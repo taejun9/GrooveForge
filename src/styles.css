@@ -205,6 +205,13 @@ h2 {
   background: #78f0c8;
 }
 
+.icon-button.selected,
+.icon-button[aria-pressed="true"] {
+  border-color: rgba(120, 240, 200, 0.55);
+  color: #78f0c8;
+  background: rgba(120, 240, 200, 0.13);
+}
+
 .icon-button:disabled,
 .segmented button:disabled,
 .pattern-tools button:disabled,

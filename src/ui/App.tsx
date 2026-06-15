@@ -1009,6 +1009,13 @@ export function App(): ReactElement {
     }
   }
 
+  function toggleMetronome(): void {
+    updateProject(
+      (current) => ({ ...current, metronomeEnabled: !current.metronomeEnabled }),
+      projectRef.current.metronomeEnabled ? "Metronome off" : "Metronome on"
+    );
+  }
+
   function selectStyle(styleId: ProjectState["styleId"]): void {
     const nextStyle = styleProfiles.find((candidate) => candidate.id === styleId);
     if (!nextStyle) {
@@ -1115,6 +1122,17 @@ export function App(): ReactElement {
               Pattern
             </button>
           </div>
+          <button
+            aria-pressed={project.metronomeEnabled}
+            className={`icon-button ${project.metronomeEnabled ? "selected" : ""}`}
+            data-testid="metronome-toggle"
+            type="button"
+            title={project.metronomeEnabled ? "Turn metronome off" : "Turn metronome on"}
+            onClick={toggleMetronome}
+          >
+            <Gauge size={18} aria-hidden="true" />
+            <span>Click</span>
+          </button>
           <button className="icon-button primary" type="button" title={playbackMode === "arrangement" ? "Play arrangement" : "Play selected pattern"} onClick={togglePlayback}>
             {isPlaying ? <CircleStop size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
             <span>{isPlaying ? "Stop" : "Play"}</span>

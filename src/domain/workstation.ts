@@ -124,6 +124,7 @@ export type ProjectState = {
   styleId: StyleId;
   selectedPattern: PatternSlot;
   swing: number;
+  metronomeEnabled: boolean;
   sound: SoundDesign;
   patterns: Record<PatternSlot, PatternData>;
   mixer: MixerChannel[];
@@ -537,6 +538,7 @@ export const starterProject: ProjectState = {
   styleId: "trap",
   selectedPattern: "A",
   swing: 0.08,
+  metronomeEnabled: false,
   sound: { ...soundPresetDefaults.clean_knock },
   patterns: {
     A: clonePatternData(starterPatternA),
@@ -1248,6 +1250,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
   if (isProjectStateShape(value)) {
     return {
       ...value,
+      metronomeEnabled: value.metronomeEnabled ?? false,
       sound: normalizeSoundDesign(value.sound),
       patterns: normalizePatternMap(value.patterns),
       mixer: normalizeMixerChannels(value.mixer),
@@ -1269,6 +1272,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
       styleId: value.styleId,
       selectedPattern: value.selectedPattern,
       swing: value.swing,
+      metronomeEnabled: value.metronomeEnabled ?? false,
       sound: normalizeSoundDesign(value.sound),
       patterns: {
         A: clonePatternData(legacyPattern),
@@ -1299,7 +1303,8 @@ type MixerChannelInput = Omit<MixerChannel, "lowCut" | "air" | "drive" | "glue">
   glue?: number;
 };
 type ArrangementBlockInput = Omit<ArrangementBlock, "bars"> & { bars?: number };
-type ProjectStateInput = Omit<ProjectState, "patterns" | "sound" | "mixer" | "arrangement"> & {
+type ProjectStateInput = Omit<ProjectState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled"> & {
+  metronomeEnabled?: boolean;
   sound?: SoundDesignInput;
   patterns: Record<PatternSlot, PatternDataInput>;
   mixer: MixerChannelInput[];
@@ -1319,6 +1324,7 @@ function isProjectStateShape(value: unknown): value is ProjectStateInput {
     isOneOf(value.styleId, styleProfiles.map((profile) => profile.id)) &&
     isOneOf(value.selectedPattern, patternSlots) &&
     isFiniteNumber(value.swing) &&
+    (value.metronomeEnabled === undefined || typeof value.metronomeEnabled === "boolean") &&
     (value.sound === undefined || isSoundDesignInput(value.sound)) &&
     isPatternMapInput(value.patterns) &&
     Array.isArray(value.mixer) &&
@@ -1329,7 +1335,8 @@ function isProjectStateShape(value: unknown): value is ProjectStateInput {
   );
 }
 
-function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patterns" | "sound" | "mixer" | "arrangement"> & {
+function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled"> & {
+  metronomeEnabled?: boolean;
   sound?: SoundDesignInput;
   mixer: MixerChannelInput[];
   arrangement: ArrangementBlockInput[];
@@ -1346,6 +1353,7 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patt
     isOneOf(value.styleId, styleProfiles.map((profile) => profile.id)) &&
     isOneOf(value.selectedPattern, patternSlots) &&
     isFiniteNumber(value.swing) &&
+    (value.metronomeEnabled === undefined || typeof value.metronomeEnabled === "boolean") &&
     (value.sound === undefined || isSoundDesignInput(value.sound)) &&
     isDrumPattern(value.drumPattern) &&
     (value.drumVelocities === undefined || isDrumVelocities(value.drumVelocities)) &&

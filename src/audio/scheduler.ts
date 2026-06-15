@@ -57,6 +57,7 @@ type TrackMix = {
 const scheduleAheadSeconds = 0.12;
 const scheduleAheadMs = scheduleAheadSeconds * 1000;
 const schedulerTickMs = 25;
+const metronomeMix: TrackMix = { gain: 1, pan: 0, lowCut: 0, air: 0.16, drive: 0, glue: 0 };
 
 function createAudioContext(): AudioContext {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -317,6 +318,27 @@ function synthOscillator(sound: SoundDesign): OscillatorType {
   return sound.synthBrightness > 0.46 ? "triangle" : "sine";
 }
 
+function scheduleMetronomeClick(context: AudioContext, destination: AudioNode, time: number, step: number): void {
+  const accent = step % 16 === 0;
+  scheduleTone(
+    context,
+    destination,
+    time,
+    accent ? 0.055 : 0.04,
+    accent ? 1760 : 1320,
+    accent ? 0.12 : 0.075,
+    "square",
+    metronomeMix,
+    0,
+    {
+      filterHz: accent ? 9200 : 7200,
+      highpassHz: 900,
+      air: metronomeMix.air,
+      release: 0
+    }
+  );
+}
+
 function scheduleStep(project: ProjectState, pattern: PatternData, context: AudioContext, master: AudioNode, step: number, time: number): void {
   const patternStep = step % 16;
   const drumMix = channelMix(project, "drum_rack");
@@ -325,6 +347,9 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
   const chordMix = channelMix(project, "chord");
   const sound = project.sound;
   const stepDuration = projectStepDurationSeconds(project);
+  if (project.metronomeEnabled && patternStep % 4 === 0) {
+    scheduleMetronomeClick(context, master, time, patternStep);
+  }
   if (pattern.drumPattern.kick[patternStep]) {
     const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
     scheduleKick(context, master, drumTime, drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix, sound);
