@@ -159,6 +159,8 @@ MIDI export work must write deterministic Standard MIDI Files from editable proj
 
 Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation, pattern programming, sound design, arrangement, mixing/mastering, and export first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, roadmap order, or plan titles.
 
+Concept correction work must make the all-genre beat-production mini DAW framing explicit: direct beat composition, sound design, arrangement, mixing/mastering, and export are the product spine, while sample import, chopping, pitch/stretch, one-shot mapping, and sampler workflows are optional later paths.
+
 First-run UX, default navigation, and roadmap work must lead with direct beat composition: pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sample browsing, chopping, sampler setup, audio clips, and audio warping must stay opt-in optional-sampling paths unless the user explicitly changes the product direction.
 
 Docs that mention clips before optional sampling is implemented must clarify that core clips are pattern, MIDI, or automation containers, not imported audio assets.

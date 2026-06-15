@@ -11,6 +11,8 @@ Agent team: `Team Forge`. See `AGENTS.md`.
 
 ## Product Spine
 
+Concept lock: GrooveForge is not a sampling app. It is an all-genre beat-production mini DAW for directly composing beats, designing sounds, arranging sections, mixing/mastering, and exporting finished audio. Sampling is a useful optional module only after the beat workstation core is already valuable.
+
 GrooveForge is a code-driven all-genre beat workstation with a programmable project format and style engine. Direct composition is the product spine: users should be able to program drums, 808/bass, melody, chords, FX, and automation as editable musical events, shape built-in instruments, arrange a song section, mix/master it, and export audio before they ever import a sample.
 
 The first-run experience should feel like opening a compact beat-making DAW, not a sample browser: choose BPM/key/style, write drums, build 808/bass, add melody/chords, shape sounds, arrange, mix, master, then export.
@@ -18,7 +20,13 @@ The first-run experience should feel like opening a compact beat-making DAW, not
 The core flow is:
 
 ```text
-BPM/key -> drums -> 808/bass -> melody/chords -> arrangement -> mixing -> mastering -> export
+BPM/key/style -> pattern programming -> drums -> 808/bass -> melody/chords -> sound design -> arrangement -> mixing -> mastering -> export
+```
+
+Optional sampling path, later:
+
+```text
+sample import -> chop/slice -> pitch/stretch -> one-shot or sampler mapping
 ```
 
 Sampling is a secondary add-on. It can be added later for users who want audio import, chopping, loop stretching, one-shot mapping, or sampler workflows, but it must not define the MVP, the first-run experience, or the core data model. A complete GrooveForge beat must be possible with no imported audio.

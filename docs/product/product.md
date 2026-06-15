@@ -11,6 +11,8 @@ GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats
 
 ## Product Definition
 
+Corrected concept: GrooveForge is a beat-production mini DAW for directly composing beats across genres, designing sounds, arranging sections, mixing/mastering, and exporting finished audio. It can support sampling later, but sampling is not the project identity, first-run workflow, MVP proof, or core architecture.
+
 GrooveForge is a code-driven all-genre beat workstation: a mini DAW with a JSON-based project format, programmable style profiles, editable musical events, local synthesis, mixing/mastering controls, and offline export. The center is making a beat directly, not finding a sample to start from.
 
 The primary object is a beat project built from musical events, patterns, tracks, devices, arrangement blocks, mixer state, master state, and render state. Audio samples can become assets inside that project later, but they are not the default starting point.
@@ -51,7 +53,13 @@ Primary navigation and the first empty project should expose beat-making control
 The core product loop is:
 
 ```text
-BPM/key -> style/pattern programming -> drum pattern -> 808/bass line -> melody/chords -> sound design -> arrangement -> mixer -> master -> export
+BPM/key/style -> pattern programming -> drum pattern -> 808/bass line -> melody/chords -> sound design -> arrangement -> mixer -> master -> export
+```
+
+Optional sampling path, later:
+
+```text
+audio sample import -> chop/slice -> pitch/stretch -> one-shot or sampler mapping
 ```
 
 Primary feature areas:
