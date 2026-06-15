@@ -129,6 +129,8 @@ Pattern Chain work must replace only arrangement blocks with deterministic Patte
 
 Pattern Chain step editor work must cycle only arrangement block Pattern A/B/C assignments through existing undoable project update paths, keep each block's section, bars, energy, muted tracks, and Pattern A/B/C musical event data intact, align the selected block and selected pattern after edits, make realtime playback plus WAV/stem/MIDI export follow the edited chain, and avoid sampling, imported audio, plugin hosting, remote AI, hidden randomness, macros, accounts, analytics, or cloud sync.
 
+Pattern Chain expand work must transform only arrangement blocks into a longer deterministic song-form outline, preserve Pattern A/B/C musical event data plus mixer/sound/master state, align selected pattern to the first expanded block, remain undoable, make realtime playback plus WAV/stem/MIDI export follow the expanded arrangement, and avoid sampling, imported audio, plugin hosting, remote AI, hidden randomness, macros, accounts, analytics, or cloud sync.
+
 Arrangement length work must keep per-block bar counts bounded, migrate older project files without bar counts to one bar per block, keep changes undoable, and make export meter, full-mix WAV export, and stem export follow total arrangement bars.
 
 Arrangement playback work must map realtime playback through arrangement blocks, per-block bar counts, and Pattern A/B/C assignments by default while preserving a selected-pattern preview mode, accurate transport status, Space shortcut behavior, and existing mixer/sound/master processing.

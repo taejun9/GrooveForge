@@ -639,6 +639,63 @@ const patternChainBlocks: Record<PatternChainId, ArrangementTemplateBlock[]> = {
   ]
 };
 
+const chainExpandSections: ArrangementSection[] = [
+  "Intro",
+  "Verse",
+  "Verse",
+  "Hook",
+  "Hook",
+  "Verse",
+  "Bridge",
+  "Bridge",
+  "Hook",
+  "Hook",
+  "Verse",
+  "Verse",
+  "Hook",
+  "Hook",
+  "Outro",
+  "Outro"
+];
+
+const chainExpandEnergies = [
+  0.34,
+  0.62,
+  0.68,
+  0.9,
+  0.94,
+  0.58,
+  0.42,
+  0.5,
+  0.92,
+  0.96,
+  0.64,
+  0.7,
+  0.95,
+  0.98,
+  0.4,
+  0.28
+];
+
+const chainExpandMutedTracks: ArrangementMuteTrack[][] = [
+  ["synth"],
+  [],
+  [],
+  [],
+  [],
+  [],
+  ["drum_rack", "bass_808"],
+  ["bass_808"],
+  [],
+  [],
+  [],
+  [],
+  [],
+  [],
+  ["bass_808", "synth"],
+  ["drum_rack", "bass_808", "synth"]
+];
+
 const starterPatternA: PatternData = withDrumDynamics({
   drumPattern: {
     kick: [true, false, false, false, false, false, true, false, false, false, false, false, true, false, false, false],
@@ -873,6 +930,20 @@ export function createPatternChain(chain: PatternChainId): ArrangementBlock[] {
     bars: normalizeArrangementBars(block.bars),
     mutedTracks: normalizeArrangementMutedTracks(block.mutedTracks)
   }));
+}
+
+export function expandPatternChainArrangement(arrangement: ArrangementBlock[]): ArrangementBlock[] {
+  const source = arrangement.length > 0 ? arrangement : createPatternChain("eight_bar");
+  return chainExpandSections.map((section, index) => {
+    const sourceBlock = source[index % source.length] ?? source[0];
+    return {
+      section,
+      pattern: sourceBlock.pattern,
+      bars: 1,
+      energy: normalizeArrangementEnergy(chainExpandEnergies[index] ?? sourceBlock.energy),
+      mutedTracks: normalizeArrangementMutedTracks(chainExpandMutedTracks[index] ?? sourceBlock.mutedTracks)
+    };
+  });
 }
 
 export function applyArrangementMovePreset(block: ArrangementBlock, preset: ArrangementMovePreset): ArrangementBlock {

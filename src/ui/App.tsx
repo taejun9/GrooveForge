@@ -102,6 +102,7 @@ import {
   drumStepVelocity,
   drumGroovePresetIds,
   drumGroovePresetLabel,
+  expandPatternChainArrangement,
   hatRepeatCount,
   masterPresetCeilingDb,
   masterPresets,
@@ -885,6 +886,25 @@ export function App(): ReactElement {
         arrangement
       }),
       `Applied ${patternChainLabel(chain)}`
+    );
+    if (changed) {
+      setSelectedArrangementIndex(0);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+    }
+  }
+
+  function expandPatternChain(): void {
+    const arrangement = expandPatternChainArrangement(projectRef.current.arrangement);
+    const firstBlock = arrangement[0];
+    const changed = updateProject(
+      (current) => ({
+        ...current,
+        selectedPattern: firstBlock.pattern,
+        arrangement
+      }),
+      "Expanded chain to song form"
     );
     if (changed) {
       setSelectedArrangementIndex(0);
@@ -2409,6 +2429,17 @@ export function App(): ReactElement {
               <span>Chain</span>
               <strong data-testid="pattern-chain-current">{patternChainReadout(project.arrangement)}</strong>
             </div>
+            <button
+              className="pattern-chain-expand"
+              data-testid="pattern-chain-expand"
+              onClick={expandPatternChain}
+              title="Expand the current chain into a longer song form"
+              type="button"
+            >
+              <ArrowRight size={14} aria-hidden="true" />
+              <span>Expand</span>
+              <small>{barCountLabel(16)} song form</small>
+            </button>
             <div className="pattern-chain-actions">
               {patternChainIds.map((chain) => {
                 const chainBlocks = createPatternChain(chain);

@@ -1633,13 +1633,14 @@ input[type="range"] {
 
 .pattern-chain-row {
   display: grid;
-  grid-template-columns: 148px 1fr;
+  grid-template-columns: 148px minmax(112px, 0.42fr) minmax(0, 1fr);
   gap: 8px;
   align-items: stretch;
   min-width: 0;
 }
 
 .pattern-chain-heading,
+.pattern-chain-expand,
 .pattern-chain-actions button {
   border: 1px solid rgba(244, 239, 231, 0.1);
   border-radius: 7px;
@@ -1655,6 +1656,7 @@ input[type="range"] {
 }
 
 .pattern-chain-heading span,
+.pattern-chain-expand small,
 .pattern-chain-actions button small {
   overflow: hidden;
   color: rgba(244, 239, 231, 0.58);
@@ -1667,6 +1669,30 @@ input[type="range"] {
   overflow: hidden;
   color: #78f0c8;
   font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pattern-chain-expand {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 2px 7px;
+  align-items: center;
+  min-width: 0;
+  min-height: 50px;
+  color: #f4efe7;
+  padding: 7px 9px;
+  text-align: start;
+}
+
+.pattern-chain-expand svg {
+  grid-row: span 2;
+  color: #ff7a4f;
+}
+
+.pattern-chain-expand span {
+  overflow: hidden;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2303,5 +2329,13 @@ input[type="range"] {
 
   .arrangement-editor {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pattern-chain-row {
+    grid-template-columns: 148px minmax(0, 1fr);
+  }
+
+  .pattern-chain-actions {
+    grid-column: 1 / -1;
   }
 }
