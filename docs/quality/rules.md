@@ -123,6 +123,8 @@ Arrangement merge work must merge only the selected block with the next block, p
 
 Arrangement template work must replace only arrangement blocks, keep existing Pattern A/B/C musical data and mixer/master state intact, reset selection safely to a valid block, align the selected pattern with the first template block, remain undoable, and make WAV/stem export follow the applied template length.
 
+Pattern Chain work must replace only arrangement blocks with deterministic Pattern A/B/C sequences, keep existing Pattern A/B/C musical data and mixer/sound/master state intact, reset selection safely to the first chain block, align the selected pattern with that block, remain undoable, make realtime playback plus WAV/stem/MIDI export follow the chain, and avoid sampling, imported audio, plugin hosting, remote AI, hidden randomness, macros, accounts, analytics, or cloud sync.
+
 Arrangement length work must keep per-block bar counts bounded, migrate older project files without bar counts to one bar per block, keep changes undoable, and make export meter, full-mix WAV export, and stem export follow total arrangement bars.
 
 Arrangement playback work must map realtime playback through arrangement blocks, per-block bar counts, and Pattern A/B/C assignments by default while preserving a selected-pattern preview mode, accurate transport status, Space shortcut behavior, and existing mixer/sound/master processing.

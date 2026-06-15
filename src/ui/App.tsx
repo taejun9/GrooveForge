@@ -63,6 +63,7 @@ import {
   NoteTrack,
   PatternData,
   PatternFillPreset,
+  PatternChainId,
   PatternSlot,
   ProjectSnapshot,
   PatternVariationPreset,
@@ -90,6 +91,7 @@ import {
   createChordProgressionPreset,
   createArrangementTemplate,
   createNextChordEvent,
+  createPatternChain,
   createPatternVariation,
   createStylePatternSet,
   createEmptyPatternData,
@@ -123,6 +125,8 @@ import {
   normalizeProjectSnapshotName,
   parseProjectFile,
   patternSlots,
+  patternChainIds,
+  patternChainLabel,
   patternFillPresetIds,
   patternFillPresetLabel,
   patternVariationPresetIds,
@@ -845,6 +849,25 @@ export function App(): ReactElement {
         arrangement
       }),
       `Applied ${arrangementTemplateLabel(template)} arrangement`
+    );
+    if (changed) {
+      setSelectedArrangementIndex(0);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+    }
+  }
+
+  function applyPatternChain(chain: PatternChainId): void {
+    const arrangement = createPatternChain(chain);
+    const firstBlock = arrangement[0];
+    const changed = updateProject(
+      (current) => ({
+        ...current,
+        selectedPattern: firstBlock.pattern,
+        arrangement
+      }),
+      `Applied ${patternChainLabel(chain)}`
     );
     if (changed) {
       setSelectedArrangementIndex(0);
@@ -1881,6 +1904,7 @@ export function App(): ReactElement {
     onApplyArrangementMove: applyArrangementMoveToSelected,
     onApplyBlueprint: applySelectedBeatBlueprint,
     onApplyMixFix: applyMixFixPreset,
+    onApplyPatternChain: applyPatternChain,
     onApplyPatternFill: applyPatternFill,
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
@@ -2359,6 +2383,31 @@ export function App(): ReactElement {
                 </button>
               );
             })}
+          </div>
+          <div className="pattern-chain-row" aria-label="Pattern chain">
+            <div className="pattern-chain-heading">
+              <span>Chain</span>
+              <strong data-testid="pattern-chain-current">{patternChainReadout(project.arrangement)}</strong>
+            </div>
+            <div className="pattern-chain-actions">
+              {patternChainIds.map((chain) => {
+                const chainBlocks = createPatternChain(chain);
+                const chainBars = chainBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+                return (
+                  <button
+                    data-testid={`pattern-chain-${chain}`}
+                    key={chain}
+                    onClick={() => applyPatternChain(chain)}
+                    title={`Apply ${patternChainLabel(chain)}`}
+                    type="button"
+                  >
+                    <ArrowRight size={14} aria-hidden="true" />
+                    <span>{patternChainLabel(chain)}</span>
+                    <small>{patternChainReadout(chainBlocks)} / {barCountLabel(chainBars)}</small>
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div className="arrangement-track">
             {project.arrangement.map((block, index) => (
@@ -3145,6 +3194,7 @@ function createQuickActions({
   onApplyArrangementMove,
   onApplyBlueprint,
   onApplyMixFix,
+  onApplyPatternChain,
   onApplyPatternFill,
   onExportMidi,
   onExportStems,
@@ -3164,6 +3214,7 @@ function createQuickActions({
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
   onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
   onApplyMixFix: (preset: MixFixPreset) => void;
+  onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
   onExportMidi: () => void;
   onExportStems: () => void;
@@ -3268,6 +3319,14 @@ function createQuickActions({
       group: "Arrange",
       keywords: "hook lift arrangement energy mute build drop",
       run: () => onApplyArrangementMove("hook_lift")
+    },
+    {
+      id: "pattern-chain",
+      title: "Apply 8 Bar Chain",
+      detail: "Turn Pattern A/B/C variations into an editable 8-bar arrangement.",
+      group: "Arrange",
+      keywords: "pattern chain arrangement structure sketch a b c song",
+      run: () => onApplyPatternChain("eight_bar")
     },
     {
       id: "mix-headroom",
@@ -5160,6 +5219,10 @@ function patternEventCount(pattern: PatternData): string {
     0
   );
   return `${drumHits + repeatedHats + pattern.bassNotes.length + pattern.melodyNotes.length + pattern.chordEvents.length} events`;
+}
+
+function patternChainReadout(arrangement: ArrangementBlock[]): string {
+  return arrangement.map((block) => block.pattern).join("-");
 }
 
 function barCountLabel(bars: number): string {

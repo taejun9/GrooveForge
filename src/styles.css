@@ -326,6 +326,7 @@ h2 {
 
 .quick-actions-panel {
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   width: min(640px, calc(100vw - 48px));
   max-height: min(680px, calc(100vh - 120px));
   gap: 10px;
@@ -333,6 +334,7 @@ h2 {
   border-radius: 8px;
   background: #171716;
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
+  overflow: hidden;
   padding: 12px;
 }
 
@@ -1627,6 +1629,77 @@ input[type="range"] {
 .arrangement-template-row button small {
   color: rgba(244, 239, 231, 0.56);
   font-size: 10px;
+}
+
+.pattern-chain-row {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 8px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.pattern-chain-heading,
+.pattern-chain-actions button {
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+}
+
+.pattern-chain-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.pattern-chain-heading span,
+.pattern-chain-actions button small {
+  overflow: hidden;
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pattern-chain-heading strong {
+  overflow: hidden;
+  color: #78f0c8;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pattern-chain-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.pattern-chain-actions button {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 2px 7px;
+  align-items: center;
+  min-width: 0;
+  min-height: 50px;
+  color: #f4efe7;
+  padding: 7px 9px;
+  text-align: start;
+}
+
+.pattern-chain-actions button svg {
+  grid-row: span 2;
+  color: #78f0c8;
+}
+
+.pattern-chain-actions button span {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .arrangement-block {

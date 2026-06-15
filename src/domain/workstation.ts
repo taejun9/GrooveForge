@@ -109,6 +109,8 @@ export type ArrangementBlock = {
 
 export const arrangementTemplateIds = ["loop", "full", "hook_first", "breakdown"] as const;
 export type ArrangementTemplateId = (typeof arrangementTemplateIds)[number];
+export const patternChainIds = ["eight_bar", "hook_switch", "break_turn"] as const;
+export type PatternChainId = (typeof patternChainIds)[number];
 export const arrangementMuteTrackIds = ["drum_rack", "bass_808", "synth", "chord"] as const;
 export type ArrangementMuteTrack = (typeof arrangementMuteTrackIds)[number];
 export const arrangementMovePresetIds = ["drop", "build", "hook_lift", "reset"] as const;
@@ -202,6 +204,11 @@ export const arrangementTemplateLabels: Record<ArrangementTemplateId, string> = 
   full: "Full Beat",
   hook_first: "Hook First",
   breakdown: "Breakdown"
+};
+export const patternChainLabels: Record<PatternChainId, string> = {
+  eight_bar: "8 Bar Chain",
+  hook_switch: "Hook Switch",
+  break_turn: "Break Turn"
 };
 export const arrangementMuteTrackLabels: Record<ArrangementMuteTrack, string> = {
   drum_rack: "Drums",
@@ -599,6 +606,39 @@ const arrangementTemplateBlocks: Record<ArrangementTemplateId, ArrangementTempla
   ]
 };
 
+const patternChainBlocks: Record<PatternChainId, ArrangementTemplateBlock[]> = {
+  eight_bar: [
+    { section: "Intro", pattern: "A", energy: 0.44, bars: 1, mutedTracks: ["synth"] },
+    { section: "Verse", pattern: "A", energy: 0.66, bars: 1 },
+    { section: "Verse", pattern: "A", energy: 0.7, bars: 1 },
+    { section: "Bridge", pattern: "C", energy: 0.58, bars: 1, mutedTracks: ["bass_808"] },
+    { section: "Hook", pattern: "B", energy: 0.9, bars: 1 },
+    { section: "Hook", pattern: "B", energy: 0.94, bars: 1 },
+    { section: "Hook", pattern: "C", energy: 0.78, bars: 1 },
+    { section: "Outro", pattern: "A", energy: 0.4, bars: 1, mutedTracks: ["bass_808", "synth"] }
+  ],
+  hook_switch: [
+    { section: "Hook", pattern: "B", energy: 0.92, bars: 1 },
+    { section: "Hook", pattern: "B", energy: 0.96, bars: 1 },
+    { section: "Verse", pattern: "A", energy: 0.62, bars: 1 },
+    { section: "Verse", pattern: "A", energy: 0.68, bars: 1 },
+    { section: "Bridge", pattern: "C", energy: 0.5, bars: 1, mutedTracks: ["drum_rack"] },
+    { section: "Hook", pattern: "B", energy: 0.98, bars: 1 },
+    { section: "Hook", pattern: "C", energy: 0.82, bars: 1 },
+    { section: "Outro", pattern: "A", energy: 0.36, bars: 1, mutedTracks: ["bass_808"] }
+  ],
+  break_turn: [
+    { section: "Intro", pattern: "A", energy: 0.34, bars: 1, mutedTracks: ["bass_808", "synth"] },
+    { section: "Verse", pattern: "A", energy: 0.58, bars: 1 },
+    { section: "Bridge", pattern: "C", energy: 0.42, bars: 1, mutedTracks: ["bass_808"] },
+    { section: "Bridge", pattern: "C", energy: 0.48, bars: 1 },
+    { section: "Hook", pattern: "B", energy: 0.88, bars: 1 },
+    { section: "Hook", pattern: "B", energy: 0.96, bars: 1 },
+    { section: "Verse", pattern: "A", energy: 0.64, bars: 1 },
+    { section: "Hook", pattern: "B", energy: 0.94, bars: 1 }
+  ]
+};
+
 const starterPatternA: PatternData = withDrumDynamics({
   drumPattern: {
     kick: [true, false, false, false, false, false, true, false, false, false, false, false, true, false, false, false],
@@ -805,6 +845,10 @@ export function arrangementTemplateLabel(template: ArrangementTemplateId): strin
   return arrangementTemplateLabels[template];
 }
 
+export function patternChainLabel(chain: PatternChainId): string {
+  return patternChainLabels[chain];
+}
+
 export function arrangementMuteTrackLabel(track: ArrangementMuteTrack): string {
   return arrangementMuteTrackLabels[track];
 }
@@ -816,6 +860,17 @@ export function arrangementMovePresetLabel(preset: ArrangementMovePreset): strin
 export function createArrangementTemplate(template: ArrangementTemplateId): ArrangementBlock[] {
   return arrangementTemplateBlocks[template].map((block) => ({
     ...block,
+    energy: normalizeArrangementEnergy(block.energy),
+    bars: normalizeArrangementBars(block.bars),
+    mutedTracks: normalizeArrangementMutedTracks(block.mutedTracks)
+  }));
+}
+
+export function createPatternChain(chain: PatternChainId): ArrangementBlock[] {
+  return patternChainBlocks[chain].map((block) => ({
+    ...block,
+    energy: normalizeArrangementEnergy(block.energy),
+    bars: normalizeArrangementBars(block.bars),
     mutedTracks: normalizeArrangementMutedTracks(block.mutedTracks)
   }));
 }
