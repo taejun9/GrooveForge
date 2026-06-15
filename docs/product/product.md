@@ -125,6 +125,7 @@ MVP capabilities:
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
 - Desktop editing shortcuts for arrangement playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, and redo while leaving focused inputs alone.
 - Transport playback modes for full arrangement playback by default and fast selected-pattern preview while editing.
+- Live playback reads the current project while scheduling future steps, so selected-pattern preview, arrangement block edits, arrangement length, BPM, mixer, sound, and master changes can be heard without stopping and restarting.
 - Mixer volume, pan, mute, solo, low-cut/air EQ, and Drive/Glue mix controls reflected in realtime playback and WAV export.
 - Master preset ceiling and output gain.
 - Export peak/RMS/headroom meter with limiter activity status for the current arrangement.

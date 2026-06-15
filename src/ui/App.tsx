@@ -906,6 +906,7 @@ export function App(): ReactElement {
       controllerRef.current = startRealtimePlayback(project, {
         mode: playbackMode,
         bars: playbackMode === "pattern" ? 2 : undefined,
+        getProject: () => projectRef.current,
         onStep: setPlaybackPosition,
         onStop: () => {
           controllerRef.current = null;

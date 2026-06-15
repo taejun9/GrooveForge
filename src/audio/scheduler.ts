@@ -40,6 +40,7 @@ export type PlaybackController = {
 type SchedulerOptions = {
   bars?: number;
   mode?: PlaybackMode;
+  getProject?: () => ProjectState;
   onStep?: (snapshot: PlaybackSnapshot) => void;
   onStop?: () => void;
 };
@@ -453,14 +454,9 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
 export function startRealtimePlayback(project: ProjectState, options: SchedulerOptions = {}): PlaybackController {
   const context = createAudioContext();
   void context.resume();
+  const getProject = options.getProject ?? (() => project);
   const mode = options.mode ?? "arrangement";
-  const bars = options.bars ?? (mode === "arrangement" ? arrangementTotalBars(project) : 2);
-  const loopSteps = loopStepCount(bars);
-  const totalBars = Math.max(1, bars);
-  const stepDuration = projectStepDurationSeconds(project);
   const masterGain = context.createGain();
-  const ceiling = dbToGain(project.masterCeilingDb);
-  masterGain.gain.setValueAtTime(masterOutputGain(project) * Math.min(1, ceiling), context.currentTime);
   masterGain.connect(context.destination);
 
   let nextStep = 0;
@@ -487,10 +483,17 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
 
     const nowMs = performance.now();
     while (nextStepAtMs < nowMs + scheduleAheadMs) {
-      const snapshot = snapshotForStep(project, nextStep, loopSteps, totalBars, mode);
-      const playbackContext = playbackContextForStep(project, mode, snapshot.loopStep);
+      const currentProject = getProject();
+      const bars = options.bars ?? (mode === "arrangement" ? arrangementTotalBars(currentProject) : 2);
+      const loopSteps = loopStepCount(bars);
+      const totalBars = Math.max(1, bars);
+      const stepDuration = projectStepDurationSeconds(currentProject);
+      const ceiling = dbToGain(currentProject.masterCeilingDb);
+      masterGain.gain.setTargetAtTime(masterOutputGain(currentProject) * Math.min(1, ceiling), context.currentTime, 0.01);
+      const snapshot = snapshotForStep(currentProject, nextStep, loopSteps, totalBars, mode);
+      const playbackContext = playbackContextForStep(currentProject, mode, snapshot.loopStep);
       const scheduleDelaySeconds = Math.max(0.015, (nextStepAtMs - nowMs) / 1000);
-      scheduleStep(project, playbackContext.pattern, context, masterGain, snapshot.loopStep, context.currentTime + scheduleDelaySeconds);
+      scheduleStep(currentProject, playbackContext.pattern, context, masterGain, snapshot.loopStep, context.currentTime + scheduleDelaySeconds);
       queueStepFeedback(snapshot, nextStepAtMs);
       nextStep += 1;
       nextStepAtMs += stepDuration * 1000;
