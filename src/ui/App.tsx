@@ -211,6 +211,7 @@ type NextMoveCommand =
   | { kind: "blueprint"; blueprintId: BeatBlueprintId }
   | { kind: "patternFill"; preset: PatternFillPreset }
   | { kind: "arrangementMove"; preset: ArrangementMovePreset }
+  | { kind: "patternChain"; chain: PatternChainId }
   | { kind: "arrangementTemplate"; template: ArrangementTemplateId }
   | { kind: "snapshot" }
   | { kind: "reviewMix" };
@@ -1872,6 +1873,9 @@ export function App(): ReactElement {
       case "arrangementMove":
         applyArrangementMoveToSelected(action.command.preset);
         return;
+      case "patternChain":
+        applyPatternChain(action.command.chain);
+        return;
       case "arrangementTemplate":
         applyArrangementTemplate(action.command.template);
         return;
@@ -3445,6 +3449,7 @@ function nextMoveIcon(action: NextMoveAction): ReactElement {
     case "reviewMix":
       return <Gauge size={14} aria-hidden="true" />;
     case "arrangementMove":
+    case "patternChain":
     case "arrangementTemplate":
       return <Waves size={14} aria-hidden="true" />;
     case "blueprint":
@@ -3459,8 +3464,10 @@ function createNextMoveActions(
   analysis: ExportAnalysis
 ): NextMoveAction[] {
   const primary = primaryNextMoveAction(project, checks, analysis);
+  const arrangementNeedsStructure = readinessCheckForId(checks, "arrangement")?.tone === "warn";
   const candidates: NextMoveAction[] = [
     primary,
+    ...(arrangementNeedsStructure ? [fullArrangementNextMoveAction()] : []),
     patternFillNextMoveAction(project),
     arrangementLiftNextMoveAction(project),
     snapshotNextMoveAction(project),
@@ -3493,14 +3500,7 @@ function primaryNextMoveAction(
   }
 
   if (arrangement?.tone === "warn") {
-    return {
-      id: "full-arrangement",
-      title: "Build a full beat structure",
-      detail: "Full Beat template from current Pattern A/B/C data.",
-      buttonLabel: "Full Beat",
-      tone: "warn",
-      command: { kind: "arrangementTemplate", template: "full" }
-    };
+    return patternChainNextMoveAction();
   }
 
   if (exportCheck?.tone !== "good" || analysis.status !== "Ready") {
@@ -3559,6 +3559,28 @@ function patternFillNextMoveAction(project: ProjectState): NextMoveAction {
     buttonLabel: patternFillPresetLabel(preset),
     tone: "good",
     command: { kind: "patternFill", preset }
+  };
+}
+
+function patternChainNextMoveAction(): NextMoveAction {
+  return {
+    id: "pattern-chain",
+    title: "Sketch an 8-bar Pattern Chain",
+    detail: "Use Pattern A/B/C as an editable song outline.",
+    buttonLabel: "8 Bar Chain",
+    tone: "warn",
+    command: { kind: "patternChain", chain: "eight_bar" }
+  };
+}
+
+function fullArrangementNextMoveAction(): NextMoveAction {
+  return {
+    id: "full-arrangement",
+    title: "Build a full beat structure",
+    detail: "Full Beat template from current Pattern A/B/C data.",
+    buttonLabel: "Full Beat",
+    tone: "warn",
+    command: { kind: "arrangementTemplate", template: "full" }
   };
 }
 
