@@ -15,6 +15,18 @@ PLAN_RE = re.compile(r"plan-\d{3}-[a-z0-9][a-z0-9-]*\.md$")
 REQUIRED_PATHS = [
     "AGENTS.md",
     "README.md",
+    "package.json",
+    "index.html",
+    "vite.config.ts",
+    "tsconfig.json",
+    "tsconfig.electron.json",
+    "electron/main.ts",
+    "electron/preload.ts",
+    "src/main.tsx",
+    "src/ui/App.tsx",
+    "src/domain/workstation.ts",
+    "src/audio/render.ts",
+    "src/styles.css",
     "docs/architecture/harness.md",
     "docs/architecture/product-architecture.md",
     "docs/product/product.md",
@@ -34,7 +46,7 @@ TEXT_EXPECTATIONS = {
     "README.md": [
         "making beats across genres",
         "Sampling is a secondary add-on.",
-        "python3 harness/scripts/run_qa.py",
+        "npm run desktop",
     ],
     "AGENTS.md": [
         "No Exec Plan, No Work",
@@ -50,8 +62,30 @@ TEXT_EXPECTATIONS = {
     ],
     "docs/references/official-sources.md": [
         "W3C Web Audio API",
+        "Electron Docs",
+        "Vite Guide",
         "ITU-R BS.1770",
         "Source Gaps",
+    ],
+    "package.json": [
+        "\"desktop\"",
+        "\"typecheck\"",
+        "\"build\"",
+    ],
+    "electron/main.ts": [
+        "nodeIntegration: false",
+        "contextIsolation: true",
+        "sandbox: true",
+    ],
+    "src/ui/App.tsx": [
+        "Guided",
+        "Studio",
+        "exportWav",
+    ],
+    "src/domain/workstation.ts": [
+        "styleProfiles",
+        "starterProject",
+        "StyleProfile",
     ],
 }
 
@@ -107,7 +141,10 @@ def check_official_sources(errors: list[str]) -> None:
 
 def check_strict_todos(errors: list[str]) -> None:
     ignored_prefixes = {
+        "dist/",
+        "dist-electron/",
         "harness/templates/",
+        "node_modules/",
     }
     for path in ROOT.rglob("*.md"):
         relative = rel(path)

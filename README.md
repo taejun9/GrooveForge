@@ -28,7 +28,7 @@ The first usable result is a browser project that can create a sample-free 8-bar
 - Pattern A/B/C storage and arrangement blocks.
 - Basic mixer volume/pan, master limiter, and WAV export.
 
-No app runtime has been installed yet. This repository currently contains the project base, durable docs, and validation harness.
+The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport, style/key/BPM, drum steps, 808/melody lanes, instruments, arrangement, mixer, master, preview playback, and WAV export.
 
 ## Core Direction
 
@@ -56,20 +56,44 @@ Do not work directly on `main`. Use a `codex/plan-NNN-<task>` branch and `.workt
 
 ## Commands
 
-Current base validation:
+Install dependencies:
+
+```sh
+npm install
+```
+
+Run the renderer dev server:
+
+```sh
+npm run dev
+```
+
+Build and open the desktop app:
+
+```sh
+npm run desktop
+```
+
+Validation:
 
 ```sh
 python3 harness/scripts/run_qa.py
 python3 harness/scripts/run_quality_gate.py
+npm run typecheck
+npm run build
+npm run qa
+npm run verify
 ```
 
-When the web app stack is installed, add real package commands for test, lint, typecheck, build, QA, and verification. Do not document commands that do not run.
+`npm run desktop` performs a production build and launches Electron from the built files.
 
 ## Layout
 
 ```text
 AGENTS.md
 README.md
+electron/
+src/
 docs/
   architecture/
     product-architecture.md

@@ -1,0 +1,33 @@
+{
+  "name": "grooveforge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "All-genre desktop beat workstation for direct composition, sound design, mixing, mastering, and export.",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -p tsconfig.json && vite build && tsc -p tsconfig.electron.json",
+    "desktop": "npm run build && electron .",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
+    "qa": "python3 harness/scripts/run_qa.py",
+    "verify": "python3 harness/scripts/run_quality_gate.py && npm run typecheck && npm run build"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.1.2",
+    "vite": "^8.0.16",
+    "typescript": "^5.9.3",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "electron": "^39.2.7",
+    "lucide-react": "^0.561.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

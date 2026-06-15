@@ -47,17 +47,17 @@ Render Engine
   Loudness Analysis
 ```
 
-## Web-First Stack Assumption
+## Desktop MVP Stack
 
-The recommended MVP stack is:
+The current MVP stack is:
 
-- Frontend: Next.js, TypeScript, Zustand, Tailwind CSS.
-- UI rendering: DOM for panels and Canvas/WebGL for dense grids, piano rolls, arrangement blocks, and waveforms.
-- Audio: Web Audio API, AudioWorklet for custom DSP, Tone.js only when it accelerates prototyping without hiding scheduler behavior.
-- Export: OfflineAudioContext-style offline rendering, then WAV encoding.
-- Storage: IndexedDB for local project and asset cache, JSON project files for portable saves.
+- Desktop shell: Electron.
+- Renderer/build: Vite, React, TypeScript.
+- UI rendering: DOM/CSS for the current workstation surface; Canvas/WebGL remains available for dense piano-roll and waveform work later.
+- Audio: Web Audio API for preview playback and a local WAV renderer for the first export path.
+- Storage: JSON project files and IndexedDB/local file cache in later plans.
 
-These are current candidates, not installed dependencies. Add package commands only after the stack exists.
+Electron is used for the first desktop MVP because it gets the existing web audio/UI direction into a runnable desktop app quickly. A later native/pro audio engine can still move to JUCE after the product loop is proven.
 
 ## Data Model Direction
 

@@ -41,21 +41,22 @@ These rules should be enforced by the local harness where practical.
 
 ## Commands
 
-Current base commands:
+Current commands:
 
 ```sh
 python3 harness/scripts/run_qa.py
 python3 harness/scripts/run_quality_gate.py
+npm run typecheck
+npm run build
+npm run qa
+npm run verify
 ```
 
-Future web app commands should be added only after the stack exists. Expected command categories:
+Desktop app manual check:
 
-- test
-- lint
-- typecheck
-- build
-- browser/audio QA
-- final verification
+```sh
+npm run desktop
+```
 
 ## Product QA Gates
 

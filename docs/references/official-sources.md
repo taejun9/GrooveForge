@@ -9,6 +9,10 @@ Record official documentation, platform docs, standards, laws, policies, or vend
 | MDN AudioWorkletNode | https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode | Browser implementation guide for custom audio nodes | 2026-06-15 | Custom DSP planning |
 | W3C Web MIDI API | https://www.w3.org/TR/webmidi/ | Browser MIDI input/output API | 2026-06-15 | Later MIDI keyboard support |
 | MDN IndexedDB API | https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API | Browser local structured data and blob storage | 2026-06-15 | Local project and asset cache |
+| Electron Docs | https://www.electronjs.org/docs/latest/ | Cross-platform desktop app shell using JavaScript, HTML, and CSS | 2026-06-15 | Desktop MVP shell |
+| Vite Guide | https://vite.dev/guide/ | Dev server and production build tool for modern web projects | 2026-06-15 | Renderer build system |
+| React Docs | https://react.dev/learn | React UI implementation reference | 2026-06-15 | Workstation renderer UI |
+| TypeScript Docs | https://www.typescriptlang.org/docs/ | TypeScript language and tooling reference | 2026-06-15 | Typed project, event, and UI models |
 | Next.js Docs | https://nextjs.org/docs | Candidate web app framework | 2026-06-15 | Web-first MVP stack planning |
 | Tailwind CSS Next.js Guide | https://tailwindcss.com/docs/installation/framework-guides/nextjs | Candidate styling setup for Next.js | 2026-06-15 | Future setup commands after stack install |
 | Zustand Repository | https://github.com/pmndrs/zustand | Candidate client state store and documentation entry point | 2026-06-15 | Project and UI state planning |
