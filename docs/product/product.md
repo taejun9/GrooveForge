@@ -113,7 +113,7 @@ MVP capabilities:
 
 - BPM/key setup.
 - Style selector that applies key-aware editable groove templates for Pattern A/B/C, BPM, swing, and sound preset.
-- 16-step drum sequencer with built-in drum kit, drum-synth sources, editable drum velocity, microtiming, and hat repeat dynamics.
+- 16-step drum sequencer with built-in drum kit, drum-synth sources, editable drum velocity, microtiming, one-click groove humanization, and hat repeat dynamics.
 - Synth 808/bass track with editable scale-aware grid, mono mode, glide, saturation direction, and kick-to-808 sidechain ducking.
 - Chord progression track with scale-locked roots, editable quality, length, and velocity.
 - Simple synth melody track with editable scale-aware grid and velocity control.

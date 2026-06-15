@@ -28,6 +28,8 @@ export type StyleProfile = {
 export type DrumPattern = Record<DrumLane, boolean[]>;
 export type DrumVelocities = Record<DrumLane, number[]>;
 export type DrumTimings = Record<DrumLane, number[]>;
+export const drumGroovePresetIds = ["tight", "pocket", "push", "reset"] as const;
+export type DrumGroovePreset = (typeof drumGroovePresetIds)[number];
 
 export type BassNote = {
   step: number;
@@ -137,6 +139,12 @@ export const patternSlots: PatternSlot[] = ["A", "B", "C"];
 export const arrangementSections: ArrangementSection[] = ["Intro", "Verse", "Hook", "Bridge", "Outro"];
 export const chordQualities: ChordQuality[] = ["maj", "min", "dim", "sus2", "sus4", "7", "m7"];
 export const masterPresets: MasterPreset[] = ["Clean Demo", "Streaming Safe", "Headroom for Vocal"];
+export const drumGroovePresetLabels: Record<DrumGroovePreset, string> = {
+  tight: "Tight",
+  pocket: "Pocket",
+  push: "Push",
+  reset: "Reset"
+};
 export const masterPresetCeilingsDb: Record<MasterPreset, number> = {
   "Clean Demo": -0.8,
   "Streaming Safe": -1,
@@ -557,6 +565,30 @@ export function sidechainGainForStep(pattern: PatternData, step: number, amount:
   return Math.max(0.28, 1 - depth * 0.72 * strongestKick);
 }
 
+export function drumGroovePresetLabel(preset: DrumGroovePreset): string {
+  return drumGroovePresetLabels[preset];
+}
+
+export function applyDrumGroovePreset(pattern: PatternData, preset: DrumGroovePreset): PatternData {
+  return {
+    ...pattern,
+    drumVelocities: Object.fromEntries(
+      drumLanes.map((lane) => [
+        lane,
+        pattern.drumVelocities[lane].map((velocity, step) =>
+          pattern.drumPattern[lane][step] ? grooveVelocity(lane, step, preset, velocity) : velocity
+        )
+      ])
+    ) as DrumVelocities,
+    drumTimings: Object.fromEntries(
+      drumLanes.map((lane) => [
+        lane,
+        pattern.drumTimings[lane].map((timing, step) => (pattern.drumPattern[lane][step] ? grooveTimingMs(lane, step, preset) : 0))
+      ])
+    ) as DrumTimings
+  };
+}
+
 function defaultDrumVelocities(drumPattern: DrumPattern): DrumVelocities {
   return {
     kick: steps.map((step) => (drumPattern.kick[step] ? defaultDrumVelocity("kick", step) : 0.72)),
@@ -564,6 +596,50 @@ function defaultDrumVelocities(drumPattern: DrumPattern): DrumVelocities {
     hat: steps.map((step) => (drumPattern.hat[step] ? defaultDrumVelocity("hat", step) : 0.56)),
     perc: steps.map((step) => (drumPattern.perc[step] ? defaultDrumVelocity("perc", step) : 0.58))
   };
+}
+
+function grooveVelocity(lane: DrumLane, step: number, preset: DrumGroovePreset, current: number): number {
+  if (preset === "reset") {
+    return defaultDrumVelocity(lane, step);
+  }
+
+  const base = defaultDrumVelocity(lane, step);
+  const accent = step % 4 === 0 ? 0.04 : step % 2 === 0 ? 0.01 : -0.03;
+  if (preset === "tight") {
+    return normalizeDrumVelocity(base + accent * 0.7);
+  }
+  if (preset === "pocket") {
+    const lanePush = lane === "clap" ? 0.05 : lane === "hat" ? -0.04 : lane === "perc" ? -0.02 : 0.02;
+    return normalizeDrumVelocity(base + accent + lanePush);
+  }
+  if (preset === "push") {
+    const lift = lane === "hat" || lane === "perc" ? 0.05 : 0.03;
+    return normalizeDrumVelocity(Math.max(current, base) + accent * 0.5 + lift);
+  }
+  return normalizeDrumVelocity(current);
+}
+
+function grooveTimingMs(lane: DrumLane, step: number, preset: DrumGroovePreset): number {
+  if (preset === "reset") {
+    return 0;
+  }
+
+  if (preset === "tight") {
+    const timing = lane === "clap" ? 5 : lane === "hat" ? (step % 2 === 0 ? -3 : 4) : lane === "perc" ? (step % 4 === 0 ? -4 : 6) : 0;
+    return normalizeDrumTimingMs(timing);
+  }
+
+  if (preset === "pocket") {
+    const timing = lane === "clap" ? 17 : lane === "hat" ? (step % 2 === 0 ? 6 : 11) : lane === "perc" ? 13 : step % 8 === 0 ? 0 : -5;
+    return normalizeDrumTimingMs(timing);
+  }
+
+  if (preset === "push") {
+    const timing = lane === "clap" ? -6 : lane === "hat" ? (step % 2 === 0 ? -12 : -7) : lane === "perc" ? -10 : step % 8 === 0 ? -4 : -8;
+    return normalizeDrumTimingMs(timing);
+  }
+
+  return 0;
 }
 
 function defaultDrumTimings(): DrumTimings {

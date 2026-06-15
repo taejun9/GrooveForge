@@ -29,13 +29,13 @@ The first usable result is an Electron desktop workstation that can create a sam
 
 - 145 BPM / F minor starter project.
 - Style selector that applies editable genre groove templates for Pattern A/B/C, BPM, swing, and sound preset.
-- Kick, snare/clap, hat, 808, chord, and synth melody tracks with editable drum velocity, microtiming, and hat repeat dynamics.
+- Kick, snare/clap, hat, 808, chord, and synth melody tracks with editable drum velocity, microtiming, one-click groove humanization, and hat repeat dynamics.
 - Sound presets and Studio tone controls for built-in drum, 808, kick-duck sidechain, synth, and chord engines.
 - Independent Pattern A/B/C variations with copy/clear tools and editable arrangement blocks with duplicate, move, and delete controls.
 - Undo/redo edit history for safer pattern, arrangement, mixer, sound, and master experimentation.
 - Basic mixer volume/pan/mute/solo, master preset ceiling, export peak/RMS/headroom meter, full-mix WAV export, and drum/808/synth/chord stem export.
 
-The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport, undo/redo, style/key/BPM with editable groove templates, drum steps with velocity, microtiming, and hat repeat, Pattern A/B/C copy/clear tools, editable scale-aware 808/melody lanes, kick-to-808 sidechain ducking, chord progression, sound design presets, Studio tone controls, editable arrangement blocks, arrangement structure controls, mixer volume/pan/mute/solo, master preset ceiling, export peak/RMS/headroom meter, local project save/load, realtime loop playback, arrangement-length WAV export, and one-click stem export.
+The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport, undo/redo, style/key/BPM with editable groove templates, drum steps with velocity, microtiming, one-click groove humanization, and hat repeat, Pattern A/B/C copy/clear tools, editable scale-aware 808/melody lanes, kick-to-808 sidechain ducking, chord progression, sound design presets, Studio tone controls, editable arrangement blocks, arrangement structure controls, mixer volume/pan/mute/solo, master preset ceiling, export peak/RMS/headroom meter, local project save/load, realtime loop playback, arrangement-length WAV export, and one-click stem export.
 
 ## Core Direction
 

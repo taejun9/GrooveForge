@@ -29,7 +29,9 @@ import {
   BassNote,
   ChordEvent,
   ChordQuality,
+  DrumGroovePreset,
   DrumLane,
+  applyDrumGroovePreset,
   getStyle,
   MasterPreset,
   MelodyNote,
@@ -49,6 +51,8 @@ import {
   defaultDrumVelocity,
   drumStepTimingMs,
   drumStepVelocity,
+  drumGroovePresetIds,
+  drumGroovePresetLabel,
   hatRepeatCount,
   masterPresetCeilingDb,
   masterPresets,
@@ -274,14 +278,14 @@ export function App(): ReactElement {
     restoreProjectFromHistory(nextProject, "Redo applied");
   }
 
-  function updateCurrentPattern(update: (pattern: PatternData) => PatternData): void {
+  function updateCurrentPattern(update: (pattern: PatternData) => PatternData, status = "Unsaved changes"): void {
     updateProject((current) => ({
       ...current,
       patterns: {
         ...current.patterns,
         [current.selectedPattern]: update(current.patterns[current.selectedPattern])
       }
-    }));
+    }), status);
   }
 
   function selectPattern(pattern: PatternSlot): void {
@@ -544,6 +548,15 @@ export function App(): ReactElement {
         )
       }
     }));
+  }
+
+  function applySelectedDrumGroove(preset: DrumGroovePreset): void {
+    updateCurrentPattern(
+      (pattern) => applyDrumGroovePreset(pattern, preset),
+      `${drumGroovePresetLabel(preset)} groove applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    setSelectedNote(null);
+    setSelectedDrumStep(null);
   }
 
   function toggleBassNote(step: number, pitch: string): void {
@@ -1009,6 +1022,21 @@ export function App(): ReactElement {
                 onChange={(event) => updateProject((current) => ({ ...current, swing: Number(event.target.value) }))}
               />
             </label>
+            <div className="groove-row" aria-label="Groove humanize">
+              <span>Groove</span>
+              <div>
+                {drumGroovePresetIds.map((preset) => (
+                  <button
+                    data-testid={`groove-preset-${preset}`}
+                    key={preset}
+                    onClick={() => applySelectedDrumGroove(preset)}
+                    type="button"
+                  >
+                    {drumGroovePresetLabel(preset)}
+                  </button>
+                ))}
+              </div>
+            </div>
             <DrumStepInspector
               selectedStep={selectedDrumStep}
               active={selectedDrumActive}
