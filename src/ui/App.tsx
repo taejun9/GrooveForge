@@ -181,31 +181,67 @@ export function App(): ReactElement {
   }, [project.arrangement.length]);
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      if (isEditableShortcutTarget(event.target)) {
-        return;
-      }
+    window.addEventListener("keydown", handleDesktopShortcut);
+    return () => window.removeEventListener("keydown", handleDesktopShortcut);
+  }, [project, undoStack, redoStack, isPlaying, selectedNote, selectedDrumStep, selectedDrumActive]);
 
-      const key = event.key.toLowerCase();
-      const withCommandModifier = event.metaKey || event.ctrlKey;
-      const wantsUndo = withCommandModifier && !event.shiftKey && key === "z";
-      const wantsRedo = withCommandModifier && ((event.shiftKey && key === "z") || key === "y");
+  function handleDesktopShortcut(event: KeyboardEvent): void {
+    if (isEditableShortcutTarget(event.target)) {
+      return;
+    }
 
-      if (!wantsUndo && !wantsRedo) {
-        return;
-      }
+    const key = event.key.toLowerCase();
+    const withCommandModifier = event.metaKey || event.ctrlKey;
+    const wantsUndo = withCommandModifier && !event.shiftKey && key === "z";
+    const wantsRedo = withCommandModifier && ((event.shiftKey && key === "z") || key === "y");
+    const wantsSave = withCommandModifier && !event.shiftKey && key === "s";
+    const wantsOpen = withCommandModifier && !event.shiftKey && key === "o";
 
+    if (wantsUndo || wantsRedo || wantsSave || wantsOpen) {
       event.preventDefault();
       if (wantsUndo) {
         undoProject();
         return;
       }
-      redoProject();
-    };
+      if (wantsRedo) {
+        redoProject();
+        return;
+      }
+      if (wantsSave) {
+        void handleSaveProject();
+        return;
+      }
+      void handleOpenProject();
+      return;
+    }
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undoStack, redoStack]);
+    if (event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    if (event.code === "Space") {
+      event.preventDefault();
+      if (!event.repeat) {
+        togglePlayback();
+      }
+      return;
+    }
+
+    const patternShortcut: Record<string, PatternSlot> = { "1": "A", "2": "B", "3": "C" };
+    const nextPattern = patternShortcut[key];
+    if (nextPattern) {
+      event.preventDefault();
+      selectPattern(nextPattern);
+      return;
+    }
+
+    if (key === "backspace" || key === "delete") {
+      event.preventDefault();
+      if (!event.repeat) {
+        deleteSelectedEvent();
+      }
+    }
+  }
 
   function updateProject(update: (current: ProjectState) => ProjectState, status = "Unsaved changes"): boolean {
     const current = projectRef.current;
@@ -279,8 +315,8 @@ export function App(): ReactElement {
     restoreProjectFromHistory(nextProject, "Redo applied");
   }
 
-  function updateCurrentPattern(update: (pattern: PatternData) => PatternData, status = "Unsaved changes"): void {
-    updateProject((current) => ({
+  function updateCurrentPattern(update: (pattern: PatternData) => PatternData, status = "Unsaved changes"): boolean {
+    return updateProject((current) => ({
       ...current,
       patterns: {
         ...current.patterns,
@@ -329,6 +365,86 @@ export function App(): ReactElement {
     );
     setSelectedNote(null);
     setSelectedDrumStep(null);
+  }
+
+  function deleteSelectedEvent(): void {
+    if (deleteSelectedNote()) {
+      return;
+    }
+    if (clearSelectedDrumStep()) {
+      return;
+    }
+    setProjectStatus("Select a step or note to delete");
+  }
+
+  function deleteSelectedNote(): boolean {
+    if (!selectedNote) {
+      return false;
+    }
+
+    const target = selectedNote;
+    const changed = updateCurrentPattern(
+      (pattern) => {
+        if (target.track === "bass") {
+          const bassNotes = pattern.bassNotes.filter(
+            (note) => note.step !== target.step || note.pitch !== target.pitch
+          );
+          return bassNotes.length === pattern.bassNotes.length ? pattern : { ...pattern, bassNotes };
+        }
+
+        const melodyNotes = pattern.melodyNotes.filter(
+          (note) => note.step !== target.step || note.pitch !== target.pitch
+        );
+        return melodyNotes.length === pattern.melodyNotes.length ? pattern : { ...pattern, melodyNotes };
+      },
+      `Deleted ${target.track === "bass" ? "808" : "Synth"} ${target.pitch}.${target.step + 1}`
+    );
+
+    if (changed) {
+      setSelectedNote(null);
+    }
+    return changed;
+  }
+
+  function clearSelectedDrumStep(): boolean {
+    if (!selectedDrumStep) {
+      return false;
+    }
+
+    const target = selectedDrumStep;
+    const changed = updateCurrentPattern(
+      (pattern) => {
+        if (!pattern.drumPattern[target.lane][target.step]) {
+          return pattern;
+        }
+
+        return {
+          ...pattern,
+          drumPattern: {
+            ...pattern.drumPattern,
+            [target.lane]: pattern.drumPattern[target.lane].map((enabled, index) =>
+              index === target.step ? false : enabled
+            )
+          },
+          drumTimings: {
+            ...pattern.drumTimings,
+            [target.lane]: pattern.drumTimings[target.lane].map((timing, index) =>
+              index === target.step ? 0 : timing
+            )
+          },
+          hatRepeats:
+            target.lane === "hat"
+              ? pattern.hatRepeats.map((repeat, index) => (index === target.step ? 1 : repeat))
+              : pattern.hatRepeats
+        };
+      },
+      `Deleted ${drumLabels[target.lane]} step ${target.step + 1}`
+    );
+
+    if (changed) {
+      setSelectedDrumStep(null);
+    }
+    return changed;
   }
 
   function selectArrangementBlock(index: number): void {
@@ -575,6 +691,13 @@ export function App(): ReactElement {
 
   function toggleBassNote(step: number, pitch: string): void {
     const exists = currentPattern.bassNotes.some((note) => note.step === step && note.pitch === pitch);
+    const selectedSameNote = selectedNote?.track === "bass" && selectedNote.step === step && selectedNote.pitch === pitch;
+    setSelectedNote({ track: "bass", step, pitch });
+    setSelectedDrumStep(null);
+    if (exists && !selectedSameNote) {
+      return;
+    }
+
     updateCurrentPattern((pattern) => ({
       ...pattern,
       bassNotes: exists
@@ -582,11 +705,17 @@ export function App(): ReactElement {
         : sortBassNotes([...pattern.bassNotes, { step, pitch, length: 2, glide: false }])
     }));
     setSelectedNote(exists ? null : { track: "bass", step, pitch });
-    setSelectedDrumStep(null);
   }
 
   function toggleMelodyNote(step: number, pitch: string): void {
     const exists = currentPattern.melodyNotes.some((note) => note.step === step && note.pitch === pitch);
+    const selectedSameNote = selectedNote?.track === "melody" && selectedNote.step === step && selectedNote.pitch === pitch;
+    setSelectedNote({ track: "melody", step, pitch });
+    setSelectedDrumStep(null);
+    if (exists && !selectedSameNote) {
+      return;
+    }
+
     updateCurrentPattern((pattern) => ({
       ...pattern,
       melodyNotes: exists
@@ -594,7 +723,6 @@ export function App(): ReactElement {
         : sortMelodyNotes([...pattern.melodyNotes, { step, pitch, length: 1, velocity: 0.68 }])
     }));
     setSelectedNote(exists ? null : { track: "melody", step, pitch });
-    setSelectedDrumStep(null);
   }
 
   function updateSelectedLength(length: number): void {

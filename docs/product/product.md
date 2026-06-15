@@ -121,6 +121,7 @@ MVP capabilities:
 - Independent Pattern A/B/C storage with copy/clear tools for drum, bass, chord, and melody variations.
 - Editable arrangement blocks for an 8-bar loop or simple song section, using assigned Pattern A/B/C data, per-block energy, and structure controls for duplicate, move, and delete.
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
+- Desktop editing shortcuts for playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, and redo while leaving focused inputs alone.
 - Mixer volume, pan, mute, solo, low-cut/air EQ, and Drive/Glue mix controls reflected in realtime playback and WAV export.
 - Master preset ceiling and output gain.
 - Export peak/RMS/headroom meter with limiter activity status for the current arrangement.
@@ -138,7 +139,7 @@ Phase 2 builds 808/bass: monophonic synth, piano-roll style editor, glide, pitch
 
 Phase 3 adds melody/chords: simple poly synth, scale lock, chord pad, melody grid, and preset patches.
 
-Phase 4 adds arrangement: pattern blocks, song section markers, duplicate/move/delete first, then split/mute/reorder refinements, and variation A/B/C.
+Phase 4 adds arrangement and editing speed: pattern blocks, song section markers, duplicate/move/delete first, desktop editing shortcuts, then split/mute/reorder refinements, and variation A/B/C.
 
 Phase 5 adds mixer/master/export: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling first, then sends, limiter, peak/LUFS metering, WAV export, and later stem export.
 
