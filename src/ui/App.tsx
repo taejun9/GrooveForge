@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { exportStems, exportWav } from "../audio/render";
+import { analyzeExport, ExportAnalysis, exportStems, exportWav } from "../audio/render";
 import { PlaybackController, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
 import {
   ArrangementBlock,
@@ -91,6 +91,7 @@ export function App(): ReactElement {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const style = getStyle(project);
   const currentPattern = activePattern(project);
+  const exportAnalysis = useMemo(() => analyzeExport(project), [project]);
   const activeChannels = useMemo(() => {
     const soloActive = project.mixer.some((channel) => channel.id !== "master" && channel.solo);
     return project.mixer.filter(
@@ -953,13 +954,15 @@ export function App(): ReactElement {
             <strong>{project.masterPreset}</strong>
             <span>{project.masterCeilingDb} dB ceiling</span>
           </div>
+          <ExportMeter analysis={exportAnalysis} />
           <label>
             <span>Ceiling</span>
             <input
+              data-testid="master-ceiling"
               type="range"
               min={-6}
               max={0}
-              step={0.5}
+              step={0.1}
               value={project.masterCeilingDb}
               onChange={(event) =>
                 updateProject((current) => ({ ...current, masterCeilingDb: Number(event.target.value) }))
@@ -993,6 +996,50 @@ function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; met
         <h2>{title}</h2>
       </div>
       <span>{meta}</span>
+    </div>
+  );
+}
+
+function ExportMeter({ analysis }: { analysis: ExportAnalysis }): ReactElement {
+  const peakPercent = meterPercent(analysis.peakDb, analysis.ceilingDb);
+  const rmsPercent = meterPercent(analysis.rmsDb, analysis.ceilingDb);
+  return (
+    <div className="export-meter" data-testid="export-meter">
+      <div className={`meter-status ${analysis.status.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
+        <span>Export meter</span>
+        <strong data-testid="export-meter-status">{analysis.status}</strong>
+      </div>
+      <div className="meter-bars">
+        <MeterBar label="Peak" percent={peakPercent} value={formatDb(analysis.peakDb)} testId="export-peak-db" />
+        <MeterBar label="RMS" percent={rmsPercent} value={formatDb(analysis.rmsDb)} testId="export-rms-db" />
+      </div>
+      <div className="meter-stats">
+        <span data-testid="export-headroom-db">Headroom {formatDb(analysis.headroomDb)}</span>
+        <span data-testid="export-limiter-percent">Limiter {formatPercent(analysis.limitedPercent)}</span>
+        <span>{analysis.durationSeconds.toFixed(1)} sec</span>
+      </div>
+    </div>
+  );
+}
+
+function MeterBar({
+  label,
+  percent,
+  value,
+  testId
+}: {
+  label: string;
+  percent: number;
+  value: string;
+  testId: string;
+}): ReactElement {
+  return (
+    <div className="meter-bar">
+      <span>{label}</span>
+      <i>
+        <b style={{ inlineSize: `${percent}%` }} />
+      </i>
+      <strong data-testid={testId}>{value}</strong>
     </div>
   );
 }
@@ -1420,6 +1467,29 @@ function panLabel(pan: number): string {
 
 function percentLabel(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function formatPercent(value: number): string {
+  if (!Number.isFinite(value)) {
+    return "0.00%";
+  }
+  return `${value.toFixed(2)}%`;
+}
+
+function formatDb(value: number): string {
+  if (!Number.isFinite(value)) {
+    return "-inf dB";
+  }
+  return `${value.toFixed(1)} dB`;
+}
+
+function meterPercent(valueDb: number, ceilingDb: number): number {
+  if (!Number.isFinite(valueDb)) {
+    return 0;
+  }
+  const floorDb = -48;
+  const clamped = Math.min(ceilingDb, Math.max(floorDb, valueDb));
+  return Math.round(((clamped - floorDb) / (ceilingDb - floorDb)) * 100);
 }
 
 function clampUnit(value: unknown): number {

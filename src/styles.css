@@ -925,6 +925,83 @@ input[type="range"] {
   font-size: 18px;
 }
 
+.export-meter {
+  display: grid;
+  gap: 9px;
+  border: 1px solid rgba(120, 240, 200, 0.16);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 10px;
+}
+
+.meter-status,
+.meter-bar,
+.meter-stats {
+  display: grid;
+  gap: 6px;
+}
+
+.meter-status {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.meter-status span,
+.meter-bar span,
+.meter-stats span {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 11px;
+}
+
+.meter-status strong {
+  color: #78f0c8;
+  font-size: 12px;
+}
+
+.meter-status.hot strong,
+.meter-status.limiter-active strong {
+  color: #f0c36a;
+}
+
+.meter-status.silent strong {
+  color: #ff7a4f;
+}
+
+.meter-bars {
+  display: grid;
+  gap: 7px;
+}
+
+.meter-bar {
+  grid-template-columns: 38px 1fr 64px;
+  align-items: center;
+}
+
+.meter-bar i {
+  display: block;
+  overflow: hidden;
+  block-size: 8px;
+  border-radius: 999px;
+  background: rgba(244, 239, 231, 0.08);
+}
+
+.meter-bar b {
+  display: block;
+  block-size: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #78f0c8, #f0c36a);
+}
+
+.meter-bar strong {
+  color: #f4efe7;
+  font-size: 11px;
+  text-align: end;
+}
+
+.meter-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .preset-row {
   display: grid;
   gap: 7px;

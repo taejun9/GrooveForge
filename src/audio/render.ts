@@ -13,8 +13,24 @@ const sampleRate = 44100;
 const channels = 2;
 export const stemTrackIds = ["drum_rack", "bass_808", "synth", "chord"] as const;
 export type StemTrackId = (typeof stemTrackIds)[number];
+export type ExportAnalysis = {
+  sampleRate: number;
+  channels: number;
+  durationSeconds: number;
+  peakDb: number;
+  rmsDb: number;
+  headroomDb: number;
+  ceilingDb: number;
+  limitedSamples: number;
+  limitedPercent: number;
+  status: "Ready" | "Hot" | "Limiter active" | "Silent";
+};
 
 type AudioChannels = [Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>];
+type RenderedAudio = {
+  buffer: AudioChannels;
+  analysis: ExportAnalysis;
+};
 type ChannelMix = {
   gain: number;
   left: number;
@@ -137,7 +153,7 @@ function synthShape(sound: SoundDesign): ToneShape {
   return sound.synthBrightness > 0.46 ? "triangle" : "sine";
 }
 
-function renderProject(project: ProjectState, bars = arrangementBarCount(project), stemTarget?: StemTrackId): AudioChannels {
+function renderProject(project: ProjectState, bars = arrangementBarCount(project), stemTarget?: StemTrackId): RenderedAudio {
   const step = stepDuration(project);
   const totalSteps = bars * 16;
   const duration = totalSteps * step;
@@ -224,13 +240,53 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   }
 
   const ceiling = dbToGain(project.masterCeilingDb);
+  let peak = 0;
+  let squareSum = 0;
+  let limitedSamples = 0;
+  const totalSamples = buffer[0].length * channels;
   for (let channel = 0; channel < channels; channel += 1) {
     for (let index = 0; index < buffer[channel].length; index += 1) {
       const value = buffer[channel][index] * outputGain;
-      buffer[channel][index] = Math.max(-ceiling, Math.min(ceiling, value));
+      if (Math.abs(value) > ceiling) {
+        limitedSamples += 1;
+      }
+      const limited = Math.max(-ceiling, Math.min(ceiling, value));
+      const absolute = Math.abs(limited);
+      peak = Math.max(peak, absolute);
+      squareSum += limited * limited;
+      buffer[channel][index] = limited;
     }
   }
-  return buffer;
+
+  const peakDb = amplitudeToDb(peak);
+  const rmsDb = amplitudeToDb(Math.sqrt(squareSum / Math.max(1, totalSamples)));
+  const headroomDb = Number.isFinite(peakDb) ? project.masterCeilingDb - peakDb : 99;
+  const limitedPercent = (limitedSamples / Math.max(1, totalSamples)) * 100;
+  const status =
+    peak === 0 ? "Silent" : limitedSamples > 0 ? "Limiter active" : headroomDb < 1 ? "Hot" : "Ready";
+
+  return {
+    buffer,
+    analysis: {
+      sampleRate,
+      channels,
+      durationSeconds: frames / sampleRate,
+      peakDb,
+      rmsDb,
+      headroomDb,
+      ceilingDb: project.masterCeilingDb,
+      limitedSamples,
+      limitedPercent,
+      status
+    }
+  };
+}
+
+function amplitudeToDb(value: number): number {
+  if (value <= 0) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  return 20 * Math.log10(value);
 }
 
 export function stemTrackLabel(track: StemTrackId): string {
@@ -296,15 +352,19 @@ function downloadWav(buffer: AudioChannels, fileName: string): void {
 }
 
 export function exportWav(project: ProjectState): void {
-  downloadWav(renderProject(project), `${projectSlug(project)}-demo.wav`);
+  downloadWav(renderProject(project).buffer, `${projectSlug(project)}-demo.wav`);
 }
 
 export function exportStems(project: ProjectState): string[] {
   const slug = projectSlug(project);
   const fileNames = stemTrackIds.map((track) => {
     const fileName = `${slug}-${track.replace("_", "-")}-stem.wav`;
-    downloadWav(renderProject(project, arrangementBarCount(project), track), fileName);
+    downloadWav(renderProject(project, arrangementBarCount(project), track).buffer, fileName);
     return fileName;
   });
   return fileNames;
+}
+
+export function analyzeExport(project: ProjectState): ExportAnalysis {
+  return renderProject(project).analysis;
 }

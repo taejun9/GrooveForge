@@ -116,6 +116,7 @@ MVP capabilities:
 - Editable arrangement blocks for an 8-bar loop or simple song section, using assigned Pattern A/B/C data, per-block energy, and structure controls for duplicate, move, and delete.
 - Mixer volume, pan, mute, and solo reflected in realtime playback and WAV export.
 - Master preset ceiling and output gain.
+- Export peak/RMS/headroom meter with limiter activity status for the current arrangement.
 - Local project save/load as a `.grooveforge.json` file.
 - WAV export through offline rendering.
 - Stem export for isolated drum, 808, synth, and chord WAV files from the current arrangement.
