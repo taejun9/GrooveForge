@@ -193,6 +193,7 @@ export const minDrumTimingMs = -35;
 export const maxDrumTimingMs = 35;
 export const projectFileVersion = 1;
 export const maxProjectSnapshots = 6;
+export const maxProjectSnapshotNameLength = 32;
 export const drumLanes: DrumLane[] = ["kick", "clap", "hat", "perc"];
 export const patternSlots: PatternSlot[] = ["A", "B", "C"];
 export const arrangementSections: ArrangementSection[] = ["Intro", "Verse", "Hook", "Bridge", "Outro"];
@@ -1619,12 +1620,16 @@ export function createEmptyPatternData(): PatternData {
 }
 
 export function nextProjectSnapshotName(project: ProjectState): string {
-  const existingNames = new Set(project.snapshots.map((snapshot) => snapshot.name));
+  const existingNames = new Set(project.snapshots.map((snapshot) => normalizeProjectSnapshotName(snapshot.name)));
   let index = project.snapshots.length + 1;
   while (existingNames.has(`Idea ${index}`)) {
     index += 1;
   }
   return `Idea ${index}`;
+}
+
+export function normalizeProjectSnapshotName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").slice(0, maxProjectSnapshotNameLength);
 }
 
 export function createProjectSnapshot(project: ProjectState, createdAt = new Date().toISOString()): ProjectSnapshot {
@@ -1663,6 +1668,41 @@ export function deleteProjectSnapshot(project: ProjectState, snapshotId: string)
   return {
     ...project,
     snapshots: cloneProjectSnapshots(snapshots)
+  };
+}
+
+export function renameProjectSnapshot(project: ProjectState, snapshotId: string, name: string): ProjectState {
+  const normalizedName = normalizeProjectSnapshotName(name);
+  if (!normalizedName) {
+    return project;
+  }
+
+  let changed = false;
+  const snapshots = project.snapshots.map((snapshot) => {
+    const clonedSnapshot = {
+      ...snapshot,
+      project: cloneProjectCore(snapshot.project)
+    };
+    if (snapshot.id !== snapshotId) {
+      return clonedSnapshot;
+    }
+    if (snapshot.name === normalizedName) {
+      return clonedSnapshot;
+    }
+    changed = true;
+    return {
+      ...clonedSnapshot,
+      name: normalizedName
+    };
+  });
+
+  if (!changed) {
+    return project;
+  }
+
+  return {
+    ...project,
+    snapshots
   };
 }
 
@@ -2098,9 +2138,9 @@ function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreSta
 function normalizeProjectSnapshots(snapshots: ProjectSnapshotInput[] | undefined): ProjectSnapshot[] {
   return (
     snapshots
-      ?.map((snapshot) => ({
+      ?.map((snapshot, index) => ({
         id: snapshot.id,
-        name: snapshot.name,
+        name: normalizeProjectSnapshotName(snapshot.name) || `Idea ${index + 1}`,
         createdAt: snapshot.createdAt,
         project: normalizeProjectCoreState(snapshot.project)
       }))

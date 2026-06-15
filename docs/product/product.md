@@ -62,7 +62,7 @@ Primary feature areas:
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with one-click Drop/Build/Hook Lift moves, per-block bar lengths, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
 - Project readiness: read-only checks for drums, 808/bass, melody/chords, arrangement, and export completeness.
-- Project snapshots: local idea slots for saving, restoring, and deleting beat states inside the project file.
+- Project snapshots: local idea slots for saving, renaming, restoring, and deleting beat states inside the project file.
 - Mixer/master: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, master preset ceiling, limiter, loudness/peak metering.
 - Export: WAV export, stem export, and arrangement MIDI export after the event/render paths are reliable.
 
@@ -129,7 +129,7 @@ MVP capabilities:
 - Read-only Beat Readiness checks for drums, 808/bass, melody/chords, arrangement structure, and export signal status.
 - Editable arrangement blocks and templates for 8-bar loop, full beat, hook-first, and breakdown structures, using assigned Pattern A/B/C data, one-click Drop/Build/Hook Lift moves, per-block track mutes, per-block bar length, split/merge controls, audible per-block energy, and structure controls for duplicate, move, and delete.
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
-- Project Snapshots that save, restore, and delete local beat idea states inside the `.grooveforge.json` file without cloud sync or nested snapshot recursion.
+- Project Snapshots that save, rename, restore, and delete local beat idea states inside the `.grooveforge.json` file without cloud sync or nested snapshot recursion.
 - Desktop editing shortcuts for arrangement playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, and redo while leaving focused inputs alone.
 - Transport playback modes for full arrangement playback by default and fast selected-pattern preview while editing.
 - Realtime metronome toggle with accented downbeat clicks that helps users program to the grid during playback without adding click audio to WAV or stem export.

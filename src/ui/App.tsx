@@ -103,6 +103,7 @@ import {
   masterPresetCeilingDb,
   masterPresets,
   melodyPitchLanes,
+  maxProjectSnapshotNameLength,
   maxProjectSnapshots,
   minArrangementBars,
   minDrumTimingMs,
@@ -118,6 +119,7 @@ import {
   normalizeEventProbability,
   normalizeHatRepeat,
   normalizeMixerEq,
+  normalizeProjectSnapshotName,
   parseProjectFile,
   patternSlots,
   patternFillPresetIds,
@@ -127,6 +129,7 @@ import {
   nextProjectSnapshotName,
   projectFileName,
   projectSnapshotSummary,
+  renameProjectSnapshot,
   retargetProjectKey,
   restoreProjectSnapshot,
   scalePitches,
@@ -206,6 +209,7 @@ export function App(): ReactElement {
   const [selectedChordIndex, setSelectedChordIndex] = useState<number | null>(0);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
   const [splitAfterBars, setSplitAfterBars] = useState(1);
+  const [snapshotNameDrafts, setSnapshotNameDrafts] = useState<Record<string, string>>({});
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const projectRef = useRef<ProjectState>(starterProject);
   const controllerRef = useRef<PlaybackController | null>(null);
@@ -307,6 +311,14 @@ export function App(): ReactElement {
       return index === null ? 0 : Math.min(index, currentPattern.chordEvents.length - 1);
     });
   }, [currentPattern.chordEvents.length, project.selectedPattern]);
+
+  useEffect(() => {
+    const snapshotIds = new Set(project.snapshots.map((snapshot) => snapshot.id));
+    setSnapshotNameDrafts((current) => {
+      const nextDrafts = Object.fromEntries(Object.entries(current).filter(([snapshotId]) => snapshotIds.has(snapshotId)));
+      return Object.keys(nextDrafts).length === Object.keys(current).length ? current : nextDrafts;
+    });
+  }, [project.snapshots]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleDesktopShortcut);
@@ -473,6 +485,53 @@ export function App(): ReactElement {
       return;
     }
     updateProject((current) => deleteProjectSnapshot(current, snapshotId), `Deleted snapshot ${snapshot.name}`);
+  }
+
+  function updateSnapshotNameDraft(snapshotId: string, name: string): void {
+    setSnapshotNameDrafts((current) => ({
+      ...current,
+      [snapshotId]: name
+    }));
+  }
+
+  function clearSnapshotNameDraft(snapshotId: string): void {
+    setSnapshotNameDrafts((current) => {
+      if (!(snapshotId in current)) {
+        return current;
+      }
+      const nextDrafts = { ...current };
+      delete nextDrafts[snapshotId];
+      return nextDrafts;
+    });
+  }
+
+  function commitSnapshotName(snapshotId: string, name: string): void {
+    const snapshot = projectRef.current.snapshots.find((candidate) => candidate.id === snapshotId);
+    if (!snapshot) {
+      clearSnapshotNameDraft(snapshotId);
+      setProjectStatus("Snapshot not found");
+      return;
+    }
+
+    const normalizedName = normalizeProjectSnapshotName(name);
+    if (!normalizedName) {
+      clearSnapshotNameDraft(snapshotId);
+      setProjectStatus("Snapshot name required");
+      return;
+    }
+
+    if (snapshot.name === normalizedName) {
+      clearSnapshotNameDraft(snapshotId);
+      return;
+    }
+
+    const changed = updateProject(
+      (current) => renameProjectSnapshot(current, snapshotId, normalizedName),
+      `Renamed snapshot ${normalizedName}`
+    );
+    if (changed) {
+      clearSnapshotNameDraft(snapshotId);
+    }
   }
 
   function updateCurrentPattern(update: (pattern: PatternData) => PatternData, status = "Unsaved changes"): boolean {
@@ -1872,7 +1931,16 @@ export function App(): ReactElement {
 
       <BeatReadiness checks={beatReadinessChecks} />
 
-      <ProjectSnapshots project={project} onDelete={deleteSavedSnapshot} onRestore={restoreSavedSnapshot} onSave={saveCurrentSnapshot} />
+      <ProjectSnapshots
+        nameDrafts={snapshotNameDrafts}
+        project={project}
+        onDelete={deleteSavedSnapshot}
+        onNameCommit={commitSnapshotName}
+        onNameDraftChange={updateSnapshotNameDraft}
+        onNameDraftReset={clearSnapshotNameDraft}
+        onRestore={restoreSavedSnapshot}
+        onSave={saveCurrentSnapshot}
+      />
 
       <section className="workspace-grid">
         <section className="panel pattern-panel" aria-label="Pattern editor">
@@ -2669,13 +2737,21 @@ function BeatBlueprints({
 }
 
 function ProjectSnapshots({
+  nameDrafts,
   project,
   onDelete,
+  onNameCommit,
+  onNameDraftChange,
+  onNameDraftReset,
   onRestore,
   onSave
 }: {
+  nameDrafts: Record<string, string>;
   project: ProjectState;
   onDelete: (snapshotId: string) => void;
+  onNameCommit: (snapshotId: string, name: string) => void;
+  onNameDraftChange: (snapshotId: string, name: string) => void;
+  onNameDraftReset: (snapshotId: string) => void;
   onRestore: (snapshotId: string) => void;
   onSave: () => void;
 }): ReactElement {
@@ -2700,24 +2776,48 @@ function ProjectSnapshots({
             <span>No slots saved</span>
           </div>
         ) : (
-          project.snapshots.map((snapshot) => (
-            <div className="snapshot-item" data-testid={`snapshot-item-${snapshot.id}`} key={snapshot.id}>
-              <div>
-                <strong>{snapshot.name}</strong>
-                <span>{projectSnapshotSummary(snapshot)}</span>
+          project.snapshots.map((snapshot) => {
+            const displayName = nameDrafts[snapshot.id] ?? snapshot.name;
+            return (
+              <div className="snapshot-item" data-testid={`snapshot-item-${snapshot.id}`} key={snapshot.id}>
+                <div>
+                  <input
+                    aria-label={`Rename ${snapshot.name}`}
+                    className="snapshot-name-input"
+                    data-testid={`snapshot-name-${snapshot.id}`}
+                    maxLength={maxProjectSnapshotNameLength}
+                    onBlur={(event) => onNameCommit(snapshot.id, event.currentTarget.value)}
+                    onChange={(event) => onNameDraftChange(snapshot.id, event.currentTarget.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        onNameCommit(snapshot.id, event.currentTarget.value);
+                        event.currentTarget.blur();
+                      }
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        onNameDraftReset(snapshot.id);
+                      }
+                    }}
+                    title={`Rename ${snapshot.name}`}
+                    type="text"
+                    value={displayName}
+                  />
+                  <span>{projectSnapshotSummary(snapshot)}</span>
+                </div>
+                <div className="snapshot-actions">
+                  <button data-testid={`snapshot-restore-${snapshot.id}`} onClick={() => onRestore(snapshot.id)} title={`Restore ${snapshot.name}`} type="button">
+                    <Undo2 size={14} aria-hidden="true" />
+                    <span>Restore</span>
+                  </button>
+                  <button className="danger" data-testid={`snapshot-delete-${snapshot.id}`} onClick={() => onDelete(snapshot.id)} title={`Delete ${snapshot.name}`} type="button">
+                    <Trash2 size={14} aria-hidden="true" />
+                    <span>Delete</span>
+                  </button>
+                </div>
               </div>
-              <div className="snapshot-actions">
-                <button data-testid={`snapshot-restore-${snapshot.id}`} onClick={() => onRestore(snapshot.id)} title={`Restore ${snapshot.name}`} type="button">
-                  <Undo2 size={14} aria-hidden="true" />
-                  <span>Restore</span>
-                </button>
-                <button className="danger" data-testid={`snapshot-delete-${snapshot.id}`} onClick={() => onDelete(snapshot.id)} title={`Delete ${snapshot.name}`} type="button">
-                  <Trash2 size={14} aria-hidden="true" />
-                  <span>Delete</span>
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </section>

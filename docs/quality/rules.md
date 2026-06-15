@@ -97,7 +97,7 @@ Sidechain work must keep kick-to-808 ducking as editable local sound-design stat
 
 Project file work must reject invalid imports without overwriting the current project and must preserve edited drum, bass, chord, melody, sound design, mixer, master, key, BPM, style, and arrangement data on save/load.
 
-Project Snapshot work must store snapshots as local project-file data, migrate older projects to an empty snapshot list, keep snapshot payloads free of nested snapshots, preserve save/load and undo/redo semantics, allow save/restore/delete without cloud sync or accounts, and avoid sampling, remote AI, hidden audio assets, destructive filesystem versioning, or analytics.
+Project Snapshot work must store snapshots as local project-file data, migrate older projects to an empty snapshot list, keep snapshot payloads free of nested snapshots, preserve save/load and undo/redo semantics, allow save/rename/restore/delete without cloud sync or accounts, keep snapshot names bounded and normalized, and avoid sampling, remote AI, hidden audio assets, destructive filesystem versioning, or analytics.
 
 Pattern work must keep Pattern A/B/C as independent editable event data. Copy and clear tools must operate on the selected pattern slot without deleting the slot itself. Pattern preview playback should loop the selected pattern, while arrangement playback and WAV export should follow arrangement pattern assignments.
 

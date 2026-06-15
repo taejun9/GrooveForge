@@ -41,7 +41,7 @@ The first usable result is an Electron desktop workstation that can create a sam
 - Arrangement templates for 8-bar loop, full beat, hook-first, and breakdown song structures with explicit section lengths.
 - Desktop editing shortcuts for arrangement playback, Pattern A/B/C switching, selected event deletion, save, open, undo, and redo.
 - Undo/redo edit history for safer pattern, arrangement, mixer, sound, and master experimentation.
-- Project Snapshots for local idea slots that can save, restore, and delete beat states inside the project file.
+- Project Snapshots for local idea slots that can save, rename, restore, and delete beat states inside the project file.
 - Realtime transport metronome toggle with accented downbeat clicks for timing reference during arrangement or Pattern playback.
 - Live playback that follows future pattern, arrangement track mutes, BPM, mixer, sound, and master edits without forcing users to stop and restart.
 - Basic mixer volume/pan/mute/solo, channel low-cut/air EQ, Drive/Glue mix controls, Space send FX, per-stem export level meters, deterministic Mix Coach checks, master preset ceiling, reproducible export peak/RMS/headroom meter, full-mix WAV export, drum/808/synth/chord stem export, and arrangement MIDI export for DAW handoff.
