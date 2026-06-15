@@ -16,11 +16,11 @@ Use this file for product-specific privacy, safety, security, AI, ads, permissio
 
 For material risk, policy, or compliance claims, record the relevant source text or official source reference.
 
-## Audio And Sample Handling
+## Audio Import And Asset Handling
 
 Imported audio can contain personal data, copyrighted material, or unreleased creative work. Test fixtures should use generated tones, synthetic drum sounds, or clearly licensed assets.
 
-Sampling is an optional later module. Its implementation must include source tracking, user import boundaries, and clear export responsibility before sample packs or user audio are added to examples.
+Sampling is an optional later module. Its implementation must include source tracking, user import boundaries, and clear export responsibility before sample packs or user audio are added to examples. This safety section does not make sampling a core product feature.
 
 ## AI Boundary
 

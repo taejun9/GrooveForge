@@ -38,9 +38,10 @@ Match the user's language in reports unless a referenced artifact is already in 
 
 ## Project Invariants
 
-- GrooveForge is an event-based beat workstation, not a sampling-first app.
+- GrooveForge is an all-genre, event-based beat workstation, not a sampling-first app.
 - Musical events, patterns, clips, tracks, devices, mixer state, and render state are first-class project data.
-- Sampling is optional and should not become the center of the MVP.
+- Genre support comes from editable style profiles and generation rules; trap is one profile, not the product identity.
+- Sampling is a secondary add-on and should not become the center of the MVP, architecture, or roadmap.
 - The first product target is a sample-free 8-bar beat with drums, 808/bass, synth melody, arrangement, mixer/master, and WAV export.
 - Keep the app local-first until there is an explicit rationale for cloud sync, remote AI calls, payments, analytics, or account features.
 

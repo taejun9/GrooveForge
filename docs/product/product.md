@@ -3,7 +3,7 @@
 
 ## Summary
 
-GrooveForge is a web-first, event-based mini DAW for composing drums, 808/bass, melody/chords, arrangement, mixing, mastering, and WAV/stem export; sampling is an optional later module.
+GrooveForge is a web-first, event-based mini DAW for making beats across genres with drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, and WAV/stem export.
 
 ## Type
 
@@ -11,9 +11,26 @@ GrooveForge is a web-first, event-based mini DAW for composing drums, 808/bass, 
 
 ## Product Definition
 
-GrooveForge is a code-driven beat workstation: a mini DAW with a JSON-based project format, programmable style profiles, editable musical events, local synthesis, mixing/mastering controls, and offline export.
+GrooveForge is a code-driven all-genre beat workstation: a mini DAW with a JSON-based project format, programmable style profiles, editable musical events, local synthesis, mixing/mastering controls, and offline export.
 
 It is not a trap-only app and not a sample-chopping tool. Trap, drill, boom bap, house, lofi, jersey, phonk, R&B, garage, and experimental workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
+
+## Product Boundary
+
+Core product:
+
+- Direct drum programming.
+- 808/bass synthesis and bassline editing.
+- Melody and chord composition.
+- Sound design through built-in instruments and devices.
+- Arrangement from editable patterns.
+- Mixing, mastering, and export.
+
+Secondary extension:
+
+- Sampling, audio import, chopping, and sampler mapping.
+
+Sampling can be useful, but it must stay behind the composition engine, instrument engine, arrangement, mixer/master, and export pipeline in priority and architecture.
 
 ## Users
 
@@ -34,21 +51,20 @@ Primary feature areas:
 
 - Transport: BPM, key, play, stop, loop, metronome.
 - Pattern editor: drum step sequencer, bass grid, melody grid, variation A/B/C.
-- Instrument panel: drum kit, synth 808, simple synth, chord synth, optional sampler later.
+- Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: pattern blocks placed into intro, verse, hook, bridge, and outro structures.
 - Mixer/master: volume, pan, mute, solo, EQ, compressor, saturation, sends, limiter, loudness/peak metering.
 - Export: WAV export first, then stems after the render path is reliable.
 
 ## First-Class Data
 
-The internal model centers on editable musical events, not audio clips:
+The core model centers on editable musical events, not audio clips:
 
 ```ts
 type MusicalEvent =
   | NoteEvent
   | DrumHitEvent
-  | AutomationEvent
-  | AudioClipEvent;
+  | AutomationEvent;
 
 type NoteEvent = {
   type: "note";
@@ -74,7 +90,7 @@ type DrumHitEvent = {
 };
 ```
 
-Audio clips are allowed, but optional. A project must be able to produce a complete beat with only drum, bass, synth, chord, automation, mixer, and master data.
+Audio clip events belong to a later extension model. A project must be able to produce a complete beat with only drum, bass, synth, chord, automation, mixer, and master data.
 
 ## MVP Scope
 
@@ -87,7 +103,7 @@ The MVP must prove this sentence:
 MVP capabilities:
 
 - BPM/key setup.
-- 16-step drum sequencer with built-in one-shot kit sounds.
+- 16-step drum sequencer with built-in drum kit and drum-synth sources.
 - Synth 808/bass track with mono mode, pitch envelope, glide, and saturation.
 - Simple synth melody track with scale-aware grid.
 - Pattern A/B/C storage.
@@ -110,11 +126,12 @@ Phase 4 adds arrangement: pattern blocks, song section markers, duplicate/split/
 
 Phase 5 adds mixer/master/export: volume, pan, mute, solo, EQ, compressor, saturation, limiter, peak/LUFS metering, WAV export, and later stem export.
 
-Phase 6 adds optional sampling: sample import, one-shot mapping, audio clips, chop pad, reverse, pitch, and stretch.
+Phase 6 scopes optional sampling as an extension after the beat-making core is useful: audio import, sampler mapping, chopping, reverse, pitch, and stretch.
 
 ## Non-Goals
 
 - Do not make sample chop/import the MVP center.
+- Do not describe GrooveForge as a sampling app in product docs, UI copy, or agent plans.
 - Do not build plugin hosting before the local synth/mixer/export loop is working.
 - Do not add AI audio generation before editable pattern generation exists.
 - Do not add cloud collaboration, accounts, payments, trackers, or remote AI calls without explicit rationale.

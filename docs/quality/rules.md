@@ -63,6 +63,8 @@ P0 scheduler work must prove stable play/stop/loop behavior, BPM changes, and se
 
 Drum, bass, melody, and arrangement work must save and reload project JSON without losing event timing, pitch, velocity, track routing, or mixer state.
 
-Export work must verify a non-silent WAV with expected duration, expected sample rate/channel count, no samples above the selected ceiling, and reproducibility from saved project data.
+Export work must verify a non-silent WAV with expected duration, expected sample rate/channel count, no audio frames above the selected ceiling, and reproducibility from saved project data.
+
+Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, or plan titles.
 
 Mixer/master work must keep mixing and mastering separate. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.

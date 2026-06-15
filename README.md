@@ -1,7 +1,7 @@
 
 # GrooveForge
 
-GrooveForge is a web-first, event-based mini DAW for composing drums, 808/bass, melody/chords, arrangement, mixing, mastering, and WAV/stem export; sampling is an optional later module.
+GrooveForge is a web-first, event-based mini DAW for making beats across genres: drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, and WAV/stem export.
 
 Project type: `web-first TypeScript mini DAW / beat workstation`.
 
@@ -11,17 +11,17 @@ Agent team: `Team Forge`. See `AGENTS.md`.
 
 ## Product Spine
 
-GrooveForge is a code-driven beat workstation with a programmable project format and style engine. The core flow is:
+GrooveForge is a code-driven all-genre beat workstation with a programmable project format and style engine. The core flow is:
 
 ```text
 BPM/key -> drums -> 808/bass -> melody/chords -> arrangement -> mixing -> mastering -> export
 ```
 
-Sampling can be added later as an optional module, but the MVP must work without imported samples.
+Sampling is a secondary add-on. It can be added later for users who want audio import, chopping, or sampler workflows, but it must not define the MVP or the core data model.
 
 ## MVP Target
 
-The first usable result is a browser project that can create a sample-free 8-bar beat and export it as WAV:
+The first usable result is a browser project that can create a sample-free 8-bar beat in any supported style profile and export it as WAV:
 
 - 145 BPM / F minor starter project.
 - Kick, snare/clap, hat, 808, and synth melody tracks.
@@ -33,6 +33,8 @@ No app runtime has been installed yet. This repository currently contains the pr
 ## Core Direction
 
 - Keep product behavior grounded in the project brief and official sources where applicable.
+- Treat genre as editable style profiles and generation rules, not as a single hard-coded genre.
+- Keep drums, 808/bass, melody/chords, arrangement, mixer/master, and export ahead of sampling work.
 - Keep sensitive real user, customer, credential, and production data out of samples, tests, docs, and screenshots.
 - Keep validation commands current as the stack becomes concrete.
 

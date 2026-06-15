@@ -32,17 +32,17 @@ REQUIRED_PATHS = [
 
 TEXT_EXPECTATIONS = {
     "README.md": [
-        "event-based mini DAW",
-        "sampling is an optional later module",
+        "making beats across genres",
+        "Sampling is a secondary add-on.",
         "python3 harness/scripts/run_qa.py",
     ],
     "AGENTS.md": [
         "No Exec Plan, No Work",
-        "GrooveForge is an event-based beat workstation",
+        "GrooveForge is an all-genre, event-based beat workstation",
     ],
     "docs/product/product.md": [
         "샘플 없이도 8마디 비트를 만들고 WAV로 export할 수 있어야 한다.",
-        "Audio clips are allowed, but optional.",
+        "Sampling can be useful, but it must stay behind the composition engine",
     ],
     "docs/quality/rules.md": [
         "QA and review are separate loops.",

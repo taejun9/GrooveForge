@@ -35,7 +35,6 @@ Audio Engine
   Drum Rack
   808 Synth
   Poly Synth
-  Optional Sampler
   FX Devices
   Mixer Bus
   Master Bus
@@ -62,16 +61,16 @@ These are current candidates, not installed dependencies. Add package commands o
 
 ## Data Model Direction
 
-The project model should make event data first-class:
+The core project model should make composition events first-class:
 
 - `Project`: version, title, BPM, key/scale, swing, tracks, arrangement, master settings.
 - `Track`: type, mixer strip, devices, clips, sends.
-- `Clip`: pattern, MIDI, audio, or automation data.
-- `MusicalEvent`: note, drum hit, automation, or audio clip event.
-- `Device`: synth, drum rack, sampler, EQ, compressor, saturation, limiter, meter, send effect.
+- `Clip`: pattern, MIDI, or automation data for the MVP.
+- `MusicalEvent`: note, drum hit, or automation event for the MVP.
+- `Device`: synth, drum rack, EQ, compressor, saturation, limiter, meter, send effect.
 - `StyleProfile`: genre rules for BPM range, swing, density, quantize strength, humanization, bass style, and melody style.
 
-Sampling is represented as an audio/sampler track and audio clip events. It must not be required for a valid project.
+Sampling is an extension model, not a core dependency. When it is added, it can introduce audio clips, sampler devices, audio tracks, and source/license metadata without changing the requirement that a valid beat can be made from generated and performed events alone.
 
 ## Track Types
 
@@ -81,12 +80,19 @@ Initial track types:
 - `bass_808`
 - `synth`
 - `chord`
-- `audio`
-- `sampler`
 - `fx_return`
 - `master`
 
-MVP tracks should be `drum_rack`, `bass_808`, `synth`, and `master`. Add `audio` and `sampler` in the optional sampling phase.
+MVP tracks should be `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master`.
+
+Extension track types for optional sampling:
+
+- `audio`
+- `sampler`
+
+## Genre Rule
+
+Genre is data, not a product silo. Trap, drill, boom bap, lofi, house, jersey, phonk, R&B, garage, and experimental behavior should live in `StyleProfile` presets and editable generation rules.
 
 ## Scheduling Rule
 
@@ -95,4 +101,3 @@ The audio scheduler is a P0 product dependency. UI timing must not be treated as
 ## Export Rule
 
 WAV export must render from project data through the same musical timeline used for realtime playback. Export validation should check that the result is non-silent, has the expected duration, does not exceed the chosen limiter ceiling, and can be recreated from saved project JSON.
-

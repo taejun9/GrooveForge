@@ -28,5 +28,5 @@ Record official documentation, platform docs, standards, laws, policies, or vend
 
 - Add browser compatibility references before committing to target browsers.
 - Add official docs for any benchmark DAW behavior before copying specific interaction details.
-- Add licensing evidence before committing sample packs, presets, loops, or third-party audio fixtures.
+- Add licensing evidence before committing presets, loops, sample packs, or third-party audio fixtures.
 - Add encoder/library documentation when a WAV encoder, metering library, or DSP package is selected.
