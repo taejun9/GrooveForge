@@ -247,6 +247,30 @@ type PatternCompareSummary = {
   arrangedBars: number;
 };
 
+type ArrangementFocusPresetId = "intro_space" | "verse_pocket" | "hook_peak" | "bridge_drop" | "outro_release";
+
+type ArrangementFocusPreset = {
+  id: ArrangementFocusPresetId;
+  label: string;
+  detail: string;
+  section: ArrangementSection;
+  pattern: PatternSlot;
+  bars: number;
+  energy: number;
+  mutedTracks: ArrangementMuteTrack[];
+};
+
+type ArrangementFocusSummary = {
+  blockNumber: number;
+  section: ArrangementSection;
+  pattern: PatternSlot;
+  bars: number;
+  energy: number;
+  eventCount: number;
+  mutedLabel: string;
+  suggestedPreset: ArrangementFocusPresetId;
+};
+
 type NextMoveCommand =
   | { kind: "blueprint"; blueprintId: BeatBlueprintId }
   | { kind: "patternFill"; preset: PatternFillPreset }
@@ -304,6 +328,59 @@ type NoteView = {
   glide?: boolean;
   probability?: number;
 };
+
+const arrangementFocusPresets: ArrangementFocusPreset[] = [
+  {
+    id: "intro_space",
+    label: "Intro Space",
+    detail: "Open with room before the low end lands.",
+    section: "Intro",
+    pattern: "A",
+    bars: 2,
+    energy: 0.54,
+    mutedTracks: ["bass_808"]
+  },
+  {
+    id: "verse_pocket",
+    label: "Verse Pocket",
+    detail: "Keep the groove clear for topline or rap.",
+    section: "Verse",
+    pattern: "A",
+    bars: 4,
+    energy: 0.72,
+    mutedTracks: ["synth"]
+  },
+  {
+    id: "hook_peak",
+    label: "Hook Peak",
+    detail: "Fullest version of the idea for the main section.",
+    section: "Hook",
+    pattern: "B",
+    bars: 4,
+    energy: 0.94,
+    mutedTracks: []
+  },
+  {
+    id: "bridge_drop",
+    label: "Bridge Drop",
+    detail: "Pull rhythm and bass away for contrast.",
+    section: "Bridge",
+    pattern: "C",
+    bars: 2,
+    energy: 0.38,
+    mutedTracks: ["drum_rack", "bass_808"]
+  },
+  {
+    id: "outro_release",
+    label: "Outro Release",
+    detail: "Exit with a lighter version of the beat.",
+    section: "Outro",
+    pattern: "C",
+    bars: 2,
+    energy: 0.46,
+    mutedTracks: ["drum_rack", "bass_808"]
+  }
+];
 
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
@@ -368,6 +445,10 @@ export function App(): ReactElement {
   const selectedArrangementBars = selectedArrangementBlock ? normalizeArrangementBars(selectedArrangementBlock.bars) : 1;
   const selectedArrangementNextBlock = project.arrangement[selectedArrangementIndex + 1];
   const selectedArrangementNextBars = selectedArrangementNextBlock ? normalizeArrangementBars(selectedArrangementNextBlock.bars) : 0;
+  const selectedArrangementFocus = useMemo(
+    () => createArrangementFocusSummary(project, selectedArrangementIndex),
+    [project, selectedArrangementIndex]
+  );
   const canSplitArrangementBlock = selectedArrangementBars > 1;
   const canMergeArrangementBlock =
     Boolean(selectedArrangementNextBlock) && selectedArrangementBars + selectedArrangementNextBars <= maxArrangementBars;
@@ -946,6 +1027,30 @@ export function App(): ReactElement {
       },
       `Applied ${arrangementMovePresetLabel(preset)} move`
     );
+  }
+
+  function applyArrangementFocusPreset(presetId: ArrangementFocusPresetId): void {
+    const preset = arrangementFocusPresets.find((candidate) => candidate.id === presetId);
+    const block = projectRef.current.arrangement[selectedArrangementIndex];
+    if (!preset || !block) {
+      setProjectStatus("Select an arrangement block");
+      return;
+    }
+
+    const changed = updateArrangementBlock(
+      selectedArrangementIndex,
+      {
+        section: preset.section,
+        pattern: preset.pattern,
+        bars: preset.bars,
+        energy: preset.energy,
+        mutedTracks: [...preset.mutedTracks]
+      },
+      `Applied ${preset.label} focus`
+    );
+    if (changed) {
+      setPlaybackMode("arrangement");
+    }
   }
 
   function toggleArrangementTrackMute(track: ArrangementMuteTrack): void {
@@ -2134,6 +2239,7 @@ export function App(): ReactElement {
     playbackMode,
     project,
     onApplyArrangementMove: applyArrangementMoveToSelected,
+    onApplyArrangementFocus: applyArrangementFocusPreset,
     onApplyBlueprint: applySelectedBeatBlueprint,
     onApplyMixFix: applyMixFixPreset,
     onApplyPatternChain: applyPatternChain,
@@ -2699,6 +2805,7 @@ export function App(): ReactElement {
               })}
             </div>
           </div>
+          <ArrangementFocusPanel summary={selectedArrangementFocus} onApply={applyArrangementFocusPreset} />
           <div className="arrangement-track">
             {project.arrangement.map((block, index) => (
               <button
@@ -3300,6 +3407,50 @@ function PatternCompareStrip({
   );
 }
 
+function ArrangementFocusPanel({
+  onApply,
+  summary
+}: {
+  onApply: (preset: ArrangementFocusPresetId) => void;
+  summary: ArrangementFocusSummary | null;
+}): ReactElement | null {
+  if (!summary) {
+    return null;
+  }
+
+  return (
+    <section className="arrangement-focus" data-testid="arrangement-focus" aria-label="Arrangement focus">
+      <div className="arrangement-focus-summary">
+        <span>Focus</span>
+        <strong data-testid="arrangement-focus-summary">
+          Block {summary.blockNumber} / {summary.section} / Pattern {summary.pattern}
+        </strong>
+        <small>
+          {barCountLabel(summary.bars)} / {Math.round(summary.energy * 100)}% energy / {summary.eventCount} events / {summary.mutedLabel}
+        </small>
+      </div>
+      <div className="arrangement-focus-actions">
+        {arrangementFocusPresets.map((preset) => (
+          <button
+            className={summary.suggestedPreset === preset.id ? "suggested" : ""}
+            data-testid={`arrangement-focus-${preset.id}`}
+            key={preset.id}
+            onClick={() => onApply(preset.id)}
+            title={`${preset.label}: ${preset.detail}`}
+            type="button"
+          >
+            <Waves size={14} aria-hidden="true" />
+            <span>{preset.label}</span>
+            <small>
+              Pattern {preset.pattern} / {barCountLabel(preset.bars)} / {Math.round(preset.energy * 100)}%
+            </small>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function DeliveryTargets({
   onApply,
   onCustomChange,
@@ -3876,6 +4027,7 @@ function createQuickActions({
   playbackMode,
   project,
   onApplyArrangementMove,
+  onApplyArrangementFocus,
   onApplyBlueprint,
   onApplyMixFix,
   onApplyPatternChain,
@@ -3897,6 +4049,7 @@ function createQuickActions({
   playbackMode: PlaybackMode;
   project: ProjectState;
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
+  onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
   onApplyMixFix: (preset: MixFixPreset) => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
@@ -4005,6 +4158,14 @@ function createQuickActions({
       group: "Arrange",
       keywords: "hook lift arrangement energy mute build drop",
       run: () => onApplyArrangementMove("hook_lift")
+    },
+    {
+      id: "hook-peak-focus",
+      title: "Apply Hook Peak Focus",
+      detail: "Set the selected block to a full-energy Hook using Pattern B.",
+      group: "Arrange",
+      keywords: "arrangement focus hook peak pattern b energy selected block",
+      run: () => onApplyArrangementFocus("hook_peak")
     },
     {
       id: "pattern-chain",
@@ -4543,6 +4704,41 @@ function createBeatMapActions(
 function usedPatternSlots(project: ProjectState): PatternSlot[] {
   const slots = new Set(project.arrangement.map((block) => block.pattern));
   return patternSlots.filter((slot) => slots.has(slot));
+}
+
+function createArrangementFocusSummary(project: ProjectState, selectedIndex: number): ArrangementFocusSummary | null {
+  const block = project.arrangement[selectedIndex] ?? project.arrangement[0];
+  if (!block) {
+    return null;
+  }
+
+  const pattern = project.patterns[block.pattern];
+  const mutedLabels = block.mutedTracks.map(arrangementMuteTrackLabel);
+  return {
+    blockNumber: Math.min(selectedIndex + 1, project.arrangement.length),
+    section: block.section,
+    pattern: block.pattern,
+    bars: normalizeArrangementBars(block.bars),
+    energy: normalizeArrangementEnergy(block.energy),
+    eventCount: drumHitCount(pattern) + pattern.bassNotes.length + pattern.melodyNotes.length + pattern.chordEvents.length,
+    mutedLabel: mutedLabels.length === 0 ? "no mutes" : `${mutedLabels.join(", ")} muted`,
+    suggestedPreset: suggestedArrangementFocusPreset(block)
+  };
+}
+
+function suggestedArrangementFocusPreset(block: ArrangementBlock): ArrangementFocusPresetId {
+  switch (block.section) {
+    case "Intro":
+      return "intro_space";
+    case "Hook":
+      return "hook_peak";
+    case "Bridge":
+      return "bridge_drop";
+    case "Outro":
+      return "outro_release";
+    case "Verse":
+      return "verse_pocket";
+  }
 }
 
 function createPatternCompareSummaries(project: ProjectState): PatternCompareSummary[] {

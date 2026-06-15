@@ -145,6 +145,8 @@ Arrangement energy work must keep Energy as deterministic arrangement-block play
 
 Arrangement Move work must transform only the selected arrangement block's existing energy and mutedTracks state through undoable project history, keep Drop/Build/Hook Lift/Reset deterministic and editable afterward, avoid mutating Pattern A/B/C musical events, preserve realtime playback plus WAV/stem/MIDI export semantics, and avoid imported audio, sampling, plugin hosting, remote AI, hidden randomness, or hidden assets.
 
+Arrangement Focus work must derive selected-block summaries from local arrangement and Pattern A/B/C event state, offer only explicit user-clicked Focus presets, update only the selected block's section, Pattern assignment, bar length, energy, and mutedTracks through undoable arrangement paths, keep selected pattern aligned with the block, preserve realtime playback plus WAV/stem/MIDI export semantics, and avoid mutating Pattern A/B/C musical events, sampling, imported audio, plugin hosting, remote AI, hidden automation, accounts, analytics, or cloud sync.
+
 Live playback edit work must read current project state while scheduling future steps, let selected-pattern preview and arrangement playback respond to edits without stopping, update BPM and master output changes on future scheduling/output, preserve Stop and Space behavior, and state that already-triggered audio is not rewritten.
 
 Undo/redo work must record bounded local project-edit history for editing actions, ignore playback/export side effects, keep keyboard shortcuts out of focused inputs, and clear history when a different project file is loaded.

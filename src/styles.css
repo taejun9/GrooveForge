@@ -200,6 +200,7 @@ h2 {
 .next-move-actions button,
 .snapshot-actions button,
 .arrangement-template-row button,
+.arrangement-focus-actions button,
 .block-pattern-row button,
 .arrangement-mute-row button,
 .arrangement-move-row button,
@@ -288,6 +289,7 @@ h2 {
 .snapshot-heading button,
 .snapshot-actions button,
 .arrangement-template-row button,
+.arrangement-focus-actions button,
 .block-pattern-row button,
 .arrangement-mute-row button,
 .arrangement-move-row button,
@@ -301,6 +303,7 @@ h2 {
 .segmented button.selected,
 .pattern-tabs button.selected,
 .arrangement-template-row button.selected,
+.arrangement-focus-actions button.suggested,
 .block-pattern-row button.selected,
 .arrangement-mute-row button.selected,
 .arrangement-move-row button.selected,
@@ -2428,6 +2431,89 @@ input[type="range"] {
 .pattern-chain-editor button small {
   color: rgba(244, 239, 231, 0.54);
   font-size: 10px;
+}
+
+.arrangement-focus {
+  display: grid;
+  grid-template-columns: minmax(164px, 0.54fr) minmax(0, 1.46fr);
+  gap: 8px;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.arrangement-focus-summary {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 8px 10px;
+}
+
+.arrangement-focus-summary span,
+.arrangement-focus-summary small,
+.arrangement-focus-actions button small {
+  overflow: hidden;
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrangement-focus-summary strong {
+  overflow: hidden;
+  color: #f4efe7;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrangement-focus-actions {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.arrangement-focus-actions button {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 2px 6px;
+  align-items: center;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px 7px;
+  text-align: start;
+}
+
+.arrangement-focus-actions button svg {
+  grid-row: span 2;
+  color: #78f0c8;
+}
+
+.arrangement-focus-actions button span {
+  overflow: hidden;
+  color: #f4efe7;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrangement-focus-actions button.suggested {
+  border-color: rgba(240, 195, 106, 0.58);
+  color: #f0c36a;
+  background: rgba(240, 195, 106, 0.12);
+}
+
+.arrangement-focus-actions button.suggested svg,
+.arrangement-focus-actions button.suggested span {
+  color: #f0c36a;
+}
+
+.arrangement-focus-actions button.suggested small {
+  color: rgba(240, 195, 106, 0.72);
 }
 
 .arrangement-block {
