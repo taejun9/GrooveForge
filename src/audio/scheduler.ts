@@ -1,6 +1,7 @@
 import {
   dbToGain,
   activePattern,
+  chordPitches,
   loopStepCount,
   noteToFrequency,
   projectStepDurationSeconds,
@@ -157,6 +158,7 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
   const drumMix = channelMix(project, "drum_rack");
   const bassMix = channelMix(project, "bass_808");
   const synthMix = channelMix(project, "synth");
+  const chordMix = channelMix(project, "chord");
   const stepDuration = projectStepDurationSeconds(project);
   const pattern = activePattern(project);
 
@@ -191,6 +193,23 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
         "triangle",
         synthMix.pan
       );
+    }
+  }
+
+  for (const chord of pattern.chordEvents) {
+    if (chord.step === patternStep) {
+      for (const pitch of chordPitches(chord)) {
+        scheduleTone(
+          context,
+          master,
+          time,
+          chord.length * stepDuration,
+          noteToFrequency(pitch),
+          chord.velocity * 0.08 * chordMix.gain,
+          "triangle",
+          chordMix.pan
+        );
+      }
     }
   }
 }

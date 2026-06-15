@@ -52,7 +52,7 @@ BPM/key -> drum pattern -> 808/bass line -> melody/chords -> arrangement -> mixe
 Primary feature areas:
 
 - Transport: BPM, key, play, stop, loop, metronome.
-- Pattern editor: drum step sequencer, bass grid, melody grid, variation A/B/C.
+- Pattern editor: drum step sequencer, bass grid, chord progression, melody grid, variation A/B/C.
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with duplicate, move, and delete controls.
 - Mixer/master: volume, pan, mute, solo, master preset ceiling, EQ, compressor, saturation, sends, limiter, loudness/peak metering.
@@ -109,8 +109,9 @@ MVP capabilities:
 - BPM/key setup.
 - 16-step drum sequencer with built-in drum kit and drum-synth sources.
 - Synth 808/bass track with editable scale-aware grid, mono mode, glide, and saturation direction.
+- Chord progression track with scale-locked roots, editable quality, length, and velocity.
 - Simple synth melody track with editable scale-aware grid and velocity control.
-- Independent Pattern A/B/C storage for drum, bass, and melody variations.
+- Independent Pattern A/B/C storage for drum, bass, chord, and melody variations.
 - Editable arrangement blocks for an 8-bar loop or simple song section, using assigned Pattern A/B/C data, per-block energy, and structure controls for duplicate, move, and delete.
 - Mixer volume, pan, mute, and solo reflected in realtime playback and WAV export.
 - Master preset ceiling and output gain.

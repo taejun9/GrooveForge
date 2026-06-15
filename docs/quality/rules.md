@@ -64,7 +64,9 @@ P0 scheduler work must prove stable play/stop/loop behavior, BPM changes, curren
 
 Drum, bass, melody, and arrangement work must preserve editable project state without losing event timing, pitch, velocity, glide, track routing, or mixer state.
 
-Project file work must reject invalid imports without overwriting the current project and must preserve edited drum, bass, melody, mixer, master, key, BPM, style, and arrangement data on save/load.
+Chord progression work must preserve Pattern A/B/C independence, keep chord roots scale-aware by default, migrate older project files without chord events, and make chord events audible in both realtime playback and WAV export.
+
+Project file work must reject invalid imports without overwriting the current project and must preserve edited drum, bass, chord, melody, mixer, master, key, BPM, style, and arrangement data on save/load.
 
 Pattern work must keep Pattern A/B/C as independent editable event data. Realtime playback should preview the selected pattern, while WAV export should follow arrangement pattern assignments.
 

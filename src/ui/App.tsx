@@ -25,6 +25,8 @@ import {
   ArrangementBlock,
   ArrangementSection,
   BassNote,
+  ChordEvent,
+  ChordQuality,
   DrumLane,
   getStyle,
   MasterPreset,
@@ -37,12 +39,14 @@ import {
   activePattern,
   arrangementSections,
   bassPitchLanes,
+  chordQualities,
   masterPresetCeilingDb,
   masterPresets,
   melodyPitchLanes,
   parseProjectFile,
   patternSlots,
   projectFileName,
+  scalePitchNames,
   serializeProjectFile,
   starterProject,
   steps,
@@ -99,6 +103,10 @@ export function App(): ReactElement {
   const melodyPitches = useMemo(
     () => mergePitchLanes(melodyPitchLanes(project.key), currentPattern.melodyNotes.map((note) => note.pitch)),
     [currentPattern.melodyNotes, project.key]
+  );
+  const chordRootOptions = useMemo(
+    () => mergeChordRoots(scalePitchNames(project.key), currentPattern.chordEvents.map((event) => event.root)),
+    [currentPattern.chordEvents, project.key]
   );
   const selectedBassNote =
     selectedNote?.track === "bass"
@@ -329,6 +337,22 @@ export function App(): ReactElement {
       ...pattern,
       melodyNotes: pattern.melodyNotes.map((note) =>
         note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, velocity } : note
+      )
+    }));
+  }
+
+  function updateChordEvent(index: number, update: Partial<ChordEvent>): void {
+    updateCurrentPattern((pattern) => ({
+      ...pattern,
+      chordEvents: pattern.chordEvents.map((event, eventIndex) =>
+        eventIndex === index
+          ? {
+              ...event,
+              ...update,
+              length: update.length === undefined ? event.length : clampStepLength(update.length),
+              velocity: update.velocity === undefined ? event.velocity : clampVelocity(update.velocity)
+            }
+          : event
       )
     }));
   }
@@ -658,6 +682,11 @@ export function App(): ReactElement {
             <Device icon={<Music2 size={17} />} name="Synth" value={`${style.melodyStyle} patch`} color="#8aa8ff" />
             <Device icon={<SlidersHorizontal size={17} />} name="FX" value="EQ / comp / sat" color="#f0c36a" />
           </div>
+          <ChordEditor
+            chords={currentPattern.chordEvents}
+            rootOptions={chordRootOptions}
+            onChange={updateChordEvent}
+          />
           {project.mode === "studio" && (
             <div className="studio-controls">
               <label>
@@ -1072,6 +1101,114 @@ function Device({
   );
 }
 
+function ChordEditor({
+  chords,
+  rootOptions,
+  onChange
+}: {
+  chords: ChordEvent[];
+  rootOptions: string[];
+  onChange: (index: number, update: Partial<ChordEvent>) => void;
+}): ReactElement {
+  return (
+    <div className="chord-editor">
+      <div className="lane-header">
+        <span>Chords</span>
+        <strong>{chords.length} events</strong>
+      </div>
+      <div className="chord-slots">
+        {chords.map((chord, index) => (
+          <div className="chord-slot" data-testid={`chord-slot-${index}`} key={`${chord.step}-${index}`}>
+            <div className="chord-slot-heading">
+              <span>{chord.step + 1}</span>
+              <strong>
+                {chord.root}
+                {chord.quality}
+              </strong>
+            </div>
+            <label>
+              <span>Root</span>
+              <select
+                data-testid={`chord-root-${index}`}
+                value={chord.root}
+                onChange={(event) => onChange(index, { root: event.target.value })}
+              >
+                {rootOptions.map((root) => (
+                  <option key={root} value={root}>
+                    {root}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Quality</span>
+              <select
+                data-testid={`chord-quality-${index}`}
+                value={chord.quality}
+                onChange={(event) => onChange(index, { quality: event.target.value as ChordQuality })}
+              >
+                {chordQualities.map((quality) => (
+                  <option key={quality} value={quality}>
+                    {quality}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Length {chord.length}</span>
+              <div className="chord-value-inputs">
+                <input
+                  data-testid={`chord-length-${index}`}
+                  max={8}
+                  min={1}
+                  onChange={(event) => onChange(index, { length: Number(event.target.value) })}
+                  step={1}
+                  type="range"
+                  value={chord.length}
+                />
+                <input
+                  aria-label={`Chord ${index + 1} length`}
+                  data-testid={`chord-length-input-${index}`}
+                  max={8}
+                  min={1}
+                  onChange={(event) => onChange(index, { length: Number(event.target.value) })}
+                  step={1}
+                  type="number"
+                  value={chord.length}
+                />
+              </div>
+            </label>
+            <label>
+              <span>Velocity {Math.round(chord.velocity * 100)}%</span>
+              <div className="chord-value-inputs">
+                <input
+                  data-testid={`chord-velocity-${index}`}
+                  max={1}
+                  min={0.1}
+                  onChange={(event) => onChange(index, { velocity: Number(event.target.value) })}
+                  step={0.01}
+                  type="range"
+                  value={chord.velocity}
+                />
+                <input
+                  aria-label={`Chord ${index + 1} velocity percent`}
+                  data-testid={`chord-velocity-input-${index}`}
+                  max={100}
+                  min={10}
+                  onChange={(event) => onChange(index, { velocity: Number(event.target.value) / 100 })}
+                  step={1}
+                  type="number"
+                  value={Math.round(chord.velocity * 100)}
+                />
+              </div>
+            </label>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function laneColor(lane: DrumLane): string {
   const colors: Record<DrumLane, string> = {
     kick: "#78f0c8",
@@ -1086,12 +1223,16 @@ function mergePitchLanes(scalePitches: string[], usedPitches: string[]): string[
   return Array.from(new Set([...scalePitches, ...usedPitches]));
 }
 
+function mergeChordRoots(scaleRoots: string[], usedRoots: string[]): string[] {
+  return Array.from(new Set([...scaleRoots, ...usedRoots]));
+}
+
 function patternEventCount(pattern: PatternData): string {
   const drumHits = Object.values(pattern.drumPattern).reduce(
     (total, laneSteps) => total + laneSteps.filter(Boolean).length,
     0
   );
-  return `${drumHits + pattern.bassNotes.length + pattern.melodyNotes.length} events`;
+  return `${drumHits + pattern.bassNotes.length + pattern.melodyNotes.length + pattern.chordEvents.length} events`;
 }
 
 function panLabel(pan: number): string {
@@ -1106,6 +1247,20 @@ function clampPan(value: number): number {
     return 0;
   }
   return Math.min(100, Math.max(-100, Math.round(value)));
+}
+
+function clampStepLength(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+  return Math.min(16, Math.max(1, Math.round(value)));
+}
+
+function clampVelocity(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0.5;
+  }
+  return Math.min(1, Math.max(0, value));
 }
 
 function clampEnergy(value: number): number {

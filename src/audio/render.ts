@@ -1,4 +1,4 @@
-import { dbToGain, noteToFrequency, patternForSlot, projectStepDurationSeconds, ProjectState } from "../domain/workstation";
+import { chordPitches, dbToGain, noteToFrequency, patternForSlot, projectStepDurationSeconds, ProjectState } from "../domain/workstation";
 
 const sampleRate = 44100;
 const channels = 2;
@@ -79,6 +79,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   const drumMix = channelMix(project, "drum_rack");
   const bassMix = channelMix(project, "bass_808");
   const synthMix = channelMix(project, "synth");
+  const chordMix = channelMix(project, "chord");
   const outputGain = masterOutputGain(project);
 
   for (let bar = 0; bar < bars; bar += 1) {
@@ -106,6 +107,11 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
     }
     for (const note of pattern.melodyNotes) {
       addSine(buffer, (barOffset + note.step) * step, note.length * step, noteToFrequency(note.pitch), synthMix, note.velocity * 0.22);
+    }
+    for (const chord of pattern.chordEvents) {
+      for (const pitch of chordPitches(chord)) {
+        addSine(buffer, (barOffset + chord.step) * step, chord.length * step, noteToFrequency(pitch), chordMix, chord.velocity * 0.14);
+      }
     }
   }
 

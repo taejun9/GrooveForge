@@ -41,6 +41,16 @@ export type MelodyNote = {
   velocity: number;
 };
 
+export type ChordQuality = "maj" | "min" | "dim" | "sus2" | "sus4" | "7" | "m7";
+
+export type ChordEvent = {
+  step: number;
+  root: string;
+  quality: ChordQuality;
+  length: number;
+  velocity: number;
+};
+
 export type NoteTrack = "bass" | "melody";
 export type PatternSlot = "A" | "B" | "C";
 
@@ -48,6 +58,7 @@ export type PatternData = {
   drumPattern: DrumPattern;
   bassNotes: BassNote[];
   melodyNotes: MelodyNote[];
+  chordEvents: ChordEvent[];
 };
 
 export type MixerChannel = {
@@ -97,6 +108,7 @@ export const stepsPerBar = 16;
 export const projectFileVersion = 1;
 export const patternSlots: PatternSlot[] = ["A", "B", "C"];
 export const arrangementSections: ArrangementSection[] = ["Intro", "Verse", "Hook", "Bridge", "Outro"];
+export const chordQualities: ChordQuality[] = ["maj", "min", "dim", "sus2", "sus4", "7", "m7"];
 export const masterPresets: MasterPreset[] = ["Clean Demo", "Streaming Safe", "Headroom for Vocal"];
 export const masterPresetCeilingsDb: Record<MasterPreset, number> = {
   "Clean Demo": -0.8,
@@ -130,6 +142,16 @@ const scaleIntervals: Record<string, number[]> = {
   major: [0, 2, 4, 5, 7, 9, 11],
   minor: [0, 2, 3, 5, 7, 8, 10],
   dorian: [0, 2, 3, 5, 7, 9, 10]
+};
+
+const chordIntervals: Record<ChordQuality, number[]> = {
+  maj: [0, 4, 7],
+  min: [0, 3, 7],
+  dim: [0, 3, 6],
+  sus2: [0, 2, 7],
+  sus4: [0, 5, 7],
+  "7": [0, 4, 7, 10],
+  m7: [0, 3, 7, 10]
 };
 
 export const styleProfiles: StyleProfile[] = [
@@ -234,6 +256,12 @@ const starterPatternA: PatternData = {
     { step: 6, pitch: "C5", length: 2, velocity: 0.7 },
     { step: 10, pitch: "Eb5", length: 1, velocity: 0.6 },
     { step: 12, pitch: "C5", length: 3, velocity: 0.66 }
+  ],
+  chordEvents: [
+    { step: 0, root: "F", quality: "min", length: 4, velocity: 0.55 },
+    { step: 4, root: "Db", quality: "maj", length: 4, velocity: 0.46 },
+    { step: 8, root: "Ab", quality: "maj", length: 4, velocity: 0.5 },
+    { step: 12, root: "Eb", quality: "maj", length: 4, velocity: 0.5 }
   ]
 };
 
@@ -257,6 +285,12 @@ const starterPatternB: PatternData = {
     { step: 6, pitch: "F5", length: 2, velocity: 0.72 },
     { step: 9, pitch: "Ab4", length: 1, velocity: 0.58 },
     { step: 12, pitch: "C5", length: 2, velocity: 0.66 }
+  ],
+  chordEvents: [
+    { step: 0, root: "F", quality: "min", length: 4, velocity: 0.5 },
+    { step: 4, root: "C", quality: "min", length: 4, velocity: 0.44 },
+    { step: 8, root: "Db", quality: "maj", length: 4, velocity: 0.48 },
+    { step: 12, root: "Eb", quality: "maj", length: 4, velocity: 0.5 }
   ]
 };
 
@@ -277,6 +311,12 @@ const starterPatternC: PatternData = {
     { step: 4, pitch: "F4", length: 2, velocity: 0.54 },
     { step: 8, pitch: "Bb4", length: 3, velocity: 0.62 },
     { step: 12, pitch: "C5", length: 2, velocity: 0.58 }
+  ],
+  chordEvents: [
+    { step: 0, root: "Db", quality: "maj", length: 4, velocity: 0.48 },
+    { step: 4, root: "Eb", quality: "maj", length: 4, velocity: 0.45 },
+    { step: 8, root: "F", quality: "min", length: 4, velocity: 0.52 },
+    { step: 12, root: "C", quality: "min", length: 4, velocity: 0.42 }
   ]
 };
 
@@ -339,7 +379,8 @@ export function clonePatternData(pattern: PatternData): PatternData {
       perc: [...pattern.drumPattern.perc]
     },
     bassNotes: pattern.bassNotes.map((note) => ({ ...note })),
-    melodyNotes: pattern.melodyNotes.map((note) => ({ ...note }))
+    melodyNotes: pattern.melodyNotes.map((note) => ({ ...note })),
+    chordEvents: pattern.chordEvents.map((event) => ({ ...event }))
   };
 }
 
@@ -443,13 +484,44 @@ export function noteToFrequency(note: string): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
+export function chordPitches(chord: ChordEvent, octave = 3): string[] {
+  const root = tonicIndex[chord.root] ?? 0;
+  const names = chord.root.includes("b") ? flatNotes : sharpNotes;
+  return chordIntervals[chord.quality].map((interval) => {
+    const absolute = root + interval;
+    const pitchIndex = absolute % 12;
+    const octaveOffset = Math.floor(absolute / 12);
+    return `${names[pitchIndex]}${octave + octaveOffset}`;
+  });
+}
+
+function normalizePatternData(pattern: PatternDataInput): PatternData {
+  return {
+    drumPattern: pattern.drumPattern,
+    bassNotes: pattern.bassNotes,
+    melodyNotes: pattern.melodyNotes,
+    chordEvents: pattern.chordEvents?.map((event) => ({ ...event })) ?? []
+  };
+}
+
+function normalizePatternMap(patterns: Record<PatternSlot, PatternDataInput>): Record<PatternSlot, PatternData> {
+  return {
+    A: normalizePatternData(patterns.A),
+    B: normalizePatternData(patterns.B),
+    C: normalizePatternData(patterns.C)
+  };
+}
+
 function normalizeProjectState(value: unknown): ProjectState | null {
-  if (isProjectState(value)) {
-    return value;
+  if (isProjectStateShape(value)) {
+    return {
+      ...value,
+      patterns: normalizePatternMap(value.patterns)
+    };
   }
 
   if (isLegacyProjectState(value)) {
-    const legacyPattern = clonePatternData({
+    const legacyPattern = normalizePatternData({
       drumPattern: value.drumPattern,
       bassNotes: value.bassNotes,
       melodyNotes: value.melodyNotes
@@ -477,7 +549,10 @@ function normalizeProjectState(value: unknown): ProjectState | null {
   return null;
 }
 
-function isProjectState(value: unknown): value is ProjectState {
+type PatternDataInput = Omit<PatternData, "chordEvents"> & { chordEvents?: ChordEvent[] };
+type ProjectStateInput = Omit<ProjectState, "patterns"> & { patterns: Record<PatternSlot, PatternDataInput> };
+
+function isProjectStateShape(value: unknown): value is ProjectStateInput {
   if (!isRecord(value)) {
     return false;
   }
@@ -490,7 +565,7 @@ function isProjectState(value: unknown): value is ProjectState {
     isOneOf(value.styleId, styleProfiles.map((profile) => profile.id)) &&
     isOneOf(value.selectedPattern, patternSlots) &&
     isFiniteNumber(value.swing) &&
-    isPatternMap(value.patterns) &&
+    isPatternMapInput(value.patterns) &&
     Array.isArray(value.mixer) &&
     value.mixer.every(isMixerChannel) &&
     isArrangement(value.arrangement) &&
@@ -525,21 +600,22 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patt
   );
 }
 
-function isPatternMap(value: unknown): value is Record<PatternSlot, PatternData> {
+function isPatternMapInput(value: unknown): value is Record<PatternSlot, PatternDataInput> {
   if (!isRecord(value)) {
     return false;
   }
-  return patternSlots.every((slot) => isPatternData(value[slot]));
+  return patternSlots.every((slot) => isPatternDataInput(value[slot]));
 }
 
-function isPatternData(value: unknown): value is PatternData {
+function isPatternDataInput(value: unknown): value is PatternDataInput {
   return (
     isRecord(value) &&
     isDrumPattern(value.drumPattern) &&
     Array.isArray(value.bassNotes) &&
     value.bassNotes.every(isBassNote) &&
     Array.isArray(value.melodyNotes) &&
-    value.melodyNotes.every(isMelodyNote)
+    value.melodyNotes.every(isMelodyNote) &&
+    (value.chordEvents === undefined || (Array.isArray(value.chordEvents) && value.chordEvents.every(isChordEvent)))
   );
 }
 
@@ -569,6 +645,22 @@ function isMelodyNote(value: unknown): value is MelodyNote {
     isRecord(value) &&
     isStep(value.step) &&
     isPitch(value.pitch) &&
+    isFiniteNumber(value.length) &&
+    value.length >= 1 &&
+    value.length <= stepsPerBar &&
+    isFiniteNumber(value.velocity) &&
+    value.velocity >= 0 &&
+    value.velocity <= 1
+  );
+}
+
+function isChordEvent(value: unknown): value is ChordEvent {
+  return (
+    isRecord(value) &&
+    isStep(value.step) &&
+    typeof value.root === "string" &&
+    (value.root in tonicIndex) &&
+    isOneOf(value.quality, chordQualities) &&
     isFiniteNumber(value.length) &&
     value.length >= 1 &&
     value.length <= stepsPerBar &&

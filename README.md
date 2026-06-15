@@ -26,11 +26,11 @@ Sampling is a secondary add-on. It can be added later for users who want audio i
 The first usable result is an Electron desktop workstation that can create a sample-free 8-bar beat in any supported style profile and export it as WAV:
 
 - 145 BPM / F minor starter project.
-- Kick, snare/clap, hat, 808, and synth melody tracks.
+- Kick, snare/clap, hat, 808, chord, and synth melody tracks.
 - Independent Pattern A/B/C variations and editable arrangement blocks with duplicate, move, and delete controls.
 - Basic mixer volume/pan/mute/solo, master preset ceiling, and WAV export.
 
-The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport, style/key/BPM, drum steps, editable scale-aware 808/melody lanes, instruments, editable arrangement blocks, arrangement structure controls, mixer volume/pan/mute/solo, master preset ceiling, local project save/load, realtime loop playback, and arrangement-length WAV export.
+The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport, style/key/BPM, drum steps, editable scale-aware 808/melody lanes, chord progression, instruments, editable arrangement blocks, arrangement structure controls, mixer volume/pan/mute/solo, master preset ceiling, local project save/load, realtime loop playback, and arrangement-length WAV export.
 
 ## Core Direction
 
