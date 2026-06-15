@@ -159,6 +159,8 @@ Undo/redo work must record bounded local project-edit history for editing action
 
 Desktop shortcut work must keep playback, Pattern A/B/C selection, save/open, undo/redo, and selected event deletion scoped to the app window, must not fire from focused editable controls, and must route destructive deletion through normal undoable project history.
 
+Keyboard Capture work must route desktop key presses into scale-locked 808 or Synth notes as editable local musical events, keep focused inputs/textareas/selects/contenteditable controls protected, make every captured note undoable through project history, expose the target and key map in the 808/Melody editor, and avoid Web MIDI permission prompts, audio recording, sampling, imported audio, sampler tracks, remote AI, accounts, analytics, or cloud sync.
+
 Quick Actions work must remain local and explicit, must not fire while focused editable targets receive keyboard input, must route mutating commands through existing undoable project update paths, must keep project/open/save/export actions user-triggered, and must avoid macros, scripting, global OS shortcuts, sampling, plugin hosting, remote AI, automation recording, accounts, analytics, or cloud sync.
 
 Export work must verify a non-silent WAV with expected duration, expected sample rate/channel count, no audio frames above the selected ceiling, and reproducibility from saved project data.

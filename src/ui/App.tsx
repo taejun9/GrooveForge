@@ -189,6 +189,19 @@ const mixPostureOptions: { id: MixPosture; label: string }[] = [
 
 const keys = ["F minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"];
 const historyLimit = 50;
+const keyboardCaptureKeys = ["a", "s", "d", "f", "g", "h", "j", "k"] as const;
+type KeyboardCaptureKey = (typeof keyboardCaptureKeys)[number];
+
+const keyboardCaptureKeyLabels: Record<KeyboardCaptureKey, string> = {
+  a: "A",
+  s: "S",
+  d: "D",
+  f: "F",
+  g: "G",
+  h: "H",
+  j: "J",
+  k: "K"
+};
 
 function isStemTrackId(track: MixerChannel["id"]): track is StemTrackId {
   return (stemTrackIds as readonly string[]).includes(track);
@@ -350,6 +363,11 @@ type NoteView = {
   probability?: number;
 };
 
+type KeyboardCaptureKeyMapItem = {
+  key: KeyboardCaptureKey;
+  pitch: string | null;
+};
+
 const arrangementFocusPresets: ArrangementFocusPreset[] = [
   {
     id: "intro_space",
@@ -412,6 +430,8 @@ export function App(): ReactElement {
   const [transportLoopScope, setTransportLoopScope] = useState<TransportLoopScope>("arrangement");
   const [playbackPosition, setPlaybackPosition] = useState<PlaybackSnapshot | null>(null);
   const [selectedNote, setSelectedNote] = useState<SelectedNote | null>(null);
+  const [keyboardCaptureEnabled, setKeyboardCaptureEnabled] = useState(false);
+  const [keyboardCaptureTarget, setKeyboardCaptureTarget] = useState<NoteTrack>("bass");
   const [selectedDrumStep, setSelectedDrumStep] = useState<SelectedDrumStep | null>(null);
   const [selectedChordIndex, setSelectedChordIndex] = useState<number | null>(0);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
@@ -490,6 +510,15 @@ export function App(): ReactElement {
     () => mergePitchLanes(melodyPitchLanes(project.key), currentPattern.melodyNotes.map((note) => note.pitch)),
     [currentPattern.melodyNotes, project.key]
   );
+  const keyboardCaptureKeyMap = useMemo(
+    () => createKeyboardCaptureKeyMap(keyboardCaptureTarget === "bass" ? bassPitchLanes(project.key) : melodyPitchLanes(project.key)),
+    [keyboardCaptureTarget, project.key]
+  );
+  const keyboardCaptureNextStep = nextKeyboardCaptureStep(
+    currentPattern,
+    keyboardCaptureTarget,
+    selectedNote?.track === keyboardCaptureTarget ? selectedNote.step + 1 : 0
+  );
   const chordRootOptions = useMemo(
     () => mergeChordRoots(scalePitchNames(project.key), currentPattern.chordEvents.map((event) => event.root)),
     [currentPattern.chordEvents, project.key]
@@ -559,7 +588,20 @@ export function App(): ReactElement {
   useEffect(() => {
     window.addEventListener("keydown", handleDesktopShortcut);
     return () => window.removeEventListener("keydown", handleDesktopShortcut);
-  }, [project, undoStack, redoStack, isPlaying, playbackMode, selectedNote, selectedDrumStep, selectedDrumActive, selectedChordIndex, quickActionsOpen]);
+  }, [
+    project,
+    undoStack,
+    redoStack,
+    isPlaying,
+    playbackMode,
+    selectedNote,
+    selectedDrumStep,
+    selectedDrumActive,
+    selectedChordIndex,
+    quickActionsOpen,
+    keyboardCaptureEnabled,
+    keyboardCaptureTarget
+  ]);
 
   function handleDesktopShortcut(event: KeyboardEvent): void {
     if (isEditableShortcutTarget(event.target)) {
@@ -614,6 +656,14 @@ export function App(): ReactElement {
       event.preventDefault();
       if (!event.repeat) {
         togglePlayback();
+      }
+      return;
+    }
+
+    if (keyboardCaptureEnabled && isKeyboardCaptureKey(key)) {
+      event.preventDefault();
+      if (!event.repeat) {
+        captureKeyboardNote(key);
       }
       return;
     }
@@ -1525,6 +1575,39 @@ export function App(): ReactElement {
         : sortMelodyNotes([...pattern.melodyNotes, { step, pitch, length: 1, velocity: 0.68, probability: 1 }])
     }));
     setSelectedNote(exists ? null : { track: "melody", step, pitch });
+  }
+
+  function captureKeyboardNote(key: KeyboardCaptureKey): void {
+    const current = projectRef.current;
+    const pattern = activePattern(current);
+    const target = keyboardCaptureTarget;
+    const pitch = keyboardCapturePitchForKey(
+      key,
+      target === "bass" ? bassPitchLanes(current.key) : melodyPitchLanes(current.key)
+    );
+    if (!pitch) {
+      setProjectStatus("Keyboard Capture key is out of range");
+      return;
+    }
+
+    const step = nextKeyboardCaptureStep(
+      pattern,
+      target,
+      selectedNote?.track === target ? selectedNote.step + 1 : 0
+    );
+    const changed = updateCurrentPattern(
+      (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch),
+      `Captured ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} on Pattern ${current.selectedPattern}`
+    );
+
+    if (!changed) {
+      setProjectStatus("Keyboard Capture note already exists");
+      return;
+    }
+
+    setSelectedNote({ track: target, step, pitch });
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
   }
 
   function updateSelectedLength(length: number): void {
@@ -2717,6 +2800,15 @@ export function App(): ReactElement {
 
         <section className="panel piano-panel" aria-label="Bass and melody editor">
           <PanelTitle icon={<KeyboardMusic size={18} />} title="808 / Melody" meta="scale locked grid" />
+          <KeyboardCapturePanel
+            enabled={keyboardCaptureEnabled}
+            keyMap={keyboardCaptureKeyMap}
+            nextStep={keyboardCaptureNextStep}
+            onEnabledChange={setKeyboardCaptureEnabled}
+            onTargetChange={setKeyboardCaptureTarget}
+            selectedNote={selectedNote}
+            target={keyboardCaptureTarget}
+          />
           <div className="note-lanes">
             <NoteEditor
               title="808"
@@ -5854,6 +5946,87 @@ function DrumStepInspector({
   );
 }
 
+function KeyboardCapturePanel({
+  enabled,
+  target,
+  nextStep,
+  keyMap,
+  selectedNote,
+  onEnabledChange,
+  onTargetChange
+}: {
+  enabled: boolean;
+  target: NoteTrack;
+  nextStep: number;
+  keyMap: KeyboardCaptureKeyMapItem[];
+  selectedNote: SelectedNote | null;
+  onEnabledChange: (enabled: boolean) => void;
+  onTargetChange: (target: NoteTrack) => void;
+}): ReactElement {
+  const selectedLabel = selectedNote
+    ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}`
+    : "None";
+  return (
+    <div className="keyboard-capture" data-testid="keyboard-capture">
+      <div className="keyboard-capture-heading">
+        <div>
+          <span>Keyboard Capture</span>
+          <strong>{enabled ? "armed" : "off"}</strong>
+        </div>
+        <button
+          aria-pressed={enabled}
+          className={enabled ? "mini-toggle selected" : "mini-toggle"}
+          data-testid="keyboard-capture-toggle"
+          onClick={() => onEnabledChange(!enabled)}
+          type="button"
+        >
+          {enabled ? "On" : "Off"}
+        </button>
+      </div>
+      <div className="keyboard-capture-controls">
+        <div className="capture-target-row" aria-label="Keyboard Capture target">
+          <button
+            className={target === "bass" ? "selected" : ""}
+            data-testid="keyboard-capture-target-bass"
+            onClick={() => onTargetChange("bass")}
+            type="button"
+          >
+            808
+          </button>
+          <button
+            className={target === "melody" ? "selected" : ""}
+            data-testid="keyboard-capture-target-melody"
+            onClick={() => onTargetChange("melody")}
+            type="button"
+          >
+            Synth
+          </button>
+        </div>
+        <div className="capture-readout">
+          <span>Next</span>
+          <strong>{nextStep + 1}</strong>
+        </div>
+        <div className="capture-readout">
+          <span>Selected</span>
+          <strong>{selectedLabel}</strong>
+        </div>
+      </div>
+      <div className="capture-key-map" aria-label="Keyboard Capture key map">
+        {keyMap.map((item) => (
+          <kbd
+            className={item.pitch ? "" : "muted"}
+            data-testid={`keyboard-capture-key-${item.key}`}
+            key={item.key}
+          >
+            <span>{keyboardCaptureKeyLabels[item.key]}</span>
+            <strong>{item.pitch ?? "-"}</strong>
+          </kbd>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function NoteEditor({
   title,
   track,
@@ -6573,6 +6746,59 @@ function mergePitchLanes(scalePitches: string[], usedPitches: string[]): string[
   return Array.from(new Set([...scalePitches, ...usedPitches]));
 }
 
+function createKeyboardCaptureKeyMap(pitches: string[]): KeyboardCaptureKeyMapItem[] {
+  return keyboardCaptureKeys.map((key, index) => ({
+    key,
+    pitch: pitches[index] ?? null
+  }));
+}
+
+function keyboardCapturePitchForKey(key: KeyboardCaptureKey, pitches: string[]): string | null {
+  return pitches[keyboardCaptureKeys.indexOf(key)] ?? null;
+}
+
+function isKeyboardCaptureKey(key: string): key is KeyboardCaptureKey {
+  return (keyboardCaptureKeys as readonly string[]).includes(key);
+}
+
+function nextKeyboardCaptureStep(pattern: PatternData, track: NoteTrack, startStep: number): number {
+  const notes = track === "bass" ? pattern.bassNotes : pattern.melodyNotes;
+  const normalizedStart = normalizeStepModulo(startStep);
+  for (let offset = 0; offset < steps.length; offset += 1) {
+    const step = (normalizedStart + offset) % steps.length;
+    if (!notes.some((note) => note.step === step)) {
+      return step;
+    }
+  }
+  return normalizedStart;
+}
+
+function addKeyboardCaptureNote(pattern: PatternData, track: NoteTrack, step: number, pitch: string): PatternData {
+  if (track === "bass") {
+    if (pattern.bassNotes.some((note) => note.step === step && note.pitch === pitch)) {
+      return pattern;
+    }
+    return {
+      ...pattern,
+      bassNotes: sortBassNotes([
+        ...pattern.bassNotes.filter((note) => note.step !== step),
+        { step, pitch, length: 2, glide: false, probability: 1 }
+      ])
+    };
+  }
+
+  if (pattern.melodyNotes.some((note) => note.step === step && note.pitch === pitch)) {
+    return pattern;
+  }
+  return {
+    ...pattern,
+    melodyNotes: sortMelodyNotes([
+      ...pattern.melodyNotes,
+      { step, pitch, length: 1, velocity: 0.68, probability: 1 }
+    ])
+  };
+}
+
 function mergeChordRoots(scaleRoots: string[], usedRoots: string[]): string[] {
   return Array.from(new Set([...scaleRoots, ...usedRoots]));
 }
@@ -6917,6 +7143,14 @@ function clampStepStart(value: number): number {
     return 0;
   }
   return Math.min(15, Math.max(0, Math.round(value)));
+}
+
+function normalizeStepModulo(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  const rounded = Math.round(value);
+  return ((rounded % steps.length) + steps.length) % steps.length;
 }
 
 function appendHistory(history: ProjectState[], project: ProjectState): ProjectState[] {

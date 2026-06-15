@@ -120,6 +120,9 @@ h2 {
 .strip-readout span,
 .field span,
 .micro-controls span,
+.keyboard-capture-heading span,
+.capture-readout span,
+.capture-key-map kbd span,
 .studio-controls span,
 .sound-control span,
 .master-panel label span,
@@ -199,6 +202,7 @@ h2 {
 .pattern-compare button,
 .pattern-tools button,
 .pattern-fill-row button,
+.capture-target-row button,
 .delivery-target-align,
 .session-brief-clear,
 .snapshot-heading button,
@@ -293,6 +297,7 @@ h2 {
 .pattern-tabs button,
 .pattern-tools button,
 .pattern-fill-row button,
+.capture-target-row button,
 .snapshot-heading button,
 .snapshot-actions button,
 .arrangement-template-row button,
@@ -310,6 +315,7 @@ h2 {
 .segmented button.selected,
 .style-quick-picks button.selected,
 .pattern-tabs button.selected,
+.capture-target-row button.selected,
 .arrangement-template-row button.selected,
 .arrangement-focus-actions button.suggested,
 .block-pattern-row button.selected,
@@ -1964,6 +1970,127 @@ input[type="range"] {
 .note-lanes {
   display: grid;
   gap: 16px;
+}
+
+.keyboard-capture {
+  display: grid;
+  gap: 10px;
+  margin-block-end: 14px;
+  border: 1px solid rgba(120, 240, 200, 0.18);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 10px;
+}
+
+.keyboard-capture-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.keyboard-capture-heading > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.keyboard-capture-heading strong {
+  overflow: hidden;
+  color: #f4efe7;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keyboard-capture .mini-toggle {
+  min-width: 58px;
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.keyboard-capture .mini-toggle.selected {
+  border-color: rgba(120, 240, 200, 0.64);
+  color: #08120f;
+  background: #78f0c8;
+}
+
+.keyboard-capture-controls {
+  display: grid;
+  grid-template-columns: minmax(144px, 1fr) 76px minmax(130px, 0.8fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.capture-target-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.capture-target-row button,
+.capture-readout {
+  min-width: 0;
+  min-height: 34px;
+}
+
+.capture-target-row button {
+  padding: 0 8px;
+}
+
+.capture-readout {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 6px;
+  background: rgba(244, 239, 231, 0.04);
+  padding: 5px 8px;
+}
+
+.capture-readout strong {
+  overflow: hidden;
+  color: #f4efe7;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capture-key-map {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.capture-key-map kbd {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 30px;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 6px;
+  background: rgba(17, 16, 15, 0.44);
+  padding: 4px 5px;
+  font-family: inherit;
+  font-size: 10px;
+}
+
+.capture-key-map kbd span,
+.capture-key-map kbd strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capture-key-map kbd strong {
+  color: #f4efe7;
+  font-size: 10px;
+}
+
+.capture-key-map kbd.muted {
+  opacity: 0.46;
 }
 
 .lane-header,
