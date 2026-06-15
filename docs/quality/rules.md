@@ -93,6 +93,8 @@ Pattern work must keep Pattern A/B/C as independent editable event data. Copy an
 
 Pattern variation work must be deterministic, operate only on the selected Pattern A/B/C slot through undoable project history, keep generated drums, bass, melody, chords, velocities, timings, repeats, and probabilities manually editable, and avoid sampling, remote AI, or hidden audio assets.
 
+Selected note edit tool work must keep 808 and Synth note move, transpose, octave, and duplicate actions scoped to the selected Pattern A/B/C slot, preserve length/glide/velocity/chance fields, avoid overlapping duplicate notes at the same step and pitch, keep pitch moves scale-aware, remain undoable, and avoid sampling, remote AI, or hidden audio assets.
+
 Arrangement editor work must let users change a block's section, Pattern A/B/C assignment, bar length, and energy without losing existing pattern, mixer, master, or save/load data. Selecting or reassigning a block should keep the pattern editor aligned with that block's assigned pattern.
 
 Arrangement track mute work must migrate older arrangement blocks to no muted tracks, keep mutes scoped to the selected block without mutating Pattern A/B/C events, apply the same mute decisions to realtime arrangement playback, full-mix WAV export, and stem export, and preserve selected-pattern preview behavior.

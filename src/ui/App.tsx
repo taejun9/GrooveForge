@@ -1,6 +1,8 @@
 import {
+  ArrowDown,
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
   CircleStop,
   Copy,
   Disc3,
@@ -93,6 +95,7 @@ import {
   patternVariationPresetIds,
   patternVariationPresetLabel,
   projectFileName,
+  scalePitches,
   scalePitchNames,
   serializeProjectFile,
   soundPresetDesign,
@@ -912,6 +915,167 @@ export function App(): ReactElement {
     }));
   }
 
+  function moveSelectedNoteStep(direction: -1 | 1): void {
+    if (!selectedNote) {
+      setProjectStatus("Select an 808 or Synth note");
+      return;
+    }
+
+    const nextStep = clampStepStart(selectedNote.step + direction);
+    moveSelectedNoteTo(nextStep, selectedNote.pitch, direction < 0 ? "Moved note left" : "Moved note right");
+  }
+
+  function moveSelectedNotePitch(direction: -1 | 1): void {
+    if (!selectedNote) {
+      setProjectStatus("Select an 808 or Synth note");
+      return;
+    }
+
+    const current = projectRef.current;
+    const pattern = activePattern(current);
+    const usedPitches =
+      selectedNote.track === "bass"
+        ? pattern.bassNotes.map((note) => note.pitch)
+        : pattern.melodyNotes.map((note) => note.pitch);
+    const nextPitch = adjacentTrackPitch(selectedNote.track, current.key, selectedNote.pitch, direction, usedPitches);
+    if (!nextPitch) {
+      setProjectStatus(direction < 0 ? "Note is at the low pitch edge" : "Note is at the high pitch edge");
+      return;
+    }
+
+    moveSelectedNoteTo(selectedNote.step, nextPitch, direction < 0 ? "Moved note down" : "Moved note up");
+  }
+
+  function moveSelectedNoteOctave(direction: -1 | 1): void {
+    if (!selectedNote) {
+      setProjectStatus("Select an 808 or Synth note");
+      return;
+    }
+
+    const nextPitch = octaveShiftPitch(selectedNote.track, selectedNote.pitch, direction);
+    if (!nextPitch) {
+      setProjectStatus(direction < 0 ? "Note is at the low octave edge" : "Note is at the high octave edge");
+      return;
+    }
+
+    moveSelectedNoteTo(selectedNote.step, nextPitch, direction < 0 ? "Moved note down an octave" : "Moved note up an octave");
+  }
+
+  function moveSelectedNoteTo(step: number, pitch: string, status: string): void {
+    const target = selectedNote;
+    if (!target) {
+      setProjectStatus("Select an 808 or Synth note");
+      return;
+    }
+    if (target.step === step && target.pitch === pitch) {
+      setProjectStatus("Note is already there");
+      return;
+    }
+
+    const pattern = activePattern(projectRef.current);
+    const sourceExists =
+      target.track === "bass"
+        ? pattern.bassNotes.some((note) => matchesSelectedNote(note, target))
+        : pattern.melodyNotes.some((note) => matchesSelectedNote(note, target));
+    if (!sourceExists) {
+      setProjectStatus("Select an active note");
+      return;
+    }
+
+    const occupied =
+      target.track === "bass"
+        ? pattern.bassNotes.some((note) => !matchesSelectedNote(note, target) && note.step === step && note.pitch === pitch)
+        : pattern.melodyNotes.some((note) => !matchesSelectedNote(note, target) && note.step === step && note.pitch === pitch);
+    if (occupied) {
+      setProjectStatus("Target note already exists");
+      return;
+    }
+
+    const changed = updateCurrentPattern(
+      (currentPatternData) => ({
+        ...currentPatternData,
+        bassNotes:
+          target.track === "bass"
+            ? sortBassNotes(
+                currentPatternData.bassNotes.map((note) =>
+                  matchesSelectedNote(note, target) ? { ...note, step, pitch } : note
+                )
+              )
+            : currentPatternData.bassNotes,
+        melodyNotes:
+          target.track === "melody"
+            ? sortMelodyNotes(
+                currentPatternData.melodyNotes.map((note) =>
+                  matchesSelectedNote(note, target) ? { ...note, step, pitch } : note
+                )
+              )
+            : currentPatternData.melodyNotes
+      }),
+      status
+    );
+
+    if (changed) {
+      setSelectedNote({ ...target, step, pitch });
+      setSelectedDrumStep(null);
+    }
+  }
+
+  function duplicateSelectedNote(): void {
+    const target = selectedNote;
+    if (!target) {
+      setProjectStatus("Select an 808 or Synth note");
+      return;
+    }
+
+    const pattern = activePattern(projectRef.current);
+    if (target.track === "bass") {
+      const source = pattern.bassNotes.find((note) => matchesSelectedNote(note, target));
+      if (!source) {
+        setProjectStatus("Select an active note");
+        return;
+      }
+      const nextStep = nextEmptyStepForPitch(pattern.bassNotes, source.pitch, source.step);
+      if (nextStep === null) {
+        setProjectStatus("No empty step for duplicate");
+        return;
+      }
+      const changed = updateCurrentPattern(
+        (currentPatternData) => ({
+          ...currentPatternData,
+          bassNotes: sortBassNotes([...currentPatternData.bassNotes, { ...source, step: nextStep }])
+        }),
+        "Duplicated 808 note"
+      );
+      if (changed) {
+        setSelectedNote({ ...target, step: nextStep });
+        setSelectedDrumStep(null);
+      }
+      return;
+    }
+
+    const source = pattern.melodyNotes.find((note) => matchesSelectedNote(note, target));
+    if (!source) {
+      setProjectStatus("Select an active note");
+      return;
+    }
+    const nextStep = nextEmptyStepForPitch(pattern.melodyNotes, source.pitch, source.step);
+    if (nextStep === null) {
+      setProjectStatus("No empty step for duplicate");
+      return;
+    }
+    const changed = updateCurrentPattern(
+      (currentPatternData) => ({
+        ...currentPatternData,
+        melodyNotes: sortMelodyNotes([...currentPatternData.melodyNotes, { ...source, step: nextStep }])
+      }),
+      "Duplicated Synth note"
+    );
+    if (changed) {
+      setSelectedNote({ ...target, step: nextStep });
+      setSelectedDrumStep(null);
+    }
+  }
+
   function updateChordEvent(index: number, update: Partial<ChordEvent>): void {
     updateCurrentPattern((pattern) => ({
       ...pattern,
@@ -1484,6 +1648,10 @@ export function App(): ReactElement {
               onGlideChange={updateSelectedGlide}
               onVelocityChange={updateSelectedVelocity}
               onProbabilityChange={updateSelectedNoteProbability}
+              onStepMove={moveSelectedNoteStep}
+              onPitchMove={moveSelectedNotePitch}
+              onOctaveMove={moveSelectedNoteOctave}
+              onDuplicate={duplicateSelectedNote}
             />
           )}
         </section>
@@ -2253,7 +2421,11 @@ function NoteInspector({
   onLengthChange,
   onGlideChange,
   onVelocityChange,
-  onProbabilityChange
+  onProbabilityChange,
+  onStepMove,
+  onPitchMove,
+  onOctaveMove,
+  onDuplicate
 }: {
   selectedNote: SelectedNote | null;
   bassNote?: BassNote;
@@ -2262,6 +2434,10 @@ function NoteInspector({
   onGlideChange: (glide: boolean) => void;
   onVelocityChange: (velocity: number) => void;
   onProbabilityChange: (probability: number) => void;
+  onStepMove: (direction: -1 | 1) => void;
+  onPitchMove: (direction: -1 | 1) => void;
+  onOctaveMove: (direction: -1 | 1) => void;
+  onDuplicate: () => void;
 }): ReactElement {
   const activeNote = bassNote ?? melodyNote;
   const label = selectedNote ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}` : "None";
@@ -2273,64 +2449,96 @@ function NoteInspector({
         <strong>{activeNote ? `${label} / ${percentLabel(probabilityValue)} chance` : "None"}</strong>
       </div>
       {activeNote && (
-        <div className="inspector-grid">
-          <label>
-            <span>Length</span>
-            <input
-              type="range"
-              min={1}
-              max={8}
-              step={1}
-              value={activeNote.length}
-              onChange={(event) => onLengthChange(Number(event.target.value))}
-            />
-          </label>
-          {bassNote && (
-            <label className="toggle-row">
-              <span>Glide</span>
-              <input type="checkbox" checked={bassNote.glide} onChange={(event) => onGlideChange(event.target.checked)} />
-            </label>
-          )}
-          {melodyNote && (
+        <>
+          <div className="note-action-row" aria-label="Selected note tools">
+            <button data-testid="note-nudge-left" onClick={() => onStepMove(-1)} title="Move selected note one step left" type="button">
+              <ArrowLeft size={14} aria-hidden="true" />
+              <span>Step</span>
+            </button>
+            <button data-testid="note-nudge-right" onClick={() => onStepMove(1)} title="Move selected note one step right" type="button">
+              <ArrowRight size={14} aria-hidden="true" />
+              <span>Step</span>
+            </button>
+            <button data-testid="note-pitch-down" onClick={() => onPitchMove(-1)} title="Move selected note down in scale" type="button">
+              <ArrowDown size={14} aria-hidden="true" />
+              <span>Pitch</span>
+            </button>
+            <button data-testid="note-pitch-up" onClick={() => onPitchMove(1)} title="Move selected note up in scale" type="button">
+              <ArrowUp size={14} aria-hidden="true" />
+              <span>Pitch</span>
+            </button>
+            <button data-testid="note-octave-down" onClick={() => onOctaveMove(-1)} title="Move selected note down an octave" type="button">
+              <ArrowDown size={14} aria-hidden="true" />
+              <span>Oct</span>
+            </button>
+            <button data-testid="note-octave-up" onClick={() => onOctaveMove(1)} title="Move selected note up an octave" type="button">
+              <ArrowUp size={14} aria-hidden="true" />
+              <span>Oct</span>
+            </button>
+            <button data-testid="note-duplicate" onClick={onDuplicate} title="Duplicate selected note to the next empty step" type="button">
+              <Copy size={14} aria-hidden="true" />
+              <span>Dup</span>
+            </button>
+          </div>
+          <div className="inspector-grid">
             <label>
-              <span>Velocity</span>
+              <span>Length</span>
               <input
                 type="range"
-                min={0.2}
-                max={1}
-                step={0.01}
-                value={melodyNote.velocity}
-                onChange={(event) => onVelocityChange(Number(event.target.value))}
+                min={1}
+                max={8}
+                step={1}
+                value={activeNote.length}
+                onChange={(event) => onLengthChange(Number(event.target.value))}
               />
             </label>
-          )}
-          <label>
-            <span>Chance {percentLabel(probabilityValue)}</span>
-            <input
-              aria-label="Note probability"
-              data-testid="note-probability"
-              max={1}
-              min={0}
-              onChange={(event) => onProbabilityChange(Number(event.target.value))}
-              step={0.01}
-              type="range"
-              value={probabilityValue}
-            />
-          </label>
-          <label>
-            <span>Chance %</span>
-            <input
-              aria-label="Note probability percent"
-              data-testid="note-probability-input"
-              inputMode="numeric"
-              onChange={(event) => onProbabilityChange(Number(event.target.value) / 100)}
-              pattern="[0-9]*"
-              step={1}
-              type="text"
-              value={`${Math.round(probabilityValue * 100)}`}
-            />
-          </label>
-        </div>
+            {bassNote && (
+              <label className="toggle-row">
+                <span>Glide</span>
+                <input type="checkbox" checked={bassNote.glide} onChange={(event) => onGlideChange(event.target.checked)} />
+              </label>
+            )}
+            {melodyNote && (
+              <label>
+                <span>Velocity</span>
+                <input
+                  type="range"
+                  min={0.2}
+                  max={1}
+                  step={0.01}
+                  value={melodyNote.velocity}
+                  onChange={(event) => onVelocityChange(Number(event.target.value))}
+                />
+              </label>
+            )}
+            <label>
+              <span>Chance {percentLabel(probabilityValue)}</span>
+              <input
+                aria-label="Note probability"
+                data-testid="note-probability"
+                max={1}
+                min={0}
+                onChange={(event) => onProbabilityChange(Number(event.target.value))}
+                step={0.01}
+                type="range"
+                value={probabilityValue}
+              />
+            </label>
+            <label>
+              <span>Chance %</span>
+              <input
+                aria-label="Note probability percent"
+                data-testid="note-probability-input"
+                inputMode="numeric"
+                onChange={(event) => onProbabilityChange(Number(event.target.value) / 100)}
+                pattern="[0-9]*"
+                step={1}
+                type="text"
+                value={`${Math.round(probabilityValue * 100)}`}
+              />
+            </label>
+          </div>
+        </>
       )}
     </div>
   );
@@ -2758,6 +2966,96 @@ function mergePitchLanes(scalePitches: string[], usedPitches: string[]): string[
 
 function mergeChordRoots(scaleRoots: string[], usedRoots: string[]): string[] {
   return Array.from(new Set([...scaleRoots, ...usedRoots]));
+}
+
+function matchesSelectedNote(note: BassNote | MelodyNote, selectedNote: SelectedNote): boolean {
+  return note.step === selectedNote.step && note.pitch === selectedNote.pitch;
+}
+
+function nextEmptyStepForPitch(notes: Array<BassNote | MelodyNote>, pitch: string, startStep: number): number | null {
+  for (let offset = 1; offset < steps.length; offset += 1) {
+    const step = (startStep + offset) % steps.length;
+    if (!notes.some((note) => note.step === step && note.pitch === pitch)) {
+      return step;
+    }
+  }
+  return null;
+}
+
+function adjacentTrackPitch(
+  track: NoteTrack,
+  key: string,
+  pitch: string,
+  direction: -1 | 1,
+  usedPitches: string[]
+): string | null {
+  const pitches = trackScalePitches(track, key, usedPitches);
+  const index = pitches.indexOf(pitch);
+  if (index < 0) {
+    return null;
+  }
+  return pitches[index + direction] ?? null;
+}
+
+function octaveShiftPitch(track: NoteTrack, pitch: string, direction: -1 | 1): string | null {
+  const parts = pitchParts(pitch);
+  if (!parts) {
+    return null;
+  }
+  const [minOctave, maxOctave] = trackOctaveRange(track);
+  const octave = parts.octave + direction;
+  if (octave < minOctave || octave > maxOctave) {
+    return null;
+  }
+  return `${parts.name}${octave}`;
+}
+
+function trackScalePitches(track: NoteTrack, key: string, usedPitches: string[]): string[] {
+  const [minOctave, maxOctave] = trackOctaveRange(track);
+  const pitches: string[] = [];
+  for (let octave = minOctave; octave <= maxOctave; octave += 1) {
+    pitches.push(...scalePitches(key, octave).slice(0, -1));
+  }
+  return Array.from(new Set([...pitches, ...usedPitches])).sort((first, second) => pitchMidi(first) - pitchMidi(second));
+}
+
+function trackOctaveRange(track: NoteTrack): [number, number] {
+  return track === "bass" ? [0, 3] : [3, 6];
+}
+
+function pitchParts(pitch: string): { name: string; octave: number } | null {
+  const match = /^([A-G](?:#|b)?)(-?\d+)$/.exec(pitch);
+  if (!match) {
+    return null;
+  }
+  return { name: match[1], octave: Number(match[2]) };
+}
+
+function pitchMidi(pitch: string): number {
+  const parts = pitchParts(pitch);
+  if (!parts) {
+    return 0;
+  }
+  const semitones: Record<string, number> = {
+    C: 0,
+    "C#": 1,
+    Db: 1,
+    D: 2,
+    "D#": 3,
+    Eb: 3,
+    E: 4,
+    F: 5,
+    "F#": 6,
+    Gb: 6,
+    G: 7,
+    "G#": 8,
+    Ab: 8,
+    A: 9,
+    "A#": 10,
+    Bb: 10,
+    B: 11
+  };
+  return (parts.octave + 1) * 12 + (semitones[parts.name] ?? 0);
 }
 
 function patternEventCount(pattern: PatternData): string {

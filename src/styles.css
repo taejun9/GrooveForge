@@ -724,6 +724,34 @@ input[type="range"] {
   font-size: 12px;
 }
 
+.note-action-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.note-action-row button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 6px;
+  color: #f4efe7;
+  background: rgba(244, 239, 231, 0.06);
+  padding: 0 5px;
+  font-size: 10px;
+}
+
+.note-action-row button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .inspector-grid {
   display: grid;
   grid-template-columns: 1fr minmax(96px, 0.5fr);
