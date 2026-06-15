@@ -120,6 +120,8 @@ h2 {
 .strip-readout span,
 .field span,
 .micro-controls span,
+.drum-accent-heading span,
+.drum-accent-row button span,
 .groove-feel-heading span,
 .groove-feel-row button span,
 .pattern-stack-heading span,
@@ -208,6 +210,7 @@ h2 {
 .style-quick-picks button,
 .pattern-tabs button,
 .pattern-compare button,
+.drum-accent-row button,
 .groove-feel-row button,
 .pattern-stack-row button,
 .pattern-tools button,
@@ -309,6 +312,7 @@ h2 {
 .segmented button,
 .style-quick-picks button,
 .pattern-tabs button,
+.drum-accent-row button,
 .groove-feel-row button,
 .pattern-stack-row button,
 .pattern-tools button,
@@ -1851,6 +1855,62 @@ h2 {
 }
 
 .groove-feel-row button small {
+  color: rgba(244, 239, 231, 0.48);
+  font-size: 10px;
+}
+
+.drum-accent-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 10px;
+}
+
+.drum-accent-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.drum-accent-heading strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.drum-accent-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.drum-accent-row button {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.drum-accent-row button span,
+.drum-accent-row button strong,
+.drum-accent-row button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drum-accent-row button strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.drum-accent-row button small {
   color: rgba(244, 239, 231, 0.48);
   font-size: 10px;
 }

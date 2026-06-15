@@ -345,6 +345,18 @@ type GrooveFeelOption = GrooveFeelDefinition & {
   chancePreview: string;
 };
 
+type DrumAccentId = "soft" | "knock" | "ghost" | "lift";
+
+type DrumAccentDefinition = {
+  id: DrumAccentId;
+  label: string;
+  detail: string;
+};
+
+type DrumAccentOption = DrumAccentDefinition & {
+  preview: string;
+};
+
 type MelodyMotifId = "hook" | "pocket" | "rise" | "answer";
 
 type MelodyMotifStep = {
@@ -648,6 +660,13 @@ const grooveFeelDefinitions: GrooveFeelDefinition[] = [
   { id: "lazy", label: "Lazy", detail: "loose", musicChance: 0.82, chordChance: 0.9, hatChance: 0.88, percChance: 0.78 }
 ];
 
+const drumAccentDefinitions: DrumAccentDefinition[] = [
+  { id: "soft", label: "Soft", detail: "lighter" },
+  { id: "knock", label: "Knock", detail: "front" },
+  { id: "ghost", label: "Ghost", detail: "depth" },
+  { id: "lift", label: "Lift", detail: "rise" }
+];
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<ProjectState[]>([]);
@@ -745,6 +764,7 @@ export function App(): ReactElement {
   const melodyMotifOptions = useMemo(() => createMelodyMotifOptions(project.key), [project.key]);
   const patternStackOptions = useMemo(() => createPatternStackOptions(project.key), [project.key]);
   const grooveFeelOptions = useMemo(() => createGrooveFeelOptions(), []);
+  const drumAccentOptions = useMemo(() => createDrumAccentOptions(), []);
   const keyboardCaptureNextStep = nextKeyboardCaptureStep(
     currentPattern,
     keyboardCaptureTarget,
@@ -1886,6 +1906,25 @@ export function App(): ReactElement {
     }
   }
 
+  function applyDrumAccent(accentId: DrumAccentId): void {
+    const accent = drumAccentDefinitions.find((candidate) => candidate.id === accentId);
+    if (!accent) {
+      setProjectStatus("Drum accent not found");
+      return;
+    }
+
+    const changed = updateCurrentPattern(
+      (pattern) => {
+        const nextPatternData = applyDrumAccentToPattern(pattern, accent.id);
+        return sameDrumAccentState(pattern, nextPatternData) ? pattern : nextPatternData;
+      },
+      `${accent.label} drum accent applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (!changed) {
+      setProjectStatus(`${accent.label} drum accent already selected`);
+    }
+  }
+
   function applyBasslinePad(padId: BasslinePadId): void {
     const pad = basslinePadDefinitions.find((candidate) => candidate.id === padId);
     if (!pad) {
@@ -2991,6 +3030,7 @@ export function App(): ReactElement {
           />
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
           <GrooveFeelPads feels={grooveFeelOptions} onApply={applyGrooveFeel} />
+          <DrumAccentPads accents={drumAccentOptions} onApply={applyDrumAccent} />
           <div className="pattern-tools" aria-label="Pattern tools">
             {patternVariationPresetIds.map((preset) => (
               <button
@@ -6328,6 +6368,38 @@ function GrooveFeelPads({
   );
 }
 
+function DrumAccentPads({
+  accents,
+  onApply
+}: {
+  accents: DrumAccentOption[];
+  onApply: (accent: DrumAccentId) => void;
+}): ReactElement {
+  return (
+    <div className="drum-accent-panel" data-testid="drum-accent-pads">
+      <div className="drum-accent-heading">
+        <span>Drum Accents</span>
+        <strong>Velocity Shape</strong>
+      </div>
+      <div className="drum-accent-row" aria-label="Drum Accent Pads">
+        {accents.map((accent) => (
+          <button
+            data-testid={`drum-accent-${accent.id}`}
+            key={accent.id}
+            onClick={() => onApply(accent.id)}
+            title={`${accent.label} ${accent.preview}`}
+            type="button"
+          >
+            <span>{accent.label}</span>
+            <strong>{accent.preview}</strong>
+            <small>{accent.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PatternStackPads({
   stacks,
   onApply
@@ -7409,6 +7481,61 @@ function sameChordProbabilities(first: ChordEvent[], second: ChordEvent[]): bool
     return false;
   }
   return first.every((event, index) => normalizeEventProbability(event.probability) === normalizeEventProbability(second[index]?.probability ?? 1));
+}
+
+function createDrumAccentOptions(): DrumAccentOption[] {
+  return drumAccentDefinitions.map((accent) => {
+    const kick = drumAccentVelocity("kick", 0, accent.id);
+    const hat = drumAccentVelocity("hat", 2, accent.id);
+    return {
+      ...accent,
+      preview: `K ${Math.round(kick * 100)} / H ${Math.round(hat * 100)}`
+    };
+  });
+}
+
+function applyDrumAccentToPattern(pattern: PatternData, accent: DrumAccentId): PatternData {
+  const nextPatternData = clonePatternData(pattern);
+  (Object.keys(drumLabels) as DrumLane[]).forEach((lane) => {
+    nextPatternData.drumVelocities[lane] = nextPatternData.drumVelocities[lane].map((current, step) =>
+      nextPatternData.drumPattern[lane][step] ? drumAccentVelocity(lane, step, accent) : normalizeDrumVelocity(current)
+    );
+  });
+  return nextPatternData;
+}
+
+function drumAccentVelocity(lane: DrumLane, step: number, accent: DrumAccentId): number {
+  if (accent === "soft") {
+    const base = lane === "kick" ? 0.76 : lane === "clap" ? 0.72 : lane === "hat" ? 0.48 : 0.44;
+    const motion = step % 4 === 0 ? 0.06 : step % 2 === 0 ? 0.02 : -0.03;
+    return normalizeDrumVelocity(base + motion);
+  }
+  if (accent === "knock") {
+    const base = lane === "kick" ? 0.98 : lane === "clap" ? 0.92 : lane === "hat" ? 0.64 : 0.6;
+    const anchor = step % 4 === 0 ? 0.05 : step % 2 === 0 ? 0.01 : -0.04;
+    return normalizeDrumVelocity(base + anchor);
+  }
+  if (accent === "ghost") {
+    if (lane === "kick" || lane === "clap") {
+      return normalizeDrumVelocity((lane === "kick" ? 0.88 : 0.84) + (step % 8 === 0 ? 0.08 : 0));
+    }
+    const ghostBase = lane === "hat" ? 0.38 : 0.34;
+    const ghostLift = step % 4 === 0 ? 0.26 : step % 2 === 0 ? 0.08 : 0;
+    return normalizeDrumVelocity(ghostBase + ghostLift);
+  }
+  const progress = step / 15;
+  const base = lane === "kick" ? 0.78 : lane === "clap" ? 0.74 : lane === "hat" ? 0.5 : 0.46;
+  const lift = progress * (lane === "hat" || lane === "perc" ? 0.24 : 0.16);
+  const pulse = step % 4 === 0 ? 0.08 : step % 2 === 0 ? 0.03 : -0.02;
+  return normalizeDrumVelocity(base + lift + pulse);
+}
+
+function sameDrumAccentState(first: PatternData, second: PatternData): boolean {
+  return (Object.keys(drumLabels) as DrumLane[]).every((lane) =>
+    first.drumVelocities[lane].every(
+      (velocity, step) => normalizeDrumVelocity(velocity) === normalizeDrumVelocity(second.drumVelocities[lane][step] ?? defaultDrumVelocity(lane, step))
+    )
+  );
 }
 
 function createPatternStackOptions(key: string): PatternStackOption[] {
