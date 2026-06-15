@@ -143,6 +143,8 @@ h2 {
 .sound-focus-row button span,
 .mix-balance-heading span,
 .mix-balance-row button span,
+.master-finish-heading span,
+.master-finish-row button span,
 .studio-controls span,
 .sound-control span,
 .master-panel label span,
@@ -242,6 +244,7 @@ h2 {
 .chord-rhythm-row button,
 .sound-focus-row button,
 .mix-balance-row button,
+.master-finish-row button,
 .bassline-pad-row button,
 .bass-glide-row button,
 .melody-motif-row button,
@@ -293,6 +296,7 @@ h2 {
 .chord-rhythm-row button:disabled,
 .sound-focus-row button:disabled,
 .mix-balance-row button:disabled,
+.master-finish-row button:disabled,
 .block-pattern-row button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
@@ -348,6 +352,7 @@ h2 {
 .chord-rhythm-row button,
 .sound-focus-row button,
 .mix-balance-row button,
+.master-finish-row button,
 .bassline-pad-row button,
 .bass-glide-row button,
 .melody-motif-row button,
@@ -3781,6 +3786,63 @@ input[type="range"] {
 
 .master-readout strong {
   font-size: 18px;
+}
+
+.master-finish-panel {
+  display: grid;
+  gap: 7px;
+}
+
+.master-finish-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.master-finish-heading strong {
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 11px;
+}
+
+.master-finish-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.master-finish-row button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.master-finish-row button span,
+.master-finish-row button strong,
+.master-finish-row button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.master-finish-row button span {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 11px;
+}
+
+.master-finish-row button strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.master-finish-row button small {
+  color: rgba(244, 239, 231, 0.48);
+  font-size: 10px;
 }
 
 .export-meter {

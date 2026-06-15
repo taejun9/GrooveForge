@@ -305,6 +305,41 @@ const soundFocusPadDefinitions: SoundFocusPadDefinition[] = [
   }
 ];
 
+const masterFinishPadDefinitions: MasterFinishPadDefinition[] = [
+  {
+    id: "demo",
+    label: "Demo",
+    detail: "clean",
+    preset: "Clean Demo",
+    ceilingDb: -0.8,
+    masterVolumeDb: -1.4
+  },
+  {
+    id: "vocal",
+    label: "Vocal",
+    detail: "headroom",
+    preset: "Headroom for Vocal",
+    ceilingDb: -3,
+    masterVolumeDb: -2.4
+  },
+  {
+    id: "store",
+    label: "Store",
+    detail: "balanced",
+    preset: "Streaming Safe",
+    ceilingDb: -1,
+    masterVolumeDb: -1.1
+  },
+  {
+    id: "club",
+    label: "Club",
+    detail: "preview",
+    preset: "Clean Demo",
+    ceilingDb: -0.8,
+    masterVolumeDb: -0.6
+  }
+];
+
 const keys = ["F minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"];
 const historyLimit = 50;
 const keyboardCaptureKeys = ["a", "s", "d", "f", "g", "h", "j", "k"] as const;
@@ -380,6 +415,22 @@ type SoundFocusPadDefinition = {
 };
 
 type SoundFocusPadOption = SoundFocusPadDefinition & {
+  preview: string;
+  changedCount: number;
+};
+
+type MasterFinishPadId = "demo" | "vocal" | "store" | "club";
+
+type MasterFinishPadDefinition = {
+  id: MasterFinishPadId;
+  label: string;
+  detail: string;
+  preset: MasterPreset;
+  ceilingDb: number;
+  masterVolumeDb: number;
+};
+
+type MasterFinishPadOption = MasterFinishPadDefinition & {
   preview: string;
   changedCount: number;
 };
@@ -934,6 +985,7 @@ export function App(): ReactElement {
   const activeChannelLabel = `${activeChannels} active ${activeChannels === 1 ? "channel" : "channels"}`;
   const mixBalancePadOptions = useMemo(() => createMixBalancePadOptions(project.mixer), [project.mixer]);
   const soundFocusPadOptions = useMemo(() => createSoundFocusPadOptions(project.sound), [project.sound]);
+  const masterFinishPadOptions = useMemo(() => createMasterFinishPadOptions(project), [project]);
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
@@ -1713,6 +1765,19 @@ export function App(): ReactElement {
       masterPreset: preset,
       masterCeilingDb: masterPresetCeilingDb(preset)
     }));
+  }
+
+  function applyMasterFinishPad(padId: MasterFinishPadId): void {
+    const pad = masterFinishPadDefinitions.find((definition) => definition.id === padId);
+    if (!pad) {
+      setProjectStatus("Master finish pad not found");
+      return;
+    }
+
+    const changed = updateProject((current) => applyMasterFinishPadToProject(current, pad), `${pad.label} master finish applied`);
+    if (!changed) {
+      setProjectStatus(`${pad.label} master finish already selected`);
+    }
   }
 
   function applyMixFixPreset(preset: MixFixPreset): void {
@@ -4152,6 +4217,7 @@ export function App(): ReactElement {
           </div>
           <ExportMeter analysis={exportAnalysis} />
           <MixCoach analysis={exportAnalysis} stemAnalyses={stemAnalyses} onApplyFix={applyMixFixPreset} />
+          <MasterFinishPads pads={masterFinishPadOptions} onApply={applyMasterFinishPad} />
           <label>
             <span>Ceiling</span>
             <input
@@ -6120,6 +6186,38 @@ function MixBalancePads({
   );
 }
 
+function MasterFinishPads({
+  pads,
+  onApply
+}: {
+  pads: MasterFinishPadOption[];
+  onApply: (pad: MasterFinishPadId) => void;
+}): ReactElement {
+  return (
+    <div className="master-finish-panel" data-testid="master-finish-pads">
+      <div className="master-finish-heading">
+        <span>Master Finish</span>
+        <strong>Output posture</strong>
+      </div>
+      <div className="master-finish-row" aria-label="Master Finish Pads">
+        {pads.map((pad) => (
+          <button
+            data-testid={`master-finish-${pad.id}`}
+            key={pad.id}
+            onClick={() => onApply(pad.id)}
+            title={`${pad.label} ${pad.preview}`}
+            type="button"
+          >
+            <span>{pad.label}</span>
+            <strong>{pad.preview}</strong>
+            <small>{pad.changedCount} moves / {pad.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ExportMeter({ analysis }: { analysis: ExportAnalysis }): ReactElement {
   const peakPercent = meterPercent(analysis.peakDb, analysis.ceilingDb);
   const rmsPercent = meterPercent(analysis.rmsDb, analysis.ceilingDb);
@@ -6267,6 +6365,48 @@ function mixBalancePreview(pad: MixBalancePadDefinition): string {
 
 function compactMixDb(value: number): string {
   return Number.isInteger(value) ? `${value}` : value.toFixed(1);
+}
+
+function createMasterFinishPadOptions(project: ProjectState): MasterFinishPadOption[] {
+  return masterFinishPadDefinitions.map((pad) => {
+    const nextProject = applyMasterFinishPadToProject(project, pad);
+    return {
+      ...pad,
+      preview: masterFinishPreview(pad),
+      changedCount: masterFinishChangedCount(project, nextProject)
+    };
+  });
+}
+
+function masterFinishPreview(pad: MasterFinishPadDefinition): string {
+  return `C ${compactMixDb(pad.ceilingDb)} / O ${compactMixDb(pad.masterVolumeDb)}`;
+}
+
+function masterFinishChangedCount(current: ProjectState, nextProject: ProjectState): number {
+  return [
+    current.masterPreset !== nextProject.masterPreset,
+    current.masterCeilingDb !== nextProject.masterCeilingDb,
+    masterChannelVolumeDb(current.mixer) !== masterChannelVolumeDb(nextProject.mixer)
+  ].filter(Boolean).length;
+}
+
+function applyMasterFinishPadToProject(project: ProjectState, pad: MasterFinishPadDefinition): ProjectState {
+  const masterVolumeDb = clampMixFixVolume(pad.masterVolumeDb);
+  const masterCeilingDb = clampMasterCeilingDb(pad.ceilingDb);
+  const mixer = project.mixer.map((channel) =>
+    channel.id === "master" ? { ...channel, volumeDb: masterVolumeDb } : channel
+  );
+  const nextProject = {
+    ...project,
+    masterPreset: pad.preset,
+    masterCeilingDb,
+    mixer
+  };
+  return masterFinishChangedCount(project, nextProject) === 0 ? project : nextProject;
+}
+
+function masterChannelVolumeDb(mixer: MixerChannel[]): number {
+  return mixer.find((channel) => channel.id === "master")?.volumeDb ?? -1;
 }
 
 function applyMixBalancePadToMixer(mixer: MixerChannel[], pad: MixBalancePadDefinition): MixerChannel[] {
@@ -8827,6 +8967,13 @@ function meterPercent(valueDb: number, ceilingDb: number): number {
   const floorDb = -48;
   const clamped = Math.min(ceilingDb, Math.max(floorDb, valueDb));
   return Math.round(((clamped - floorDb) / (ceilingDb - floorDb)) * 100);
+}
+
+function clampMasterCeilingDb(value: number): number {
+  if (!Number.isFinite(value)) {
+    return -1;
+  }
+  return Math.min(0, Math.max(-6, Math.round(value * 10) / 10));
 }
 
 function clampSplitAfterBars(value: number, blockBars: number): number {
