@@ -706,6 +706,21 @@ type BeatMapSummary = {
   metrics: BeatMapMetric[];
 };
 
+type BeatPassportMetric = {
+  id: string;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type BeatPassportSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  metrics: BeatPassportMetric[];
+};
+
 type SelectedDrumStep = {
   lane: DrumLane;
   step: number;
@@ -970,6 +985,10 @@ export function App(): ReactElement {
   );
   const beatMapActions = useMemo(
     () => createBeatMapActions(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
+  );
+  const beatPassportSummary = useMemo(
+    () => createBeatPassportSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
@@ -3413,6 +3432,8 @@ export function App(): ReactElement {
 
       <SessionBriefPanel brief={project.sessionBrief} onChange={updateSessionBrief} onClear={clearSessionBrief} />
 
+      <BeatPassport summary={beatPassportSummary} />
+
       <BeatReadiness checks={beatReadinessChecks} />
 
       <BeatMap summary={beatMapSummary} actions={beatMapActions} onRun={runNextMove} />
@@ -4972,6 +4993,30 @@ function BeatReadiness({ checks }: { checks: BeatReadinessCheck[] }): ReactEleme
   );
 }
 
+function BeatPassport({ summary }: { summary: BeatPassportSummary }): ReactElement {
+  return (
+    <section className={`beat-passport ${summary.tone}`} data-testid="beat-passport" aria-label="Beat passport">
+      <div className="beat-passport-heading">
+        <div>
+          <Gauge size={17} aria-hidden="true" />
+          <span>Beat Passport</span>
+        </div>
+        <strong data-testid="beat-passport-headline">{summary.headline}</strong>
+        <small data-testid="beat-passport-detail">{summary.detail}</small>
+      </div>
+      <div className="beat-passport-grid" data-testid="beat-passport-grid">
+        {summary.metrics.map((metric) => (
+          <div className={`beat-passport-card ${metric.tone}`} data-testid={`beat-passport-${metric.id}`} key={metric.id}>
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+            <small>{metric.detail}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function BeatMap({
   actions,
   onRun,
@@ -5670,6 +5715,88 @@ function sessionBriefFieldLabel(field: keyof SessionBrief): string {
     notes: "notes"
   };
   return labels[field];
+}
+
+function createBeatPassportSummary(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): BeatPassportSummary {
+  const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const slots = usedPatternSlots(project);
+  const readyCount = checks.filter((check) => check.tone === "good").length;
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const readinessTone = weakestTone(checks.map((check) => check.tone));
+  const lengthTone: MixCoachTone = bars >= target.targetBars ? "good" : bars >= 8 ? "warn" : "danger";
+  const patternTone: MixCoachTone = slots.length >= 3 ? "good" : slots.length >= 2 ? "warn" : "danger";
+  const exportTone: MixCoachTone = analysis.status === "Ready" ? "good" : analysis.status === "Silent" ? "danger" : "warn";
+  const stemTone: MixCoachTone =
+    audibleStems.length >= target.stemGoal ? "good" : audibleStems.length >= 2 ? "warn" : "danger";
+  const masterTone: MixCoachTone = project.masterPreset === target.preferredMasterPreset ? "good" : "warn";
+  const tone = weakestTone([lengthTone, patternTone, readinessTone, exportTone, stemTone, masterTone]);
+  const patternLabel = slots.length > 0 ? slots.join("/") : project.selectedPattern;
+  const stemLabel = audibleStems.length > 0 ? audibleStems.map(stemTrackLabel).join("/") : "No stems";
+  const checksLeft = checks.length - readyCount;
+
+  return {
+    headline: `${target.name} / ${barCountLabel(bars)} / Pattern ${patternLabel}`,
+    detail: `${styleName} / ${project.key} / ${project.bpm} BPM / ${project.masterPreset}`,
+    tone,
+    metrics: [
+      {
+        id: "target",
+        label: "Target",
+        value: target.name,
+        detail: target.focus,
+        tone: isDeliveryTargetAligned(project, target) ? "good" : "warn"
+      },
+      {
+        id: "length",
+        label: "Length",
+        value: barCountLabel(bars),
+        detail: `${barCountLabel(target.targetBars)} target`,
+        tone: lengthTone
+      },
+      {
+        id: "patterns",
+        label: "Patterns",
+        value: patternLabel,
+        detail: `${slots.length}/3 slots used`,
+        tone: patternTone
+      },
+      {
+        id: "readiness",
+        label: "Ready",
+        value: `${readyCount}/${checks.length}`,
+        detail: checksLeft === 0 ? "All checks green" : `${checksLeft} checks left`,
+        tone: readinessTone
+      },
+      {
+        id: "export",
+        label: "Export",
+        value: analysis.status,
+        detail: `${formatDb(analysis.headroomDb)} headroom`,
+        tone: exportTone
+      },
+      {
+        id: "stems",
+        label: "Stems",
+        value: `${audibleStems.length}/${target.stemGoal}`,
+        detail: stemLabel,
+        tone: stemTone
+      },
+      {
+        id: "master",
+        label: "Master",
+        value: project.masterPreset,
+        detail: `${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(masterChannelVolumeDb(project.mixer))} output`,
+        tone: masterTone
+      }
+    ]
+  };
 }
 
 function createBeatMapSummary(
