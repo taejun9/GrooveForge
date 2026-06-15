@@ -153,6 +153,8 @@ Docs that mention clips before optional sampling is implemented must clarify tha
 
 Any new plan that mentions sample import, chopping, sampler tracks, or audio warping must explicitly mark that work as optional sampling-phase work or document the user-approved exception in its Decision Log.
 
+Any product, architecture, UI, roadmap, or QA wording that implies users must import, chop, browse, or map samples before making a complete beat fails the product boundary. The expected proof remains a sample-free beat made from built-in drums, synth 808/bass, melody/chords, arrangement, mixer/master, and export.
+
 Mixer/master work must keep mixing and mastering separate. Volume, pan, mute, solo, master output gain, and preset ceiling controls must affect both realtime playback and WAV export when implemented. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.
 
 Channel EQ work must keep low-cut/air controls in mixer state, migrate older project files safely, keep non-master track EQ separate from master processing, and make EQ values affect realtime playback, full-mix WAV export, and stem export.

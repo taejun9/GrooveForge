@@ -11,11 +11,11 @@ GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats
 
 ## Product Definition
 
-GrooveForge is a code-driven all-genre beat workstation: a mini DAW with a JSON-based project format, programmable style profiles, editable musical events, local synthesis, mixing/mastering controls, and offline export.
+GrooveForge is a code-driven all-genre beat workstation: a mini DAW with a JSON-based project format, programmable style profiles, editable musical events, local synthesis, mixing/mastering controls, and offline export. The center is making a beat directly, not finding a sample to start from.
 
 The primary object is a beat project built from musical events, patterns, tracks, devices, arrangement blocks, mixer state, master state, and render state. Audio samples can become assets inside that project later, but they are not the default starting point.
 
-The product should make a blank beat feel playable without imported audio: set BPM/key, write rhythm, compose bass and melody, shape tone, arrange sections, mix/master, and export.
+The product should make a blank beat feel playable without imported audio: set BPM/key/style, write rhythm, compose 808/bass, melody, and chords, shape tone and FX, arrange sections, mix/master, and export.
 
 It is not a trap-only app and not a sample-chopping tool. Trap, drill, boom bap, house, lofi, jersey, phonk, R&B, garage, and experimental workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
 
@@ -35,7 +35,7 @@ Optional sampling module, later and outside the MVP:
 
 - Sampling, audio import, chopping, and sampler mapping.
 
-Sampling can be useful, but it must stay behind the composition engine, instrument engine, arrangement, mixer/master, and export pipeline in priority, architecture, roadmap order, and UI copy. No user should need a sample to make the first complete beat.
+Sampling can be useful, but it must stay behind the composition engine, instrument engine, arrangement, mixer/master, and export pipeline in priority, architecture, roadmap order, and UI copy. No user should need a sample to make the first complete beat. When sampling appears later, it should behave like an optional sound source or instrument layer inside the beat workstation, not as the default project spine.
 
 Primary navigation and the first empty project should expose beat-making controls before sample workflows: transport, style/key/BPM, pattern editor, drum programming, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sampling entry points, when added, should be opt-in secondary paths rather than the default way to start.
 
@@ -155,6 +155,18 @@ Phase 4 adds arrangement and editing speed: pattern blocks, song section markers
 Phase 5 adds mixer/master/export: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, master preset ceiling first, then limiter, peak/LUFS metering, WAV export, stem export, and MIDI export.
 
 Phase 6 scopes optional sampling as an extension only after the beat-making core is useful: audio import, sampler mapping, chopping, reverse, pitch, and stretch.
+
+## Priority Guardrail
+
+Feature priority follows the beat-workstation core:
+
+| priority | area | reason |
+|---|---|---|
+| P0 | scheduler, drum sequencer, 808/bass, WAV export | timing, rhythm, low end, and output define whether this is a usable music app |
+| P1 | melody/chords, arrangement, mixer | these make a sample-free beat feel like a song rather than a loop |
+| P2 | mastering, MIDI input, deeper meters | these improve finishing and workflow after the core beat exists |
+| P3 | sampling and plugin hosting | useful extensions, but not required for the first complete beat |
+| P4 | AI generation | later automation only after editable event generation is reliable |
 
 ## Non-Goals
 
