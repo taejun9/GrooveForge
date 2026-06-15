@@ -121,7 +121,8 @@ MVP capabilities:
 - Independent Pattern A/B/C storage with copy/clear tools for drum, bass, chord, and melody variations.
 - Editable arrangement blocks and templates for 8-bar loop, full beat, hook-first, and breakdown structures, using assigned Pattern A/B/C data, per-block bar length, per-block energy, and structure controls for duplicate, move, and delete.
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
-- Desktop editing shortcuts for playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, and redo while leaving focused inputs alone.
+- Desktop editing shortcuts for arrangement playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, and redo while leaving focused inputs alone.
+- Transport playback modes for full arrangement playback by default and fast selected-pattern preview while editing.
 - Mixer volume, pan, mute, solo, low-cut/air EQ, and Drive/Glue mix controls reflected in realtime playback and WAV export.
 - Master preset ceiling and output gain.
 - Export peak/RMS/headroom meter with limiter activity status for the current arrangement.

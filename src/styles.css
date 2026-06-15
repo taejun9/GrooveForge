@@ -148,6 +148,8 @@ h2 {
 
 .command-strip {
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .transport-status {
@@ -229,6 +231,15 @@ h2 {
   padding: 3px;
   border-radius: 8px;
   background: rgba(244, 239, 231, 0.05);
+}
+
+.playback-mode-row {
+  grid-template-columns: minmax(104px, 1fr) minmax(84px, 1fr);
+}
+
+.playback-mode-row button {
+  min-height: 38px;
+  padding: 0 10px;
 }
 
 .segmented button,
