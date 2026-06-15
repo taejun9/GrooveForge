@@ -1,6 +1,8 @@
 import {
   ArrangementBlock,
+  arrangementBlockMutesTrack,
   arrangementEnergyGain,
+  ArrangementMuteTrack,
   arrangementTotalBars,
   chordEventShouldPlay,
   chordPitches,
@@ -84,6 +86,14 @@ function channelMix(project: ProjectState, id: TrackType, stemTarget?: StemTrack
 
 function masterOutputGain(project: ProjectState): number {
   return channelMix(project, "master").gain;
+}
+
+function mutedChannelMix(mix: ChannelMix): ChannelMix {
+  return { ...mix, gain: 0 };
+}
+
+function arrangementChannelMix(mix: ChannelMix, block: ArrangementBlock | undefined, track: ArrangementMuteTrack): ChannelMix {
+  return arrangementBlockMutesTrack(block, track) ? mutedChannelMix(mix) : mix;
 }
 
 function arrangementBarCount(project: ProjectState): number {
@@ -228,10 +238,10 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   const duration = totalSteps * step;
   const frames = Math.ceil(duration * sampleRate);
   const buffer: AudioChannels = [new Float32Array(frames), new Float32Array(frames)];
-  const drumMix = channelMix(project, "drum_rack", stemTarget);
-  const bassMix = channelMix(project, "bass_808", stemTarget);
-  const synthMix = channelMix(project, "synth", stemTarget);
-  const chordMix = channelMix(project, "chord", stemTarget);
+  const baseDrumMix = channelMix(project, "drum_rack", stemTarget);
+  const baseBassMix = channelMix(project, "bass_808", stemTarget);
+  const baseSynthMix = channelMix(project, "synth", stemTarget);
+  const baseChordMix = channelMix(project, "chord", stemTarget);
   const sound = project.sound;
   const outputGain = masterOutputGain(project);
 
@@ -240,6 +250,10 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
     const arrangementBlock = arrangementBlockForBar(project, bar);
     const pattern = arrangementBlock ? patternForSlot(project, arrangementBlock.pattern) : patternForSlot(project, project.selectedPattern);
     const energyGain = arrangementBlock ? arrangementEnergyGain(arrangementBlock.energy) : 1;
+    const drumMix = arrangementChannelMix(baseDrumMix, arrangementBlock, "drum_rack");
+    const bassMix = arrangementChannelMix(baseBassMix, arrangementBlock, "bass_808");
+    const synthMix = arrangementChannelMix(baseSynthMix, arrangementBlock, "synth");
+    const chordMix = arrangementChannelMix(baseChordMix, arrangementBlock, "chord");
     for (let patternStep = 0; patternStep < 16; patternStep += 1) {
       const absoluteStep = barOffset + patternStep;
       const time = (barOffset + patternStep) * step;
@@ -296,7 +310,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
         note.length * step * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
         bassMix,
-          energyGain * (0.52 + sound.bassDrive * 0.24) * sidechainGainForStep(pattern, note.step, sound.sidechainDuck, barOffset + note.step),
+        energyGain * (0.52 + sound.bassDrive * 0.24) * sidechainGainForStep(pattern, note.step, sound.sidechainDuck, barOffset + note.step),
         bassShape(sound),
         { drive: sound.bassDrive, filter: 0.72 + sound.bassDrive * 0.28, decay: 3.8 - sound.bassDecay * 1.4 }
       );

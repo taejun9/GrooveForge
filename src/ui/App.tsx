@@ -26,6 +26,7 @@ import { analyzeExport, ExportAnalysis, exportStems, exportWav } from "../audio/
 import { PlaybackController, PlaybackMode, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
 import {
   ArrangementBlock,
+  ArrangementMuteTrack,
   ArrangementSection,
   ArrangementTemplateId,
   BassNote,
@@ -50,6 +51,8 @@ import {
   activePattern,
   arrangementSections,
   arrangementEnergyGain,
+  arrangementMuteTrackIds,
+  arrangementMuteTrackLabel,
   arrangementTemplateIds,
   arrangementTemplateLabel,
   arrangementTotalBars,
@@ -77,6 +80,7 @@ import {
   maxArrangementBars,
   maxDrumTimingMs,
   normalizeArrangementEnergy,
+  normalizeArrangementMutedTracks,
   normalizeArrangementBars,
   normalizeDrumProbability,
   normalizeDrumTimingMs,
@@ -525,7 +529,11 @@ export function App(): ReactElement {
         ...block,
         ...update,
         energy: update.energy === undefined ? block.energy : normalizeArrangementEnergy(update.energy),
-        bars: update.bars === undefined ? block.bars : normalizeArrangementBars(update.bars)
+        bars: update.bars === undefined ? block.bars : normalizeArrangementBars(update.bars),
+        mutedTracks:
+          update.mutedTracks === undefined
+            ? block.mutedTracks
+            : normalizeArrangementMutedTracks(update.mutedTracks)
       };
       return {
         ...current,
@@ -535,6 +543,17 @@ export function App(): ReactElement {
     });
     setSelectedNote(null);
     setSelectedDrumStep(null);
+  }
+
+  function toggleArrangementTrackMute(track: ArrangementMuteTrack): void {
+    const block = projectRef.current.arrangement[selectedArrangementIndex];
+    if (!block) {
+      return;
+    }
+    const mutedTracks = block.mutedTracks.includes(track)
+      ? block.mutedTracks.filter((mutedTrack) => mutedTrack !== track)
+      : [...block.mutedTracks, track];
+    updateArrangementBlock(selectedArrangementIndex, { mutedTracks });
   }
 
   function applyArrangementTemplate(template: ArrangementTemplateId): void {
@@ -614,7 +633,7 @@ export function App(): ReactElement {
         selectedPattern: source.pattern,
         arrangement: [
           ...current.arrangement.slice(0, nextIndex),
-          { ...source },
+          { ...source, mutedTracks: [...source.mutedTracks] },
           ...current.arrangement.slice(nextIndex)
         ]
       };
@@ -1534,6 +1553,7 @@ export function App(): ReactElement {
                 <span>{block.section}</span>
                 <strong>{block.pattern}</strong>
                 <small>{barCountLabel(block.bars)}</small>
+                {block.mutedTracks.length > 0 && <em>{block.mutedTracks.length} mute</em>}
                 <i style={{ inlineSize: `${Math.max(18, block.energy * 100)}%` }} />
               </button>
             ))}
@@ -1576,6 +1596,24 @@ export function App(): ReactElement {
                     <small>{patternEventCount(project.patterns[pattern])}</small>
                   </button>
                 ))}
+              </div>
+              <div className="arrangement-mute-row" aria-label="Block track mutes">
+                {arrangementMuteTrackIds.map((track) => {
+                  const muted = selectedArrangementBlock.mutedTracks.includes(track);
+                  return (
+                    <button
+                      aria-pressed={muted}
+                      className={muted ? "selected" : ""}
+                      data-testid={`arrangement-track-mute-${track}`}
+                      key={track}
+                      onClick={() => toggleArrangementTrackMute(track)}
+                      title={`${muted ? "Unmute" : "Mute"} ${arrangementMuteTrackLabel(track)} in this block`}
+                      type="button"
+                    >
+                      {arrangementMuteTrackLabel(track)}
+                    </button>
+                  );
+                })}
               </div>
               <label>
                 <span>Bars</span>

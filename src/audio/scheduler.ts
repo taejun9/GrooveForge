@@ -2,6 +2,7 @@ import {
   dbToGain,
   arrangementEnergyGain,
   activePattern,
+  ArrangementMuteTrack,
   ArrangementSection,
   arrangementTotalBars,
   chordPitches,
@@ -36,6 +37,7 @@ export type PlaybackSnapshot = {
   arrangementIndex?: number;
   energy: number;
   energyGain: number;
+  mutedTracks: ArrangementMuteTrack[];
   totalBars: number;
 };
 
@@ -128,6 +130,15 @@ function masterOutputGain(project: ProjectState): number {
   return channelMix(project, "master").gain;
 }
 
+function mutedTrackMix(mix: TrackMix): TrackMix {
+  return { ...mix, gain: 0 };
+}
+
+function arrangementTrackMix(project: ProjectState, track: ArrangementMuteTrack, mutedTracks: ArrangementMuteTrack[]): TrackMix {
+  const mix = channelMix(project, track);
+  return mutedTracks.includes(track) ? mutedTrackMix(mix) : mix;
+}
+
 type PlaybackStepContext = {
   pattern: PatternData;
   patternSlot: PatternSlot;
@@ -135,6 +146,7 @@ type PlaybackStepContext = {
   arrangementIndex?: number;
   energy: number;
   energyGain: number;
+  mutedTracks: ArrangementMuteTrack[];
 };
 
 function arrangementContextForBar(project: ProjectState, bar: number): PlaybackStepContext {
@@ -148,7 +160,8 @@ function arrangementContextForBar(project: ProjectState, bar: number): PlaybackS
         section: block.section,
         arrangementIndex: index,
         energy: block.energy,
-        energyGain: arrangementEnergyGain(block.energy)
+        energyGain: arrangementEnergyGain(block.energy),
+        mutedTracks: block.mutedTracks
       };
     }
     cursor += blockBars;
@@ -158,7 +171,8 @@ function arrangementContextForBar(project: ProjectState, bar: number): PlaybackS
     pattern: activePattern(project),
     patternSlot: project.selectedPattern,
     energy: 1,
-    energyGain: 1
+    energyGain: 1,
+    mutedTracks: []
   };
 }
 
@@ -168,7 +182,8 @@ function playbackContextForStep(project: ProjectState, mode: PlaybackMode, loopS
       pattern: activePattern(project),
       patternSlot: project.selectedPattern,
       energy: 1,
-      energyGain: 1
+      energyGain: 1,
+      mutedTracks: []
     };
   }
 
@@ -189,6 +204,7 @@ function snapshotForStep(project: ProjectState, step: number, loopSteps: number,
     arrangementIndex: playbackContext.arrangementIndex,
     energy: playbackContext.energy,
     energyGain: playbackContext.energyGain,
+    mutedTracks: playbackContext.mutedTracks,
     totalBars
   };
 }
@@ -363,13 +379,14 @@ function scheduleStep(
   step: number,
   time: number,
   absoluteStep = step,
-  energyGain = 1
+  energyGain = 1,
+  mutedTracks: ArrangementMuteTrack[] = []
 ): void {
   const patternStep = step % 16;
-  const drumMix = channelMix(project, "drum_rack");
-  const bassMix = channelMix(project, "bass_808");
-  const synthMix = channelMix(project, "synth");
-  const chordMix = channelMix(project, "chord");
+  const drumMix = arrangementTrackMix(project, "drum_rack", mutedTracks);
+  const bassMix = arrangementTrackMix(project, "bass_808", mutedTracks);
+  const synthMix = arrangementTrackMix(project, "synth", mutedTracks);
+  const chordMix = arrangementTrackMix(project, "chord", mutedTracks);
   const sound = project.sound;
   const stepDuration = projectStepDurationSeconds(project);
   if (project.metronomeEnabled && patternStep % 4 === 0) {
@@ -551,7 +568,8 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
         snapshot.loopStep,
         context.currentTime + scheduleDelaySeconds,
         nextStep,
-        playbackContext.energyGain
+        playbackContext.energyGain,
+        playbackContext.mutedTracks
       );
       queueStepFeedback(snapshot, nextStepAtMs);
       nextStep += 1;

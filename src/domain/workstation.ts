@@ -98,10 +98,13 @@ export type ArrangementBlock = {
   pattern: PatternSlot;
   energy: number;
   bars: number;
+  mutedTracks: ArrangementMuteTrack[];
 };
 
 export const arrangementTemplateIds = ["loop", "full", "hook_first", "breakdown"] as const;
 export type ArrangementTemplateId = (typeof arrangementTemplateIds)[number];
+export const arrangementMuteTrackIds = ["drum_rack", "bass_808", "synth", "chord"] as const;
+export type ArrangementMuteTrack = (typeof arrangementMuteTrackIds)[number];
 
 export type MasterPreset = "Clean Demo" | "Streaming Safe" | "Headroom for Vocal";
 
@@ -162,6 +165,12 @@ export const arrangementTemplateLabels: Record<ArrangementTemplateId, string> = 
   full: "Full Beat",
   hook_first: "Hook First",
   breakdown: "Breakdown"
+};
+export const arrangementMuteTrackLabels: Record<ArrangementMuteTrack, string> = {
+  drum_rack: "Drums",
+  bass_808: "808",
+  synth: "Synth",
+  chord: "Chords"
 };
 export const chordQualities: ChordQuality[] = ["maj", "min", "dim", "sus2", "sus4", "7", "m7"];
 export const masterPresets: MasterPreset[] = ["Clean Demo", "Streaming Safe", "Headroom for Vocal"];
@@ -423,7 +432,9 @@ const chordProgressionPresetBlueprints: Record<ChordProgressionPreset, ChordBlue
   ]
 };
 
-const arrangementTemplateBlocks: Record<ArrangementTemplateId, ArrangementBlock[]> = {
+type ArrangementTemplateBlock = Omit<ArrangementBlock, "mutedTracks"> & { mutedTracks?: ArrangementMuteTrack[] };
+
+const arrangementTemplateBlocks: Record<ArrangementTemplateId, ArrangementTemplateBlock[]> = {
   loop: [
     { section: "Intro", pattern: "A", energy: 0.42, bars: 1 },
     { section: "Verse", pattern: "A", energy: 0.68, bars: 2 },
@@ -589,8 +600,15 @@ export function arrangementTemplateLabel(template: ArrangementTemplateId): strin
   return arrangementTemplateLabels[template];
 }
 
+export function arrangementMuteTrackLabel(track: ArrangementMuteTrack): string {
+  return arrangementMuteTrackLabels[track];
+}
+
 export function createArrangementTemplate(template: ArrangementTemplateId): ArrangementBlock[] {
-  return arrangementTemplateBlocks[template].map((block) => ({ ...block }));
+  return arrangementTemplateBlocks[template].map((block) => ({
+    ...block,
+    mutedTracks: normalizeArrangementMutedTracks(block.mutedTracks)
+  }));
 }
 
 export function normalizeArrangementBars(value: unknown): number {
@@ -609,6 +627,17 @@ export function normalizeArrangementEnergy(value: unknown): number {
 
 export function arrangementEnergyGain(value: unknown): number {
   return 0.45 + normalizeArrangementEnergy(value) * 0.67;
+}
+
+export function normalizeArrangementMutedTracks(value: unknown): ArrangementMuteTrack[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return arrangementMuteTrackIds.filter((track) => value.includes(track));
+}
+
+export function arrangementBlockMutesTrack(block: ArrangementBlock | undefined, track: ArrangementMuteTrack): boolean {
+  return Boolean(block?.mutedTracks.includes(track));
 }
 
 export function arrangementTotalBars(project: ProjectState): number {
@@ -1426,7 +1455,8 @@ function normalizeArrangement(arrangement: ArrangementBlockInput[]): Arrangement
     section: block.section,
     pattern: block.pattern,
     energy: normalizeArrangementEnergy(block.energy),
-    bars: normalizeArrangementBars(block.bars)
+    bars: normalizeArrangementBars(block.bars),
+    mutedTracks: normalizeArrangementMutedTracks(block.mutedTracks)
   }));
 }
 
@@ -1577,7 +1607,10 @@ type MixerChannelInput = Omit<MixerChannel, "lowCut" | "air" | "drive" | "glue">
   drive?: number;
   glue?: number;
 };
-type ArrangementBlockInput = Omit<ArrangementBlock, "bars"> & { bars?: number };
+type ArrangementBlockInput = Omit<ArrangementBlock, "bars" | "mutedTracks"> & {
+  bars?: number;
+  mutedTracks?: ArrangementMuteTrack[];
+};
 type ProjectStateInput = Omit<ProjectState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled"> & {
   metronomeEnabled?: boolean;
   sound?: SoundDesignInput;
@@ -1813,7 +1846,9 @@ function isArrangementBlock(value: unknown): value is ArrangementBlockInput {
     value.energy >= 0 &&
     value.energy <= 1 &&
     (value.bars === undefined ||
-      (isFiniteNumber(value.bars) && value.bars >= minArrangementBars && value.bars <= maxArrangementBars))
+      (isFiniteNumber(value.bars) && value.bars >= minArrangementBars && value.bars <= maxArrangementBars)) &&
+    (value.mutedTracks === undefined ||
+      (Array.isArray(value.mutedTracks) && value.mutedTracks.every((track) => isOneOf(track, arrangementMuteTrackIds))))
   );
 }
 

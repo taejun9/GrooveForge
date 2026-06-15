@@ -179,6 +179,7 @@ h2 {
 .pattern-tools button,
 .arrangement-template-row button,
 .block-pattern-row button,
+.arrangement-mute-row button,
 .chord-preset-row button,
 .chord-tools > button,
 .preset-row button,
@@ -254,6 +255,7 @@ h2 {
 .pattern-tools button,
 .arrangement-template-row button,
 .block-pattern-row button,
+.arrangement-mute-row button,
 .chord-preset-row button,
 .chord-tools > button,
 .preset-row button {
@@ -264,6 +266,7 @@ h2 {
 .pattern-tabs button.selected,
 .arrangement-template-row button.selected,
 .block-pattern-row button.selected,
+.arrangement-mute-row button.selected,
 .chord-preset-row button.selected,
 .preset-row button.selected {
   border-color: rgba(240, 195, 106, 0.64);
@@ -1032,6 +1035,17 @@ input[type="range"] {
   font-size: 11px;
 }
 
+.arrangement-block em {
+  justify-self: start;
+  max-inline-size: 100%;
+  overflow: hidden;
+  color: #ff7a4f;
+  font-size: 10px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .arrangement-block i {
   display: block;
   block-size: 4px;
@@ -1098,6 +1112,25 @@ input[type="range"] {
 
 .block-pattern-row button.selected small {
   color: rgba(17, 16, 15, 0.62);
+}
+
+.arrangement-mute-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.arrangement-mute-row button {
+  min-width: 0;
+  padding: 0 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.arrangement-mute-row button.selected {
+  border-color: rgba(255, 122, 79, 0.52);
+  color: #ffd8cf;
+  background: rgba(255, 122, 79, 0.14);
 }
 
 .energy-inputs {

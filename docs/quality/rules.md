@@ -95,6 +95,8 @@ Pattern variation work must be deterministic, operate only on the selected Patte
 
 Arrangement editor work must let users change a block's section, Pattern A/B/C assignment, bar length, and energy without losing existing pattern, mixer, master, or save/load data. Selecting or reassigning a block should keep the pattern editor aligned with that block's assigned pattern.
 
+Arrangement track mute work must migrate older arrangement blocks to no muted tracks, keep mutes scoped to the selected block without mutating Pattern A/B/C events, apply the same mute decisions to realtime arrangement playback, full-mix WAV export, and stem export, and preserve selected-pattern preview behavior.
+
 Arrangement structure work must preserve at least one block, keep selection/pattern alignment after duplicate, move, and delete actions, and make WAV export follow the current arrangement length.
 
 Arrangement template work must replace only arrangement blocks, keep existing Pattern A/B/C musical data and mixer/master state intact, reset selection safely to a valid block, align the selected pattern with the first template block, remain undoable, and make WAV/stem export follow the applied template length.
