@@ -68,7 +68,7 @@ Primary feature areas:
 - Beat blueprints: sample-free editable project starts that combine style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset.
 - Pattern editor: drum step sequencer, bass grid, chord progression, melody grid, variation A/B/C, and one-click Pattern Fill tail moves.
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
-- Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with Pattern Chain 8-bar sketches, one-click Drop/Build/Hook Lift moves, per-block bar lengths, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
+- Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with Pattern Chain 8-bar sketches, per-step A/B/C chain cycling, one-click Drop/Build/Hook Lift moves, per-block bar lengths, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
 - Project readiness: read-only checks for drums, 808/bass, melody/chords, arrangement, and export completeness.
 - Next Move: explicit local action recommendations that connect readiness/export state to Blueprint, Pattern Fill, Hook Lift, Save Slot, and Mix Check commands.
 - Quick Actions: searchable local command palette for transport, project, creative, arrangement, mix, and export actions.
@@ -139,7 +139,7 @@ MVP capabilities:
 - Read-only Beat Readiness checks for drums, 808/bass, melody/chords, arrangement structure, and export signal status.
 - Next Move strip that gives one primary recommended action and secondary local actions from the current readiness/export state without mutating Beat Readiness.
 - Editable arrangement blocks and templates for 8-bar loop, full beat, hook-first, and breakdown structures, using assigned Pattern A/B/C data, one-click Drop/Build/Hook Lift moves, per-block track mutes, per-block bar length, split/merge controls, audible per-block energy, and structure controls for duplicate, move, and delete.
-- Pattern Chain presets that replace only arrangement blocks with editable 8-bar Pattern A/B/C sketches while preserving Pattern A/B/C musical event data, mixer state, sound design, master state, and existing export paths.
+- Pattern Chain presets and per-step A/B/C cycling that edit only arrangement block assignments while preserving Pattern A/B/C musical event data, mixer state, sound design, master state, and existing export paths.
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
 - Project Snapshots that save, rename, restore, and delete local beat idea states inside the `.grooveforge.json` file without cloud sync or nested snapshot recursion.
 - Desktop editing shortcuts and Quick Actions command search for arrangement playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, redo, snapshots, blueprints, pattern fills, mix fixes, and export while leaving focused inputs alone.

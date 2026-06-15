@@ -784,8 +784,8 @@ export function App(): ReactElement {
     setSelectedChordIndex(null);
   }
 
-  function updateArrangementBlock(index: number, update: Partial<ArrangementBlock>, status = "Unsaved changes"): void {
-    updateProject((current) => {
+  function updateArrangementBlock(index: number, update: Partial<ArrangementBlock>, status = "Unsaved changes"): boolean {
+    const changed = updateProject((current) => {
       const block = current.arrangement[index];
       if (!block) {
         return current;
@@ -806,9 +806,25 @@ export function App(): ReactElement {
         arrangement: current.arrangement.map((candidate, candidateIndex) => (candidateIndex === index ? nextBlock : candidate))
       };
     }, status);
-    setSelectedNote(null);
-    setSelectedDrumStep(null);
-    setSelectedChordIndex(null);
+    if (changed) {
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+    }
+    return changed;
+  }
+
+  function cyclePatternChainStep(index: number): void {
+    const block = projectRef.current.arrangement[index];
+    if (!block) {
+      setProjectStatus("Chain step not found");
+      return;
+    }
+    const nextPattern = nextPatternSlot(block.pattern);
+    const changed = updateArrangementBlock(index, { pattern: nextPattern }, `Step ${index + 1} Pattern ${nextPattern}`);
+    if (changed) {
+      setSelectedArrangementIndex(index);
+    }
   }
 
   function applyArrangementMoveToSelected(preset: ArrangementMovePreset): void {
@@ -2408,6 +2424,28 @@ export function App(): ReactElement {
                 );
               })}
             </div>
+            <div className="pattern-chain-editor" aria-label="Pattern chain step editor" data-testid="pattern-chain-step-editor">
+              {project.arrangement.slice(0, 8).map((block, index) => {
+                const nextPattern = nextPatternSlot(block.pattern);
+                return (
+                  <button
+                    aria-label={`Chain step ${index + 1} ${block.section} Pattern ${block.pattern}, ${barCountLabel(block.bars)}. Switch to Pattern ${nextPattern}`}
+                    className={selectedArrangementIndex === index ? "selected" : ""}
+                    data-testid={`pattern-chain-step-${index}`}
+                    key={`${block.section}-${index}-${block.pattern}`}
+                    onClick={() => cyclePatternChainStep(index)}
+                    title={`Switch step ${index + 1} to Pattern ${nextPattern}`}
+                    type="button"
+                  >
+                    <span>Step {index + 1}</span>
+                    <strong data-testid={`pattern-chain-step-pattern-${index}`}>{block.pattern}</strong>
+                    <small>
+                      {block.section} {normalizeArrangementBars(block.bars)}b
+                    </small>
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div className="arrangement-track">
             {project.arrangement.map((block, index) => (
@@ -2530,8 +2568,8 @@ export function App(): ReactElement {
                 />
               </label>
               <label>
-                <span>
-                  Energy {Math.round(selectedArrangementBlock.energy * 100)}% / {arrangementEnergyGain(selectedArrangementBlock.energy).toFixed(2)}x
+                <span title={`${arrangementEnergyGain(selectedArrangementBlock.energy).toFixed(2)}x gain`}>
+                  Energy {Math.round(selectedArrangementBlock.energy * 100)}%
                 </span>
                 <div className="energy-inputs">
                   <input
@@ -5223,6 +5261,11 @@ function patternEventCount(pattern: PatternData): string {
 
 function patternChainReadout(arrangement: ArrangementBlock[]): string {
   return arrangement.map((block) => block.pattern).join("-");
+}
+
+function nextPatternSlot(pattern: PatternSlot): PatternSlot {
+  const index = patternSlots.indexOf(pattern);
+  return patternSlots[(index + 1) % patternSlots.length] ?? "A";
 }
 
 function barCountLabel(bars: number): string {

@@ -1633,7 +1633,7 @@ input[type="range"] {
 
 .pattern-chain-row {
   display: grid;
-  grid-template-columns: 132px 1fr;
+  grid-template-columns: 148px 1fr;
   gap: 8px;
   align-items: stretch;
   min-width: 0;
@@ -1700,6 +1700,61 @@ input[type="range"] {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pattern-chain-editor {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.pattern-chain-editor button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  gap: 2px 4px;
+  align-items: center;
+  min-width: 0;
+  min-height: 56px;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.04);
+  color: #f4efe7;
+  padding: 6px;
+  text-align: start;
+}
+
+.pattern-chain-editor button.selected {
+  border-color: rgba(120, 240, 200, 0.58);
+  background: rgba(120, 240, 200, 0.12);
+}
+
+.pattern-chain-editor button span,
+.pattern-chain-editor button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pattern-chain-editor button span {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.pattern-chain-editor button strong {
+  grid-row: span 2;
+  color: #78f0c8;
+  font-size: 17px;
+  line-height: 1;
+  text-align: end;
+}
+
+.pattern-chain-editor button small {
+  color: rgba(244, 239, 231, 0.54);
+  font-size: 10px;
 }
 
 .arrangement-block {
@@ -1819,14 +1874,18 @@ input[type="range"] {
 
 .arrangement-mute-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .arrangement-mute-row button {
   min-width: 0;
+  overflow: hidden;
   padding: 0 6px;
   font-size: 11px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1852,8 +1911,8 @@ input[type="range"] {
 
 .energy-inputs {
   display: grid;
-  grid-template-columns: minmax(90px, 1fr) 72px;
-  gap: 8px;
+  grid-template-columns: minmax(76px, 1fr) 64px;
+  gap: 6px;
   align-items: center;
 }
 
