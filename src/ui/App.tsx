@@ -596,6 +596,9 @@ export function App(): ReactElement {
     if (update.glue !== undefined) {
       nextUpdate.glue = normalizeMixerEq(update.glue);
     }
+    if (update.send !== undefined) {
+      nextUpdate.send = normalizeMixerEq(update.send);
+    }
     updateProject((current) => ({
       ...current,
       mixer: current.mixer.map((track) => (track.id === id ? { ...track, ...nextUpdate } : track))
@@ -2065,6 +2068,31 @@ export function App(): ReactElement {
                         />
                       </div>
                     </label>
+                    <label className="strip-control">
+                      <span>Space</span>
+                      <div className="eq-inputs">
+                        <input
+                          aria-label={`${channel.name} space send`}
+                          data-testid={`mixer-send-${channel.id}`}
+                          max={1}
+                          min={0}
+                          onChange={(event) => updateMixerChannel(channel.id, { send: Number(event.target.value) })}
+                          step={0.01}
+                          type="range"
+                          value={channel.send}
+                        />
+                        <input
+                          aria-label={`${channel.name} space send percent`}
+                          data-testid={`mixer-send-input-${channel.id}`}
+                          max={100}
+                          min={0}
+                          onChange={(event) => updateMixerChannel(channel.id, { send: Number(event.target.value) / 100 })}
+                          step={1}
+                          type="number"
+                          value={Math.round(channel.send * 100)}
+                        />
+                      </div>
+                    </label>
                   </div>
                 )}
                 <div className="strip-readout">
@@ -2076,6 +2104,7 @@ export function App(): ReactElement {
                       <span>Air {percentLabel(channel.air)}</span>
                       <span>Drive {percentLabel(channel.drive)}</span>
                       <span>Glue {percentLabel(channel.glue)}</span>
+                      <span>Space {percentLabel(channel.send)}</span>
                     </>
                   )}
                 </div>

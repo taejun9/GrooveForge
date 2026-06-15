@@ -142,3 +142,5 @@ Mixer/master work must keep mixing and mastering separate. Volume, pan, mute, so
 Channel EQ work must keep low-cut/air controls in mixer state, migrate older project files safely, keep non-master track EQ separate from master processing, and make EQ values affect realtime playback, full-mix WAV export, and stem export.
 
 Channel dynamics work must keep Drive/Glue controls in mixer state, migrate older project files safely, keep non-master track saturation/compression separate from master processing, label simplified compression honestly, and make Drive/Glue values affect realtime playback, full-mix WAV export, and stem export.
+
+FX send work must keep Space/send controls in mixer state, migrate older project files safely, use deterministic built-in processing rather than imported audio or plugin hosting, make send amount audible in realtime playback and full-mix WAV export, prevent muted, solo-excluded, or arrangement-muted tracks from leaking into the FX return, and keep stem export isolated to the requested stem's own send return.

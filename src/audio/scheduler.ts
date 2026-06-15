@@ -60,12 +60,18 @@ type TrackMix = {
   air: number;
   drive: number;
   glue: number;
+  send: number;
 };
 
 const scheduleAheadSeconds = 0.12;
 const scheduleAheadMs = scheduleAheadSeconds * 1000;
 const schedulerTickMs = 25;
-const metronomeMix: TrackMix = { gain: 1, pan: 0, lowCut: 0, air: 0.16, drive: 0, glue: 0 };
+const metronomeMix: TrackMix = { gain: 1, pan: 0, lowCut: 0, air: 0.16, drive: 0, glue: 0, send: 0 };
+
+type PlaybackDestination = {
+  dry: AudioNode;
+  send: AudioNode;
+};
 
 function createAudioContext(): AudioContext {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -83,7 +89,7 @@ function channelMix(project: ProjectState, id: string): TrackMix {
   const channel = project.mixer.find((track) => track.id === id);
   const soloActive = hasSolo(project);
   if (!channel || channel.muted || (id !== "master" && soloActive && !channel.solo)) {
-    return { gain: 0, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0 };
+    return { gain: 0, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0, send: 0 };
   }
   return {
     gain: dbToGain(channel.volumeDb),
@@ -91,7 +97,8 @@ function channelMix(project: ProjectState, id: string): TrackMix {
     lowCut: channel.lowCut,
     air: channel.air,
     drive: channel.drive,
-    glue: channel.glue
+    glue: channel.glue,
+    send: id === "master" ? 0 : channel.send
   };
 }
 
@@ -124,6 +131,35 @@ function connectChannelGlue(context: AudioContext, source: AudioNode, mix: Track
   compressor.release.setValueAtTime(0.08 + mix.glue * 0.18, time);
   source.connect(compressor);
   return compressor;
+}
+
+function createSpaceBus(context: AudioContext, destination: AudioNode): GainNode {
+  const input = context.createGain();
+  const delay = context.createDelay(0.8);
+  const feedback = context.createGain();
+  const filter = context.createBiquadFilter();
+  const wet = context.createGain();
+  delay.delayTime.setValueAtTime(0.22, context.currentTime);
+  feedback.gain.setValueAtTime(0.28, context.currentTime);
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(5200, context.currentTime);
+  filter.Q.setValueAtTime(0.45, context.currentTime);
+  wet.gain.setValueAtTime(0.48, context.currentTime);
+  input.connect(delay);
+  delay.connect(filter);
+  filter.connect(wet).connect(destination);
+  filter.connect(feedback).connect(delay);
+  return input;
+}
+
+function connectScheduledOutput(context: AudioContext, source: AudioNode, destination: PlaybackDestination, mix: TrackMix, time: number): void {
+  source.connect(destination.dry);
+  if (mix.gain <= 0 || mix.send <= 0) {
+    return;
+  }
+  const sendGain = context.createGain();
+  sendGain.gain.setValueAtTime(Math.min(0.72, mix.send * 0.58), time);
+  source.connect(sendGain).connect(destination.send);
 }
 
 function masterOutputGain(project: ProjectState): number {
@@ -211,7 +247,7 @@ function snapshotForStep(project: ProjectState, step: number, loopSteps: number,
 
 function scheduleKick(
   context: AudioContext,
-  destination: AudioNode,
+  destination: PlaybackDestination,
   time: number,
   gainValue: number,
   mix: TrackMix,
@@ -238,14 +274,15 @@ function scheduleKick(
   gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.18 + sound.kickPunch * 0.1);
   panner.pan.setValueAtTime(mix.pan, time);
   osc.connect(highpass).connect(drive);
-  connectChannelGlue(context, drive, mix, time).connect(gain).connect(panner).connect(destination);
+  connectChannelGlue(context, drive, mix, time).connect(gain).connect(panner);
+  connectScheduledOutput(context, panner, destination, mix, time);
   osc.start(time);
   osc.stop(time + 0.3);
 }
 
 function scheduleNoise(
   context: AudioContext,
-  destination: AudioNode,
+  destination: PlaybackDestination,
   time: number,
   duration: number,
   gainValue: number,
@@ -277,14 +314,15 @@ function scheduleNoise(
   const panner = context.createStereoPanner();
   panner.pan.setValueAtTime(mix.pan, time);
   source.connect(filter).connect(drive);
-  connectChannelGlue(context, drive, mix, time).connect(gain).connect(panner).connect(destination);
+  connectChannelGlue(context, drive, mix, time).connect(gain).connect(panner);
+  connectScheduledOutput(context, panner, destination, mix, time);
   source.start(time);
   source.stop(time + duration);
 }
 
 function scheduleTone(
   context: AudioContext,
-  destination: AudioNode,
+  destination: PlaybackDestination,
   time: number,
   duration: number,
   frequency: number,
@@ -318,7 +356,8 @@ function scheduleTone(
   gain.gain.exponentialRampToValueAtTime(0.0001, time + Math.max(0.04, duration + (tone.release ?? 0) * 0.12));
   panner.pan.setValueAtTime(pan, time);
   osc.connect(highpass).connect(filter).connect(drive);
-  connectChannelGlue(context, drive, mix, time).connect(gain).connect(panner).connect(destination);
+  connectChannelGlue(context, drive, mix, time).connect(gain).connect(panner);
+  connectScheduledOutput(context, panner, destination, mix, time);
   osc.start(time);
   osc.stop(time + duration + (tone.release ?? 0) * 0.14 + 0.03);
 }
@@ -350,7 +389,7 @@ function synthOscillator(sound: SoundDesign): OscillatorType {
   return sound.synthBrightness > 0.46 ? "triangle" : "sine";
 }
 
-function scheduleMetronomeClick(context: AudioContext, destination: AudioNode, time: number, step: number): void {
+function scheduleMetronomeClick(context: AudioContext, destination: PlaybackDestination, time: number, step: number): void {
   const accent = step % 16 === 0;
   scheduleTone(
     context,
@@ -375,7 +414,7 @@ function scheduleStep(
   project: ProjectState,
   pattern: PatternData,
   context: AudioContext,
-  master: AudioNode,
+  destination: PlaybackDestination,
   step: number,
   time: number,
   absoluteStep = step,
@@ -390,17 +429,17 @@ function scheduleStep(
   const sound = project.sound;
   const stepDuration = projectStepDurationSeconds(project);
   if (project.metronomeEnabled && patternStep % 4 === 0) {
-    scheduleMetronomeClick(context, master, time, patternStep);
+    scheduleMetronomeClick(context, destination, time, patternStep);
   }
   if (drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
     const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
-    scheduleKick(context, master, drumTime, energyGain * drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix, sound);
+    scheduleKick(context, destination, drumTime, energyGain * drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix, sound);
   }
   if (drumStepShouldPlay(pattern, "clap", patternStep, absoluteStep)) {
     const drumTime = time + drumStepTimingMs(pattern, "clap", patternStep) / 1000;
     scheduleNoise(
       context,
-      master,
+      destination,
       drumTime,
       0.11 + (1 - sound.snareSnap) * 0.08,
       energyGain * (0.2 + sound.snareSnap * 0.14) * drumMix.gain * drumStepVelocity(pattern, "clap", patternStep),
@@ -415,7 +454,7 @@ function scheduleStep(
     for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
       scheduleNoise(
         context,
-        master,
+        destination,
         drumTime + (repeatIndex * stepDuration) / repeatCount,
         0.035 + (1 - sound.hatBrightness) * 0.025,
         energyGain * (0.08 + sound.hatBrightness * 0.08) * drumMix.gain * baseVelocity * (repeatIndex === 0 ? 1 : 0.72),
@@ -428,7 +467,7 @@ function scheduleStep(
     const drumTime = time + drumStepTimingMs(pattern, "perc", patternStep) / 1000;
     scheduleTone(
       context,
-      master,
+      destination,
       drumTime,
       0.07,
       260 + sound.snareSnap * 190,
@@ -448,7 +487,7 @@ function scheduleStep(
     if (note.step === patternStep && noteEventShouldPlay("bass", note, absoluteStep)) {
       scheduleTone(
         context,
-        master,
+        destination,
         time,
         note.length * stepDuration * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
@@ -471,7 +510,7 @@ function scheduleStep(
     if (note.step === patternStep && noteEventShouldPlay("melody", note, absoluteStep)) {
       scheduleTone(
         context,
-        master,
+        destination,
         time,
         note.length * stepDuration * (0.8 + sound.synthRelease * 0.42),
         noteToFrequency(note.pitch),
@@ -497,7 +536,7 @@ function scheduleStep(
         const spread = pitches.length <= 1 ? 0 : (voiceIndex / (pitches.length - 1)) * 2 - 1;
         scheduleTone(
           context,
-          master,
+          destination,
           time,
           chord.length * stepDuration * (0.9 + sound.synthRelease * 0.24),
           noteToFrequency(pitch),
@@ -525,6 +564,8 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
   const mode = options.mode ?? "arrangement";
   const masterGain = context.createGain();
   masterGain.connect(context.destination);
+  const spaceInput = createSpaceBus(context, masterGain);
+  const destinations: PlaybackDestination = { dry: masterGain, send: spaceInput };
 
   let nextStep = 0;
   let nextStepAtMs = performance.now() + 50;
@@ -564,7 +605,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
         currentProject,
         playbackContext.pattern,
         context,
-        masterGain,
+        destinations,
         snapshot.loopStep,
         context.currentTime + scheduleDelaySeconds,
         nextStep,

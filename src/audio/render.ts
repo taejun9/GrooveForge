@@ -52,6 +52,7 @@ type ChannelMix = {
   air: number;
   drive: number;
   glue: number;
+  send: number;
 };
 type RenderNoiseSeed = (start: number, duration: number, brightness: number) => number;
 
@@ -66,11 +67,11 @@ function hasSolo(project: ProjectState): boolean {
 function channelMix(project: ProjectState, id: TrackType, stemTarget?: StemTrackId): ChannelMix {
   const channel = project.mixer.find((track) => track.id === id);
   if (stemTarget && id !== stemTarget) {
-    return { gain: 0, left: 0, right: 0, lowCut: 0, air: 0, drive: 0, glue: 0 };
+    return { gain: 0, left: 0, right: 0, lowCut: 0, air: 0, drive: 0, glue: 0, send: 0 };
   }
   const soloActive = hasSolo(project);
   if (!channel || (!stemTarget && channel.muted) || (!stemTarget && id !== "master" && soloActive && !channel.solo)) {
-    return { gain: 0, left: 0, right: 0, lowCut: 0, air: 0, drive: 0, glue: 0 };
+    return { gain: 0, left: 0, right: 0, lowCut: 0, air: 0, drive: 0, glue: 0, send: 0 };
   }
 
   const normalizedPan = Math.max(-1, Math.min(1, channel.pan / 100));
@@ -81,7 +82,8 @@ function channelMix(project: ProjectState, id: TrackType, stemTarget?: StemTrack
     lowCut: channel.lowCut,
     air: channel.air,
     drive: channel.drive,
-    glue: channel.glue
+    glue: channel.glue,
+    send: id === "master" ? 0 : channel.send
   };
 }
 
@@ -149,6 +151,23 @@ function channelGlueSample(sample: number, mix: ChannelMix): number {
   return sign * compressed * (1 + mix.glue * 0.1);
 }
 
+function spaceSendMix(mix: ChannelMix): ChannelMix {
+  if (mix.gain <= 0 || mix.send <= 0) {
+    return { ...mix, gain: 0 };
+  }
+  return {
+    ...mix,
+    gain: mix.gain * mix.send * 0.58,
+    left: Math.max(0, Math.min(1, mix.left + mix.send * 0.08)),
+    right: Math.max(0, Math.min(1, mix.right + mix.send * 0.08)),
+    lowCut: Math.max(mix.lowCut, 0.18),
+    air: Math.min(1, mix.air + 0.18),
+    drive: mix.drive * 0.35,
+    glue: mix.glue * 0.45,
+    send: 0
+  };
+}
+
 function addTone(
   buffer: AudioChannels,
   start: number,
@@ -179,6 +198,25 @@ function addTone(
     buffer[0][startFrame + index] += value * mix.left;
     buffer[1][startFrame + index] += value * mix.right;
   }
+}
+
+function addToneWithSend(
+  buffer: AudioChannels,
+  sendBuffer: AudioChannels,
+  start: number,
+  duration: number,
+  frequency: number,
+  mix: ChannelMix,
+  gainScale: number,
+  shape: ToneShape,
+  tone: { drive?: number; filter?: number; decay?: number } = {}
+): void {
+  addTone(buffer, start, duration, frequency, mix, gainScale, shape, tone);
+  addTone(sendBuffer, start, duration * 1.08, frequency, spaceSendMix(mix), gainScale * 0.82, shape, {
+    ...tone,
+    decay: Math.max(2.2, (tone.decay ?? 4) * 0.76),
+    filter: Math.min(1, (tone.filter ?? 1) + 0.08)
+  });
 }
 
 function waveform(shape: ToneShape, phase: number): number {
@@ -221,6 +259,47 @@ function addNoise(
     previous = raw;
     buffer[0][startFrame + index] += value * mix.left;
     buffer[1][startFrame + index] += value * mix.right;
+  }
+}
+
+function addNoiseWithSend(
+  buffer: AudioChannels,
+  sendBuffer: AudioChannels,
+  start: number,
+  duration: number,
+  mix: ChannelMix,
+  gainScale: number,
+  brightness = 0.5,
+  noiseSeed = 0
+): void {
+  addNoise(buffer, start, duration, mix, gainScale, brightness, noiseSeed);
+  addNoise(sendBuffer, start, duration * 1.12, spaceSendMix(mix), gainScale * 0.7, Math.min(1, brightness + 0.16), noiseSeed);
+}
+
+function applySpaceReturn(buffer: AudioChannels, sendBuffer: AudioChannels): void {
+  const delayLeft = Math.floor(sampleRate * 0.17);
+  const delayRight = Math.floor(sampleRate * 0.23);
+  const feedback = 0.34;
+  const crossfeed = 0.44;
+  const returnGain = 0.62;
+  let dampedLeft = 0;
+  let dampedRight = 0;
+
+  for (let index = 0; index < sendBuffer[0].length; index += 1) {
+    const inputLeft = sendBuffer[0][index];
+    const inputRight = sendBuffer[1][index];
+    const echoLeft = index >= delayLeft ? sendBuffer[1][index - delayLeft] * crossfeed : 0;
+    const echoRight = index >= delayRight ? sendBuffer[0][index - delayRight] * crossfeed : 0;
+    dampedLeft = dampedLeft * 0.58 + (inputLeft + echoLeft) * 0.42;
+    dampedRight = dampedRight * 0.58 + (inputRight + echoRight) * 0.42;
+    buffer[0][index] += (inputLeft * 0.18 + dampedLeft) * returnGain;
+    buffer[1][index] += (inputRight * 0.18 + dampedRight) * returnGain;
+    if (index + delayLeft < sendBuffer[0].length) {
+      sendBuffer[0][index + delayLeft] += dampedRight * feedback;
+    }
+    if (index + delayRight < sendBuffer[1].length) {
+      sendBuffer[1][index + delayRight] += dampedLeft * feedback;
+    }
   }
 }
 
@@ -301,6 +380,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   const duration = totalSteps * step;
   const frames = Math.ceil(duration * sampleRate);
   const buffer: AudioChannels = [new Float32Array(frames), new Float32Array(frames)];
+  const sendBuffer: AudioChannels = [new Float32Array(frames), new Float32Array(frames)];
   const baseDrumMix = channelMix(project, "drum_rack", stemTarget);
   const baseBassMix = channelMix(project, "bass_808", stemTarget);
   const baseSynthMix = channelMix(project, "synth", stemTarget);
@@ -324,18 +404,19 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
       if (drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
         const velocity = drumStepVelocity(pattern, "kick", patternStep);
         const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
-        addTone(buffer, drumTime, 0.18 + sound.kickPunch * 0.1, 44 + sound.kickPunch * 10, drumMix, energyGain * (0.78 + sound.kickPunch * 0.24) * velocity, "sine", {
+        addToneWithSend(buffer, sendBuffer, drumTime, 0.18 + sound.kickPunch * 0.1, 44 + sound.kickPunch * 10, drumMix, energyGain * (0.78 + sound.kickPunch * 0.24) * velocity, "sine", {
           decay: 4.8 - sound.kickPunch * 1.2
         });
-        addTone(buffer, drumTime, 0.06 + sound.kickPunch * 0.04, 82 + sound.kickPunch * 45, drumMix, energyGain * (0.2 + sound.kickPunch * 0.22) * velocity, "sine", {
+        addToneWithSend(buffer, sendBuffer, drumTime, 0.06 + sound.kickPunch * 0.04, 82 + sound.kickPunch * 45, drumMix, energyGain * (0.2 + sound.kickPunch * 0.22) * velocity, "sine", {
           decay: 8
         });
       }
       if (drumStepShouldPlay(pattern, "clap", patternStep, absoluteStep)) {
         const drumTime = time + drumStepTimingMs(pattern, "clap", patternStep) / 1000;
         const drumDuration = 0.11 + (1 - sound.snareSnap) * 0.08;
-        addNoise(
+        addNoiseWithSend(
           buffer,
+          sendBuffer,
           drumTime,
           drumDuration,
           drumMix,
@@ -351,8 +432,9 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
         const drumDuration = 0.035 + (1 - sound.hatBrightness) * 0.025;
         for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
           const repeatTime = drumTime + (repeatIndex * step) / repeatCount;
-          addNoise(
+          addNoiseWithSend(
             buffer,
+            sendBuffer,
             repeatTime,
             drumDuration,
             drumMix,
@@ -364,7 +446,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
       }
       if (drumStepShouldPlay(pattern, "perc", patternStep, absoluteStep)) {
         const drumTime = time + drumStepTimingMs(pattern, "perc", patternStep) / 1000;
-        addTone(buffer, drumTime, 0.08, 260 + sound.snareSnap * 190, drumMix, energyGain * 0.16 * drumStepVelocity(pattern, "perc", patternStep), "triangle", {
+        addToneWithSend(buffer, sendBuffer, drumTime, 0.08, 260 + sound.snareSnap * 190, drumMix, energyGain * 0.16 * drumStepVelocity(pattern, "perc", patternStep), "triangle", {
           filter: 0.7 + sound.hatBrightness * 0.3
         });
       }
@@ -373,8 +455,9 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
       if (!noteEventShouldPlay("bass", note, barOffset + note.step)) {
         continue;
       }
-      addTone(
+      addToneWithSend(
         buffer,
+        sendBuffer,
         (barOffset + note.step) * step,
         note.length * step * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
@@ -388,8 +471,9 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
       if (!noteEventShouldPlay("melody", note, barOffset + note.step)) {
         continue;
       }
-      addTone(
+      addToneWithSend(
         buffer,
+        sendBuffer,
         (barOffset + note.step) * step,
         note.length * step * (0.8 + sound.synthRelease * 0.42),
         noteToFrequency(note.pitch),
@@ -411,8 +495,9 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
           left: Math.max(0, Math.min(1, chordMix.left - spread * sound.chordWidth * 0.28)),
           right: Math.max(0, Math.min(1, chordMix.right + spread * sound.chordWidth * 0.28))
         };
-        addTone(
+        addToneWithSend(
           buffer,
+          sendBuffer,
           (barOffset + chord.step) * step,
           chord.length * step * (0.9 + sound.synthRelease * 0.24),
           noteToFrequency(pitch),
@@ -424,6 +509,8 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
       }
     }
   }
+
+  applySpaceReturn(buffer, sendBuffer);
 
   const ceiling = dbToGain(project.masterCeilingDb);
   let peak = 0;

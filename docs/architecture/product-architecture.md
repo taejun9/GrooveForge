@@ -36,6 +36,7 @@ Audio Engine
   808 Synth
   Poly Synth
   FX Devices
+  Space Send / FX Return
   Mixer Bus
   Master Bus
         |
@@ -66,7 +67,7 @@ Composition-first invariant: GrooveForge must remain fully usable when audio imp
 The core project model should make composition events first-class. In the core architecture, a clip is a pattern, MIDI, or automation container, not an imported audio asset:
 
 - `Project`: version, title, BPM, key/scale, swing, tracks, arrangement, master settings.
-- `Track`: type, mixer strip, devices, clips, sends.
+- `Track`: type, mixer strip, devices, clips, Space send amount.
 - `Clip`: pattern, MIDI, or automation data for the MVP.
 - `MusicalEvent`: note, drum hit, or automation event for the MVP.
 - `Device`: synth, drum rack, EQ, compressor, saturation, limiter, meter, send effect.
@@ -91,6 +92,8 @@ Initial track types:
 
 MVP tracks should be `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master`.
 
+The MVP `fx_return` is a built-in Space send/return path for shared ambience. It is deterministic project processing, not plugin hosting, imported impulse responses, sample playback, or a sampling workflow.
+
 Extension track types for optional sampling, later:
 
 - `audio`
@@ -106,4 +109,4 @@ The audio scheduler is a P0 product dependency. UI timing must not be treated as
 
 ## Export Rule
 
-WAV export must render from project data through the same musical timeline used for realtime playback. Export validation should check that the result is non-silent, has the expected duration, does not exceed the chosen limiter ceiling, and can be recreated from saved project JSON.
+WAV export must render from project data through the same musical timeline used for realtime playback, including built-in Space send processing. Export validation should check that the result is non-silent, has the expected duration, does not exceed the chosen limiter ceiling, and can be recreated from saved project JSON.
