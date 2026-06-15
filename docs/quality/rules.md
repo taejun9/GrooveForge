@@ -73,7 +73,7 @@ Groove humanize work must be deterministic, operate on selected Pattern A/B/C ve
 
 Style groove work must apply key-aware editable Pattern A/B/C event data, BPM, swing, and built-in sound preset changes without introducing imported audio or bypassing undo/redo.
 
-Chord progression work must preserve Pattern A/B/C independence, keep chord roots scale-aware by default, migrate older project files without chord events, and make chord events audible in both realtime playback and WAV export.
+Chord progression work must preserve Pattern A/B/C independence, keep chord roots and progression presets scale-aware by default, migrate older project files without chord events, keep add/delete operations undoable, preserve at least one chord event in guided editing, and make chord events audible in both realtime playback and WAV export.
 
 Sound design work must keep tone parameters in project state, migrate older project files without sound data, and make preset or Studio tone changes audible in both realtime playback and WAV export.
 

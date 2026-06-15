@@ -30,6 +30,8 @@ export type DrumVelocities = Record<DrumLane, number[]>;
 export type DrumTimings = Record<DrumLane, number[]>;
 export const drumGroovePresetIds = ["tight", "pocket", "push", "reset"] as const;
 export type DrumGroovePreset = (typeof drumGroovePresetIds)[number];
+export const chordProgressionPresetIds = ["moody", "lift", "bounce", "sparse"] as const;
+export type ChordProgressionPreset = (typeof chordProgressionPresetIds)[number];
 
 export type BassNote = {
   step: number;
@@ -148,6 +150,12 @@ export const drumGroovePresetLabels: Record<DrumGroovePreset, string> = {
   pocket: "Pocket",
   push: "Push",
   reset: "Reset"
+};
+export const chordProgressionPresetLabels: Record<ChordProgressionPreset, string> = {
+  moody: "Moody",
+  lift: "Lift",
+  bounce: "Bounce",
+  sparse: "Sparse"
 };
 export const masterPresetCeilingsDb: Record<MasterPreset, number> = {
   "Clean Demo": -0.8,
@@ -364,6 +372,32 @@ type PatternBlueprint = {
   chords: ChordBlueprint[];
 };
 
+const chordProgressionPresetBlueprints: Record<ChordProgressionPreset, ChordBlueprint[]> = {
+  moody: [
+    { step: 0, degree: 0, length: 4, velocity: 0.55 },
+    { step: 4, degree: 5, length: 4, velocity: 0.48 },
+    { step: 8, degree: 2, length: 4, velocity: 0.5 },
+    { step: 12, degree: 6, length: 4, velocity: 0.5 }
+  ],
+  lift: [
+    { step: 0, degree: 5, length: 4, velocity: 0.52 },
+    { step: 4, degree: 6, length: 4, velocity: 0.5 },
+    { step: 8, degree: 0, length: 4, velocity: 0.58 },
+    { step: 12, degree: 2, length: 4, velocity: 0.52 }
+  ],
+  bounce: [
+    { step: 0, degree: 0, length: 3, velocity: 0.56 },
+    { step: 3, degree: 2, length: 3, velocity: 0.48 },
+    { step: 6, degree: 5, length: 4, velocity: 0.52 },
+    { step: 10, degree: 6, length: 3, velocity: 0.5 },
+    { step: 13, degree: 0, length: 3, velocity: 0.54 }
+  ],
+  sparse: [
+    { step: 0, degree: 0, length: 8, velocity: 0.48 },
+    { step: 8, degree: 5, length: 8, velocity: 0.44 }
+  ]
+};
+
 const starterPatternA: PatternData = withDrumDynamics({
   drumPattern: {
     kick: [true, false, false, false, false, false, true, false, false, false, false, false, true, false, false, false],
@@ -488,6 +522,10 @@ export function masterPresetCeilingDb(preset: MasterPreset): number {
 
 export function soundPresetLabel(preset: SoundPresetId): string {
   return soundPresetLabels[preset];
+}
+
+export function chordProgressionPresetLabel(preset: ChordProgressionPreset): string {
+  return chordProgressionPresetLabels[preset];
 }
 
 export function soundPresetDesign(preset: (typeof soundPresetIds)[number]): SoundDesign {
@@ -806,6 +844,32 @@ function patternFromBlueprint(key: string, pattern: PatternBlueprint): PatternDa
   }, hatRepeatOverrides(pattern.hat));
 }
 
+export function createChordProgressionPreset(preset: ChordProgressionPreset, key: string): ChordEvent[] {
+  return chordProgressionPresetBlueprints[preset].map((chord) => chordFromBlueprint(key, chord));
+}
+
+export function createNextChordEvent(key: string, chords: ChordEvent[]): ChordEvent {
+  const sortedChords = [...chords].sort((first, second) => first.step - second.step);
+  const lastChord = sortedChords[sortedChords.length - 1];
+  const usedSteps = new Set(sortedChords.map((chord) => chord.step));
+  const quarterStep = [0, 4, 8, 12].find((step) => !usedSteps.has(step));
+  const step =
+    quarterStep ??
+    (lastChord ? Math.min(stepsPerBar - 1, lastChord.step + Math.max(1, lastChord.length)) : 0);
+  const degree = sortedChords.length % scalePitchNames(key).length;
+  return chordFromBlueprint(key, { step, degree, length: Math.min(4, stepsPerBar - step), velocity: 0.5 });
+}
+
+function chordFromBlueprint(key: string, chord: ChordBlueprint): ChordEvent {
+  return {
+    step: normalizeStep(chord.step),
+    root: rootFromDegree(key, chord.degree),
+    quality: chord.quality ?? chordQualityFromDegree(key, chord.degree),
+    length: normalizeChordLength(chord.length, chord.step),
+    velocity: normalizeChordVelocity(chord.velocity)
+  };
+}
+
 function drumPattern(kick: number[], clap: number[], hat: number[], perc: number[]): DrumPattern {
   return {
     kick: steps.map((step) => kick.includes(step)),
@@ -826,6 +890,28 @@ function hatRepeatOverrides(hatSteps: number[]): Partial<Record<number, number>>
 function pitchFromDegree(key: string, degree: number, octave: number): string {
   const names = scalePitchNames(key);
   return `${names[positiveModulo(degree, names.length)]}${octave + Math.floor(degree / names.length)}`;
+}
+
+function normalizeStep(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(stepsPerBar - 1, Math.max(0, Math.round(value)));
+}
+
+function normalizeChordLength(length: number, step: number): number {
+  if (!Number.isFinite(length)) {
+    return 1;
+  }
+  const normalizedStep = normalizeStep(step);
+  return Math.min(stepsPerBar - normalizedStep, Math.max(1, Math.round(length)));
+}
+
+function normalizeChordVelocity(velocity: number): number {
+  if (!Number.isFinite(velocity)) {
+    return 0.5;
+  }
+  return Math.min(1, Math.max(0, velocity));
 }
 
 function rootFromDegree(key: string, degree: number): string {

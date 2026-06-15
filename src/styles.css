@@ -176,6 +176,8 @@ h2 {
 .pattern-tabs button,
 .pattern-tools button,
 .block-pattern-row button,
+.chord-preset-row button,
+.chord-tools > button,
 .preset-row button,
 .mini-toggle {
   border: 1px solid rgba(244, 239, 231, 0.12);
@@ -232,6 +234,8 @@ h2 {
 .pattern-tabs button,
 .pattern-tools button,
 .block-pattern-row button,
+.chord-preset-row button,
+.chord-tools > button,
 .preset-row button {
   min-height: 34px;
 }
@@ -239,6 +243,7 @@ h2 {
 .segmented button.selected,
 .pattern-tabs button.selected,
 .block-pattern-row button.selected,
+.chord-preset-row button.selected,
 .preset-row button.selected {
   border-color: rgba(240, 195, 106, 0.64);
   color: #11100f;
@@ -793,6 +798,29 @@ input[type="range"] {
   gap: 9px;
 }
 
+.chord-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.chord-preset-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.chord-preset-row button,
+.chord-tools > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
 .chord-slots {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -818,11 +846,29 @@ input[type="range"] {
 }
 
 .chord-slot-heading strong {
+  min-width: 0;
   overflow: hidden;
   color: #f4efe7;
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chord-slot-heading button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  border: 1px solid rgba(255, 122, 79, 0.24);
+  border-radius: 6px;
+  color: #f4efe7;
+  background: rgba(255, 122, 79, 0.08);
+}
+
+.chord-slot-heading button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .chord-slot label {
@@ -831,7 +877,8 @@ input[type="range"] {
   min-width: 0;
 }
 
-.chord-slot select {
+.chord-slot select,
+.chord-slot input[type="number"] {
   min-height: 32px;
   border: 1px solid rgba(244, 239, 231, 0.13);
   border-radius: 6px;

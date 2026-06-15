@@ -11,6 +11,7 @@ import {
   KeyboardMusic,
   Music2,
   Play,
+  Plus,
   Redo2,
   Save,
   SlidersHorizontal,
@@ -28,10 +29,13 @@ import {
   ArrangementSection,
   BassNote,
   ChordEvent,
+  ChordProgressionPreset,
   ChordQuality,
   DrumGroovePreset,
   DrumLane,
   applyDrumGroovePreset,
+  chordProgressionPresetIds,
+  chordProgressionPresetLabel,
   getStyle,
   MasterPreset,
   MelodyNote,
@@ -46,6 +50,8 @@ import {
   bassPitchLanes,
   chordQualities,
   clonePatternData,
+  createChordProgressionPreset,
+  createNextChordEvent,
   createStylePatternSet,
   createEmptyPatternData,
   defaultDrumVelocity,
@@ -316,13 +322,20 @@ export function App(): ReactElement {
   }
 
   function updateCurrentPattern(update: (pattern: PatternData) => PatternData, status = "Unsaved changes"): boolean {
-    return updateProject((current) => ({
-      ...current,
-      patterns: {
-        ...current.patterns,
-        [current.selectedPattern]: update(current.patterns[current.selectedPattern])
+    return updateProject((current) => {
+      const currentPatternData = current.patterns[current.selectedPattern];
+      const nextPatternData = update(currentPatternData);
+      if (nextPatternData === currentPatternData) {
+        return current;
       }
-    }), status);
+      return {
+        ...current,
+        patterns: {
+          ...current.patterns,
+          [current.selectedPattern]: nextPatternData
+        }
+      };
+    }, status);
   }
 
   function selectPattern(pattern: PatternSlot): void {
@@ -776,17 +789,70 @@ export function App(): ReactElement {
   function updateChordEvent(index: number, update: Partial<ChordEvent>): void {
     updateCurrentPattern((pattern) => ({
       ...pattern,
-      chordEvents: pattern.chordEvents.map((event, eventIndex) =>
-        eventIndex === index
-          ? {
-              ...event,
-              ...update,
-              length: update.length === undefined ? event.length : clampStepLength(update.length),
-              velocity: update.velocity === undefined ? event.velocity : clampVelocity(update.velocity)
-            }
-          : event
+      chordEvents: sortChordEvents(
+        pattern.chordEvents.map((event, eventIndex) => {
+          if (eventIndex !== index) {
+            return event;
+          }
+          const step = update.step === undefined ? event.step : clampStepStart(update.step);
+          const length = Math.min(
+            update.length === undefined ? event.length : clampStepLength(update.length),
+            16 - step
+          );
+          return {
+            ...event,
+            ...update,
+            step,
+            length,
+            velocity: update.velocity === undefined ? event.velocity : clampVelocity(update.velocity)
+          };
+        })
       )
     }));
+  }
+
+  function applyChordProgressionPreset(preset: ChordProgressionPreset): void {
+    updateCurrentPattern(
+      (pattern) => ({
+        ...pattern,
+        chordEvents: createChordProgressionPreset(preset, projectRef.current.key)
+      }),
+      `${chordProgressionPresetLabel(preset)} chords applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+  }
+
+  function addChordEvent(): void {
+    updateCurrentPattern(
+      (pattern) => ({
+        ...pattern,
+        chordEvents: sortChordEvents([
+          ...pattern.chordEvents,
+          createNextChordEvent(projectRef.current.key, pattern.chordEvents)
+        ])
+      }),
+      `Added chord to Pattern ${projectRef.current.selectedPattern}`
+    );
+  }
+
+  function deleteChordEvent(index: number): void {
+    const currentChords = activePattern(projectRef.current).chordEvents;
+    if (currentChords.length <= 1) {
+      setProjectStatus("Chord progression needs one chord");
+      return;
+    }
+
+    updateCurrentPattern(
+      (pattern) => {
+        if (!pattern.chordEvents[index]) {
+          return pattern;
+        }
+        return {
+          ...pattern,
+          chordEvents: pattern.chordEvents.filter((_, eventIndex) => eventIndex !== index)
+        };
+      },
+      `Deleted chord ${index + 1} from Pattern ${projectRef.current.selectedPattern}`
+    );
   }
 
   function togglePlayback(): void {
@@ -1250,7 +1316,10 @@ export function App(): ReactElement {
           <ChordEditor
             chords={currentPattern.chordEvents}
             rootOptions={chordRootOptions}
+            onAdd={addChordEvent}
             onChange={updateChordEvent}
+            onDelete={deleteChordEvent}
+            onPreset={applyChordProgressionPreset}
           />
         </section>
 
@@ -2173,17 +2242,41 @@ function SoundControl({
 function ChordEditor({
   chords,
   rootOptions,
-  onChange
+  onAdd,
+  onChange,
+  onDelete,
+  onPreset
 }: {
   chords: ChordEvent[];
   rootOptions: string[];
+  onAdd: () => void;
   onChange: (index: number, update: Partial<ChordEvent>) => void;
+  onDelete: (index: number) => void;
+  onPreset: (preset: ChordProgressionPreset) => void;
 }): ReactElement {
   return (
     <div className="chord-editor">
       <div className="lane-header">
         <span>Chords</span>
         <strong>{chords.length} events</strong>
+      </div>
+      <div className="chord-tools" aria-label="Chord progression tools">
+        <div className="chord-preset-row" aria-label="Chord progression presets">
+          {chordProgressionPresetIds.map((preset) => (
+            <button
+              data-testid={`chord-preset-${preset}`}
+              key={preset}
+              onClick={() => onPreset(preset)}
+              type="button"
+            >
+              {chordProgressionPresetLabel(preset)}
+            </button>
+          ))}
+        </div>
+        <button data-testid="chord-add" onClick={onAdd} title="Add chord event" type="button">
+          <Plus size={14} aria-hidden="true" />
+          <span>Add chord</span>
+        </button>
       </div>
       <div className="chord-slots">
         {chords.map((chord, index) => (
@@ -2194,7 +2287,28 @@ function ChordEditor({
                 {chord.root}
                 {chord.quality}
               </strong>
+              <button
+                data-testid={`chord-delete-${index}`}
+                disabled={chords.length <= 1}
+                onClick={() => onDelete(index)}
+                title="Delete chord event"
+                type="button"
+              >
+                <Trash2 size={13} aria-hidden="true" />
+              </button>
             </div>
+            <label>
+              <span>Step</span>
+              <input
+                data-testid={`chord-step-${index}`}
+                max={16}
+                min={1}
+                onChange={(event) => onChange(index, { step: clampStepStart(Number(event.target.value) - 1) })}
+                step={1}
+                type="number"
+                value={chord.step + 1}
+              />
+            </label>
             <label>
               <span>Root</span>
               <select
@@ -2396,6 +2510,17 @@ function sortBassNotes(notes: BassNote[]): BassNote[] {
 
 function sortMelodyNotes(notes: MelodyNote[]): MelodyNote[] {
   return [...notes].sort((first, second) => first.step - second.step || first.pitch.localeCompare(second.pitch));
+}
+
+function sortChordEvents(events: ChordEvent[]): ChordEvent[] {
+  return [...events].sort((first, second) => first.step - second.step || first.root.localeCompare(second.root));
+}
+
+function clampStepStart(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(15, Math.max(0, Math.round(value)));
 }
 
 function appendHistory(history: ProjectState[], project: ProjectState): ProjectState[] {

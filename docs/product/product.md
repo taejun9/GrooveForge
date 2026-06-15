@@ -115,7 +115,7 @@ MVP capabilities:
 - Style selector that applies key-aware editable groove templates for Pattern A/B/C, BPM, swing, and sound preset.
 - 16-step drum sequencer with built-in drum kit, drum-synth sources, editable drum velocity, microtiming, one-click groove humanization, and hat repeat dynamics.
 - Synth 808/bass track with editable scale-aware grid, mono mode, glide, saturation direction, and kick-to-808 sidechain ducking.
-- Chord progression track with scale-locked roots, editable quality, length, and velocity.
+- Chord progression track with scale-locked roots, key-aware progression presets, editable step/root/quality/length/velocity, and add/delete controls.
 - Simple synth melody track with editable scale-aware grid and velocity control.
 - Sound design presets and Studio tone controls for kick punch, snare snap, hat brightness, 808 drive/decay, sidechain ducking, synth brightness/release, and chord warmth/width.
 - Independent Pattern A/B/C storage with copy/clear tools for drum, bass, chord, and melody variations.
@@ -137,7 +137,7 @@ Phase 1 builds the drum sequencer: 16/32-step grid, kick/snare/clap/hat lanes, v
 
 Phase 2 builds 808/bass: monophonic synth, piano-roll style editor, glide, pitch envelope, saturation, and sidechain ducking prototype.
 
-Phase 3 adds melody/chords: simple poly synth, scale lock, chord pad, melody grid, and preset patches.
+Phase 3 adds melody/chords: simple poly synth, scale lock, chord progression presets, chord add/delete tools, melody grid, and preset patches.
 
 Phase 4 adds arrangement and editing speed: pattern blocks, song section markers, duplicate/move/delete first, desktop editing shortcuts, then split/mute/reorder refinements, and variation A/B/C.
 
