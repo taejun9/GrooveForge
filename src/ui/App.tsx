@@ -1023,7 +1023,12 @@ export function App(): ReactElement {
           <PanelTitle icon={<Sparkles size={18} />} title="Instruments" meta={project.mode === "guided" ? "curated" : "editable"} />
           <div className="device-list">
             <Device icon={<Drum size={17} />} name="Drum Rack" value={`${soundPresetLabel(project.sound.preset)} kit`} color="#78f0c8" />
-            <Device icon={<Waves size={17} />} name="808 Engine" value={`${style.bassStyle} / drive ${percentLabel(project.sound.bassDrive)}`} color="#ff7a4f" />
+            <Device
+              icon={<Waves size={17} />}
+              name="808 Engine"
+              value={`drive ${percentLabel(project.sound.bassDrive)} / duck ${percentLabel(project.sound.sidechainDuck)}`}
+              color="#ff7a4f"
+            />
             <Device icon={<Music2 size={17} />} name="Synth" value={`${style.melodyStyle} / bright ${percentLabel(project.sound.synthBrightness)}`} color="#8aa8ff" />
             <Device icon={<SlidersHorizontal size={17} />} name="Chord Tone" value={`warm ${percentLabel(project.sound.chordWarmth)}`} color="#d58cff" />
           </div>
@@ -1588,6 +1593,7 @@ function SoundDesigner({
       <div className="sound-readout" aria-label="Sound design state">
         <span data-testid="sound-kick-readout">Kick {percentLabel(sound.kickPunch)}</span>
         <span data-testid="sound-bass-readout">808 {percentLabel(sound.bassDrive)}</span>
+        <span data-testid="sound-duck-readout">Duck {percentLabel(sound.sidechainDuck)}</span>
         <span data-testid="sound-synth-readout">Synth {percentLabel(sound.synthBrightness)}</span>
         <span data-testid="sound-chord-readout">Chord {percentLabel(sound.chordWarmth)}</span>
       </div>
@@ -1622,6 +1628,12 @@ function SoundDesigner({
             label="808 decay"
             value={sound.bassDecay}
             onChange={(value) => onChange({ bassDecay: value })}
+          />
+          <SoundControl
+            id="sidechain-duck"
+            label="Kick duck"
+            value={sound.sidechainDuck}
+            onChange={(value) => onChange({ sidechainDuck: value })}
           />
           <SoundControl
             id="synth-brightness"
@@ -1664,6 +1676,30 @@ function SoundControl({
   value: number;
   onChange: (value: number) => void;
 }): ReactElement {
+  const percentValue = `${Math.round(value * 100)}`;
+  const [percentText, setPercentText] = useState(percentValue);
+  const [isEditingPercent, setIsEditingPercent] = useState(false);
+  const skipNextBlurCommit = useRef(false);
+
+  useEffect(() => {
+    if (!isEditingPercent) {
+      setPercentText(percentValue);
+    }
+  }, [isEditingPercent, percentValue]);
+
+  function commitPercentInput(inputText: string): void {
+    const nextText = inputText.trim();
+    const parsed = nextText === "" ? Math.round(value * 100) : Number(nextText);
+    const nextPercent = Number.isFinite(parsed) ? Math.min(100, Math.max(0, Math.round(parsed))) : Math.round(value * 100);
+    const nextValue = nextPercent / 100;
+
+    setIsEditingPercent(false);
+    setPercentText(`${nextPercent}`);
+    if (nextValue !== value) {
+      onChange(nextValue);
+    }
+  }
+
   return (
     <label className="sound-control">
       <span>
@@ -1675,7 +1711,12 @@ function SoundControl({
           data-testid={`sound-${id}`}
           max={1}
           min={0}
-          onChange={(event) => onChange(Number(event.target.value))}
+          onChange={(event) => {
+            const nextValue = Number(event.target.value);
+            setIsEditingPercent(false);
+            setPercentText(`${Math.round(nextValue * 100)}`);
+            onChange(nextValue);
+          }}
           step={0.01}
           type="range"
           value={value}
@@ -1685,10 +1726,37 @@ function SoundControl({
           data-testid={`sound-${id}-input`}
           max={100}
           min={0}
-          onChange={(event) => onChange(Number(event.target.value) / 100)}
+          onBlur={(event) => {
+            if (skipNextBlurCommit.current) {
+              skipNextBlurCommit.current = false;
+              return;
+            }
+            commitPercentInput(event.currentTarget.value);
+          }}
+          onChange={(event) => {
+            setIsEditingPercent(true);
+            setPercentText(event.target.value);
+          }}
+          onFocus={() => {
+            setIsEditingPercent(true);
+            setPercentText(percentValue);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              skipNextBlurCommit.current = true;
+              commitPercentInput(event.currentTarget.value);
+              event.currentTarget.blur();
+            }
+            if (event.key === "Escape") {
+              skipNextBlurCommit.current = true;
+              setIsEditingPercent(false);
+              setPercentText(percentValue);
+              event.currentTarget.blur();
+            }
+          }}
           step={1}
           type="number"
-          value={Math.round(value * 100)}
+          value={isEditingPercent ? percentText : percentValue}
         />
       </div>
     </label>

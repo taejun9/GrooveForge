@@ -8,6 +8,7 @@ import {
   noteToFrequency,
   projectStepDurationSeconds,
   ProjectState,
+  sidechainGainForStep,
   SoundDesign
 } from "../domain/workstation";
 
@@ -261,7 +262,7 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
         time,
         note.length * stepDuration * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
-        (0.42 + sound.bassDrive * 0.22) * bassMix.gain,
+        (0.42 + sound.bassDrive * 0.22) * bassMix.gain * sidechainGainForStep(pattern, patternStep, sound.sidechainDuck),
         bassOscillator(sound),
         bassMix.pan,
         { drive: sound.bassDrive, filterHz: 260 + sound.bassDrive * 1500, release: sound.bassDecay }

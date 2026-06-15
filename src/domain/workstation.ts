@@ -95,6 +95,7 @@ export type SoundDesign = {
   hatBrightness: number;
   bassDrive: number;
   bassDecay: number;
+  sidechainDuck: number;
   synthBrightness: number;
   synthRelease: number;
   chordWarmth: number;
@@ -152,6 +153,7 @@ export const soundPresetDefaults: Record<(typeof soundPresetIds)[number], SoundD
     hatBrightness: 0.62,
     bassDrive: 0.34,
     bassDecay: 0.54,
+    sidechainDuck: 0.42,
     synthBrightness: 0.56,
     synthRelease: 0.45,
     chordWarmth: 0.58,
@@ -164,6 +166,7 @@ export const soundPresetDefaults: Record<(typeof soundPresetIds)[number], SoundD
     hatBrightness: 0.72,
     bassDrive: 0.66,
     bassDecay: 0.62,
+    sidechainDuck: 0.68,
     synthBrightness: 0.6,
     synthRelease: 0.34,
     chordWarmth: 0.42,
@@ -176,6 +179,7 @@ export const soundPresetDefaults: Record<(typeof soundPresetIds)[number], SoundD
     hatBrightness: 0.38,
     bassDrive: 0.52,
     bassDecay: 0.72,
+    sidechainDuck: 0.28,
     synthBrightness: 0.34,
     synthRelease: 0.68,
     chordWarmth: 0.78,
@@ -188,6 +192,7 @@ export const soundPresetDefaults: Record<(typeof soundPresetIds)[number], SoundD
     hatBrightness: 0.82,
     bassDrive: 0.28,
     bassDecay: 0.48,
+    sidechainDuck: 0.36,
     synthBrightness: 0.76,
     synthRelease: 0.74,
     chordWarmth: 0.34,
@@ -516,6 +521,24 @@ export function drumStepVelocity(pattern: PatternData, lane: DrumLane, step: num
 
 export function hatRepeatCount(pattern: PatternData, step: number): number {
   return pattern.drumPattern.hat[step] ? normalizeHatRepeat(pattern.hatRepeats[step] ?? 1) : 1;
+}
+
+export function sidechainGainForStep(pattern: PatternData, step: number, amount: number): number {
+  const depth = clampUnit(amount);
+  if (depth <= 0) {
+    return 1;
+  }
+
+  const releaseShape = [1, 0.58, 0.26, 0.08];
+  const strongestKick = releaseShape.reduce((strongest, shape, offset) => {
+    const kickStep = positiveModulo(step - offset, stepsPerBar);
+    if (!pattern.drumPattern.kick[kickStep]) {
+      return strongest;
+    }
+    return Math.max(strongest, shape * drumStepVelocity(pattern, "kick", kickStep));
+  }, 0);
+
+  return Math.max(0.28, 1 - depth * 0.72 * strongestKick);
 }
 
 function defaultDrumVelocities(drumPattern: DrumPattern): DrumVelocities {
@@ -919,6 +942,7 @@ function normalizeSoundDesign(sound: SoundDesignInput | undefined): SoundDesign 
     hatBrightness: clampUnit(sound.hatBrightness),
     bassDrive: clampUnit(sound.bassDrive),
     bassDecay: clampUnit(sound.bassDecay),
+    sidechainDuck: clampUnit(sound.sidechainDuck),
     synthBrightness: clampUnit(sound.synthBrightness),
     synthRelease: clampUnit(sound.synthRelease),
     chordWarmth: clampUnit(sound.chordWarmth),
@@ -1039,6 +1063,7 @@ function isSoundDesignInput(value: unknown): value is SoundDesignInput {
     isOptionalUnit(value.hatBrightness) &&
     isOptionalUnit(value.bassDrive) &&
     isOptionalUnit(value.bassDecay) &&
+    isOptionalUnit(value.sidechainDuck) &&
     isOptionalUnit(value.synthBrightness) &&
     isOptionalUnit(value.synthRelease) &&
     isOptionalUnit(value.chordWarmth) &&

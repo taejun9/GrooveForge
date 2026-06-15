@@ -73,6 +73,8 @@ Chord progression work must preserve Pattern A/B/C independence, keep chord root
 
 Sound design work must keep tone parameters in project state, migrate older project files without sound data, and make preset or Studio tone changes audible in both realtime playback and WAV export.
 
+Sidechain work must keep kick-to-808 ducking as editable local sound-design state, migrate older project files without sidechain data, and apply the same deterministic gain rule to realtime playback, full-mix WAV export, and 808 stem export.
+
 Project file work must reject invalid imports without overwriting the current project and must preserve edited drum, bass, chord, melody, sound design, mixer, master, key, BPM, style, and arrangement data on save/load.
 
 Pattern work must keep Pattern A/B/C as independent editable event data. Copy and clear tools must operate on the selected pattern slot without deleting the slot itself. Realtime playback should preview the selected pattern, while WAV export should follow arrangement pattern assignments.
