@@ -70,7 +70,7 @@ Primary feature areas:
 - Beat blueprints: sample-free editable project starts that combine style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset.
 - Delivery Targets: local starter sketch, vocal session, beat-store demo, club demo, and editable custom targets that can be set without changing the beat or explicitly aligned to arrangement length, master preset, and mix posture.
 - Session Brief: bounded local artist, vibe, reference, and notes fields stored in the project file for beat intent and handoff context.
-- Pattern editor: drum step sequencer, bass grid with 808 Bassline Pads and 808 Glide Pads for one-click length/glide/chance shaping, chord progression with key-aware Chord Pads, melody grid with Melody Motif Pads, Pattern Stack Pads for one-click 808/chord/Synth sketches, Groove Feel Pads for editable timing/chance feel, Drum Accent Pads for editable velocity shape, Desktop Keyboard Capture for scale-locked 808/Synth note entry, Pattern Compare cue/use cards, variation A/B/C, and one-click Pattern Fill tail moves.
+- Pattern editor: drum step sequencer, bass grid with 808 Bassline Pads and 808 Glide Pads for one-click length/glide/chance shaping, chord progression with key-aware Chord Pads, melody grid with Melody Motif Pads and Melody Accent Pads for one-click Synth velocity/chance shaping, Pattern Stack Pads for one-click 808/chord/Synth sketches, Groove Feel Pads for editable timing/chance feel, Drum Accent Pads for editable velocity shape, Desktop Keyboard Capture for scale-locked 808/Synth note entry, Pattern Compare cue/use cards, variation A/B/C, and one-click Pattern Fill tail moves.
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with Arrangement Focus presets, Pattern Chain 8-bar sketches, per-step A/B/C chain cycling, Chain Expand song-form outlining, one-click Drop/Build/Hook Lift moves, per-block bar lengths, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
 - Project readiness: read-only checks for drums, 808/bass, melody/chords, arrangement, and export completeness.
@@ -139,7 +139,7 @@ MVP capabilities:
 - 16-step drum sequencer with built-in drum kit, drum-synth sources, editable drum velocity, Drum Accent Pads, probability, visible chance badges, microtiming, one-click groove humanization, and hat repeat dynamics.
 - Synth 808/bass track with editable scale-aware grid, 808 Bassline Pads, 808 Glide Pads, Desktop Keyboard Capture, mono mode, glide, note chance badges, selected-note move/transpose/duplicate tools, saturation direction, and kick-to-808 sidechain ducking.
 - Chord progression track with scale-locked roots, key-aware Chord Pads, key-aware progression presets, editable step/root/quality/inversion/length/velocity/chance, visible chance badges, add/delete controls, and selected-chord move/duplicate/inversion tools.
-- Simple synth melody track with editable scale-aware grid, Melody Motif Pads, Desktop Keyboard Capture, velocity control, note chance badges, and selected-note move/transpose/duplicate tools.
+- Simple synth melody track with editable scale-aware grid, Melody Motif Pads, Melody Accent Pads, Desktop Keyboard Capture, velocity control, note chance badges, and selected-note move/transpose/duplicate tools.
 - Sound design presets and Studio tone controls for kick punch, snare snap, hat brightness, 808 drive/decay, sidechain ducking, synth brightness/release, and chord warmth/width.
 - Independent Pattern A/B/C storage with Pattern Compare cue/use cards for density and arrangement-use decisions, Pattern Stack Pads for one-click 808/chord/Synth sketches, Groove Feel Pads for editable timing/chance feel, Drum Accent Pads for editable velocity shape, deterministic Subtle/Hook/Break variation tools, one-click Drum Fill/808 Pickup/Melody Turn/Clear Tail moves, plus copy/clear tools for drum, bass, chord, and melody variations.
 - Read-only Beat Readiness checks for drums, 808/bass, melody/chords, arrangement structure, and export signal status.
@@ -172,7 +172,7 @@ Phase 1 builds the drum sequencer: 16/32-step grid, kick/snare/clap/hat lanes, v
 
 Phase 2 builds 808/bass: monophonic synth, piano-roll style editor, 808 Bassline Pads, 808 Glide Pads, glide, pitch envelope, saturation, and sidechain ducking prototype.
 
-Phase 3 adds melody/chords: simple poly synth, scale lock, Melody Motif Pads, Keyboard Capture for 808/Synth note entry, key-aware Chord Pads, chord progression presets, chord add/delete tools, selected-chord move/duplicate/inversion tools, melody grid, and preset patches.
+Phase 3 adds melody/chords: simple poly synth, scale lock, Melody Motif Pads, Melody Accent Pads, Keyboard Capture for 808/Synth note entry, key-aware Chord Pads, chord progression presets, chord add/delete tools, selected-chord move/duplicate/inversion tools, melody grid, and preset patches.
 
 Phase 4 adds arrangement and editing speed: pattern blocks, song section markers, per-block bar lengths, arrangement templates, duplicate/move/delete, split/merge controls, desktop editing shortcuts, then deeper mute/reorder refinements, and variation A/B/C.
 

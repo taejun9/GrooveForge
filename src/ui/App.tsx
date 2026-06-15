@@ -391,6 +391,19 @@ type MelodyMotifOption = MelodyMotifDefinition & {
   eventCount: number;
 };
 
+type MelodyAccentId = "soft" | "lead" | "pulse" | "fade";
+
+type MelodyAccentDefinition = {
+  id: MelodyAccentId;
+  label: string;
+  detail: string;
+};
+
+type MelodyAccentOption = MelodyAccentDefinition & {
+  preview: string;
+  chanceCount: number;
+};
+
 type ChordPadId = "home" | "lift" | "tension" | "color";
 
 type ChordPadDefinition = {
@@ -666,6 +679,13 @@ const melodyMotifDefinitions: MelodyMotifDefinition[] = [
   }
 ];
 
+const melodyAccentDefinitions: MelodyAccentDefinition[] = [
+  { id: "soft", label: "Soft", detail: "lighter" },
+  { id: "lead", label: "Lead", detail: "front" },
+  { id: "pulse", label: "Pulse", detail: "bounce" },
+  { id: "fade", label: "Fade", detail: "tail" }
+];
+
 const patternStackDefinitions: PatternStackDefinition[] = [
   { id: "pocket", label: "Pocket", detail: "verse", bassline: "bounce", chordPreset: "sparse", motif: "pocket" },
   { id: "hook", label: "Hook", detail: "main", bassline: "slide", chordPreset: "moody", motif: "hook" },
@@ -783,6 +803,7 @@ export function App(): ReactElement {
   const basslinePadOptions = useMemo(() => createBasslinePadOptions(project.key), [project.key]);
   const bassGlidePadOptions = useMemo(() => createBassGlidePadOptions(currentPattern.bassNotes), [currentPattern.bassNotes]);
   const melodyMotifOptions = useMemo(() => createMelodyMotifOptions(project.key), [project.key]);
+  const melodyAccentOptions = useMemo(() => createMelodyAccentOptions(currentPattern.melodyNotes), [currentPattern.melodyNotes]);
   const patternStackOptions = useMemo(() => createPatternStackOptions(project.key), [project.key]);
   const grooveFeelOptions = useMemo(() => createGrooveFeelOptions(), []);
   const drumAccentOptions = useMemo(() => createDrumAccentOptions(), []);
@@ -2021,6 +2042,35 @@ export function App(): ReactElement {
     setSelectedChordIndex(null);
   }
 
+  function applyMelodyAccent(accentId: MelodyAccentId): void {
+    const accent = melodyAccentDefinitions.find((candidate) => candidate.id === accentId);
+    if (!accent) {
+      setProjectStatus("Melody accent pad not found");
+      return;
+    }
+
+    const currentMelodyNotes = projectRef.current.patterns[projectRef.current.selectedPattern].melodyNotes;
+    if (currentMelodyNotes.length === 0) {
+      setProjectStatus(`Add a Synth note before using ${accent.label} accent`);
+      return;
+    }
+
+    const melodyNotes = applyMelodyAccentToNotes(currentMelodyNotes, accent.id);
+    const changed = updateCurrentPattern(
+      (pattern) => (sameMelodyNotes(pattern.melodyNotes, melodyNotes) ? pattern : { ...pattern, melodyNotes }),
+      `${accent.label} melody accent applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (!changed) {
+      setProjectStatus(`${accent.label} melody accent already selected`);
+      return;
+    }
+
+    const firstNote = melodyNotes[0];
+    setSelectedNote(firstNote ? { track: "melody", step: firstNote.step, pitch: firstNote.pitch } : null);
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
+  }
+
   function updateSelectedLength(length: number): void {
     if (!selectedNote) {
       return;
@@ -3248,6 +3298,7 @@ export function App(): ReactElement {
           <BasslinePads pads={basslinePadOptions} onApply={applyBasslinePad} />
           <BassGlidePads pads={bassGlidePadOptions} onApply={applyBassGlidePad} />
           <MelodyMotifPads motifs={melodyMotifOptions} onApply={applyMelodyMotif} />
+          <MelodyAccentPads accents={melodyAccentOptions} onApply={applyMelodyAccent} />
           <div className="note-lanes">
             <NoteEditor
               title="808"
@@ -6579,6 +6630,38 @@ function MelodyMotifPads({
   );
 }
 
+function MelodyAccentPads({
+  accents,
+  onApply
+}: {
+  accents: MelodyAccentOption[];
+  onApply: (accent: MelodyAccentId) => void;
+}): ReactElement {
+  return (
+    <div className="melody-accent-panel" data-testid="melody-accent-pads">
+      <div className="melody-accent-heading">
+        <span>Melody Accents</span>
+        <strong>Velocity + Chance</strong>
+      </div>
+      <div className="melody-accent-row" aria-label="Melody Accent Pads">
+        {accents.map((accent) => (
+          <button
+            data-testid={`melody-accent-${accent.id}`}
+            key={accent.id}
+            onClick={() => onApply(accent.id)}
+            title={`${accent.label} ${accent.preview}`}
+            type="button"
+          >
+            <span>{accent.label}</span>
+            <strong>{accent.preview}</strong>
+            <small>{accent.chanceCount} chance edit / {accent.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function KeyboardCapturePanel({
   enabled,
   target,
@@ -7809,6 +7892,59 @@ function createMelodyMotifNotes(key: string, motif: MelodyMotifDefinition): Melo
       };
     })
   );
+}
+
+function createMelodyAccentOptions(notes: MelodyNote[]): MelodyAccentOption[] {
+  return melodyAccentDefinitions.map((accent) => {
+    const transformed = applyMelodyAccentToNotes(notes, accent.id);
+    const averageVelocity =
+      transformed.length === 0
+        ? 0
+        : transformed.reduce((total, note) => total + note.velocity, 0) / transformed.length;
+    return {
+      ...accent,
+      preview: transformed.length === 0 ? "add synth" : `${Math.round(averageVelocity * 100)}% vel`,
+      chanceCount: transformed.filter((note) => normalizeEventProbability(note.probability) < 1).length
+    };
+  });
+}
+
+function applyMelodyAccentToNotes(notes: MelodyNote[], accentId: MelodyAccentId): MelodyNote[] {
+  const noteCount = notes.length;
+  return sortMelodyNotes(
+    notes.map((note, index) => ({
+      ...note,
+      velocity: melodyAccentVelocity(index, noteCount, accentId),
+      probability: melodyAccentProbability(index, noteCount, accentId)
+    }))
+  );
+}
+
+function melodyAccentVelocity(index: number, noteCount: number, accentId: MelodyAccentId): number {
+  if (accentId === "soft") {
+    return clampVelocity(index % 2 === 0 ? 0.58 : 0.54);
+  }
+  if (accentId === "lead") {
+    return clampVelocity(index % 4 === 0 ? 0.86 : index % 2 === 0 ? 0.76 : 0.68);
+  }
+  if (accentId === "pulse") {
+    return clampVelocity(index % 2 === 0 ? 0.82 : 0.54);
+  }
+  if (noteCount <= 1) {
+    return clampVelocity(0.72);
+  }
+  const progress = index / Math.max(1, noteCount - 1);
+  return clampVelocity(0.84 - progress * 0.28);
+}
+
+function melodyAccentProbability(index: number, noteCount: number, accentId: MelodyAccentId): number {
+  if (accentId === "pulse") {
+    return normalizeEventProbability(index % 2 === 0 ? 1 : 0.94);
+  }
+  if (accentId === "fade") {
+    return normalizeEventProbability(index >= Math.max(0, noteCount - 2) ? 0.96 : 1);
+  }
+  return normalizeEventProbability(1);
 }
 
 function sameMelodyNotes(first: MelodyNote[], second: MelodyNote[]): boolean {
