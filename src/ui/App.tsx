@@ -16,6 +16,7 @@ import {
   Plus,
   Redo2,
   Save,
+  Scissors,
   SlidersHorizontal,
   Sparkles,
   Trash2,
@@ -152,6 +153,7 @@ export function App(): ReactElement {
   const [selectedNote, setSelectedNote] = useState<SelectedNote | null>(null);
   const [selectedDrumStep, setSelectedDrumStep] = useState<SelectedDrumStep | null>(null);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
+  const [splitAfterBars, setSplitAfterBars] = useState(1);
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const projectRef = useRef<ProjectState>(starterProject);
   const controllerRef = useRef<PlaybackController | null>(null);
@@ -180,6 +182,8 @@ export function App(): ReactElement {
       ? `${barCountLabel(arrangementTotalBars(project))} arrangement`
       : `Pattern ${project.selectedPattern} preview`;
   const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
+  const selectedArrangementBars = selectedArrangementBlock ? normalizeArrangementBars(selectedArrangementBlock.bars) : 1;
+  const canSplitArrangementBlock = selectedArrangementBars > 1;
   const bassPitches = useMemo(
     () => mergePitchLanes(bassPitchLanes(project.key), currentPattern.bassNotes.map((note) => note.pitch)),
     [currentPattern.bassNotes, project.key]
@@ -230,6 +234,10 @@ export function App(): ReactElement {
   useEffect(() => {
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, project.arrangement.length - 1)));
   }, [project.arrangement.length]);
+
+  useEffect(() => {
+    setSplitAfterBars((value) => clampSplitAfterBars(value, selectedArrangementBars));
+  }, [selectedArrangementBars, selectedArrangementIndex]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleDesktopShortcut);
@@ -652,6 +660,52 @@ export function App(): ReactElement {
     if (changed) {
       setSelectedNote(null);
       setSelectedDrumStep(null);
+    }
+  }
+
+  function splitArrangementBlock(): void {
+    const changed = updateProject((current) => {
+      const block = current.arrangement[selectedArrangementIndex];
+      if (!block) {
+        return current;
+      }
+      const blockBars = normalizeArrangementBars(block.bars);
+      if (blockBars <= 1) {
+        return current;
+      }
+      const firstBars = clampSplitAfterBars(splitAfterBars, blockBars);
+      const secondBars = blockBars - firstBars;
+      if (secondBars < 1) {
+        return current;
+      }
+      const firstBlock: ArrangementBlock = {
+        ...block,
+        bars: firstBars,
+        mutedTracks: [...block.mutedTracks]
+      };
+      const secondBlock: ArrangementBlock = {
+        ...block,
+        bars: secondBars,
+        mutedTracks: [...block.mutedTracks]
+      };
+      const nextIndex = selectedArrangementIndex + 1;
+      setSelectedArrangementIndex(nextIndex);
+      setSplitAfterBars(clampSplitAfterBars(1, secondBars));
+      return {
+        ...current,
+        selectedPattern: secondBlock.pattern,
+        arrangement: [
+          ...current.arrangement.slice(0, selectedArrangementIndex),
+          firstBlock,
+          secondBlock,
+          ...current.arrangement.slice(selectedArrangementIndex + 1)
+        ]
+      };
+    }, "Split arrangement block");
+    setSelectedNote(null);
+    setSelectedDrumStep(null);
+    if (!changed) {
+      setProjectStatus("Block needs 2+ bars to split");
     }
   }
 
@@ -1827,6 +1881,20 @@ export function App(): ReactElement {
                 />
               </label>
               <label>
+                <span>Split after</span>
+                <input
+                  aria-label="Split arrangement block after bars"
+                  data-testid="arrangement-split-after"
+                  disabled={!canSplitArrangementBlock}
+                  type="number"
+                  min={1}
+                  max={Math.max(1, selectedArrangementBars - 1)}
+                  step={1}
+                  value={clampSplitAfterBars(splitAfterBars, selectedArrangementBars)}
+                  onChange={(event) => setSplitAfterBars(clampSplitAfterBars(Number(event.target.value), selectedArrangementBars))}
+                />
+              </label>
+              <label>
                 <span>
                   Energy {Math.round(selectedArrangementBlock.energy * 100)}% / {arrangementEnergyGain(selectedArrangementBlock.energy).toFixed(2)}x
                 </span>
@@ -1885,6 +1953,16 @@ export function App(): ReactElement {
                 >
                   <Copy size={15} aria-hidden="true" />
                   <span>Duplicate</span>
+                </button>
+                <button
+                  data-testid="arrangement-split"
+                  disabled={!canSplitArrangementBlock}
+                  onClick={splitArrangementBlock}
+                  title="Split selected block"
+                  type="button"
+                >
+                  <Scissors size={15} aria-hidden="true" />
+                  <span>Split</span>
                 </button>
                 <button
                   data-testid="arrangement-delete"
@@ -3198,6 +3276,15 @@ function meterPercent(valueDb: number, ceilingDb: number): number {
   const floorDb = -48;
   const clamped = Math.min(ceilingDb, Math.max(floorDb, valueDb));
   return Math.round(((clamped - floorDb) / (ceilingDb - floorDb)) * 100);
+}
+
+function clampSplitAfterBars(value: number, blockBars: number): number {
+  const bars = normalizeArrangementBars(blockBars);
+  const maxSplit = Math.max(1, bars - 1);
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+  return Math.min(maxSplit, Math.max(1, Math.round(value)));
 }
 
 function clampUnit(value: unknown): number {

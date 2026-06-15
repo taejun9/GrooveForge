@@ -105,6 +105,8 @@ Arrangement track mute work must migrate older arrangement blocks to no muted tr
 
 Arrangement structure work must preserve at least one block, keep selection/pattern alignment after duplicate, move, and delete actions, and make WAV export follow the current arrangement length.
 
+Arrangement split work must split only the selected arrangement block, preserve total arrangement bars, duplicate the selected block's section, Pattern A/B/C assignment, energy, and muted tracks into the resulting blocks, select the new second block, keep the action undoable, avoid mutating Pattern A/B/C event data, and make realtime playback, WAV/stem export, and MIDI export follow the split structure.
+
 Arrangement template work must replace only arrangement blocks, keep existing Pattern A/B/C musical data and mixer/master state intact, reset selection safely to a valid block, align the selected pattern with the first template block, remain undoable, and make WAV/stem export follow the applied template length.
 
 Arrangement length work must keep per-block bar counts bounded, migrate older project files without bar counts to one bar per block, keep changes undoable, and make export meter, full-mix WAV export, and stem export follow total arrangement bars.
