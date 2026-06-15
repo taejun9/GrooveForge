@@ -134,7 +134,7 @@ export type SoundDesign = {
   chordWidth: number;
 };
 
-export type ProjectState = {
+export type ProjectCoreState = {
   title: string;
   mode: SkillMode;
   bpm: number;
@@ -149,6 +149,17 @@ export type ProjectState = {
   arrangement: ArrangementBlock[];
   masterCeilingDb: number;
   masterPreset: MasterPreset;
+};
+
+export type ProjectSnapshot = {
+  id: string;
+  name: string;
+  createdAt: string;
+  project: ProjectCoreState;
+};
+
+export type ProjectState = ProjectCoreState & {
+  snapshots: ProjectSnapshot[];
 };
 
 export const beatBlueprintIds = ["dark_808", "rnb_pocket", "club_bounce", "warm_loop"] as const;
@@ -181,6 +192,7 @@ export const maxArrangementBars = 16;
 export const minDrumTimingMs = -35;
 export const maxDrumTimingMs = 35;
 export const projectFileVersion = 1;
+export const maxProjectSnapshots = 6;
 export const drumLanes: DrumLane[] = ["kick", "clap", "hat", "perc"];
 export const patternSlots: PatternSlot[] = ["A", "B", "C"];
 export const arrangementSections: ArrangementSection[] = ["Intro", "Verse", "Hook", "Bridge", "Outro"];
@@ -693,7 +705,8 @@ export const starterProject: ProjectState = {
   ],
   arrangement: createArrangementTemplate("full"),
   masterCeilingDb: masterPresetCeilingsDb["Headroom for Vocal"],
-  masterPreset: "Headroom for Vocal"
+  masterPreset: "Headroom for Vocal",
+  snapshots: []
 };
 
 export function beatBlueprintLabel(id: BeatBlueprintId): string {
@@ -1605,6 +1618,102 @@ export function createEmptyPatternData(): PatternData {
   });
 }
 
+export function nextProjectSnapshotName(project: ProjectState): string {
+  const existingNames = new Set(project.snapshots.map((snapshot) => snapshot.name));
+  let index = project.snapshots.length + 1;
+  while (existingNames.has(`Idea ${index}`)) {
+    index += 1;
+  }
+  return `Idea ${index}`;
+}
+
+export function createProjectSnapshot(project: ProjectState, createdAt = new Date().toISOString()): ProjectSnapshot {
+  return {
+    id: projectSnapshotId(project, createdAt),
+    name: nextProjectSnapshotName(project),
+    createdAt,
+    project: cloneProjectCore(project)
+  };
+}
+
+export function saveProjectSnapshot(project: ProjectState, createdAt = new Date().toISOString()): ProjectState {
+  const snapshot = createProjectSnapshot(project, createdAt);
+  return {
+    ...project,
+    snapshots: [snapshot, ...cloneProjectSnapshots(project.snapshots)].slice(0, maxProjectSnapshots)
+  };
+}
+
+export function restoreProjectSnapshot(project: ProjectState, snapshotId: string): ProjectState {
+  const snapshot = project.snapshots.find((candidate) => candidate.id === snapshotId);
+  if (!snapshot) {
+    return project;
+  }
+  return {
+    ...cloneProjectCore(snapshot.project),
+    snapshots: cloneProjectSnapshots(project.snapshots)
+  };
+}
+
+export function deleteProjectSnapshot(project: ProjectState, snapshotId: string): ProjectState {
+  const snapshots = project.snapshots.filter((snapshot) => snapshot.id !== snapshotId);
+  if (snapshots.length === project.snapshots.length) {
+    return project;
+  }
+  return {
+    ...project,
+    snapshots: cloneProjectSnapshots(snapshots)
+  };
+}
+
+export function projectSnapshotSummary(snapshot: ProjectSnapshot): string {
+  const bars = snapshot.project.arrangement.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  return `${snapshot.project.key} / ${snapshot.project.bpm} BPM / ${bars} bars`;
+}
+
+function projectSnapshotId(project: ProjectState, createdAt: string): string {
+  const base = `snapshot-${createdAt.replace(/[^0-9]/g, "").slice(0, 17) || "local"}`;
+  const existingIds = new Set(project.snapshots.map((snapshot) => snapshot.id));
+  let suffix = 1;
+  while (existingIds.has(`${base}-${suffix}`)) {
+    suffix += 1;
+  }
+  return `${base}-${suffix}`;
+}
+
+function cloneProjectSnapshots(snapshots: ProjectSnapshot[]): ProjectSnapshot[] {
+  return snapshots.map((snapshot) => ({
+    ...snapshot,
+    project: cloneProjectCore(snapshot.project)
+  }));
+}
+
+function cloneProjectCore(project: ProjectCoreState): ProjectCoreState {
+  return {
+    title: project.title,
+    mode: project.mode,
+    bpm: project.bpm,
+    key: project.key,
+    styleId: project.styleId,
+    selectedPattern: project.selectedPattern,
+    swing: project.swing,
+    metronomeEnabled: project.metronomeEnabled,
+    sound: { ...project.sound },
+    patterns: {
+      A: clonePatternData(project.patterns.A),
+      B: clonePatternData(project.patterns.B),
+      C: clonePatternData(project.patterns.C)
+    },
+    mixer: project.mixer.map((channel) => ({ ...channel })),
+    arrangement: project.arrangement.map((block) => ({
+      ...block,
+      mutedTracks: [...block.mutedTracks]
+    })),
+    masterCeilingDb: project.masterCeilingDb,
+    masterPreset: project.masterPreset
+  };
+}
+
 export function projectFileName(project: ProjectState): string {
   const slug = project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   return `${slug || "grooveforge-project"}.grooveforge.json`;
@@ -1975,15 +2084,35 @@ function normalizeSoundDesign(sound: SoundDesignInput | undefined): SoundDesign 
   };
 }
 
+function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreState {
+  return {
+    ...value,
+    metronomeEnabled: value.metronomeEnabled ?? false,
+    sound: normalizeSoundDesign(value.sound),
+    patterns: normalizePatternMap(value.patterns),
+    mixer: normalizeMixerChannels(value.mixer),
+    arrangement: normalizeArrangement(value.arrangement)
+  };
+}
+
+function normalizeProjectSnapshots(snapshots: ProjectSnapshotInput[] | undefined): ProjectSnapshot[] {
+  return (
+    snapshots
+      ?.map((snapshot) => ({
+        id: snapshot.id,
+        name: snapshot.name,
+        createdAt: snapshot.createdAt,
+        project: normalizeProjectCoreState(snapshot.project)
+      }))
+      .slice(0, maxProjectSnapshots) ?? []
+  );
+}
+
 function normalizeProjectState(value: unknown): ProjectState | null {
   if (isProjectStateShape(value)) {
     return {
-      ...value,
-      metronomeEnabled: value.metronomeEnabled ?? false,
-      sound: normalizeSoundDesign(value.sound),
-      patterns: normalizePatternMap(value.patterns),
-      mixer: normalizeMixerChannels(value.mixer),
-      arrangement: normalizeArrangement(value.arrangement)
+      ...normalizeProjectCoreState(value),
+      snapshots: normalizeProjectSnapshots(value.snapshots)
     };
   }
 
@@ -2011,7 +2140,8 @@ function normalizeProjectState(value: unknown): ProjectState | null {
       mixer: normalizeMixerChannels(value.mixer),
       arrangement: normalizeArrangement(value.arrangement),
       masterCeilingDb: value.masterCeilingDb,
-      masterPreset: value.masterPreset
+      masterPreset: value.masterPreset,
+      snapshots: []
     };
   }
 
@@ -2042,15 +2172,29 @@ type ArrangementBlockInput = Omit<ArrangementBlock, "bars" | "mutedTracks"> & {
   bars?: number;
   mutedTracks?: ArrangementMuteTrack[];
 };
-type ProjectStateInput = Omit<ProjectState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled"> & {
+type ProjectCoreStateInput = Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled"> & {
   metronomeEnabled?: boolean;
   sound?: SoundDesignInput;
   patterns: Record<PatternSlot, PatternDataInput>;
   mixer: MixerChannelInput[];
   arrangement: ArrangementBlockInput[];
 };
+type ProjectSnapshotInput = Omit<ProjectSnapshot, "project"> & {
+  project: ProjectCoreStateInput;
+};
+type ProjectStateInput = ProjectCoreStateInput & {
+  snapshots?: ProjectSnapshotInput[];
+};
 
 function isProjectStateShape(value: unknown): value is ProjectStateInput {
+  if (!isProjectCoreStateShape(value) || !isRecord(value)) {
+    return false;
+  }
+  const snapshots = (value as { snapshots?: unknown }).snapshots;
+  return snapshots === undefined || isProjectSnapshotsInput(snapshots);
+}
+
+function isProjectCoreStateShape(value: unknown): value is ProjectCoreStateInput {
   if (!isRecord(value)) {
     return false;
   }
@@ -2074,7 +2218,21 @@ function isProjectStateShape(value: unknown): value is ProjectStateInput {
   );
 }
 
-function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled"> & {
+function isProjectSnapshotsInput(value: unknown): value is ProjectSnapshotInput[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (snapshot) =>
+        isRecord(snapshot) &&
+        typeof snapshot.id === "string" &&
+        typeof snapshot.name === "string" &&
+        typeof snapshot.createdAt === "string" &&
+        isProjectCoreStateShape(snapshot.project)
+    )
+  );
+}
+
+function isLegacyProjectState(value: unknown): value is Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled"> & {
   metronomeEnabled?: boolean;
   sound?: SoundDesignInput;
   mixer: MixerChannelInput[];

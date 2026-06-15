@@ -63,6 +63,7 @@ import {
   PatternData,
   PatternFillPreset,
   PatternSlot,
+  ProjectSnapshot,
   PatternVariationPreset,
   ProjectState,
   SoundDesign,
@@ -92,6 +93,7 @@ import {
   createStylePatternSet,
   createEmptyPatternData,
   defaultDrumVelocity,
+  deleteProjectSnapshot,
   drumStepProbability,
   drumStepTimingMs,
   drumStepVelocity,
@@ -101,6 +103,7 @@ import {
   masterPresetCeilingDb,
   masterPresets,
   melodyPitchLanes,
+  maxProjectSnapshots,
   minArrangementBars,
   minDrumTimingMs,
   maxArrangementBars,
@@ -121,11 +124,15 @@ import {
   patternFillPresetLabel,
   patternVariationPresetIds,
   patternVariationPresetLabel,
+  nextProjectSnapshotName,
   projectFileName,
+  projectSnapshotSummary,
   retargetProjectKey,
+  restoreProjectSnapshot,
   scalePitches,
   scalePitchNames,
   serializeProjectFile,
+  saveProjectSnapshot,
   soundPresetDesign,
   soundPresetIds,
   soundPresetLabel,
@@ -436,6 +443,36 @@ export function App(): ReactElement {
     setRedoStack((history) => history.slice(1));
     setUndoStack((history) => appendHistory(history, current));
     restoreProjectFromHistory(nextProject, "Redo applied");
+  }
+
+  function saveCurrentSnapshot(): void {
+    const snapshotName = nextProjectSnapshotName(projectRef.current);
+    updateProject((current) => saveProjectSnapshot(current), `Saved snapshot ${snapshotName}`);
+  }
+
+  function restoreSavedSnapshot(snapshotId: string): void {
+    const snapshot = projectRef.current.snapshots.find((candidate) => candidate.id === snapshotId);
+    if (!snapshot) {
+      setProjectStatus("Snapshot not found");
+      return;
+    }
+    const changed = updateProject((current) => restoreProjectSnapshot(current, snapshotId), `Restored snapshot ${snapshot.name}`);
+    if (changed) {
+      setSelectedArrangementIndex(0);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+      setPlaybackPosition(null);
+    }
+  }
+
+  function deleteSavedSnapshot(snapshotId: string): void {
+    const snapshot = projectRef.current.snapshots.find((candidate) => candidate.id === snapshotId);
+    if (!snapshot) {
+      setProjectStatus("Snapshot not found");
+      return;
+    }
+    updateProject((current) => deleteProjectSnapshot(current, snapshotId), `Deleted snapshot ${snapshot.name}`);
   }
 
   function updateCurrentPattern(update: (pattern: PatternData) => PatternData, status = "Unsaved changes"): boolean {
@@ -1835,6 +1872,8 @@ export function App(): ReactElement {
 
       <BeatReadiness checks={beatReadinessChecks} />
 
+      <ProjectSnapshots project={project} onDelete={deleteSavedSnapshot} onRestore={restoreSavedSnapshot} onSave={saveCurrentSnapshot} />
+
       <section className="workspace-grid">
         <section className="panel pattern-panel" aria-label="Pattern editor">
           <PanelTitle icon={<Drum size={18} />} title="Drums" meta="16 step rack" />
@@ -2624,6 +2663,62 @@ function BeatBlueprints({
             </button>
           );
         })}
+      </div>
+    </section>
+  );
+}
+
+function ProjectSnapshots({
+  project,
+  onDelete,
+  onRestore,
+  onSave
+}: {
+  project: ProjectState;
+  onDelete: (snapshotId: string) => void;
+  onRestore: (snapshotId: string) => void;
+  onSave: () => void;
+}): ReactElement {
+  return (
+    <section className="snapshot-row" data-testid="project-snapshots" aria-label="Project snapshots">
+      <div className="snapshot-heading">
+        <div>
+          <Save size={17} aria-hidden="true" />
+          <span>Snapshots</span>
+        </div>
+        <strong data-testid="snapshot-count">
+          {project.snapshots.length}/{maxProjectSnapshots} slots
+        </strong>
+        <button data-testid="snapshot-save" onClick={onSave} title="Save current project snapshot" type="button">
+          <Save size={14} aria-hidden="true" />
+          <span>Save Slot</span>
+        </button>
+      </div>
+      <div className="snapshot-list">
+        {project.snapshots.length === 0 ? (
+          <div className="snapshot-empty" data-testid="snapshot-empty">
+            <span>No slots saved</span>
+          </div>
+        ) : (
+          project.snapshots.map((snapshot) => (
+            <div className="snapshot-item" data-testid={`snapshot-item-${snapshot.id}`} key={snapshot.id}>
+              <div>
+                <strong>{snapshot.name}</strong>
+                <span>{projectSnapshotSummary(snapshot)}</span>
+              </div>
+              <div className="snapshot-actions">
+                <button data-testid={`snapshot-restore-${snapshot.id}`} onClick={() => onRestore(snapshot.id)} title={`Restore ${snapshot.name}`} type="button">
+                  <Undo2 size={14} aria-hidden="true" />
+                  <span>Restore</span>
+                </button>
+                <button className="danger" data-testid={`snapshot-delete-${snapshot.id}`} onClick={() => onDelete(snapshot.id)} title={`Delete ${snapshot.name}`} type="button">
+                  <Trash2 size={14} aria-hidden="true" />
+                  <span>Delete</span>
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </section>
   );
