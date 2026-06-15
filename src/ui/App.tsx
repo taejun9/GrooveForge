@@ -421,6 +421,19 @@ type ChordPadOption = ChordPadDefinition & {
   selected: boolean;
 };
 
+type ChordRhythmId = "held" | "pulse" | "stab" | "ghost";
+
+type ChordRhythmDefinition = {
+  id: ChordRhythmId;
+  label: string;
+  detail: string;
+};
+
+type ChordRhythmOption = ChordRhythmDefinition & {
+  preview: string;
+  chanceCount: number;
+};
+
 type ArrangementFocusPresetId = "intro_space" | "verse_pocket" | "hook_peak" | "bridge_drop" | "outro_release";
 
 type ArrangementFocusPreset = {
@@ -566,6 +579,13 @@ const chordPadDefinitions: ChordPadDefinition[] = [
   { id: "lift", label: "Lift", detail: "open", degree: 5, inversion: 1 },
   { id: "tension", label: "Tension", detail: "pull", degree: 4, quality: "7", inversion: 0 },
   { id: "color", label: "Color", detail: "float", degree: 3, quality: "sus2", inversion: 1 }
+];
+
+const chordRhythmDefinitions: ChordRhythmDefinition[] = [
+  { id: "held", label: "Held", detail: "wide" },
+  { id: "pulse", label: "Pulse", detail: "bounce" },
+  { id: "stab", label: "Stab", detail: "short" },
+  { id: "ghost", label: "Ghost", detail: "air" }
 ];
 
 const basslinePadDefinitions: BasslinePadDefinition[] = [
@@ -832,6 +852,10 @@ export function App(): ReactElement {
   const chordPadOptions = useMemo(
     () => createChordPadOptions(project.key, selectedChord),
     [project.key, selectedChord]
+  );
+  const chordRhythmOptions = useMemo(
+    () => createChordRhythmOptions(currentPattern.chordEvents),
+    [currentPattern.chordEvents]
   );
   const selectedDrumVelocity =
     selectedDrumStep && selectedDrumActive
@@ -2391,6 +2415,42 @@ export function App(): ReactElement {
     }
   }
 
+  function applyChordRhythm(rhythmId: ChordRhythmId): void {
+    const rhythm = chordRhythmDefinitions.find((definition) => definition.id === rhythmId);
+    if (!rhythm) {
+      setProjectStatus("Chord rhythm not found");
+      return;
+    }
+
+    let nextSelectedIndex: number | null = selectedChordIndex;
+    const changed = updateCurrentPattern((pattern) => {
+      if (pattern.chordEvents.length === 0) {
+        return pattern;
+      }
+      const chordEvents = applyChordRhythmToEvents(pattern.chordEvents, rhythmId);
+      if (sameChordEvents(pattern.chordEvents, chordEvents)) {
+        return pattern;
+      }
+      if (selectedChordIndex !== null) {
+        nextSelectedIndex = chordEvents[selectedChordIndex] ? selectedChordIndex : 0;
+      } else {
+        nextSelectedIndex = 0;
+      }
+      return {
+        ...pattern,
+        chordEvents
+      };
+    }, `${rhythm.label} chord rhythm applied to Pattern ${projectRef.current.selectedPattern}`);
+
+    if (changed) {
+      setSelectedChordIndex(nextSelectedIndex);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+    } else {
+      setProjectStatus(`${rhythm.label} chord rhythm already selected`);
+    }
+  }
+
   function addChordEvent(): void {
     let nextSelectedIndex: number | null = null;
     const changed = updateCurrentPattern(
@@ -3359,6 +3419,7 @@ export function App(): ReactElement {
           />
           <ChordEditor
             chordPads={chordPadOptions}
+            chordRhythms={chordRhythmOptions}
             chords={currentPattern.chordEvents}
             rootOptions={chordRootOptions}
             selectedIndex={selectedChordIndex}
@@ -3370,6 +3431,7 @@ export function App(): ReactElement {
             onMoveStep={moveSelectedChordStep}
             onPad={applyChordPad}
             onPreset={applyChordProgressionPreset}
+            onRhythm={applyChordRhythm}
             onSelect={selectChordEvent}
           />
         </section>
@@ -7164,6 +7226,7 @@ function SoundControl({
 
 function ChordEditor({
   chordPads,
+  chordRhythms,
   chords,
   rootOptions,
   selectedIndex,
@@ -7175,9 +7238,11 @@ function ChordEditor({
   onMoveStep,
   onPad,
   onPreset,
+  onRhythm,
   onSelect
 }: {
   chordPads: ChordPadOption[];
+  chordRhythms: ChordRhythmOption[];
   chords: ChordEvent[];
   rootOptions: string[];
   selectedIndex: number | null;
@@ -7189,6 +7254,7 @@ function ChordEditor({
   onMoveStep: (direction: -1 | 1) => void;
   onPad: (pad: ChordPadId) => void;
   onPreset: (preset: ChordProgressionPreset) => void;
+  onRhythm: (rhythm: ChordRhythmId) => void;
   onSelect: (index: number) => void;
 }): ReactElement {
   const selectedChord = selectedIndex === null ? undefined : chords[selectedIndex];
@@ -7248,6 +7314,28 @@ function ChordEditor({
             <small>{pad.detail}</small>
           </button>
         ))}
+      </div>
+      <div className="chord-rhythm-panel" data-testid="chord-rhythm-pads">
+        <div className="chord-rhythm-heading">
+          <span>Chord Rhythm</span>
+          <strong>Length + Chance</strong>
+        </div>
+        <div className="chord-rhythm-row" aria-label="Chord Rhythm Pads">
+          {chordRhythms.map((rhythm) => (
+            <button
+              data-testid={`chord-rhythm-${rhythm.id}`}
+              disabled={chords.length === 0}
+              key={rhythm.id}
+              onClick={() => onRhythm(rhythm.id)}
+              title={`${rhythm.label} ${rhythm.preview}`}
+              type="button"
+            >
+              <span>{rhythm.label}</span>
+              <strong>{rhythm.preview}</strong>
+              <small>{rhythm.chanceCount} chance edit / {rhythm.detail}</small>
+            </button>
+          ))}
+        </div>
       </div>
       <div className="chord-edit-row" aria-label="Selected chord edit tools">
         <button
@@ -7985,6 +8073,74 @@ function createChordPadOptions(key: string, selectedChord?: ChordEvent): ChordPa
       selected
     };
   });
+}
+
+function createChordRhythmOptions(chords: ChordEvent[]): ChordRhythmOption[] {
+  return chordRhythmDefinitions.map((rhythm) => {
+    const transformed = applyChordRhythmToEvents(chords, rhythm.id);
+    const averageLength =
+      transformed.length === 0
+        ? 0
+        : transformed.reduce((total, chord) => total + chord.length, 0) / transformed.length;
+    return {
+      ...rhythm,
+      preview: transformed.length === 0 ? "add chords" : `${Math.round(averageLength)} step`,
+      chanceCount: transformed.filter((chord) => normalizeEventProbability(chord.probability) < 1).length
+    };
+  });
+}
+
+function applyChordRhythmToEvents(chords: ChordEvent[], rhythmId: ChordRhythmId): ChordEvent[] {
+  const chordCount = chords.length;
+  return sortChordEvents(
+    chords.map((chord, index) => ({
+      ...chord,
+      length: chordRhythmLength(chord, index, rhythmId),
+      velocity: chordRhythmVelocity(index, chordCount, rhythmId),
+      probability: chordRhythmProbability(index, chordCount, rhythmId)
+    }))
+  );
+}
+
+function chordRhythmLength(chord: ChordEvent, index: number, rhythmId: ChordRhythmId): number {
+  const maxLength = Math.max(1, 16 - chord.step);
+  if (rhythmId === "held") {
+    return Math.min(maxLength, Math.max(chord.length, 4));
+  }
+  if (rhythmId === "pulse") {
+    return Math.min(maxLength, index % 2 === 0 ? 3 : 2);
+  }
+  if (rhythmId === "stab") {
+    return Math.min(maxLength, 1);
+  }
+  return Math.min(maxLength, index % 2 === 0 ? 2 : 1);
+}
+
+function chordRhythmVelocity(index: number, chordCount: number, rhythmId: ChordRhythmId): number {
+  if (rhythmId === "held") {
+    return clampVelocity(0.58);
+  }
+  if (rhythmId === "pulse") {
+    return clampVelocity(index % 2 === 0 ? 0.68 : 0.5);
+  }
+  if (rhythmId === "stab") {
+    return clampVelocity(index % 4 === 0 ? 0.76 : 0.62);
+  }
+  if (chordCount <= 1) {
+    return clampVelocity(0.42);
+  }
+  const progress = index / Math.max(1, chordCount - 1);
+  return clampVelocity(0.54 - progress * 0.16);
+}
+
+function chordRhythmProbability(index: number, chordCount: number, rhythmId: ChordRhythmId): number {
+  if (rhythmId === "pulse") {
+    return normalizeEventProbability(index % 2 === 0 ? 1 : 0.94);
+  }
+  if (rhythmId === "ghost") {
+    return normalizeEventProbability(index >= Math.max(0, chordCount - 2) ? 0.9 : 0.96);
+  }
+  return normalizeEventProbability(1);
 }
 
 function chordPadQualityFromDegree(key: string, degree: number): ChordQuality {

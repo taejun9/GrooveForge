@@ -137,6 +137,8 @@ h2 {
 .melody-motif-row button span,
 .melody-accent-heading span,
 .melody-accent-row button span,
+.chord-rhythm-heading span,
+.chord-rhythm-row button span,
 .studio-controls span,
 .sound-control span,
 .master-panel label span,
@@ -233,6 +235,7 @@ h2 {
 .arrangement-move-row button,
 .chord-preset-row button,
 .chord-pad-row button,
+.chord-rhythm-row button,
 .bassline-pad-row button,
 .bass-glide-row button,
 .melody-motif-row button,
@@ -281,6 +284,7 @@ h2 {
 .next-move-actions button:disabled,
 .snapshot-actions button:disabled,
 .chord-pad-row button:disabled,
+.chord-rhythm-row button:disabled,
 .block-pattern-row button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
@@ -333,6 +337,7 @@ h2 {
 .arrangement-move-row button,
 .chord-preset-row button,
 .chord-pad-row button,
+.chord-rhythm-row button,
 .bassline-pad-row button,
 .bass-glide-row button,
 .melody-motif-row button,
@@ -2806,6 +2811,30 @@ input[type="range"] {
   gap: 6px;
 }
 
+.chord-rhythm-panel {
+  display: grid;
+  gap: 6px;
+  margin-block-start: -2px;
+}
+
+.chord-rhythm-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chord-rhythm-heading strong {
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 11px;
+}
+
+.chord-rhythm-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
 .chord-preset-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2814,6 +2843,7 @@ input[type="range"] {
 
 .chord-preset-row button,
 .chord-pad-row button,
+.chord-rhythm-row button,
 .chord-tools > button,
 .chord-edit-row button {
   display: inline-flex;
@@ -2824,7 +2854,8 @@ input[type="range"] {
   font-size: 12px;
 }
 
-.chord-pad-row button {
+.chord-pad-row button,
+.chord-rhythm-row button {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: center;
@@ -2837,23 +2868,29 @@ input[type="range"] {
 
 .chord-pad-row button span,
 .chord-pad-row button strong,
-.chord-pad-row button small {
+.chord-pad-row button small,
+.chord-rhythm-row button span,
+.chord-rhythm-row button strong,
+.chord-rhythm-row button small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.chord-pad-row button span {
+.chord-pad-row button span,
+.chord-rhythm-row button span {
   color: rgba(244, 239, 231, 0.68);
   font-size: 11px;
 }
 
-.chord-pad-row button strong {
+.chord-pad-row button strong,
+.chord-rhythm-row button strong {
   color: #f4efe7;
   font-size: 12px;
 }
 
-.chord-pad-row button small {
+.chord-pad-row button small,
+.chord-rhythm-row button small {
   color: rgba(244, 239, 231, 0.48);
   font-size: 10px;
 }
