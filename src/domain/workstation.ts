@@ -468,6 +468,20 @@ export function clonePatternData(pattern: PatternData): PatternData {
   };
 }
 
+export function createEmptyPatternData(): PatternData {
+  return {
+    drumPattern: {
+      kick: steps.map(() => false),
+      clap: steps.map(() => false),
+      hat: steps.map(() => false),
+      perc: steps.map(() => false)
+    },
+    bassNotes: [],
+    melodyNotes: [],
+    chordEvents: []
+  };
+}
+
 export function projectFileName(project: ProjectState): string {
   const slug = project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   return `${slug || "grooveforge-project"}.grooveforge.json`;

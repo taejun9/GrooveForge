@@ -41,6 +41,8 @@ import {
   arrangementSections,
   bassPitchLanes,
   chordQualities,
+  clonePatternData,
+  createEmptyPatternData,
   masterPresetCeilingDb,
   masterPresets,
   melodyPitchLanes,
@@ -152,6 +154,33 @@ export function App(): ReactElement {
     setProject((current) => ({ ...current, selectedPattern: pattern }));
     setSelectedNote(null);
     setProjectStatus(`Editing Pattern ${pattern}`);
+  }
+
+  function copySelectedPattern(target: PatternSlot): void {
+    const sourceSlot = project.selectedPattern;
+    updateProject((current) => ({
+      ...current,
+      selectedPattern: target,
+      patterns: {
+        ...current.patterns,
+        [target]: clonePatternData(current.patterns[current.selectedPattern])
+      }
+    }));
+    setSelectedNote(null);
+    setProjectStatus(`Copied Pattern ${sourceSlot} to ${target}`);
+  }
+
+  function clearSelectedPattern(): void {
+    const sourceSlot = project.selectedPattern;
+    updateProject((current) => ({
+      ...current,
+      patterns: {
+        ...current.patterns,
+        [current.selectedPattern]: createEmptyPatternData()
+      }
+    }));
+    setSelectedNote(null);
+    setProjectStatus(`Cleared Pattern ${sourceSlot}`);
   }
 
   function selectArrangementBlock(index: number): void {
@@ -640,6 +669,32 @@ export function App(): ReactElement {
                 <small>{patternEventCount(project.patterns[pattern])}</small>
               </button>
             ))}
+          </div>
+          <div className="pattern-tools" aria-label="Pattern tools">
+            {patternSlots
+              .filter((pattern) => pattern !== project.selectedPattern)
+              .map((pattern) => (
+                <button
+                  key={pattern}
+                  data-testid={`pattern-copy-${pattern}`}
+                  type="button"
+                  title={`Copy selected pattern to Pattern ${pattern}`}
+                  onClick={() => copySelectedPattern(pattern)}
+                >
+                  <Copy size={14} aria-hidden="true" />
+                  <span>Copy to {pattern}</span>
+                </button>
+              ))}
+            <button
+              className="danger"
+              data-testid="pattern-clear"
+              type="button"
+              title={`Clear Pattern ${project.selectedPattern}`}
+              onClick={clearSelectedPattern}
+            >
+              <Trash2 size={14} aria-hidden="true" />
+              <span>Clear {project.selectedPattern}</span>
+            </button>
           </div>
           <div className="step-grid">
             {(Object.keys(drumLabels) as DrumLane[]).map((lane) => (

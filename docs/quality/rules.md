@@ -70,7 +70,7 @@ Sound design work must keep tone parameters in project state, migrate older proj
 
 Project file work must reject invalid imports without overwriting the current project and must preserve edited drum, bass, chord, melody, sound design, mixer, master, key, BPM, style, and arrangement data on save/load.
 
-Pattern work must keep Pattern A/B/C as independent editable event data. Realtime playback should preview the selected pattern, while WAV export should follow arrangement pattern assignments.
+Pattern work must keep Pattern A/B/C as independent editable event data. Copy and clear tools must operate on the selected pattern slot without deleting the slot itself. Realtime playback should preview the selected pattern, while WAV export should follow arrangement pattern assignments.
 
 Arrangement editor work must let users change a block's section, Pattern A/B/C assignment, and energy without losing existing pattern, mixer, master, or save/load data. Selecting or reassigning a block should keep the pattern editor aligned with that block's assigned pattern.
 
