@@ -1871,6 +1871,18 @@ export function App(): ReactElement {
     }
   }
 
+  function handleExportHandoffSheet(): void {
+    try {
+      const contents = createHandoffSheet(project, exportAnalysis, stemAnalyses);
+      const fileName = handoffSheetFileName(project);
+      downloadTextFile(contents, fileName);
+      setProjectStatus(`Exported ${fileName}`);
+    } catch (error) {
+      console.error(error);
+      setProjectStatus("Sheet export failed");
+    }
+  }
+
   function toggleMetronome(): void {
     updateProject(
       (current) => ({ ...current, metronomeEnabled: !current.metronomeEnabled }),
@@ -2043,6 +2055,7 @@ export function App(): ReactElement {
     onApplyMixFix: applyMixFixPreset,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternFill: applyPatternFill,
+    onExportHandoffSheet: handleExportHandoffSheet,
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
     onExportWav: handleExportWav,
@@ -2194,6 +2207,10 @@ export function App(): ReactElement {
           <button className="icon-button" data-testid="export-midi" type="button" title="Export MIDI" onClick={handleExportMidi}>
             <Download size={18} aria-hidden="true" />
             <span>MIDI</span>
+          </button>
+          <button className="icon-button" data-testid="export-handoff-sheet" type="button" title="Export handoff sheet" onClick={handleExportHandoffSheet}>
+            <Download size={18} aria-hidden="true" />
+            <span>Sheet</span>
           </button>
         </div>
       </header>
@@ -3565,6 +3582,7 @@ function createQuickActions({
   onApplyMixFix,
   onApplyPatternChain,
   onApplyPatternFill,
+  onExportHandoffSheet,
   onExportMidi,
   onExportStems,
   onExportWav,
@@ -3585,6 +3603,7 @@ function createQuickActions({
   onApplyMixFix: (preset: MixFixPreset) => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
+  onExportHandoffSheet: () => void;
   onExportMidi: () => void;
   onExportStems: () => void;
   onExportWav: () => void;
@@ -3744,6 +3763,14 @@ function createQuickActions({
       group: "Export",
       keywords: "export midi daw handoff arrangement",
       run: onExportMidi
+    },
+    {
+      id: "export-handoff-sheet",
+      title: "Export handoff sheet",
+      detail: "Write a local text summary for collaboration or review.",
+      group: "Export",
+      keywords: "export sheet handoff notes session brief delivery target mix stems",
+      run: onExportHandoffSheet
     }
   ];
 }
@@ -5938,6 +5965,81 @@ function formatDb(value: number): string {
   return `${value.toFixed(1)} dB`;
 }
 
+function createHandoffSheet(
+  project: ProjectState,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): string {
+  const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const target = deliveryTargetForId(project.deliveryTarget);
+  const bars = arrangementTotalBars(project);
+  const patternUsage = usedPatternSlots(project).join("/") || project.selectedPattern;
+  const brief = project.sessionBrief;
+  const arrangementLines = project.arrangement.map(
+    (block, index) =>
+      `${index + 1}. ${block.section} / Pattern ${block.pattern} / ${barCountLabel(block.bars)} / Energy ${percentLabel(block.energy)} / Muted ${block.mutedTracks.length === 0 ? "None" : block.mutedTracks.map(arrangementMuteTrackLabel).join(", ")}`
+  );
+  const stemLines = stemTrackIds.map((track) => {
+    const stem = stemAnalyses[track];
+    const audible = Number.isFinite(stem.rmsDb);
+    return `${stemTrackLabel(track)}: ${audible ? "Audible" : "Silent"} / Peak ${formatDb(stem.peakDb)} / RMS ${formatDb(stem.rmsDb)} / Headroom ${formatDb(stem.headroomDb)}`;
+  });
+  const sections = [
+    "GrooveForge Handoff Sheet",
+    "",
+    "Project",
+    `Title: ${project.title}`,
+    `Style: ${styleName}`,
+    `BPM: ${project.bpm}`,
+    `Key: ${project.key}`,
+    `Selected Pattern: ${project.selectedPattern}`,
+    `Arrangement: ${barCountLabel(bars)} / Pattern ${patternUsage}`,
+    "",
+    "Delivery Target",
+    `Name: ${target.name}`,
+    `Focus: ${target.focus}`,
+    `Target Length: ${barCountLabel(target.targetBars)}`,
+    `Target Stems: ${target.stemGoal}`,
+    `Master Preset: ${project.masterPreset}`,
+    `Master Ceiling: ${formatDb(project.masterCeilingDb)}`,
+    "",
+    "Session Brief",
+    `Artist: ${handoffValue(brief.artist)}`,
+    `Vibe: ${handoffValue(brief.vibe)}`,
+    `Reference: ${handoffValue(brief.reference)}`,
+    `Notes: ${handoffValue(brief.notes)}`,
+    "",
+    "Arrangement Blocks",
+    ...arrangementLines,
+    "",
+    "Export Meter",
+    `Status: ${analysis.status}`,
+    `Duration: ${analysis.durationSeconds.toFixed(2)} sec`,
+    `Peak: ${formatDb(analysis.peakDb)}`,
+    `RMS: ${formatDb(analysis.rmsDb)}`,
+    `Headroom: ${formatDb(analysis.headroomDb)}`,
+    `Limiter Activity: ${formatPercent(analysis.limitedPercent)}`,
+    "",
+    "Stem Meter",
+    ...stemLines,
+    "",
+    "Notes",
+    "Peak, RMS, headroom, and limiter activity are local render checks, not platform-compliance, true-peak, LUFS, publishing, or mastering guarantees.",
+    "This sheet is generated from local project data and does not include audio media."
+  ];
+
+  return `${sections.join("\n")}\n`;
+}
+
+function handoffValue(value: string): string {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : "Not set";
+}
+
+function handoffSheetFileName(project: ProjectState): string {
+  return `${projectFileName(project).replace(/\.grooveforge\.json$/, "") || "grooveforge-project"}-handoff.txt`;
+}
+
 function meterPercent(valueDb: number, ceilingDb: number): number {
   if (!Number.isFinite(valueDb)) {
     return 0;
@@ -6021,6 +6123,16 @@ function isEditableShortcutTarget(target: EventTarget | null): boolean {
 
 function downloadProjectFile(contents: string, fileName: string): void {
   const blob = new Blob([contents], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadTextFile(contents: string, fileName: string): void {
+  const blob = new Blob([contents], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

@@ -169,6 +169,8 @@ Mix Fix work must run only after explicit user button clicks, derive action tone
 
 MIDI export work must write deterministic Standard MIDI Files from editable project events, follow arrangement Pattern A/B/C assignments, block lengths, track mutes, BPM, drum repeats, note/chord lengths, and chord inversions, include drum, 808, synth, and chord tracks, and avoid depending on rendered audio, imported samples, or sampler assets.
 
+Handoff Sheet export work must write a local plain text summary only after an explicit user click, derive content from local project state, selected Delivery Target, Session Brief, arrangement data, deterministic export analysis, and deterministic stem analysis, avoid mutating project state or triggering audio render downloads, preserve realtime playback plus WAV/stem/MIDI export semantics, and avoid media uploads, copyrighted reference audio, platform compliance, publishing, licensing, LUFS/true-peak guarantees, sampling, imported audio, plugin hosting, remote AI, remote analysis, accounts, analytics, or cloud sync.
+
 Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation, pattern programming, sound design, arrangement, mixing/mastering, and export first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, roadmap order, or plan titles.
 
 Concept correction work must make the all-genre beat-production mini DAW framing explicit: direct beat composition, sound design, arrangement, mixing/mastering, and export are the product spine, while sample import, chopping, pitch/stretch, one-shot mapping, and sampler workflows are optional later paths.

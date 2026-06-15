@@ -77,7 +77,7 @@ Primary feature areas:
 - Quick Actions: searchable local command palette for transport, project, creative, arrangement, mix, and export actions.
 - Project snapshots: local idea slots for saving, renaming, restoring, and deleting beat states inside the project file.
 - Mixer/master: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Mix Fix actions, master preset ceiling, limiter, loudness/peak metering.
-- Export: WAV export, stem export, and arrangement MIDI export after the event/render paths are reliable.
+- Export: WAV export, stem export, arrangement MIDI export, and local Handoff Sheet text export after the event/render paths are reliable.
 
 ## First-Class Data
 
@@ -159,6 +159,7 @@ MVP capabilities:
 - WAV export through deterministic offline rendering.
 - Stem export through deterministic offline rendering for isolated drum, 808, synth, and chord WAV files from the current arrangement.
 - MIDI export as a deterministic Standard MIDI File with drum, 808, synth, and chord tracks from the current arrangement.
+- Handoff Sheet export as a local plain text summary of title, BPM/key/style, Delivery Target, Session Brief, arrangement blocks, export meter, and stem meter data without media upload or compliance claims.
 
 ## Roadmap
 
