@@ -1314,9 +1314,12 @@ export function App(): ReactElement {
                 {steps.map((step) => {
                   const active = currentPattern.drumPattern[lane][step];
                   const velocity = drumStepVelocity(currentPattern, lane, step);
+                  const probability = drumStepProbability(currentPattern, lane, step);
+                  const hasChanceBadge = probability < 1;
                   const repeat = lane === "hat" ? hatRepeatCount(currentPattern, step) : 1;
                   const timing = drumStepTimingMs(currentPattern, lane, step);
                   const stepBadge = [
+                    hasChanceBadge ? compactChanceBadgeLabel(probability) : "",
                     lane === "hat" && repeat > 1 ? `${repeat}x` : "",
                     timing === 0 ? "" : timingBadge(timing)
                   ]
@@ -1345,7 +1348,14 @@ export function App(): ReactElement {
                       type="button"
                     >
                       <span>{step + 1}</span>
-                      {active && stepBadge && <small>{stepBadge}</small>}
+                      {active && stepBadge && (
+                        <small
+                          className={hasChanceBadge ? "chance-badge" : undefined}
+                          data-testid={hasChanceBadge ? `drum-chance-badge-${lane}-${step}` : undefined}
+                        >
+                          {stepBadge}
+                        </small>
+                      )}
                     </button>
                   );
                 })}
@@ -2139,7 +2149,9 @@ function NoteEditor({
                   selectedNote?.track === track && selectedNote.step === step && selectedNote.pitch === pitch;
                 return (
                   <button
-                    aria-label={`${title} ${pitch} step ${step + 1}`}
+                    aria-label={`${title} ${pitch} step ${step + 1}${
+                      note && note.probability !== undefined && note.probability < 1 ? ` ${chanceBadgeLabel(note.probability)} chance` : ""
+                    }`}
                     aria-pressed={Boolean(note)}
                     className={["note", note ? "active" : "", currentStep === step ? "playhead" : "", selected ? "selected" : ""]
                       .filter(Boolean)
@@ -2150,6 +2162,11 @@ function NoteEditor({
                   >
                     {note && <span style={{ inlineSize: `${Math.min(100, note.length * 25)}%` }} />}
                     {note?.glide && <em>G</em>}
+                    {note && note.probability !== undefined && note.probability < 1 && (
+                      <small className="chance-badge" data-testid={`note-chance-badge-${track}-${step}-${pitch}`}>
+                        {compactChanceBadgeLabel(note.probability)}
+                      </small>
+                    )}
                   </button>
                 );
               })}
@@ -2522,6 +2539,11 @@ function ChordEditor({
                 {chord.root}
                 {chord.quality}
               </strong>
+              {chord.probability < 1 && (
+                <small className="chance-badge" data-testid={`chord-chance-badge-${index}`}>
+                  {chanceBadgeLabel(chord.probability)}
+                </small>
+              )}
               <button
                 data-testid={`chord-delete-${index}`}
                 disabled={chords.length <= 1}
@@ -2695,6 +2717,14 @@ function panLabel(pan: number): string {
 
 function percentLabel(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function chanceBadgeLabel(value: number): string {
+  return percentLabel(normalizeEventProbability(value));
+}
+
+function compactChanceBadgeLabel(value: number): string {
+  return `${Math.round(normalizeEventProbability(value) * 100)}`;
 }
 
 function timingLabel(value: number): string {

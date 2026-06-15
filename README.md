@@ -31,7 +31,7 @@ The first usable result is an Electron desktop workstation that can create a sam
 
 - 145 BPM / F minor starter project.
 - Style selector that applies editable genre groove templates for Pattern A/B/C, BPM, swing, and sound preset.
-- Kick, snare/clap, hat, 808, chord, and synth melody tracks with editable drum velocity, event chance, microtiming, one-click groove humanization, and hat repeat dynamics.
+- Kick, snare/clap, hat, 808, chord, and synth melody tracks with editable drum velocity, event chance, chance badges, microtiming, one-click groove humanization, and hat repeat dynamics.
 - Key-aware chord progression presets with chord add/delete controls and per-chord chance for fast harmonic sketching.
 - Sound presets and Studio tone controls for built-in drum, 808, kick-duck sidechain, synth, and chord engines.
 - Independent Pattern A/B/C variations with copy/clear tools and editable arrangement blocks with bar length, duplicate, move, and delete controls.
@@ -42,7 +42,7 @@ The first usable result is an Electron desktop workstation that can create a sam
 - Live playback that follows future pattern, arrangement, BPM, mixer, sound, and master edits without forcing users to stop and restart.
 - Basic mixer volume/pan/mute/solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling, export peak/RMS/headroom meter, full-mix WAV export, and drum/808/synth/chord stem export.
 
-The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport with arrangement playback, Pattern preview, and a realtime-only metronome that reads live project edits while running, desktop editing shortcuts, undo/redo, style/key/BPM with editable groove templates, drum steps with velocity, probability, microtiming, one-click groove humanization, and hat repeat, Pattern A/B/C copy/clear tools, editable scale-aware 808/melody lanes with note chance, kick-to-808 sidechain ducking, chord progression presets plus add/delete/chance controls, sound design presets, Studio tone controls, editable arrangement blocks with per-block bar lengths, arrangement templates, arrangement structure controls, mixer volume/pan/mute/solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling, export peak/RMS/headroom meter, local project save/load, arrangement-length WAV export, and one-click stem export.
+The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport with arrangement playback, Pattern preview, and a realtime-only metronome that reads live project edits while running, desktop editing shortcuts, undo/redo, style/key/BPM with editable groove templates, drum steps with velocity, probability, visible chance badges, microtiming, one-click groove humanization, and hat repeat, Pattern A/B/C copy/clear tools, editable scale-aware 808/melody lanes with note chance badges, kick-to-808 sidechain ducking, chord progression presets plus add/delete/chance controls, sound design presets, Studio tone controls, editable arrangement blocks with per-block bar lengths, arrangement templates, arrangement structure controls, mixer volume/pan/mute/solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling, export peak/RMS/headroom meter, local project save/load, arrangement-length WAV export, and one-click stem export.
 
 ## Core Direction
 

@@ -472,9 +472,19 @@ h2 {
   z-index: 1;
   inset-block-start: 3px;
   inset-inline-end: 3px;
+  max-inline-size: calc(100% - 6px);
+  overflow: hidden;
   color: rgba(17, 16, 15, 0.72);
   font-size: 8px;
   line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chance-badge {
+  border-radius: 999px;
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
 .micro-controls,
@@ -668,6 +678,22 @@ input[type="range"] {
   font-style: normal;
   font-weight: 800;
   line-height: 1;
+}
+
+.note small {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: 3px;
+  inset-inline-start: 3px;
+  max-inline-size: calc(100% - 6px);
+  overflow: hidden;
+  color: #11100f;
+  background: color-mix(in srgb, var(--note) 74%, #f4efe7);
+  padding: 2px 3px;
+  font-size: 8px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .note.playhead {
@@ -873,6 +899,16 @@ input[type="range"] {
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chord-slot-heading small {
+  flex: 0 0 auto;
+  border: 1px solid rgba(213, 140, 255, 0.36);
+  color: #f4efe7;
+  background: rgba(213, 140, 255, 0.16);
+  padding: 4px 6px;
+  font-size: 10px;
+  line-height: 1;
 }
 
 .chord-slot-heading button {
