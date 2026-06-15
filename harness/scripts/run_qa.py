@@ -46,7 +46,9 @@ REQUIRED_PATHS = [
 TEXT_EXPECTATIONS = {
     "README.md": [
         "making beats across genres",
+        "beat workstation first, not a sampler-first app",
         "Direct composition is the product spine",
+        "opening a compact beat-making DAW, not a sample browser",
         "Sampling is a secondary add-on.",
         "local project save/load",
         "Style selector that applies editable genre groove templates",
@@ -65,9 +67,14 @@ TEXT_EXPECTATIONS = {
         "GrooveForge is an all-genre, event-based beat workstation",
     ],
     "docs/product/product.md": [
+        "It is beat-first, not sampler-first.",
+        "Pattern programming for all supported styles.",
+        "Optional sampling module, later and outside the MVP:",
+        "No user should need a sample to make the first complete beat.",
         "샘플 없이도 8마디 비트를 만들고 WAV로 export할 수 있어야 한다.",
         "This sentence supersedes any sampling-first interpretation of the brief.",
         "Sampling can be useful, but it must stay behind the composition engine",
+        "it means a pattern, MIDI, or automation container",
         "Local project save/load",
         "Style selector that applies key-aware editable groove templates",
         "editable drum velocity, and hat repeat dynamics",
@@ -100,6 +107,13 @@ TEXT_EXPECTATIONS = {
         "keep keyboard shortcuts out of focused inputs",
         "Volume, pan, mute, solo, master output gain, and preset ceiling controls",
         "sample import, chopping, sampler tracks, or audio warping",
+        "core clips are pattern, MIDI, or automation containers",
+    ],
+    "docs/architecture/product-architecture.md": [
+        "Pattern/Event Clips",
+        "not an imported audio asset",
+        "Sampling architecture should attach to the beat workstation",
+        "Extension track types for optional sampling, later:",
     ],
     "docs/references/official-sources.md": [
         "W3C Web Audio API",

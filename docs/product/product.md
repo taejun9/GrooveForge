@@ -3,7 +3,7 @@
 
 ## Summary
 
-GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres with drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, and WAV/stem export.
+GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres with drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, and WAV/stem export. It is beat-first, not sampler-first.
 
 ## Type
 
@@ -15,12 +15,15 @@ GrooveForge is a code-driven all-genre beat workstation: a mini DAW with a JSON-
 
 The primary object is a beat project built from musical events, patterns, tracks, devices, arrangement blocks, mixer state, master state, and render state. Audio samples can become assets inside that project later, but they are not the default starting point.
 
+The product should make a blank beat feel playable without imported audio: set BPM/key, write rhythm, compose bass and melody, shape tone, arrange sections, mix/master, and export.
+
 It is not a trap-only app and not a sample-chopping tool. Trap, drill, boom bap, house, lofi, jersey, phonk, R&B, garage, and experimental workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
 
 ## Product Boundary
 
 Core product:
 
+- Pattern programming for all supported styles.
 - Direct drum programming.
 - 808/bass synthesis and bassline editing.
 - Melody and chord composition.
@@ -28,11 +31,11 @@ Core product:
 - Arrangement from editable patterns.
 - Mixing, mastering, and export.
 
-Secondary extension:
+Optional sampling module, later and outside the MVP:
 
 - Sampling, audio import, chopping, and sampler mapping.
 
-Sampling can be useful, but it must stay behind the composition engine, instrument engine, arrangement, mixer/master, and export pipeline in priority, architecture, roadmap order, and UI copy.
+Sampling can be useful, but it must stay behind the composition engine, instrument engine, arrangement, mixer/master, and export pipeline in priority, architecture, roadmap order, and UI copy. No user should need a sample to make the first complete beat.
 
 ## Users
 
@@ -46,7 +49,7 @@ Sampling can be useful, but it must stay behind the composition engine, instrume
 The core product loop is:
 
 ```text
-BPM/key -> drum pattern -> 808/bass line -> melody/chords -> arrangement -> mixer -> master -> export
+BPM/key -> style/pattern programming -> drum pattern -> 808/bass line -> melody/chords -> sound design -> arrangement -> mixer -> master -> export
 ```
 
 Primary feature areas:
@@ -94,6 +97,8 @@ type DrumHitEvent = {
 
 Audio clip events belong to a later extension model. A project must be able to produce a complete beat with only drum, bass, synth, chord, automation, mixer, and master data.
 
+When product docs use the word clip before the sampling phase, it means a pattern, MIDI, or automation container. It must not imply that imported audio clips are required for the core workflow.
+
 ## MVP Scope
 
 The MVP must prove this sentence:
@@ -137,7 +142,7 @@ Phase 4 adds arrangement: pattern blocks, song section markers, duplicate/move/d
 
 Phase 5 adds mixer/master/export: volume, pan, mute, solo, master preset ceiling first, then EQ, compressor, saturation, limiter, peak/LUFS metering, WAV export, and later stem export.
 
-Phase 6 scopes optional sampling as an extension after the beat-making core is useful: audio import, sampler mapping, chopping, reverse, pitch, and stretch.
+Phase 6 scopes optional sampling as an extension only after the beat-making core is useful: audio import, sampler mapping, chopping, reverse, pitch, and stretch.
 
 ## Non-Goals
 

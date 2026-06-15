@@ -88,7 +88,9 @@ Export meter work must label measurements honestly as peak, RMS, headroom, and l
 
 Stem export work must render isolated drum, 808, synth, and chord WAV files from the current arrangement, keep full-mix WAV export intact, and avoid depending on imported audio or sample assets.
 
-Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation, sound design, arrangement, mixing/mastering, and export first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, or plan titles.
+Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation, pattern programming, sound design, arrangement, mixing/mastering, and export first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, roadmap order, or plan titles.
+
+Docs that mention clips before optional sampling is implemented must clarify that core clips are pattern, MIDI, or automation containers, not imported audio assets.
 
 Any new plan that mentions sample import, chopping, sampler tracks, or audio warping must explicitly mark that work as optional sampling-phase work or document the user-approved exception in its Decision Log.
 

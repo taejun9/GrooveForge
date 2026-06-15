@@ -16,7 +16,7 @@ Project State
   BPM
   Key / Scale
   Tracks
-  Clips
+  Pattern/Event Clips
   Patterns
   Devices
   Automation
@@ -63,7 +63,7 @@ Electron is used for the first desktop MVP because it gets the existing web audi
 
 Composition-first invariant: GrooveForge must remain fully usable when audio import, sampler tracks, chop pads, and audio warping are absent. Core playback, arrangement, save/load, and export paths should depend on musical events, built-in instruments, mixer state, and master state before they depend on user audio assets.
 
-The core project model should make composition events first-class:
+The core project model should make composition events first-class. In the core architecture, a clip is a pattern, MIDI, or automation container, not an imported audio asset:
 
 - `Project`: version, title, BPM, key/scale, swing, tracks, arrangement, master settings.
 - `Track`: type, mixer strip, devices, clips, sends.
@@ -72,7 +72,7 @@ The core project model should make composition events first-class:
 - `Device`: synth, drum rack, EQ, compressor, saturation, limiter, meter, send effect.
 - `StyleProfile`: genre rules for BPM range, swing, density, quantize strength, humanization, bass style, and melody style.
 
-Sampling is an extension model, not a core dependency. When it is added, it can introduce audio clips, sampler devices, audio tracks, and source/license metadata without changing the requirement that a valid beat can be made from generated and performed events alone.
+Sampling is an extension model, not a core dependency. When it is added, it can introduce audio clips, sampler devices, audio tracks, and source/license metadata without changing the requirement that a valid beat can be made from generated and performed events alone. Sampling architecture should attach to the beat workstation; it should not replace the workstation model.
 
 ## Track Types
 
@@ -87,7 +87,7 @@ Initial track types:
 
 MVP tracks should be `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master`.
 
-Extension track types for optional sampling:
+Extension track types for optional sampling, later:
 
 - `audio`
 - `sampler`

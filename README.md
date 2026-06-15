@@ -1,7 +1,7 @@
 
 # GrooveForge
 
-GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres: drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, and WAV/stem export.
+GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres: drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, and WAV/stem export. It is a beat workstation first, not a sampler-first app.
 
 Project type: `web-first TypeScript mini DAW / beat workstation`.
 
@@ -13,13 +13,15 @@ Agent team: `Team Forge`. See `AGENTS.md`.
 
 GrooveForge is a code-driven all-genre beat workstation with a programmable project format and style engine. Direct composition is the product spine: users should be able to program musical events, shape built-in instruments, arrange a song section, mix/master it, and export audio before they ever import a sample.
 
+The first-run experience should feel like opening a compact beat-making DAW, not a sample browser: choose BPM/key/style, write drums, build 808/bass, add melody/chords, shape sounds, arrange, mix, master, then export.
+
 The core flow is:
 
 ```text
 BPM/key -> drums -> 808/bass -> melody/chords -> arrangement -> mixing -> mastering -> export
 ```
 
-Sampling is a secondary add-on. It can be added later for users who want audio import, chopping, or sampler workflows, but it must not define the MVP, the first-run experience, or the core data model.
+Sampling is a secondary add-on. It can be added later for users who want audio import, chopping, loop stretching, or sampler workflows, but it must not define the MVP, the first-run experience, or the core data model.
 
 ## MVP Target
 
@@ -39,7 +41,7 @@ The first desktop runtime is an Electron + Vite + TypeScript app. It opens direc
 
 - Keep product behavior grounded in the project brief and official sources where applicable.
 - Treat genre as editable style profiles and generation rules, not as a single hard-coded genre.
-- Keep drums, 808/bass, melody/chords, arrangement, mixer/master, and export ahead of sampling work.
+- Keep pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export ahead of sampling work.
 - Treat sample import, chopping, sampler tracks, and audio warping as P3/v2 optional modules unless a user-approved plan explicitly says otherwise.
 - Keep sensitive real user, customer, credential, and production data out of samples, tests, docs, and screenshots.
 - Keep validation commands current as the stack becomes concrete.
