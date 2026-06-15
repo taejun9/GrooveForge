@@ -281,6 +281,27 @@ type StyleInspectorSummary = {
   patterns: StylePatternDensity[];
 };
 
+type MelodyMotifId = "hook" | "pocket" | "rise" | "answer";
+
+type MelodyMotifStep = {
+  step: number;
+  degree: number;
+  length: number;
+  velocity: number;
+};
+
+type MelodyMotifDefinition = {
+  id: MelodyMotifId;
+  label: string;
+  detail: string;
+  steps: MelodyMotifStep[];
+};
+
+type MelodyMotifOption = MelodyMotifDefinition & {
+  preview: string;
+  eventCount: number;
+};
+
 type ChordPadId = "home" | "lift" | "tension" | "color";
 
 type ChordPadDefinition = {
@@ -445,6 +466,58 @@ const chordPadDefinitions: ChordPadDefinition[] = [
   { id: "color", label: "Color", detail: "float", degree: 3, quality: "sus2", inversion: 1 }
 ];
 
+const melodyMotifDefinitions: MelodyMotifDefinition[] = [
+  {
+    id: "hook",
+    label: "Hook",
+    detail: "lead",
+    steps: [
+      { step: 0, degree: 4, length: 2, velocity: 0.74 },
+      { step: 3, degree: 4, length: 1, velocity: 0.68 },
+      { step: 6, degree: 2, length: 2, velocity: 0.7 },
+      { step: 8, degree: 0, length: 2, velocity: 0.74 },
+      { step: 11, degree: 2, length: 1, velocity: 0.66 },
+      { step: 14, degree: 4, length: 2, velocity: 0.72 }
+    ]
+  },
+  {
+    id: "pocket",
+    label: "Pocket",
+    detail: "space",
+    steps: [
+      { step: 1, degree: 0, length: 2, velocity: 0.58 },
+      { step: 5, degree: 2, length: 1, velocity: 0.64 },
+      { step: 9, degree: 1, length: 2, velocity: 0.58 },
+      { step: 13, degree: 5, length: 1, velocity: 0.62 }
+    ]
+  },
+  {
+    id: "rise",
+    label: "Rise",
+    detail: "build",
+    steps: [
+      { step: 0, degree: 0, length: 1, velocity: 0.58 },
+      { step: 2, degree: 1, length: 1, velocity: 0.62 },
+      { step: 4, degree: 2, length: 1, velocity: 0.66 },
+      { step: 6, degree: 3, length: 1, velocity: 0.7 },
+      { step: 8, degree: 4, length: 1, velocity: 0.74 },
+      { step: 10, degree: 5, length: 1, velocity: 0.78 },
+      { step: 12, degree: 6, length: 2, velocity: 0.82 }
+    ]
+  },
+  {
+    id: "answer",
+    label: "Answer",
+    detail: "reply",
+    steps: [
+      { step: 8, degree: 5, length: 2, velocity: 0.7 },
+      { step: 10, degree: 4, length: 1, velocity: 0.66 },
+      { step: 12, degree: 2, length: 1, velocity: 0.64 },
+      { step: 14, degree: 0, length: 2, velocity: 0.7 }
+    ]
+  }
+];
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<ProjectState[]>([]);
@@ -538,6 +611,7 @@ export function App(): ReactElement {
     () => createKeyboardCaptureKeyMap(keyboardCaptureTarget === "bass" ? bassPitchLanes(project.key) : melodyPitchLanes(project.key)),
     [keyboardCaptureTarget, project.key]
   );
+  const melodyMotifOptions = useMemo(() => createMelodyMotifOptions(project.key), [project.key]);
   const keyboardCaptureNextStep = nextKeyboardCaptureStep(
     currentPattern,
     keyboardCaptureTarget,
@@ -1634,6 +1708,29 @@ export function App(): ReactElement {
     }
 
     setSelectedNote({ track: target, step, pitch });
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
+  }
+
+  function applyMelodyMotif(motifId: MelodyMotifId): void {
+    const motif = melodyMotifDefinitions.find((candidate) => candidate.id === motifId);
+    if (!motif) {
+      setProjectStatus("Melody motif not found");
+      return;
+    }
+
+    const melodyNotes = createMelodyMotifNotes(projectRef.current.key, motif);
+    const changed = updateCurrentPattern(
+      (pattern) => (sameMelodyNotes(pattern.melodyNotes, melodyNotes) ? pattern : { ...pattern, melodyNotes }),
+      `${motif.label} melody motif applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (!changed) {
+      setProjectStatus(`${motif.label} melody motif already selected`);
+      return;
+    }
+
+    const firstNote = melodyNotes[0];
+    setSelectedNote(firstNote ? { track: "melody", step: firstNote.step, pitch: firstNote.pitch } : null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
   }
@@ -2859,6 +2956,7 @@ export function App(): ReactElement {
             selectedNote={selectedNote}
             target={keyboardCaptureTarget}
           />
+          <MelodyMotifPads motifs={melodyMotifOptions} onApply={applyMelodyMotif} />
           <div className="note-lanes">
             <NoteEditor
               title="808"
@@ -5998,6 +6096,38 @@ function DrumStepInspector({
   );
 }
 
+function MelodyMotifPads({
+  motifs,
+  onApply
+}: {
+  motifs: MelodyMotifOption[];
+  onApply: (motif: MelodyMotifId) => void;
+}): ReactElement {
+  return (
+    <div className="melody-motif-panel" data-testid="melody-motif-pads">
+      <div className="melody-motif-heading">
+        <span>Melody Motifs</span>
+        <strong>Synth</strong>
+      </div>
+      <div className="melody-motif-row" aria-label="Melody Motif Pads">
+        {motifs.map((motif) => (
+          <button
+            data-testid={`melody-motif-${motif.id}`}
+            key={motif.id}
+            onClick={() => onApply(motif.id)}
+            title={`${motif.label} ${motif.preview}`}
+            type="button"
+          >
+            <span>{motif.label}</span>
+            <strong>{motif.preview}</strong>
+            <small>{motif.eventCount} notes / {motif.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function KeyboardCapturePanel({
   enabled,
   target,
@@ -6873,6 +7003,50 @@ function addKeyboardCaptureNote(pattern: PatternData, track: NoteTrack, step: nu
       { step, pitch, length: 1, velocity: 0.68, probability: 1 }
     ])
   };
+}
+
+function createMelodyMotifOptions(key: string): MelodyMotifOption[] {
+  return melodyMotifDefinitions.map((motif) => {
+    const notes = createMelodyMotifNotes(key, motif);
+    return {
+      ...motif,
+      preview: notes[0]?.pitch ?? "-",
+      eventCount: notes.length
+    };
+  });
+}
+
+function createMelodyMotifNotes(key: string, motif: MelodyMotifDefinition): MelodyNote[] {
+  const pitches = melodyPitchLanes(key);
+  return sortMelodyNotes(
+    motif.steps.map((motifStep) => {
+      const step = clampStepStart(motifStep.step);
+      return {
+        step,
+        pitch: pitches[positiveIndex(motifStep.degree, pitches.length)] ?? pitches[0] ?? "C4",
+        length: Math.min(clampStepLength(motifStep.length), 16 - step),
+        velocity: clampVelocity(motifStep.velocity),
+        probability: 1
+      };
+    })
+  );
+}
+
+function sameMelodyNotes(first: MelodyNote[], second: MelodyNote[]): boolean {
+  if (first.length !== second.length) {
+    return false;
+  }
+  return first.every((note, index) => {
+    const candidate = second[index];
+    return (
+      candidate !== undefined &&
+      note.step === candidate.step &&
+      note.pitch === candidate.pitch &&
+      note.length === candidate.length &&
+      note.velocity === candidate.velocity &&
+      normalizeEventProbability(note.probability) === normalizeEventProbability(candidate.probability)
+    );
+  });
 }
 
 function mergeChordRoots(scaleRoots: string[], usedRoots: string[]): string[] {
