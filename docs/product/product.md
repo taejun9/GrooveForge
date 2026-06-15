@@ -114,6 +114,7 @@ MVP capabilities:
 - Sound design presets and Studio tone controls for kick punch, snare snap, hat brightness, 808 drive/decay, synth brightness/release, and chord warmth/width.
 - Independent Pattern A/B/C storage with copy/clear tools for drum, bass, chord, and melody variations.
 - Editable arrangement blocks for an 8-bar loop or simple song section, using assigned Pattern A/B/C data, per-block energy, and structure controls for duplicate, move, and delete.
+- Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
 - Mixer volume, pan, mute, and solo reflected in realtime playback and WAV export.
 - Master preset ceiling and output gain.
 - Export peak/RMS/headroom meter with limiter activity status for the current arrangement.

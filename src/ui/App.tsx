@@ -11,10 +11,12 @@ import {
   KeyboardMusic,
   Music2,
   Play,
+  Redo2,
   Save,
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  Undo2,
   Waves
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode } from "react";
@@ -67,6 +69,7 @@ const drumLabels: Record<DrumLane, string> = {
 };
 
 const keys = ["F minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"];
+const historyLimit = 50;
 
 type SelectedNote = {
   track: NoteTrack;
@@ -84,11 +87,14 @@ type NoteView = {
 
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
+  const [undoStack, setUndoStack] = useState<ProjectState[]>([]);
+  const [redoStack, setRedoStack] = useState<ProjectState[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState<PlaybackSnapshot | null>(null);
   const [selectedNote, setSelectedNote] = useState<SelectedNote | null>(null);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
   const [projectStatus, setProjectStatus] = useState("Demo project");
+  const projectRef = useRef<ProjectState>(starterProject);
   const controllerRef = useRef<PlaybackController | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const style = getStyle(project);
@@ -101,6 +107,8 @@ export function App(): ReactElement {
     ).length;
   }, [project.mixer]);
   const activeChannelLabel = `${activeChannels} active ${activeChannels === 1 ? "channel" : "channels"}`;
+  const canUndo = undoStack.length > 0;
+  const canRedo = redoStack.length > 0;
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
   const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const bassPitches = useMemo(
@@ -135,9 +143,101 @@ export function App(): ReactElement {
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, project.arrangement.length - 1)));
   }, [project.arrangement.length]);
 
-  function updateProject(update: (current: ProjectState) => ProjectState): void {
-    setProject((current) => update(current));
-    setProjectStatus("Unsaved changes");
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (isEditableShortcutTarget(event.target)) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      const withCommandModifier = event.metaKey || event.ctrlKey;
+      const wantsUndo = withCommandModifier && !event.shiftKey && key === "z";
+      const wantsRedo = withCommandModifier && ((event.shiftKey && key === "z") || key === "y");
+
+      if (!wantsUndo && !wantsRedo) {
+        return;
+      }
+
+      event.preventDefault();
+      if (wantsUndo) {
+        undoProject();
+        return;
+      }
+      redoProject();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undoStack, redoStack]);
+
+  function updateProject(update: (current: ProjectState) => ProjectState, status = "Unsaved changes"): boolean {
+    const current = projectRef.current;
+    const nextProject = update(current);
+    if (nextProject === current) {
+      return false;
+    }
+
+    projectRef.current = nextProject;
+    setUndoStack((history) => appendHistory(history, current));
+    setRedoStack([]);
+    setProject(nextProject);
+    setProjectStatus(status);
+    return true;
+  }
+
+  function updateProjectView(update: (current: ProjectState) => ProjectState, status: string): void {
+    const current = projectRef.current;
+    const nextProject = update(current);
+    if (nextProject !== current) {
+      projectRef.current = nextProject;
+      setProject(nextProject);
+    }
+    setProjectStatus(status);
+  }
+
+  function replaceProject(nextProject: ProjectState, status: string): void {
+    projectRef.current = nextProject;
+    setProject(nextProject);
+    setUndoStack([]);
+    setRedoStack([]);
+    setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, nextProject.arrangement.length - 1)));
+    setSelectedNote(null);
+    setProjectStatus(status);
+  }
+
+  function restoreProjectFromHistory(nextProject: ProjectState, status: string): void {
+    projectRef.current = nextProject;
+    setProject(nextProject);
+    setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, nextProject.arrangement.length - 1)));
+    setSelectedNote(null);
+    setPlaybackPosition(null);
+    setProjectStatus(status);
+  }
+
+  function undoProject(): void {
+    const previousProject = undoStack[undoStack.length - 1];
+    if (!previousProject) {
+      setProjectStatus("Nothing to undo");
+      return;
+    }
+
+    const current = projectRef.current;
+    setUndoStack((history) => history.slice(0, -1));
+    setRedoStack((history) => prependFuture(history, current));
+    restoreProjectFromHistory(previousProject, "Undo applied");
+  }
+
+  function redoProject(): void {
+    const nextProject = redoStack[0];
+    if (!nextProject) {
+      setProjectStatus("Nothing to redo");
+      return;
+    }
+
+    const current = projectRef.current;
+    setRedoStack((history) => history.slice(1));
+    setUndoStack((history) => appendHistory(history, current));
+    restoreProjectFromHistory(nextProject, "Redo applied");
   }
 
   function updateCurrentPattern(update: (pattern: PatternData) => PatternData): void {
@@ -151,36 +251,42 @@ export function App(): ReactElement {
   }
 
   function selectPattern(pattern: PatternSlot): void {
-    setProject((current) => ({ ...current, selectedPattern: pattern }));
+    updateProjectView(
+      (current) => (current.selectedPattern === pattern ? current : { ...current, selectedPattern: pattern }),
+      `Editing Pattern ${pattern}`
+    );
     setSelectedNote(null);
-    setProjectStatus(`Editing Pattern ${pattern}`);
   }
 
   function copySelectedPattern(target: PatternSlot): void {
-    const sourceSlot = project.selectedPattern;
-    updateProject((current) => ({
-      ...current,
-      selectedPattern: target,
-      patterns: {
-        ...current.patterns,
-        [target]: clonePatternData(current.patterns[current.selectedPattern])
-      }
-    }));
+    const sourceSlot = projectRef.current.selectedPattern;
+    updateProject(
+      (current) => ({
+        ...current,
+        selectedPattern: target,
+        patterns: {
+          ...current.patterns,
+          [target]: clonePatternData(current.patterns[current.selectedPattern])
+        }
+      }),
+      `Copied Pattern ${sourceSlot} to ${target}`
+    );
     setSelectedNote(null);
-    setProjectStatus(`Copied Pattern ${sourceSlot} to ${target}`);
   }
 
   function clearSelectedPattern(): void {
-    const sourceSlot = project.selectedPattern;
-    updateProject((current) => ({
-      ...current,
-      patterns: {
-        ...current.patterns,
-        [current.selectedPattern]: createEmptyPatternData()
-      }
-    }));
+    const sourceSlot = projectRef.current.selectedPattern;
+    updateProject(
+      (current) => ({
+        ...current,
+        patterns: {
+          ...current.patterns,
+          [current.selectedPattern]: createEmptyPatternData()
+        }
+      }),
+      `Cleared Pattern ${sourceSlot}`
+    );
     setSelectedNote(null);
-    setProjectStatus(`Cleared Pattern ${sourceSlot}`);
   }
 
   function selectArrangementBlock(index: number): void {
@@ -190,9 +296,8 @@ export function App(): ReactElement {
     }
 
     setSelectedArrangementIndex(index);
-    setProject((current) => ({ ...current, selectedPattern: block.pattern }));
+    updateProjectView((current) => ({ ...current, selectedPattern: block.pattern }), `Arranging ${block.section}`);
     setSelectedNote(null);
-    setProjectStatus(`Arranging ${block.section}`);
   }
 
   function updateArrangementBlock(index: number, update: Partial<ArrangementBlock>): void {
@@ -249,7 +354,7 @@ export function App(): ReactElement {
   }
 
   function duplicateArrangementBlock(): void {
-    setProject((current) => {
+    const changed = updateProject((current) => {
       const source = current.arrangement[selectedArrangementIndex] ?? current.arrangement[0];
       if (!source) {
         return current;
@@ -265,13 +370,14 @@ export function App(): ReactElement {
           ...current.arrangement.slice(nextIndex)
         ]
       };
-    });
-    setSelectedNote(null);
-    setProjectStatus("Duplicated arrangement block");
+    }, "Duplicated arrangement block");
+    if (changed) {
+      setSelectedNote(null);
+    }
   }
 
   function moveArrangementBlock(direction: -1 | 1): void {
-    setProject((current) => {
+    const changed = updateProject((current) => {
       const fromIndex = selectedArrangementIndex;
       const toIndex = fromIndex + direction;
       const movingBlock = current.arrangement[fromIndex];
@@ -288,13 +394,14 @@ export function App(): ReactElement {
         selectedPattern: movingBlock.pattern,
         arrangement
       };
-    });
-    setSelectedNote(null);
-    setProjectStatus(direction < 0 ? "Moved block left" : "Moved block right");
+    }, direction < 0 ? "Moved block left" : "Moved block right");
+    if (changed) {
+      setSelectedNote(null);
+    }
   }
 
   function deleteArrangementBlock(): void {
-    setProject((current) => {
+    const changed = updateProject((current) => {
       if (current.arrangement.length <= 1) {
         return current;
       }
@@ -308,9 +415,11 @@ export function App(): ReactElement {
         selectedPattern: nextBlock.pattern,
         arrangement
       };
-    });
+    }, "Deleted arrangement block");
     setSelectedNote(null);
-    setProjectStatus(project.arrangement.length <= 1 ? "Arrangement needs one block" : "Deleted arrangement block");
+    if (!changed) {
+      setProjectStatus("Arrangement needs one block");
+    }
   }
 
   function toggleStep(lane: DrumLane, step: number): void {
@@ -494,11 +603,9 @@ export function App(): ReactElement {
       const nextProject = parseProjectFile(contents);
       controllerRef.current?.stop();
       controllerRef.current = null;
-      setProject(nextProject);
+      replaceProject(nextProject, `Loaded ${sourceName}`);
       setPlaybackPosition(null);
-      setSelectedNote(null);
       setIsPlaying(false);
-      setProjectStatus(`Loaded ${sourceName}`);
     } catch (error) {
       console.error(error);
       setProjectStatus("Invalid project file");
@@ -601,6 +708,28 @@ export function App(): ReactElement {
           <button className="icon-button primary" type="button" title="Play realtime loop" onClick={togglePlayback}>
             {isPlaying ? <CircleStop size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
             <span>{isPlaying ? "Stop" : "Play"}</span>
+          </button>
+          <button
+            className="icon-button"
+            data-testid="undo-button"
+            type="button"
+            title="Undo last edit"
+            disabled={!canUndo}
+            onClick={undoProject}
+          >
+            <Undo2 size={18} aria-hidden="true" />
+            <span>Undo</span>
+          </button>
+          <button
+            className="icon-button"
+            data-testid="redo-button"
+            type="button"
+            title="Redo last undone edit"
+            disabled={!canRedo}
+            onClick={redoProject}
+          >
+            <Redo2 size={18} aria-hidden="true" />
+            <span>Redo</span>
           </button>
           <button className="icon-button" type="button" title="Open project" onClick={() => void handleOpenProject()}>
             <FolderOpen size={18} aria-hidden="true" />
@@ -1588,6 +1717,22 @@ function sortBassNotes(notes: BassNote[]): BassNote[] {
 
 function sortMelodyNotes(notes: MelodyNote[]): MelodyNote[] {
   return [...notes].sort((first, second) => first.step - second.step || first.pitch.localeCompare(second.pitch));
+}
+
+function appendHistory(history: ProjectState[], project: ProjectState): ProjectState[] {
+  return [...history, project].slice(-historyLimit);
+}
+
+function prependFuture(history: ProjectState[], project: ProjectState): ProjectState[] {
+  return [project, ...history].slice(0, historyLimit);
+}
+
+function isEditableShortcutTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  const tagName = target.tagName.toLowerCase();
+  return target.isContentEditable || tagName === "input" || tagName === "textarea" || tagName === "select";
 }
 
 function downloadProjectFile(contents: string, fileName: string): void {
