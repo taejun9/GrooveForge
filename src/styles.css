@@ -194,6 +194,7 @@ h2 {
 
 .icon-button,
 .segmented button,
+.style-quick-picks button,
 .pattern-tabs button,
 .pattern-compare button,
 .pattern-tools button,
@@ -288,6 +289,7 @@ h2 {
 }
 
 .segmented button,
+.style-quick-picks button,
 .pattern-tabs button,
 .pattern-tools button,
 .pattern-fill-row button,
@@ -306,6 +308,7 @@ h2 {
 }
 
 .segmented button.selected,
+.style-quick-picks button.selected,
 .pattern-tabs button.selected,
 .arrangement-template-row button.selected,
 .arrangement-focus-actions button.suggested,
@@ -423,6 +426,60 @@ h2 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
+}
+
+.style-quick-picks {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.style-quick-picks button {
+  display: grid;
+  min-width: 0;
+  min-height: 54px;
+  gap: 2px;
+  align-content: center;
+  border-color: color-mix(in srgb, var(--quick-style-color) 26%, rgba(244, 239, 231, 0.12));
+  border-inline-start: 3px solid var(--quick-style-color);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--quick-style-color) 12%, transparent), transparent 60%),
+    rgba(244, 239, 231, 0.045);
+  padding: 6px 7px;
+  text-align: start;
+}
+
+.style-quick-picks button.selected {
+  border-color: color-mix(in srgb, var(--quick-style-color) 70%, #f4efe7);
+  color: #f4efe7;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--quick-style-color) 24%, transparent), transparent 64%),
+    rgba(244, 239, 231, 0.075);
+}
+
+.style-quick-picks button span,
+.style-quick-picks button strong,
+.style-quick-picks button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.style-quick-picks button span {
+  color: rgba(244, 239, 231, 0.76);
+  font-size: 11px;
+}
+
+.style-quick-picks button strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.style-quick-picks button small {
+  color: rgba(244, 239, 231, 0.56);
+  font-size: 9px;
 }
 
 .style-inspector-pattern {

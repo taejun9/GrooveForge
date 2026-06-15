@@ -2504,7 +2504,11 @@ export function App(): ReactElement {
         </div>
       </section>
 
-      <StyleInspector summary={styleInspectorSummary} />
+      <StyleInspector
+        onSelectStyle={selectStyle}
+        selectedStyleId={project.styleId}
+        summary={styleInspectorSummary}
+      />
 
       <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
 
@@ -3348,7 +3352,15 @@ function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; met
   );
 }
 
-function StyleInspector({ summary }: { summary: StyleInspectorSummary }): ReactElement {
+function StyleInspector({
+  onSelectStyle,
+  selectedStyleId,
+  summary
+}: {
+  onSelectStyle: (styleId: ProjectState["styleId"]) => void;
+  selectedStyleId: ProjectState["styleId"];
+  summary: StyleInspectorSummary;
+}): ReactElement {
   const metrics = [
     { label: "BPM range", value: summary.bpm },
     { label: "Swing", value: summary.swing },
@@ -3379,6 +3391,29 @@ function StyleInspector({ summary }: { summary: StyleInspectorSummary }): ReactE
             <strong>{metric.value}</strong>
           </div>
         ))}
+      </div>
+      <div className="style-quick-picks" aria-label="Style quick picks" data-testid="style-quick-picks">
+        {styleProfiles.map((profile) => {
+          const selected = profile.id === selectedStyleId;
+          return (
+            <button
+              aria-pressed={selected}
+              className={selected ? "selected" : ""}
+              data-testid={`style-quick-${profile.id}`}
+              key={profile.id}
+              onClick={() => onSelectStyle(profile.id)}
+              style={{ "--quick-style-color": profile.color } as CSSProperties}
+              title={`Apply ${profile.name} groove`}
+              type="button"
+            >
+              <span>{profile.name}</span>
+              <strong>{profile.defaultBpm} BPM</strong>
+              <small>
+                {bassStyleRoleLabel(profile.bassStyle)} / {melodyStyleRoleLabel(profile.melodyStyle)}
+              </small>
+            </button>
+          );
+        })}
       </div>
       <div className="style-inspector-patterns" aria-label="Pattern density">
         {summary.patterns.map((pattern) => (
