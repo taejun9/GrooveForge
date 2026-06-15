@@ -87,6 +87,8 @@ Chord progression work must preserve Pattern A/B/C independence, keep chord root
 
 Chord inversion work must migrate older chord events to root position, preserve per-chord inversion data across Pattern A/B/C copy, save/load, undo/redo, realtime playback, WAV export, and stem export, and keep inversions as editable musical event data rather than imported audio.
 
+Selected chord edit tool work must keep chord move, duplicate, delete, and inversion actions scoped to the selected Pattern A/B/C slot, preserve root/quality/length/velocity/chance fields unless directly edited, avoid overlapping duplicate or moved chord starts at the same step, preserve at least one chord event, keep actions undoable, and keep realtime playback, WAV/stem export, and MIDI export driven by editable chord event data rather than imported audio.
+
 Sound design work must keep tone parameters in project state, migrate older project files without sound data, and make preset or Studio tone changes audible in both realtime playback and WAV export.
 
 Sidechain work must keep kick-to-808 ducking as editable local sound-design state, migrate older project files without sidechain data, and apply the same deterministic gain rule to realtime playback, full-mix WAV export, and 808 stem export.

@@ -35,6 +35,7 @@ import {
   ArrangementTemplateId,
   BassNote,
   ChordEvent,
+  ChordInversion,
   ChordProgressionPreset,
   ChordQuality,
   DrumGroovePreset,
@@ -152,6 +153,7 @@ export function App(): ReactElement {
   const [playbackPosition, setPlaybackPosition] = useState<PlaybackSnapshot | null>(null);
   const [selectedNote, setSelectedNote] = useState<SelectedNote | null>(null);
   const [selectedDrumStep, setSelectedDrumStep] = useState<SelectedDrumStep | null>(null);
+  const [selectedChordIndex, setSelectedChordIndex] = useState<number | null>(0);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
   const [splitAfterBars, setSplitAfterBars] = useState(1);
   const [projectStatus, setProjectStatus] = useState("Demo project");
@@ -211,6 +213,8 @@ export function App(): ReactElement {
   const selectedDrumActive = selectedDrumStep
     ? currentPattern.drumPattern[selectedDrumStep.lane][selectedDrumStep.step]
     : false;
+  const selectedChord =
+    selectedChordIndex === null ? undefined : currentPattern.chordEvents[selectedChordIndex];
   const selectedDrumVelocity =
     selectedDrumStep && selectedDrumActive
       ? drumStepVelocity(currentPattern, selectedDrumStep.lane, selectedDrumStep.step)
@@ -244,9 +248,18 @@ export function App(): ReactElement {
   }, [selectedArrangementBars, selectedArrangementIndex]);
 
   useEffect(() => {
+    setSelectedChordIndex((index) => {
+      if (currentPattern.chordEvents.length === 0) {
+        return null;
+      }
+      return index === null ? 0 : Math.min(index, currentPattern.chordEvents.length - 1);
+    });
+  }, [currentPattern.chordEvents.length, project.selectedPattern]);
+
+  useEffect(() => {
     window.addEventListener("keydown", handleDesktopShortcut);
     return () => window.removeEventListener("keydown", handleDesktopShortcut);
-  }, [project, undoStack, redoStack, isPlaying, playbackMode, selectedNote, selectedDrumStep, selectedDrumActive]);
+  }, [project, undoStack, redoStack, isPlaying, playbackMode, selectedNote, selectedDrumStep, selectedDrumActive, selectedChordIndex]);
 
   function handleDesktopShortcut(event: KeyboardEvent): void {
     if (isEditableShortcutTarget(event.target)) {
@@ -339,6 +352,7 @@ export function App(): ReactElement {
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, nextProject.arrangement.length - 1)));
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
     setProjectStatus(status);
   }
 
@@ -348,6 +362,7 @@ export function App(): ReactElement {
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, nextProject.arrangement.length - 1)));
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
     setPlaybackPosition(null);
     setProjectStatus(status);
   }
@@ -402,6 +417,7 @@ export function App(): ReactElement {
     );
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(0);
   }
 
   function copySelectedPattern(target: PatternSlot): void {
@@ -419,6 +435,7 @@ export function App(): ReactElement {
     );
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(0);
   }
 
   function clearSelectedPattern(): void {
@@ -435,6 +452,7 @@ export function App(): ReactElement {
     );
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
   }
 
   function applyPatternVariation(preset: PatternVariationPreset): void {
@@ -445,6 +463,7 @@ export function App(): ReactElement {
     );
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
   }
 
   function deleteSelectedEvent(): void {
@@ -454,7 +473,10 @@ export function App(): ReactElement {
     if (clearSelectedDrumStep()) {
       return;
     }
-    setProjectStatus("Select a step or note to delete");
+    if (deleteSelectedChordEvent()) {
+      return;
+    }
+    setProjectStatus("Select a step, note, or chord to delete");
   }
 
   function deleteSelectedNote(): boolean {
@@ -484,6 +506,13 @@ export function App(): ReactElement {
       setSelectedNote(null);
     }
     return changed;
+  }
+
+  function deleteSelectedChordEvent(): boolean {
+    if (selectedChordIndex === null) {
+      return false;
+    }
+    return deleteChordEvent(selectedChordIndex);
   }
 
   function clearSelectedDrumStep(): boolean {
@@ -537,6 +566,7 @@ export function App(): ReactElement {
     updateProjectView((current) => ({ ...current, selectedPattern: block.pattern }), `Arranging ${block.section}`);
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
   }
 
   function updateArrangementBlock(index: number, update: Partial<ArrangementBlock>): void {
@@ -563,6 +593,7 @@ export function App(): ReactElement {
     });
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
   }
 
   function toggleArrangementTrackMute(track: ArrangementMuteTrack): void {
@@ -591,6 +622,7 @@ export function App(): ReactElement {
       setSelectedArrangementIndex(0);
       setSelectedNote(null);
       setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
     }
   }
 
@@ -664,6 +696,7 @@ export function App(): ReactElement {
     if (changed) {
       setSelectedNote(null);
       setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
     }
   }
 
@@ -708,6 +741,7 @@ export function App(): ReactElement {
     }, "Split arrangement block");
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
     if (!changed) {
       setProjectStatus("Block needs 2+ bars to split");
     }
@@ -743,6 +777,7 @@ export function App(): ReactElement {
     }, "Merged arrangement blocks");
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
     if (!changed) {
       setProjectStatus("Merge needs a next block within 16 bars");
     }
@@ -770,6 +805,7 @@ export function App(): ReactElement {
     if (changed) {
       setSelectedNote(null);
       setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
     }
   }
 
@@ -791,6 +827,7 @@ export function App(): ReactElement {
     }, "Deleted arrangement block");
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
     if (!changed) {
       setProjectStatus("Arrangement needs one block");
     }
@@ -801,6 +838,7 @@ export function App(): ReactElement {
     const active = currentPattern.drumPattern[lane][step];
     setSelectedDrumStep({ lane, step });
     setSelectedNote(null);
+    setSelectedChordIndex(null);
     if (active && !selectedSameStep) {
       return;
     }
@@ -907,6 +945,7 @@ export function App(): ReactElement {
     );
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
   }
 
   function toggleBassNote(step: number, pitch: string): void {
@@ -914,6 +953,7 @@ export function App(): ReactElement {
     const selectedSameNote = selectedNote?.track === "bass" && selectedNote.step === step && selectedNote.pitch === pitch;
     setSelectedNote({ track: "bass", step, pitch });
     setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
     if (exists && !selectedSameNote) {
       return;
     }
@@ -932,6 +972,7 @@ export function App(): ReactElement {
     const selectedSameNote = selectedNote?.track === "melody" && selectedNote.step === step && selectedNote.pitch === pitch;
     setSelectedNote({ track: "melody", step, pitch });
     setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
     if (exists && !selectedSameNote) {
       return;
     }
@@ -1118,6 +1159,7 @@ export function App(): ReactElement {
     if (changed) {
       setSelectedNote({ ...target, step, pitch });
       setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
     }
   }
 
@@ -1150,6 +1192,7 @@ export function App(): ReactElement {
       if (changed) {
         setSelectedNote({ ...target, step: nextStep });
         setSelectedDrumStep(null);
+        setSelectedChordIndex(null);
       }
       return;
     }
@@ -1174,77 +1217,190 @@ export function App(): ReactElement {
     if (changed) {
       setSelectedNote({ ...target, step: nextStep });
       setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
     }
   }
 
-  function updateChordEvent(index: number, update: Partial<ChordEvent>): void {
-    updateCurrentPattern((pattern) => ({
-      ...pattern,
-      chordEvents: sortChordEvents(
-        pattern.chordEvents.map((event, eventIndex) => {
-          if (eventIndex !== index) {
-            return event;
-          }
-          const step = update.step === undefined ? event.step : clampStepStart(update.step);
-          const length = Math.min(
-            update.length === undefined ? event.length : clampStepLength(update.length),
-            16 - step
-          );
-          return {
-            ...event,
-            ...update,
-            step,
-            length,
-            inversion: update.inversion === undefined ? event.inversion : normalizeChordInversion(update.inversion),
-            velocity: update.velocity === undefined ? event.velocity : clampVelocity(update.velocity),
-            probability: update.probability === undefined ? event.probability : normalizeEventProbability(update.probability)
-          };
-        })
-      )
-    }));
+  function selectChordEvent(index: number): void {
+    if (!currentPattern.chordEvents[index]) {
+      return;
+    }
+    setSelectedChordIndex(index);
+    setSelectedNote(null);
+    setSelectedDrumStep(null);
+  }
+
+  function updateChordEvent(index: number, update: Partial<ChordEvent>, status = "Edited chord event"): boolean {
+    let nextSelectedIndex: number | null = null;
+    let rejectedStatus = "";
+    const changed = updateCurrentPattern((pattern) => {
+      const source = pattern.chordEvents[index];
+      if (!source) {
+        return pattern;
+      }
+      const nextEvent = chordEventWithUpdate(source, update);
+      if (
+        update.step !== undefined &&
+        pattern.chordEvents.some((event, eventIndex) => eventIndex !== index && event.step === nextEvent.step)
+      ) {
+        rejectedStatus = "Target chord step already exists";
+        return pattern;
+      }
+      if (sameChordEvent(source, nextEvent)) {
+        return pattern;
+      }
+      const chordEvents = sortChordEvents(
+        pattern.chordEvents.map((event, eventIndex) => (eventIndex === index ? nextEvent : event))
+      );
+      nextSelectedIndex = findChordEventIndex(chordEvents, nextEvent);
+      return {
+        ...pattern,
+        chordEvents
+      };
+    }, status);
+
+    if (changed) {
+      setSelectedChordIndex(nextSelectedIndex);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+    } else if (rejectedStatus) {
+      setProjectStatus(rejectedStatus);
+    }
+    return changed;
   }
 
   function applyChordProgressionPreset(preset: ChordProgressionPreset): void {
-    updateCurrentPattern(
+    const changed = updateCurrentPattern(
       (pattern) => ({
         ...pattern,
         chordEvents: createChordProgressionPreset(preset, projectRef.current.key)
       }),
       `${chordProgressionPresetLabel(preset)} chords applied to Pattern ${projectRef.current.selectedPattern}`
     );
+    if (changed) {
+      setSelectedChordIndex(0);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+    }
   }
 
   function addChordEvent(): void {
-    updateCurrentPattern(
-      (pattern) => ({
-        ...pattern,
-        chordEvents: sortChordEvents([
-          ...pattern.chordEvents,
-          createNextChordEvent(projectRef.current.key, pattern.chordEvents)
-        ])
-      }),
+    let nextSelectedIndex: number | null = null;
+    const changed = updateCurrentPattern(
+      (pattern) => {
+        const chord = createNextChordEvent(projectRef.current.key, pattern.chordEvents);
+        const chordEvents = sortChordEvents([...pattern.chordEvents, chord]);
+        nextSelectedIndex = findChordEventIndex(chordEvents, chord);
+        return {
+          ...pattern,
+          chordEvents
+        };
+      },
       `Added chord to Pattern ${projectRef.current.selectedPattern}`
     );
+    if (changed) {
+      setSelectedChordIndex(nextSelectedIndex);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+    }
   }
 
-  function deleteChordEvent(index: number): void {
+  function deleteChordEvent(index: number): boolean {
     const currentChords = activePattern(projectRef.current).chordEvents;
     if (currentChords.length <= 1) {
       setProjectStatus("Chord progression needs one chord");
-      return;
+      return false;
     }
 
-    updateCurrentPattern(
+    let nextSelectedIndex: number | null = null;
+    const changed = updateCurrentPattern(
       (pattern) => {
         if (!pattern.chordEvents[index]) {
           return pattern;
         }
+        const chordEvents = pattern.chordEvents.filter((_, eventIndex) => eventIndex !== index);
+        nextSelectedIndex = Math.min(index, chordEvents.length - 1);
         return {
           ...pattern,
-          chordEvents: pattern.chordEvents.filter((_, eventIndex) => eventIndex !== index)
+          chordEvents
         };
       },
       `Deleted chord ${index + 1} from Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (changed) {
+      setSelectedChordIndex(nextSelectedIndex);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+    }
+    return changed;
+  }
+
+  function moveSelectedChordStep(direction: -1 | 1): void {
+    if (selectedChordIndex === null || !selectedChord) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+    const nextStep = clampStepStart(selectedChord.step + direction);
+    if (nextStep === selectedChord.step) {
+      setProjectStatus(direction < 0 ? "Chord is at the first step" : "Chord is at the last step");
+      return;
+    }
+    updateChordEvent(
+      selectedChordIndex,
+      { step: nextStep },
+      direction < 0 ? "Moved chord left" : "Moved chord right"
+    );
+  }
+
+  function duplicateSelectedChord(): void {
+    if (selectedChordIndex === null) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+    let nextSelectedIndex: number | null = null;
+    let rejectedStatus = "";
+    const changed = updateCurrentPattern((pattern) => {
+      const source = pattern.chordEvents[selectedChordIndex];
+      if (!source) {
+        return pattern;
+      }
+      const nextStep = nextEmptyChordStep(pattern.chordEvents, source.step);
+      if (nextStep === null) {
+        rejectedStatus = "No empty step for duplicate chord";
+        return pattern;
+      }
+      const duplicate: ChordEvent = { ...source, step: nextStep };
+      const chordEvents = sortChordEvents([...pattern.chordEvents, duplicate]);
+      nextSelectedIndex = findChordEventIndex(chordEvents, duplicate);
+      return {
+        ...pattern,
+        chordEvents
+      };
+    }, "Duplicated chord event");
+    if (changed) {
+      setSelectedChordIndex(nextSelectedIndex);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+    } else if (rejectedStatus) {
+      setProjectStatus(rejectedStatus);
+    }
+  }
+
+  function moveSelectedChordInversion(direction: -1 | 1): void {
+    if (selectedChordIndex === null || !selectedChord) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+    const inversionIndex = chordInversions.indexOf(normalizeChordInversion(selectedChord.inversion));
+    const nextInversion = chordInversions[inversionIndex + direction];
+    if (nextInversion === undefined) {
+      setProjectStatus(direction < 0 ? "Chord is already root voicing" : "Chord is at top voicing");
+      return;
+    }
+    updateChordEvent(
+      selectedChordIndex,
+      { inversion: nextInversion },
+      direction < 0 ? "Moved chord voicing down" : "Moved chord voicing up"
     );
   }
 
@@ -1386,6 +1542,7 @@ export function App(): ReactElement {
     if (changed) {
       setSelectedNote(null);
       setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
     }
   }
 
@@ -1411,6 +1568,7 @@ export function App(): ReactElement {
     );
     setSelectedNote(null);
     setSelectedDrumStep(null);
+    setSelectedChordIndex(0);
   }
 
   return (
@@ -1799,10 +1957,15 @@ export function App(): ReactElement {
           <ChordEditor
             chords={currentPattern.chordEvents}
             rootOptions={chordRootOptions}
+            selectedIndex={selectedChordIndex}
             onAdd={addChordEvent}
             onChange={updateChordEvent}
             onDelete={deleteChordEvent}
+            onDuplicate={duplicateSelectedChord}
+            onInvert={moveSelectedChordInversion}
+            onMoveStep={moveSelectedChordStep}
             onPreset={applyChordProgressionPreset}
+            onSelect={selectChordEvent}
           />
         </section>
 
@@ -2951,18 +3114,42 @@ function SoundControl({
 function ChordEditor({
   chords,
   rootOptions,
+  selectedIndex,
   onAdd,
   onChange,
   onDelete,
-  onPreset
+  onDuplicate,
+  onInvert,
+  onMoveStep,
+  onPreset,
+  onSelect
 }: {
   chords: ChordEvent[];
   rootOptions: string[];
+  selectedIndex: number | null;
   onAdd: () => void;
-  onChange: (index: number, update: Partial<ChordEvent>) => void;
-  onDelete: (index: number) => void;
+  onChange: (index: number, update: Partial<ChordEvent>) => boolean;
+  onDelete: (index: number) => boolean;
+  onDuplicate: () => void;
+  onInvert: (direction: -1 | 1) => void;
+  onMoveStep: (direction: -1 | 1) => void;
   onPreset: (preset: ChordProgressionPreset) => void;
+  onSelect: (index: number) => void;
 }): ReactElement {
+  const selectedChord = selectedIndex === null ? undefined : chords[selectedIndex];
+  const selectedInversion = selectedChord ? normalizeChordInversion(selectedChord.inversion) : 0;
+  const canMoveLeft =
+    selectedIndex !== null &&
+    selectedChord !== undefined &&
+    selectedChord.step > 0 &&
+    !chords.some((chord, index) => index !== selectedIndex && chord.step === selectedChord.step - 1);
+  const canMoveRight =
+    selectedIndex !== null &&
+    selectedChord !== undefined &&
+    selectedChord.step < 15 &&
+    !chords.some((chord, index) => index !== selectedIndex && chord.step === selectedChord.step + 1);
+  const canDuplicate = selectedChord ? nextEmptyChordStep(chords, selectedChord.step) !== null : false;
+
   return (
     <div className="chord-editor">
       <div className="lane-header">
@@ -2987,9 +3174,71 @@ function ChordEditor({
           <span>Add chord</span>
         </button>
       </div>
+      <div className="chord-edit-row" aria-label="Selected chord edit tools">
+        <button
+          data-testid="chord-move-left"
+          disabled={!canMoveLeft}
+          onClick={() => onMoveStep(-1)}
+          title="Move selected chord left"
+          type="button"
+        >
+          <ArrowLeft size={13} aria-hidden="true" />
+          <span>Step</span>
+        </button>
+        <button
+          data-testid="chord-move-right"
+          disabled={!canMoveRight}
+          onClick={() => onMoveStep(1)}
+          title="Move selected chord right"
+          type="button"
+        >
+          <ArrowRight size={13} aria-hidden="true" />
+          <span>Step</span>
+        </button>
+        <button
+          data-testid="chord-duplicate"
+          disabled={!canDuplicate}
+          onClick={onDuplicate}
+          title="Duplicate selected chord to the next empty step"
+          type="button"
+        >
+          <Copy size={13} aria-hidden="true" />
+          <span>Copy</span>
+        </button>
+        <button
+          data-testid="chord-invert-down"
+          disabled={!selectedChord || selectedInversion <= 0}
+          onClick={() => onInvert(-1)}
+          title="Move selected chord voicing down"
+          type="button"
+        >
+          <ArrowDown size={13} aria-hidden="true" />
+          <span>Voice</span>
+        </button>
+        <button
+          data-testid="chord-invert-up"
+          disabled={!selectedChord || selectedInversion >= chordInversions[chordInversions.length - 1]}
+          onClick={() => onInvert(1)}
+          title="Move selected chord voicing up"
+          type="button"
+        >
+          <ArrowUp size={13} aria-hidden="true" />
+          <span>Voice</span>
+        </button>
+      </div>
       <div className="chord-slots">
         {chords.map((chord, index) => (
-          <div className="chord-slot" data-testid={`chord-slot-${index}`} key={`${chord.step}-${index}`}>
+          <div
+            aria-label={`Chord ${index + 1} ${chord.root}${chord.quality} step ${chord.step + 1}`}
+            className={["chord-slot", selectedIndex === index ? "selected" : ""].filter(Boolean).join(" ")}
+            data-testid={`chord-slot-${index}`}
+            key={`${chord.step}-${index}`}
+            onClick={() => onSelect(index)}
+            onFocusCapture={() => onSelect(index)}
+            onPointerDownCapture={() => onSelect(index)}
+            role="group"
+            tabIndex={0}
+          >
             <div className="chord-slot-heading">
               <span>{chord.step + 1}</span>
               <strong>
@@ -3164,6 +3413,47 @@ function mergePitchLanes(scalePitches: string[], usedPitches: string[]): string[
 
 function mergeChordRoots(scaleRoots: string[], usedRoots: string[]): string[] {
   return Array.from(new Set([...scaleRoots, ...usedRoots]));
+}
+
+function chordEventWithUpdate(event: ChordEvent, update: Partial<ChordEvent>): ChordEvent {
+  const step = update.step === undefined ? event.step : clampStepStart(update.step);
+  const length = Math.min(update.length === undefined ? event.length : clampStepLength(update.length), 16 - step);
+  return {
+    ...event,
+    ...update,
+    step,
+    length,
+    inversion: update.inversion === undefined ? event.inversion : normalizeChordInversion(update.inversion),
+    velocity: update.velocity === undefined ? event.velocity : clampVelocity(update.velocity),
+    probability: update.probability === undefined ? event.probability : normalizeEventProbability(update.probability)
+  };
+}
+
+function sameChordEvent(first: ChordEvent, second: ChordEvent): boolean {
+  return (
+    first.step === second.step &&
+    first.root === second.root &&
+    first.quality === second.quality &&
+    normalizeChordInversion(first.inversion) === normalizeChordInversion(second.inversion) &&
+    first.length === second.length &&
+    first.velocity === second.velocity &&
+    normalizeEventProbability(first.probability) === normalizeEventProbability(second.probability)
+  );
+}
+
+function findChordEventIndex(chords: ChordEvent[], target: ChordEvent): number | null {
+  const index = chords.findIndex((chord) => sameChordEvent(chord, target));
+  return index < 0 ? null : index;
+}
+
+function nextEmptyChordStep(chords: ChordEvent[], startStep: number): number | null {
+  for (let offset = 1; offset < steps.length; offset += 1) {
+    const step = (startStep + offset) % steps.length;
+    if (!chords.some((chord) => chord.step === step)) {
+      return step;
+    }
+  }
+  return null;
 }
 
 function matchesSelectedNote(note: BassNote | MelodyNote, selectedNote: SelectedNote): boolean {
