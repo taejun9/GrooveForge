@@ -328,6 +328,23 @@ type PatternStackOption = PatternStackDefinition & {
   melodyCount: number;
 };
 
+type GrooveFeelId = "tight" | "pocket" | "push" | "lazy";
+
+type GrooveFeelDefinition = {
+  id: GrooveFeelId;
+  label: string;
+  detail: string;
+  musicChance: number;
+  chordChance: number;
+  hatChance: number;
+  percChance: number;
+};
+
+type GrooveFeelOption = GrooveFeelDefinition & {
+  timingPreview: string;
+  chancePreview: string;
+};
+
 type MelodyMotifId = "hook" | "pocket" | "rise" | "answer";
 
 type MelodyMotifStep = {
@@ -624,6 +641,13 @@ const patternStackDefinitions: PatternStackDefinition[] = [
   { id: "break", label: "Break", detail: "space", bassline: "offbeat", chordPreset: "bounce", motif: "answer" }
 ];
 
+const grooveFeelDefinitions: GrooveFeelDefinition[] = [
+  { id: "tight", label: "Tight", detail: "grid", musicChance: 1, chordChance: 1, hatChance: 1, percChance: 0.96 },
+  { id: "pocket", label: "Pocket", detail: "behind", musicChance: 0.94, chordChance: 0.96, hatChance: 0.94, percChance: 0.86 },
+  { id: "push", label: "Push", detail: "ahead", musicChance: 1, chordChance: 1, hatChance: 1, percChance: 0.92 },
+  { id: "lazy", label: "Lazy", detail: "loose", musicChance: 0.82, chordChance: 0.9, hatChance: 0.88, percChance: 0.78 }
+];
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<ProjectState[]>([]);
@@ -720,6 +744,7 @@ export function App(): ReactElement {
   const basslinePadOptions = useMemo(() => createBasslinePadOptions(project.key), [project.key]);
   const melodyMotifOptions = useMemo(() => createMelodyMotifOptions(project.key), [project.key]);
   const patternStackOptions = useMemo(() => createPatternStackOptions(project.key), [project.key]);
+  const grooveFeelOptions = useMemo(() => createGrooveFeelOptions(), []);
   const keyboardCaptureNextStep = nextKeyboardCaptureStep(
     currentPattern,
     keyboardCaptureTarget,
@@ -1842,6 +1867,25 @@ export function App(): ReactElement {
     setSelectedChordIndex(0);
   }
 
+  function applyGrooveFeel(feelId: GrooveFeelId): void {
+    const feel = grooveFeelDefinitions.find((candidate) => candidate.id === feelId);
+    if (!feel) {
+      setProjectStatus("Groove feel not found");
+      return;
+    }
+
+    const changed = updateCurrentPattern(
+      (pattern) => {
+        const nextPatternData = applyGrooveFeelToPattern(pattern, feel);
+        return sameGrooveFeelState(pattern, nextPatternData) ? pattern : nextPatternData;
+      },
+      `${feel.label} groove feel applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (!changed) {
+      setProjectStatus(`${feel.label} groove feel already selected`);
+    }
+  }
+
   function applyBasslinePad(padId: BasslinePadId): void {
     const pad = basslinePadDefinitions.find((candidate) => candidate.id === padId);
     if (!pad) {
@@ -2946,6 +2990,7 @@ export function App(): ReactElement {
             onUse={usePatternInSelectedBlock}
           />
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
+          <GrooveFeelPads feels={grooveFeelOptions} onApply={applyGrooveFeel} />
           <div className="pattern-tools" aria-label="Pattern tools">
             {patternVariationPresetIds.map((preset) => (
               <button
@@ -6251,6 +6296,38 @@ function DrumStepInspector({
   );
 }
 
+function GrooveFeelPads({
+  feels,
+  onApply
+}: {
+  feels: GrooveFeelOption[];
+  onApply: (feel: GrooveFeelId) => void;
+}): ReactElement {
+  return (
+    <div className="groove-feel-panel" data-testid="groove-feel-pads">
+      <div className="groove-feel-heading">
+        <span>Groove Feel</span>
+        <strong>Timing + Chance</strong>
+      </div>
+      <div className="groove-feel-row" aria-label="Groove Feel Pads">
+        {feels.map((feel) => (
+          <button
+            data-testid={`groove-feel-${feel.id}`}
+            key={feel.id}
+            onClick={() => onApply(feel.id)}
+            title={`${feel.label} ${feel.timingPreview}`}
+            type="button"
+          >
+            <span>{feel.label}</span>
+            <strong>{feel.timingPreview}</strong>
+            <small>{feel.chancePreview} / {feel.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PatternStackPads({
   stacks,
   onApply
@@ -7222,6 +7299,116 @@ function addKeyboardCaptureNote(pattern: PatternData, track: NoteTrack, step: nu
       { step, pitch, length: 1, velocity: 0.68, probability: 1 }
     ])
   };
+}
+
+function createGrooveFeelOptions(): GrooveFeelOption[] {
+  return grooveFeelDefinitions.map((feel) => {
+    const kickTiming = grooveFeelTimingMs("kick", 6, feel.id);
+    const clapTiming = grooveFeelTimingMs("clap", 4, feel.id);
+    return {
+      ...feel,
+      timingPreview: `${timingBadge(kickTiming)} / ${timingBadge(clapTiming)} ms`,
+      chancePreview: `${Math.round(feel.musicChance * 100)}% notes`
+    };
+  });
+}
+
+function applyGrooveFeelToPattern(pattern: PatternData, feel: GrooveFeelDefinition): PatternData {
+  const nextPatternData = clonePatternData(pattern);
+  (Object.keys(drumLabels) as DrumLane[]).forEach((lane) => {
+    nextPatternData.drumTimings[lane] = nextPatternData.drumTimings[lane].map((current, step) =>
+      nextPatternData.drumPattern[lane][step] ? grooveFeelTimingMs(lane, step, feel.id) : 0
+    );
+    nextPatternData.drumProbabilities[lane] = nextPatternData.drumProbabilities[lane].map((current, step) =>
+      nextPatternData.drumPattern[lane][step] ? grooveFeelDrumProbability(lane, step, feel) : normalizeDrumProbability(current)
+    );
+  });
+  nextPatternData.bassNotes = sortBassNotes(
+    nextPatternData.bassNotes.map((note, index) => ({
+      ...note,
+      probability: grooveFeelMusicProbability("bass", index, feel)
+    }))
+  );
+  nextPatternData.melodyNotes = sortMelodyNotes(
+    nextPatternData.melodyNotes.map((note, index) => ({
+      ...note,
+      probability: grooveFeelMusicProbability("melody", index, feel)
+    }))
+  );
+  nextPatternData.chordEvents = nextPatternData.chordEvents.map((event, index) => ({
+    ...event,
+    probability: index <= 1 ? normalizeEventProbability(Math.max(feel.chordChance, 0.94)) : normalizeEventProbability(feel.chordChance)
+  }));
+  return nextPatternData;
+}
+
+function grooveFeelTimingMs(lane: DrumLane, step: number, feel: GrooveFeelId): number {
+  if (feel === "tight") {
+    const timing = lane === "clap" ? 4 : lane === "hat" ? (step % 2 === 0 ? -2 : 3) : lane === "perc" ? (step % 4 === 0 ? -3 : 4) : 0;
+    return normalizeDrumTimingMs(timing);
+  }
+  if (feel === "pocket") {
+    const timing = lane === "clap" ? 15 : lane === "hat" ? (step % 2 === 0 ? 5 : 10) : lane === "perc" ? 12 : step % 8 === 0 ? 0 : -4;
+    return normalizeDrumTimingMs(timing);
+  }
+  if (feel === "push") {
+    const timing = lane === "clap" ? -6 : lane === "hat" ? (step % 2 === 0 ? -11 : -7) : lane === "perc" ? -9 : step % 8 === 0 ? -3 : -7;
+    return normalizeDrumTimingMs(timing);
+  }
+  const timing = lane === "clap" ? 20 : lane === "hat" ? (step % 2 === 0 ? 9 : 15) : lane === "perc" ? 18 : step % 8 === 0 ? 4 : 10;
+  return normalizeDrumTimingMs(timing);
+}
+
+function grooveFeelDrumProbability(lane: DrumLane, step: number, feel: GrooveFeelDefinition): number {
+  if (lane === "kick" || lane === "clap") {
+    return normalizeDrumProbability(feel.id === "lazy" && step % 8 !== 0 ? 0.94 : 1);
+  }
+  if (lane === "hat") {
+    return normalizeDrumProbability(step % 4 === 0 ? Math.max(feel.hatChance, 0.94) : feel.hatChance);
+  }
+  return normalizeDrumProbability(step % 8 === 0 ? Math.max(feel.percChance, 0.9) : feel.percChance);
+}
+
+function grooveFeelMusicProbability(track: NoteTrack, index: number, feel: GrooveFeelDefinition): number {
+  if (feel.id === "tight" || feel.id === "push") {
+    return normalizeEventProbability(1);
+  }
+  const accent = track === "bass" ? index % 2 === 0 : index % 3 === 0;
+  return normalizeEventProbability(accent ? Math.max(feel.musicChance, 0.94) : feel.musicChance);
+}
+
+function sameGrooveFeelState(first: PatternData, second: PatternData): boolean {
+  const lanes = Object.keys(drumLabels) as DrumLane[];
+  const sameDrums = lanes.every((lane) =>
+    first.drumTimings[lane].every(
+      (timing, step) =>
+        normalizeDrumTimingMs(timing) === normalizeDrumTimingMs(second.drumTimings[lane][step] ?? 0) &&
+        normalizeDrumProbability(first.drumProbabilities[lane][step] ?? 1) ===
+          normalizeDrumProbability(second.drumProbabilities[lane][step] ?? 1)
+    )
+  );
+  if (!sameDrums) {
+    return false;
+  }
+  return (
+    sameNoteProbabilities(first.bassNotes, second.bassNotes) &&
+    sameNoteProbabilities(first.melodyNotes, second.melodyNotes) &&
+    sameChordProbabilities(first.chordEvents, second.chordEvents)
+  );
+}
+
+function sameNoteProbabilities(first: Array<BassNote | MelodyNote>, second: Array<BassNote | MelodyNote>): boolean {
+  if (first.length !== second.length) {
+    return false;
+  }
+  return first.every((note, index) => normalizeEventProbability(note.probability) === normalizeEventProbability(second[index]?.probability ?? 1));
+}
+
+function sameChordProbabilities(first: ChordEvent[], second: ChordEvent[]): boolean {
+  if (first.length !== second.length) {
+    return false;
+  }
+  return first.every((event, index) => normalizeEventProbability(event.probability) === normalizeEventProbability(second[index]?.probability ?? 1));
 }
 
 function createPatternStackOptions(key: string): PatternStackOption[] {
