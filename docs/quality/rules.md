@@ -87,6 +87,8 @@ Arrangement editor work must let users change a block's section, Pattern A/B/C a
 
 Arrangement structure work must preserve at least one block, keep selection/pattern alignment after duplicate, move, and delete actions, and make WAV export follow the current arrangement length.
 
+Arrangement template work must replace only arrangement blocks, keep existing Pattern A/B/C musical data and mixer/master state intact, reset selection safely to a valid block, align the selected pattern with the first template block, remain undoable, and make WAV/stem export follow the applied template length.
+
 Undo/redo work must record bounded local project-edit history for editing actions, ignore playback/export side effects, keep keyboard shortcuts out of focused inputs, and clear history when a different project file is loaded.
 
 Desktop shortcut work must keep playback, Pattern A/B/C selection, save/open, undo/redo, and selected event deletion scoped to the app window, must not fire from focused editable controls, and must route destructive deletion through normal undoable project history.

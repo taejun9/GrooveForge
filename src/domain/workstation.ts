@@ -92,6 +92,9 @@ export type ArrangementBlock = {
   energy: number;
 };
 
+export const arrangementTemplateIds = ["loop", "full", "hook_first", "breakdown"] as const;
+export type ArrangementTemplateId = (typeof arrangementTemplateIds)[number];
+
 export type MasterPreset = "Clean Demo" | "Streaming Safe" | "Headroom for Vocal";
 
 export const soundPresetIds = ["clean_knock", "club_punch", "warm_tape", "air_space"] as const;
@@ -143,6 +146,12 @@ export const projectFileVersion = 1;
 export const drumLanes: DrumLane[] = ["kick", "clap", "hat", "perc"];
 export const patternSlots: PatternSlot[] = ["A", "B", "C"];
 export const arrangementSections: ArrangementSection[] = ["Intro", "Verse", "Hook", "Bridge", "Outro"];
+export const arrangementTemplateLabels: Record<ArrangementTemplateId, string> = {
+  loop: "8 Bar Loop",
+  full: "Full Beat",
+  hook_first: "Hook First",
+  breakdown: "Breakdown"
+};
 export const chordQualities: ChordQuality[] = ["maj", "min", "dim", "sus2", "sus4", "7", "m7"];
 export const masterPresets: MasterPreset[] = ["Clean Demo", "Streaming Safe", "Headroom for Vocal"];
 export const drumGroovePresetLabels: Record<DrumGroovePreset, string> = {
@@ -398,6 +407,42 @@ const chordProgressionPresetBlueprints: Record<ChordProgressionPreset, ChordBlue
   ]
 };
 
+const arrangementTemplateBlocks: Record<ArrangementTemplateId, ArrangementBlock[]> = {
+  loop: [
+    { section: "Intro", pattern: "A", energy: 0.42 },
+    { section: "Verse", pattern: "A", energy: 0.68 },
+    { section: "Hook", pattern: "B", energy: 0.9 },
+    { section: "Outro", pattern: "A", energy: 0.34 }
+  ],
+  full: [
+    { section: "Intro", pattern: "A", energy: 0.35 },
+    { section: "Verse", pattern: "A", energy: 0.65 },
+    { section: "Hook", pattern: "B", energy: 0.9 },
+    { section: "Verse", pattern: "A", energy: 0.68 },
+    { section: "Hook", pattern: "B", energy: 0.94 },
+    { section: "Bridge", pattern: "C", energy: 0.5 },
+    { section: "Hook", pattern: "B", energy: 0.96 },
+    { section: "Outro", pattern: "A", energy: 0.28 }
+  ],
+  hook_first: [
+    { section: "Hook", pattern: "B", energy: 0.92 },
+    { section: "Verse", pattern: "A", energy: 0.62 },
+    { section: "Hook", pattern: "B", energy: 0.95 },
+    { section: "Bridge", pattern: "C", energy: 0.48 },
+    { section: "Hook", pattern: "B", energy: 0.98 },
+    { section: "Outro", pattern: "A", energy: 0.32 }
+  ],
+  breakdown: [
+    { section: "Intro", pattern: "A", energy: 0.28 },
+    { section: "Verse", pattern: "A", energy: 0.58 },
+    { section: "Bridge", pattern: "C", energy: 0.36 },
+    { section: "Hook", pattern: "B", energy: 0.9 },
+    { section: "Bridge", pattern: "C", energy: 0.44 },
+    { section: "Hook", pattern: "B", energy: 0.96 },
+    { section: "Outro", pattern: "A", energy: 0.26 }
+  ]
+};
+
 const starterPatternA: PatternData = withDrumDynamics({
   drumPattern: {
     kick: [true, false, false, false, false, false, true, false, false, false, false, false, true, false, false, false],
@@ -502,16 +547,7 @@ export const starterProject: ProjectState = {
     { id: "chord", name: "Chord", volumeDb: -10, pan: 16, lowCut: 0.12, air: 0.28, drive: 0.06, glue: 0.18, muted: false, solo: false, accent: "#d58cff" },
     { id: "master", name: "Master", volumeDb: -1, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0, muted: false, solo: false, accent: "#f0c36a" }
   ],
-  arrangement: [
-    { section: "Intro", pattern: "A", energy: 0.35 },
-    { section: "Verse", pattern: "A", energy: 0.65 },
-    { section: "Hook", pattern: "B", energy: 0.9 },
-    { section: "Verse", pattern: "A", energy: 0.68 },
-    { section: "Hook", pattern: "B", energy: 0.94 },
-    { section: "Bridge", pattern: "C", energy: 0.5 },
-    { section: "Hook", pattern: "B", energy: 0.96 },
-    { section: "Outro", pattern: "A", energy: 0.28 }
-  ],
+  arrangement: createArrangementTemplate("full"),
   masterCeilingDb: masterPresetCeilingsDb["Headroom for Vocal"],
   masterPreset: "Headroom for Vocal"
 };
@@ -526,6 +562,14 @@ export function soundPresetLabel(preset: SoundPresetId): string {
 
 export function chordProgressionPresetLabel(preset: ChordProgressionPreset): string {
   return chordProgressionPresetLabels[preset];
+}
+
+export function arrangementTemplateLabel(template: ArrangementTemplateId): string {
+  return arrangementTemplateLabels[template];
+}
+
+export function createArrangementTemplate(template: ArrangementTemplateId): ArrangementBlock[] {
+  return arrangementTemplateBlocks[template].map((block) => ({ ...block }));
 }
 
 export function soundPresetDesign(preset: (typeof soundPresetIds)[number]): SoundDesign {

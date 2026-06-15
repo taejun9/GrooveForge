@@ -27,6 +27,7 @@ import { PlaybackController, PlaybackSnapshot, startRealtimePlayback } from "../
 import {
   ArrangementBlock,
   ArrangementSection,
+  ArrangementTemplateId,
   BassNote,
   ChordEvent,
   ChordProgressionPreset,
@@ -47,10 +48,13 @@ import {
   SoundDesign,
   activePattern,
   arrangementSections,
+  arrangementTemplateIds,
+  arrangementTemplateLabel,
   bassPitchLanes,
   chordQualities,
   clonePatternData,
   createChordProgressionPreset,
+  createArrangementTemplate,
   createNextChordEvent,
   createStylePatternSet,
   createEmptyPatternData,
@@ -491,6 +495,24 @@ export function App(): ReactElement {
     });
     setSelectedNote(null);
     setSelectedDrumStep(null);
+  }
+
+  function applyArrangementTemplate(template: ArrangementTemplateId): void {
+    const arrangement = createArrangementTemplate(template);
+    const firstBlock = arrangement[0];
+    const changed = updateProject(
+      (current) => ({
+        ...current,
+        selectedPattern: firstBlock.pattern,
+        arrangement
+      }),
+      `Applied ${arrangementTemplateLabel(template)} arrangement`
+    );
+    if (changed) {
+      setSelectedArrangementIndex(0);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+    }
   }
 
   function updateMixerChannel(id: MixerChannel["id"], update: Partial<MixerChannel>): void {
@@ -1325,6 +1347,23 @@ export function App(): ReactElement {
 
         <section className="panel arrangement-panel" aria-label="Arrangement">
           <PanelTitle icon={<Music2 size={18} />} title="Arrangement" meta={`${project.arrangement.length} blocks`} />
+          <div className="arrangement-template-row" aria-label="Arrangement templates">
+            {arrangementTemplateIds.map((template) => {
+              const templateBlocks = createArrangementTemplate(template);
+              return (
+                <button
+                  data-testid={`arrangement-template-${template}`}
+                  key={template}
+                  onClick={() => applyArrangementTemplate(template)}
+                  title={`Apply ${arrangementTemplateLabel(template)} arrangement`}
+                  type="button"
+                >
+                  <span>{arrangementTemplateLabel(template)}</span>
+                  <small>{templateBlocks.length} blocks</small>
+                </button>
+              );
+            })}
+          </div>
           <div className="arrangement-track">
             {project.arrangement.map((block, index) => (
               <button
