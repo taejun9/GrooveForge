@@ -304,6 +304,30 @@ type BasslinePadOption = BasslinePadDefinition & {
   glideCount: number;
 };
 
+type PatternStackId = "pocket" | "hook" | "lift" | "break";
+
+type PatternStackDefinition = {
+  id: PatternStackId;
+  label: string;
+  detail: string;
+  bassline: BasslinePadId;
+  chordPreset: ChordProgressionPreset;
+  motif: MelodyMotifId;
+};
+
+type PatternStackEvents = {
+  bassNotes: BassNote[];
+  chordEvents: ChordEvent[];
+  melodyNotes: MelodyNote[];
+};
+
+type PatternStackOption = PatternStackDefinition & {
+  preview: string;
+  bassCount: number;
+  chordCount: number;
+  melodyCount: number;
+};
+
 type MelodyMotifId = "hook" | "pocket" | "rise" | "answer";
 
 type MelodyMotifStep = {
@@ -593,6 +617,13 @@ const melodyMotifDefinitions: MelodyMotifDefinition[] = [
   }
 ];
 
+const patternStackDefinitions: PatternStackDefinition[] = [
+  { id: "pocket", label: "Pocket", detail: "verse", bassline: "bounce", chordPreset: "sparse", motif: "pocket" },
+  { id: "hook", label: "Hook", detail: "main", bassline: "slide", chordPreset: "moody", motif: "hook" },
+  { id: "lift", label: "Lift", detail: "pre", bassline: "root", chordPreset: "lift", motif: "rise" },
+  { id: "break", label: "Break", detail: "space", bassline: "offbeat", chordPreset: "bounce", motif: "answer" }
+];
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<ProjectState[]>([]);
@@ -688,6 +719,7 @@ export function App(): ReactElement {
   );
   const basslinePadOptions = useMemo(() => createBasslinePadOptions(project.key), [project.key]);
   const melodyMotifOptions = useMemo(() => createMelodyMotifOptions(project.key), [project.key]);
+  const patternStackOptions = useMemo(() => createPatternStackOptions(project.key), [project.key]);
   const keyboardCaptureNextStep = nextKeyboardCaptureStep(
     currentPattern,
     keyboardCaptureTarget,
@@ -1786,6 +1818,28 @@ export function App(): ReactElement {
     setSelectedNote({ track: target, step, pitch });
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
+  }
+
+  function applyPatternStack(stackId: PatternStackId): void {
+    const stack = patternStackDefinitions.find((candidate) => candidate.id === stackId);
+    if (!stack) {
+      setProjectStatus("Pattern stack not found");
+      return;
+    }
+
+    const stackEvents = createPatternStackEvents(projectRef.current.key, stack);
+    const changed = updateCurrentPattern(
+      (pattern) => (samePatternStackEvents(pattern, stackEvents) ? pattern : { ...pattern, ...stackEvents }),
+      `${stack.label} pattern stack applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (!changed) {
+      setProjectStatus(`${stack.label} pattern stack already selected`);
+      return;
+    }
+
+    setSelectedNote(null);
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(0);
   }
 
   function applyBasslinePad(padId: BasslinePadId): void {
@@ -2891,6 +2945,7 @@ export function App(): ReactElement {
             onCue={cuePattern}
             onUse={usePatternInSelectedBlock}
           />
+          <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
           <div className="pattern-tools" aria-label="Pattern tools">
             {patternVariationPresetIds.map((preset) => (
               <button
@@ -6196,6 +6251,38 @@ function DrumStepInspector({
   );
 }
 
+function PatternStackPads({
+  stacks,
+  onApply
+}: {
+  stacks: PatternStackOption[];
+  onApply: (stack: PatternStackId) => void;
+}): ReactElement {
+  return (
+    <div className="pattern-stack-panel" data-testid="pattern-stack-pads">
+      <div className="pattern-stack-heading">
+        <span>Pattern Stacks</span>
+        <strong>808 + Chords + Synth</strong>
+      </div>
+      <div className="pattern-stack-row" aria-label="Pattern Stack Pads">
+        {stacks.map((stack) => (
+          <button
+            data-testid={`pattern-stack-${stack.id}`}
+            key={stack.id}
+            onClick={() => onApply(stack.id)}
+            title={`${stack.label} ${stack.preview}`}
+            type="button"
+          >
+            <span>{stack.label}</span>
+            <strong>{stack.preview}</strong>
+            <small>{stack.bassCount} 808 / {stack.chordCount} chords / {stack.melodyCount} synth</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function BasslinePads({
   pads,
   onApply
@@ -7137,6 +7224,39 @@ function addKeyboardCaptureNote(pattern: PatternData, track: NoteTrack, step: nu
   };
 }
 
+function createPatternStackOptions(key: string): PatternStackOption[] {
+  return patternStackDefinitions.map((stack) => {
+    const events = createPatternStackEvents(key, stack);
+    const firstBass = events.bassNotes[0]?.pitch ?? "-";
+    const firstChord = events.chordEvents[0]?.root ?? "-";
+    return {
+      ...stack,
+      preview: `${firstBass} / ${firstChord}`,
+      bassCount: events.bassNotes.length,
+      chordCount: events.chordEvents.length,
+      melodyCount: events.melodyNotes.length
+    };
+  });
+}
+
+function createPatternStackEvents(key: string, stack: PatternStackDefinition): PatternStackEvents {
+  const bassline = basslinePadDefinitions.find((pad) => pad.id === stack.bassline) ?? basslinePadDefinitions[0];
+  const motif = melodyMotifDefinitions.find((candidate) => candidate.id === stack.motif) ?? melodyMotifDefinitions[0];
+  return {
+    bassNotes: bassline ? createBasslinePadNotes(key, bassline) : [],
+    chordEvents: createChordProgressionPreset(stack.chordPreset, key),
+    melodyNotes: motif ? createMelodyMotifNotes(key, motif) : []
+  };
+}
+
+function samePatternStackEvents(pattern: PatternData, events: PatternStackEvents): boolean {
+  return (
+    sameBassNotes(pattern.bassNotes, events.bassNotes) &&
+    sameChordEvents(pattern.chordEvents, events.chordEvents) &&
+    sameMelodyNotes(pattern.melodyNotes, events.melodyNotes)
+  );
+}
+
 function createBasslinePadOptions(key: string): BasslinePadOption[] {
   return basslinePadDefinitions.map((pad) => {
     const notes = createBasslinePadNotes(key, pad);
@@ -7178,6 +7298,25 @@ function sameBassNotes(first: BassNote[], second: BassNote[]): boolean {
       note.length === candidate.length &&
       note.glide === candidate.glide &&
       normalizeEventProbability(note.probability) === normalizeEventProbability(candidate.probability)
+    );
+  });
+}
+
+function sameChordEvents(first: ChordEvent[], second: ChordEvent[]): boolean {
+  if (first.length !== second.length) {
+    return false;
+  }
+  return first.every((event, index) => {
+    const candidate = second[index];
+    return (
+      candidate !== undefined &&
+      event.step === candidate.step &&
+      event.root === candidate.root &&
+      event.quality === candidate.quality &&
+      normalizeChordInversion(event.inversion) === normalizeChordInversion(candidate.inversion) &&
+      event.length === candidate.length &&
+      event.velocity === candidate.velocity &&
+      normalizeEventProbability(event.probability) === normalizeEventProbability(candidate.probability)
     );
   });
 }

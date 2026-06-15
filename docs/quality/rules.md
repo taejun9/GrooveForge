@@ -113,6 +113,8 @@ Pattern work must keep Pattern A/B/C as independent editable event data. Copy an
 
 Pattern variation work must be deterministic, operate only on the selected Pattern A/B/C slot through undoable project history, keep generated drums, bass, melody, chords, velocities, timings, repeats, and probabilities manually editable, and avoid sampling, remote AI, or hidden audio assets.
 
+Pattern Stack Pad work must derive 808/bass notes, chord events, and Synth melody notes from the current key after an explicit click, update only the selected Pattern A/B/C bass, chord, and melody event data through undoable project history, keep results manually editable through existing lane editors and inspectors, preserve realtime playback plus WAV/stem/MIDI export semantics, and avoid sampling, imported audio, hidden generation, remote AI, accounts, analytics, or cloud sync.
+
 Pattern Fill work must be deterministic, operate only on the selected Pattern A/B/C slot through undoable project history, edit only local drum, 808/bass, melody, and chord-tail event data, keep Drum Fill/808 Pickup/Melody Turn/Clear Tail results manually editable, preserve realtime playback plus WAV/stem/MIDI export semantics, and avoid sampling, remote AI, hidden randomness, or hidden audio assets.
 
 808 Bassline Pad work must derive 808/bass notes from the current key after an explicit click, update only the selected Pattern A/B/C bass notes through undoable project history, keep results manually editable through the note grid and inspector, preserve glide, chance, realtime playback plus WAV/stem/MIDI export semantics, and avoid sampling, imported audio, hidden generation, remote AI, accounts, analytics, or cloud sync.
