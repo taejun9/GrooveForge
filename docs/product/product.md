@@ -62,6 +62,7 @@ Primary feature areas:
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with one-click Drop/Build/Hook Lift moves, per-block bar lengths, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
 - Project readiness: read-only checks for drums, 808/bass, melody/chords, arrangement, and export completeness.
+- Next Move: explicit local action recommendations that connect readiness/export state to Blueprint, Pattern Fill, Hook Lift, Save Slot, and Mix Check commands.
 - Project snapshots: local idea slots for saving, renaming, restoring, and deleting beat states inside the project file.
 - Mixer/master: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, master preset ceiling, limiter, loudness/peak metering.
 - Export: WAV export, stem export, and arrangement MIDI export after the event/render paths are reliable.
@@ -127,6 +128,7 @@ MVP capabilities:
 - Sound design presets and Studio tone controls for kick punch, snare snap, hat brightness, 808 drive/decay, sidechain ducking, synth brightness/release, and chord warmth/width.
 - Independent Pattern A/B/C storage with deterministic Subtle/Hook/Break variation tools, one-click Drum Fill/808 Pickup/Melody Turn/Clear Tail moves, plus copy/clear tools for drum, bass, chord, and melody variations.
 - Read-only Beat Readiness checks for drums, 808/bass, melody/chords, arrangement structure, and export signal status.
+- Next Move strip that gives one primary recommended action and secondary local actions from the current readiness/export state without mutating Beat Readiness.
 - Editable arrangement blocks and templates for 8-bar loop, full beat, hook-first, and breakdown structures, using assigned Pattern A/B/C data, one-click Drop/Build/Hook Lift moves, per-block track mutes, per-block bar length, split/merge controls, audible per-block energy, and structure controls for duplicate, move, and delete.
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
 - Project Snapshots that save, rename, restore, and delete local beat idea states inside the `.grooveforge.json` file without cloud sync or nested snapshot recursion.

@@ -34,7 +34,7 @@ button {
 .app-shell {
   display: grid;
   min-height: 100vh;
-  grid-template-rows: auto auto auto auto auto 1fr;
+  grid-template-rows: auto auto auto auto auto auto 1fr;
   gap: 12px;
   padding: 16px;
 }
@@ -43,6 +43,7 @@ button {
 .mode-row,
 .blueprint-row,
 .beat-readiness,
+.next-move,
 .snapshot-row,
 .panel {
   border: 1px solid rgba(244, 239, 231, 0.11);
@@ -69,6 +70,7 @@ button {
 .session-meter,
 .mode-row,
 .blueprint-heading > div,
+.next-move-heading > div,
 .snapshot-heading > div {
   display: flex;
   align-items: center;
@@ -184,6 +186,7 @@ h2 {
 .pattern-tools button,
 .pattern-fill-row button,
 .snapshot-heading button,
+.next-move-actions button,
 .snapshot-actions button,
 .arrangement-template-row button,
 .block-pattern-row button,
@@ -227,6 +230,7 @@ h2 {
 .pattern-tools button:disabled,
 .pattern-fill-row button:disabled,
 .snapshot-heading button:disabled,
+.next-move-actions button:disabled,
 .snapshot-actions button:disabled,
 .block-pattern-row button:disabled {
   cursor: not-allowed;
@@ -469,6 +473,101 @@ h2 {
   color: rgba(244, 239, 231, 0.72);
   font-size: 11px;
   line-height: 1.3;
+}
+
+.next-move {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 68px;
+  padding: 10px;
+  border-radius: 8px;
+  border-color: rgba(120, 240, 200, 0.2);
+  background: rgba(120, 240, 200, 0.055);
+}
+
+.next-move.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.065);
+}
+
+.next-move.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.065);
+}
+
+.next-move-heading {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.next-move-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.next-move-heading svg {
+  color: #78f0c8;
+}
+
+.next-move.warn .next-move-heading svg {
+  color: #f0c36a;
+}
+
+.next-move.danger .next-move-heading svg {
+  color: #ff7a4f;
+}
+
+.next-move-heading strong,
+.next-move-heading p {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.next-move-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.next-move-heading p {
+  margin: 0;
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 11px;
+}
+
+.next-move-actions {
+  display: inline-flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.next-move-actions button {
+  display: inline-flex;
+  max-width: 132px;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 9px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.next-move-actions button.primary {
+  border-color: rgba(120, 240, 200, 0.62);
+  color: #08120f;
+  background: #78f0c8;
+}
+
+.next-move-actions button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .snapshot-row {

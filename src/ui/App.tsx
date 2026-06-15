@@ -183,6 +183,23 @@ type BeatReadinessCheck = {
   tone: MixCoachTone;
 };
 
+type NextMoveCommand =
+  | { kind: "blueprint"; blueprintId: BeatBlueprintId }
+  | { kind: "patternFill"; preset: PatternFillPreset }
+  | { kind: "arrangementMove"; preset: ArrangementMovePreset }
+  | { kind: "arrangementTemplate"; template: ArrangementTemplateId }
+  | { kind: "snapshot" }
+  | { kind: "reviewMix" };
+
+type NextMoveAction = {
+  id: string;
+  title: string;
+  detail: string;
+  buttonLabel: string;
+  tone: MixCoachTone;
+  command: NextMoveCommand;
+};
+
 type SelectedDrumStep = {
   lane: DrumLane;
   step: number;
@@ -214,10 +231,15 @@ export function App(): ReactElement {
   const projectRef = useRef<ProjectState>(starterProject);
   const controllerRef = useRef<PlaybackController | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const masterPanelRef = useRef<HTMLElement | null>(null);
   const style = getStyle(project);
   const currentPattern = activePattern(project);
   const exportAnalysis = useMemo(() => analyzeExport(project), [project]);
   const beatReadinessChecks = useMemo(() => createBeatReadinessChecks(project, exportAnalysis), [project, exportAnalysis]);
+  const nextMoveActions = useMemo(
+    () => createNextMoveActions(project, beatReadinessChecks, exportAnalysis),
+    [project, beatReadinessChecks, exportAnalysis]
+  );
   const stemAnalyses = useMemo(() => analyzeStemExports(project), [project]);
   const activeChannels = useMemo(() => {
     const soloActive = project.mixer.some((channel) => channel.id !== "master" && channel.solo);
@@ -1755,6 +1777,30 @@ export function App(): ReactElement {
     }
   }
 
+  function runNextMove(action: NextMoveAction): void {
+    switch (action.command.kind) {
+      case "blueprint":
+        applySelectedBeatBlueprint(action.command.blueprintId);
+        return;
+      case "patternFill":
+        applyPatternFill(action.command.preset);
+        return;
+      case "arrangementMove":
+        applyArrangementMoveToSelected(action.command.preset);
+        return;
+      case "arrangementTemplate":
+        applyArrangementTemplate(action.command.template);
+        return;
+      case "snapshot":
+        saveCurrentSnapshot();
+        return;
+      case "reviewMix":
+        masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+        setProjectStatus("Review Mix Coach");
+        return;
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="transport-band">
@@ -1930,6 +1976,8 @@ export function App(): ReactElement {
       <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
 
       <BeatReadiness checks={beatReadinessChecks} />
+
+      <NextMove actions={nextMoveActions} onRun={runNextMove} />
 
       <ProjectSnapshots
         nameDrafts={snapshotNameDrafts}
@@ -2636,7 +2684,7 @@ export function App(): ReactElement {
           </div>
         </section>
 
-        <section className="panel master-panel" aria-label="Master">
+        <section className="panel master-panel" aria-label="Master" ref={masterPanelRef}>
           <PanelTitle icon={<Gauge size={18} />} title="Master" meta="export ready" />
           <div className="master-readout">
             <strong>{project.masterPreset}</strong>
@@ -2846,6 +2894,211 @@ function BeatReadiness({ checks }: { checks: BeatReadinessCheck[] }): ReactEleme
       </div>
     </section>
   );
+}
+
+function NextMove({
+  actions,
+  onRun
+}: {
+  actions: NextMoveAction[];
+  onRun: (action: NextMoveAction) => void;
+}): ReactElement {
+  const [primaryAction, ...secondaryActions] = actions;
+
+  return (
+    <section className={`next-move ${primaryAction.tone}`} data-testid="next-move" aria-label="Next move">
+      <div className="next-move-heading">
+        <div>
+          <Sparkles size={17} aria-hidden="true" />
+          <span>Next Move</span>
+        </div>
+        <strong data-testid="next-move-title">{primaryAction.title}</strong>
+        <p data-testid="next-move-detail">{primaryAction.detail}</p>
+      </div>
+      <div className="next-move-actions">
+        <button
+          className="primary"
+          data-testid={`next-move-action-${primaryAction.id}`}
+          onClick={() => onRun(primaryAction)}
+          title={primaryAction.title}
+          type="button"
+        >
+          {nextMoveIcon(primaryAction)}
+          <span>{primaryAction.buttonLabel}</span>
+        </button>
+        {secondaryActions.map((action) => (
+          <button
+            data-testid={`next-move-action-${action.id}`}
+            key={action.id}
+            onClick={() => onRun(action)}
+            title={action.title}
+            type="button"
+          >
+            {nextMoveIcon(action)}
+            <span>{action.buttonLabel}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function nextMoveIcon(action: NextMoveAction): ReactElement {
+  switch (action.command.kind) {
+    case "snapshot":
+      return <Save size={14} aria-hidden="true" />;
+    case "reviewMix":
+      return <Gauge size={14} aria-hidden="true" />;
+    case "arrangementMove":
+    case "arrangementTemplate":
+      return <Waves size={14} aria-hidden="true" />;
+    case "blueprint":
+    case "patternFill":
+      return <Sparkles size={14} aria-hidden="true" />;
+  }
+}
+
+function createNextMoveActions(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis
+): NextMoveAction[] {
+  const primary = primaryNextMoveAction(project, checks, analysis);
+  const candidates: NextMoveAction[] = [
+    primary,
+    patternFillNextMoveAction(project),
+    arrangementLiftNextMoveAction(project),
+    snapshotNextMoveAction(project),
+    mixReviewNextMoveAction(analysis)
+  ];
+
+  const uniqueActions = new Map<string, NextMoveAction>();
+  for (const action of candidates) {
+    if (!uniqueActions.has(action.id)) {
+      uniqueActions.set(action.id, action);
+    }
+  }
+
+  return [...uniqueActions.values()].slice(0, 4);
+}
+
+function primaryNextMoveAction(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis
+): NextMoveAction {
+  const drums = readinessCheckForId(checks, "drums");
+  const bass = readinessCheckForId(checks, "bass");
+  const harmony = readinessCheckForId(checks, "harmony");
+  const arrangement = readinessCheckForId(checks, "arrangement");
+  const exportCheck = readinessCheckForId(checks, "export");
+
+  if ([drums, bass, harmony].some((check) => check?.tone === "danger")) {
+    return blueprintNextMoveAction(project);
+  }
+
+  if (arrangement?.tone === "warn") {
+    return {
+      id: "full-arrangement",
+      title: "Build a full beat structure",
+      detail: "Full Beat template from current Pattern A/B/C data.",
+      buttonLabel: "Full Beat",
+      tone: "warn",
+      command: { kind: "arrangementTemplate", template: "full" }
+    };
+  }
+
+  if (exportCheck?.tone !== "good" || analysis.status !== "Ready") {
+    return mixReviewNextMoveAction(analysis);
+  }
+
+  if (project.snapshots.length === 0) {
+    return snapshotNextMoveAction(project);
+  }
+
+  return arrangementLiftNextMoveAction(project);
+}
+
+function readinessCheckForId(checks: BeatReadinessCheck[], id: string): BeatReadinessCheck | undefined {
+  return checks.find((check) => check.id === id);
+}
+
+function blueprintNextMoveAction(project: ProjectState): NextMoveAction {
+  const blueprintId = suggestedBlueprintId(project);
+  const blueprint = beatBlueprints.find((candidate) => candidate.id === blueprintId);
+  return {
+    id: "blueprint",
+    title: "Start from an editable beat",
+    detail: `${blueprint?.name ?? "Beat"} / drums, 808, chords, arrangement, mix.`,
+    buttonLabel: "Blueprint",
+    tone: "danger",
+    command: { kind: "blueprint", blueprintId }
+  };
+}
+
+function suggestedBlueprintId(project: ProjectState): BeatBlueprintId {
+  switch (project.styleId) {
+    case "rnb":
+      return "rnb_pocket";
+    case "house":
+    case "garage":
+      return "club_bounce";
+    case "boom_bap":
+    case "lofi":
+      return "warm_loop";
+    case "trap":
+    case "drill":
+    case "experimental":
+      return "dark_808";
+  }
+}
+
+function patternFillNextMoveAction(project: ProjectState): NextMoveAction {
+  const pattern = activePattern(project);
+  const preset: PatternFillPreset =
+    pattern.bassNotes.length < 3 ? "bass_pickup" : pattern.melodyNotes.length < 3 ? "melody_turn" : "drum_fill";
+  return {
+    id: `pattern-${preset}`,
+    title: `${patternFillPresetLabel(preset)} on Pattern ${project.selectedPattern}`,
+    detail: `Tail variation for Pattern ${project.selectedPattern}.`,
+    buttonLabel: patternFillPresetLabel(preset),
+    tone: "good",
+    command: { kind: "patternFill", preset }
+  };
+}
+
+function arrangementLiftNextMoveAction(project: ProjectState): NextMoveAction {
+  return {
+    id: "hook-lift",
+    title: "Lift the selected song block",
+    detail: `Energy and mute lift for Pattern ${project.selectedPattern}.`,
+    buttonLabel: "Hook Lift",
+    tone: "good",
+    command: { kind: "arrangementMove", preset: "hook_lift" }
+  };
+}
+
+function snapshotNextMoveAction(project: ProjectState): NextMoveAction {
+  return {
+    id: "save-snapshot",
+    title: "Save this beat state",
+    detail: `${project.snapshots.length}/${maxProjectSnapshots} local idea slots are saved in this project.`,
+    buttonLabel: "Save Slot",
+    tone: project.snapshots.length === 0 ? "good" : "warn",
+    command: { kind: "snapshot" }
+  };
+}
+
+function mixReviewNextMoveAction(analysis: ExportAnalysis): NextMoveAction {
+  const tone: MixCoachTone = analysis.status === "Ready" ? "good" : "warn";
+  return {
+    id: "mix-review",
+    title: "Check export polish",
+    detail: `${analysis.status} render with ${formatDb(analysis.headroomDb)} headroom.`,
+    buttonLabel: "Mix Check",
+    tone,
+    command: { kind: "reviewMix" }
+  };
 }
 
 function createBeatReadinessChecks(project: ProjectState, analysis: ExportAnalysis): BeatReadinessCheck[] {
