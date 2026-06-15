@@ -236,6 +236,17 @@ type BeatReadinessCheck = {
   tone: MixCoachTone;
 };
 
+type PatternCompareSummary = {
+  slot: PatternSlot;
+  eventCount: number;
+  drumHits: number;
+  bassNotes: number;
+  melodyNotes: number;
+  chordEvents: number;
+  arrangedBlocks: number;
+  arrangedBars: number;
+};
+
 type NextMoveCommand =
   | { kind: "blueprint"; blueprintId: BeatBlueprintId }
   | { kind: "patternFill"; preset: PatternFillPreset }
@@ -332,6 +343,7 @@ export function App(): ReactElement {
     () => createBeatMapActions(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
+  const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
   const activeChannels = useMemo(() => {
     const soloActive = project.mixer.some((channel) => channel.id !== "master" && channel.solo);
     return project.mixer.filter(
@@ -687,6 +699,33 @@ export function App(): ReactElement {
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(0);
+  }
+
+  function cuePattern(pattern: PatternSlot): void {
+    updateProjectView(
+      (current) => (current.selectedPattern === pattern ? current : { ...current, selectedPattern: pattern }),
+      `Cue Pattern ${pattern}`
+    );
+    setPlaybackMode("pattern");
+    setSelectedNote(null);
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(0);
+  }
+
+  function usePatternInSelectedBlock(pattern: PatternSlot): void {
+    const block = projectRef.current.arrangement[selectedArrangementIndex];
+    if (!block) {
+      setProjectStatus("Select an arrangement block");
+      return;
+    }
+    const changed = updateArrangementBlock(
+      selectedArrangementIndex,
+      { pattern },
+      `Block ${selectedArrangementIndex + 1} uses Pattern ${pattern}`
+    );
+    if (changed) {
+      setPlaybackMode("arrangement");
+    }
   }
 
   function copySelectedPattern(target: PatternSlot): void {
@@ -2346,6 +2385,14 @@ export function App(): ReactElement {
               </button>
             ))}
           </div>
+          <PatternCompareStrip
+            playbackMode={playbackMode}
+            selectedBlockPattern={selectedArrangementBlock?.pattern ?? project.selectedPattern}
+            selectedPattern={project.selectedPattern}
+            summaries={patternCompareSummaries}
+            onCue={cuePattern}
+            onUse={usePatternInSelectedBlock}
+          />
           <div className="pattern-tools" aria-label="Pattern tools">
             {patternVariationPresetIds.map((preset) => (
               <button
@@ -3179,6 +3226,77 @@ function BeatBlueprints({
         })}
       </div>
     </section>
+  );
+}
+
+function PatternCompareStrip({
+  onCue,
+  onUse,
+  playbackMode,
+  selectedBlockPattern,
+  selectedPattern,
+  summaries
+}: {
+  onCue: (pattern: PatternSlot) => void;
+  onUse: (pattern: PatternSlot) => void;
+  playbackMode: PlaybackMode;
+  selectedBlockPattern: PatternSlot;
+  selectedPattern: PatternSlot;
+  summaries: PatternCompareSummary[];
+}): ReactElement {
+  return (
+    <div className="pattern-compare" data-testid="pattern-compare" aria-label="Pattern compare">
+      {summaries.map((summary) => {
+        const selected = selectedPattern === summary.slot;
+        const cued = selected && playbackMode === "pattern";
+        const usedInBlock = selectedBlockPattern === summary.slot;
+        return (
+          <div
+            className={["pattern-compare-card", selected ? "selected" : "", cued ? "cued" : ""]
+              .filter(Boolean)
+              .join(" ")}
+            data-testid={`pattern-compare-${summary.slot}`}
+            key={summary.slot}
+          >
+            <div className="pattern-compare-head">
+              <span>Pattern {summary.slot}</span>
+              <strong>{summary.eventCount} events</strong>
+            </div>
+            <div className="pattern-compare-metrics">
+              <span>{summary.drumHits} drums</span>
+              <span>{summary.bassNotes + summary.melodyNotes} notes</span>
+              <span>{summary.chordEvents} chords</span>
+            </div>
+            <small>
+              {barCountLabel(summary.arrangedBars)} / {summary.arrangedBlocks} block{summary.arrangedBlocks === 1 ? "" : "s"}
+            </small>
+            <div className="pattern-compare-actions">
+              <button
+                className={cued ? "selected" : ""}
+                data-testid={`pattern-cue-${summary.slot}`}
+                onClick={() => onCue(summary.slot)}
+                title={`Cue Pattern ${summary.slot} for preview`}
+                type="button"
+              >
+                <Play size={13} aria-hidden="true" />
+                <span>Cue</span>
+              </button>
+              <button
+                className={usedInBlock ? "selected" : ""}
+                data-testid={`pattern-use-${summary.slot}`}
+                disabled={usedInBlock}
+                onClick={() => onUse(summary.slot)}
+                title={`Use Pattern ${summary.slot} in selected block`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{usedInBlock ? "Used" : "Use"}</span>
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -4425,6 +4543,28 @@ function createBeatMapActions(
 function usedPatternSlots(project: ProjectState): PatternSlot[] {
   const slots = new Set(project.arrangement.map((block) => block.pattern));
   return patternSlots.filter((slot) => slots.has(slot));
+}
+
+function createPatternCompareSummaries(project: ProjectState): PatternCompareSummary[] {
+  return patternSlots.map((slot) => {
+    const pattern = project.patterns[slot];
+    const arrangedBlocks = project.arrangement.filter((block) => block.pattern === slot);
+    const arrangedBars = arrangedBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+    const drumHits = drumHitCount(pattern);
+    const bassNotes = pattern.bassNotes.length;
+    const melodyNotes = pattern.melodyNotes.length;
+    const chordEvents = pattern.chordEvents.length;
+    return {
+      slot,
+      eventCount: drumHits + bassNotes + melodyNotes + chordEvents,
+      drumHits,
+      bassNotes,
+      melodyNotes,
+      chordEvents,
+      arrangedBlocks: arrangedBlocks.length,
+      arrangedBars
+    };
+  });
 }
 
 function audibleStemTracks(stemAnalyses: StemExportAnalyses): StemTrackId[] {

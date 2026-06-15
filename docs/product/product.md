@@ -68,7 +68,7 @@ Primary feature areas:
 - Beat blueprints: sample-free editable project starts that combine style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset.
 - Delivery Targets: local starter sketch, vocal session, beat-store demo, club demo, and editable custom targets that can be set without changing the beat or explicitly aligned to arrangement length, master preset, and mix posture.
 - Session Brief: bounded local artist, vibe, reference, and notes fields stored in the project file for beat intent and handoff context.
-- Pattern editor: drum step sequencer, bass grid, chord progression, melody grid, variation A/B/C, and one-click Pattern Fill tail moves.
+- Pattern editor: drum step sequencer, bass grid, chord progression, melody grid, Pattern Compare cue/use cards, variation A/B/C, and one-click Pattern Fill tail moves.
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with Pattern Chain 8-bar sketches, per-step A/B/C chain cycling, Chain Expand song-form outlining, one-click Drop/Build/Hook Lift moves, per-block bar lengths, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
 - Project readiness: read-only checks for drums, 808/bass, melody/chords, arrangement, and export completeness.
@@ -138,12 +138,12 @@ MVP capabilities:
 - Chord progression track with scale-locked roots, key-aware progression presets, editable step/root/quality/inversion/length/velocity/chance, visible chance badges, add/delete controls, and selected-chord move/duplicate/inversion tools.
 - Simple synth melody track with editable scale-aware grid, velocity control, note chance badges, and selected-note move/transpose/duplicate tools.
 - Sound design presets and Studio tone controls for kick punch, snare snap, hat brightness, 808 drive/decay, sidechain ducking, synth brightness/release, and chord warmth/width.
-- Independent Pattern A/B/C storage with deterministic Subtle/Hook/Break variation tools, one-click Drum Fill/808 Pickup/Melody Turn/Clear Tail moves, plus copy/clear tools for drum, bass, chord, and melody variations.
+- Independent Pattern A/B/C storage with Pattern Compare cue/use cards for density and arrangement-use decisions, deterministic Subtle/Hook/Break variation tools, one-click Drum Fill/808 Pickup/Melody Turn/Clear Tail moves, plus copy/clear tools for drum, bass, chord, and melody variations.
 - Read-only Beat Readiness checks for drums, 808/bass, melody/chords, arrangement structure, and export signal status.
 - Delivery Targets stored in project state with safe migration for older files; setting a fixed or custom target changes only the target, editable custom fields stay bounded in local project data, and explicit target alignment can update arrangement template, master preset, master ceiling, and mix posture through undoable project history.
 - Session Brief stored in local project state with bounded artist, vibe, reference, and notes text so beginners can clarify intent and producers can keep handoff context without media uploads or cloud collaboration.
 - Beat Map production overview derived from local project, selected fixed or custom Delivery Target, Beat Readiness, export analysis, and stem analysis state, showing beginner workflow stages, producer-facing song/pattern/export/stem metrics, and explicit local action buttons without mutating project state unless clicked.
-- Next Move strip that gives one primary recommended action and secondary local actions from the current readiness/export state, including target alignment and Pattern Chain when arrangement structure is weak, without mutating Beat Readiness.
+- Next Move strip that gives one primary recommended action and secondary local actions from the current readiness/export state, including target alignment, Pattern Compare, and Pattern Chain when arrangement structure is weak, without mutating Beat Readiness.
 - Editable arrangement blocks and templates for 8-bar loop, full beat, hook-first, and breakdown structures, using assigned Pattern A/B/C data, one-click Drop/Build/Hook Lift moves, per-block track mutes, per-block bar length, split/merge controls, audible per-block energy, and structure controls for duplicate, move, and delete.
 - Pattern Chain presets, per-step A/B/C cycling, and Chain Expand song-form outlining that edit only arrangement block assignments while preserving Pattern A/B/C musical event data, mixer state, sound design, master state, and existing export paths.
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
