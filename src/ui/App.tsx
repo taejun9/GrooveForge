@@ -234,6 +234,77 @@ const mixBalancePadDefinitions: MixBalancePadDefinition[] = [
   }
 ];
 
+const soundFocusPadDefinitions: SoundFocusPadDefinition[] = [
+  {
+    id: "punch",
+    label: "Punch",
+    detail: "front",
+    values: {
+      kickPunch: 0.9,
+      snareSnap: 0.82,
+      hatBrightness: 0.62,
+      bassDrive: 0.68,
+      bassDecay: 0.52,
+      sidechainDuck: 0.72,
+      synthBrightness: 0.58,
+      synthRelease: 0.36,
+      chordWarmth: 0.5,
+      chordWidth: 0.46
+    }
+  },
+  {
+    id: "warm",
+    label: "Warm",
+    detail: "round",
+    values: {
+      kickPunch: 0.64,
+      snareSnap: 0.56,
+      hatBrightness: 0.38,
+      bassDrive: 0.54,
+      bassDecay: 0.7,
+      sidechainDuck: 0.46,
+      synthBrightness: 0.42,
+      synthRelease: 0.64,
+      chordWarmth: 0.86,
+      chordWidth: 0.62
+    }
+  },
+  {
+    id: "air",
+    label: "Air",
+    detail: "bright",
+    values: {
+      kickPunch: 0.58,
+      snareSnap: 0.72,
+      hatBrightness: 0.88,
+      bassDrive: 0.42,
+      bassDecay: 0.58,
+      sidechainDuck: 0.4,
+      synthBrightness: 0.86,
+      synthRelease: 0.7,
+      chordWarmth: 0.55,
+      chordWidth: 0.72
+    }
+  },
+  {
+    id: "space",
+    label: "Space",
+    detail: "wide",
+    values: {
+      kickPunch: 0.52,
+      snareSnap: 0.58,
+      hatBrightness: 0.72,
+      bassDrive: 0.44,
+      bassDecay: 0.74,
+      sidechainDuck: 0.5,
+      synthBrightness: 0.68,
+      synthRelease: 0.86,
+      chordWarmth: 0.7,
+      chordWidth: 0.9
+    }
+  }
+];
+
 const keys = ["F minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"];
 const historyLimit = 50;
 const keyboardCaptureKeys = ["a", "s", "d", "f", "g", "h", "j", "k"] as const;
@@ -293,6 +364,22 @@ type MixBalancePadDefinition = {
 };
 
 type MixBalancePadOption = MixBalancePadDefinition & {
+  preview: string;
+  changedCount: number;
+};
+
+type SoundFocusPadId = "punch" | "warm" | "air" | "space";
+
+type SoundFocusParameter = Exclude<keyof SoundDesign, "preset">;
+
+type SoundFocusPadDefinition = {
+  id: SoundFocusPadId;
+  label: string;
+  detail: string;
+  values: Partial<Record<SoundFocusParameter, number>>;
+};
+
+type SoundFocusPadOption = SoundFocusPadDefinition & {
   preview: string;
   changedCount: number;
 };
@@ -846,6 +933,7 @@ export function App(): ReactElement {
   }, [project.mixer]);
   const activeChannelLabel = `${activeChannels} active ${activeChannels === 1 ? "channel" : "channels"}`;
   const mixBalancePadOptions = useMemo(() => createMixBalancePadOptions(project.mixer), [project.mixer]);
+  const soundFocusPadOptions = useMemo(() => createSoundFocusPadOptions(project.sound), [project.sound]);
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
@@ -1661,6 +1749,27 @@ export function App(): ReactElement {
       ...current,
       sound: soundPresetDesign(preset)
     }));
+  }
+
+  function applySoundFocusPad(padId: SoundFocusPadId): void {
+    const pad = soundFocusPadDefinitions.find((definition) => definition.id === padId);
+    if (!pad) {
+      setProjectStatus("Sound focus pad not found");
+      return;
+    }
+
+    const changed = updateProject((current) => {
+      const sound = applySoundFocusPadToSound(current.sound, pad);
+      return sameSoundDesign(current.sound, sound) ? current : { ...current, sound };
+    }, `${pad.label} sound focus applied`);
+
+    if (changed) {
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+    } else {
+      setProjectStatus(`${pad.label} sound focus already selected`);
+    }
   }
 
   function updateSoundDesign(update: Partial<Omit<SoundDesign, "preset">>): void {
@@ -3499,9 +3608,11 @@ export function App(): ReactElement {
             <Device icon={<SlidersHorizontal size={17} />} name="Chord Tone" value={`warm ${percentLabel(project.sound.chordWarmth)}`} color="#d58cff" />
           </div>
           <SoundDesigner
+            focusPads={soundFocusPadOptions}
             mode={project.mode}
             sound={project.sound}
             onChange={updateSoundDesign}
+            onFocusPad={applySoundFocusPad}
             onPreset={applySoundPreset}
           />
           <ChordEditor
@@ -6203,6 +6314,56 @@ function sameMixerChannel(first: MixerChannel | undefined, second: MixerChannel 
   );
 }
 
+const soundFocusParameters: SoundFocusParameter[] = [
+  "kickPunch",
+  "snareSnap",
+  "hatBrightness",
+  "bassDrive",
+  "bassDecay",
+  "sidechainDuck",
+  "synthBrightness",
+  "synthRelease",
+  "chordWarmth",
+  "chordWidth"
+];
+
+function createSoundFocusPadOptions(sound: SoundDesign): SoundFocusPadOption[] {
+  return soundFocusPadDefinitions.map((pad) => {
+    const transformed = applySoundFocusPadToSound(sound, pad);
+    return {
+      ...pad,
+      preview: soundFocusPreview(pad),
+      changedCount: soundFocusParameters.filter((parameter) => transformed[parameter] !== sound[parameter]).length
+    };
+  });
+}
+
+function soundFocusPreview(pad: SoundFocusPadDefinition): string {
+  return `K ${compactUnitPercent(pad.values.kickPunch)} / 8 ${compactUnitPercent(pad.values.bassDrive)}`;
+}
+
+function compactUnitPercent(value: number | undefined): string {
+  return `${Math.round(clampUnit(value ?? 0) * 100)}`;
+}
+
+function applySoundFocusPadToSound(sound: SoundDesign, pad: SoundFocusPadDefinition): SoundDesign {
+  const nextSound: SoundDesign = {
+    ...sound,
+    preset: "custom"
+  };
+  soundFocusParameters.forEach((parameter) => {
+    const value = pad.values[parameter];
+    if (value !== undefined) {
+      nextSound[parameter] = clampUnit(value);
+    }
+  });
+  return nextSound;
+}
+
+function sameSoundDesign(first: SoundDesign, second: SoundDesign): boolean {
+  return first.preset === second.preset && soundFocusParameters.every((parameter) => first[parameter] === second[parameter]);
+}
+
 function applyMixFixToProject(
   project: ProjectState,
   preset: MixFixPreset,
@@ -7208,13 +7369,17 @@ function Device({
 }
 
 function SoundDesigner({
+  focusPads,
   mode,
   sound,
+  onFocusPad,
   onPreset,
   onChange
 }: {
+  focusPads: SoundFocusPadOption[];
   mode: ProjectState["mode"];
   sound: SoundDesign;
+  onFocusPad: (pad: SoundFocusPadId) => void;
   onPreset: (preset: (typeof soundPresetIds)[number]) => void;
   onChange: (update: Partial<Omit<SoundDesign, "preset">>) => void;
 }): ReactElement {
@@ -7237,6 +7402,7 @@ function SoundDesigner({
           </button>
         ))}
       </div>
+      <SoundFocusPads pads={focusPads} onApply={onFocusPad} />
       <div className="sound-readout" aria-label="Sound design state">
         <span data-testid="sound-kick-readout">Kick {percentLabel(sound.kickPunch)}</span>
         <span data-testid="sound-bass-readout">808 {percentLabel(sound.bassDrive)}</span>
@@ -7308,6 +7474,38 @@ function SoundDesigner({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function SoundFocusPads({
+  pads,
+  onApply
+}: {
+  pads: SoundFocusPadOption[];
+  onApply: (pad: SoundFocusPadId) => void;
+}): ReactElement {
+  return (
+    <div className="sound-focus-panel" data-testid="sound-focus-pads">
+      <div className="sound-focus-heading">
+        <span>Sound Focus</span>
+        <strong>Tone posture</strong>
+      </div>
+      <div className="sound-focus-row" aria-label="Sound Focus Pads">
+        {pads.map((pad) => (
+          <button
+            data-testid={`sound-focus-${pad.id}`}
+            key={pad.id}
+            onClick={() => onApply(pad.id)}
+            title={`${pad.label} ${pad.preview}`}
+            type="button"
+          >
+            <span>{pad.label}</span>
+            <strong>{pad.preview}</strong>
+            <small>{pad.changedCount} moves / {pad.detail}</small>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

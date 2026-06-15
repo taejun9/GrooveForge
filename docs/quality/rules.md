@@ -105,6 +105,8 @@ Selected chord edit tool work must keep chord move, duplicate, delete, and inver
 
 Sound design work must keep tone parameters in project state, migrate older project files without sound data, and make preset or Studio tone changes audible in both realtime playback and WAV export.
 
+Sound Focus Pad work must derive kick, drum, 808, sidechain, synth, and chord tone changes from explicit local tone-posture presets, update only editable `SoundDesign` state through undoable project history, mark the result as custom when needed, keep manual Sound Designer controls editable, preserve musical events, arrangement, mixer/master, project files, snapshots, realtime playback, WAV/stem/MIDI export, and Handoff Sheet semantics, and avoid sampling, imported audio, hidden generation, remote AI, plugin hosting, accounts, analytics, or cloud sync.
+
 Sidechain work must keep kick-to-808 ducking as editable local sound-design state, migrate older project files without sidechain data, and apply the same deterministic gain rule to realtime playback, full-mix WAV export, and 808 stem export.
 
 Project file work must reject invalid imports without overwriting the current project and must preserve edited drum, bass, chord, melody, sound design, mixer, master, key, BPM, style, and arrangement data on save/load.
