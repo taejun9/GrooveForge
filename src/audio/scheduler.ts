@@ -3,6 +3,7 @@ import {
   activePattern,
   chordPitches,
   loopStepCount,
+  drumStepTimingMs,
   drumStepVelocity,
   hatRepeatCount,
   noteToFrequency,
@@ -210,13 +211,15 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
   const pattern = activePattern(project);
 
   if (pattern.drumPattern.kick[patternStep]) {
-    scheduleKick(context, master, time, drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix.pan, sound);
+    const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
+    scheduleKick(context, master, drumTime, drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix.pan, sound);
   }
   if (pattern.drumPattern.clap[patternStep]) {
+    const drumTime = time + drumStepTimingMs(pattern, "clap", patternStep) / 1000;
     scheduleNoise(
       context,
       master,
-      time,
+      drumTime,
       0.11 + (1 - sound.snareSnap) * 0.08,
       (0.2 + sound.snareSnap * 0.14) * drumMix.gain * drumStepVelocity(pattern, "clap", patternStep),
       780 + sound.snareSnap * 1800,
@@ -226,11 +229,12 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
   if (pattern.drumPattern.hat[patternStep]) {
     const repeatCount = hatRepeatCount(pattern, patternStep);
     const baseVelocity = drumStepVelocity(pattern, "hat", patternStep);
+    const drumTime = time + drumStepTimingMs(pattern, "hat", patternStep) / 1000;
     for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
       scheduleNoise(
         context,
         master,
-        time + (repeatIndex * stepDuration) / repeatCount,
+        drumTime + (repeatIndex * stepDuration) / repeatCount,
         0.035 + (1 - sound.hatBrightness) * 0.025,
         (0.08 + sound.hatBrightness * 0.08) * drumMix.gain * baseVelocity * (repeatIndex === 0 ? 1 : 0.72),
         4300 + sound.hatBrightness * 4200,
@@ -239,10 +243,11 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
     }
   }
   if (pattern.drumPattern.perc[patternStep]) {
+    const drumTime = time + drumStepTimingMs(pattern, "perc", patternStep) / 1000;
     scheduleTone(
       context,
       master,
-      time,
+      drumTime,
       0.07,
       260 + sound.snareSnap * 190,
       0.12 * drumMix.gain * drumStepVelocity(pattern, "perc", patternStep),

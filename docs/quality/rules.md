@@ -67,6 +67,8 @@ Drum, bass, melody, and arrangement work must preserve editable project state wi
 
 Drum dynamics work must migrate old patterns, preserve per-step velocity and hat repeat data across Pattern A/B/C copy, save/load, undo/redo, realtime playback, WAV export, and stem export.
 
+Drum microtiming work must migrate old patterns, preserve per-step timing offsets across Pattern A/B/C copy, save/load, undo/redo, realtime playback, WAV export, and stem export, and keep offsets as local musical event data rather than imported audio.
+
 Style groove work must apply key-aware editable Pattern A/B/C event data, BPM, swing, and built-in sound preset changes without introducing imported audio or bypassing undo/redo.
 
 Chord progression work must preserve Pattern A/B/C independence, keep chord roots scale-aware by default, migrate older project files without chord events, and make chord events audible in both realtime playback and WAV export.

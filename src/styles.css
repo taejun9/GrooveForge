@@ -503,6 +503,30 @@ input[type="range"] {
   text-align: center;
 }
 
+.timing-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 68px;
+  gap: 5px;
+  align-items: center;
+}
+
+.timing-row button {
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 5px;
+}
+
+.timing-row button.selected {
+  border-color: rgba(120, 240, 200, 0.64);
+  color: #11100f;
+  background: #78f0c8;
+}
+
+.timing-row input[type="number"] {
+  min-width: 0;
+  text-align: center;
+}
+
 .repeat-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

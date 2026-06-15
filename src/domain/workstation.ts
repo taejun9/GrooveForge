@@ -27,6 +27,7 @@ export type StyleProfile = {
 
 export type DrumPattern = Record<DrumLane, boolean[]>;
 export type DrumVelocities = Record<DrumLane, number[]>;
+export type DrumTimings = Record<DrumLane, number[]>;
 
 export type BassNote = {
   step: number;
@@ -58,6 +59,7 @@ export type PatternSlot = "A" | "B" | "C";
 export type PatternData = {
   drumPattern: DrumPattern;
   drumVelocities: DrumVelocities;
+  drumTimings: DrumTimings;
   hatRepeats: number[];
   bassNotes: BassNote[];
   melodyNotes: MelodyNote[];
@@ -127,6 +129,8 @@ export type ProjectFile = {
 
 export const steps = Array.from({ length: 16 }, (_, index) => index);
 export const stepsPerBar = 16;
+export const minDrumTimingMs = -35;
+export const maxDrumTimingMs = 35;
 export const projectFileVersion = 1;
 export const drumLanes: DrumLane[] = ["kick", "clap", "hat", "perc"];
 export const patternSlots: PatternSlot[] = ["A", "B", "C"];
@@ -478,12 +482,13 @@ export function soundPresetDesign(preset: (typeof soundPresetIds)[number]): Soun
   return { ...soundPresetDefaults[preset] };
 }
 
-type PatternSeed = Omit<PatternData, "drumVelocities" | "hatRepeats">;
+type PatternSeed = Omit<PatternData, "drumVelocities" | "drumTimings" | "hatRepeats">;
 
 function withDrumDynamics(pattern: PatternSeed, repeatOverrides: Partial<Record<number, number>> = {}): PatternData {
   return {
     ...pattern,
     drumVelocities: defaultDrumVelocities(pattern.drumPattern),
+    drumTimings: defaultDrumTimings(),
     hatRepeats: defaultHatRepeats(pattern.drumPattern.hat, repeatOverrides)
   };
 }
@@ -515,8 +520,19 @@ export function normalizeHatRepeat(value: number): number {
   return Math.min(4, Math.max(1, Math.round(value)));
 }
 
+export function normalizeDrumTimingMs(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(maxDrumTimingMs, Math.max(minDrumTimingMs, Math.round(value)));
+}
+
 export function drumStepVelocity(pattern: PatternData, lane: DrumLane, step: number): number {
   return normalizeDrumVelocity(pattern.drumVelocities[lane]?.[step] ?? defaultDrumVelocity(lane, step));
+}
+
+export function drumStepTimingMs(pattern: PatternData, lane: DrumLane, step: number): number {
+  return normalizeDrumTimingMs(pattern.drumTimings[lane]?.[step] ?? 0);
 }
 
 export function hatRepeatCount(pattern: PatternData, step: number): number {
@@ -547,6 +563,15 @@ function defaultDrumVelocities(drumPattern: DrumPattern): DrumVelocities {
     clap: steps.map((step) => (drumPattern.clap[step] ? defaultDrumVelocity("clap", step) : 0.68)),
     hat: steps.map((step) => (drumPattern.hat[step] ? defaultDrumVelocity("hat", step) : 0.56)),
     perc: steps.map((step) => (drumPattern.perc[step] ? defaultDrumVelocity("perc", step) : 0.58))
+  };
+}
+
+function defaultDrumTimings(): DrumTimings {
+  return {
+    kick: steps.map(() => 0),
+    clap: steps.map(() => 0),
+    hat: steps.map(() => 0),
+    perc: steps.map(() => 0)
   };
 }
 
@@ -760,6 +785,12 @@ export function clonePatternData(pattern: PatternData): PatternData {
       hat: [...pattern.drumVelocities.hat],
       perc: [...pattern.drumVelocities.perc]
     },
+    drumTimings: {
+      kick: [...pattern.drumTimings.kick],
+      clap: [...pattern.drumTimings.clap],
+      hat: [...pattern.drumTimings.hat],
+      perc: [...pattern.drumTimings.perc]
+    },
     hatRepeats: [...pattern.hatRepeats],
     bassNotes: pattern.bassNotes.map((note) => ({ ...note })),
     melodyNotes: pattern.melodyNotes.map((note) => ({ ...note })),
@@ -897,6 +928,7 @@ function normalizePatternData(pattern: PatternDataInput): PatternData {
   return {
     drumPattern,
     drumVelocities: normalizeDrumVelocities(pattern.drumVelocities, drumPattern),
+    drumTimings: normalizeDrumTimings(pattern.drumTimings),
     hatRepeats: normalizeHatRepeats(pattern.hatRepeats, drumPattern.hat),
     bassNotes: pattern.bassNotes,
     melodyNotes: pattern.melodyNotes,
@@ -921,6 +953,18 @@ function normalizeDrumVelocities(value: DrumVelocities | undefined, drumPattern:
     clap: steps.map((step) => normalizeDrumVelocity(value.clap[step] ?? defaultDrumVelocity("clap", step))),
     hat: steps.map((step) => normalizeDrumVelocity(value.hat[step] ?? defaultDrumVelocity("hat", step))),
     perc: steps.map((step) => normalizeDrumVelocity(value.perc[step] ?? defaultDrumVelocity("perc", step)))
+  };
+}
+
+function normalizeDrumTimings(value: DrumTimings | undefined): DrumTimings {
+  if (!value) {
+    return defaultDrumTimings();
+  }
+  return {
+    kick: steps.map((step) => normalizeDrumTimingMs(value.kick[step] ?? 0)),
+    clap: steps.map((step) => normalizeDrumTimingMs(value.clap[step] ?? 0)),
+    hat: steps.map((step) => normalizeDrumTimingMs(value.hat[step] ?? 0)),
+    perc: steps.map((step) => normalizeDrumTimingMs(value.perc[step] ?? 0))
   };
 }
 
@@ -989,9 +1033,10 @@ function normalizeProjectState(value: unknown): ProjectState | null {
   return null;
 }
 
-type PatternDataInput = Omit<PatternData, "chordEvents" | "drumVelocities" | "hatRepeats"> & {
+type PatternDataInput = Omit<PatternData, "chordEvents" | "drumVelocities" | "drumTimings" | "hatRepeats"> & {
   chordEvents?: ChordEvent[];
   drumVelocities?: DrumVelocities;
+  drumTimings?: DrumTimings;
   hatRepeats?: number[];
 };
 type SoundDesignInput = Partial<SoundDesign> & { preset?: SoundPresetId };
@@ -1041,6 +1086,7 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patt
     (value.sound === undefined || isSoundDesignInput(value.sound)) &&
     isDrumPattern(value.drumPattern) &&
     (value.drumVelocities === undefined || isDrumVelocities(value.drumVelocities)) &&
+    (value.drumTimings === undefined || isDrumTimings(value.drumTimings)) &&
     (value.hatRepeats === undefined || isHatRepeats(value.hatRepeats)) &&
     Array.isArray(value.bassNotes) &&
     value.bassNotes.every(isBassNote) &&
@@ -1083,6 +1129,7 @@ function isPatternDataInput(value: unknown): value is PatternDataInput {
     isRecord(value) &&
     isDrumPattern(value.drumPattern) &&
     (value.drumVelocities === undefined || isDrumVelocities(value.drumVelocities)) &&
+    (value.drumTimings === undefined || isDrumTimings(value.drumTimings)) &&
     (value.hatRepeats === undefined || isHatRepeats(value.hatRepeats)) &&
     Array.isArray(value.bassNotes) &&
     value.bassNotes.every(isBassNote) &&
@@ -1110,6 +1157,18 @@ function isDrumVelocities(value: unknown): value is DrumVelocities {
       Array.isArray(value[lane]) &&
       value[lane].length === stepsPerBar &&
       value[lane].every((velocity) => isFiniteNumber(velocity) && velocity >= 0 && velocity <= 1)
+  );
+}
+
+function isDrumTimings(value: unknown): value is DrumTimings {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return drumLanes.every(
+    (lane) =>
+      Array.isArray(value[lane]) &&
+      value[lane].length === stepsPerBar &&
+      value[lane].every((timing) => isFiniteNumber(timing) && timing >= minDrumTimingMs && timing <= maxDrumTimingMs)
   );
 }
 

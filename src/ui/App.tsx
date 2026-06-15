@@ -47,11 +47,15 @@ import {
   createStylePatternSet,
   createEmptyPatternData,
   defaultDrumVelocity,
+  drumStepTimingMs,
   drumStepVelocity,
   hatRepeatCount,
   masterPresetCeilingDb,
   masterPresets,
   melodyPitchLanes,
+  minDrumTimingMs,
+  maxDrumTimingMs,
+  normalizeDrumTimingMs,
   normalizeDrumVelocity,
   normalizeHatRepeat,
   parseProjectFile,
@@ -151,6 +155,10 @@ export function App(): ReactElement {
     selectedDrumStep && selectedDrumActive
       ? drumStepVelocity(currentPattern, selectedDrumStep.lane, selectedDrumStep.step)
       : undefined;
+  const selectedDrumTiming =
+    selectedDrumStep && selectedDrumActive
+      ? drumStepTimingMs(currentPattern, selectedDrumStep.lane, selectedDrumStep.step)
+      : 0;
   const selectedHatRepeat =
     selectedDrumStep && selectedDrumStep.lane === "hat" && selectedDrumActive
       ? hatRepeatCount(currentPattern, selectedDrumStep.step)
@@ -479,6 +487,12 @@ export function App(): ReactElement {
             index === step && nextActive ? normalizeDrumVelocity(velocity || defaultDrumVelocity(lane, step)) : velocity
           )
         },
+        drumTimings: {
+          ...pattern.drumTimings,
+          [lane]: pattern.drumTimings[lane].map((timing, index) =>
+            index === step ? (nextActive ? normalizeDrumTimingMs(timing) : 0) : timing
+          )
+        },
         hatRepeats:
           lane === "hat"
             ? pattern.hatRepeats.map((repeat, index) => (index === step && !nextActive ? 1 : repeat))
@@ -513,6 +527,22 @@ export function App(): ReactElement {
       hatRepeats: pattern.hatRepeats.map((currentRepeat, index) =>
         index === selectedDrumStep.step ? normalizeHatRepeat(repeat) : currentRepeat
       )
+    }));
+  }
+
+  function updateSelectedDrumTiming(timingMs: number): void {
+    if (!selectedDrumStep || !selectedDrumActive) {
+      return;
+    }
+
+    updateCurrentPattern((pattern) => ({
+      ...pattern,
+      drumTimings: {
+        ...pattern.drumTimings,
+        [selectedDrumStep.lane]: pattern.drumTimings[selectedDrumStep.lane].map((currentTiming, index) =>
+          index === selectedDrumStep.step ? normalizeDrumTimingMs(timingMs) : currentTiming
+        )
+      }
     }));
   }
 
@@ -930,6 +960,13 @@ export function App(): ReactElement {
                   const active = currentPattern.drumPattern[lane][step];
                   const velocity = drumStepVelocity(currentPattern, lane, step);
                   const repeat = lane === "hat" ? hatRepeatCount(currentPattern, step) : 1;
+                  const timing = drumStepTimingMs(currentPattern, lane, step);
+                  const stepBadge = [
+                    lane === "hat" && repeat > 1 ? `${repeat}x` : "",
+                    timing === 0 ? "" : timingBadge(timing)
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
                   return (
                     <button
                       aria-label={`${drumLabels[lane]} step ${step + 1}`}
@@ -953,7 +990,7 @@ export function App(): ReactElement {
                       type="button"
                     >
                       <span>{step + 1}</span>
-                      {active && lane === "hat" && repeat > 1 && <small>{repeat}x</small>}
+                      {active && stepBadge && <small>{stepBadge}</small>}
                     </button>
                   );
                 })}
@@ -976,8 +1013,10 @@ export function App(): ReactElement {
               selectedStep={selectedDrumStep}
               active={selectedDrumActive}
               velocity={selectedDrumVelocity}
+              timingMs={selectedDrumTiming}
               hatRepeat={selectedHatRepeat}
               onVelocityChange={updateSelectedDrumVelocity}
+              onTimingChange={updateSelectedDrumTiming}
               onHatRepeatChange={updateSelectedHatRepeat}
             />
           </div>
@@ -1351,26 +1390,53 @@ function DrumStepInspector({
   selectedStep,
   active,
   velocity,
+  timingMs,
   hatRepeat,
   onVelocityChange,
+  onTimingChange,
   onHatRepeatChange
 }: {
   selectedStep: SelectedDrumStep | null;
   active: boolean;
   velocity?: number;
+  timingMs: number;
   hatRepeat: number;
   onVelocityChange: (velocity: number) => void;
+  onTimingChange: (timingMs: number) => void;
   onHatRepeatChange: (repeat: number) => void;
 }): ReactElement {
   const velocityValue = velocity ?? 0.75;
+  const timingValue = normalizeDrumTimingMs(timingMs);
+  const timingTextValue = `${timingValue}`;
+  const [timingText, setTimingText] = useState(timingTextValue);
+  const [isEditingTiming, setIsEditingTiming] = useState(false);
+  const skipNextTimingBlurCommit = useRef(false);
   const label = selectedStep ? `${drumLabels[selectedStep.lane]} ${selectedStep.step + 1}` : "No step";
+
+  useEffect(() => {
+    if (!isEditingTiming) {
+      setTimingText(timingTextValue);
+    }
+  }, [isEditingTiming, timingTextValue]);
+
+  function commitTimingInput(inputText: string): void {
+    const nextText = inputText.trim();
+    const parsed = nextText === "" ? timingValue : Number(nextText);
+    const nextTiming = normalizeDrumTimingMs(parsed);
+
+    setIsEditingTiming(false);
+    setTimingText(`${nextTiming}`);
+    if (nextTiming !== timingValue) {
+      onTimingChange(nextTiming);
+    }
+  }
 
   return (
     <div className="drum-step-inspector" aria-label="Drum step dynamics">
       <div className="inspector-heading">
         <span>Dynamics</span>
         <strong data-testid="drum-step-readout">
-          {selectedStep ? `${label} ${active ? percentLabel(velocityValue) : "off"}` : "Select step"}
+          {selectedStep ? `${label} ${active ? `${percentLabel(velocityValue)} / ${timingLabel(timingValue)}` : "off"}` : "Select step"}
         </strong>
       </div>
       <label>
@@ -1397,6 +1463,65 @@ function DrumStepInspector({
             step={1}
             type="number"
             value={Math.round(velocityValue * 100)}
+          />
+        </div>
+      </label>
+      <label>
+        <span>Timing {active ? timingLabel(timingValue) : "--"}</span>
+        <div className="timing-row" aria-label="Drum timing">
+          {[
+            { label: "Early", timing: -15, testId: "drum-timing-early" },
+            { label: "On", timing: 0, testId: "drum-timing-on" },
+            { label: "Late", timing: 15, testId: "drum-timing-late" }
+          ].map((option) => (
+            <button
+              className={timingValue === option.timing ? "selected" : ""}
+              data-testid={option.testId}
+              disabled={!selectedStep || !active}
+              key={option.label}
+              onClick={() => onTimingChange(option.timing)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+          <input
+            aria-label="Drum timing milliseconds"
+            data-testid="drum-timing-input"
+            disabled={!selectedStep || !active}
+            max={maxDrumTimingMs}
+            min={minDrumTimingMs}
+            onBlur={(event) => {
+              if (skipNextTimingBlurCommit.current) {
+                skipNextTimingBlurCommit.current = false;
+                return;
+              }
+              commitTimingInput(event.currentTarget.value);
+            }}
+            onChange={(event) => {
+              setIsEditingTiming(true);
+              setTimingText(event.target.value);
+            }}
+            onFocus={() => {
+              setIsEditingTiming(true);
+              setTimingText(timingTextValue);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                skipNextTimingBlurCommit.current = true;
+                commitTimingInput(event.currentTarget.value);
+                event.currentTarget.blur();
+              }
+              if (event.key === "Escape") {
+                skipNextTimingBlurCommit.current = true;
+                setIsEditingTiming(false);
+                setTimingText(timingTextValue);
+                event.currentTarget.blur();
+              }
+            }}
+            step={1}
+            type="number"
+            value={isEditingTiming ? timingText : timingTextValue}
           />
         </div>
       </label>
@@ -1910,6 +2035,19 @@ function panLabel(pan: number): string {
 
 function percentLabel(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function timingLabel(value: number): string {
+  const timing = normalizeDrumTimingMs(value);
+  if (timing === 0) {
+    return "On grid";
+  }
+  return timing > 0 ? `Late +${timing} ms` : `Early ${timing} ms`;
+}
+
+function timingBadge(value: number): string {
+  const timing = normalizeDrumTimingMs(value);
+  return timing > 0 ? `+${timing}` : `${timing}`;
 }
 
 function formatPercent(value: number): string {
