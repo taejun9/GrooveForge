@@ -35,6 +35,8 @@ export const chordProgressionPresetIds = ["moody", "lift", "bounce", "sparse"] a
 export type ChordProgressionPreset = (typeof chordProgressionPresetIds)[number];
 export const patternVariationPresetIds = ["subtle", "hook", "breakdown"] as const;
 export type PatternVariationPreset = (typeof patternVariationPresetIds)[number];
+export const patternFillPresetIds = ["drum_fill", "bass_pickup", "melody_turn", "clear_tail"] as const;
+export type PatternFillPreset = (typeof patternFillPresetIds)[number];
 
 export type BassNote = {
   step: number;
@@ -223,6 +225,12 @@ export const patternVariationPresetLabels: Record<PatternVariationPreset, string
   subtle: "Subtle",
   hook: "Hook",
   breakdown: "Break"
+};
+export const patternFillPresetLabels: Record<PatternFillPreset, string> = {
+  drum_fill: "Drum Fill",
+  bass_pickup: "808 Pickup",
+  melody_turn: "Melody Turn",
+  clear_tail: "Clear Tail"
 };
 export const masterPresetCeilingsDb: Record<MasterPreset, number> = {
   "Clean Demo": -0.8,
@@ -775,6 +783,10 @@ export function patternVariationPresetLabel(preset: PatternVariationPreset): str
   return patternVariationPresetLabels[preset];
 }
 
+export function patternFillPresetLabel(preset: PatternFillPreset): string {
+  return patternFillPresetLabels[preset];
+}
+
 export function arrangementTemplateLabel(template: ArrangementTemplateId): string {
   return arrangementTemplateLabels[template];
 }
@@ -1034,6 +1046,24 @@ export function createPatternVariation(pattern: PatternData, preset: PatternVari
   return applyDrumGroovePreset(variation, "tight");
 }
 
+export function applyPatternFillPreset(pattern: PatternData, preset: PatternFillPreset, key: string): PatternData {
+  const filled = clonePatternData(pattern);
+  if (preset === "drum_fill") {
+    applyDrumTailFill(filled);
+    return filled;
+  }
+  if (preset === "bass_pickup") {
+    applyBassPickup(filled, key);
+    return filled;
+  }
+  if (preset === "melody_turn") {
+    applyMelodyTurn(filled, key);
+    return filled;
+  }
+  clearPatternTail(filled);
+  return filled;
+}
+
 function applySubtleVariation(pattern: PatternData): void {
   setDrumStep(pattern, "kick", 10, true, 0.68, 0.72, -4);
   setDrumStep(pattern, "perc", 3, true, 0.58, 0.64, 8);
@@ -1109,6 +1139,58 @@ function applyBreakdownVariation(pattern: PatternData): void {
     velocity: Math.max(0.28, event.velocity - 0.12),
     probability: index <= 1 ? 1 : 0.72
   }));
+}
+
+function applyDrumTailFill(pattern: PatternData): void {
+  setDrumStep(pattern, "kick", 12, true, 0.94, 1, -2);
+  setDrumStep(pattern, "kick", 14, true, 0.78, 0.9, -7);
+  setDrumStep(pattern, "clap", 12, true, 0.92, 1, 3);
+  setDrumStep(pattern, "hat", 12, true, 0.68, 1, -6);
+  setDrumStep(pattern, "hat", 13, true, 0.58, 0.94, -4, 2);
+  setDrumStep(pattern, "hat", 14, true, 0.66, 1, -9);
+  setDrumStep(pattern, "hat", 15, true, 0.78, 1, -12, 4);
+  setDrumStep(pattern, "perc", 13, true, 0.62, 0.86, 8);
+  setDrumStep(pattern, "perc", 15, true, 0.68, 0.78, -10);
+}
+
+function applyBassPickup(pattern: PatternData, key: string): void {
+  pattern.bassNotes = sortBassNotes([
+    ...pattern.bassNotes.filter((note) => note.step < 12).map(trimEventBeforeTail),
+    { step: 12, pitch: pitchFromDegree(key, 4, 1), length: 1, glide: false, probability: 0.9 },
+    { step: 14, pitch: pitchFromDegree(key, 5, 1), length: 1, glide: true, probability: 1 },
+    { step: 15, pitch: pitchFromDegree(key, 6, 1), length: 1, glide: true, probability: 1 }
+  ]);
+}
+
+function applyMelodyTurn(pattern: PatternData, key: string): void {
+  pattern.melodyNotes = sortMelodyNotes([
+    ...pattern.melodyNotes.filter((note) => note.step < 12).map(trimEventBeforeTail),
+    { step: 12, pitch: pitchFromDegree(key, 4, 4), length: 1, velocity: 0.64, probability: 0.92 },
+    { step: 13, pitch: pitchFromDegree(key, 5, 4), length: 1, velocity: 0.7, probability: 1 },
+    { step: 14, pitch: pitchFromDegree(key, 3, 4), length: 1, velocity: 0.66, probability: 1 },
+    { step: 15, pitch: pitchFromDegree(key, 2, 4), length: 1, velocity: 0.74, probability: 1 }
+  ]);
+}
+
+function clearPatternTail(pattern: PatternData): void {
+  drumLanes.forEach((lane) => {
+    [12, 13, 14, 15].forEach((step) => setDrumStep(pattern, lane, step, false));
+  });
+  pattern.bassNotes = sortBassNotes(pattern.bassNotes.filter((note) => note.step < 12).map(trimEventBeforeTail));
+  pattern.melodyNotes = sortMelodyNotes(pattern.melodyNotes.filter((note) => note.step < 12).map(trimEventBeforeTail));
+  pattern.chordEvents = pattern.chordEvents
+    .filter((event) => event.step < 12)
+    .map((event) => ({
+      ...event,
+      length: normalizeChordLength(Math.min(event.length, 12 - event.step), event.step)
+    }));
+}
+
+function trimEventBeforeTail<T extends BassNote | MelodyNote>(note: T): T {
+  return {
+    ...note,
+    length: clampEventLength(Math.min(note.length, 12 - note.step), note.step)
+  };
 }
 
 function setDrumStep(

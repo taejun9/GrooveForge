@@ -180,6 +180,7 @@ h2 {
 .segmented button,
 .pattern-tabs button,
 .pattern-tools button,
+.pattern-fill-row button,
 .arrangement-template-row button,
 .block-pattern-row button,
 .arrangement-mute-row button,
@@ -220,6 +221,7 @@ h2 {
 .icon-button:disabled,
 .segmented button:disabled,
 .pattern-tools button:disabled,
+.pattern-fill-row button:disabled,
 .block-pattern-row button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
@@ -257,6 +259,7 @@ h2 {
 .segmented button,
 .pattern-tabs button,
 .pattern-tools button,
+.pattern-fill-row button,
 .arrangement-template-row button,
 .block-pattern-row button,
 .arrangement-mute-row button,
@@ -543,7 +546,15 @@ h2 {
   margin-top: 8px;
 }
 
-.pattern-tools button {
+.pattern-fill-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.pattern-tools button,
+.pattern-fill-row button {
   display: inline-flex;
   min-width: 0;
   align-items: center;
@@ -554,13 +565,15 @@ h2 {
   white-space: nowrap;
 }
 
-.pattern-tools button span {
+.pattern-tools button span,
+.pattern-fill-row button span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.pattern-tools button.danger {
+.pattern-tools button.danger,
+.pattern-fill-row button.danger {
   border-color: rgba(255, 122, 79, 0.38);
   color: #ffd8cf;
   background: rgba(255, 122, 79, 0.08);

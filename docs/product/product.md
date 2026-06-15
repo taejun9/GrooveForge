@@ -58,7 +58,7 @@ Primary feature areas:
 
 - Transport: BPM, key, play, stop, loop, metronome.
 - Beat blueprints: sample-free editable project starts that combine style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset.
-- Pattern editor: drum step sequencer, bass grid, chord progression, melody grid, variation A/B/C.
+- Pattern editor: drum step sequencer, bass grid, chord progression, melody grid, variation A/B/C, and one-click Pattern Fill tail moves.
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with one-click Drop/Build/Hook Lift moves, per-block bar lengths, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
 - Project readiness: read-only checks for drums, 808/bass, melody/chords, arrangement, and export completeness.
@@ -124,7 +124,7 @@ MVP capabilities:
 - Chord progression track with scale-locked roots, key-aware progression presets, editable step/root/quality/inversion/length/velocity/chance, visible chance badges, add/delete controls, and selected-chord move/duplicate/inversion tools.
 - Simple synth melody track with editable scale-aware grid, velocity control, note chance badges, and selected-note move/transpose/duplicate tools.
 - Sound design presets and Studio tone controls for kick punch, snare snap, hat brightness, 808 drive/decay, sidechain ducking, synth brightness/release, and chord warmth/width.
-- Independent Pattern A/B/C storage with deterministic Subtle/Hook/Break variation tools plus copy/clear tools for drum, bass, chord, and melody variations.
+- Independent Pattern A/B/C storage with deterministic Subtle/Hook/Break variation tools, one-click Drum Fill/808 Pickup/Melody Turn/Clear Tail moves, plus copy/clear tools for drum, bass, chord, and melody variations.
 - Read-only Beat Readiness checks for drums, 808/bass, melody/chords, arrangement structure, and export signal status.
 - Editable arrangement blocks and templates for 8-bar loop, full beat, hook-first, and breakdown structures, using assigned Pattern A/B/C data, one-click Drop/Build/Hook Lift moves, per-block track mutes, per-block bar length, split/merge controls, audible per-block energy, and structure controls for duplicate, move, and delete.
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.

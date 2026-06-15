@@ -61,6 +61,7 @@ import {
   MixerChannel,
   NoteTrack,
   PatternData,
+  PatternFillPreset,
   PatternSlot,
   PatternVariationPreset,
   ProjectState,
@@ -68,6 +69,7 @@ import {
   activePattern,
   applyBeatBlueprint,
   applyArrangementMovePreset,
+  applyPatternFillPreset,
   arrangementSections,
   arrangementEnergyGain,
   arrangementMovePresetIds,
@@ -115,6 +117,8 @@ import {
   normalizeMixerEq,
   parseProjectFile,
   patternSlots,
+  patternFillPresetIds,
+  patternFillPresetLabel,
   patternVariationPresetIds,
   patternVariationPresetLabel,
   projectFileName,
@@ -501,6 +505,17 @@ export function App(): ReactElement {
     updateCurrentPattern(
       (pattern) => createPatternVariation(pattern, preset),
       `${patternVariationPresetLabel(preset)} variation applied to Pattern ${sourceSlot}`
+    );
+    setSelectedNote(null);
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
+  }
+
+  function applyPatternFill(preset: PatternFillPreset): void {
+    const sourceSlot = projectRef.current.selectedPattern;
+    updateCurrentPattern(
+      (pattern) => applyPatternFillPreset(pattern, preset, projectRef.current.key),
+      `${patternFillPresetLabel(preset)} applied to Pattern ${sourceSlot}`
     );
     setSelectedNote(null);
     setSelectedDrumStep(null);
@@ -1873,6 +1888,24 @@ export function App(): ReactElement {
               <Trash2 size={14} aria-hidden="true" />
               <span>Clear {project.selectedPattern}</span>
             </button>
+          </div>
+          <div className="pattern-fill-row" aria-label="Pattern fills">
+            {patternFillPresetIds.map((preset) => {
+              const isClear = preset === "clear_tail";
+              return (
+                <button
+                  className={isClear ? "danger" : ""}
+                  key={preset}
+                  data-testid={`pattern-fill-${preset}`}
+                  type="button"
+                  title={`Apply ${patternFillPresetLabel(preset)} to Pattern ${project.selectedPattern}`}
+                  onClick={() => applyPatternFill(preset)}
+                >
+                  {isClear ? <Scissors size={14} aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
+                  <span>{patternFillPresetLabel(preset)}</span>
+                </button>
+              );
+            })}
           </div>
           <div className="step-grid">
             {(Object.keys(drumLabels) as DrumLane[]).map((lane) => (
