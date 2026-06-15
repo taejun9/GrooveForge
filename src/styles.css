@@ -34,13 +34,14 @@ button {
 .app-shell {
   display: grid;
   min-height: 100vh;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto 1fr;
   gap: 12px;
   padding: 16px;
 }
 
 .transport-band,
 .mode-row,
+.beat-readiness,
 .panel {
   border: 1px solid rgba(244, 239, 231, 0.11);
   background: rgba(25, 25, 24, 0.88);
@@ -291,6 +292,81 @@ h2 {
 .session-meter span:first-child {
   border-color: color-mix(in srgb, var(--accent) 70%, transparent);
   color: var(--accent);
+}
+
+.beat-readiness {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 10px;
+  align-items: stretch;
+  min-height: 74px;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.beat-readiness-heading {
+  display: grid;
+  gap: 5px;
+  align-content: center;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.beat-readiness-heading span {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 11px;
+}
+
+.beat-readiness-heading strong {
+  color: #f4efe7;
+  font-size: 17px;
+}
+
+.beat-readiness-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.beat-readiness-card {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.16);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px 9px;
+}
+
+.beat-readiness-card.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.07);
+}
+
+.beat-readiness-card.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.07);
+}
+
+.beat-readiness-card span {
+  overflow: hidden;
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.beat-readiness-card strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.beat-readiness-card p {
+  margin: 0;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 11px;
+  line-height: 1.3;
 }
 
 .workspace-grid {

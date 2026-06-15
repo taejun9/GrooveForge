@@ -154,6 +154,14 @@ type MixCoachCheck = {
   tone: MixCoachTone;
 };
 
+type BeatReadinessCheck = {
+  id: string;
+  label: string;
+  status: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
 type SelectedDrumStep = {
   lane: DrumLane;
   step: number;
@@ -187,6 +195,7 @@ export function App(): ReactElement {
   const style = getStyle(project);
   const currentPattern = activePattern(project);
   const exportAnalysis = useMemo(() => analyzeExport(project), [project]);
+  const beatReadinessChecks = useMemo(() => createBeatReadinessChecks(project, exportAnalysis), [project, exportAnalysis]);
   const stemAnalyses = useMemo(() => analyzeStemExports(project), [project]);
   const activeChannels = useMemo(() => {
     const soloActive = project.mixer.some((channel) => channel.id !== "master" && channel.solo);
@@ -1768,6 +1777,8 @@ export function App(): ReactElement {
         </div>
       </section>
 
+      <BeatReadiness checks={beatReadinessChecks} />
+
       <section className="workspace-grid">
         <section className="panel pattern-panel" aria-label="Pattern editor">
           <PanelTitle icon={<Drum size={18} />} title="Drums" meta="16 step rack" />
@@ -2482,6 +2493,216 @@ function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; met
       <span>{meta}</span>
     </div>
   );
+}
+
+function BeatReadiness({ checks }: { checks: BeatReadinessCheck[] }): ReactElement {
+  const readyCount = checks.filter((check) => check.tone === "good").length;
+
+  return (
+    <section className="beat-readiness" data-testid="beat-readiness" aria-label="Beat readiness">
+      <div className="beat-readiness-heading">
+        <span>Beat Readiness</span>
+        <strong data-testid="beat-readiness-summary">
+          {readyCount}/{checks.length} ready
+        </strong>
+      </div>
+      <div className="beat-readiness-list">
+        {checks.map((check) => (
+          <div className={`beat-readiness-card ${check.tone}`} data-testid={`beat-readiness-check-${check.id}`} key={check.id}>
+            <span>{check.label}</span>
+            <strong>{check.status}</strong>
+            <p>{check.detail}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function createBeatReadinessChecks(project: ProjectState, analysis: ExportAnalysis): BeatReadinessCheck[] {
+  const arrangedPatterns = arrangedPatternData(project);
+  const drumHits = arrangedPatterns.reduce((total, pattern) => total + drumHitCount(pattern), 0);
+  const hasKick = arrangedPatterns.some((pattern) => pattern.drumPattern.kick.some(Boolean));
+  const hasClap = arrangedPatterns.some((pattern) => pattern.drumPattern.clap.some(Boolean));
+  const bassCount = arrangedPatterns.reduce((total, pattern) => total + pattern.bassNotes.length, 0);
+  const melodyCount = arrangedPatterns.reduce((total, pattern) => total + pattern.melodyNotes.length, 0);
+  const chordCount = arrangedPatterns.reduce((total, pattern) => total + pattern.chordEvents.length, 0);
+  const bars = arrangementTotalBars(project);
+
+  return [
+    drumReadinessCheck(drumHits, hasKick, hasClap),
+    bassReadinessCheck(bassCount),
+    harmonyReadinessCheck(melodyCount, chordCount),
+    arrangementReadinessCheck(project.arrangement.length, bars),
+    exportReadinessCheck(analysis)
+  ];
+}
+
+function arrangedPatternData(project: ProjectState): PatternData[] {
+  const slots = new Set(project.arrangement.map((block) => block.pattern));
+  const arrangedSlots = slots.size > 0 ? [...slots] : [project.selectedPattern];
+  return arrangedSlots.map((slot) => project.patterns[slot]);
+}
+
+function drumHitCount(pattern: PatternData): number {
+  const baseHits = Object.values(pattern.drumPattern).reduce(
+    (total, laneSteps) => total + laneSteps.filter(Boolean).length,
+    0
+  );
+  const repeatedHats = pattern.drumPattern.hat.reduce(
+    (total, enabled, step) => total + (enabled ? hatRepeatCount(pattern, step) - 1 : 0),
+    0
+  );
+  return baseHits + repeatedHats;
+}
+
+function drumReadinessCheck(drumHits: number, hasKick: boolean, hasClap: boolean): BeatReadinessCheck {
+  if (drumHits <= 0) {
+    return {
+      id: "drums",
+      label: "Drums",
+      status: "Empty",
+      detail: "No arranged drum hits detected.",
+      tone: "danger"
+    };
+  }
+  if (!hasKick || !hasClap || drumHits < 8) {
+    return {
+      id: "drums",
+      label: "Drums",
+      status: "Sparse",
+      detail: `${drumHits} arranged hits across the used patterns.`,
+      tone: "warn"
+    };
+  }
+  return {
+    id: "drums",
+    label: "Drums",
+    status: "Set",
+    detail: `${drumHits} arranged hits with kick and clap anchors.`,
+    tone: "good"
+  };
+}
+
+function bassReadinessCheck(bassCount: number): BeatReadinessCheck {
+  if (bassCount <= 0) {
+    return {
+      id: "bass",
+      label: "808",
+      status: "Missing",
+      detail: "No arranged 808 or bass notes detected.",
+      tone: "danger"
+    };
+  }
+  if (bassCount < 3) {
+    return {
+      id: "bass",
+      label: "808",
+      status: "Light",
+      detail: `${bassCount} arranged bass note${bassCount === 1 ? "" : "s"} detected.`,
+      tone: "warn"
+    };
+  }
+  return {
+    id: "bass",
+    label: "808",
+    status: "Set",
+    detail: `${bassCount} arranged bass notes detected.`,
+    tone: "good"
+  };
+}
+
+function harmonyReadinessCheck(melodyCount: number, chordCount: number): BeatReadinessCheck {
+  if (melodyCount <= 0 && chordCount <= 0) {
+    return {
+      id: "harmony",
+      label: "Melody/chords",
+      status: "Missing",
+      detail: "No arranged melody or chord events detected.",
+      tone: "danger"
+    };
+  }
+  if (melodyCount < 3 && chordCount < 2) {
+    return {
+      id: "harmony",
+      label: "Melody/chords",
+      status: "Sketch",
+      detail: `${melodyCount} melody events and ${chordCount} chord events detected.`,
+      tone: "warn"
+    };
+  }
+  return {
+    id: "harmony",
+    label: "Melody/chords",
+    status: "Set",
+    detail: `${melodyCount} melody events and ${chordCount} chord events detected.`,
+    tone: "good"
+  };
+}
+
+function arrangementReadinessCheck(blockCount: number, bars: number): BeatReadinessCheck {
+  if (bars < 8) {
+    return {
+      id: "arrangement",
+      label: "Arrangement",
+      status: "Short",
+      detail: `${barCountLabel(bars)} across ${blockCount} block${blockCount === 1 ? "" : "s"}.`,
+      tone: "warn"
+    };
+  }
+  if (blockCount < 2) {
+    return {
+      id: "arrangement",
+      label: "Arrangement",
+      status: "Loop ready",
+      detail: `${barCountLabel(bars)} in one arrangement block.`,
+      tone: "good"
+    };
+  }
+  return {
+    id: "arrangement",
+    label: "Arrangement",
+    status: "Structured",
+    detail: `${barCountLabel(bars)} across ${blockCount} blocks.`,
+    tone: "good"
+  };
+}
+
+function exportReadinessCheck(analysis: ExportAnalysis): BeatReadinessCheck {
+  if (analysis.status === "Silent") {
+    return {
+      id: "export",
+      label: "Export",
+      status: "Silent",
+      detail: "Rendered arrangement output has no signal.",
+      tone: "danger"
+    };
+  }
+  if (analysis.status === "Limiter active") {
+    return {
+      id: "export",
+      label: "Export",
+      status: "Limited",
+      detail: `${formatPercent(analysis.limitedPercent)} limiter activity at export.`,
+      tone: "warn"
+    };
+  }
+  if (analysis.headroomDb < 0.5) {
+    return {
+      id: "export",
+      label: "Export",
+      status: "Hot",
+      detail: `${formatDb(analysis.headroomDb)} headroom before the ceiling.`,
+      tone: "warn"
+    };
+  }
+  return {
+    id: "export",
+    label: "Export",
+    status: "Ready",
+    detail: `${formatDb(analysis.headroomDb)} headroom before the ceiling.`,
+    tone: "good"
+  };
 }
 
 function ExportMeter({ analysis }: { analysis: ExportAnalysis }): ReactElement {
