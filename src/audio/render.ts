@@ -1,12 +1,14 @@
 import {
   ArrangementBlock,
   arrangementTotalBars,
+  chordEventShouldPlay,
   chordPitches,
   dbToGain,
   drumStepTimingMs,
   drumStepVelocity,
   drumStepShouldPlay,
   hatRepeatCount,
+  noteEventShouldPlay,
   noteToFrequency,
   patternForSlot,
   projectStepDurationSeconds,
@@ -283,6 +285,9 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
       }
     }
     for (const note of pattern.bassNotes) {
+      if (!noteEventShouldPlay("bass", note, barOffset + note.step)) {
+        continue;
+      }
       addTone(
         buffer,
         (barOffset + note.step) * step,
@@ -295,6 +300,9 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
       );
     }
     for (const note of pattern.melodyNotes) {
+      if (!noteEventShouldPlay("melody", note, barOffset + note.step)) {
+        continue;
+      }
       addTone(
         buffer,
         (barOffset + note.step) * step,
@@ -307,6 +315,9 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
       );
     }
     for (const chord of pattern.chordEvents) {
+      if (!chordEventShouldPlay(chord, barOffset + chord.step)) {
+        continue;
+      }
       const pitches = chordPitches(chord);
       for (const [voiceIndex, pitch] of pitches.entries()) {
         const spread = pitches.length <= 1 ? 0 : (voiceIndex / (pitches.length - 1)) * 2 - 1;

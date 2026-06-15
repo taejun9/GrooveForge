@@ -77,6 +77,7 @@ import {
   normalizeDrumProbability,
   normalizeDrumTimingMs,
   normalizeDrumVelocity,
+  normalizeEventProbability,
   normalizeHatRepeat,
   normalizeMixerEq,
   parseProjectFile,
@@ -120,6 +121,7 @@ type NoteView = {
   length: number;
   velocity?: number;
   glide?: boolean;
+  probability?: number;
 };
 
 export function App(): ReactElement {
@@ -781,7 +783,7 @@ export function App(): ReactElement {
       ...pattern,
       bassNotes: exists
         ? pattern.bassNotes.filter((note) => note.step !== step || note.pitch !== pitch)
-        : sortBassNotes([...pattern.bassNotes, { step, pitch, length: 2, glide: false }])
+        : sortBassNotes([...pattern.bassNotes, { step, pitch, length: 2, glide: false, probability: 1 }])
     }));
     setSelectedNote(exists ? null : { track: "bass", step, pitch });
   }
@@ -799,7 +801,7 @@ export function App(): ReactElement {
       ...pattern,
       melodyNotes: exists
         ? pattern.melodyNotes.filter((note) => note.step !== step || note.pitch !== pitch)
-        : sortMelodyNotes([...pattern.melodyNotes, { step, pitch, length: 1, velocity: 0.68 }])
+        : sortMelodyNotes([...pattern.melodyNotes, { step, pitch, length: 1, velocity: 0.68, probability: 1 }])
     }));
     setSelectedNote(exists ? null : { track: "melody", step, pitch });
   }
@@ -852,6 +854,29 @@ export function App(): ReactElement {
     }));
   }
 
+  function updateSelectedNoteProbability(probability: number): void {
+    if (!selectedNote) {
+      return;
+    }
+
+    const nextProbability = normalizeEventProbability(probability);
+    updateCurrentPattern((pattern) => ({
+      ...pattern,
+      bassNotes:
+        selectedNote.track === "bass"
+          ? pattern.bassNotes.map((note) =>
+              note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, probability: nextProbability } : note
+            )
+          : pattern.bassNotes,
+      melodyNotes:
+        selectedNote.track === "melody"
+          ? pattern.melodyNotes.map((note) =>
+              note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, probability: nextProbability } : note
+            )
+          : pattern.melodyNotes
+    }));
+  }
+
   function updateChordEvent(index: number, update: Partial<ChordEvent>): void {
     updateCurrentPattern((pattern) => ({
       ...pattern,
@@ -870,7 +895,8 @@ export function App(): ReactElement {
             ...update,
             step,
             length,
-            velocity: update.velocity === undefined ? event.velocity : clampVelocity(update.velocity)
+            velocity: update.velocity === undefined ? event.velocity : clampVelocity(update.velocity),
+            probability: update.probability === undefined ? event.probability : normalizeEventProbability(update.probability)
           };
         })
       )
@@ -1400,6 +1426,7 @@ export function App(): ReactElement {
               onLengthChange={updateSelectedLength}
               onGlideChange={updateSelectedGlide}
               onVelocityChange={updateSelectedVelocity}
+              onProbabilityChange={updateSelectedNoteProbability}
             />
           )}
         </section>
@@ -2140,7 +2167,8 @@ function NoteInspector({
   melodyNote,
   onLengthChange,
   onGlideChange,
-  onVelocityChange
+  onVelocityChange,
+  onProbabilityChange
 }: {
   selectedNote: SelectedNote | null;
   bassNote?: BassNote;
@@ -2148,14 +2176,16 @@ function NoteInspector({
   onLengthChange: (length: number) => void;
   onGlideChange: (glide: boolean) => void;
   onVelocityChange: (velocity: number) => void;
+  onProbabilityChange: (probability: number) => void;
 }): ReactElement {
   const activeNote = bassNote ?? melodyNote;
   const label = selectedNote ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}` : "None";
+  const probabilityValue = activeNote ? normalizeEventProbability(activeNote.probability) : 1;
   return (
     <div className="note-inspector">
       <div className="inspector-heading">
         <span>Selected</span>
-        <strong>{activeNote ? label : "None"}</strong>
+        <strong>{activeNote ? `${label} / ${percentLabel(probabilityValue)} chance` : "None"}</strong>
       </div>
       {activeNote && (
         <div className="inspector-grid">
@@ -2189,6 +2219,32 @@ function NoteInspector({
               />
             </label>
           )}
+          <label>
+            <span>Chance {percentLabel(probabilityValue)}</span>
+            <input
+              aria-label="Note probability"
+              data-testid="note-probability"
+              max={1}
+              min={0}
+              onChange={(event) => onProbabilityChange(Number(event.target.value))}
+              step={0.01}
+              type="range"
+              value={probabilityValue}
+            />
+          </label>
+          <label>
+            <span>Chance %</span>
+            <input
+              aria-label="Note probability percent"
+              data-testid="note-probability-input"
+              inputMode="numeric"
+              onChange={(event) => onProbabilityChange(Number(event.target.value) / 100)}
+              pattern="[0-9]*"
+              step={1}
+              type="text"
+              value={`${Math.round(probabilityValue * 100)}`}
+            />
+          </label>
         </div>
       )}
     </div>
@@ -2561,6 +2617,31 @@ function ChordEditor({
                   step={1}
                   type="number"
                   value={Math.round(chord.velocity * 100)}
+                />
+              </div>
+            </label>
+            <label>
+              <span>Chance {percentLabel(chord.probability)}</span>
+              <div className="chord-value-inputs">
+                <input
+                  aria-label={`Chord ${index + 1} probability`}
+                  data-testid={`chord-probability-${index}`}
+                  max={1}
+                  min={0}
+                  onChange={(event) => onChange(index, { probability: Number(event.target.value) })}
+                  step={0.01}
+                  type="range"
+                  value={normalizeEventProbability(chord.probability)}
+                />
+                <input
+                  aria-label={`Chord ${index + 1} probability percent`}
+                  data-testid={`chord-probability-input-${index}`}
+                  inputMode="numeric"
+                  onChange={(event) => onChange(index, { probability: Number(event.target.value) / 100 })}
+                  pattern="[0-9]*"
+                  step={1}
+                  type="text"
+                  value={`${Math.round(normalizeEventProbability(chord.probability) * 100)}`}
                 />
               </div>
             </label>

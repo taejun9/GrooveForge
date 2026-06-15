@@ -39,6 +39,7 @@ export type BassNote = {
   pitch: string;
   length: number;
   glide: boolean;
+  probability: number;
 };
 
 export type MelodyNote = {
@@ -46,6 +47,7 @@ export type MelodyNote = {
   pitch: string;
   length: number;
   velocity: number;
+  probability: number;
 };
 
 export type ChordQuality = "maj" | "min" | "dim" | "sus2" | "sus4" | "7" | "m7";
@@ -56,6 +58,7 @@ export type ChordEvent = {
   quality: ChordQuality;
   length: number;
   velocity: number;
+  probability: number;
 };
 
 export type NoteTrack = "bass" | "melody";
@@ -457,23 +460,23 @@ const starterPatternA: PatternData = withDrumDynamics({
     perc: [false, false, false, true, false, false, false, false, false, true, false, false, false, false, true, false]
   },
   bassNotes: [
-    { step: 0, pitch: "F1", length: 2, glide: false },
-    { step: 6, pitch: "C2", length: 2, glide: true },
-    { step: 10, pitch: "Eb2", length: 2, glide: false },
-    { step: 12, pitch: "F1", length: 4, glide: false }
+    { step: 0, pitch: "F1", length: 2, glide: false, probability: 1 },
+    { step: 6, pitch: "C2", length: 2, glide: true, probability: 1 },
+    { step: 10, pitch: "Eb2", length: 2, glide: false, probability: 1 },
+    { step: 12, pitch: "F1", length: 4, glide: false, probability: 1 }
   ],
   melodyNotes: [
-    { step: 0, pitch: "F4", length: 2, velocity: 0.72 },
-    { step: 3, pitch: "Ab4", length: 1, velocity: 0.62 },
-    { step: 6, pitch: "C5", length: 2, velocity: 0.7 },
-    { step: 10, pitch: "Eb5", length: 1, velocity: 0.6 },
-    { step: 12, pitch: "C5", length: 3, velocity: 0.66 }
+    { step: 0, pitch: "F4", length: 2, velocity: 0.72, probability: 1 },
+    { step: 3, pitch: "Ab4", length: 1, velocity: 0.62, probability: 1 },
+    { step: 6, pitch: "C5", length: 2, velocity: 0.7, probability: 1 },
+    { step: 10, pitch: "Eb5", length: 1, velocity: 0.6, probability: 1 },
+    { step: 12, pitch: "C5", length: 3, velocity: 0.66, probability: 1 }
   ],
   chordEvents: [
-    { step: 0, root: "F", quality: "min", length: 4, velocity: 0.55 },
-    { step: 4, root: "Db", quality: "maj", length: 4, velocity: 0.46 },
-    { step: 8, root: "Ab", quality: "maj", length: 4, velocity: 0.5 },
-    { step: 12, root: "Eb", quality: "maj", length: 4, velocity: 0.5 }
+    { step: 0, root: "F", quality: "min", length: 4, velocity: 0.55, probability: 1 },
+    { step: 4, root: "Db", quality: "maj", length: 4, velocity: 0.46, probability: 1 },
+    { step: 8, root: "Ab", quality: "maj", length: 4, velocity: 0.5, probability: 1 },
+    { step: 12, root: "Eb", quality: "maj", length: 4, velocity: 0.5, probability: 1 }
   ]
 }, { 7: 2, 15: 3 });
 
@@ -485,24 +488,24 @@ const starterPatternB: PatternData = withDrumDynamics({
     perc: [false, false, true, false, false, false, false, true, false, false, true, false, false, true, false, false]
   },
   bassNotes: [
-    { step: 0, pitch: "F1", length: 2, glide: false },
-    { step: 5, pitch: "Ab1", length: 1, glide: true },
-    { step: 8, pitch: "C2", length: 2, glide: false },
-    { step: 12, pitch: "Eb2", length: 2, glide: true },
-    { step: 14, pitch: "F1", length: 2, glide: false }
+    { step: 0, pitch: "F1", length: 2, glide: false, probability: 1 },
+    { step: 5, pitch: "Ab1", length: 1, glide: true, probability: 1 },
+    { step: 8, pitch: "C2", length: 2, glide: false, probability: 1 },
+    { step: 12, pitch: "Eb2", length: 2, glide: true, probability: 1 },
+    { step: 14, pitch: "F1", length: 2, glide: false, probability: 1 }
   ],
   melodyNotes: [
-    { step: 0, pitch: "C5", length: 2, velocity: 0.7 },
-    { step: 2, pitch: "Eb5", length: 1, velocity: 0.62 },
-    { step: 6, pitch: "F5", length: 2, velocity: 0.72 },
-    { step: 9, pitch: "Ab4", length: 1, velocity: 0.58 },
-    { step: 12, pitch: "C5", length: 2, velocity: 0.66 }
+    { step: 0, pitch: "C5", length: 2, velocity: 0.7, probability: 1 },
+    { step: 2, pitch: "Eb5", length: 1, velocity: 0.62, probability: 1 },
+    { step: 6, pitch: "F5", length: 2, velocity: 0.72, probability: 1 },
+    { step: 9, pitch: "Ab4", length: 1, velocity: 0.58, probability: 1 },
+    { step: 12, pitch: "C5", length: 2, velocity: 0.66, probability: 1 }
   ],
   chordEvents: [
-    { step: 0, root: "F", quality: "min", length: 4, velocity: 0.5 },
-    { step: 4, root: "C", quality: "min", length: 4, velocity: 0.44 },
-    { step: 8, root: "Db", quality: "maj", length: 4, velocity: 0.48 },
-    { step: 12, root: "Eb", quality: "maj", length: 4, velocity: 0.5 }
+    { step: 0, root: "F", quality: "min", length: 4, velocity: 0.5, probability: 1 },
+    { step: 4, root: "C", quality: "min", length: 4, velocity: 0.44, probability: 1 },
+    { step: 8, root: "Db", quality: "maj", length: 4, velocity: 0.48, probability: 1 },
+    { step: 12, root: "Eb", quality: "maj", length: 4, velocity: 0.5, probability: 1 }
   ]
 }, { 1: 2, 7: 2, 15: 3 });
 
@@ -514,21 +517,21 @@ const starterPatternC: PatternData = withDrumDynamics({
     perc: [false, false, false, false, false, false, true, false, false, false, false, true, false, false, false, true]
   },
   bassNotes: [
-    { step: 0, pitch: "F1", length: 4, glide: false },
-    { step: 8, pitch: "Db2", length: 4, glide: false },
-    { step: 14, pitch: "Eb2", length: 2, glide: true }
+    { step: 0, pitch: "F1", length: 4, glide: false, probability: 1 },
+    { step: 8, pitch: "Db2", length: 4, glide: false, probability: 1 },
+    { step: 14, pitch: "Eb2", length: 2, glide: true, probability: 1 }
   ],
   melodyNotes: [
-    { step: 0, pitch: "Ab4", length: 3, velocity: 0.6 },
-    { step: 4, pitch: "F4", length: 2, velocity: 0.54 },
-    { step: 8, pitch: "Bb4", length: 3, velocity: 0.62 },
-    { step: 12, pitch: "C5", length: 2, velocity: 0.58 }
+    { step: 0, pitch: "Ab4", length: 3, velocity: 0.6, probability: 1 },
+    { step: 4, pitch: "F4", length: 2, velocity: 0.54, probability: 1 },
+    { step: 8, pitch: "Bb4", length: 3, velocity: 0.62, probability: 1 },
+    { step: 12, pitch: "C5", length: 2, velocity: 0.58, probability: 1 }
   ],
   chordEvents: [
-    { step: 0, root: "Db", quality: "maj", length: 4, velocity: 0.48 },
-    { step: 4, root: "Eb", quality: "maj", length: 4, velocity: 0.45 },
-    { step: 8, root: "F", quality: "min", length: 4, velocity: 0.52 },
-    { step: 12, root: "C", quality: "min", length: 4, velocity: 0.42 }
+    { step: 0, root: "Db", quality: "maj", length: 4, velocity: 0.48, probability: 1 },
+    { step: 4, root: "Eb", quality: "maj", length: 4, velocity: 0.45, probability: 1 },
+    { step: 8, root: "F", quality: "min", length: 4, velocity: 0.52, probability: 1 },
+    { step: 12, root: "C", quality: "min", length: 4, velocity: 0.42, probability: 1 }
   ]
 }, { 14: 2 });
 
@@ -633,6 +636,10 @@ export function normalizeDrumProbability(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
+export function normalizeEventProbability(value: number): number {
+  return normalizeDrumProbability(value);
+}
+
 export function normalizeHatRepeat(value: number): number {
   if (!Number.isFinite(value)) {
     return 1;
@@ -678,6 +685,28 @@ export function drumStepShouldPlay(pattern: PatternData, lane: DrumLane, step: n
     return false;
   }
   return probabilityGateValue(lane, step, absoluteStep) < probability;
+}
+
+export function noteEventShouldPlay(track: NoteTrack, note: BassNote | MelodyNote, absoluteStep: number): boolean {
+  const probability = normalizeEventProbability(note.probability);
+  if (probability >= 1) {
+    return true;
+  }
+  if (probability <= 0) {
+    return false;
+  }
+  return probabilityGateValue(track, note.step, absoluteStep) < probability;
+}
+
+export function chordEventShouldPlay(chord: ChordEvent, absoluteStep: number): boolean {
+  const probability = normalizeEventProbability(chord.probability);
+  if (probability >= 1) {
+    return true;
+  }
+  if (probability <= 0) {
+    return false;
+  }
+  return probabilityGateValue("chord", chord.step, absoluteStep) < probability;
 }
 
 export function hatRepeatCount(pattern: PatternData, step: number): number {
@@ -744,8 +773,8 @@ function defaultDrumProbabilities(): DrumProbabilities {
   };
 }
 
-function probabilityGateValue(lane: DrumLane, step: number, absoluteStep: number): number {
-  const laneSalt: Record<DrumLane, number> = { kick: 11, clap: 23, hat: 37, perc: 53 };
+function probabilityGateValue(lane: DrumLane | NoteTrack | "chord", step: number, absoluteStep: number): number {
+  const laneSalt: Record<DrumLane | NoteTrack | "chord", number> = { kick: 11, clap: 23, hat: 37, perc: 53, bass: 71, melody: 89, chord: 107 };
   let hash = Math.imul(absoluteStep + 1, 1103515245) ^ Math.imul(step + 1, 12345) ^ Math.imul(laneSalt[lane], 265443576);
   hash = Math.imul(hash ^ (hash >>> 16), 2246822507);
   hash = Math.imul(hash ^ (hash >>> 13), 3266489909);
@@ -931,20 +960,23 @@ function patternFromBlueprint(key: string, pattern: PatternBlueprint): PatternDa
       step: note.step,
       pitch: pitchFromDegree(key, note.degree, note.octave),
       length: note.length,
-      glide: note.glide ?? false
+      glide: note.glide ?? false,
+      probability: 1
     })),
     melodyNotes: pattern.melody.map((note) => ({
       step: note.step,
       pitch: pitchFromDegree(key, note.degree, note.octave),
       length: note.length,
-      velocity: note.velocity ?? 0.64
+      velocity: note.velocity ?? 0.64,
+      probability: 1
     })),
     chordEvents: pattern.chords.map((chord) => ({
       step: chord.step,
       root: rootFromDegree(key, chord.degree),
       quality: chord.quality ?? chordQualityFromDegree(key, chord.degree),
       length: chord.length,
-      velocity: chord.velocity
+      velocity: chord.velocity,
+      probability: 1
     }))
   }, hatRepeatOverrides(pattern.hat));
 }
@@ -971,7 +1003,8 @@ function chordFromBlueprint(key: string, chord: ChordBlueprint): ChordEvent {
     root: rootFromDegree(key, chord.degree),
     quality: chord.quality ?? chordQualityFromDegree(key, chord.degree),
     length: normalizeChordLength(chord.length, chord.step),
-    velocity: normalizeChordVelocity(chord.velocity)
+    velocity: normalizeChordVelocity(chord.velocity),
+    probability: 1
   };
 }
 
@@ -1215,9 +1248,9 @@ function normalizePatternData(pattern: PatternDataInput): PatternData {
     drumTimings: normalizeDrumTimings(pattern.drumTimings),
     drumProbabilities: normalizeDrumProbabilities(pattern.drumProbabilities),
     hatRepeats: normalizeHatRepeats(pattern.hatRepeats, drumPattern.hat),
-    bassNotes: pattern.bassNotes,
-    melodyNotes: pattern.melodyNotes,
-    chordEvents: pattern.chordEvents?.map((event) => ({ ...event })) ?? []
+    bassNotes: normalizeBassNotes(pattern.bassNotes),
+    melodyNotes: normalizeMelodyNotes(pattern.melodyNotes),
+    chordEvents: normalizeChordEvents(pattern.chordEvents)
   };
 }
 
@@ -1282,6 +1315,29 @@ function normalizeDrumProbabilities(value: DrumProbabilities | undefined): DrumP
     hat: steps.map((step) => normalizeDrumProbability(value.hat[step] ?? 1)),
     perc: steps.map((step) => normalizeDrumProbability(value.perc[step] ?? 1))
   };
+}
+
+function normalizeBassNotes(notes: BassNoteInput[]): BassNote[] {
+  return notes.map((note) => ({
+    ...note,
+    probability: normalizeEventProbability(note.probability ?? 1)
+  }));
+}
+
+function normalizeMelodyNotes(notes: MelodyNoteInput[]): MelodyNote[] {
+  return notes.map((note) => ({
+    ...note,
+    probability: normalizeEventProbability(note.probability ?? 1)
+  }));
+}
+
+function normalizeChordEvents(events: ChordEventInput[] | undefined): ChordEvent[] {
+  return (
+    events?.map((event) => ({
+      ...event,
+      probability: normalizeEventProbability(event.probability ?? 1)
+    })) ?? []
+  );
 }
 
 function normalizeHatRepeats(value: number[] | undefined, hatSteps: boolean[]): number[] {
@@ -1353,8 +1409,13 @@ function normalizeProjectState(value: unknown): ProjectState | null {
   return null;
 }
 
-type PatternDataInput = Omit<PatternData, "chordEvents" | "drumVelocities" | "drumTimings" | "drumProbabilities" | "hatRepeats"> & {
-  chordEvents?: ChordEvent[];
+type BassNoteInput = Omit<BassNote, "probability"> & { probability?: number };
+type MelodyNoteInput = Omit<MelodyNote, "probability"> & { probability?: number };
+type ChordEventInput = Omit<ChordEvent, "probability"> & { probability?: number };
+type PatternDataInput = Omit<PatternData, "bassNotes" | "melodyNotes" | "chordEvents" | "drumVelocities" | "drumTimings" | "drumProbabilities" | "hatRepeats"> & {
+  bassNotes: BassNoteInput[];
+  melodyNotes: MelodyNoteInput[];
+  chordEvents?: ChordEventInput[];
   drumVelocities?: DrumVelocities;
   drumTimings?: DrumTimings;
   drumProbabilities?: DrumProbabilities;
@@ -1467,6 +1528,7 @@ function isPatternDataInput(value: unknown): value is PatternDataInput {
     isDrumPattern(value.drumPattern) &&
     (value.drumVelocities === undefined || isDrumVelocities(value.drumVelocities)) &&
     (value.drumTimings === undefined || isDrumTimings(value.drumTimings)) &&
+    (value.drumProbabilities === undefined || isDrumProbabilities(value.drumProbabilities)) &&
     (value.hatRepeats === undefined || isHatRepeats(value.hatRepeats)) &&
     Array.isArray(value.bassNotes) &&
     value.bassNotes.every(isBassNote) &&
@@ -1525,7 +1587,7 @@ function isHatRepeats(value: unknown): value is number[] {
   return Array.isArray(value) && value.length === stepsPerBar && value.every((repeat) => Number.isInteger(repeat) && repeat >= 1 && repeat <= 4);
 }
 
-function isBassNote(value: unknown): value is BassNote {
+function isBassNote(value: unknown): value is BassNoteInput {
   return (
     isRecord(value) &&
     isStep(value.step) &&
@@ -1533,11 +1595,12 @@ function isBassNote(value: unknown): value is BassNote {
     isFiniteNumber(value.length) &&
     value.length >= 1 &&
     value.length <= stepsPerBar &&
-    typeof value.glide === "boolean"
+    typeof value.glide === "boolean" &&
+    isOptionalUnit(value.probability)
   );
 }
 
-function isMelodyNote(value: unknown): value is MelodyNote {
+function isMelodyNote(value: unknown): value is MelodyNoteInput {
   return (
     isRecord(value) &&
     isStep(value.step) &&
@@ -1547,11 +1610,12 @@ function isMelodyNote(value: unknown): value is MelodyNote {
     value.length <= stepsPerBar &&
     isFiniteNumber(value.velocity) &&
     value.velocity >= 0 &&
-    value.velocity <= 1
+    value.velocity <= 1 &&
+    isOptionalUnit(value.probability)
   );
 }
 
-function isChordEvent(value: unknown): value is ChordEvent {
+function isChordEvent(value: unknown): value is ChordEventInput {
   return (
     isRecord(value) &&
     isStep(value.step) &&
@@ -1563,7 +1627,8 @@ function isChordEvent(value: unknown): value is ChordEvent {
     value.length <= stepsPerBar &&
     isFiniteNumber(value.velocity) &&
     value.velocity >= 0 &&
-    value.velocity <= 1
+    value.velocity <= 1 &&
+    isOptionalUnit(value.probability)
   );
 }
 

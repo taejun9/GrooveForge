@@ -4,12 +4,14 @@ import {
   ArrangementSection,
   arrangementTotalBars,
   chordPitches,
+  chordEventShouldPlay,
   loopStepCount,
   drumStepTimingMs,
   drumStepVelocity,
   drumStepShouldPlay,
   hatRepeatCount,
   normalizeArrangementBars,
+  noteEventShouldPlay,
   noteToFrequency,
   PatternData,
   PatternSlot,
@@ -404,7 +406,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
   }
 
   for (const note of pattern.bassNotes) {
-    if (note.step === patternStep) {
+    if (note.step === patternStep && noteEventShouldPlay("bass", note, absoluteStep)) {
       scheduleTone(
         context,
         master,
@@ -427,7 +429,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
   }
 
   for (const note of pattern.melodyNotes) {
-    if (note.step === patternStep) {
+    if (note.step === patternStep && noteEventShouldPlay("melody", note, absoluteStep)) {
       scheduleTone(
         context,
         master,
@@ -450,7 +452,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
   }
 
   for (const chord of pattern.chordEvents) {
-    if (chord.step === patternStep) {
+    if (chord.step === patternStep && chordEventShouldPlay(chord, absoluteStep)) {
       const pitches = chordPitches(chord);
       for (const [voiceIndex, pitch] of pitches.entries()) {
         const spread = pitches.length <= 1 ? 0 : (voiceIndex / (pitches.length - 1)) * 2 - 1;
