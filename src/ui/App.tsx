@@ -706,6 +706,21 @@ type BeatMapSummary = {
   metrics: BeatMapMetric[];
 };
 
+type StructureLensSignal = {
+  id: "target" | "sections" | "hook" | "arc";
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type StructureLensSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  signals: StructureLensSignal[];
+};
+
 type BeatPassportMetric = {
   id: string;
   label: string;
@@ -997,6 +1012,8 @@ export function App(): ReactElement {
     () => createBeatMapActions(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
+  const structureLensSummary = useMemo(() => createStructureLensSummary(project), [project]);
+  const structureLensActions = useMemo(() => createStructureLensActions(project), [project]);
   const beatPassportSummary = useMemo(
     () => createBeatPassportSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
@@ -3458,6 +3475,8 @@ export function App(): ReactElement {
 
       <BeatMap summary={beatMapSummary} actions={beatMapActions} onRun={runNextMove} />
 
+      <StructureLens summary={structureLensSummary} actions={structureLensActions} onRun={runNextMove} />
+
       <NextMove actions={nextMoveActions} onRun={runNextMove} />
 
       <ProjectSnapshots
@@ -5161,6 +5180,53 @@ function BeatMap({
   );
 }
 
+function StructureLens({
+  actions,
+  onRun,
+  summary
+}: {
+  actions: NextMoveAction[];
+  onRun: (action: NextMoveAction) => void;
+  summary: StructureLensSummary;
+}): ReactElement {
+  return (
+    <section className={`structure-lens ${summary.tone}`} data-testid="structure-lens" aria-label="Structure lens">
+      <div className="structure-lens-heading">
+        <div>
+          <Waves size={17} aria-hidden="true" />
+          <span>Structure Lens</span>
+        </div>
+        <strong data-testid="structure-lens-headline">{summary.headline}</strong>
+        <small data-testid="structure-lens-detail">{summary.detail}</small>
+      </div>
+      <div className="structure-lens-signals" data-testid="structure-lens-signals">
+        {summary.signals.map((signal) => (
+          <div className={`structure-lens-signal ${signal.tone}`} data-testid={`structure-lens-${signal.id}`} key={signal.id}>
+            <span>{signal.label}</span>
+            <strong>{signal.value}</strong>
+            <small>{signal.detail}</small>
+          </div>
+        ))}
+      </div>
+      <div className="structure-lens-actions" aria-label="Structure lens actions">
+        {actions.map((action) => (
+          <button
+            className={action.tone}
+            data-testid={`structure-lens-action-${action.id}`}
+            key={action.id}
+            onClick={() => onRun(action)}
+            title={action.title}
+            type="button"
+          >
+            {nextMoveIcon(action)}
+            <span>{action.buttonLabel}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function NextMove({
   actions,
   onRun
@@ -6124,6 +6190,117 @@ function createBeatMapActions(
   }
 
   return [...uniqueActions.values()].slice(0, 4);
+}
+
+function createStructureLensSummary(project: ProjectState): StructureLensSummary {
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const sectionLabels = arrangementSections.filter((section) => project.arrangement.some((block) => block.section === section));
+  const hasVerse = sectionLabels.includes("Verse");
+  const hasHook = sectionLabels.includes("Hook");
+  const targetTone: MixCoachTone = bars >= target.targetBars ? "good" : bars >= Math.min(8, target.targetBars) ? "warn" : "danger";
+  const sectionTone: MixCoachTone =
+    hasVerse && hasHook && sectionLabels.length >= 4 ? "good" : hasHook && sectionLabels.length >= 3 ? "warn" : "danger";
+  const hookSignal = structureHookSignal(project);
+  const arcSignal = structureArcSignal(project);
+  const signals: StructureLensSignal[] = [
+    {
+      id: "target",
+      label: "Target Fit",
+      value: `${bars}/${target.targetBars} bars`,
+      detail: target.name,
+      tone: targetTone
+    },
+    {
+      id: "sections",
+      label: "Sections",
+      value: `${sectionLabels.length}/${arrangementSections.length}`,
+      detail: sectionLabels.length > 0 ? sectionLabels.join("/") : "No arrangement blocks",
+      tone: sectionTone
+    },
+    hookSignal,
+    arcSignal
+  ];
+  const tone = weakestTone(signals.map((signal) => signal.tone));
+  const headline =
+    tone === "good" ? "Song shape reads clearly" : tone === "warn" ? "Song shape needs contrast" : "Build a clearer song shape";
+  const detail = `${barCountLabel(bars)} / ${target.name} / ${usedPatternSlots(project).join("/") || project.selectedPattern}`;
+
+  return {
+    headline,
+    detail,
+    tone,
+    signals
+  };
+}
+
+function createStructureLensActions(project: ProjectState): NextMoveAction[] {
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const candidates: NextMoveAction[] = [
+    !isDeliveryTargetAligned(project, target) ? deliveryTargetNextMoveAction(project) : arrangementLiftNextMoveAction(project),
+    bars < 8 ? patternChainNextMoveAction() : chainExpandNextMoveAction(),
+    fullArrangementNextMoveAction(),
+    arrangementLiftNextMoveAction(project),
+    patternChainNextMoveAction()
+  ];
+  const uniqueActions = new Map<string, NextMoveAction>();
+
+  for (const action of candidates) {
+    if (!uniqueActions.has(action.id)) {
+      uniqueActions.set(action.id, action);
+    }
+  }
+
+  return [...uniqueActions.values()].slice(0, 4);
+}
+
+function structureHookSignal(project: ProjectState): StructureLensSignal {
+  const hookBlocks = project.arrangement.filter((block) => block.section === "Hook");
+  if (hookBlocks.length === 0) {
+    return {
+      id: "hook",
+      label: "Hook",
+      value: "Missing",
+      detail: "Add a main section",
+      tone: "danger"
+    };
+  }
+
+  const hookEnergy = Math.max(...hookBlocks.map((block) => normalizeArrangementEnergy(block.energy)));
+  const nonHookBlocks = project.arrangement.filter((block) => block.section !== "Hook");
+  const comparisonBlocks = nonHookBlocks.length > 0 ? nonHookBlocks : project.arrangement;
+  const comparisonEnergy =
+    comparisonBlocks.reduce((total, block) => total + normalizeArrangementEnergy(block.energy), 0) / comparisonBlocks.length;
+  const contrast = hookEnergy - comparisonEnergy;
+  const tone: MixCoachTone = hookEnergy >= 0.86 && contrast >= 0.12 ? "good" : hookEnergy >= 0.74 && contrast >= 0.04 ? "warn" : "danger";
+
+  return {
+    id: "hook",
+    label: "Hook",
+    value: percentLabel(hookEnergy),
+    detail: `${signedPercentLabel(contrast)} over other sections`,
+    tone
+  };
+}
+
+function structureArcSignal(project: ProjectState): StructureLensSignal {
+  const energies = project.arrangement.map((block) => normalizeArrangementEnergy(block.energy));
+  const low = Math.min(...energies);
+  const high = Math.max(...energies);
+  const spread = high - low;
+  const first = energies[0] ?? 0;
+  const last = energies[energies.length - 1] ?? first;
+  const hasRelease = last <= high - 0.18 || project.arrangement.some((block) => block.section === "Outro");
+  const tone: MixCoachTone = spread >= 0.36 && high >= 0.86 && hasRelease ? "good" : spread >= 0.22 ? "warn" : "danger";
+
+  return {
+    id: "arc",
+    label: "Energy Arc",
+    value: `${Math.round(spread * 100)}% spread`,
+    detail: `low ${percentLabel(low)} / high ${percentLabel(high)}`,
+    tone
+  };
 }
 
 function usedPatternSlots(project: ProjectState): PatternSlot[] {
@@ -9185,6 +9362,11 @@ function panLabel(pan: number): string {
 
 function percentLabel(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function signedPercentLabel(value: number): string {
+  const percent = Math.round(value * 100);
+  return `${percent >= 0 ? "+" : ""}${percent}%`;
 }
 
 function chanceBadgeLabel(value: number): string {

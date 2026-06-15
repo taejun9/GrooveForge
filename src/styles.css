@@ -50,6 +50,7 @@ button {
 .handoff-pack,
 .beat-readiness,
 .beat-map,
+.structure-lens,
 .next-move,
 .snapshot-row,
 .panel {
@@ -83,6 +84,7 @@ button {
 .beat-passport-heading > div,
 .handoff-pack-heading > div,
 .beat-map-heading > div,
+.structure-lens-heading > div,
 .next-move-heading > div,
 .snapshot-heading > div {
   display: flex;
@@ -1636,6 +1638,155 @@ h2 {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.structure-lens {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) 188px;
+  gap: 10px;
+  align-items: stretch;
+  min-height: 84px;
+  border-color: rgba(158, 231, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(158, 231, 255, 0.045);
+  padding: 10px;
+}
+
+.structure-lens.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.05);
+}
+
+.structure-lens.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.05);
+}
+
+.structure-lens-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.structure-lens-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.structure-lens-heading svg {
+  color: #9ee7ff;
+}
+
+.structure-lens.warn .structure-lens-heading svg {
+  color: #f0c36a;
+}
+
+.structure-lens.danger .structure-lens-heading svg {
+  color: #ff7a4f;
+}
+
+.structure-lens-heading strong,
+.structure-lens-heading small,
+.structure-lens-signal span,
+.structure-lens-signal strong,
+.structure-lens-signal small,
+.structure-lens-actions button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.structure-lens-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.structure-lens-heading small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.structure-lens-signals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.structure-lens-signal {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+  border: 1px solid rgba(158, 231, 255, 0.22);
+  border-inline-start: 3px solid #9ee7ff;
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 8px 9px;
+}
+
+.structure-lens-signal.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  border-inline-start-color: #f0c36a;
+}
+
+.structure-lens-signal.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  border-inline-start-color: #ff7a4f;
+}
+
+.structure-lens-signal span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.structure-lens-signal strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.structure-lens-signal small {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
+}
+
+.structure-lens-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-content: center;
+}
+
+.structure-lens-actions button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.structure-lens-actions button.good {
+  border-color: rgba(158, 231, 255, 0.34);
+  background: rgba(158, 231, 255, 0.08);
+}
+
+.structure-lens-actions button.warn {
+  border-color: rgba(240, 195, 106, 0.34);
+  background: rgba(240, 195, 106, 0.08);
+}
+
+.structure-lens-actions button.danger {
+  border-color: rgba(255, 122, 79, 0.38);
+  background: rgba(255, 122, 79, 0.08);
 }
 
 .next-move {
@@ -4320,6 +4471,10 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .structure-lens {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
   .beat-passport {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -4336,8 +4491,17 @@ input[type="range"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .structure-lens-signals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .beat-map-metrics {
     grid-column: 2;
+  }
+
+  .structure-lens-actions {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .beat-map-actions {
