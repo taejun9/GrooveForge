@@ -1,7 +1,7 @@
 
 # GrooveForge
 
-GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres: drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, Session Brief, Space send FX, MIDI export, and WAV/stem export. It is a beat workstation first, not a sampler-first app.
+GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres: drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, Session Brief, Space send FX, MIDI export, and WAV/stem export. It is a beat workstation first, not a sampler-first app, and it starts from directly writing the beat rather than importing or chopping audio.
 
 Project type: `web-first TypeScript mini DAW / beat workstation`.
 
@@ -11,9 +11,9 @@ Agent team: `Team Forge`. See `AGENTS.md`.
 
 ## Product Spine
 
-Concept lock: GrooveForge is not a sampling app. It is an all-genre beat-production mini DAW for directly composing beats, designing sounds, arranging sections, mixing/mastering, and exporting finished audio. Sampling is a useful optional module only after the beat workstation core is already valuable.
+Concept lock: GrooveForge is not a sampling app. It is an all-genre beat-production mini DAW for directly composing beats, designing sounds, arranging sections, mixing/mastering, and exporting finished audio. In the user's terms, it is "직접 비트를 작곡하고 사운드를 설계하고 믹싱/마스터링까지 하는 비트 제작 미니 DAW." Sampling is a useful optional module only after the beat workstation core is already valuable.
 
-GrooveForge is a code-driven all-genre beat workstation with a programmable project format and style engine. Direct composition is the product spine: users should be able to program drums, 808/bass, melody, chords, FX, and automation as editable musical events, shape built-in instruments, arrange a song section, mix/master it, and export audio before they ever import a sample.
+GrooveForge is a code-driven all-genre beat workstation with a programmable project format and style engine. Direct composition is the product spine: users should be able to program drums, 808/bass, melody, chords, FX, and automation as editable musical events, shape built-in instruments, arrange a song section, mix/master it, and export audio before they ever import a sample. The product center is Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export.
 
 The first-run experience should feel like opening a compact beat-making DAW, not a sample browser: choose BPM/key/style, write drums, build 808/bass, add melody/chords, shape sounds, arrange, mix, master, then export.
 
@@ -29,7 +29,7 @@ Optional sampling path, later:
 sample import -> chop/slice -> pitch/stretch -> one-shot or sampler mapping
 ```
 
-Sampling is a secondary add-on. It can be added later for users who want audio import, chopping, loop stretching, one-shot mapping, or sampler workflows, but it must not define the MVP, the first-run experience, or the core data model. A complete GrooveForge beat must be possible with no imported audio.
+Sampling is a secondary add-on. It can be added later for users who want audio import, chopping, loop stretching, one-shot mapping, or sampler workflows, but it must not define the MVP, the first-run experience, or the core data model. It should enter as an optional sound source or instrument layer inside the beat workstation, not as the product's starting assumption. A complete GrooveForge beat must be possible with no imported audio.
 
 If a draft, screen, or roadmap has to choose what appears first, the answer is direct beat creation: pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sample browsing, chopping, and sampler setup are opt-in extension paths after the beat workstation core is useful.
 

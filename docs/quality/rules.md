@@ -197,6 +197,8 @@ Product framing work must preserve the core boundary: GrooveForge is for all-gen
 
 Concept correction work must make the all-genre beat-production mini DAW framing explicit: direct beat composition, sound design, arrangement, mixing/mastering, and export are the product spine, while sample import, chopping, pitch/stretch, one-shot mapping, and sampler workflows are optional later paths.
 
+Concept correction work must preserve this center list in durable docs: Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export.
+
 First-run UX, default navigation, and roadmap work must lead with direct beat composition: pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sample browsing, chopping, sampler setup, audio clips, and audio warping must stay opt-in optional-sampling paths unless the user explicitly changes the product direction.
 
 Docs that mention clips before optional sampling is implemented must clarify that core clips are pattern, MIDI, or automation containers, not imported audio assets.
@@ -204,6 +206,8 @@ Docs that mention clips before optional sampling is implemented must clarify tha
 Any new plan that mentions sample import, chopping, sampler tracks, or audio warping must explicitly mark that work as optional sampling-phase work or document the user-approved exception in its Decision Log.
 
 Any product, architecture, UI, roadmap, or QA wording that implies users must import, chop, browse, or map samples before making a complete beat fails the product boundary. The expected proof remains a sample-free beat made from built-in drums, synth 808/bass, melody/chords, arrangement, mixer/master, and export.
+
+Any product or architecture wording that promotes `AudioClipEvent`, sampler assets, sample browsing, or chopping above editable musical events fails the product boundary until optional sampling is explicitly in scope.
 
 Mixer/master work must keep mixing and mastering separate. Volume, pan, mute, solo, master output gain, and preset ceiling controls must affect both realtime playback and WAV export when implemented. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.
 
