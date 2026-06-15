@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { exportMidi } from "../audio/midi";
 import { analyzeExport, ExportAnalysis, exportStems, exportWav } from "../audio/render";
 import { PlaybackController, PlaybackMode, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
 import {
@@ -1267,6 +1268,16 @@ export function App(): ReactElement {
     }
   }
 
+  function handleExportMidi(): void {
+    try {
+      exportMidi(project);
+      setProjectStatus("Exported MIDI");
+    } catch (error) {
+      console.error(error);
+      setProjectStatus("MIDI export failed");
+    }
+  }
+
   function toggleMetronome(): void {
     updateProject(
       (current) => ({ ...current, metronomeEnabled: !current.metronomeEnabled }),
@@ -1437,6 +1448,10 @@ export function App(): ReactElement {
           <button className="icon-button" data-testid="export-stems" type="button" title="Export stem WAVs" onClick={handleExportStems}>
             <Download size={18} aria-hidden="true" />
             <span>Stems</span>
+          </button>
+          <button className="icon-button" data-testid="export-midi" type="button" title="Export MIDI" onClick={handleExportMidi}>
+            <Download size={18} aria-hidden="true" />
+            <span>MIDI</span>
           </button>
         </div>
       </header>

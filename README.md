@@ -1,7 +1,7 @@
 
 # GrooveForge
 
-GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres: drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, and WAV/stem export. It is a beat workstation first, not a sampler-first app.
+GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres: drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, MIDI export, and WAV/stem export. It is a beat workstation first, not a sampler-first app.
 
 Project type: `web-first TypeScript mini DAW / beat workstation`.
 
@@ -41,9 +41,9 @@ The first usable result is an Electron desktop workstation that can create a sam
 - Undo/redo edit history for safer pattern, arrangement, mixer, sound, and master experimentation.
 - Realtime transport metronome toggle with accented downbeat clicks for timing reference during arrangement or Pattern playback.
 - Live playback that follows future pattern, arrangement track mutes, BPM, mixer, sound, and master edits without forcing users to stop and restart.
-- Basic mixer volume/pan/mute/solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling, reproducible export peak/RMS/headroom meter, full-mix WAV export, and drum/808/synth/chord stem export.
+- Basic mixer volume/pan/mute/solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling, reproducible export peak/RMS/headroom meter, full-mix WAV export, drum/808/synth/chord stem export, and arrangement MIDI export for DAW handoff.
 
-The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport with arrangement playback, Pattern preview, and a realtime-only metronome that reads live project edits while running, desktop editing shortcuts, undo/redo, style/key/BPM with editable groove templates, drum steps with velocity, probability, visible chance badges, microtiming, one-click groove humanization, and hat repeat, deterministic Pattern variation tools, Pattern A/B/C copy/clear tools, editable scale-aware 808/melody lanes with note chance badges and selected-note move/transpose/duplicate tools, kick-to-808 sidechain ducking, chord progression presets plus add/delete/inversion/chance controls, sound design presets, Studio tone controls, editable arrangement blocks with per-track mutes, per-block bar lengths, and audible energy, arrangement templates, arrangement structure controls, mixer volume/pan/mute/solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling, reproducible export peak/RMS/headroom meter, local project save/load, arrangement-length WAV export, and one-click stem export.
+The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport with arrangement playback, Pattern preview, and a realtime-only metronome that reads live project edits while running, desktop editing shortcuts, undo/redo, style/key/BPM with editable groove templates, drum steps with velocity, probability, visible chance badges, microtiming, one-click groove humanization, and hat repeat, deterministic Pattern variation tools, Pattern A/B/C copy/clear tools, editable scale-aware 808/melody lanes with note chance badges and selected-note move/transpose/duplicate tools, kick-to-808 sidechain ducking, chord progression presets plus add/delete/inversion/chance controls, sound design presets, Studio tone controls, editable arrangement blocks with per-track mutes, per-block bar lengths, and audible energy, arrangement templates, arrangement structure controls, mixer volume/pan/mute/solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling, reproducible export peak/RMS/headroom meter, local project save/load, arrangement-length WAV export, one-click stem export, and arrangement MIDI export.
 
 ## Core Direction
 

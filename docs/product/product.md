@@ -3,7 +3,7 @@
 
 ## Summary
 
-GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres with drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, and WAV/stem export. It is beat-first, not sampler-first.
+GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres with drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, MIDI export, and WAV/stem export. It is beat-first, not sampler-first.
 
 ## Type
 
@@ -61,7 +61,7 @@ Primary feature areas:
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with per-block bar lengths, arrangement templates plus duplicate, move, and delete controls.
 - Mixer/master: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling, sends, limiter, loudness/peak metering.
-- Export: WAV export first, then stems after the render path is reliable.
+- Export: WAV export, stem export, and arrangement MIDI export after the event/render paths are reliable.
 
 ## First-Class Data
 
@@ -134,6 +134,7 @@ MVP capabilities:
 - Local project save/load as a `.grooveforge.json` file.
 - WAV export through deterministic offline rendering.
 - Stem export through deterministic offline rendering for isolated drum, 808, synth, and chord WAV files from the current arrangement.
+- MIDI export as a deterministic Standard MIDI File with drum, 808, synth, and chord tracks from the current arrangement.
 
 ## Roadmap
 
@@ -147,7 +148,7 @@ Phase 3 adds melody/chords: simple poly synth, scale lock, chord progression pre
 
 Phase 4 adds arrangement and editing speed: pattern blocks, song section markers, per-block bar lengths, arrangement templates, duplicate/move/delete first, desktop editing shortcuts, then split/mute/reorder refinements, and variation A/B/C.
 
-Phase 5 adds mixer/master/export: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling first, then sends, limiter, peak/LUFS metering, WAV export, and later stem export.
+Phase 5 adds mixer/master/export: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling first, then sends, limiter, peak/LUFS metering, WAV export, stem export, and MIDI export.
 
 Phase 6 scopes optional sampling as an extension only after the beat-making core is useful: audio import, sampler mapping, chopping, reverse, pitch, and stretch.
 
