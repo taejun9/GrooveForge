@@ -51,10 +51,12 @@ import {
   ChordInversion,
   ChordProgressionPreset,
   ChordQuality,
+  CustomDeliveryTarget,
   DeliveryTarget,
   DeliveryTargetId,
   DrumGroovePreset,
   DrumLane,
+  MixPosture,
   applyDrumGroovePreset,
   chordProgressionPresetIds,
   chordProgressionPresetLabel,
@@ -71,6 +73,7 @@ import {
   PatternVariationPreset,
   ProjectState,
   SoundDesign,
+  activeDeliveryTarget,
   activePattern,
   applyBeatBlueprint,
   applyDeliveryTarget,
@@ -98,11 +101,11 @@ import {
   createPatternVariation,
   createStylePatternSet,
   createEmptyPatternData,
+  defaultCustomDeliveryTarget,
   defaultDrumVelocity,
   deleteProjectSnapshot,
   deliveryTargets,
   deliveryTargetForId,
-  deliveryTargetLabel,
   drumStepProbability,
   drumStepTimingMs,
   drumStepVelocity,
@@ -113,11 +116,17 @@ import {
   hatRepeatCount,
   masterPresetCeilingDb,
   masterPresets,
+  maxCustomDeliveryTargetFocusLength,
+  maxCustomDeliveryTargetNameLength,
+  maxDeliveryTargetBars,
+  maxDeliveryTargetStemGoal,
   maxSessionBriefFieldLength,
   maxSessionBriefNotesLength,
   melodyPitchLanes,
   maxProjectSnapshotNameLength,
   maxProjectSnapshots,
+  minDeliveryTargetBars,
+  minDeliveryTargetStemGoal,
   minArrangementBars,
   minDrumTimingMs,
   maxArrangementBars,
@@ -129,6 +138,8 @@ import {
   normalizeDrumTimingMs,
   normalizeDrumVelocity,
   normalizeChordInversion,
+  normalizeDeliveryTargetBars,
+  normalizeDeliveryTargetStemGoal,
   normalizeEventProbability,
   normalizeHatRepeat,
   normalizeMixerEq,
@@ -167,6 +178,13 @@ const drumLabels: Record<DrumLane, string> = {
   hat: "Hat",
   perc: "Perc"
 };
+
+const mixPostureOptions: { id: MixPosture; label: string }[] = [
+  { id: "loose", label: "Loose sketch" },
+  { id: "vocal_headroom", label: "Vocal headroom" },
+  { id: "balanced", label: "Balanced" },
+  { id: "club_forward", label: "Club forward" }
+];
 
 const keys = ["F minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"];
 const historyLimit = 50;
@@ -297,7 +315,7 @@ export function App(): ReactElement {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const masterPanelRef = useRef<HTMLElement | null>(null);
   const style = getStyle(project);
-  const deliveryTarget = deliveryTargetForId(project.deliveryTarget);
+  const deliveryTarget = activeDeliveryTarget(project);
   const currentPattern = activePattern(project);
   const exportAnalysis = useMemo(() => analyzeExport(project), [project]);
   const stemAnalyses = useMemo(() => analyzeStemExports(project), [project]);
@@ -1940,12 +1958,18 @@ export function App(): ReactElement {
   }
 
   function selectDeliveryTarget(targetId: DeliveryTargetId): void {
-    const target = deliveryTargetForId(targetId);
-    updateProject((current) => ({ ...current, deliveryTarget: target.id }), `Set ${target.name} target`);
+    const target = deliveryTargetForId(targetId, projectRef.current.customDeliveryTarget);
+    updateProject((current) => {
+      const resolvedTarget = deliveryTargetForId(targetId, current.customDeliveryTarget);
+      if (current.deliveryTarget === resolvedTarget.id) {
+        return current;
+      }
+      return { ...current, deliveryTarget: resolvedTarget.id };
+    }, `Set ${target.name} target`);
   }
 
   function alignDeliveryTarget(targetId: DeliveryTargetId): void {
-    const target = deliveryTargetForId(targetId);
+    const target = deliveryTargetForId(targetId, projectRef.current.customDeliveryTarget);
     const changed = updateProject((current) => applyDeliveryTarget(current, target.id), `Aligned ${target.name} target`);
     if (changed) {
       setSelectedArrangementIndex(0);
@@ -1954,6 +1978,26 @@ export function App(): ReactElement {
       setSelectedChordIndex(null);
       setPlaybackMode("arrangement");
     }
+  }
+
+  function updateCustomDeliveryTarget(update: Partial<CustomDeliveryTarget>): void {
+    const preview = {
+      ...projectRef.current.customDeliveryTarget,
+      ...update
+    };
+    updateProject((current) => {
+      const nextTarget = {
+        ...current.customDeliveryTarget,
+        ...update
+      };
+      if (sameCustomDeliveryTarget(current.customDeliveryTarget, nextTarget)) {
+        return current;
+      }
+      return {
+        ...current,
+        customDeliveryTarget: nextTarget
+      };
+    }, `Updated ${deliveryTargetForId("custom", preview).name} target`);
   }
 
   function updateSessionBrief(field: keyof SessionBrief, value: string): void {
@@ -2260,7 +2304,12 @@ export function App(): ReactElement {
 
       <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
 
-      <DeliveryTargets project={project} onApply={alignDeliveryTarget} onSelect={selectDeliveryTarget} />
+      <DeliveryTargets
+        project={project}
+        onApply={alignDeliveryTarget}
+        onCustomChange={updateCustomDeliveryTarget}
+        onSelect={selectDeliveryTarget}
+      />
 
       <SessionBriefPanel brief={project.sessionBrief} onChange={updateSessionBrief} onClear={clearSessionBrief} />
 
@@ -3135,14 +3184,21 @@ function BeatBlueprints({
 
 function DeliveryTargets({
   onApply,
+  onCustomChange,
   onSelect,
   project
 }: {
   onApply: (targetId: DeliveryTargetId) => void;
+  onCustomChange: (update: Partial<CustomDeliveryTarget>) => void;
   onSelect: (targetId: DeliveryTargetId) => void;
   project: ProjectState;
 }): ReactElement {
-  const currentTarget = deliveryTargetForId(project.deliveryTarget);
+  const currentTarget = activeDeliveryTarget(project);
+  const customTarget = deliveryTargetForId("custom", project.customDeliveryTarget);
+  const customSelected = project.deliveryTarget === "custom";
+  const customAligned = isDeliveryTargetAligned(project, customTarget);
+  const customName = project.customDeliveryTarget.name || defaultCustomDeliveryTarget.name;
+  const customFocus = project.customDeliveryTarget.focus || defaultCustomDeliveryTarget.focus;
   return (
     <section className="delivery-target-row" data-testid="delivery-targets" aria-label="Delivery targets">
       <div className="delivery-target-heading">
@@ -3153,35 +3209,159 @@ function DeliveryTargets({
         <strong data-testid="delivery-target-current">{currentTarget.name}</strong>
         <small>{barCountLabel(currentTarget.targetBars)} / {currentTarget.stemGoal} stems</small>
       </div>
-      <div className="delivery-target-list">
-        {deliveryTargets.map((target) => {
-          const selected = project.deliveryTarget === target.id;
-          const aligned = isDeliveryTargetAligned(project, target);
-          return (
-            <div className={selected ? "selected" : ""} data-testid={`delivery-target-${target.id}`} key={target.id}>
-              <button
-                className="delivery-target-select"
-                data-testid={`delivery-target-set-${target.id}`}
-                onClick={() => onSelect(target.id)}
-                title={`Set ${target.name} target`}
-                type="button"
+      <div className="delivery-target-stack">
+        <div className="delivery-target-list">
+          {deliveryTargets.map((target) => {
+            const selected = project.deliveryTarget === target.id;
+            const aligned = isDeliveryTargetAligned(project, target);
+            return (
+              <div className={selected ? "selected" : ""} data-testid={`delivery-target-${target.id}`} key={target.id}>
+                <button
+                  className="delivery-target-select"
+                  data-testid={`delivery-target-set-${target.id}`}
+                  onClick={() => onSelect(target.id)}
+                  title={`Set ${target.name} target`}
+                  type="button"
+                >
+                  <span>{target.name}</span>
+                  <strong>{target.focus}</strong>
+                  <small>{arrangementTemplateLabel(target.preferredTemplate)} / {target.preferredMasterPreset}</small>
+                </button>
+                <button
+                  className={aligned ? "delivery-target-align aligned" : "delivery-target-align"}
+                  data-testid={`delivery-target-align-${target.id}`}
+                  onClick={() => onApply(target.id)}
+                  title={`Align project to ${target.name}`}
+                  type="button"
+                >
+                  {aligned ? "Aligned" : "Align"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <div
+          className={customSelected ? "custom-delivery-panel selected" : "custom-delivery-panel"}
+          data-testid="delivery-target-custom"
+        >
+          <div className="custom-delivery-copy">
+            <span>Custom Target</span>
+            <strong>{customTarget.name}</strong>
+            <small>{customTarget.focus}</small>
+          </div>
+          <div className="custom-delivery-fields">
+            <label className="custom-delivery-field">
+              <span>Name</span>
+              <input
+                data-testid="custom-target-name"
+                maxLength={maxCustomDeliveryTargetNameLength}
+                onChange={(event) =>
+                  onCustomChange({
+                    name: boundedCustomDeliveryText(event.currentTarget.value, maxCustomDeliveryTargetNameLength)
+                  })
+                }
+                value={customName}
+              />
+            </label>
+            <label className="custom-delivery-field wide">
+              <span>Focus</span>
+              <input
+                data-testid="custom-target-focus"
+                maxLength={maxCustomDeliveryTargetFocusLength}
+                onChange={(event) =>
+                  onCustomChange({
+                    focus: boundedCustomDeliveryText(event.currentTarget.value, maxCustomDeliveryTargetFocusLength)
+                  })
+                }
+                value={customFocus}
+              />
+            </label>
+            <label className="custom-delivery-field">
+              <span>Bars</span>
+              <input
+                data-testid="custom-target-bars"
+                max={maxDeliveryTargetBars}
+                min={minDeliveryTargetBars}
+                onChange={(event) => onCustomChange({ targetBars: normalizeDeliveryTargetBars(event.currentTarget.valueAsNumber) })}
+                type="number"
+                value={project.customDeliveryTarget.targetBars}
+              />
+            </label>
+            <label className="custom-delivery-field">
+              <span>Stems</span>
+              <input
+                data-testid="custom-target-stems"
+                max={maxDeliveryTargetStemGoal}
+                min={minDeliveryTargetStemGoal}
+                onChange={(event) => onCustomChange({ stemGoal: normalizeDeliveryTargetStemGoal(event.currentTarget.valueAsNumber) })}
+                type="number"
+                value={project.customDeliveryTarget.stemGoal}
+              />
+            </label>
+            <label className="custom-delivery-field">
+              <span>Template</span>
+              <select
+                data-testid="custom-target-template"
+                onChange={(event) => onCustomChange({ preferredTemplate: event.currentTarget.value as ArrangementTemplateId })}
+                value={project.customDeliveryTarget.preferredTemplate}
               >
-                <span>{target.name}</span>
-                <strong>{target.focus}</strong>
-                <small>{arrangementTemplateLabel(target.preferredTemplate)} / {target.preferredMasterPreset}</small>
-              </button>
-              <button
-                className={aligned ? "delivery-target-align aligned" : "delivery-target-align"}
-                data-testid={`delivery-target-align-${target.id}`}
-                onClick={() => onApply(target.id)}
-                title={`Align project to ${target.name}`}
-                type="button"
+                {arrangementTemplateIds.map((template) => (
+                  <option key={template} value={template}>
+                    {arrangementTemplateLabel(template)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="custom-delivery-field">
+              <span>Master</span>
+              <select
+                data-testid="custom-target-master"
+                onChange={(event) => onCustomChange({ preferredMasterPreset: event.currentTarget.value as MasterPreset })}
+                value={project.customDeliveryTarget.preferredMasterPreset}
               >
-                {aligned ? "Aligned" : "Align"}
-              </button>
-            </div>
-          );
-        })}
+                {masterPresets.map((preset) => (
+                  <option key={preset} value={preset}>
+                    {preset}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="custom-delivery-field">
+              <span>Posture</span>
+              <select
+                data-testid="custom-target-posture"
+                onChange={(event) => onCustomChange({ mixPosture: event.currentTarget.value as MixPosture })}
+                value={project.customDeliveryTarget.mixPosture}
+              >
+                {mixPostureOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="custom-delivery-actions">
+            <button
+              className="delivery-target-select"
+              data-testid="delivery-target-set-custom"
+              onClick={() => onSelect("custom")}
+              title="Set custom target"
+              type="button"
+            >
+              Set Custom
+            </button>
+            <button
+              className={customAligned ? "delivery-target-align aligned" : "delivery-target-align"}
+              data-testid="delivery-target-align-custom"
+              onClick={() => onApply("custom")}
+              title="Align project to custom target"
+              type="button"
+            >
+              {customAligned ? "Aligned" : "Align"}
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -3822,8 +4002,10 @@ function createNextMoveActions(
 ): NextMoveAction[] {
   const primary = primaryNextMoveAction(project, checks, analysis);
   const arrangementNeedsStructure = readinessCheckForId(checks, "arrangement")?.tone === "warn";
+  const target = activeDeliveryTarget(project);
   const candidates: NextMoveAction[] = [
     primary,
+    ...(!isDeliveryTargetAligned(project, target) ? [deliveryTargetNextMoveAction(project)] : []),
     ...(arrangementNeedsStructure ? [fullArrangementNextMoveAction()] : []),
     patternFillNextMoveAction(project),
     arrangementLiftNextMoveAction(project),
@@ -3976,7 +4158,7 @@ function mixReviewNextMoveAction(analysis: ExportAnalysis): NextMoveAction {
 }
 
 function deliveryTargetNextMoveAction(project: ProjectState): NextMoveAction {
-  const target = deliveryTargetForId(project.deliveryTarget);
+  const target = activeDeliveryTarget(project);
   return {
     id: `delivery-target-${target.id}`,
     title: `Align ${target.name} target`,
@@ -4044,6 +4226,22 @@ function boundedSessionBriefText(value: string, maxLength: number): string {
   return value.replace(/\s+/g, " ").slice(0, maxLength);
 }
 
+function boundedCustomDeliveryText(value: string, maxLength: number): string {
+  return value.replace(/\s+/g, " ").slice(0, maxLength);
+}
+
+function sameCustomDeliveryTarget(left: CustomDeliveryTarget, right: CustomDeliveryTarget): boolean {
+  return (
+    left.name === right.name &&
+    left.focus === right.focus &&
+    left.targetBars === right.targetBars &&
+    left.preferredTemplate === right.preferredTemplate &&
+    left.preferredMasterPreset === right.preferredMasterPreset &&
+    left.stemGoal === right.stemGoal &&
+    left.mixPosture === right.mixPosture
+  );
+}
+
 function sessionBriefFieldLabel(field: keyof SessionBrief): string {
   const labels: Record<keyof SessionBrief, string> = {
     artist: "artist",
@@ -4065,7 +4263,7 @@ function createBeatMapSummary(
   const tone = weakestTone([...stages.map((stage) => stage.tone), ...metrics.map((metric) => metric.tone)]);
   const bars = arrangementTotalBars(project);
   const patternUsage = usedPatternSlots(project).join("/");
-  const target = deliveryTargetForId(project.deliveryTarget);
+  const target = activeDeliveryTarget(project);
   const headline =
     tone === "danger" ? `${target.name} target needs a starter move` : tone === "warn" ? `${target.name} target in progress` : `${target.name} target ready`;
   const detail = `${barCountLabel(bars)} of ${barCountLabel(target.targetBars)} / Pattern ${patternUsage} / ${analysis.status} export`;
@@ -4091,7 +4289,7 @@ function createBeatMapStages(
   const harmony = readinessCheckForId(checks, "harmony");
   const compositionTone = weakestTone([drums?.tone ?? "danger", bass?.tone ?? "danger", harmony?.tone ?? "danger"]);
   const bars = arrangementTotalBars(project);
-  const target = deliveryTargetForId(project.deliveryTarget);
+  const target = activeDeliveryTarget(project);
   const arrangementTone: MixCoachTone = bars >= target.targetBars ? "good" : bars >= 8 ? "warn" : "danger";
   const mixTone = weakestTone(createMixCoachChecks(analysis, stemAnalyses).map((check) => check.tone));
   const audibleStemCount = audibleStemTracks(stemAnalyses).length;
@@ -4143,7 +4341,7 @@ function createBeatMapMetrics(
   stemAnalyses: StemExportAnalyses
 ): BeatMapMetric[] {
   const bars = arrangementTotalBars(project);
-  const target = deliveryTargetForId(project.deliveryTarget);
+  const target = activeDeliveryTarget(project);
   const slots = usedPatternSlots(project);
   const audibleStems = audibleStemTracks(stemAnalyses);
   const spread = stemSpreadDb(stemAnalyses);
@@ -4204,7 +4402,7 @@ function createBeatMapActions(
   const harmony = readinessCheckForId(checks, "harmony");
   const compositionTone = weakestTone([drums?.tone ?? "danger", bass?.tone ?? "danger", harmony?.tone ?? "danger"]);
   const bars = arrangementTotalBars(project);
-  const target = deliveryTargetForId(project.deliveryTarget);
+  const target = activeDeliveryTarget(project);
   const mixTone = weakestTone(createMixCoachChecks(analysis, stemAnalyses).map((check) => check.tone));
   const candidates: NextMoveAction[] = [
     !isDeliveryTargetAligned(project, target) ? deliveryTargetNextMoveAction(project) : arrangementLiftNextMoveAction(project),
@@ -5971,7 +6169,7 @@ function createHandoffSheet(
   stemAnalyses: StemExportAnalyses
 ): string {
   const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
-  const target = deliveryTargetForId(project.deliveryTarget);
+  const target = activeDeliveryTarget(project);
   const bars = arrangementTotalBars(project);
   const patternUsage = usedPatternSlots(project).join("/") || project.selectedPattern;
   const brief = project.sessionBrief;
