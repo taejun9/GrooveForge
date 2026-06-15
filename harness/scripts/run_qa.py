@@ -50,6 +50,8 @@ TEXT_EXPECTATIONS = {
         "Direct composition is the product spine",
         "opening a compact beat-making DAW, not a sample browser",
         "Sampling is a secondary add-on.",
+        "If a draft, screen, or roadmap has to choose what appears first, the answer is direct beat creation",
+        "Keep first-run UI and default navigation focused on making beats across genres",
         "local project save/load",
         "Style selector that applies editable genre groove templates",
         "drum velocity, microtiming, one-click groove humanization, and hat repeat dynamics",
@@ -71,6 +73,7 @@ TEXT_EXPECTATIONS = {
     "AGENTS.md": [
         "No Exec Plan, No Work",
         "GrooveForge is an all-genre, event-based beat workstation",
+        "First-run UI, default navigation, and roadmap order should lead with direct beat composition",
     ],
     "docs/product/product.md": [
         "It is beat-first, not sampler-first.",
@@ -80,6 +83,8 @@ TEXT_EXPECTATIONS = {
         "샘플 없이도 8마디 비트를 만들고 WAV로 export할 수 있어야 한다.",
         "This sentence supersedes any sampling-first interpretation of the brief.",
         "Sampling can be useful, but it must stay behind the composition engine",
+        "Primary navigation and the first empty project should expose beat-making controls before sample workflows",
+        "Sampling entry points, when added, should be opt-in secondary paths",
         "it means a pattern, MIDI, or automation container",
         "Local project save/load",
         "Style selector that applies key-aware editable groove templates",
@@ -146,12 +151,16 @@ TEXT_EXPECTATIONS = {
         "simplified compression honestly",
         "full-mix WAV export, and stem export",
         "sample import, chopping, sampler tracks, or audio warping",
+        "First-run UX, default navigation, and roadmap work must lead with direct beat composition",
+        "Sample browsing, chopping, sampler setup, audio clips, and audio warping must stay opt-in optional-sampling paths",
         "core clips are pattern, MIDI, or automation containers",
     ],
     "docs/architecture/product-architecture.md": [
         "Pattern/Event Clips",
         "not an imported audio asset",
         "Sampling architecture should attach to the beat workstation",
+        "The core architecture should remain valid with no audio-file entities at all.",
+        "sample browsing, chopping, sampler mapping, and audio warping belong behind explicit optional-sampling entry points",
         "Extension track types for optional sampling, later:",
     ],
     "harness/scripts/run_qa.py": [

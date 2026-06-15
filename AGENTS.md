@@ -42,6 +42,7 @@ Match the user's language in reports unless a referenced artifact is already in 
 - Musical events, patterns, clips, tracks, devices, mixer state, and render state are first-class project data.
 - Genre support comes from editable style profiles and generation rules; trap is one profile, not the product identity.
 - Sampling is a secondary add-on and should not become the center of the MVP, architecture, or roadmap.
+- First-run UI, default navigation, and roadmap order should lead with direct beat composition, not sample browsing, chopping, or sampler setup.
 - The first product target is a sample-free 8-bar beat with drums, 808/bass, synth melody, arrangement, mixer/master, and WAV export.
 - Keep the app local-first until there is an explicit rationale for cloud sync, remote AI calls, payments, analytics, or account features.
 

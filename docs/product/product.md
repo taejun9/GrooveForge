@@ -37,6 +37,8 @@ Optional sampling module, later and outside the MVP:
 
 Sampling can be useful, but it must stay behind the composition engine, instrument engine, arrangement, mixer/master, and export pipeline in priority, architecture, roadmap order, and UI copy. No user should need a sample to make the first complete beat.
 
+Primary navigation and the first empty project should expose beat-making controls before sample workflows: transport, style/key/BPM, pattern editor, drum programming, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sampling entry points, when added, should be opt-in secondary paths rather than the default way to start.
+
 ## Users
 
 - Developers and technically comfortable producers who want programmable beat construction.
@@ -151,6 +153,7 @@ Phase 6 scopes optional sampling as an extension only after the beat-making core
 - Do not make sample chop/import the MVP center.
 - Do not describe GrooveForge as a sampling app in product docs, UI copy, or agent plans.
 - Do not use sample import, chopping, sampler tracks, or audio warping as a plan title or primary scope unless the work is explicitly in the optional sampling phase.
+- Do not put sample browsing, chopping, or sampler setup ahead of direct beat composition in first-run UX, roadmap ordering, or default navigation.
 - Do not build plugin hosting before the local synth/mixer/export loop is working.
 - Do not add AI audio generation before editable pattern generation exists.
 - Do not add cloud collaboration, accounts, payments, trackers, or remote AI calls without explicit rationale.

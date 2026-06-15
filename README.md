@@ -23,6 +23,8 @@ BPM/key -> drums -> 808/bass -> melody/chords -> arrangement -> mixing -> master
 
 Sampling is a secondary add-on. It can be added later for users who want audio import, chopping, loop stretching, or sampler workflows, but it must not define the MVP, the first-run experience, or the core data model.
 
+If a draft, screen, or roadmap has to choose what appears first, the answer is direct beat creation: pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sample browsing, chopping, and sampler setup are opt-in extension paths after the beat workstation core is useful.
+
 ## MVP Target
 
 The first usable result is an Electron desktop workstation that can create a sample-free 8-bar beat in any supported style profile and export it as WAV:
@@ -46,6 +48,7 @@ The first desktop runtime is an Electron + Vite + TypeScript app. It opens direc
 - Treat genre as editable style profiles and generation rules, not as a single hard-coded genre.
 - Keep pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export ahead of sampling work.
 - Treat sample import, chopping, sampler tracks, and audio warping as P3/v2 optional modules unless a user-approved plan explicitly says otherwise.
+- Keep first-run UI and default navigation focused on making beats across genres, not on finding or slicing samples.
 - Keep sensitive real user, customer, credential, and production data out of samples, tests, docs, and screenshots.
 - Keep validation commands current as the stack becomes concrete.
 

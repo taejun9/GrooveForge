@@ -74,6 +74,8 @@ The core project model should make composition events first-class. In the core a
 
 Sampling is an extension model, not a core dependency. When it is added, it can introduce audio clips, sampler devices, audio tracks, and source/license metadata without changing the requirement that a valid beat can be made from generated and performed events alone. Sampling architecture should attach to the beat workstation; it should not replace the workstation model.
 
+The core architecture should remain valid with no audio-file entities at all. Default project creation, playback, arrangement, save/load, and export must continue to start from musical events and built-in instruments; sample browsing, chopping, sampler mapping, and audio warping belong behind explicit optional-sampling entry points.
+
 ## Track Types
 
 Initial track types:
