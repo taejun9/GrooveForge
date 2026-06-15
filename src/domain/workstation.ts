@@ -11,6 +11,8 @@ export type StyleId =
   | "lofi"
   | "house"
   | "rnb"
+  | "jersey"
+  | "phonk"
   | "garage"
   | "experimental";
 
@@ -594,6 +596,26 @@ export const styleProfiles: StyleProfile[] = [
     bassStyle: "sub",
     melodyStyle: "chordal",
     color: "#ff8aa8"
+  },
+  {
+    id: "jersey",
+    name: "Jersey Club",
+    bpmRange: [130, 150],
+    defaultBpm: 140,
+    defaultSwing: 0.04,
+    bassStyle: "sub",
+    melodyStyle: "riff",
+    color: "#f7ff5c"
+  },
+  {
+    id: "phonk",
+    name: "Phonk",
+    bpmRange: [120, 160],
+    defaultBpm: 132,
+    defaultSwing: 0.1,
+    bassStyle: "808",
+    melodyStyle: "loop",
+    color: "#ff5c7a"
   },
   {
     id: "garage",
@@ -1670,6 +1692,16 @@ const stylePatternBlueprints: Record<StyleId, [PatternBlueprint, PatternBlueprin
     blueprint([0, 6, 9, 14], [4, 12], [0, 2, 5, 8, 10, 13, 15], [3, 11], [0, 6, 9, 14], [5, 4, 2, 0], [0, 3, 5, 4]),
     blueprint([0, 8], [4, 12], [0, 6, 8, 14], [11], [0, 8], [4, 2], [3, 0])
   ],
+  jersey: [
+    blueprint([0, 3, 6, 8, 11, 14], [4, 12], [0, 2, 4, 6, 8, 10, 12, 14], [1, 5, 9, 13, 15], [0, 3, 6, 8, 11, 14], [0, 2, 4, 5, 2], [0, 3, 4, 5]),
+    blueprint([0, 2, 5, 8, 10, 13, 15], [4, 12], [0, 1, 3, 4, 6, 8, 9, 11, 12, 14, 15], [2, 6, 10, 14], [0, 2, 5, 8, 10, 13], [4, 5, 2, 0, 4], [0, 4, 5, 3]),
+    blueprint([0, 6, 11, 14], [4, 12], [0, 4, 6, 8, 12, 14], [3, 7, 15], [0, 6, 11, 14], [5, 4, 2], [3, 0])
+  ],
+  phonk: [
+    blueprint([0, 4, 7, 11, 14], [4, 12], [0, 2, 4, 6, 8, 10, 12, 14], [3, 6, 9, 13], [0, 4, 7, 11, 14], [0, 2, 3, 5], [0, 5, 3, 4]),
+    blueprint([0, 3, 6, 8, 12, 15], [4, 12], [0, 1, 3, 4, 6, 8, 10, 11, 12, 14, 15], [2, 7, 10, 13], [0, 3, 6, 8, 12, 15], [3, 5, 4, 2, 0], [0, 3, 5, 4]),
+    blueprint([0, 8, 11, 14], [4, 12], [0, 4, 6, 8, 10, 12, 14], [6, 11, 15], [0, 8, 11, 14], [5, 3, 0], [5, 0])
+  ],
   garage: [
     blueprint([0, 6, 10, 14], [4, 12], [1, 3, 6, 8, 10, 13, 15], [5, 9], [0, 3, 6, 10, 14], [0, 2, 4, 5], [0, 3, 4, 5]),
     blueprint([0, 5, 8, 11, 14], [4, 12], [1, 2, 5, 7, 9, 10, 13, 15], [3, 6, 12], [0, 2, 5, 8, 12, 14], [4, 2, 5, 0], [0, 4, 3, 5]),
@@ -1685,6 +1717,8 @@ const stylePatternBlueprints: Record<StyleId, [PatternBlueprint, PatternBlueprin
 export function styleSoundPreset(styleId: StyleId): (typeof soundPresetIds)[number] {
   switch (styleId) {
     case "trap":
+    case "jersey":
+    case "phonk":
     case "garage":
       return "club_punch";
     case "boom_bap":

@@ -4419,6 +4419,7 @@ function suggestedBlueprintId(project: ProjectState): BeatBlueprintId {
     case "rnb":
       return "rnb_pocket";
     case "house":
+    case "jersey":
     case "garage":
       return "club_bounce";
     case "boom_bap":
@@ -4426,6 +4427,7 @@ function suggestedBlueprintId(project: ProjectState): BeatBlueprintId {
       return "warm_loop";
     case "trap":
     case "drill":
+    case "phonk":
     case "experimental":
       return "dark_808";
   }
