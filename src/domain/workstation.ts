@@ -147,6 +147,22 @@ export type ProjectState = {
   masterPreset: MasterPreset;
 };
 
+export const beatBlueprintIds = ["dark_808", "rnb_pocket", "club_bounce", "warm_loop"] as const;
+export type BeatBlueprintId = (typeof beatBlueprintIds)[number];
+
+export type BeatBlueprint = {
+  id: BeatBlueprintId;
+  name: string;
+  focus: string;
+  styleId: StyleId;
+  key: string;
+  bpm: number;
+  arrangementTemplate: ArrangementTemplateId;
+  soundPreset: (typeof soundPresetIds)[number];
+  masterPreset: MasterPreset;
+  mixer: Partial<Record<TrackType, Partial<Pick<MixerChannel, "volumeDb" | "pan" | "lowCut" | "air" | "drive" | "glue" | "send">>>>;
+};
+
 export type ProjectFile = {
   app: "GrooveForge";
   fileVersion: 1;
@@ -212,6 +228,81 @@ export const soundPresetLabels: Record<SoundPresetId, string> = {
   air_space: "Air Space",
   custom: "Custom"
 };
+
+export const beatBlueprints: BeatBlueprint[] = [
+  {
+    id: "dark_808",
+    name: "Dark 808 Sketch",
+    focus: "drill/trap hook with vocal headroom",
+    styleId: "drill",
+    key: "F minor",
+    bpm: 142,
+    arrangementTemplate: "hook_first",
+    soundPreset: "air_space",
+    masterPreset: "Headroom for Vocal",
+    mixer: {
+      drum_rack: { volumeDb: -4, lowCut: 0.06, air: 0.28, drive: 0.18, glue: 0.3, send: 0.12 },
+      bass_808: { volumeDb: -5, lowCut: 0, air: 0.08, drive: 0.34, glue: 0.22, send: 0.02 },
+      synth: { volumeDb: -10, pan: -18, lowCut: 0.22, air: 0.44, drive: 0.08, glue: 0.12, send: 0.38 },
+      chord: { volumeDb: -12, pan: 18, lowCut: 0.18, air: 0.32, drive: 0.06, glue: 0.16, send: 0.42 },
+      master: { volumeDb: -1.6 }
+    }
+  },
+  {
+    id: "rnb_pocket",
+    name: "R&B Pocket",
+    focus: "laid-back chords and clean low end",
+    styleId: "rnb",
+    key: "C minor",
+    bpm: 76,
+    arrangementTemplate: "full",
+    soundPreset: "clean_knock",
+    masterPreset: "Streaming Safe",
+    mixer: {
+      drum_rack: { volumeDb: -6, lowCut: 0.08, air: 0.18, drive: 0.08, glue: 0.22, send: 0.18 },
+      bass_808: { volumeDb: -7, lowCut: 0, air: 0.08, drive: 0.16, glue: 0.2, send: 0.04 },
+      synth: { volumeDb: -11, pan: -14, lowCut: 0.24, air: 0.42, drive: 0.04, glue: 0.12, send: 0.36 },
+      chord: { volumeDb: -8, pan: 10, lowCut: 0.14, air: 0.24, drive: 0.04, glue: 0.2, send: 0.3 },
+      master: { volumeDb: -1.2 }
+    }
+  },
+  {
+    id: "club_bounce",
+    name: "Club Bounce",
+    focus: "four-on-floor drive and bright mids",
+    styleId: "house",
+    key: "D minor",
+    bpm: 124,
+    arrangementTemplate: "full",
+    soundPreset: "club_punch",
+    masterPreset: "Clean Demo",
+    mixer: {
+      drum_rack: { volumeDb: -3, lowCut: 0.05, air: 0.3, drive: 0.22, glue: 0.36, send: 0.1 },
+      bass_808: { volumeDb: -7, lowCut: 0.02, air: 0.1, drive: 0.22, glue: 0.2, send: 0.04 },
+      synth: { volumeDb: -8, pan: -10, lowCut: 0.2, air: 0.52, drive: 0.1, glue: 0.14, send: 0.24 },
+      chord: { volumeDb: -9, pan: 12, lowCut: 0.18, air: 0.44, drive: 0.08, glue: 0.18, send: 0.28 },
+      master: { volumeDb: -0.8 }
+    }
+  },
+  {
+    id: "warm_loop",
+    name: "Warm Loop",
+    focus: "boom bap/lo-fi sketch with swing",
+    styleId: "lofi",
+    key: "A minor",
+    bpm: 82,
+    arrangementTemplate: "breakdown",
+    soundPreset: "warm_tape",
+    masterPreset: "Headroom for Vocal",
+    mixer: {
+      drum_rack: { volumeDb: -5, lowCut: 0.12, air: 0.1, drive: 0.2, glue: 0.32, send: 0.2 },
+      bass_808: { volumeDb: -8, lowCut: 0.02, air: 0.04, drive: 0.18, glue: 0.18, send: 0.08 },
+      synth: { volumeDb: -11, pan: -20, lowCut: 0.3, air: 0.18, drive: 0.12, glue: 0.16, send: 0.4 },
+      chord: { volumeDb: -8, pan: 20, lowCut: 0.16, air: 0.14, drive: 0.1, glue: 0.24, send: 0.36 },
+      master: { volumeDb: -2 }
+    }
+  }
+];
 export const soundPresetDefaults: Record<(typeof soundPresetIds)[number], SoundDesign> = {
   clean_knock: {
     preset: "clean_knock",
@@ -589,12 +680,79 @@ export const starterProject: ProjectState = {
   masterPreset: "Headroom for Vocal"
 };
 
+export function beatBlueprintLabel(id: BeatBlueprintId): string {
+  return beatBlueprintForId(id).name;
+}
+
+export function beatBlueprintFocus(id: BeatBlueprintId): string {
+  return beatBlueprintForId(id).focus;
+}
+
+export function applyBeatBlueprint(project: ProjectState, blueprintId: BeatBlueprintId): ProjectState {
+  const blueprint = beatBlueprintForId(blueprintId);
+  const style = styleProfiles.find((profile) => profile.id === blueprint.styleId) ?? styleProfiles[0];
+  return {
+    ...project,
+    bpm: blueprint.bpm,
+    key: blueprint.key,
+    styleId: blueprint.styleId,
+    selectedPattern: "A",
+    swing: style.defaultSwing,
+    sound: soundPresetDesign(blueprint.soundPreset),
+    patterns: createStylePatternSet(blueprint.styleId, blueprint.key),
+    arrangement: createArrangementTemplate(blueprint.arrangementTemplate),
+    mixer: applyBeatBlueprintMixer(starterProject.mixer, blueprint.mixer),
+    masterCeilingDb: masterPresetCeilingDb(blueprint.masterPreset),
+    masterPreset: blueprint.masterPreset
+  };
+}
+
 export function masterPresetCeilingDb(preset: MasterPreset): number {
   return masterPresetCeilingsDb[preset];
 }
 
 export function soundPresetLabel(preset: SoundPresetId): string {
   return soundPresetLabels[preset];
+}
+
+function beatBlueprintForId(id: BeatBlueprintId): BeatBlueprint {
+  return beatBlueprints.find((blueprint) => blueprint.id === id) ?? beatBlueprints[0];
+}
+
+function applyBeatBlueprintMixer(
+  sourceMixer: MixerChannel[],
+  mixerUpdates: BeatBlueprint["mixer"]
+): MixerChannel[] {
+  return sourceMixer.map((channel) => {
+    const update = mixerUpdates[channel.id] ?? {};
+    return {
+      ...channel,
+      ...update,
+      volumeDb: clampVolumeDb(update.volumeDb ?? channel.volumeDb),
+      pan: clampPanValue(update.pan ?? channel.pan),
+      lowCut: normalizeMixerEq(update.lowCut ?? channel.lowCut),
+      air: normalizeMixerEq(update.air ?? channel.air),
+      drive: normalizeMixerEq(update.drive ?? channel.drive),
+      glue: normalizeMixerEq(update.glue ?? channel.glue),
+      send: normalizeMixerEq(update.send ?? channel.send),
+      muted: false,
+      solo: false
+    };
+  });
+}
+
+function clampVolumeDb(value: number): number {
+  if (!Number.isFinite(value)) {
+    return -6;
+  }
+  return Math.min(3, Math.max(-36, Math.round(value * 10) / 10));
+}
+
+function clampPanValue(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(100, Math.max(-100, Math.round(value)));
 }
 
 export function chordProgressionPresetLabel(preset: ChordProgressionPreset): string {

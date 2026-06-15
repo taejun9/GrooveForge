@@ -44,6 +44,7 @@ import {
   ArrangementSection,
   ArrangementTemplateId,
   BassNote,
+  BeatBlueprintId,
   ChordEvent,
   ChordInversion,
   ChordProgressionPreset,
@@ -64,6 +65,7 @@ import {
   ProjectState,
   SoundDesign,
   activePattern,
+  applyBeatBlueprint,
   arrangementSections,
   arrangementEnergyGain,
   arrangementMuteTrackIds,
@@ -72,6 +74,7 @@ import {
   arrangementTemplateLabel,
   arrangementTotalBars,
   bassPitchLanes,
+  beatBlueprints,
   chordInversions,
   chordInversionLabel,
   chordQualities,
@@ -1605,6 +1608,21 @@ export function App(): ReactElement {
     setSelectedChordIndex(0);
   }
 
+  function applySelectedBeatBlueprint(blueprintId: BeatBlueprintId): void {
+    const blueprint = beatBlueprints.find((candidate) => candidate.id === blueprintId);
+    const changed = updateProject(
+      (current) => applyBeatBlueprint(current, blueprintId),
+      blueprint ? `Applied ${blueprint.name} blueprint` : "Applied beat blueprint"
+    );
+    if (changed) {
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(0);
+      setSelectedArrangementIndex(0);
+      setPlaybackMode("arrangement");
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="transport-band">
@@ -1776,6 +1794,8 @@ export function App(): ReactElement {
           <span>{projectStatus}</span>
         </div>
       </section>
+
+      <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
 
       <BeatReadiness checks={beatReadinessChecks} />
 
@@ -2492,6 +2512,53 @@ function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; met
       </div>
       <span>{meta}</span>
     </div>
+  );
+}
+
+function BeatBlueprints({
+  project,
+  onApply
+}: {
+  project: ProjectState;
+  onApply: (blueprintId: BeatBlueprintId) => void;
+}): ReactElement {
+  return (
+    <section className="blueprint-row" data-testid="beat-blueprints" aria-label="Beat blueprints">
+      <div className="blueprint-heading">
+        <div>
+          <Sparkles size={17} aria-hidden="true" />
+          <span>Beat Blueprints</span>
+        </div>
+        <strong data-testid="beat-blueprint-current">
+          {project.bpm} BPM / {project.key}
+        </strong>
+      </div>
+      <div className="blueprint-list">
+        {beatBlueprints.map((blueprint) => {
+          const selected =
+            project.styleId === blueprint.styleId &&
+            project.key === blueprint.key &&
+            project.bpm === blueprint.bpm;
+          const styleName = styleProfiles.find((profile) => profile.id === blueprint.styleId)?.name ?? blueprint.styleId;
+          return (
+            <button
+              className={selected ? "selected" : ""}
+              data-testid={`beat-blueprint-${blueprint.id}`}
+              key={blueprint.id}
+              onClick={() => onApply(blueprint.id)}
+              title={`Apply ${blueprint.name} blueprint`}
+              type="button"
+            >
+              <span>{blueprint.name}</span>
+              <strong>{blueprint.focus}</strong>
+              <small>
+                {styleName} / {blueprint.key} / {blueprint.bpm} BPM / {arrangementTemplateLabel(blueprint.arrangementTemplate)}
+              </small>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

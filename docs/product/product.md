@@ -57,6 +57,7 @@ BPM/key -> style/pattern programming -> drum pattern -> 808/bass line -> melody/
 Primary feature areas:
 
 - Transport: BPM, key, play, stop, loop, metronome.
+- Beat blueprints: sample-free editable project starts that combine style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset.
 - Pattern editor: drum step sequencer, bass grid, chord progression, melody grid, variation A/B/C.
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with per-block bar lengths, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
@@ -117,6 +118,7 @@ MVP capabilities:
 - BPM/key setup.
 - Key changes retarget Pattern A/B/C 808/bass, melody, and chord-root musical events so existing beats stay in the selected key.
 - Style selector that applies key-aware editable groove templates for Pattern A/B/C, BPM, swing, and sound preset.
+- Beat Blueprints that apply complete sample-free project starts across style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset while preserving manual editing.
 - 16-step drum sequencer with built-in drum kit, drum-synth sources, editable drum velocity, probability, visible chance badges, microtiming, one-click groove humanization, and hat repeat dynamics.
 - Synth 808/bass track with editable scale-aware grid, mono mode, glide, note chance badges, selected-note move/transpose/duplicate tools, saturation direction, and kick-to-808 sidechain ducking.
 - Chord progression track with scale-locked roots, key-aware progression presets, editable step/root/quality/inversion/length/velocity/chance, visible chance badges, add/delete controls, and selected-chord move/duplicate/inversion tools.

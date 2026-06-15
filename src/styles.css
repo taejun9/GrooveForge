@@ -34,13 +34,14 @@ button {
 .app-shell {
   display: grid;
   min-height: 100vh;
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-rows: auto auto auto auto 1fr;
   gap: 12px;
   padding: 16px;
 }
 
 .transport-band,
 .mode-row,
+.blueprint-row,
 .beat-readiness,
 .panel {
   border: 1px solid rgba(244, 239, 231, 0.11);
@@ -65,7 +66,8 @@ button {
 .panel-title > div,
 .strip-top,
 .session-meter,
-.mode-row {
+.mode-row,
+.blueprint-heading > div {
   display: flex;
   align-items: center;
 }
@@ -292,6 +294,92 @@ h2 {
 .session-meter span:first-child {
   border-color: color-mix(in srgb, var(--accent) 70%, transparent);
   color: var(--accent);
+}
+
+.blueprint-row {
+  display: grid;
+  grid-template-columns: 158px 1fr;
+  gap: 10px;
+  align-items: stretch;
+  min-height: 78px;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.blueprint-heading {
+  display: grid;
+  gap: 5px;
+  align-content: center;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.blueprint-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.blueprint-heading svg {
+  color: #78f0c8;
+}
+
+.blueprint-heading strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.blueprint-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.blueprint-list button {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+  min-height: 58px;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 7px;
+  color: #f4efe7;
+  background: rgba(244, 239, 231, 0.05);
+  padding: 8px 9px;
+  text-align: start;
+}
+
+.blueprint-list button.selected {
+  border-color: rgba(120, 240, 200, 0.62);
+  background: rgba(120, 240, 200, 0.12);
+}
+
+.blueprint-list button span,
+.blueprint-list button strong,
+.blueprint-list button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.blueprint-list button span {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.blueprint-list button strong {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.blueprint-list button small {
+  color: rgba(244, 239, 231, 0.48);
+  font-size: 10px;
+  line-height: 1.25;
 }
 
 .beat-readiness {

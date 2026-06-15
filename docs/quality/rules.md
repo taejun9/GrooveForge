@@ -81,6 +81,8 @@ Groove humanize work must be deterministic, operate on selected Pattern A/B/C ve
 
 Style groove work must apply key-aware editable Pattern A/B/C event data, BPM, swing, and built-in sound preset changes without introducing imported audio or bypassing undo/redo.
 
+Beat Blueprint work must apply deterministic sample-free project starts from local style, key, BPM, Pattern A/B/C event data, arrangement templates, sound presets, mixer balance, and master presets; keep the result fully editable and undoable; preserve title, mode, metronome, save/load, playback, WAV/stem/MIDI export semantics; and avoid remote AI, imported audio, sampling, plugin hosting, hidden randomness, or hidden assets.
+
 Key retarget work must update Pattern A/B/C 808/bass note pitches, melody note pitches, and chord roots by scale degree, preserve event timing, length, velocity, glide, and chance fields, remain undoable, and avoid imported audio or sampling dependencies.
 
 Chord progression work must preserve Pattern A/B/C independence, keep chord roots and progression presets scale-aware by default, migrate older project files without chord events, keep add/delete operations undoable, preserve at least one chord event in guided editing, and make chord events audible in both realtime playback and WAV export.
