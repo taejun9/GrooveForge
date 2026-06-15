@@ -123,6 +123,8 @@ Pattern Fill work must be deterministic, operate only on the selected Pattern A/
 
 808 Bassline Pad work must derive 808/bass notes from the current key after an explicit click, update only the selected Pattern A/B/C bass notes through undoable project history, keep results manually editable through the note grid and inspector, preserve glide, chance, realtime playback plus WAV/stem/MIDI export semantics, and avoid sampling, imported audio, hidden generation, remote AI, accounts, analytics, or cloud sync.
 
+808 Glide Pad work must derive 808/bass note length, glide, and chance changes from explicit local movement presets, update only the selected Pattern A/B/C bass note data through undoable project history, keep bass note counts and pitches stable, keep results manually editable through the note grid and inspector, preserve realtime playback plus WAV/stem/MIDI export semantics, and avoid sampling, imported audio, hidden generation, remote AI, accounts, analytics, or cloud sync.
+
 Melody Motif Pad work must derive Synth melody notes from the current key after an explicit click, update only the selected Pattern A/B/C melody notes through undoable project history, keep results manually editable through the note grid and inspector, preserve realtime playback plus WAV/stem/MIDI export semantics, and avoid sampling, imported audio, hidden generation, remote AI, accounts, analytics, or cloud sync.
 
 Beat Readiness work must derive checks from editable Pattern A/B/C, arrangement, and deterministic export analysis data, remain read-only, avoid mutating project state or generating musical events, preserve realtime playback and WAV/stem/MIDI export semantics, and avoid imported audio, sampling, plugin hosting, remote AI, or remote analysis dependencies.

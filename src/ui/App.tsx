@@ -304,6 +304,19 @@ type BasslinePadOption = BasslinePadDefinition & {
   glideCount: number;
 };
 
+type BassGlidePadId = "clean" | "bounce" | "slide" | "hold";
+
+type BassGlidePadDefinition = {
+  id: BassGlidePadId;
+  label: string;
+  detail: string;
+};
+
+type BassGlidePadOption = BassGlidePadDefinition & {
+  preview: string;
+  glideCount: number;
+};
+
 type PatternStackId = "pocket" | "hook" | "lift" | "break";
 
 type PatternStackDefinition = {
@@ -594,6 +607,13 @@ const basslinePadDefinitions: BasslinePadDefinition[] = [
   }
 ];
 
+const bassGlidePadDefinitions: BassGlidePadDefinition[] = [
+  { id: "clean", label: "Clean", detail: "tight/no glide" },
+  { id: "bounce", label: "Bounce", detail: "short pocket" },
+  { id: "slide", label: "Slide", detail: "connected glide" },
+  { id: "hold", label: "Hold", detail: "long sustain" }
+];
+
 const melodyMotifDefinitions: MelodyMotifDefinition[] = [
   {
     id: "hook",
@@ -761,6 +781,7 @@ export function App(): ReactElement {
     [keyboardCaptureTarget, project.key]
   );
   const basslinePadOptions = useMemo(() => createBasslinePadOptions(project.key), [project.key]);
+  const bassGlidePadOptions = useMemo(() => createBassGlidePadOptions(currentPattern.bassNotes), [currentPattern.bassNotes]);
   const melodyMotifOptions = useMemo(() => createMelodyMotifOptions(project.key), [project.key]);
   const patternStackOptions = useMemo(() => createPatternStackOptions(project.key), [project.key]);
   const grooveFeelOptions = useMemo(() => createGrooveFeelOptions(), []);
@@ -1939,6 +1960,35 @@ export function App(): ReactElement {
     );
     if (!changed) {
       setProjectStatus(`${pad.label} 808 bassline already selected`);
+      return;
+    }
+
+    const firstNote = bassNotes[0];
+    setSelectedNote(firstNote ? { track: "bass", step: firstNote.step, pitch: firstNote.pitch } : null);
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
+  }
+
+  function applyBassGlidePad(padId: BassGlidePadId): void {
+    const pad = bassGlidePadDefinitions.find((candidate) => candidate.id === padId);
+    if (!pad) {
+      setProjectStatus("808 glide pad not found");
+      return;
+    }
+
+    const currentBassNotes = projectRef.current.patterns[projectRef.current.selectedPattern].bassNotes;
+    if (currentBassNotes.length === 0) {
+      setProjectStatus(`Add an 808 note before using ${pad.label} glide`);
+      return;
+    }
+
+    const bassNotes = applyBassGlidePadToNotes(currentBassNotes, pad.id);
+    const changed = updateCurrentPattern(
+      (pattern) => (sameBassNotes(pattern.bassNotes, bassNotes) ? pattern : { ...pattern, bassNotes }),
+      `${pad.label} 808 glide applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (!changed) {
+      setProjectStatus(`${pad.label} 808 glide already selected`);
       return;
     }
 
@@ -3196,6 +3246,7 @@ export function App(): ReactElement {
             target={keyboardCaptureTarget}
           />
           <BasslinePads pads={basslinePadOptions} onApply={applyBasslinePad} />
+          <BassGlidePads pads={bassGlidePadOptions} onApply={applyBassGlidePad} />
           <MelodyMotifPads motifs={melodyMotifOptions} onApply={applyMelodyMotif} />
           <div className="note-lanes">
             <NoteEditor
@@ -6464,6 +6515,38 @@ function BasslinePads({
   );
 }
 
+function BassGlidePads({
+  pads,
+  onApply
+}: {
+  pads: BassGlidePadOption[];
+  onApply: (pad: BassGlidePadId) => void;
+}): ReactElement {
+  return (
+    <div className="bass-glide-panel" data-testid="bass-glide-pads">
+      <div className="bass-glide-heading">
+        <span>808 Glide</span>
+        <strong>Length + Chance</strong>
+      </div>
+      <div className="bass-glide-row" aria-label="808 Glide Pads">
+        {pads.map((pad) => (
+          <button
+            data-testid={`bass-glide-${pad.id}`}
+            key={pad.id}
+            onClick={() => onApply(pad.id)}
+            title={`${pad.label} ${pad.preview}`}
+            type="button"
+          >
+            <span>{pad.label}</span>
+            <strong>{pad.preview}</strong>
+            <small>{pad.glideCount} glide / {pad.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MelodyMotifPads({
   motifs,
   onApply
@@ -7597,6 +7680,72 @@ function createBasslinePadNotes(key: string, pad: BasslinePadDefinition): BassNo
       };
     })
   );
+}
+
+function createBassGlidePadOptions(notes: BassNote[]): BassGlidePadOption[] {
+  return bassGlidePadDefinitions.map((pad) => {
+    const transformed = applyBassGlidePadToNotes(notes, pad.id);
+    const glideCount = transformed.filter((note) => note.glide).length;
+    const averageLength =
+      transformed.length === 0
+        ? 0
+        : transformed.reduce((total, note) => total + note.length, 0) / transformed.length;
+    return {
+      ...pad,
+      preview: transformed.length === 0 ? "add 808" : `${averageLength.toFixed(1)} step`,
+      glideCount
+    };
+  });
+}
+
+function applyBassGlidePadToNotes(notes: BassNote[], padId: BassGlidePadId): BassNote[] {
+  const noteCount = notes.length;
+  return sortBassNotes(
+    notes.map((note, index) => ({
+      ...note,
+      length: bassGlidePadLength(note, index, noteCount, padId),
+      glide: bassGlidePadEnabled(index, noteCount, padId),
+      probability: bassGlidePadProbability(index, noteCount, padId)
+    }))
+  );
+}
+
+function bassGlidePadLength(note: BassNote, index: number, noteCount: number, padId: BassGlidePadId): number {
+  const maxLength = Math.max(1, 16 - note.step);
+  let targetLength: number;
+  if (padId === "clean") {
+    targetLength = index % 2 === 0 ? Math.min(note.length, 2) : 1;
+  } else if (padId === "bounce") {
+    targetLength = index % 4 === 3 ? 3 : index % 2 === 0 ? 2 : 1;
+  } else if (padId === "slide") {
+    targetLength = index === 0 ? 2 : index % 3 === 0 ? 3 : 2;
+  } else {
+    targetLength = noteCount <= 2 ? 6 : index % 2 === 0 ? 4 : 3;
+  }
+  return Math.min(clampStepLength(targetLength), maxLength);
+}
+
+function bassGlidePadEnabled(index: number, noteCount: number, padId: BassGlidePadId): boolean {
+  if (padId === "bounce") {
+    return noteCount > 1 && index % 3 === 1;
+  }
+  if (padId === "slide") {
+    return noteCount > 1 && index > 0;
+  }
+  return false;
+}
+
+function bassGlidePadProbability(index: number, noteCount: number, padId: BassGlidePadId): number {
+  if (padId === "bounce") {
+    return normalizeEventProbability(index % 2 === 0 ? 1 : 0.93);
+  }
+  if (padId === "slide") {
+    return normalizeEventProbability(index === 0 ? 1 : 0.96);
+  }
+  if (padId === "hold") {
+    return normalizeEventProbability(index === noteCount - 1 ? 0.96 : 1);
+  }
+  return normalizeEventProbability(1);
 }
 
 function sameBassNotes(first: BassNote[], second: BassNote[]): boolean {
