@@ -49,7 +49,7 @@ TEXT_EXPECTATIONS = {
         "Direct composition is the product spine",
         "Sampling is a secondary add-on.",
         "local project save/load",
-        "Independent Pattern A/B/C variations",
+        "Independent Pattern A/B/C variations and editable arrangement blocks",
         "npm run desktop",
     ],
     "AGENTS.md": [
@@ -62,12 +62,14 @@ TEXT_EXPECTATIONS = {
         "Sampling can be useful, but it must stay behind the composition engine",
         "Local project save/load",
         "Independent Pattern A/B/C storage",
+        "Editable arrangement blocks",
     ],
     "docs/quality/rules.md": [
         "QA and review are separate loops.",
         "python3 harness/scripts/run_quality_gate.py",
         "Project file work must reject invalid imports",
         "Pattern work must keep Pattern A/B/C as independent editable event data",
+        "Arrangement editor work must let users change a block's section",
         "sample import, chopping, sampler tracks, or audio warping",
     ],
     "docs/references/official-sources.md": [
@@ -108,6 +110,11 @@ TEXT_EXPECTATIONS = {
         "Invalid project file",
         "patternEventCount",
         "selectPattern",
+        "selectedArrangementIndex",
+        "updateArrangementBlock",
+        "Selected arrangement block editor",
+        "arrangement-section-select",
+        "arrangement-energy-input",
     ],
     "src/audio/scheduler.ts": [
         "scheduleAheadSeconds",
@@ -129,6 +136,8 @@ TEXT_EXPECTATIONS = {
         "parseProjectFile",
         "PatternData",
         "patternSlots",
+        "ArrangementSection",
+        "arrangementSections",
         "normalizeProjectState",
     ],
 }

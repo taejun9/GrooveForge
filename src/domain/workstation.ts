@@ -60,9 +60,11 @@ export type MixerChannel = {
   accent: string;
 };
 
+export type ArrangementSection = "Intro" | "Verse" | "Hook" | "Bridge" | "Outro";
+
 export type ArrangementBlock = {
-  section: "Intro" | "Verse" | "Hook" | "Bridge" | "Outro";
-  pattern: "A" | "B" | "C";
+  section: ArrangementSection;
+  pattern: PatternSlot;
   energy: number;
 };
 
@@ -92,6 +94,7 @@ export const steps = Array.from({ length: 16 }, (_, index) => index);
 export const stepsPerBar = 16;
 export const projectFileVersion = 1;
 export const patternSlots: PatternSlot[] = ["A", "B", "C"];
+export const arrangementSections: ArrangementSection[] = ["Intro", "Verse", "Hook", "Bridge", "Outro"];
 
 const sharpNotes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const flatNotes = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
@@ -581,8 +584,8 @@ function isMixerChannel(value: unknown): value is MixerChannel {
 function isArrangementBlock(value: unknown): value is ArrangementBlock {
   return (
     isRecord(value) &&
-    isOneOf(value.section, ["Intro", "Verse", "Hook", "Bridge", "Outro"]) &&
-    isOneOf(value.pattern, ["A", "B", "C"]) &&
+    isOneOf(value.section, arrangementSections) &&
+    isOneOf(value.pattern, patternSlots) &&
     isFiniteNumber(value.energy) &&
     value.energy >= 0 &&
     value.energy <= 1

@@ -68,6 +68,8 @@ Project file work must reject invalid imports without overwriting the current pr
 
 Pattern work must keep Pattern A/B/C as independent editable event data. Realtime playback should preview the selected pattern, while WAV export should follow arrangement pattern assignments.
 
+Arrangement editor work must let users change a block's section, Pattern A/B/C assignment, and energy without losing existing pattern, mixer, master, or save/load data. Selecting or reassigning a block should keep the pattern editor aligned with that block's assigned pattern.
+
 Export work must verify a non-silent WAV with expected duration, expected sample rate/channel count, no audio frames above the selected ceiling, and reproducibility from saved project data.
 
 Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation, sound design, arrangement, mixing/mastering, and export first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, or plan titles.

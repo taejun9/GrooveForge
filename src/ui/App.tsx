@@ -18,6 +18,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { exportWav } from "../audio/render";
 import { PlaybackController, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
 import {
+  ArrangementBlock,
+  ArrangementSection,
   BassNote,
   DrumLane,
   getStyle,
@@ -27,6 +29,7 @@ import {
   PatternSlot,
   ProjectState,
   activePattern,
+  arrangementSections,
   bassPitchLanes,
   melodyPitchLanes,
   parseProjectFile,
@@ -66,6 +69,7 @@ export function App(): ReactElement {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState<PlaybackSnapshot | null>(null);
   const [selectedNote, setSelectedNote] = useState<SelectedNote | null>(null);
+  const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const controllerRef = useRef<PlaybackController | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -73,6 +77,7 @@ export function App(): ReactElement {
   const currentPattern = activePattern(project);
   const activeChannels = useMemo(() => project.mixer.filter((channel) => !channel.muted).length, [project.mixer]);
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
+  const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const bassPitches = useMemo(
     () => mergePitchLanes(bassPitchLanes(project.key), currentPattern.bassNotes.map((note) => note.pitch)),
     [currentPattern.bassNotes, project.key]
@@ -97,6 +102,10 @@ export function App(): ReactElement {
     };
   }, []);
 
+  useEffect(() => {
+    setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, project.arrangement.length - 1)));
+  }, [project.arrangement.length]);
+
   function updateProject(update: (current: ProjectState) => ProjectState): void {
     setProject((current) => update(current));
     setProjectStatus("Unsaved changes");
@@ -116,6 +125,38 @@ export function App(): ReactElement {
     setProject((current) => ({ ...current, selectedPattern: pattern }));
     setSelectedNote(null);
     setProjectStatus(`Editing Pattern ${pattern}`);
+  }
+
+  function selectArrangementBlock(index: number): void {
+    const block = project.arrangement[index];
+    if (!block) {
+      return;
+    }
+
+    setSelectedArrangementIndex(index);
+    setProject((current) => ({ ...current, selectedPattern: block.pattern }));
+    setSelectedNote(null);
+    setProjectStatus(`Arranging ${block.section}`);
+  }
+
+  function updateArrangementBlock(index: number, update: Partial<ArrangementBlock>): void {
+    updateProject((current) => {
+      const block = current.arrangement[index];
+      if (!block) {
+        return current;
+      }
+      const nextBlock: ArrangementBlock = {
+        ...block,
+        ...update,
+        energy: update.energy === undefined ? block.energy : clampEnergy(update.energy)
+      };
+      return {
+        ...current,
+        selectedPattern: nextBlock.pattern,
+        arrangement: current.arrangement.map((candidate, candidateIndex) => (candidateIndex === index ? nextBlock : candidate))
+      };
+    });
+    setSelectedNote(null);
   }
 
   function toggleStep(lane: DrumLane, step: number): void {
@@ -542,16 +583,94 @@ export function App(): ReactElement {
         </section>
 
         <section className="panel arrangement-panel" aria-label="Arrangement">
-          <PanelTitle icon={<Music2 size={18} />} title="Arrangement" meta="8 blocks" />
+          <PanelTitle icon={<Music2 size={18} />} title="Arrangement" meta={`${project.arrangement.length} blocks`} />
           <div className="arrangement-track">
             {project.arrangement.map((block, index) => (
-              <button className="arrangement-block" key={`${block.section}-${index}`} type="button">
+              <button
+                aria-label={`Block ${index + 1} ${block.section} Pattern ${block.pattern}`}
+                aria-pressed={selectedArrangementIndex === index}
+                className={["arrangement-block", selectedArrangementIndex === index ? "selected" : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+                data-testid={`arrangement-block-${index}`}
+                key={`${block.section}-${index}`}
+                onClick={() => selectArrangementBlock(index)}
+                type="button"
+              >
                 <span>{block.section}</span>
                 <strong>{block.pattern}</strong>
                 <i style={{ inlineSize: `${Math.max(18, block.energy * 100)}%` }} />
               </button>
             ))}
           </div>
+          {selectedArrangementBlock && (
+            <div className="arrangement-editor" aria-label="Selected arrangement block editor">
+              <div className="arrangement-editor-heading">
+                <span>Block {selectedArrangementIndex + 1}</span>
+                <strong>
+                  {selectedArrangementBlock.section} / Pattern {selectedArrangementBlock.pattern}
+                </strong>
+              </div>
+              <label>
+                <span>Section</span>
+                <select
+                  data-testid="arrangement-section-select"
+                  value={selectedArrangementBlock.section}
+                  onChange={(event) =>
+                    updateArrangementBlock(selectedArrangementIndex, { section: event.target.value as ArrangementSection })
+                  }
+                >
+                  {arrangementSections.map((section) => (
+                    <option key={section} value={section}>
+                      {section}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="block-pattern-row" aria-label="Block pattern">
+                {patternSlots.map((pattern) => (
+                  <button
+                    key={pattern}
+                    className={selectedArrangementBlock.pattern === pattern ? "selected" : ""}
+                    data-testid={`arrangement-pattern-${pattern}`}
+                    type="button"
+                    onClick={() => updateArrangementBlock(selectedArrangementIndex, { pattern })}
+                  >
+                    <span>{pattern}</span>
+                    <small>{patternEventCount(project.patterns[pattern])}</small>
+                  </button>
+                ))}
+              </div>
+              <label>
+                <span>Energy {Math.round(selectedArrangementBlock.energy * 100)}%</span>
+                <div className="energy-inputs">
+                  <input
+                    data-testid="arrangement-energy-slider"
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={selectedArrangementBlock.energy}
+                    onChange={(event) =>
+                      updateArrangementBlock(selectedArrangementIndex, { energy: Number(event.target.value) })
+                    }
+                  />
+                  <input
+                    aria-label="Arrangement energy percent"
+                    data-testid="arrangement-energy-input"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={Math.round(selectedArrangementBlock.energy * 100)}
+                    onChange={(event) =>
+                      updateArrangementBlock(selectedArrangementIndex, { energy: Number(event.target.value) / 100 })
+                    }
+                  />
+                </div>
+              </label>
+            </div>
+          )}
         </section>
 
         <section className="panel mixer-panel" aria-label="Mixer">
@@ -807,6 +926,13 @@ function patternEventCount(pattern: PatternData): string {
     0
   );
   return `${drumHits + pattern.bassNotes.length + pattern.melodyNotes.length} events`;
+}
+
+function clampEnergy(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, value));
 }
 
 function sortBassNotes(notes: BassNote[]): BassNote[] {
