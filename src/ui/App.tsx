@@ -213,6 +213,7 @@ type NextMoveCommand =
   | { kind: "patternFill"; preset: PatternFillPreset }
   | { kind: "arrangementMove"; preset: ArrangementMovePreset }
   | { kind: "patternChain"; chain: PatternChainId }
+  | { kind: "chainExpand" }
   | { kind: "arrangementTemplate"; template: ArrangementTemplateId }
   | { kind: "snapshot" }
   | { kind: "reviewMix" };
@@ -224,6 +225,30 @@ type NextMoveAction = {
   buttonLabel: string;
   tone: MixCoachTone;
   command: NextMoveCommand;
+};
+
+type BeatMapStage = {
+  id: string;
+  label: string;
+  status: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type BeatMapMetric = {
+  id: string;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type BeatMapSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  stages: BeatMapStage[];
+  metrics: BeatMapMetric[];
 };
 
 type SelectedDrumStep = {
@@ -263,12 +288,20 @@ export function App(): ReactElement {
   const style = getStyle(project);
   const currentPattern = activePattern(project);
   const exportAnalysis = useMemo(() => analyzeExport(project), [project]);
+  const stemAnalyses = useMemo(() => analyzeStemExports(project), [project]);
   const beatReadinessChecks = useMemo(() => createBeatReadinessChecks(project, exportAnalysis), [project, exportAnalysis]);
   const nextMoveActions = useMemo(
     () => createNextMoveActions(project, beatReadinessChecks, exportAnalysis),
     [project, beatReadinessChecks, exportAnalysis]
   );
-  const stemAnalyses = useMemo(() => analyzeStemExports(project), [project]);
+  const beatMapSummary = useMemo(
+    () => createBeatMapSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
+  );
+  const beatMapActions = useMemo(
+    () => createBeatMapActions(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
+  );
   const activeChannels = useMemo(() => {
     const soloActive = project.mixer.some((channel) => channel.id !== "master" && channel.solo);
     return project.mixer.filter(
@@ -1896,6 +1929,9 @@ export function App(): ReactElement {
       case "patternChain":
         applyPatternChain(action.command.chain);
         return;
+      case "chainExpand":
+        expandPatternChain();
+        return;
       case "arrangementTemplate":
         applyArrangementTemplate(action.command.template);
         return;
@@ -2146,6 +2182,8 @@ export function App(): ReactElement {
       <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
 
       <BeatReadiness checks={beatReadinessChecks} />
+
+      <BeatMap summary={beatMapSummary} actions={beatMapActions} onRun={runNextMove} />
 
       <NextMove actions={nextMoveActions} onRun={runNextMove} />
 
@@ -3211,6 +3249,62 @@ function BeatReadiness({ checks }: { checks: BeatReadinessCheck[] }): ReactEleme
   );
 }
 
+function BeatMap({
+  actions,
+  onRun,
+  summary
+}: {
+  actions: NextMoveAction[];
+  onRun: (action: NextMoveAction) => void;
+  summary: BeatMapSummary;
+}): ReactElement {
+  return (
+    <section className={`beat-map ${summary.tone}`} data-testid="beat-map" aria-label="Beat map">
+      <div className="beat-map-heading">
+        <div>
+          <Music2 size={17} aria-hidden="true" />
+          <span>Beat Map</span>
+        </div>
+        <strong data-testid="beat-map-headline">{summary.headline}</strong>
+        <p data-testid="beat-map-detail">{summary.detail}</p>
+      </div>
+      <div className="beat-map-stages" data-testid="beat-map-stages">
+        {summary.stages.map((stage) => (
+          <div className={`beat-map-stage ${stage.tone}`} data-testid={`beat-map-stage-${stage.id}`} key={stage.id}>
+            <span>{stage.label}</span>
+            <strong>{stage.status}</strong>
+            <small>{stage.detail}</small>
+          </div>
+        ))}
+      </div>
+      <div className="beat-map-metrics" data-testid="beat-map-metrics">
+        {summary.metrics.map((metric) => (
+          <div className={`beat-map-metric ${metric.tone}`} data-testid={`beat-map-metric-${metric.id}`} key={metric.id}>
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+            <small>{metric.detail}</small>
+          </div>
+        ))}
+      </div>
+      <div className="beat-map-actions" aria-label="Beat map actions">
+        {actions.map((action) => (
+          <button
+            className={action.tone}
+            data-testid={`beat-map-action-${action.id}`}
+            key={action.id}
+            onClick={() => onRun(action)}
+            title={action.title}
+            type="button"
+          >
+            {nextMoveIcon(action)}
+            <span>{action.buttonLabel}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function NextMove({
   actions,
   onRun
@@ -3481,6 +3575,7 @@ function nextMoveIcon(action: NextMoveAction): ReactElement {
       return <Gauge size={14} aria-hidden="true" />;
     case "arrangementMove":
     case "patternChain":
+    case "chainExpand":
     case "arrangementTemplate":
       return <Waves size={14} aria-hidden="true" />;
     case "blueprint":
@@ -3647,6 +3742,193 @@ function mixReviewNextMoveAction(analysis: ExportAnalysis): NextMoveAction {
     tone,
     command: { kind: "reviewMix" }
   };
+}
+
+function chainExpandNextMoveAction(): NextMoveAction {
+  return {
+    id: "chain-expand",
+    title: "Expand to song form",
+    detail: "Turn the current chain into a 16-bar intro, verse, hook, bridge, hook, and outro outline.",
+    buttonLabel: "Expand",
+    tone: "warn",
+    command: { kind: "chainExpand" }
+  };
+}
+
+function createBeatMapSummary(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): BeatMapSummary {
+  const stages = createBeatMapStages(project, checks, analysis, stemAnalyses);
+  const metrics = createBeatMapMetrics(project, analysis, stemAnalyses);
+  const tone = weakestTone([...stages.map((stage) => stage.tone), ...metrics.map((metric) => metric.tone)]);
+  const bars = arrangementTotalBars(project);
+  const patternUsage = usedPatternSlots(project).join("/");
+  const headline =
+    tone === "danger" ? "Beat path needs a starter move" : tone === "warn" ? "Beat map is in progress" : "Beat map is delivery-ready";
+  const detail = `${barCountLabel(bars)} / Pattern ${patternUsage} / ${analysis.status} export`;
+
+  return {
+    headline,
+    detail,
+    tone,
+    stages,
+    metrics
+  };
+}
+
+function createBeatMapStages(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): BeatMapStage[] {
+  const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const drums = readinessCheckForId(checks, "drums");
+  const bass = readinessCheckForId(checks, "bass");
+  const harmony = readinessCheckForId(checks, "harmony");
+  const compositionTone = weakestTone([drums?.tone ?? "danger", bass?.tone ?? "danger", harmony?.tone ?? "danger"]);
+  const bars = arrangementTotalBars(project);
+  const arrangementTone: MixCoachTone = bars >= 16 ? "good" : bars >= 8 ? "warn" : "danger";
+  const mixTone = weakestTone(createMixCoachChecks(analysis, stemAnalyses).map((check) => check.tone));
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const deliveryTone: MixCoachTone =
+    analysis.status === "Silent" ? "danger" : analysis.status !== "Ready" || audibleStemCount < stemTrackIds.length ? "warn" : "good";
+
+  return [
+    {
+      id: "start",
+      label: "Start",
+      status: styleName,
+      detail: `${project.key} / ${project.bpm} BPM`,
+      tone: "good"
+    },
+    {
+      id: "compose",
+      label: "Compose",
+      status: compositionTone === "good" ? "Playable" : compositionTone === "warn" ? "Sketch" : "Needs core",
+      detail: `${drums?.status ?? "Drums"} / ${bass?.status ?? "808"} / ${harmony?.status ?? "Harmony"}`,
+      tone: compositionTone
+    },
+    {
+      id: "arrange",
+      label: "Arrange",
+      status: bars >= 16 ? "Song form" : bars >= 8 ? "Loop ready" : "Short",
+      detail: `${barCountLabel(bars)} across ${project.arrangement.length} blocks`,
+      tone: arrangementTone
+    },
+    {
+      id: "polish",
+      label: "Polish",
+      status: mixTone === "good" ? "Balanced" : mixTone === "warn" ? "Check mix" : "Needs signal",
+      detail: `${formatDb(analysis.headroomDb)} headroom`,
+      tone: mixTone
+    },
+    {
+      id: "deliver",
+      label: "Deliver",
+      status: deliveryTone === "good" ? "Ready" : deliveryTone === "warn" ? "Check exports" : "No signal",
+      detail: `${audibleStemCount}/${stemTrackIds.length} stems audible`,
+      tone: deliveryTone
+    }
+  ];
+}
+
+function createBeatMapMetrics(
+  project: ProjectState,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): BeatMapMetric[] {
+  const bars = arrangementTotalBars(project);
+  const slots = usedPatternSlots(project);
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const spread = stemSpreadDb(stemAnalyses);
+  const songTone: MixCoachTone = bars >= 16 ? "good" : bars >= 8 ? "warn" : "danger";
+  const patternTone: MixCoachTone = slots.length >= 3 ? "good" : slots.length >= 2 ? "warn" : "danger";
+  const exportTone: MixCoachTone = analysis.status === "Ready" ? "good" : analysis.status === "Silent" ? "danger" : "warn";
+  const stemTone: MixCoachTone =
+    audibleStems.length === stemTrackIds.length ? "good" : audibleStems.length >= 2 ? "warn" : "danger";
+
+  return [
+    {
+      id: "song",
+      label: "Song",
+      value: barCountLabel(bars),
+      detail: `${project.arrangement.length} blocks`,
+      tone: songTone
+    },
+    {
+      id: "patterns",
+      label: "Patterns",
+      value: `${slots.length}/3 used`,
+      detail: `Pattern ${slots.join("/")}`,
+      tone: patternTone
+    },
+    {
+      id: "export",
+      label: "Export",
+      value: analysis.status,
+      detail: `${formatDb(analysis.peakDb)} peak`,
+      tone: exportTone
+    },
+    {
+      id: "stems",
+      label: "Stems",
+      value: `${audibleStems.length}/${stemTrackIds.length}`,
+      detail: spread === null ? "Need two audible stems" : `${spread.toFixed(1)} dB spread`,
+      tone: stemTone
+    }
+  ];
+}
+
+function createBeatMapActions(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): NextMoveAction[] {
+  const drums = readinessCheckForId(checks, "drums");
+  const bass = readinessCheckForId(checks, "bass");
+  const harmony = readinessCheckForId(checks, "harmony");
+  const compositionTone = weakestTone([drums?.tone ?? "danger", bass?.tone ?? "danger", harmony?.tone ?? "danger"]);
+  const bars = arrangementTotalBars(project);
+  const mixTone = weakestTone(createMixCoachChecks(analysis, stemAnalyses).map((check) => check.tone));
+  const candidates: NextMoveAction[] = [
+    compositionTone === "danger" ? blueprintNextMoveAction(project) : patternFillNextMoveAction(project),
+    bars < 8 ? patternChainNextMoveAction() : bars < 16 ? chainExpandNextMoveAction() : arrangementLiftNextMoveAction(project),
+    mixTone === "good" && analysis.status === "Ready" ? snapshotNextMoveAction(project) : mixReviewNextMoveAction(analysis),
+    project.snapshots.length === 0 ? snapshotNextMoveAction(project) : mixReviewNextMoveAction(analysis)
+  ];
+  const uniqueActions = new Map<string, NextMoveAction>();
+
+  for (const action of candidates) {
+    if (!uniqueActions.has(action.id)) {
+      uniqueActions.set(action.id, action);
+    }
+  }
+
+  return [...uniqueActions.values()].slice(0, 4);
+}
+
+function usedPatternSlots(project: ProjectState): PatternSlot[] {
+  const slots = new Set(project.arrangement.map((block) => block.pattern));
+  return patternSlots.filter((slot) => slots.has(slot));
+}
+
+function audibleStemTracks(stemAnalyses: StemExportAnalyses): StemTrackId[] {
+  return stemTrackIds.filter((track) => Number.isFinite(stemAnalyses[track].rmsDb));
+}
+
+function weakestTone(tones: MixCoachTone[]): MixCoachTone {
+  if (tones.includes("danger")) {
+    return "danger";
+  }
+  if (tones.includes("warn")) {
+    return "warn";
+  }
+  return "good";
 }
 
 function createBeatReadinessChecks(project: ProjectState, analysis: ExportAnalysis): BeatReadinessCheck[] {

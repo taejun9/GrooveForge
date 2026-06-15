@@ -70,6 +70,7 @@ Primary feature areas:
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with Pattern Chain 8-bar sketches, per-step A/B/C chain cycling, Chain Expand song-form outlining, one-click Drop/Build/Hook Lift moves, per-block bar lengths, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
 - Project readiness: read-only checks for drums, 808/bass, melody/chords, arrangement, and export completeness.
+- Beat Map: deterministic production overview that maps the current beat into Start, Compose, Arrange, Polish, and Deliver stages, plus song length, Pattern A/B/C usage, export, and stem metrics for faster beginner and producer decisions.
 - Next Move: explicit local action recommendations that connect readiness/export state to Blueprint, Pattern Fill, Pattern Chain, Hook Lift, Save Slot, and Mix Check commands.
 - Quick Actions: searchable local command palette for transport, project, creative, arrangement, mix, and export actions.
 - Project snapshots: local idea slots for saving, renaming, restoring, and deleting beat states inside the project file.
@@ -137,6 +138,7 @@ MVP capabilities:
 - Sound design presets and Studio tone controls for kick punch, snare snap, hat brightness, 808 drive/decay, sidechain ducking, synth brightness/release, and chord warmth/width.
 - Independent Pattern A/B/C storage with deterministic Subtle/Hook/Break variation tools, one-click Drum Fill/808 Pickup/Melody Turn/Clear Tail moves, plus copy/clear tools for drum, bass, chord, and melody variations.
 - Read-only Beat Readiness checks for drums, 808/bass, melody/chords, arrangement structure, and export signal status.
+- Beat Map production overview derived from local project, Beat Readiness, export analysis, and stem analysis state, showing beginner workflow stages, producer-facing song/pattern/export/stem metrics, and explicit local action buttons without mutating project state unless clicked.
 - Next Move strip that gives one primary recommended action and secondary local actions from the current readiness/export state, including Pattern Chain when arrangement structure is weak, without mutating Beat Readiness.
 - Editable arrangement blocks and templates for 8-bar loop, full beat, hook-first, and breakdown structures, using assigned Pattern A/B/C data, one-click Drop/Build/Hook Lift moves, per-block track mutes, per-block bar length, split/merge controls, audible per-block energy, and structure controls for duplicate, move, and delete.
 - Pattern Chain presets, per-step A/B/C cycling, and Chain Expand song-form outlining that edit only arrangement block assignments while preserving Pattern A/B/C musical event data, mixer state, sound design, master state, and existing export paths.
