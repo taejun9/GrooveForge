@@ -109,6 +109,8 @@ export const arrangementTemplateIds = ["loop", "full", "hook_first", "breakdown"
 export type ArrangementTemplateId = (typeof arrangementTemplateIds)[number];
 export const arrangementMuteTrackIds = ["drum_rack", "bass_808", "synth", "chord"] as const;
 export type ArrangementMuteTrack = (typeof arrangementMuteTrackIds)[number];
+export const arrangementMovePresetIds = ["drop", "build", "hook_lift", "reset"] as const;
+export type ArrangementMovePreset = (typeof arrangementMovePresetIds)[number];
 
 export type MasterPreset = "Clean Demo" | "Streaming Safe" | "Headroom for Vocal";
 
@@ -191,6 +193,12 @@ export const arrangementMuteTrackLabels: Record<ArrangementMuteTrack, string> = 
   bass_808: "808",
   synth: "Synth",
   chord: "Chords"
+};
+export const arrangementMovePresetLabels: Record<ArrangementMovePreset, string> = {
+  drop: "Drop",
+  build: "Build",
+  hook_lift: "Hook Lift",
+  reset: "Reset"
 };
 export const chordQualities: ChordQuality[] = ["maj", "min", "dim", "sus2", "sus4", "7", "m7"];
 export const chordInversionLabels: Record<ChordInversion, string> = {
@@ -775,11 +783,42 @@ export function arrangementMuteTrackLabel(track: ArrangementMuteTrack): string {
   return arrangementMuteTrackLabels[track];
 }
 
+export function arrangementMovePresetLabel(preset: ArrangementMovePreset): string {
+  return arrangementMovePresetLabels[preset];
+}
+
 export function createArrangementTemplate(template: ArrangementTemplateId): ArrangementBlock[] {
   return arrangementTemplateBlocks[template].map((block) => ({
     ...block,
     mutedTracks: normalizeArrangementMutedTracks(block.mutedTracks)
   }));
+}
+
+export function applyArrangementMovePreset(block: ArrangementBlock, preset: ArrangementMovePreset): ArrangementBlock {
+  const moveSettings: Record<ArrangementMovePreset, Pick<ArrangementBlock, "energy" | "mutedTracks">> = {
+    drop: {
+      energy: 0.34,
+      mutedTracks: ["drum_rack", "bass_808"]
+    },
+    build: {
+      energy: 0.68,
+      mutedTracks: ["bass_808"]
+    },
+    hook_lift: {
+      energy: 0.96,
+      mutedTracks: []
+    },
+    reset: {
+      energy: 0.68,
+      mutedTracks: []
+    }
+  };
+  const settings = moveSettings[preset];
+  return {
+    ...block,
+    energy: normalizeArrangementEnergy(settings.energy),
+    mutedTracks: normalizeArrangementMutedTracks(settings.mutedTracks)
+  };
 }
 
 export function normalizeArrangementBars(value: unknown): number {

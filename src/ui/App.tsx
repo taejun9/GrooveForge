@@ -40,6 +40,7 @@ import {
 import { PlaybackController, PlaybackMode, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
 import {
   ArrangementBlock,
+  ArrangementMovePreset,
   ArrangementMuteTrack,
   ArrangementSection,
   ArrangementTemplateId,
@@ -66,8 +67,11 @@ import {
   SoundDesign,
   activePattern,
   applyBeatBlueprint,
+  applyArrangementMovePreset,
   arrangementSections,
   arrangementEnergyGain,
+  arrangementMovePresetIds,
+  arrangementMovePresetLabel,
   arrangementMuteTrackIds,
   arrangementMuteTrackLabel,
   arrangementTemplateIds,
@@ -606,7 +610,7 @@ export function App(): ReactElement {
     setSelectedChordIndex(null);
   }
 
-  function updateArrangementBlock(index: number, update: Partial<ArrangementBlock>): void {
+  function updateArrangementBlock(index: number, update: Partial<ArrangementBlock>, status = "Unsaved changes"): void {
     updateProject((current) => {
       const block = current.arrangement[index];
       if (!block) {
@@ -627,10 +631,27 @@ export function App(): ReactElement {
         selectedPattern: nextBlock.pattern,
         arrangement: current.arrangement.map((candidate, candidateIndex) => (candidateIndex === index ? nextBlock : candidate))
       };
-    });
+    }, status);
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
+  }
+
+  function applyArrangementMoveToSelected(preset: ArrangementMovePreset): void {
+    const block = projectRef.current.arrangement[selectedArrangementIndex];
+    if (!block) {
+      setProjectStatus("Select an arrangement block");
+      return;
+    }
+    const nextBlock = applyArrangementMovePreset(block, preset);
+    updateArrangementBlock(
+      selectedArrangementIndex,
+      {
+        energy: nextBlock.energy,
+        mutedTracks: nextBlock.mutedTracks
+      },
+      `Applied ${arrangementMovePresetLabel(preset)} move`
+    );
   }
 
   function toggleArrangementTrackMute(track: ArrangementMuteTrack): void {
@@ -2122,6 +2143,19 @@ export function App(): ReactElement {
                     </button>
                   );
                 })}
+              </div>
+              <div className="arrangement-move-row" aria-label="Arrangement moves">
+                {arrangementMovePresetIds.map((preset) => (
+                  <button
+                    data-testid={`arrangement-move-${preset}`}
+                    key={preset}
+                    onClick={() => applyArrangementMoveToSelected(preset)}
+                    title={`Apply ${arrangementMovePresetLabel(preset)} move to selected block`}
+                    type="button"
+                  >
+                    {arrangementMovePresetLabel(preset)}
+                  </button>
+                ))}
               </div>
               <label>
                 <span>Bars</span>

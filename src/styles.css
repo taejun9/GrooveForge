@@ -183,6 +183,7 @@ h2 {
 .arrangement-template-row button,
 .block-pattern-row button,
 .arrangement-mute-row button,
+.arrangement-move-row button,
 .chord-preset-row button,
 .chord-tools > button,
 .preset-row button,
@@ -259,6 +260,7 @@ h2 {
 .arrangement-template-row button,
 .block-pattern-row button,
 .arrangement-mute-row button,
+.arrangement-move-row button,
 .chord-preset-row button,
 .chord-inversion-row button,
 .chord-tools > button,
@@ -271,6 +273,7 @@ h2 {
 .arrangement-template-row button.selected,
 .block-pattern-row button.selected,
 .arrangement-mute-row button.selected,
+.arrangement-move-row button.selected,
 .chord-preset-row button.selected,
 .chord-inversion-row button.selected,
 .preset-row button.selected {
@@ -1378,6 +1381,20 @@ input[type="range"] {
   border-color: rgba(255, 122, 79, 0.52);
   color: #ffd8cf;
   background: rgba(255, 122, 79, 0.14);
+}
+
+.arrangement-move-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(92px, 1fr));
+  gap: 6px;
+}
+
+.arrangement-move-row button {
+  min-width: 0;
+  padding: 0 6px;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .energy-inputs {
