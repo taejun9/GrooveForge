@@ -141,6 +141,8 @@ Next Move work must derive deterministic recommendations from local project, Bea
 
 Next Move Pattern Chain work must recommend Pattern Chain only from local readiness state, route the click through the existing undoable `applyPatternChain` path, keep Full Beat available as an explicit alternative when arrangement structure is weak, avoid mutating Beat Readiness, and preserve realtime playback plus WAV/stem/MIDI export semantics.
 
+Finish Move Action work must route Master Finish recommendations and Quick Actions through existing `applyMasterFinishPad`, keep actions explicit, local, undoable, and editable, update only master state and master mixer volume, preserve project/render semantics, and avoid hidden automatic mastering, LUFS, true-peak, platform claims, sampling, imported audio, or remote AI.
+
 Selected note edit tool work must keep 808 and Synth note move, transpose, octave, and duplicate actions scoped to the selected Pattern A/B/C slot, preserve length/glide/velocity/chance fields, avoid overlapping duplicate notes at the same step and pitch, keep pitch moves scale-aware, remain undoable, and avoid sampling, remote AI, or hidden audio assets.
 
 Arrangement editor work must let users change a block's section, Pattern A/B/C assignment, bar length, and energy without losing existing pattern, mixer, master, or save/load data. Selecting or reassigning a block should keep the pattern editor aligned with that block's assigned pattern.

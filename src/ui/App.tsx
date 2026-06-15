@@ -669,6 +669,7 @@ type NextMoveCommand =
   | { kind: "chainExpand" }
   | { kind: "arrangementTemplate"; template: ArrangementTemplateId }
   | { kind: "deliveryTarget"; target: DeliveryTargetId }
+  | { kind: "masterFinish"; pad: MasterFinishPadId }
   | { kind: "snapshot" }
   | { kind: "reviewMix" };
 
@@ -3122,6 +3123,9 @@ export function App(): ReactElement {
       case "deliveryTarget":
         alignDeliveryTarget(action.command.target);
         return;
+      case "masterFinish":
+        applyMasterFinishPad(action.command.pad);
+        return;
       case "snapshot":
         saveCurrentSnapshot();
         return;
@@ -3169,6 +3173,7 @@ export function App(): ReactElement {
     onApplyArrangementMove: applyArrangementMoveToSelected,
     onApplyArrangementFocus: applyArrangementFocusPreset,
     onApplyBlueprint: applySelectedBeatBlueprint,
+    onApplyMasterFinish: applyMasterFinishPad,
     onApplyMixFix: applyMixFixPreset,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternFill: applyPatternFill,
@@ -5081,6 +5086,7 @@ function createQuickActions({
   onApplyArrangementMove,
   onApplyArrangementFocus,
   onApplyBlueprint,
+  onApplyMasterFinish,
   onApplyMixFix,
   onApplyPatternChain,
   onApplyPatternFill,
@@ -5106,6 +5112,7 @@ function createQuickActions({
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
+  onApplyMasterFinish: (pad: MasterFinishPadId) => void;
   onApplyMixFix: (preset: MixFixPreset) => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
@@ -5285,6 +5292,14 @@ function createQuickActions({
       keywords: "mix fix low end 808 drums bass glue",
       run: () => onApplyMixFix("low_end")
     },
+    ...masterFinishPadDefinitions.map((pad): QuickAction => ({
+      id: `master-finish-${pad.id}`,
+      title: `${pad.label} master finish`,
+      detail: `${pad.preset} at ${formatDb(pad.ceilingDb)} ceiling / ${formatDb(pad.masterVolumeDb)} output.`,
+      group: "Mix",
+      keywords: `master finish ${pad.id} ${pad.label} ${pad.detail} output ceiling demo vocal store club`,
+      run: () => onApplyMasterFinish(pad.id)
+    })),
     {
       id: "export-wav",
       title: "Export WAV",
@@ -5348,6 +5363,7 @@ function nextMoveIcon(action: NextMoveAction): ReactElement {
     case "reviewMix":
       return <Gauge size={14} aria-hidden="true" />;
     case "deliveryTarget":
+    case "masterFinish":
       return <Gauge size={14} aria-hidden="true" />;
     case "arrangementMove":
     case "patternChain":
@@ -5372,6 +5388,7 @@ function createNextMoveActions(
     primary,
     ...(!isDeliveryTargetAligned(project, target) ? [deliveryTargetNextMoveAction(project)] : []),
     ...(arrangementNeedsStructure ? [fullArrangementNextMoveAction()] : []),
+    masterFinishNextMoveAction(project, analysis),
     patternFillNextMoveAction(project),
     arrangementLiftNextMoveAction(project),
     snapshotNextMoveAction(project),
@@ -5533,6 +5550,42 @@ function deliveryTargetNextMoveAction(project: ProjectState): NextMoveAction {
     buttonLabel: "Align Target",
     tone: "warn",
     command: { kind: "deliveryTarget", target: target.id }
+  };
+}
+
+function suggestedMasterFinishPad(project: ProjectState): MasterFinishPadId {
+  const target = activeDeliveryTarget(project);
+
+  switch (target.id) {
+    case "vocal_session":
+      return "vocal";
+    case "beat_store":
+      return "store";
+    case "club_demo":
+      return "club";
+    case "starter_sketch":
+    case "custom":
+      if (target.mixPosture === "vocal_headroom") {
+        return "vocal";
+      }
+      if (target.mixPosture === "club_forward") {
+        return "club";
+      }
+      return target.preferredMasterPreset === "Streaming Safe" ? "store" : "demo";
+  }
+}
+
+function masterFinishNextMoveAction(project: ProjectState, analysis: ExportAnalysis): NextMoveAction {
+  const padId = suggestedMasterFinishPad(project);
+  const pad = masterFinishPadDefinitions.find((definition) => definition.id === padId) ?? masterFinishPadDefinitions[0];
+  const tone: MixCoachTone = analysis.status === "Ready" ? "good" : "warn";
+  return {
+    id: `master-finish-${pad.id}`,
+    title: `${pad.label} finish posture`,
+    detail: `${pad.preset} / ${formatDb(pad.ceilingDb)} ceiling / ${formatDb(pad.masterVolumeDb)} output.`,
+    buttonLabel: `${pad.label} Finish`,
+    tone,
+    command: { kind: "masterFinish", pad: pad.id }
   };
 }
 
@@ -5775,6 +5828,7 @@ function createBeatMapActions(
     !isDeliveryTargetAligned(project, target) ? deliveryTargetNextMoveAction(project) : arrangementLiftNextMoveAction(project),
     compositionTone === "danger" ? blueprintNextMoveAction(project) : patternFillNextMoveAction(project),
     bars < 8 ? patternChainNextMoveAction() : bars < target.targetBars ? chainExpandNextMoveAction() : arrangementLiftNextMoveAction(project),
+    masterFinishNextMoveAction(project, analysis),
     mixTone === "good" && analysis.status === "Ready" ? snapshotNextMoveAction(project) : mixReviewNextMoveAction(analysis),
     project.snapshots.length === 0 ? snapshotNextMoveAction(project) : mixReviewNextMoveAction(analysis)
   ];
