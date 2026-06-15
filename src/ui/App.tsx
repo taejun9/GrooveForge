@@ -187,6 +187,53 @@ const mixPostureOptions: { id: MixPosture; label: string }[] = [
   { id: "club_forward", label: "Club forward" }
 ];
 
+const mixBalancePadDefinitions: MixBalancePadDefinition[] = [
+  {
+    id: "clean",
+    label: "Clean",
+    detail: "rough",
+    channels: {
+      drum_rack: { volumeDb: -5, pan: 0, lowCut: 0.08, air: 0.22, drive: 0.12, glue: 0.2, send: 0.1 },
+      bass_808: { volumeDb: -6.5, pan: 0, lowCut: 0, air: 0.08, drive: 0.18, glue: 0.16, send: 0.03 },
+      synth: { volumeDb: -9, pan: -12, lowCut: 0.2, air: 0.34, drive: 0.06, glue: 0.1, send: 0.22 },
+      chord: { volumeDb: -10, pan: 16, lowCut: 0.16, air: 0.28, drive: 0.05, glue: 0.16, send: 0.28 }
+    }
+  },
+  {
+    id: "vocal",
+    label: "Vocal",
+    detail: "space",
+    channels: {
+      drum_rack: { volumeDb: -5.5, pan: 0, lowCut: 0.08, air: 0.2, drive: 0.1, glue: 0.22, send: 0.08 },
+      bass_808: { volumeDb: -7.5, pan: 0, lowCut: 0, air: 0.06, drive: 0.16, glue: 0.14, send: 0.02 },
+      synth: { volumeDb: -11, pan: -10, lowCut: 0.28, air: 0.3, drive: 0.04, glue: 0.08, send: 0.18 },
+      chord: { volumeDb: -12, pan: 14, lowCut: 0.26, air: 0.26, drive: 0.04, glue: 0.12, send: 0.22 }
+    }
+  },
+  {
+    id: "club",
+    label: "Club",
+    detail: "knock",
+    channels: {
+      drum_rack: { volumeDb: -3.8, pan: 0, lowCut: 0.06, air: 0.28, drive: 0.22, glue: 0.34, send: 0.08 },
+      bass_808: { volumeDb: -4.8, pan: 0, lowCut: 0, air: 0.08, drive: 0.3, glue: 0.26, send: 0.02 },
+      synth: { volumeDb: -8.5, pan: -18, lowCut: 0.16, air: 0.4, drive: 0.08, glue: 0.12, send: 0.2 },
+      chord: { volumeDb: -9.2, pan: 18, lowCut: 0.14, air: 0.34, drive: 0.08, glue: 0.18, send: 0.22 }
+    }
+  },
+  {
+    id: "wide",
+    label: "Wide",
+    detail: "hook",
+    channels: {
+      drum_rack: { volumeDb: -4.8, pan: 0, lowCut: 0.08, air: 0.24, drive: 0.14, glue: 0.22, send: 0.12 },
+      bass_808: { volumeDb: -6.2, pan: 0, lowCut: 0, air: 0.08, drive: 0.2, glue: 0.18, send: 0.03 },
+      synth: { volumeDb: -9.5, pan: -28, lowCut: 0.22, air: 0.46, drive: 0.08, glue: 0.12, send: 0.34 },
+      chord: { volumeDb: -10, pan: 28, lowCut: 0.18, air: 0.42, drive: 0.06, glue: 0.16, send: 0.38 }
+    }
+  }
+];
+
 const keys = ["F minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"];
 const historyLimit = 50;
 const keyboardCaptureKeys = ["a", "s", "d", "f", "g", "h", "j", "k"] as const;
@@ -230,6 +277,24 @@ type MixFixAction = {
   label: string;
   detail: string;
   tone: MixCoachTone;
+};
+
+type MixBalancePadId = "clean" | "vocal" | "club" | "wide";
+
+type MixBalanceChannelUpdate = Partial<
+  Pick<MixerChannel, "volumeDb" | "pan" | "lowCut" | "air" | "drive" | "glue" | "send">
+>;
+
+type MixBalancePadDefinition = {
+  id: MixBalancePadId;
+  label: string;
+  detail: string;
+  channels: Partial<Record<MixerChannel["id"], MixBalanceChannelUpdate>>;
+};
+
+type MixBalancePadOption = MixBalancePadDefinition & {
+  preview: string;
+  changedCount: number;
 };
 
 type TransportLoopScope = "arrangement" | "block" | "pattern";
@@ -780,6 +845,7 @@ export function App(): ReactElement {
     ).length;
   }, [project.mixer]);
   const activeChannelLabel = `${activeChannels} active ${activeChannels === 1 ? "channel" : "channels"}`;
+  const mixBalancePadOptions = useMemo(() => createMixBalancePadOptions(project.mixer), [project.mixer]);
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
@@ -1567,6 +1633,27 @@ export function App(): ReactElement {
       (current) => applyMixFixToProject(current, preset, stemSnapshot),
       `Applied ${mixFixPresetLabel(preset)} mix fix`
     );
+  }
+
+  function applyMixBalancePad(padId: MixBalancePadId): void {
+    const pad = mixBalancePadDefinitions.find((definition) => definition.id === padId);
+    if (!pad) {
+      setProjectStatus("Mix balance pad not found");
+      return;
+    }
+
+    const changed = updateProject((current) => {
+      const mixer = applyMixBalancePadToMixer(current.mixer, pad);
+      return sameMixerChannels(current.mixer, mixer) ? current : { ...current, mixer };
+    }, `${pad.label} mix balance applied`);
+
+    if (changed) {
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+    } else {
+      setProjectStatus(`${pad.label} mix balance already selected`);
+    }
   }
 
   function applySoundPreset(preset: (typeof soundPresetIds)[number]): void {
@@ -3732,6 +3819,7 @@ export function App(): ReactElement {
 
         <section className="panel mixer-panel" aria-label="Mixer">
           <PanelTitle icon={<SlidersHorizontal size={18} />} title="Mixer" meta={`${activeChannels} audible`} />
+          <MixBalancePads pads={mixBalancePadOptions} onApply={applyMixBalancePad} />
           <div className="mixer-strips">
             {project.mixer.map((channel) => (
               <div className="strip" key={channel.id} style={{ "--strip": channel.accent } as CSSProperties}>
@@ -3765,7 +3853,7 @@ export function App(): ReactElement {
                     max={3}
                     min={-36}
                     onChange={(event) => updateMixerChannel(channel.id, { volumeDb: Number(event.target.value) })}
-                    step={1}
+                    step={0.1}
                     type="range"
                     value={channel.volumeDb}
                   />
@@ -5889,6 +5977,38 @@ function exportReadinessCheck(analysis: ExportAnalysis): BeatReadinessCheck {
   };
 }
 
+function MixBalancePads({
+  pads,
+  onApply
+}: {
+  pads: MixBalancePadOption[];
+  onApply: (pad: MixBalancePadId) => void;
+}): ReactElement {
+  return (
+    <div className="mix-balance-panel" data-testid="mix-balance-pads">
+      <div className="mix-balance-heading">
+        <span>Mix Balance</span>
+        <strong>Rough posture</strong>
+      </div>
+      <div className="mix-balance-row" aria-label="Mix Balance Pads">
+        {pads.map((pad) => (
+          <button
+            data-testid={`mix-balance-${pad.id}`}
+            key={pad.id}
+            onClick={() => onApply(pad.id)}
+            title={`${pad.label} ${pad.preview}`}
+            type="button"
+          >
+            <span>{pad.label}</span>
+            <strong>{pad.preview}</strong>
+            <small>{pad.changedCount} moves / {pad.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ExportMeter({ analysis }: { analysis: ExportAnalysis }): ReactElement {
   const peakPercent = meterPercent(analysis.peakDb, analysis.ceilingDb);
   const rmsPercent = meterPercent(analysis.rmsDb, analysis.ceilingDb);
@@ -6015,6 +6135,72 @@ function createMixCoachChecks(analysis: ExportAnalysis, stemAnalyses: StemExport
     stemBalanceCheck(loudestStem, quietestStem, stemSpread),
     lowEndBlendCheck(lowEndDelta)
   ];
+}
+
+function createMixBalancePadOptions(mixer: MixerChannel[]): MixBalancePadOption[] {
+  return mixBalancePadDefinitions.map((pad) => {
+    const transformed = applyMixBalancePadToMixer(mixer, pad);
+    return {
+      ...pad,
+      preview: mixBalancePreview(pad),
+      changedCount: transformed.filter((channel, index) => !sameMixerChannel(channel, mixer[index])).length
+    };
+  });
+}
+
+function mixBalancePreview(pad: MixBalancePadDefinition): string {
+  const drumVolume = pad.channels.drum_rack?.volumeDb ?? 0;
+  const bassVolume = pad.channels.bass_808?.volumeDb ?? 0;
+  return `D ${compactMixDb(drumVolume)} / 8 ${compactMixDb(bassVolume)}`;
+}
+
+function compactMixDb(value: number): string {
+  return Number.isInteger(value) ? `${value}` : value.toFixed(1);
+}
+
+function applyMixBalancePadToMixer(mixer: MixerChannel[], pad: MixBalancePadDefinition): MixerChannel[] {
+  return mixer.map((channel) => {
+    const update = pad.channels[channel.id];
+    if (!update) {
+      return { ...channel, muted: false, solo: false };
+    }
+    return {
+      ...channel,
+      volumeDb: update.volumeDb === undefined ? channel.volumeDb : clampMixFixVolume(update.volumeDb),
+      pan: update.pan === undefined ? channel.pan : clampPan(update.pan),
+      lowCut: update.lowCut === undefined ? channel.lowCut : normalizeMixerEq(update.lowCut),
+      air: update.air === undefined ? channel.air : normalizeMixerEq(update.air),
+      drive: update.drive === undefined ? channel.drive : normalizeMixerEq(update.drive),
+      glue: update.glue === undefined ? channel.glue : normalizeMixerEq(update.glue),
+      send: update.send === undefined ? channel.send : normalizeMixerEq(update.send),
+      muted: false,
+      solo: false
+    };
+  });
+}
+
+function sameMixerChannels(first: MixerChannel[], second: MixerChannel[]): boolean {
+  if (first.length !== second.length) {
+    return false;
+  }
+  return first.every((channel, index) => sameMixerChannel(channel, second[index]));
+}
+
+function sameMixerChannel(first: MixerChannel | undefined, second: MixerChannel | undefined): boolean {
+  return (
+    first !== undefined &&
+    second !== undefined &&
+    first.id === second.id &&
+    first.volumeDb === second.volumeDb &&
+    first.pan === second.pan &&
+    first.lowCut === second.lowCut &&
+    first.air === second.air &&
+    first.drive === second.drive &&
+    first.glue === second.glue &&
+    first.send === second.send &&
+    first.muted === second.muted &&
+    first.solo === second.solo
+  );
 }
 
 function applyMixFixToProject(
