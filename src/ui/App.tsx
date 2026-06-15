@@ -166,6 +166,7 @@ import {
   soundPresetDesign,
   soundPresetIds,
   soundPresetLabel,
+  StyleProfile,
   styleSoundPreset,
   starterProject,
   steps,
@@ -247,6 +248,24 @@ type PatternCompareSummary = {
   chordEvents: number;
   arrangedBlocks: number;
   arrangedBars: number;
+};
+
+type StylePatternDensity = {
+  slot: PatternSlot;
+  label: string;
+  eventCount: number;
+  detail: string;
+};
+
+type StyleInspectorSummary = {
+  profile: StyleProfile;
+  bpm: string;
+  swing: string;
+  bass: string;
+  melody: string;
+  soundPreset: string;
+  totalEvents: number;
+  patterns: StylePatternDensity[];
 };
 
 type ArrangementFocusPresetId = "intro_space" | "verse_pocket" | "hook_peak" | "bridge_drop" | "outro_release";
@@ -424,6 +443,10 @@ export function App(): ReactElement {
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
+  const styleInspectorSummary = useMemo(
+    () => createStyleInspectorSummary(project, style, patternCompareSummaries),
+    [patternCompareSummaries, project, style]
+  );
   const activeChannels = useMemo(() => {
     const soloActive = project.mixer.some((channel) => channel.id !== "master" && channel.solo);
     return project.mixer.filter(
@@ -2318,7 +2341,12 @@ export function App(): ReactElement {
           </label>
           <label className="field">
             <span>Style</span>
-            <select value={project.styleId} onChange={(event) => selectStyle(event.target.value as ProjectState["styleId"])}>
+            <select
+              aria-label="Style"
+              data-testid="style-select"
+              value={project.styleId}
+              onChange={(event) => selectStyle(event.target.value as ProjectState["styleId"])}
+            >
               {styleProfiles.map((profile) => (
                 <option key={profile.id} value={profile.id}>
                   {profile.name}
@@ -2475,6 +2503,8 @@ export function App(): ReactElement {
           <span>{projectStatus}</span>
         </div>
       </section>
+
+      <StyleInspector summary={styleInspectorSummary} />
 
       <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
 
@@ -3315,6 +3345,51 @@ function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; met
       </div>
       <span>{meta}</span>
     </div>
+  );
+}
+
+function StyleInspector({ summary }: { summary: StyleInspectorSummary }): ReactElement {
+  const metrics = [
+    { label: "BPM range", value: summary.bpm },
+    { label: "Swing", value: summary.swing },
+    { label: "Bass role", value: summary.bass },
+    { label: "Melody role", value: summary.melody },
+    { label: "Sound", value: summary.soundPreset }
+  ];
+
+  return (
+    <section
+      aria-label="Style inspector"
+      className="style-inspector"
+      data-testid="style-inspector"
+      style={{ "--style-color": summary.profile.color } as CSSProperties}
+    >
+      <div className="style-inspector-heading">
+        <div>
+          <Sparkles size={17} aria-hidden="true" />
+          <span>Style Inspector</span>
+        </div>
+        <strong data-testid="style-inspector-name">{summary.profile.name}</strong>
+        <p>{summary.totalEvents} editable Pattern A/B/C events from local style data</p>
+      </div>
+      <div className="style-inspector-metrics">
+        {metrics.map((metric) => (
+          <div className="style-inspector-metric" key={metric.label}>
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+          </div>
+        ))}
+      </div>
+      <div className="style-inspector-patterns" aria-label="Pattern density">
+        {summary.patterns.map((pattern) => (
+          <div className="style-inspector-pattern" data-testid={`style-density-${pattern.slot}`} key={pattern.slot}>
+            <span>Pattern {pattern.slot}</span>
+            <strong>{pattern.label}</strong>
+            <small>{pattern.detail}</small>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -4861,6 +4936,76 @@ function createPatternCompareSummaries(project: ProjectState): PatternCompareSum
       arrangedBars
     };
   });
+}
+
+function createStyleInspectorSummary(
+  project: ProjectState,
+  profile: StyleProfile,
+  patternSummaries: PatternCompareSummary[]
+): StyleInspectorSummary {
+  const totalEvents = patternSummaries.reduce((total, pattern) => total + pattern.eventCount, 0);
+  const soundPreset = styleSoundPreset(profile.id);
+
+  return {
+    profile,
+    bpm: `${project.bpm} active / ${profile.bpmRange[0]}-${profile.bpmRange[1]}`,
+    swing: `${percentLabel(project.swing)} active / ${percentLabel(profile.defaultSwing)} default`,
+    bass: bassStyleRoleLabel(profile.bassStyle),
+    melody: melodyStyleRoleLabel(profile.melodyStyle),
+    soundPreset: soundPresetLabel(soundPreset),
+    totalEvents,
+    patterns: patternSummaries.map((pattern) => ({
+      slot: pattern.slot,
+      label: styleDensityLabel(pattern.eventCount),
+      eventCount: pattern.eventCount,
+      detail: `${pattern.eventCount} events / ${pattern.drumHits} drums / ${pattern.bassNotes + pattern.melodyNotes} notes`
+    }))
+  };
+}
+
+function styleDensityLabel(eventCount: number): string {
+  if (eventCount >= 30) {
+    return "Dense";
+  }
+  if (eventCount >= 20) {
+    return "Full";
+  }
+  if (eventCount >= 12) {
+    return "Pocket";
+  }
+  return "Open";
+}
+
+function bassStyleRoleLabel(style: StyleProfile["bassStyle"]): string {
+  switch (style) {
+    case "808":
+      return "808 lead";
+    case "sub":
+      return "Sub anchor";
+    case "walking":
+      return "Walking bass";
+    case "pluck":
+      return "Pluck groove";
+    case "reese":
+      return "Reese weight";
+    case "minimal":
+      return "Minimal low end";
+  }
+}
+
+function melodyStyleRoleLabel(style: StyleProfile["melodyStyle"]): string {
+  switch (style) {
+    case "riff":
+      return "Riff hook";
+    case "chordal":
+      return "Chord focus";
+    case "loop":
+      return "Loop motif";
+    case "ambient":
+      return "Ambient texture";
+    case "none":
+      return "Rhythm first";
+  }
 }
 
 function audibleStemTracks(stemAnalyses: StemExportAnalyses): StemTrackId[] {

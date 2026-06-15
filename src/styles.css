@@ -35,13 +35,14 @@ button {
 .app-shell {
   display: grid;
   min-height: 100vh;
-  grid-template-rows: auto auto auto auto auto auto auto auto auto 1fr;
+  grid-template-rows: auto auto auto auto auto auto auto auto auto auto 1fr;
   gap: 12px;
   padding: 16px;
 }
 
 .transport-band,
 .mode-row,
+.style-inspector,
 .blueprint-row,
 .delivery-target-row,
 .session-brief-row,
@@ -73,6 +74,7 @@ button {
 .strip-top,
 .session-meter,
 .mode-row,
+.style-inspector-heading > div,
 .blueprint-heading > div,
 .delivery-target-heading > div,
 .session-brief-heading > div,
@@ -109,6 +111,9 @@ h2 {
 .brand-lockup span,
 .panel-title span,
 .session-meter span,
+.style-inspector-heading span,
+.style-inspector-metric span,
+.style-inspector-pattern span,
 .master-readout span,
 .strip > span,
 .strip-control span,
@@ -330,6 +335,103 @@ h2 {
 .session-meter span:first-child {
   border-color: color-mix(in srgb, var(--accent) 70%, transparent);
   color: var(--accent);
+}
+
+.style-inspector {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 300px;
+  gap: 10px;
+  align-items: stretch;
+  min-height: 78px;
+  border-color: color-mix(in srgb, var(--style-color) 34%, rgba(244, 239, 231, 0.11));
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--style-color) 12%, transparent), transparent 36%),
+    rgba(25, 25, 24, 0.88);
+  padding: 10px;
+}
+
+.style-inspector-heading {
+  display: grid;
+  gap: 5px;
+  align-content: center;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.style-inspector-heading > div {
+  gap: 7px;
+}
+
+.style-inspector-heading svg {
+  color: var(--style-color);
+}
+
+.style-inspector-heading strong,
+.style-inspector-heading p,
+.style-inspector-metric span,
+.style-inspector-metric strong,
+.style-inspector-pattern span,
+.style-inspector-pattern strong,
+.style-inspector-pattern small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.style-inspector-heading strong {
+  color: #f4efe7;
+  font-size: 15px;
+}
+
+.style-inspector-heading p {
+  margin: 0;
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.style-inspector-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.style-inspector-metric,
+.style-inspector-pattern {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 8px 9px;
+}
+
+.style-inspector-metric {
+  border-inline-start: 3px solid color-mix(in srgb, var(--style-color) 74%, #f4efe7);
+}
+
+.style-inspector-metric strong,
+.style-inspector-pattern strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.style-inspector-patterns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.style-inspector-pattern {
+  border-color: color-mix(in srgb, var(--style-color) 20%, rgba(244, 239, 231, 0.1));
+}
+
+.style-inspector-pattern small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 10px;
 }
 
 .quick-actions-overlay {

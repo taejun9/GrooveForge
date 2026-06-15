@@ -40,6 +40,7 @@ The first usable result is an Electron desktop workstation that can create a sam
 - 145 BPM / F minor starter project.
 - Key changes that retarget Pattern A/B/C 808, synth, and chord-root event data instead of only changing the project label.
 - Style selector that applies editable genre groove templates for Trap, Drill, Boom Bap, Lo-fi, House, R&B, Jersey Club, Phonk, Garage, and Experimental Pattern A/B/C, BPM, swing, and sound preset.
+- Style Inspector that explains the selected genre's BPM range, active/default swing, bass role, melody role, sound preset, and Pattern A/B/C event density from local project data.
 - Beat Blueprints for sample-free project starts that apply style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset while staying fully editable.
 - Kick, snare/clap, hat, 808, chord, and synth melody tracks with editable drum velocity, event chance, chance badges, microtiming, one-click groove humanization, hat repeat dynamics, and selected-note move/transpose/duplicate tools.
 - Key-aware chord progression presets with chord add/delete, selected-chord move/duplicate/inversion tools, and per-chord chance controls for fast harmonic sketching.
