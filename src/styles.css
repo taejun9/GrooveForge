@@ -34,7 +34,7 @@ button {
 .app-shell {
   display: grid;
   min-height: 100vh;
-  grid-template-rows: auto auto auto auto auto auto auto 1fr;
+  grid-template-rows: auto auto auto auto auto auto auto auto 1fr;
   gap: 12px;
   padding: 16px;
 }
@@ -42,6 +42,7 @@ button {
 .transport-band,
 .mode-row,
 .blueprint-row,
+.delivery-target-row,
 .beat-readiness,
 .beat-map,
 .next-move,
@@ -71,6 +72,7 @@ button {
 .session-meter,
 .mode-row,
 .blueprint-heading > div,
+.delivery-target-heading > div,
 .beat-map-heading > div,
 .next-move-heading > div,
 .snapshot-heading > div {
@@ -187,6 +189,7 @@ h2 {
 .pattern-tabs button,
 .pattern-tools button,
 .pattern-fill-row button,
+.delivery-target-align,
 .snapshot-heading button,
 .beat-map-actions button,
 .next-move-actions button,
@@ -232,6 +235,7 @@ h2 {
 .segmented button:disabled,
 .pattern-tools button:disabled,
 .pattern-fill-row button:disabled,
+.delivery-target-align:disabled,
 .snapshot-heading button:disabled,
 .beat-map-actions button:disabled,
 .next-move-actions button:disabled,
@@ -529,6 +533,131 @@ h2 {
   color: rgba(244, 239, 231, 0.48);
   font-size: 10px;
   line-height: 1.25;
+}
+
+.delivery-target-row {
+  display: grid;
+  grid-template-columns: 158px 1fr;
+  gap: 10px;
+  align-items: stretch;
+  min-height: 80px;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.delivery-target-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.delivery-target-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.delivery-target-heading svg {
+  color: #8aa8ff;
+}
+
+.delivery-target-heading strong,
+.delivery-target-heading small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delivery-target-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.delivery-target-heading small {
+  color: rgba(244, 239, 231, 0.56);
+  font-size: 11px;
+}
+
+.delivery-target-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.delivery-target-list > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  min-width: 0;
+  border: 1px solid rgba(138, 168, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(138, 168, 255, 0.045);
+  overflow: hidden;
+}
+
+.delivery-target-list > div.selected {
+  border-color: rgba(138, 168, 255, 0.58);
+  background: rgba(138, 168, 255, 0.09);
+}
+
+.delivery-target-select {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  min-height: 62px;
+  border: 0;
+  color: #f4efe7;
+  background: transparent;
+  padding: 8px 9px;
+  text-align: start;
+}
+
+.delivery-target-select span,
+.delivery-target-select strong,
+.delivery-target-select small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.delivery-target-select span {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.delivery-target-select strong {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.delivery-target-select small {
+  color: rgba(244, 239, 231, 0.48);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.delivery-target-align {
+  min-width: 0;
+  min-height: 100%;
+  border-block: 0;
+  border-inline-end: 0;
+  border-radius: 0;
+  border-inline-start: 1px solid rgba(244, 239, 231, 0.1);
+  color: #f4efe7;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.delivery-target-align.aligned {
+  color: #08120f;
+  background: #78f0c8;
 }
 
 .beat-readiness {
@@ -2516,6 +2645,10 @@ input[type="range"] {
   .beat-map-actions {
     grid-column: 1 / -1;
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .delivery-target-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .pattern-chain-row {

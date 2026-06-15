@@ -51,6 +51,8 @@ import {
   ChordInversion,
   ChordProgressionPreset,
   ChordQuality,
+  DeliveryTarget,
+  DeliveryTargetId,
   DrumGroovePreset,
   DrumLane,
   applyDrumGroovePreset,
@@ -71,6 +73,7 @@ import {
   SoundDesign,
   activePattern,
   applyBeatBlueprint,
+  applyDeliveryTarget,
   applyArrangementMovePreset,
   applyPatternFillPreset,
   arrangementSections,
@@ -97,6 +100,9 @@ import {
   createEmptyPatternData,
   defaultDrumVelocity,
   deleteProjectSnapshot,
+  deliveryTargets,
+  deliveryTargetForId,
+  deliveryTargetLabel,
   drumStepProbability,
   drumStepTimingMs,
   drumStepVelocity,
@@ -215,6 +221,7 @@ type NextMoveCommand =
   | { kind: "patternChain"; chain: PatternChainId }
   | { kind: "chainExpand" }
   | { kind: "arrangementTemplate"; template: ArrangementTemplateId }
+  | { kind: "deliveryTarget"; target: DeliveryTargetId }
   | { kind: "snapshot" }
   | { kind: "reviewMix" };
 
@@ -286,6 +293,7 @@ export function App(): ReactElement {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const masterPanelRef = useRef<HTMLElement | null>(null);
   const style = getStyle(project);
+  const deliveryTarget = deliveryTargetForId(project.deliveryTarget);
   const currentPattern = activePattern(project);
   const exportAnalysis = useMemo(() => analyzeExport(project), [project]);
   const stemAnalyses = useMemo(() => analyzeStemExports(project), [project]);
@@ -1915,6 +1923,23 @@ export function App(): ReactElement {
     }
   }
 
+  function selectDeliveryTarget(targetId: DeliveryTargetId): void {
+    const target = deliveryTargetForId(targetId);
+    updateProject((current) => ({ ...current, deliveryTarget: target.id }), `Set ${target.name} target`);
+  }
+
+  function alignDeliveryTarget(targetId: DeliveryTargetId): void {
+    const target = deliveryTargetForId(targetId);
+    const changed = updateProject((current) => applyDeliveryTarget(current, target.id), `Aligned ${target.name} target`);
+    if (changed) {
+      setSelectedArrangementIndex(0);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+      setPlaybackMode("arrangement");
+    }
+  }
+
   function runNextMove(action: NextMoveAction): void {
     switch (action.command.kind) {
       case "blueprint":
@@ -1934,6 +1959,9 @@ export function App(): ReactElement {
         return;
       case "arrangementTemplate":
         applyArrangementTemplate(action.command.template);
+        return;
+      case "deliveryTarget":
+        alignDeliveryTarget(action.command.target);
         return;
       case "snapshot":
         saveCurrentSnapshot();
@@ -2172,6 +2200,7 @@ export function App(): ReactElement {
         </div>
         <div className="session-meter">
           <span style={{ "--accent": style.color } as CSSProperties}>{style.name}</span>
+          <span>{deliveryTarget.name}</span>
           <span>{project.key}</span>
           <span>{activeChannelLabel}</span>
           <span>{project.masterPreset}</span>
@@ -2180,6 +2209,8 @@ export function App(): ReactElement {
       </section>
 
       <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
+
+      <DeliveryTargets project={project} onApply={alignDeliveryTarget} onSelect={selectDeliveryTarget} />
 
       <BeatReadiness checks={beatReadinessChecks} />
 
@@ -3050,6 +3081,60 @@ function BeatBlueprints({
   );
 }
 
+function DeliveryTargets({
+  onApply,
+  onSelect,
+  project
+}: {
+  onApply: (targetId: DeliveryTargetId) => void;
+  onSelect: (targetId: DeliveryTargetId) => void;
+  project: ProjectState;
+}): ReactElement {
+  const currentTarget = deliveryTargetForId(project.deliveryTarget);
+  return (
+    <section className="delivery-target-row" data-testid="delivery-targets" aria-label="Delivery targets">
+      <div className="delivery-target-heading">
+        <div>
+          <Gauge size={17} aria-hidden="true" />
+          <span>Delivery Target</span>
+        </div>
+        <strong data-testid="delivery-target-current">{currentTarget.name}</strong>
+        <small>{barCountLabel(currentTarget.targetBars)} / {currentTarget.stemGoal} stems</small>
+      </div>
+      <div className="delivery-target-list">
+        {deliveryTargets.map((target) => {
+          const selected = project.deliveryTarget === target.id;
+          const aligned = isDeliveryTargetAligned(project, target);
+          return (
+            <div className={selected ? "selected" : ""} data-testid={`delivery-target-${target.id}`} key={target.id}>
+              <button
+                className="delivery-target-select"
+                data-testid={`delivery-target-set-${target.id}`}
+                onClick={() => onSelect(target.id)}
+                title={`Set ${target.name} target`}
+                type="button"
+              >
+                <span>{target.name}</span>
+                <strong>{target.focus}</strong>
+                <small>{arrangementTemplateLabel(target.preferredTemplate)} / {target.preferredMasterPreset}</small>
+              </button>
+              <button
+                className={aligned ? "delivery-target-align aligned" : "delivery-target-align"}
+                data-testid={`delivery-target-align-${target.id}`}
+                onClick={() => onApply(target.id)}
+                title={`Align project to ${target.name}`}
+                type="button"
+              >
+                {aligned ? "Aligned" : "Align"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function QuickActions({
   actions,
   open,
@@ -3573,6 +3658,8 @@ function nextMoveIcon(action: NextMoveAction): ReactElement {
       return <Save size={14} aria-hidden="true" />;
     case "reviewMix":
       return <Gauge size={14} aria-hidden="true" />;
+    case "deliveryTarget":
+      return <Gauge size={14} aria-hidden="true" />;
     case "arrangementMove":
     case "patternChain":
     case "chainExpand":
@@ -3744,6 +3831,18 @@ function mixReviewNextMoveAction(analysis: ExportAnalysis): NextMoveAction {
   };
 }
 
+function deliveryTargetNextMoveAction(project: ProjectState): NextMoveAction {
+  const target = deliveryTargetForId(project.deliveryTarget);
+  return {
+    id: `delivery-target-${target.id}`,
+    title: `Align ${target.name} target`,
+    detail: `${barCountLabel(target.targetBars)} target with ${target.preferredMasterPreset} posture.`,
+    buttonLabel: "Align Target",
+    tone: "warn",
+    command: { kind: "deliveryTarget", target: target.id }
+  };
+}
+
 function chainExpandNextMoveAction(): NextMoveAction {
   return {
     id: "chain-expand",
@@ -3753,6 +3852,14 @@ function chainExpandNextMoveAction(): NextMoveAction {
     tone: "warn",
     command: { kind: "chainExpand" }
   };
+}
+
+function isDeliveryTargetAligned(project: ProjectState, target: DeliveryTarget): boolean {
+  return (
+    project.deliveryTarget === target.id &&
+    project.masterPreset === target.preferredMasterPreset &&
+    arrangementTotalBars(project) >= target.targetBars
+  );
 }
 
 function createBeatMapSummary(
@@ -3766,9 +3873,10 @@ function createBeatMapSummary(
   const tone = weakestTone([...stages.map((stage) => stage.tone), ...metrics.map((metric) => metric.tone)]);
   const bars = arrangementTotalBars(project);
   const patternUsage = usedPatternSlots(project).join("/");
+  const target = deliveryTargetForId(project.deliveryTarget);
   const headline =
-    tone === "danger" ? "Beat path needs a starter move" : tone === "warn" ? "Beat map is in progress" : "Beat map is delivery-ready";
-  const detail = `${barCountLabel(bars)} / Pattern ${patternUsage} / ${analysis.status} export`;
+    tone === "danger" ? `${target.name} target needs a starter move` : tone === "warn" ? `${target.name} target in progress` : `${target.name} target ready`;
+  const detail = `${barCountLabel(bars)} of ${barCountLabel(target.targetBars)} / Pattern ${patternUsage} / ${analysis.status} export`;
 
   return {
     headline,
@@ -3791,18 +3899,19 @@ function createBeatMapStages(
   const harmony = readinessCheckForId(checks, "harmony");
   const compositionTone = weakestTone([drums?.tone ?? "danger", bass?.tone ?? "danger", harmony?.tone ?? "danger"]);
   const bars = arrangementTotalBars(project);
-  const arrangementTone: MixCoachTone = bars >= 16 ? "good" : bars >= 8 ? "warn" : "danger";
+  const target = deliveryTargetForId(project.deliveryTarget);
+  const arrangementTone: MixCoachTone = bars >= target.targetBars ? "good" : bars >= 8 ? "warn" : "danger";
   const mixTone = weakestTone(createMixCoachChecks(analysis, stemAnalyses).map((check) => check.tone));
   const audibleStemCount = audibleStemTracks(stemAnalyses).length;
   const deliveryTone: MixCoachTone =
-    analysis.status === "Silent" ? "danger" : analysis.status !== "Ready" || audibleStemCount < stemTrackIds.length ? "warn" : "good";
+    analysis.status === "Silent" ? "danger" : analysis.status !== "Ready" || audibleStemCount < target.stemGoal ? "warn" : "good";
 
   return [
     {
       id: "start",
       label: "Start",
-      status: styleName,
-      detail: `${project.key} / ${project.bpm} BPM`,
+      status: target.name,
+      detail: `${styleName} / ${project.key} / ${project.bpm} BPM`,
       tone: "good"
     },
     {
@@ -3815,8 +3924,8 @@ function createBeatMapStages(
     {
       id: "arrange",
       label: "Arrange",
-      status: bars >= 16 ? "Song form" : bars >= 8 ? "Loop ready" : "Short",
-      detail: `${barCountLabel(bars)} across ${project.arrangement.length} blocks`,
+      status: bars >= target.targetBars ? "Target met" : bars >= 8 ? "In range" : "Short",
+      detail: `${barCountLabel(bars)} of ${barCountLabel(target.targetBars)} target`,
       tone: arrangementTone
     },
     {
@@ -3830,7 +3939,7 @@ function createBeatMapStages(
       id: "deliver",
       label: "Deliver",
       status: deliveryTone === "good" ? "Ready" : deliveryTone === "warn" ? "Check exports" : "No signal",
-      detail: `${audibleStemCount}/${stemTrackIds.length} stems audible`,
+      detail: `${audibleStemCount}/${target.stemGoal} target stems audible`,
       tone: deliveryTone
     }
   ];
@@ -3842,21 +3951,22 @@ function createBeatMapMetrics(
   stemAnalyses: StemExportAnalyses
 ): BeatMapMetric[] {
   const bars = arrangementTotalBars(project);
+  const target = deliveryTargetForId(project.deliveryTarget);
   const slots = usedPatternSlots(project);
   const audibleStems = audibleStemTracks(stemAnalyses);
   const spread = stemSpreadDb(stemAnalyses);
-  const songTone: MixCoachTone = bars >= 16 ? "good" : bars >= 8 ? "warn" : "danger";
+  const songTone: MixCoachTone = bars >= target.targetBars ? "good" : bars >= 8 ? "warn" : "danger";
   const patternTone: MixCoachTone = slots.length >= 3 ? "good" : slots.length >= 2 ? "warn" : "danger";
   const exportTone: MixCoachTone = analysis.status === "Ready" ? "good" : analysis.status === "Silent" ? "danger" : "warn";
   const stemTone: MixCoachTone =
-    audibleStems.length === stemTrackIds.length ? "good" : audibleStems.length >= 2 ? "warn" : "danger";
+    audibleStems.length >= target.stemGoal ? "good" : audibleStems.length >= 2 ? "warn" : "danger";
 
   return [
     {
       id: "song",
       label: "Song",
       value: barCountLabel(bars),
-      detail: `${project.arrangement.length} blocks`,
+      detail: `${barCountLabel(target.targetBars)} ${target.name} target`,
       tone: songTone
     },
     {
@@ -3876,7 +3986,7 @@ function createBeatMapMetrics(
     {
       id: "stems",
       label: "Stems",
-      value: `${audibleStems.length}/${stemTrackIds.length}`,
+      value: `${audibleStems.length}/${target.stemGoal}`,
       detail: spread === null ? "Need two audible stems" : `${spread.toFixed(1)} dB spread`,
       tone: stemTone
     }
@@ -3894,10 +4004,12 @@ function createBeatMapActions(
   const harmony = readinessCheckForId(checks, "harmony");
   const compositionTone = weakestTone([drums?.tone ?? "danger", bass?.tone ?? "danger", harmony?.tone ?? "danger"]);
   const bars = arrangementTotalBars(project);
+  const target = deliveryTargetForId(project.deliveryTarget);
   const mixTone = weakestTone(createMixCoachChecks(analysis, stemAnalyses).map((check) => check.tone));
   const candidates: NextMoveAction[] = [
+    !isDeliveryTargetAligned(project, target) ? deliveryTargetNextMoveAction(project) : arrangementLiftNextMoveAction(project),
     compositionTone === "danger" ? blueprintNextMoveAction(project) : patternFillNextMoveAction(project),
-    bars < 8 ? patternChainNextMoveAction() : bars < 16 ? chainExpandNextMoveAction() : arrangementLiftNextMoveAction(project),
+    bars < 8 ? patternChainNextMoveAction() : bars < target.targetBars ? chainExpandNextMoveAction() : arrangementLiftNextMoveAction(project),
     mixTone === "good" && analysis.status === "Ready" ? snapshotNextMoveAction(project) : mixReviewNextMoveAction(analysis),
     project.snapshots.length === 0 ? snapshotNextMoveAction(project) : mixReviewNextMoveAction(analysis)
   ];

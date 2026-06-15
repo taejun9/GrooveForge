@@ -118,6 +118,9 @@ export type ArrangementMovePreset = (typeof arrangementMovePresetIds)[number];
 
 export type MasterPreset = "Clean Demo" | "Streaming Safe" | "Headroom for Vocal";
 
+export const deliveryTargetIds = ["starter_sketch", "vocal_session", "beat_store", "club_demo"] as const;
+export type DeliveryTargetId = (typeof deliveryTargetIds)[number];
+
 export const soundPresetIds = ["clean_knock", "club_punch", "warm_tape", "air_space"] as const;
 
 export type SoundPresetId = (typeof soundPresetIds)[number] | "custom";
@@ -151,6 +154,7 @@ export type ProjectCoreState = {
   arrangement: ArrangementBlock[];
   masterCeilingDb: number;
   masterPreset: MasterPreset;
+  deliveryTarget: DeliveryTargetId;
 };
 
 export type ProjectSnapshot = {
@@ -178,6 +182,17 @@ export type BeatBlueprint = {
   soundPreset: (typeof soundPresetIds)[number];
   masterPreset: MasterPreset;
   mixer: Partial<Record<TrackType, Partial<Pick<MixerChannel, "volumeDb" | "pan" | "lowCut" | "air" | "drive" | "glue" | "send">>>>;
+};
+
+export type DeliveryTarget = {
+  id: DeliveryTargetId;
+  name: string;
+  focus: string;
+  targetBars: number;
+  preferredTemplate: ArrangementTemplateId;
+  preferredMasterPreset: MasterPreset;
+  stemGoal: number;
+  mixPosture: "loose" | "vocal_headroom" | "balanced" | "club_forward";
 };
 
 export type ProjectFile = {
@@ -229,6 +244,55 @@ export const chordInversionLabels: Record<ChordInversion, string> = {
   2: "2nd"
 };
 export const masterPresets: MasterPreset[] = ["Clean Demo", "Streaming Safe", "Headroom for Vocal"];
+export const defaultDeliveryTarget: DeliveryTargetId = "vocal_session";
+export const deliveryTargetLabels: Record<DeliveryTargetId, string> = {
+  starter_sketch: "Starter Sketch",
+  vocal_session: "Vocal Session",
+  beat_store: "Beat Store",
+  club_demo: "Club Demo"
+};
+export const deliveryTargets: DeliveryTarget[] = [
+  {
+    id: "starter_sketch",
+    name: "Starter Sketch",
+    focus: "fast draft with flexible headroom",
+    targetBars: 8,
+    preferredTemplate: "loop",
+    preferredMasterPreset: "Clean Demo",
+    stemGoal: 2,
+    mixPosture: "loose"
+  },
+  {
+    id: "vocal_session",
+    name: "Vocal Session",
+    focus: "arranged beat with vocal headroom",
+    targetBars: 16,
+    preferredTemplate: "hook_first",
+    preferredMasterPreset: "Headroom for Vocal",
+    stemGoal: 4,
+    mixPosture: "vocal_headroom"
+  },
+  {
+    id: "beat_store",
+    name: "Beat Store",
+    focus: "structured demo with clean stems",
+    targetBars: 24,
+    preferredTemplate: "full",
+    preferredMasterPreset: "Streaming Safe",
+    stemGoal: 4,
+    mixPosture: "balanced"
+  },
+  {
+    id: "club_demo",
+    name: "Club Demo",
+    focus: "full-energy preview with strong drums",
+    targetBars: 16,
+    preferredTemplate: "full",
+    preferredMasterPreset: "Clean Demo",
+    stemGoal: 4,
+    mixPosture: "club_forward"
+  }
+];
 export const drumGroovePresetLabels: Record<DrumGroovePreset, string> = {
   tight: "Tight",
   pocket: "Pocket",
@@ -804,6 +868,7 @@ export const starterProject: ProjectState = {
   arrangement: createArrangementTemplate("full"),
   masterCeilingDb: masterPresetCeilingsDb["Headroom for Vocal"],
   masterPreset: "Headroom for Vocal",
+  deliveryTarget: defaultDeliveryTarget,
   snapshots: []
 };
 
@@ -838,6 +903,30 @@ export function masterPresetCeilingDb(preset: MasterPreset): number {
   return masterPresetCeilingsDb[preset];
 }
 
+export function deliveryTargetLabel(target: DeliveryTargetId): string {
+  return deliveryTargetForId(target).name;
+}
+
+export function deliveryTargetFocus(target: DeliveryTargetId): string {
+  return deliveryTargetForId(target).focus;
+}
+
+export function deliveryTargetForId(target: DeliveryTargetId): DeliveryTarget {
+  return deliveryTargets.find((candidate) => candidate.id === target) ?? deliveryTargets[0];
+}
+
+export function applyDeliveryTarget(project: ProjectState, targetId: DeliveryTargetId): ProjectState {
+  const target = deliveryTargetForId(targetId);
+  return {
+    ...project,
+    deliveryTarget: target.id,
+    arrangement: createArrangementTemplate(target.preferredTemplate),
+    masterPreset: target.preferredMasterPreset,
+    masterCeilingDb: masterPresetCeilingDb(target.preferredMasterPreset),
+    mixer: applyDeliveryTargetMixer(project.mixer, target)
+  };
+}
+
 export function soundPresetLabel(preset: SoundPresetId): string {
   return soundPresetLabels[preset];
 }
@@ -865,6 +954,43 @@ function applyBeatBlueprintMixer(
       muted: false,
       solo: false
     };
+  });
+}
+
+function applyDeliveryTargetMixer(sourceMixer: MixerChannel[], target: DeliveryTarget): MixerChannel[] {
+  return sourceMixer.map((channel) => {
+    if (channel.id === "master") {
+      const masterVolume = target.mixPosture === "vocal_headroom" ? -2 : target.mixPosture === "club_forward" ? -0.8 : channel.volumeDb;
+      return { ...channel, volumeDb: clampVolumeDb(masterVolume), muted: false, solo: false };
+    }
+
+    if (target.mixPosture === "loose") {
+      return { ...channel, muted: false, solo: false };
+    }
+
+    if (target.mixPosture === "vocal_headroom") {
+      if (channel.id === "bass_808") {
+        return { ...channel, volumeDb: clampVolumeDb(Math.min(channel.volumeDb, -6.5)), drive: normalizeMixerEq(channel.drive * 0.92), send: normalizeMixerEq(Math.min(channel.send, 0.05)), muted: false, solo: false };
+      }
+      if (channel.id === "synth" || channel.id === "chord") {
+        return { ...channel, volumeDb: clampVolumeDb(Math.min(channel.volumeDb, -10)), lowCut: normalizeMixerEq(Math.max(channel.lowCut, 0.18)), send: normalizeMixerEq(Math.min(channel.send, 0.32)), muted: false, solo: false };
+      }
+      return { ...channel, volumeDb: clampVolumeDb(Math.min(channel.volumeDb, -4.5)), muted: false, solo: false };
+    }
+
+    if (target.mixPosture === "balanced") {
+      const targetVolume =
+        channel.id === "drum_rack" ? -5 : channel.id === "bass_808" ? -6.5 : channel.id === "synth" ? -9 : channel.id === "chord" ? -9.5 : channel.volumeDb;
+      return { ...channel, volumeDb: clampVolumeDb(targetVolume), muted: false, solo: false };
+    }
+
+    if (channel.id === "drum_rack") {
+      return { ...channel, volumeDb: -3, drive: normalizeMixerEq(Math.max(channel.drive, 0.22)), glue: normalizeMixerEq(Math.max(channel.glue, 0.32)), muted: false, solo: false };
+    }
+    if (channel.id === "bass_808") {
+      return { ...channel, volumeDb: -5.5, drive: normalizeMixerEq(Math.max(channel.drive, 0.28)), send: normalizeMixerEq(Math.min(channel.send, 0.04)), muted: false, solo: false };
+    }
+    return { ...channel, muted: false, solo: false };
   });
 }
 
@@ -1876,7 +2002,8 @@ function cloneProjectCore(project: ProjectCoreState): ProjectCoreState {
       mutedTracks: [...block.mutedTracks]
     })),
     masterCeilingDb: project.masterCeilingDb,
-    masterPreset: project.masterPreset
+    masterPreset: project.masterPreset,
+    deliveryTarget: project.deliveryTarget
   };
 }
 
@@ -2254,11 +2381,16 @@ function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreSta
   return {
     ...value,
     metronomeEnabled: value.metronomeEnabled ?? false,
+    deliveryTarget: normalizeDeliveryTargetId(value.deliveryTarget),
     sound: normalizeSoundDesign(value.sound),
     patterns: normalizePatternMap(value.patterns),
     mixer: normalizeMixerChannels(value.mixer),
     arrangement: normalizeArrangement(value.arrangement)
   };
+}
+
+function normalizeDeliveryTargetId(target: DeliveryTargetId | undefined): DeliveryTargetId {
+  return target && isOneOf(target, deliveryTargetIds) ? target : defaultDeliveryTarget;
 }
 
 function normalizeProjectSnapshots(snapshots: ProjectSnapshotInput[] | undefined): ProjectSnapshot[] {
@@ -2307,6 +2439,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
       arrangement: normalizeArrangement(value.arrangement),
       masterCeilingDb: value.masterCeilingDb,
       masterPreset: value.masterPreset,
+      deliveryTarget: normalizeDeliveryTargetId(value.deliveryTarget),
       snapshots: []
     };
   }
@@ -2338,8 +2471,9 @@ type ArrangementBlockInput = Omit<ArrangementBlock, "bars" | "mutedTracks"> & {
   bars?: number;
   mutedTracks?: ArrangementMuteTrack[];
 };
-type ProjectCoreStateInput = Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled"> & {
+type ProjectCoreStateInput = Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled" | "deliveryTarget"> & {
   metronomeEnabled?: boolean;
+  deliveryTarget?: DeliveryTargetId;
   sound?: SoundDesignInput;
   patterns: Record<PatternSlot, PatternDataInput>;
   mixer: MixerChannelInput[];
@@ -2374,6 +2508,7 @@ function isProjectCoreStateShape(value: unknown): value is ProjectCoreStateInput
     isOneOf(value.selectedPattern, patternSlots) &&
     isFiniteNumber(value.swing) &&
     (value.metronomeEnabled === undefined || typeof value.metronomeEnabled === "boolean") &&
+    (value.deliveryTarget === undefined || isOneOf(value.deliveryTarget, deliveryTargetIds)) &&
     (value.sound === undefined || isSoundDesignInput(value.sound)) &&
     isPatternMapInput(value.patterns) &&
     Array.isArray(value.mixer) &&
@@ -2398,8 +2533,9 @@ function isProjectSnapshotsInput(value: unknown): value is ProjectSnapshotInput[
   );
 }
 
-function isLegacyProjectState(value: unknown): value is Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled"> & {
+function isLegacyProjectState(value: unknown): value is Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled" | "deliveryTarget"> & {
   metronomeEnabled?: boolean;
+  deliveryTarget?: DeliveryTargetId;
   sound?: SoundDesignInput;
   mixer: MixerChannelInput[];
   arrangement: ArrangementBlockInput[];
@@ -2417,6 +2553,7 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectCoreState, "
     isOneOf(value.selectedPattern, patternSlots) &&
     isFiniteNumber(value.swing) &&
     (value.metronomeEnabled === undefined || typeof value.metronomeEnabled === "boolean") &&
+    (value.deliveryTarget === undefined || isOneOf(value.deliveryTarget, deliveryTargetIds)) &&
     (value.sound === undefined || isSoundDesignInput(value.sound)) &&
     isDrumPattern(value.drumPattern) &&
     (value.drumVelocities === undefined || isDrumVelocities(value.drumVelocities)) &&
