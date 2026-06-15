@@ -637,6 +637,25 @@ type ChordRhythmOption = ChordRhythmDefinition & {
   chanceCount: number;
 };
 
+type ChordVoicingId = "open" | "deep" | "tension" | "air";
+
+type ChordVoicingDefinition = {
+  id: ChordVoicingId;
+  label: string;
+  detail: string;
+  quality?: ChordQuality;
+  inversion: ChordInversion;
+  length: number;
+  velocity: number;
+  probability: number;
+};
+
+type ChordVoicingOption = ChordVoicingDefinition & {
+  quality: ChordQuality;
+  preview: string;
+  selected: boolean;
+};
+
 type ArrangementFocusPresetId = "intro_space" | "verse_pocket" | "hook_peak" | "bridge_drop" | "outro_release";
 
 type ArrangementFocusPreset = {
@@ -830,6 +849,13 @@ const chordRhythmDefinitions: ChordRhythmDefinition[] = [
   { id: "pulse", label: "Pulse", detail: "bounce" },
   { id: "stab", label: "Stab", detail: "short" },
   { id: "ghost", label: "Ghost", detail: "air" }
+];
+
+const chordVoicingDefinitions: ChordVoicingDefinition[] = [
+  { id: "open", label: "Open", detail: "wide top", inversion: 2, length: 6, velocity: 0.62, probability: 1 },
+  { id: "deep", label: "Deep", detail: "root weight", inversion: 0, length: 4, velocity: 0.72, probability: 1 },
+  { id: "tension", label: "Tension", detail: "dominant pull", quality: "7", inversion: 1, length: 3, velocity: 0.78, probability: 0.98 },
+  { id: "air", label: "Air", detail: "suspended ghost", quality: "sus2", inversion: 2, length: 2, velocity: 0.48, probability: 0.9 }
 ];
 
 const basslinePadDefinitions: BasslinePadDefinition[] = [
@@ -1109,6 +1135,10 @@ export function App(): ReactElement {
   const chordRhythmOptions = useMemo(
     () => createChordRhythmOptions(currentPattern.chordEvents),
     [currentPattern.chordEvents]
+  );
+  const chordVoicingOptions = useMemo(
+    () => createChordVoicingOptions(selectedChord),
+    [selectedChord]
   );
   const selectedDrumVelocity =
     selectedDrumStep && selectedDrumActive
@@ -2759,6 +2789,34 @@ export function App(): ReactElement {
     }
   }
 
+  function applyChordVoicingPad(voicingId: ChordVoicingId): void {
+    if (selectedChordIndex === null || !selectedChord) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+
+    const option = createChordVoicingOptions(selectedChord).find((voicing) => voicing.id === voicingId);
+    if (!option) {
+      setProjectStatus("Chord voicing pad not found");
+      return;
+    }
+
+    const changed = updateChordEvent(
+      selectedChordIndex,
+      {
+        quality: option.quality,
+        inversion: option.inversion,
+        length: option.length,
+        velocity: option.velocity,
+        probability: option.probability
+      },
+      `${option.label} chord voicing applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (!changed) {
+      setProjectStatus(`${option.label} chord voicing already selected`);
+    }
+  }
+
   function addChordEvent(): void {
     let nextSelectedIndex: number | null = null;
     const changed = updateCurrentPattern(
@@ -3748,6 +3806,7 @@ export function App(): ReactElement {
           <ChordEditor
             chordPads={chordPadOptions}
             chordRhythms={chordRhythmOptions}
+            chordVoicings={chordVoicingOptions}
             chords={currentPattern.chordEvents}
             rootOptions={chordRootOptions}
             selectedIndex={selectedChordIndex}
@@ -3761,6 +3820,7 @@ export function App(): ReactElement {
             onPreset={applyChordProgressionPreset}
             onRhythm={applyChordRhythm}
             onSelect={selectChordEvent}
+            onVoicing={applyChordVoicingPad}
           />
         </section>
 
@@ -8265,6 +8325,7 @@ function SoundControl({
 function ChordEditor({
   chordPads,
   chordRhythms,
+  chordVoicings,
   chords,
   rootOptions,
   selectedIndex,
@@ -8277,10 +8338,12 @@ function ChordEditor({
   onPad,
   onPreset,
   onRhythm,
-  onSelect
+  onSelect,
+  onVoicing
 }: {
   chordPads: ChordPadOption[];
   chordRhythms: ChordRhythmOption[];
+  chordVoicings: ChordVoicingOption[];
   chords: ChordEvent[];
   rootOptions: string[];
   selectedIndex: number | null;
@@ -8294,6 +8357,7 @@ function ChordEditor({
   onPreset: (preset: ChordProgressionPreset) => void;
   onRhythm: (rhythm: ChordRhythmId) => void;
   onSelect: (index: number) => void;
+  onVoicing: (voicing: ChordVoicingId) => void;
 }): ReactElement {
   const selectedChord = selectedIndex === null ? undefined : chords[selectedIndex];
   const selectedInversion = selectedChord ? normalizeChordInversion(selectedChord.inversion) : 0;
@@ -8371,6 +8435,29 @@ function ChordEditor({
               <span>{rhythm.label}</span>
               <strong>{rhythm.preview}</strong>
               <small>{rhythm.chanceCount} chance edit / {rhythm.detail}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="chord-voicing-panel" data-testid="chord-voicing-pads">
+        <div className="chord-voicing-heading">
+          <span>Chord Voicing</span>
+          <strong>Color + Shape</strong>
+        </div>
+        <div className="chord-voicing-row" aria-label="Chord Voicing Pads">
+          {chordVoicings.map((voicing) => (
+            <button
+              className={voicing.selected ? "selected" : ""}
+              data-testid={`chord-voicing-${voicing.id}`}
+              disabled={!selectedChord}
+              key={voicing.id}
+              onClick={() => onVoicing(voicing.id)}
+              title={`${voicing.label} ${voicing.preview}`}
+              type="button"
+            >
+              <span>{voicing.label}</span>
+              <strong>{voicing.preview}</strong>
+              <small>{voicing.detail}</small>
             </button>
           ))}
         </div>
@@ -9126,6 +9213,45 @@ function createChordRhythmOptions(chords: ChordEvent[]): ChordRhythmOption[] {
       chanceCount: transformed.filter((chord) => normalizeEventProbability(chord.probability) < 1).length
     };
   });
+}
+
+function createChordVoicingOptions(selectedChord?: ChordEvent): ChordVoicingOption[] {
+  return chordVoicingDefinitions.map((definition) => {
+    if (!selectedChord) {
+      return {
+        ...definition,
+        quality: definition.quality ?? "maj",
+        preview: "Select chord",
+        selected: false
+      };
+    }
+
+    const update = chordVoicingUpdate(selectedChord, definition);
+    const nextChord = chordEventWithUpdate(selectedChord, update);
+    return {
+      ...definition,
+      quality: nextChord.quality,
+      inversion: nextChord.inversion,
+      length: nextChord.length,
+      velocity: nextChord.velocity,
+      probability: nextChord.probability,
+      preview: `${nextChord.quality} ${chordInversionLabel(nextChord.inversion)} / ${nextChord.length} step`,
+      selected: sameChordEvent(selectedChord, nextChord)
+    };
+  });
+}
+
+function chordVoicingUpdate(
+  chord: ChordEvent,
+  definition: ChordVoicingDefinition
+): Pick<ChordEvent, "quality" | "inversion" | "length" | "velocity" | "probability"> {
+  return {
+    quality: definition.quality ?? chord.quality,
+    inversion: definition.inversion,
+    length: Math.min(definition.length, Math.max(1, 16 - chord.step)),
+    velocity: definition.velocity,
+    probability: definition.probability
+  };
 }
 
 function applyChordRhythmToEvents(chords: ChordEvent[], rhythmId: ChordRhythmId): ChordEvent[] {

@@ -145,6 +145,8 @@ h2 {
 .melody-accent-row button span,
 .chord-rhythm-heading span,
 .chord-rhythm-row button span,
+.chord-voicing-heading span,
+.chord-voicing-row button span,
 .sound-focus-heading span,
 .sound-focus-row button span,
 .mix-balance-heading span,
@@ -248,6 +250,7 @@ h2 {
 .chord-preset-row button,
 .chord-pad-row button,
 .chord-rhythm-row button,
+.chord-voicing-row button,
 .sound-focus-row button,
 .mix-balance-row button,
 .master-finish-row button,
@@ -300,6 +303,7 @@ h2 {
 .snapshot-actions button:disabled,
 .chord-pad-row button:disabled,
 .chord-rhythm-row button:disabled,
+.chord-voicing-row button:disabled,
 .sound-focus-row button:disabled,
 .mix-balance-row button:disabled,
 .master-finish-row button:disabled,
@@ -356,6 +360,7 @@ h2 {
 .chord-preset-row button,
 .chord-pad-row button,
 .chord-rhythm-row button,
+.chord-voicing-row button,
 .sound-focus-row button,
 .mix-balance-row button,
 .master-finish-row button,
@@ -380,6 +385,7 @@ h2 {
 .arrangement-move-row button.selected,
 .chord-preset-row button.selected,
 .chord-pad-row button.selected,
+.chord-voicing-row button.selected,
 .chord-inversion-row button.selected,
 .preset-row button.selected {
   border-color: rgba(240, 195, 106, 0.64);
@@ -3312,6 +3318,12 @@ input[type="range"] {
   margin-block-start: -2px;
 }
 
+.chord-voicing-panel {
+  display: grid;
+  gap: 6px;
+  margin-block-start: -2px;
+}
+
 .chord-rhythm-heading {
   display: flex;
   align-items: center;
@@ -3319,12 +3331,26 @@ input[type="range"] {
   gap: 8px;
 }
 
-.chord-rhythm-heading strong {
+.chord-voicing-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chord-rhythm-heading strong,
+.chord-voicing-heading strong {
   color: rgba(244, 239, 231, 0.72);
   font-size: 11px;
 }
 
 .chord-rhythm-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.chord-voicing-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
@@ -3339,6 +3365,7 @@ input[type="range"] {
 .chord-preset-row button,
 .chord-pad-row button,
 .chord-rhythm-row button,
+.chord-voicing-row button,
 .chord-tools > button,
 .chord-edit-row button {
   display: inline-flex;
@@ -3350,7 +3377,8 @@ input[type="range"] {
 }
 
 .chord-pad-row button,
-.chord-rhythm-row button {
+.chord-rhythm-row button,
+.chord-voicing-row button {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-content: center;
@@ -3366,33 +3394,42 @@ input[type="range"] {
 .chord-pad-row button small,
 .chord-rhythm-row button span,
 .chord-rhythm-row button strong,
-.chord-rhythm-row button small {
+.chord-rhythm-row button small,
+.chord-voicing-row button span,
+.chord-voicing-row button strong,
+.chord-voicing-row button small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .chord-pad-row button span,
-.chord-rhythm-row button span {
+.chord-rhythm-row button span,
+.chord-voicing-row button span {
   color: rgba(244, 239, 231, 0.68);
   font-size: 11px;
 }
 
 .chord-pad-row button strong,
-.chord-rhythm-row button strong {
+.chord-rhythm-row button strong,
+.chord-voicing-row button strong {
   color: #f4efe7;
   font-size: 12px;
 }
 
 .chord-pad-row button small,
-.chord-rhythm-row button small {
+.chord-rhythm-row button small,
+.chord-voicing-row button small {
   color: rgba(244, 239, 231, 0.48);
   font-size: 10px;
 }
 
 .chord-pad-row button.selected span,
 .chord-pad-row button.selected strong,
-.chord-pad-row button.selected small {
+.chord-pad-row button.selected small,
+.chord-voicing-row button.selected span,
+.chord-voicing-row button.selected strong,
+.chord-voicing-row button.selected small {
   color: #11100f;
 }
 
