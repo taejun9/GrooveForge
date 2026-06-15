@@ -110,6 +110,7 @@ MVP capabilities:
 - Arrangement blocks for an 8-bar loop or simple song section.
 - Mixer volume and pan.
 - Master limiter.
+- Local project save/load as a `.grooveforge.json` file.
 - WAV export through offline rendering.
 
 ## Roadmap

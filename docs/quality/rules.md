@@ -64,6 +64,8 @@ P0 scheduler work must prove stable play/stop/loop behavior, BPM changes, curren
 
 Drum, bass, melody, and arrangement work must preserve editable project state without losing event timing, pitch, velocity, glide, track routing, or mixer state.
 
+Project file work must reject invalid imports without overwriting the current project and must preserve edited drum, bass, melody, mixer, master, key, BPM, style, and arrangement data on save/load.
+
 Export work must verify a non-silent WAV with expected duration, expected sample rate/channel count, no audio frames above the selected ceiling, and reproducibility from saved project data.
 
 Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, or plan titles.

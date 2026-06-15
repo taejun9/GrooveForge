@@ -76,8 +76,16 @@ export type ProjectState = {
   masterPreset: "Clean Demo" | "Streaming Safe" | "Headroom for Vocal";
 };
 
+export type ProjectFile = {
+  app: "GrooveForge";
+  fileVersion: 1;
+  savedAt: string;
+  project: ProjectState;
+};
+
 export const steps = Array.from({ length: 16 }, (_, index) => index);
 export const stepsPerBar = 16;
+export const projectFileVersion = 1;
 
 const sharpNotes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const flatNotes = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
@@ -242,6 +250,30 @@ export function getStyle(project: ProjectState): StyleProfile {
   return styleProfiles.find((style) => style.id === project.styleId) ?? styleProfiles[0];
 }
 
+export function projectFileName(project: ProjectState): string {
+  const slug = project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  return `${slug || "grooveforge-project"}.grooveforge.json`;
+}
+
+export function serializeProjectFile(project: ProjectState): string {
+  const file: ProjectFile = {
+    app: "GrooveForge",
+    fileVersion: projectFileVersion,
+    savedAt: new Date().toISOString(),
+    project
+  };
+  return `${JSON.stringify(file, null, 2)}\n`;
+}
+
+export function parseProjectFile(contents: string): ProjectState {
+  const parsed: unknown = JSON.parse(contents);
+  const candidate = isRecord(parsed) && parsed.app === "GrooveForge" && isRecord(parsed.project) ? parsed.project : parsed;
+  if (!isProjectState(candidate)) {
+    throw new Error("Invalid GrooveForge project file.");
+  }
+  return candidate;
+}
+
 export function dbToGain(db: number): number {
   return Math.pow(10, db / 20);
 }
@@ -315,4 +347,110 @@ export function noteToFrequency(note: string): number {
   const accidentalOffset = accidental === "#" ? 1 : accidental === "b" ? -1 : 0;
   const midi = (octave + 1) * 12 + semitones[letter] + accidentalOffset;
   return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function isProjectState(value: unknown): value is ProjectState {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.title === "string" &&
+    isOneOf(value.mode, ["guided", "studio"]) &&
+    isFiniteNumber(value.bpm) &&
+    typeof value.key === "string" &&
+    isOneOf(value.styleId, styleProfiles.map((profile) => profile.id)) &&
+    isOneOf(value.selectedPattern, ["A", "B", "C"]) &&
+    isFiniteNumber(value.swing) &&
+    isDrumPattern(value.drumPattern) &&
+    Array.isArray(value.bassNotes) &&
+    value.bassNotes.every(isBassNote) &&
+    Array.isArray(value.melodyNotes) &&
+    value.melodyNotes.every(isMelodyNote) &&
+    Array.isArray(value.mixer) &&
+    value.mixer.every(isMixerChannel) &&
+    Array.isArray(value.arrangement) &&
+    value.arrangement.every(isArrangementBlock) &&
+    isFiniteNumber(value.masterCeilingDb) &&
+    isOneOf(value.masterPreset, ["Clean Demo", "Streaming Safe", "Headroom for Vocal"])
+  );
+}
+
+function isDrumPattern(value: unknown): value is DrumPattern {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (["kick", "clap", "hat", "perc"] as DrumLane[]).every(
+    (lane) => Array.isArray(value[lane]) && value[lane].length === stepsPerBar && value[lane].every((step) => typeof step === "boolean")
+  );
+}
+
+function isBassNote(value: unknown): value is BassNote {
+  return (
+    isRecord(value) &&
+    isStep(value.step) &&
+    isPitch(value.pitch) &&
+    isFiniteNumber(value.length) &&
+    value.length >= 1 &&
+    value.length <= stepsPerBar &&
+    typeof value.glide === "boolean"
+  );
+}
+
+function isMelodyNote(value: unknown): value is MelodyNote {
+  return (
+    isRecord(value) &&
+    isStep(value.step) &&
+    isPitch(value.pitch) &&
+    isFiniteNumber(value.length) &&
+    value.length >= 1 &&
+    value.length <= stepsPerBar &&
+    isFiniteNumber(value.velocity) &&
+    value.velocity >= 0 &&
+    value.velocity <= 1
+  );
+}
+
+function isMixerChannel(value: unknown): value is MixerChannel {
+  return (
+    isRecord(value) &&
+    isOneOf(value.id, ["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]) &&
+    typeof value.name === "string" &&
+    isFiniteNumber(value.volumeDb) &&
+    isFiniteNumber(value.pan) &&
+    typeof value.muted === "boolean" &&
+    typeof value.solo === "boolean" &&
+    typeof value.accent === "string"
+  );
+}
+
+function isArrangementBlock(value: unknown): value is ArrangementBlock {
+  return (
+    isRecord(value) &&
+    isOneOf(value.section, ["Intro", "Verse", "Hook", "Bridge", "Outro"]) &&
+    isOneOf(value.pattern, ["A", "B", "C"]) &&
+    isFiniteNumber(value.energy) &&
+    value.energy >= 0 &&
+    value.energy <= 1
+  );
+}
+
+function isStep(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value < stepsPerBar;
+}
+
+function isPitch(value: unknown): value is string {
+  return typeof value === "string" && /^([A-G])(#|b)?-?\d+$/.test(value);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isOneOf<T extends string>(value: unknown, options: readonly T[]): value is T {
+  return typeof value === "string" && options.includes(value as T);
 }

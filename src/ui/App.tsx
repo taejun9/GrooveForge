@@ -3,6 +3,7 @@ import {
   Disc3,
   Download,
   Drum,
+  FolderOpen,
   Gauge,
   KeyboardMusic,
   Music2,
@@ -12,7 +13,7 @@ import {
   Sparkles,
   Waves
 } from "lucide-react";
-import type { CSSProperties, ReactElement, ReactNode } from "react";
+import type { ChangeEvent, CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { exportWav } from "../audio/render";
 import { PlaybackController, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
@@ -25,6 +26,9 @@ import {
   ProjectState,
   bassPitchLanes,
   melodyPitchLanes,
+  parseProjectFile,
+  projectFileName,
+  serializeProjectFile,
   starterProject,
   steps,
   styleProfiles
@@ -58,7 +62,9 @@ export function App(): ReactElement {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState<PlaybackSnapshot | null>(null);
   const [selectedNote, setSelectedNote] = useState<SelectedNote | null>(null);
+  const [projectStatus, setProjectStatus] = useState("Demo project");
   const controllerRef = useRef<PlaybackController | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const style = getStyle(project);
   const activeChannels = useMemo(() => project.mixer.filter((channel) => !channel.muted).length, [project.mixer]);
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
@@ -88,6 +94,7 @@ export function App(): ReactElement {
 
   function updateProject(update: (current: ProjectState) => ProjectState): void {
     setProject((current) => update(current));
+    setProjectStatus("Unsaved changes");
   }
 
   function toggleStep(lane: DrumLane, step: number): void {
@@ -196,6 +203,76 @@ export function App(): ReactElement {
     }
   }
 
+  async function handleSaveProject(): Promise<void> {
+    const contents = serializeProjectFile(project);
+    const defaultName = projectFileName(project);
+
+    try {
+      const result = await window.grooveforge?.saveProject?.(contents, defaultName);
+      if (result) {
+        setProjectStatus(result.canceled ? "Save canceled" : `Saved ${fileDisplayName(result.filePath)}`);
+        return;
+      }
+
+      downloadProjectFile(contents, defaultName);
+      setProjectStatus(`Downloaded ${defaultName}`);
+    } catch (error) {
+      console.error(error);
+      setProjectStatus("Save failed");
+    }
+  }
+
+  async function handleOpenProject(): Promise<void> {
+    try {
+      const result = await window.grooveforge?.openProject?.();
+      if (result) {
+        if (result.canceled || !result.contents) {
+          setProjectStatus("Open canceled");
+          return;
+        }
+        loadProjectText(result.contents, fileDisplayName(result.filePath));
+        return;
+      }
+
+      importInputRef.current?.click();
+    } catch (error) {
+      console.error(error);
+      setProjectStatus("Open failed");
+    }
+  }
+
+  function handleImportFile(event: ChangeEvent<HTMLInputElement>): void {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) {
+      return;
+    }
+
+    void file
+      .text()
+      .then((contents) => loadProjectText(contents, file.name))
+      .catch((error: unknown) => {
+        console.error(error);
+        setProjectStatus("Open failed");
+      });
+  }
+
+  function loadProjectText(contents: string, sourceName: string): void {
+    try {
+      const nextProject = parseProjectFile(contents);
+      controllerRef.current?.stop();
+      controllerRef.current = null;
+      setProject(nextProject);
+      setPlaybackPosition(null);
+      setSelectedNote(null);
+      setIsPlaying(false);
+      setProjectStatus(`Loaded ${sourceName}`);
+    } catch (error) {
+      console.error(error);
+      setProjectStatus("Invalid project file");
+    }
+  }
+
   function selectStyle(styleId: ProjectState["styleId"]): void {
     const nextStyle = styleProfiles.find((candidate) => candidate.id === styleId);
     if (!nextStyle) {
@@ -221,6 +298,14 @@ export function App(): ReactElement {
         </div>
 
         <div className="transport-controls">
+          <label className="field title-field">
+            <span>Title</span>
+            <input
+              type="text"
+              value={project.title}
+              onChange={(event) => updateProject((current) => ({ ...current, title: event.target.value }))}
+            />
+          </label>
           <label className="field compact">
             <span>BPM</span>
             <input
@@ -265,7 +350,11 @@ export function App(): ReactElement {
             {isPlaying ? <CircleStop size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
             <span>{isPlaying ? "Stop" : "Play"}</span>
           </button>
-          <button className="icon-button" type="button" title="Save project">
+          <button className="icon-button" type="button" title="Open project" onClick={() => void handleOpenProject()}>
+            <FolderOpen size={18} aria-hidden="true" />
+            <span>Open</span>
+          </button>
+          <button className="icon-button" type="button" title="Save project" onClick={() => void handleSaveProject()}>
             <Save size={18} aria-hidden="true" />
             <span>Save</span>
           </button>
@@ -277,6 +366,13 @@ export function App(): ReactElement {
       </header>
 
       <section className="mode-row" aria-label="Mode">
+        <input
+          ref={importInputRef}
+          className="file-input"
+          type="file"
+          accept=".json,.grooveforge.json,application/json"
+          onChange={handleImportFile}
+        />
         <div className="segmented">
           <button
             className={project.mode === "guided" ? "selected" : ""}
@@ -298,6 +394,7 @@ export function App(): ReactElement {
           <span>{project.key}</span>
           <span>{activeChannels} active channels</span>
           <span>{project.masterPreset}</span>
+          <span>{projectStatus}</span>
         </div>
       </section>
 
@@ -688,4 +785,21 @@ function sortBassNotes(notes: BassNote[]): BassNote[] {
 
 function sortMelodyNotes(notes: MelodyNote[]): MelodyNote[] {
   return [...notes].sort((first, second) => first.step - second.step || first.pitch.localeCompare(second.pitch));
+}
+
+function downloadProjectFile(contents: string, fileName: string): void {
+  const blob = new Blob([contents], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function fileDisplayName(filePath?: string): string {
+  if (!filePath) {
+    return "project file";
+  }
+  return filePath.split(/[\\/]/).pop() || "project file";
 }
