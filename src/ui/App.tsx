@@ -32,7 +32,9 @@ import {
   ExportAnalysis,
   exportStems,
   exportWav,
+  StemExportAnalyses,
   stemTrackIds,
+  stemTrackLabel,
   StemTrackId
 } from "../audio/render";
 import { PlaybackController, PlaybackMode, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
@@ -140,6 +142,16 @@ type SelectedNote = {
   track: NoteTrack;
   step: number;
   pitch: string;
+};
+
+type MixCoachTone = "good" | "warn" | "danger";
+
+type MixCoachCheck = {
+  id: string;
+  label: string;
+  status: string;
+  detail: string;
+  tone: MixCoachTone;
 };
 
 type SelectedDrumStep = {
@@ -2426,6 +2438,7 @@ export function App(): ReactElement {
             <span>{project.masterCeilingDb} dB ceiling</span>
           </div>
           <ExportMeter analysis={exportAnalysis} />
+          <MixCoach analysis={exportAnalysis} stemAnalyses={stemAnalyses} />
           <label>
             <span>Ceiling</span>
             <input
@@ -2491,6 +2504,185 @@ function ExportMeter({ analysis }: { analysis: ExportAnalysis }): ReactElement {
       </div>
     </div>
   );
+}
+
+function MixCoach({
+  analysis,
+  stemAnalyses
+}: {
+  analysis: ExportAnalysis;
+  stemAnalyses: StemExportAnalyses;
+}): ReactElement {
+  const checks = createMixCoachChecks(analysis, stemAnalyses);
+
+  return (
+    <div className="mix-coach" data-testid="mix-coach">
+      <div className="mix-coach-heading">
+        <span>Mix Coach</span>
+        <strong data-testid="mix-coach-summary">{mixCoachSummary(checks)}</strong>
+      </div>
+      <div className="mix-coach-list">
+        {checks.map((check) => (
+          <div className={`mix-coach-card ${check.tone}`} data-testid={`mix-coach-check-${check.id}`} key={check.id}>
+            <span>{check.label}</span>
+            <strong>{check.status}</strong>
+            <p>{check.detail}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function createMixCoachChecks(analysis: ExportAnalysis, stemAnalyses: StemExportAnalyses): MixCoachCheck[] {
+  const audibleStems = stemTrackIds
+    .map((track) => ({ track, analysis: stemAnalyses[track] }))
+    .filter((entry) => Number.isFinite(entry.analysis.rmsDb));
+  const loudestStem = audibleStems.reduce<(typeof audibleStems)[number] | undefined>(
+    (loudest, entry) => (!loudest || entry.analysis.rmsDb > loudest.analysis.rmsDb ? entry : loudest),
+    undefined
+  );
+  const quietestStem = audibleStems.reduce<(typeof audibleStems)[number] | undefined>(
+    (quietest, entry) => (!quietest || entry.analysis.rmsDb < quietest.analysis.rmsDb ? entry : quietest),
+    undefined
+  );
+  const stemSpread =
+    loudestStem && quietestStem ? Math.max(0, loudestStem.analysis.rmsDb - quietestStem.analysis.rmsDb) : 0;
+  const drums = stemAnalyses.drum_rack;
+  const bass = stemAnalyses.bass_808;
+  const lowEndDelta =
+    Number.isFinite(drums.rmsDb) && Number.isFinite(bass.rmsDb) ? bass.rmsDb - drums.rmsDb : null;
+
+  return [
+    masterHeadroomCheck(analysis),
+    limiterCheck(analysis),
+    stemBalanceCheck(loudestStem, quietestStem, stemSpread),
+    lowEndBlendCheck(lowEndDelta)
+  ];
+}
+
+function masterHeadroomCheck(analysis: ExportAnalysis): MixCoachCheck {
+  if (analysis.status === "Silent") {
+    return {
+      id: "headroom",
+      label: "Master headroom",
+      status: "No signal",
+      detail: "Add or unmute musical events before judging the master.",
+      tone: "danger"
+    };
+  }
+  if (analysis.headroomDb < 0.5) {
+    return {
+      id: "headroom",
+      label: "Master headroom",
+      status: "Tight",
+      detail: `Only ${formatDb(analysis.headroomDb)} remains before the ceiling.`,
+      tone: "warn"
+    };
+  }
+  return {
+    id: "headroom",
+    label: "Master headroom",
+    status: "Open",
+    detail: `${formatDb(analysis.headroomDb)} remains before the ceiling.`,
+    tone: "good"
+  };
+}
+
+function limiterCheck(analysis: ExportAnalysis): MixCoachCheck {
+  if (analysis.limitedSamples > 0) {
+    return {
+      id: "limiter",
+      label: "Limiter activity",
+      status: "Catching peaks",
+      detail: `${formatPercent(analysis.limitedPercent)} of rendered samples hit the ceiling.`,
+      tone: analysis.limitedPercent > 0.1 ? "warn" : "good"
+    };
+  }
+  return {
+    id: "limiter",
+    label: "Limiter activity",
+    status: "Clear",
+    detail: "No rendered samples hit the ceiling.",
+    tone: "good"
+  };
+}
+
+function stemBalanceCheck(
+  loudestStem: { track: StemTrackId; analysis: ExportAnalysis } | undefined,
+  quietestStem: { track: StemTrackId; analysis: ExportAnalysis } | undefined,
+  stemSpread: number
+): MixCoachCheck {
+  if (!loudestStem || !quietestStem) {
+    return {
+      id: "stem-balance",
+      label: "Stem balance",
+      status: "No signal",
+      detail: "Unmute at least two core stems before comparing balance.",
+      tone: "danger"
+    };
+  }
+  if (stemSpread > 18) {
+    return {
+      id: "stem-balance",
+      label: "Stem balance",
+      status: "Wide spread",
+      detail: `RMS spread is ${stemSpread.toFixed(1)} dB from ${stemTrackLabel(loudestStem.track)} to ${stemTrackLabel(quietestStem.track)}.`,
+      tone: "warn"
+    };
+  }
+  return {
+    id: "stem-balance",
+    label: "Stem balance",
+    status: "Connected",
+    detail: `RMS spread is ${stemSpread.toFixed(1)} dB from ${stemTrackLabel(loudestStem.track)} to ${stemTrackLabel(quietestStem.track)}.`,
+    tone: "good"
+  };
+}
+
+function lowEndBlendCheck(lowEndDelta: number | null): MixCoachCheck {
+  if (lowEndDelta === null) {
+    return {
+      id: "low-end",
+      label: "Low-end blend",
+      status: "No comparison",
+      detail: "Drums and 808 both need signal for low-end balance.",
+      tone: "danger"
+    };
+  }
+  if (lowEndDelta > 6) {
+    return {
+      id: "low-end",
+      label: "Low-end blend",
+      status: "808 forward",
+      detail: `808 is ${lowEndDelta.toFixed(1)} dB RMS above drums.`,
+      tone: "warn"
+    };
+  }
+  if (lowEndDelta < -12) {
+    return {
+      id: "low-end",
+      label: "Low-end blend",
+      status: "Drums forward",
+      detail: `Drums are ${Math.abs(lowEndDelta).toFixed(1)} dB RMS above 808.`,
+      tone: "warn"
+    };
+  }
+  return {
+    id: "low-end",
+    label: "Low-end blend",
+    status: "Balanced",
+    detail: `808 is ${lowEndDelta.toFixed(1)} dB RMS relative to drums.`,
+    tone: "good"
+  };
+}
+
+function mixCoachSummary(checks: MixCoachCheck[]): string {
+  const warningCount = checks.filter((check) => check.tone !== "good").length;
+  if (warningCount === 0) {
+    return "Ready checks";
+  }
+  return `${warningCount} check${warningCount === 1 ? "" : "s"} to review`;
 }
 
 function MeterBar({

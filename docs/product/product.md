@@ -60,7 +60,7 @@ Primary feature areas:
 - Pattern editor: drum step sequencer, bass grid, chord progression, melody grid, variation A/B/C.
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with per-block bar lengths, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
-- Mixer/master: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, master preset ceiling, limiter, loudness/peak metering.
+- Mixer/master: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, master preset ceiling, limiter, loudness/peak metering.
 - Export: WAV export, stem export, and arrangement MIDI export after the event/render paths are reliable.
 
 ## First-Class Data
@@ -128,7 +128,7 @@ MVP capabilities:
 - Transport playback modes for full arrangement playback by default and fast selected-pattern preview while editing.
 - Realtime metronome toggle with accented downbeat clicks that helps users program to the grid during playback without adding click audio to WAV or stem export.
 - Live playback reads the current project while scheduling future steps, so selected-pattern preview, arrangement block edits, arrangement track mutes, arrangement length, arrangement energy, BPM, mixer, sound, and master changes can be heard without stopping and restarting.
-- Mixer volume, pan, mute, solo, low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, and per-stem export level meters reflected in deterministic render feedback.
+- Mixer volume, pan, mute, solo, low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, and deterministic Mix Coach checks reflected in deterministic render feedback.
 - Master preset ceiling and output gain.
 - Reproducible export peak/RMS/headroom meter with limiter activity status for the current arrangement.
 - Local project save/load as a `.grooveforge.json` file.
@@ -148,7 +148,7 @@ Phase 3 adds melody/chords: simple poly synth, scale lock, chord progression pre
 
 Phase 4 adds arrangement and editing speed: pattern blocks, song section markers, per-block bar lengths, arrangement templates, duplicate/move/delete, split/merge controls, desktop editing shortcuts, then deeper mute/reorder refinements, and variation A/B/C.
 
-Phase 5 adds mixer/master/export: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, master preset ceiling first, then limiter, peak/LUFS metering, WAV export, stem export, and MIDI export.
+Phase 5 adds mixer/master/export: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, master preset ceiling first, then limiter, peak/LUFS metering, WAV export, stem export, and MIDI export.
 
 Phase 6 scopes optional sampling as an extension only after the beat-making core is useful: audio import, sampler mapping, chopping, reverse, pitch, and stretch.
 

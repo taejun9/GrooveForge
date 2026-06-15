@@ -1490,6 +1490,71 @@ input[type="range"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.mix-coach {
+  display: grid;
+  gap: 9px;
+  border: 1px solid rgba(138, 168, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(138, 168, 255, 0.055);
+  padding: 10px;
+}
+
+.mix-coach-heading {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.mix-coach-heading span {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 11px;
+}
+
+.mix-coach-heading strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.mix-coach-list {
+  display: grid;
+  gap: 7px;
+}
+
+.mix-coach-card {
+  display: grid;
+  gap: 4px;
+  border-inline-start: 3px solid #78f0c8;
+  border-radius: 6px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 8px 9px;
+}
+
+.mix-coach-card.warn {
+  border-inline-start-color: #f0c36a;
+}
+
+.mix-coach-card.danger {
+  border-inline-start-color: #ff7a4f;
+}
+
+.mix-coach-card span {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 11px;
+}
+
+.mix-coach-card strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.mix-coach-card p {
+  margin: 0;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .preset-row {
   display: grid;
   gap: 7px;
