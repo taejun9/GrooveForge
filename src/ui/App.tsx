@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { exportWav } from "../audio/render";
+import { exportStems, exportWav } from "../audio/render";
 import { PlaybackController, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
 import {
   ArrangementBlock,
@@ -475,6 +475,26 @@ export function App(): ReactElement {
     }
   }
 
+  function handleExportWav(): void {
+    try {
+      exportWav(project);
+      setProjectStatus("Exported mix WAV");
+    } catch (error) {
+      console.error(error);
+      setProjectStatus("WAV export failed");
+    }
+  }
+
+  function handleExportStems(): void {
+    try {
+      const fileNames = exportStems(project);
+      setProjectStatus(`Exported ${fileNames.length} stems`);
+    } catch (error) {
+      console.error(error);
+      setProjectStatus("Stem export failed");
+    }
+  }
+
   function selectStyle(styleId: ProjectState["styleId"]): void {
     const nextStyle = styleProfiles.find((candidate) => candidate.id === styleId);
     if (!nextStyle) {
@@ -560,9 +580,13 @@ export function App(): ReactElement {
             <Save size={18} aria-hidden="true" />
             <span>Save</span>
           </button>
-          <button className="icon-button" type="button" title="Export WAV" onClick={() => exportWav(project)}>
+          <button className="icon-button" type="button" title="Export WAV" onClick={handleExportWav}>
             <Download size={18} aria-hidden="true" />
             <span>WAV</span>
+          </button>
+          <button className="icon-button" data-testid="export-stems" type="button" title="Export stem WAVs" onClick={handleExportStems}>
+            <Download size={18} aria-hidden="true" />
+            <span>Stems</span>
           </button>
         </div>
       </header>

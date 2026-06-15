@@ -78,6 +78,8 @@ Arrangement structure work must preserve at least one block, keep selection/patt
 
 Export work must verify a non-silent WAV with expected duration, expected sample rate/channel count, no audio frames above the selected ceiling, and reproducibility from saved project data.
 
+Stem export work must render isolated drum, 808, synth, and chord WAV files from the current arrangement, keep full-mix WAV export intact, and avoid depending on imported audio or sample assets.
+
 Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation, sound design, arrangement, mixing/mastering, and export first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, or plan titles.
 
 Any new plan that mentions sample import, chopping, sampler tracks, or audio warping must explicitly mark that work as optional sampling-phase work or document the user-approved exception in its Decision Log.

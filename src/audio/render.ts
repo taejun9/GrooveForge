@@ -5,11 +5,15 @@ import {
   patternForSlot,
   projectStepDurationSeconds,
   ProjectState,
-  SoundDesign
+  SoundDesign,
+  TrackType
 } from "../domain/workstation";
 
 const sampleRate = 44100;
 const channels = 2;
+export const stemTrackIds = ["drum_rack", "bass_808", "synth", "chord"] as const;
+export type StemTrackId = (typeof stemTrackIds)[number];
+
 type AudioChannels = [Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>];
 type ChannelMix = {
   gain: number;
@@ -25,10 +29,13 @@ function hasSolo(project: ProjectState): boolean {
   return project.mixer.some((track) => track.id !== "master" && track.solo);
 }
 
-function channelMix(project: ProjectState, id: string): ChannelMix {
+function channelMix(project: ProjectState, id: TrackType, stemTarget?: StemTrackId): ChannelMix {
   const channel = project.mixer.find((track) => track.id === id);
+  if (stemTarget && id !== stemTarget) {
+    return { gain: 0, left: 0, right: 0 };
+  }
   const soloActive = hasSolo(project);
-  if (!channel || channel.muted || (id !== "master" && soloActive && !channel.solo)) {
+  if (!channel || (!stemTarget && channel.muted) || (!stemTarget && id !== "master" && soloActive && !channel.solo)) {
     return { gain: 0, left: 0, right: 0 };
   }
 
@@ -130,16 +137,16 @@ function synthShape(sound: SoundDesign): ToneShape {
   return sound.synthBrightness > 0.46 ? "triangle" : "sine";
 }
 
-function renderProject(project: ProjectState, bars = arrangementBarCount(project)): AudioChannels {
+function renderProject(project: ProjectState, bars = arrangementBarCount(project), stemTarget?: StemTrackId): AudioChannels {
   const step = stepDuration(project);
   const totalSteps = bars * 16;
   const duration = totalSteps * step;
   const frames = Math.ceil(duration * sampleRate);
   const buffer: AudioChannels = [new Float32Array(frames), new Float32Array(frames)];
-  const drumMix = channelMix(project, "drum_rack");
-  const bassMix = channelMix(project, "bass_808");
-  const synthMix = channelMix(project, "synth");
-  const chordMix = channelMix(project, "chord");
+  const drumMix = channelMix(project, "drum_rack", stemTarget);
+  const bassMix = channelMix(project, "bass_808", stemTarget);
+  const synthMix = channelMix(project, "synth", stemTarget);
+  const chordMix = channelMix(project, "chord", stemTarget);
   const sound = project.sound;
   const outputGain = masterOutputGain(project);
 
@@ -226,6 +233,16 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   return buffer;
 }
 
+export function stemTrackLabel(track: StemTrackId): string {
+  const labels: Record<StemTrackId, string> = {
+    drum_rack: "Drums",
+    bass_808: "808",
+    synth: "Synth",
+    chord: "Chords"
+  };
+  return labels[track];
+}
+
 function writeString(view: DataView, offset: number, value: string): void {
   for (let index = 0; index < value.length; index += 1) {
     view.setUint8(offset + index, value.charCodeAt(index));
@@ -264,12 +281,30 @@ function encodeWav(buffer: AudioChannels): Blob {
   return new Blob([arrayBuffer], { type: "audio/wav" });
 }
 
-export function exportWav(project: ProjectState): void {
-  const blob = encodeWav(renderProject(project));
+function projectSlug(project: ProjectState): string {
+  return project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "grooveforge";
+}
+
+function downloadWav(buffer: AudioChannels, fileName: string): void {
+  const blob = encodeWav(buffer);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "grooveforge"}-demo.wav`;
+  link.download = fileName;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+export function exportWav(project: ProjectState): void {
+  downloadWav(renderProject(project), `${projectSlug(project)}-demo.wav`);
+}
+
+export function exportStems(project: ProjectState): string[] {
+  const slug = projectSlug(project);
+  const fileNames = stemTrackIds.map((track) => {
+    const fileName = `${slug}-${track.replace("_", "-")}-stem.wav`;
+    downloadWav(renderProject(project, arrangementBarCount(project), track), fileName);
+    return fileName;
+  });
+  return fileNames;
 }

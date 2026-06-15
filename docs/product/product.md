@@ -118,6 +118,7 @@ MVP capabilities:
 - Master preset ceiling and output gain.
 - Local project save/load as a `.grooveforge.json` file.
 - WAV export through offline rendering.
+- Stem export for isolated drum, 808, synth, and chord WAV files from the current arrangement.
 
 ## Roadmap
 
