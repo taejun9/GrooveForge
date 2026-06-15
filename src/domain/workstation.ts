@@ -481,8 +481,7 @@ function isProjectState(value: unknown): value is ProjectState {
     isPatternMap(value.patterns) &&
     Array.isArray(value.mixer) &&
     value.mixer.every(isMixerChannel) &&
-    Array.isArray(value.arrangement) &&
-    value.arrangement.every(isArrangementBlock) &&
+    isArrangement(value.arrangement) &&
     isFiniteNumber(value.masterCeilingDb) &&
     isOneOf(value.masterPreset, ["Clean Demo", "Streaming Safe", "Headroom for Vocal"])
   );
@@ -508,8 +507,7 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patt
     value.melodyNotes.every(isMelodyNote) &&
     Array.isArray(value.mixer) &&
     value.mixer.every(isMixerChannel) &&
-    Array.isArray(value.arrangement) &&
-    value.arrangement.every(isArrangementBlock) &&
+    isArrangement(value.arrangement) &&
     isFiniteNumber(value.masterCeilingDb) &&
     isOneOf(value.masterPreset, ["Clean Demo", "Streaming Safe", "Headroom for Vocal"])
   );
@@ -579,6 +577,10 @@ function isMixerChannel(value: unknown): value is MixerChannel {
     typeof value.solo === "boolean" &&
     typeof value.accent === "string"
   );
+}
+
+function isArrangement(value: unknown): value is ArrangementBlock[] {
+  return Array.isArray(value) && value.length > 0 && value.every(isArrangementBlock);
 }
 
 function isArrangementBlock(value: unknown): value is ArrangementBlock {

@@ -16,6 +16,10 @@ function channelGain(project: ProjectState, id: string): number {
   return dbToGain(channel.volumeDb);
 }
 
+function arrangementBarCount(project: ProjectState): number {
+  return Math.max(1, project.arrangement.length);
+}
+
 function addSine(buffer: AudioChannels, start: number, duration: number, frequency: number, gain: number): void {
   const startFrame = Math.max(0, Math.floor(start * sampleRate));
   const frames = Math.max(1, Math.floor(duration * sampleRate));
@@ -40,7 +44,7 @@ function addNoise(buffer: AudioChannels, start: number, duration: number, gain: 
   }
 }
 
-function renderProject(project: ProjectState, bars = 8): AudioChannels {
+function renderProject(project: ProjectState, bars = arrangementBarCount(project)): AudioChannels {
   const step = stepDuration(project);
   const totalSteps = bars * 16;
   const duration = totalSteps * step;

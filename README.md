@@ -27,10 +27,10 @@ The first usable result is an Electron desktop workstation that can create a sam
 
 - 145 BPM / F minor starter project.
 - Kick, snare/clap, hat, 808, and synth melody tracks.
-- Independent Pattern A/B/C variations and editable arrangement blocks.
+- Independent Pattern A/B/C variations and editable arrangement blocks with duplicate, move, and delete controls.
 - Basic mixer volume/pan, master limiter, and WAV export.
 
-The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport, style/key/BPM, drum steps, editable scale-aware 808/melody lanes, instruments, editable arrangement blocks, mixer, master, local project save/load, realtime loop playback, and WAV export.
+The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport, style/key/BPM, drum steps, editable scale-aware 808/melody lanes, instruments, editable arrangement blocks, arrangement structure controls, mixer, master, local project save/load, realtime loop playback, and arrangement-length WAV export.
 
 ## Core Direction
 

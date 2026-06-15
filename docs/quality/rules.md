@@ -70,6 +70,8 @@ Pattern work must keep Pattern A/B/C as independent editable event data. Realtim
 
 Arrangement editor work must let users change a block's section, Pattern A/B/C assignment, and energy without losing existing pattern, mixer, master, or save/load data. Selecting or reassigning a block should keep the pattern editor aligned with that block's assigned pattern.
 
+Arrangement structure work must preserve at least one block, keep selection/pattern alignment after duplicate, move, and delete actions, and make WAV export follow the current arrangement length.
+
 Export work must verify a non-silent WAV with expected duration, expected sample rate/channel count, no audio frames above the selected ceiling, and reproducibility from saved project data.
 
 Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation, sound design, arrangement, mixing/mastering, and export first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, or plan titles.

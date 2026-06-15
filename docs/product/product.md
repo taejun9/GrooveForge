@@ -54,7 +54,7 @@ Primary feature areas:
 - Transport: BPM, key, play, stop, loop, metronome.
 - Pattern editor: drum step sequencer, bass grid, melody grid, variation A/B/C.
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
-- Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures.
+- Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with duplicate, move, and delete controls.
 - Mixer/master: volume, pan, mute, solo, EQ, compressor, saturation, sends, limiter, loudness/peak metering.
 - Export: WAV export first, then stems after the render path is reliable.
 
@@ -111,7 +111,7 @@ MVP capabilities:
 - Synth 808/bass track with editable scale-aware grid, mono mode, glide, and saturation direction.
 - Simple synth melody track with editable scale-aware grid and velocity control.
 - Independent Pattern A/B/C storage for drum, bass, and melody variations.
-- Editable arrangement blocks for an 8-bar loop or simple song section, using assigned Pattern A/B/C data and per-block energy.
+- Editable arrangement blocks for an 8-bar loop or simple song section, using assigned Pattern A/B/C data, per-block energy, and structure controls for duplicate, move, and delete.
 - Mixer volume and pan.
 - Master limiter.
 - Local project save/load as a `.grooveforge.json` file.
@@ -127,7 +127,7 @@ Phase 2 builds 808/bass: monophonic synth, piano-roll style editor, glide, pitch
 
 Phase 3 adds melody/chords: simple poly synth, scale lock, chord pad, melody grid, and preset patches.
 
-Phase 4 adds arrangement: pattern blocks, song section markers, duplicate/split/mute, and variation A/B/C.
+Phase 4 adds arrangement: pattern blocks, song section markers, duplicate/move/delete first, then split/mute/reorder refinements, and variation A/B/C.
 
 Phase 5 adds mixer/master/export: volume, pan, mute, solo, EQ, compressor, saturation, limiter, peak/LUFS metering, WAV export, and later stem export.
 

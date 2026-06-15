@@ -49,7 +49,7 @@ TEXT_EXPECTATIONS = {
         "Direct composition is the product spine",
         "Sampling is a secondary add-on.",
         "local project save/load",
-        "Independent Pattern A/B/C variations and editable arrangement blocks",
+        "Independent Pattern A/B/C variations and editable arrangement blocks with duplicate, move, and delete controls",
         "npm run desktop",
     ],
     "AGENTS.md": [
@@ -63,6 +63,7 @@ TEXT_EXPECTATIONS = {
         "Local project save/load",
         "Independent Pattern A/B/C storage",
         "Editable arrangement blocks",
+        "duplicate, move, and delete controls",
     ],
     "docs/quality/rules.md": [
         "QA and review are separate loops.",
@@ -70,6 +71,7 @@ TEXT_EXPECTATIONS = {
         "Project file work must reject invalid imports",
         "Pattern work must keep Pattern A/B/C as independent editable event data",
         "Arrangement editor work must let users change a block's section",
+        "Arrangement structure work must preserve at least one block",
         "sample import, chopping, sampler tracks, or audio warping",
     ],
     "docs/references/official-sources.md": [
@@ -112,9 +114,14 @@ TEXT_EXPECTATIONS = {
         "selectPattern",
         "selectedArrangementIndex",
         "updateArrangementBlock",
+        "duplicateArrangementBlock",
+        "moveArrangementBlock",
+        "deleteArrangementBlock",
         "Selected arrangement block editor",
         "arrangement-section-select",
         "arrangement-energy-input",
+        "arrangement-duplicate",
+        "arrangement-delete",
     ],
     "src/audio/scheduler.ts": [
         "scheduleAheadSeconds",
@@ -125,6 +132,7 @@ TEXT_EXPECTATIONS = {
     "src/audio/render.ts": [
         "patternForSlot",
         "arrangementBlock",
+        "arrangementBarCount",
     ],
     "src/domain/workstation.ts": [
         "styleProfiles",

@@ -1,5 +1,8 @@
 import {
+  ArrowLeft,
+  ArrowRight,
   CircleStop,
+  Copy,
   Disc3,
   Download,
   Drum,
@@ -11,6 +14,7 @@ import {
   Save,
   SlidersHorizontal,
   Sparkles,
+  Trash2,
   Waves
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode } from "react";
@@ -157,6 +161,71 @@ export function App(): ReactElement {
       };
     });
     setSelectedNote(null);
+  }
+
+  function duplicateArrangementBlock(): void {
+    setProject((current) => {
+      const source = current.arrangement[selectedArrangementIndex] ?? current.arrangement[0];
+      if (!source) {
+        return current;
+      }
+      const nextIndex = Math.min(selectedArrangementIndex + 1, current.arrangement.length);
+      setSelectedArrangementIndex(nextIndex);
+      return {
+        ...current,
+        selectedPattern: source.pattern,
+        arrangement: [
+          ...current.arrangement.slice(0, nextIndex),
+          { ...source },
+          ...current.arrangement.slice(nextIndex)
+        ]
+      };
+    });
+    setSelectedNote(null);
+    setProjectStatus("Duplicated arrangement block");
+  }
+
+  function moveArrangementBlock(direction: -1 | 1): void {
+    setProject((current) => {
+      const fromIndex = selectedArrangementIndex;
+      const toIndex = fromIndex + direction;
+      const movingBlock = current.arrangement[fromIndex];
+      if (!movingBlock || toIndex < 0 || toIndex >= current.arrangement.length) {
+        return current;
+      }
+
+      const arrangement = [...current.arrangement];
+      arrangement.splice(fromIndex, 1);
+      arrangement.splice(toIndex, 0, movingBlock);
+      setSelectedArrangementIndex(toIndex);
+      return {
+        ...current,
+        selectedPattern: movingBlock.pattern,
+        arrangement
+      };
+    });
+    setSelectedNote(null);
+    setProjectStatus(direction < 0 ? "Moved block left" : "Moved block right");
+  }
+
+  function deleteArrangementBlock(): void {
+    setProject((current) => {
+      if (current.arrangement.length <= 1) {
+        return current;
+      }
+
+      const arrangement = current.arrangement.filter((_, index) => index !== selectedArrangementIndex);
+      const nextIndex = Math.min(selectedArrangementIndex, arrangement.length - 1);
+      const nextBlock = arrangement[nextIndex];
+      setSelectedArrangementIndex(nextIndex);
+      return {
+        ...current,
+        selectedPattern: nextBlock.pattern,
+        arrangement
+      };
+    });
+    setSelectedNote(null);
+    setProjectStatus(project.arrangement.length <= 1 ? "Arrangement needs one block" : "Deleted arrangement block");
   }
 
   function toggleStep(lane: DrumLane, step: number): void {
@@ -669,6 +738,47 @@ export function App(): ReactElement {
                   />
                 </div>
               </label>
+              <div className="arrangement-actions" aria-label="Arrangement structure actions">
+                <button
+                  data-testid="arrangement-move-left"
+                  disabled={selectedArrangementIndex === 0}
+                  onClick={() => moveArrangementBlock(-1)}
+                  title="Move selected block left"
+                  type="button"
+                >
+                  <ArrowLeft size={15} aria-hidden="true" />
+                  <span>Move</span>
+                </button>
+                <button
+                  data-testid="arrangement-move-right"
+                  disabled={selectedArrangementIndex >= project.arrangement.length - 1}
+                  onClick={() => moveArrangementBlock(1)}
+                  title="Move selected block right"
+                  type="button"
+                >
+                  <ArrowRight size={15} aria-hidden="true" />
+                  <span>Move</span>
+                </button>
+                <button
+                  data-testid="arrangement-duplicate"
+                  onClick={duplicateArrangementBlock}
+                  title="Duplicate selected block"
+                  type="button"
+                >
+                  <Copy size={15} aria-hidden="true" />
+                  <span>Duplicate</span>
+                </button>
+                <button
+                  data-testid="arrangement-delete"
+                  disabled={project.arrangement.length <= 1}
+                  onClick={deleteArrangementBlock}
+                  title="Delete selected block"
+                  type="button"
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  <span>Delete</span>
+                </button>
+              </div>
             </div>
           )}
         </section>

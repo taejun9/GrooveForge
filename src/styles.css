@@ -551,7 +551,7 @@ input[type="range"] {
 
 .arrangement-track {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
   gap: 6px;
   align-items: stretch;
   min-width: 0;
@@ -664,6 +664,30 @@ input[type="range"] {
   color: #f4efe7;
   background: #141413;
   padding: 0 8px;
+}
+
+.arrangement-actions {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(84px, 1fr));
+  gap: 8px;
+}
+
+.arrangement-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 6px;
+  color: #f4efe7;
+  background: rgba(244, 239, 231, 0.06);
+}
+
+.arrangement-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .mixer-strips {
