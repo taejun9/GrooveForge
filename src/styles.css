@@ -47,6 +47,7 @@ button {
 .delivery-target-row,
 .session-brief-row,
 .beat-passport,
+.handoff-pack,
 .beat-readiness,
 .beat-map,
 .next-move,
@@ -80,6 +81,7 @@ button {
 .delivery-target-heading > div,
 .session-brief-heading > div,
 .beat-passport-heading > div,
+.handoff-pack-heading > div,
 .beat-map-heading > div,
 .next-move-heading > div,
 .snapshot-heading > div {
@@ -1240,6 +1242,155 @@ h2 {
 .beat-passport-card small {
   color: rgba(244, 239, 231, 0.68);
   font-size: 10px;
+}
+
+.handoff-pack {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  min-height: 84px;
+  border-color: rgba(120, 240, 200, 0.18);
+  border-radius: 8px;
+  background: rgba(120, 240, 200, 0.04);
+  padding: 10px;
+}
+
+.handoff-pack.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.handoff-pack.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.handoff-pack-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.handoff-pack-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.handoff-pack-heading svg {
+  color: #78f0c8;
+}
+
+.handoff-pack.warn .handoff-pack-heading svg {
+  color: #f0c36a;
+}
+
+.handoff-pack.danger .handoff-pack-heading svg {
+  color: #ff7a4f;
+}
+
+.handoff-pack-heading strong,
+.handoff-pack-heading small,
+.handoff-pack-card span,
+.handoff-pack-card strong,
+.handoff-pack-card small,
+.handoff-pack-card button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.handoff-pack-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.handoff-pack-heading small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.handoff-pack-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.handoff-pack-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 74px;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-inline-start: 3px solid #78f0c8;
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 8px;
+}
+
+.handoff-pack-card.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  border-inline-start-color: #f0c36a;
+}
+
+.handoff-pack-card.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  border-inline-start-color: #ff7a4f;
+}
+
+.handoff-pack-card > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.handoff-pack-card span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.handoff-pack-card strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.handoff-pack-card small {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
+}
+
+.handoff-pack-card button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.handoff-pack-card button.good {
+  border-color: rgba(120, 240, 200, 0.34);
+  background: rgba(120, 240, 200, 0.08);
+}
+
+.handoff-pack-card button.warn {
+  border-color: rgba(240, 195, 106, 0.34);
+  background: rgba(240, 195, 106, 0.08);
+}
+
+.handoff-pack-card button.danger {
+  border-color: rgba(255, 122, 79, 0.38);
+  background: rgba(255, 122, 79, 0.08);
 }
 
 .beat-readiness {
@@ -4173,8 +4324,16 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .handoff-pack {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
   .beat-passport-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .handoff-pack-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .beat-map-metrics {

@@ -721,6 +721,16 @@ type BeatPassportSummary = {
   metrics: BeatPassportMetric[];
 };
 
+type HandoffPackItem = {
+  id: "wav" | "stems" | "midi" | "sheet";
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+  buttonLabel: string;
+  run: () => void;
+};
+
 type SelectedDrumStep = {
   lane: DrumLane;
   step: number;
@@ -3434,6 +3444,16 @@ export function App(): ReactElement {
 
       <BeatPassport summary={beatPassportSummary} />
 
+      <HandoffPack
+        analysis={exportAnalysis}
+        project={project}
+        stemAnalyses={stemAnalyses}
+        onExportHandoffSheet={handleExportHandoffSheet}
+        onExportMidi={handleExportMidi}
+        onExportStems={handleExportStems}
+        onExportWav={handleExportWav}
+      />
+
       <BeatReadiness checks={beatReadinessChecks} />
 
       <BeatMap summary={beatMapSummary} actions={beatMapActions} onRun={runNextMove} />
@@ -5017,6 +5037,74 @@ function BeatPassport({ summary }: { summary: BeatPassportSummary }): ReactEleme
   );
 }
 
+function HandoffPack({
+  analysis,
+  project,
+  stemAnalyses,
+  onExportHandoffSheet,
+  onExportMidi,
+  onExportStems,
+  onExportWav
+}: {
+  analysis: ExportAnalysis;
+  project: ProjectState;
+  stemAnalyses: StemExportAnalyses;
+  onExportHandoffSheet: () => void;
+  onExportMidi: () => void;
+  onExportStems: () => void;
+  onExportWav: () => void;
+}): ReactElement {
+  const items = createHandoffPackItems({
+    analysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet,
+    onExportMidi,
+    onExportStems,
+    onExportWav
+  });
+  const readyCount = items.filter((item) => item.tone === "good").length;
+  const tone = weakestTone(items.map((item) => item.tone));
+
+  return (
+    <section className={`handoff-pack ${tone}`} data-testid="handoff-pack" aria-label="Handoff pack">
+      <div className="handoff-pack-heading">
+        <div>
+          <Download size={17} aria-hidden="true" />
+          <span>Handoff Pack</span>
+        </div>
+        <strong data-testid="handoff-pack-summary">
+          {readyCount}/{items.length} ready
+        </strong>
+        <small data-testid="handoff-pack-detail">
+          {handoffSheetFileName(project)}
+        </small>
+      </div>
+      <div className="handoff-pack-grid" data-testid="handoff-pack-grid">
+        {items.map((item) => (
+          <div className={`handoff-pack-card ${item.tone}`} data-testid={`handoff-pack-${item.id}`} key={item.id}>
+            <div>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+              <small>{item.detail}</small>
+            </div>
+            <button
+              className={item.tone}
+              data-testid={`handoff-pack-action-${item.id}`}
+              onClick={item.run}
+              title={item.detail}
+              type="button"
+            >
+              <Download size={14} aria-hidden="true" />
+              <span>{item.buttonLabel}</span>
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function BeatMap({
   actions,
   onRun,
@@ -5797,6 +5885,74 @@ function createBeatPassportSummary(
       }
     ]
   };
+}
+
+function createHandoffPackItems({
+  analysis,
+  project,
+  stemAnalyses,
+  onExportHandoffSheet,
+  onExportMidi,
+  onExportStems,
+  onExportWav
+}: {
+  analysis: ExportAnalysis;
+  project: ProjectState;
+  stemAnalyses: StemExportAnalyses;
+  onExportHandoffSheet: () => void;
+  onExportMidi: () => void;
+  onExportStems: () => void;
+  onExportWav: () => void;
+}): HandoffPackItem[] {
+  const bars = arrangementTotalBars(project);
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const target = activeDeliveryTarget(project);
+  const briefFields = sessionBriefFilledFields(project.sessionBrief);
+  const exportTone: MixCoachTone = analysis.status === "Ready" ? "good" : analysis.status === "Silent" ? "danger" : "warn";
+  const stemTone: MixCoachTone =
+    audibleStems.length === stemTrackIds.length ? "good" : audibleStems.length >= Math.min(2, stemTrackIds.length) ? "warn" : "danger";
+  const midiTone: MixCoachTone = bars >= 8 ? "good" : bars >= 4 ? "warn" : "danger";
+  const sheetTone: MixCoachTone = briefFields >= 2 ? "good" : briefFields >= 1 ? "warn" : "danger";
+  const audibleStemLabel = audibleStems.length > 0 ? audibleStems.map(stemTrackLabel).join("/") : "No audible stems";
+
+  return [
+    {
+      id: "wav",
+      label: "Mix WAV",
+      value: analysis.status,
+      detail: `${barCountLabel(bars)} / ${formatDb(analysis.peakDb)} peak`,
+      tone: exportTone,
+      buttonLabel: "WAV",
+      run: onExportWav
+    },
+    {
+      id: "stems",
+      label: "Stem WAVs",
+      value: `${audibleStems.length}/${stemTrackIds.length}`,
+      detail: audibleStemLabel,
+      tone: stemTone,
+      buttonLabel: "Stems",
+      run: onExportStems
+    },
+    {
+      id: "midi",
+      label: "Arrangement MIDI",
+      value: barCountLabel(bars),
+      detail: `Pattern ${usedPatternSlots(project).join("/") || project.selectedPattern} handoff`,
+      tone: midiTone,
+      buttonLabel: "MIDI",
+      run: onExportMidi
+    },
+    {
+      id: "sheet",
+      label: "Handoff Sheet",
+      value: `${briefFields}/4 brief`,
+      detail: `${target.name} / ${handoffSheetFileName(project)}`,
+      tone: sheetTone,
+      buttonLabel: "Sheet",
+      run: onExportHandoffSheet
+    }
+  ];
 }
 
 function createBeatMapSummary(
