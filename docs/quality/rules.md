@@ -25,6 +25,7 @@ These rules should be enforced by the local harness where practical.
 - Review starts only after QA completes.
 - Failed validation must be reported and fixed or explicitly documented.
 - Completion reviews go in `docs/reviews/` and should summarize QA, findings, residual risk, and follow-ups.
+- Strict quality scans must ignore local `.worktree/` checkouts while still checking committed docs and completed plan/review artifacts.
 
 ## Documentation Hygiene
 

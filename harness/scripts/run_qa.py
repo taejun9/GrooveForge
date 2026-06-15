@@ -115,6 +115,9 @@ TEXT_EXPECTATIONS = {
         "Sampling architecture should attach to the beat workstation",
         "Extension track types for optional sampling, later:",
     ],
+    "harness/scripts/run_qa.py": [
+        '".worktree/"',
+    ],
     "docs/references/official-sources.md": [
         "W3C Web Audio API",
         "Electron Docs",
@@ -334,6 +337,7 @@ def check_official_sources(errors: list[str]) -> None:
 
 def check_strict_todos(errors: list[str]) -> None:
     ignored_prefixes = {
+        ".worktree/",
         "dist/",
         "dist-electron/",
         "harness/templates/",
