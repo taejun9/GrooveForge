@@ -281,6 +281,29 @@ type StyleInspectorSummary = {
   patterns: StylePatternDensity[];
 };
 
+type BasslinePadId = "root" | "bounce" | "slide" | "offbeat";
+
+type BasslinePadStep = {
+  step: number;
+  degree: number;
+  length: number;
+  glide: boolean;
+  probability?: number;
+};
+
+type BasslinePadDefinition = {
+  id: BasslinePadId;
+  label: string;
+  detail: string;
+  steps: BasslinePadStep[];
+};
+
+type BasslinePadOption = BasslinePadDefinition & {
+  preview: string;
+  eventCount: number;
+  glideCount: number;
+};
+
 type MelodyMotifId = "hook" | "pocket" | "rise" | "answer";
 
 type MelodyMotifStep = {
@@ -466,6 +489,58 @@ const chordPadDefinitions: ChordPadDefinition[] = [
   { id: "color", label: "Color", detail: "float", degree: 3, quality: "sus2", inversion: 1 }
 ];
 
+const basslinePadDefinitions: BasslinePadDefinition[] = [
+  {
+    id: "root",
+    label: "Root",
+    detail: "anchor",
+    steps: [
+      { step: 0, degree: 0, length: 3, glide: false },
+      { step: 4, degree: 0, length: 2, glide: false, probability: 0.92 },
+      { step: 8, degree: 0, length: 3, glide: false },
+      { step: 12, degree: 4, length: 2, glide: false, probability: 0.92 },
+      { step: 14, degree: 0, length: 2, glide: false }
+    ]
+  },
+  {
+    id: "bounce",
+    label: "Bounce",
+    detail: "pocket",
+    steps: [
+      { step: 0, degree: 0, length: 2, glide: false },
+      { step: 3, degree: 0, length: 1, glide: false },
+      { step: 6, degree: 2, length: 2, glide: false },
+      { step: 8, degree: 0, length: 2, glide: false },
+      { step: 11, degree: 5, length: 1, glide: true, probability: 0.9 },
+      { step: 14, degree: 4, length: 2, glide: false }
+    ]
+  },
+  {
+    id: "slide",
+    label: "Slide",
+    detail: "glide",
+    steps: [
+      { step: 0, degree: 0, length: 2, glide: false },
+      { step: 3, degree: 1, length: 1, glide: true, probability: 0.92 },
+      { step: 4, degree: 2, length: 2, glide: true },
+      { step: 8, degree: 0, length: 2, glide: false },
+      { step: 12, degree: 5, length: 1, glide: true, probability: 0.92 },
+      { step: 13, degree: 4, length: 3, glide: true }
+    ]
+  },
+  {
+    id: "offbeat",
+    label: "Offbeat",
+    detail: "sync",
+    steps: [
+      { step: 2, degree: 0, length: 2, glide: false },
+      { step: 6, degree: 2, length: 2, glide: false },
+      { step: 10, degree: 0, length: 2, glide: false },
+      { step: 14, degree: 5, length: 2, glide: true }
+    ]
+  }
+];
+
 const melodyMotifDefinitions: MelodyMotifDefinition[] = [
   {
     id: "hook",
@@ -611,6 +686,7 @@ export function App(): ReactElement {
     () => createKeyboardCaptureKeyMap(keyboardCaptureTarget === "bass" ? bassPitchLanes(project.key) : melodyPitchLanes(project.key)),
     [keyboardCaptureTarget, project.key]
   );
+  const basslinePadOptions = useMemo(() => createBasslinePadOptions(project.key), [project.key]);
   const melodyMotifOptions = useMemo(() => createMelodyMotifOptions(project.key), [project.key]);
   const keyboardCaptureNextStep = nextKeyboardCaptureStep(
     currentPattern,
@@ -1708,6 +1784,29 @@ export function App(): ReactElement {
     }
 
     setSelectedNote({ track: target, step, pitch });
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
+  }
+
+  function applyBasslinePad(padId: BasslinePadId): void {
+    const pad = basslinePadDefinitions.find((candidate) => candidate.id === padId);
+    if (!pad) {
+      setProjectStatus("808 bassline pad not found");
+      return;
+    }
+
+    const bassNotes = createBasslinePadNotes(projectRef.current.key, pad);
+    const changed = updateCurrentPattern(
+      (pattern) => (sameBassNotes(pattern.bassNotes, bassNotes) ? pattern : { ...pattern, bassNotes }),
+      `${pad.label} 808 bassline applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (!changed) {
+      setProjectStatus(`${pad.label} 808 bassline already selected`);
+      return;
+    }
+
+    const firstNote = bassNotes[0];
+    setSelectedNote(firstNote ? { track: "bass", step: firstNote.step, pitch: firstNote.pitch } : null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
   }
@@ -2956,6 +3055,7 @@ export function App(): ReactElement {
             selectedNote={selectedNote}
             target={keyboardCaptureTarget}
           />
+          <BasslinePads pads={basslinePadOptions} onApply={applyBasslinePad} />
           <MelodyMotifPads motifs={melodyMotifOptions} onApply={applyMelodyMotif} />
           <div className="note-lanes">
             <NoteEditor
@@ -6096,6 +6196,38 @@ function DrumStepInspector({
   );
 }
 
+function BasslinePads({
+  pads,
+  onApply
+}: {
+  pads: BasslinePadOption[];
+  onApply: (pad: BasslinePadId) => void;
+}): ReactElement {
+  return (
+    <div className="bassline-pad-panel" data-testid="bassline-pads">
+      <div className="bassline-pad-heading">
+        <span>808 Basslines</span>
+        <strong>Low end</strong>
+      </div>
+      <div className="bassline-pad-row" aria-label="808 Bassline Pads">
+        {pads.map((pad) => (
+          <button
+            data-testid={`bassline-pad-${pad.id}`}
+            key={pad.id}
+            onClick={() => onApply(pad.id)}
+            title={`${pad.label} ${pad.preview}`}
+            type="button"
+          >
+            <span>{pad.label}</span>
+            <strong>{pad.preview}</strong>
+            <small>{pad.eventCount} notes / {pad.glideCount} glide / {pad.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MelodyMotifPads({
   motifs,
   onApply
@@ -7003,6 +7135,51 @@ function addKeyboardCaptureNote(pattern: PatternData, track: NoteTrack, step: nu
       { step, pitch, length: 1, velocity: 0.68, probability: 1 }
     ])
   };
+}
+
+function createBasslinePadOptions(key: string): BasslinePadOption[] {
+  return basslinePadDefinitions.map((pad) => {
+    const notes = createBasslinePadNotes(key, pad);
+    return {
+      ...pad,
+      preview: notes[0]?.pitch ?? "-",
+      eventCount: notes.length,
+      glideCount: notes.filter((note) => note.glide).length
+    };
+  });
+}
+
+function createBasslinePadNotes(key: string, pad: BasslinePadDefinition): BassNote[] {
+  const pitches = bassPitchLanes(key);
+  return sortBassNotes(
+    pad.steps.map((padStep) => {
+      const step = clampStepStart(padStep.step);
+      return {
+        step,
+        pitch: pitches[positiveIndex(padStep.degree, pitches.length)] ?? pitches[0] ?? "C1",
+        length: Math.min(clampStepLength(padStep.length), 16 - step),
+        glide: padStep.glide,
+        probability: normalizeEventProbability(padStep.probability ?? 1)
+      };
+    })
+  );
+}
+
+function sameBassNotes(first: BassNote[], second: BassNote[]): boolean {
+  if (first.length !== second.length) {
+    return false;
+  }
+  return first.every((note, index) => {
+    const candidate = second[index];
+    return (
+      candidate !== undefined &&
+      note.step === candidate.step &&
+      note.pitch === candidate.pitch &&
+      note.length === candidate.length &&
+      note.glide === candidate.glide &&
+      normalizeEventProbability(note.probability) === normalizeEventProbability(candidate.probability)
+    );
+  });
 }
 
 function createMelodyMotifOptions(key: string): MelodyMotifOption[] {

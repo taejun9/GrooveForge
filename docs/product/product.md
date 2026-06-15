@@ -68,7 +68,7 @@ Primary feature areas:
 - Beat blueprints: sample-free editable project starts that combine style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset.
 - Delivery Targets: local starter sketch, vocal session, beat-store demo, club demo, and editable custom targets that can be set without changing the beat or explicitly aligned to arrangement length, master preset, and mix posture.
 - Session Brief: bounded local artist, vibe, reference, and notes fields stored in the project file for beat intent and handoff context.
-- Pattern editor: drum step sequencer, bass grid, chord progression with key-aware Chord Pads, melody grid with Melody Motif Pads, Desktop Keyboard Capture for scale-locked 808/Synth note entry, Pattern Compare cue/use cards, variation A/B/C, and one-click Pattern Fill tail moves.
+- Pattern editor: drum step sequencer, bass grid with 808 Bassline Pads, chord progression with key-aware Chord Pads, melody grid with Melody Motif Pads, Desktop Keyboard Capture for scale-locked 808/Synth note entry, Pattern Compare cue/use cards, variation A/B/C, and one-click Pattern Fill tail moves.
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with Arrangement Focus presets, Pattern Chain 8-bar sketches, per-step A/B/C chain cycling, Chain Expand song-form outlining, one-click Drop/Build/Hook Lift moves, per-block bar lengths, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
 - Project readiness: read-only checks for drums, 808/bass, melody/chords, arrangement, and export completeness.
@@ -135,7 +135,7 @@ MVP capabilities:
 - Style Inspector with Style Quick Picks that derive read-only BPM range, active/default swing, bass role, melody role, sound preset, and Pattern A/B/C event density from local style/profile/project data while applying styles through the existing undoable style-selection path.
 - Beat Blueprints that apply complete sample-free project starts across style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset while preserving manual editing.
 - 16-step drum sequencer with built-in drum kit, drum-synth sources, editable drum velocity, probability, visible chance badges, microtiming, one-click groove humanization, and hat repeat dynamics.
-- Synth 808/bass track with editable scale-aware grid, Desktop Keyboard Capture, mono mode, glide, note chance badges, selected-note move/transpose/duplicate tools, saturation direction, and kick-to-808 sidechain ducking.
+- Synth 808/bass track with editable scale-aware grid, 808 Bassline Pads, Desktop Keyboard Capture, mono mode, glide, note chance badges, selected-note move/transpose/duplicate tools, saturation direction, and kick-to-808 sidechain ducking.
 - Chord progression track with scale-locked roots, key-aware Chord Pads, key-aware progression presets, editable step/root/quality/inversion/length/velocity/chance, visible chance badges, add/delete controls, and selected-chord move/duplicate/inversion tools.
 - Simple synth melody track with editable scale-aware grid, Melody Motif Pads, Desktop Keyboard Capture, velocity control, note chance badges, and selected-note move/transpose/duplicate tools.
 - Sound design presets and Studio tone controls for kick punch, snare snap, hat brightness, 808 drive/decay, sidechain ducking, synth brightness/release, and chord warmth/width.
@@ -168,7 +168,7 @@ Phase 0 validates the audio scheduler: BPM clock, tick/bar/beat math, play/stop/
 
 Phase 1 builds the drum sequencer: 16/32-step grid, kick/snare/clap/hat lanes, velocity, swing, pattern save/load, and hat repeat.
 
-Phase 2 builds 808/bass: monophonic synth, piano-roll style editor, glide, pitch envelope, saturation, and sidechain ducking prototype.
+Phase 2 builds 808/bass: monophonic synth, piano-roll style editor, 808 Bassline Pads, glide, pitch envelope, saturation, and sidechain ducking prototype.
 
 Phase 3 adds melody/chords: simple poly synth, scale lock, Melody Motif Pads, Keyboard Capture for 808/Synth note entry, key-aware Chord Pads, chord progression presets, chord add/delete tools, selected-chord move/duplicate/inversion tools, melody grid, and preset patches.
 

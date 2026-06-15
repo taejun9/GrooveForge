@@ -123,6 +123,8 @@ h2 {
 .keyboard-capture-heading span,
 .capture-readout span,
 .capture-key-map kbd span,
+.bassline-pad-heading span,
+.bassline-pad-row button span,
 .melody-motif-heading span,
 .melody-motif-row button span,
 .studio-controls span,
@@ -218,6 +220,7 @@ h2 {
 .arrangement-move-row button,
 .chord-preset-row button,
 .chord-pad-row button,
+.bassline-pad-row button,
 .melody-motif-row button,
 .chord-tools > button,
 .preset-row button,
@@ -312,6 +315,7 @@ h2 {
 .arrangement-move-row button,
 .chord-preset-row button,
 .chord-pad-row button,
+.bassline-pad-row button,
 .melody-motif-row button,
 .chord-inversion-row button,
 .chord-tools > button,
@@ -2099,6 +2103,62 @@ input[type="range"] {
 
 .capture-key-map kbd.muted {
   opacity: 0.46;
+}
+
+.bassline-pad-panel {
+  display: grid;
+  gap: 8px;
+  margin-block-end: 8px;
+  border: 1px solid rgba(255, 122, 79, 0.2);
+  border-radius: 7px;
+  background: rgba(255, 122, 79, 0.055);
+  padding: 10px;
+}
+
+.bassline-pad-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bassline-pad-heading strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.bassline-pad-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.bassline-pad-row button {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.bassline-pad-row button span,
+.bassline-pad-row button strong,
+.bassline-pad-row button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bassline-pad-row button strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.bassline-pad-row button small {
+  color: rgba(244, 239, 231, 0.48);
+  font-size: 10px;
 }
 
 .melody-motif-panel {
