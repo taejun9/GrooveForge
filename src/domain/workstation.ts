@@ -139,6 +139,13 @@ export type SoundDesign = {
   chordWidth: number;
 };
 
+export type SessionBrief = {
+  artist: string;
+  vibe: string;
+  reference: string;
+  notes: string;
+};
+
 export type ProjectCoreState = {
   title: string;
   mode: SkillMode;
@@ -155,6 +162,7 @@ export type ProjectCoreState = {
   masterCeilingDb: number;
   masterPreset: MasterPreset;
   deliveryTarget: DeliveryTargetId;
+  sessionBrief: SessionBrief;
 };
 
 export type ProjectSnapshot = {
@@ -211,6 +219,8 @@ export const maxDrumTimingMs = 35;
 export const projectFileVersion = 1;
 export const maxProjectSnapshots = 6;
 export const maxProjectSnapshotNameLength = 32;
+export const maxSessionBriefFieldLength = 64;
+export const maxSessionBriefNotesLength = 240;
 export const drumLanes: DrumLane[] = ["kick", "clap", "hat", "perc"];
 export const patternSlots: PatternSlot[] = ["A", "B", "C"];
 export const arrangementSections: ArrangementSection[] = ["Intro", "Verse", "Hook", "Bridge", "Outro"];
@@ -244,6 +254,12 @@ export const chordInversionLabels: Record<ChordInversion, string> = {
   2: "2nd"
 };
 export const masterPresets: MasterPreset[] = ["Clean Demo", "Streaming Safe", "Headroom for Vocal"];
+export const defaultSessionBrief: SessionBrief = {
+  artist: "",
+  vibe: "",
+  reference: "",
+  notes: ""
+};
 export const defaultDeliveryTarget: DeliveryTargetId = "vocal_session";
 export const deliveryTargetLabels: Record<DeliveryTargetId, string> = {
   starter_sketch: "Starter Sketch",
@@ -869,6 +885,7 @@ export const starterProject: ProjectState = {
   masterCeilingDb: masterPresetCeilingsDb["Headroom for Vocal"],
   masterPreset: "Headroom for Vocal",
   deliveryTarget: defaultDeliveryTarget,
+  sessionBrief: { ...defaultSessionBrief },
   snapshots: []
 };
 
@@ -2003,7 +2020,8 @@ function cloneProjectCore(project: ProjectCoreState): ProjectCoreState {
     })),
     masterCeilingDb: project.masterCeilingDb,
     masterPreset: project.masterPreset,
-    deliveryTarget: project.deliveryTarget
+    deliveryTarget: project.deliveryTarget,
+    sessionBrief: { ...project.sessionBrief }
   };
 }
 
@@ -2382,6 +2400,7 @@ function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreSta
     ...value,
     metronomeEnabled: value.metronomeEnabled ?? false,
     deliveryTarget: normalizeDeliveryTargetId(value.deliveryTarget),
+    sessionBrief: normalizeSessionBrief(value.sessionBrief),
     sound: normalizeSoundDesign(value.sound),
     patterns: normalizePatternMap(value.patterns),
     mixer: normalizeMixerChannels(value.mixer),
@@ -2391,6 +2410,19 @@ function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreSta
 
 function normalizeDeliveryTargetId(target: DeliveryTargetId | undefined): DeliveryTargetId {
   return target && isOneOf(target, deliveryTargetIds) ? target : defaultDeliveryTarget;
+}
+
+function normalizeSessionBrief(brief: SessionBriefInput | undefined): SessionBrief {
+  return {
+    artist: normalizeBriefText(brief?.artist, maxSessionBriefFieldLength),
+    vibe: normalizeBriefText(brief?.vibe, maxSessionBriefFieldLength),
+    reference: normalizeBriefText(brief?.reference, maxSessionBriefFieldLength),
+    notes: normalizeBriefText(brief?.notes, maxSessionBriefNotesLength)
+  };
+}
+
+function normalizeBriefText(value: unknown, maxLength: number): string {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, maxLength) : "";
 }
 
 function normalizeProjectSnapshots(snapshots: ProjectSnapshotInput[] | undefined): ProjectSnapshot[] {
@@ -2440,6 +2472,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
       masterCeilingDb: value.masterCeilingDb,
       masterPreset: value.masterPreset,
       deliveryTarget: normalizeDeliveryTargetId(value.deliveryTarget),
+      sessionBrief: normalizeSessionBrief(value.sessionBrief),
       snapshots: []
     };
   }
@@ -2460,6 +2493,7 @@ type PatternDataInput = Omit<PatternData, "bassNotes" | "melodyNotes" | "chordEv
   hatRepeats?: number[];
 };
 type SoundDesignInput = Partial<SoundDesign> & { preset?: SoundPresetId };
+type SessionBriefInput = Partial<SessionBrief>;
 type MixerChannelInput = Omit<MixerChannel, "lowCut" | "air" | "drive" | "glue" | "send"> & {
   lowCut?: number;
   air?: number;
@@ -2471,9 +2505,10 @@ type ArrangementBlockInput = Omit<ArrangementBlock, "bars" | "mutedTracks"> & {
   bars?: number;
   mutedTracks?: ArrangementMuteTrack[];
 };
-type ProjectCoreStateInput = Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled" | "deliveryTarget"> & {
+type ProjectCoreStateInput = Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled" | "deliveryTarget" | "sessionBrief"> & {
   metronomeEnabled?: boolean;
   deliveryTarget?: DeliveryTargetId;
+  sessionBrief?: SessionBriefInput;
   sound?: SoundDesignInput;
   patterns: Record<PatternSlot, PatternDataInput>;
   mixer: MixerChannelInput[];
@@ -2509,6 +2544,7 @@ function isProjectCoreStateShape(value: unknown): value is ProjectCoreStateInput
     isFiniteNumber(value.swing) &&
     (value.metronomeEnabled === undefined || typeof value.metronomeEnabled === "boolean") &&
     (value.deliveryTarget === undefined || isOneOf(value.deliveryTarget, deliveryTargetIds)) &&
+    (value.sessionBrief === undefined || isSessionBriefInput(value.sessionBrief)) &&
     (value.sound === undefined || isSoundDesignInput(value.sound)) &&
     isPatternMapInput(value.patterns) &&
     Array.isArray(value.mixer) &&
@@ -2533,9 +2569,10 @@ function isProjectSnapshotsInput(value: unknown): value is ProjectSnapshotInput[
   );
 }
 
-function isLegacyProjectState(value: unknown): value is Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled" | "deliveryTarget"> & {
+function isLegacyProjectState(value: unknown): value is Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled" | "deliveryTarget" | "sessionBrief"> & {
   metronomeEnabled?: boolean;
   deliveryTarget?: DeliveryTargetId;
+  sessionBrief?: SessionBriefInput;
   sound?: SoundDesignInput;
   mixer: MixerChannelInput[];
   arrangement: ArrangementBlockInput[];
@@ -2554,6 +2591,7 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectCoreState, "
     isFiniteNumber(value.swing) &&
     (value.metronomeEnabled === undefined || typeof value.metronomeEnabled === "boolean") &&
     (value.deliveryTarget === undefined || isOneOf(value.deliveryTarget, deliveryTargetIds)) &&
+    (value.sessionBrief === undefined || isSessionBriefInput(value.sessionBrief)) &&
     (value.sound === undefined || isSoundDesignInput(value.sound)) &&
     isDrumPattern(value.drumPattern) &&
     (value.drumVelocities === undefined || isDrumVelocities(value.drumVelocities)) &&
@@ -2586,6 +2624,16 @@ function isSoundDesignInput(value: unknown): value is SoundDesignInput {
     isOptionalUnit(value.synthRelease) &&
     isOptionalUnit(value.chordWarmth) &&
     isOptionalUnit(value.chordWidth)
+  );
+}
+
+function isSessionBriefInput(value: unknown): value is SessionBriefInput {
+  return (
+    isRecord(value) &&
+    (value.artist === undefined || typeof value.artist === "string") &&
+    (value.vibe === undefined || typeof value.vibe === "string") &&
+    (value.reference === undefined || typeof value.reference === "string") &&
+    (value.notes === undefined || typeof value.notes === "string")
   );
 }
 

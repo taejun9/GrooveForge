@@ -9,12 +9,14 @@ UI Layer
   Piano Roll
   Chord Pad
   Arrangement
+  Session Brief
   Mixer
   Master Panel
         |
 Project State
   BPM
   Key / Scale
+  Session Brief
   Tracks
   Pattern/Event Clips
   Patterns
@@ -69,6 +71,7 @@ Composition-first invariant: GrooveForge must remain fully usable when audio imp
 The core project model should make composition events first-class. In the core architecture, a clip is a pattern, MIDI, or automation container, not an imported audio asset:
 
 - `Project`: version, title, BPM, key/scale, swing, tracks, arrangement, master settings.
+- `SessionBrief`: bounded local artist, vibe, reference, and notes text for project intent and handoff context.
 - `Track`: type, mixer strip, devices, clips, Space send amount.
 - `Clip`: pattern, MIDI, or automation data for the MVP.
 - `MusicalEvent`: note, drum hit, or automation event for the MVP.

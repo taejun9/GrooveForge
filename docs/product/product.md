@@ -3,7 +3,7 @@
 
 ## Summary
 
-GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres with drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, Space send FX, MIDI export, and WAV/stem export. It is beat-first, not sampler-first.
+GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres with drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, Session Brief, Space send FX, MIDI export, and WAV/stem export. It is beat-first, not sampler-first.
 
 ## Type
 
@@ -67,6 +67,7 @@ Primary feature areas:
 - Transport: BPM, key, play, stop, loop, metronome.
 - Beat blueprints: sample-free editable project starts that combine style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset.
 - Delivery Targets: local starter sketch, vocal session, beat-store demo, and club demo targets that can be set without changing the beat or explicitly aligned to arrangement length, master preset, and mix posture.
+- Session Brief: bounded local artist, vibe, reference, and notes fields stored in the project file for beat intent and handoff context.
 - Pattern editor: drum step sequencer, bass grid, chord progression, melody grid, variation A/B/C, and one-click Pattern Fill tail moves.
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with Pattern Chain 8-bar sketches, per-step A/B/C chain cycling, Chain Expand song-form outlining, one-click Drop/Build/Hook Lift moves, per-block bar lengths, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
@@ -140,6 +141,7 @@ MVP capabilities:
 - Independent Pattern A/B/C storage with deterministic Subtle/Hook/Break variation tools, one-click Drum Fill/808 Pickup/Melody Turn/Clear Tail moves, plus copy/clear tools for drum, bass, chord, and melody variations.
 - Read-only Beat Readiness checks for drums, 808/bass, melody/chords, arrangement structure, and export signal status.
 - Delivery Targets stored in project state with safe migration for older files; setting a target changes only the target, while explicit target alignment can update arrangement template, master preset, master ceiling, and mix posture through undoable project history.
+- Session Brief stored in local project state with bounded artist, vibe, reference, and notes text so beginners can clarify intent and producers can keep handoff context without media uploads or cloud collaboration.
 - Beat Map production overview derived from local project, selected Delivery Target, Beat Readiness, export analysis, and stem analysis state, showing beginner workflow stages, producer-facing song/pattern/export/stem metrics, and explicit local action buttons without mutating project state unless clicked.
 - Next Move strip that gives one primary recommended action and secondary local actions from the current readiness/export state, including Pattern Chain when arrangement structure is weak, without mutating Beat Readiness.
 - Editable arrangement blocks and templates for 8-bar loop, full beat, hook-first, and breakdown structures, using assigned Pattern A/B/C data, one-click Drop/Build/Hook Lift moves, per-block track mutes, per-block bar length, split/merge controls, audible per-block energy, and structure controls for duplicate, move, and delete.

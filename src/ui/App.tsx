@@ -108,10 +108,13 @@ import {
   drumStepVelocity,
   drumGroovePresetIds,
   drumGroovePresetLabel,
+  defaultSessionBrief,
   expandPatternChainArrangement,
   hatRepeatCount,
   masterPresetCeilingDb,
   masterPresets,
+  maxSessionBriefFieldLength,
+  maxSessionBriefNotesLength,
   melodyPitchLanes,
   maxProjectSnapshotNameLength,
   maxProjectSnapshots,
@@ -147,6 +150,7 @@ import {
   scalePitches,
   scalePitchNames,
   serializeProjectFile,
+  SessionBrief,
   saveProjectSnapshot,
   soundPresetDesign,
   soundPresetIds,
@@ -1940,6 +1944,35 @@ export function App(): ReactElement {
     }
   }
 
+  function updateSessionBrief(field: keyof SessionBrief, value: string): void {
+    const maxLength = field === "notes" ? maxSessionBriefNotesLength : maxSessionBriefFieldLength;
+    const nextValue = boundedSessionBriefText(value, maxLength);
+    updateProject((current) => {
+      if (current.sessionBrief[field] === nextValue) {
+        return current;
+      }
+      return {
+        ...current,
+        sessionBrief: {
+          ...current.sessionBrief,
+          [field]: nextValue
+        }
+      };
+    }, `Updated ${sessionBriefFieldLabel(field)} brief`);
+  }
+
+  function clearSessionBrief(): void {
+    updateProject((current) => {
+      if (sessionBriefFilledFields(current.sessionBrief) === 0) {
+        return current;
+      }
+      return {
+        ...current,
+        sessionBrief: { ...defaultSessionBrief }
+      };
+    }, "Cleared session brief");
+  }
+
   function runNextMove(action: NextMoveAction): void {
     switch (action.command.kind) {
       case "blueprint":
@@ -2211,6 +2244,8 @@ export function App(): ReactElement {
       <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
 
       <DeliveryTargets project={project} onApply={alignDeliveryTarget} onSelect={selectDeliveryTarget} />
+
+      <SessionBriefPanel brief={project.sessionBrief} onChange={updateSessionBrief} onClear={clearSessionBrief} />
 
       <BeatReadiness checks={beatReadinessChecks} />
 
@@ -3135,6 +3170,88 @@ function DeliveryTargets({
   );
 }
 
+function SessionBriefPanel({
+  brief,
+  onChange,
+  onClear
+}: {
+  brief: SessionBrief;
+  onChange: (field: keyof SessionBrief, value: string) => void;
+  onClear: () => void;
+}): ReactElement {
+  const filledFields = sessionBriefFilledFields(brief);
+
+  return (
+    <section className="session-brief-row" data-testid="session-brief" aria-label="Session brief">
+      <div className="session-brief-heading">
+        <div>
+          <Music2 size={17} aria-hidden="true" />
+          <span>Session Brief</span>
+        </div>
+        <strong data-testid="session-brief-summary">{filledFields}/4 fields</strong>
+        <small>{sessionBriefStatus(brief).value}</small>
+      </div>
+      <div className="session-brief-fields">
+        <label className="session-brief-field">
+          <span>Artist</span>
+          <input
+            data-testid="session-brief-artist"
+            maxLength={maxSessionBriefFieldLength}
+            onChange={(event) => onChange("artist", event.target.value)}
+            placeholder="Artist or client"
+            type="text"
+            value={brief.artist}
+          />
+        </label>
+        <label className="session-brief-field">
+          <span>Vibe</span>
+          <input
+            data-testid="session-brief-vibe"
+            maxLength={maxSessionBriefFieldLength}
+            onChange={(event) => onChange("vibe", event.target.value)}
+            placeholder="Mood or energy"
+            type="text"
+            value={brief.vibe}
+          />
+        </label>
+        <label className="session-brief-field">
+          <span>Reference</span>
+          <input
+            data-testid="session-brief-reference"
+            maxLength={maxSessionBriefFieldLength}
+            onChange={(event) => onChange("reference", event.target.value)}
+            placeholder="Track or scene"
+            type="text"
+            value={brief.reference}
+          />
+        </label>
+        <label className="session-brief-field notes">
+          <span>Notes</span>
+          <textarea
+            data-testid="session-brief-notes"
+            maxLength={maxSessionBriefNotesLength}
+            onChange={(event) => onChange("notes", event.target.value)}
+            placeholder="Handoff notes"
+            rows={2}
+            value={brief.notes}
+          />
+        </label>
+      </div>
+      <button
+        className="session-brief-clear"
+        data-testid="session-brief-clear"
+        disabled={filledFields === 0}
+        onClick={onClear}
+        title="Clear Session Brief"
+        type="button"
+      >
+        <X size={14} aria-hidden="true" />
+        <span>Clear</span>
+      </button>
+    </section>
+  );
+}
+
 function QuickActions({
   actions,
   open,
@@ -3862,6 +3979,54 @@ function isDeliveryTargetAligned(project: ProjectState, target: DeliveryTarget):
   );
 }
 
+const sessionBriefFields: (keyof SessionBrief)[] = ["artist", "vibe", "reference", "notes"];
+
+function sessionBriefStatus(brief: SessionBrief): Pick<BeatMapMetric, "value" | "detail" | "tone"> {
+  const filledFields = sessionBriefFilledFields(brief);
+  const hasVibe = brief.vibe.trim().length > 0;
+  const hasContext = [brief.artist, brief.reference, brief.notes].some((value) => value.trim().length > 0);
+
+  if (hasVibe && hasContext) {
+    return {
+      value: "Usable",
+      detail: `${filledFields}/4 fields captured`,
+      tone: "good"
+    };
+  }
+
+  if (filledFields > 0) {
+    return {
+      value: `${filledFields}/4 fields`,
+      detail: hasVibe ? "Add artist, reference, or notes" : "Add vibe for direction",
+      tone: "warn"
+    };
+  }
+
+  return {
+    value: "Empty",
+    detail: "Add artist, vibe, reference, or notes",
+    tone: "warn"
+  };
+}
+
+function sessionBriefFilledFields(brief: SessionBrief): number {
+  return sessionBriefFields.filter((field) => brief[field].trim().length > 0).length;
+}
+
+function boundedSessionBriefText(value: string, maxLength: number): string {
+  return value.replace(/\s+/g, " ").slice(0, maxLength);
+}
+
+function sessionBriefFieldLabel(field: keyof SessionBrief): string {
+  const labels: Record<keyof SessionBrief, string> = {
+    artist: "artist",
+    vibe: "vibe",
+    reference: "reference",
+    notes: "notes"
+  };
+  return labels[field];
+}
+
 function createBeatMapSummary(
   project: ProjectState,
   checks: BeatReadinessCheck[],
@@ -3960,8 +4125,16 @@ function createBeatMapMetrics(
   const exportTone: MixCoachTone = analysis.status === "Ready" ? "good" : analysis.status === "Silent" ? "danger" : "warn";
   const stemTone: MixCoachTone =
     audibleStems.length >= target.stemGoal ? "good" : audibleStems.length >= 2 ? "warn" : "danger";
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
 
   return [
+    {
+      id: "brief",
+      label: "Brief",
+      value: briefStatus.value,
+      detail: briefStatus.detail,
+      tone: briefStatus.tone
+    },
     {
       id: "song",
       label: "Song",
