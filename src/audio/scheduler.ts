@@ -1,5 +1,6 @@
 import {
   dbToGain,
+  activePattern,
   loopStepCount,
   noteToFrequency,
   projectStepDurationSeconds,
@@ -123,27 +124,28 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
   const bassGain = channelGain(project, "bass_808");
   const synthGain = channelGain(project, "synth");
   const stepDuration = projectStepDurationSeconds(project);
+  const pattern = activePattern(project);
 
-  if (project.drumPattern.kick[patternStep]) {
+  if (pattern.drumPattern.kick[patternStep]) {
     scheduleKick(context, master, time, drumGain);
   }
-  if (project.drumPattern.clap[patternStep]) {
+  if (pattern.drumPattern.clap[patternStep]) {
     scheduleNoise(context, master, time, 0.15, 0.26 * drumGain, 950);
   }
-  if (project.drumPattern.hat[patternStep]) {
+  if (pattern.drumPattern.hat[patternStep]) {
     scheduleNoise(context, master, time, 0.045, 0.12 * drumGain, 5200);
   }
-  if (project.drumPattern.perc[patternStep]) {
+  if (pattern.drumPattern.perc[patternStep]) {
     scheduleTone(context, master, time, 0.07, 330, 0.12 * drumGain, "triangle");
   }
 
-  for (const note of project.bassNotes) {
+  for (const note of pattern.bassNotes) {
     if (note.step === patternStep) {
       scheduleTone(context, master, time, note.length * stepDuration, noteToFrequency(note.pitch), 0.5 * bassGain, "sine");
     }
   }
 
-  for (const note of project.melodyNotes) {
+  for (const note of pattern.melodyNotes) {
     if (note.step === patternStep) {
       scheduleTone(
         context,

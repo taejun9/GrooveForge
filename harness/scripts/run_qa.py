@@ -48,6 +48,7 @@ TEXT_EXPECTATIONS = {
         "making beats across genres",
         "Sampling is a secondary add-on.",
         "local project save/load",
+        "Independent Pattern A/B/C variations",
         "npm run desktop",
     ],
     "AGENTS.md": [
@@ -58,11 +59,13 @@ TEXT_EXPECTATIONS = {
         "샘플 없이도 8마디 비트를 만들고 WAV로 export할 수 있어야 한다.",
         "Sampling can be useful, but it must stay behind the composition engine",
         "Local project save/load",
+        "Independent Pattern A/B/C storage",
     ],
     "docs/quality/rules.md": [
         "QA and review are separate loops.",
         "python3 harness/scripts/run_quality_gate.py",
         "Project file work must reject invalid imports",
+        "Pattern work must keep Pattern A/B/C as independent editable event data",
     ],
     "docs/references/official-sources.md": [
         "W3C Web Audio API",
@@ -100,11 +103,18 @@ TEXT_EXPECTATIONS = {
         "handleSaveProject",
         "handleOpenProject",
         "Invalid project file",
+        "patternEventCount",
+        "selectPattern",
     ],
     "src/audio/scheduler.ts": [
         "scheduleAheadSeconds",
         "startRealtimePlayback",
         "onStep",
+        "activePattern",
+    ],
+    "src/audio/render.ts": [
+        "patternForSlot",
+        "arrangementBlock",
     ],
     "src/domain/workstation.ts": [
         "styleProfiles",
@@ -114,6 +124,9 @@ TEXT_EXPECTATIONS = {
         "melodyPitchLanes",
         "serializeProjectFile",
         "parseProjectFile",
+        "PatternData",
+        "patternSlots",
+        "normalizeProjectState",
     ],
 }
 

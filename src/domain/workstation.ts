@@ -42,6 +42,13 @@ export type MelodyNote = {
 };
 
 export type NoteTrack = "bass" | "melody";
+export type PatternSlot = "A" | "B" | "C";
+
+export type PatternData = {
+  drumPattern: DrumPattern;
+  bassNotes: BassNote[];
+  melodyNotes: MelodyNote[];
+};
 
 export type MixerChannel = {
   id: TrackType;
@@ -65,11 +72,9 @@ export type ProjectState = {
   bpm: number;
   key: string;
   styleId: StyleId;
-  selectedPattern: "A" | "B" | "C";
+  selectedPattern: PatternSlot;
   swing: number;
-  drumPattern: DrumPattern;
-  bassNotes: BassNote[];
-  melodyNotes: MelodyNote[];
+  patterns: Record<PatternSlot, PatternData>;
   mixer: MixerChannel[];
   arrangement: ArrangementBlock[];
   masterCeilingDb: number;
@@ -86,6 +91,7 @@ export type ProjectFile = {
 export const steps = Array.from({ length: 16 }, (_, index) => index);
 export const stepsPerBar = 16;
 export const projectFileVersion = 1;
+export const patternSlots: PatternSlot[] = ["A", "B", "C"];
 
 const sharpNotes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const flatNotes = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
@@ -198,14 +204,7 @@ export const styleProfiles: StyleProfile[] = [
   }
 ];
 
-export const starterProject: ProjectState = {
-  title: "Untitled Beat",
-  mode: "guided",
-  bpm: 145,
-  key: "F minor",
-  styleId: "trap",
-  selectedPattern: "A",
-  swing: 0.08,
+const starterPatternA: PatternData = {
   drumPattern: {
     kick: [true, false, false, false, false, false, true, false, false, false, false, false, true, false, false, false],
     clap: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
@@ -224,7 +223,65 @@ export const starterProject: ProjectState = {
     { step: 6, pitch: "C5", length: 2, velocity: 0.7 },
     { step: 10, pitch: "Eb5", length: 1, velocity: 0.6 },
     { step: 12, pitch: "C5", length: 3, velocity: 0.66 }
+  ]
+};
+
+const starterPatternB: PatternData = {
+  drumPattern: {
+    kick: [true, false, false, false, false, true, false, false, true, false, false, false, true, false, true, false],
+    clap: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
+    hat: [true, true, true, false, true, false, true, true, true, true, true, false, true, false, true, true],
+    perc: [false, false, true, false, false, false, false, true, false, false, true, false, false, true, false, false]
+  },
+  bassNotes: [
+    { step: 0, pitch: "F1", length: 2, glide: false },
+    { step: 5, pitch: "Ab1", length: 1, glide: true },
+    { step: 8, pitch: "C2", length: 2, glide: false },
+    { step: 12, pitch: "Eb2", length: 2, glide: true },
+    { step: 14, pitch: "F1", length: 2, glide: false }
   ],
+  melodyNotes: [
+    { step: 0, pitch: "C5", length: 2, velocity: 0.7 },
+    { step: 2, pitch: "Eb5", length: 1, velocity: 0.62 },
+    { step: 6, pitch: "F5", length: 2, velocity: 0.72 },
+    { step: 9, pitch: "Ab4", length: 1, velocity: 0.58 },
+    { step: 12, pitch: "C5", length: 2, velocity: 0.66 }
+  ]
+};
+
+const starterPatternC: PatternData = {
+  drumPattern: {
+    kick: [true, false, false, false, false, false, false, false, true, false, false, false, false, false, true, false],
+    clap: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
+    hat: [true, false, false, false, true, false, true, false, true, false, false, false, true, false, true, false],
+    perc: [false, false, false, false, false, false, true, false, false, false, false, true, false, false, false, true]
+  },
+  bassNotes: [
+    { step: 0, pitch: "F1", length: 4, glide: false },
+    { step: 8, pitch: "Db2", length: 4, glide: false },
+    { step: 14, pitch: "Eb2", length: 2, glide: true }
+  ],
+  melodyNotes: [
+    { step: 0, pitch: "Ab4", length: 3, velocity: 0.6 },
+    { step: 4, pitch: "F4", length: 2, velocity: 0.54 },
+    { step: 8, pitch: "Bb4", length: 3, velocity: 0.62 },
+    { step: 12, pitch: "C5", length: 2, velocity: 0.58 }
+  ]
+};
+
+export const starterProject: ProjectState = {
+  title: "Untitled Beat",
+  mode: "guided",
+  bpm: 145,
+  key: "F minor",
+  styleId: "trap",
+  selectedPattern: "A",
+  swing: 0.08,
+  patterns: {
+    A: clonePatternData(starterPatternA),
+    B: clonePatternData(starterPatternB),
+    C: clonePatternData(starterPatternC)
+  },
   mixer: [
     { id: "drum_rack", name: "Drums", volumeDb: -4, pan: 0, muted: false, solo: false, accent: "#78f0c8" },
     { id: "bass_808", name: "808", volumeDb: -6, pan: 0, muted: false, solo: false, accent: "#ff7a4f" },
@@ -250,6 +307,27 @@ export function getStyle(project: ProjectState): StyleProfile {
   return styleProfiles.find((style) => style.id === project.styleId) ?? styleProfiles[0];
 }
 
+export function activePattern(project: ProjectState): PatternData {
+  return patternForSlot(project, project.selectedPattern);
+}
+
+export function patternForSlot(project: ProjectState, slot: PatternSlot): PatternData {
+  return project.patterns[slot] ?? project.patterns.A;
+}
+
+export function clonePatternData(pattern: PatternData): PatternData {
+  return {
+    drumPattern: {
+      kick: [...pattern.drumPattern.kick],
+      clap: [...pattern.drumPattern.clap],
+      hat: [...pattern.drumPattern.hat],
+      perc: [...pattern.drumPattern.perc]
+    },
+    bassNotes: pattern.bassNotes.map((note) => ({ ...note })),
+    melodyNotes: pattern.melodyNotes.map((note) => ({ ...note }))
+  };
+}
+
 export function projectFileName(project: ProjectState): string {
   const slug = project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   return `${slug || "grooveforge-project"}.grooveforge.json`;
@@ -268,10 +346,11 @@ export function serializeProjectFile(project: ProjectState): string {
 export function parseProjectFile(contents: string): ProjectState {
   const parsed: unknown = JSON.parse(contents);
   const candidate = isRecord(parsed) && parsed.app === "GrooveForge" && isRecord(parsed.project) ? parsed.project : parsed;
-  if (!isProjectState(candidate)) {
+  const project = normalizeProjectState(candidate);
+  if (!project) {
     throw new Error("Invalid GrooveForge project file.");
   }
-  return candidate;
+  return project;
 }
 
 export function dbToGain(db: number): number {
@@ -349,6 +428,40 @@ export function noteToFrequency(note: string): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
+function normalizeProjectState(value: unknown): ProjectState | null {
+  if (isProjectState(value)) {
+    return value;
+  }
+
+  if (isLegacyProjectState(value)) {
+    const legacyPattern = clonePatternData({
+      drumPattern: value.drumPattern,
+      bassNotes: value.bassNotes,
+      melodyNotes: value.melodyNotes
+    });
+    return {
+      title: value.title,
+      mode: value.mode,
+      bpm: value.bpm,
+      key: value.key,
+      styleId: value.styleId,
+      selectedPattern: value.selectedPattern,
+      swing: value.swing,
+      patterns: {
+        A: clonePatternData(legacyPattern),
+        B: clonePatternData(legacyPattern),
+        C: clonePatternData(legacyPattern)
+      },
+      mixer: value.mixer,
+      arrangement: value.arrangement,
+      masterCeilingDb: value.masterCeilingDb,
+      masterPreset: value.masterPreset
+    };
+  }
+
+  return null;
+}
+
 function isProjectState(value: unknown): value is ProjectState {
   if (!isRecord(value)) {
     return false;
@@ -360,7 +473,30 @@ function isProjectState(value: unknown): value is ProjectState {
     isFiniteNumber(value.bpm) &&
     typeof value.key === "string" &&
     isOneOf(value.styleId, styleProfiles.map((profile) => profile.id)) &&
-    isOneOf(value.selectedPattern, ["A", "B", "C"]) &&
+    isOneOf(value.selectedPattern, patternSlots) &&
+    isFiniteNumber(value.swing) &&
+    isPatternMap(value.patterns) &&
+    Array.isArray(value.mixer) &&
+    value.mixer.every(isMixerChannel) &&
+    Array.isArray(value.arrangement) &&
+    value.arrangement.every(isArrangementBlock) &&
+    isFiniteNumber(value.masterCeilingDb) &&
+    isOneOf(value.masterPreset, ["Clean Demo", "Streaming Safe", "Headroom for Vocal"])
+  );
+}
+
+function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patterns"> & PatternData {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.title === "string" &&
+    isOneOf(value.mode, ["guided", "studio"]) &&
+    isFiniteNumber(value.bpm) &&
+    typeof value.key === "string" &&
+    isOneOf(value.styleId, styleProfiles.map((profile) => profile.id)) &&
+    isOneOf(value.selectedPattern, patternSlots) &&
     isFiniteNumber(value.swing) &&
     isDrumPattern(value.drumPattern) &&
     Array.isArray(value.bassNotes) &&
@@ -373,6 +509,24 @@ function isProjectState(value: unknown): value is ProjectState {
     value.arrangement.every(isArrangementBlock) &&
     isFiniteNumber(value.masterCeilingDb) &&
     isOneOf(value.masterPreset, ["Clean Demo", "Streaming Safe", "Headroom for Vocal"])
+  );
+}
+
+function isPatternMap(value: unknown): value is Record<PatternSlot, PatternData> {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return patternSlots.every((slot) => isPatternData(value[slot]));
+}
+
+function isPatternData(value: unknown): value is PatternData {
+  return (
+    isRecord(value) &&
+    isDrumPattern(value.drumPattern) &&
+    Array.isArray(value.bassNotes) &&
+    value.bassNotes.every(isBassNote) &&
+    Array.isArray(value.melodyNotes) &&
+    value.melodyNotes.every(isMelodyNote)
   );
 }
 

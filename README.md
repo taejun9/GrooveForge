@@ -25,7 +25,7 @@ The first usable result is a browser project that can create a sample-free 8-bar
 
 - 145 BPM / F minor starter project.
 - Kick, snare/clap, hat, 808, and synth melody tracks.
-- Pattern A/B/C storage and arrangement blocks.
+- Independent Pattern A/B/C variations and arrangement blocks.
 - Basic mixer volume/pan, master limiter, and WAV export.
 
 The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport, style/key/BPM, drum steps, editable scale-aware 808/melody lanes, instruments, arrangement, mixer, master, local project save/load, realtime loop playback, and WAV export.

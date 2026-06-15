@@ -1,4 +1,4 @@
-import { dbToGain, noteToFrequency, projectStepDurationSeconds, ProjectState } from "../domain/workstation";
+import { dbToGain, noteToFrequency, patternForSlot, projectStepDurationSeconds, ProjectState } from "../domain/workstation";
 
 const sampleRate = 44100;
 const channels = 2;
@@ -50,30 +50,30 @@ function renderProject(project: ProjectState, bars = 8): AudioChannels {
   const bassGain = channelGain(project, "bass_808");
   const synthGain = channelGain(project, "synth");
 
-  for (let absoluteStep = 0; absoluteStep < totalSteps; absoluteStep += 1) {
-    const patternStep = absoluteStep % 16;
-    const time = absoluteStep * step;
-    if (project.drumPattern.kick[patternStep]) {
-      addSine(buffer, time, 0.22, 52, 0.95 * drumGain);
-      addSine(buffer, time, 0.08, 96, 0.3 * drumGain);
-    }
-    if (project.drumPattern.clap[patternStep]) {
-      addNoise(buffer, time, 0.16, 0.42 * drumGain);
-    }
-    if (project.drumPattern.hat[patternStep]) {
-      addNoise(buffer, time, 0.045, 0.18 * drumGain);
-    }
-    if (project.drumPattern.perc[patternStep]) {
-      addSine(buffer, time, 0.08, 330, 0.18 * drumGain);
-    }
-  }
-
   for (let bar = 0; bar < bars; bar += 1) {
     const barOffset = bar * 16;
-    for (const note of project.bassNotes) {
+    const arrangementBlock = project.arrangement[bar % project.arrangement.length];
+    const pattern = arrangementBlock ? patternForSlot(project, arrangementBlock.pattern) : patternForSlot(project, project.selectedPattern);
+    for (let patternStep = 0; patternStep < 16; patternStep += 1) {
+      const time = (barOffset + patternStep) * step;
+      if (pattern.drumPattern.kick[patternStep]) {
+        addSine(buffer, time, 0.22, 52, 0.95 * drumGain);
+        addSine(buffer, time, 0.08, 96, 0.3 * drumGain);
+      }
+      if (pattern.drumPattern.clap[patternStep]) {
+        addNoise(buffer, time, 0.16, 0.42 * drumGain);
+      }
+      if (pattern.drumPattern.hat[patternStep]) {
+        addNoise(buffer, time, 0.045, 0.18 * drumGain);
+      }
+      if (pattern.drumPattern.perc[patternStep]) {
+        addSine(buffer, time, 0.08, 330, 0.18 * drumGain);
+      }
+    }
+    for (const note of pattern.bassNotes) {
       addSine(buffer, (barOffset + note.step) * step, note.length * step, noteToFrequency(note.pitch), 0.72 * bassGain);
     }
-    for (const note of project.melodyNotes) {
+    for (const note of pattern.melodyNotes) {
       addSine(buffer, (barOffset + note.step) * step, note.length * step, noteToFrequency(note.pitch), note.velocity * 0.22 * synthGain);
     }
   }

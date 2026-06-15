@@ -66,6 +66,8 @@ Drum, bass, melody, and arrangement work must preserve editable project state wi
 
 Project file work must reject invalid imports without overwriting the current project and must preserve edited drum, bass, melody, mixer, master, key, BPM, style, and arrangement data on save/load.
 
+Pattern work must keep Pattern A/B/C as independent editable event data. Realtime playback should preview the selected pattern, while WAV export should follow arrangement pattern assignments.
+
 Export work must verify a non-silent WAV with expected duration, expected sample rate/channel count, no audio frames above the selected ceiling, and reproducibility from saved project data.
 
 Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, or plan titles.

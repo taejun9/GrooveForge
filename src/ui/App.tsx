@@ -23,10 +23,14 @@ import {
   getStyle,
   MelodyNote,
   NoteTrack,
+  PatternData,
+  PatternSlot,
   ProjectState,
+  activePattern,
   bassPitchLanes,
   melodyPitchLanes,
   parseProjectFile,
+  patternSlots,
   projectFileName,
   serializeProjectFile,
   starterProject,
@@ -66,23 +70,24 @@ export function App(): ReactElement {
   const controllerRef = useRef<PlaybackController | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const style = getStyle(project);
+  const currentPattern = activePattern(project);
   const activeChannels = useMemo(() => project.mixer.filter((channel) => !channel.muted).length, [project.mixer]);
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
   const bassPitches = useMemo(
-    () => mergePitchLanes(bassPitchLanes(project.key), project.bassNotes.map((note) => note.pitch)),
-    [project.bassNotes, project.key]
+    () => mergePitchLanes(bassPitchLanes(project.key), currentPattern.bassNotes.map((note) => note.pitch)),
+    [currentPattern.bassNotes, project.key]
   );
   const melodyPitches = useMemo(
-    () => mergePitchLanes(melodyPitchLanes(project.key), project.melodyNotes.map((note) => note.pitch)),
-    [project.key, project.melodyNotes]
+    () => mergePitchLanes(melodyPitchLanes(project.key), currentPattern.melodyNotes.map((note) => note.pitch)),
+    [currentPattern.melodyNotes, project.key]
   );
   const selectedBassNote =
     selectedNote?.track === "bass"
-      ? project.bassNotes.find((note) => note.step === selectedNote.step && note.pitch === selectedNote.pitch)
+      ? currentPattern.bassNotes.find((note) => note.step === selectedNote.step && note.pitch === selectedNote.pitch)
       : undefined;
   const selectedMelodyNote =
     selectedNote?.track === "melody"
-      ? project.melodyNotes.find((note) => note.step === selectedNote.step && note.pitch === selectedNote.pitch)
+      ? currentPattern.melodyNotes.find((note) => note.step === selectedNote.step && note.pitch === selectedNote.pitch)
       : undefined;
 
   useEffect(() => {
@@ -97,34 +102,50 @@ export function App(): ReactElement {
     setProjectStatus("Unsaved changes");
   }
 
-  function toggleStep(lane: DrumLane, step: number): void {
+  function updateCurrentPattern(update: (pattern: PatternData) => PatternData): void {
     updateProject((current) => ({
       ...current,
+      patterns: {
+        ...current.patterns,
+        [current.selectedPattern]: update(current.patterns[current.selectedPattern])
+      }
+    }));
+  }
+
+  function selectPattern(pattern: PatternSlot): void {
+    setProject((current) => ({ ...current, selectedPattern: pattern }));
+    setSelectedNote(null);
+    setProjectStatus(`Editing Pattern ${pattern}`);
+  }
+
+  function toggleStep(lane: DrumLane, step: number): void {
+    updateCurrentPattern((pattern) => ({
+      ...pattern,
       drumPattern: {
-        ...current.drumPattern,
-        [lane]: current.drumPattern[lane].map((enabled, index) => (index === step ? !enabled : enabled))
+        ...pattern.drumPattern,
+        [lane]: pattern.drumPattern[lane].map((enabled, index) => (index === step ? !enabled : enabled))
       }
     }));
   }
 
   function toggleBassNote(step: number, pitch: string): void {
-    const exists = project.bassNotes.some((note) => note.step === step && note.pitch === pitch);
-    updateProject((current) => ({
-      ...current,
+    const exists = currentPattern.bassNotes.some((note) => note.step === step && note.pitch === pitch);
+    updateCurrentPattern((pattern) => ({
+      ...pattern,
       bassNotes: exists
-        ? current.bassNotes.filter((note) => note.step !== step || note.pitch !== pitch)
-        : sortBassNotes([...current.bassNotes, { step, pitch, length: 2, glide: false }])
+        ? pattern.bassNotes.filter((note) => note.step !== step || note.pitch !== pitch)
+        : sortBassNotes([...pattern.bassNotes, { step, pitch, length: 2, glide: false }])
     }));
     setSelectedNote(exists ? null : { track: "bass", step, pitch });
   }
 
   function toggleMelodyNote(step: number, pitch: string): void {
-    const exists = project.melodyNotes.some((note) => note.step === step && note.pitch === pitch);
-    updateProject((current) => ({
-      ...current,
+    const exists = currentPattern.melodyNotes.some((note) => note.step === step && note.pitch === pitch);
+    updateCurrentPattern((pattern) => ({
+      ...pattern,
       melodyNotes: exists
-        ? current.melodyNotes.filter((note) => note.step !== step || note.pitch !== pitch)
-        : sortMelodyNotes([...current.melodyNotes, { step, pitch, length: 1, velocity: 0.68 }])
+        ? pattern.melodyNotes.filter((note) => note.step !== step || note.pitch !== pitch)
+        : sortMelodyNotes([...pattern.melodyNotes, { step, pitch, length: 1, velocity: 0.68 }])
     }));
     setSelectedNote(exists ? null : { track: "melody", step, pitch });
   }
@@ -134,20 +155,20 @@ export function App(): ReactElement {
       return;
     }
 
-    updateProject((current) => ({
-      ...current,
+    updateCurrentPattern((pattern) => ({
+      ...pattern,
       bassNotes:
         selectedNote.track === "bass"
-          ? current.bassNotes.map((note) =>
+          ? pattern.bassNotes.map((note) =>
               note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, length } : note
             )
-          : current.bassNotes,
+          : pattern.bassNotes,
       melodyNotes:
         selectedNote.track === "melody"
-          ? current.melodyNotes.map((note) =>
+          ? pattern.melodyNotes.map((note) =>
               note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, length } : note
             )
-          : current.melodyNotes
+          : pattern.melodyNotes
     }));
   }
 
@@ -156,9 +177,9 @@ export function App(): ReactElement {
       return;
     }
 
-    updateProject((current) => ({
-      ...current,
-      bassNotes: current.bassNotes.map((note) =>
+    updateCurrentPattern((pattern) => ({
+      ...pattern,
+      bassNotes: pattern.bassNotes.map((note) =>
         note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, glide } : note
       )
     }));
@@ -169,9 +190,9 @@ export function App(): ReactElement {
       return;
     }
 
-    updateProject((current) => ({
-      ...current,
-      melodyNotes: current.melodyNotes.map((note) =>
+    updateCurrentPattern((pattern) => ({
+      ...pattern,
+      melodyNotes: pattern.melodyNotes.map((note) =>
         note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, velocity } : note
       )
     }));
@@ -402,14 +423,15 @@ export function App(): ReactElement {
         <section className="panel pattern-panel" aria-label="Pattern editor">
           <PanelTitle icon={<Drum size={18} />} title="Drums" meta="16 step rack" />
           <div className="pattern-tabs" aria-label="Pattern">
-            {(["A", "B", "C"] as const).map((pattern) => (
+            {patternSlots.map((pattern) => (
               <button
                 key={pattern}
                 className={project.selectedPattern === pattern ? "selected" : ""}
                 type="button"
-                onClick={() => updateProject((current) => ({ ...current, selectedPattern: pattern }))}
+                onClick={() => selectPattern(pattern)}
               >
-                {pattern}
+                <span>{pattern}</span>
+                <small>{patternEventCount(project.patterns[pattern])}</small>
               </button>
             ))}
           </div>
@@ -422,7 +444,7 @@ export function App(): ReactElement {
                     aria-label={`${drumLabels[lane]} step ${step + 1}`}
                     className={[
                       "step",
-                      project.drumPattern[lane][step] ? "active" : "",
+                      currentPattern.drumPattern[lane][step] ? "active" : "",
                       currentPatternStep === step ? "playhead" : ""
                     ]
                       .filter(Boolean)
@@ -463,7 +485,7 @@ export function App(): ReactElement {
             <NoteEditor
               title="808"
               track="bass"
-              notes={project.bassNotes.map((note) => ({ ...note, velocity: note.glide ? 0.95 : 0.82 }))}
+              notes={currentPattern.bassNotes.map((note) => ({ ...note, velocity: note.glide ? 0.95 : 0.82 }))}
               pitches={bassPitches}
               color="#ff7a4f"
               currentStep={currentPatternStep}
@@ -473,7 +495,7 @@ export function App(): ReactElement {
             <NoteEditor
               title="Synth"
               track="melody"
-              notes={project.melodyNotes}
+              notes={currentPattern.melodyNotes}
               pitches={melodyPitches}
               color="#8aa8ff"
               currentStep={currentPatternStep}
@@ -777,6 +799,14 @@ function laneColor(lane: DrumLane): string {
 
 function mergePitchLanes(scalePitches: string[], usedPitches: string[]): string[] {
   return Array.from(new Set([...scalePitches, ...usedPitches]));
+}
+
+function patternEventCount(pattern: PatternData): string {
+  const drumHits = Object.values(pattern.drumPattern).reduce(
+    (total, laneSteps) => total + laneSteps.filter(Boolean).length,
+    0
+  );
+  return `${drumHits + pattern.bassNotes.length + pattern.melodyNotes.length} events`;
 }
 
 function sortBassNotes(notes: BassNote[]): BassNote[] {

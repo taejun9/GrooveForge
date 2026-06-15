@@ -106,8 +106,8 @@ MVP capabilities:
 - 16-step drum sequencer with built-in drum kit and drum-synth sources.
 - Synth 808/bass track with editable scale-aware grid, mono mode, glide, and saturation direction.
 - Simple synth melody track with editable scale-aware grid and velocity control.
-- Pattern A/B/C storage.
-- Arrangement blocks for an 8-bar loop or simple song section.
+- Independent Pattern A/B/C storage for drum, bass, and melody variations.
+- Arrangement blocks for an 8-bar loop or simple song section, using assigned Pattern A/B/C data.
 - Mixer volume and pan.
 - Master limiter.
 - Local project save/load as a `.grooveforge.json` file.
