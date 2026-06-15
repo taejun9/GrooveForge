@@ -75,6 +75,8 @@ export type MixerChannel = {
   pan: number;
   lowCut: number;
   air: number;
+  drive: number;
+  glue: number;
   muted: boolean;
   solo: boolean;
   accent: string;
@@ -460,11 +462,11 @@ export const starterProject: ProjectState = {
     C: clonePatternData(starterPatternC)
   },
   mixer: [
-    { id: "drum_rack", name: "Drums", volumeDb: -4, pan: 0, lowCut: 0.08, air: 0.24, muted: false, solo: false, accent: "#78f0c8" },
-    { id: "bass_808", name: "808", volumeDb: -6, pan: 0, lowCut: 0, air: 0.1, muted: false, solo: false, accent: "#ff7a4f" },
-    { id: "synth", name: "Synth", volumeDb: -8, pan: -12, lowCut: 0.18, air: 0.36, muted: false, solo: false, accent: "#8aa8ff" },
-    { id: "chord", name: "Chord", volumeDb: -10, pan: 16, lowCut: 0.12, air: 0.28, muted: false, solo: false, accent: "#d58cff" },
-    { id: "master", name: "Master", volumeDb: -1, pan: 0, lowCut: 0, air: 0, muted: false, solo: false, accent: "#f0c36a" }
+    { id: "drum_rack", name: "Drums", volumeDb: -4, pan: 0, lowCut: 0.08, air: 0.24, drive: 0.16, glue: 0.26, muted: false, solo: false, accent: "#78f0c8" },
+    { id: "bass_808", name: "808", volumeDb: -6, pan: 0, lowCut: 0, air: 0.1, drive: 0.22, glue: 0.18, muted: false, solo: false, accent: "#ff7a4f" },
+    { id: "synth", name: "Synth", volumeDb: -8, pan: -12, lowCut: 0.18, air: 0.36, drive: 0.08, glue: 0.12, muted: false, solo: false, accent: "#8aa8ff" },
+    { id: "chord", name: "Chord", volumeDb: -10, pan: 16, lowCut: 0.12, air: 0.28, drive: 0.06, glue: 0.18, muted: false, solo: false, accent: "#d58cff" },
+    { id: "master", name: "Master", volumeDb: -1, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0, muted: false, solo: false, accent: "#f0c36a" }
   ],
   arrangement: [
     { section: "Intro", pattern: "A", energy: 0.35 },
@@ -1033,7 +1035,9 @@ function normalizeMixerChannels(channels: MixerChannelInput[]): MixerChannel[] {
   return channels.map((channel) => ({
     ...channel,
     lowCut: normalizeMixerEq(channel.lowCut ?? 0),
-    air: normalizeMixerEq(channel.air ?? 0)
+    air: normalizeMixerEq(channel.air ?? 0),
+    drive: normalizeMixerEq(channel.drive ?? 0),
+    glue: normalizeMixerEq(channel.glue ?? 0)
   }));
 }
 
@@ -1134,9 +1138,11 @@ type PatternDataInput = Omit<PatternData, "chordEvents" | "drumVelocities" | "dr
   hatRepeats?: number[];
 };
 type SoundDesignInput = Partial<SoundDesign> & { preset?: SoundPresetId };
-type MixerChannelInput = Omit<MixerChannel, "lowCut" | "air"> & {
+type MixerChannelInput = Omit<MixerChannel, "lowCut" | "air" | "drive" | "glue"> & {
   lowCut?: number;
   air?: number;
+  drive?: number;
+  glue?: number;
 };
 type ProjectStateInput = Omit<ProjectState, "patterns" | "sound" | "mixer"> & {
   sound?: SoundDesignInput;
@@ -1329,6 +1335,8 @@ function isMixerChannelInput(value: unknown): value is MixerChannelInput {
     value.pan <= 100 &&
     isOptionalUnit(value.lowCut) &&
     isOptionalUnit(value.air) &&
+    isOptionalUnit(value.drive) &&
+    isOptionalUnit(value.glue) &&
     typeof value.muted === "boolean" &&
     typeof value.solo === "boolean" &&
     typeof value.accent === "string"

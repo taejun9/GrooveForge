@@ -41,6 +41,8 @@ type ChannelMix = {
   right: number;
   lowCut: number;
   air: number;
+  drive: number;
+  glue: number;
 };
 
 function stepDuration(project: ProjectState): number {
@@ -54,11 +56,11 @@ function hasSolo(project: ProjectState): boolean {
 function channelMix(project: ProjectState, id: TrackType, stemTarget?: StemTrackId): ChannelMix {
   const channel = project.mixer.find((track) => track.id === id);
   if (stemTarget && id !== stemTarget) {
-    return { gain: 0, left: 0, right: 0, lowCut: 0, air: 0 };
+    return { gain: 0, left: 0, right: 0, lowCut: 0, air: 0, drive: 0, glue: 0 };
   }
   const soloActive = hasSolo(project);
   if (!channel || (!stemTarget && channel.muted) || (!stemTarget && id !== "master" && soloActive && !channel.solo)) {
-    return { gain: 0, left: 0, right: 0, lowCut: 0, air: 0 };
+    return { gain: 0, left: 0, right: 0, lowCut: 0, air: 0, drive: 0, glue: 0 };
   }
 
   const normalizedPan = Math.max(-1, Math.min(1, channel.pan / 100));
@@ -67,7 +69,9 @@ function channelMix(project: ProjectState, id: TrackType, stemTarget?: StemTrack
     left: normalizedPan <= 0 ? 1 : 1 - normalizedPan,
     right: normalizedPan >= 0 ? 1 : 1 + normalizedPan,
     lowCut: channel.lowCut,
-    air: channel.air
+    air: channel.air,
+    drive: channel.drive,
+    glue: channel.glue
   };
 }
 
@@ -92,6 +96,29 @@ function toneEqFactor(frequency: number, mix: ChannelMix): number {
   return Math.max(0.08, lowCutFactor * airFactor);
 }
 
+function channelDriveSample(sample: number, mix: ChannelMix): number {
+  if (mix.drive <= 0) {
+    return sample;
+  }
+
+  const drive = 1 + mix.drive * 3.4;
+  const normalizer = Math.tanh(drive);
+  return normalizer === 0 ? sample : Math.tanh(sample * drive) / normalizer;
+}
+
+function channelGlueSample(sample: number, mix: ChannelMix): number {
+  if (mix.glue <= 0) {
+    return sample;
+  }
+
+  const sign = sample < 0 ? -1 : 1;
+  const absolute = Math.abs(sample);
+  const threshold = 0.22 - mix.glue * 0.08;
+  const ratio = 1 + mix.glue * 5.2;
+  const compressed = absolute <= threshold ? absolute : threshold + (absolute - threshold) / ratio;
+  return sign * compressed * (1 + mix.glue * 0.1);
+}
+
 function addTone(
   buffer: AudioChannels,
   start: number,
@@ -107,7 +134,7 @@ function addTone(
   }
   const startFrame = Math.max(0, Math.floor(start * sampleRate));
   const frames = Math.max(1, Math.floor(duration * sampleRate));
-  const drive = tone.drive ?? 0;
+  const drive = Math.min(1, (tone.drive ?? 0) + mix.drive * 0.48);
   const decay = tone.decay ?? 5;
   const filter = tone.filter ?? 1;
   const eqFactor = toneEqFactor(frequency, mix);
@@ -118,7 +145,7 @@ function addTone(
     const fundamental = waveform(shape, phase);
     const harmonic = Math.sin(phase * 2) * drive * 0.28 + Math.sin(phase * 3) * drive * 0.12;
     const shaped = Math.tanh((fundamental + harmonic) * (1 + drive * 2.8));
-    const value = shaped * mix.gain * gainScale * envelope * filter * eqFactor;
+    const value = channelGlueSample(shaped * mix.gain * gainScale * envelope * filter * eqFactor, mix);
     buffer[0][startFrame + index] += value * mix.left;
     buffer[1][startFrame + index] += value * mix.right;
   }
@@ -151,7 +178,8 @@ function addNoise(buffer: AudioChannels, start: number, duration: number, mix: C
     const t = index / sampleRate;
     const envelope = Math.exp((-6 - airBrightness * 5) * t / duration);
     const raw = Math.random() * 2 - 1;
-    const value = (raw * airBrightness + previous * (1 - airBrightness)) * mix.gain * gainScale * envelope * channelGain;
+    const saturated = channelDriveSample(raw * airBrightness + previous * (1 - airBrightness), mix);
+    const value = channelGlueSample(saturated * mix.gain * gainScale * envelope * channelGain, mix);
     previous = raw;
     buffer[0][startFrame + index] += value * mix.left;
     buffer[1][startFrame + index] += value * mix.right;

@@ -372,6 +372,12 @@ export function App(): ReactElement {
     if (update.air !== undefined) {
       nextUpdate.air = normalizeMixerEq(update.air);
     }
+    if (update.drive !== undefined) {
+      nextUpdate.drive = normalizeMixerEq(update.drive);
+    }
+    if (update.glue !== undefined) {
+      nextUpdate.glue = normalizeMixerEq(update.glue);
+    }
     updateProject((current) => ({
       ...current,
       mixer: current.mixer.map((track) => (track.id === id ? { ...track, ...nextUpdate } : track))
@@ -1369,6 +1375,56 @@ export function App(): ReactElement {
                         />
                       </div>
                     </label>
+                    <label className="strip-control">
+                      <span>Drive</span>
+                      <div className="eq-inputs">
+                        <input
+                          aria-label={`${channel.name} drive`}
+                          data-testid={`mixer-drive-${channel.id}`}
+                          max={1}
+                          min={0}
+                          onChange={(event) => updateMixerChannel(channel.id, { drive: Number(event.target.value) })}
+                          step={0.01}
+                          type="range"
+                          value={channel.drive}
+                        />
+                        <input
+                          aria-label={`${channel.name} drive percent`}
+                          data-testid={`mixer-drive-input-${channel.id}`}
+                          max={100}
+                          min={0}
+                          onChange={(event) => updateMixerChannel(channel.id, { drive: Number(event.target.value) / 100 })}
+                          step={1}
+                          type="number"
+                          value={Math.round(channel.drive * 100)}
+                        />
+                      </div>
+                    </label>
+                    <label className="strip-control">
+                      <span>Glue</span>
+                      <div className="eq-inputs">
+                        <input
+                          aria-label={`${channel.name} glue`}
+                          data-testid={`mixer-glue-${channel.id}`}
+                          max={1}
+                          min={0}
+                          onChange={(event) => updateMixerChannel(channel.id, { glue: Number(event.target.value) })}
+                          step={0.01}
+                          type="range"
+                          value={channel.glue}
+                        />
+                        <input
+                          aria-label={`${channel.name} glue percent`}
+                          data-testid={`mixer-glue-input-${channel.id}`}
+                          max={100}
+                          min={0}
+                          onChange={(event) => updateMixerChannel(channel.id, { glue: Number(event.target.value) / 100 })}
+                          step={1}
+                          type="number"
+                          value={Math.round(channel.glue * 100)}
+                        />
+                      </div>
+                    </label>
                   </div>
                 )}
                 <div className="strip-readout">
@@ -1378,6 +1434,8 @@ export function App(): ReactElement {
                     <>
                       <span>Cut {percentLabel(channel.lowCut)}</span>
                       <span>Air {percentLabel(channel.air)}</span>
+                      <span>Drive {percentLabel(channel.drive)}</span>
+                      <span>Glue {percentLabel(channel.glue)}</span>
                     </>
                   )}
                 </div>

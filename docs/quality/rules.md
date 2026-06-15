@@ -104,3 +104,5 @@ Any new plan that mentions sample import, chopping, sampler tracks, or audio war
 Mixer/master work must keep mixing and mastering separate. Volume, pan, mute, solo, master output gain, and preset ceiling controls must affect both realtime playback and WAV export when implemented. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.
 
 Channel EQ work must keep low-cut/air controls in mixer state, migrate older project files safely, keep non-master track EQ separate from master processing, and make EQ values affect realtime playback, full-mix WAV export, and stem export.
+
+Channel dynamics work must keep Drive/Glue controls in mixer state, migrate older project files safely, keep non-master track saturation/compression separate from master processing, label simplified compression honestly, and make Drive/Glue values affect realtime playback, full-mix WAV export, and stem export.

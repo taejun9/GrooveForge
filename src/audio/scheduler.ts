@@ -35,6 +35,8 @@ type TrackMix = {
   pan: number;
   lowCut: number;
   air: number;
+  drive: number;
+  glue: number;
 };
 
 const scheduleAheadSeconds = 0.12;
@@ -57,13 +59,15 @@ function channelMix(project: ProjectState, id: string): TrackMix {
   const channel = project.mixer.find((track) => track.id === id);
   const soloActive = hasSolo(project);
   if (!channel || channel.muted || (id !== "master" && soloActive && !channel.solo)) {
-    return { gain: 0, pan: 0, lowCut: 0, air: 0 };
+    return { gain: 0, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0 };
   }
   return {
     gain: dbToGain(channel.volumeDb),
     pan: Math.max(-1, Math.min(1, channel.pan / 100)),
     lowCut: channel.lowCut,
-    air: channel.air
+    air: channel.air,
+    drive: channel.drive,
+    glue: channel.glue
   };
 }
 
@@ -77,6 +81,25 @@ function channelAirGain(mix: TrackMix, amount = 0.12): number {
 
 function channelAirFilterHz(baseHz: number, mix: TrackMix): number {
   return Math.min(18000, baseHz * (1 + mix.air * 0.34));
+}
+
+function channelGlueMakeup(mix: TrackMix): number {
+  return 1 + mix.glue * 0.08;
+}
+
+function connectChannelGlue(context: AudioContext, source: AudioNode, mix: TrackMix, time: number): AudioNode {
+  if (mix.glue <= 0) {
+    return source;
+  }
+
+  const compressor = context.createDynamicsCompressor();
+  compressor.threshold.setValueAtTime(-18 - mix.glue * 24, time);
+  compressor.knee.setValueAtTime(8 + mix.glue * 18, time);
+  compressor.ratio.setValueAtTime(1.2 + mix.glue * 5.2, time);
+  compressor.attack.setValueAtTime(0.006 + mix.glue * 0.01, time);
+  compressor.release.setValueAtTime(0.08 + mix.glue * 0.18, time);
+  source.connect(compressor);
+  return compressor;
 }
 
 function masterOutputGain(project: ProjectState): number {
@@ -106,19 +129,23 @@ function scheduleKick(
   }
   const osc = context.createOscillator();
   const highpass = context.createBiquadFilter();
+  const drive = context.createWaveShaper();
   const gain = context.createGain();
   const panner = context.createStereoPanner();
   osc.type = "sine";
   highpass.type = "highpass";
   highpass.frequency.setValueAtTime(channelHighpassHz(mix), time);
   highpass.Q.setValueAtTime(0.7, time);
+  drive.curve = driveCurve(mix.drive * 0.42);
+  drive.oversample = "2x";
   osc.frequency.setValueAtTime(78 + sound.kickPunch * 42, time);
   osc.frequency.exponentialRampToValueAtTime(42 + sound.kickPunch * 10, time + 0.09 + sound.kickPunch * 0.05);
   gain.gain.setValueAtTime(0.0001, time);
-  gain.gain.exponentialRampToValueAtTime((0.72 + sound.kickPunch * 0.3) * gainValue * channelAirGain(mix, 0.06), time + 0.006);
+  gain.gain.exponentialRampToValueAtTime((0.72 + sound.kickPunch * 0.3) * gainValue * channelAirGain(mix, 0.06) * channelGlueMakeup(mix), time + 0.006);
   gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.18 + sound.kickPunch * 0.1);
   panner.pan.setValueAtTime(mix.pan, time);
-  osc.connect(highpass).connect(gain).connect(panner).connect(destination);
+  osc.connect(highpass).connect(drive);
+  connectChannelGlue(context, drive, mix, time).connect(gain).connect(panner).connect(destination);
   osc.start(time);
   osc.stop(time + 0.3);
 }
@@ -144,16 +171,20 @@ function scheduleNoise(
 
   const source = context.createBufferSource();
   const filter = context.createBiquadFilter();
+  const drive = context.createWaveShaper();
   const gain = context.createGain();
   filter.type = "highpass";
   filter.frequency.setValueAtTime(Math.max(channelHighpassHz(mix), filterHz + mix.lowCut * 900 + mix.air * 1400), time);
+  drive.curve = driveCurve(mix.drive * 0.36);
+  drive.oversample = "2x";
   gain.gain.setValueAtTime(0.0001, time);
-  gain.gain.exponentialRampToValueAtTime(gainValue * channelAirGain(mix, 0.16), time + 0.004);
+  gain.gain.exponentialRampToValueAtTime(gainValue * channelAirGain(mix, 0.16) * channelGlueMakeup(mix), time + 0.004);
   gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
   source.buffer = buffer;
   const panner = context.createStereoPanner();
   panner.pan.setValueAtTime(mix.pan, time);
-  source.connect(filter).connect(gain).connect(panner).connect(destination);
+  source.connect(filter).connect(drive);
+  connectChannelGlue(context, drive, mix, time).connect(gain).connect(panner).connect(destination);
   source.start(time);
   source.stop(time + duration);
 }
@@ -166,6 +197,7 @@ function scheduleTone(
   frequency: number,
   gainValue: number,
   type: OscillatorType,
+  mix: TrackMix,
   pan: number,
   tone: { drive?: number; filterHz?: number; highpassHz?: number; air?: number; release?: number } = {}
 ): void {
@@ -186,13 +218,14 @@ function scheduleTone(
   filter.type = "lowpass";
   filter.frequency.setValueAtTime(tone.filterHz ?? 12000, time);
   filter.Q.setValueAtTime(0.6, time);
-  drive.curve = driveCurve(tone.drive ?? 0);
+  drive.curve = driveCurve(Math.min(1, (tone.drive ?? 0) + mix.drive * 0.48));
   drive.oversample = "2x";
   gain.gain.setValueAtTime(0.0001, time);
-  gain.gain.exponentialRampToValueAtTime(gainValue * (1 + (tone.air ?? 0) * 0.12), time + 0.01);
+  gain.gain.exponentialRampToValueAtTime(gainValue * (1 + (tone.air ?? 0) * 0.12) * channelGlueMakeup(mix), time + 0.01);
   gain.gain.exponentialRampToValueAtTime(0.0001, time + Math.max(0.04, duration + (tone.release ?? 0) * 0.12));
   panner.pan.setValueAtTime(pan, time);
-  osc.connect(highpass).connect(filter).connect(drive).connect(gain).connect(panner).connect(destination);
+  osc.connect(highpass).connect(filter).connect(drive);
+  connectChannelGlue(context, drive, mix, time).connect(gain).connect(panner).connect(destination);
   osc.start(time);
   osc.stop(time + duration + (tone.release ?? 0) * 0.14 + 0.03);
 }
@@ -276,6 +309,7 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
       260 + sound.snareSnap * 190,
       0.12 * drumMix.gain * drumStepVelocity(pattern, "perc", patternStep),
       "triangle",
+      drumMix,
       drumMix.pan,
       {
         filterHz: channelAirFilterHz(1800 + sound.hatBrightness * 4200, drumMix),
@@ -295,6 +329,7 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
         noteToFrequency(note.pitch),
         (0.42 + sound.bassDrive * 0.22) * bassMix.gain * sidechainGainForStep(pattern, patternStep, sound.sidechainDuck),
         bassOscillator(sound),
+        bassMix,
         bassMix.pan,
         {
           drive: sound.bassDrive,
@@ -317,6 +352,7 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
         noteToFrequency(note.pitch),
         note.velocity * 0.12 * synthMix.gain,
         synthOscillator(sound),
+        synthMix,
         synthMix.pan,
         {
           drive: sound.synthBrightness * 0.08,
@@ -342,6 +378,7 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
           noteToFrequency(pitch),
           chord.velocity * 0.08 * chordMix.gain,
           "triangle",
+          chordMix,
           Math.max(-1, Math.min(1, chordMix.pan + spread * sound.chordWidth * 0.34)),
           {
             drive: (1 - sound.chordWarmth) * 0.08,
