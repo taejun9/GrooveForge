@@ -53,11 +53,14 @@ export type MelodyNote = {
 };
 
 export type ChordQuality = "maj" | "min" | "dim" | "sus2" | "sus4" | "7" | "m7";
+export const chordInversions = [0, 1, 2] as const;
+export type ChordInversion = (typeof chordInversions)[number];
 
 export type ChordEvent = {
   step: number;
   root: string;
   quality: ChordQuality;
+  inversion: ChordInversion;
   length: number;
   velocity: number;
   probability: number;
@@ -173,6 +176,11 @@ export const arrangementMuteTrackLabels: Record<ArrangementMuteTrack, string> = 
   chord: "Chords"
 };
 export const chordQualities: ChordQuality[] = ["maj", "min", "dim", "sus2", "sus4", "7", "m7"];
+export const chordInversionLabels: Record<ChordInversion, string> = {
+  0: "Root",
+  1: "1st",
+  2: "2nd"
+};
 export const masterPresets: MasterPreset[] = ["Clean Demo", "Streaming Safe", "Headroom for Vocal"];
 export const drumGroovePresetLabels: Record<DrumGroovePreset, string> = {
   tight: "Tight",
@@ -491,10 +499,10 @@ const starterPatternA: PatternData = withDrumDynamics({
     { step: 12, pitch: "C5", length: 3, velocity: 0.66, probability: 1 }
   ],
   chordEvents: [
-    { step: 0, root: "F", quality: "min", length: 4, velocity: 0.55, probability: 1 },
-    { step: 4, root: "Db", quality: "maj", length: 4, velocity: 0.46, probability: 1 },
-    { step: 8, root: "Ab", quality: "maj", length: 4, velocity: 0.5, probability: 1 },
-    { step: 12, root: "Eb", quality: "maj", length: 4, velocity: 0.5, probability: 1 }
+    { step: 0, root: "F", quality: "min", inversion: 0, length: 4, velocity: 0.55, probability: 1 },
+    { step: 4, root: "Db", quality: "maj", inversion: 0, length: 4, velocity: 0.46, probability: 1 },
+    { step: 8, root: "Ab", quality: "maj", inversion: 0, length: 4, velocity: 0.5, probability: 1 },
+    { step: 12, root: "Eb", quality: "maj", inversion: 0, length: 4, velocity: 0.5, probability: 1 }
   ]
 }, { 7: 2, 15: 3 });
 
@@ -520,10 +528,10 @@ const starterPatternB: PatternData = withDrumDynamics({
     { step: 12, pitch: "C5", length: 2, velocity: 0.66, probability: 1 }
   ],
   chordEvents: [
-    { step: 0, root: "F", quality: "min", length: 4, velocity: 0.5, probability: 1 },
-    { step: 4, root: "C", quality: "min", length: 4, velocity: 0.44, probability: 1 },
-    { step: 8, root: "Db", quality: "maj", length: 4, velocity: 0.48, probability: 1 },
-    { step: 12, root: "Eb", quality: "maj", length: 4, velocity: 0.5, probability: 1 }
+    { step: 0, root: "F", quality: "min", inversion: 0, length: 4, velocity: 0.5, probability: 1 },
+    { step: 4, root: "C", quality: "min", inversion: 0, length: 4, velocity: 0.44, probability: 1 },
+    { step: 8, root: "Db", quality: "maj", inversion: 0, length: 4, velocity: 0.48, probability: 1 },
+    { step: 12, root: "Eb", quality: "maj", inversion: 0, length: 4, velocity: 0.5, probability: 1 }
   ]
 }, { 1: 2, 7: 2, 15: 3 });
 
@@ -546,10 +554,10 @@ const starterPatternC: PatternData = withDrumDynamics({
     { step: 12, pitch: "C5", length: 2, velocity: 0.58, probability: 1 }
   ],
   chordEvents: [
-    { step: 0, root: "Db", quality: "maj", length: 4, velocity: 0.48, probability: 1 },
-    { step: 4, root: "Eb", quality: "maj", length: 4, velocity: 0.45, probability: 1 },
-    { step: 8, root: "F", quality: "min", length: 4, velocity: 0.52, probability: 1 },
-    { step: 12, root: "C", quality: "min", length: 4, velocity: 0.42, probability: 1 }
+    { step: 0, root: "Db", quality: "maj", inversion: 0, length: 4, velocity: 0.48, probability: 1 },
+    { step: 4, root: "Eb", quality: "maj", inversion: 0, length: 4, velocity: 0.45, probability: 1 },
+    { step: 8, root: "F", quality: "min", inversion: 0, length: 4, velocity: 0.52, probability: 1 },
+    { step: 12, root: "C", quality: "min", inversion: 0, length: 4, velocity: 0.42, probability: 1 }
   ]
 }, { 14: 2 });
 
@@ -590,6 +598,10 @@ export function soundPresetLabel(preset: SoundPresetId): string {
 
 export function chordProgressionPresetLabel(preset: ChordProgressionPreset): string {
   return chordProgressionPresetLabels[preset];
+}
+
+export function chordInversionLabel(inversion: ChordInversion): string {
+  return chordInversionLabels[inversion];
 }
 
 export function patternVariationPresetLabel(preset: PatternVariationPreset): string {
@@ -689,6 +701,10 @@ export function normalizeDrumProbability(value: number): number {
 
 export function normalizeEventProbability(value: number): number {
   return normalizeDrumProbability(value);
+}
+
+export function normalizeChordInversion(value: unknown): ChordInversion {
+  return isChordInversion(value) ? value : 0;
 }
 
 export function normalizeHatRepeat(value: number): number {
@@ -1152,6 +1168,7 @@ function patternFromBlueprint(key: string, pattern: PatternBlueprint): PatternDa
       step: chord.step,
       root: rootFromDegree(key, chord.degree),
       quality: chord.quality ?? chordQualityFromDegree(key, chord.degree),
+      inversion: 0,
       length: chord.length,
       velocity: chord.velocity,
       probability: 1
@@ -1180,6 +1197,7 @@ function chordFromBlueprint(key: string, chord: ChordBlueprint): ChordEvent {
     step: normalizeStep(chord.step),
     root: rootFromDegree(key, chord.degree),
     quality: chord.quality ?? chordQualityFromDegree(key, chord.degree),
+    inversion: 0,
     length: normalizeChordLength(chord.length, chord.step),
     velocity: normalizeChordVelocity(chord.velocity),
     probability: 1
@@ -1486,12 +1504,13 @@ export function noteToFrequency(note: string): number {
 export function chordPitches(chord: ChordEvent, octave = 3): string[] {
   const root = tonicIndex[chord.root] ?? 0;
   const names = chord.root.includes("b") ? flatNotes : sharpNotes;
-  return chordIntervals[chord.quality].map((interval) => {
+  const pitches = chordIntervals[chord.quality].map((interval) => {
     const absolute = root + interval;
     const pitchIndex = absolute % 12;
     const octaveOffset = Math.floor(absolute / 12);
     return `${names[pitchIndex]}${octave + octaveOffset}`;
   });
+  return applyChordInversion(pitches, chord.inversion);
 }
 
 function pitchParts(pitch: string): { name: string; octave: number } | null {
@@ -1531,6 +1550,20 @@ function scaleDegreeOctaveOffset(key: string, degree: number): number {
 function circularPitchDistance(first: number, second: number): number {
   const distance = Math.abs(first - second) % 12;
   return Math.min(distance, 12 - distance);
+}
+
+function applyChordInversion(pitches: string[], inversion: unknown): string[] {
+  const moves = Math.min(normalizeChordInversion(inversion), Math.max(0, pitches.length - 1));
+  if (moves === 0) {
+    return pitches;
+  }
+
+  return [...pitches.slice(moves), ...pitches.slice(0, moves).map((pitch) => shiftPitchOctave(pitch, 1))];
+}
+
+function shiftPitchOctave(pitch: string, octaves: number): string {
+  const parts = pitchParts(pitch);
+  return parts ? `${parts.name}${parts.octave + octaves}` : pitch;
 }
 
 function normalizePatternData(pattern: PatternDataInput): PatternData {
@@ -1629,6 +1662,7 @@ function normalizeChordEvents(events: ChordEventInput[] | undefined): ChordEvent
   return (
     events?.map((event) => ({
       ...event,
+      inversion: normalizeChordInversion(event.inversion),
       probability: normalizeEventProbability(event.probability ?? 1)
     })) ?? []
   );
@@ -1705,7 +1739,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
 
 type BassNoteInput = Omit<BassNote, "probability"> & { probability?: number };
 type MelodyNoteInput = Omit<MelodyNote, "probability"> & { probability?: number };
-type ChordEventInput = Omit<ChordEvent, "probability"> & { probability?: number };
+type ChordEventInput = Omit<ChordEvent, "probability" | "inversion"> & { probability?: number; inversion?: unknown };
 type PatternDataInput = Omit<PatternData, "bassNotes" | "melodyNotes" | "chordEvents" | "drumVelocities" | "drumTimings" | "drumProbabilities" | "hatRepeats"> & {
   bassNotes: BassNoteInput[];
   melodyNotes: MelodyNoteInput[];
@@ -1925,6 +1959,7 @@ function isChordEvent(value: unknown): value is ChordEventInput {
     isFiniteNumber(value.velocity) &&
     value.velocity >= 0 &&
     value.velocity <= 1 &&
+    (value.inversion === undefined || isChordInversion(value.inversion)) &&
     isOptionalUnit(value.probability)
   );
 }
@@ -1981,6 +2016,10 @@ function isFiniteNumber(value: unknown): value is number {
 
 function isOptionalUnit(value: unknown): boolean {
   return value === undefined || (isFiniteNumber(value) && value >= 0 && value <= 1);
+}
+
+function isChordInversion(value: unknown): value is ChordInversion {
+  return isFiniteNumber(value) && chordInversions.includes(value as ChordInversion);
 }
 
 function clampUnit(value: unknown): number {

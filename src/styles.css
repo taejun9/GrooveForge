@@ -257,6 +257,7 @@ h2 {
 .block-pattern-row button,
 .arrangement-mute-row button,
 .chord-preset-row button,
+.chord-inversion-row button,
 .chord-tools > button,
 .preset-row button {
   min-height: 34px;
@@ -268,6 +269,7 @@ h2 {
 .block-pattern-row button.selected,
 .arrangement-mute-row button.selected,
 .chord-preset-row button.selected,
+.chord-inversion-row button.selected,
 .preset-row button.selected {
   border-color: rgba(240, 195, 106, 0.64);
   color: #11100f;
@@ -973,6 +975,20 @@ input[type="range"] {
   color: #f4efe7;
   background: #141413;
   padding: 0 8px;
+}
+
+.chord-inversion-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.chord-inversion-row button {
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 6px;
+  color: #d8d0c4;
+  background: rgba(244, 239, 231, 0.04);
+  font-size: 12px;
 }
 
 .chord-value-inputs {

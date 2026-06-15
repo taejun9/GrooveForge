@@ -59,6 +59,8 @@ import {
   arrangementTemplateLabel,
   arrangementTotalBars,
   bassPitchLanes,
+  chordInversions,
+  chordInversionLabel,
   chordQualities,
   clonePatternData,
   createChordProgressionPreset,
@@ -87,6 +89,7 @@ import {
   normalizeDrumProbability,
   normalizeDrumTimingMs,
   normalizeDrumVelocity,
+  normalizeChordInversion,
   normalizeEventProbability,
   normalizeHatRepeat,
   normalizeMixerEq,
@@ -1095,6 +1098,7 @@ export function App(): ReactElement {
             ...update,
             step,
             length,
+            inversion: update.inversion === undefined ? event.inversion : normalizeChordInversion(update.inversion),
             velocity: update.velocity === undefined ? event.velocity : clampVelocity(update.velocity),
             probability: update.probability === undefined ? event.probability : normalizeEventProbability(update.probability)
           };
@@ -2821,6 +2825,7 @@ function ChordEditor({
                 {chord.root}
                 {chord.quality}
               </strong>
+              <small data-testid={`chord-inversion-badge-${index}`}>{chordInversionLabel(normalizeChordInversion(chord.inversion))}</small>
               {chord.probability < 1 && (
                 <small className="chance-badge" data-testid={`chord-chance-badge-${index}`}>
                   {chanceBadgeLabel(chord.probability)}
@@ -2875,6 +2880,22 @@ function ChordEditor({
                   </option>
                 ))}
               </select>
+            </label>
+            <label>
+              <span>Voicing {chordInversionLabel(normalizeChordInversion(chord.inversion))}</span>
+              <div className="chord-inversion-row" aria-label={`Chord ${index + 1} inversion`}>
+                {chordInversions.map((inversion) => (
+                  <button
+                    className={normalizeChordInversion(chord.inversion) === inversion ? "selected" : ""}
+                    data-testid={`chord-inversion-${index}-${inversion}`}
+                    key={inversion}
+                    onClick={() => onChange(index, { inversion })}
+                    type="button"
+                  >
+                    {chordInversionLabel(inversion)}
+                  </button>
+                ))}
+              </div>
             </label>
             <label>
               <span>Length {chord.length}</span>
