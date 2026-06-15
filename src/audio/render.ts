@@ -1,5 +1,6 @@
 import {
   ArrangementBlock,
+  arrangementEnergyGain,
   arrangementTotalBars,
   chordEventShouldPlay,
   chordPitches,
@@ -238,16 +239,17 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
     const barOffset = bar * 16;
     const arrangementBlock = arrangementBlockForBar(project, bar);
     const pattern = arrangementBlock ? patternForSlot(project, arrangementBlock.pattern) : patternForSlot(project, project.selectedPattern);
+    const energyGain = arrangementBlock ? arrangementEnergyGain(arrangementBlock.energy) : 1;
     for (let patternStep = 0; patternStep < 16; patternStep += 1) {
       const absoluteStep = barOffset + patternStep;
       const time = (barOffset + patternStep) * step;
       if (drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
         const velocity = drumStepVelocity(pattern, "kick", patternStep);
         const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
-        addTone(buffer, drumTime, 0.18 + sound.kickPunch * 0.1, 44 + sound.kickPunch * 10, drumMix, (0.78 + sound.kickPunch * 0.24) * velocity, "sine", {
+        addTone(buffer, drumTime, 0.18 + sound.kickPunch * 0.1, 44 + sound.kickPunch * 10, drumMix, energyGain * (0.78 + sound.kickPunch * 0.24) * velocity, "sine", {
           decay: 4.8 - sound.kickPunch * 1.2
         });
-        addTone(buffer, drumTime, 0.06 + sound.kickPunch * 0.04, 82 + sound.kickPunch * 45, drumMix, (0.2 + sound.kickPunch * 0.22) * velocity, "sine", {
+        addTone(buffer, drumTime, 0.06 + sound.kickPunch * 0.04, 82 + sound.kickPunch * 45, drumMix, energyGain * (0.2 + sound.kickPunch * 0.22) * velocity, "sine", {
           decay: 8
         });
       }
@@ -258,7 +260,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
           drumTime,
           0.11 + (1 - sound.snareSnap) * 0.08,
           drumMix,
-          (0.28 + sound.snareSnap * 0.18) * drumStepVelocity(pattern, "clap", patternStep),
+          energyGain * (0.28 + sound.snareSnap * 0.18) * drumStepVelocity(pattern, "clap", patternStep),
           sound.snareSnap
         );
       }
@@ -272,14 +274,14 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
             drumTime + (repeatIndex * step) / repeatCount,
             0.035 + (1 - sound.hatBrightness) * 0.025,
             drumMix,
-            (0.12 + sound.hatBrightness * 0.1) * velocity * (repeatIndex === 0 ? 1 : 0.72),
+            energyGain * (0.12 + sound.hatBrightness * 0.1) * velocity * (repeatIndex === 0 ? 1 : 0.72),
             sound.hatBrightness
           );
         }
       }
       if (drumStepShouldPlay(pattern, "perc", patternStep, absoluteStep)) {
         const drumTime = time + drumStepTimingMs(pattern, "perc", patternStep) / 1000;
-        addTone(buffer, drumTime, 0.08, 260 + sound.snareSnap * 190, drumMix, 0.16 * drumStepVelocity(pattern, "perc", patternStep), "triangle", {
+        addTone(buffer, drumTime, 0.08, 260 + sound.snareSnap * 190, drumMix, energyGain * 0.16 * drumStepVelocity(pattern, "perc", patternStep), "triangle", {
           filter: 0.7 + sound.hatBrightness * 0.3
         });
       }
@@ -294,7 +296,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
         note.length * step * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
         bassMix,
-          (0.52 + sound.bassDrive * 0.24) * sidechainGainForStep(pattern, note.step, sound.sidechainDuck, barOffset + note.step),
+          energyGain * (0.52 + sound.bassDrive * 0.24) * sidechainGainForStep(pattern, note.step, sound.sidechainDuck, barOffset + note.step),
         bassShape(sound),
         { drive: sound.bassDrive, filter: 0.72 + sound.bassDrive * 0.28, decay: 3.8 - sound.bassDecay * 1.4 }
       );
@@ -309,7 +311,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
         note.length * step * (0.8 + sound.synthRelease * 0.42),
         noteToFrequency(note.pitch),
         synthMix,
-        note.velocity * 0.22,
+        energyGain * note.velocity * 0.22,
         synthShape(sound),
         { drive: sound.synthBrightness * 0.08, filter: 0.62 + sound.synthBrightness * 0.38, decay: 4.4 - sound.synthRelease * 1.8 }
       );
@@ -332,7 +334,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
           chord.length * step * (0.9 + sound.synthRelease * 0.24),
           noteToFrequency(pitch),
           voiceMix,
-          chord.velocity * 0.14,
+          energyGain * chord.velocity * 0.14,
           "triangle",
           { drive: (1 - sound.chordWarmth) * 0.08, filter: 0.48 + (1 - sound.chordWarmth) * 0.42, decay: 3.8 - sound.synthRelease * 1.2 }
         );

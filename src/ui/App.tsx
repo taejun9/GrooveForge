@@ -48,6 +48,7 @@ import {
   SoundDesign,
   activePattern,
   arrangementSections,
+  arrangementEnergyGain,
   arrangementTemplateIds,
   arrangementTemplateLabel,
   arrangementTotalBars,
@@ -73,6 +74,7 @@ import {
   minDrumTimingMs,
   maxArrangementBars,
   maxDrumTimingMs,
+  normalizeArrangementEnergy,
   normalizeArrangementBars,
   normalizeDrumProbability,
   normalizeDrumTimingMs,
@@ -508,7 +510,7 @@ export function App(): ReactElement {
       const nextBlock: ArrangementBlock = {
         ...block,
         ...update,
-        energy: update.energy === undefined ? block.energy : clampEnergy(update.energy),
+        energy: update.energy === undefined ? block.energy : normalizeArrangementEnergy(update.energy),
         bars: update.bars === undefined ? block.bars : normalizeArrangementBars(update.bars)
       };
       return {
@@ -1565,7 +1567,9 @@ export function App(): ReactElement {
                 />
               </label>
               <label>
-                <span>Energy {Math.round(selectedArrangementBlock.energy * 100)}%</span>
+                <span>
+                  Energy {Math.round(selectedArrangementBlock.energy * 100)}% / {arrangementEnergyGain(selectedArrangementBlock.energy).toFixed(2)}x
+                </span>
                 <div className="energy-inputs">
                   <input
                     data-testid="arrangement-energy-slider"
@@ -2787,13 +2791,6 @@ function clampStepLength(value: number): number {
 function clampVelocity(value: number): number {
   if (!Number.isFinite(value)) {
     return 0.5;
-  }
-  return Math.min(1, Math.max(0, value));
-}
-
-function clampEnergy(value: number): number {
-  if (!Number.isFinite(value)) {
-    return 0;
   }
   return Math.min(1, Math.max(0, value));
 }

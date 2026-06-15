@@ -101,6 +101,8 @@ Arrangement length work must keep per-block bar counts bounded, migrate older pr
 
 Arrangement playback work must map realtime playback through arrangement blocks, per-block bar counts, and Pattern A/B/C assignments by default while preserving a selected-pattern preview mode, accurate transport status, Space shortcut behavior, and existing mixer/sound/master processing.
 
+Arrangement energy work must keep Energy as deterministic arrangement-block playback/render interpretation, apply the same gain rule to realtime arrangement playback, WAV export, and stem export, preserve selected-pattern preview at neutral energy, and avoid mutating stored pattern events.
+
 Live playback edit work must read current project state while scheduling future steps, let selected-pattern preview and arrangement playback respond to edits without stopping, update BPM and master output changes on future scheduling/output, preserve Stop and Space behavior, and state that already-triggered audio is not rewritten.
 
 Undo/redo work must record bounded local project-edit history for editing actions, ignore playback/export side effects, keep keyboard shortcuts out of focused inputs, and clear history when a different project file is loaded.

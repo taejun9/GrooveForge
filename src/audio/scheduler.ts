@@ -1,5 +1,6 @@
 import {
   dbToGain,
+  arrangementEnergyGain,
   activePattern,
   ArrangementSection,
   arrangementTotalBars,
@@ -33,6 +34,8 @@ export type PlaybackSnapshot = {
   pattern: PatternSlot;
   section?: ArrangementSection;
   arrangementIndex?: number;
+  energy: number;
+  energyGain: number;
   totalBars: number;
 };
 
@@ -130,6 +133,8 @@ type PlaybackStepContext = {
   patternSlot: PatternSlot;
   section?: ArrangementSection;
   arrangementIndex?: number;
+  energy: number;
+  energyGain: number;
 };
 
 function arrangementContextForBar(project: ProjectState, bar: number): PlaybackStepContext {
@@ -141,7 +146,9 @@ function arrangementContextForBar(project: ProjectState, bar: number): PlaybackS
         pattern: patternForSlot(project, block.pattern),
         patternSlot: block.pattern,
         section: block.section,
-        arrangementIndex: index
+        arrangementIndex: index,
+        energy: block.energy,
+        energyGain: arrangementEnergyGain(block.energy)
       };
     }
     cursor += blockBars;
@@ -149,7 +156,9 @@ function arrangementContextForBar(project: ProjectState, bar: number): PlaybackS
 
   return {
     pattern: activePattern(project),
-    patternSlot: project.selectedPattern
+    patternSlot: project.selectedPattern,
+    energy: 1,
+    energyGain: 1
   };
 }
 
@@ -157,7 +166,9 @@ function playbackContextForStep(project: ProjectState, mode: PlaybackMode, loopS
   if (mode === "pattern") {
     return {
       pattern: activePattern(project),
-      patternSlot: project.selectedPattern
+      patternSlot: project.selectedPattern,
+      energy: 1,
+      energyGain: 1
     };
   }
 
@@ -176,6 +187,8 @@ function snapshotForStep(project: ProjectState, step: number, loopSteps: number,
     pattern: playbackContext.patternSlot,
     section: playbackContext.section,
     arrangementIndex: playbackContext.arrangementIndex,
+    energy: playbackContext.energy,
+    energyGain: playbackContext.energyGain,
     totalBars
   };
 }
@@ -342,7 +355,16 @@ function scheduleMetronomeClick(context: AudioContext, destination: AudioNode, t
   );
 }
 
-function scheduleStep(project: ProjectState, pattern: PatternData, context: AudioContext, master: AudioNode, step: number, time: number, absoluteStep = step): void {
+function scheduleStep(
+  project: ProjectState,
+  pattern: PatternData,
+  context: AudioContext,
+  master: AudioNode,
+  step: number,
+  time: number,
+  absoluteStep = step,
+  energyGain = 1
+): void {
   const patternStep = step % 16;
   const drumMix = channelMix(project, "drum_rack");
   const bassMix = channelMix(project, "bass_808");
@@ -355,7 +377,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
   }
   if (drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
     const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
-    scheduleKick(context, master, drumTime, drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix, sound);
+    scheduleKick(context, master, drumTime, energyGain * drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix, sound);
   }
   if (drumStepShouldPlay(pattern, "clap", patternStep, absoluteStep)) {
     const drumTime = time + drumStepTimingMs(pattern, "clap", patternStep) / 1000;
@@ -364,7 +386,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
       master,
       drumTime,
       0.11 + (1 - sound.snareSnap) * 0.08,
-      (0.2 + sound.snareSnap * 0.14) * drumMix.gain * drumStepVelocity(pattern, "clap", patternStep),
+      energyGain * (0.2 + sound.snareSnap * 0.14) * drumMix.gain * drumStepVelocity(pattern, "clap", patternStep),
       780 + sound.snareSnap * 1800,
       drumMix
     );
@@ -379,7 +401,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
         master,
         drumTime + (repeatIndex * stepDuration) / repeatCount,
         0.035 + (1 - sound.hatBrightness) * 0.025,
-        (0.08 + sound.hatBrightness * 0.08) * drumMix.gain * baseVelocity * (repeatIndex === 0 ? 1 : 0.72),
+        energyGain * (0.08 + sound.hatBrightness * 0.08) * drumMix.gain * baseVelocity * (repeatIndex === 0 ? 1 : 0.72),
         4300 + sound.hatBrightness * 4200,
         drumMix
       );
@@ -393,7 +415,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
       drumTime,
       0.07,
       260 + sound.snareSnap * 190,
-      0.12 * drumMix.gain * drumStepVelocity(pattern, "perc", patternStep),
+      energyGain * 0.12 * drumMix.gain * drumStepVelocity(pattern, "perc", patternStep),
       "triangle",
       drumMix,
       drumMix.pan,
@@ -413,7 +435,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
         time,
         note.length * stepDuration * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
-        (0.42 + sound.bassDrive * 0.22) * bassMix.gain * sidechainGainForStep(pattern, patternStep, sound.sidechainDuck, absoluteStep),
+        energyGain * (0.42 + sound.bassDrive * 0.22) * bassMix.gain * sidechainGainForStep(pattern, patternStep, sound.sidechainDuck, absoluteStep),
         bassOscillator(sound),
         bassMix,
         bassMix.pan,
@@ -436,7 +458,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
         time,
         note.length * stepDuration * (0.8 + sound.synthRelease * 0.42),
         noteToFrequency(note.pitch),
-        note.velocity * 0.12 * synthMix.gain,
+        energyGain * note.velocity * 0.12 * synthMix.gain,
         synthOscillator(sound),
         synthMix,
         synthMix.pan,
@@ -462,7 +484,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
           time,
           chord.length * stepDuration * (0.9 + sound.synthRelease * 0.24),
           noteToFrequency(pitch),
-          chord.velocity * 0.08 * chordMix.gain,
+          energyGain * chord.velocity * 0.08 * chordMix.gain,
           "triangle",
           chordMix,
           Math.max(-1, Math.min(1, chordMix.pan + spread * sound.chordWidth * 0.34)),
@@ -521,7 +543,16 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
       const snapshot = snapshotForStep(currentProject, nextStep, loopSteps, totalBars, mode);
       const playbackContext = playbackContextForStep(currentProject, mode, snapshot.loopStep);
       const scheduleDelaySeconds = Math.max(0.015, (nextStepAtMs - nowMs) / 1000);
-      scheduleStep(currentProject, playbackContext.pattern, context, masterGain, snapshot.loopStep, context.currentTime + scheduleDelaySeconds, nextStep);
+      scheduleStep(
+        currentProject,
+        playbackContext.pattern,
+        context,
+        masterGain,
+        snapshot.loopStep,
+        context.currentTime + scheduleDelaySeconds,
+        nextStep,
+        playbackContext.energyGain
+      );
       queueStepFeedback(snapshot, nextStepAtMs);
       nextStep += 1;
       nextStepAtMs += stepDuration * 1000;

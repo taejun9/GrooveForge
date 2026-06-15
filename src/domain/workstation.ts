@@ -589,6 +589,17 @@ export function normalizeArrangementBars(value: unknown): number {
   return Math.min(maxArrangementBars, Math.max(minArrangementBars, Math.round(value)));
 }
 
+export function normalizeArrangementEnergy(value: unknown): number {
+  if (!isFiniteNumber(value)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, value));
+}
+
+export function arrangementEnergyGain(value: unknown): number {
+  return 0.45 + normalizeArrangementEnergy(value) * 0.67;
+}
+
 export function arrangementTotalBars(project: ProjectState): number {
   return project.arrangement.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
 }
@@ -1276,7 +1287,7 @@ function normalizeArrangement(arrangement: ArrangementBlockInput[]): Arrangement
   return arrangement.map((block) => ({
     section: block.section,
     pattern: block.pattern,
-    energy: clampUnit(block.energy),
+    energy: normalizeArrangementEnergy(block.energy),
     bars: normalizeArrangementBars(block.bars)
   }));
 }
