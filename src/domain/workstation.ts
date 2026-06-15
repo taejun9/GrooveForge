@@ -75,6 +75,7 @@ export type ProjectState = {
 };
 
 export const steps = Array.from({ length: 16 }, (_, index) => index);
+export const stepsPerBar = 16;
 
 export const styleProfiles: StyleProfile[] = [
   {
@@ -213,6 +214,22 @@ export function getStyle(project: ProjectState): StyleProfile {
 
 export function dbToGain(db: number): number {
   return Math.pow(10, db / 20);
+}
+
+export function stepDurationSeconds(bpm: number): number {
+  return 60 / bpm / 4;
+}
+
+export function projectStepDurationSeconds(project: ProjectState): number {
+  return stepDurationSeconds(project.bpm);
+}
+
+export function loopStepCount(bars: number): number {
+  return bars * stepsPerBar;
+}
+
+export function stepToSeconds(project: ProjectState, absoluteStep: number): number {
+  return absoluteStep * projectStepDurationSeconds(project);
 }
 
 export function noteToFrequency(note: string): number {

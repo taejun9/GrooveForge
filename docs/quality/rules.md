@@ -60,7 +60,7 @@ npm run desktop
 
 ## Product QA Gates
 
-P0 scheduler work must prove stable play/stop/loop behavior, BPM changes, and separation between UI timing and audio timing.
+P0 scheduler work must prove stable play/stop/loop behavior, BPM changes, current-step feedback, and separation between UI timing and audio timing.
 
 Drum, bass, melody, and arrangement work must save and reload project JSON without losing event timing, pitch, velocity, track routing, or mixer state.
 

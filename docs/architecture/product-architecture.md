@@ -54,7 +54,7 @@ The current MVP stack is:
 - Desktop shell: Electron.
 - Renderer/build: Vite, React, TypeScript.
 - UI rendering: DOM/CSS for the current workstation surface; Canvas/WebGL remains available for dense piano-roll and waveform work later.
-- Audio: Web Audio API for preview playback and a local WAV renderer for the first export path.
+- Audio: Web Audio API for realtime loop playback and a local WAV renderer for the first export path.
 - Storage: JSON project files and IndexedDB/local file cache in later plans.
 
 Electron is used for the first desktop MVP because it gets the existing web audio/UI direction into a runnable desktop app quickly. A later native/pro audio engine can still move to JUCE after the product loop is proven.
@@ -96,7 +96,7 @@ Genre is data, not a product silo. Trap, drill, boom bap, lofi, house, jersey, p
 
 ## Scheduling Rule
 
-The audio scheduler is a P0 product dependency. UI timing must not be treated as audio timing. Playback should use stable musical ticks and schedule audio ahead of the render deadline while keeping UI state as a view of the transport.
+The audio scheduler is a P0 product dependency. UI timing must not be treated as audio timing. Realtime playback uses stable musical ticks, schedules audio ahead of the render deadline, loops over musical steps, and reports current step/bar/beat back to the UI as a view of the transport.
 
 ## Export Rule
 

@@ -13,8 +13,9 @@ import {
   Waves
 } from "lucide-react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
-import { useMemo, useRef, useState } from "react";
-import { exportWav, playPreview } from "../audio/render";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { exportWav } from "../audio/render";
+import { PlaybackController, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
 import {
   DrumLane,
   getStyle,
@@ -36,9 +37,18 @@ const keys = ["F minor", "A minor", "C minor", "D minor", "E minor", "G minor", 
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [isPlaying, setIsPlaying] = useState(false);
-  const stopRef = useRef<null | (() => void)>(null);
+  const [playbackPosition, setPlaybackPosition] = useState<PlaybackSnapshot | null>(null);
+  const controllerRef = useRef<PlaybackController | null>(null);
   const style = getStyle(project);
   const activeChannels = useMemo(() => project.mixer.filter((channel) => !channel.muted).length, [project.mixer]);
+  const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
+
+  useEffect(() => {
+    return () => {
+      controllerRef.current?.stop();
+      controllerRef.current = null;
+    };
+  }, []);
 
   function updateProject(update: (current: ProjectState) => ProjectState): void {
     setProject((current) => update(current));
@@ -56,17 +66,28 @@ export function App(): ReactElement {
 
   function togglePlayback(): void {
     if (isPlaying) {
-      stopRef.current?.();
-      stopRef.current = null;
-      setIsPlaying(false);
+      controllerRef.current?.stop();
+      controllerRef.current = null;
+      setPlaybackPosition(null);
       return;
     }
 
-    setIsPlaying(true);
-    stopRef.current = playPreview(project, () => {
-      stopRef.current = null;
+    try {
+      setIsPlaying(true);
+      controllerRef.current = startRealtimePlayback(project, {
+        bars: 2,
+        onStep: setPlaybackPosition,
+        onStop: () => {
+          controllerRef.current = null;
+          setPlaybackPosition(null);
+          setIsPlaying(false);
+        }
+      });
+    } catch (error) {
+      console.error(error);
       setIsPlaying(false);
-    });
+      setPlaybackPosition(null);
+    }
   }
 
   function selectStyle(styleId: ProjectState["styleId"]): void {
@@ -130,7 +151,11 @@ export function App(): ReactElement {
         </div>
 
         <div className="command-strip">
-          <button className="icon-button primary" type="button" title="Play preview" onClick={togglePlayback}>
+          <div className="transport-status" aria-live="polite">
+            <strong>{isPlaying ? `Bar ${playbackPosition?.bar ?? 1}.${playbackPosition?.beat ?? 1}` : "Ready"}</strong>
+            <span>{isPlaying ? `Step ${(currentPatternStep ?? 0) + 1}` : "2 bar loop"}</span>
+          </div>
+          <button className="icon-button primary" type="button" title="Play realtime loop" onClick={togglePlayback}>
             {isPlaying ? <CircleStop size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
             <span>{isPlaying ? "Stop" : "Play"}</span>
           </button>
@@ -192,7 +217,13 @@ export function App(): ReactElement {
                 {steps.map((step) => (
                   <button
                     aria-label={`${drumLabels[lane]} step ${step + 1}`}
-                    className={project.drumPattern[lane][step] ? "step active" : "step"}
+                    className={[
+                      "step",
+                      project.drumPattern[lane][step] ? "active" : "",
+                      currentPatternStep === step ? "playhead" : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     key={step}
                     onClick={() => toggleStep(lane, step)}
                     style={{ "--lane-color": laneColor(lane) } as CSSProperties}
@@ -230,8 +261,9 @@ export function App(): ReactElement {
               title="808"
               notes={project.bassNotes.map((note) => ({ ...note, velocity: note.glide ? 0.95 : 0.82 }))}
               color="#ff7a4f"
+              currentStep={currentPatternStep}
             />
-            <NoteLane title="Synth" notes={project.melodyNotes} color="#8aa8ff" />
+            <NoteLane title="Synth" notes={project.melodyNotes} color="#8aa8ff" currentStep={currentPatternStep} />
           </div>
         </section>
 
@@ -370,11 +402,13 @@ function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; met
 function NoteLane({
   title,
   notes,
-  color
+  color,
+  currentStep
 }: {
   title: string;
   notes: { step: number; pitch: string; length: number; velocity: number }[];
   color: string;
+  currentStep: number | null;
 }): ReactElement {
   const pitches = Array.from(new Set(notes.map((note) => note.pitch))).reverse();
   return (
@@ -389,7 +423,9 @@ function NoteLane({
                 const note = notes.find((candidate) => candidate.step === step && candidate.pitch === pitch);
                 return (
                   <i
-                    className={note ? "note active" : "note"}
+                    className={["note", note ? "active" : "", currentStep === step ? "playhead" : ""]
+                      .filter(Boolean)
+                      .join(" ")}
                     key={`${pitch}-${step}`}
                     style={note ? { gridColumn: `${step + 1} / span ${note.length}` } : undefined}
                   />

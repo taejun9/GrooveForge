@@ -137,6 +137,27 @@ h2 {
   gap: 8px;
 }
 
+.transport-status {
+  display: grid;
+  min-width: 92px;
+  min-height: 38px;
+  align-content: center;
+  padding: 4px 10px;
+  border: 1px solid rgba(120, 240, 200, 0.24);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.065);
+}
+
+.transport-status strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.transport-status span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 11px;
+}
+
 .icon-button,
 .segmented button,
 .pattern-tabs button,
@@ -310,6 +331,11 @@ h2 {
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.28) inset;
 }
 
+.step.playhead {
+  outline: 2px solid #f4efe7;
+  outline-offset: 1px;
+}
+
 .step span {
   font-size: 10px;
 }
@@ -381,6 +407,10 @@ input[type="range"] {
 .note.active {
   border-color: color-mix(in srgb, var(--note) 72%, transparent);
   background: var(--note);
+}
+
+.note.playhead {
+  box-shadow: 0 0 0 2px rgba(244, 239, 231, 0.62) inset;
 }
 
 .device-list {

@@ -26,6 +26,7 @@ REQUIRED_PATHS = [
     "src/ui/App.tsx",
     "src/domain/workstation.ts",
     "src/audio/render.ts",
+    "src/audio/scheduler.ts",
     "src/styles.css",
     "docs/architecture/harness.md",
     "docs/architecture/product-architecture.md",
@@ -81,6 +82,13 @@ TEXT_EXPECTATIONS = {
         "Guided",
         "Studio",
         "exportWav",
+        "startRealtimePlayback",
+        "currentPatternStep",
+    ],
+    "src/audio/scheduler.ts": [
+        "scheduleAheadSeconds",
+        "startRealtimePlayback",
+        "onStep",
     ],
     "src/domain/workstation.ts": [
         "styleProfiles",

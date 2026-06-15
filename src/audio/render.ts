@@ -1,11 +1,11 @@
-import { dbToGain, noteToFrequency, ProjectState } from "../domain/workstation";
+import { dbToGain, noteToFrequency, projectStepDurationSeconds, ProjectState } from "../domain/workstation";
 
 const sampleRate = 44100;
 const channels = 2;
 type AudioChannels = [Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>];
 
 function stepDuration(project: ProjectState): number {
-  return 60 / project.bpm / 4;
+  return projectStepDurationSeconds(project);
 }
 
 function channelGain(project: ProjectState, id: string): number {
@@ -133,27 +133,4 @@ export function exportWav(project: ProjectState): void {
   link.download = `${project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "grooveforge"}-demo.wav`;
   link.click();
   URL.revokeObjectURL(url);
-}
-
-export function playPreview(project: ProjectState, onDone: () => void): () => void {
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) {
-    throw new Error("AudioContext is not available in this runtime.");
-  }
-  const context = new AudioContextClass();
-  const rendered = renderProject(project, 2);
-  const audioBuffer = context.createBuffer(channels, rendered[0].length, sampleRate);
-  rendered.forEach((channel, index) => audioBuffer.copyToChannel(channel, index));
-  const source = context.createBufferSource();
-  source.buffer = audioBuffer;
-  source.connect(context.destination);
-  source.onended = () => {
-    void context.close();
-    onDone();
-  };
-  source.start();
-  return () => {
-    source.stop();
-    void context.close();
-  };
 }
