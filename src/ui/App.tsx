@@ -44,6 +44,7 @@ import {
   bassPitchLanes,
   chordQualities,
   clonePatternData,
+  createStylePatternSet,
   createEmptyPatternData,
   masterPresetCeilingDb,
   masterPresets,
@@ -56,6 +57,7 @@ import {
   soundPresetDesign,
   soundPresetIds,
   soundPresetLabel,
+  styleSoundPreset,
   starterProject,
   steps,
   styleProfiles
@@ -637,12 +639,22 @@ export function App(): ReactElement {
     if (!nextStyle) {
       return;
     }
-    updateProject((current) => ({
-      ...current,
-      styleId,
-      bpm: nextStyle.defaultBpm,
-      swing: nextStyle.defaultSwing
-    }));
+    updateProject(
+      (current) => {
+        const soundPreset = styleSoundPreset(styleId);
+        return {
+          ...current,
+          styleId,
+          selectedPattern: "A",
+          bpm: nextStyle.defaultBpm,
+          swing: nextStyle.defaultSwing,
+          sound: soundPresetDesign(soundPreset),
+          patterns: createStylePatternSet(styleId, current.key)
+        };
+      },
+      `Applied ${nextStyle.name} groove`
+    );
+    setSelectedNote(null);
   }
 
   return (

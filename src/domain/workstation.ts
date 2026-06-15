@@ -312,6 +312,33 @@ export const styleProfiles: StyleProfile[] = [
   }
 ];
 
+type NoteBlueprint = {
+  step: number;
+  degree: number;
+  octave: number;
+  length: number;
+  velocity?: number;
+  glide?: boolean;
+};
+
+type ChordBlueprint = {
+  step: number;
+  degree: number;
+  quality?: ChordQuality;
+  length: number;
+  velocity: number;
+};
+
+type PatternBlueprint = {
+  kick: number[];
+  clap: number[];
+  hat: number[];
+  perc: number[];
+  bass: NoteBlueprint[];
+  melody: NoteBlueprint[];
+  chords: ChordBlueprint[];
+};
+
 const starterPatternA: PatternData = {
   drumPattern: {
     kick: [true, false, false, false, false, false, true, false, false, false, false, false, true, false, false, false],
@@ -440,6 +467,169 @@ export function soundPresetLabel(preset: SoundPresetId): string {
 
 export function soundPresetDesign(preset: (typeof soundPresetIds)[number]): SoundDesign {
   return { ...soundPresetDefaults[preset] };
+}
+
+const stylePatternBlueprints: Record<StyleId, [PatternBlueprint, PatternBlueprint, PatternBlueprint]> = {
+  trap: [
+    blueprint([0, 6, 12], [4, 12], [0, 2, 4, 7, 8, 10, 12, 14, 15], [3, 9, 14], [0, 6, 10, 12], [0, 3, 6, 10, 12], [0, 3, 5, 4]),
+    blueprint([0, 5, 8, 12, 14], [4, 12], [0, 1, 2, 4, 6, 7, 8, 9, 10, 12, 14, 15], [2, 7, 10, 13], [0, 5, 8, 12, 14], [4, 5, 7, 3, 4], [0, 4, 3, 5]),
+    blueprint([0, 8, 14], [4, 12], [0, 4, 6, 8, 12, 14], [6, 11, 15], [0, 8, 14], [3, 0, 4, 5], [3, 5, 0, 4])
+  ],
+  drill: [
+    blueprint([0, 6, 11], [4, 12], [0, 2, 4, 7, 8, 10, 12, 15], [3, 9, 14], [0, 6, 11, 14], [4, 5, 3], [0, 5]),
+    blueprint([0, 5, 8, 13], [4, 12], [0, 1, 3, 4, 6, 8, 10, 11, 12, 14, 15], [2, 7, 10, 15], [0, 5, 8, 13], [5, 4, 3], [0, 3, 5, 4]),
+    blueprint([0, 8, 14], [4, 12], [0, 4, 6, 8, 12, 15], [7, 11], [0, 8, 14], [3, 1], [5, 0])
+  ],
+  boom_bap: [
+    blueprint([0, 3, 7, 10], [4, 12], [0, 2, 4, 6, 8, 10, 12, 14], [6, 11, 15], [0, 3, 7, 10, 14], [0, 2, 4, 3], [0, 3, 4, 2]),
+    blueprint([0, 2, 6, 9, 14], [4, 12], [0, 2, 4, 5, 8, 10, 12, 13], [3, 7, 11], [0, 2, 6, 9, 14], [4, 2, 0, 5], [0, 4, 3, 5]),
+    blueprint([0, 7, 10], [4, 12], [0, 4, 6, 8, 12, 14], [2, 11], [0, 7, 12], [2, 4], [3, 0])
+  ],
+  lofi: [
+    blueprint([0, 6, 10], [4, 12], [0, 4, 8, 12], [3, 11], [0, 6, 10], [2, 4, 1], [0, 3, 5, 4]),
+    blueprint([0, 5, 9, 14], [4, 12], [0, 3, 4, 8, 11, 12], [6, 15], [0, 5, 9, 14], [4, 2, 5], [0, 5, 3, 4]),
+    blueprint([0, 8], [4, 12], [0, 8, 12], [10], [0, 8], [5, 4], [5, 0])
+  ],
+  house: [
+    blueprint([0, 4, 8, 12], [4, 12], [2, 6, 10, 14], [3, 7, 11, 15], [0, 3, 6, 10, 14], [0, 2, 4, 5], [0, 3, 4, 5]),
+    blueprint([0, 4, 8, 12], [4, 12], [2, 3, 6, 7, 10, 11, 14, 15], [5, 9, 13], [0, 2, 4, 6, 10, 14], [4, 5, 2, 0], [0, 4, 3, 5]),
+    blueprint([0, 4, 8, 12], [4, 12], [2, 6, 10, 14], [7, 15], [0, 8], [0, 3], [0, 3])
+  ],
+  rnb: [
+    blueprint([0, 7, 10], [4, 12], [0, 3, 6, 8, 11, 14], [5, 13], [0, 7, 12], [4, 2, 5], [0, 5, 3, 4]),
+    blueprint([0, 6, 9, 14], [4, 12], [0, 2, 5, 8, 10, 13, 15], [3, 11], [0, 6, 9, 14], [5, 4, 2, 0], [0, 3, 5, 4]),
+    blueprint([0, 8], [4, 12], [0, 6, 8, 14], [11], [0, 8], [4, 2], [3, 0])
+  ],
+  garage: [
+    blueprint([0, 6, 10, 14], [4, 12], [1, 3, 6, 8, 10, 13, 15], [5, 9], [0, 3, 6, 10, 14], [0, 2, 4, 5], [0, 3, 4, 5]),
+    blueprint([0, 5, 8, 11, 14], [4, 12], [1, 2, 5, 7, 9, 10, 13, 15], [3, 6, 12], [0, 2, 5, 8, 12, 14], [4, 2, 5, 0], [0, 4, 3, 5]),
+    blueprint([0, 8, 14], [4, 12], [2, 6, 10, 14], [7, 11], [0, 8, 14], [0, 3], [5, 0])
+  ],
+  experimental: [
+    blueprint([0, 5, 11], [3, 12], [0, 1, 4, 7, 9, 14], [2, 6, 13], [0, 5, 11, 14], [6, 2, 5], [0, 2, 5]),
+    blueprint([1, 4, 8, 15], [6, 13], [0, 3, 5, 10, 12, 15], [2, 7, 11, 14], [1, 4, 8, 12], [5, 1, 6, 3], [2, 6, 3, 0]),
+    blueprint([0, 9], [5, 14], [1, 8, 15], [4, 10], [0, 9], [6, 4], [6, 0])
+  ]
+};
+
+export function styleSoundPreset(styleId: StyleId): (typeof soundPresetIds)[number] {
+  switch (styleId) {
+    case "trap":
+    case "garage":
+      return "club_punch";
+    case "boom_bap":
+    case "lofi":
+      return "warm_tape";
+    case "rnb":
+      return "clean_knock";
+    case "drill":
+    case "house":
+    case "experimental":
+      return "air_space";
+  }
+}
+
+export function createStylePatternSet(styleId: StyleId, key: string): Record<PatternSlot, PatternData> {
+  const [patternA, patternB, patternC] = stylePatternBlueprints[styleId];
+  return {
+    A: patternFromBlueprint(key, patternA),
+    B: patternFromBlueprint(key, patternB),
+    C: patternFromBlueprint(key, patternC)
+  };
+}
+
+function blueprint(
+  kick: number[],
+  clap: number[],
+  hat: number[],
+  perc: number[],
+  bassDegrees: number[],
+  melodyDegrees: number[],
+  chordDegrees: number[]
+): PatternBlueprint {
+  return {
+    kick,
+    clap,
+    hat,
+    perc,
+    bass: bassDegrees.map((degree, index) => ({
+      step: [0, 3, 6, 10, 14][index] ?? (index * 3) % 16,
+      degree,
+      octave: index > 3 ? 2 : 1,
+      length: index === 0 ? 3 : 2,
+      glide: index % 3 === 1
+    })),
+    melody: melodyDegrees.map((degree, index) => ({
+      step: [0, 3, 6, 10, 13][index] ?? (index * 4) % 16,
+      degree,
+      octave: index > 3 ? 5 : 4,
+      length: index % 2 === 0 ? 2 : 1,
+      velocity: 0.56 + (index % 3) * 0.04
+    })),
+    chords: chordDegrees.map((degree, index) => ({
+      step: index * 4,
+      degree,
+      length: 4,
+      velocity: 0.42 + (index % 2) * 0.04
+    }))
+  };
+}
+
+function patternFromBlueprint(key: string, pattern: PatternBlueprint): PatternData {
+  return {
+    drumPattern: drumPattern(pattern.kick, pattern.clap, pattern.hat, pattern.perc),
+    bassNotes: pattern.bass.map((note) => ({
+      step: note.step,
+      pitch: pitchFromDegree(key, note.degree, note.octave),
+      length: note.length,
+      glide: note.glide ?? false
+    })),
+    melodyNotes: pattern.melody.map((note) => ({
+      step: note.step,
+      pitch: pitchFromDegree(key, note.degree, note.octave),
+      length: note.length,
+      velocity: note.velocity ?? 0.64
+    })),
+    chordEvents: pattern.chords.map((chord) => ({
+      step: chord.step,
+      root: rootFromDegree(key, chord.degree),
+      quality: chord.quality ?? chordQualityFromDegree(key, chord.degree),
+      length: chord.length,
+      velocity: chord.velocity
+    }))
+  };
+}
+
+function drumPattern(kick: number[], clap: number[], hat: number[], perc: number[]): DrumPattern {
+  return {
+    kick: steps.map((step) => kick.includes(step)),
+    clap: steps.map((step) => clap.includes(step)),
+    hat: steps.map((step) => hat.includes(step)),
+    perc: steps.map((step) => perc.includes(step))
+  };
+}
+
+function pitchFromDegree(key: string, degree: number, octave: number): string {
+  const names = scalePitchNames(key);
+  return `${names[positiveModulo(degree, names.length)]}${octave + Math.floor(degree / names.length)}`;
+}
+
+function rootFromDegree(key: string, degree: number): string {
+  const names = scalePitchNames(key);
+  return names[positiveModulo(degree, names.length)] ?? names[0];
+}
+
+function chordQualityFromDegree(key: string, degree: number): ChordQuality {
+  const [, mode = "minor"] = key.split(" ");
+  const majorQualities: ChordQuality[] = ["maj", "min", "min", "maj", "maj", "min", "dim"];
+  const dorianQualities: ChordQuality[] = ["min", "min", "maj", "maj", "min", "dim", "maj"];
+  const minorQualities: ChordQuality[] = ["min", "dim", "maj", "min", "min", "maj", "maj"];
+  const qualities = mode === "major" ? majorQualities : mode === "dorian" ? dorianQualities : minorQualities;
+  return qualities[positiveModulo(degree, qualities.length)] ?? "min";
+}
+
+function positiveModulo(value: number, divisor: number): number {
+  return ((value % divisor) + divisor) % divisor;
 }
 
 export function getStyle(project: ProjectState): StyleProfile {
