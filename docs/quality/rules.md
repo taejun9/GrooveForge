@@ -95,6 +95,8 @@ Key retarget work must update Pattern A/B/C 808/bass note pitches, melody note p
 
 Chord progression work must preserve Pattern A/B/C independence, keep chord roots and progression presets scale-aware by default, migrate older project files without chord events, keep add/delete operations undoable, preserve at least one chord event in guided editing, and make chord events audible in both realtime playback and WAV export.
 
+Chord Pad work must derive pad roots and qualities from the current key, update only the selected chord event after an explicit click through existing undoable chord update paths, preserve step/length/velocity/chance unless directly edited, keep chord events editable local musical data, and avoid sampling, imported audio, hidden generation, remote AI, accounts, analytics, or cloud sync.
+
 Chord inversion work must migrate older chord events to root position, preserve per-chord inversion data across Pattern A/B/C copy, save/load, undo/redo, realtime playback, WAV export, and stem export, and keep inversions as editable musical event data rather than imported audio.
 
 Selected chord edit tool work must keep chord move, duplicate, delete, and inversion actions scoped to the selected Pattern A/B/C slot, preserve root/quality/length/velocity/chance fields unless directly edited, avoid overlapping duplicate or moved chord starts at the same step, preserve at least one chord event, keep actions undoable, and keep realtime playback, WAV/stem export, and MIDI export driven by editable chord event data rather than imported audio.

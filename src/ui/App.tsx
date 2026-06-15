@@ -281,6 +281,23 @@ type StyleInspectorSummary = {
   patterns: StylePatternDensity[];
 };
 
+type ChordPadId = "home" | "lift" | "tension" | "color";
+
+type ChordPadDefinition = {
+  id: ChordPadId;
+  label: string;
+  detail: string;
+  degree: number;
+  quality?: ChordQuality;
+  inversion: ChordInversion;
+};
+
+type ChordPadOption = ChordPadDefinition & {
+  root: string;
+  quality: ChordQuality;
+  selected: boolean;
+};
+
 type ArrangementFocusPresetId = "intro_space" | "verse_pocket" | "hook_peak" | "bridge_drop" | "outro_release";
 
 type ArrangementFocusPreset = {
@@ -421,6 +438,13 @@ const arrangementFocusPresets: ArrangementFocusPreset[] = [
   }
 ];
 
+const chordPadDefinitions: ChordPadDefinition[] = [
+  { id: "home", label: "Home", detail: "center", degree: 0, inversion: 0 },
+  { id: "lift", label: "Lift", detail: "open", degree: 5, inversion: 1 },
+  { id: "tension", label: "Tension", detail: "pull", degree: 4, quality: "7", inversion: 0 },
+  { id: "color", label: "Color", detail: "float", degree: 3, quality: "sus2", inversion: 1 }
+];
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<ProjectState[]>([]);
@@ -536,6 +560,10 @@ export function App(): ReactElement {
     : false;
   const selectedChord =
     selectedChordIndex === null ? undefined : currentPattern.chordEvents[selectedChordIndex];
+  const chordPadOptions = useMemo(
+    () => createChordPadOptions(project.key, selectedChord),
+    [project.key, selectedChord]
+  );
   const selectedDrumVelocity =
     selectedDrumStep && selectedDrumActive
       ? drumStepVelocity(currentPattern, selectedDrumStep.lane, selectedDrumStep.step)
@@ -1908,6 +1936,28 @@ export function App(): ReactElement {
     }
   }
 
+  function applyChordPad(padId: ChordPadId): void {
+    if (selectedChordIndex === null || !selectedChord) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+
+    const option = createChordPadOptions(projectRef.current.key, selectedChord).find((pad) => pad.id === padId);
+    if (!option) {
+      setProjectStatus("Chord pad not found");
+      return;
+    }
+
+    const changed = updateChordEvent(
+      selectedChordIndex,
+      { root: option.root, quality: option.quality, inversion: option.inversion },
+      `${option.label} chord pad applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (!changed) {
+      setProjectStatus(`${option.label} chord pad already selected`);
+    }
+  }
+
   function addChordEvent(): void {
     let nextSelectedIndex: number | null = null;
     const changed = updateCurrentPattern(
@@ -2868,6 +2918,7 @@ export function App(): ReactElement {
             onPreset={applySoundPreset}
           />
           <ChordEditor
+            chordPads={chordPadOptions}
             chords={currentPattern.chordEvents}
             rootOptions={chordRootOptions}
             selectedIndex={selectedChordIndex}
@@ -2877,6 +2928,7 @@ export function App(): ReactElement {
             onDuplicate={duplicateSelectedChord}
             onInvert={moveSelectedChordInversion}
             onMoveStep={moveSelectedChordStep}
+            onPad={applyChordPad}
             onPreset={applyChordProgressionPreset}
             onSelect={selectChordEvent}
           />
@@ -6447,6 +6499,7 @@ function SoundControl({
 }
 
 function ChordEditor({
+  chordPads,
   chords,
   rootOptions,
   selectedIndex,
@@ -6456,9 +6509,11 @@ function ChordEditor({
   onDuplicate,
   onInvert,
   onMoveStep,
+  onPad,
   onPreset,
   onSelect
 }: {
+  chordPads: ChordPadOption[];
   chords: ChordEvent[];
   rootOptions: string[];
   selectedIndex: number | null;
@@ -6468,6 +6523,7 @@ function ChordEditor({
   onDuplicate: () => void;
   onInvert: (direction: -1 | 1) => void;
   onMoveStep: (direction: -1 | 1) => void;
+  onPad: (pad: ChordPadId) => void;
   onPreset: (preset: ChordProgressionPreset) => void;
   onSelect: (index: number) => void;
 }): ReactElement {
@@ -6508,6 +6564,26 @@ function ChordEditor({
           <Plus size={14} aria-hidden="true" />
           <span>Add chord</span>
         </button>
+      </div>
+      <div className="chord-pad-row" aria-label="Chord Pads">
+        {chordPads.map((pad) => (
+          <button
+            className={pad.selected ? "selected" : ""}
+            data-testid={`chord-pad-${pad.id}`}
+            disabled={!selectedChord}
+            key={pad.id}
+            onClick={() => onPad(pad.id)}
+            title={`${pad.label} ${pad.root}${pad.quality}`}
+            type="button"
+          >
+            <span>{pad.label}</span>
+            <strong>
+              {pad.root}
+              {pad.quality}
+            </strong>
+            <small>{pad.detail}</small>
+          </button>
+        ))}
       </div>
       <div className="chord-edit-row" aria-label="Selected chord edit tools">
         <button
@@ -6801,6 +6877,41 @@ function addKeyboardCaptureNote(pattern: PatternData, track: NoteTrack, step: nu
 
 function mergeChordRoots(scaleRoots: string[], usedRoots: string[]): string[] {
   return Array.from(new Set([...scaleRoots, ...usedRoots]));
+}
+
+function createChordPadOptions(key: string, selectedChord?: ChordEvent): ChordPadOption[] {
+  const roots = scalePitchNames(key);
+  return chordPadDefinitions.map((pad) => {
+    const root = roots[positiveIndex(pad.degree, roots.length)] ?? roots[0] ?? "C";
+    const quality = pad.quality ?? chordPadQualityFromDegree(key, pad.degree);
+    const selected =
+      selectedChord !== undefined &&
+      selectedChord.root === root &&
+      selectedChord.quality === quality &&
+      normalizeChordInversion(selectedChord.inversion) === pad.inversion;
+    return {
+      ...pad,
+      root,
+      quality,
+      selected
+    };
+  });
+}
+
+function chordPadQualityFromDegree(key: string, degree: number): ChordQuality {
+  const [, mode = "minor"] = key.split(" ");
+  const majorQualities: ChordQuality[] = ["maj", "min", "min", "maj", "maj", "min", "dim"];
+  const dorianQualities: ChordQuality[] = ["min", "min", "maj", "maj", "min", "dim", "maj"];
+  const minorQualities: ChordQuality[] = ["min", "dim", "maj", "min", "min", "maj", "maj"];
+  const qualities = mode === "major" ? majorQualities : mode === "dorian" ? dorianQualities : minorQualities;
+  return qualities[positiveIndex(degree, qualities.length)] ?? "min";
+}
+
+function positiveIndex(value: number, length: number): number {
+  if (length <= 0) {
+    return 0;
+  }
+  return ((value % length) + length) % length;
 }
 
 function chordEventWithUpdate(event: ChordEvent, update: Partial<ChordEvent>): ChordEvent {
