@@ -21,7 +21,8 @@ import {
   Sparkles,
   Trash2,
   Undo2,
-  Waves
+  Waves,
+  X
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -184,6 +185,16 @@ type MixFixAction = {
   tone: MixCoachTone;
 };
 
+type QuickAction = {
+  id: string;
+  title: string;
+  detail: string;
+  group: string;
+  keywords: string;
+  disabled?: boolean;
+  run: () => void | Promise<void>;
+};
+
 type BeatReadinessCheck = {
   id: string;
   label: string;
@@ -236,6 +247,8 @@ export function App(): ReactElement {
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
   const [splitAfterBars, setSplitAfterBars] = useState(1);
   const [snapshotNameDrafts, setSnapshotNameDrafts] = useState<Record<string, string>>({});
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [quickActionQuery, setQuickActionQuery] = useState("");
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const projectRef = useRef<ProjectState>(starterProject);
   const controllerRef = useRef<PlaybackController | null>(null);
@@ -354,7 +367,7 @@ export function App(): ReactElement {
   useEffect(() => {
     window.addEventListener("keydown", handleDesktopShortcut);
     return () => window.removeEventListener("keydown", handleDesktopShortcut);
-  }, [project, undoStack, redoStack, isPlaying, playbackMode, selectedNote, selectedDrumStep, selectedDrumActive, selectedChordIndex]);
+  }, [project, undoStack, redoStack, isPlaying, playbackMode, selectedNote, selectedDrumStep, selectedDrumActive, selectedChordIndex, quickActionsOpen]);
 
   function handleDesktopShortcut(event: KeyboardEvent): void {
     if (isEditableShortcutTarget(event.target)) {
@@ -363,10 +376,25 @@ export function App(): ReactElement {
 
     const key = event.key.toLowerCase();
     const withCommandModifier = event.metaKey || event.ctrlKey;
+    const wantsQuickActions = withCommandModifier && !event.shiftKey && key === "k";
     const wantsUndo = withCommandModifier && !event.shiftKey && key === "z";
     const wantsRedo = withCommandModifier && ((event.shiftKey && key === "z") || key === "y");
     const wantsSave = withCommandModifier && !event.shiftKey && key === "s";
     const wantsOpen = withCommandModifier && !event.shiftKey && key === "o";
+
+    if (wantsQuickActions) {
+      event.preventDefault();
+      openQuickActions();
+      return;
+    }
+
+    if (quickActionsOpen) {
+      if (key === "escape") {
+        event.preventDefault();
+        closeQuickActions();
+      }
+      return;
+    }
 
     if (wantsUndo || wantsRedo || wantsSave || wantsOpen) {
       event.preventDefault();
@@ -1818,6 +1846,54 @@ export function App(): ReactElement {
     }
   }
 
+  function openQuickActions(): void {
+    setQuickActionQuery("");
+    setQuickActionsOpen(true);
+  }
+
+  function closeQuickActions(): void {
+    setQuickActionsOpen(false);
+    setQuickActionQuery("");
+  }
+
+  function runQuickAction(action: QuickAction): void {
+    if (action.disabled) {
+      return;
+    }
+    closeQuickActions();
+    try {
+      void Promise.resolve(action.run()).catch((error: unknown) => {
+        console.error(error);
+        setProjectStatus("Quick action failed");
+      });
+    } catch (error) {
+      console.error(error);
+      setProjectStatus("Quick action failed");
+    }
+  }
+
+  const quickActions = createQuickActions({
+    canRedo,
+    canUndo,
+    isPlaying,
+    playbackMode,
+    project,
+    onApplyArrangementMove: applyArrangementMoveToSelected,
+    onApplyBlueprint: applySelectedBeatBlueprint,
+    onApplyMixFix: applyMixFixPreset,
+    onApplyPatternFill: applyPatternFill,
+    onExportMidi: handleExportMidi,
+    onExportStems: handleExportStems,
+    onExportWav: handleExportWav,
+    onOpenProject: handleOpenProject,
+    onRedo: redoProject,
+    onSaveProject: handleSaveProject,
+    onSaveSnapshot: saveCurrentSnapshot,
+    onTogglePlayback: togglePlayback,
+    onUndo: undoProject
+  });
+  const filteredQuickActions = filterQuickActions(quickActions, quickActionQuery);
+
   return (
     <main className="app-shell">
       <header className="transport-band">
@@ -1908,6 +1984,10 @@ export function App(): ReactElement {
             <Gauge size={18} aria-hidden="true" />
             <span>Click</span>
           </button>
+          <button className="icon-button" data-testid="quick-actions-open" type="button" title="Open Quick Actions" onClick={openQuickActions}>
+            <KeyboardMusic size={18} aria-hidden="true" />
+            <span>Actions</span>
+          </button>
           <button className="icon-button primary" type="button" title={playbackMode === "arrangement" ? "Play arrangement" : "Play selected pattern"} onClick={togglePlayback}>
             {isPlaying ? <CircleStop size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
             <span>{isPlaying ? "Stop" : "Play"}</span>
@@ -1956,6 +2036,15 @@ export function App(): ReactElement {
           </button>
         </div>
       </header>
+
+      <QuickActions
+        actions={filteredQuickActions}
+        open={quickActionsOpen}
+        query={quickActionQuery}
+        onClose={closeQuickActions}
+        onQueryChange={setQuickActionQuery}
+        onRun={runQuickAction}
+      />
 
       <section className="mode-row" aria-label="Mode">
         <input
@@ -2801,6 +2890,93 @@ function BeatBlueprints({
   );
 }
 
+function QuickActions({
+  actions,
+  open,
+  query,
+  onClose,
+  onQueryChange,
+  onRun
+}: {
+  actions: QuickAction[];
+  open: boolean;
+  query: string;
+  onClose: () => void;
+  onQueryChange: (query: string) => void;
+  onRun: (action: QuickAction) => void;
+}): ReactElement | null {
+  if (!open) {
+    return null;
+  }
+
+  const firstRunnableAction = actions.find((action) => !action.disabled);
+
+  return (
+    <div
+      className="quick-actions-overlay"
+      data-testid="quick-actions"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <section className="quick-actions-panel" role="dialog" aria-modal="true" aria-label="Quick Actions">
+        <div className="quick-actions-heading">
+          <div>
+            <KeyboardMusic size={18} aria-hidden="true" />
+            <span>Quick Actions</span>
+          </div>
+          <button data-testid="quick-actions-close" onClick={onClose} title="Close Quick Actions" type="button">
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+        <input
+          aria-label="Search Quick Actions"
+          autoFocus
+          data-testid="quick-actions-search"
+          onChange={(event) => onQueryChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              onClose();
+            }
+            if (event.key === "Enter" && firstRunnableAction) {
+              event.preventDefault();
+              onRun(firstRunnableAction);
+            }
+          }}
+          placeholder="Search commands"
+          type="search"
+          value={query}
+        />
+        <div className="quick-actions-list" data-testid="quick-actions-list">
+          {actions.length === 0 ? (
+            <div className="quick-action-empty" data-testid="quick-actions-empty">
+              No matching actions
+            </div>
+          ) : (
+            actions.map((action) => (
+              <button
+                data-testid={`quick-action-${action.id}`}
+                disabled={action.disabled}
+                key={action.id}
+                onClick={() => onRun(action)}
+                title={action.detail}
+                type="button"
+              >
+                <span>{action.group}</span>
+                <strong>{action.title}</strong>
+                <small>{action.detail}</small>
+              </button>
+            ))
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ProjectSnapshots({
   nameDrafts,
   project,
@@ -2958,6 +3134,211 @@ function NextMove({
       </div>
     </section>
   );
+}
+
+function createQuickActions({
+  canRedo,
+  canUndo,
+  isPlaying,
+  playbackMode,
+  project,
+  onApplyArrangementMove,
+  onApplyBlueprint,
+  onApplyMixFix,
+  onApplyPatternFill,
+  onExportMidi,
+  onExportStems,
+  onExportWav,
+  onOpenProject,
+  onRedo,
+  onSaveProject,
+  onSaveSnapshot,
+  onTogglePlayback,
+  onUndo
+}: {
+  canRedo: boolean;
+  canUndo: boolean;
+  isPlaying: boolean;
+  playbackMode: PlaybackMode;
+  project: ProjectState;
+  onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
+  onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
+  onApplyMixFix: (preset: MixFixPreset) => void;
+  onApplyPatternFill: (preset: PatternFillPreset) => void;
+  onExportMidi: () => void;
+  onExportStems: () => void;
+  onExportWav: () => void;
+  onOpenProject: () => Promise<void>;
+  onRedo: () => void;
+  onSaveProject: () => Promise<void>;
+  onSaveSnapshot: () => void;
+  onTogglePlayback: () => void;
+  onUndo: () => void;
+}): QuickAction[] {
+  const suggestedBlueprint = suggestedBlueprintId(project);
+  const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
+
+  return [
+    {
+      id: "toggle-playback",
+      title: isPlaying ? "Stop playback" : playbackMode === "arrangement" ? "Play arrangement" : "Play selected pattern",
+      detail: playbackMode === "arrangement" ? "Transport follows the full song structure." : `Preview Pattern ${project.selectedPattern}.`,
+      group: "Transport",
+      keywords: "play stop space transport preview arrangement pattern",
+      run: onTogglePlayback
+    },
+    {
+      id: "save-project",
+      title: "Save project",
+      detail: "Write the current .grooveforge.json project.",
+      group: "Project",
+      keywords: "save project file json download",
+      run: onSaveProject
+    },
+    {
+      id: "open-project",
+      title: "Open project",
+      detail: "Load a saved GrooveForge project file.",
+      group: "Project",
+      keywords: "open load import project json",
+      run: onOpenProject
+    },
+    {
+      id: "save-snapshot",
+      title: "Save snapshot",
+      detail: `${project.snapshots.length}/${maxProjectSnapshots} local idea slots saved.`,
+      group: "Project",
+      keywords: "snapshot slot idea save version compare",
+      run: onSaveSnapshot
+    },
+    {
+      id: "undo",
+      title: "Undo",
+      detail: "Undo the last project edit.",
+      group: "Edit",
+      keywords: "undo edit history revert",
+      disabled: !canUndo,
+      run: onUndo
+    },
+    {
+      id: "redo",
+      title: "Redo",
+      detail: "Redo the last undone project edit.",
+      group: "Edit",
+      keywords: "redo edit history",
+      disabled: !canRedo,
+      run: onRedo
+    },
+    {
+      id: "blueprint",
+      title: `Apply ${suggestedBlueprintName}`,
+      detail: "Start from an editable beat with drums, 808, harmony, arrangement, and mix.",
+      group: "Create",
+      keywords: "blueprint starter beat drums 808 chords arrangement mix",
+      run: () => onApplyBlueprint(suggestedBlueprint)
+    },
+    {
+      id: "fill-drums",
+      title: "Apply Drum Fill",
+      detail: `Add an editable tail move to Pattern ${project.selectedPattern}.`,
+      group: "Create",
+      keywords: "drum fill pattern tail variation",
+      run: () => onApplyPatternFill("drum_fill")
+    },
+    {
+      id: "fill-bass",
+      title: "Apply 808 Pickup",
+      detail: `Add a bass pickup to Pattern ${project.selectedPattern}.`,
+      group: "Create",
+      keywords: "808 bass pickup fill pattern",
+      run: () => onApplyPatternFill("bass_pickup")
+    },
+    {
+      id: "fill-melody",
+      title: "Apply Melody Turn",
+      detail: `Add a melodic turn to Pattern ${project.selectedPattern}.`,
+      group: "Create",
+      keywords: "melody turn fill pattern synth",
+      run: () => onApplyPatternFill("melody_turn")
+    },
+    {
+      id: "hook-lift",
+      title: "Apply Hook Lift",
+      detail: "Push arrangement energy and mutes on the selected block.",
+      group: "Arrange",
+      keywords: "hook lift arrangement energy mute build drop",
+      run: () => onApplyArrangementMove("hook_lift")
+    },
+    {
+      id: "mix-headroom",
+      title: "Mix Fix Headroom",
+      detail: "Set a vocal-safe ceiling and reduce master gain.",
+      group: "Mix",
+      keywords: "mix fix headroom master ceiling vocal limiter",
+      run: () => onApplyMixFix("headroom")
+    },
+    {
+      id: "mix-stem-balance",
+      title: "Mix Fix Stem Balance",
+      detail: "Nudge core stem volumes toward a rough balance.",
+      group: "Mix",
+      keywords: "mix fix stem balance volume drums bass synth chords",
+      run: () => onApplyMixFix("stem_balance")
+    },
+    {
+      id: "mix-low-end",
+      title: "Mix Fix Low End",
+      detail: "Tighten the 808 and drum relationship.",
+      group: "Mix",
+      keywords: "mix fix low end 808 drums bass glue",
+      run: () => onApplyMixFix("low_end")
+    },
+    {
+      id: "export-wav",
+      title: "Export WAV",
+      detail: "Render the full arrangement as a mix WAV.",
+      group: "Export",
+      keywords: "export render wav mix audio",
+      run: onExportWav
+    },
+    {
+      id: "export-stems",
+      title: "Export stems",
+      detail: "Render drum, 808, synth, and chord WAV stems.",
+      group: "Export",
+      keywords: "export render stems wav drums 808 synth chord",
+      run: onExportStems
+    },
+    {
+      id: "export-midi",
+      title: "Export MIDI",
+      detail: "Write arrangement MIDI for DAW handoff.",
+      group: "Export",
+      keywords: "export midi daw handoff arrangement",
+      run: onExportMidi
+    }
+  ];
+}
+
+function filterQuickActions(actions: QuickAction[], query: string): QuickAction[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return actions.slice(0, 12);
+  }
+  const terms = normalizedQuery.split(/\s+/);
+  return actions
+    .filter((action) => {
+      const tokens = quickActionSearchTokens(action);
+      return terms.every((term) => tokens.some((token) => token.startsWith(term)));
+    })
+    .slice(0, 12);
+}
+
+function quickActionSearchTokens(action: QuickAction): string[] {
+  return `${action.group} ${action.title} ${action.detail} ${action.keywords}`
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
 }
 
 function nextMoveIcon(action: NextMoveAction): ReactElement {

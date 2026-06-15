@@ -137,6 +137,8 @@ Undo/redo work must record bounded local project-edit history for editing action
 
 Desktop shortcut work must keep playback, Pattern A/B/C selection, save/open, undo/redo, and selected event deletion scoped to the app window, must not fire from focused editable controls, and must route destructive deletion through normal undoable project history.
 
+Quick Actions work must remain local and explicit, must not fire while focused editable targets receive keyboard input, must route mutating commands through existing undoable project update paths, must keep project/open/save/export actions user-triggered, and must avoid macros, scripting, global OS shortcuts, sampling, plugin hosting, remote AI, automation recording, accounts, analytics, or cloud sync.
+
 Export work must verify a non-silent WAV with expected duration, expected sample rate/channel count, no audio frames above the selected ceiling, and reproducibility from saved project data.
 
 Render noise work must keep offline WAV export, stem export, and export meter analysis deterministic from render-relevant project data, avoid `Math.random()` in the offline render path, and avoid tying audio output to transient UI mode, project title, save timestamps, remote services, imported samples, or hidden audio assets.

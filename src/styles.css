@@ -314,6 +314,131 @@ h2 {
   color: var(--accent);
 }
 
+.quick-actions-overlay {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: start center;
+  background: rgba(17, 16, 15, 0.68);
+  padding-block-start: 82px;
+}
+
+.quick-actions-panel {
+  display: grid;
+  width: min(640px, calc(100vw - 48px));
+  max-height: min(680px, calc(100vh - 120px));
+  gap: 10px;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 8px;
+  background: #171716;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
+  padding: 12px;
+}
+
+.quick-actions-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quick-actions-heading > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.quick-actions-heading svg {
+  color: #78f0c8;
+}
+
+.quick-actions-heading button {
+  display: grid;
+  place-items: center;
+  min-height: 28px;
+  min-width: 28px;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 6px;
+  color: rgba(244, 239, 231, 0.72);
+  background: rgba(244, 239, 231, 0.06);
+  padding: 0;
+}
+
+.quick-actions-panel input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(244, 239, 231, 0.14);
+  border-radius: 7px;
+  color: #f4efe7;
+  background: #11100f;
+  padding: 0 12px;
+}
+
+.quick-actions-list {
+  display: grid;
+  gap: 7px;
+  min-height: 0;
+  overflow: auto;
+  padding-inline-end: 2px;
+}
+
+.quick-action-empty,
+.quick-actions-list button {
+  min-height: 54px;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 8px 10px;
+}
+
+.quick-action-empty {
+  display: grid;
+  align-items: center;
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 12px;
+}
+
+.quick-actions-list button {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 3px 10px;
+  align-items: center;
+  color: #f4efe7;
+  text-align: start;
+}
+
+.quick-actions-list button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.quick-actions-list button span,
+.quick-actions-list button strong,
+.quick-actions-list button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-list button span {
+  grid-row: span 2;
+  color: #78f0c8;
+  font-size: 11px;
+}
+
+.quick-actions-list button strong {
+  font-size: 12px;
+}
+
+.quick-actions-list button small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 11px;
+}
+
 .blueprint-row {
   display: grid;
   grid-template-columns: 158px 1fr;
