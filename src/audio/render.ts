@@ -3,44 +3,70 @@ import { dbToGain, noteToFrequency, patternForSlot, projectStepDurationSeconds, 
 const sampleRate = 44100;
 const channels = 2;
 type AudioChannels = [Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>];
+type ChannelMix = {
+  gain: number;
+  left: number;
+  right: number;
+};
 
 function stepDuration(project: ProjectState): number {
   return projectStepDurationSeconds(project);
 }
 
-function channelGain(project: ProjectState, id: string): number {
+function hasSolo(project: ProjectState): boolean {
+  return project.mixer.some((track) => track.id !== "master" && track.solo);
+}
+
+function channelMix(project: ProjectState, id: string): ChannelMix {
   const channel = project.mixer.find((track) => track.id === id);
-  if (!channel || channel.muted) {
-    return 0;
+  const soloActive = hasSolo(project);
+  if (!channel || channel.muted || (id !== "master" && soloActive && !channel.solo)) {
+    return { gain: 0, left: 0, right: 0 };
   }
-  return dbToGain(channel.volumeDb);
+
+  const normalizedPan = Math.max(-1, Math.min(1, channel.pan / 100));
+  return {
+    gain: dbToGain(channel.volumeDb),
+    left: normalizedPan <= 0 ? 1 : 1 - normalizedPan,
+    right: normalizedPan >= 0 ? 1 : 1 + normalizedPan
+  };
+}
+
+function masterOutputGain(project: ProjectState): number {
+  return channelMix(project, "master").gain;
 }
 
 function arrangementBarCount(project: ProjectState): number {
   return Math.max(1, project.arrangement.length);
 }
 
-function addSine(buffer: AudioChannels, start: number, duration: number, frequency: number, gain: number): void {
+function addSine(buffer: AudioChannels, start: number, duration: number, frequency: number, mix: ChannelMix, gainScale: number): void {
+  if (mix.gain <= 0) {
+    return;
+  }
   const startFrame = Math.max(0, Math.floor(start * sampleRate));
   const frames = Math.max(1, Math.floor(duration * sampleRate));
   for (let index = 0; index < frames && startFrame + index < buffer[0].length; index += 1) {
     const t = index / sampleRate;
     const envelope = Math.exp(-5 * t / duration);
-    const value = Math.sin(2 * Math.PI * frequency * t) * gain * envelope;
-    buffer[0][startFrame + index] += value;
-    buffer[1][startFrame + index] += value;
+    const value = Math.sin(2 * Math.PI * frequency * t) * mix.gain * gainScale * envelope;
+    buffer[0][startFrame + index] += value * mix.left;
+    buffer[1][startFrame + index] += value * mix.right;
   }
 }
 
-function addNoise(buffer: AudioChannels, start: number, duration: number, gain: number): void {
+function addNoise(buffer: AudioChannels, start: number, duration: number, mix: ChannelMix, gainScale: number): void {
+  if (mix.gain <= 0) {
+    return;
+  }
   const startFrame = Math.max(0, Math.floor(start * sampleRate));
   const frames = Math.max(1, Math.floor(duration * sampleRate));
   for (let index = 0; index < frames && startFrame + index < buffer[0].length; index += 1) {
     const t = index / sampleRate;
     const envelope = Math.exp(-8 * t / duration);
-    const value = (Math.random() * 2 - 1) * gain * envelope;
-    buffer[0][startFrame + index] += value;
-    buffer[1][startFrame + index] += value;
+    const value = (Math.random() * 2 - 1) * mix.gain * gainScale * envelope;
+    buffer[0][startFrame + index] += value * mix.left;
+    buffer[1][startFrame + index] += value * mix.right;
   }
 }
 
@@ -50,9 +76,10 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   const duration = totalSteps * step;
   const frames = Math.ceil(duration * sampleRate);
   const buffer: AudioChannels = [new Float32Array(frames), new Float32Array(frames)];
-  const drumGain = channelGain(project, "drum_rack");
-  const bassGain = channelGain(project, "bass_808");
-  const synthGain = channelGain(project, "synth");
+  const drumMix = channelMix(project, "drum_rack");
+  const bassMix = channelMix(project, "bass_808");
+  const synthMix = channelMix(project, "synth");
+  const outputGain = masterOutputGain(project);
 
   for (let bar = 0; bar < bars; bar += 1) {
     const barOffset = bar * 16;
@@ -61,31 +88,32 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
     for (let patternStep = 0; patternStep < 16; patternStep += 1) {
       const time = (barOffset + patternStep) * step;
       if (pattern.drumPattern.kick[patternStep]) {
-        addSine(buffer, time, 0.22, 52, 0.95 * drumGain);
-        addSine(buffer, time, 0.08, 96, 0.3 * drumGain);
+        addSine(buffer, time, 0.22, 52, drumMix, 0.95);
+        addSine(buffer, time, 0.08, 96, drumMix, 0.3);
       }
       if (pattern.drumPattern.clap[patternStep]) {
-        addNoise(buffer, time, 0.16, 0.42 * drumGain);
+        addNoise(buffer, time, 0.16, drumMix, 0.42);
       }
       if (pattern.drumPattern.hat[patternStep]) {
-        addNoise(buffer, time, 0.045, 0.18 * drumGain);
+        addNoise(buffer, time, 0.045, drumMix, 0.18);
       }
       if (pattern.drumPattern.perc[patternStep]) {
-        addSine(buffer, time, 0.08, 330, 0.18 * drumGain);
+        addSine(buffer, time, 0.08, 330, drumMix, 0.18);
       }
     }
     for (const note of pattern.bassNotes) {
-      addSine(buffer, (barOffset + note.step) * step, note.length * step, noteToFrequency(note.pitch), 0.72 * bassGain);
+      addSine(buffer, (barOffset + note.step) * step, note.length * step, noteToFrequency(note.pitch), bassMix, 0.72);
     }
     for (const note of pattern.melodyNotes) {
-      addSine(buffer, (barOffset + note.step) * step, note.length * step, noteToFrequency(note.pitch), note.velocity * 0.22 * synthGain);
+      addSine(buffer, (barOffset + note.step) * step, note.length * step, noteToFrequency(note.pitch), synthMix, note.velocity * 0.22);
     }
   }
 
   const ceiling = dbToGain(project.masterCeilingDb);
   for (let channel = 0; channel < channels; channel += 1) {
     for (let index = 0; index < buffer[channel].length; index += 1) {
-      buffer[channel][index] = Math.max(-ceiling, Math.min(ceiling, buffer[channel][index]));
+      const value = buffer[channel][index] * outputGain;
+      buffer[channel][index] = Math.max(-ceiling, Math.min(ceiling, value));
     }
   }
   return buffer;

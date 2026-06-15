@@ -27,7 +27,9 @@ import {
   BassNote,
   DrumLane,
   getStyle,
+  MasterPreset,
   MelodyNote,
+  MixerChannel,
   NoteTrack,
   PatternData,
   PatternSlot,
@@ -35,6 +37,8 @@ import {
   activePattern,
   arrangementSections,
   bassPitchLanes,
+  masterPresetCeilingDb,
+  masterPresets,
   melodyPitchLanes,
   parseProjectFile,
   patternSlots,
@@ -79,7 +83,13 @@ export function App(): ReactElement {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const style = getStyle(project);
   const currentPattern = activePattern(project);
-  const activeChannels = useMemo(() => project.mixer.filter((channel) => !channel.muted).length, [project.mixer]);
+  const activeChannels = useMemo(() => {
+    const soloActive = project.mixer.some((channel) => channel.id !== "master" && channel.solo);
+    return project.mixer.filter(
+      (channel) => channel.id !== "master" && !channel.muted && (!soloActive || channel.solo)
+    ).length;
+  }, [project.mixer]);
+  const activeChannelLabel = `${activeChannels} active ${activeChannels === 1 ? "channel" : "channels"}`;
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
   const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const bassPitches = useMemo(
@@ -161,6 +171,21 @@ export function App(): ReactElement {
       };
     });
     setSelectedNote(null);
+  }
+
+  function updateMixerChannel(id: MixerChannel["id"], update: Partial<MixerChannel>): void {
+    updateProject((current) => ({
+      ...current,
+      mixer: current.mixer.map((track) => (track.id === id ? { ...track, ...update } : track))
+    }));
+  }
+
+  function applyMasterPreset(preset: MasterPreset): void {
+    updateProject((current) => ({
+      ...current,
+      masterPreset: preset,
+      masterCeilingDb: masterPresetCeilingDb(preset)
+    }));
   }
 
   function duplicateArrangementBlock(): void {
@@ -523,7 +548,7 @@ export function App(): ReactElement {
         <div className="session-meter">
           <span style={{ "--accent": style.color } as CSSProperties}>{style.name}</span>
           <span>{project.key}</span>
-          <span>{activeChannels} active channels</span>
+          <span>{activeChannelLabel}</span>
           <span>{project.masterPreset}</span>
           <span>{projectStatus}</span>
         </div>
@@ -784,44 +809,74 @@ export function App(): ReactElement {
         </section>
 
         <section className="panel mixer-panel" aria-label="Mixer">
-          <PanelTitle icon={<SlidersHorizontal size={18} />} title="Mixer" meta="tracks" />
+          <PanelTitle icon={<SlidersHorizontal size={18} />} title="Mixer" meta={`${activeChannels} audible`} />
           <div className="mixer-strips">
             {project.mixer.map((channel) => (
               <div className="strip" key={channel.id} style={{ "--strip": channel.accent } as CSSProperties}>
                 <div className="strip-top">
                   <span>{channel.name}</span>
-                  <button
-                    className={channel.muted ? "mini-toggle active" : "mini-toggle"}
-                    type="button"
-                    onClick={() =>
-                      updateProject((current) => ({
-                        ...current,
-                        mixer: current.mixer.map((track) =>
-                          track.id === channel.id ? { ...track, muted: !track.muted } : track
-                        )
-                      }))
-                    }
-                  >
-                    M
-                  </button>
+                  <div className="strip-toggles">
+                    <button
+                      className={channel.muted ? "mini-toggle active" : "mini-toggle"}
+                      data-testid={`mixer-mute-${channel.id}`}
+                      type="button"
+                      onClick={() => updateMixerChannel(channel.id, { muted: !channel.muted })}
+                    >
+                      M
+                    </button>
+                    <button
+                      className={channel.solo ? "mini-toggle active solo" : "mini-toggle"}
+                      data-testid={`mixer-solo-${channel.id}`}
+                      disabled={channel.id === "master"}
+                      type="button"
+                      onClick={() => updateMixerChannel(channel.id, { solo: !channel.solo })}
+                    >
+                      S
+                    </button>
+                  </div>
                 </div>
-                <input
-                  aria-label={`${channel.name} volume`}
-                  max={3}
-                  min={-36}
-                  onChange={(event) =>
-                    updateProject((current) => ({
-                      ...current,
-                      mixer: current.mixer.map((track) =>
-                        track.id === channel.id ? { ...track, volumeDb: Number(event.target.value) } : track
-                      )
-                    }))
-                  }
-                  step={1}
-                  type="range"
-                  value={channel.volumeDb}
-                />
-                <span>{channel.volumeDb} dB</span>
+                <label className="strip-control">
+                  <span>Volume</span>
+                  <input
+                    aria-label={`${channel.name} volume`}
+                    data-testid={`mixer-volume-${channel.id}`}
+                    max={3}
+                    min={-36}
+                    onChange={(event) => updateMixerChannel(channel.id, { volumeDb: Number(event.target.value) })}
+                    step={1}
+                    type="range"
+                    value={channel.volumeDb}
+                  />
+                </label>
+                <label className="strip-control">
+                  <span>Pan</span>
+                  <div className="pan-inputs">
+                    <input
+                      aria-label={`${channel.name} pan`}
+                      data-testid={`mixer-pan-${channel.id}`}
+                      max={100}
+                      min={-100}
+                      onChange={(event) => updateMixerChannel(channel.id, { pan: clampPan(Number(event.target.value)) })}
+                      step={1}
+                      type="range"
+                      value={channel.pan}
+                    />
+                    <input
+                      aria-label={`${channel.name} pan value`}
+                      data-testid={`mixer-pan-input-${channel.id}`}
+                      max={100}
+                      min={-100}
+                      onChange={(event) => updateMixerChannel(channel.id, { pan: clampPan(Number(event.target.value)) })}
+                      step={1}
+                      type="number"
+                      value={channel.pan}
+                    />
+                  </div>
+                </label>
+                <div className="strip-readout">
+                  <span>{channel.volumeDb} dB</span>
+                  <span>{panLabel(channel.pan)}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -847,12 +902,13 @@ export function App(): ReactElement {
             />
           </label>
           <div className="preset-row">
-            {(["Clean Demo", "Streaming Safe", "Headroom for Vocal"] as const).map((preset) => (
+            {masterPresets.map((preset) => (
               <button
                 key={preset}
                 className={project.masterPreset === preset ? "selected" : ""}
+                data-testid={`master-preset-${preset}`}
                 type="button"
-                onClick={() => updateProject((current) => ({ ...current, masterPreset: preset }))}
+                onClick={() => applyMasterPreset(preset)}
               >
                 {preset}
               </button>
@@ -1036,6 +1092,20 @@ function patternEventCount(pattern: PatternData): string {
     0
   );
   return `${drumHits + pattern.bassNotes.length + pattern.melodyNotes.length} events`;
+}
+
+function panLabel(pan: number): string {
+  if (pan === 0) {
+    return "C";
+  }
+  return pan < 0 ? `L ${Math.abs(pan)}` : `R ${pan}`;
+}
+
+function clampPan(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(100, Math.max(-100, Math.round(value)));
 }
 
 function clampEnergy(value: number): number {

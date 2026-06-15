@@ -68,6 +68,8 @@ export type ArrangementBlock = {
   energy: number;
 };
 
+export type MasterPreset = "Clean Demo" | "Streaming Safe" | "Headroom for Vocal";
+
 export type ProjectState = {
   title: string;
   mode: SkillMode;
@@ -80,7 +82,7 @@ export type ProjectState = {
   mixer: MixerChannel[];
   arrangement: ArrangementBlock[];
   masterCeilingDb: number;
-  masterPreset: "Clean Demo" | "Streaming Safe" | "Headroom for Vocal";
+  masterPreset: MasterPreset;
 };
 
 export type ProjectFile = {
@@ -95,6 +97,12 @@ export const stepsPerBar = 16;
 export const projectFileVersion = 1;
 export const patternSlots: PatternSlot[] = ["A", "B", "C"];
 export const arrangementSections: ArrangementSection[] = ["Intro", "Verse", "Hook", "Bridge", "Outro"];
+export const masterPresets: MasterPreset[] = ["Clean Demo", "Streaming Safe", "Headroom for Vocal"];
+export const masterPresetCeilingsDb: Record<MasterPreset, number> = {
+  "Clean Demo": -0.8,
+  "Streaming Safe": -1,
+  "Headroom for Vocal": -3
+};
 
 const sharpNotes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const flatNotes = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
@@ -302,9 +310,13 @@ export const starterProject: ProjectState = {
     { section: "Hook", pattern: "B", energy: 0.96 },
     { section: "Outro", pattern: "A", energy: 0.28 }
   ],
-  masterCeilingDb: -1,
+  masterCeilingDb: masterPresetCeilingsDb["Headroom for Vocal"],
   masterPreset: "Headroom for Vocal"
 };
+
+export function masterPresetCeilingDb(preset: MasterPreset): number {
+  return masterPresetCeilingsDb[preset];
+}
 
 export function getStyle(project: ProjectState): StyleProfile {
   return styleProfiles.find((style) => style.id === project.styleId) ?? styleProfiles[0];
@@ -483,7 +495,7 @@ function isProjectState(value: unknown): value is ProjectState {
     value.mixer.every(isMixerChannel) &&
     isArrangement(value.arrangement) &&
     isFiniteNumber(value.masterCeilingDb) &&
-    isOneOf(value.masterPreset, ["Clean Demo", "Streaming Safe", "Headroom for Vocal"])
+    isOneOf(value.masterPreset, masterPresets)
   );
 }
 
@@ -509,7 +521,7 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patt
     value.mixer.every(isMixerChannel) &&
     isArrangement(value.arrangement) &&
     isFiniteNumber(value.masterCeilingDb) &&
-    isOneOf(value.masterPreset, ["Clean Demo", "Streaming Safe", "Headroom for Vocal"])
+    isOneOf(value.masterPreset, masterPresets)
   );
 }
 
@@ -573,6 +585,8 @@ function isMixerChannel(value: unknown): value is MixerChannel {
     typeof value.name === "string" &&
     isFiniteNumber(value.volumeDb) &&
     isFiniteNumber(value.pan) &&
+    value.pan >= -100 &&
+    value.pan <= 100 &&
     typeof value.muted === "boolean" &&
     typeof value.solo === "boolean" &&
     typeof value.accent === "string"

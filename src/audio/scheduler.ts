@@ -24,6 +24,11 @@ type SchedulerOptions = {
   onStop?: () => void;
 };
 
+type TrackMix = {
+  gain: number;
+  pan: number;
+};
+
 const scheduleAheadSeconds = 0.12;
 const scheduleAheadMs = scheduleAheadSeconds * 1000;
 const schedulerTickMs = 25;
@@ -36,12 +41,24 @@ function createAudioContext(): AudioContext {
   return new AudioContextClass();
 }
 
-function channelGain(project: ProjectState, id: string): number {
+function hasSolo(project: ProjectState): boolean {
+  return project.mixer.some((track) => track.id !== "master" && track.solo);
+}
+
+function channelMix(project: ProjectState, id: string): TrackMix {
   const channel = project.mixer.find((track) => track.id === id);
-  if (!channel || channel.muted) {
-    return 0;
+  const soloActive = hasSolo(project);
+  if (!channel || channel.muted || (id !== "master" && soloActive && !channel.solo)) {
+    return { gain: 0, pan: 0 };
   }
-  return dbToGain(channel.volumeDb);
+  return {
+    gain: dbToGain(channel.volumeDb),
+    pan: Math.max(-1, Math.min(1, channel.pan / 100))
+  };
+}
+
+function masterOutputGain(project: ProjectState): number {
+  return channelMix(project, "master").gain;
 }
 
 function snapshotForStep(step: number, loopSteps: number): PlaybackSnapshot {
@@ -54,16 +71,21 @@ function snapshotForStep(step: number, loopSteps: number): PlaybackSnapshot {
   };
 }
 
-function scheduleKick(context: AudioContext, destination: AudioNode, time: number, gainValue: number): void {
+function scheduleKick(context: AudioContext, destination: AudioNode, time: number, gainValue: number, pan: number): void {
+  if (gainValue <= 0) {
+    return;
+  }
   const osc = context.createOscillator();
   const gain = context.createGain();
+  const panner = context.createStereoPanner();
   osc.type = "sine";
   osc.frequency.setValueAtTime(92, time);
   osc.frequency.exponentialRampToValueAtTime(45, time + 0.12);
   gain.gain.setValueAtTime(0.0001, time);
   gain.gain.exponentialRampToValueAtTime(0.9 * gainValue, time + 0.008);
   gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.22);
-  osc.connect(gain).connect(destination);
+  panner.pan.setValueAtTime(pan, time);
+  osc.connect(gain).connect(panner).connect(destination);
   osc.start(time);
   osc.stop(time + 0.25);
 }
@@ -74,8 +96,12 @@ function scheduleNoise(
   time: number,
   duration: number,
   gainValue: number,
-  filterHz: number
+  filterHz: number,
+  pan: number
 ): void {
+  if (gainValue <= 0) {
+    return;
+  }
   const frames = Math.max(1, Math.floor(context.sampleRate * duration));
   const buffer = context.createBuffer(1, frames, context.sampleRate);
   const data = buffer.getChannelData(0);
@@ -92,7 +118,9 @@ function scheduleNoise(
   gain.gain.exponentialRampToValueAtTime(gainValue, time + 0.004);
   gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
   source.buffer = buffer;
-  source.connect(filter).connect(gain).connect(destination);
+  const panner = context.createStereoPanner();
+  panner.pan.setValueAtTime(pan, time);
+  source.connect(filter).connect(gain).connect(panner).connect(destination);
   source.start(time);
   source.stop(time + duration);
 }
@@ -104,44 +132,50 @@ function scheduleTone(
   duration: number,
   frequency: number,
   gainValue: number,
-  type: OscillatorType
+  type: OscillatorType,
+  pan: number
 ): void {
+  if (gainValue <= 0) {
+    return;
+  }
   const osc = context.createOscillator();
   const gain = context.createGain();
+  const panner = context.createStereoPanner();
   osc.type = type;
   osc.frequency.setValueAtTime(frequency, time);
   gain.gain.setValueAtTime(0.0001, time);
   gain.gain.exponentialRampToValueAtTime(gainValue, time + 0.01);
   gain.gain.exponentialRampToValueAtTime(0.0001, time + Math.max(0.04, duration));
-  osc.connect(gain).connect(destination);
+  panner.pan.setValueAtTime(pan, time);
+  osc.connect(gain).connect(panner).connect(destination);
   osc.start(time);
   osc.stop(time + duration + 0.03);
 }
 
 function scheduleStep(project: ProjectState, context: AudioContext, master: AudioNode, step: number, time: number): void {
   const patternStep = step % 16;
-  const drumGain = channelGain(project, "drum_rack");
-  const bassGain = channelGain(project, "bass_808");
-  const synthGain = channelGain(project, "synth");
+  const drumMix = channelMix(project, "drum_rack");
+  const bassMix = channelMix(project, "bass_808");
+  const synthMix = channelMix(project, "synth");
   const stepDuration = projectStepDurationSeconds(project);
   const pattern = activePattern(project);
 
   if (pattern.drumPattern.kick[patternStep]) {
-    scheduleKick(context, master, time, drumGain);
+    scheduleKick(context, master, time, drumMix.gain, drumMix.pan);
   }
   if (pattern.drumPattern.clap[patternStep]) {
-    scheduleNoise(context, master, time, 0.15, 0.26 * drumGain, 950);
+    scheduleNoise(context, master, time, 0.15, 0.26 * drumMix.gain, 950, drumMix.pan);
   }
   if (pattern.drumPattern.hat[patternStep]) {
-    scheduleNoise(context, master, time, 0.045, 0.12 * drumGain, 5200);
+    scheduleNoise(context, master, time, 0.045, 0.12 * drumMix.gain, 5200, drumMix.pan);
   }
   if (pattern.drumPattern.perc[patternStep]) {
-    scheduleTone(context, master, time, 0.07, 330, 0.12 * drumGain, "triangle");
+    scheduleTone(context, master, time, 0.07, 330, 0.12 * drumMix.gain, "triangle", drumMix.pan);
   }
 
   for (const note of pattern.bassNotes) {
     if (note.step === patternStep) {
-      scheduleTone(context, master, time, note.length * stepDuration, noteToFrequency(note.pitch), 0.5 * bassGain, "sine");
+      scheduleTone(context, master, time, note.length * stepDuration, noteToFrequency(note.pitch), 0.5 * bassMix.gain, "sine", bassMix.pan);
     }
   }
 
@@ -153,8 +187,9 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
         time,
         note.length * stepDuration,
         noteToFrequency(note.pitch),
-        note.velocity * 0.12 * synthGain,
-        "triangle"
+        note.velocity * 0.12 * synthMix.gain,
+        "triangle",
+        synthMix.pan
       );
     }
   }
@@ -168,7 +203,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
   const stepDuration = projectStepDurationSeconds(project);
   const masterGain = context.createGain();
   const ceiling = dbToGain(project.masterCeilingDb);
-  masterGain.gain.setValueAtTime(Math.min(1, ceiling), context.currentTime);
+  masterGain.gain.setValueAtTime(masterOutputGain(project) * Math.min(1, ceiling), context.currentTime);
   masterGain.connect(context.destination);
 
   let nextStep = 0;

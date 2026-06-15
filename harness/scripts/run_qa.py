@@ -50,6 +50,7 @@ TEXT_EXPECTATIONS = {
         "Sampling is a secondary add-on.",
         "local project save/load",
         "Independent Pattern A/B/C variations and editable arrangement blocks with duplicate, move, and delete controls",
+        "Basic mixer volume/pan/mute/solo",
         "npm run desktop",
     ],
     "AGENTS.md": [
@@ -64,6 +65,7 @@ TEXT_EXPECTATIONS = {
         "Independent Pattern A/B/C storage",
         "Editable arrangement blocks",
         "duplicate, move, and delete controls",
+        "Mixer volume, pan, mute, and solo reflected in realtime playback and WAV export",
     ],
     "docs/quality/rules.md": [
         "QA and review are separate loops.",
@@ -72,6 +74,7 @@ TEXT_EXPECTATIONS = {
         "Pattern work must keep Pattern A/B/C as independent editable event data",
         "Arrangement editor work must let users change a block's section",
         "Arrangement structure work must preserve at least one block",
+        "Volume, pan, mute, solo, master output gain, and preset ceiling controls",
         "sample import, chopping, sampler tracks, or audio warping",
     ],
     "docs/references/official-sources.md": [
@@ -122,17 +125,26 @@ TEXT_EXPECTATIONS = {
         "arrangement-energy-input",
         "arrangement-duplicate",
         "arrangement-delete",
+        "updateMixerChannel",
+        "applyMasterPreset",
+        "mixer-pan",
+        "mixer-pan-input",
+        "mixer-solo",
     ],
     "src/audio/scheduler.ts": [
         "scheduleAheadSeconds",
         "startRealtimePlayback",
         "onStep",
         "activePattern",
+        "channelMix",
+        "createStereoPanner",
     ],
     "src/audio/render.ts": [
         "patternForSlot",
         "arrangementBlock",
         "arrangementBarCount",
+        "channelMix",
+        "masterOutputGain",
     ],
     "src/domain/workstation.ts": [
         "styleProfiles",
@@ -146,6 +158,8 @@ TEXT_EXPECTATIONS = {
         "patternSlots",
         "ArrangementSection",
         "arrangementSections",
+        "masterPresets",
+        "masterPresetCeilingDb",
         "normalizeProjectState",
     ],
 }

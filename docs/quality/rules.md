@@ -78,4 +78,4 @@ Product framing work must preserve the core boundary: GrooveForge is for all-gen
 
 Any new plan that mentions sample import, chopping, sampler tracks, or audio warping must explicitly mark that work as optional sampling-phase work or document the user-approved exception in its Decision Log.
 
-Mixer/master work must keep mixing and mastering separate. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.
+Mixer/master work must keep mixing and mastering separate. Volume, pan, mute, solo, master output gain, and preset ceiling controls must affect both realtime playback and WAV export when implemented. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.
