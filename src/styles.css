@@ -973,6 +973,11 @@ input[type="range"] {
   font-size: 22px;
 }
 
+.arrangement-block small {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 11px;
+}
+
 .arrangement-block i {
   display: block;
   block-size: 4px;
@@ -982,7 +987,7 @@ input[type="range"] {
 
 .arrangement-editor {
   display: grid;
-  grid-template-columns: minmax(148px, 0.8fr) minmax(160px, 1fr) minmax(180px, 1.1fr) minmax(180px, 1.3fr);
+  grid-template-columns: minmax(132px, 0.8fr) minmax(150px, 1fr) minmax(160px, 1fr) minmax(110px, 0.6fr) minmax(176px, 1.2fr);
   gap: 10px;
   align-items: end;
   margin-top: 12px;
@@ -1005,7 +1010,13 @@ input[type="range"] {
   white-space: nowrap;
 }
 
-.arrangement-editor select {
+.arrangement-editor-heading small {
+  color: rgba(244, 239, 231, 0.56);
+  font-size: 11px;
+}
+
+.arrangement-editor select,
+.arrangement-editor input[type="number"] {
   min-height: 36px;
   border: 1px solid rgba(244, 239, 231, 0.13);
   border-radius: 6px;

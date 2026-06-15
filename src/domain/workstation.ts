@@ -90,6 +90,7 @@ export type ArrangementBlock = {
   section: ArrangementSection;
   pattern: PatternSlot;
   energy: number;
+  bars: number;
 };
 
 export const arrangementTemplateIds = ["loop", "full", "hook_first", "breakdown"] as const;
@@ -140,6 +141,8 @@ export type ProjectFile = {
 
 export const steps = Array.from({ length: 16 }, (_, index) => index);
 export const stepsPerBar = 16;
+export const minArrangementBars = 1;
+export const maxArrangementBars = 16;
 export const minDrumTimingMs = -35;
 export const maxDrumTimingMs = 35;
 export const projectFileVersion = 1;
@@ -409,37 +412,37 @@ const chordProgressionPresetBlueprints: Record<ChordProgressionPreset, ChordBlue
 
 const arrangementTemplateBlocks: Record<ArrangementTemplateId, ArrangementBlock[]> = {
   loop: [
-    { section: "Intro", pattern: "A", energy: 0.42 },
-    { section: "Verse", pattern: "A", energy: 0.68 },
-    { section: "Hook", pattern: "B", energy: 0.9 },
-    { section: "Outro", pattern: "A", energy: 0.34 }
+    { section: "Intro", pattern: "A", energy: 0.42, bars: 1 },
+    { section: "Verse", pattern: "A", energy: 0.68, bars: 2 },
+    { section: "Hook", pattern: "B", energy: 0.9, bars: 4 },
+    { section: "Outro", pattern: "A", energy: 0.34, bars: 1 }
   ],
   full: [
-    { section: "Intro", pattern: "A", energy: 0.35 },
-    { section: "Verse", pattern: "A", energy: 0.65 },
-    { section: "Hook", pattern: "B", energy: 0.9 },
-    { section: "Verse", pattern: "A", energy: 0.68 },
-    { section: "Hook", pattern: "B", energy: 0.94 },
-    { section: "Bridge", pattern: "C", energy: 0.5 },
-    { section: "Hook", pattern: "B", energy: 0.96 },
-    { section: "Outro", pattern: "A", energy: 0.28 }
+    { section: "Intro", pattern: "A", energy: 0.35, bars: 2 },
+    { section: "Verse", pattern: "A", energy: 0.65, bars: 4 },
+    { section: "Hook", pattern: "B", energy: 0.9, bars: 4 },
+    { section: "Verse", pattern: "A", energy: 0.68, bars: 4 },
+    { section: "Hook", pattern: "B", energy: 0.94, bars: 4 },
+    { section: "Bridge", pattern: "C", energy: 0.5, bars: 2 },
+    { section: "Hook", pattern: "B", energy: 0.96, bars: 4 },
+    { section: "Outro", pattern: "A", energy: 0.28, bars: 2 }
   ],
   hook_first: [
-    { section: "Hook", pattern: "B", energy: 0.92 },
-    { section: "Verse", pattern: "A", energy: 0.62 },
-    { section: "Hook", pattern: "B", energy: 0.95 },
-    { section: "Bridge", pattern: "C", energy: 0.48 },
-    { section: "Hook", pattern: "B", energy: 0.98 },
-    { section: "Outro", pattern: "A", energy: 0.32 }
+    { section: "Hook", pattern: "B", energy: 0.92, bars: 4 },
+    { section: "Verse", pattern: "A", energy: 0.62, bars: 4 },
+    { section: "Hook", pattern: "B", energy: 0.95, bars: 4 },
+    { section: "Bridge", pattern: "C", energy: 0.48, bars: 2 },
+    { section: "Hook", pattern: "B", energy: 0.98, bars: 4 },
+    { section: "Outro", pattern: "A", energy: 0.32, bars: 2 }
   ],
   breakdown: [
-    { section: "Intro", pattern: "A", energy: 0.28 },
-    { section: "Verse", pattern: "A", energy: 0.58 },
-    { section: "Bridge", pattern: "C", energy: 0.36 },
-    { section: "Hook", pattern: "B", energy: 0.9 },
-    { section: "Bridge", pattern: "C", energy: 0.44 },
-    { section: "Hook", pattern: "B", energy: 0.96 },
-    { section: "Outro", pattern: "A", energy: 0.26 }
+    { section: "Intro", pattern: "A", energy: 0.28, bars: 2 },
+    { section: "Verse", pattern: "A", energy: 0.58, bars: 4 },
+    { section: "Bridge", pattern: "C", energy: 0.36, bars: 2 },
+    { section: "Hook", pattern: "B", energy: 0.9, bars: 4 },
+    { section: "Bridge", pattern: "C", energy: 0.44, bars: 2 },
+    { section: "Hook", pattern: "B", energy: 0.96, bars: 4 },
+    { section: "Outro", pattern: "A", energy: 0.26, bars: 2 }
   ]
 };
 
@@ -570,6 +573,17 @@ export function arrangementTemplateLabel(template: ArrangementTemplateId): strin
 
 export function createArrangementTemplate(template: ArrangementTemplateId): ArrangementBlock[] {
   return arrangementTemplateBlocks[template].map((block) => ({ ...block }));
+}
+
+export function normalizeArrangementBars(value: unknown): number {
+  if (!isFiniteNumber(value)) {
+    return minArrangementBars;
+  }
+  return Math.min(maxArrangementBars, Math.max(minArrangementBars, Math.round(value)));
+}
+
+export function arrangementTotalBars(project: ProjectState): number {
+  return project.arrangement.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
 }
 
 export function soundPresetDesign(preset: (typeof soundPresetIds)[number]): SoundDesign {
@@ -1171,6 +1185,15 @@ function normalizeMixerChannels(channels: MixerChannelInput[]): MixerChannel[] {
   }));
 }
 
+function normalizeArrangement(arrangement: ArrangementBlockInput[]): ArrangementBlock[] {
+  return arrangement.map((block) => ({
+    section: block.section,
+    pattern: block.pattern,
+    energy: clampUnit(block.energy),
+    bars: normalizeArrangementBars(block.bars)
+  }));
+}
+
 function normalizeDrumVelocities(value: DrumVelocities | undefined, drumPattern: DrumPattern): DrumVelocities {
   if (!value) {
     return defaultDrumVelocities(drumPattern);
@@ -1227,7 +1250,8 @@ function normalizeProjectState(value: unknown): ProjectState | null {
       ...value,
       sound: normalizeSoundDesign(value.sound),
       patterns: normalizePatternMap(value.patterns),
-      mixer: normalizeMixerChannels(value.mixer)
+      mixer: normalizeMixerChannels(value.mixer),
+      arrangement: normalizeArrangement(value.arrangement)
     };
   }
 
@@ -1252,7 +1276,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
         C: clonePatternData(legacyPattern)
       },
       mixer: normalizeMixerChannels(value.mixer),
-      arrangement: value.arrangement,
+      arrangement: normalizeArrangement(value.arrangement),
       masterCeilingDb: value.masterCeilingDb,
       masterPreset: value.masterPreset
     };
@@ -1274,10 +1298,12 @@ type MixerChannelInput = Omit<MixerChannel, "lowCut" | "air" | "drive" | "glue">
   drive?: number;
   glue?: number;
 };
-type ProjectStateInput = Omit<ProjectState, "patterns" | "sound" | "mixer"> & {
+type ArrangementBlockInput = Omit<ArrangementBlock, "bars"> & { bars?: number };
+type ProjectStateInput = Omit<ProjectState, "patterns" | "sound" | "mixer" | "arrangement"> & {
   sound?: SoundDesignInput;
   patterns: Record<PatternSlot, PatternDataInput>;
   mixer: MixerChannelInput[];
+  arrangement: ArrangementBlockInput[];
 };
 
 function isProjectStateShape(value: unknown): value is ProjectStateInput {
@@ -1303,9 +1329,10 @@ function isProjectStateShape(value: unknown): value is ProjectStateInput {
   );
 }
 
-function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patterns" | "sound" | "mixer"> & {
+function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patterns" | "sound" | "mixer" | "arrangement"> & {
   sound?: SoundDesignInput;
   mixer: MixerChannelInput[];
+  arrangement: ArrangementBlockInput[];
 } & PatternDataInput {
   if (!isRecord(value)) {
     return false;
@@ -1473,18 +1500,20 @@ function isMixerChannelInput(value: unknown): value is MixerChannelInput {
   );
 }
 
-function isArrangement(value: unknown): value is ArrangementBlock[] {
+function isArrangement(value: unknown): value is ArrangementBlockInput[] {
   return Array.isArray(value) && value.length > 0 && value.every(isArrangementBlock);
 }
 
-function isArrangementBlock(value: unknown): value is ArrangementBlock {
+function isArrangementBlock(value: unknown): value is ArrangementBlockInput {
   return (
     isRecord(value) &&
     isOneOf(value.section, arrangementSections) &&
     isOneOf(value.pattern, patternSlots) &&
     isFiniteNumber(value.energy) &&
     value.energy >= 0 &&
-    value.energy <= 1
+    value.energy <= 1 &&
+    (value.bars === undefined ||
+      (isFiniteNumber(value.bars) && value.bars >= minArrangementBars && value.bars <= maxArrangementBars))
   );
 }
 

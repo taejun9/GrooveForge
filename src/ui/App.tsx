@@ -50,6 +50,7 @@ import {
   arrangementSections,
   arrangementTemplateIds,
   arrangementTemplateLabel,
+  arrangementTotalBars,
   bassPitchLanes,
   chordQualities,
   clonePatternData,
@@ -67,8 +68,11 @@ import {
   masterPresetCeilingDb,
   masterPresets,
   melodyPitchLanes,
+  minArrangementBars,
   minDrumTimingMs,
+  maxArrangementBars,
   maxDrumTimingMs,
+  normalizeArrangementBars,
   normalizeDrumTimingMs,
   normalizeDrumVelocity,
   normalizeHatRepeat,
@@ -485,7 +489,8 @@ export function App(): ReactElement {
       const nextBlock: ArrangementBlock = {
         ...block,
         ...update,
-        energy: update.energy === undefined ? block.energy : clampEnergy(update.energy)
+        energy: update.energy === undefined ? block.energy : clampEnergy(update.energy),
+        bars: update.bars === undefined ? block.bars : normalizeArrangementBars(update.bars)
       };
       return {
         ...current,
@@ -1346,10 +1351,11 @@ export function App(): ReactElement {
         </section>
 
         <section className="panel arrangement-panel" aria-label="Arrangement">
-          <PanelTitle icon={<Music2 size={18} />} title="Arrangement" meta={`${project.arrangement.length} blocks`} />
+          <PanelTitle icon={<Music2 size={18} />} title="Arrangement" meta={`${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`} />
           <div className="arrangement-template-row" aria-label="Arrangement templates">
             {arrangementTemplateIds.map((template) => {
               const templateBlocks = createArrangementTemplate(template);
+              const templateBars = templateBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
               return (
                 <button
                   data-testid={`arrangement-template-${template}`}
@@ -1359,7 +1365,7 @@ export function App(): ReactElement {
                   type="button"
                 >
                   <span>{arrangementTemplateLabel(template)}</span>
-                  <small>{templateBlocks.length} blocks</small>
+                  <small>{templateBlocks.length} blocks / {barCountLabel(templateBars)}</small>
                 </button>
               );
             })}
@@ -1367,7 +1373,7 @@ export function App(): ReactElement {
           <div className="arrangement-track">
             {project.arrangement.map((block, index) => (
               <button
-                aria-label={`Block ${index + 1} ${block.section} Pattern ${block.pattern}`}
+                aria-label={`Block ${index + 1} ${block.section} Pattern ${block.pattern} ${barCountLabel(block.bars)}`}
                 aria-pressed={selectedArrangementIndex === index}
                 className={["arrangement-block", selectedArrangementIndex === index ? "selected" : ""]
                   .filter(Boolean)
@@ -1379,6 +1385,7 @@ export function App(): ReactElement {
               >
                 <span>{block.section}</span>
                 <strong>{block.pattern}</strong>
+                <small>{barCountLabel(block.bars)}</small>
                 <i style={{ inlineSize: `${Math.max(18, block.energy * 100)}%` }} />
               </button>
             ))}
@@ -1390,6 +1397,7 @@ export function App(): ReactElement {
                 <strong>
                   {selectedArrangementBlock.section} / Pattern {selectedArrangementBlock.pattern}
                 </strong>
+                <small>{barCountLabel(selectedArrangementBlock.bars)}</small>
               </div>
               <label>
                 <span>Section</span>
@@ -1421,6 +1429,21 @@ export function App(): ReactElement {
                   </button>
                 ))}
               </div>
+              <label>
+                <span>Bars</span>
+                <input
+                  aria-label="Arrangement block bars"
+                  data-testid="arrangement-bars-input"
+                  type="number"
+                  min={minArrangementBars}
+                  max={maxArrangementBars}
+                  step={1}
+                  value={selectedArrangementBlock.bars}
+                  onChange={(event) =>
+                    updateArrangementBlock(selectedArrangementIndex, { bars: Number(event.target.value) })
+                  }
+                />
+              </label>
               <label>
                 <span>Energy {Math.round(selectedArrangementBlock.energy * 100)}%</span>
                 <div className="energy-inputs">
@@ -2459,6 +2482,10 @@ function patternEventCount(pattern: PatternData): string {
     0
   );
   return `${drumHits + repeatedHats + pattern.bassNotes.length + pattern.melodyNotes.length + pattern.chordEvents.length} events`;
+}
+
+function barCountLabel(bars: number): string {
+  return `${bars} ${bars === 1 ? "bar" : "bars"}`;
 }
 
 function panLabel(pan: number): string {
