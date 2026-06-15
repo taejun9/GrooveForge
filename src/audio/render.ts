@@ -5,6 +5,7 @@ import {
   dbToGain,
   drumStepTimingMs,
   drumStepVelocity,
+  drumStepShouldPlay,
   hatRepeatCount,
   noteToFrequency,
   patternForSlot,
@@ -236,8 +237,9 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
     const arrangementBlock = arrangementBlockForBar(project, bar);
     const pattern = arrangementBlock ? patternForSlot(project, arrangementBlock.pattern) : patternForSlot(project, project.selectedPattern);
     for (let patternStep = 0; patternStep < 16; patternStep += 1) {
+      const absoluteStep = barOffset + patternStep;
       const time = (barOffset + patternStep) * step;
-      if (pattern.drumPattern.kick[patternStep]) {
+      if (drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
         const velocity = drumStepVelocity(pattern, "kick", patternStep);
         const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
         addTone(buffer, drumTime, 0.18 + sound.kickPunch * 0.1, 44 + sound.kickPunch * 10, drumMix, (0.78 + sound.kickPunch * 0.24) * velocity, "sine", {
@@ -247,7 +249,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
           decay: 8
         });
       }
-      if (pattern.drumPattern.clap[patternStep]) {
+      if (drumStepShouldPlay(pattern, "clap", patternStep, absoluteStep)) {
         const drumTime = time + drumStepTimingMs(pattern, "clap", patternStep) / 1000;
         addNoise(
           buffer,
@@ -258,7 +260,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
           sound.snareSnap
         );
       }
-      if (pattern.drumPattern.hat[patternStep]) {
+      if (drumStepShouldPlay(pattern, "hat", patternStep, absoluteStep)) {
         const repeatCount = hatRepeatCount(pattern, patternStep);
         const velocity = drumStepVelocity(pattern, "hat", patternStep);
         const drumTime = time + drumStepTimingMs(pattern, "hat", patternStep) / 1000;
@@ -273,7 +275,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
           );
         }
       }
-      if (pattern.drumPattern.perc[patternStep]) {
+      if (drumStepShouldPlay(pattern, "perc", patternStep, absoluteStep)) {
         const drumTime = time + drumStepTimingMs(pattern, "perc", patternStep) / 1000;
         addTone(buffer, drumTime, 0.08, 260 + sound.snareSnap * 190, drumMix, 0.16 * drumStepVelocity(pattern, "perc", patternStep), "triangle", {
           filter: 0.7 + sound.hatBrightness * 0.3
@@ -287,7 +289,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
         note.length * step * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
         bassMix,
-        (0.52 + sound.bassDrive * 0.24) * sidechainGainForStep(pattern, note.step, sound.sidechainDuck),
+          (0.52 + sound.bassDrive * 0.24) * sidechainGainForStep(pattern, note.step, sound.sidechainDuck, barOffset + note.step),
         bassShape(sound),
         { drive: sound.bassDrive, filter: 0.72 + sound.bassDrive * 0.28, decay: 3.8 - sound.bassDecay * 1.4 }
       );

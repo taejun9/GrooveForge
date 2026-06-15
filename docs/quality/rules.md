@@ -69,6 +69,8 @@ Drum, bass, melody, and arrangement work must preserve editable project state wi
 
 Drum dynamics work must migrate old patterns, preserve per-step velocity and hat repeat data across Pattern A/B/C copy, save/load, undo/redo, realtime playback, WAV export, and stem export.
 
+Drum probability work must migrate old patterns to 100% chance, preserve per-step probability data across Pattern A/B/C copy, save/load, undo/redo, realtime playback, WAV export, and stem export, and use deterministic probability gates so exported audio is reproducible from saved project data.
+
 Drum microtiming work must migrate old patterns, preserve per-step timing offsets across Pattern A/B/C copy, save/load, undo/redo, realtime playback, WAV export, and stem export, and keep offsets as local musical event data rather than imported audio.
 
 Groove humanize work must be deterministic, operate on selected Pattern A/B/C velocity and microtiming event data, preserve pattern independence, keep results manually editable, and avoid remote AI or sampling dependencies.

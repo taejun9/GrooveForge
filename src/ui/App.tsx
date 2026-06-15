@@ -60,6 +60,7 @@ import {
   createStylePatternSet,
   createEmptyPatternData,
   defaultDrumVelocity,
+  drumStepProbability,
   drumStepTimingMs,
   drumStepVelocity,
   drumGroovePresetIds,
@@ -73,6 +74,7 @@ import {
   maxArrangementBars,
   maxDrumTimingMs,
   normalizeArrangementBars,
+  normalizeDrumProbability,
   normalizeDrumTimingMs,
   normalizeDrumVelocity,
   normalizeHatRepeat,
@@ -189,6 +191,10 @@ export function App(): ReactElement {
     selectedDrumStep && selectedDrumActive
       ? drumStepTimingMs(currentPattern, selectedDrumStep.lane, selectedDrumStep.step)
       : 0;
+  const selectedDrumProbability =
+    selectedDrumStep && selectedDrumActive
+      ? drumStepProbability(currentPattern, selectedDrumStep.lane, selectedDrumStep.step)
+      : undefined;
   const selectedHatRepeat =
     selectedDrumStep && selectedDrumStep.lane === "hat" && selectedDrumActive
       ? hatRepeatCount(currentPattern, selectedDrumStep.step)
@@ -678,6 +684,12 @@ export function App(): ReactElement {
             index === step ? (nextActive ? normalizeDrumTimingMs(timing) : 0) : timing
           )
         },
+        drumProbabilities: {
+          ...pattern.drumProbabilities,
+          [lane]: pattern.drumProbabilities[lane].map((probability, index) =>
+            index === step && nextActive ? normalizeDrumProbability(probability) : probability
+          )
+        },
         hatRepeats:
           lane === "hat"
             ? pattern.hatRepeats.map((repeat, index) => (index === step && !nextActive ? 1 : repeat))
@@ -697,6 +709,22 @@ export function App(): ReactElement {
         ...pattern.drumVelocities,
         [selectedDrumStep.lane]: pattern.drumVelocities[selectedDrumStep.lane].map((currentVelocity, index) =>
           index === selectedDrumStep.step ? normalizeDrumVelocity(velocity) : currentVelocity
+        )
+      }
+    }));
+  }
+
+  function updateSelectedDrumProbability(probability: number): void {
+    if (!selectedDrumStep || !selectedDrumActive) {
+      return;
+    }
+
+    updateCurrentPattern((pattern) => ({
+      ...pattern,
+      drumProbabilities: {
+        ...pattern.drumProbabilities,
+        [selectedDrumStep.lane]: pattern.drumProbabilities[selectedDrumStep.lane].map((currentProbability, index) =>
+          index === selectedDrumStep.step ? normalizeDrumProbability(probability) : currentProbability
         )
       }
     }));
@@ -1330,8 +1358,10 @@ export function App(): ReactElement {
               active={selectedDrumActive}
               velocity={selectedDrumVelocity}
               timingMs={selectedDrumTiming}
+              probability={selectedDrumProbability}
               hatRepeat={selectedHatRepeat}
               onVelocityChange={updateSelectedDrumVelocity}
+              onProbabilityChange={updateSelectedDrumProbability}
               onTimingChange={updateSelectedDrumTiming}
               onHatRepeatChange={updateSelectedHatRepeat}
             />
@@ -1857,8 +1887,10 @@ function DrumStepInspector({
   active,
   velocity,
   timingMs,
+  probability,
   hatRepeat,
   onVelocityChange,
+  onProbabilityChange,
   onTimingChange,
   onHatRepeatChange
 }: {
@@ -1866,12 +1898,15 @@ function DrumStepInspector({
   active: boolean;
   velocity?: number;
   timingMs: number;
+  probability?: number;
   hatRepeat: number;
   onVelocityChange: (velocity: number) => void;
+  onProbabilityChange: (probability: number) => void;
   onTimingChange: (timingMs: number) => void;
   onHatRepeatChange: (repeat: number) => void;
 }): ReactElement {
   const velocityValue = velocity ?? 0.75;
+  const probabilityValue = probability ?? 1;
   const timingValue = normalizeDrumTimingMs(timingMs);
   const timingTextValue = `${timingValue}`;
   const [timingText, setTimingText] = useState(timingTextValue);
@@ -1902,12 +1937,14 @@ function DrumStepInspector({
       <div className="inspector-heading">
         <span>Dynamics</span>
         <strong data-testid="drum-step-readout">
-          {selectedStep ? `${label} ${active ? `${percentLabel(velocityValue)} / ${timingLabel(timingValue)}` : "off"}` : "Select step"}
+          {selectedStep
+            ? `${label} ${active ? `${percentLabel(velocityValue)} / ${percentLabel(probabilityValue)} chance / ${timingLabel(timingValue)}` : "off"}`
+            : "Select step"}
         </strong>
       </div>
       <label>
         <span>Velocity {active ? percentLabel(velocityValue) : "--"}</span>
-        <div className="drum-velocity-row">
+        <div className="drum-value-row">
           <input
             aria-label="Drum velocity"
             data-testid="drum-velocity"
@@ -1929,6 +1966,33 @@ function DrumStepInspector({
             step={1}
             type="number"
             value={Math.round(velocityValue * 100)}
+          />
+        </div>
+      </label>
+      <label>
+        <span>Chance {active ? percentLabel(probabilityValue) : "--"}</span>
+        <div className="drum-value-row">
+          <input
+            aria-label="Drum probability"
+            data-testid="drum-probability"
+            disabled={!selectedStep || !active}
+            max={1}
+            min={0}
+            onChange={(event) => onProbabilityChange(Number(event.target.value))}
+            step={0.01}
+            type="range"
+            value={probabilityValue}
+          />
+          <input
+            aria-label="Drum probability percent"
+            data-testid="drum-probability-input"
+            disabled={!selectedStep || !active}
+            max={100}
+            min={0}
+            onChange={(event) => onProbabilityChange(Number(event.target.value) / 100)}
+            step={1}
+            type="number"
+            value={Math.round(probabilityValue * 100)}
           />
         </div>
       </label>

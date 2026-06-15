@@ -7,6 +7,7 @@ import {
   loopStepCount,
   drumStepTimingMs,
   drumStepVelocity,
+  drumStepShouldPlay,
   hatRepeatCount,
   normalizeArrangementBars,
   noteToFrequency,
@@ -339,7 +340,7 @@ function scheduleMetronomeClick(context: AudioContext, destination: AudioNode, t
   );
 }
 
-function scheduleStep(project: ProjectState, pattern: PatternData, context: AudioContext, master: AudioNode, step: number, time: number): void {
+function scheduleStep(project: ProjectState, pattern: PatternData, context: AudioContext, master: AudioNode, step: number, time: number, absoluteStep = step): void {
   const patternStep = step % 16;
   const drumMix = channelMix(project, "drum_rack");
   const bassMix = channelMix(project, "bass_808");
@@ -350,11 +351,11 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
   if (project.metronomeEnabled && patternStep % 4 === 0) {
     scheduleMetronomeClick(context, master, time, patternStep);
   }
-  if (pattern.drumPattern.kick[patternStep]) {
+  if (drumStepShouldPlay(pattern, "kick", patternStep, absoluteStep)) {
     const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
     scheduleKick(context, master, drumTime, drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix, sound);
   }
-  if (pattern.drumPattern.clap[patternStep]) {
+  if (drumStepShouldPlay(pattern, "clap", patternStep, absoluteStep)) {
     const drumTime = time + drumStepTimingMs(pattern, "clap", patternStep) / 1000;
     scheduleNoise(
       context,
@@ -366,7 +367,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
       drumMix
     );
   }
-  if (pattern.drumPattern.hat[patternStep]) {
+  if (drumStepShouldPlay(pattern, "hat", patternStep, absoluteStep)) {
     const repeatCount = hatRepeatCount(pattern, patternStep);
     const baseVelocity = drumStepVelocity(pattern, "hat", patternStep);
     const drumTime = time + drumStepTimingMs(pattern, "hat", patternStep) / 1000;
@@ -382,7 +383,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
       );
     }
   }
-  if (pattern.drumPattern.perc[patternStep]) {
+  if (drumStepShouldPlay(pattern, "perc", patternStep, absoluteStep)) {
     const drumTime = time + drumStepTimingMs(pattern, "perc", patternStep) / 1000;
     scheduleTone(
       context,
@@ -410,7 +411,7 @@ function scheduleStep(project: ProjectState, pattern: PatternData, context: Audi
         time,
         note.length * stepDuration * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
-        (0.42 + sound.bassDrive * 0.22) * bassMix.gain * sidechainGainForStep(pattern, patternStep, sound.sidechainDuck),
+        (0.42 + sound.bassDrive * 0.22) * bassMix.gain * sidechainGainForStep(pattern, patternStep, sound.sidechainDuck, absoluteStep),
         bassOscillator(sound),
         bassMix,
         bassMix.pan,
@@ -518,7 +519,7 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
       const snapshot = snapshotForStep(currentProject, nextStep, loopSteps, totalBars, mode);
       const playbackContext = playbackContextForStep(currentProject, mode, snapshot.loopStep);
       const scheduleDelaySeconds = Math.max(0.015, (nextStepAtMs - nowMs) / 1000);
-      scheduleStep(currentProject, playbackContext.pattern, context, masterGain, snapshot.loopStep, context.currentTime + scheduleDelaySeconds);
+      scheduleStep(currentProject, playbackContext.pattern, context, masterGain, snapshot.loopStep, context.currentTime + scheduleDelaySeconds, nextStep);
       queueStepFeedback(snapshot, nextStepAtMs);
       nextStep += 1;
       nextStepAtMs += stepDuration * 1000;
