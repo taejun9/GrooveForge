@@ -48,6 +48,7 @@ export type PlaybackController = {
 type SchedulerOptions = {
   bars?: number;
   mode?: PlaybackMode;
+  startBar?: number;
   getProject?: () => ProjectState;
   onStep?: (snapshot: PlaybackSnapshot) => void;
   onStop?: () => void;
@@ -212,7 +213,7 @@ function arrangementContextForBar(project: ProjectState, bar: number): PlaybackS
   };
 }
 
-function playbackContextForStep(project: ProjectState, mode: PlaybackMode, loopStep: number): PlaybackStepContext {
+function playbackContextForStep(project: ProjectState, mode: PlaybackMode, loopStep: number, startBar = 0): PlaybackStepContext {
   if (mode === "pattern") {
     return {
       pattern: activePattern(project),
@@ -223,12 +224,19 @@ function playbackContextForStep(project: ProjectState, mode: PlaybackMode, loopS
     };
   }
 
-  return arrangementContextForBar(project, Math.floor(loopStep / 16));
+  return arrangementContextForBar(project, startBar + Math.floor(loopStep / 16));
 }
 
-function snapshotForStep(project: ProjectState, step: number, loopSteps: number, totalBars: number, mode: PlaybackMode): PlaybackSnapshot {
+function snapshotForStep(
+  project: ProjectState,
+  step: number,
+  loopSteps: number,
+  totalBars: number,
+  mode: PlaybackMode,
+  startBar = 0
+): PlaybackSnapshot {
   const loopStep = step % loopSteps;
-  const playbackContext = playbackContextForStep(project, mode, loopStep);
+  const playbackContext = playbackContextForStep(project, mode, loopStep, startBar);
   return {
     absoluteStep: step,
     loopStep,
@@ -595,11 +603,12 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
       const bars = options.bars ?? (mode === "arrangement" ? arrangementTotalBars(currentProject) : 2);
       const loopSteps = loopStepCount(bars);
       const totalBars = Math.max(1, bars);
+      const startBar = mode === "arrangement" ? Math.max(0, options.startBar ?? 0) : 0;
       const stepDuration = projectStepDurationSeconds(currentProject);
       const ceiling = dbToGain(currentProject.masterCeilingDb);
       masterGain.gain.setTargetAtTime(masterOutputGain(currentProject) * Math.min(1, ceiling), context.currentTime, 0.01);
-      const snapshot = snapshotForStep(currentProject, nextStep, loopSteps, totalBars, mode);
-      const playbackContext = playbackContextForStep(currentProject, mode, snapshot.loopStep);
+      const snapshot = snapshotForStep(currentProject, nextStep, loopSteps, totalBars, mode, startBar);
+      const playbackContext = playbackContextForStep(currentProject, mode, snapshot.loopStep, startBar);
       const scheduleDelaySeconds = Math.max(0.015, (nextStepAtMs - nowMs) / 1000);
       scheduleStep(
         currentProject,

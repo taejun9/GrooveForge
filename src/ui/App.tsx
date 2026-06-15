@@ -218,6 +218,8 @@ type MixFixAction = {
   tone: MixCoachTone;
 };
 
+type TransportLoopScope = "arrangement" | "block" | "pattern";
+
 type QuickAction = {
   id: string;
   title: string;
@@ -388,6 +390,7 @@ export function App(): ReactElement {
   const [redoStack, setRedoStack] = useState<ProjectState[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>("arrangement");
+  const [transportLoopScope, setTransportLoopScope] = useState<TransportLoopScope>("arrangement");
   const [playbackPosition, setPlaybackPosition] = useState<PlaybackSnapshot | null>(null);
   const [selectedNote, setSelectedNote] = useState<SelectedNote | null>(null);
   const [selectedDrumStep, setSelectedDrumStep] = useState<SelectedDrumStep | null>(null);
@@ -431,18 +434,22 @@ export function App(): ReactElement {
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
+  const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
+  const selectedArrangementBars = selectedArrangementBlock ? normalizeArrangementBars(selectedArrangementBlock.bars) : 1;
+  const selectedArrangementStartBar = arrangementStartBar(project, selectedArrangementIndex);
+  const transportLoopMode = transportLoopScope === "pattern" ? "pattern" : "arrangement";
+  const transportLoopBars =
+    transportLoopScope === "pattern" ? 2 : transportLoopScope === "block" ? selectedArrangementBars : undefined;
+  const transportLoopStartBar = transportLoopScope === "block" ? selectedArrangementStartBar : 0;
+  const transportLoopReadout = transportLoopStatus(project, transportLoopScope, selectedArrangementIndex);
   const transportPrimary = isPlaying
     ? playbackPosition?.mode === "pattern"
       ? `Pattern ${playbackPosition.pattern} ${playbackPosition.bar}.${playbackPosition.beat}`
       : `${playbackPosition?.section ?? "Arrangement"} ${playbackPosition?.bar ?? 1}.${playbackPosition?.beat ?? 1}`
     : "Ready";
   const transportSecondary = isPlaying
-    ? `Pattern ${playbackPosition?.pattern ?? project.selectedPattern} / Step ${(currentPatternStep ?? 0) + 1}`
-    : playbackMode === "arrangement"
-      ? `${barCountLabel(arrangementTotalBars(project))} arrangement`
-      : `Pattern ${project.selectedPattern} preview`;
-  const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
-  const selectedArrangementBars = selectedArrangementBlock ? normalizeArrangementBars(selectedArrangementBlock.bars) : 1;
+    ? `${transportLoopLabel(transportLoopScope)} / Pattern ${playbackPosition?.pattern ?? project.selectedPattern} / Step ${(currentPatternStep ?? 0) + 1}`
+    : transportLoopReadout;
   const selectedArrangementNextBlock = project.arrangement[selectedArrangementIndex + 1];
   const selectedArrangementNextBars = selectedArrangementNextBlock ? normalizeArrangementBars(selectedArrangementNextBlock.bars) : 0;
   const selectedArrangementFocus = useMemo(
@@ -787,10 +794,18 @@ export function App(): ReactElement {
       (current) => (current.selectedPattern === pattern ? current : { ...current, selectedPattern: pattern }),
       `Cue Pattern ${pattern}`
     );
-    setPlaybackMode("pattern");
+    selectTransportLoopScope("pattern", false);
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(0);
+  }
+
+  function selectTransportLoopScope(scope: TransportLoopScope, showStatus = true): void {
+    setTransportLoopScope(scope);
+    setPlaybackMode(scope === "pattern" ? "pattern" : "arrangement");
+    if (showStatus) {
+      setProjectStatus(`${transportLoopLabel(scope)} loop`);
+    }
   }
 
   function usePatternInSelectedBlock(pattern: PatternSlot): void {
@@ -805,7 +820,7 @@ export function App(): ReactElement {
       `Block ${selectedArrangementIndex + 1} uses Pattern ${pattern}`
     );
     if (changed) {
-      setPlaybackMode("arrangement");
+      selectTransportLoopScope("arrangement", false);
     }
   }
 
@@ -1049,7 +1064,7 @@ export function App(): ReactElement {
       `Applied ${preset.label} focus`
     );
     if (changed) {
-      setPlaybackMode("arrangement");
+      selectTransportLoopScope("block", false);
     }
   }
 
@@ -1918,8 +1933,9 @@ export function App(): ReactElement {
     try {
       setIsPlaying(true);
       controllerRef.current = startRealtimePlayback(project, {
-        mode: playbackMode,
-        bars: playbackMode === "pattern" ? 2 : undefined,
+        mode: transportLoopMode,
+        bars: transportLoopBars,
+        startBar: transportLoopStartBar,
         getProject: () => projectRef.current,
         onStep: setPlaybackPosition,
         onStop: () => {
@@ -2097,7 +2113,7 @@ export function App(): ReactElement {
       setSelectedDrumStep(null);
       setSelectedChordIndex(0);
       setSelectedArrangementIndex(0);
-      setPlaybackMode("arrangement");
+      selectTransportLoopScope("arrangement", false);
     }
   }
 
@@ -2120,7 +2136,7 @@ export function App(): ReactElement {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
-      setPlaybackMode("arrangement");
+      selectTransportLoopScope("arrangement", false);
     }
   }
 
@@ -2238,6 +2254,8 @@ export function App(): ReactElement {
     isPlaying,
     playbackMode,
     project,
+    selectedArrangementIndex,
+    transportLoopScope,
     onApplyArrangementMove: applyArrangementMoveToSelected,
     onApplyArrangementFocus: applyArrangementFocusPreset,
     onApplyBlueprint: applySelectedBeatBlueprint,
@@ -2252,6 +2270,7 @@ export function App(): ReactElement {
     onRedo: redoProject,
     onSaveProject: handleSaveProject,
     onSaveSnapshot: saveCurrentSnapshot,
+    onSelectTransportLoopScope: selectTransportLoopScope,
     onTogglePlayback: togglePlayback,
     onUndo: undoProject
   });
@@ -2314,23 +2333,33 @@ export function App(): ReactElement {
             <strong>{transportPrimary}</strong>
             <span>{transportSecondary}</span>
           </div>
-          <div className="segmented playback-mode-row" aria-label="Playback mode">
+          <div className="segmented playback-mode-row" aria-label="Transport loop">
             <button
-              className={playbackMode === "arrangement" ? "selected" : ""}
+              className={transportLoopScope === "arrangement" ? "selected" : ""}
               data-testid="playback-mode-arrangement"
-              disabled={isPlaying && playbackMode !== "arrangement"}
-              onClick={() => setPlaybackMode("arrangement")}
-              title="Play the full arrangement timeline"
+              disabled={isPlaying && transportLoopScope !== "arrangement"}
+              onClick={() => selectTransportLoopScope("arrangement")}
+              title="Loop the full arrangement timeline"
               type="button"
             >
-              Arrangement
+              Song
             </button>
             <button
-              className={playbackMode === "pattern" ? "selected" : ""}
+              className={transportLoopScope === "block" ? "selected" : ""}
+              data-testid="transport-loop-block"
+              disabled={isPlaying && transportLoopScope !== "block"}
+              onClick={() => selectTransportLoopScope("block")}
+              title="Loop the selected arrangement block"
+              type="button"
+            >
+              Block
+            </button>
+            <button
+              className={transportLoopScope === "pattern" ? "selected" : ""}
               data-testid="playback-mode-pattern"
-              disabled={isPlaying && playbackMode !== "pattern"}
-              onClick={() => setPlaybackMode("pattern")}
-              title="Preview the selected Pattern A/B/C loop"
+              disabled={isPlaying && transportLoopScope !== "pattern"}
+              onClick={() => selectTransportLoopScope("pattern")}
+              title="Loop the selected Pattern A/B/C"
               type="button"
             >
               Pattern
@@ -2351,7 +2380,7 @@ export function App(): ReactElement {
             <KeyboardMusic size={18} aria-hidden="true" />
             <span>Actions</span>
           </button>
-          <button className="icon-button primary" type="button" title={playbackMode === "arrangement" ? "Play arrangement" : "Play selected pattern"} onClick={togglePlayback}>
+          <button className="icon-button primary" type="button" title={`Play ${transportLoopLabel(transportLoopScope).toLowerCase()} loop`} onClick={togglePlayback}>
             {isPlaying ? <CircleStop size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
             <span>{isPlaying ? "Stop" : "Play"}</span>
           </button>
@@ -4026,6 +4055,8 @@ function createQuickActions({
   isPlaying,
   playbackMode,
   project,
+  selectedArrangementIndex,
+  transportLoopScope,
   onApplyArrangementMove,
   onApplyArrangementFocus,
   onApplyBlueprint,
@@ -4040,6 +4071,7 @@ function createQuickActions({
   onRedo,
   onSaveProject,
   onSaveSnapshot,
+  onSelectTransportLoopScope,
   onTogglePlayback,
   onUndo
 }: {
@@ -4048,6 +4080,8 @@ function createQuickActions({
   isPlaying: boolean;
   playbackMode: PlaybackMode;
   project: ProjectState;
+  selectedArrangementIndex: number;
+  transportLoopScope: TransportLoopScope;
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
@@ -4062,20 +4096,51 @@ function createQuickActions({
   onRedo: () => void;
   onSaveProject: () => Promise<void>;
   onSaveSnapshot: () => void;
+  onSelectTransportLoopScope: (scope: TransportLoopScope) => void;
   onTogglePlayback: () => void;
   onUndo: () => void;
 }): QuickAction[] {
   const suggestedBlueprint = suggestedBlueprintId(project);
   const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
+  const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
 
   return [
     {
       id: "toggle-playback",
-      title: isPlaying ? "Stop playback" : playbackMode === "arrangement" ? "Play arrangement" : "Play selected pattern",
-      detail: playbackMode === "arrangement" ? "Transport follows the full song structure." : `Preview Pattern ${project.selectedPattern}.`,
+      title: isPlaying ? "Stop playback" : `Play ${transportLoopLabel(transportLoopScope)} loop`,
+      detail: transportLoopStatus(project, transportLoopScope, selectedArrangementIndex),
       group: "Transport",
       keywords: "play stop space transport preview arrangement pattern",
       run: onTogglePlayback
+    },
+    {
+      id: "loop-song",
+      title: "Loop full song",
+      detail: `${barCountLabel(arrangementTotalBars(project))} arrangement loop.`,
+      group: "Transport",
+      keywords: "loop song arrangement full transport",
+      disabled: isPlaying && transportLoopScope !== "arrangement",
+      run: () => onSelectTransportLoopScope("arrangement")
+    },
+    {
+      id: "loop-block",
+      title: "Loop selected block",
+      detail: selectedBlock
+        ? `Block ${Math.min(selectedArrangementIndex + 1, project.arrangement.length)} ${selectedBlock.section} / Pattern ${selectedBlock.pattern}.`
+        : "No arrangement block selected.",
+      group: "Transport",
+      keywords: "loop selected block arrangement section transport",
+      disabled: (isPlaying && transportLoopScope !== "block") || !selectedBlock,
+      run: () => onSelectTransportLoopScope("block")
+    },
+    {
+      id: "loop-pattern",
+      title: "Loop selected pattern",
+      detail: `Pattern ${project.selectedPattern} two-bar preview.`,
+      group: "Transport",
+      keywords: "loop pattern preview selected a b c transport",
+      disabled: isPlaying && transportLoopScope !== "pattern",
+      run: () => onSelectTransportLoopScope("pattern")
     },
     {
       id: "save-project",
@@ -4704,6 +4769,39 @@ function createBeatMapActions(
 function usedPatternSlots(project: ProjectState): PatternSlot[] {
   const slots = new Set(project.arrangement.map((block) => block.pattern));
   return patternSlots.filter((slot) => slots.has(slot));
+}
+
+function arrangementStartBar(project: ProjectState, selectedIndex: number): number {
+  return project.arrangement
+    .slice(0, Math.max(0, selectedIndex))
+    .reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+}
+
+function transportLoopLabel(scope: TransportLoopScope): string {
+  switch (scope) {
+    case "arrangement":
+      return "Song";
+    case "block":
+      return "Block";
+    case "pattern":
+      return "Pattern";
+  }
+}
+
+function transportLoopStatus(project: ProjectState, scope: TransportLoopScope, selectedIndex: number): string {
+  if (scope === "pattern") {
+    return `Pattern ${project.selectedPattern} / ${barCountLabel(2)} loop`;
+  }
+
+  if (scope === "block") {
+    const block = project.arrangement[selectedIndex] ?? project.arrangement[0];
+    if (!block) {
+      return "Block loop unavailable";
+    }
+    return `Block ${Math.min(selectedIndex + 1, project.arrangement.length)} ${block.section} / Pattern ${block.pattern} / ${barCountLabel(block.bars)}`;
+  }
+
+  return `${barCountLabel(arrangementTotalBars(project))} song loop`;
 }
 
 function createArrangementFocusSummary(project: ProjectState, selectedIndex: number): ArrangementFocusSummary | null {

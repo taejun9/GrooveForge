@@ -141,6 +141,8 @@ Arrangement length work must keep per-block bar counts bounded, migrate older pr
 
 Arrangement playback work must map realtime playback through arrangement blocks, per-block bar counts, and Pattern A/B/C assignments by default while preserving a selected-pattern preview mode, accurate transport status, Space shortcut behavior, and existing mixer/sound/master processing.
 
+Transport Loop work must keep Song, selected Block, and Pattern loop scope as explicit local playback state, use selected-block start bar and bar length only for realtime audition, preserve Space/Stop behavior and live project reads, avoid writing loop scope into saved project data, and keep WAV/stem/MIDI export plus Handoff Sheet semantics tied to the full arrangement rather than the audition loop.
+
 Arrangement energy work must keep Energy as deterministic arrangement-block playback/render interpretation, apply the same gain rule to realtime arrangement playback, WAV export, and stem export, preserve selected-pattern preview at neutral energy, and avoid mutating stored pattern events.
 
 Arrangement Move work must transform only the selected arrangement block's existing energy and mutedTracks state through undoable project history, keep Drop/Build/Hook Lift/Reset deterministic and editable afterward, avoid mutating Pattern A/B/C musical events, preserve realtime playback plus WAV/stem/MIDI export semantics, and avoid imported audio, sampling, plugin hosting, remote AI, hidden randomness, or hidden assets.

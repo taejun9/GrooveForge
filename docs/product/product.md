@@ -64,7 +64,7 @@ audio sample import -> chop/slice -> pitch/stretch -> one-shot or sampler mappin
 
 Primary feature areas:
 
-- Transport: BPM, key, play, stop, loop, metronome.
+- Transport: BPM, key, play, stop, Song/Block/Pattern loop audition, metronome.
 - Beat blueprints: sample-free editable project starts that combine style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset.
 - Delivery Targets: local starter sketch, vocal session, beat-store demo, club demo, and editable custom targets that can be set without changing the beat or explicitly aligned to arrangement length, master preset, and mix posture.
 - Session Brief: bounded local artist, vibe, reference, and notes fields stored in the project file for beat intent and handoff context.
@@ -149,7 +149,7 @@ MVP capabilities:
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
 - Project Snapshots that save, rename, restore, and delete local beat idea states inside the `.grooveforge.json` file without cloud sync or nested snapshot recursion.
 - Desktop editing shortcuts and Quick Actions command search for arrangement playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, redo, snapshots, blueprints, pattern fills, Arrangement Focus, mix fixes, and export while leaving focused inputs alone.
-- Transport playback modes for full arrangement playback by default and fast selected-pattern preview while editing.
+- Transport playback modes for full arrangement playback by default, selected-block loop audition, and fast selected-pattern preview while editing.
 - Realtime metronome toggle with accented downbeat clicks that helps users program to the grid during playback without adding click audio to WAV or stem export.
 - Live playback reads the current project while scheduling future steps, so selected-pattern preview, arrangement block edits, arrangement track mutes, arrangement length, arrangement energy, BPM, mixer, sound, and master changes can be heard without stopping and restarting.
 - Mixer volume, pan, mute, solo, low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, and explicit Headroom/Stem Balance/Low End Mix Fix actions reflected in deterministic render feedback.

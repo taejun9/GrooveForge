@@ -274,7 +274,7 @@ h2 {
 }
 
 .playback-mode-row {
-  grid-template-columns: minmax(104px, 1fr) minmax(84px, 1fr);
+  grid-template-columns: repeat(3, minmax(70px, 1fr));
 }
 
 .playback-mode-row button {
