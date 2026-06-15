@@ -33,6 +33,8 @@ export const drumGroovePresetIds = ["tight", "pocket", "push", "reset"] as const
 export type DrumGroovePreset = (typeof drumGroovePresetIds)[number];
 export const chordProgressionPresetIds = ["moody", "lift", "bounce", "sparse"] as const;
 export type ChordProgressionPreset = (typeof chordProgressionPresetIds)[number];
+export const patternVariationPresetIds = ["subtle", "hook", "breakdown"] as const;
+export type PatternVariationPreset = (typeof patternVariationPresetIds)[number];
 
 export type BassNote = {
   step: number;
@@ -174,6 +176,11 @@ export const chordProgressionPresetLabels: Record<ChordProgressionPreset, string
   lift: "Lift",
   bounce: "Bounce",
   sparse: "Sparse"
+};
+export const patternVariationPresetLabels: Record<PatternVariationPreset, string> = {
+  subtle: "Subtle",
+  hook: "Hook",
+  breakdown: "Break"
 };
 export const masterPresetCeilingsDb: Record<MasterPreset, number> = {
   "Clean Demo": -0.8,
@@ -574,6 +581,10 @@ export function chordProgressionPresetLabel(preset: ChordProgressionPreset): str
   return chordProgressionPresetLabels[preset];
 }
 
+export function patternVariationPresetLabel(preset: PatternVariationPreset): string {
+  return patternVariationPresetLabels[preset];
+}
+
 export function arrangementTemplateLabel(template: ArrangementTemplateId): string {
   return arrangementTemplateLabels[template];
 }
@@ -764,6 +775,133 @@ export function applyDrumGroovePreset(pattern: PatternData, preset: DrumGroovePr
       ])
     ) as DrumTimings
   };
+}
+
+export function createPatternVariation(pattern: PatternData, preset: PatternVariationPreset): PatternData {
+  const variation = clonePatternData(pattern);
+  if (preset === "subtle") {
+    applySubtleVariation(variation);
+    return applyDrumGroovePreset(variation, "pocket");
+  }
+  if (preset === "hook") {
+    applyHookVariation(variation);
+    return applyDrumGroovePreset(variation, "push");
+  }
+  applyBreakdownVariation(variation);
+  return applyDrumGroovePreset(variation, "tight");
+}
+
+function applySubtleVariation(pattern: PatternData): void {
+  setDrumStep(pattern, "kick", 10, true, 0.68, 0.72, -4);
+  setDrumStep(pattern, "perc", 3, true, 0.58, 0.64, 8);
+  setDrumStep(pattern, "perc", 11, true, 0.54, 0.58, 10);
+  setDrumStep(pattern, "hat", 15, true, 0.62, 0.76, -6, 2);
+  pattern.bassNotes = pattern.bassNotes.map((note, index) => ({
+    ...note,
+    probability: index % 3 === 2 ? Math.min(1, normalizeEventProbability(note.probability) * 0.86) : normalizeEventProbability(note.probability)
+  }));
+  pattern.melodyNotes = pattern.melodyNotes.map((note, index) => ({
+    ...note,
+    velocity: Math.min(1, note.velocity + (index % 2 === 0 ? 0.04 : -0.02)),
+    probability: index % 3 === 1 ? 0.82 : normalizeEventProbability(note.probability)
+  }));
+  pattern.chordEvents = pattern.chordEvents.map((event, index) => ({
+    ...event,
+    velocity: Math.min(1, event.velocity + (index % 2 === 0 ? 0.04 : 0))
+  }));
+}
+
+function applyHookVariation(pattern: PatternData): void {
+  [0, 5, 8, 12, 14].forEach((step) => setDrumStep(pattern, "kick", step, true, step === 0 || step === 12 ? 1 : 0.88, 1, step === 14 ? -7 : 0));
+  [4, 12].forEach((step) => setDrumStep(pattern, "clap", step, true, 0.94, 1, 2));
+  [0, 2, 4, 6, 8, 10, 12, 14, 15].forEach((step) =>
+    setDrumStep(pattern, "hat", step, true, step % 4 === 0 ? 0.78 : 0.64, 1, step % 2 === 0 ? -5 : -8, step === 15 ? 3 : 1)
+  );
+  [2, 7, 10, 13].forEach((step) => setDrumStep(pattern, "perc", step, true, 0.68, step === 13 ? 0.78 : 1, step % 2 === 0 ? -6 : 7));
+  pattern.bassNotes = sortBassNotes(
+    pattern.bassNotes.map((note, index) => ({
+      ...note,
+      glide: note.glide || index === pattern.bassNotes.length - 1,
+      length: clampEventLength(note.length + (index % 2 === 0 ? 1 : 0), note.step),
+      probability: 1
+    }))
+  );
+  pattern.melodyNotes = sortMelodyNotes(
+    pattern.melodyNotes.map((note, index) => ({
+      ...note,
+      length: clampEventLength(index % 3 === 0 ? note.length + 1 : note.length, note.step),
+      velocity: Math.min(1, note.velocity + 0.12),
+      probability: 1
+    }))
+  );
+  pattern.chordEvents = pattern.chordEvents.map((event) => ({ ...event, velocity: Math.min(1, event.velocity + 0.12), probability: 1 }));
+}
+
+function applyBreakdownVariation(pattern: PatternData): void {
+  const firstKick = pattern.drumPattern.kick.findIndex(Boolean);
+  const anchorKick = firstKick >= 0 ? firstKick : 0;
+  pattern.drumPattern.kick = steps.map((step) => step === anchorKick || step === 8);
+  pattern.drumPattern.clap = steps.map((step) => step === 12 && pattern.drumPattern.clap.some(Boolean));
+  pattern.drumPattern.hat = steps.map((step) => [0, 8, 12].includes(step));
+  pattern.drumPattern.perc = steps.map(() => false);
+  pattern.drumVelocities = defaultDrumVelocities(pattern.drumPattern);
+  pattern.drumProbabilities = defaultDrumProbabilities();
+  pattern.drumTimings = defaultDrumTimings();
+  pattern.hatRepeats = defaultHatRepeats(pattern.drumPattern.hat);
+  pattern.bassNotes = sortBassNotes(
+    pattern.bassNotes.slice(0, Math.max(1, Math.min(2, pattern.bassNotes.length))).map((note, index) => ({
+      ...note,
+      length: clampEventLength(index === 0 ? Math.max(note.length, 4) : note.length, note.step),
+      glide: false,
+      probability: 1
+    }))
+  );
+  pattern.melodyNotes = sortMelodyNotes(
+    pattern.melodyNotes
+      .filter((note, index) => index % 2 === 0 || note.step % 8 === 0)
+      .map((note) => ({ ...note, velocity: Math.max(0.28, note.velocity - 0.18), probability: 0.72 }))
+  );
+  pattern.chordEvents = pattern.chordEvents.map((event, index) => ({
+    ...event,
+    velocity: Math.max(0.28, event.velocity - 0.12),
+    probability: index <= 1 ? 1 : 0.72
+  }));
+}
+
+function setDrumStep(
+  pattern: PatternData,
+  lane: DrumLane,
+  step: number,
+  active: boolean,
+  velocity = defaultDrumVelocity(lane, step),
+  probability = 1,
+  timing = 0,
+  repeat = 1
+): void {
+  const normalizedStep = normalizeStep(step);
+  pattern.drumPattern[lane][normalizedStep] = active;
+  pattern.drumVelocities[lane][normalizedStep] = active ? normalizeDrumVelocity(velocity) : pattern.drumVelocities[lane][normalizedStep];
+  pattern.drumProbabilities[lane][normalizedStep] = active ? normalizeDrumProbability(probability) : 1;
+  pattern.drumTimings[lane][normalizedStep] = active ? normalizeDrumTimingMs(timing) : 0;
+  if (lane === "hat") {
+    pattern.hatRepeats[normalizedStep] = active ? normalizeHatRepeat(repeat) : 1;
+  }
+}
+
+function clampEventLength(length: number, step: number): number {
+  if (!Number.isFinite(length)) {
+    return 1;
+  }
+  const normalizedStep = normalizeStep(step);
+  return Math.min(stepsPerBar - normalizedStep, Math.max(1, Math.round(length)));
+}
+
+function sortBassNotes(notes: BassNote[]): BassNote[] {
+  return [...notes].sort((first, second) => first.step - second.step || first.pitch.localeCompare(second.pitch));
+}
+
+function sortMelodyNotes(notes: MelodyNote[]): MelodyNote[] {
+  return [...notes].sort((first, second) => first.step - second.step || first.pitch.localeCompare(second.pitch));
 }
 
 function defaultDrumVelocities(drumPattern: DrumPattern): DrumVelocities {

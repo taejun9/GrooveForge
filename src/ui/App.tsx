@@ -44,6 +44,7 @@ import {
   NoteTrack,
   PatternData,
   PatternSlot,
+  PatternVariationPreset,
   ProjectState,
   SoundDesign,
   activePattern,
@@ -58,6 +59,7 @@ import {
   createChordProgressionPreset,
   createArrangementTemplate,
   createNextChordEvent,
+  createPatternVariation,
   createStylePatternSet,
   createEmptyPatternData,
   defaultDrumVelocity,
@@ -84,6 +86,8 @@ import {
   normalizeMixerEq,
   parseProjectFile,
   patternSlots,
+  patternVariationPresetIds,
+  patternVariationPresetLabel,
   projectFileName,
   scalePitchNames,
   serializeProjectFile,
@@ -404,6 +408,16 @@ export function App(): ReactElement {
         }
       }),
       `Cleared Pattern ${sourceSlot}`
+    );
+    setSelectedNote(null);
+    setSelectedDrumStep(null);
+  }
+
+  function applyPatternVariation(preset: PatternVariationPreset): void {
+    const sourceSlot = projectRef.current.selectedPattern;
+    updateCurrentPattern(
+      (pattern) => createPatternVariation(pattern, preset),
+      `${patternVariationPresetLabel(preset)} variation applied to Pattern ${sourceSlot}`
     );
     setSelectedNote(null);
     setSelectedDrumStep(null);
@@ -1284,6 +1298,18 @@ export function App(): ReactElement {
             ))}
           </div>
           <div className="pattern-tools" aria-label="Pattern tools">
+            {patternVariationPresetIds.map((preset) => (
+              <button
+                key={preset}
+                data-testid={`pattern-variation-${preset}`}
+                type="button"
+                title={`Apply ${patternVariationPresetLabel(preset)} variation to Pattern ${project.selectedPattern}`}
+                onClick={() => applyPatternVariation(preset)}
+              >
+                <Sparkles size={14} aria-hidden="true" />
+                <span>{patternVariationPresetLabel(preset)}</span>
+              </button>
+            ))}
             {patternSlots
               .filter((pattern) => pattern !== project.selectedPattern)
               .map((pattern) => (

@@ -120,7 +120,7 @@ MVP capabilities:
 - Chord progression track with scale-locked roots, key-aware progression presets, editable step/root/quality/length/velocity/chance, visible chance badges, and add/delete controls.
 - Simple synth melody track with editable scale-aware grid, velocity control, and note chance badges.
 - Sound design presets and Studio tone controls for kick punch, snare snap, hat brightness, 808 drive/decay, sidechain ducking, synth brightness/release, and chord warmth/width.
-- Independent Pattern A/B/C storage with copy/clear tools for drum, bass, chord, and melody variations.
+- Independent Pattern A/B/C storage with deterministic Subtle/Hook/Break variation tools plus copy/clear tools for drum, bass, chord, and melody variations.
 - Editable arrangement blocks and templates for 8-bar loop, full beat, hook-first, and breakdown structures, using assigned Pattern A/B/C data, per-block bar length, audible per-block energy, and structure controls for duplicate, move, and delete.
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
 - Desktop editing shortcuts for arrangement playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, and redo while leaving focused inputs alone.
