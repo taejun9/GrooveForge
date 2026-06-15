@@ -1196,7 +1196,7 @@ input[type="range"] {
 .arrangement-actions {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: repeat(5, minmax(84px, 1fr));
+  grid-template-columns: repeat(6, minmax(84px, 1fr));
   gap: 8px;
 }
 

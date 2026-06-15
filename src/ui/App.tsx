@@ -183,7 +183,11 @@ export function App(): ReactElement {
       : `Pattern ${project.selectedPattern} preview`;
   const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const selectedArrangementBars = selectedArrangementBlock ? normalizeArrangementBars(selectedArrangementBlock.bars) : 1;
+  const selectedArrangementNextBlock = project.arrangement[selectedArrangementIndex + 1];
+  const selectedArrangementNextBars = selectedArrangementNextBlock ? normalizeArrangementBars(selectedArrangementNextBlock.bars) : 0;
   const canSplitArrangementBlock = selectedArrangementBars > 1;
+  const canMergeArrangementBlock =
+    Boolean(selectedArrangementNextBlock) && selectedArrangementBars + selectedArrangementNextBars <= maxArrangementBars;
   const bassPitches = useMemo(
     () => mergePitchLanes(bassPitchLanes(project.key), currentPattern.bassNotes.map((note) => note.pitch)),
     [currentPattern.bassNotes, project.key]
@@ -706,6 +710,41 @@ export function App(): ReactElement {
     setSelectedDrumStep(null);
     if (!changed) {
       setProjectStatus("Block needs 2+ bars to split");
+    }
+  }
+
+  function mergeArrangementBlock(): void {
+    const changed = updateProject((current) => {
+      const block = current.arrangement[selectedArrangementIndex];
+      const nextBlock = current.arrangement[selectedArrangementIndex + 1];
+      if (!block || !nextBlock) {
+        return current;
+      }
+      const mergedBars = normalizeArrangementBars(block.bars) + normalizeArrangementBars(nextBlock.bars);
+      if (mergedBars > maxArrangementBars) {
+        return current;
+      }
+      const mergedBlock: ArrangementBlock = {
+        ...block,
+        bars: mergedBars,
+        mutedTracks: [...block.mutedTracks]
+      };
+      setSelectedArrangementIndex(selectedArrangementIndex);
+      setSplitAfterBars(clampSplitAfterBars(1, mergedBars));
+      return {
+        ...current,
+        selectedPattern: mergedBlock.pattern,
+        arrangement: [
+          ...current.arrangement.slice(0, selectedArrangementIndex),
+          mergedBlock,
+          ...current.arrangement.slice(selectedArrangementIndex + 2)
+        ]
+      };
+    }, "Merged arrangement blocks");
+    setSelectedNote(null);
+    setSelectedDrumStep(null);
+    if (!changed) {
+      setProjectStatus("Merge needs a next block within 16 bars");
     }
   }
 
@@ -1963,6 +2002,16 @@ export function App(): ReactElement {
                 >
                   <Scissors size={15} aria-hidden="true" />
                   <span>Split</span>
+                </button>
+                <button
+                  data-testid="arrangement-merge"
+                  disabled={!canMergeArrangementBlock}
+                  onClick={mergeArrangementBlock}
+                  title="Merge selected block with next block"
+                  type="button"
+                >
+                  <Plus size={15} aria-hidden="true" />
+                  <span>Merge</span>
                 </button>
                 <button
                   data-testid="arrangement-delete"

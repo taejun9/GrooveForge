@@ -107,6 +107,8 @@ Arrangement structure work must preserve at least one block, keep selection/patt
 
 Arrangement split work must split only the selected arrangement block, preserve total arrangement bars, duplicate the selected block's section, Pattern A/B/C assignment, energy, and muted tracks into the resulting blocks, select the new second block, keep the action undoable, avoid mutating Pattern A/B/C event data, and make realtime playback, WAV/stem export, and MIDI export follow the split structure.
 
+Arrangement merge work must merge only the selected block with the next block, preserve total arrangement bars, keep the selected block's section, Pattern A/B/C assignment, energy, and muted tracks as the merged block identity, keep the result within max per-block bar bounds, select the merged block, keep the action undoable, avoid mutating Pattern A/B/C event data, and make realtime playback, WAV/stem export, and MIDI export follow the merged structure.
+
 Arrangement template work must replace only arrangement blocks, keep existing Pattern A/B/C musical data and mixer/master state intact, reset selection safely to a valid block, align the selected pattern with the first template block, remain undoable, and make WAV/stem export follow the applied template length.
 
 Arrangement length work must keep per-block bar counts bounded, migrate older project files without bar counts to one bar per block, keep changes undoable, and make export meter, full-mix WAV export, and stem export follow total arrangement bars.
