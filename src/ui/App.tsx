@@ -46,9 +46,14 @@ import {
   clonePatternData,
   createStylePatternSet,
   createEmptyPatternData,
+  defaultDrumVelocity,
+  drumStepVelocity,
+  hatRepeatCount,
   masterPresetCeilingDb,
   masterPresets,
   melodyPitchLanes,
+  normalizeDrumVelocity,
+  normalizeHatRepeat,
   parseProjectFile,
   patternSlots,
   projectFileName,
@@ -79,6 +84,11 @@ type SelectedNote = {
   pitch: string;
 };
 
+type SelectedDrumStep = {
+  lane: DrumLane;
+  step: number;
+};
+
 type NoteView = {
   step: number;
   pitch: string;
@@ -94,6 +104,7 @@ export function App(): ReactElement {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState<PlaybackSnapshot | null>(null);
   const [selectedNote, setSelectedNote] = useState<SelectedNote | null>(null);
+  const [selectedDrumStep, setSelectedDrumStep] = useState<SelectedDrumStep | null>(null);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const projectRef = useRef<ProjectState>(starterProject);
@@ -133,6 +144,17 @@ export function App(): ReactElement {
     selectedNote?.track === "melody"
       ? currentPattern.melodyNotes.find((note) => note.step === selectedNote.step && note.pitch === selectedNote.pitch)
       : undefined;
+  const selectedDrumActive = selectedDrumStep
+    ? currentPattern.drumPattern[selectedDrumStep.lane][selectedDrumStep.step]
+    : false;
+  const selectedDrumVelocity =
+    selectedDrumStep && selectedDrumActive
+      ? drumStepVelocity(currentPattern, selectedDrumStep.lane, selectedDrumStep.step)
+      : undefined;
+  const selectedHatRepeat =
+    selectedDrumStep && selectedDrumStep.lane === "hat" && selectedDrumActive
+      ? hatRepeatCount(currentPattern, selectedDrumStep.step)
+      : 1;
 
   useEffect(() => {
     return () => {
@@ -204,6 +226,7 @@ export function App(): ReactElement {
     setRedoStack([]);
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, nextProject.arrangement.length - 1)));
     setSelectedNote(null);
+    setSelectedDrumStep(null);
     setProjectStatus(status);
   }
 
@@ -212,6 +235,7 @@ export function App(): ReactElement {
     setProject(nextProject);
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, nextProject.arrangement.length - 1)));
     setSelectedNote(null);
+    setSelectedDrumStep(null);
     setPlaybackPosition(null);
     setProjectStatus(status);
   }
@@ -258,6 +282,7 @@ export function App(): ReactElement {
       `Editing Pattern ${pattern}`
     );
     setSelectedNote(null);
+    setSelectedDrumStep(null);
   }
 
   function copySelectedPattern(target: PatternSlot): void {
@@ -274,6 +299,7 @@ export function App(): ReactElement {
       `Copied Pattern ${sourceSlot} to ${target}`
     );
     setSelectedNote(null);
+    setSelectedDrumStep(null);
   }
 
   function clearSelectedPattern(): void {
@@ -289,6 +315,7 @@ export function App(): ReactElement {
       `Cleared Pattern ${sourceSlot}`
     );
     setSelectedNote(null);
+    setSelectedDrumStep(null);
   }
 
   function selectArrangementBlock(index: number): void {
@@ -300,6 +327,7 @@ export function App(): ReactElement {
     setSelectedArrangementIndex(index);
     updateProjectView((current) => ({ ...current, selectedPattern: block.pattern }), `Arranging ${block.section}`);
     setSelectedNote(null);
+    setSelectedDrumStep(null);
   }
 
   function updateArrangementBlock(index: number, update: Partial<ArrangementBlock>): void {
@@ -320,6 +348,7 @@ export function App(): ReactElement {
       };
     });
     setSelectedNote(null);
+    setSelectedDrumStep(null);
   }
 
   function updateMixerChannel(id: MixerChannel["id"], update: Partial<MixerChannel>): void {
@@ -375,6 +404,7 @@ export function App(): ReactElement {
     }, "Duplicated arrangement block");
     if (changed) {
       setSelectedNote(null);
+      setSelectedDrumStep(null);
     }
   }
 
@@ -399,6 +429,7 @@ export function App(): ReactElement {
     }, direction < 0 ? "Moved block left" : "Moved block right");
     if (changed) {
       setSelectedNote(null);
+      setSelectedDrumStep(null);
     }
   }
 
@@ -419,18 +450,69 @@ export function App(): ReactElement {
       };
     }, "Deleted arrangement block");
     setSelectedNote(null);
+    setSelectedDrumStep(null);
     if (!changed) {
       setProjectStatus("Arrangement needs one block");
     }
   }
 
   function toggleStep(lane: DrumLane, step: number): void {
+    const selectedSameStep = selectedDrumStep?.lane === lane && selectedDrumStep.step === step;
+    const active = currentPattern.drumPattern[lane][step];
+    setSelectedDrumStep({ lane, step });
+    setSelectedNote(null);
+    if (active && !selectedSameStep) {
+      return;
+    }
+
+    updateCurrentPattern((pattern) => {
+      const nextActive = active ? false : true;
+      return {
+        ...pattern,
+        drumPattern: {
+          ...pattern.drumPattern,
+          [lane]: pattern.drumPattern[lane].map((enabled, index) => (index === step ? nextActive : enabled))
+        },
+        drumVelocities: {
+          ...pattern.drumVelocities,
+          [lane]: pattern.drumVelocities[lane].map((velocity, index) =>
+            index === step && nextActive ? normalizeDrumVelocity(velocity || defaultDrumVelocity(lane, step)) : velocity
+          )
+        },
+        hatRepeats:
+          lane === "hat"
+            ? pattern.hatRepeats.map((repeat, index) => (index === step && !nextActive ? 1 : repeat))
+            : pattern.hatRepeats
+      };
+    });
+  }
+
+  function updateSelectedDrumVelocity(velocity: number): void {
+    if (!selectedDrumStep || !selectedDrumActive) {
+      return;
+    }
+
     updateCurrentPattern((pattern) => ({
       ...pattern,
-      drumPattern: {
-        ...pattern.drumPattern,
-        [lane]: pattern.drumPattern[lane].map((enabled, index) => (index === step ? !enabled : enabled))
+      drumVelocities: {
+        ...pattern.drumVelocities,
+        [selectedDrumStep.lane]: pattern.drumVelocities[selectedDrumStep.lane].map((currentVelocity, index) =>
+          index === selectedDrumStep.step ? normalizeDrumVelocity(velocity) : currentVelocity
+        )
       }
+    }));
+  }
+
+  function updateSelectedHatRepeat(repeat: number): void {
+    if (!selectedDrumStep || selectedDrumStep.lane !== "hat" || !selectedDrumActive) {
+      return;
+    }
+
+    updateCurrentPattern((pattern) => ({
+      ...pattern,
+      hatRepeats: pattern.hatRepeats.map((currentRepeat, index) =>
+        index === selectedDrumStep.step ? normalizeHatRepeat(repeat) : currentRepeat
+      )
     }));
   }
 
@@ -443,6 +525,7 @@ export function App(): ReactElement {
         : sortBassNotes([...pattern.bassNotes, { step, pitch, length: 2, glide: false }])
     }));
     setSelectedNote(exists ? null : { track: "bass", step, pitch });
+    setSelectedDrumStep(null);
   }
 
   function toggleMelodyNote(step: number, pitch: string): void {
@@ -454,6 +537,7 @@ export function App(): ReactElement {
         : sortMelodyNotes([...pattern.melodyNotes, { step, pitch, length: 1, velocity: 0.68 }])
     }));
     setSelectedNote(exists ? null : { track: "melody", step, pitch });
+    setSelectedDrumStep(null);
   }
 
   function updateSelectedLength(length: number): void {
@@ -655,6 +739,7 @@ export function App(): ReactElement {
       `Applied ${nextStyle.name} groove`
     );
     setSelectedNote(null);
+    setSelectedDrumStep(null);
   }
 
   return (
@@ -841,24 +926,37 @@ export function App(): ReactElement {
             {(Object.keys(drumLabels) as DrumLane[]).map((lane) => (
               <div className="step-row" key={lane}>
                 <div className="lane-name">{drumLabels[lane]}</div>
-                {steps.map((step) => (
-                  <button
-                    aria-label={`${drumLabels[lane]} step ${step + 1}`}
-                    className={[
-                      "step",
-                      currentPattern.drumPattern[lane][step] ? "active" : "",
-                      currentPatternStep === step ? "playhead" : ""
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    key={step}
-                    onClick={() => toggleStep(lane, step)}
-                    style={{ "--lane-color": laneColor(lane) } as CSSProperties}
-                    type="button"
-                  >
-                    <span>{step + 1}</span>
-                  </button>
-                ))}
+                {steps.map((step) => {
+                  const active = currentPattern.drumPattern[lane][step];
+                  const velocity = drumStepVelocity(currentPattern, lane, step);
+                  const repeat = lane === "hat" ? hatRepeatCount(currentPattern, step) : 1;
+                  return (
+                    <button
+                      aria-label={`${drumLabels[lane]} step ${step + 1}`}
+                      className={[
+                        "step",
+                        active ? "active" : "",
+                        selectedDrumStep?.lane === lane && selectedDrumStep.step === step ? "selected" : "",
+                        currentPatternStep === step ? "playhead" : ""
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      data-testid={`drum-step-${lane}-${step}`}
+                      key={step}
+                      onClick={() => toggleStep(lane, step)}
+                      style={
+                        {
+                          "--lane-color": laneColor(lane),
+                          "--step-velocity": `${Math.round(velocity * 100)}%`
+                        } as CSSProperties
+                      }
+                      type="button"
+                    >
+                      <span>{step + 1}</span>
+                      {active && lane === "hat" && repeat > 1 && <small>{repeat}x</small>}
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </div>
@@ -874,10 +972,14 @@ export function App(): ReactElement {
                 onChange={(event) => updateProject((current) => ({ ...current, swing: Number(event.target.value) }))}
               />
             </label>
-            <label>
-              <span>Density</span>
-              <input type="range" min={0} max={1} step={0.05} defaultValue={0.72} />
-            </label>
+            <DrumStepInspector
+              selectedStep={selectedDrumStep}
+              active={selectedDrumActive}
+              velocity={selectedDrumVelocity}
+              hatRepeat={selectedHatRepeat}
+              onVelocityChange={updateSelectedDrumVelocity}
+              onHatRepeatChange={updateSelectedHatRepeat}
+            />
           </div>
         </section>
 
@@ -1236,6 +1338,79 @@ function MeterBar({
         <b style={{ inlineSize: `${percent}%` }} />
       </i>
       <strong data-testid={testId}>{value}</strong>
+    </div>
+  );
+}
+
+function DrumStepInspector({
+  selectedStep,
+  active,
+  velocity,
+  hatRepeat,
+  onVelocityChange,
+  onHatRepeatChange
+}: {
+  selectedStep: SelectedDrumStep | null;
+  active: boolean;
+  velocity?: number;
+  hatRepeat: number;
+  onVelocityChange: (velocity: number) => void;
+  onHatRepeatChange: (repeat: number) => void;
+}): ReactElement {
+  const velocityValue = velocity ?? 0.75;
+  const label = selectedStep ? `${drumLabels[selectedStep.lane]} ${selectedStep.step + 1}` : "No step";
+
+  return (
+    <div className="drum-step-inspector" aria-label="Drum step dynamics">
+      <div className="inspector-heading">
+        <span>Dynamics</span>
+        <strong data-testid="drum-step-readout">
+          {selectedStep ? `${label} ${active ? percentLabel(velocityValue) : "off"}` : "Select step"}
+        </strong>
+      </div>
+      <label>
+        <span>Velocity {active ? percentLabel(velocityValue) : "--"}</span>
+        <div className="drum-velocity-row">
+          <input
+            aria-label="Drum velocity"
+            data-testid="drum-velocity"
+            disabled={!selectedStep || !active}
+            max={1}
+            min={0.15}
+            onChange={(event) => onVelocityChange(Number(event.target.value))}
+            step={0.01}
+            type="range"
+            value={velocityValue}
+          />
+          <input
+            aria-label="Drum velocity percent"
+            data-testid="drum-velocity-input"
+            disabled={!selectedStep || !active}
+            max={100}
+            min={15}
+            onChange={(event) => onVelocityChange(Number(event.target.value) / 100)}
+            step={1}
+            type="number"
+            value={Math.round(velocityValue * 100)}
+          />
+        </div>
+      </label>
+      {selectedStep?.lane === "hat" && (
+        <div className="repeat-row" aria-label="Hat repeat">
+          {[1, 2, 3, 4].map((repeat) => (
+            <button
+              className={hatRepeat === repeat ? "selected" : ""}
+              data-testid={`hat-repeat-${repeat}`}
+              disabled={!active}
+              key={repeat}
+              onClick={() => onHatRepeatChange(repeat)}
+              type="button"
+            >
+              {repeat}x
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1651,7 +1826,11 @@ function patternEventCount(pattern: PatternData): string {
     (total, laneSteps) => total + laneSteps.filter(Boolean).length,
     0
   );
-  return `${drumHits + pattern.bassNotes.length + pattern.melodyNotes.length + pattern.chordEvents.length} events`;
+  const repeatedHats = pattern.drumPattern.hat.reduce(
+    (total, enabled, step) => total + (enabled ? hatRepeatCount(pattern, step) - 1 : 0),
+    0
+  );
+  return `${drumHits + repeatedHats + pattern.bassNotes.length + pattern.melodyNotes.length + pattern.chordEvents.length} events`;
 }
 
 function panLabel(pan: number): string {

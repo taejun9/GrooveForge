@@ -3,6 +3,8 @@ import {
   activePattern,
   chordPitches,
   loopStepCount,
+  drumStepVelocity,
+  hatRepeatCount,
   noteToFrequency,
   projectStepDurationSeconds,
   ProjectState,
@@ -207,7 +209,7 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
   const pattern = activePattern(project);
 
   if (pattern.drumPattern.kick[patternStep]) {
-    scheduleKick(context, master, time, drumMix.gain, drumMix.pan, sound);
+    scheduleKick(context, master, time, drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix.pan, sound);
   }
   if (pattern.drumPattern.clap[patternStep]) {
     scheduleNoise(
@@ -215,26 +217,40 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
       master,
       time,
       0.11 + (1 - sound.snareSnap) * 0.08,
-      (0.2 + sound.snareSnap * 0.14) * drumMix.gain,
+      (0.2 + sound.snareSnap * 0.14) * drumMix.gain * drumStepVelocity(pattern, "clap", patternStep),
       780 + sound.snareSnap * 1800,
       drumMix.pan
     );
   }
   if (pattern.drumPattern.hat[patternStep]) {
-    scheduleNoise(
+    const repeatCount = hatRepeatCount(pattern, patternStep);
+    const baseVelocity = drumStepVelocity(pattern, "hat", patternStep);
+    for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
+      scheduleNoise(
+        context,
+        master,
+        time + (repeatIndex * stepDuration) / repeatCount,
+        0.035 + (1 - sound.hatBrightness) * 0.025,
+        (0.08 + sound.hatBrightness * 0.08) * drumMix.gain * baseVelocity * (repeatIndex === 0 ? 1 : 0.72),
+        4300 + sound.hatBrightness * 4200,
+        drumMix.pan
+      );
+    }
+  }
+  if (pattern.drumPattern.perc[patternStep]) {
+    scheduleTone(
       context,
       master,
       time,
-      0.035 + (1 - sound.hatBrightness) * 0.025,
-      (0.08 + sound.hatBrightness * 0.08) * drumMix.gain,
-      4300 + sound.hatBrightness * 4200,
-      drumMix.pan
+      0.07,
+      260 + sound.snareSnap * 190,
+      0.12 * drumMix.gain * drumStepVelocity(pattern, "perc", patternStep),
+      "triangle",
+      drumMix.pan,
+      {
+        filterHz: 1800 + sound.hatBrightness * 4200
+      }
     );
-  }
-  if (pattern.drumPattern.perc[patternStep]) {
-    scheduleTone(context, master, time, 0.07, 260 + sound.snareSnap * 190, 0.12 * drumMix.gain, "triangle", drumMix.pan, {
-      filterHz: 1800 + sound.hatBrightness * 4200
-    });
   }
 
   for (const note of pattern.bassNotes) {

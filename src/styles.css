@@ -388,12 +388,15 @@ h2 {
 
 .step {
   position: relative;
+  display: grid;
+  place-items: center;
   min-inline-size: 0;
   min-block-size: 34px;
   border: 1px solid rgba(244, 239, 231, 0.1);
   border-radius: 5px;
   color: rgba(244, 239, 231, 0.38);
   background: rgba(244, 239, 231, 0.035);
+  overflow: hidden;
 }
 
 .step:nth-child(5),
@@ -410,13 +413,42 @@ h2 {
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.28) inset;
 }
 
+.step.active::after {
+  position: absolute;
+  inset-inline-start: 4px;
+  inset-block-end: 4px;
+  inline-size: var(--step-velocity);
+  max-inline-size: calc(100% - 8px);
+  block-size: 3px;
+  border-radius: 999px;
+  background: rgba(17, 16, 15, 0.55);
+  content: "";
+}
+
+.step.selected {
+  border-color: #f4efe7;
+  box-shadow: 0 0 0 2px rgba(244, 239, 231, 0.26);
+}
+
 .step.playhead {
   outline: 2px solid #f4efe7;
   outline-offset: 1px;
 }
 
 .step span {
+  position: relative;
+  z-index: 1;
   font-size: 10px;
+}
+
+.step small {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: 3px;
+  inset-inline-end: 3px;
+  color: rgba(17, 16, 15, 0.72);
+  font-size: 8px;
+  line-height: 1;
 }
 
 .micro-controls,
@@ -438,6 +470,55 @@ input[type="range"] {
   width: 100%;
   min-width: 0;
   accent-color: #78f0c8;
+}
+
+.drum-step-inspector {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 8px;
+  background: rgba(244, 239, 231, 0.04);
+}
+
+.drum-step-inspector .inspector-heading {
+  margin-block-end: 0;
+}
+
+.drum-step-inspector label {
+  display: grid;
+  gap: 5px;
+}
+
+.drum-velocity-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px;
+  gap: 7px;
+  align-items: center;
+}
+
+.drum-velocity-row input[type="number"] {
+  min-width: 0;
+  text-align: center;
+}
+
+.repeat-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.repeat-row button {
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 5px;
+}
+
+.repeat-row button.selected {
+  border-color: rgba(240, 195, 106, 0.64);
+  color: #11100f;
+  background: #f0c36a;
 }
 
 .note-lanes {

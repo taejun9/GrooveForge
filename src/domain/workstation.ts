@@ -26,6 +26,7 @@ export type StyleProfile = {
 };
 
 export type DrumPattern = Record<DrumLane, boolean[]>;
+export type DrumVelocities = Record<DrumLane, number[]>;
 
 export type BassNote = {
   step: number;
@@ -56,6 +57,8 @@ export type PatternSlot = "A" | "B" | "C";
 
 export type PatternData = {
   drumPattern: DrumPattern;
+  drumVelocities: DrumVelocities;
+  hatRepeats: number[];
   bassNotes: BassNote[];
   melodyNotes: MelodyNote[];
   chordEvents: ChordEvent[];
@@ -124,6 +127,7 @@ export type ProjectFile = {
 export const steps = Array.from({ length: 16 }, (_, index) => index);
 export const stepsPerBar = 16;
 export const projectFileVersion = 1;
+export const drumLanes: DrumLane[] = ["kick", "clap", "hat", "perc"];
 export const patternSlots: PatternSlot[] = ["A", "B", "C"];
 export const arrangementSections: ArrangementSection[] = ["Intro", "Verse", "Hook", "Bridge", "Outro"];
 export const chordQualities: ChordQuality[] = ["maj", "min", "dim", "sus2", "sus4", "7", "m7"];
@@ -339,7 +343,7 @@ type PatternBlueprint = {
   chords: ChordBlueprint[];
 };
 
-const starterPatternA: PatternData = {
+const starterPatternA: PatternData = withDrumDynamics({
   drumPattern: {
     kick: [true, false, false, false, false, false, true, false, false, false, false, false, true, false, false, false],
     clap: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
@@ -365,9 +369,9 @@ const starterPatternA: PatternData = {
     { step: 8, root: "Ab", quality: "maj", length: 4, velocity: 0.5 },
     { step: 12, root: "Eb", quality: "maj", length: 4, velocity: 0.5 }
   ]
-};
+}, { 7: 2, 15: 3 });
 
-const starterPatternB: PatternData = {
+const starterPatternB: PatternData = withDrumDynamics({
   drumPattern: {
     kick: [true, false, false, false, false, true, false, false, true, false, false, false, true, false, true, false],
     clap: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
@@ -394,9 +398,9 @@ const starterPatternB: PatternData = {
     { step: 8, root: "Db", quality: "maj", length: 4, velocity: 0.48 },
     { step: 12, root: "Eb", quality: "maj", length: 4, velocity: 0.5 }
   ]
-};
+}, { 1: 2, 7: 2, 15: 3 });
 
-const starterPatternC: PatternData = {
+const starterPatternC: PatternData = withDrumDynamics({
   drumPattern: {
     kick: [true, false, false, false, false, false, false, false, true, false, false, false, false, false, true, false],
     clap: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
@@ -420,7 +424,7 @@ const starterPatternC: PatternData = {
     { step: 8, root: "F", quality: "min", length: 4, velocity: 0.52 },
     { step: 12, root: "C", quality: "min", length: 4, velocity: 0.42 }
   ]
-};
+}, { 14: 2 });
 
 export const starterProject: ProjectState = {
   title: "Untitled Beat",
@@ -467,6 +471,72 @@ export function soundPresetLabel(preset: SoundPresetId): string {
 
 export function soundPresetDesign(preset: (typeof soundPresetIds)[number]): SoundDesign {
   return { ...soundPresetDefaults[preset] };
+}
+
+type PatternSeed = Omit<PatternData, "drumVelocities" | "hatRepeats">;
+
+function withDrumDynamics(pattern: PatternSeed, repeatOverrides: Partial<Record<number, number>> = {}): PatternData {
+  return {
+    ...pattern,
+    drumVelocities: defaultDrumVelocities(pattern.drumPattern),
+    hatRepeats: defaultHatRepeats(pattern.drumPattern.hat, repeatOverrides)
+  };
+}
+
+export function defaultDrumVelocity(lane: DrumLane, step: number): number {
+  if (lane === "kick") {
+    return step % 8 === 0 ? 0.98 : 0.86;
+  }
+  if (lane === "clap") {
+    return step % 8 === 4 ? 0.9 : 0.76;
+  }
+  if (lane === "hat") {
+    return step % 4 === 0 ? 0.72 : step % 2 === 0 ? 0.62 : 0.5;
+  }
+  return step % 4 === 0 ? 0.68 : 0.58;
+}
+
+export function normalizeDrumVelocity(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0.75;
+  }
+  return Math.min(1, Math.max(0.15, value));
+}
+
+export function normalizeHatRepeat(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+  return Math.min(4, Math.max(1, Math.round(value)));
+}
+
+export function drumStepVelocity(pattern: PatternData, lane: DrumLane, step: number): number {
+  return normalizeDrumVelocity(pattern.drumVelocities[lane]?.[step] ?? defaultDrumVelocity(lane, step));
+}
+
+export function hatRepeatCount(pattern: PatternData, step: number): number {
+  return pattern.drumPattern.hat[step] ? normalizeHatRepeat(pattern.hatRepeats[step] ?? 1) : 1;
+}
+
+function defaultDrumVelocities(drumPattern: DrumPattern): DrumVelocities {
+  return {
+    kick: steps.map((step) => (drumPattern.kick[step] ? defaultDrumVelocity("kick", step) : 0.72)),
+    clap: steps.map((step) => (drumPattern.clap[step] ? defaultDrumVelocity("clap", step) : 0.68)),
+    hat: steps.map((step) => (drumPattern.hat[step] ? defaultDrumVelocity("hat", step) : 0.56)),
+    perc: steps.map((step) => (drumPattern.perc[step] ? defaultDrumVelocity("perc", step) : 0.58))
+  };
+}
+
+function defaultHatRepeats(hatSteps: boolean[], repeatOverrides: Partial<Record<number, number>> = {}): number[] {
+  return steps.map((step) => {
+    if (!hatSteps[step]) {
+      return 1;
+    }
+    if (repeatOverrides[step] !== undefined) {
+      return normalizeHatRepeat(repeatOverrides[step] ?? 1);
+    }
+    return step % 16 === 15 ? 2 : 1;
+  });
 }
 
 const stylePatternBlueprints: Record<StyleId, [PatternBlueprint, PatternBlueprint, PatternBlueprint]> = {
@@ -576,8 +646,9 @@ function blueprint(
 }
 
 function patternFromBlueprint(key: string, pattern: PatternBlueprint): PatternData {
-  return {
-    drumPattern: drumPattern(pattern.kick, pattern.clap, pattern.hat, pattern.perc),
+  const drums = drumPattern(pattern.kick, pattern.clap, pattern.hat, pattern.perc);
+  return withDrumDynamics({
+    drumPattern: drums,
     bassNotes: pattern.bass.map((note) => ({
       step: note.step,
       pitch: pitchFromDegree(key, note.degree, note.octave),
@@ -597,7 +668,7 @@ function patternFromBlueprint(key: string, pattern: PatternBlueprint): PatternDa
       length: chord.length,
       velocity: chord.velocity
     }))
-  };
+  }, hatRepeatOverrides(pattern.hat));
 }
 
 function drumPattern(kick: number[], clap: number[], hat: number[], perc: number[]): DrumPattern {
@@ -607,6 +678,14 @@ function drumPattern(kick: number[], clap: number[], hat: number[], perc: number
     hat: steps.map((step) => hat.includes(step)),
     perc: steps.map((step) => perc.includes(step))
   };
+}
+
+function hatRepeatOverrides(hatSteps: number[]): Partial<Record<number, number>> {
+  return Object.fromEntries(
+    hatSteps
+      .filter((step) => step % 8 === 7 || step % 16 === 15 || step === 1)
+      .map((step) => [step, step % 16 === 15 ? 3 : 2])
+  );
 }
 
 function pitchFromDegree(key: string, degree: number, octave: number): string {
@@ -652,6 +731,13 @@ export function clonePatternData(pattern: PatternData): PatternData {
       hat: [...pattern.drumPattern.hat],
       perc: [...pattern.drumPattern.perc]
     },
+    drumVelocities: {
+      kick: [...pattern.drumVelocities.kick],
+      clap: [...pattern.drumVelocities.clap],
+      hat: [...pattern.drumVelocities.hat],
+      perc: [...pattern.drumVelocities.perc]
+    },
+    hatRepeats: [...pattern.hatRepeats],
     bassNotes: pattern.bassNotes.map((note) => ({ ...note })),
     melodyNotes: pattern.melodyNotes.map((note) => ({ ...note })),
     chordEvents: pattern.chordEvents.map((event) => ({ ...event }))
@@ -659,7 +745,7 @@ export function clonePatternData(pattern: PatternData): PatternData {
 }
 
 export function createEmptyPatternData(): PatternData {
-  return {
+  return withDrumDynamics({
     drumPattern: {
       kick: steps.map(() => false),
       clap: steps.map(() => false),
@@ -669,7 +755,7 @@ export function createEmptyPatternData(): PatternData {
     bassNotes: [],
     melodyNotes: [],
     chordEvents: []
-  };
+  });
 }
 
 export function projectFileName(project: ProjectState): string {
@@ -784,8 +870,11 @@ export function chordPitches(chord: ChordEvent, octave = 3): string[] {
 }
 
 function normalizePatternData(pattern: PatternDataInput): PatternData {
+  const drumPattern = pattern.drumPattern;
   return {
-    drumPattern: pattern.drumPattern,
+    drumPattern,
+    drumVelocities: normalizeDrumVelocities(pattern.drumVelocities, drumPattern),
+    hatRepeats: normalizeHatRepeats(pattern.hatRepeats, drumPattern.hat),
     bassNotes: pattern.bassNotes,
     melodyNotes: pattern.melodyNotes,
     chordEvents: pattern.chordEvents?.map((event) => ({ ...event })) ?? []
@@ -798,6 +887,25 @@ function normalizePatternMap(patterns: Record<PatternSlot, PatternDataInput>): R
     B: normalizePatternData(patterns.B),
     C: normalizePatternData(patterns.C)
   };
+}
+
+function normalizeDrumVelocities(value: DrumVelocities | undefined, drumPattern: DrumPattern): DrumVelocities {
+  if (!value) {
+    return defaultDrumVelocities(drumPattern);
+  }
+  return {
+    kick: steps.map((step) => normalizeDrumVelocity(value.kick[step] ?? defaultDrumVelocity("kick", step))),
+    clap: steps.map((step) => normalizeDrumVelocity(value.clap[step] ?? defaultDrumVelocity("clap", step))),
+    hat: steps.map((step) => normalizeDrumVelocity(value.hat[step] ?? defaultDrumVelocity("hat", step))),
+    perc: steps.map((step) => normalizeDrumVelocity(value.perc[step] ?? defaultDrumVelocity("perc", step)))
+  };
+}
+
+function normalizeHatRepeats(value: number[] | undefined, hatSteps: boolean[]): number[] {
+  if (!value) {
+    return defaultHatRepeats(hatSteps);
+  }
+  return steps.map((step) => (hatSteps[step] ? normalizeHatRepeat(value[step] ?? 1) : 1));
 }
 
 function normalizeSoundDesign(sound: SoundDesignInput | undefined): SoundDesign {
@@ -857,7 +965,11 @@ function normalizeProjectState(value: unknown): ProjectState | null {
   return null;
 }
 
-type PatternDataInput = Omit<PatternData, "chordEvents"> & { chordEvents?: ChordEvent[] };
+type PatternDataInput = Omit<PatternData, "chordEvents" | "drumVelocities" | "hatRepeats"> & {
+  chordEvents?: ChordEvent[];
+  drumVelocities?: DrumVelocities;
+  hatRepeats?: number[];
+};
 type SoundDesignInput = Partial<SoundDesign> & { preset?: SoundPresetId };
 type ProjectStateInput = Omit<ProjectState, "patterns" | "sound"> & {
   sound?: SoundDesignInput;
@@ -904,6 +1016,8 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patt
     isFiniteNumber(value.swing) &&
     (value.sound === undefined || isSoundDesignInput(value.sound)) &&
     isDrumPattern(value.drumPattern) &&
+    (value.drumVelocities === undefined || isDrumVelocities(value.drumVelocities)) &&
+    (value.hatRepeats === undefined || isHatRepeats(value.hatRepeats)) &&
     Array.isArray(value.bassNotes) &&
     value.bassNotes.every(isBassNote) &&
     Array.isArray(value.melodyNotes) &&
@@ -943,6 +1057,8 @@ function isPatternDataInput(value: unknown): value is PatternDataInput {
   return (
     isRecord(value) &&
     isDrumPattern(value.drumPattern) &&
+    (value.drumVelocities === undefined || isDrumVelocities(value.drumVelocities)) &&
+    (value.hatRepeats === undefined || isHatRepeats(value.hatRepeats)) &&
     Array.isArray(value.bassNotes) &&
     value.bassNotes.every(isBassNote) &&
     Array.isArray(value.melodyNotes) &&
@@ -958,6 +1074,22 @@ function isDrumPattern(value: unknown): value is DrumPattern {
   return (["kick", "clap", "hat", "perc"] as DrumLane[]).every(
     (lane) => Array.isArray(value[lane]) && value[lane].length === stepsPerBar && value[lane].every((step) => typeof step === "boolean")
   );
+}
+
+function isDrumVelocities(value: unknown): value is DrumVelocities {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return drumLanes.every(
+    (lane) =>
+      Array.isArray(value[lane]) &&
+      value[lane].length === stepsPerBar &&
+      value[lane].every((velocity) => isFiniteNumber(velocity) && velocity >= 0 && velocity <= 1)
+  );
+}
+
+function isHatRepeats(value: unknown): value is number[] {
+  return Array.isArray(value) && value.length === stepsPerBar && value.every((repeat) => Number.isInteger(repeat) && repeat >= 1 && repeat <= 4);
 }
 
 function isBassNote(value: unknown): value is BassNote {

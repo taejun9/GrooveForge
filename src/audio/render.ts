@@ -1,6 +1,8 @@
 import {
   chordPitches,
   dbToGain,
+  drumStepVelocity,
+  hatRepeatCount,
   noteToFrequency,
   patternForSlot,
   projectStepDurationSeconds,
@@ -173,21 +175,40 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
     for (let patternStep = 0; patternStep < 16; patternStep += 1) {
       const time = (barOffset + patternStep) * step;
       if (pattern.drumPattern.kick[patternStep]) {
-        addTone(buffer, time, 0.18 + sound.kickPunch * 0.1, 44 + sound.kickPunch * 10, drumMix, 0.78 + sound.kickPunch * 0.24, "sine", {
+        const velocity = drumStepVelocity(pattern, "kick", patternStep);
+        addTone(buffer, time, 0.18 + sound.kickPunch * 0.1, 44 + sound.kickPunch * 10, drumMix, (0.78 + sound.kickPunch * 0.24) * velocity, "sine", {
           decay: 4.8 - sound.kickPunch * 1.2
         });
-        addTone(buffer, time, 0.06 + sound.kickPunch * 0.04, 82 + sound.kickPunch * 45, drumMix, 0.2 + sound.kickPunch * 0.22, "sine", {
+        addTone(buffer, time, 0.06 + sound.kickPunch * 0.04, 82 + sound.kickPunch * 45, drumMix, (0.2 + sound.kickPunch * 0.22) * velocity, "sine", {
           decay: 8
         });
       }
       if (pattern.drumPattern.clap[patternStep]) {
-        addNoise(buffer, time, 0.11 + (1 - sound.snareSnap) * 0.08, drumMix, 0.28 + sound.snareSnap * 0.18, sound.snareSnap);
+        addNoise(
+          buffer,
+          time,
+          0.11 + (1 - sound.snareSnap) * 0.08,
+          drumMix,
+          (0.28 + sound.snareSnap * 0.18) * drumStepVelocity(pattern, "clap", patternStep),
+          sound.snareSnap
+        );
       }
       if (pattern.drumPattern.hat[patternStep]) {
-        addNoise(buffer, time, 0.035 + (1 - sound.hatBrightness) * 0.025, drumMix, 0.12 + sound.hatBrightness * 0.1, sound.hatBrightness);
+        const repeatCount = hatRepeatCount(pattern, patternStep);
+        const velocity = drumStepVelocity(pattern, "hat", patternStep);
+        for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
+          addNoise(
+            buffer,
+            time + (repeatIndex * step) / repeatCount,
+            0.035 + (1 - sound.hatBrightness) * 0.025,
+            drumMix,
+            (0.12 + sound.hatBrightness * 0.1) * velocity * (repeatIndex === 0 ? 1 : 0.72),
+            sound.hatBrightness
+          );
+        }
       }
       if (pattern.drumPattern.perc[patternStep]) {
-        addTone(buffer, time, 0.08, 260 + sound.snareSnap * 190, drumMix, 0.16, "triangle", {
+        addTone(buffer, time, 0.08, 260 + sound.snareSnap * 190, drumMix, 0.16 * drumStepVelocity(pattern, "perc", patternStep), "triangle", {
           filter: 0.7 + sound.hatBrightness * 0.3
         });
       }
