@@ -129,10 +129,10 @@ MVP capabilities:
 - Live playback reads the current project while scheduling future steps, so selected-pattern preview, arrangement block edits, arrangement track mutes, arrangement length, arrangement energy, BPM, mixer, sound, and master changes can be heard without stopping and restarting.
 - Mixer volume, pan, mute, solo, low-cut/air EQ, and Drive/Glue mix controls reflected in realtime playback and WAV export.
 - Master preset ceiling and output gain.
-- Export peak/RMS/headroom meter with limiter activity status for the current arrangement.
+- Reproducible export peak/RMS/headroom meter with limiter activity status for the current arrangement.
 - Local project save/load as a `.grooveforge.json` file.
-- WAV export through offline rendering.
-- Stem export for isolated drum, 808, synth, and chord WAV files from the current arrangement.
+- WAV export through deterministic offline rendering.
+- Stem export through deterministic offline rendering for isolated drum, 808, synth, and chord WAV files from the current arrangement.
 
 ## Roadmap
 

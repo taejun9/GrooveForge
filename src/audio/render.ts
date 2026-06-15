@@ -53,6 +53,7 @@ type ChannelMix = {
   drive: number;
   glue: number;
 };
+type RenderNoiseSeed = (start: number, duration: number, brightness: number) => number;
 
 function stepDuration(project: ProjectState): number {
   return projectStepDurationSeconds(project);
@@ -194,7 +195,15 @@ function waveform(shape: ToneShape, phase: number): number {
   }
 }
 
-function addNoise(buffer: AudioChannels, start: number, duration: number, mix: ChannelMix, gainScale: number, brightness = 0.5): void {
+function addNoise(
+  buffer: AudioChannels,
+  start: number,
+  duration: number,
+  mix: ChannelMix,
+  gainScale: number,
+  brightness = 0.5,
+  noiseSeed = 0
+): void {
   if (mix.gain <= 0) {
     return;
   }
@@ -206,13 +215,67 @@ function addNoise(buffer: AudioChannels, start: number, duration: number, mix: C
   for (let index = 0; index < frames && startFrame + index < buffer[0].length; index += 1) {
     const t = index / sampleRate;
     const envelope = Math.exp((-6 - airBrightness * 5) * t / duration);
-    const raw = Math.random() * 2 - 1;
+    const raw = seededNoiseSample(noiseSeed, index);
     const saturated = channelDriveSample(raw * airBrightness + previous * (1 - airBrightness), mix);
     const value = channelGlueSample(saturated * mix.gain * gainScale * envelope * channelGain, mix);
     previous = raw;
     buffer[0][startFrame + index] += value * mix.left;
     buffer[1][startFrame + index] += value * mix.right;
   }
+}
+
+function createRenderNoiseSeed(project: ProjectState): RenderNoiseSeed {
+  const renderSeed = hashString(
+    JSON.stringify({
+      bpm: project.bpm,
+      selectedPattern: project.selectedPattern,
+      patterns: project.patterns,
+      sound: project.sound,
+      mixer: project.mixer,
+      arrangement: project.arrangement,
+      masterCeilingDb: project.masterCeilingDb
+    })
+  );
+  let eventIndex = 0;
+
+  return (start: number, duration: number, brightness: number) => {
+    const seed = hashNumbers(
+      renderSeed,
+      eventIndex,
+      Math.max(0, Math.floor(start * sampleRate)),
+      Math.max(1, Math.floor(duration * sampleRate)),
+      Math.round(brightness * 1000)
+    );
+    eventIndex += 1;
+    return seed;
+  };
+}
+
+function seededNoiseSample(seed: number, index: number): number {
+  return (hashNumbers(seed, index) / 0xffffffff) * 2 - 1;
+}
+
+function hashString(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function hashNumbers(...values: number[]): number {
+  let hash = 2166136261;
+  for (const value of values) {
+    hash ^= value >>> 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 2246822507);
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 3266489909);
+  hash ^= hash >>> 16;
+  return hash >>> 0;
 }
 
 function bassShape(sound: SoundDesign): ToneShape {
@@ -244,6 +307,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   const baseChordMix = channelMix(project, "chord", stemTarget);
   const sound = project.sound;
   const outputGain = masterOutputGain(project);
+  const nextNoiseSeed = createRenderNoiseSeed(project);
 
   for (let bar = 0; bar < bars; bar += 1) {
     const barOffset = bar * 16;
@@ -269,27 +333,32 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
       }
       if (drumStepShouldPlay(pattern, "clap", patternStep, absoluteStep)) {
         const drumTime = time + drumStepTimingMs(pattern, "clap", patternStep) / 1000;
+        const drumDuration = 0.11 + (1 - sound.snareSnap) * 0.08;
         addNoise(
           buffer,
           drumTime,
-          0.11 + (1 - sound.snareSnap) * 0.08,
+          drumDuration,
           drumMix,
           energyGain * (0.28 + sound.snareSnap * 0.18) * drumStepVelocity(pattern, "clap", patternStep),
-          sound.snareSnap
+          sound.snareSnap,
+          nextNoiseSeed(drumTime, drumDuration, sound.snareSnap)
         );
       }
       if (drumStepShouldPlay(pattern, "hat", patternStep, absoluteStep)) {
         const repeatCount = hatRepeatCount(pattern, patternStep);
         const velocity = drumStepVelocity(pattern, "hat", patternStep);
         const drumTime = time + drumStepTimingMs(pattern, "hat", patternStep) / 1000;
+        const drumDuration = 0.035 + (1 - sound.hatBrightness) * 0.025;
         for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
+          const repeatTime = drumTime + (repeatIndex * step) / repeatCount;
           addNoise(
             buffer,
-            drumTime + (repeatIndex * step) / repeatCount,
-            0.035 + (1 - sound.hatBrightness) * 0.025,
+            repeatTime,
+            drumDuration,
             drumMix,
             energyGain * (0.12 + sound.hatBrightness * 0.1) * velocity * (repeatIndex === 0 ? 1 : 0.72),
-            sound.hatBrightness
+            sound.hatBrightness,
+            nextNoiseSeed(repeatTime, drumDuration, sound.hatBrightness)
           );
         }
       }

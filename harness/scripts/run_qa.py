@@ -65,6 +65,7 @@ TEXT_EXPECTATIONS = {
         "Live playback that follows future pattern, arrangement track mutes, BPM, mixer, sound, and master edits without forcing users to stop and restart.",
         "per-track mutes, per-block bar lengths, and audible energy",
         "Basic mixer volume/pan/mute/solo, channel low-cut/air EQ, Drive/Glue mix controls",
+        "reproducible export peak/RMS/headroom meter",
         "transport with arrangement playback, Pattern preview, and a realtime-only metronome",
         "deterministic Pattern variation tools",
         "editable scale-aware 808/melody lanes with note chance badges and selected-note move/transpose/duplicate tools",
@@ -72,7 +73,7 @@ TEXT_EXPECTATIONS = {
         "Drive/Glue mix controls",
         "chord progression presets plus add/delete/chance controls",
         "Sound presets and Studio tone controls",
-        "export peak/RMS/headroom meter",
+        "reproducible export peak/RMS/headroom meter",
         "one-click stem export",
         "npm run desktop",
     ],
@@ -120,8 +121,9 @@ TEXT_EXPECTATIONS = {
         "Mixer volume, pan, mute, solo, low-cut/air EQ, and Drive/Glue mix controls reflected in realtime playback and WAV export",
         "channel low-cut/air EQ",
         "Drive/Glue mix controls",
-        "Export peak/RMS/headroom meter with limiter activity status",
-        "Stem export for isolated drum, 808, synth, and chord WAV files",
+        "Reproducible export peak/RMS/headroom meter with limiter activity status",
+        "WAV export through deterministic offline rendering",
+        "Stem export through deterministic offline rendering",
     ],
     "docs/quality/rules.md": [
         "QA and review are separate loops.",
@@ -145,6 +147,8 @@ TEXT_EXPECTATIONS = {
         "Sound design work must keep tone parameters in project state",
         "Sidechain work must keep kick-to-808 ducking",
         "Export meter work must label measurements honestly as peak, RMS, headroom, and limiter activity",
+        "Render noise work must keep offline WAV export, stem export, and export meter analysis deterministic from render-relevant project data",
+        "avoid `Math.random()` in the offline render path",
         "Stem export work must render isolated drum, 808, synth, and chord WAV files",
         "Pattern work must keep Pattern A/B/C as independent editable event data",
         "Copy and clear tools must operate on the selected pattern slot",
@@ -458,6 +462,10 @@ TEXT_EXPECTATIONS = {
         "arrangementBlockMutesTrack",
         "mutedChannelMix",
         "arrangementChannelMix",
+        "createRenderNoiseSeed",
+        "seededNoiseSample",
+        "hashString",
+        "hashNumbers",
         "normalizeArrangementBars",
         "chordPitches",
         "SoundDesign",
@@ -629,6 +637,12 @@ def check_strict_todos(errors: list[str]) -> None:
             errors.append(f"strict mode found TODO in {relative}")
 
 
+def check_offline_render_determinism(errors: list[str]) -> None:
+    render_text = (ROOT / "src/audio/render.ts").read_text(encoding="utf-8")
+    if "Math.random" in render_text:
+        errors.append("src/audio/render.ts must not use Math.random in the offline render path")
+
+
 def run_checks(strict: bool = False) -> list[str]:
     errors: list[str] = []
     check_required_paths(errors)
@@ -637,6 +651,7 @@ def run_checks(strict: bool = False) -> list[str]:
     check_plan_names(errors)
     check_text_expectations(errors)
     check_official_sources(errors)
+    check_offline_render_determinism(errors)
     if strict:
         check_strict_todos(errors)
     return errors
