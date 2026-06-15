@@ -1,4 +1,12 @@
-import { chordPitches, dbToGain, noteToFrequency, patternForSlot, projectStepDurationSeconds, ProjectState } from "../domain/workstation";
+import {
+  chordPitches,
+  dbToGain,
+  noteToFrequency,
+  patternForSlot,
+  projectStepDurationSeconds,
+  ProjectState,
+  SoundDesign
+} from "../domain/workstation";
 
 const sampleRate = 44100;
 const channels = 2;
@@ -40,34 +48,86 @@ function arrangementBarCount(project: ProjectState): number {
   return Math.max(1, project.arrangement.length);
 }
 
-function addSine(buffer: AudioChannels, start: number, duration: number, frequency: number, mix: ChannelMix, gainScale: number): void {
+type ToneShape = "sine" | "triangle" | "saw" | "square";
+
+function addTone(
+  buffer: AudioChannels,
+  start: number,
+  duration: number,
+  frequency: number,
+  mix: ChannelMix,
+  gainScale: number,
+  shape: ToneShape,
+  tone: { drive?: number; filter?: number; decay?: number } = {}
+): void {
   if (mix.gain <= 0) {
     return;
   }
   const startFrame = Math.max(0, Math.floor(start * sampleRate));
   const frames = Math.max(1, Math.floor(duration * sampleRate));
+  const drive = tone.drive ?? 0;
+  const decay = tone.decay ?? 5;
+  const filter = tone.filter ?? 1;
   for (let index = 0; index < frames && startFrame + index < buffer[0].length; index += 1) {
     const t = index / sampleRate;
-    const envelope = Math.exp(-5 * t / duration);
-    const value = Math.sin(2 * Math.PI * frequency * t) * mix.gain * gainScale * envelope;
+    const envelope = Math.exp(-decay * t / Math.max(0.01, duration));
+    const phase = 2 * Math.PI * frequency * t;
+    const fundamental = waveform(shape, phase);
+    const harmonic = Math.sin(phase * 2) * drive * 0.28 + Math.sin(phase * 3) * drive * 0.12;
+    const shaped = Math.tanh((fundamental + harmonic) * (1 + drive * 2.8));
+    const value = shaped * mix.gain * gainScale * envelope * filter;
     buffer[0][startFrame + index] += value * mix.left;
     buffer[1][startFrame + index] += value * mix.right;
   }
 }
 
-function addNoise(buffer: AudioChannels, start: number, duration: number, mix: ChannelMix, gainScale: number): void {
+function waveform(shape: ToneShape, phase: number): number {
+  switch (shape) {
+    case "triangle":
+      return (2 / Math.PI) * Math.asin(Math.sin(phase));
+    case "saw":
+      return 2 * (phase / (2 * Math.PI) - Math.floor(0.5 + phase / (2 * Math.PI)));
+    case "square":
+      return Math.sin(phase) >= 0 ? 1 : -1;
+    case "sine":
+    default:
+      return Math.sin(phase);
+  }
+}
+
+function addNoise(buffer: AudioChannels, start: number, duration: number, mix: ChannelMix, gainScale: number, brightness = 0.5): void {
   if (mix.gain <= 0) {
     return;
   }
   const startFrame = Math.max(0, Math.floor(start * sampleRate));
   const frames = Math.max(1, Math.floor(duration * sampleRate));
+  let previous = 0;
   for (let index = 0; index < frames && startFrame + index < buffer[0].length; index += 1) {
     const t = index / sampleRate;
-    const envelope = Math.exp(-8 * t / duration);
-    const value = (Math.random() * 2 - 1) * mix.gain * gainScale * envelope;
+    const envelope = Math.exp((-6 - brightness * 5) * t / duration);
+    const raw = Math.random() * 2 - 1;
+    const value = (raw * brightness + previous * (1 - brightness)) * mix.gain * gainScale * envelope;
+    previous = raw;
     buffer[0][startFrame + index] += value * mix.left;
     buffer[1][startFrame + index] += value * mix.right;
   }
+}
+
+function bassShape(sound: SoundDesign): ToneShape {
+  if (sound.bassDrive > 0.64) {
+    return "saw";
+  }
+  if (sound.bassDrive > 0.38) {
+    return "triangle";
+  }
+  return "sine";
+}
+
+function synthShape(sound: SoundDesign): ToneShape {
+  if (sound.synthBrightness > 0.72) {
+    return "square";
+  }
+  return sound.synthBrightness > 0.46 ? "triangle" : "sine";
 }
 
 function renderProject(project: ProjectState, bars = arrangementBarCount(project)): AudioChannels {
@@ -80,6 +140,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   const bassMix = channelMix(project, "bass_808");
   const synthMix = channelMix(project, "synth");
   const chordMix = channelMix(project, "chord");
+  const sound = project.sound;
   const outputGain = masterOutputGain(project);
 
   for (let bar = 0; bar < bars; bar += 1) {
@@ -89,28 +150,68 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
     for (let patternStep = 0; patternStep < 16; patternStep += 1) {
       const time = (barOffset + patternStep) * step;
       if (pattern.drumPattern.kick[patternStep]) {
-        addSine(buffer, time, 0.22, 52, drumMix, 0.95);
-        addSine(buffer, time, 0.08, 96, drumMix, 0.3);
+        addTone(buffer, time, 0.18 + sound.kickPunch * 0.1, 44 + sound.kickPunch * 10, drumMix, 0.78 + sound.kickPunch * 0.24, "sine", {
+          decay: 4.8 - sound.kickPunch * 1.2
+        });
+        addTone(buffer, time, 0.06 + sound.kickPunch * 0.04, 82 + sound.kickPunch * 45, drumMix, 0.2 + sound.kickPunch * 0.22, "sine", {
+          decay: 8
+        });
       }
       if (pattern.drumPattern.clap[patternStep]) {
-        addNoise(buffer, time, 0.16, drumMix, 0.42);
+        addNoise(buffer, time, 0.11 + (1 - sound.snareSnap) * 0.08, drumMix, 0.28 + sound.snareSnap * 0.18, sound.snareSnap);
       }
       if (pattern.drumPattern.hat[patternStep]) {
-        addNoise(buffer, time, 0.045, drumMix, 0.18);
+        addNoise(buffer, time, 0.035 + (1 - sound.hatBrightness) * 0.025, drumMix, 0.12 + sound.hatBrightness * 0.1, sound.hatBrightness);
       }
       if (pattern.drumPattern.perc[patternStep]) {
-        addSine(buffer, time, 0.08, 330, drumMix, 0.18);
+        addTone(buffer, time, 0.08, 260 + sound.snareSnap * 190, drumMix, 0.16, "triangle", {
+          filter: 0.7 + sound.hatBrightness * 0.3
+        });
       }
     }
     for (const note of pattern.bassNotes) {
-      addSine(buffer, (barOffset + note.step) * step, note.length * step, noteToFrequency(note.pitch), bassMix, 0.72);
+      addTone(
+        buffer,
+        (barOffset + note.step) * step,
+        note.length * step * (0.74 + sound.bassDecay * 0.52),
+        noteToFrequency(note.pitch),
+        bassMix,
+        0.52 + sound.bassDrive * 0.24,
+        bassShape(sound),
+        { drive: sound.bassDrive, filter: 0.72 + sound.bassDrive * 0.28, decay: 3.8 - sound.bassDecay * 1.4 }
+      );
     }
     for (const note of pattern.melodyNotes) {
-      addSine(buffer, (barOffset + note.step) * step, note.length * step, noteToFrequency(note.pitch), synthMix, note.velocity * 0.22);
+      addTone(
+        buffer,
+        (barOffset + note.step) * step,
+        note.length * step * (0.8 + sound.synthRelease * 0.42),
+        noteToFrequency(note.pitch),
+        synthMix,
+        note.velocity * 0.22,
+        synthShape(sound),
+        { drive: sound.synthBrightness * 0.08, filter: 0.62 + sound.synthBrightness * 0.38, decay: 4.4 - sound.synthRelease * 1.8 }
+      );
     }
     for (const chord of pattern.chordEvents) {
-      for (const pitch of chordPitches(chord)) {
-        addSine(buffer, (barOffset + chord.step) * step, chord.length * step, noteToFrequency(pitch), chordMix, chord.velocity * 0.14);
+      const pitches = chordPitches(chord);
+      for (const [voiceIndex, pitch] of pitches.entries()) {
+        const spread = pitches.length <= 1 ? 0 : (voiceIndex / (pitches.length - 1)) * 2 - 1;
+        const voiceMix = {
+          ...chordMix,
+          left: Math.max(0, Math.min(1, chordMix.left - spread * sound.chordWidth * 0.28)),
+          right: Math.max(0, Math.min(1, chordMix.right + spread * sound.chordWidth * 0.28))
+        };
+        addTone(
+          buffer,
+          (barOffset + chord.step) * step,
+          chord.length * step * (0.9 + sound.synthRelease * 0.24),
+          noteToFrequency(pitch),
+          voiceMix,
+          chord.velocity * 0.14,
+          "triangle",
+          { drive: (1 - sound.chordWarmth) * 0.08, filter: 0.48 + (1 - sound.chordWarmth) * 0.42, decay: 3.8 - sound.synthRelease * 1.2 }
+        );
       }
     }
   }

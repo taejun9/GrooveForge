@@ -36,6 +36,7 @@ import {
   PatternData,
   PatternSlot,
   ProjectState,
+  SoundDesign,
   activePattern,
   arrangementSections,
   bassPitchLanes,
@@ -48,6 +49,9 @@ import {
   projectFileName,
   scalePitchNames,
   serializeProjectFile,
+  soundPresetDesign,
+  soundPresetIds,
+  soundPresetLabel,
   starterProject,
   steps,
   styleProfiles
@@ -193,6 +197,24 @@ export function App(): ReactElement {
       ...current,
       masterPreset: preset,
       masterCeilingDb: masterPresetCeilingDb(preset)
+    }));
+  }
+
+  function applySoundPreset(preset: (typeof soundPresetIds)[number]): void {
+    updateProject((current) => ({
+      ...current,
+      sound: soundPresetDesign(preset)
+    }));
+  }
+
+  function updateSoundDesign(update: Partial<Omit<SoundDesign, "preset">>): void {
+    updateProject((current) => ({
+      ...current,
+      sound: {
+        ...current.sound,
+        ...Object.fromEntries(Object.entries(update).map(([key, value]) => [key, clampUnit(value)])),
+        preset: "custom"
+      }
     }));
   }
 
@@ -677,32 +699,22 @@ export function App(): ReactElement {
         <section className="panel instrument-panel" aria-label="Instrument panel">
           <PanelTitle icon={<Sparkles size={18} />} title="Instruments" meta={project.mode === "guided" ? "curated" : "editable"} />
           <div className="device-list">
-            <Device icon={<Drum size={17} />} name="Drum Rack" value="Forge Kit 01" color="#78f0c8" />
-            <Device icon={<Waves size={17} />} name="808 Engine" value={`${style.bassStyle} / mono`} color="#ff7a4f" />
-            <Device icon={<Music2 size={17} />} name="Synth" value={`${style.melodyStyle} patch`} color="#8aa8ff" />
-            <Device icon={<SlidersHorizontal size={17} />} name="FX" value="EQ / comp / sat" color="#f0c36a" />
+            <Device icon={<Drum size={17} />} name="Drum Rack" value={`${soundPresetLabel(project.sound.preset)} kit`} color="#78f0c8" />
+            <Device icon={<Waves size={17} />} name="808 Engine" value={`${style.bassStyle} / drive ${percentLabel(project.sound.bassDrive)}`} color="#ff7a4f" />
+            <Device icon={<Music2 size={17} />} name="Synth" value={`${style.melodyStyle} / bright ${percentLabel(project.sound.synthBrightness)}`} color="#8aa8ff" />
+            <Device icon={<SlidersHorizontal size={17} />} name="Chord Tone" value={`warm ${percentLabel(project.sound.chordWarmth)}`} color="#d58cff" />
           </div>
+          <SoundDesigner
+            mode={project.mode}
+            sound={project.sound}
+            onChange={updateSoundDesign}
+            onPreset={applySoundPreset}
+          />
           <ChordEditor
             chords={currentPattern.chordEvents}
             rootOptions={chordRootOptions}
             onChange={updateChordEvent}
           />
-          {project.mode === "studio" && (
-            <div className="studio-controls">
-              <label>
-                <span>808 drive</span>
-                <input type="range" min={0} max={1} step={0.01} defaultValue={0.42} />
-              </label>
-              <label>
-                <span>Sidechain</span>
-                <input type="range" min={0} max={1} step={0.01} defaultValue={0.38} />
-              </label>
-              <label>
-                <span>Humanize</span>
-                <input type="range" min={0} max={1} step={0.01} defaultValue={0.12} />
-              </label>
-            </div>
-          )}
         </section>
 
         <section className="panel arrangement-panel" aria-label="Arrangement">
@@ -1101,6 +1113,146 @@ function Device({
   );
 }
 
+function SoundDesigner({
+  mode,
+  sound,
+  onPreset,
+  onChange
+}: {
+  mode: ProjectState["mode"];
+  sound: SoundDesign;
+  onPreset: (preset: (typeof soundPresetIds)[number]) => void;
+  onChange: (update: Partial<Omit<SoundDesign, "preset">>) => void;
+}): ReactElement {
+  return (
+    <div className="sound-designer">
+      <div className="lane-header">
+        <span>Tone</span>
+        <strong data-testid="sound-preset-readout">{soundPresetLabel(sound.preset)}</strong>
+      </div>
+      <div className="sound-preset-row" aria-label="Sound presets">
+        {soundPresetIds.map((preset) => (
+          <button
+            className={sound.preset === preset ? "selected" : ""}
+            data-testid={`sound-preset-${preset}`}
+            key={preset}
+            onClick={() => onPreset(preset)}
+            type="button"
+          >
+            {soundPresetLabel(preset)}
+          </button>
+        ))}
+      </div>
+      <div className="sound-readout" aria-label="Sound design state">
+        <span data-testid="sound-kick-readout">Kick {percentLabel(sound.kickPunch)}</span>
+        <span data-testid="sound-bass-readout">808 {percentLabel(sound.bassDrive)}</span>
+        <span data-testid="sound-synth-readout">Synth {percentLabel(sound.synthBrightness)}</span>
+        <span data-testid="sound-chord-readout">Chord {percentLabel(sound.chordWarmth)}</span>
+      </div>
+      {mode === "studio" && (
+        <div className="sound-control-grid">
+          <SoundControl
+            id="kick-punch"
+            label="Kick punch"
+            value={sound.kickPunch}
+            onChange={(value) => onChange({ kickPunch: value })}
+          />
+          <SoundControl
+            id="snare-snap"
+            label="Snare snap"
+            value={sound.snareSnap}
+            onChange={(value) => onChange({ snareSnap: value })}
+          />
+          <SoundControl
+            id="hat-brightness"
+            label="Hat bright"
+            value={sound.hatBrightness}
+            onChange={(value) => onChange({ hatBrightness: value })}
+          />
+          <SoundControl
+            id="bass-drive"
+            label="808 drive"
+            value={sound.bassDrive}
+            onChange={(value) => onChange({ bassDrive: value })}
+          />
+          <SoundControl
+            id="bass-decay"
+            label="808 decay"
+            value={sound.bassDecay}
+            onChange={(value) => onChange({ bassDecay: value })}
+          />
+          <SoundControl
+            id="synth-brightness"
+            label="Synth bright"
+            value={sound.synthBrightness}
+            onChange={(value) => onChange({ synthBrightness: value })}
+          />
+          <SoundControl
+            id="synth-release"
+            label="Synth release"
+            value={sound.synthRelease}
+            onChange={(value) => onChange({ synthRelease: value })}
+          />
+          <SoundControl
+            id="chord-warmth"
+            label="Chord warm"
+            value={sound.chordWarmth}
+            onChange={(value) => onChange({ chordWarmth: value })}
+          />
+          <SoundControl
+            id="chord-width"
+            label="Chord width"
+            value={sound.chordWidth}
+            onChange={(value) => onChange({ chordWidth: value })}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SoundControl({
+  id,
+  label,
+  value,
+  onChange
+}: {
+  id: string;
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}): ReactElement {
+  return (
+    <label className="sound-control">
+      <span>
+        {label} {percentLabel(value)}
+      </span>
+      <div className="sound-control-inputs">
+        <input
+          aria-label={label}
+          data-testid={`sound-${id}`}
+          max={1}
+          min={0}
+          onChange={(event) => onChange(Number(event.target.value))}
+          step={0.01}
+          type="range"
+          value={value}
+        />
+        <input
+          aria-label={`${label} percent`}
+          data-testid={`sound-${id}-input`}
+          max={100}
+          min={0}
+          onChange={(event) => onChange(Number(event.target.value) / 100)}
+          step={1}
+          type="number"
+          value={Math.round(value * 100)}
+        />
+      </div>
+    </label>
+  );
+}
+
 function ChordEditor({
   chords,
   rootOptions,
@@ -1240,6 +1392,17 @@ function panLabel(pan: number): string {
     return "C";
   }
   return pan < 0 ? `L ${Math.abs(pan)}` : `R ${pan}`;
+}
+
+function percentLabel(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function clampUnit(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 0.5;
+  }
+  return Math.min(1, Math.max(0, value));
 }
 
 function clampPan(value: number): number {

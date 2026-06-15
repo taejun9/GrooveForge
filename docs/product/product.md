@@ -111,6 +111,7 @@ MVP capabilities:
 - Synth 808/bass track with editable scale-aware grid, mono mode, glide, and saturation direction.
 - Chord progression track with scale-locked roots, editable quality, length, and velocity.
 - Simple synth melody track with editable scale-aware grid and velocity control.
+- Sound design presets and Studio tone controls for kick punch, snare snap, hat brightness, 808 drive/decay, synth brightness/release, and chord warmth/width.
 - Independent Pattern A/B/C storage for drum, bass, chord, and melody variations.
 - Editable arrangement blocks for an 8-bar loop or simple song section, using assigned Pattern A/B/C data, per-block energy, and structure controls for duplicate, move, and delete.
 - Mixer volume, pan, mute, and solo reflected in realtime playback and WAV export.

@@ -27,10 +27,11 @@ The first usable result is an Electron desktop workstation that can create a sam
 
 - 145 BPM / F minor starter project.
 - Kick, snare/clap, hat, 808, chord, and synth melody tracks.
+- Sound presets and Studio tone controls for built-in drum, 808, synth, and chord engines.
 - Independent Pattern A/B/C variations and editable arrangement blocks with duplicate, move, and delete controls.
 - Basic mixer volume/pan/mute/solo, master preset ceiling, and WAV export.
 
-The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport, style/key/BPM, drum steps, editable scale-aware 808/melody lanes, chord progression, instruments, editable arrangement blocks, arrangement structure controls, mixer volume/pan/mute/solo, master preset ceiling, local project save/load, realtime loop playback, and arrangement-length WAV export.
+The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport, style/key/BPM, drum steps, editable scale-aware 808/melody lanes, chord progression, sound design presets, Studio tone controls, editable arrangement blocks, arrangement structure controls, mixer volume/pan/mute/solo, master preset ceiling, local project save/load, realtime loop playback, and arrangement-length WAV export.
 
 ## Core Direction
 

@@ -81,6 +81,23 @@ export type ArrangementBlock = {
 
 export type MasterPreset = "Clean Demo" | "Streaming Safe" | "Headroom for Vocal";
 
+export const soundPresetIds = ["clean_knock", "club_punch", "warm_tape", "air_space"] as const;
+
+export type SoundPresetId = (typeof soundPresetIds)[number] | "custom";
+
+export type SoundDesign = {
+  preset: SoundPresetId;
+  kickPunch: number;
+  snareSnap: number;
+  hatBrightness: number;
+  bassDrive: number;
+  bassDecay: number;
+  synthBrightness: number;
+  synthRelease: number;
+  chordWarmth: number;
+  chordWidth: number;
+};
+
 export type ProjectState = {
   title: string;
   mode: SkillMode;
@@ -89,6 +106,7 @@ export type ProjectState = {
   styleId: StyleId;
   selectedPattern: PatternSlot;
   swing: number;
+  sound: SoundDesign;
   patterns: Record<PatternSlot, PatternData>;
   mixer: MixerChannel[];
   arrangement: ArrangementBlock[];
@@ -114,6 +132,63 @@ export const masterPresetCeilingsDb: Record<MasterPreset, number> = {
   "Clean Demo": -0.8,
   "Streaming Safe": -1,
   "Headroom for Vocal": -3
+};
+export const soundPresetLabels: Record<SoundPresetId, string> = {
+  clean_knock: "Clean Knock",
+  club_punch: "Club Punch",
+  warm_tape: "Warm Tape",
+  air_space: "Air Space",
+  custom: "Custom"
+};
+export const soundPresetDefaults: Record<(typeof soundPresetIds)[number], SoundDesign> = {
+  clean_knock: {
+    preset: "clean_knock",
+    kickPunch: 0.58,
+    snareSnap: 0.52,
+    hatBrightness: 0.62,
+    bassDrive: 0.34,
+    bassDecay: 0.54,
+    synthBrightness: 0.56,
+    synthRelease: 0.45,
+    chordWarmth: 0.58,
+    chordWidth: 0.46
+  },
+  club_punch: {
+    preset: "club_punch",
+    kickPunch: 0.86,
+    snareSnap: 0.74,
+    hatBrightness: 0.72,
+    bassDrive: 0.66,
+    bassDecay: 0.62,
+    synthBrightness: 0.6,
+    synthRelease: 0.34,
+    chordWarmth: 0.42,
+    chordWidth: 0.38
+  },
+  warm_tape: {
+    preset: "warm_tape",
+    kickPunch: 0.5,
+    snareSnap: 0.42,
+    hatBrightness: 0.38,
+    bassDrive: 0.52,
+    bassDecay: 0.72,
+    synthBrightness: 0.34,
+    synthRelease: 0.68,
+    chordWarmth: 0.78,
+    chordWidth: 0.52
+  },
+  air_space: {
+    preset: "air_space",
+    kickPunch: 0.44,
+    snareSnap: 0.58,
+    hatBrightness: 0.82,
+    bassDrive: 0.28,
+    bassDecay: 0.48,
+    synthBrightness: 0.76,
+    synthRelease: 0.74,
+    chordWarmth: 0.34,
+    chordWidth: 0.78
+  }
 };
 
 const sharpNotes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -328,6 +403,7 @@ export const starterProject: ProjectState = {
   styleId: "trap",
   selectedPattern: "A",
   swing: 0.08,
+  sound: { ...soundPresetDefaults.clean_knock },
   patterns: {
     A: clonePatternData(starterPatternA),
     B: clonePatternData(starterPatternB),
@@ -356,6 +432,14 @@ export const starterProject: ProjectState = {
 
 export function masterPresetCeilingDb(preset: MasterPreset): number {
   return masterPresetCeilingsDb[preset];
+}
+
+export function soundPresetLabel(preset: SoundPresetId): string {
+  return soundPresetLabels[preset];
+}
+
+export function soundPresetDesign(preset: (typeof soundPresetIds)[number]): SoundDesign {
+  return { ...soundPresetDefaults[preset] };
 }
 
 export function getStyle(project: ProjectState): StyleProfile {
@@ -512,10 +596,29 @@ function normalizePatternMap(patterns: Record<PatternSlot, PatternDataInput>): R
   };
 }
 
+function normalizeSoundDesign(sound: SoundDesignInput | undefined): SoundDesign {
+  if (!sound) {
+    return { ...soundPresetDefaults.clean_knock };
+  }
+  return {
+    preset: sound.preset ?? "custom",
+    kickPunch: clampUnit(sound.kickPunch),
+    snareSnap: clampUnit(sound.snareSnap),
+    hatBrightness: clampUnit(sound.hatBrightness),
+    bassDrive: clampUnit(sound.bassDrive),
+    bassDecay: clampUnit(sound.bassDecay),
+    synthBrightness: clampUnit(sound.synthBrightness),
+    synthRelease: clampUnit(sound.synthRelease),
+    chordWarmth: clampUnit(sound.chordWarmth),
+    chordWidth: clampUnit(sound.chordWidth)
+  };
+}
+
 function normalizeProjectState(value: unknown): ProjectState | null {
   if (isProjectStateShape(value)) {
     return {
       ...value,
+      sound: normalizeSoundDesign(value.sound),
       patterns: normalizePatternMap(value.patterns)
     };
   }
@@ -534,6 +637,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
       styleId: value.styleId,
       selectedPattern: value.selectedPattern,
       swing: value.swing,
+      sound: normalizeSoundDesign(value.sound),
       patterns: {
         A: clonePatternData(legacyPattern),
         B: clonePatternData(legacyPattern),
@@ -550,7 +654,11 @@ function normalizeProjectState(value: unknown): ProjectState | null {
 }
 
 type PatternDataInput = Omit<PatternData, "chordEvents"> & { chordEvents?: ChordEvent[] };
-type ProjectStateInput = Omit<ProjectState, "patterns"> & { patterns: Record<PatternSlot, PatternDataInput> };
+type SoundDesignInput = Partial<SoundDesign> & { preset?: SoundPresetId };
+type ProjectStateInput = Omit<ProjectState, "patterns" | "sound"> & {
+  sound?: SoundDesignInput;
+  patterns: Record<PatternSlot, PatternDataInput>;
+};
 
 function isProjectStateShape(value: unknown): value is ProjectStateInput {
   if (!isRecord(value)) {
@@ -565,6 +673,7 @@ function isProjectStateShape(value: unknown): value is ProjectStateInput {
     isOneOf(value.styleId, styleProfiles.map((profile) => profile.id)) &&
     isOneOf(value.selectedPattern, patternSlots) &&
     isFiniteNumber(value.swing) &&
+    (value.sound === undefined || isSoundDesignInput(value.sound)) &&
     isPatternMapInput(value.patterns) &&
     Array.isArray(value.mixer) &&
     value.mixer.every(isMixerChannel) &&
@@ -574,7 +683,9 @@ function isProjectStateShape(value: unknown): value is ProjectStateInput {
   );
 }
 
-function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patterns"> & PatternData {
+function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patterns" | "sound"> & {
+  sound?: SoundDesignInput;
+} & PatternDataInput {
   if (!isRecord(value)) {
     return false;
   }
@@ -587,6 +698,7 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patt
     isOneOf(value.styleId, styleProfiles.map((profile) => profile.id)) &&
     isOneOf(value.selectedPattern, patternSlots) &&
     isFiniteNumber(value.swing) &&
+    (value.sound === undefined || isSoundDesignInput(value.sound)) &&
     isDrumPattern(value.drumPattern) &&
     Array.isArray(value.bassNotes) &&
     value.bassNotes.every(isBassNote) &&
@@ -597,6 +709,22 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patt
     isArrangement(value.arrangement) &&
     isFiniteNumber(value.masterCeilingDb) &&
     isOneOf(value.masterPreset, masterPresets)
+  );
+}
+
+function isSoundDesignInput(value: unknown): value is SoundDesignInput {
+  return (
+    isRecord(value) &&
+    (value.preset === undefined || isOneOf(value.preset, [...soundPresetIds, "custom"])) &&
+    isOptionalUnit(value.kickPunch) &&
+    isOptionalUnit(value.snareSnap) &&
+    isOptionalUnit(value.hatBrightness) &&
+    isOptionalUnit(value.bassDrive) &&
+    isOptionalUnit(value.bassDecay) &&
+    isOptionalUnit(value.synthBrightness) &&
+    isOptionalUnit(value.synthRelease) &&
+    isOptionalUnit(value.chordWarmth) &&
+    isOptionalUnit(value.chordWidth)
   );
 }
 
@@ -710,6 +838,17 @@ function isPitch(value: unknown): value is string {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function isOptionalUnit(value: unknown): boolean {
+  return value === undefined || (isFiniteNumber(value) && value >= 0 && value <= 1);
+}
+
+function clampUnit(value: unknown): number {
+  if (!isFiniteNumber(value)) {
+    return 0.5;
+  }
+  return Math.min(1, Math.max(0, value));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

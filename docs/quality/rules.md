@@ -66,7 +66,9 @@ Drum, bass, melody, and arrangement work must preserve editable project state wi
 
 Chord progression work must preserve Pattern A/B/C independence, keep chord roots scale-aware by default, migrate older project files without chord events, and make chord events audible in both realtime playback and WAV export.
 
-Project file work must reject invalid imports without overwriting the current project and must preserve edited drum, bass, chord, melody, mixer, master, key, BPM, style, and arrangement data on save/load.
+Sound design work must keep tone parameters in project state, migrate older project files without sound data, and make preset or Studio tone changes audible in both realtime playback and WAV export.
+
+Project file work must reject invalid imports without overwriting the current project and must preserve edited drum, bass, chord, melody, sound design, mixer, master, key, BPM, style, and arrangement data on save/load.
 
 Pattern work must keep Pattern A/B/C as independent editable event data. Realtime playback should preview the selected pattern, while WAV export should follow arrangement pattern assignments.
 

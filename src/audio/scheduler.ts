@@ -5,7 +5,8 @@ import {
   loopStepCount,
   noteToFrequency,
   projectStepDurationSeconds,
-  ProjectState
+  ProjectState,
+  SoundDesign
 } from "../domain/workstation";
 
 export type PlaybackSnapshot = {
@@ -72,7 +73,14 @@ function snapshotForStep(step: number, loopSteps: number): PlaybackSnapshot {
   };
 }
 
-function scheduleKick(context: AudioContext, destination: AudioNode, time: number, gainValue: number, pan: number): void {
+function scheduleKick(
+  context: AudioContext,
+  destination: AudioNode,
+  time: number,
+  gainValue: number,
+  pan: number,
+  sound: SoundDesign
+): void {
   if (gainValue <= 0) {
     return;
   }
@@ -80,15 +88,15 @@ function scheduleKick(context: AudioContext, destination: AudioNode, time: numbe
   const gain = context.createGain();
   const panner = context.createStereoPanner();
   osc.type = "sine";
-  osc.frequency.setValueAtTime(92, time);
-  osc.frequency.exponentialRampToValueAtTime(45, time + 0.12);
+  osc.frequency.setValueAtTime(78 + sound.kickPunch * 42, time);
+  osc.frequency.exponentialRampToValueAtTime(42 + sound.kickPunch * 10, time + 0.09 + sound.kickPunch * 0.05);
   gain.gain.setValueAtTime(0.0001, time);
-  gain.gain.exponentialRampToValueAtTime(0.9 * gainValue, time + 0.008);
-  gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.22);
+  gain.gain.exponentialRampToValueAtTime((0.72 + sound.kickPunch * 0.3) * gainValue, time + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.18 + sound.kickPunch * 0.1);
   panner.pan.setValueAtTime(pan, time);
   osc.connect(gain).connect(panner).connect(destination);
   osc.start(time);
-  osc.stop(time + 0.25);
+  osc.stop(time + 0.3);
 }
 
 function scheduleNoise(
@@ -134,23 +142,58 @@ function scheduleTone(
   frequency: number,
   gainValue: number,
   type: OscillatorType,
-  pan: number
+  pan: number,
+  tone: { drive?: number; filterHz?: number; release?: number } = {}
 ): void {
   if (gainValue <= 0) {
     return;
   }
   const osc = context.createOscillator();
+  const filter = context.createBiquadFilter();
+  const drive = context.createWaveShaper();
   const gain = context.createGain();
   const panner = context.createStereoPanner();
   osc.type = type;
   osc.frequency.setValueAtTime(frequency, time);
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(tone.filterHz ?? 12000, time);
+  filter.Q.setValueAtTime(0.6, time);
+  drive.curve = driveCurve(tone.drive ?? 0);
+  drive.oversample = "2x";
   gain.gain.setValueAtTime(0.0001, time);
   gain.gain.exponentialRampToValueAtTime(gainValue, time + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, time + Math.max(0.04, duration));
+  gain.gain.exponentialRampToValueAtTime(0.0001, time + Math.max(0.04, duration + (tone.release ?? 0) * 0.12));
   panner.pan.setValueAtTime(pan, time);
-  osc.connect(gain).connect(panner).connect(destination);
+  osc.connect(filter).connect(drive).connect(gain).connect(panner).connect(destination);
   osc.start(time);
-  osc.stop(time + duration + 0.03);
+  osc.stop(time + duration + (tone.release ?? 0) * 0.14 + 0.03);
+}
+
+function driveCurve(amount: number): Float32Array<ArrayBuffer> {
+  const curve = new Float32Array(128);
+  const drive = 1 + amount * 18;
+  for (let index = 0; index < curve.length; index += 1) {
+    const x = (index / (curve.length - 1)) * 2 - 1;
+    curve[index] = Math.tanh(x * drive);
+  }
+  return curve;
+}
+
+function bassOscillator(sound: SoundDesign): OscillatorType {
+  if (sound.bassDrive > 0.64) {
+    return "sawtooth";
+  }
+  if (sound.bassDrive > 0.38) {
+    return "triangle";
+  }
+  return "sine";
+}
+
+function synthOscillator(sound: SoundDesign): OscillatorType {
+  if (sound.synthBrightness > 0.72) {
+    return "square";
+  }
+  return sound.synthBrightness > 0.46 ? "triangle" : "sine";
 }
 
 function scheduleStep(project: ProjectState, context: AudioContext, master: AudioNode, step: number, time: number): void {
@@ -159,25 +202,54 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
   const bassMix = channelMix(project, "bass_808");
   const synthMix = channelMix(project, "synth");
   const chordMix = channelMix(project, "chord");
+  const sound = project.sound;
   const stepDuration = projectStepDurationSeconds(project);
   const pattern = activePattern(project);
 
   if (pattern.drumPattern.kick[patternStep]) {
-    scheduleKick(context, master, time, drumMix.gain, drumMix.pan);
+    scheduleKick(context, master, time, drumMix.gain, drumMix.pan, sound);
   }
   if (pattern.drumPattern.clap[patternStep]) {
-    scheduleNoise(context, master, time, 0.15, 0.26 * drumMix.gain, 950, drumMix.pan);
+    scheduleNoise(
+      context,
+      master,
+      time,
+      0.11 + (1 - sound.snareSnap) * 0.08,
+      (0.2 + sound.snareSnap * 0.14) * drumMix.gain,
+      780 + sound.snareSnap * 1800,
+      drumMix.pan
+    );
   }
   if (pattern.drumPattern.hat[patternStep]) {
-    scheduleNoise(context, master, time, 0.045, 0.12 * drumMix.gain, 5200, drumMix.pan);
+    scheduleNoise(
+      context,
+      master,
+      time,
+      0.035 + (1 - sound.hatBrightness) * 0.025,
+      (0.08 + sound.hatBrightness * 0.08) * drumMix.gain,
+      4300 + sound.hatBrightness * 4200,
+      drumMix.pan
+    );
   }
   if (pattern.drumPattern.perc[patternStep]) {
-    scheduleTone(context, master, time, 0.07, 330, 0.12 * drumMix.gain, "triangle", drumMix.pan);
+    scheduleTone(context, master, time, 0.07, 260 + sound.snareSnap * 190, 0.12 * drumMix.gain, "triangle", drumMix.pan, {
+      filterHz: 1800 + sound.hatBrightness * 4200
+    });
   }
 
   for (const note of pattern.bassNotes) {
     if (note.step === patternStep) {
-      scheduleTone(context, master, time, note.length * stepDuration, noteToFrequency(note.pitch), 0.5 * bassMix.gain, "sine", bassMix.pan);
+      scheduleTone(
+        context,
+        master,
+        time,
+        note.length * stepDuration * (0.74 + sound.bassDecay * 0.52),
+        noteToFrequency(note.pitch),
+        (0.42 + sound.bassDrive * 0.22) * bassMix.gain,
+        bassOscillator(sound),
+        bassMix.pan,
+        { drive: sound.bassDrive, filterHz: 260 + sound.bassDrive * 1500, release: sound.bassDecay }
+      );
     }
   }
 
@@ -187,27 +259,31 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
         context,
         master,
         time,
-        note.length * stepDuration,
+        note.length * stepDuration * (0.8 + sound.synthRelease * 0.42),
         noteToFrequency(note.pitch),
         note.velocity * 0.12 * synthMix.gain,
-        "triangle",
-        synthMix.pan
+        synthOscillator(sound),
+        synthMix.pan,
+        { drive: sound.synthBrightness * 0.08, filterHz: 1200 + sound.synthBrightness * 7600, release: sound.synthRelease }
       );
     }
   }
 
   for (const chord of pattern.chordEvents) {
     if (chord.step === patternStep) {
-      for (const pitch of chordPitches(chord)) {
+      const pitches = chordPitches(chord);
+      for (const [voiceIndex, pitch] of pitches.entries()) {
+        const spread = pitches.length <= 1 ? 0 : (voiceIndex / (pitches.length - 1)) * 2 - 1;
         scheduleTone(
           context,
           master,
           time,
-          chord.length * stepDuration,
+          chord.length * stepDuration * (0.9 + sound.synthRelease * 0.24),
           noteToFrequency(pitch),
           chord.velocity * 0.08 * chordMix.gain,
           "triangle",
-          chordMix.pan
+          Math.max(-1, Math.min(1, chordMix.pan + spread * sound.chordWidth * 0.34)),
+          { drive: (1 - sound.chordWarmth) * 0.08, filterHz: 900 + (1 - sound.chordWarmth) * 6200, release: sound.synthRelease }
         );
       }
     }
