@@ -149,6 +149,8 @@ Stem level meter work must derive drum, 808, synth, and chord meter values from 
 
 Mix Coach work must derive suggestions only from deterministic full-mix and stem export analysis, remain read-only, preserve project state and existing realtime/WAV/stem/MIDI export semantics, communicate peak/RMS/headroom/limiter/stem-balance checks without LUFS, true-peak, platform compliance, or mastering-fix claims, and avoid imported audio, sampling, plugin hosting, remote AI, or remote analysis dependencies.
 
+Mix Fix work must run only after explicit user button clicks, derive action tone from deterministic local full-mix/stem analysis, route all mixer/master changes through undoable project update paths, keep fixes limited to editable mixer/master state, avoid hidden automatic mastering, and avoid LUFS, true-peak, platform compliance, sampling, plugin hosting, remote AI, remote analysis, accounts, analytics, or cloud sync claims.
+
 MIDI export work must write deterministic Standard MIDI Files from editable project events, follow arrangement Pattern A/B/C assignments, block lengths, track mutes, BPM, drum repeats, note/chord lengths, and chord inversions, include drum, 808, synth, and chord tracks, and avoid depending on rendered audio, imported samples, or sampler assets.
 
 Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation, pattern programming, sound design, arrangement, mixing/mastering, and export first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, roadmap order, or plan titles.

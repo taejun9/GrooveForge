@@ -175,6 +175,15 @@ type MixCoachCheck = {
   tone: MixCoachTone;
 };
 
+type MixFixPreset = "headroom" | "stem_balance" | "low_end";
+
+type MixFixAction = {
+  preset: MixFixPreset;
+  label: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
 type BeatReadinessCheck = {
   id: string;
   label: string;
@@ -846,6 +855,14 @@ export function App(): ReactElement {
       masterPreset: preset,
       masterCeilingDb: masterPresetCeilingDb(preset)
     }));
+  }
+
+  function applyMixFixPreset(preset: MixFixPreset): void {
+    const stemSnapshot = analyzeStemExports(projectRef.current);
+    updateProject(
+      (current) => applyMixFixToProject(current, preset, stemSnapshot),
+      `Applied ${mixFixPresetLabel(preset)} mix fix`
+    );
   }
 
   function applySoundPreset(preset: (typeof soundPresetIds)[number]): void {
@@ -2691,7 +2708,7 @@ export function App(): ReactElement {
             <span>{project.masterCeilingDb} dB ceiling</span>
           </div>
           <ExportMeter analysis={exportAnalysis} />
-          <MixCoach analysis={exportAnalysis} stemAnalyses={stemAnalyses} />
+          <MixCoach analysis={exportAnalysis} stemAnalyses={stemAnalyses} onApplyFix={applyMixFixPreset} />
           <label>
             <span>Ceiling</span>
             <input
@@ -3311,12 +3328,15 @@ function ExportMeter({ analysis }: { analysis: ExportAnalysis }): ReactElement {
 
 function MixCoach({
   analysis,
-  stemAnalyses
+  stemAnalyses,
+  onApplyFix
 }: {
   analysis: ExportAnalysis;
   stemAnalyses: StemExportAnalyses;
+  onApplyFix: (preset: MixFixPreset) => void;
 }): ReactElement {
   const checks = createMixCoachChecks(analysis, stemAnalyses);
+  const fixes = createMixFixActions(analysis, stemAnalyses);
 
   return (
     <div className="mix-coach" data-testid="mix-coach">
@@ -3333,8 +3353,56 @@ function MixCoach({
           </div>
         ))}
       </div>
+      <div className="mix-fix-row" aria-label="Mix fixes">
+        {fixes.map((fix) => (
+          <button
+            className={fix.tone}
+            data-testid={`mix-fix-${fix.preset}`}
+            key={fix.preset}
+            onClick={() => onApplyFix(fix.preset)}
+            title={fix.detail}
+            type="button"
+          >
+            <SlidersHorizontal size={14} aria-hidden="true" />
+            <span>{fix.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
+}
+
+function createMixFixActions(analysis: ExportAnalysis, stemAnalyses: StemExportAnalyses): MixFixAction[] {
+  const lowEndDelta = lowEndDeltaDb(stemAnalyses);
+  const headroomTone: MixCoachTone = analysis.headroomDb < 0.5 || analysis.limitedSamples > 0 ? "warn" : "good";
+  const lowEndTone: MixCoachTone =
+    lowEndDelta === null ? "danger" : lowEndDelta > 6 || lowEndDelta < -12 ? "warn" : "good";
+  const spread = stemSpreadDb(stemAnalyses);
+  const balanceTone: MixCoachTone = spread === null ? "danger" : spread > 18 ? "warn" : "good";
+
+  return [
+    {
+      preset: "headroom",
+      label: "Headroom",
+      detail: `Set vocal-safe ceiling and master gain from ${formatDb(analysis.headroomDb)} headroom.`,
+      tone: headroomTone
+    },
+    {
+      preset: "stem_balance",
+      label: "Stem Balance",
+      detail: spread === null ? "Nudge core stem levels after at least two stems have signal." : `Nudge ${spread.toFixed(1)} dB stem spread toward a rough balance.`,
+      tone: balanceTone
+    },
+    {
+      preset: "low_end",
+      label: "Low End",
+      detail:
+        lowEndDelta === null
+          ? "Set drum and 808 mixer values for comparison."
+          : `Tighten 808/drum relation at ${lowEndDelta.toFixed(1)} dB RMS delta.`,
+      tone: lowEndTone
+    }
+  ];
 }
 
 function createMixCoachChecks(analysis: ExportAnalysis, stemAnalyses: StemExportAnalyses): MixCoachCheck[] {
@@ -3362,6 +3430,122 @@ function createMixCoachChecks(analysis: ExportAnalysis, stemAnalyses: StemExport
     stemBalanceCheck(loudestStem, quietestStem, stemSpread),
     lowEndBlendCheck(lowEndDelta)
   ];
+}
+
+function applyMixFixToProject(
+  project: ProjectState,
+  preset: MixFixPreset,
+  stemAnalyses: StemExportAnalyses
+): ProjectState {
+  switch (preset) {
+    case "headroom":
+      return {
+        ...project,
+        masterPreset: "Headroom for Vocal",
+        masterCeilingDb: masterPresetCeilingDb("Headroom for Vocal"),
+        mixer: project.mixer.map((channel) =>
+          channel.id === "master"
+            ? { ...channel, volumeDb: Math.min(channel.volumeDb, -2) }
+            : {
+                ...channel,
+                drive: normalizeMixerEq(channel.drive * 0.9),
+                glue: normalizeMixerEq(channel.glue * 0.95)
+              }
+        )
+      };
+    case "stem_balance":
+      return {
+        ...project,
+        mixer: project.mixer.map((channel) => {
+          const target = roughStemVolumeTarget(channel.id);
+          return target === null ? channel : { ...channel, volumeDb: nudgeMixFixVolume(channel.volumeDb, target) };
+        })
+      };
+    case "low_end": {
+      const lowEndDelta = lowEndDeltaDb(stemAnalyses);
+      const bassShift = lowEndDelta === null ? 0 : lowEndDelta > 6 ? -2 : lowEndDelta < -12 ? 2 : 0;
+      const drumShift = lowEndDelta === null ? 0 : lowEndDelta > 6 ? 0.8 : lowEndDelta < -12 ? -0.8 : 0;
+      return {
+        ...project,
+        mixer: project.mixer.map((channel) => {
+          if (channel.id === "bass_808") {
+            return {
+              ...channel,
+              volumeDb: clampMixFixVolume(channel.volumeDb + bassShift),
+              lowCut: 0,
+              air: normalizeMixerEq(Math.min(channel.air, 0.12)),
+              drive: normalizeMixerEq(Math.max(channel.drive, 0.2)),
+              glue: normalizeMixerEq(Math.max(channel.glue, 0.2)),
+              send: normalizeMixerEq(Math.min(channel.send, 0.04))
+            };
+          }
+          if (channel.id === "drum_rack") {
+            return {
+              ...channel,
+              volumeDb: clampMixFixVolume(channel.volumeDb + drumShift),
+              lowCut: normalizeMixerEq(Math.max(channel.lowCut, 0.08)),
+              glue: normalizeMixerEq(Math.max(channel.glue, 0.24))
+            };
+          }
+          return channel;
+        })
+      };
+    }
+  }
+}
+
+function mixFixPresetLabel(preset: MixFixPreset): string {
+  switch (preset) {
+    case "headroom":
+      return "Headroom";
+    case "stem_balance":
+      return "Stem Balance";
+    case "low_end":
+      return "Low End";
+  }
+}
+
+function roughStemVolumeTarget(trackId: MixerChannel["id"]): number | null {
+  switch (trackId) {
+    case "drum_rack":
+      return -5;
+    case "bass_808":
+      return -6.5;
+    case "synth":
+      return -9;
+    case "chord":
+      return -9.5;
+    default:
+      return null;
+  }
+}
+
+function nudgeMixFixVolume(current: number, target: number): number {
+  return clampMixFixVolume(current + (target - current) * 0.65);
+}
+
+function clampMixFixVolume(value: number): number {
+  if (!Number.isFinite(value)) {
+    return -6;
+  }
+  return Math.min(3, Math.max(-36, Math.round(value * 10) / 10));
+}
+
+function lowEndDeltaDb(stemAnalyses: StemExportAnalyses): number | null {
+  const drums = stemAnalyses.drum_rack;
+  const bass = stemAnalyses.bass_808;
+  return Number.isFinite(drums.rmsDb) && Number.isFinite(bass.rmsDb) ? bass.rmsDb - drums.rmsDb : null;
+}
+
+function stemSpreadDb(stemAnalyses: StemExportAnalyses): number | null {
+  const audibleStems = stemTrackIds
+    .map((track) => stemAnalyses[track])
+    .filter((analysis) => Number.isFinite(analysis.rmsDb));
+  if (audibleStems.length < 2) {
+    return null;
+  }
+  const levels = audibleStems.map((analysis) => analysis.rmsDb);
+  return Math.max(...levels) - Math.min(...levels);
 }
 
 function masterHeadroomCheck(analysis: ExportAnalysis): MixCoachCheck {

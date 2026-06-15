@@ -64,7 +64,7 @@ Primary feature areas:
 - Project readiness: read-only checks for drums, 808/bass, melody/chords, arrangement, and export completeness.
 - Next Move: explicit local action recommendations that connect readiness/export state to Blueprint, Pattern Fill, Hook Lift, Save Slot, and Mix Check commands.
 - Project snapshots: local idea slots for saving, renaming, restoring, and deleting beat states inside the project file.
-- Mixer/master: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, master preset ceiling, limiter, loudness/peak metering.
+- Mixer/master: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Mix Fix actions, master preset ceiling, limiter, loudness/peak metering.
 - Export: WAV export, stem export, and arrangement MIDI export after the event/render paths are reliable.
 
 ## First-Class Data
@@ -136,7 +136,7 @@ MVP capabilities:
 - Transport playback modes for full arrangement playback by default and fast selected-pattern preview while editing.
 - Realtime metronome toggle with accented downbeat clicks that helps users program to the grid during playback without adding click audio to WAV or stem export.
 - Live playback reads the current project while scheduling future steps, so selected-pattern preview, arrangement block edits, arrangement track mutes, arrangement length, arrangement energy, BPM, mixer, sound, and master changes can be heard without stopping and restarting.
-- Mixer volume, pan, mute, solo, low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, and deterministic Mix Coach checks reflected in deterministic render feedback.
+- Mixer volume, pan, mute, solo, low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, and explicit Headroom/Stem Balance/Low End Mix Fix actions reflected in deterministic render feedback.
 - Master preset ceiling and output gain.
 - Reproducible export peak/RMS/headroom meter with limiter activity status for the current arrangement.
 - Local project save/load as a `.grooveforge.json` file.

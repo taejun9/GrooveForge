@@ -1991,6 +1991,44 @@ input[type="range"] {
   line-height: 1.35;
 }
 
+.mix-fix-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.mix-fix-row button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 6px;
+  color: #f4efe7;
+  background: rgba(120, 240, 200, 0.07);
+  padding: 0 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.mix-fix-row button.warn {
+  border-color: rgba(240, 195, 106, 0.3);
+  background: rgba(240, 195, 106, 0.08);
+}
+
+.mix-fix-row button.danger {
+  border-color: rgba(255, 122, 79, 0.34);
+  background: rgba(255, 122, 79, 0.08);
+}
+
+.mix-fix-row button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .preset-row {
   display: grid;
   gap: 7px;
