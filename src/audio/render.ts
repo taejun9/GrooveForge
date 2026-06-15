@@ -1,4 +1,6 @@
 import {
+  ArrangementBlock,
+  arrangementTotalBars,
   chordPitches,
   dbToGain,
   drumStepTimingMs,
@@ -8,6 +10,7 @@ import {
   patternForSlot,
   projectStepDurationSeconds,
   ProjectState,
+  normalizeArrangementBars,
   sidechainGainForStep,
   SoundDesign,
   TrackType
@@ -80,7 +83,19 @@ function masterOutputGain(project: ProjectState): number {
 }
 
 function arrangementBarCount(project: ProjectState): number {
-  return Math.max(1, project.arrangement.length);
+  return Math.max(1, arrangementTotalBars(project));
+}
+
+function arrangementBlockForBar(project: ProjectState, bar: number): ArrangementBlock | undefined {
+  let cursor = 0;
+  for (const block of project.arrangement) {
+    const blockBars = normalizeArrangementBars(block.bars);
+    if (bar < cursor + blockBars) {
+      return block;
+    }
+    cursor += blockBars;
+  }
+  return project.arrangement.at(-1);
 }
 
 type ToneShape = "sine" | "triangle" | "saw" | "square";
@@ -218,7 +233,7 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
 
   for (let bar = 0; bar < bars; bar += 1) {
     const barOffset = bar * 16;
-    const arrangementBlock = project.arrangement[bar % project.arrangement.length];
+    const arrangementBlock = arrangementBlockForBar(project, bar);
     const pattern = arrangementBlock ? patternForSlot(project, arrangementBlock.pattern) : patternForSlot(project, project.selectedPattern);
     for (let patternStep = 0; patternStep < 16; patternStep += 1) {
       const time = (barOffset + patternStep) * step;

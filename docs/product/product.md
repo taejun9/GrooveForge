@@ -57,7 +57,7 @@ Primary feature areas:
 - Transport: BPM, key, play, stop, loop, metronome.
 - Pattern editor: drum step sequencer, bass grid, chord progression, melody grid, variation A/B/C.
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
-- Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with arrangement templates plus duplicate, move, and delete controls.
+- Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with per-block bar lengths, arrangement templates plus duplicate, move, and delete controls.
 - Mixer/master: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling, sends, limiter, loudness/peak metering.
 - Export: WAV export first, then stems after the render path is reliable.
 
@@ -119,7 +119,7 @@ MVP capabilities:
 - Simple synth melody track with editable scale-aware grid and velocity control.
 - Sound design presets and Studio tone controls for kick punch, snare snap, hat brightness, 808 drive/decay, sidechain ducking, synth brightness/release, and chord warmth/width.
 - Independent Pattern A/B/C storage with copy/clear tools for drum, bass, chord, and melody variations.
-- Editable arrangement blocks and templates for 8-bar loop, full beat, hook-first, and breakdown structures, using assigned Pattern A/B/C data, per-block energy, and structure controls for duplicate, move, and delete.
+- Editable arrangement blocks and templates for 8-bar loop, full beat, hook-first, and breakdown structures, using assigned Pattern A/B/C data, per-block bar length, per-block energy, and structure controls for duplicate, move, and delete.
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
 - Desktop editing shortcuts for playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, and redo while leaving focused inputs alone.
 - Mixer volume, pan, mute, solo, low-cut/air EQ, and Drive/Glue mix controls reflected in realtime playback and WAV export.
@@ -139,7 +139,7 @@ Phase 2 builds 808/bass: monophonic synth, piano-roll style editor, glide, pitch
 
 Phase 3 adds melody/chords: simple poly synth, scale lock, chord progression presets, chord add/delete tools, melody grid, and preset patches.
 
-Phase 4 adds arrangement and editing speed: pattern blocks, song section markers, arrangement templates, duplicate/move/delete first, desktop editing shortcuts, then split/mute/reorder refinements, and variation A/B/C.
+Phase 4 adds arrangement and editing speed: pattern blocks, song section markers, per-block bar lengths, arrangement templates, duplicate/move/delete first, desktop editing shortcuts, then split/mute/reorder refinements, and variation A/B/C.
 
 Phase 5 adds mixer/master/export: volume, pan, mute, solo, channel low-cut/air EQ, Drive/Glue mix controls, master preset ceiling first, then sends, limiter, peak/LUFS metering, WAV export, and later stem export.
 
