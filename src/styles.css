@@ -100,7 +100,9 @@ h2 {
 .field span,
 .micro-controls span,
 .studio-controls span,
-.master-panel label span {
+.master-panel label span,
+.inspector-heading span,
+.note-inspector label span {
   color: rgba(244, 239, 231, 0.62);
   font-size: 12px;
 }
@@ -366,10 +368,22 @@ input[type="range"] {
   gap: 16px;
 }
 
-.lane-header {
+.lane-header,
+.inspector-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: 8px;
+}
+
+.lane-header span {
   color: rgba(244, 239, 231, 0.7);
   font-size: 12px;
-  margin-block-end: 8px;
+}
+
+.lane-header strong {
+  color: rgba(244, 239, 231, 0.44);
+  font-size: 11px;
 }
 
 .piano-grid {
@@ -398,19 +412,84 @@ input[type="range"] {
 }
 
 .note {
+  position: relative;
   min-height: 25px;
   border: 1px solid rgba(244, 239, 231, 0.08);
   border-radius: 5px;
   background: rgba(244, 239, 231, 0.035);
+  padding: 0;
+  overflow: hidden;
 }
 
 .note.active {
   border-color: color-mix(in srgb, var(--note) 72%, transparent);
+  background: color-mix(in srgb, var(--note) 24%, rgba(244, 239, 231, 0.035));
+}
+
+.note.active span {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  min-inline-size: 28%;
   background: var(--note);
+}
+
+.note em {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 5px;
+  color: #11100f;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .note.playhead {
   box-shadow: 0 0 0 2px rgba(244, 239, 231, 0.62) inset;
+}
+
+.note.selected {
+  outline: 2px solid #f0c36a;
+  outline-offset: 1px;
+}
+
+.note-inspector {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid rgba(244, 239, 231, 0.1);
+  padding-top: 12px;
+}
+
+.inspector-heading {
+  margin-block-end: 0;
+}
+
+.inspector-heading strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.inspector-grid {
+  display: grid;
+  grid-template-columns: 1fr minmax(96px, 0.5fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.inspector-grid label {
+  display: grid;
+  gap: 5px;
+}
+
+.toggle-row {
+  min-height: 42px;
+}
+
+.toggle-row input {
+  inline-size: 24px;
+  block-size: 24px;
+  accent-color: #f0c36a;
 }
 
 .device-list {

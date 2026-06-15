@@ -104,8 +104,8 @@ MVP capabilities:
 
 - BPM/key setup.
 - 16-step drum sequencer with built-in drum kit and drum-synth sources.
-- Synth 808/bass track with mono mode, pitch envelope, glide, and saturation.
-- Simple synth melody track with scale-aware grid.
+- Synth 808/bass track with editable scale-aware grid, mono mode, glide, and saturation direction.
+- Simple synth melody track with editable scale-aware grid and velocity control.
 - Pattern A/B/C storage.
 - Arrangement blocks for an 8-bar loop or simple song section.
 - Mixer volume and pan.

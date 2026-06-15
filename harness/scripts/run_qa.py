@@ -84,6 +84,10 @@ TEXT_EXPECTATIONS = {
         "exportWav",
         "startRealtimePlayback",
         "currentPatternStep",
+        "NoteEditor",
+        "toggleBassNote",
+        "toggleMelodyNote",
+        "NoteInspector",
     ],
     "src/audio/scheduler.ts": [
         "scheduleAheadSeconds",
@@ -94,6 +98,8 @@ TEXT_EXPECTATIONS = {
         "styleProfiles",
         "starterProject",
         "StyleProfile",
+        "bassPitchLanes",
+        "melodyPitchLanes",
     ],
 }
 

@@ -17,9 +17,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { exportWav } from "../audio/render";
 import { PlaybackController, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
 import {
+  BassNote,
   DrumLane,
   getStyle,
+  MelodyNote,
+  NoteTrack,
   ProjectState,
+  bassPitchLanes,
+  melodyPitchLanes,
   starterProject,
   steps,
   styleProfiles
@@ -34,14 +39,45 @@ const drumLabels: Record<DrumLane, string> = {
 
 const keys = ["F minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"];
 
+type SelectedNote = {
+  track: NoteTrack;
+  step: number;
+  pitch: string;
+};
+
+type NoteView = {
+  step: number;
+  pitch: string;
+  length: number;
+  velocity?: number;
+  glide?: boolean;
+};
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState<PlaybackSnapshot | null>(null);
+  const [selectedNote, setSelectedNote] = useState<SelectedNote | null>(null);
   const controllerRef = useRef<PlaybackController | null>(null);
   const style = getStyle(project);
   const activeChannels = useMemo(() => project.mixer.filter((channel) => !channel.muted).length, [project.mixer]);
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
+  const bassPitches = useMemo(
+    () => mergePitchLanes(bassPitchLanes(project.key), project.bassNotes.map((note) => note.pitch)),
+    [project.bassNotes, project.key]
+  );
+  const melodyPitches = useMemo(
+    () => mergePitchLanes(melodyPitchLanes(project.key), project.melodyNotes.map((note) => note.pitch)),
+    [project.key, project.melodyNotes]
+  );
+  const selectedBassNote =
+    selectedNote?.track === "bass"
+      ? project.bassNotes.find((note) => note.step === selectedNote.step && note.pitch === selectedNote.pitch)
+      : undefined;
+  const selectedMelodyNote =
+    selectedNote?.track === "melody"
+      ? project.melodyNotes.find((note) => note.step === selectedNote.step && note.pitch === selectedNote.pitch)
+      : undefined;
 
   useEffect(() => {
     return () => {
@@ -61,6 +97,76 @@ export function App(): ReactElement {
         ...current.drumPattern,
         [lane]: current.drumPattern[lane].map((enabled, index) => (index === step ? !enabled : enabled))
       }
+    }));
+  }
+
+  function toggleBassNote(step: number, pitch: string): void {
+    const exists = project.bassNotes.some((note) => note.step === step && note.pitch === pitch);
+    updateProject((current) => ({
+      ...current,
+      bassNotes: exists
+        ? current.bassNotes.filter((note) => note.step !== step || note.pitch !== pitch)
+        : sortBassNotes([...current.bassNotes, { step, pitch, length: 2, glide: false }])
+    }));
+    setSelectedNote(exists ? null : { track: "bass", step, pitch });
+  }
+
+  function toggleMelodyNote(step: number, pitch: string): void {
+    const exists = project.melodyNotes.some((note) => note.step === step && note.pitch === pitch);
+    updateProject((current) => ({
+      ...current,
+      melodyNotes: exists
+        ? current.melodyNotes.filter((note) => note.step !== step || note.pitch !== pitch)
+        : sortMelodyNotes([...current.melodyNotes, { step, pitch, length: 1, velocity: 0.68 }])
+    }));
+    setSelectedNote(exists ? null : { track: "melody", step, pitch });
+  }
+
+  function updateSelectedLength(length: number): void {
+    if (!selectedNote) {
+      return;
+    }
+
+    updateProject((current) => ({
+      ...current,
+      bassNotes:
+        selectedNote.track === "bass"
+          ? current.bassNotes.map((note) =>
+              note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, length } : note
+            )
+          : current.bassNotes,
+      melodyNotes:
+        selectedNote.track === "melody"
+          ? current.melodyNotes.map((note) =>
+              note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, length } : note
+            )
+          : current.melodyNotes
+    }));
+  }
+
+  function updateSelectedGlide(glide: boolean): void {
+    if (!selectedNote || selectedNote.track !== "bass") {
+      return;
+    }
+
+    updateProject((current) => ({
+      ...current,
+      bassNotes: current.bassNotes.map((note) =>
+        note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, glide } : note
+      )
+    }));
+  }
+
+  function updateSelectedVelocity(velocity: number): void {
+    if (!selectedNote || selectedNote.track !== "melody") {
+      return;
+    }
+
+    updateProject((current) => ({
+      ...current,
+      melodyNotes: current.melodyNotes.map((note) =>
+        note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, velocity } : note
+      )
     }));
   }
 
@@ -257,14 +363,37 @@ export function App(): ReactElement {
         <section className="panel piano-panel" aria-label="Bass and melody editor">
           <PanelTitle icon={<KeyboardMusic size={18} />} title="808 / Melody" meta="scale locked grid" />
           <div className="note-lanes">
-            <NoteLane
+            <NoteEditor
               title="808"
+              track="bass"
               notes={project.bassNotes.map((note) => ({ ...note, velocity: note.glide ? 0.95 : 0.82 }))}
+              pitches={bassPitches}
               color="#ff7a4f"
               currentStep={currentPatternStep}
+              selectedNote={selectedNote}
+              onToggle={toggleBassNote}
             />
-            <NoteLane title="Synth" notes={project.melodyNotes} color="#8aa8ff" currentStep={currentPatternStep} />
+            <NoteEditor
+              title="Synth"
+              track="melody"
+              notes={project.melodyNotes}
+              pitches={melodyPitches}
+              color="#8aa8ff"
+              currentStep={currentPatternStep}
+              selectedNote={selectedNote}
+              onToggle={toggleMelodyNote}
+            />
           </div>
+          {project.mode === "studio" && (
+            <NoteInspector
+              selectedNote={selectedNote}
+              bassNote={selectedBassNote}
+              melodyNote={selectedMelodyNote}
+              onLengthChange={updateSelectedLength}
+              onGlideChange={updateSelectedGlide}
+              onVelocityChange={updateSelectedVelocity}
+            />
+          )}
         </section>
 
         <section className="panel instrument-panel" aria-label="Instrument panel">
@@ -399,42 +528,122 @@ function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; met
   );
 }
 
-function NoteLane({
+function NoteEditor({
   title,
+  track,
   notes,
+  pitches,
   color,
-  currentStep
+  currentStep,
+  selectedNote,
+  onToggle
 }: {
   title: string;
-  notes: { step: number; pitch: string; length: number; velocity: number }[];
+  track: NoteTrack;
+  notes: NoteView[];
+  pitches: string[];
   color: string;
   currentStep: number | null;
+  selectedNote: SelectedNote | null;
+  onToggle: (step: number, pitch: string) => void;
 }): ReactElement {
-  const pitches = Array.from(new Set(notes.map((note) => note.pitch))).reverse();
+  const displayPitches = [...pitches].reverse();
   return (
     <div className="note-lane">
-      <div className="lane-header">{title}</div>
+      <div className="lane-header">
+        <span>{title}</span>
+        <strong>{notes.length} events</strong>
+      </div>
       <div className="piano-grid" style={{ "--note": color } as CSSProperties}>
-        {pitches.map((pitch) => (
+        {displayPitches.map((pitch) => (
           <div className="piano-row" key={pitch}>
             <span>{pitch}</span>
             <div>
               {steps.map((step) => {
                 const note = notes.find((candidate) => candidate.step === step && candidate.pitch === pitch);
+                const selected =
+                  selectedNote?.track === track && selectedNote.step === step && selectedNote.pitch === pitch;
                 return (
-                  <i
-                    className={["note", note ? "active" : "", currentStep === step ? "playhead" : ""]
+                  <button
+                    aria-label={`${title} ${pitch} step ${step + 1}`}
+                    aria-pressed={Boolean(note)}
+                    className={["note", note ? "active" : "", currentStep === step ? "playhead" : "", selected ? "selected" : ""]
                       .filter(Boolean)
                       .join(" ")}
                     key={`${pitch}-${step}`}
-                    style={note ? { gridColumn: `${step + 1} / span ${note.length}` } : undefined}
-                  />
+                    onClick={() => onToggle(step, pitch)}
+                    type="button"
+                  >
+                    {note && <span style={{ inlineSize: `${Math.min(100, note.length * 25)}%` }} />}
+                    {note?.glide && <em>G</em>}
+                  </button>
                 );
               })}
             </div>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function NoteInspector({
+  selectedNote,
+  bassNote,
+  melodyNote,
+  onLengthChange,
+  onGlideChange,
+  onVelocityChange
+}: {
+  selectedNote: SelectedNote | null;
+  bassNote?: BassNote;
+  melodyNote?: MelodyNote;
+  onLengthChange: (length: number) => void;
+  onGlideChange: (glide: boolean) => void;
+  onVelocityChange: (velocity: number) => void;
+}): ReactElement {
+  const activeNote = bassNote ?? melodyNote;
+  const label = selectedNote ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}` : "None";
+  return (
+    <div className="note-inspector">
+      <div className="inspector-heading">
+        <span>Selected</span>
+        <strong>{activeNote ? label : "None"}</strong>
+      </div>
+      {activeNote && (
+        <div className="inspector-grid">
+          <label>
+            <span>Length</span>
+            <input
+              type="range"
+              min={1}
+              max={8}
+              step={1}
+              value={activeNote.length}
+              onChange={(event) => onLengthChange(Number(event.target.value))}
+            />
+          </label>
+          {bassNote && (
+            <label className="toggle-row">
+              <span>Glide</span>
+              <input type="checkbox" checked={bassNote.glide} onChange={(event) => onGlideChange(event.target.checked)} />
+            </label>
+          )}
+          {melodyNote && (
+            <label>
+              <span>Velocity</span>
+              <input
+                type="range"
+                min={0.2}
+                max={1}
+                step={0.01}
+                value={melodyNote.velocity}
+                onChange={(event) => onVelocityChange(Number(event.target.value))}
+              />
+            </label>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -467,4 +676,16 @@ function laneColor(lane: DrumLane): string {
     perc: "#8aa8ff"
   };
   return colors[lane];
+}
+
+function mergePitchLanes(scalePitches: string[], usedPitches: string[]): string[] {
+  return Array.from(new Set([...scalePitches, ...usedPitches]));
+}
+
+function sortBassNotes(notes: BassNote[]): BassNote[] {
+  return [...notes].sort((first, second) => first.step - second.step || first.pitch.localeCompare(second.pitch));
+}
+
+function sortMelodyNotes(notes: MelodyNote[]): MelodyNote[] {
+  return [...notes].sort((first, second) => first.step - second.step || first.pitch.localeCompare(second.pitch));
 }

@@ -28,7 +28,7 @@ The first usable result is a browser project that can create a sample-free 8-bar
 - Pattern A/B/C storage and arrangement blocks.
 - Basic mixer volume/pan, master limiter, and WAV export.
 
-The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport, style/key/BPM, drum steps, 808/melody lanes, instruments, arrangement, mixer, master, realtime loop playback, and WAV export.
+The first desktop runtime is an Electron + Vite + TypeScript app. It opens directly into the workstation surface: transport, style/key/BPM, drum steps, editable scale-aware 808/melody lanes, instruments, arrangement, mixer, master, realtime loop playback, and WAV export.
 
 ## Core Direction
 

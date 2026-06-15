@@ -41,6 +41,8 @@ export type MelodyNote = {
   velocity: number;
 };
 
+export type NoteTrack = "bass" | "melody";
+
 export type MixerChannel = {
   id: TrackType;
   name: string;
@@ -76,6 +78,34 @@ export type ProjectState = {
 
 export const steps = Array.from({ length: 16 }, (_, index) => index);
 export const stepsPerBar = 16;
+
+const sharpNotes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const flatNotes = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+const tonicIndex: Record<string, number> = {
+  C: 0,
+  "C#": 1,
+  Db: 1,
+  D: 2,
+  "D#": 3,
+  Eb: 3,
+  E: 4,
+  F: 5,
+  "F#": 6,
+  Gb: 6,
+  G: 7,
+  "G#": 8,
+  Ab: 8,
+  A: 9,
+  "A#": 10,
+  Bb: 10,
+  B: 11
+};
+
+const scaleIntervals: Record<string, number[]> = {
+  major: [0, 2, 4, 5, 7, 9, 11],
+  minor: [0, 2, 3, 5, 7, 8, 10],
+  dorian: [0, 2, 3, 5, 7, 9, 10]
+};
 
 export const styleProfiles: StyleProfile[] = [
   {
@@ -230,6 +260,40 @@ export function loopStepCount(bars: number): number {
 
 export function stepToSeconds(project: ProjectState, absoluteStep: number): number {
   return absoluteStep * projectStepDurationSeconds(project);
+}
+
+export function scalePitchNames(key: string): string[] {
+  const [tonic = "C", mode = "minor"] = key.split(" ");
+  const root = tonicIndex[tonic] ?? 0;
+  const intervals = scaleIntervals[mode] ?? scaleIntervals.minor;
+  const noteNames = tonic.includes("b") || ["F", "Bb", "Eb", "Ab", "Db"].includes(tonic) ? flatNotes : sharpNotes;
+  return intervals.map((interval) => noteNames[(root + interval) % 12]);
+}
+
+export function scalePitches(key: string, startOctave: number): string[] {
+  const [tonic = "C", mode = "minor"] = key.split(" ");
+  const root = tonicIndex[tonic] ?? 0;
+  const intervals = scaleIntervals[mode] ?? scaleIntervals.minor;
+  const names = scalePitchNames(key);
+  let octave = startOctave;
+  let previousIndex = root;
+  const pitches = intervals.map((interval, index) => {
+    const pitchIndex = (root + interval) % 12;
+    if (index > 0 && pitchIndex < previousIndex) {
+      octave += 1;
+    }
+    previousIndex = pitchIndex;
+    return `${names[index]}${octave}`;
+  });
+  return [...pitches, `${names[0]}${startOctave + 1}`];
+}
+
+export function bassPitchLanes(key: string): string[] {
+  return scalePitches(key, 1);
+}
+
+export function melodyPitchLanes(key: string): string[] {
+  return scalePitches(key, 4);
 }
 
 export function noteToFrequency(note: string): number {
