@@ -30,6 +30,7 @@ If a draft, screen, or roadmap has to choose what appears first, the answer is d
 The first usable result is an Electron desktop workstation that can create a sample-free 8-bar beat in any supported style profile and export it as WAV:
 
 - 145 BPM / F minor starter project.
+- Key changes that retarget Pattern A/B/C 808, synth, and chord-root event data instead of only changing the project label.
 - Style selector that applies editable genre groove templates for Pattern A/B/C, BPM, swing, and sound preset.
 - Kick, snare/clap, hat, 808, chord, and synth melody tracks with editable drum velocity, event chance, chance badges, microtiming, one-click groove humanization, hat repeat dynamics, and selected-note move/transpose/duplicate tools.
 - Key-aware chord progression presets with chord add/delete controls and per-chord chance for fast harmonic sketching.

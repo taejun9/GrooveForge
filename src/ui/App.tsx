@@ -95,6 +95,7 @@ import {
   patternVariationPresetIds,
   patternVariationPresetLabel,
   projectFileName,
+  retargetProjectKey,
   scalePitches,
   scalePitchNames,
   serializeProjectFile,
@@ -1269,6 +1270,14 @@ export function App(): ReactElement {
     );
   }
 
+  function applyProjectKey(key: string): void {
+    const changed = updateProject((current) => retargetProjectKey(current, key), `Retargeted project to ${key}`);
+    if (changed) {
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+    }
+  }
+
   function selectStyle(styleId: ProjectState["styleId"]): void {
     const nextStyle = styleProfiles.find((candidate) => candidate.id === styleId);
     if (!nextStyle) {
@@ -1327,10 +1336,7 @@ export function App(): ReactElement {
           </label>
           <label className="field">
             <span>Key</span>
-            <select
-              value={project.key}
-              onChange={(event) => updateProject((current) => ({ ...current, key: event.target.value }))}
-            >
+            <select value={project.key} onChange={(event) => applyProjectKey(event.target.value)}>
               {keys.map((key) => (
                 <option key={key}>{key}</option>
               ))}

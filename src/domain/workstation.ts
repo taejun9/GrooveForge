@@ -1378,6 +1378,82 @@ export function scalePitches(key: string, startOctave: number): string[] {
   return [...pitches, `${names[0]}${startOctave + 1}`];
 }
 
+export function retargetPitchNameToKey(pitchName: string, sourceKey: string, targetKey: string): string {
+  if (sourceKey === targetKey) {
+    return pitchName;
+  }
+
+  const degree = nearestScaleDegree(pitchName, sourceKey);
+  if (degree === null) {
+    return pitchName;
+  }
+
+  return scalePitchNames(targetKey)[degree] ?? pitchName;
+}
+
+export function retargetPitchToKey(pitch: string, sourceKey: string, targetKey: string): string {
+  if (sourceKey === targetKey) {
+    return pitch;
+  }
+
+  const parts = pitchParts(pitch);
+  if (!parts) {
+    return pitch;
+  }
+
+  const degree = nearestScaleDegree(parts.name, sourceKey);
+  if (degree === null) {
+    return pitch;
+  }
+
+  const sourceDegreeOctaveOffset = scaleDegreeOctaveOffset(sourceKey, degree);
+  const targetStartOctave = parts.octave - sourceDegreeOctaveOffset;
+  return scalePitches(targetKey, targetStartOctave)[degree] ?? pitch;
+}
+
+export function retargetPatternKey(pattern: PatternData, sourceKey: string, targetKey: string): PatternData {
+  if (sourceKey === targetKey) {
+    return pattern;
+  }
+
+  return {
+    ...pattern,
+    bassNotes: sortBassNotes(
+      pattern.bassNotes.map((note) => ({
+        ...note,
+        pitch: retargetPitchToKey(note.pitch, sourceKey, targetKey)
+      }))
+    ),
+    melodyNotes: sortMelodyNotes(
+      pattern.melodyNotes.map((note) => ({
+        ...note,
+        pitch: retargetPitchToKey(note.pitch, sourceKey, targetKey)
+      }))
+    ),
+    chordEvents: pattern.chordEvents.map((event) => ({
+      ...event,
+      root: retargetPitchNameToKey(event.root, sourceKey, targetKey)
+    }))
+  };
+}
+
+export function retargetProjectKey(project: ProjectState, targetKey: string): ProjectState {
+  if (project.key === targetKey) {
+    return project;
+  }
+
+  const sourceKey = project.key;
+  return {
+    ...project,
+    key: targetKey,
+    patterns: {
+      A: retargetPatternKey(project.patterns.A, sourceKey, targetKey),
+      B: retargetPatternKey(project.patterns.B, sourceKey, targetKey),
+      C: retargetPatternKey(project.patterns.C, sourceKey, targetKey)
+    }
+  };
+}
+
 export function bassPitchLanes(key: string): string[] {
   return scalePitches(key, 1);
 }
@@ -1416,6 +1492,45 @@ export function chordPitches(chord: ChordEvent, octave = 3): string[] {
     const octaveOffset = Math.floor(absolute / 12);
     return `${names[pitchIndex]}${octave + octaveOffset}`;
   });
+}
+
+function pitchParts(pitch: string): { name: string; octave: number } | null {
+  const match = /^([A-G](?:#|b)?)(-?\d+)$/.exec(pitch);
+  if (!match) {
+    return null;
+  }
+  return { name: match[1], octave: Number(match[2]) };
+}
+
+function nearestScaleDegree(pitchName: string, key: string): number | null {
+  const pitchClass = tonicIndex[pitchName];
+  if (pitchClass === undefined) {
+    return null;
+  }
+
+  const scalePitchClasses = scalePitchNames(key).map((name) => tonicIndex[name] ?? 0);
+  const exactDegree = scalePitchClasses.findIndex((candidate) => candidate === pitchClass);
+  if (exactDegree >= 0) {
+    return exactDegree;
+  }
+
+  return scalePitchClasses.reduce(
+    (best, candidate, degree) => {
+      const distance = circularPitchDistance(pitchClass, candidate);
+      return distance < best.distance ? { degree, distance } : best;
+    },
+    { degree: 0, distance: Number.POSITIVE_INFINITY }
+  ).degree;
+}
+
+function scaleDegreeOctaveOffset(key: string, degree: number): number {
+  const referencePitch = scalePitches(key, 0)[degree];
+  return pitchParts(referencePitch)?.octave ?? 0;
+}
+
+function circularPitchDistance(first: number, second: number): number {
+  const distance = Math.abs(first - second) % 12;
+  return Math.min(distance, 12 - distance);
 }
 
 function normalizePatternData(pattern: PatternDataInput): PatternData {
