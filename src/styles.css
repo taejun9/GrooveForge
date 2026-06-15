@@ -1352,6 +1352,53 @@ input[type="range"] {
   white-space: nowrap;
 }
 
+.stem-meter {
+  display: grid;
+  gap: 7px;
+  border-block: 1px solid rgba(244, 239, 231, 0.08);
+  padding-block: 8px 7px;
+}
+
+.stem-meter-status,
+.stem-meter-stats {
+  display: grid;
+  gap: 6px;
+}
+
+.stem-meter-status {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.stem-meter-status span,
+.stem-meter-stats span {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 11px;
+}
+
+.stem-meter-status strong {
+  color: #78f0c8;
+  font-size: 11px;
+}
+
+.stem-meter-status.hot strong,
+.stem-meter-status.limiter-active strong {
+  color: #f0c36a;
+}
+
+.stem-meter-status.silent strong {
+  color: #ff7a4f;
+}
+
+.stem-meter-bars {
+  display: grid;
+  gap: 6px;
+}
+
+.stem-meter .meter-bar {
+  grid-template-columns: 30px 1fr 58px;
+}
+
 .master-readout {
   display: grid;
   gap: 5px;

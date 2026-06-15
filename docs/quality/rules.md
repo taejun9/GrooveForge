@@ -133,6 +133,8 @@ Export meter work must label measurements honestly as peak, RMS, headroom, and l
 
 Stem export work must render isolated drum, 808, synth, and chord WAV files from the current arrangement, keep full-mix WAV export intact, and avoid depending on imported audio or sample assets.
 
+Stem level meter work must derive drum, 808, synth, and chord meter values from the deterministic offline stem render path, show peak/RMS/headroom honestly without LUFS or true-peak claims, avoid mutating project state, keep existing realtime playback and WAV/stem/MIDI export semantics intact, and avoid imported audio, sampling, plugin hosting, or remote analysis dependencies.
+
 MIDI export work must write deterministic Standard MIDI Files from editable project events, follow arrangement Pattern A/B/C assignments, block lengths, track mutes, BPM, drum repeats, note/chord lengths, and chord inversions, include drum, 808, synth, and chord tracks, and avoid depending on rendered audio, imported samples, or sampler assets.
 
 Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation, pattern programming, sound design, arrangement, mixing/mastering, and export first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, roadmap order, or plan titles.

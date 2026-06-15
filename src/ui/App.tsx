@@ -26,7 +26,15 @@ import {
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { exportMidi } from "../audio/midi";
-import { analyzeExport, ExportAnalysis, exportStems, exportWav } from "../audio/render";
+import {
+  analyzeExport,
+  analyzeStemExports,
+  ExportAnalysis,
+  exportStems,
+  exportWav,
+  stemTrackIds,
+  StemTrackId
+} from "../audio/render";
 import { PlaybackController, PlaybackMode, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
 import {
   ArrangementBlock,
@@ -124,6 +132,10 @@ const drumLabels: Record<DrumLane, string> = {
 const keys = ["F minor", "A minor", "C minor", "D minor", "E minor", "G minor", "C major", "D dorian"];
 const historyLimit = 50;
 
+function isStemTrackId(track: MixerChannel["id"]): track is StemTrackId {
+  return (stemTrackIds as readonly string[]).includes(track);
+}
+
 type SelectedNote = {
   track: NoteTrack;
   step: number;
@@ -163,6 +175,7 @@ export function App(): ReactElement {
   const style = getStyle(project);
   const currentPattern = activePattern(project);
   const exportAnalysis = useMemo(() => analyzeExport(project), [project]);
+  const stemAnalyses = useMemo(() => analyzeStemExports(project), [project]);
   const activeChannels = useMemo(() => {
     const soloActive = project.mixer.some((channel) => channel.id !== "master" && channel.solo);
     return project.mixer.filter(
@@ -2256,6 +2269,9 @@ export function App(): ReactElement {
                     />
                   </div>
                 </label>
+                {isStemTrackId(channel.id) && (
+                  <StemLevelMeter analysis={stemAnalyses[channel.id]} trackId={channel.id} />
+                )}
                 {channel.id !== "master" && (
                   <div className="eq-controls" aria-label={`${channel.name} channel EQ`}>
                     <label className="strip-control">
@@ -2495,6 +2511,34 @@ function MeterBar({
         <b style={{ inlineSize: `${percent}%` }} />
       </i>
       <strong data-testid={testId}>{value}</strong>
+    </div>
+  );
+}
+
+function StemLevelMeter({
+  trackId,
+  analysis
+}: {
+  trackId: StemTrackId;
+  analysis: ExportAnalysis;
+}): ReactElement {
+  const peakPercent = meterPercent(analysis.peakDb, analysis.ceilingDb);
+  const rmsPercent = meterPercent(analysis.rmsDb, analysis.ceilingDb);
+  const statusClass = analysis.status.toLowerCase().replace(/[^a-z]+/g, "-");
+
+  return (
+    <div className="stem-meter" data-testid={`stem-level-meter-${trackId}`}>
+      <div className={`stem-meter-status ${statusClass}`}>
+        <span>Stem</span>
+        <strong data-testid={`stem-status-${trackId}`}>{analysis.status}</strong>
+      </div>
+      <div className="stem-meter-bars">
+        <MeterBar label="Pk" percent={peakPercent} value={formatDb(analysis.peakDb)} testId={`stem-peak-db-${trackId}`} />
+        <MeterBar label="RMS" percent={rmsPercent} value={formatDb(analysis.rmsDb)} testId={`stem-rms-db-${trackId}`} />
+      </div>
+      <div className="stem-meter-stats">
+        <span data-testid={`stem-headroom-db-${trackId}`}>Headroom {formatDb(analysis.headroomDb)}</span>
+      </div>
     </div>
   );
 }

@@ -38,6 +38,7 @@ export type ExportAnalysis = {
   limitedPercent: number;
   status: "Ready" | "Hot" | "Limiter active" | "Silent";
 };
+export type StemExportAnalyses = Record<StemTrackId, ExportAnalysis>;
 
 type AudioChannels = [Float32Array<ArrayBuffer>, Float32Array<ArrayBuffer>];
 type RenderedAudio = {
@@ -640,4 +641,14 @@ export function exportStems(project: ProjectState): string[] {
 
 export function analyzeExport(project: ProjectState): ExportAnalysis {
   return renderProject(project).analysis;
+}
+
+export function analyzeStemExports(project: ProjectState): StemExportAnalyses {
+  return stemTrackIds.reduce<StemExportAnalyses>(
+    (analyses, track) => ({
+      ...analyses,
+      [track]: renderProject(project, arrangementBarCount(project), track).analysis
+    }),
+    {} as StemExportAnalyses
+  );
 }
