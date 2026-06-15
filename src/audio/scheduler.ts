@@ -1,23 +1,36 @@
 import {
   dbToGain,
   activePattern,
+  ArrangementSection,
+  arrangementTotalBars,
   chordPitches,
   loopStepCount,
   drumStepTimingMs,
   drumStepVelocity,
   hatRepeatCount,
+  normalizeArrangementBars,
   noteToFrequency,
+  PatternData,
+  PatternSlot,
+  patternForSlot,
   projectStepDurationSeconds,
   ProjectState,
   sidechainGainForStep,
   SoundDesign
 } from "../domain/workstation";
 
+export type PlaybackMode = "arrangement" | "pattern";
+
 export type PlaybackSnapshot = {
   absoluteStep: number;
   loopStep: number;
   bar: number;
   beat: number;
+  mode: PlaybackMode;
+  pattern: PatternSlot;
+  section?: ArrangementSection;
+  arrangementIndex?: number;
+  totalBars: number;
 };
 
 export type PlaybackController = {
@@ -26,6 +39,7 @@ export type PlaybackController = {
 
 type SchedulerOptions = {
   bars?: number;
+  mode?: PlaybackMode;
   onStep?: (snapshot: PlaybackSnapshot) => void;
   onStop?: () => void;
 };
@@ -106,13 +120,58 @@ function masterOutputGain(project: ProjectState): number {
   return channelMix(project, "master").gain;
 }
 
-function snapshotForStep(step: number, loopSteps: number): PlaybackSnapshot {
+type PlaybackStepContext = {
+  pattern: PatternData;
+  patternSlot: PatternSlot;
+  section?: ArrangementSection;
+  arrangementIndex?: number;
+};
+
+function arrangementContextForBar(project: ProjectState, bar: number): PlaybackStepContext {
+  let cursor = 0;
+  for (const [index, block] of project.arrangement.entries()) {
+    const blockBars = normalizeArrangementBars(block.bars);
+    if (bar < cursor + blockBars) {
+      return {
+        pattern: patternForSlot(project, block.pattern),
+        patternSlot: block.pattern,
+        section: block.section,
+        arrangementIndex: index
+      };
+    }
+    cursor += blockBars;
+  }
+
+  return {
+    pattern: activePattern(project),
+    patternSlot: project.selectedPattern
+  };
+}
+
+function playbackContextForStep(project: ProjectState, mode: PlaybackMode, loopStep: number): PlaybackStepContext {
+  if (mode === "pattern") {
+    return {
+      pattern: activePattern(project),
+      patternSlot: project.selectedPattern
+    };
+  }
+
+  return arrangementContextForBar(project, Math.floor(loopStep / 16));
+}
+
+function snapshotForStep(project: ProjectState, step: number, loopSteps: number, totalBars: number, mode: PlaybackMode): PlaybackSnapshot {
   const loopStep = step % loopSteps;
+  const playbackContext = playbackContextForStep(project, mode, loopStep);
   return {
     absoluteStep: step,
     loopStep,
     bar: Math.floor(loopStep / 16) + 1,
-    beat: Math.floor((loopStep % 16) / 4) + 1
+    beat: Math.floor((loopStep % 16) / 4) + 1,
+    mode,
+    pattern: playbackContext.patternSlot,
+    section: playbackContext.section,
+    arrangementIndex: playbackContext.arrangementIndex,
+    totalBars
   };
 }
 
@@ -257,7 +316,7 @@ function synthOscillator(sound: SoundDesign): OscillatorType {
   return sound.synthBrightness > 0.46 ? "triangle" : "sine";
 }
 
-function scheduleStep(project: ProjectState, context: AudioContext, master: AudioNode, step: number, time: number): void {
+function scheduleStep(project: ProjectState, pattern: PatternData, context: AudioContext, master: AudioNode, step: number, time: number): void {
   const patternStep = step % 16;
   const drumMix = channelMix(project, "drum_rack");
   const bassMix = channelMix(project, "bass_808");
@@ -265,8 +324,6 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
   const chordMix = channelMix(project, "chord");
   const sound = project.sound;
   const stepDuration = projectStepDurationSeconds(project);
-  const pattern = activePattern(project);
-
   if (pattern.drumPattern.kick[patternStep]) {
     const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
     scheduleKick(context, master, drumTime, drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix, sound);
@@ -396,8 +453,10 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
 export function startRealtimePlayback(project: ProjectState, options: SchedulerOptions = {}): PlaybackController {
   const context = createAudioContext();
   void context.resume();
-  const bars = options.bars ?? 2;
+  const mode = options.mode ?? "arrangement";
+  const bars = options.bars ?? (mode === "arrangement" ? arrangementTotalBars(project) : 2);
   const loopSteps = loopStepCount(bars);
+  const totalBars = Math.max(1, bars);
   const stepDuration = projectStepDurationSeconds(project);
   const masterGain = context.createGain();
   const ceiling = dbToGain(project.masterCeilingDb);
@@ -428,9 +487,10 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
 
     const nowMs = performance.now();
     while (nextStepAtMs < nowMs + scheduleAheadMs) {
-      const snapshot = snapshotForStep(nextStep, loopSteps);
+      const snapshot = snapshotForStep(project, nextStep, loopSteps, totalBars, mode);
+      const playbackContext = playbackContextForStep(project, mode, snapshot.loopStep);
       const scheduleDelaySeconds = Math.max(0.015, (nextStepAtMs - nowMs) / 1000);
-      scheduleStep(project, context, masterGain, snapshot.loopStep, context.currentTime + scheduleDelaySeconds);
+      scheduleStep(project, playbackContext.pattern, context, masterGain, snapshot.loopStep, context.currentTime + scheduleDelaySeconds);
       queueStepFeedback(snapshot, nextStepAtMs);
       nextStep += 1;
       nextStepAtMs += stepDuration * 1000;

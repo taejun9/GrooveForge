@@ -23,7 +23,7 @@ import {
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { analyzeExport, ExportAnalysis, exportStems, exportWav } from "../audio/render";
-import { PlaybackController, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
+import { PlaybackController, PlaybackMode, PlaybackSnapshot, startRealtimePlayback } from "../audio/scheduler";
 import {
   ArrangementBlock,
   ArrangementSection,
@@ -125,6 +125,7 @@ export function App(): ReactElement {
   const [undoStack, setUndoStack] = useState<ProjectState[]>([]);
   const [redoStack, setRedoStack] = useState<ProjectState[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackMode, setPlaybackMode] = useState<PlaybackMode>("arrangement");
   const [playbackPosition, setPlaybackPosition] = useState<PlaybackSnapshot | null>(null);
   const [selectedNote, setSelectedNote] = useState<SelectedNote | null>(null);
   const [selectedDrumStep, setSelectedDrumStep] = useState<SelectedDrumStep | null>(null);
@@ -146,6 +147,16 @@ export function App(): ReactElement {
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
+  const transportPrimary = isPlaying
+    ? playbackPosition?.mode === "pattern"
+      ? `Pattern ${playbackPosition.pattern} ${playbackPosition.bar}.${playbackPosition.beat}`
+      : `${playbackPosition?.section ?? "Arrangement"} ${playbackPosition?.bar ?? 1}.${playbackPosition?.beat ?? 1}`
+    : "Ready";
+  const transportSecondary = isPlaying
+    ? `Pattern ${playbackPosition?.pattern ?? project.selectedPattern} / Step ${(currentPatternStep ?? 0) + 1}`
+    : playbackMode === "arrangement"
+      ? `${barCountLabel(arrangementTotalBars(project))} arrangement`
+      : `Pattern ${project.selectedPattern} preview`;
   const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const bassPitches = useMemo(
     () => mergePitchLanes(bassPitchLanes(project.key), currentPattern.bassNotes.map((note) => note.pitch)),
@@ -197,7 +208,7 @@ export function App(): ReactElement {
   useEffect(() => {
     window.addEventListener("keydown", handleDesktopShortcut);
     return () => window.removeEventListener("keydown", handleDesktopShortcut);
-  }, [project, undoStack, redoStack, isPlaying, selectedNote, selectedDrumStep, selectedDrumActive]);
+  }, [project, undoStack, redoStack, isPlaying, playbackMode, selectedNote, selectedDrumStep, selectedDrumActive]);
 
   function handleDesktopShortcut(event: KeyboardEvent): void {
     if (isEditableShortcutTarget(event.target)) {
@@ -893,7 +904,8 @@ export function App(): ReactElement {
     try {
       setIsPlaying(true);
       controllerRef.current = startRealtimePlayback(project, {
-        bars: 2,
+        mode: playbackMode,
+        bars: playbackMode === "pattern" ? 2 : undefined,
         onStep: setPlaybackPosition,
         onStop: () => {
           controllerRef.current = null;
@@ -1077,10 +1089,32 @@ export function App(): ReactElement {
 
         <div className="command-strip">
           <div className="transport-status" aria-live="polite">
-            <strong>{isPlaying ? `Bar ${playbackPosition?.bar ?? 1}.${playbackPosition?.beat ?? 1}` : "Ready"}</strong>
-            <span>{isPlaying ? `Step ${(currentPatternStep ?? 0) + 1}` : "2 bar loop"}</span>
+            <strong>{transportPrimary}</strong>
+            <span>{transportSecondary}</span>
           </div>
-          <button className="icon-button primary" type="button" title="Play realtime loop" onClick={togglePlayback}>
+          <div className="segmented playback-mode-row" aria-label="Playback mode">
+            <button
+              className={playbackMode === "arrangement" ? "selected" : ""}
+              data-testid="playback-mode-arrangement"
+              disabled={isPlaying && playbackMode !== "arrangement"}
+              onClick={() => setPlaybackMode("arrangement")}
+              title="Play the full arrangement timeline"
+              type="button"
+            >
+              Arrangement
+            </button>
+            <button
+              className={playbackMode === "pattern" ? "selected" : ""}
+              data-testid="playback-mode-pattern"
+              disabled={isPlaying && playbackMode !== "pattern"}
+              onClick={() => setPlaybackMode("pattern")}
+              title="Preview the selected Pattern A/B/C loop"
+              type="button"
+            >
+              Pattern
+            </button>
+          </div>
+          <button className="icon-button primary" type="button" title={playbackMode === "arrangement" ? "Play arrangement" : "Play selected pattern"} onClick={togglePlayback}>
             {isPlaying ? <CircleStop size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
             <span>{isPlaying ? "Stop" : "Play"}</span>
           </button>
