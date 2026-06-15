@@ -46,6 +46,7 @@ REQUIRED_PATHS = [
 TEXT_EXPECTATIONS = {
     "README.md": [
         "making beats across genres",
+        "Direct composition is the product spine",
         "Sampling is a secondary add-on.",
         "local project save/load",
         "Independent Pattern A/B/C variations",
@@ -57,6 +58,7 @@ TEXT_EXPECTATIONS = {
     ],
     "docs/product/product.md": [
         "샘플 없이도 8마디 비트를 만들고 WAV로 export할 수 있어야 한다.",
+        "This sentence supersedes any sampling-first interpretation of the brief.",
         "Sampling can be useful, but it must stay behind the composition engine",
         "Local project save/load",
         "Independent Pattern A/B/C storage",
@@ -66,6 +68,7 @@ TEXT_EXPECTATIONS = {
         "python3 harness/scripts/run_quality_gate.py",
         "Project file work must reject invalid imports",
         "Pattern work must keep Pattern A/B/C as independent editable event data",
+        "sample import, chopping, sampler tracks, or audio warping",
     ],
     "docs/references/official-sources.md": [
         "W3C Web Audio API",

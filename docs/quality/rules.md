@@ -70,6 +70,8 @@ Pattern work must keep Pattern A/B/C as independent editable event data. Realtim
 
 Export work must verify a non-silent WAV with expected duration, expected sample rate/channel count, no audio frames above the selected ceiling, and reproducibility from saved project data.
 
-Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, or plan titles.
+Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation, sound design, arrangement, mixing/mastering, and export first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, or plan titles.
+
+Any new plan that mentions sample import, chopping, sampler tracks, or audio warping must explicitly mark that work as optional sampling-phase work or document the user-approved exception in its Decision Log.
 
 Mixer/master work must keep mixing and mastering separate. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.

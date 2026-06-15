@@ -3,7 +3,7 @@
 
 ## Summary
 
-GrooveForge is a web-first, event-based mini DAW for making beats across genres with drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, and WAV/stem export.
+GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres with drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, and WAV/stem export.
 
 ## Type
 
@@ -12,6 +12,8 @@ GrooveForge is a web-first, event-based mini DAW for making beats across genres 
 ## Product Definition
 
 GrooveForge is a code-driven all-genre beat workstation: a mini DAW with a JSON-based project format, programmable style profiles, editable musical events, local synthesis, mixing/mastering controls, and offline export.
+
+The primary object is a beat project built from musical events, patterns, tracks, devices, arrangement blocks, mixer state, master state, and render state. Audio samples can become assets inside that project later, but they are not the default starting point.
 
 It is not a trap-only app and not a sample-chopping tool. Trap, drill, boom bap, house, lofi, jersey, phonk, R&B, garage, and experimental workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
 
@@ -30,7 +32,7 @@ Secondary extension:
 
 - Sampling, audio import, chopping, and sampler mapping.
 
-Sampling can be useful, but it must stay behind the composition engine, instrument engine, arrangement, mixer/master, and export pipeline in priority and architecture.
+Sampling can be useful, but it must stay behind the composition engine, instrument engine, arrangement, mixer/master, and export pipeline in priority, architecture, roadmap order, and UI copy.
 
 ## Users
 
@@ -100,6 +102,8 @@ The MVP must prove this sentence:
 샘플 없이도 8마디 비트를 만들고 WAV로 export할 수 있어야 한다.
 ```
 
+This sentence supersedes any sampling-first interpretation of the brief.
+
 MVP capabilities:
 
 - BPM/key setup.
@@ -133,6 +137,7 @@ Phase 6 scopes optional sampling as an extension after the beat-making core is u
 
 - Do not make sample chop/import the MVP center.
 - Do not describe GrooveForge as a sampling app in product docs, UI copy, or agent plans.
+- Do not use sample import, chopping, sampler tracks, or audio warping as a plan title or primary scope unless the work is explicitly in the optional sampling phase.
 - Do not build plugin hosting before the local synth/mixer/export loop is working.
 - Do not add AI audio generation before editable pattern generation exists.
 - Do not add cloud collaboration, accounts, payments, trackers, or remote AI calls without explicit rationale.

@@ -61,6 +61,8 @@ Electron is used for the first desktop MVP because it gets the existing web audi
 
 ## Data Model Direction
 
+Composition-first invariant: GrooveForge must remain fully usable when audio import, sampler tracks, chop pads, and audio warping are absent. Core playback, arrangement, save/load, and export paths should depend on musical events, built-in instruments, mixer state, and master state before they depend on user audio assets.
+
 The core project model should make composition events first-class:
 
 - `Project`: version, title, BPM, key/scale, swing, tracks, arrangement, master settings.
