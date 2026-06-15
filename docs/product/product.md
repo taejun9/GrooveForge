@@ -58,7 +58,7 @@ Primary feature areas:
 - Pattern editor: drum step sequencer, bass grid, chord progression, melody grid, variation A/B/C.
 - Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, and sound-design controls.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with duplicate, move, and delete controls.
-- Mixer/master: volume, pan, mute, solo, master preset ceiling, EQ, compressor, saturation, sends, limiter, loudness/peak metering.
+- Mixer/master: volume, pan, mute, solo, channel low-cut/air EQ, master preset ceiling, compressor, saturation, sends, limiter, loudness/peak metering.
 - Export: WAV export first, then stems after the render path is reliable.
 
 ## First-Class Data
@@ -121,7 +121,7 @@ MVP capabilities:
 - Independent Pattern A/B/C storage with copy/clear tools for drum, bass, chord, and melody variations.
 - Editable arrangement blocks for an 8-bar loop or simple song section, using assigned Pattern A/B/C data, per-block energy, and structure controls for duplicate, move, and delete.
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
-- Mixer volume, pan, mute, and solo reflected in realtime playback and WAV export.
+- Mixer volume, pan, mute, solo, and low-cut/air EQ reflected in realtime playback and WAV export.
 - Master preset ceiling and output gain.
 - Export peak/RMS/headroom meter with limiter activity status for the current arrangement.
 - Local project save/load as a `.grooveforge.json` file.
@@ -140,7 +140,7 @@ Phase 3 adds melody/chords: simple poly synth, scale lock, chord pad, melody gri
 
 Phase 4 adds arrangement: pattern blocks, song section markers, duplicate/move/delete first, then split/mute/reorder refinements, and variation A/B/C.
 
-Phase 5 adds mixer/master/export: volume, pan, mute, solo, master preset ceiling first, then EQ, compressor, saturation, limiter, peak/LUFS metering, WAV export, and later stem export.
+Phase 5 adds mixer/master/export: volume, pan, mute, solo, channel low-cut/air EQ, master preset ceiling first, then compressor, saturation, limiter, peak/LUFS metering, WAV export, and later stem export.
 
 Phase 6 scopes optional sampling as an extension only after the beat-making core is useful: audio import, sampler mapping, chopping, reverse, pitch, and stretch.
 

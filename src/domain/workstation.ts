@@ -73,6 +73,8 @@ export type MixerChannel = {
   name: string;
   volumeDb: number;
   pan: number;
+  lowCut: number;
+  air: number;
   muted: boolean;
   solo: boolean;
   accent: string;
@@ -458,11 +460,11 @@ export const starterProject: ProjectState = {
     C: clonePatternData(starterPatternC)
   },
   mixer: [
-    { id: "drum_rack", name: "Drums", volumeDb: -4, pan: 0, muted: false, solo: false, accent: "#78f0c8" },
-    { id: "bass_808", name: "808", volumeDb: -6, pan: 0, muted: false, solo: false, accent: "#ff7a4f" },
-    { id: "synth", name: "Synth", volumeDb: -8, pan: -12, muted: false, solo: false, accent: "#8aa8ff" },
-    { id: "chord", name: "Chord", volumeDb: -10, pan: 16, muted: false, solo: false, accent: "#d58cff" },
-    { id: "master", name: "Master", volumeDb: -1, pan: 0, muted: false, solo: false, accent: "#f0c36a" }
+    { id: "drum_rack", name: "Drums", volumeDb: -4, pan: 0, lowCut: 0.08, air: 0.24, muted: false, solo: false, accent: "#78f0c8" },
+    { id: "bass_808", name: "808", volumeDb: -6, pan: 0, lowCut: 0, air: 0.1, muted: false, solo: false, accent: "#ff7a4f" },
+    { id: "synth", name: "Synth", volumeDb: -8, pan: -12, lowCut: 0.18, air: 0.36, muted: false, solo: false, accent: "#8aa8ff" },
+    { id: "chord", name: "Chord", volumeDb: -10, pan: 16, lowCut: 0.12, air: 0.28, muted: false, solo: false, accent: "#d58cff" },
+    { id: "master", name: "Master", volumeDb: -1, pan: 0, lowCut: 0, air: 0, muted: false, solo: false, accent: "#f0c36a" }
   ],
   arrangement: [
     { section: "Intro", pattern: "A", energy: 0.35 },
@@ -533,6 +535,13 @@ export function normalizeDrumTimingMs(value: number): number {
     return 0;
   }
   return Math.min(maxDrumTimingMs, Math.max(minDrumTimingMs, Math.round(value)));
+}
+
+export function normalizeMixerEq(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, value));
 }
 
 export function drumStepVelocity(pattern: PatternData, lane: DrumLane, step: number): number {
@@ -1020,6 +1029,14 @@ function normalizePatternMap(patterns: Record<PatternSlot, PatternDataInput>): R
   };
 }
 
+function normalizeMixerChannels(channels: MixerChannelInput[]): MixerChannel[] {
+  return channels.map((channel) => ({
+    ...channel,
+    lowCut: normalizeMixerEq(channel.lowCut ?? 0),
+    air: normalizeMixerEq(channel.air ?? 0)
+  }));
+}
+
 function normalizeDrumVelocities(value: DrumVelocities | undefined, drumPattern: DrumPattern): DrumVelocities {
   if (!value) {
     return defaultDrumVelocities(drumPattern);
@@ -1075,7 +1092,8 @@ function normalizeProjectState(value: unknown): ProjectState | null {
     return {
       ...value,
       sound: normalizeSoundDesign(value.sound),
-      patterns: normalizePatternMap(value.patterns)
+      patterns: normalizePatternMap(value.patterns),
+      mixer: normalizeMixerChannels(value.mixer)
     };
   }
 
@@ -1099,7 +1117,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
         B: clonePatternData(legacyPattern),
         C: clonePatternData(legacyPattern)
       },
-      mixer: value.mixer,
+      mixer: normalizeMixerChannels(value.mixer),
       arrangement: value.arrangement,
       masterCeilingDb: value.masterCeilingDb,
       masterPreset: value.masterPreset
@@ -1116,9 +1134,14 @@ type PatternDataInput = Omit<PatternData, "chordEvents" | "drumVelocities" | "dr
   hatRepeats?: number[];
 };
 type SoundDesignInput = Partial<SoundDesign> & { preset?: SoundPresetId };
-type ProjectStateInput = Omit<ProjectState, "patterns" | "sound"> & {
+type MixerChannelInput = Omit<MixerChannel, "lowCut" | "air"> & {
+  lowCut?: number;
+  air?: number;
+};
+type ProjectStateInput = Omit<ProjectState, "patterns" | "sound" | "mixer"> & {
   sound?: SoundDesignInput;
   patterns: Record<PatternSlot, PatternDataInput>;
+  mixer: MixerChannelInput[];
 };
 
 function isProjectStateShape(value: unknown): value is ProjectStateInput {
@@ -1137,15 +1160,16 @@ function isProjectStateShape(value: unknown): value is ProjectStateInput {
     (value.sound === undefined || isSoundDesignInput(value.sound)) &&
     isPatternMapInput(value.patterns) &&
     Array.isArray(value.mixer) &&
-    value.mixer.every(isMixerChannel) &&
+    value.mixer.every(isMixerChannelInput) &&
     isArrangement(value.arrangement) &&
     isFiniteNumber(value.masterCeilingDb) &&
     isOneOf(value.masterPreset, masterPresets)
   );
 }
 
-function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patterns" | "sound"> & {
+function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patterns" | "sound" | "mixer"> & {
   sound?: SoundDesignInput;
+  mixer: MixerChannelInput[];
 } & PatternDataInput {
   if (!isRecord(value)) {
     return false;
@@ -1169,7 +1193,7 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectState, "patt
     Array.isArray(value.melodyNotes) &&
     value.melodyNotes.every(isMelodyNote) &&
     Array.isArray(value.mixer) &&
-    value.mixer.every(isMixerChannel) &&
+    value.mixer.every(isMixerChannelInput) &&
     isArrangement(value.arrangement) &&
     isFiniteNumber(value.masterCeilingDb) &&
     isOneOf(value.masterPreset, masterPresets)
@@ -1294,7 +1318,7 @@ function isChordEvent(value: unknown): value is ChordEvent {
   );
 }
 
-function isMixerChannel(value: unknown): value is MixerChannel {
+function isMixerChannelInput(value: unknown): value is MixerChannelInput {
   return (
     isRecord(value) &&
     isOneOf(value.id, ["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]) &&
@@ -1303,6 +1327,8 @@ function isMixerChannel(value: unknown): value is MixerChannel {
     isFiniteNumber(value.pan) &&
     value.pan >= -100 &&
     value.pan <= 100 &&
+    isOptionalUnit(value.lowCut) &&
+    isOptionalUnit(value.air) &&
     typeof value.muted === "boolean" &&
     typeof value.solo === "boolean" &&
     typeof value.accent === "string"

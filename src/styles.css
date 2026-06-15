@@ -1006,7 +1006,7 @@ input[type="range"] {
 .strip {
   display: grid;
   gap: 10px;
-  min-height: 166px;
+  min-height: 224px;
   border: 1px solid rgba(244, 239, 231, 0.1);
   border-top: 3px solid var(--strip);
   border-radius: 7px;
@@ -1051,6 +1051,19 @@ input[type="range"] {
   gap: 5px;
 }
 
+.eq-controls {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.eq-inputs {
+  display: grid;
+  grid-template-columns: minmax(64px, 1fr) 54px;
+  gap: 7px;
+  align-items: center;
+}
+
 .pan-inputs {
   display: grid;
   grid-template-columns: minmax(74px, 1fr) 62px;
@@ -1058,7 +1071,8 @@ input[type="range"] {
   align-items: center;
 }
 
-.pan-inputs input[type="number"] {
+.pan-inputs input[type="number"],
+.eq-inputs input[type="number"] {
   min-height: 32px;
   border: 1px solid rgba(244, 239, 231, 0.13);
   border-radius: 6px;
@@ -1068,9 +1082,15 @@ input[type="range"] {
 }
 
 .strip-readout {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 8px;
+}
+
+.strip-readout span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .master-readout {

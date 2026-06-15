@@ -39,6 +39,8 @@ type ChannelMix = {
   gain: number;
   left: number;
   right: number;
+  lowCut: number;
+  air: number;
 };
 
 function stepDuration(project: ProjectState): number {
@@ -52,18 +54,20 @@ function hasSolo(project: ProjectState): boolean {
 function channelMix(project: ProjectState, id: TrackType, stemTarget?: StemTrackId): ChannelMix {
   const channel = project.mixer.find((track) => track.id === id);
   if (stemTarget && id !== stemTarget) {
-    return { gain: 0, left: 0, right: 0 };
+    return { gain: 0, left: 0, right: 0, lowCut: 0, air: 0 };
   }
   const soloActive = hasSolo(project);
   if (!channel || (!stemTarget && channel.muted) || (!stemTarget && id !== "master" && soloActive && !channel.solo)) {
-    return { gain: 0, left: 0, right: 0 };
+    return { gain: 0, left: 0, right: 0, lowCut: 0, air: 0 };
   }
 
   const normalizedPan = Math.max(-1, Math.min(1, channel.pan / 100));
   return {
     gain: dbToGain(channel.volumeDb),
     left: normalizedPan <= 0 ? 1 : 1 - normalizedPan,
-    right: normalizedPan >= 0 ? 1 : 1 + normalizedPan
+    right: normalizedPan >= 0 ? 1 : 1 + normalizedPan,
+    lowCut: channel.lowCut,
+    air: channel.air
   };
 }
 
@@ -76,6 +80,17 @@ function arrangementBarCount(project: ProjectState): number {
 }
 
 type ToneShape = "sine" | "triangle" | "saw" | "square";
+
+function channelHighpassHz(mix: ChannelMix): number {
+  return mix.lowCut <= 0 ? 18 : 30 + mix.lowCut * 260;
+}
+
+function toneEqFactor(frequency: number, mix: ChannelMix): number {
+  const highpassHz = channelHighpassHz(mix);
+  const lowCutFactor = frequency < highpassHz ? Math.max(0.16, frequency / highpassHz) : 1;
+  const airFactor = 1 + mix.air * (frequency > 700 ? 0.22 : frequency > 180 ? 0.08 : -0.04);
+  return Math.max(0.08, lowCutFactor * airFactor);
+}
 
 function addTone(
   buffer: AudioChannels,
@@ -95,6 +110,7 @@ function addTone(
   const drive = tone.drive ?? 0;
   const decay = tone.decay ?? 5;
   const filter = tone.filter ?? 1;
+  const eqFactor = toneEqFactor(frequency, mix);
   for (let index = 0; index < frames && startFrame + index < buffer[0].length; index += 1) {
     const t = index / sampleRate;
     const envelope = Math.exp(-decay * t / Math.max(0.01, duration));
@@ -102,7 +118,7 @@ function addTone(
     const fundamental = waveform(shape, phase);
     const harmonic = Math.sin(phase * 2) * drive * 0.28 + Math.sin(phase * 3) * drive * 0.12;
     const shaped = Math.tanh((fundamental + harmonic) * (1 + drive * 2.8));
-    const value = shaped * mix.gain * gainScale * envelope * filter;
+    const value = shaped * mix.gain * gainScale * envelope * filter * eqFactor;
     buffer[0][startFrame + index] += value * mix.left;
     buffer[1][startFrame + index] += value * mix.right;
   }
@@ -129,11 +145,13 @@ function addNoise(buffer: AudioChannels, start: number, duration: number, mix: C
   const startFrame = Math.max(0, Math.floor(start * sampleRate));
   const frames = Math.max(1, Math.floor(duration * sampleRate));
   let previous = 0;
+  const airBrightness = Math.min(1, Math.max(0, brightness + mix.air * 0.2 + mix.lowCut * 0.06));
+  const channelGain = (1 + mix.air * 0.14) * (1 - mix.lowCut * 0.08);
   for (let index = 0; index < frames && startFrame + index < buffer[0].length; index += 1) {
     const t = index / sampleRate;
-    const envelope = Math.exp((-6 - brightness * 5) * t / duration);
+    const envelope = Math.exp((-6 - airBrightness * 5) * t / duration);
     const raw = Math.random() * 2 - 1;
-    const value = (raw * brightness + previous * (1 - brightness)) * mix.gain * gainScale * envelope;
+    const value = (raw * airBrightness + previous * (1 - airBrightness)) * mix.gain * gainScale * envelope * channelGain;
     previous = raw;
     buffer[0][startFrame + index] += value * mix.left;
     buffer[1][startFrame + index] += value * mix.right;

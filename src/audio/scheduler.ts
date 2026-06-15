@@ -33,6 +33,8 @@ type SchedulerOptions = {
 type TrackMix = {
   gain: number;
   pan: number;
+  lowCut: number;
+  air: number;
 };
 
 const scheduleAheadSeconds = 0.12;
@@ -55,12 +57,26 @@ function channelMix(project: ProjectState, id: string): TrackMix {
   const channel = project.mixer.find((track) => track.id === id);
   const soloActive = hasSolo(project);
   if (!channel || channel.muted || (id !== "master" && soloActive && !channel.solo)) {
-    return { gain: 0, pan: 0 };
+    return { gain: 0, pan: 0, lowCut: 0, air: 0 };
   }
   return {
     gain: dbToGain(channel.volumeDb),
-    pan: Math.max(-1, Math.min(1, channel.pan / 100))
+    pan: Math.max(-1, Math.min(1, channel.pan / 100)),
+    lowCut: channel.lowCut,
+    air: channel.air
   };
+}
+
+function channelHighpassHz(mix: TrackMix): number {
+  return mix.lowCut <= 0 ? 18 : 30 + mix.lowCut * 260;
+}
+
+function channelAirGain(mix: TrackMix, amount = 0.12): number {
+  return 1 + mix.air * amount;
+}
+
+function channelAirFilterHz(baseHz: number, mix: TrackMix): number {
+  return Math.min(18000, baseHz * (1 + mix.air * 0.34));
 }
 
 function masterOutputGain(project: ProjectState): number {
@@ -82,23 +98,27 @@ function scheduleKick(
   destination: AudioNode,
   time: number,
   gainValue: number,
-  pan: number,
+  mix: TrackMix,
   sound: SoundDesign
 ): void {
   if (gainValue <= 0) {
     return;
   }
   const osc = context.createOscillator();
+  const highpass = context.createBiquadFilter();
   const gain = context.createGain();
   const panner = context.createStereoPanner();
   osc.type = "sine";
+  highpass.type = "highpass";
+  highpass.frequency.setValueAtTime(channelHighpassHz(mix), time);
+  highpass.Q.setValueAtTime(0.7, time);
   osc.frequency.setValueAtTime(78 + sound.kickPunch * 42, time);
   osc.frequency.exponentialRampToValueAtTime(42 + sound.kickPunch * 10, time + 0.09 + sound.kickPunch * 0.05);
   gain.gain.setValueAtTime(0.0001, time);
-  gain.gain.exponentialRampToValueAtTime((0.72 + sound.kickPunch * 0.3) * gainValue, time + 0.006);
+  gain.gain.exponentialRampToValueAtTime((0.72 + sound.kickPunch * 0.3) * gainValue * channelAirGain(mix, 0.06), time + 0.006);
   gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.18 + sound.kickPunch * 0.1);
-  panner.pan.setValueAtTime(pan, time);
-  osc.connect(gain).connect(panner).connect(destination);
+  panner.pan.setValueAtTime(mix.pan, time);
+  osc.connect(highpass).connect(gain).connect(panner).connect(destination);
   osc.start(time);
   osc.stop(time + 0.3);
 }
@@ -110,7 +130,7 @@ function scheduleNoise(
   duration: number,
   gainValue: number,
   filterHz: number,
-  pan: number
+  mix: TrackMix
 ): void {
   if (gainValue <= 0) {
     return;
@@ -126,13 +146,13 @@ function scheduleNoise(
   const filter = context.createBiquadFilter();
   const gain = context.createGain();
   filter.type = "highpass";
-  filter.frequency.setValueAtTime(filterHz, time);
+  filter.frequency.setValueAtTime(Math.max(channelHighpassHz(mix), filterHz + mix.lowCut * 900 + mix.air * 1400), time);
   gain.gain.setValueAtTime(0.0001, time);
-  gain.gain.exponentialRampToValueAtTime(gainValue, time + 0.004);
+  gain.gain.exponentialRampToValueAtTime(gainValue * channelAirGain(mix, 0.16), time + 0.004);
   gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
   source.buffer = buffer;
   const panner = context.createStereoPanner();
-  panner.pan.setValueAtTime(pan, time);
+  panner.pan.setValueAtTime(mix.pan, time);
   source.connect(filter).connect(gain).connect(panner).connect(destination);
   source.start(time);
   source.stop(time + duration);
@@ -147,28 +167,32 @@ function scheduleTone(
   gainValue: number,
   type: OscillatorType,
   pan: number,
-  tone: { drive?: number; filterHz?: number; release?: number } = {}
+  tone: { drive?: number; filterHz?: number; highpassHz?: number; air?: number; release?: number } = {}
 ): void {
   if (gainValue <= 0) {
     return;
   }
   const osc = context.createOscillator();
+  const highpass = context.createBiquadFilter();
   const filter = context.createBiquadFilter();
   const drive = context.createWaveShaper();
   const gain = context.createGain();
   const panner = context.createStereoPanner();
   osc.type = type;
   osc.frequency.setValueAtTime(frequency, time);
+  highpass.type = "highpass";
+  highpass.frequency.setValueAtTime(tone.highpassHz ?? 18, time);
+  highpass.Q.setValueAtTime(0.7, time);
   filter.type = "lowpass";
   filter.frequency.setValueAtTime(tone.filterHz ?? 12000, time);
   filter.Q.setValueAtTime(0.6, time);
   drive.curve = driveCurve(tone.drive ?? 0);
   drive.oversample = "2x";
   gain.gain.setValueAtTime(0.0001, time);
-  gain.gain.exponentialRampToValueAtTime(gainValue, time + 0.01);
+  gain.gain.exponentialRampToValueAtTime(gainValue * (1 + (tone.air ?? 0) * 0.12), time + 0.01);
   gain.gain.exponentialRampToValueAtTime(0.0001, time + Math.max(0.04, duration + (tone.release ?? 0) * 0.12));
   panner.pan.setValueAtTime(pan, time);
-  osc.connect(filter).connect(drive).connect(gain).connect(panner).connect(destination);
+  osc.connect(highpass).connect(filter).connect(drive).connect(gain).connect(panner).connect(destination);
   osc.start(time);
   osc.stop(time + duration + (tone.release ?? 0) * 0.14 + 0.03);
 }
@@ -212,7 +236,7 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
 
   if (pattern.drumPattern.kick[patternStep]) {
     const drumTime = time + drumStepTimingMs(pattern, "kick", patternStep) / 1000;
-    scheduleKick(context, master, drumTime, drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix.pan, sound);
+    scheduleKick(context, master, drumTime, drumMix.gain * drumStepVelocity(pattern, "kick", patternStep), drumMix, sound);
   }
   if (pattern.drumPattern.clap[patternStep]) {
     const drumTime = time + drumStepTimingMs(pattern, "clap", patternStep) / 1000;
@@ -223,7 +247,7 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
       0.11 + (1 - sound.snareSnap) * 0.08,
       (0.2 + sound.snareSnap * 0.14) * drumMix.gain * drumStepVelocity(pattern, "clap", patternStep),
       780 + sound.snareSnap * 1800,
-      drumMix.pan
+      drumMix
     );
   }
   if (pattern.drumPattern.hat[patternStep]) {
@@ -238,7 +262,7 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
         0.035 + (1 - sound.hatBrightness) * 0.025,
         (0.08 + sound.hatBrightness * 0.08) * drumMix.gain * baseVelocity * (repeatIndex === 0 ? 1 : 0.72),
         4300 + sound.hatBrightness * 4200,
-        drumMix.pan
+        drumMix
       );
     }
   }
@@ -254,7 +278,9 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
       "triangle",
       drumMix.pan,
       {
-        filterHz: 1800 + sound.hatBrightness * 4200
+        filterHz: channelAirFilterHz(1800 + sound.hatBrightness * 4200, drumMix),
+        highpassHz: channelHighpassHz(drumMix),
+        air: drumMix.air
       }
     );
   }
@@ -270,7 +296,13 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
         (0.42 + sound.bassDrive * 0.22) * bassMix.gain * sidechainGainForStep(pattern, patternStep, sound.sidechainDuck),
         bassOscillator(sound),
         bassMix.pan,
-        { drive: sound.bassDrive, filterHz: 260 + sound.bassDrive * 1500, release: sound.bassDecay }
+        {
+          drive: sound.bassDrive,
+          filterHz: channelAirFilterHz(260 + sound.bassDrive * 1500, bassMix),
+          highpassHz: channelHighpassHz(bassMix),
+          air: bassMix.air,
+          release: sound.bassDecay
+        }
       );
     }
   }
@@ -286,7 +318,13 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
         note.velocity * 0.12 * synthMix.gain,
         synthOscillator(sound),
         synthMix.pan,
-        { drive: sound.synthBrightness * 0.08, filterHz: 1200 + sound.synthBrightness * 7600, release: sound.synthRelease }
+        {
+          drive: sound.synthBrightness * 0.08,
+          filterHz: channelAirFilterHz(1200 + sound.synthBrightness * 7600, synthMix),
+          highpassHz: channelHighpassHz(synthMix),
+          air: synthMix.air,
+          release: sound.synthRelease
+        }
       );
     }
   }
@@ -305,7 +343,13 @@ function scheduleStep(project: ProjectState, context: AudioContext, master: Audi
           chord.velocity * 0.08 * chordMix.gain,
           "triangle",
           Math.max(-1, Math.min(1, chordMix.pan + spread * sound.chordWidth * 0.34)),
-          { drive: (1 - sound.chordWarmth) * 0.08, filterHz: 900 + (1 - sound.chordWarmth) * 6200, release: sound.synthRelease }
+          {
+            drive: (1 - sound.chordWarmth) * 0.08,
+            filterHz: channelAirFilterHz(900 + (1 - sound.chordWarmth) * 6200, chordMix),
+            highpassHz: channelHighpassHz(chordMix),
+            air: chordMix.air,
+            release: sound.synthRelease
+          }
         );
       }
     }

@@ -62,6 +62,7 @@ import {
   normalizeDrumTimingMs,
   normalizeDrumVelocity,
   normalizeHatRepeat,
+  normalizeMixerEq,
   parseProjectFile,
   patternSlots,
   projectFileName,
@@ -364,9 +365,16 @@ export function App(): ReactElement {
   }
 
   function updateMixerChannel(id: MixerChannel["id"], update: Partial<MixerChannel>): void {
+    const nextUpdate: Partial<MixerChannel> = { ...update };
+    if (update.lowCut !== undefined) {
+      nextUpdate.lowCut = normalizeMixerEq(update.lowCut);
+    }
+    if (update.air !== undefined) {
+      nextUpdate.air = normalizeMixerEq(update.air);
+    }
     updateProject((current) => ({
       ...current,
-      mixer: current.mixer.map((track) => (track.id === id ? { ...track, ...update } : track))
+      mixer: current.mixer.map((track) => (track.id === id ? { ...track, ...nextUpdate } : track))
     }));
   }
 
@@ -1309,9 +1317,69 @@ export function App(): ReactElement {
                     />
                   </div>
                 </label>
+                {channel.id !== "master" && (
+                  <div className="eq-controls" aria-label={`${channel.name} channel EQ`}>
+                    <label className="strip-control">
+                      <span>Low cut</span>
+                      <div className="eq-inputs">
+                        <input
+                          aria-label={`${channel.name} low cut`}
+                          data-testid={`mixer-low-cut-${channel.id}`}
+                          max={1}
+                          min={0}
+                          onChange={(event) => updateMixerChannel(channel.id, { lowCut: Number(event.target.value) })}
+                          step={0.01}
+                          type="range"
+                          value={channel.lowCut}
+                        />
+                        <input
+                          aria-label={`${channel.name} low cut percent`}
+                          data-testid={`mixer-low-cut-input-${channel.id}`}
+                          max={100}
+                          min={0}
+                          onChange={(event) => updateMixerChannel(channel.id, { lowCut: Number(event.target.value) / 100 })}
+                          step={1}
+                          type="number"
+                          value={Math.round(channel.lowCut * 100)}
+                        />
+                      </div>
+                    </label>
+                    <label className="strip-control">
+                      <span>Air</span>
+                      <div className="eq-inputs">
+                        <input
+                          aria-label={`${channel.name} air`}
+                          data-testid={`mixer-air-${channel.id}`}
+                          max={1}
+                          min={0}
+                          onChange={(event) => updateMixerChannel(channel.id, { air: Number(event.target.value) })}
+                          step={0.01}
+                          type="range"
+                          value={channel.air}
+                        />
+                        <input
+                          aria-label={`${channel.name} air percent`}
+                          data-testid={`mixer-air-input-${channel.id}`}
+                          max={100}
+                          min={0}
+                          onChange={(event) => updateMixerChannel(channel.id, { air: Number(event.target.value) / 100 })}
+                          step={1}
+                          type="number"
+                          value={Math.round(channel.air * 100)}
+                        />
+                      </div>
+                    </label>
+                  </div>
+                )}
                 <div className="strip-readout">
                   <span>{channel.volumeDb} dB</span>
                   <span>{panLabel(channel.pan)}</span>
+                  {channel.id !== "master" && (
+                    <>
+                      <span>Cut {percentLabel(channel.lowCut)}</span>
+                      <span>Air {percentLabel(channel.air)}</span>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
