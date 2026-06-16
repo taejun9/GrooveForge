@@ -928,6 +928,24 @@ type ProductionSnapshotSummary = {
   metrics: ProductionSnapshotMetric[];
 };
 
+type KeyCompassCardId = "scale" | "chords" | "bass" | "melody" | "focus";
+
+type KeyCompassCard = {
+  id: KeyCompassCardId;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type KeyCompassSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  scaleNotes: string[];
+  cards: KeyCompassCard[];
+};
+
 type BeatPassportMetric = {
   id: string;
   label: string;
@@ -1513,6 +1531,10 @@ export function App(): ReactElement {
     : false;
   const selectedChord =
     selectedChordIndex === null ? undefined : currentPattern.chordEvents[selectedChordIndex];
+  const keyCompassSummary = useMemo(
+    () => createKeyCompassSummary(project, selectedNote, selectedChord, selectedDrumStep),
+    [project, selectedNote, selectedChord, selectedDrumStep]
+  );
   const chordPadOptions = useMemo(
     () => createChordPadOptions(project.key, selectedChord),
     [project.key, selectedChord]
@@ -4027,6 +4049,8 @@ export function App(): ReactElement {
         summary={styleInspectorSummary}
       />
 
+      <KeyCompass summary={keyCompassSummary} />
+
       <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
 
       <DeliveryTargets
@@ -5753,6 +5777,39 @@ function ProductionSnapshot({ summary }: { summary: ProductionSnapshotSummary })
   );
 }
 
+function KeyCompass({ summary }: { summary: KeyCompassSummary }): ReactElement {
+  return (
+    <section className={`key-compass ${summary.tone}`} data-testid="key-compass" aria-label="Key compass">
+      <div className="key-compass-heading">
+        <div>
+          <Music2 size={17} aria-hidden="true" />
+          <span>Key Compass</span>
+        </div>
+        <strong data-testid="key-compass-headline">{summary.headline}</strong>
+        <small data-testid="key-compass-detail">{summary.detail}</small>
+      </div>
+      <div className="key-compass-body">
+        <div className="key-compass-notes" data-testid="key-compass-scale-notes" aria-label="Scale notes">
+          {summary.scaleNotes.map((note, index) => (
+            <span data-testid={`key-compass-note-${index}`} key={`${note}-${index}`}>
+              {note}
+            </span>
+          ))}
+        </div>
+        <div className="key-compass-grid" data-testid="key-compass-grid">
+          {summary.cards.map((card) => (
+            <div className={`key-compass-card ${card.tone}`} data-testid={`key-compass-${card.id}`} key={card.id}>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <small>{card.detail}</small>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function FinishChecklist({ summary }: { summary: FinishChecklistSummary }): ReactElement {
   return (
     <section className={`finish-checklist ${summary.tone}`} data-testid="finish-checklist" aria-label="Finish checklist">
@@ -7236,6 +7293,189 @@ function createHandoffPackItems({
       run: onExportHandoffSheet
     }
   ];
+}
+
+function createKeyCompassSummary(
+  project: ProjectState,
+  selectedNote: SelectedNote | null,
+  selectedChord: ChordEvent | undefined,
+  selectedDrumStep: SelectedDrumStep | null
+): KeyCompassSummary {
+  const pattern = activePattern(project);
+  const scaleNotes = scalePitchNames(project.key);
+  const chordRoots = pattern.chordEvents.map((chord) => chord.root);
+  const chordRootWarnings = chordRoots.filter((root) => keyCompassScaleDegree(project.key, root) === null).length;
+  const bassWarnings = pattern.bassNotes.filter((note) => !keyCompassPitchInKey(project.key, note.pitch)).length;
+  const melodyWarnings = pattern.melodyNotes.filter((note) => !keyCompassPitchInKey(project.key, note.pitch)).length;
+  const chordTone: MixCoachTone =
+    pattern.chordEvents.length === 0 ? "danger" : chordRootWarnings > 0 ? "warn" : pattern.chordEvents.length >= 3 ? "good" : "warn";
+  const bassTone: MixCoachTone =
+    pattern.bassNotes.length === 0 ? "danger" : bassWarnings > 0 ? "warn" : pattern.bassNotes.length >= 4 ? "good" : "warn";
+  const melodyTone: MixCoachTone =
+    pattern.melodyNotes.length === 0 ? "danger" : melodyWarnings > 0 ? "warn" : pattern.melodyNotes.length >= 4 ? "good" : "warn";
+  const focusCard = keyCompassFocusCard(project, selectedNote, selectedChord, selectedDrumStep);
+  const cards: KeyCompassCard[] = [
+    {
+      id: "scale",
+      label: "Scale",
+      value: scaleNotes.join(" "),
+      detail: `${scaleNotes.length} safe notes for Pattern ${project.selectedPattern}`,
+      tone: "good"
+    },
+    {
+      id: "chords",
+      label: "Chords",
+      value: keyCompassChordMotion(project.key, pattern.chordEvents),
+      detail:
+        chordRootWarnings > 0
+          ? `${chordRootWarnings} root outside scale`
+          : `${pattern.chordEvents.length} chord events in Pattern ${project.selectedPattern}`,
+      tone: chordTone
+    },
+    {
+      id: "bass",
+      label: "808/Bass",
+      value: keyCompassPitchSpread(pattern.bassNotes.map((note) => note.pitch)),
+      detail:
+        bassWarnings > 0
+          ? `${bassWarnings} bass notes outside scale`
+          : `${pattern.bassNotes.length} notes / ${keyCompassStepSpread(pattern.bassNotes.map((note) => note.step))}`,
+      tone: bassTone
+    },
+    {
+      id: "melody",
+      label: "Melody",
+      value: keyCompassPitchSpread(pattern.melodyNotes.map((note) => note.pitch)),
+      detail:
+        melodyWarnings > 0
+          ? `${melodyWarnings} melody notes outside scale`
+          : `${pattern.melodyNotes.length} notes / ${keyCompassStepSpread(pattern.melodyNotes.map((note) => note.step))}`,
+      tone: melodyTone
+    },
+    focusCard
+  ];
+
+  return {
+    headline: `${project.key} / Pattern ${project.selectedPattern} compass`,
+    detail: `${scaleNotes.join(" ")} / ${pattern.chordEvents.length} chords / ${pattern.bassNotes.length} 808 / ${pattern.melodyNotes.length} synth`,
+    tone: weakestTone(cards.map((card) => card.tone)),
+    scaleNotes,
+    cards
+  };
+}
+
+function keyCompassFocusCard(
+  project: ProjectState,
+  selectedNote: SelectedNote | null,
+  selectedChord: ChordEvent | undefined,
+  selectedDrumStep: SelectedDrumStep | null
+): KeyCompassCard {
+  if (selectedChord) {
+    const degree = keyCompassScaleDegreeLabel(project.key, selectedChord.root);
+    return {
+      id: "focus",
+      label: "Focus",
+      value: `${degree} ${selectedChord.root} ${selectedChord.quality}`,
+      detail: `Step ${selectedChord.step + 1} / ${selectedChord.length} step length / ${chordInversionLabel(normalizeChordInversion(selectedChord.inversion))}`,
+      tone: keyCompassScaleDegree(project.key, selectedChord.root) === null ? "warn" : "good"
+    };
+  }
+
+  if (selectedNote) {
+    const degree = keyCompassPitchScaleDegreeLabel(project.key, selectedNote.pitch);
+    const trackLabel = selectedNote.track === "bass" ? "808" : "Synth";
+    return {
+      id: "focus",
+      label: "Focus",
+      value: `${trackLabel} ${selectedNote.pitch}`,
+      detail: `${degree} / Step ${selectedNote.step + 1}`,
+      tone: keyCompassPitchInKey(project.key, selectedNote.pitch) ? "good" : "warn"
+    };
+  }
+
+  if (selectedDrumStep) {
+    return {
+      id: "focus",
+      label: "Focus",
+      value: `${drumLabels[selectedDrumStep.lane]} step`,
+      detail: `Step ${selectedDrumStep.step + 1} selected / harmony unchanged`,
+      tone: "warn"
+    };
+  }
+
+  return {
+    id: "focus",
+    label: "Focus",
+    value: `Pattern ${project.selectedPattern}`,
+    detail: "Select a note or chord for degree context",
+    tone: "warn"
+  };
+}
+
+function keyCompassChordMotion(key: string, chords: ChordEvent[]): string {
+  if (chords.length === 0) {
+    return "No chords";
+  }
+  return chords
+    .slice(0, 5)
+    .map((chord) => `${keyCompassScaleDegreeLabel(key, chord.root)}:${chord.root}${chord.quality}`)
+    .join(" > ");
+}
+
+function keyCompassPitchSpread(pitches: string[]): string {
+  if (pitches.length === 0) {
+    return "No notes";
+  }
+  const uniqueNames = Array.from(
+    new Set(
+      pitches
+        .map((pitch) => pitchParts(pitch)?.name)
+        .filter((name): name is string => Boolean(name))
+    )
+  );
+  return uniqueNames.length > 0 ? uniqueNames.slice(0, 6).join("/") : `${pitches.length} notes`;
+}
+
+function keyCompassStepSpread(stepsInUse: number[]): string {
+  if (stepsInUse.length === 0) {
+    return "no steps";
+  }
+  const low = Math.min(...stepsInUse) + 1;
+  const high = Math.max(...stepsInUse) + 1;
+  return low === high ? `step ${low}` : `steps ${low}-${high}`;
+}
+
+function keyCompassPitchInKey(key: string, pitch: string): boolean {
+  const parts = pitchParts(pitch);
+  return Boolean(parts && keyCompassScaleDegree(key, parts.name) !== null);
+}
+
+function keyCompassPitchScaleDegreeLabel(key: string, pitch: string): string {
+  const parts = pitchParts(pitch);
+  return parts ? keyCompassScaleDegreeLabel(key, parts.name) : "outside scale";
+}
+
+function keyCompassScaleDegreeLabel(key: string, pitchName: string): string {
+  const degree = keyCompassScaleDegree(key, pitchName);
+  return degree === null ? "out" : `D${degree + 1}`;
+}
+
+function keyCompassScaleDegree(key: string, pitchName: string): number | null {
+  const scaleNotes = scalePitchNames(key);
+  const normalizedPitchName = normalizePitchNameForCompass(pitchName);
+  const index = scaleNotes.findIndex((note) => normalizePitchNameForCompass(note) === normalizedPitchName);
+  return index >= 0 ? index : null;
+}
+
+function normalizePitchNameForCompass(pitchName: string): string {
+  const enharmonic: Record<string, string> = {
+    Db: "C#",
+    Eb: "D#",
+    Gb: "F#",
+    Ab: "G#",
+    Bb: "A#"
+  };
+  return enharmonic[pitchName] ?? pitchName;
 }
 
 function createProductionSnapshotSummary(

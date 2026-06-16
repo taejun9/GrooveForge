@@ -43,6 +43,7 @@ button {
 .transport-band,
 .mode-row,
 .style-inspector,
+.key-compass,
 .blueprint-row,
 .delivery-target-row,
 .session-brief-row,
@@ -81,6 +82,7 @@ button {
 .session-meter,
 .mode-row,
 .style-inspector-heading > div,
+.key-compass-heading > div,
 .blueprint-heading > div,
 .delivery-target-heading > div,
 .session-brief-heading > div,
@@ -591,6 +593,146 @@ h2 {
 
 .style-inspector-pattern small {
   color: rgba(244, 239, 231, 0.66);
+  font-size: 10px;
+}
+
+.key-compass {
+  display: grid;
+  grid-template-columns: 178px minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  min-height: 86px;
+  border-color: rgba(240, 195, 106, 0.22);
+  border-radius: 8px;
+  background: rgba(240, 195, 106, 0.045);
+  padding: 10px;
+}
+
+.key-compass.warn {
+  border-color: rgba(240, 195, 106, 0.3);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.key-compass.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.05);
+}
+
+.key-compass-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.key-compass-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.key-compass-heading svg {
+  color: #f0c36a;
+}
+
+.key-compass.danger .key-compass-heading svg {
+  color: #ff7a4f;
+}
+
+.key-compass-heading strong,
+.key-compass-heading small,
+.key-compass-card span,
+.key-compass-card strong,
+.key-compass-card small,
+.key-compass-notes span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.key-compass-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.key-compass-heading small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.key-compass-body {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.key-compass-notes {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.key-compass-notes span {
+  min-height: 26px;
+  border: 1px solid rgba(240, 195, 106, 0.22);
+  border-radius: 6px;
+  background: rgba(240, 195, 106, 0.08);
+  color: #f4efe7;
+  font-size: 11px;
+  line-height: 24px;
+  text-align: center;
+}
+
+.key-compass-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.key-compass-card {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+  border: 1px solid rgba(240, 195, 106, 0.2);
+  border-inline-start: 3px solid #f0c36a;
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 8px 9px;
+}
+
+.key-compass-card.good {
+  border-color: rgba(120, 240, 200, 0.2);
+  border-inline-start-color: #78f0c8;
+}
+
+.key-compass-card.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  border-inline-start-color: #f0c36a;
+}
+
+.key-compass-card.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  border-inline-start-color: #ff7a4f;
+}
+
+.key-compass-card span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.key-compass-card strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.key-compass-card small {
+  color: rgba(244, 239, 231, 0.68);
   font-size: 10px;
 }
 
@@ -5608,6 +5750,10 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .key-compass {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
   .structure-lens {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -5637,6 +5783,10 @@ input[type="range"] {
   }
 
   .production-snapshot-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .key-compass-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
