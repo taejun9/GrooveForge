@@ -885,6 +885,27 @@ type PatternStackPreviewSummary = {
   stackId: PatternStackId | "none";
 };
 
+type PatternStackResultMetric = {
+  id: "bass" | "chord" | "melody";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type PatternStackResult = {
+  stackId: PatternStackId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: PatternStackResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type GrooveFeelId = "tight" | "pocket" | "push" | "lazy";
 
 type GrooveFeelDefinition = {
@@ -2343,6 +2364,7 @@ export function App(): ReactElement {
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
+  const [patternStackResult, setPatternStackResult] = useState<PatternStackResult | null>(null);
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
@@ -2852,6 +2874,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setPatternStackResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -2863,6 +2886,7 @@ export function App(): ReactElement {
       projectRef.current = nextProject;
       setProject(nextProject);
       setQuickActionResult(null);
+      setPatternStackResult(null);
     }
     setProjectStatus(status);
   }
@@ -2949,6 +2973,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setPatternStackResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
   }
@@ -2965,6 +2990,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setPatternStackResult(null);
     setProjectStatus(status);
   }
 
@@ -4189,16 +4215,19 @@ export function App(): ReactElement {
       return;
     }
 
+    const beforeProject = projectRef.current;
     const stackEvents = createPatternStackEvents(projectRef.current.key, stack);
     const changed = updateCurrentPattern(
       (pattern) => (samePatternStackEvents(pattern, stackEvents) ? pattern : { ...pattern, ...stackEvents }),
       `${stack.label} pattern stack applied to Pattern ${projectRef.current.selectedPattern}`
     );
     if (!changed) {
+      setPatternStackResult(null);
       setProjectStatus(`${stack.label} pattern stack already selected`);
       return;
     }
 
+    setPatternStackResult(createPatternStackResult(stack, beforeProject, projectRef.current));
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(0);
@@ -6134,6 +6163,7 @@ export function App(): ReactElement {
           <PatternDna summary={patternDnaSummary} focusedCardId={patternDnaFocusId} onFocus={focusPatternDnaCard} />
           <PatternClonePads clones={patternCloneOptions} onApply={cloneSelectedPatternVariation} />
           <PatternStackPreview preview={patternStackPreviewSummary} />
+          {patternStackResult && <PatternStackResultStrip result={patternStackResult} />}
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
           <DrumMovePreview preview={drumMovePreviewSummary} />
           <DrumFoundationPads foundations={drumFoundationOptions} onApply={applyDrumFoundation} />
@@ -16039,6 +16069,48 @@ function PatternStackPreview({ preview }: { preview: PatternStackPreviewSummary 
   );
 }
 
+function PatternStackResultStrip({ result }: { result: PatternStackResult }): ReactElement {
+  return (
+    <div
+      className={`pattern-stack-result ${result.tone}`}
+      data-result-pattern-stack={result.stackId}
+      data-testid="pattern-stack-result"
+      aria-live="polite"
+    >
+      <div className="pattern-stack-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="pattern-stack-result-title">{result.title}</strong>
+          <small data-testid="pattern-stack-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="pattern-stack-result-meta">
+        <span data-testid="pattern-stack-result-status">{result.status}</span>
+        <span data-testid="pattern-stack-result-scope">{result.scope}</span>
+        <span data-testid="pattern-stack-result-impact">{result.impact}</span>
+      </div>
+      <div className="pattern-stack-result-metrics" data-testid="pattern-stack-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`pattern-stack-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="pattern-stack-result-followup" data-testid="pattern-stack-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="pattern-stack-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="pattern-stack-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function PatternStackPads({
   stacks,
   onApply
@@ -17754,6 +17826,47 @@ function createPatternStackPreviewSummary(key: string, pattern: PatternData, sta
     detailTitle: `${statusLabel}: ${patternLabel}; ${stackLabel}; ${bassLabel}; ${chordLabel}; ${melodyLabel}; ${moveLabel}.`,
     tone: currentCount === 0 ? "warn" : moves.total === 0 ? "good" : "warn",
     stackId: stack?.id ?? "none"
+  };
+}
+
+function createPatternStackResult(stack: PatternStackDefinition, beforeProject: ProjectState, afterProject: ProjectState): PatternStackResult {
+  const beforePattern = activePattern(beforeProject);
+  const afterPattern = activePattern(afterProject);
+  const moves = patternStackMoveCount(beforeProject.key, beforePattern, stack);
+  const metrics: PatternStackResultMetric[] = [
+    createPatternStackResultMetric("bass", "808 notes", beforePattern.bassNotes.length, afterPattern.bassNotes.length, moves.bass),
+    createPatternStackResultMetric("chord", "Chords", beforePattern.chordEvents.length, afterPattern.chordEvents.length, moves.chord),
+    createPatternStackResultMetric("melody", "Synth notes", beforePattern.melodyNotes.length, afterPattern.melodyNotes.length, moves.melody)
+  ];
+  const changedCount = [moves.bass, moves.chord, moves.melody].filter((count) => count > 0).length;
+
+  return {
+    stackId: stack.id,
+    title: `${stack.label} stack applied`,
+    status: "Applied",
+    detail: `Pattern ${afterProject.selectedPattern} / ${stack.detail}`,
+    scope: "808 + Chords + Synth",
+    impact: `B ${moves.bass} / C ${moves.chord} / S ${moves.melody}`,
+    metrics,
+    auditionCue: `Loop Pattern ${afterProject.selectedPattern}; listen for low-end, harmony, and top-line balance.`,
+    nextCheck: "Use selected-note and selected-chord tools if the stack needs manual edits.",
+    tone: changedCount > 0 ? "good" : "warn"
+  };
+}
+
+function createPatternStackResultMetric(
+  id: PatternStackResultMetric["id"],
+  label: string,
+  beforeCount: number,
+  afterCount: number,
+  changedEvents: number
+): PatternStackResultMetric {
+  return {
+    id,
+    label,
+    before: `${beforeCount}`,
+    after: `${afterCount}`,
+    tone: changedEvents === 0 ? "warn" : "good"
   };
 }
 
