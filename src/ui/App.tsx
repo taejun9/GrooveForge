@@ -1000,6 +1000,9 @@ type ComposerAction = {
   label: string;
   detail: string;
   buttonLabel: string;
+  scope: string;
+  impact: string;
+  safety: string;
   tone: MixCoachTone;
   priority: number;
   command: ComposerActionCommand;
@@ -6153,6 +6156,10 @@ function ComposerActions({
             <span>
               <strong>{action.buttonLabel}</strong>
               <small>{action.detail}</small>
+              <em data-testid={`composer-action-preview-${action.id}`}>
+                {action.scope} / {action.impact}
+              </em>
+              <i>{action.safety}</i>
             </span>
           </button>
         ))}
@@ -8015,6 +8022,9 @@ function composerDrumAction(
       label: "Build rhythm foundation",
       detail: `${styleActionProfile.cues.drums} / ${drumHits}/${goal} hits`,
       buttonLabel: "Drum Foundation",
+      scope: `Pattern ${project.selectedPattern} drums`,
+      impact: "replace foundation",
+      safety: "Undoable pattern edit",
       tone: drums?.tone === "danger" ? "danger" : tone,
       priority: composerActionPriority("drums", drums?.tone === "danger" ? "danger" : tone, styleActionProfile),
       command: { kind: "drumFoundation", foundation }
@@ -8027,6 +8037,9 @@ function composerDrumAction(
     label: "Add drum movement",
     detail: `${styleActionProfile.cues.drums} / tail move`,
     buttonLabel: "Drum Fill",
+    scope: `Pattern ${project.selectedPattern} drums`,
+    impact: "add tail fill",
+    safety: "Undoable tail edit",
     tone: "good",
     priority: composerActionPriority("drums", "good", styleActionProfile),
     command: { kind: "patternFill", preset: "drum_fill" }
@@ -8048,6 +8061,9 @@ function composerBassAction(
       label: "Write low end",
       detail: `${styleActionProfile.cues.bass} / ${basslinePadLabel(pad)} ${bassCount}/${goal}`,
       buttonLabel: "808 Bassline",
+      scope: `Pattern ${project.selectedPattern} 808`,
+      impact: "replace bass lane",
+      safety: "Undoable lane edit",
       tone,
       priority: composerActionPriority("bass", tone, styleActionProfile),
       command: { kind: "bassline", pad }
@@ -8060,6 +8076,9 @@ function composerBassAction(
     label: "Add low-end pickup",
     detail: `${styleActionProfile.cues.bass} / tail move`,
     buttonLabel: "808 Pickup",
+    scope: `Pattern ${project.selectedPattern} 808`,
+    impact: "add tail pickup",
+    safety: "Undoable tail edit",
     tone: "good",
     priority: composerActionPriority("bass", "good", styleActionProfile),
     command: { kind: "patternFill", preset: "bass_pickup" }
@@ -8080,6 +8099,9 @@ function composerHarmonyAction(
     label: chordCount < goal ? "Set chord motion" : "Refresh chord color",
     detail: `${styleActionProfile.cues.harmony} / ${chordProgressionPresetLabel(preset)} ${chordCount}/${goal}`,
     buttonLabel: chordCount < goal ? "Chord Progression" : "Chord Color",
+    scope: `Pattern ${project.selectedPattern} chords`,
+    impact: "replace chord lane",
+    safety: "Undoable chord edit",
     tone,
     priority: composerActionPriority("harmony", tone, styleActionProfile),
     command: { kind: "chordProgression", preset }
@@ -8101,6 +8123,9 @@ function composerMelodyAction(
       label: "Seed hook motif",
       detail: `${styleActionProfile.cues.melody} / ${melodyMotifLabel(motif)} ${melodyCount}/${goal}`,
       buttonLabel: "Melody Motif",
+      scope: `Pattern ${project.selectedPattern} synth`,
+      impact: "replace melody lane",
+      safety: "Undoable note edit",
       tone,
       priority: composerActionPriority("melody", tone, styleActionProfile),
       command: { kind: "melodyMotif", motif }
@@ -8113,6 +8138,9 @@ function composerMelodyAction(
     label: "Turn the melody tail",
     detail: `${styleActionProfile.cues.melody} / tail move`,
     buttonLabel: "Melody Turn",
+    scope: `Pattern ${project.selectedPattern} synth`,
+    impact: "add tail turn",
+    safety: "Undoable tail edit",
     tone: "good",
     priority: composerActionPriority("melody", "good", styleActionProfile),
     command: { kind: "patternFill", preset: "melody_turn" }
@@ -8133,6 +8161,9 @@ function composerArrangementAction(
       label: "Sketch song form",
       detail: `${styleActionProfile.cues.arrange} / ${barCountLabel(bars)} now`,
       buttonLabel: "8 Bar Chain",
+      scope: "Arrangement",
+      impact: "replace blocks",
+      safety: "Undoable form edit",
       tone: "danger",
       priority: composerActionPriority("arrange", "danger", styleActionProfile),
       command: { kind: "patternChain", chain: "eight_bar" }
@@ -8146,6 +8177,9 @@ function composerArrangementAction(
       label: `Reach ${target.name}`,
       detail: `${styleActionProfile.cues.arrange} / ${barCountLabel(target.targetBars)} target`,
       buttonLabel: arrangementTemplateLabel(target.preferredTemplate),
+      scope: "Arrangement",
+      impact: "apply template",
+      safety: "Undoable form edit",
       tone: "warn",
       priority: composerActionPriority("arrange", "warn", styleActionProfile),
       command: { kind: "arrangementTemplate", template: target.preferredTemplate }
@@ -8158,6 +8192,9 @@ function composerArrangementAction(
     label: "Add section contrast",
     detail: `${styleActionProfile.cues.arrange} / ${barCountLabel(bars)} form`,
     buttonLabel: "Hook Switch",
+    scope: "Arrangement",
+    impact: "replace blocks",
+    safety: "Undoable form edit",
     tone: "good",
     priority: composerActionPriority("arrange", "good", styleActionProfile),
     command: { kind: "patternChain", chain: "hook_switch" }
@@ -8182,6 +8219,9 @@ function composerFinishAction(
     label: "Set output posture",
     detail: `${styleActionProfile.cues.finish} / ${audibleStemCount}/${target.stemGoal} stems`,
     buttonLabel: `${masterFinishPadLabel(pad)} Finish`,
+    scope: "Master output",
+    impact: "preset/ceiling/gain",
+    safety: "Undoable master edit",
     tone,
     priority: composerActionPriority("finish", tone, styleActionProfile),
     command: { kind: "masterFinish", pad }

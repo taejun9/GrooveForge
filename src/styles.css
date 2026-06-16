@@ -1032,7 +1032,9 @@ h2 {
 .composer-actions-heading strong,
 .composer-actions-heading small,
 .composer-actions-grid button strong,
-.composer-actions-grid button small {
+.composer-actions-grid button small,
+.composer-actions-grid button em,
+.composer-actions-grid button i {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1101,7 +1103,7 @@ h2 {
 .composer-actions-grid button span {
   display: grid;
   min-width: 0;
-  gap: 3px;
+  gap: 2px;
 }
 
 .composer-actions-grid button strong {
@@ -1111,6 +1113,32 @@ h2 {
 .composer-actions-grid button small {
   color: rgba(244, 239, 231, 0.62);
   font-size: 10px;
+}
+
+.composer-actions-grid button em,
+.composer-actions-grid button i {
+  font-style: normal;
+  font-size: 9px;
+}
+
+.composer-actions-grid button em {
+  color: rgba(130, 215, 255, 0.78);
+}
+
+.composer-actions-grid button.good em {
+  color: rgba(120, 240, 200, 0.76);
+}
+
+.composer-actions-grid button.warn em {
+  color: rgba(240, 195, 106, 0.78);
+}
+
+.composer-actions-grid button.danger em {
+  color: rgba(255, 122, 79, 0.78);
+}
+
+.composer-actions-grid button i {
+  color: rgba(244, 239, 231, 0.5);
 }
 
 .quick-actions-overlay {
