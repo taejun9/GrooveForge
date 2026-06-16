@@ -649,6 +649,27 @@ type MasterFinishPreviewSummary = {
   tone: MixCoachTone;
 };
 
+type MasterFinishResultMetric = {
+  id: "preset" | "ceiling" | "output";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type MasterFinishResult = {
+  padId: MasterFinishPadId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: MasterFinishResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type TransportLoopScope = "arrangement" | "block" | "pattern";
 
 type QuickAction = {
@@ -2483,6 +2504,7 @@ export function App(): ReactElement {
   const [melodyMoveResult, setMelodyMoveResult] = useState<MelodyMoveResult | null>(null);
   const [chordMoveResult, setChordMoveResult] = useState<ChordMoveResult | null>(null);
   const [soundFocusResult, setSoundFocusResult] = useState<SoundFocusResult | null>(null);
+  const [masterFinishResult, setMasterFinishResult] = useState<MasterFinishResult | null>(null);
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
@@ -2998,6 +3020,7 @@ export function App(): ReactElement {
     setMelodyMoveResult(null);
     setChordMoveResult(null);
     setSoundFocusResult(null);
+    setMasterFinishResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -3015,6 +3038,7 @@ export function App(): ReactElement {
       setMelodyMoveResult(null);
       setChordMoveResult(null);
       setSoundFocusResult(null);
+      setMasterFinishResult(null);
     }
     setProjectStatus(status);
   }
@@ -3107,6 +3131,7 @@ export function App(): ReactElement {
     setMelodyMoveResult(null);
     setChordMoveResult(null);
     setSoundFocusResult(null);
+    setMasterFinishResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
   }
@@ -3129,6 +3154,7 @@ export function App(): ReactElement {
     setMelodyMoveResult(null);
     setChordMoveResult(null);
     setSoundFocusResult(null);
+    setMasterFinishResult(null);
     setProjectStatus(status);
   }
 
@@ -3753,16 +3779,24 @@ export function App(): ReactElement {
     }));
   }
 
-  function applyMasterFinishPad(padId: MasterFinishPadId): void {
+  function applyMasterFinishPad(padId: MasterFinishPadId, options: { showResult?: boolean } = {}): void {
     const pad = masterFinishPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
+      setMasterFinishResult(null);
       setProjectStatus("Master finish pad not found");
       return;
     }
 
+    const beforeProject = projectRef.current;
     const changed = updateProject((current) => applyMasterFinishPadToProject(current, pad), `${pad.label} master finish applied`);
     if (!changed) {
+      setMasterFinishResult(null);
       setProjectStatus(`${pad.label} master finish already selected`);
+      return;
+    }
+
+    if (options.showResult) {
+      setMasterFinishResult(createMasterFinishResult(pad, beforeProject, projectRef.current));
     }
   }
 
@@ -7275,7 +7309,8 @@ export function App(): ReactElement {
           <MasterFinishPads
             pads={masterFinishPadOptions}
             preview={masterFinishPreviewSummary}
-            onApply={applyMasterFinishPad}
+            result={masterFinishResult}
+            onApply={(pad) => applyMasterFinishPad(pad, { showResult: true })}
           />
           <label>
             <span>Ceiling</span>
@@ -14870,10 +14905,12 @@ function StemAuditionPads({
 function MasterFinishPads({
   pads,
   preview,
+  result,
   onApply
 }: {
   pads: MasterFinishPadOption[];
   preview: MasterFinishPreviewSummary;
+  result: MasterFinishResult | null;
   onApply: (pad: MasterFinishPadId) => void;
 }): ReactElement {
   return (
@@ -14895,6 +14932,7 @@ function MasterFinishPads({
         <small data-testid="master-finish-preview-output">{preview.outputLabel}</small>
         <small data-testid="master-finish-preview-changes">{preview.changeLabel}</small>
       </div>
+      {result && <MasterFinishResultStrip result={result} />}
       <div className="master-finish-row" aria-label="Master Finish Pads">
         {pads.map((pad) => (
           <button
@@ -14909,6 +14947,48 @@ function MasterFinishPads({
             <small>{pad.changedCount} moves / {pad.detail}</small>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function MasterFinishResultStrip({ result }: { result: MasterFinishResult }): ReactElement {
+  return (
+    <div
+      className={`master-finish-result ${result.tone}`}
+      data-result-master-finish={result.padId}
+      data-testid="master-finish-result"
+      aria-live="polite"
+    >
+      <div className="master-finish-result-main">
+        <Gauge size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="master-finish-result-title">{result.title}</strong>
+          <small data-testid="master-finish-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="master-finish-result-meta">
+        <span data-testid="master-finish-result-status">{result.status}</span>
+        <span data-testid="master-finish-result-scope">{result.scope}</span>
+        <span data-testid="master-finish-result-impact">{result.impact}</span>
+      </div>
+      <div className="master-finish-result-metrics" data-testid="master-finish-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`master-finish-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="master-finish-result-followup" data-testid="master-finish-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="master-finish-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="master-finish-result-next-check">{result.nextCheck}</em>
+        </span>
       </div>
     </div>
   );
@@ -15304,6 +15384,57 @@ function createMasterFinishPreviewSummary(
     changeLabel,
     detailTitle,
     tone
+  };
+}
+
+function createMasterFinishResult(
+  pad: MasterFinishPadDefinition,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): MasterFinishResult {
+  const changedCount = masterFinishChangedCount(beforeProject, afterProject);
+  const metrics: MasterFinishResultMetric[] = [
+    createMasterFinishResultMetric("preset", "Preset", beforeProject.masterPreset, afterProject.masterPreset),
+    createMasterFinishResultMetric(
+      "ceiling",
+      "Ceiling",
+      formatDb(beforeProject.masterCeilingDb),
+      formatDb(afterProject.masterCeilingDb)
+    ),
+    createMasterFinishResultMetric(
+      "output",
+      "Output",
+      formatDb(masterChannelVolumeDb(beforeProject.mixer)),
+      formatDb(masterChannelVolumeDb(afterProject.mixer))
+    )
+  ];
+
+  return {
+    padId: pad.id,
+    title: `${pad.label} Master Finish applied`,
+    status: "Applied",
+    detail: pad.detail,
+    scope: "Editable master output",
+    impact: `${changedCount} finish move${changedCount === 1 ? "" : "s"}`,
+    metrics,
+    auditionCue: "Play Full Mix; watch Export meter headroom and limiter.",
+    nextCheck: "Use Ceiling and master output controls for manual trim before WAV/stem export.",
+    tone: changedCount > 0 ? "good" : "warn"
+  };
+}
+
+function createMasterFinishResultMetric(
+  id: MasterFinishResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): MasterFinishResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: before === after ? "warn" : "good"
   };
 }
 
