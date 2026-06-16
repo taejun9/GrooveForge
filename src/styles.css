@@ -166,6 +166,8 @@ h2 {
 .master-panel label span,
 .finish-checklist-heading span,
 .finish-checklist-card span,
+.review-queue-heading span,
+.review-queue-item span,
 .inspector-heading span,
 .note-inspector label span,
 .arrangement-arc-heading span,
@@ -4736,6 +4738,116 @@ input[type="range"] {
 }
 
 .finish-checklist-card small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 10px;
+}
+
+.review-queue {
+  display: grid;
+  gap: 9px;
+  border: 1px solid rgba(138, 168, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(138, 168, 255, 0.05);
+  padding: 10px;
+}
+
+.review-queue.warn {
+  border-color: rgba(240, 195, 106, 0.2);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.review-queue.danger {
+  border-color: rgba(255, 122, 79, 0.24);
+  background: rgba(255, 122, 79, 0.055);
+}
+
+.review-queue-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.review-queue-heading > div {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.review-queue-heading svg {
+  color: #8aa8ff;
+}
+
+.review-queue.warn .review-queue-heading svg {
+  color: #f0c36a;
+}
+
+.review-queue.danger .review-queue-heading svg {
+  color: #ff7a4f;
+}
+
+.review-queue-heading strong,
+.review-queue-heading small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-queue-heading strong {
+  color: #f4efe7;
+  font-size: 12px;
+  text-align: end;
+}
+
+.review-queue-heading small {
+  grid-column: 1 / -1;
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.review-queue-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.review-queue-item {
+  display: grid;
+  grid-template-columns: minmax(58px, 0.42fr) minmax(0, 1fr);
+  gap: 3px 7px;
+  min-width: 0;
+  border-inline-start: 3px solid #78f0c8;
+  border-radius: 6px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 7px 8px;
+}
+
+.review-queue-item.warn {
+  border-inline-start-color: #f0c36a;
+}
+
+.review-queue-item.danger {
+  border-inline-start-color: #ff7a4f;
+}
+
+.review-queue-item strong,
+.review-queue-item small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-queue-item strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.review-queue-item small {
+  grid-column: 1 / -1;
   color: rgba(244, 239, 231, 0.66);
   font-size: 10px;
 }

@@ -82,6 +82,7 @@ Primary feature areas:
 - Project readiness: read-only checks for drums, 808/bass, melody/chords, arrangement, and export completeness.
 - Beat Passport: compact read-only target, length, Pattern A/B/C, readiness, export, stem, and master posture summary from local project/render state.
 - Finish Checklist: read-only Compose, Arrange, Mix, Master, and Handoff readiness scan from local project, render, stem, target, and Session Brief state.
+- Review Queue: read-only prioritized production issue scan from local readiness, structure, mix, master, target, stem, and Session Brief state.
 - Handoff Pack: explicit WAV, stem, MIDI, and Handoff Sheet export buttons with local deliverable status for final beat delivery.
 - Beat Map: deterministic production overview that maps the current beat into Start, Compose, Arrange, Polish, and Deliver stages against the selected fixed or custom Delivery Target, plus song length, Pattern A/B/C usage, export, and stem metrics for faster beginner and producer decisions.
 - Structure Lens: read-only arrangement quality view for target fit, section coverage, hook contrast, and energy arc, with explicit local buttons for existing arrangement moves.
@@ -157,6 +158,7 @@ MVP capabilities:
 - Session Brief stored in local project state with bounded artist, vibe, reference, and notes text so beginners can clarify intent and producers can keep handoff context without media uploads or cloud collaboration.
 - Beat Passport summary derived from local project state, Beat Readiness, export analysis, stem analysis, Delivery Target, and master posture so beginners and producers can scan target, length, Pattern A/B/C use, readiness, export, stems, and master state without changing the beat.
 - Finish Checklist derived from local project state, Beat Readiness, Structure Lens posture, Mix Coach checks, export analysis, stem analysis, Delivery Target, and Session Brief so users can review Compose, Arrange, Mix, Master, and Handoff readiness without changing the beat.
+- Review Queue derived from local project state, Beat Readiness, Structure Lens signals, Mix Coach checks, export analysis, stem analysis, Delivery Target, and Session Brief so users can scan the top production issues without changing the beat.
 - Handoff Pack surface that groups explicit full-mix WAV, stem WAV, arrangement MIDI, and Handoff Sheet export actions with status derived from local project state and deterministic export/stem analysis.
 - Beat Map production overview derived from local project, selected fixed or custom Delivery Target, Beat Readiness, export analysis, and stem analysis state, showing beginner workflow stages, producer-facing song/pattern/export/stem metrics, and explicit local action buttons without mutating project state unless clicked.
 - Structure Lens derived from local arrangement blocks and selected Delivery Target, showing target fit, section coverage, hook contrast, and energy arc while routing explicit action buttons through existing undoable arrangement paths.

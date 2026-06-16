@@ -11,6 +11,7 @@ import {
   FolderOpen,
   Gauge,
   KeyboardMusic,
+  ListChecks,
   Music2,
   Play,
   Plus,
@@ -886,6 +887,21 @@ type FinishChecklistSummary = {
   cards: FinishChecklistCard[];
 };
 
+type ReviewQueueItem = {
+  id: string;
+  area: string;
+  status: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type ReviewQueueSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  items: ReviewQueueItem[];
+};
+
 type HandoffPackItem = {
   id: "wav" | "stems" | "midi" | "sheet";
   label: string;
@@ -1284,6 +1300,10 @@ export function App(): ReactElement {
   );
   const finishChecklistSummary = useMemo(
     () => createFinishChecklistSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
+  );
+  const reviewQueueSummary = useMemo(
+    () => createReviewQueueSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
@@ -4722,6 +4742,7 @@ export function App(): ReactElement {
             <span>{project.masterCeilingDb} dB ceiling</span>
           </div>
           <FinishChecklist summary={finishChecklistSummary} />
+          <ReviewQueue summary={reviewQueueSummary} />
           <ExportMeter analysis={exportAnalysis} />
           <MixCoach analysis={exportAnalysis} stemAnalyses={stemAnalyses} onApplyFix={applyMixFixPreset} />
           <MasterFinishPads pads={masterFinishPadOptions} onApply={applyMasterFinishPad} />
@@ -5548,6 +5569,30 @@ function FinishChecklist({ summary }: { summary: FinishChecklistSummary }): Reac
             <span>{card.label}</span>
             <strong>{card.status}</strong>
             <small>{card.detail}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ReviewQueue({ summary }: { summary: ReviewQueueSummary }): ReactElement {
+  return (
+    <section className={`review-queue ${summary.tone}`} data-testid="review-queue" aria-label="Review queue">
+      <div className="review-queue-heading">
+        <div>
+          <ListChecks size={16} aria-hidden="true" />
+          <span>Review Queue</span>
+        </div>
+        <strong data-testid="review-queue-headline">{summary.headline}</strong>
+        <small data-testid="review-queue-detail">{summary.detail}</small>
+      </div>
+      <div className="review-queue-list" data-testid="review-queue-list">
+        {summary.items.map((item) => (
+          <div className={`review-queue-item ${item.tone}`} data-testid={`review-queue-${item.id}`} key={item.id}>
+            <span>{item.area}</span>
+            <strong>{item.status}</strong>
+            <small>{item.detail}</small>
           </div>
         ))}
       </div>
@@ -6536,6 +6581,174 @@ function createFinishChecklistSummary(
     tone,
     cards
   };
+}
+
+function createReviewQueueSummary(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): ReviewQueueSummary {
+  const target = activeDeliveryTarget(project);
+  const structure = createStructureLensSummary(project);
+  const mixChecks = createMixCoachChecks(analysis, stemAnalyses);
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const briefFields = sessionBriefFilledFields(project.sessionBrief);
+  const candidates: Array<ReviewQueueItem & { order: number }> = [];
+  let order = 0;
+  const pushIssue = (item: ReviewQueueItem): void => {
+    candidates.push({ ...item, order });
+    order += 1;
+  };
+
+  checks
+    .filter((check) => check.tone !== "good")
+    .forEach((check) =>
+      pushIssue({
+        id: `readiness-${check.id}`,
+        area: readinessReviewArea(check.id),
+        status: `${check.label}: ${check.status}`,
+        detail: check.detail,
+        tone: check.tone
+      })
+    );
+
+  structure.signals
+    .filter((signal) => signal.tone !== "good")
+    .forEach((signal) =>
+      pushIssue({
+        id: `structure-${signal.id}`,
+        area: "Arrange",
+        status: `${signal.label}: ${signal.value}`,
+        detail: signal.detail,
+        tone: signal.tone
+      })
+    );
+
+  if (!isDeliveryTargetAligned(project, target)) {
+    pushIssue({
+      id: "target-alignment",
+      area: "Target",
+      status: "Delivery target mismatch",
+      detail: `Align length, master preset, and mix posture for ${target.name}.`,
+      tone: "warn"
+    });
+  }
+
+  mixChecks
+    .filter((check) => check.tone !== "good")
+    .forEach((check) =>
+      pushIssue({
+        id: `mix-${check.id}`,
+        area: mixReviewArea(check.id),
+        status: `${check.label}: ${check.status}`,
+        detail: check.detail,
+        tone: check.tone
+      })
+    );
+
+  if (project.masterPreset !== target.preferredMasterPreset) {
+    pushIssue({
+      id: "master-preset",
+      area: "Master",
+      status: "Preset target",
+      detail: `${project.masterPreset} selected; ${target.preferredMasterPreset} fits ${target.name}.`,
+      tone: "warn"
+    });
+  }
+
+  if (audibleStems.length < target.stemGoal) {
+    pushIssue({
+      id: "stem-coverage",
+      area: "Handoff",
+      status: "Stem coverage",
+      detail: `${audibleStems.length}/${target.stemGoal} audible stems for ${target.name}.`,
+      tone: audibleStems.length > 0 ? "warn" : "danger"
+    });
+  }
+
+  if (briefFields < 2) {
+    pushIssue({
+      id: "session-brief",
+      area: "Handoff",
+      status: "Brief context",
+      detail: `${briefFields}/4 Session Brief fields filled for collaborator review.`,
+      tone: briefFields > 0 ? "warn" : "danger"
+    });
+  }
+
+  if (candidates.length === 0) {
+    const items: ReviewQueueItem[] = [
+      {
+        id: "ready",
+        area: "Review",
+        status: "No queued issues",
+        detail: `${target.name} / ${analysis.status} / ${formatDb(analysis.headroomDb)} headroom`,
+        tone: "good"
+      }
+    ];
+    return {
+      headline: "No queued issues",
+      detail: `${target.name} scan is clear`,
+      tone: "good",
+      items
+    };
+  }
+
+  const items = candidates
+    .sort((first, second) => reviewToneRank(first.tone) - reviewToneRank(second.tone) || first.order - second.order)
+    .slice(0, 5)
+    .map(({ order: _order, ...item }) => item);
+  const tone = weakestTone(items.map((item) => item.tone));
+  const hiddenCount = Math.max(0, candidates.length - items.length);
+  const headline = tone === "danger" ? "Fix these before export" : "Review before export";
+  const issueLabel = `${items.length} issue${items.length === 1 ? "" : "s"}`;
+
+  return {
+    headline,
+    detail: hiddenCount > 0 ? `${issueLabel} shown / ${hiddenCount} more queued` : `${issueLabel} queued / ${target.name}`,
+    tone,
+    items
+  };
+}
+
+function readinessReviewArea(id: string): string {
+  switch (id) {
+    case "drums":
+    case "bass":
+    case "harmony":
+      return "Compose";
+    case "arrangement":
+      return "Arrange";
+    case "export":
+      return "Export";
+    default:
+      return "Review";
+  }
+}
+
+function mixReviewArea(id: string): string {
+  switch (id) {
+    case "headroom":
+    case "limiter":
+      return "Master";
+    case "stem-balance":
+    case "low-end":
+      return "Mix";
+    default:
+      return "Mix";
+  }
+}
+
+function reviewToneRank(tone: MixCoachTone): number {
+  switch (tone) {
+    case "danger":
+      return 0;
+    case "warn":
+      return 1;
+    case "good":
+      return 2;
+  }
 }
 
 function createHandoffPackItems({
