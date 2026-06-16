@@ -615,6 +615,15 @@ function projectSlug(project: ProjectState): string {
   return project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "grooveforge";
 }
 
+export function mixWavFileName(project: ProjectState): string {
+  return `${projectSlug(project)}-demo.wav`;
+}
+
+export function stemWavFileNames(project: ProjectState): string[] {
+  const slug = projectSlug(project);
+  return stemTrackIds.map((track) => `${slug}-${track.replace("_", "-")}-stem.wav`);
+}
+
 function downloadWav(buffer: AudioChannels, fileName: string): void {
   const blob = encodeWav(buffer);
   const url = URL.createObjectURL(blob);
@@ -626,15 +635,14 @@ function downloadWav(buffer: AudioChannels, fileName: string): void {
 }
 
 export function exportWav(project: ProjectState): void {
-  downloadWav(renderProject(project).buffer, `${projectSlug(project)}-demo.wav`);
+  downloadWav(renderProject(project).buffer, mixWavFileName(project));
 }
 
 export function exportStems(project: ProjectState): string[] {
-  const slug = projectSlug(project);
-  const fileNames = stemTrackIds.map((track) => {
-    const fileName = `${slug}-${track.replace("_", "-")}-stem.wav`;
+  const fileNames = stemWavFileNames(project);
+  fileNames.forEach((fileName, index) => {
+    const track = stemTrackIds[index];
     downloadWav(renderProject(project, arrangementBarCount(project), track).buffer, fileName);
-    return fileName;
   });
   return fileNames;
 }

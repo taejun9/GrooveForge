@@ -2775,6 +2775,60 @@ h2 {
   min-width: 0;
 }
 
+.handoff-pack-file-manifest {
+  display: grid;
+  grid-column: 2;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.handoff-pack-file {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  border: 1px solid rgba(120, 240, 200, 0.18);
+  border-radius: 7px;
+  background: rgba(17, 16, 15, 0.22);
+  padding: 7px;
+}
+
+.handoff-pack-file.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+}
+
+.handoff-pack-file.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+}
+
+.handoff-pack-file span,
+.handoff-pack-file strong,
+.handoff-pack-file small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.handoff-pack-file span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.handoff-pack-file strong {
+  color: #f4efe7;
+  font-size: 10px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.handoff-pack-file small {
+  color: rgba(244, 239, 231, 0.6);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
 .handoff-pack-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 74px;
@@ -7763,6 +7817,10 @@ input[type="range"] {
   }
 
   .handoff-pack-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .handoff-pack-file-manifest {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

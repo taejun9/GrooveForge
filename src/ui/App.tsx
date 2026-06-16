@@ -27,14 +27,16 @@ import {
 } from "lucide-react";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode, Ref } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { exportMidi } from "../audio/midi";
+import { exportMidi, midiFileName } from "../audio/midi";
 import {
   analyzeExport,
   analyzeStemExports,
   ExportAnalysis,
   exportStems,
   exportWav,
+  mixWavFileName,
   StemExportAnalyses,
+  stemWavFileNames,
   stemTrackIds,
   stemTrackLabel,
   StemTrackId
@@ -1416,6 +1418,14 @@ type HandoffPackRouteSummary = {
   detailLabel: string;
   fileLabel: string;
   detailTitle: string;
+  tone: MixCoachTone;
+};
+
+type HandoffFileManifestItem = {
+  id: HandoffPackItem["id"];
+  label: string;
+  fileLabel: string;
+  detail: string;
   tone: MixCoachTone;
 };
 
@@ -7284,6 +7294,7 @@ function HandoffPack({
   const readyCount = items.filter((item) => item.tone === "good").length;
   const tone = weakestTone(items.map((item) => item.tone));
   const routeSummary = createHandoffPackRouteSummary(project, stemAnalyses, items, tone);
+  const fileManifest = createHandoffFileManifest(project, stemAnalyses, items);
 
   return (
     <section className={`handoff-pack ${tone}`} data-testid="handoff-pack" aria-label="Handoff pack">
@@ -7328,6 +7339,15 @@ function HandoffPack({
               <Download size={14} aria-hidden="true" />
               <span>{item.buttonLabel}</span>
             </button>
+          </div>
+        ))}
+      </div>
+      <div className="handoff-pack-file-manifest" data-testid="handoff-pack-file-manifest" aria-label="Handoff file manifest">
+        {fileManifest.map((item) => (
+          <div className={`handoff-pack-file ${item.tone}`} data-testid={`handoff-pack-file-${item.id}`} key={item.id} title={item.fileLabel}>
+            <span>{item.label}</span>
+            <strong>{item.fileLabel}</strong>
+            <small>{item.detail}</small>
           </div>
         ))}
       </div>
@@ -9333,6 +9353,48 @@ function createHandoffPackRouteSummary(
     detailTitle: `${target.name} handoff / ${readyCount}/${items.length} ready / ${audibleStems.length}/${target.stemGoal} target stems / ${briefStatus.detail} / ${openTitle} / ${handoffSheetFileName(project)}`,
     tone
   };
+}
+
+function createHandoffFileManifest(
+  project: ProjectState,
+  stemAnalyses: StemExportAnalyses,
+  items: HandoffPackItem[]
+): HandoffFileManifestItem[] {
+  const itemTone = (id: HandoffPackItem["id"]): MixCoachTone => items.find((item) => item.id === id)?.tone ?? "warn";
+  const stemFiles = stemWavFileNames(project);
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const briefFields = sessionBriefFilledFields(project.sessionBrief);
+
+  return [
+    {
+      id: "wav",
+      label: "Mix WAV",
+      fileLabel: mixWavFileName(project),
+      detail: `${barCountLabel(arrangementTotalBars(project))} full mix`,
+      tone: itemTone("wav")
+    },
+    {
+      id: "stems",
+      label: "Stem WAVs",
+      fileLabel: stemFiles.join(" / "),
+      detail: `${audibleStems.length}/${stemTrackIds.length} audible stems`,
+      tone: itemTone("stems")
+    },
+    {
+      id: "midi",
+      label: "Arrangement MIDI",
+      fileLabel: midiFileName(project),
+      detail: `${barCountLabel(arrangementTotalBars(project))} arrangement`,
+      tone: itemTone("midi")
+    },
+    {
+      id: "sheet",
+      label: "Handoff Sheet",
+      fileLabel: handoffSheetFileName(project),
+      detail: `${briefFields}/4 brief fields`,
+      tone: itemTone("sheet")
+    }
+  ];
 }
 
 function createKeyCompassSummary(
