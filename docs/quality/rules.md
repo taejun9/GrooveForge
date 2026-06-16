@@ -287,7 +287,7 @@ Any future optional-sampling schema must keep `NoteEvent`, `DrumHitEvent`, and a
 
 Data model examples fail the product boundary if they add `AudioClipEvent` to the core `MusicalEvent` union or include `audio`/`sampler` in the MVP track union or default project track list before an explicit optional-sampling plan exists.
 
-Mixer/master work must keep mixing and mastering separate. Volume, pan, mute, solo, master output gain, and preset ceiling controls must affect both realtime playback and WAV export when implemented. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.
+Mixer/master work must keep mixing and mastering separate. Volume, pan, mute, solo, master output gain, and preset ceiling controls must affect both realtime playback and WAV export when implemented. Mixer channel role readouts must derive only from local mixer channel volume, pan, mute, solo, low-cut, air, Drive/Glue, and Space send fields, stay UI-local and out of saved project schema, avoid changing Mix Coach, Mix Balance Pads, Stem Audition Pads, Master Finish, playback, or export semantics, and avoid hidden mixing, mastering, LUFS/true-peak, platform-safety claims, sampling, imported audio, remote AI, accounts, analytics, or cloud sync. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.
 
 Channel EQ work must keep low-cut/air controls in mixer state, migrate older project files safely, keep non-master track EQ separate from master processing, and make EQ values affect realtime playback, full-mix WAV export, and stem export.
 

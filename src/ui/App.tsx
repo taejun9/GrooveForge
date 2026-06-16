@@ -1014,6 +1014,13 @@ type ArrangementBlockRoleSummary = {
   isShaped: boolean;
 };
 
+type MixerChannelRoleSummary = {
+  roleLabel: string;
+  levelLabel: string;
+  detailLabel: string;
+  isShaped: boolean;
+};
+
 type ProductionSnapshotMetricId = "target" | "form" | "patterns" | "mix" | "handoff";
 
 type ProductionSnapshotMetric = {
@@ -5654,8 +5661,10 @@ export function App(): ReactElement {
           <MixBalancePads pads={mixBalancePadOptions} onApply={applyMixBalancePad} />
           <StemAuditionPads pads={stemAuditionPadOptions} onApply={applyStemAuditionPad} />
           <div className="mixer-strips">
-            {project.mixer.map((channel) => (
-              <div className="strip" key={channel.id} style={{ "--strip": channel.accent } as CSSProperties}>
+            {project.mixer.map((channel) => {
+              const roleSummary = mixerChannelRoleSummary(channel);
+              return (
+                <div className="strip" key={channel.id} style={{ "--strip": channel.accent } as CSSProperties}>
                 <div className="strip-top">
                   <span>{channel.name}</span>
                   <div className="strip-toggles">
@@ -5677,6 +5686,14 @@ export function App(): ReactElement {
                       S
                     </button>
                   </div>
+                </div>
+                <div
+                  className={roleSummary.isShaped ? "mixer-channel-role-readout shaped" : "mixer-channel-role-readout"}
+                  data-testid={`mixer-channel-role-${channel.id}`}
+                >
+                  <span data-testid={`mixer-channel-role-level-${channel.id}`}>{roleSummary.levelLabel}</span>
+                  <strong data-testid={`mixer-channel-role-label-${channel.id}`}>{roleSummary.roleLabel}</strong>
+                  <small data-testid={`mixer-channel-role-detail-${channel.id}`}>{roleSummary.detailLabel}</small>
                 </div>
                 <label className="strip-control">
                   <span>Volume</span>
@@ -5861,8 +5878,9 @@ export function App(): ReactElement {
                     </>
                   )}
                 </div>
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </section>
 
@@ -10827,6 +10845,52 @@ function arrangementBlockRoleLabel(
     return "Peak";
   }
   return "Pocket";
+}
+
+function mixerChannelRoleSummary(channel: MixerChannel): MixerChannelRoleSummary {
+  const stateParts = [channel.muted ? "Muted" : "Live", channel.solo ? "Solo" : null].filter(Boolean);
+  const toneParts =
+    channel.id === "master"
+      ? [`trim ${formatDb(channel.volumeDb)}`, `pan ${panLabel(channel.pan)}`]
+      : [
+          `cut ${percentLabel(channel.lowCut)}`,
+          `air ${percentLabel(channel.air)}`,
+          `drive ${percentLabel(channel.drive)}`,
+          `glue ${percentLabel(channel.glue)}`,
+          `space ${percentLabel(channel.send)}`
+        ];
+
+  return {
+    roleLabel: mixerChannelRoleLabel(channel),
+    levelLabel: `${formatDb(channel.volumeDb)} / ${panLabel(channel.pan)}`,
+    detailLabel: [...stateParts, ...toneParts].join(" / "),
+    isShaped:
+      channel.muted ||
+      channel.solo ||
+      Math.abs(channel.pan) >= 10 ||
+      channel.lowCut >= 0.1 ||
+      channel.air >= 0.25 ||
+      channel.drive >= 0.18 ||
+      channel.glue >= 0.22 ||
+      channel.send >= 0.18
+  };
+}
+
+function mixerChannelRoleLabel(channel: MixerChannel): string {
+  switch (channel.id) {
+    case "drum_rack":
+      return "Rhythm anchor";
+    case "bass_808":
+      return "Low-end weight";
+    case "synth":
+      return "Hook color";
+    case "chord":
+      return "Harmony bed";
+    case "master":
+      return "Output guard";
+    default:
+      return "Mix lane";
+  }
 }
 
 function transportLoopLabel(scope: TransportLoopScope): string {
