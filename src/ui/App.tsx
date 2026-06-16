@@ -1729,6 +1729,16 @@ type HandoffPackSendOrderSummary = {
   tone: MixCoachTone;
 };
 
+type HandoffExportReceipt = {
+  itemId: HandoffPackItem["id"] | null;
+  statusLabel: string;
+  fileLabel: string;
+  detailLabel: string;
+  nextLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type HandoffFileManifestItem = {
   id: HandoffPackItem["id"];
   label: string;
@@ -2205,6 +2215,7 @@ export function App(): ReactElement {
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
   const [finishChecklistFocusId, setFinishChecklistFocusId] = useState<FinishChecklistCardId | null>(null);
   const [exportPreflightFocusId, setExportPreflightFocusId] = useState<ExportPreflightFocusId | null>(null);
+  const [handoffExportReceipt, setHandoffExportReceipt] = useState<HandoffExportReceipt | null>(null);
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const [projectFileLabel, setProjectFileLabel] = useState<string | null>(null);
   const [projectHasUnsavedChanges, setProjectHasUnsavedChanges] = useState(false);
@@ -4963,11 +4974,32 @@ export function App(): ReactElement {
   }
 
   function handleExportWav(): void {
+    const fileName = mixWavFileName(project);
     try {
       exportWav(project);
+      setHandoffExportReceipt(
+        createHandoffExportReceipt({
+          itemId: "wav",
+          statusLabel: "Exported WAV",
+          fileLabel: fileName,
+          detailLabel: `${exportAnalysis.status} / ${barCountLabel(arrangementTotalBars(project))}`,
+          nextLabel: "Confirm mix download or export stems",
+          tone: "good"
+        })
+      );
       setProjectStatus("Exported mix WAV");
     } catch (error) {
       console.error(error);
+      setHandoffExportReceipt(
+        createHandoffExportReceipt({
+          itemId: "wav",
+          statusLabel: "WAV failed",
+          fileLabel: fileName,
+          detailLabel: "No mix WAV download completed",
+          nextLabel: "Review Export Preflight before retry",
+          tone: "danger"
+        })
+      );
       setProjectStatus("WAV export failed");
     }
   }
@@ -4975,31 +5007,92 @@ export function App(): ReactElement {
   function handleExportStems(): void {
     try {
       const fileNames = exportStems(project);
+      const audibleStems = audibleStemTracks(stemAnalyses);
+      setHandoffExportReceipt(
+        createHandoffExportReceipt({
+          itemId: "stems",
+          statusLabel: "Exported stems",
+          fileLabel: `${fileNames.length} stem files`,
+          detailLabel: `${audibleStems.length}/${stemTrackIds.length} audible / ${fileNames.join(" / ")}`,
+          nextLabel: "Confirm stem downloads or export MIDI",
+          tone: "good"
+        })
+      );
       setProjectStatus(`Exported ${fileNames.length} stems`);
     } catch (error) {
       console.error(error);
+      setHandoffExportReceipt(
+        createHandoffExportReceipt({
+          itemId: "stems",
+          statusLabel: "Stems failed",
+          fileLabel: "No stem files downloaded",
+          detailLabel: `${stemWavFileNames(project).length} expected stem files`,
+          nextLabel: "Check stem status before retry",
+          tone: "danger"
+        })
+      );
       setProjectStatus("Stem export failed");
     }
   }
 
   function handleExportMidi(): void {
     try {
-      exportMidi(project);
+      const fileName = exportMidi(project);
+      setHandoffExportReceipt(
+        createHandoffExportReceipt({
+          itemId: "midi",
+          statusLabel: "Exported MIDI",
+          fileLabel: fileName,
+          detailLabel: `${barCountLabel(arrangementTotalBars(project))} arrangement MIDI`,
+          nextLabel: "Confirm MIDI download or export sheet",
+          tone: "good"
+        })
+      );
       setProjectStatus("Exported MIDI");
     } catch (error) {
       console.error(error);
+      setHandoffExportReceipt(
+        createHandoffExportReceipt({
+          itemId: "midi",
+          statusLabel: "MIDI failed",
+          fileLabel: midiFileName(project),
+          detailLabel: "No arrangement MIDI download completed",
+          nextLabel: "Review arrangement before retry",
+          tone: "danger"
+        })
+      );
       setProjectStatus("MIDI export failed");
     }
   }
 
   function handleExportHandoffSheet(): void {
+    const fileName = handoffSheetFileName(project);
     try {
       const contents = createHandoffSheet(project, exportAnalysis, stemAnalyses);
-      const fileName = handoffSheetFileName(project);
       downloadTextFile(contents, fileName);
+      setHandoffExportReceipt(
+        createHandoffExportReceipt({
+          itemId: "sheet",
+          statusLabel: "Exported sheet",
+          fileLabel: fileName,
+          detailLabel: `${sessionBriefFilledFields(project.sessionBrief)}/4 brief fields`,
+          nextLabel: "Confirm sheet download with audio files",
+          tone: "good"
+        })
+      );
       setProjectStatus(`Exported ${fileName}`);
     } catch (error) {
       console.error(error);
+      setHandoffExportReceipt(
+        createHandoffExportReceipt({
+          itemId: "sheet",
+          statusLabel: "Sheet failed",
+          fileLabel: fileName,
+          detailLabel: "No Handoff Sheet download completed",
+          nextLabel: "Review Session Brief before retry",
+          tone: "danger"
+        })
+      );
       setProjectStatus("Sheet export failed");
     }
   }
@@ -5759,6 +5852,7 @@ export function App(): ReactElement {
 
       <HandoffPack
         analysis={exportAnalysis}
+        exportReceipt={handoffExportReceipt}
         project={project}
         stemAnalyses={stemAnalyses}
         onExportHandoffSheet={handleExportHandoffSheet}
@@ -8537,6 +8631,7 @@ function ExportPreflight({
 
 function HandoffPack({
   analysis,
+  exportReceipt,
   project,
   stemAnalyses,
   onExportHandoffSheet,
@@ -8545,6 +8640,7 @@ function HandoffPack({
   onExportWav
 }: {
   analysis: ExportAnalysis;
+  exportReceipt: HandoffExportReceipt | null;
   project: ProjectState;
   stemAnalyses: StemExportAnalyses;
   onExportHandoffSheet: () => void;
@@ -8565,6 +8661,7 @@ function HandoffPack({
   const tone = weakestTone(items.map((item) => item.tone));
   const routeSummary = createHandoffPackRouteSummary(project, stemAnalyses, items, tone);
   const sendOrderSummary = createHandoffPackSendOrderSummary(project, items);
+  const receiptSummary = exportReceipt ?? emptyHandoffExportReceipt();
   const fileManifest = createHandoffFileManifest(project, stemAnalyses, items);
 
   return (
@@ -8603,6 +8700,18 @@ function HandoffPack({
         <strong data-testid="handoff-pack-send-order-next">{sendOrderSummary.nextLabel}</strong>
         <small data-testid="handoff-pack-send-order-detail">{sendOrderSummary.detailLabel}</small>
         <small data-testid="handoff-pack-send-order-sequence">{sendOrderSummary.sequenceLabel}</small>
+      </div>
+      <div
+        aria-label={receiptSummary.detailTitle}
+        className={`handoff-export-receipt ${receiptSummary.tone}`}
+        data-export-item={receiptSummary.itemId ?? "none"}
+        data-testid="handoff-export-receipt"
+        title={receiptSummary.detailTitle}
+      >
+        <span data-testid="handoff-export-receipt-status">{receiptSummary.statusLabel}</span>
+        <strong data-testid="handoff-export-receipt-file">{receiptSummary.fileLabel}</strong>
+        <small data-testid="handoff-export-receipt-detail">{receiptSummary.detailLabel}</small>
+        <small data-testid="handoff-export-receipt-next">{receiptSummary.nextLabel}</small>
       </div>
       <div className="handoff-pack-grid" data-testid="handoff-pack-grid">
         {items.map((item) => (
@@ -11301,6 +11410,36 @@ function handoffPackSendOrder(items: HandoffPackItem[]): HandoffPackItem[] {
   return order.flatMap((id) => {
     const item = items.find((candidate) => candidate.id === id);
     return item ? [item] : [];
+  });
+}
+
+function createHandoffExportReceipt({
+  itemId,
+  statusLabel,
+  fileLabel,
+  detailLabel,
+  nextLabel,
+  tone
+}: Omit<HandoffExportReceipt, "detailTitle">): HandoffExportReceipt {
+  return {
+    itemId,
+    statusLabel,
+    fileLabel,
+    detailLabel,
+    nextLabel,
+    detailTitle: `${statusLabel} / ${fileLabel} / ${detailLabel} / ${nextLabel}`,
+    tone
+  };
+}
+
+function emptyHandoffExportReceipt(): HandoffExportReceipt {
+  return createHandoffExportReceipt({
+    itemId: null,
+    statusLabel: "No export receipt",
+    fileLabel: "Run a deliverable",
+    detailLabel: "Latest explicit WAV, Stems, MIDI, or Sheet result appears here",
+    nextLabel: "This readout does not create files",
+    tone: "warn"
   });
 }
 
