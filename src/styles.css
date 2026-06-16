@@ -8849,6 +8849,75 @@ input[type="range"] {
   font-size: 11px;
 }
 
+.master-finish-preview {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.8fr) minmax(94px, 0.9fr) repeat(4, minmax(72px, 1fr));
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(138, 168, 255, 0.18);
+  border-radius: 7px;
+  background: rgba(138, 168, 255, 0.055);
+  padding: 7px;
+}
+
+.master-finish-preview.good {
+  border-color: rgba(120, 240, 200, 0.34);
+  background: rgba(120, 240, 200, 0.07);
+}
+
+.master-finish-preview.warn {
+  border-color: rgba(255, 209, 102, 0.32);
+  background: rgba(255, 209, 102, 0.07);
+}
+
+.master-finish-preview.danger {
+  border-color: rgba(255, 111, 145, 0.34);
+  background: rgba(255, 111, 145, 0.07);
+}
+
+.master-finish-preview span,
+.master-finish-preview strong,
+.master-finish-preview small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.master-finish-preview span {
+  color: #08120f;
+  background: #8aa8ff;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.master-finish-preview.good span {
+  background: #78f0c8;
+}
+
+.master-finish-preview.warn span {
+  background: #ffd166;
+}
+
+.master-finish-preview.danger span {
+  background: #ff6f91;
+}
+
+.master-finish-preview strong {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.master-finish-preview small {
+  color: rgba(244, 239, 231, 0.6);
+  font-size: 10px;
+}
+
 .master-finish-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -9717,6 +9786,10 @@ input[type="range"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .master-finish-preview {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .delivery-target-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -9864,6 +9937,11 @@ input[type="range"] {
   }
 
   .delivery-target-preview {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .master-finish-preview {
     grid-template-columns: 1fr;
     gap: 4px;
   }

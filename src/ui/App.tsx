@@ -594,6 +594,18 @@ type MasterFinishPadOption = MasterFinishPadDefinition & {
   changedCount: number;
 };
 
+type MasterFinishPreviewSummary = {
+  padId: MasterFinishPadId;
+  statusLabel: string;
+  padLabel: string;
+  presetLabel: string;
+  ceilingLabel: string;
+  outputLabel: string;
+  changeLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type TransportLoopScope = "arrangement" | "block" | "pattern";
 
 type QuickAction = {
@@ -2339,6 +2351,10 @@ export function App(): ReactElement {
   const soundFocusPadOptions = useMemo(() => createSoundFocusPadOptions(project.sound), [project.sound]);
   const drumKitPadOptions = useMemo(() => createDrumKitPadOptions(project), [project]);
   const masterFinishPadOptions = useMemo(() => createMasterFinishPadOptions(project), [project]);
+  const masterFinishPreviewSummary = useMemo(
+    () => createMasterFinishPreviewSummary(project, masterFinishPadOptions),
+    [project, masterFinishPadOptions]
+  );
   const masterOutputRoleSummary = useMemo(
     () => createMasterOutputRoleSummary(project, exportAnalysis),
     [project, exportAnalysis]
@@ -6873,7 +6889,11 @@ export function App(): ReactElement {
             stemAnalyses={stemAnalyses}
             onApplyFix={applyMixFixPreset}
           />
-          <MasterFinishPads pads={masterFinishPadOptions} onApply={applyMasterFinishPad} />
+          <MasterFinishPads
+            pads={masterFinishPadOptions}
+            preview={masterFinishPreviewSummary}
+            onApply={applyMasterFinishPad}
+          />
           <label>
             <span>Ceiling</span>
             <input
@@ -14466,9 +14486,11 @@ function StemAuditionPads({
 
 function MasterFinishPads({
   pads,
+  preview,
   onApply
 }: {
   pads: MasterFinishPadOption[];
+  preview: MasterFinishPreviewSummary;
   onApply: (pad: MasterFinishPadId) => void;
 }): ReactElement {
   return (
@@ -14476,6 +14498,19 @@ function MasterFinishPads({
       <div className="master-finish-heading">
         <span>Master Finish</span>
         <strong>Output posture</strong>
+      </div>
+      <div
+        className={`master-finish-preview ${preview.tone}`}
+        data-preview-pad={preview.padId}
+        data-testid="master-finish-preview"
+        title={preview.detailTitle}
+      >
+        <span data-testid="master-finish-preview-status">{preview.statusLabel}</span>
+        <strong data-testid="master-finish-preview-pad">{preview.padLabel}</strong>
+        <small data-testid="master-finish-preview-preset">{preview.presetLabel}</small>
+        <small data-testid="master-finish-preview-ceiling">{preview.ceilingLabel}</small>
+        <small data-testid="master-finish-preview-output">{preview.outputLabel}</small>
+        <small data-testid="master-finish-preview-changes">{preview.changeLabel}</small>
       </div>
       <div className="master-finish-row" aria-label="Master Finish Pads">
         {pads.map((pad) => (
@@ -14776,6 +14811,42 @@ function createMasterFinishPadOptions(project: ProjectState): MasterFinishPadOpt
       changedCount: masterFinishChangedCount(project, nextProject)
     };
   });
+}
+
+function createMasterFinishPreviewSummary(
+  project: ProjectState,
+  pads: MasterFinishPadOption[]
+): MasterFinishPreviewSummary {
+  const suggestedPadId = suggestedMasterFinishPad(project);
+  const pad = pads.find((option) => option.id === suggestedPadId) ?? pads[0];
+  const currentOutputDb = masterChannelVolumeDb(project.mixer);
+  const presetAligned = project.masterPreset === pad.preset;
+  const ceilingAligned = project.masterCeilingDb === pad.ceilingDb;
+  const outputAligned = currentOutputDb === pad.masterVolumeDb;
+  const statusLabel = pad.changedCount === 0 ? "Finish aligned" : "Suggested finish";
+  const presetLabel = presetAligned ? `${pad.preset} ready` : `${project.masterPreset} -> ${pad.preset}`;
+  const ceilingLabel = ceilingAligned
+    ? `${formatDb(pad.ceilingDb)} ceiling ready`
+    : `${formatDb(project.masterCeilingDb)} -> ${formatDb(pad.ceilingDb)} ceiling`;
+  const outputLabel = outputAligned
+    ? `${formatDb(pad.masterVolumeDb)} output ready`
+    : `${formatDb(currentOutputDb)} -> ${formatDb(pad.masterVolumeDb)} output`;
+  const changeLabel = `${pad.changedCount} finish move${pad.changedCount === 1 ? "" : "s"}`;
+  const tone: MixCoachTone = pad.changedCount === 0 ? "good" : pad.changedCount === 1 ? "warn" : "danger";
+  const padLabel = `${pad.label} / ${pad.detail}`;
+  const detailTitle = `${statusLabel}: ${padLabel}; ${presetLabel}; ${ceilingLabel}; ${outputLabel}; ${changeLabel}`;
+
+  return {
+    padId: pad.id,
+    statusLabel,
+    padLabel,
+    presetLabel,
+    ceilingLabel,
+    outputLabel,
+    changeLabel,
+    detailTitle,
+    tone
+  };
 }
 
 function masterFinishPreview(pad: MasterFinishPadDefinition): string {
