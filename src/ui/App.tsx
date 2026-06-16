@@ -1892,6 +1892,8 @@ export function App(): ReactElement {
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [projectStatus, setProjectStatus] = useState("Demo project");
+  const [projectFileLabel, setProjectFileLabel] = useState<string | null>(null);
+  const [projectHasUnsavedChanges, setProjectHasUnsavedChanges] = useState(false);
   const [localDraftRecovery, setLocalDraftRecovery] = useState<LocalDraftRecovery | null>(() => readLocalDraftRecovery());
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState<string | null>(localDraftRecovery?.savedAt ?? null);
   const [localDraftWriteArmed, setLocalDraftWriteArmed] = useState(false);
@@ -1997,7 +1999,13 @@ export function App(): ReactElement {
     ? `${transportLoopLabel(transportLoopScope)} / Pattern ${playbackPosition?.pattern ?? project.selectedPattern} / Step ${(currentPatternStep ?? 0) + 1}`
     : transportLoopReadout;
   const localDraftStatusLabel = localDraftSavedAt ? `Draft ${formatLocalDraftSavedAt(localDraftSavedAt)}` : "Draft local";
-  const projectSafetyReadout = createProjectSafetyReadoutSummary(localDraftRecovery, localDraftSavedAt, projectStatus);
+  const projectSafetyReadout = createProjectSafetyReadoutSummary(
+    localDraftRecovery,
+    localDraftSavedAt,
+    projectStatus,
+    projectFileLabel,
+    projectHasUnsavedChanges
+  );
   const selectedArrangementNextBlock = project.arrangement[selectedArrangementIndex + 1];
   const selectedArrangementNextBars = selectedArrangementNextBlock ? normalizeArrangementBars(selectedArrangementNextBlock.bars) : 0;
   const selectedArrangementFocus = useMemo(
@@ -2284,6 +2292,7 @@ export function App(): ReactElement {
     setUndoStack((history) => appendHistory(history, current));
     setRedoStack([]);
     setLocalDraftWriteArmed(true);
+    setProjectHasUnsavedChanges(true);
     setProject(nextProject);
     setComposerActionResult(null);
     setNextMoveResult(null);
@@ -2303,9 +2312,12 @@ export function App(): ReactElement {
     setProjectStatus(status);
   }
 
-  function replaceProject(nextProject: ProjectState, status: string): void {
+  function replaceProject(nextProject: ProjectState, status: string, fileLabel: string | null = null): void {
     projectRef.current = nextProject;
     localDraftSkipNextWriteRef.current = true;
+    setProjectFileLabel(fileLabel);
+    setProjectHasUnsavedChanges(false);
+    setLocalDraftWriteArmed(false);
     setProject(nextProject);
     setUndoStack([]);
     setRedoStack([]);
@@ -4445,6 +4457,8 @@ export function App(): ReactElement {
       if (result) {
         if (!result.canceled) {
           clearLocalDraftState();
+          setProjectFileLabel(fileDisplayName(result.filePath));
+          setProjectHasUnsavedChanges(false);
         }
         setProjectStatus(result.canceled ? "Save canceled" : `Saved ${fileDisplayName(result.filePath)}`);
         return;
@@ -4452,6 +4466,8 @@ export function App(): ReactElement {
 
       downloadProjectFile(contents, defaultName);
       clearLocalDraftState();
+      setProjectFileLabel(defaultName);
+      setProjectHasUnsavedChanges(false);
       setProjectStatus(`Downloaded ${defaultName}`);
     } catch (error) {
       console.error(error);
@@ -4499,7 +4515,7 @@ export function App(): ReactElement {
       const nextProject = parseProjectFile(contents);
       controllerRef.current?.stop();
       controllerRef.current = null;
-      replaceProject(nextProject, `Loaded ${sourceName}`);
+      replaceProject(nextProject, `Loaded ${sourceName}`, sourceName);
       setPlaybackPosition(null);
       setIsPlaying(false);
     } catch (error) {
@@ -8605,17 +8621,20 @@ function createSnapshotSlotRoleSummary(project: ProjectState): SnapshotSlotRoleS
 function createProjectSafetyReadoutSummary(
   recovery: LocalDraftRecovery | null,
   localDraftSavedAt: string | null,
-  projectStatus: string
+  projectStatus: string,
+  projectFileLabel: string | null,
+  hasUnsavedChanges: boolean
 ): ProjectSafetyReadoutSummary {
   const trimmedStatus = projectStatus.trim();
+  const fileLabel = projectFileLabel?.trim() || null;
 
   if (recovery) {
     const savedLabel = formatLocalDraftSavedAt(recovery.savedAt);
     return {
       roleLabel: "Restore or clear",
       statusLabel: "Draft found",
-      detailLabel: `${savedLabel} / local only`,
-      detailTitle: `Draft found / ${savedLabel} / Restore Draft or Clear Draft before deciding what to keep`,
+      detailLabel: fileLabel ? `${savedLabel} / ${fileLabel}` : `${savedLabel} / local only`,
+      detailTitle: `Draft found / ${savedLabel} / ${fileLabel ? `Current file ${fileLabel} / ` : ""}Restore Draft or Clear Draft before deciding what to keep`,
       tone: "warn"
     };
   }
@@ -8623,11 +8642,31 @@ function createProjectSafetyReadoutSummary(
   if (localDraftSavedAt) {
     const savedLabel = formatLocalDraftSavedAt(localDraftSavedAt);
     return {
-      roleLabel: "Safety net",
+      roleLabel: fileLabel && hasUnsavedChanges ? "Unsaved edits" : "Safety net",
       statusLabel: `Draft ${savedLabel}`,
-      detailLabel: "Save .grooveforge next",
-      detailTitle: `Renderer-local draft written ${savedLabel} / Save a .grooveforge file for a durable copy`,
+      detailLabel: fileLabel ? `${fileLabel} changed` : "Save .grooveforge next",
+      detailTitle: `Renderer-local draft written ${savedLabel} / ${fileLabel ? `${fileLabel} has unsaved edits` : "Save a .grooveforge file for a durable copy"}`,
       tone: "warn"
+    };
+  }
+
+  if (fileLabel && hasUnsavedChanges) {
+    return {
+      roleLabel: "Unsaved edits",
+      statusLabel: "File changed",
+      detailLabel: `${fileLabel} / draft pending`,
+      detailTitle: `${fileLabel} has unsaved edits / Local draft writes after project edits / Save to refresh the durable file`,
+      tone: "warn"
+    };
+  }
+
+  if (fileLabel) {
+    return {
+      roleLabel: "Durable copy",
+      statusLabel: "File saved",
+      detailLabel: fileLabel,
+      detailTitle: `${fileLabel} is the current durable project file / Local draft recovery cleared after explicit save or open`,
+      tone: "good"
     };
   }
 
