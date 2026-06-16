@@ -1061,6 +1061,14 @@ type MixerChannelRoleSummary = {
   isShaped: boolean;
 };
 
+type StemAuditionReadoutSummary = {
+  roleLabel: string;
+  statusLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type MasterOutputRoleSummary = {
   roleLabel: string;
   statusLabel: string;
@@ -2044,6 +2052,7 @@ export function App(): ReactElement {
   const activeChannelLabel = `${activeChannels} active ${activeChannels === 1 ? "channel" : "channels"}`;
   const mixBalancePadOptions = useMemo(() => createMixBalancePadOptions(project.mixer), [project.mixer]);
   const stemAuditionPadOptions = useMemo(() => createStemAuditionPadOptions(project.mixer), [project.mixer]);
+  const stemAuditionReadout = useMemo(() => createStemAuditionReadoutSummary(project.mixer), [project.mixer]);
   const soundFocusPadOptions = useMemo(() => createSoundFocusPadOptions(project.sound), [project.sound]);
   const drumKitPadOptions = useMemo(() => createDrumKitPadOptions(project), [project]);
   const masterFinishPadOptions = useMemo(() => createMasterFinishPadOptions(project), [project]);
@@ -6053,6 +6062,15 @@ export function App(): ReactElement {
           <PanelTitle icon={<SlidersHorizontal size={18} />} title="Mixer" meta={`${activeChannels} audible`} />
           <MixBalancePads pads={mixBalancePadOptions} onApply={applyMixBalancePad} />
           <StemAuditionPads pads={stemAuditionPadOptions} onApply={applyStemAuditionPad} />
+          <div
+            className={["stem-audition-readout", stemAuditionReadout.tone].join(" ")}
+            data-testid="stem-audition-readout"
+            title={stemAuditionReadout.detailTitle}
+          >
+            <span data-testid="stem-audition-status">{stemAuditionReadout.statusLabel}</span>
+            <strong data-testid="stem-audition-label">{stemAuditionReadout.roleLabel}</strong>
+            <small data-testid="stem-audition-detail">{stemAuditionReadout.detailLabel}</small>
+          </div>
           <div className="mixer-strips">
             {project.mixer.map((channel) => {
               const roleSummary = mixerChannelRoleSummary(channel);
@@ -12635,6 +12653,61 @@ function createStemAuditionPadOptions(mixer: MixerChannel[]): StemAuditionPadOpt
 
 function stemAuditionPreview(pad: StemAuditionPadDefinition): string {
   return pad.trackId === null ? "All" : stemTrackLabel(pad.trackId);
+}
+
+function createStemAuditionReadoutSummary(mixer: MixerChannel[]): StemAuditionReadoutSummary {
+  const stemChannels = mixer.filter((channel): channel is MixerChannel & { id: StemTrackId } => isStemTrackId(channel.id));
+  const soloActive = stemChannels.some((channel) => channel.solo);
+  const audibleChannels = stemChannels.filter((channel) => !channel.muted && (!soloActive || channel.solo));
+  const mutedCount = stemChannels.filter((channel) => channel.muted).length;
+  const soloCount = stemChannels.filter((channel) => channel.solo).length;
+  const audibleLabel =
+    audibleChannels.length === stemChannels.length
+      ? "Drums/808/Synth/Chords"
+      : audibleChannels.length > 0
+        ? audibleChannels.map((channel) => stemTrackLabel(channel.id)).join("/")
+        : "No stems";
+
+  if (audibleChannels.length === 0) {
+    const detailLabel = `${mutedCount} muted / ${soloCount} solo`;
+    return {
+      roleLabel: "Silent audition",
+      statusLabel: "No audible stems",
+      detailLabel,
+      detailTitle: `No stem channels are currently audible / ${detailLabel}`,
+      tone: "danger"
+    };
+  }
+
+  if (!soloActive && mutedCount === 0) {
+    return {
+      roleLabel: "Full mix audition",
+      statusLabel: "Hearing Full Mix",
+      detailLabel: `${audibleChannels.length} active stems`,
+      detailTitle: `Hearing the full mix / ${audibleLabel} / no muted or soloed stems`,
+      tone: "good"
+    };
+  }
+
+  if (soloActive && audibleChannels.length === 1 && soloCount === 1 && mutedCount === 0) {
+    const stemLabel = stemTrackLabel(audibleChannels[0].id);
+    return {
+      roleLabel: `${stemLabel} solo`,
+      statusLabel: `Hearing ${stemLabel} Stem`,
+      detailLabel: "1 active stem",
+      detailTitle: `Hearing only the ${stemLabel} stem / mixer solo audition`,
+      tone: "good"
+    };
+  }
+
+  const detailLabel = `${audibleLabel} audible / ${mutedCount} muted / ${soloCount} solo`;
+  return {
+    roleLabel: "Manual mixer state",
+    statusLabel: "Custom audition",
+    detailLabel,
+    detailTitle: `Custom mixer audition / ${detailLabel}`,
+    tone: "warn"
+  };
 }
 
 function mixBalancePreview(pad: MixBalancePadDefinition): string {

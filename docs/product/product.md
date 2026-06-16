@@ -209,6 +209,7 @@ MVP capabilities:
 - Realtime metronome toggle with accented downbeat clicks that helps users program to the grid during playback without adding click audio to WAV or stem export.
 - Live playback reads the current project while scheduling future steps, so selected-pattern preview, arrangement block edits, arrangement track mutes, arrangement length, arrangement energy, BPM, mixer, sound, and master changes can be heard without stopping and restarting.
 - Mixer volume, pan, mute, solo, mixer channel role readouts, Stem Audition Pads that explicitly set Full Mix/Drums/808/Synth/Chords audition through existing mixer solo/mute state, Mix Balance Pads, low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Headroom/Stem Balance/Low End Mix Fix actions, Master Finish Pads, and master output role readout reflected in deterministic render feedback.
+- Stem Audition Readout derived from local mixer solo/mute state, showing Full Mix, soloed stem, or manual custom audition context without mutating mixer, playback, export, or project data.
 - Master preset ceiling, Master Finish Pads, master output role readout, and output gain.
 - Reproducible export peak/RMS/headroom meter with limiter activity status for the current arrangement.
 - Local project save/load as a `.grooveforge.json` file, with UI-local current-file identity and unsaved-edit status.
