@@ -523,6 +523,27 @@ type MixFixPreviewSummary = {
   tone: MixCoachTone;
 };
 
+type MixFixResultMetric = {
+  id: "export" | "headroom" | "stems" | "lowEnd" | "controls";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type MixFixResult = {
+  fixId: MixFixPreset;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: MixFixResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type MixBalancePadId = "clean" | "vocal" | "club" | "wide";
 
 type MixBalanceChannelUpdate = Partial<
@@ -2527,6 +2548,7 @@ export function App(): ReactElement {
   const [soundFocusResult, setSoundFocusResult] = useState<SoundFocusResult | null>(null);
   const [masterFinishResult, setMasterFinishResult] = useState<MasterFinishResult | null>(null);
   const [mixBalanceResult, setMixBalanceResult] = useState<MixBalanceResult | null>(null);
+  const [mixFixResult, setMixFixResult] = useState<MixFixResult | null>(null);
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
@@ -3044,6 +3066,7 @@ export function App(): ReactElement {
     setSoundFocusResult(null);
     setMasterFinishResult(null);
     setMixBalanceResult(null);
+    setMixFixResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -3063,6 +3086,7 @@ export function App(): ReactElement {
       setSoundFocusResult(null);
       setMasterFinishResult(null);
       setMixBalanceResult(null);
+      setMixFixResult(null);
     }
     setProjectStatus(status);
   }
@@ -3157,6 +3181,7 @@ export function App(): ReactElement {
     setSoundFocusResult(null);
     setMasterFinishResult(null);
     setMixBalanceResult(null);
+    setMixFixResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
   }
@@ -3181,6 +3206,7 @@ export function App(): ReactElement {
     setSoundFocusResult(null);
     setMasterFinishResult(null);
     setMixBalanceResult(null);
+    setMixFixResult(null);
     setProjectStatus(status);
   }
 
@@ -3827,10 +3853,33 @@ export function App(): ReactElement {
   }
 
   function applyMixFixPreset(preset: MixFixPreset): void {
-    const stemSnapshot = analyzeStemExports(projectRef.current);
-    updateProject(
-      (current) => applyMixFixToProject(current, preset, stemSnapshot),
+    const beforeProject = projectRef.current;
+    const beforeAnalysis = analyzeExport(beforeProject);
+    const beforeStemAnalyses = analyzeStemExports(beforeProject);
+    const changed = updateProject(
+      (current) => applyMixFixToProject(current, preset, beforeStemAnalyses),
       `Applied ${mixFixPresetLabel(preset)} mix fix`
+    );
+    if (!changed) {
+      setMixFixResult(null);
+      setProjectStatus(`${mixFixPresetLabel(preset)} mix fix already selected`);
+      return;
+    }
+
+    const afterProject = projectRef.current;
+    setSelectedNote(null);
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
+    setMixFixResult(
+      createMixFixResult(
+        preset,
+        beforeProject,
+        afterProject,
+        beforeAnalysis,
+        analyzeExport(afterProject),
+        beforeStemAnalyses,
+        analyzeStemExports(afterProject)
+      )
     );
   }
 
@@ -7333,6 +7382,7 @@ export function App(): ReactElement {
             analysis={exportAnalysis}
             focusedCheckId={mixCoachFocusId}
             project={project}
+            result={mixFixResult}
             stemAnalyses={stemAnalyses}
             onApplyFix={applyMixFixPreset}
           />
@@ -15095,12 +15145,14 @@ function MixCoach({
   analysis,
   focusedCheckId,
   project,
+  result,
   stemAnalyses,
   onApplyFix
 }: {
   analysis: ExportAnalysis;
   focusedCheckId: string | null;
   project: ProjectState;
+  result: MixFixResult | null;
   stemAnalyses: StemExportAnalyses;
   onApplyFix: (preset: MixFixPreset) => void;
 }): ReactElement {
@@ -15136,6 +15188,7 @@ function MixCoach({
         <small data-testid="mix-fix-preview-detail">{fixPreview.detailLabel}</small>
         <small data-testid="mix-fix-preview-changes">{fixPreview.changeLabel}</small>
       </div>
+      {result && <MixFixResultStrip result={result} />}
       <div className="mix-coach-list">
         {checks.map((check) => {
           const focused = focusedCheckId !== null && check.id === focusSummary.checkId;
@@ -15167,6 +15220,48 @@ function MixCoach({
             <span>{fix.label}</span>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function MixFixResultStrip({ result }: { result: MixFixResult }): ReactElement {
+  return (
+    <div
+      className={`mix-fix-result ${result.tone}`}
+      data-result-mix-fix={result.fixId}
+      data-testid="mix-fix-result"
+      aria-live="polite"
+    >
+      <div className="mix-fix-result-main">
+        <SlidersHorizontal size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="mix-fix-result-title">{result.title}</strong>
+          <small data-testid="mix-fix-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="mix-fix-result-meta">
+        <span data-testid="mix-fix-result-status">{result.status}</span>
+        <span data-testid="mix-fix-result-scope">{result.scope}</span>
+        <span data-testid="mix-fix-result-impact">{result.impact}</span>
+      </div>
+      <div className="mix-fix-result-metrics" data-testid="mix-fix-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`mix-fix-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="mix-fix-result-followup" data-testid="mix-fix-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="mix-fix-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="mix-fix-result-next-check">{result.nextCheck}</em>
+        </span>
       </div>
     </div>
   );
@@ -15242,6 +15337,112 @@ function createMixFixPreviewSummary(
     detailTitle,
     tone: suggestedFix.tone
   };
+}
+
+function createMixFixResult(
+  preset: MixFixPreset,
+  beforeProject: ProjectState,
+  afterProject: ProjectState,
+  beforeAnalysis: ExportAnalysis,
+  afterAnalysis: ExportAnalysis,
+  beforeStemAnalyses: StemExportAnalyses,
+  afterStemAnalyses: StemExportAnalyses
+): MixFixResult {
+  const action = createMixFixActions(beforeAnalysis, beforeStemAnalyses).find((fix) => fix.preset === preset);
+  const changedMoves = mixFixChangedCount(beforeProject, afterProject);
+  const changedControls = mixBalanceChangedControlCount(beforeProject.mixer, afterProject.mixer);
+  const metrics: MixFixResultMetric[] = [
+    createMixFixResultMetric("export", "Export", mixFixExportPosture(beforeAnalysis), mixFixExportPosture(afterAnalysis)),
+    createMixFixResultMetric(
+      "headroom",
+      "Headroom",
+      mixFixHeadroomPosture(beforeAnalysis),
+      mixFixHeadroomPosture(afterAnalysis)
+    ),
+    createMixFixResultMetric("stems", "Stems", mixFixStemPosture(beforeStemAnalyses), mixFixStemPosture(afterStemAnalyses)),
+    createMixFixResultMetric("lowEnd", "Low end", mixFixLowEndPosture(beforeStemAnalyses), mixFixLowEndPosture(afterStemAnalyses)),
+    createMixFixResultMetric("controls", "Controls", mixFixControlPosture(beforeProject), mixFixControlPosture(afterProject))
+  ];
+
+  return {
+    fixId: preset,
+    title: `${mixFixPresetLabel(preset)} Mix Fix applied`,
+    status: "Applied",
+    detail: action?.detail ?? "Editable mixer/master fix applied.",
+    scope: mixFixScopeLabel(preset),
+    impact: `${changedMoves} mix move${changedMoves === 1 ? "" : "s"} / ${changedControls} controls`,
+    metrics,
+    auditionCue: mixFixAuditionCue(preset),
+    nextCheck: mixFixNextCheck(preset),
+    tone: changedMoves > 0 ? "good" : "warn"
+  };
+}
+
+function createMixFixResultMetric(
+  id: MixFixResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): MixFixResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: before === after ? "warn" : "good"
+  };
+}
+
+function mixFixExportPosture(analysis: ExportAnalysis): string {
+  return `${analysis.status} / ${formatDb(analysis.peakDb)} peak`;
+}
+
+function mixFixHeadroomPosture(analysis: ExportAnalysis): string {
+  return `${formatDb(analysis.headroomDb)} / L ${formatPercent(analysis.limitedPercent)}`;
+}
+
+function mixFixStemPosture(stemAnalyses: StemExportAnalyses): string {
+  const spread = stemSpreadDb(stemAnalyses);
+  return spread === null ? "needs 2 stems" : `${spread.toFixed(1)} dB spread`;
+}
+
+function mixFixLowEndPosture(stemAnalyses: StemExportAnalyses): string {
+  const lowEndDelta = lowEndDeltaDb(stemAnalyses);
+  if (lowEndDelta === null) {
+    return "needs drums + 808";
+  }
+  return lowEndDelta >= 0 ? `808 +${lowEndDelta.toFixed(1)} dB` : `808 ${lowEndDelta.toFixed(1)} dB`;
+}
+
+function mixFixControlPosture(project: ProjectState): string {
+  return `M ${formatDb(masterChannelVolumeDb(project.mixer))} / D ${mixerTrackVolumeDb(project.mixer, "drum_rack")} / 8 ${mixerTrackVolumeDb(project.mixer, "bass_808")}`;
+}
+
+function mixerTrackVolumeDb(mixer: MixerChannel[], trackId: MixerChannel["id"]): string {
+  const channel = mixer.find((candidate) => candidate.id === trackId);
+  return channel ? formatDb(channel.volumeDb) : "missing";
+}
+
+function mixFixAuditionCue(preset: MixFixPreset): string {
+  switch (preset) {
+    case "headroom":
+      return "Play Full Mix; watch Export meter headroom and limiter activity.";
+    case "stem_balance":
+      return "Play Full Mix, then audition Drums, 808, Synth, and Chords stems.";
+    case "low_end":
+      return "Audition Drums and 808 together, then compare Full Mix punch.";
+  }
+}
+
+function mixFixNextCheck(preset: MixFixPreset): string {
+  switch (preset) {
+    case "headroom":
+      return "Use Ceiling and master output controls if peaks still feel tight.";
+    case "stem_balance":
+      return "Trim the loudest or quietest stem with Mixer controls after listening.";
+    case "low_end":
+      return "Use 808 and drum volume, low-cut, Drive, and Glue for manual fine trim.";
+  }
 }
 
 function mixFixScopeLabel(preset: MixFixPreset): string {
