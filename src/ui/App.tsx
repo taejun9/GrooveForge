@@ -1271,6 +1271,22 @@ type ReviewQueueSummary = {
   items: ReviewQueueItem[];
 };
 
+type ModeFocusCard = {
+  id: string;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type ModeFocusSummary = {
+  mode: ProjectState["mode"];
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: ModeFocusCard[];
+};
+
 type SnapshotCompareMetricId = "setup" | "length" | "readiness" | "export" | "stems" | "master";
 
 type SnapshotCompareMetric = {
@@ -1823,6 +1839,10 @@ export function App(): ReactElement {
   const composerGuideSummary = useMemo(
     () => createComposerGuideSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
+  );
+  const modeFocusSummary = useMemo(
+    () => createModeFocusSummary(project, composerGuideSummary, beatMapSummary, reviewQueueSummary, finishChecklistSummary),
+    [project, composerGuideSummary, beatMapSummary, reviewQueueSummary, finishChecklistSummary]
   );
   const composerActionsSummary = useMemo(
     () => createComposerActionsSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
@@ -4366,6 +4386,7 @@ export function App(): ReactElement {
         <div className="segmented">
           <button
             className={project.mode === "guided" ? "selected" : ""}
+            data-testid="mode-guided"
             type="button"
             onClick={() => updateProject((current) => ({ ...current, mode: "guided" }))}
           >
@@ -4373,6 +4394,7 @@ export function App(): ReactElement {
           </button>
           <button
             className={project.mode === "studio" ? "selected" : ""}
+            data-testid="mode-studio"
             type="button"
             onClick={() => updateProject((current) => ({ ...current, mode: "studio" }))}
           >
@@ -4388,6 +4410,8 @@ export function App(): ReactElement {
           <span>{projectStatus}</span>
         </div>
       </section>
+
+      <ModeFocus summary={modeFocusSummary} />
 
       {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
 
@@ -6393,6 +6417,30 @@ function ReviewQueue({ summary }: { summary: ReviewQueueSummary }): ReactElement
   );
 }
 
+function ModeFocus({ summary }: { summary: ModeFocusSummary }): ReactElement {
+  return (
+    <section className={`mode-focus ${summary.tone}`} data-testid="mode-focus" aria-label="Mode focus">
+      <div className="mode-focus-heading">
+        <div>
+          <SlidersHorizontal size={16} aria-hidden="true" />
+          <span data-testid="mode-focus-mode">{summary.mode === "guided" ? "Guided Focus" : "Studio Focus"}</span>
+        </div>
+        <strong data-testid="mode-focus-headline">{summary.headline}</strong>
+        <small data-testid="mode-focus-detail">{summary.detail}</small>
+      </div>
+      <div className="mode-focus-grid" data-testid="mode-focus-grid">
+        {summary.cards.map((card) => (
+          <div className={`mode-focus-card ${card.tone}`} data-testid={`mode-focus-${card.id}`} key={card.id}>
+            <span>{card.label}</span>
+            <strong>{card.value}</strong>
+            <small>{card.detail}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function HandoffPack({
   analysis,
   project,
@@ -8045,6 +8093,88 @@ function createReviewQueueSummary(
     detail: hiddenCount > 0 ? `${issueLabel} shown / ${hiddenCount} more queued` : `${issueLabel} queued / ${target.name}`,
     tone,
     items
+  };
+}
+
+function createModeFocusSummary(
+  project: ProjectState,
+  composer: ComposerGuideSummary,
+  beatMap: BeatMapSummary,
+  reviewQueue: ReviewQueueSummary,
+  finish: FinishChecklistSummary
+): ModeFocusSummary {
+  const target = activeDeliveryTarget(project);
+
+  if (project.mode === "studio") {
+    const sessionCard = finish.cards.find((card) => card.id === "mix") ?? finish.cards[0];
+    const issue = reviewQueue.items[0];
+    const handoffCard = finish.cards.find((card) => card.id === "handoff") ?? finish.cards[finish.cards.length - 1];
+    const cards: ModeFocusCard[] = [
+      {
+        id: "session",
+        label: "Session scan",
+        value: sessionCard.status,
+        detail: sessionCard.detail,
+        tone: sessionCard.tone
+      },
+      {
+        id: "issue",
+        label: issue.area,
+        value: issue.status,
+        detail: issue.detail,
+        tone: issue.tone
+      },
+      {
+        id: "handoff",
+        label: "Handoff",
+        value: handoffCard.status,
+        detail: handoffCard.detail,
+        tone: handoffCard.tone
+      }
+    ];
+
+    return {
+      mode: "studio",
+      headline: reviewQueue.headline,
+      detail: `${target.name} / ${project.masterPreset} / ${finish.detail}`,
+      tone: weakestTone(cards.map((card) => card.tone)),
+      cards
+    };
+  }
+
+  const stage = beatMap.stages.find((candidate) => candidate.tone !== "good") ?? beatMap.stages[beatMap.stages.length - 1];
+  const focus = composer.cards.find((card) => card.tone !== "good") ?? composer.cards[0];
+  const check = finish.cards.find((card) => card.tone !== "good") ?? finish.cards[finish.cards.length - 1];
+  const cards: ModeFocusCard[] = [
+    {
+      id: "stage",
+      label: "Current stage",
+      value: stage.label,
+      detail: `${stage.status} / ${stage.detail}`,
+      tone: stage.tone
+    },
+    {
+      id: "focus",
+      label: "Writing focus",
+      value: focus.label,
+      detail: `${focus.status} / ${focus.detail}`,
+      tone: focus.tone
+    },
+    {
+      id: "check",
+      label: "Local check",
+      value: check.label,
+      detail: `${check.status} / ${check.detail}`,
+      tone: check.tone
+    }
+  ];
+
+  return {
+    mode: "guided",
+    headline: composer.headline,
+    detail: `${beatMap.headline} / Pattern ${project.selectedPattern} / ${target.name}`,
+    tone: weakestTone(cards.map((card) => card.tone)),
+    cards
   };
 }
 

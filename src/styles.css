@@ -42,6 +42,7 @@ button {
 
 .transport-band,
 .mode-row,
+.mode-focus,
 .quick-action-result,
 .style-inspector,
 .key-compass,
@@ -85,6 +86,7 @@ button {
 .strip-top,
 .session-meter,
 .mode-row,
+.mode-focus-heading > div,
 .style-inspector-heading > div,
 .key-compass-heading > div,
 .groove-compass-heading > div,
@@ -450,6 +452,120 @@ h2 {
 .session-meter span:first-child {
   border-color: color-mix(in srgb, var(--accent) 70%, transparent);
   color: var(--accent);
+}
+
+.mode-focus {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.55fr) minmax(0, 1.45fr);
+  gap: 10px;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 74px;
+  padding: 10px;
+  border-radius: 8px;
+  border-color: rgba(120, 240, 200, 0.18);
+  background: rgba(120, 240, 200, 0.04);
+}
+
+.mode-focus.warn {
+  border-color: rgba(240, 195, 106, 0.2);
+  background: rgba(240, 195, 106, 0.04);
+}
+
+.mode-focus.danger {
+  border-color: rgba(255, 122, 79, 0.24);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.mode-focus-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.mode-focus-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.mode-focus-heading svg {
+  color: #78f0c8;
+}
+
+.mode-focus.warn .mode-focus-heading svg {
+  color: #f0c36a;
+}
+
+.mode-focus.danger .mode-focus-heading svg {
+  color: #ff7a4f;
+}
+
+.mode-focus-heading strong,
+.mode-focus-heading small,
+.mode-focus-card span,
+.mode-focus-card strong,
+.mode-focus-card small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mode-focus-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.mode-focus-heading small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.mode-focus-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.mode-focus-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(120, 240, 200, 0.16);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.05);
+}
+
+.mode-focus-card.warn {
+  border-color: rgba(240, 195, 106, 0.18);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.mode-focus-card.danger {
+  border-color: rgba(255, 122, 79, 0.2);
+  background: rgba(255, 122, 79, 0.05);
+}
+
+.mode-focus-card span {
+  color: rgba(244, 239, 231, 0.55);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.mode-focus-card strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.mode-focus-card small {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
 }
 
 .style-inspector {
@@ -6494,6 +6610,10 @@ input[type="range"] {
   }
 
   .beat-map {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
+  .mode-focus {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
