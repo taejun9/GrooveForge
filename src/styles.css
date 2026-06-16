@@ -3724,6 +3724,125 @@ h2 {
   background: #78f0c8;
 }
 
+.pattern-dna {
+  display: grid;
+  grid-template-columns: minmax(118px, 0.34fr) minmax(0, 1fr);
+  gap: 7px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(120, 240, 200, 0.16);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.045);
+}
+
+.pattern-dna.warn {
+  border-color: rgba(240, 195, 106, 0.18);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.pattern-dna.danger {
+  border-color: rgba(255, 122, 79, 0.22);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.pattern-dna-heading {
+  display: grid;
+  gap: 3px;
+  align-content: center;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 7px;
+}
+
+.pattern-dna-heading > div {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pattern-dna-heading svg {
+  color: #78f0c8;
+}
+
+.pattern-dna.warn .pattern-dna-heading svg {
+  color: #f0c36a;
+}
+
+.pattern-dna.danger .pattern-dna-heading svg {
+  color: #ff7a4f;
+}
+
+.pattern-dna-heading span,
+.pattern-dna-heading strong,
+.pattern-dna-heading small,
+.pattern-dna-card span,
+.pattern-dna-card strong,
+.pattern-dna-card small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pattern-dna-heading strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.pattern-dna-heading small {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.pattern-dna-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  min-width: 0;
+}
+
+.pattern-dna-card {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.14);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.045);
+  padding: 6px;
+}
+
+.pattern-dna-card.warn {
+  border-color: rgba(240, 195, 106, 0.16);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.pattern-dna-card.danger {
+  border-color: rgba(255, 122, 79, 0.18);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.pattern-dna-card span {
+  color: rgba(244, 239, 231, 0.5);
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pattern-dna-card strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.pattern-dna-card small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 9px;
+}
+
 .pattern-stack-panel {
   display: grid;
   gap: 8px;
@@ -6609,6 +6728,21 @@ input[type="range"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .pattern-dna {
+    grid-template-columns: 1fr;
+  }
+
+  .pattern-dna-heading {
+    border-inline-end: 0;
+    border-block-end: 1px solid rgba(244, 239, 231, 0.1);
+    padding-inline-end: 0;
+    padding-block-end: 7px;
+  }
+
+  .pattern-dna-grid {
+    grid-template-columns: 1fr;
+  }
+
   .beat-map {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -6785,5 +6919,11 @@ input[type="range"] {
 
   .pattern-chain-actions {
     grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 621px) and (max-width: 1220px) {
+  .pattern-dna-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

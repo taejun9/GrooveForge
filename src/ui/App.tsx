@@ -559,6 +559,24 @@ type PatternCompareSummary = {
   arrangedBars: number;
 };
 
+type PatternDnaCardId = "layers" | "density" | "variation" | "arrangement";
+
+type PatternDnaCard = {
+  id: PatternDnaCardId;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type PatternDnaSummary = {
+  slot: PatternSlot;
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: PatternDnaCard[];
+};
+
 type StylePatternDensity = {
   slot: PatternSlot;
   label: string;
@@ -1730,6 +1748,7 @@ export function App(): ReactElement {
   );
   const snapshotCompareSummary = useMemo(() => createSnapshotCompareSummary(project), [project]);
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
+  const patternDnaSummary = useMemo(() => createPatternDnaSummary(project), [project]);
   const styleInspectorSummary = useMemo(
     () => createStyleInspectorSummary(project, style, patternCompareSummaries),
     [patternCompareSummaries, project, style]
@@ -4485,6 +4504,7 @@ export function App(): ReactElement {
               <button
                 key={pattern}
                 className={project.selectedPattern === pattern ? "selected" : ""}
+                data-testid={`pattern-tab-${pattern}`}
                 type="button"
                 onClick={() => selectPattern(pattern)}
               >
@@ -4501,6 +4521,7 @@ export function App(): ReactElement {
             onCue={cuePattern}
             onUse={usePatternInSelectedBlock}
           />
+          <PatternDna summary={patternDnaSummary} />
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
           <DrumFoundationPads foundations={drumFoundationOptions} onApply={applyDrumFoundation} />
           <GrooveFeelPads feels={grooveFeelOptions} onApply={applyGrooveFeel} />
@@ -5517,6 +5538,30 @@ function PatternCompareStrip({
         );
       })}
     </div>
+  );
+}
+
+function PatternDna({ summary }: { summary: PatternDnaSummary }): ReactElement {
+  return (
+    <section className={`pattern-dna ${summary.tone}`} data-testid="pattern-dna" aria-label="Pattern DNA">
+      <div className="pattern-dna-heading">
+        <div>
+          <Music2 size={15} aria-hidden="true" />
+          <span data-testid="pattern-dna-slot">Pattern {summary.slot} DNA</span>
+        </div>
+        <strong data-testid="pattern-dna-headline">{summary.headline}</strong>
+        <small data-testid="pattern-dna-detail">{summary.detail}</small>
+      </div>
+      <div className="pattern-dna-grid" data-testid="pattern-dna-grid">
+        {summary.cards.map((card) => (
+          <div className={`pattern-dna-card ${card.tone}`} data-testid={`pattern-dna-${card.id}`} key={card.id}>
+            <span>{card.label}</span>
+            <strong>{card.value}</strong>
+            <small>{card.detail}</small>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -9882,6 +9927,119 @@ function createPatternCompareSummaries(project: ProjectState): PatternCompareSum
       arrangedBars
     };
   });
+}
+
+function createPatternDnaSummary(project: ProjectState): PatternDnaSummary {
+  const slot = project.selectedPattern;
+  const pattern = project.patterns[slot];
+  const drumHits = drumHitCount(pattern);
+  const bassNotes = pattern.bassNotes.length;
+  const melodyNotes = pattern.melodyNotes.length;
+  const chordEvents = pattern.chordEvents.length;
+  const eventCount = patternEventTotal(pattern);
+  const arrangedBlocks = project.arrangement.filter((block) => block.pattern === slot);
+  const arrangedBars = arrangedBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  const arrangedSections = [...new Set(arrangedBlocks.map((block) => block.section))];
+
+  const layers = [
+    { label: "Drums", ready: drumHits > 0 },
+    { label: "808", ready: bassNotes > 0 },
+    { label: "Chords", ready: chordEvents > 0 },
+    { label: "Synth", ready: melodyNotes > 0 }
+  ];
+  const readyLayers = layers.filter((layer) => layer.ready);
+  const missingLayers = layers.filter((layer) => !layer.ready);
+  const layerTone: MixCoachTone = readyLayers.length >= 4 ? "good" : readyLayers.length >= 2 ? "warn" : "danger";
+  const densityLabel = styleDensityLabel(eventCount);
+  const densityTone: MixCoachTone = eventCount >= 24 ? "good" : eventCount >= 12 ? "warn" : "danger";
+  const variationSignals = patternVariationSignals(pattern);
+  const variationTone: MixCoachTone =
+    variationSignals.length >= 3 ? "good" : variationSignals.length >= 1 ? "warn" : "danger";
+  const arrangementTone: MixCoachTone = arrangedBars >= 4 ? "good" : arrangedBars > 0 ? "warn" : "danger";
+
+  const cards: PatternDnaCard[] = [
+    {
+      id: "layers",
+      label: "Layers",
+      value: `${readyLayers.length}/4 ready`,
+      detail:
+        readyLayers.length === layers.length
+          ? readyLayers.map((layer) => layer.label).join(" / ")
+          : `Add ${missingLayers.map((layer) => layer.label).join(" / ")}`,
+      tone: layerTone
+    },
+    {
+      id: "density",
+      label: "Density",
+      value: densityLabel,
+      detail: `${drumHits} drums / ${bassNotes + melodyNotes} notes / ${chordEvents} chords`,
+      tone: densityTone
+    },
+    {
+      id: "variation",
+      label: "Variation",
+      value: variationSignals.length > 0 ? `${variationSignals.length} signals` : "Straight loop",
+      detail: variationSignals.length > 0 ? variationSignals.join(" / ") : "Add chance, timing, glide, or rolls",
+      tone: variationTone
+    },
+    {
+      id: "arrangement",
+      label: "Arrangement",
+      value: arrangedBars > 0 ? barCountLabel(arrangedBars) : "Not arranged",
+      detail:
+        arrangedBlocks.length > 0
+          ? `${arrangedBlocks.length} block${arrangedBlocks.length === 1 ? "" : "s"} / ${arrangedSections.join("/")}`
+          : "Use in a block or Pattern Chain",
+      tone: arrangementTone
+    }
+  ];
+
+  const tone = weakestTone(cards.map((card) => card.tone));
+  const headline =
+    tone === "good"
+      ? `Pattern ${slot} is song-ready`
+      : layerTone === "danger"
+        ? `Build Pattern ${slot} core`
+        : arrangementTone === "danger"
+          ? `Place Pattern ${slot} in the song`
+          : `Shape Pattern ${slot} motion`;
+
+  return {
+    slot,
+    headline,
+    detail: `${densityLabel} / ${readyLayers.length}/4 layers / ${arrangedBars > 0 ? barCountLabel(arrangedBars) : "not arranged"}`,
+    tone,
+    cards
+  };
+}
+
+function patternVariationSignals(pattern: PatternData): string[] {
+  const lanes = Object.keys(drumLabels) as DrumLane[];
+  const hasVelocity = lanes.some((lane) =>
+    pattern.drumPattern[lane].some(
+      (enabled, step) => enabled && Math.abs(drumStepVelocity(pattern, lane, step) - defaultDrumVelocity(lane, step)) > 0.01
+    )
+  );
+  const hasTiming = lanes.some((lane) =>
+    pattern.drumPattern[lane].some((enabled, step) => enabled && Math.abs(drumStepTimingMs(pattern, lane, step)) > 0)
+  );
+  const hasChance =
+    lanes.some((lane) =>
+      pattern.drumPattern[lane].some((enabled, step) => enabled && drumStepProbability(pattern, lane, step) < 1)
+    ) ||
+    pattern.bassNotes.some((note) => normalizeEventProbability(note.probability) < 1) ||
+    pattern.melodyNotes.some((note) => normalizeEventProbability(note.probability) < 1) ||
+    pattern.chordEvents.some((event) => normalizeEventProbability(event.probability) < 1);
+  const hasRolls = pattern.drumPattern.hat.some((enabled, step) => enabled && hatRepeatCount(pattern, step) > 1);
+  const hasGlide = pattern.bassNotes.some((note) => note.glide);
+
+  return [
+    hasVelocity ? "Accent" : "",
+    hasTiming ? "Timing" : "",
+    hasChance ? "Chance" : "",
+    hasRolls ? "Rolls" : "",
+    hasGlide ? "Glide" : ""
+  ].filter(Boolean);
 }
 
 function createStyleInspectorSummary(
