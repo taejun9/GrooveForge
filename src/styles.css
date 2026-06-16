@@ -6460,6 +6460,47 @@ input[type="range"] {
   font-size: 11px;
 }
 
+.arrangement-block-role-readout {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(72px, 0.22fr) minmax(78px, 0.24fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.18);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.07);
+  padding: 6px 8px;
+}
+
+.arrangement-block-role-readout span,
+.arrangement-block-role-readout strong,
+.arrangement-block-role-readout small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrangement-block-role-readout strong {
+  color: #78f0c8;
+  font-size: 12px;
+}
+
+.arrangement-block-role-readout small {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 11px;
+}
+
+.arrangement-block-role-readout.shaped {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.07);
+}
+
+.arrangement-block-role-readout.shaped strong {
+  color: #f0c36a;
+}
+
 .arrangement-editor select,
 .arrangement-editor input[type="number"] {
   min-height: 36px;

@@ -1007,6 +1007,13 @@ type SongFormOverviewSummary = {
   selectedIndex: number;
 };
 
+type ArrangementBlockRoleSummary = {
+  roleLabel: string;
+  timelineLabel: string;
+  detailLabel: string;
+  isShaped: boolean;
+};
+
 type ProductionSnapshotMetricId = "target" | "form" | "patterns" | "mix" | "handoff";
 
 type ProductionSnapshotMetric = {
@@ -1913,6 +1920,10 @@ export function App(): ReactElement {
   const selectedArrangementNextBars = selectedArrangementNextBlock ? normalizeArrangementBars(selectedArrangementNextBlock.bars) : 0;
   const selectedArrangementFocus = useMemo(
     () => createArrangementFocusSummary(project, selectedArrangementIndex),
+    [project, selectedArrangementIndex]
+  );
+  const selectedArrangementBlockRole = useMemo(
+    () => selectedArrangementBlockRoleSummary(project, selectedArrangementIndex),
     [project, selectedArrangementIndex]
   );
   const arrangementArcPadOptions = useMemo(
@@ -5413,6 +5424,20 @@ export function App(): ReactElement {
                 </strong>
                 <small>{barCountLabel(selectedArrangementBlock.bars)}</small>
               </div>
+              {selectedArrangementBlockRole && (
+                <div
+                  className={
+                    selectedArrangementBlockRole.isShaped
+                      ? "arrangement-block-role-readout shaped"
+                      : "arrangement-block-role-readout"
+                  }
+                  data-testid="arrangement-block-role-readout"
+                >
+                  <span data-testid="arrangement-block-role-timeline">{selectedArrangementBlockRole.timelineLabel}</span>
+                  <strong data-testid="arrangement-block-role-label">{selectedArrangementBlockRole.roleLabel}</strong>
+                  <small data-testid="arrangement-block-role-detail">{selectedArrangementBlockRole.detailLabel}</small>
+                </div>
+              )}
               <label>
                 <span>Section</span>
                 <select
@@ -10750,6 +10775,58 @@ function arrangementStartBar(project: ProjectState, selectedIndex: number): numb
   return project.arrangement
     .slice(0, Math.max(0, selectedIndex))
     .reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+}
+
+function selectedArrangementBlockRoleSummary(project: ProjectState, selectedIndex: number): ArrangementBlockRoleSummary | null {
+  const boundedIndex = Math.min(Math.max(0, selectedIndex), project.arrangement.length - 1);
+  const block = project.arrangement[boundedIndex];
+  if (!block) {
+    return null;
+  }
+
+  const bars = normalizeArrangementBars(block.bars);
+  const startBar = arrangementStartBar(project, boundedIndex) + 1;
+  const endBar = startBar + bars - 1;
+  const energy = normalizeArrangementEnergy(block.energy);
+  const mutedTracks = normalizeArrangementMutedTracks(block.mutedTracks);
+  const mutedLabel =
+    mutedTracks.length === 0 ? "Full mix" : `${mutedTracks.map(arrangementMuteTrackLabel).join("/")} muted`;
+  const eventCount = patternEventTotal(project.patterns[block.pattern]);
+
+  return {
+    roleLabel: arrangementBlockRoleLabel(block.section, boundedIndex, project.arrangement.length, energy, mutedTracks.length),
+    timelineLabel: startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`,
+    detailLabel: `Pattern ${block.pattern} / ${barCountLabel(bars)} / ${percentLabel(energy)} energy / ${eventCount} events / ${mutedLabel}`,
+    isShaped: energy >= 0.82 || energy <= 0.48 || mutedTracks.length > 0 || bars >= 4
+  };
+}
+
+function arrangementBlockRoleLabel(
+  section: ArrangementSection,
+  index: number,
+  totalBlocks: number,
+  energy: number,
+  mutedCount: number
+): string {
+  if (section === "Intro" || index === 0) {
+    return "Setup";
+  }
+  if (section === "Hook") {
+    return "Hook lift";
+  }
+  if (section === "Outro" || index === totalBlocks - 1) {
+    return "Release";
+  }
+  if (section === "Bridge") {
+    return "Contrast";
+  }
+  if (mutedCount >= 2 || energy <= 0.38) {
+    return "Breakdown";
+  }
+  if (energy >= 0.88) {
+    return "Peak";
+  }
+  return "Pocket";
 }
 
 function transportLoopLabel(scope: TransportLoopScope): string {
