@@ -1436,6 +1436,12 @@ type KeyboardCaptureDefaults = {
   velocity: number;
   glide: boolean;
 };
+type NoteDegreeSummary = {
+  degreeLabel: string;
+  roleLabel: string;
+  pitchLabel: string;
+  inKey: boolean;
+};
 
 const arrangementFocusPresets: ArrangementFocusPreset[] = [
   {
@@ -5215,6 +5221,7 @@ export function App(): ReactElement {
           </div>
           {project.mode === "studio" && (
             <NoteInspector
+              currentKey={project.key}
               selectedNote={selectedNote}
               noteClipboard={noteClipboard}
               bassNote={selectedBassNote}
@@ -9982,6 +9989,39 @@ function keyCompassPitchScaleDegreeLabel(key: string, pitch: string): string {
   return parts ? keyCompassScaleDegreeLabel(key, parts.name) : "outside scale";
 }
 
+function selectedNoteDegreeSummary(key: string, pitch: string): NoteDegreeSummary {
+  const parts = pitchParts(pitch);
+  if (!parts) {
+    return {
+      degreeLabel: "Out",
+      roleLabel: "Outside scale",
+      pitchLabel: pitch,
+      inKey: false
+    };
+  }
+
+  const degree = keyCompassScaleDegree(key, parts.name);
+  if (degree === null) {
+    return {
+      degreeLabel: "Out",
+      roleLabel: "Outside scale",
+      pitchLabel: `${parts.name}${parts.octave}`,
+      inKey: false
+    };
+  }
+
+  return {
+    degreeLabel: `D${degree + 1}`,
+    roleLabel: scaleDegreeRoleLabel(degree),
+    pitchLabel: `${parts.name}${parts.octave}`,
+    inKey: true
+  };
+}
+
+function scaleDegreeRoleLabel(degree: number): string {
+  return ["Root", "Step", "Color", "Lift", "Anchor", "Mood", "Lead"][degree] ?? "Scale";
+}
+
 function keyCompassScaleDegreeLabel(key: string, pitchName: string): string {
   const degree = keyCompassScaleDegree(key, pitchName);
   return degree === null ? "out" : `D${degree + 1}`;
@@ -12607,6 +12647,7 @@ function NoteEditor({
 }
 
 function NoteInspector({
+  currentKey,
   selectedNote,
   noteClipboard,
   bassNote,
@@ -12622,6 +12663,7 @@ function NoteInspector({
   onPaste,
   onDuplicate
 }: {
+  currentKey: string;
   selectedNote: SelectedNote | null;
   noteClipboard: NoteClipboard | null;
   bassNote?: BassNote;
@@ -12639,6 +12681,7 @@ function NoteInspector({
 }): ReactElement {
   const activeNote = bassNote ?? melodyNote;
   const label = selectedNote ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}` : "None";
+  const degreeSummary = selectedNote ? selectedNoteDegreeSummary(currentKey, selectedNote.pitch) : null;
   const clipboardLabel = noteClipboard
     ? `${noteClipboard.track === "bass" ? "808" : "Synth"} ${noteClipboard.note.pitch}.${noteClipboard.note.step + 1}`
     : "Empty";
@@ -12651,6 +12694,15 @@ function NoteInspector({
       </div>
       {activeNote && (
         <>
+          {degreeSummary && (
+            <div className={degreeSummary.inKey ? "note-degree-readout" : "note-degree-readout warn"} data-testid="note-degree-readout">
+              <span>Degree</span>
+              <strong data-testid="note-degree-label">{degreeSummary.degreeLabel}</strong>
+              <small data-testid="note-degree-role">
+                {degreeSummary.roleLabel} / {degreeSummary.pitchLabel}
+              </small>
+            </div>
+          )}
           <div className="note-action-row" aria-label="Selected note tools">
             <button data-testid="note-nudge-left" onClick={() => onStepMove(-1)} title="Move selected note one step left" type="button">
               <ArrowLeft size={14} aria-hidden="true" />
