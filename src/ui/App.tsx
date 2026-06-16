@@ -1609,6 +1609,8 @@ type ModeFocusCard = {
   label: string;
   value: string;
   detail: string;
+  focusTarget: ReviewQueueFocusTarget;
+  focusLabel: string;
   tone: MixCoachTone;
 };
 
@@ -5355,6 +5357,19 @@ export function App(): ReactElement {
     setProjectStatus(`Snapshot ${metric.label}: ${metric.value}`);
   }
 
+  function focusModeFocusCard(card: ModeFocusCard): void {
+    const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Mode ${card.label}: ${card.value}`);
+  }
+
   function focusComposerGuideCard(card: ComposerGuideCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5807,7 +5822,7 @@ export function App(): ReactElement {
         </div>
       </section>
 
-      <ModeFocus summary={modeFocusSummary} />
+      <ModeFocus summary={modeFocusSummary} onFocus={focusModeFocusCard} />
 
       <WorkflowNavigator items={workflowNavigatorItems} onJump={jumpToWorkflowZone} />
 
@@ -8526,7 +8541,7 @@ function ReviewQueue({
   );
 }
 
-function ModeFocus({ summary }: { summary: ModeFocusSummary }): ReactElement {
+function ModeFocus({ onFocus, summary }: { summary: ModeFocusSummary; onFocus: (card: ModeFocusCard) => void }): ReactElement {
   return (
     <section className={`mode-focus ${summary.tone}`} data-testid="mode-focus" aria-label="Mode focus">
       <div className="mode-focus-heading">
@@ -8542,6 +8557,16 @@ function ModeFocus({ summary }: { summary: ModeFocusSummary }): ReactElement {
           <div className={`mode-focus-card ${card.tone}`} data-testid={`mode-focus-${card.id}`} key={card.id}>
             <span>{card.label}</span>
             <strong>{card.value}</strong>
+            <button
+              className="mode-focus-jump"
+              data-testid={`mode-focus-jump-${card.id}`}
+              onClick={() => onFocus(card)}
+              title={`Jump to ${card.focusLabel}: ${card.value}`}
+              type="button"
+            >
+              <ArrowRight size={13} aria-hidden="true" />
+              <span>{card.focusLabel}</span>
+            </button>
             <small>{card.detail}</small>
           </div>
         ))}
@@ -11122,6 +11147,8 @@ function createModeFocusSummary(
         label: "Session scan",
         value: sessionCard.status,
         detail: sessionCard.detail,
+        focusTarget: sessionCard.focusTarget,
+        focusLabel: sessionCard.focusLabel,
         tone: sessionCard.tone
       },
       {
@@ -11129,6 +11156,8 @@ function createModeFocusSummary(
         label: issue.area,
         value: issue.status,
         detail: issue.detail,
+        focusTarget: issue.focusTarget,
+        focusLabel: issue.focusLabel,
         tone: issue.tone
       },
       {
@@ -11136,6 +11165,8 @@ function createModeFocusSummary(
         label: "Handoff",
         value: handoffCard.status,
         detail: handoffCard.detail,
+        focusTarget: handoffCard.focusTarget,
+        focusLabel: handoffCard.focusLabel,
         tone: handoffCard.tone
       }
     ];
@@ -11152,12 +11183,15 @@ function createModeFocusSummary(
   const stage = beatMap.stages.find((candidate) => candidate.tone !== "good") ?? beatMap.stages[beatMap.stages.length - 1];
   const focus = composer.cards.find((card) => card.tone !== "good") ?? composer.cards[0];
   const check = finish.cards.find((card) => card.tone !== "good") ?? finish.cards[finish.cards.length - 1];
+  const stageFocusTarget = modeFocusStageTarget(stage.id);
   const cards: ModeFocusCard[] = [
     {
       id: "stage",
       label: "Current stage",
       value: stage.label,
       detail: `${stage.status} / ${stage.detail}`,
+      focusTarget: stageFocusTarget,
+      focusLabel: reviewQueueFocusLabel(stageFocusTarget),
       tone: stage.tone
     },
     {
@@ -11165,6 +11199,8 @@ function createModeFocusSummary(
       label: "Writing focus",
       value: focus.label,
       detail: `${focus.status} / ${focus.detail}`,
+      focusTarget: focus.focusTarget,
+      focusLabel: focus.focusLabel,
       tone: focus.tone
     },
     {
@@ -11172,6 +11208,8 @@ function createModeFocusSummary(
       label: "Local check",
       value: check.label,
       detail: `${check.status} / ${check.detail}`,
+      focusTarget: check.focusTarget,
+      focusLabel: check.focusLabel,
       tone: check.tone
     }
   ];
@@ -11183,6 +11221,21 @@ function createModeFocusSummary(
     tone: weakestTone(cards.map((card) => card.tone)),
     cards
   };
+}
+
+function modeFocusStageTarget(stageId: string): ReviewQueueFocusTarget {
+  switch (stageId) {
+    case "arrange":
+      return "arrange";
+    case "polish":
+      return "mix";
+    case "deliver":
+      return "deliver";
+    case "start":
+    case "compose":
+    default:
+      return "compose";
+  }
 }
 
 function readinessReviewArea(id: string): string {
