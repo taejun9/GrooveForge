@@ -459,6 +459,18 @@ type BeatBlueprintPreviewSummary = {
   metrics: BeatBlueprintPreviewMetric[];
 };
 
+type DeliveryTargetAlignmentPreviewSummary = {
+  targetId: DeliveryTargetId;
+  statusLabel: string;
+  targetLabel: string;
+  lengthLabel: string;
+  masterLabel: string;
+  mixLabel: string;
+  stemLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 const beatBlueprintPreviewMetricTestIds: Record<BeatBlueprintPreviewMetricId, string> = {
   style: "beat-blueprint-preview-style",
   key: "beat-blueprint-preview-key",
@@ -7402,6 +7414,7 @@ function DeliveryTargets({
   const customAligned = isDeliveryTargetAligned(project, customTarget);
   const customName = project.customDeliveryTarget.name || defaultCustomDeliveryTarget.name;
   const customFocus = project.customDeliveryTarget.focus || defaultCustomDeliveryTarget.focus;
+  const alignmentPreview = createDeliveryTargetAlignmentPreview(project, currentTarget);
   return (
     <section className="delivery-target-row" data-testid="delivery-targets" aria-label="Delivery targets">
       <div className="delivery-target-heading">
@@ -7413,6 +7426,20 @@ function DeliveryTargets({
         <small>{barCountLabel(currentTarget.targetBars)} / {currentTarget.stemGoal} stems</small>
       </div>
       <div className="delivery-target-stack">
+        <div
+          aria-label={alignmentPreview.detailTitle}
+          className={`delivery-target-preview ${alignmentPreview.tone}`}
+          data-preview-target={alignmentPreview.targetId}
+          data-testid="delivery-target-preview"
+          title={alignmentPreview.detailTitle}
+        >
+          <span data-testid="delivery-target-preview-status">{alignmentPreview.statusLabel}</span>
+          <strong data-testid="delivery-target-preview-target">{alignmentPreview.targetLabel}</strong>
+          <small data-testid="delivery-target-preview-length">{alignmentPreview.lengthLabel}</small>
+          <small data-testid="delivery-target-preview-master">{alignmentPreview.masterLabel}</small>
+          <small data-testid="delivery-target-preview-mix">{alignmentPreview.mixLabel}</small>
+          <small data-testid="delivery-target-preview-stems">{alignmentPreview.stemLabel}</small>
+        </div>
         <div className="delivery-target-list">
           {deliveryTargets.map((target) => {
             const selected = project.deliveryTarget === target.id;
@@ -10013,6 +10040,46 @@ function isDeliveryTargetAligned(project: ProjectState, target: DeliveryTarget):
     project.masterPreset === target.preferredMasterPreset &&
     arrangementTotalBars(project) >= target.targetBars
   );
+}
+
+function createDeliveryTargetAlignmentPreview(
+  project: ProjectState,
+  target: DeliveryTarget
+): DeliveryTargetAlignmentPreviewSummary {
+  const currentBars = arrangementTotalBars(project);
+  const targetSelected = project.deliveryTarget === target.id;
+  const lengthAligned = currentBars >= target.targetBars;
+  const masterAligned = project.masterPreset === target.preferredMasterPreset;
+  const changeCount = [!targetSelected, !lengthAligned, !masterAligned].filter(Boolean).length;
+  const aligned = isDeliveryTargetAligned(project, target);
+  const tone: MixCoachTone = aligned ? "good" : currentBars >= Math.min(8, target.targetBars) ? "warn" : "danger";
+  const statusLabel = aligned ? "Aligned target" : `${changeCount} align change${changeCount === 1 ? "" : "s"}`;
+  const targetLabel = targetSelected ? `${target.name} active` : `Target -> ${target.name}`;
+  const lengthLabel = lengthAligned
+    ? `${barCountLabel(currentBars)} covers ${barCountLabel(target.targetBars)}`
+    : `${barCountLabel(currentBars)} -> ${barCountLabel(target.targetBars)}`;
+  const masterLabel = masterAligned
+    ? `${target.preferredMasterPreset} ready`
+    : `${project.masterPreset} -> ${target.preferredMasterPreset}`;
+  const mixLabel = `Mix -> ${mixPostureLabel(target.mixPosture)}`;
+  const stemLabel = `${target.stemGoal} stem target`;
+  const detailTitle = `${target.name} Align preview: ${target.focus}; ${lengthLabel}; ${masterLabel}; ${mixLabel}; ${stemLabel}`;
+
+  return {
+    targetId: target.id,
+    statusLabel,
+    targetLabel,
+    lengthLabel,
+    masterLabel,
+    mixLabel,
+    stemLabel,
+    detailTitle,
+    tone
+  };
+}
+
+function mixPostureLabel(posture: MixPosture): string {
+  return mixPostureOptions.find((option) => option.id === posture)?.label ?? posture.split("_").join(" ");
 }
 
 const sessionBriefFields: (keyof SessionBrief)[] = ["artist", "vibe", "reference", "notes"];
