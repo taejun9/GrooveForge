@@ -993,6 +993,7 @@ type ChordRhythmDefinition = {
 
 type ChordRhythmOption = ChordRhythmDefinition & {
   preview: string;
+  changedCount: number;
   chanceCount: number;
 };
 
@@ -1021,6 +1022,20 @@ type ChordHarmonicSummary = {
   roleLabel: string;
   detailLabel: string;
   inKey: boolean;
+};
+
+type ChordMovePreviewSummary = {
+  statusLabel: string;
+  selectedLabel: string;
+  harmonicLabel: string;
+  rhythmLabel: string;
+  voicingLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+  padId: ChordPadId | "none";
+  rhythmId: ChordRhythmId | "none";
+  voicingId: ChordVoicingId | "none";
 };
 
 type ArrangementFocusPresetId = "intro_space" | "verse_pocket" | "hook_peak" | "bridge_drop" | "outro_release";
@@ -2549,6 +2564,18 @@ export function App(): ReactElement {
   const chordVoicingOptions = useMemo(
     () => createChordVoicingOptions(selectedChord),
     [selectedChord]
+  );
+  const chordMovePreviewSummary = useMemo(
+    () =>
+      createChordMovePreviewSummary(
+        project.key,
+        currentPattern.chordEvents,
+        selectedChord,
+        chordPadOptions,
+        chordRhythmOptions,
+        chordVoicingOptions
+      ),
+    [project.key, currentPattern.chordEvents, selectedChord, chordPadOptions, chordRhythmOptions, chordVoicingOptions]
   );
   const selectedDrumVelocity =
     selectedDrumStep && selectedDrumActive
@@ -6268,6 +6295,7 @@ export function App(): ReactElement {
           <ChordEditor
             chordPads={chordPadOptions}
             chordClipboard={chordClipboard}
+            chordMovePreview={chordMovePreviewSummary}
             chordRhythms={chordRhythmOptions}
             chordVoicings={chordVoicingOptions}
             chords={currentPattern.chordEvents}
@@ -16823,6 +16851,7 @@ function SoundControl({
 function ChordEditor({
   chordPads,
   chordClipboard,
+  chordMovePreview,
   chordRhythms,
   chordVoicings,
   chords,
@@ -16846,6 +16875,7 @@ function ChordEditor({
 }: {
   chordPads: ChordPadOption[];
   chordClipboard: ChordClipboard | null;
+  chordMovePreview: ChordMovePreviewSummary;
   chordRhythms: ChordRhythmOption[];
   chordVoicings: ChordVoicingOption[];
   chords: ChordEvent[];
@@ -16907,6 +16937,21 @@ function ChordEditor({
           <Plus size={14} aria-hidden="true" />
           <span>Add chord</span>
         </button>
+      </div>
+      <div
+        className={`chord-move-preview ${chordMovePreview.tone}`}
+        data-preview-chord-pad={chordMovePreview.padId}
+        data-preview-chord-rhythm={chordMovePreview.rhythmId}
+        data-preview-chord-voicing={chordMovePreview.voicingId}
+        data-testid="chord-move-preview"
+        title={chordMovePreview.detailTitle}
+      >
+        <span data-testid="chord-move-preview-status">{chordMovePreview.statusLabel}</span>
+        <strong data-testid="chord-move-preview-selected">{chordMovePreview.selectedLabel}</strong>
+        <small data-testid="chord-move-preview-harmonic">{chordMovePreview.harmonicLabel}</small>
+        <small data-testid="chord-move-preview-rhythm">{chordMovePreview.rhythmLabel}</small>
+        <small data-testid="chord-move-preview-voicing">{chordMovePreview.voicingLabel}</small>
+        <small data-testid="chord-move-preview-moves">{chordMovePreview.moveLabel}</small>
       </div>
       <div className="chord-pad-row" aria-label="Chord Pads">
         {chordPads.map((pad) => (
@@ -18086,9 +18131,86 @@ function createChordRhythmOptions(chords: ChordEvent[]): ChordRhythmOption[] {
     return {
       ...rhythm,
       preview: transformed.length === 0 ? "add chords" : `${Math.round(averageLength)} step`,
+      changedCount: chordRhythmChangedCount(chords, transformed),
       chanceCount: transformed.filter((chord) => normalizeEventProbability(chord.probability) < 1).length
     };
   });
+}
+
+function createChordMovePreviewSummary(
+  key: string,
+  chords: ChordEvent[],
+  selectedChord: ChordEvent | undefined,
+  pads: ChordPadOption[],
+  rhythms: ChordRhythmOption[],
+  voicings: ChordVoicingOption[]
+): ChordMovePreviewSummary {
+  const pad = pads.find((option) => !option.selected) ?? pads[0];
+  const rhythm = rhythms.find((option) => option.changedCount > 0) ?? rhythms[0];
+  const voicing = voicings.find((option) => !option.selected) ?? voicings[0];
+
+  if (!selectedChord) {
+    return {
+      statusLabel: "Select chord",
+      selectedLabel: chords.length === 0 ? "No chords yet" : `${chords.length} chord events`,
+      harmonicLabel: `${key} waits`,
+      rhythmLabel: rhythm ? `${rhythm.label}: ${rhythm.preview}` : "Rhythm waits",
+      voicingLabel: "Voicing waits",
+      moveLabel: "0 moves ready",
+      detailTitle: "Select or add a chord event before applying harmonic, rhythm, or voicing moves.",
+      tone: "warn",
+      padId: "none",
+      rhythmId: rhythm?.id ?? "none",
+      voicingId: "none"
+    };
+  }
+
+  const harmonicSummary = selectedChordHarmonicSummary(key, selectedChord);
+  const padMoveCount = pad ? chordPadMoveCount(selectedChord, pad) : 0;
+  const rhythmMoveCount = rhythm?.changedCount ?? 0;
+  const voicingMoveCount = voicing ? chordVoicingMoveCount(selectedChord, voicing) : 0;
+  const totalMoveCount = padMoveCount + rhythmMoveCount + voicingMoveCount;
+  const selectedLabel = `${selectedChord.root}${selectedChord.quality}.${selectedChord.step + 1}`;
+  const harmonicLabel = `${harmonicSummary.romanLabel} / ${harmonicSummary.roleLabel}`;
+  const rhythmLabel = rhythm ? `${rhythm.label}: ${rhythm.preview}` : "Rhythm ready";
+  const voicingLabel = voicing ? `${voicing.label}: ${voicing.preview}` : "Voicing ready";
+  const moveLabel = `P ${padMoveCount} / R ${rhythmMoveCount} / V ${voicingMoveCount}`;
+  const statusLabel = totalMoveCount === 0 ? "Chord aligned" : "Suggested move";
+  return {
+    statusLabel,
+    selectedLabel,
+    harmonicLabel,
+    rhythmLabel,
+    voicingLabel,
+    moveLabel,
+    detailTitle: `${statusLabel}: ${selectedLabel}; ${harmonicLabel}; ${rhythmLabel}; ${voicingLabel}; ${moveLabel}.`,
+    tone: totalMoveCount === 0 && harmonicSummary.inKey ? "good" : harmonicSummary.inKey ? "warn" : "danger",
+    padId: pad?.id ?? "none",
+    rhythmId: rhythm?.id ?? "none",
+    voicingId: voicing?.id ?? "none"
+  };
+}
+
+function chordPadMoveCount(chord: ChordEvent, pad: ChordPadOption): number {
+  return [
+    chord.root !== pad.root,
+    chord.quality !== pad.quality,
+    normalizeChordInversion(chord.inversion) !== pad.inversion
+  ].filter(Boolean).length;
+}
+
+function chordVoicingMoveCount(chord: ChordEvent, voicing: ChordVoicingOption): number {
+  return [
+    chord.quality !== voicing.quality,
+    normalizeChordInversion(chord.inversion) !== normalizeChordInversion(voicing.inversion),
+    chord.length !== voicing.length,
+    chord.velocity !== voicing.velocity,
+    normalizeEventProbability(chord.probability) !== normalizeEventProbability(voicing.probability)
+  ].filter(Boolean).length;
+}
+
+function chordRhythmChangedCount(current: ChordEvent[], transformed: ChordEvent[]): number {
+  return transformed.filter((chord, index) => current[index] === undefined || !sameChordEvent(current[index], chord)).length;
 }
 
 function createChordVoicingOptions(selectedChord?: ChordEvent): ChordVoicingOption[] {
