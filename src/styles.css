@@ -249,6 +249,17 @@ h2 {
   gap: 10px;
 }
 
+.tempo-nudge-pads {
+  display: grid;
+  align-self: end;
+  flex: 0 0 82px;
+  width: 82px;
+  min-width: 82px;
+  min-height: 36px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
 .field {
   display: grid;
   gap: 5px;
@@ -370,6 +381,7 @@ h2 {
 .style-quick-picks button,
 .pattern-tabs button,
 .pattern-compare button,
+.tempo-nudge-pads button,
 .drum-accent-row button,
 .groove-feel-row button,
 .pattern-clone-row button,
@@ -426,6 +438,13 @@ h2 {
 
 .tap-tempo-button {
   min-width: 64px;
+}
+
+.tempo-nudge-pads button {
+  min-height: 16px;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 1;
 }
 
 .icon-button.primary {

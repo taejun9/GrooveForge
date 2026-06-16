@@ -74,7 +74,7 @@ Optional sampling remains a later extension after the direct beat workstation is
 
 Primary feature areas:
 
-- Transport: BPM, Tap Tempo, key, play, stop, Song/Block/Pattern loop audition, metronome.
+- Transport: BPM, Tap Tempo, Tempo Nudge Pads, key, play, stop, Song/Block/Pattern loop audition, metronome.
 - Beat blueprints: sample-free editable project starts that combine style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset.
 - Delivery Targets: local starter sketch, vocal session, beat-store demo, club demo, and editable custom targets that can be set without changing the beat or explicitly aligned to arrangement length, master preset, and mix posture.
 - Session Brief: bounded local artist, vibe, reference, and notes fields stored in the project file for beat intent and handoff context, with a UI-only role readout for brief usefulness and next missing context.
@@ -157,7 +157,7 @@ This sentence is the MVP proof.
 
 MVP capabilities:
 
-- BPM/key setup, including Tap Tempo for explicit click-to-set BPM.
+- BPM/key setup, including Tap Tempo and Tempo Nudge Pads for explicit click-to-set, half-time, double-time, and +/-1 BPM changes.
 - Key changes retarget Pattern A/B/C 808/bass, melody, and chord-root musical events so existing beats stay in the selected key.
 - Style selector that applies key-aware editable groove templates for Trap, Drill, Boom Bap, Lo-fi, House, R&B, Jersey Club, Phonk, Garage, and Experimental Pattern A/B/C, BPM, swing, and sound preset.
 - Style Inspector with Style Quick Picks that derive read-only BPM range, active/default swing, bass role, melody role, sound preset, and Pattern A/B/C event density from local style/profile/project data while applying styles through the existing undoable style-selection path.
@@ -197,6 +197,7 @@ MVP capabilities:
 - Desktop editing shortcuts, Keyboard Capture, and Quick Actions command search for arrangement playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, redo, snapshots, blueprints, pattern fills, Arrangement Focus, mix fixes, master finish, and export while leaving focused inputs alone, then showing UI-only local result metrics, audition cues, and next checks after explicit command clicks.
 - Transport playback modes for full arrangement playback by default, selected-block loop audition, and fast selected-pattern preview while editing.
 - Tap Tempo that averages recent explicit clicks into a bounded project BPM through undoable project history without audio input, hidden beat detection, or tempo automation.
+- Tempo Nudge Pads that apply -1, +1, half-time, and double-time BPM moves through explicit undoable project history while resetting UI-local Tap Tempo state.
 - Realtime metronome toggle with accented downbeat clicks that helps users program to the grid during playback without adding click audio to WAV or stem export.
 - Live playback reads the current project while scheduling future steps, so selected-pattern preview, arrangement block edits, arrangement track mutes, arrangement length, arrangement energy, BPM, mixer, sound, and master changes can be heard without stopping and restarting.
 - Mixer volume, pan, mute, solo, mixer channel role readouts, Stem Audition Pads that explicitly set Full Mix/Drums/808/Synth/Chords audition through existing mixer solo/mute state, Mix Balance Pads, low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Headroom/Stem Balance/Low End Mix Fix actions, Master Finish Pads, and master output role readout reflected in deterministic render feedback.
@@ -211,7 +212,7 @@ MVP capabilities:
 
 ## Roadmap
 
-Phase 0 validates the audio scheduler: BPM clock, Tap Tempo helper, tick/bar/beat math, play/stop/loop, metronome, and simple kick playback.
+Phase 0 validates the audio scheduler: BPM clock, Tap Tempo helper, Tempo Nudge Pads, tick/bar/beat math, play/stop/loop, metronome, and simple kick playback.
 
 Phase 1 builds the drum sequencer: 16/32-step grid, kick/snare/clap/hat lanes, velocity, swing, pattern save/load, and hat repeat.
 

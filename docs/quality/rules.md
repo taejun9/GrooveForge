@@ -65,6 +65,8 @@ P0 scheduler work must prove stable play/stop/loop behavior, BPM changes, curren
 
 Tap Tempo work must keep tap history UI-local and out of saved project schema, update only the project BPM through explicit user clicks and existing undoable project history, clamp calculated BPM to the supported transport range, preserve manual BPM entry, playback, metronome, save/load, WAV/stem/MIDI export semantics, and avoid audio input, recording, beat detection, tempo automation, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.
 
+Tempo Nudge Pad work must derive -1, +1, half-time, and double-time BPM changes only from the current project BPM, clamp results to the supported transport range, reset UI-local Tap Tempo state, route every pad through explicit undoable project history, preserve manual BPM entry, Tap Tempo, playback, metronome, save/load, WAV/stem/MIDI export semantics, and avoid hidden tempo automation, audio input, recording, beat detection, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.
+
 Metronome work must keep click playback realtime-only, accent beat 1 distinctly from beats 2-4, persist the transport toggle through save/load migration, follow live BPM changes while playing, preserve Stop/Space behavior, and keep WAV/stem exports free of metronome audio.
 
 Drum, bass, melody, and arrangement work must preserve editable project state without losing event timing, pitch, velocity, glide, track routing, or mixer state.

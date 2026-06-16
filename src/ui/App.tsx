@@ -192,6 +192,12 @@ const maxProjectBpm = 220;
 const tapTempoWindowMs = 2500;
 const tapTempoMaxTaps = 6;
 const tapTempoCommitDelayMs = 650;
+const tempoNudgePads: TempoNudgePadDefinition[] = [
+  { id: "down", label: "-1", title: "Lower tempo by 1 BPM" },
+  { id: "up", label: "+1", title: "Raise tempo by 1 BPM" },
+  { id: "half", label: "1/2", title: "Set half-time BPM" },
+  { id: "double", label: "x2", title: "Set double-time BPM" }
+];
 
 const mixPostureOptions: { id: MixPosture; label: string }[] = [
   { id: "loose", label: "Loose sketch" },
@@ -803,6 +809,14 @@ type TapTempoState = {
   taps: number;
   bpm: number | null;
   applied: boolean;
+};
+
+type TempoNudgePadId = "down" | "up" | "half" | "double";
+
+type TempoNudgePadDefinition = {
+  id: TempoNudgePadId;
+  label: string;
+  title: string;
 };
 
 type ChordPadId = "home" | "lift" | "tension" | "color";
@@ -2352,6 +2366,18 @@ export function App(): ReactElement {
     const nextBpm = clampProjectBpm(value);
     resetTapTempo();
     updateProject((current) => (current.bpm === nextBpm ? current : { ...current, bpm: nextBpm }));
+  }
+
+  function applyTempoNudgePad(pad: TempoNudgePadDefinition): void {
+    const nextBpm = tempoNudgePadBpm(projectRef.current.bpm, pad.id);
+    resetTapTempo();
+    const changed = updateProject(
+      (current) => (current.bpm === nextBpm ? current : { ...current, bpm: nextBpm }),
+      `${pad.label} tempo ${nextBpm} BPM`
+    );
+    if (!changed) {
+      setProjectStatus(`${pad.label} tempo held at ${nextBpm} BPM`);
+    }
   }
 
   function commitTapTempoBpm(nextBpm: number): void {
@@ -4951,6 +4977,19 @@ export function App(): ReactElement {
               onChange={(event) => updateProjectBpm(Number(event.target.value) || projectRef.current.bpm)}
             />
           </label>
+          <div className="tempo-nudge-pads" aria-label="Tempo nudge pads" data-testid="tempo-nudge-pads">
+            {tempoNudgePads.map((pad) => (
+              <button
+                data-testid={tempoNudgePadTestId(pad.id)}
+                key={pad.id}
+                onClick={() => applyTempoNudgePad(pad)}
+                title={pad.title}
+                type="button"
+              >
+                {pad.label}
+              </button>
+            ))}
+          </div>
           <label className="field">
             <span>Key</span>
             <select value={project.key} onChange={(event) => applyProjectKey(event.target.value)}>
@@ -15651,6 +15690,32 @@ function clampProjectBpm(value: number): number {
     return starterProject.bpm;
   }
   return Math.min(maxProjectBpm, Math.max(minProjectBpm, Math.round(value)));
+}
+
+function tempoNudgePadBpm(currentBpm: number, padId: TempoNudgePadId): number {
+  switch (padId) {
+    case "down":
+      return clampProjectBpm(currentBpm - 1);
+    case "up":
+      return clampProjectBpm(currentBpm + 1);
+    case "half":
+      return clampProjectBpm(currentBpm / 2);
+    case "double":
+      return clampProjectBpm(currentBpm * 2);
+  }
+}
+
+function tempoNudgePadTestId(padId: TempoNudgePadId): string {
+  switch (padId) {
+    case "down":
+      return "tempo-nudge-down";
+    case "up":
+      return "tempo-nudge-up";
+    case "half":
+      return "tempo-nudge-half";
+    case "double":
+      return "tempo-nudge-double";
+  }
 }
 
 function calculateTapTempoBpm(tapTimes: number[]): number | null {
