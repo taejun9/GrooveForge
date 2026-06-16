@@ -1428,6 +1428,7 @@ type NoteView = {
 type KeyboardCaptureKeyMapItem = {
   key: KeyboardCaptureKey;
   pitch: string | null;
+  degreeLabel: string | null;
 };
 type KeyboardCaptureDefaults = {
   octave: number;
@@ -12525,11 +12526,13 @@ function KeyboardCapturePanel({
         {keyMap.map((item) => (
           <kbd
             className={item.pitch ? "" : "muted"}
+            aria-label={`${keyboardCaptureKeyLabels[item.key]} ${item.pitch ?? "out of range"} ${item.degreeLabel ?? ""}`.trim()}
             data-testid={`keyboard-capture-key-${item.key}`}
             key={item.key}
           >
             <span>{keyboardCaptureKeyLabels[item.key]}</span>
             <strong>{item.pitch ?? "-"}</strong>
+            <em data-testid={`keyboard-capture-degree-${item.key}`}>{item.degreeLabel ?? "-"}</em>
           </kbd>
         ))}
       </div>
@@ -13449,12 +13452,17 @@ function mergePitchLanes(scalePitches: string[], usedPitches: string[]): string[
 function createKeyboardCaptureKeyMap(pitches: string[]): KeyboardCaptureKeyMapItem[] {
   return keyboardCaptureKeys.map((key, index) => ({
     key,
-    pitch: pitches[index] ?? null
+    pitch: pitches[index] ?? null,
+    degreeLabel: pitches[index] ? keyboardCaptureDegreeLabel(index) : null
   }));
 }
 
 function keyboardCapturePitchForKey(key: KeyboardCaptureKey, pitches: string[]): string | null {
   return pitches[keyboardCaptureKeys.indexOf(key)] ?? null;
+}
+
+function keyboardCaptureDegreeLabel(index: number): string {
+  return index === keyboardCaptureKeys.length - 1 ? "8ve" : `D${index + 1}`;
 }
 
 function keyboardCapturePitchLanes(key: string, track: NoteTrack, defaults: KeyboardCaptureDefaults): string[] {
