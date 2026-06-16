@@ -1190,12 +1190,20 @@ type KeyCompassFocusSummary = {
 };
 
 type GrooveCompassCardId = "density" | "anchors" | "hats" | "timing" | "chance" | "focus";
+type GrooveCompassFocusId = GrooveCompassCardId;
+type GrooveCompassFocusTarget = "compose";
 
-type GrooveCompassCard = {
-  id: GrooveCompassCardId;
+type GrooveCompassFocusItem = {
+  focusId: GrooveCompassFocusId;
   label: string;
   value: string;
   detail: string;
+  focusTarget: GrooveCompassFocusTarget;
+  focusLabel: "Compose";
+};
+
+type GrooveCompassCard = GrooveCompassFocusItem & {
+  id: GrooveCompassCardId;
   tone: MixCoachTone;
 };
 
@@ -1204,6 +1212,15 @@ type GrooveCompassSummary = {
   detail: string;
   tone: MixCoachTone;
   cards: GrooveCompassCard[];
+};
+
+type GrooveCompassFocusSummary = {
+  focusId: GrooveCompassFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
 };
 
 type ComposerGuideCardId = "drums" | "bass" | "harmony" | "melody" | "arrange" | "finish";
@@ -2083,6 +2100,7 @@ export function App(): ReactElement {
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [keyCompassFocusId, setKeyCompassFocusId] = useState<KeyCompassFocusId | null>(null);
+  const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
   const [styleInspectorFocusId, setStyleInspectorFocusId] = useState<StyleInspectorFocusId | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
@@ -5131,6 +5149,16 @@ export function App(): ReactElement {
     setProjectStatus(`Key ${item.label}: ${item.value}`);
   }
 
+  function focusGrooveCompassItem(item: GrooveCompassFocusItem): void {
+    const targetRefs: Record<GrooveCompassFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current
+    };
+
+    setGrooveCompassFocusId(item.focusId);
+    targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Groove ${item.label}: ${item.value}`);
+  }
+
   function focusPatternDnaCard(card: PatternDnaCard): void {
     const targetRefs: Record<PatternDnaFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5551,7 +5579,7 @@ export function App(): ReactElement {
 
       <KeyCompass focusedCardId={keyCompassFocusId} onFocus={focusKeyCompassItem} summary={keyCompassSummary} />
 
-      <GrooveCompass summary={grooveCompassSummary} />
+      <GrooveCompass focusedCardId={grooveCompassFocusId} onFocus={focusGrooveCompassItem} summary={grooveCompassSummary} />
 
       <ComposerGuide
         summary={composerGuideSummary}
@@ -7756,7 +7784,17 @@ function KeyCompass({
   );
 }
 
-function GrooveCompass({ summary }: { summary: GrooveCompassSummary }): ReactElement {
+function GrooveCompass({
+  focusedCardId,
+  onFocus,
+  summary
+}: {
+  focusedCardId: GrooveCompassFocusId | null;
+  onFocus: (item: GrooveCompassFocusItem) => void;
+  summary: GrooveCompassSummary;
+}): ReactElement {
+  const focusSummary = createGrooveCompassFocusSummary(summary, focusedCardId);
+
   return (
     <section className={`groove-compass ${summary.tone}`} data-testid="groove-compass" aria-label="Groove compass">
       <div className="groove-compass-heading">
@@ -7767,14 +7805,38 @@ function GrooveCompass({ summary }: { summary: GrooveCompassSummary }): ReactEle
         <strong data-testid="groove-compass-headline">{summary.headline}</strong>
         <small data-testid="groove-compass-detail">{summary.detail}</small>
       </div>
+      <div className={`groove-compass-focus-readout ${focusSummary.tone}`} data-testid="groove-compass-focus-readout" title={focusSummary.detailTitle}>
+        <span data-testid="groove-compass-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="groove-compass-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="groove-compass-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
       <div className="groove-compass-grid" data-testid="groove-compass-grid">
-        {summary.cards.map((card) => (
-          <div className={`groove-compass-card ${card.tone}`} data-testid={`groove-compass-${card.id}`} key={card.id}>
-            <span>{card.label}</span>
-            <strong>{card.value}</strong>
-            <small>{card.detail}</small>
-          </div>
-        ))}
+        {summary.cards.map((card) => {
+          const focused = focusedCardId === card.focusId;
+          return (
+            <div
+              className={["groove-compass-card", card.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`groove-compass-${card.id}`}
+              key={card.id}
+            >
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <button
+                aria-pressed={focused}
+                className="groove-compass-focus-button"
+                data-testid={`groove-compass-focus-${card.id}`}
+                onClick={() => onFocus(card)}
+                title={`Focus ${card.focusLabel}: ${card.value}`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{card.focusLabel}</span>
+              </button>
+              <small>{card.detail}</small>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -10872,37 +10934,52 @@ function createGrooveCompassSummary(project: ProjectState, selectedDrumStep: Sel
   const cards: GrooveCompassCard[] = [
     {
       id: "density",
+      focusId: "density",
       label: "Density",
       value: `${totalHits} hits`,
       detail: `${activeSteps.size}/16 active steps`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: densityTone
     },
     {
       id: "anchors",
+      focusId: "anchors",
       label: "Anchors",
       value: `K${laneHits.kick} / C${laneHits.clap}`,
       detail: `kick + clap foundation / ${laneHits.perc} perc`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: anchorTone
     },
     {
       id: "hats",
+      focusId: "hats",
       label: "Hat Motion",
       value: `${laneHits.hat} hats`,
       detail: `${repeatedHatHits} repeat hits`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: hatTone
     },
     {
       id: "timing",
+      focusId: "timing",
       label: "Timing Feel",
       value: `${Math.round(timingSpread)} ms spread`,
       detail: `${shiftedHits} shifted hits`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: timingTone
     },
     {
       id: "chance",
+      focusId: "chance",
       label: "Chance",
       value: `${Math.round(chanceAverage * 100)}% avg`,
       detail: `${Math.round(chanceFloor * 100)}% floor`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: chanceTone
     },
     focusCard
@@ -10916,6 +10993,37 @@ function createGrooveCompassSummary(project: ProjectState, selectedDrumStep: Sel
   };
 }
 
+function createGrooveCompassFocusSummary(
+  summary: GrooveCompassSummary,
+  focusedCardId: GrooveCompassFocusId | null
+): GrooveCompassFocusSummary {
+  const focusedCard = focusedCardId ? summary.cards.find((card) => card.focusId === focusedCardId) ?? null : null;
+  const card = focusedCard ?? summary.cards[0] ?? null;
+
+  if (!card) {
+    return {
+      focusId: null,
+      statusLabel: "Groove clear",
+      areaLabel: "No groove focus",
+      detailLabel: "No Groove Compass cards available",
+      detailTitle: "Groove Compass has no focusable cards.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel = focusedCard ? "Focused Groove" : "Groove Focus";
+  const detailLabel = `${card.focusLabel} panel / ${card.detail}`;
+
+  return {
+    focusId: card.focusId,
+    statusLabel,
+    areaLabel: `${card.label}: ${card.value}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
+    tone: card.tone
+  };
+}
+
 function grooveCompassFocusCard(
   pattern: PatternData,
   selectedPattern: PatternSlot,
@@ -10924,9 +11032,12 @@ function grooveCompassFocusCard(
   if (!selectedDrumStep) {
     return {
       id: "focus",
+      focusId: "focus",
       label: "Focus",
       value: `Pattern ${selectedPattern}`,
       detail: "Select a drum step for pocket detail",
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: "warn"
     };
   }
@@ -10936,9 +11047,12 @@ function grooveCompassFocusCard(
   if (!isActive) {
     return {
       id: "focus",
+      focusId: "focus",
       label: "Focus",
       value: `${drumLabels[lane]} ${step + 1}`,
       detail: `Inactive step in Pattern ${selectedPattern}`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: "warn"
     };
   }
@@ -10950,9 +11064,12 @@ function grooveCompassFocusCard(
 
   return {
     id: "focus",
+    focusId: "focus",
     label: "Focus",
     value: `${drumLabels[lane]} ${step + 1}`,
     detail: `${percentLabel(velocity)} vel / ${percentLabel(chance)} chance / ${timingLabel(timing)} / x${repeat}`,
+    focusTarget: "compose",
+    focusLabel: "Compose",
     tone: chance < 1 || timing !== 0 || repeat > 1 ? "good" : "warn"
   };
 }
