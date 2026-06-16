@@ -1472,6 +1472,14 @@ type PatternPlaybackReadoutSummary = {
   tone: MixCoachTone;
 };
 
+type ArrangementPlaybackReadoutSummary = {
+  roleLabel: string;
+  statusLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type KeyboardCapturePostureSummary = {
   roleLabel: string;
   statusLabel: string;
@@ -2060,6 +2068,11 @@ export function App(): ReactElement {
       ? playbackPosition.arrangementIndex
       : null;
   const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
+  const arrangementPlaybackReadout = createArrangementPlaybackReadoutSummary(
+    project,
+    selectedArrangementIndex,
+    playingArrangementIndex
+  );
   const selectedArrangementBars = selectedArrangementBlock ? normalizeArrangementBars(selectedArrangementBlock.bars) : 1;
   const selectedArrangementStartBar = arrangementStartBar(project, selectedArrangementIndex);
   const transportLoopMode = transportLoopScope === "pattern" ? "pattern" : "arrangement";
@@ -5767,6 +5780,15 @@ export function App(): ReactElement {
             </div>
           </div>
           <ArrangementFocusPanel summary={selectedArrangementFocus} onApply={applyArrangementFocusPreset} />
+          <div
+            className={["arrangement-playback-readout", arrangementPlaybackReadout.tone].join(" ")}
+            data-testid="arrangement-playback-readout"
+            title={arrangementPlaybackReadout.detailTitle}
+          >
+            <span data-testid="arrangement-playback-label">{arrangementPlaybackReadout.roleLabel}</span>
+            <strong data-testid="arrangement-playback-status">{arrangementPlaybackReadout.statusLabel}</strong>
+            <small data-testid="arrangement-playback-detail">{arrangementPlaybackReadout.detailLabel}</small>
+          </div>
           <div className="arrangement-track">
             {project.arrangement.map((block, index) => {
               const selected = selectedArrangementIndex === index;
@@ -9053,6 +9075,71 @@ function createPatternPlaybackReadoutSummary(
   }
 
   const detailLabel = `${selectedEventCount} edit / ${playingEventCount ?? "audible"} heard`;
+  return {
+    roleLabel,
+    statusLabel,
+    detailLabel,
+    detailTitle: `${roleLabel} / ${statusLabel} / ${detailLabel}`,
+    tone: "warn"
+  };
+}
+
+function createArrangementPlaybackReadoutSummary(
+  project: ProjectState,
+  selectedIndex: number,
+  playingIndex: number | null
+): ArrangementPlaybackReadoutSummary {
+  const boundedSelectedIndex = Math.min(Math.max(0, selectedIndex), project.arrangement.length - 1);
+  const selectedBlock = project.arrangement[boundedSelectedIndex];
+  if (!selectedBlock) {
+    return {
+      roleLabel: "No block",
+      statusLabel: "Arrangement idle",
+      detailLabel: "Create a block",
+      detailTitle: "Arrangement has no block selected or available for playback context.",
+      tone: "danger"
+    };
+  }
+
+  const selectedLabel = `Block ${boundedSelectedIndex + 1} ${selectedBlock.section}`;
+  const roleLabel = `Editing ${selectedLabel}`;
+  const selectedDetail = `Pattern ${selectedBlock.pattern} / ${barCountLabel(selectedBlock.bars)}`;
+
+  if (playingIndex === null) {
+    return {
+      roleLabel,
+      statusLabel: "Arrangement idle",
+      detailLabel: selectedDetail,
+      detailTitle: `${roleLabel} / playback stopped / ${selectedDetail}`,
+      tone: "warn"
+    };
+  }
+
+  const boundedPlayingIndex = Math.min(Math.max(0, playingIndex), project.arrangement.length - 1);
+  const playingBlock = project.arrangement[boundedPlayingIndex];
+  if (!playingBlock) {
+    return {
+      roleLabel,
+      statusLabel: "Hearing Arrangement",
+      detailLabel: selectedDetail,
+      detailTitle: `${roleLabel} / arrangement playback snapshot has no matching block / ${selectedDetail}`,
+      tone: "warn"
+    };
+  }
+
+  const playingLabel = `Block ${boundedPlayingIndex + 1} ${playingBlock.section}`;
+  const statusLabel = `Hearing ${playingLabel}`;
+  if (boundedPlayingIndex === boundedSelectedIndex) {
+    return {
+      roleLabel,
+      statusLabel,
+      detailLabel: `${selectedDetail} live`,
+      detailTitle: `${roleLabel} / ${statusLabel} / ${selectedDetail} live`,
+      tone: "good"
+    };
+  }
+
+  const detailLabel = `Pattern ${selectedBlock.pattern} edit / Pattern ${playingBlock.pattern} heard`;
   return {
     roleLabel,
     statusLabel,
