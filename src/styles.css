@@ -139,6 +139,8 @@ h2 {
 .bassline-pad-row button span,
 .bass-glide-heading span,
 .bass-glide-row button span,
+.bass-contour-heading span,
+.bass-contour-row button span,
 .melody-motif-heading span,
 .melody-motif-row button span,
 .melody-accent-heading span,
@@ -258,6 +260,7 @@ h2 {
 .master-finish-row button,
 .bassline-pad-row button,
 .bass-glide-row button,
+.bass-contour-row button,
 .melody-motif-row button,
 .melody-accent-row button,
 .melody-contour-row button,
@@ -369,6 +372,7 @@ h2 {
 .master-finish-row button,
 .bassline-pad-row button,
 .bass-glide-row button,
+.bass-contour-row button,
 .melody-motif-row button,
 .melody-accent-row button,
 .melody-contour-row button,
@@ -2854,6 +2858,62 @@ input[type="range"] {
 }
 
 .bass-glide-row button small {
+  color: rgba(244, 239, 231, 0.48);
+  font-size: 10px;
+}
+
+.bass-contour-panel {
+  display: grid;
+  gap: 8px;
+  margin-block-end: 8px;
+  border: 1px solid rgba(255, 160, 118, 0.2);
+  border-radius: 7px;
+  background: rgba(255, 160, 118, 0.055);
+  padding: 10px;
+}
+
+.bass-contour-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bass-contour-heading strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.bass-contour-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.bass-contour-row button {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.bass-contour-row button span,
+.bass-contour-row button strong,
+.bass-contour-row button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bass-contour-row button strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.bass-contour-row button small {
   color: rgba(244, 239, 231, 0.48);
   font-size: 10px;
 }

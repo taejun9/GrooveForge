@@ -520,6 +520,19 @@ type BassGlidePadOption = BassGlidePadDefinition & {
   glideCount: number;
 };
 
+type BassContourId = "root" | "rise" | "drop" | "answer";
+
+type BassContourDefinition = {
+  id: BassContourId;
+  label: string;
+  detail: string;
+};
+
+type BassContourOption = BassContourDefinition & {
+  preview: string;
+  pitchSpan: string;
+};
+
 type PatternStackId = "pocket" | "hook" | "lift" | "break";
 
 type PatternStackDefinition = {
@@ -930,6 +943,13 @@ const bassGlidePadDefinitions: BassGlidePadDefinition[] = [
   { id: "hold", label: "Hold", detail: "long sustain" }
 ];
 
+const bassContourDefinitions: BassContourDefinition[] = [
+  { id: "root", label: "Root", detail: "sub anchor" },
+  { id: "rise", label: "Rise", detail: "build lift" },
+  { id: "drop", label: "Drop", detail: "resolve low" },
+  { id: "answer", label: "Answer", detail: "call back" }
+];
+
 const melodyMotifDefinitions: MelodyMotifDefinition[] = [
   {
     id: "hook",
@@ -1121,6 +1141,10 @@ export function App(): ReactElement {
   );
   const basslinePadOptions = useMemo(() => createBasslinePadOptions(project.key), [project.key]);
   const bassGlidePadOptions = useMemo(() => createBassGlidePadOptions(currentPattern.bassNotes), [currentPattern.bassNotes]);
+  const bassContourOptions = useMemo(
+    () => createBassContourOptions(project.key, currentPattern.bassNotes),
+    [project.key, currentPattern.bassNotes]
+  );
   const melodyMotifOptions = useMemo(() => createMelodyMotifOptions(project.key), [project.key]);
   const melodyAccentOptions = useMemo(() => createMelodyAccentOptions(currentPattern.melodyNotes), [currentPattern.melodyNotes]);
   const melodyContourOptions = useMemo(
@@ -2396,6 +2420,35 @@ export function App(): ReactElement {
     );
     if (!changed) {
       setProjectStatus(`${pad.label} 808 glide already selected`);
+      return;
+    }
+
+    const firstNote = bassNotes[0];
+    setSelectedNote(firstNote ? { track: "bass", step: firstNote.step, pitch: firstNote.pitch } : null);
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
+  }
+
+  function applyBassContour(contourId: BassContourId): void {
+    const contour = bassContourDefinitions.find((candidate) => candidate.id === contourId);
+    if (!contour) {
+      setProjectStatus("808 contour pad not found");
+      return;
+    }
+
+    const currentBassNotes = projectRef.current.patterns[projectRef.current.selectedPattern].bassNotes;
+    if (currentBassNotes.length === 0) {
+      setProjectStatus(`Add an 808 note before using ${contour.label} contour`);
+      return;
+    }
+
+    const bassNotes = applyBassContourToNotes(projectRef.current.key, currentBassNotes, contour.id);
+    const changed = updateCurrentPattern(
+      (pattern) => (sameBassNotes(pattern.bassNotes, bassNotes) ? pattern : { ...pattern, bassNotes }),
+      `${contour.label} 808 contour applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (!changed) {
+      setProjectStatus(`${contour.label} 808 contour already selected`);
       return;
     }
 
@@ -3794,6 +3847,7 @@ export function App(): ReactElement {
           />
           <BasslinePads pads={basslinePadOptions} onApply={applyBasslinePad} />
           <BassGlidePads pads={bassGlidePadOptions} onApply={applyBassGlidePad} />
+          <BassContourPads contours={bassContourOptions} onApply={applyBassContour} />
           <MelodyMotifPads motifs={melodyMotifOptions} onApply={applyMelodyMotif} />
           <MelodyAccentPads accents={melodyAccentOptions} onApply={applyMelodyAccent} />
           <MelodyContourPads contours={melodyContourOptions} onApply={applyMelodyContour} />
@@ -7775,6 +7829,38 @@ function BassGlidePads({
   );
 }
 
+function BassContourPads({
+  contours,
+  onApply
+}: {
+  contours: BassContourOption[];
+  onApply: (contour: BassContourId) => void;
+}): ReactElement {
+  return (
+    <div className="bass-contour-panel" data-testid="bass-contour-pads">
+      <div className="bass-contour-heading">
+        <span>808 Contour</span>
+        <strong>Pitch Shape</strong>
+      </div>
+      <div className="bass-contour-row" aria-label="808 Contour Pads">
+        {contours.map((contour) => (
+          <button
+            data-testid={`bass-contour-${contour.id}`}
+            key={contour.id}
+            onClick={() => onApply(contour.id)}
+            title={`${contour.label} ${contour.preview}`}
+            type="button"
+          >
+            <span>{contour.label}</span>
+            <strong>{contour.preview}</strong>
+            <small>{contour.pitchSpan} / {contour.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MelodyMotifPads({
   motifs,
   onApply
@@ -9128,6 +9214,60 @@ function bassGlidePadProbability(index: number, noteCount: number, padId: BassGl
     return normalizeEventProbability(index === noteCount - 1 ? 0.96 : 1);
   }
   return normalizeEventProbability(1);
+}
+
+function createBassContourOptions(key: string, notes: BassNote[]): BassContourOption[] {
+  return bassContourDefinitions.map((contour) => {
+    const transformed = applyBassContourToNotes(key, notes, contour.id);
+    return {
+      ...contour,
+      preview: transformed.length === 0 ? "add 808" : `${transformed[0]?.pitch ?? "-"}>${transformed[transformed.length - 1]?.pitch ?? "-"}`,
+      pitchSpan: bassPitchSpanLabel(transformed)
+    };
+  });
+}
+
+function applyBassContourToNotes(key: string, notes: BassNote[], contourId: BassContourId): BassNote[] {
+  const pitches = bassPitchLanes(key);
+  if (notes.length === 0 || pitches.length === 0) {
+    return notes;
+  }
+
+  const orderedNotes = sortBassNotes(notes);
+  return sortBassNotes(
+    orderedNotes.map((note, index) => ({
+      ...note,
+      pitch: pitches[bassContourPitchIndex(index, orderedNotes.length, pitches, contourId)] ?? note.pitch
+    }))
+  );
+}
+
+function bassContourPitchIndex(
+  index: number,
+  noteCount: number,
+  pitches: string[],
+  contourId: BassContourId
+): number {
+  const fifth = Math.min(pitches.length - 1, 4);
+  if (contourId === "root") {
+    return index % 4 === 3 ? fifth : 0;
+  }
+  if (contourId === "rise") {
+    return Math.min(pitches.length - 1, Math.max(0, index));
+  }
+  if (contourId === "drop") {
+    return Math.max(0, fifth - index);
+  }
+  const half = Math.max(1, Math.ceil(noteCount / 2));
+  return index < half ? Math.min(pitches.length - 1, index * 2) : Math.max(0, fifth - (index - half) * 2);
+}
+
+function bassPitchSpanLabel(notes: BassNote[]): string {
+  if (notes.length === 0) {
+    return "0 notes";
+  }
+  const uniquePitches = new Set(notes.map((note) => note.pitch));
+  return `${uniquePitches.size} pitches`;
 }
 
 function sameBassNotes(first: BassNote[], second: BassNote[]): boolean {
