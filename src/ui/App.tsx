@@ -1410,6 +1410,14 @@ type EditHistoryReadoutSummary = {
   tone: MixCoachTone;
 };
 
+type KeyboardCapturePostureSummary = {
+  roleLabel: string;
+  statusLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type HandoffPackItem = {
   id: "wav" | "stems" | "midi" | "sheet";
   label: string;
@@ -2031,6 +2039,12 @@ export function App(): ReactElement {
     currentPattern,
     keyboardCaptureTarget,
     selectedNote?.track === keyboardCaptureTarget ? selectedNote.step + 1 : 0
+  );
+  const keyboardCapturePosture = createKeyboardCapturePostureSummary(
+    keyboardCaptureEnabled,
+    keyboardCaptureTarget,
+    activeKeyboardCaptureDefaults,
+    keyboardCaptureNextStep
   );
   const chordRootOptions = useMemo(
     () => mergeChordRoots(scalePitchNames(project.key), currentPattern.chordEvents.map((event) => event.root)),
@@ -4865,6 +4879,15 @@ export function App(): ReactElement {
             <span data-testid="edit-history-status">{editHistoryReadout.statusLabel}</span>
             <strong data-testid="edit-history-label">{editHistoryReadout.roleLabel}</strong>
             <small data-testid="edit-history-detail">{editHistoryReadout.detailLabel}</small>
+          </div>
+          <div
+            className={`keyboard-capture-posture ${keyboardCapturePosture.tone}`}
+            data-testid="keyboard-capture-posture"
+            title={keyboardCapturePosture.detailTitle}
+          >
+            <span data-testid="keyboard-capture-posture-status">{keyboardCapturePosture.statusLabel}</span>
+            <strong data-testid="keyboard-capture-posture-label">{keyboardCapturePosture.roleLabel}</strong>
+            <small data-testid="keyboard-capture-posture-detail">{keyboardCapturePosture.detailLabel}</small>
           </div>
           <div className="segmented playback-mode-row" aria-label="Transport loop">
             <button
@@ -14125,6 +14148,28 @@ function createKeyboardCaptureKeyMap(pitches: string[]): KeyboardCaptureKeyMapIt
     pitch: pitches[index] ?? null,
     degreeLabel: pitches[index] ? keyboardCaptureDegreeLabel(index) : null
   }));
+}
+
+function createKeyboardCapturePostureSummary(
+  enabled: boolean,
+  target: NoteTrack,
+  defaults: KeyboardCaptureDefaults,
+  nextStep: number
+): KeyboardCapturePostureSummary {
+  const targetLabel = target === "bass" ? "808" : "Synth";
+  const statusLabel = enabled ? "Capture armed" : "Capture off";
+  const detailLabel =
+    target === "bass"
+      ? `Step ${nextStep + 1} / Oct ${defaults.octave} / Len ${defaults.length} / ${defaults.glide ? "Glide on" : "Glide off"}`
+      : `Step ${nextStep + 1} / Oct ${defaults.octave} / Len ${defaults.length} / Vel ${Math.round(defaults.velocity * 100)}%`;
+
+  return {
+    roleLabel: `${targetLabel} keys`,
+    statusLabel,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${targetLabel} target / ${detailLabel}`,
+    tone: enabled ? "good" : "warn"
+  };
 }
 
 function keyboardCapturePitchForKey(key: KeyboardCaptureKey, pitches: string[]): string | null {
