@@ -155,6 +155,8 @@ h2 {
 .chord-voicing-row button span,
 .sound-focus-heading span,
 .sound-focus-row button span,
+.drum-kit-heading span,
+.drum-kit-row button span,
 .mix-balance-heading span,
 .mix-balance-row button span,
 .master-finish-heading span,
@@ -259,6 +261,7 @@ h2 {
 .chord-rhythm-row button,
 .chord-voicing-row button,
 .sound-focus-row button,
+.drum-kit-row button,
 .mix-balance-row button,
 .master-finish-row button,
 .bassline-pad-row button,
@@ -314,6 +317,7 @@ h2 {
 .chord-rhythm-row button:disabled,
 .chord-voicing-row button:disabled,
 .sound-focus-row button:disabled,
+.drum-kit-row button:disabled,
 .mix-balance-row button:disabled,
 .master-finish-row button:disabled,
 .block-pattern-row button:disabled {
@@ -372,6 +376,7 @@ h2 {
 .chord-rhythm-row button,
 .chord-voicing-row button,
 .sound-focus-row button,
+.drum-kit-row button,
 .mix-balance-row button,
 .master-finish-row button,
 .bassline-pad-row button,
@@ -3362,6 +3367,67 @@ input[type="range"] {
   border-color: rgba(120, 240, 200, 0.66);
   color: #11100f;
   background: #78f0c8;
+}
+
+.drum-kit-panel {
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(255, 122, 79, 0.18);
+  border-radius: 7px;
+  background: rgba(255, 122, 79, 0.05);
+  padding: 9px;
+}
+
+.drum-kit-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.drum-kit-heading strong {
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 11px;
+}
+
+.drum-kit-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.drum-kit-row button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.drum-kit-row button span,
+.drum-kit-row button strong,
+.drum-kit-row button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drum-kit-row button span {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 11px;
+}
+
+.drum-kit-row button strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.drum-kit-row button small {
+  color: rgba(244, 239, 231, 0.48);
+  font-size: 10px;
 }
 
 .sound-focus-panel {

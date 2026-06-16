@@ -305,6 +305,37 @@ const soundFocusPadDefinitions: SoundFocusPadDefinition[] = [
   }
 ];
 
+const drumKitPadDefinitions: DrumKitPadDefinition[] = [
+  {
+    id: "clean",
+    label: "Clean",
+    detail: "balanced",
+    sound: { kickPunch: 0.58, snareSnap: 0.58, hatBrightness: 0.64 },
+    mixer: { volumeDb: -5, lowCut: 0.08, air: 0.22, drive: 0.08, glue: 0.18, send: 0.08 }
+  },
+  {
+    id: "knock",
+    label: "Knock",
+    detail: "front",
+    sound: { kickPunch: 0.9, snareSnap: 0.78, hatBrightness: 0.58 },
+    mixer: { volumeDb: -3.8, lowCut: 0.06, air: 0.22, drive: 0.22, glue: 0.34, send: 0.06 }
+  },
+  {
+    id: "dust",
+    label: "Dust",
+    detail: "warm",
+    sound: { kickPunch: 0.52, snareSnap: 0.44, hatBrightness: 0.34 },
+    mixer: { volumeDb: -5.6, lowCut: 0.14, air: 0.08, drive: 0.2, glue: 0.3, send: 0.18 }
+  },
+  {
+    id: "air",
+    label: "Air",
+    detail: "bright",
+    sound: { kickPunch: 0.46, snareSnap: 0.64, hatBrightness: 0.9 },
+    mixer: { volumeDb: -5.2, lowCut: 0.1, air: 0.42, drive: 0.1, glue: 0.16, send: 0.22 }
+  }
+];
+
 const masterFinishPadDefinitions: MasterFinishPadDefinition[] = [
   {
     id: "demo",
@@ -415,6 +446,23 @@ type SoundFocusPadDefinition = {
 };
 
 type SoundFocusPadOption = SoundFocusPadDefinition & {
+  preview: string;
+  changedCount: number;
+};
+
+type DrumKitPadId = "clean" | "knock" | "dust" | "air";
+
+type DrumKitSoundParameter = "kickPunch" | "snareSnap" | "hatBrightness";
+
+type DrumKitPadDefinition = {
+  id: DrumKitPadId;
+  label: string;
+  detail: string;
+  sound: Record<DrumKitSoundParameter, number>;
+  mixer: MixBalanceChannelUpdate;
+};
+
+type DrumKitPadOption = DrumKitPadDefinition & {
   preview: string;
   changedCount: number;
 };
@@ -1158,6 +1206,7 @@ export function App(): ReactElement {
   const activeChannelLabel = `${activeChannels} active ${activeChannels === 1 ? "channel" : "channels"}`;
   const mixBalancePadOptions = useMemo(() => createMixBalancePadOptions(project.mixer), [project.mixer]);
   const soundFocusPadOptions = useMemo(() => createSoundFocusPadOptions(project.sound), [project.sound]);
+  const drumKitPadOptions = useMemo(() => createDrumKitPadOptions(project), [project]);
   const masterFinishPadOptions = useMemo(() => createMasterFinishPadOptions(project), [project]);
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
@@ -2020,6 +2069,23 @@ export function App(): ReactElement {
       setSelectedChordIndex(null);
     } else {
       setProjectStatus(`${pad.label} sound focus already selected`);
+    }
+  }
+
+  function applyDrumKitPad(padId: DrumKitPadId): void {
+    const pad = drumKitPadDefinitions.find((definition) => definition.id === padId);
+    if (!pad) {
+      setProjectStatus("Drum kit pad not found");
+      return;
+    }
+
+    const changed = updateProject((current) => applyDrumKitPadToProject(current, pad), `${pad.label} drum kit applied`);
+    if (changed) {
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+    } else {
+      setProjectStatus(`${pad.label} drum kit already selected`);
     }
   }
 
@@ -3989,10 +4055,12 @@ export function App(): ReactElement {
             <Device icon={<SlidersHorizontal size={17} />} name="Chord Tone" value={`warm ${percentLabel(project.sound.chordWarmth)}`} color="#d58cff" />
           </div>
           <SoundDesigner
+            drumKitPads={drumKitPadOptions}
             focusPads={soundFocusPadOptions}
             mode={project.mode}
             sound={project.sound}
             onChange={updateSoundDesign}
+            onDrumKitPad={applyDrumKitPad}
             onFocusPad={applySoundFocusPad}
             onPreset={applySoundPreset}
           />
@@ -7234,6 +7302,66 @@ const soundFocusParameters: SoundFocusParameter[] = [
   "chordWidth"
 ];
 
+const drumKitSoundParameters: DrumKitSoundParameter[] = ["kickPunch", "snareSnap", "hatBrightness"];
+
+function createDrumKitPadOptions(project: ProjectState): DrumKitPadOption[] {
+  return drumKitPadDefinitions.map((pad) => {
+    const transformed = applyDrumKitPadToProject(project, pad);
+    return {
+      ...pad,
+      preview: drumKitPadPreview(pad),
+      changedCount: drumKitPadChangedCount(project, transformed)
+    };
+  });
+}
+
+function drumKitPadPreview(pad: DrumKitPadDefinition): string {
+  return `K ${compactUnitPercent(pad.sound.kickPunch)} / H ${compactUnitPercent(pad.sound.hatBrightness)}`;
+}
+
+function applyDrumKitPadToProject(project: ProjectState, pad: DrumKitPadDefinition): ProjectState {
+  const sound: SoundDesign = {
+    ...project.sound,
+    preset: "custom"
+  };
+  drumKitSoundParameters.forEach((parameter) => {
+    sound[parameter] = clampUnit(pad.sound[parameter]);
+  });
+
+  const mixer = project.mixer.map((channel) => {
+    if (channel.id !== "drum_rack") {
+      return channel;
+    }
+    return {
+      ...channel,
+      volumeDb: pad.mixer.volumeDb === undefined ? channel.volumeDb : clampMixFixVolume(pad.mixer.volumeDb),
+      pan: pad.mixer.pan === undefined ? channel.pan : clampPan(pad.mixer.pan),
+      lowCut: pad.mixer.lowCut === undefined ? channel.lowCut : normalizeMixerEq(pad.mixer.lowCut),
+      air: pad.mixer.air === undefined ? channel.air : normalizeMixerEq(pad.mixer.air),
+      drive: pad.mixer.drive === undefined ? channel.drive : normalizeMixerEq(pad.mixer.drive),
+      glue: pad.mixer.glue === undefined ? channel.glue : normalizeMixerEq(pad.mixer.glue),
+      send: pad.mixer.send === undefined ? channel.send : normalizeMixerEq(pad.mixer.send)
+    };
+  });
+
+  const nextProject = {
+    ...project,
+    sound,
+    mixer
+  };
+  return drumKitPadChangedCount(project, nextProject) === 0 ? project : nextProject;
+}
+
+function drumKitPadChangedCount(current: ProjectState, nextProject: ProjectState): number {
+  const currentDrums = current.mixer.find((channel) => channel.id === "drum_rack");
+  const nextDrums = nextProject.mixer.find((channel) => channel.id === "drum_rack");
+  return [
+    ...drumKitSoundParameters.map((parameter) => current.sound[parameter] !== nextProject.sound[parameter]),
+    current.sound.preset !== nextProject.sound.preset,
+    !sameMixerChannel(currentDrums, nextDrums)
+  ].filter(Boolean).length;
+}
+
 function createSoundFocusPadOptions(sound: SoundDesign): SoundFocusPadOption[] {
   return soundFocusPadDefinitions.map((pad) => {
     const transformed = applySoundFocusPadToSound(sound, pad);
@@ -8372,16 +8500,20 @@ function Device({
 }
 
 function SoundDesigner({
+  drumKitPads,
   focusPads,
   mode,
   sound,
+  onDrumKitPad,
   onFocusPad,
   onPreset,
   onChange
 }: {
+  drumKitPads: DrumKitPadOption[];
   focusPads: SoundFocusPadOption[];
   mode: ProjectState["mode"];
   sound: SoundDesign;
+  onDrumKitPad: (pad: DrumKitPadId) => void;
   onFocusPad: (pad: SoundFocusPadId) => void;
   onPreset: (preset: (typeof soundPresetIds)[number]) => void;
   onChange: (update: Partial<Omit<SoundDesign, "preset">>) => void;
@@ -8405,6 +8537,7 @@ function SoundDesigner({
           </button>
         ))}
       </div>
+      <DrumKitPads pads={drumKitPads} onApply={onDrumKitPad} />
       <SoundFocusPads pads={focusPads} onApply={onFocusPad} />
       <div className="sound-readout" aria-label="Sound design state">
         <span data-testid="sound-kick-readout">Kick {percentLabel(sound.kickPunch)}</span>
@@ -8477,6 +8610,38 @@ function SoundDesigner({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function DrumKitPads({
+  pads,
+  onApply
+}: {
+  pads: DrumKitPadOption[];
+  onApply: (pad: DrumKitPadId) => void;
+}): ReactElement {
+  return (
+    <div className="drum-kit-panel" data-testid="drum-kit-pads">
+      <div className="drum-kit-heading">
+        <span>Drum Kit</span>
+        <strong>Kick / Clap / Hat</strong>
+      </div>
+      <div className="drum-kit-row" aria-label="Drum Kit Pads">
+        {pads.map((pad) => (
+          <button
+            data-testid={`drum-kit-${pad.id}`}
+            key={pad.id}
+            onClick={() => onApply(pad.id)}
+            title={`${pad.label} ${pad.preview}`}
+            type="button"
+          >
+            <span>{pad.label}</span>
+            <strong>{pad.preview}</strong>
+            <small>{pad.changedCount} moves / {pad.detail}</small>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
