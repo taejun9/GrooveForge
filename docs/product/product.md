@@ -89,6 +89,7 @@ Primary feature areas:
 - Next Move: explicit local action recommendations that connect readiness/export state to Blueprint, target alignment, Pattern Fill, Pattern Chain, Hook Lift, Master Finish, Save Slot, and Mix Check commands.
 - Quick Actions: searchable local command palette for transport, project, creative, arrangement, mix, master finish, and export actions.
 - Project snapshots: local idea slots for saving, renaming, restoring, and deleting beat states inside the project file.
+- Snapshot Compare: local read-only comparison of the current beat against saved Project Snapshots by setup, arrangement length, readiness, export, stems, and master posture.
 - Mixer/master: volume, pan, mute, solo, Stem Audition Pads for Full Mix/Drums/808/Synth/Chords solo checks, Mix Balance Pads for one-click editable rough balance, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Mix Fix actions, Master Finish Pads for editable demo/vocal/store/club output posture, master preset ceiling, limiter, loudness/peak metering.
 - Export: WAV export, stem export, arrangement MIDI export, and local Handoff Sheet text export after the event/render paths are reliable.
 
@@ -167,6 +168,7 @@ MVP capabilities:
 - Pattern Chain presets, per-step A/B/C cycling, and Chain Expand song-form outlining that edit only arrangement block assignments while preserving Pattern A/B/C musical event data, mixer state, sound design, master state, and existing export paths.
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes.
 - Project Snapshots that save, rename, restore, and delete local beat idea states inside the `.grooveforge.json` file without cloud sync or nested snapshot recursion.
+- Snapshot Compare derived from local current project state and saved Project Snapshot payloads so users can compare setup, arrangement length, readiness, export, stems, and master posture without restoring, deleting, renaming, saving, or mutating the beat.
 - Desktop editing shortcuts, Keyboard Capture, and Quick Actions command search for arrangement playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, redo, snapshots, blueprints, pattern fills, Arrangement Focus, mix fixes, master finish, and export while leaving focused inputs alone.
 - Transport playback modes for full arrangement playback by default, selected-block loop audition, and fast selected-pattern preview while editing.
 - Realtime metronome toggle with accented downbeat clicks that helps users program to the grid during playback without adding click audio to WAV or stem export.

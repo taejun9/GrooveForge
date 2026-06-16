@@ -925,6 +925,32 @@ type ReviewQueueSummary = {
   items: ReviewQueueItem[];
 };
 
+type SnapshotCompareMetricId = "setup" | "length" | "readiness" | "export" | "stems" | "master";
+
+type SnapshotCompareMetric = {
+  id: SnapshotCompareMetricId;
+  label: string;
+  current: string;
+  snapshot: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type SnapshotCompareCard = {
+  id: string;
+  name: string;
+  detail: string;
+  tone: MixCoachTone;
+  metrics: SnapshotCompareMetric[];
+};
+
+type SnapshotCompareSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: SnapshotCompareCard[];
+};
+
 type HandoffPackItem = {
   id: "wav" | "stems" | "midi" | "sheet";
   label: string;
@@ -1329,6 +1355,7 @@ export function App(): ReactElement {
     () => createReviewQueueSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
+  const snapshotCompareSummary = useMemo(() => createSnapshotCompareSummary(project), [project]);
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
   const styleInspectorSummary = useMemo(
     () => createStyleInspectorSummary(project, style, patternCompareSummaries),
@@ -3984,6 +4011,8 @@ export function App(): ReactElement {
         onSave={saveCurrentSnapshot}
       />
 
+      <SnapshotCompare summary={snapshotCompareSummary} />
+
       <section className="workspace-grid">
         <section className="panel pattern-panel" aria-label="Pattern editor">
           <PanelTitle icon={<Drum size={18} />} title="Drums" meta="16 step rack" />
@@ -5546,6 +5575,50 @@ function ProjectSnapshots({
   );
 }
 
+function SnapshotCompare({ summary }: { summary: SnapshotCompareSummary }): ReactElement {
+  return (
+    <section className={`snapshot-compare ${summary.tone}`} data-testid="snapshot-compare" aria-label="Snapshot compare">
+      <div className="snapshot-compare-heading">
+        <div>
+          <Copy size={16} aria-hidden="true" />
+          <span>Snapshot Compare</span>
+        </div>
+        <strong data-testid="snapshot-compare-headline">{summary.headline}</strong>
+        <small data-testid="snapshot-compare-detail">{summary.detail}</small>
+      </div>
+      {summary.cards.length === 0 ? (
+        <div className="snapshot-compare-empty" data-testid="snapshot-compare-empty">
+          <span>Save a slot to compare takes</span>
+        </div>
+      ) : (
+        <div className="snapshot-compare-grid" data-testid="snapshot-compare-grid">
+          {summary.cards.map((card) => (
+            <div className={`snapshot-compare-card ${card.tone}`} data-testid={`snapshot-compare-${card.id}`} key={card.id}>
+              <div className="snapshot-compare-card-heading">
+                <strong>{card.name}</strong>
+                <small>{card.detail}</small>
+              </div>
+              <div className="snapshot-compare-metrics">
+                {card.metrics.map((metric) => (
+                  <div
+                    className={`snapshot-compare-metric ${metric.tone}`}
+                    data-testid={`snapshot-compare-${card.id}-${metric.id}`}
+                    key={metric.id}
+                  >
+                    <span>{metric.label}</span>
+                    <strong>{metric.snapshot}</strong>
+                    <small>{metric.detail}</small>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function BeatReadiness({ checks }: { checks: BeatReadinessCheck[] }): ReactElement {
   const readyCount = checks.filter((check) => check.tone === "good").length;
 
@@ -6537,6 +6610,161 @@ function createBeatPassportSummary(
       }
     ]
   };
+}
+
+type SnapshotCompareProjectProfile = {
+  setup: string;
+  targetName: string;
+  bars: number;
+  length: string;
+  readyCount: number;
+  readiness: string;
+  readinessTone: MixCoachTone;
+  exportStatus: string;
+  exportDetail: string;
+  exportTone: MixCoachTone;
+  stemCount: number;
+  stemGoal: number;
+  stems: string;
+  stemTone: MixCoachTone;
+  master: string;
+  masterDetail: string;
+};
+
+function createSnapshotCompareSummary(project: ProjectState): SnapshotCompareSummary {
+  const current = createSnapshotCompareProjectProfile(project);
+
+  if (project.snapshots.length === 0) {
+    return {
+      headline: "No saved takes yet",
+      detail: `${current.setup} / ${current.length} / ${current.targetName}`,
+      tone: "warn",
+      cards: []
+    };
+  }
+
+  const cards = project.snapshots.map((snapshot) => createSnapshotCompareCard(current, snapshot));
+  const tone = weakestTone(cards.map((card) => card.tone));
+
+  return {
+    headline: `${project.snapshots.length} saved take${project.snapshots.length === 1 ? "" : "s"} to compare`,
+    detail: `${project.snapshots.length}/${maxProjectSnapshots} slots / current ${current.length} / ${current.targetName}`,
+    tone,
+    cards
+  };
+}
+
+function createSnapshotCompareCard(
+  current: SnapshotCompareProjectProfile,
+  snapshot: ProjectSnapshot
+): SnapshotCompareCard {
+  const snapshotProject: ProjectState = {
+    ...snapshot.project,
+    snapshots: []
+  };
+  const saved = createSnapshotCompareProjectProfile(snapshotProject);
+  const metrics: SnapshotCompareMetric[] = [
+    {
+      id: "setup",
+      label: "Setup",
+      current: current.setup,
+      snapshot: saved.setup,
+      detail: saved.setup === current.setup ? "Matches current setup" : `Current ${current.setup}`,
+      tone: saved.setup === current.setup ? "good" : "warn"
+    },
+    {
+      id: "length",
+      label: "Length",
+      current: current.length,
+      snapshot: saved.length,
+      detail: saved.length === current.length ? "Same arrangement length" : `Current ${current.length}`,
+      tone: saved.bars < 8 ? "danger" : saved.length === current.length ? "good" : "warn"
+    },
+    {
+      id: "readiness",
+      label: "Ready",
+      current: current.readiness,
+      snapshot: saved.readiness,
+      detail: `Current ${current.readiness} / ${saved.readyCount - current.readyCount >= 0 ? "+" : ""}${saved.readyCount - current.readyCount}`,
+      tone:
+        saved.readinessTone === "danger"
+          ? "danger"
+          : saved.readyCount >= current.readyCount && saved.readinessTone === "good"
+            ? "good"
+            : "warn"
+    },
+    {
+      id: "export",
+      label: "Export",
+      current: current.exportStatus,
+      snapshot: saved.exportStatus,
+      detail: `Current ${current.exportStatus} / ${saved.exportDetail}`,
+      tone: saved.exportTone === "danger" ? "danger" : saved.exportStatus === current.exportStatus ? saved.exportTone : "warn"
+    },
+    {
+      id: "stems",
+      label: "Stems",
+      current: current.stems,
+      snapshot: saved.stems,
+      detail: `Current ${current.stems} / ${saved.stemCount}/${saved.stemGoal} target`,
+      tone: saved.stemTone
+    },
+    {
+      id: "master",
+      label: "Master",
+      current: current.master,
+      snapshot: saved.master,
+      detail: saved.masterDetail === current.masterDetail ? "Same master posture" : `Current ${current.master} / ${saved.masterDetail}`,
+      tone: saved.master === current.master && saved.masterDetail === current.masterDetail ? "good" : "warn"
+    }
+  ];
+
+  return {
+    id: snapshot.id,
+    name: snapshot.name,
+    detail: `${snapshotSavedDateLabel(snapshot.createdAt)} / ${saved.targetName} / ${saved.length}`,
+    tone: weakestTone(metrics.map((metric) => metric.tone)),
+    metrics
+  };
+}
+
+function createSnapshotCompareProjectProfile(project: ProjectState): SnapshotCompareProjectProfile {
+  const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const analysis = analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const checks = createBeatReadinessChecks(project, analysis);
+  const readyCount = checks.filter((check) => check.tone === "good").length;
+  const readinessTone = weakestTone(checks.map((check) => check.tone));
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const exportTone: MixCoachTone = analysis.status === "Ready" ? "good" : analysis.status === "Silent" ? "danger" : "warn";
+  const stemTone: MixCoachTone =
+    audibleStems.length >= target.stemGoal ? "good" : audibleStems.length >= 2 ? "warn" : "danger";
+
+  return {
+    setup: `${styleName} / ${project.key} / ${project.bpm} BPM`,
+    targetName: target.name,
+    bars,
+    length: barCountLabel(bars),
+    readyCount,
+    readiness: `${readyCount}/${checks.length}`,
+    readinessTone,
+    exportStatus: analysis.status,
+    exportDetail: `${formatDb(analysis.headroomDb)} headroom`,
+    exportTone,
+    stemCount: audibleStems.length,
+    stemGoal: target.stemGoal,
+    stems: `${audibleStems.length}/${target.stemGoal}`,
+    stemTone,
+    master: project.masterPreset,
+    masterDetail: `${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(masterChannelVolumeDb(project.mixer))} output`
+  };
+}
+
+function snapshotSavedDateLabel(createdAt: string): string {
+  const datePart = createdAt.trim().slice(0, 10);
+  return datePart.length === 10 ? datePart : "saved slot";
 }
 
 function createFinishChecklistSummary(
