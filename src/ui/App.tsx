@@ -562,6 +562,14 @@ type QuickAction = {
   run: () => void | Promise<void>;
 };
 
+type QuickActionScopeId = "all" | "transport" | "compose" | "arrange" | "mix" | "master" | "project" | "export";
+
+type QuickActionScopeOption = {
+  id: QuickActionScopeId;
+  label: string;
+  count: number;
+};
+
 type QuickActionResultMetric = {
   id: string;
   label: string;
@@ -2010,6 +2018,7 @@ export function App(): ReactElement {
   const [snapshotNameDrafts, setSnapshotNameDrafts] = useState<Record<string, string>>({});
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [quickActionQuery, setQuickActionQuery] = useState("");
+  const [quickActionScope, setQuickActionScope] = useState<QuickActionScopeId>("all");
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
@@ -5082,6 +5091,7 @@ export function App(): ReactElement {
 
   function openQuickActions(): void {
     setQuickActionQuery("");
+    setQuickActionScope("all");
     setQuickActionsOpen(true);
   }
 
@@ -5140,7 +5150,8 @@ export function App(): ReactElement {
     onTogglePlayback: togglePlayback,
     onUndo: undoProject
   });
-  const filteredQuickActions = filterQuickActions(quickActions, quickActionQuery);
+  const quickActionScopeOptions = createQuickActionScopeOptions(quickActions, quickActionQuery);
+  const filteredQuickActions = filterQuickActions(quickActions, quickActionQuery, quickActionScope);
 
   return (
     <main className="app-shell">
@@ -5365,9 +5376,12 @@ export function App(): ReactElement {
         actions={filteredQuickActions}
         open={quickActionsOpen}
         query={quickActionQuery}
+        scope={quickActionScope}
+        scopeOptions={quickActionScopeOptions}
         onClose={closeQuickActions}
         onQueryChange={setQuickActionQuery}
         onRun={runQuickAction}
+        onScopeChange={setQuickActionScope}
       />
 
       {localDraftRecovery && (
@@ -7150,16 +7164,22 @@ function QuickActions({
   actions,
   open,
   query,
+  scope,
+  scopeOptions,
   onClose,
   onQueryChange,
-  onRun
+  onRun,
+  onScopeChange
 }: {
   actions: QuickAction[];
   open: boolean;
   query: string;
+  scope: QuickActionScopeId;
+  scopeOptions: QuickActionScopeOption[];
   onClose: () => void;
   onQueryChange: (query: string) => void;
   onRun: (action: QuickAction) => void;
+  onScopeChange: (scope: QuickActionScopeId) => void;
 }): ReactElement | null {
   if (!open) {
     return null;
@@ -7206,6 +7226,24 @@ function QuickActions({
           type="search"
           value={query}
         />
+        <div className="quick-actions-scope-bar" data-testid="quick-actions-scope-bar" aria-label="Quick Action scopes">
+          {scopeOptions.map((option) => (
+            <button
+              aria-pressed={scope === option.id}
+              data-testid={`quick-actions-scope-${option.id}`}
+              key={option.id}
+              onClick={() => onScopeChange(option.id)}
+              title={`${option.label}: ${option.count} matching command${option.count === 1 ? "" : "s"}`}
+              type="button"
+            >
+              <span>{option.label}</span>
+              <strong data-testid={`quick-actions-scope-count-${option.id}`}>{option.count}</strong>
+            </button>
+          ))}
+        </div>
+        <div className="quick-actions-count" data-testid="quick-actions-count">
+          {actions.length} shown / {scopeOptions.find((option) => option.id === scope)?.count ?? 0} matching
+        </div>
         <div className="quick-actions-list" data-testid="quick-actions-list">
           {actions.length === 0 ? (
             <div className="quick-action-empty" data-testid="quick-actions-empty">
@@ -8516,18 +8554,62 @@ function createQuickActions({
   ];
 }
 
-function filterQuickActions(actions: QuickAction[], query: string): QuickAction[] {
+const quickActionScopeDefinitions: Array<Omit<QuickActionScopeOption, "count">> = [
+  { id: "all", label: "All" },
+  { id: "transport", label: "Transport" },
+  { id: "compose", label: "Compose" },
+  { id: "arrange", label: "Arrange" },
+  { id: "mix", label: "Mix" },
+  { id: "master", label: "Master" },
+  { id: "project", label: "Project" },
+  { id: "export", label: "Export" }
+];
+
+function filterQuickActions(actions: QuickAction[], query: string, scope: QuickActionScopeId): QuickAction[] {
+  return actions
+    .filter((action) => quickActionMatchesQuery(action, query) && quickActionMatchesScope(action, scope))
+    .slice(0, 12);
+}
+
+function createQuickActionScopeOptions(actions: QuickAction[], query: string): QuickActionScopeOption[] {
+  const queryMatches = actions.filter((action) => quickActionMatchesQuery(action, query));
+
+  return quickActionScopeDefinitions.map((definition) => ({
+    ...definition,
+    count: queryMatches.filter((action) => quickActionMatchesScope(action, definition.id)).length
+  }));
+}
+
+function quickActionMatchesQuery(action: QuickAction, query: string): boolean {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) {
-    return actions.slice(0, 12);
+    return true;
   }
+
   const terms = normalizedQuery.split(/\s+/);
-  return actions
-    .filter((action) => {
-      const tokens = quickActionSearchTokens(action);
-      return terms.every((term) => tokens.some((token) => token.startsWith(term)));
-    })
-    .slice(0, 12);
+  const tokens = quickActionSearchTokens(action);
+  return terms.every((term) => tokens.some((token) => token.startsWith(term)));
+}
+
+function quickActionMatchesScope(action: QuickAction, scope: QuickActionScopeId): boolean {
+  switch (scope) {
+    case "all":
+      return true;
+    case "transport":
+      return action.group === "Transport";
+    case "compose":
+      return action.group === "Create";
+    case "arrange":
+      return action.group === "Arrange";
+    case "mix":
+      return action.group === "Mix" && !action.id.startsWith("master-finish-");
+    case "master":
+      return action.id.startsWith("master-finish-");
+    case "project":
+      return action.group === "Project" || action.group === "Edit";
+    case "export":
+      return action.group === "Export";
+  }
 }
 
 function quickActionSearchTokens(action: QuickAction): string[] {

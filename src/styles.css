@@ -1813,7 +1813,7 @@ h2 {
 
 .quick-actions-panel {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   width: min(640px, calc(100vw - 48px));
   max-height: min(680px, calc(100vh - 120px));
   gap: 10px;
@@ -1864,6 +1864,58 @@ h2 {
   color: #f4efe7;
   background: #11100f;
   padding: 0 12px;
+}
+
+.quick-actions-scope-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.quick-actions-scope-bar button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 6px;
+  color: rgba(244, 239, 231, 0.72);
+  background: rgba(244, 239, 231, 0.045);
+  padding: 5px 7px;
+}
+
+.quick-actions-scope-bar button[aria-pressed="true"] {
+  border-color: rgba(120, 240, 200, 0.44);
+  color: #f4efe7;
+  background: rgba(120, 240, 200, 0.13);
+}
+
+.quick-actions-scope-bar button span,
+.quick-actions-scope-bar button strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-scope-bar button span {
+  font-size: 11px;
+}
+
+.quick-actions-scope-bar button strong {
+  color: #78f0c8;
+  font-size: 11px;
+}
+
+.quick-actions-count {
+  overflow: hidden;
+  color: rgba(244, 239, 231, 0.56);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .quick-actions-list {
