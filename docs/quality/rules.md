@@ -267,6 +267,8 @@ Concept correction work must preserve this center list in durable docs: Pattern 
 
 Concept correction work must preserve the user's intent that GrooveForge is for "비트(모든 장르)를 만드는" work, not a trap-only, sample-pack, or sampler-first product.
 
+Brief alignment work fails if the project can be summarized as a sampling app, sample-chopping tool, sample-pack workflow, or sampler setup surface. The expected summary is an all-genre beat-production mini DAW where sampling is an accessory module.
+
 First-run UX, default navigation, and roadmap work must lead with direct beat composition: pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sample browsing, chopping, sampler setup, audio clips, and audio warping must stay opt-in optional-sampling paths unless the user explicitly changes the product direction.
 
 Sampling placement work fails if the default empty project, first visible action, MVP proof, primary navigation, onboarding language, priority table, or plan title makes sample browsing, sample import, chopping, sampler setup, or audio clips appear before editable musical events and beat-making controls.

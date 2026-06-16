@@ -90,6 +90,8 @@ Sampling is an extension model, not a core dependency. When it is added, it can 
 
 Optional sampling schemas must preserve the existing event-first contract: `NoteEvent`, `DrumHitEvent`, and automation stay sufficient for a complete beat, while any future `AudioClipEvent` remains additive, opt-in, and absent from the core MVP proof.
 
+Sampling modules are leaf-level source or instrument devices, not root-level project architecture. They must plug into the existing track, arrangement, mixer/master, and export flow rather than requiring the product to start from sample browsing, chopping, loop stretching, or sampler setup.
+
 The core architecture should remain valid with no audio-file entities at all. Default project creation, playback, arrangement, save/load, and export must continue to start from musical events and built-in instruments; sample browsing, chopping, sampler mapping, and audio warping belong behind explicit optional-sampling entry points.
 
 Key and scale changes are composition edits over musical event data. They should retarget Pattern A/B/C bass notes, melody notes, and chord roots by scale degree before any future sampling module is considered part of the workflow.

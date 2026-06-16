@@ -27,6 +27,8 @@ BPM/key/style -> pattern programming -> drums -> 808/bass -> melody/chords -> so
 
 Optional sampling scope is intentionally subordinate: after core beat-making works, a future module may add audio import, chopping/slicing, pitch/stretch, one-shot mapping, or sampler instruments. It must attach as an opt-in sound source inside the workstation. A complete GrooveForge beat must still be possible with no imported audio.
 
+Concept audit rule: do not read any sampling reference as the main workflow. Sampling is an accessory module, not the app category. If a draft starts from sample import, sample browsing, chopping, loop stretching, one-shot mapping, or sampler setup, it is out of alignment until it is explicitly labeled optional sampling-phase work.
+
 Drafting rule: the default empty project, first visible actions, MVP proof, primary navigation, and new plan titles should lead with editable musical events and beat-making controls. Do not present optional sampling as a co-equal product spine.
 
 ## MVP Target
