@@ -41,6 +41,7 @@ button {
 }
 
 .transport-band,
+.local-draft-recovery,
 .mode-row,
 .mode-focus,
 .workflow-navigator,
@@ -78,6 +79,39 @@ button {
   min-height: 76px;
   padding: 14px;
   border-radius: 8px;
+}
+
+.local-draft-recovery {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 58px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border-color: rgba(120, 240, 200, 0.24);
+  background: rgba(23, 35, 32, 0.88);
+}
+
+.local-draft-recovery > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.local-draft-recovery strong {
+  font-size: 14px;
+}
+
+.local-draft-recovery span {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 12px;
+}
+
+.local-draft-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .brand-lockup,
@@ -280,6 +314,7 @@ h2 {
 .delivery-target-align,
 .session-brief-clear,
 .snapshot-heading button,
+.local-draft-actions button,
 .beat-map-actions button,
 .next-move-actions button,
 .snapshot-actions button,
@@ -343,6 +378,7 @@ h2 {
 .delivery-target-align:disabled,
 .session-brief-clear:disabled,
 .snapshot-heading button:disabled,
+.local-draft-actions button:disabled,
 .beat-map-actions button:disabled,
 .next-move-actions button:disabled,
 .snapshot-actions button:disabled,

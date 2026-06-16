@@ -182,6 +182,10 @@ const drumLabels: Record<DrumLane, string> = {
   perc: "Perc"
 };
 
+const localDraftStorageKey = "grooveforge.localDraft.v1";
+const localDraftRecordVersion = 1;
+const localDraftMaxCharacters = 1_500_000;
+
 const mixPostureOptions: { id: MixPosture; label: string }[] = [
   { id: "loose", label: "Loose sketch" },
   { id: "vocal_headroom", label: "Vocal headroom" },
@@ -418,6 +422,12 @@ type NoteClipboard =
     };
 
 type MixCoachTone = "good" | "warn" | "danger";
+
+type LocalDraftRecovery = {
+  savedAt: string;
+  project: ProjectState;
+  characterCount: number;
+};
 
 type MixCoachCheck = {
   id: string;
@@ -1768,7 +1778,11 @@ export function App(): ReactElement {
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [projectStatus, setProjectStatus] = useState("Demo project");
+  const [localDraftRecovery, setLocalDraftRecovery] = useState<LocalDraftRecovery | null>(() => readLocalDraftRecovery());
+  const [localDraftSavedAt, setLocalDraftSavedAt] = useState<string | null>(localDraftRecovery?.savedAt ?? null);
   const projectRef = useRef<ProjectState>(starterProject);
+  const localDraftReadyRef = useRef(false);
+  const localDraftSkipNextWriteRef = useRef(false);
   const controllerRef = useRef<PlaybackController | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const composePanelRef = useRef<HTMLElement | null>(null);
@@ -1862,6 +1876,7 @@ export function App(): ReactElement {
   const transportSecondary = isPlaying
     ? `${transportLoopLabel(transportLoopScope)} / Pattern ${playbackPosition?.pattern ?? project.selectedPattern} / Step ${(currentPatternStep ?? 0) + 1}`
     : transportLoopReadout;
+  const localDraftStatusLabel = localDraftSavedAt ? `Draft ${formatLocalDraftSavedAt(localDraftSavedAt)}` : "Draft local";
   const selectedArrangementNextBlock = project.arrangement[selectedArrangementIndex + 1];
   const selectedArrangementNextBars = selectedArrangementNextBlock ? normalizeArrangementBars(selectedArrangementNextBlock.bars) : 0;
   const selectedArrangementFocus = useMemo(
@@ -1981,6 +1996,22 @@ export function App(): ReactElement {
       controllerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!localDraftReadyRef.current) {
+      localDraftReadyRef.current = true;
+      return;
+    }
+    if (localDraftSkipNextWriteRef.current) {
+      localDraftSkipNextWriteRef.current = false;
+      return;
+    }
+
+    const savedAt = writeLocalDraft(project);
+    if (savedAt) {
+      setLocalDraftSavedAt(savedAt);
+    }
+  }, [project]);
 
   useEffect(() => {
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, project.arrangement.length - 1)));
@@ -2137,6 +2168,7 @@ export function App(): ReactElement {
 
   function replaceProject(nextProject: ProjectState, status: string): void {
     projectRef.current = nextProject;
+    localDraftSkipNextWriteRef.current = true;
     setProject(nextProject);
     setUndoStack([]);
     setRedoStack([]);
@@ -2147,6 +2179,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    clearLocalDraftState();
     setProjectStatus(status);
   }
 
@@ -2188,6 +2221,43 @@ export function App(): ReactElement {
     setRedoStack((history) => history.slice(1));
     setUndoStack((history) => appendHistory(history, current));
     restoreProjectFromHistory(nextProject, "Redo applied");
+  }
+
+  function clearLocalDraftState(): void {
+    clearLocalDraftStorage();
+    setLocalDraftRecovery(null);
+    setLocalDraftSavedAt(null);
+  }
+
+  function restoreLocalDraft(): void {
+    if (!localDraftRecovery) {
+      setProjectStatus("No local draft to restore");
+      return;
+    }
+
+    controllerRef.current?.stop();
+    controllerRef.current = null;
+    setPlaybackPosition(null);
+    setIsPlaying(false);
+
+    const draftProject = localDraftRecovery.project;
+    const changed = updateProject(
+      () => draftProject,
+      `Restored local draft ${formatLocalDraftSavedAt(localDraftRecovery.savedAt)}`
+    );
+    clearLocalDraftState();
+
+    if (changed) {
+      setSelectedArrangementIndex(0);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+    }
+  }
+
+  function clearLocalDraftRecovery(): void {
+    clearLocalDraftState();
+    setProjectStatus("Cleared local draft recovery");
   }
 
   function saveCurrentSnapshot(): void {
@@ -4219,11 +4289,15 @@ export function App(): ReactElement {
     try {
       const result = await window.grooveforge?.saveProject?.(contents, defaultName);
       if (result) {
+        if (!result.canceled) {
+          clearLocalDraftState();
+        }
         setProjectStatus(result.canceled ? "Save canceled" : `Saved ${fileDisplayName(result.filePath)}`);
         return;
       }
 
       downloadProjectFile(contents, defaultName);
+      clearLocalDraftState();
       setProjectStatus(`Downloaded ${defaultName}`);
     } catch (error) {
       console.error(error);
@@ -4766,6 +4840,14 @@ export function App(): ReactElement {
         onRun={runQuickAction}
       />
 
+      {localDraftRecovery && (
+        <LocalDraftRecoveryBanner
+          draft={localDraftRecovery}
+          onClear={clearLocalDraftRecovery}
+          onRestore={restoreLocalDraft}
+        />
+      )}
+
       <section className="mode-row" aria-label="Mode">
         <input
           ref={importInputRef}
@@ -4798,6 +4880,7 @@ export function App(): ReactElement {
           <span>{project.key}</span>
           <span>{activeChannelLabel}</span>
           <span>{project.masterPreset}</span>
+          <span data-testid="local-draft-status">{localDraftStatusLabel}</span>
           <span>{projectStatus}</span>
         </div>
       </section>
@@ -6317,6 +6400,39 @@ function SessionBriefPanel({
         <X size={14} aria-hidden="true" />
         <span>Clear</span>
       </button>
+    </section>
+  );
+}
+
+function LocalDraftRecoveryBanner({
+  draft,
+  onClear,
+  onRestore
+}: {
+  draft: LocalDraftRecovery;
+  onClear: () => void;
+  onRestore: () => void;
+}): ReactElement {
+  const bars = arrangementTotalBars(draft.project);
+
+  return (
+    <section className="local-draft-recovery" data-testid="local-draft-recovery" aria-label="Local draft recovery">
+      <div>
+        <strong data-testid="local-draft-title">Local draft found: {draft.project.title}</strong>
+        <span data-testid="local-draft-detail">
+          {formatLocalDraftSavedAt(draft.savedAt)} / {draft.project.bpm} BPM / {draft.project.key} / {barCountLabel(bars)} / local only
+        </span>
+      </div>
+      <div className="local-draft-actions">
+        <button className="icon-button primary" data-testid="restore-local-draft" onClick={onRestore} title="Restore local draft" type="button">
+          <Undo2 size={16} aria-hidden="true" />
+          <span>Restore Draft</span>
+        </button>
+        <button className="icon-button" data-testid="clear-local-draft" onClick={onClear} title="Clear local draft recovery" type="button">
+          <Trash2 size={16} aria-hidden="true" />
+          <span>Clear Draft</span>
+        </button>
+      </div>
     </section>
   );
 }
@@ -14527,6 +14643,87 @@ function appendHistory(history: ProjectState[], project: ProjectState): ProjectS
 
 function prependFuture(history: ProjectState[], project: ProjectState): ProjectState[] {
   return [project, ...history].slice(0, historyLimit);
+}
+
+function readLocalDraftRecovery(): LocalDraftRecovery | null {
+  try {
+    const rawRecord = window.localStorage.getItem(localDraftStorageKey);
+    if (!rawRecord) {
+      return null;
+    }
+
+    const parsed: unknown = JSON.parse(rawRecord);
+    if (!isLocalDraftRecord(parsed) || parsed.contents.length > localDraftMaxCharacters) {
+      throw new Error("Invalid local draft record.");
+    }
+
+    return {
+      savedAt: parsed.savedAt,
+      project: parseProjectFile(parsed.contents),
+      characterCount: parsed.contents.length
+    };
+  } catch (error) {
+    console.warn("Ignoring local draft recovery data.", error);
+    clearLocalDraftStorage();
+    return null;
+  }
+}
+
+function writeLocalDraft(project: ProjectState): string | null {
+  try {
+    const contents = serializeProjectFile(project);
+    if (contents.length > localDraftMaxCharacters) {
+      console.warn("Skipping local draft because project JSON is too large.");
+      return null;
+    }
+
+    const savedAt = new Date().toISOString();
+    const record = JSON.stringify({
+      version: localDraftRecordVersion,
+      savedAt,
+      contents
+    });
+
+    if (record.length > localDraftMaxCharacters) {
+      console.warn("Skipping local draft because the recovery record is too large.");
+      return null;
+    }
+
+    window.localStorage.setItem(localDraftStorageKey, record);
+    return savedAt;
+  } catch (error) {
+    console.warn("Local draft recovery is unavailable.", error);
+    return null;
+  }
+}
+
+function clearLocalDraftStorage(): void {
+  try {
+    window.localStorage.removeItem(localDraftStorageKey);
+  } catch (error) {
+    console.warn("Unable to clear local draft recovery data.", error);
+  }
+}
+
+function isLocalDraftRecord(value: unknown): value is { version: number; savedAt: string; contents: string } {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    record.version === localDraftRecordVersion &&
+    typeof record.savedAt === "string" &&
+    typeof record.contents === "string" &&
+    record.contents.length > 0
+  );
+}
+
+function formatLocalDraftSavedAt(savedAt: string): string {
+  const date = new Date(savedAt);
+  if (Number.isNaN(date.getTime())) {
+    return "local draft";
+  }
+  return `${savedAt.slice(0, 10)} ${savedAt.slice(11, 16)}`;
 }
 
 function isEditableShortcutTarget(target: EventTarget | null): boolean {

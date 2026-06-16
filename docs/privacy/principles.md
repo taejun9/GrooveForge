@@ -22,6 +22,10 @@ Imported audio can contain personal data, copyrighted material, or unreleased cr
 
 Sampling is an optional later module. Its implementation must include source tracking, user import boundaries, and clear export responsibility before sample packs or user audio are added to examples. This safety section does not make sampling a core product feature.
 
+## Local Draft Recovery
+
+Local draft recovery may store only bounded GrooveForge project JSON in renderer-local storage. It must not store media blobs, imported audio, sample packs, analytics identifiers, account data, or cloud sync state. Restore and Clear controls must be explicit user actions, and clearing a draft must not delete the current project or any saved `.grooveforge.json` file.
+
 ## AI Boundary
 
 Pattern generation may be local and event-based. Remote AI calls, generated-audio services, model telemetry, or prompt logging require an explicit product rationale, privacy review, and source entry before implementation.
