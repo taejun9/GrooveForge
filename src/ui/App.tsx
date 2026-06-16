@@ -878,6 +878,39 @@ type StructureLensSummary = {
   signals: StructureLensSignal[];
 };
 
+type SongFormMetricId = "flow" | "patterns" | "selected" | "energy";
+
+type SongFormMetric = {
+  id: SongFormMetricId;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type SongFormSegment = {
+  index: number;
+  section: ArrangementSection;
+  pattern: PatternSlot;
+  bars: number;
+  startBar: number;
+  endBar: number;
+  energy: number;
+  mutedLabel: string;
+  eventCount: number;
+  tone: MixCoachTone;
+  widthPercent: number;
+};
+
+type SongFormOverviewSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  metrics: SongFormMetric[];
+  segments: SongFormSegment[];
+  selectedIndex: number;
+};
+
 type BeatPassportMetric = {
   id: string;
   label: string;
@@ -1343,6 +1376,10 @@ export function App(): ReactElement {
   );
   const structureLensSummary = useMemo(() => createStructureLensSummary(project), [project]);
   const structureLensActions = useMemo(() => createStructureLensActions(project), [project]);
+  const songFormOverviewSummary = useMemo(
+    () => createSongFormOverviewSummary(project, selectedArrangementIndex),
+    [project, selectedArrangementIndex]
+  );
   const beatPassportSummary = useMemo(
     () => createBeatPassportSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
@@ -3998,6 +4035,8 @@ export function App(): ReactElement {
 
       <StructureLens summary={structureLensSummary} actions={structureLensActions} onRun={runNextMove} />
 
+      <SongFormOverview summary={songFormOverviewSummary} onSelectBlock={selectArrangementBlock} />
+
       <NextMove actions={nextMoveActions} onRun={runNextMove} />
 
       <ProjectSnapshots
@@ -5886,6 +5925,69 @@ function StructureLens({
   );
 }
 
+function SongFormOverview({
+  onSelectBlock,
+  summary
+}: {
+  onSelectBlock: (index: number) => void;
+  summary: SongFormOverviewSummary;
+}): ReactElement {
+  return (
+    <section className={`song-form-overview ${summary.tone}`} data-testid="song-form-overview" aria-label="Song form overview">
+      <div className="song-form-heading">
+        <div>
+          <Music2 size={17} aria-hidden="true" />
+          <span>Song Form</span>
+        </div>
+        <strong data-testid="song-form-headline">{summary.headline}</strong>
+        <small data-testid="song-form-detail">{summary.detail}</small>
+      </div>
+      <div className="song-form-metrics" data-testid="song-form-metrics">
+        {summary.metrics.map((metric) => (
+          <div className={`song-form-metric ${metric.tone}`} data-testid={`song-form-metric-${metric.id}`} key={metric.id}>
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+            <small>{metric.detail}</small>
+          </div>
+        ))}
+      </div>
+      <div className="song-form-timeline" data-testid="song-form-timeline">
+        {summary.segments.map((segment) => {
+          const selected = segment.index === summary.selectedIndex;
+          return (
+            <button
+              aria-pressed={selected}
+              className={["song-form-segment", segment.tone, selected ? "selected" : ""].filter(Boolean).join(" ")}
+              data-testid={`song-form-segment-${segment.index}`}
+              key={`${segment.section}-${segment.index}-${segment.pattern}`}
+              onClick={() => onSelectBlock(segment.index)}
+              style={
+                {
+                  "--segment-flex": segment.bars,
+                  "--segment-width": `${segment.widthPercent}%`,
+                  "--segment-energy": `${Math.max(14, segment.energy * 100)}%`
+                } as CSSProperties
+              }
+              title={`Select block ${segment.index + 1}: ${segment.section}, Pattern ${segment.pattern}, ${barCountLabel(segment.bars)}`}
+              type="button"
+            >
+              <span>
+                {segment.index + 1}. {segment.section}
+              </span>
+              <strong>Pattern {segment.pattern}</strong>
+              <small>
+                {segment.startBar}-{segment.endBar} / {Math.round(segment.energy * 100)}% / {segment.eventCount} events
+              </small>
+              <em>{segment.mutedLabel}</em>
+              <i aria-hidden="true" />
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function NextMove({
   actions,
   onRun
@@ -7321,6 +7423,129 @@ function createStructureLensActions(project: ProjectState): NextMoveAction[] {
   }
 
   return [...uniqueActions.values()].slice(0, 4);
+}
+
+function createSongFormOverviewSummary(project: ProjectState, selectedIndex: number): SongFormOverviewSummary {
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const sectionLabels = arrangementSections.filter((section) => project.arrangement.some((block) => block.section === section));
+  const patternSlotsUsed = usedPatternSlots(project);
+  const segments = createSongFormSegments(project);
+  const selectedSegment = segments[selectedIndex] ?? segments[0];
+  const flowTone: MixCoachTone =
+    sectionLabels.includes("Hook") && sectionLabels.length >= 3 ? "good" : sectionLabels.length >= 2 ? "warn" : "danger";
+  const patternTone: MixCoachTone = patternSlotsUsed.length >= 3 ? "good" : patternSlotsUsed.length >= 2 ? "warn" : "danger";
+  const lengthTone: MixCoachTone = bars >= target.targetBars ? "good" : bars >= 8 ? "warn" : "danger";
+  const energyValues = segments.map((segment) => segment.energy);
+  const lowEnergy = energyValues.length > 0 ? Math.min(...energyValues) : 0;
+  const highEnergy = energyValues.length > 0 ? Math.max(...energyValues) : 0;
+  const energySpread = highEnergy - lowEnergy;
+  const energyTone: MixCoachTone = energySpread >= 0.28 ? "good" : energySpread >= 0.14 ? "warn" : "danger";
+  const flowLabel = compactSectionFlow(project.arrangement);
+  const patternLabel = patternSlotsUsed.length > 0 ? patternSlotsUsed.join("/") : project.selectedPattern;
+
+  return {
+    headline: `${barCountLabel(bars)} / ${project.arrangement.length} blocks / ${target.name}`,
+    detail: `${sectionLabels.length}/${arrangementSections.length} sections / Pattern ${patternLabel} / target ${barCountLabel(target.targetBars)}`,
+    tone: weakestTone([flowTone, patternTone, lengthTone, energyTone]),
+    metrics: [
+      {
+        id: "flow",
+        label: "Flow",
+        value: flowLabel,
+        detail: `${sectionLabels.length}/${arrangementSections.length} sections covered`,
+        tone: flowTone
+      },
+      {
+        id: "patterns",
+        label: "Patterns",
+        value: patternLabel,
+        detail: `${patternSlotsUsed.length}/3 Pattern slots in arrangement`,
+        tone: patternTone
+      },
+      {
+        id: "selected",
+        label: "Selected",
+        value: selectedSegment ? `Block ${selectedSegment.index + 1}` : "No block",
+        detail: selectedSegment
+          ? `${selectedSegment.section} / Pattern ${selectedSegment.pattern} / ${barCountLabel(selectedSegment.bars)}`
+          : "No arrangement block selected",
+        tone: selectedSegment ? selectedSegment.tone : "danger"
+      },
+      {
+        id: "energy",
+        label: "Energy",
+        value: `${Math.round(lowEnergy * 100)}-${Math.round(highEnergy * 100)}%`,
+        detail: `${Math.round(energySpread * 100)}% spread across blocks`,
+        tone: energyTone
+      }
+    ],
+    segments,
+    selectedIndex: Math.min(selectedIndex, Math.max(0, segments.length - 1))
+  };
+}
+
+function createSongFormSegments(project: ProjectState): SongFormSegment[] {
+  const totalBars = Math.max(1, arrangementTotalBars(project));
+  let startBar = 1;
+
+  return project.arrangement.map((block, index) => {
+    const bars = normalizeArrangementBars(block.bars);
+    const endBar = startBar + bars - 1;
+    const energy = normalizeArrangementEnergy(block.energy);
+    const pattern = project.patterns[block.pattern];
+    const eventCount = patternEventTotal(pattern);
+    const mutedLabel =
+      block.mutedTracks.length === 0 ? "Full mix" : `${block.mutedTracks.map(arrangementMuteTrackLabel).join("/")} muted`;
+    const tone = songFormSegmentTone(eventCount, energy, block.mutedTracks.length);
+    const segment: SongFormSegment = {
+      index,
+      section: block.section,
+      pattern: block.pattern,
+      bars,
+      startBar,
+      endBar,
+      energy,
+      mutedLabel,
+      eventCount,
+      tone,
+      widthPercent: Math.max(8, (bars / totalBars) * 100)
+    };
+    startBar = endBar + 1;
+    return segment;
+  });
+}
+
+function songFormSegmentTone(eventCount: number, energy: number, mutedTrackCount: number): MixCoachTone {
+  if (eventCount === 0 || energy < 0.2 || mutedTrackCount >= arrangementMuteTrackIds.length) {
+    return "danger";
+  }
+  if (eventCount < 8 || energy < 0.42 || mutedTrackCount >= 2) {
+    return "warn";
+  }
+  return "good";
+}
+
+function compactSectionFlow(arrangement: ArrangementBlock[]): string {
+  const compact = arrangement.reduce<ArrangementSection[]>((sections, block) => {
+    if (sections[sections.length - 1] !== block.section) {
+      sections.push(block.section);
+    }
+    return sections;
+  }, []);
+  return compact.length > 0 ? compact.join(">") : "No blocks";
+}
+
+function patternEventTotal(pattern: PatternData): number {
+  const drumHits = Object.values(pattern.drumPattern).reduce(
+    (total, laneSteps) => total + laneSteps.filter(Boolean).length,
+    0
+  );
+  const repeatedHats = pattern.drumPattern.hat.reduce(
+    (total, enabled, step) => total + (enabled ? hatRepeatCount(pattern, step) - 1 : 0),
+    0
+  );
+  return drumHits + repeatedHats + pattern.bassNotes.length + pattern.melodyNotes.length + pattern.chordEvents.length;
 }
 
 function structureHookSignal(project: ProjectState): StructureLensSignal {
@@ -11085,15 +11310,7 @@ function pitchMidi(pitch: string): number {
 }
 
 function patternEventCount(pattern: PatternData): string {
-  const drumHits = Object.values(pattern.drumPattern).reduce(
-    (total, laneSteps) => total + laneSteps.filter(Boolean).length,
-    0
-  );
-  const repeatedHats = pattern.drumPattern.hat.reduce(
-    (total, enabled, step) => total + (enabled ? hatRepeatCount(pattern, step) - 1 : 0),
-    0
-  );
-  return `${drumHits + repeatedHats + pattern.bassNotes.length + pattern.melodyNotes.length + pattern.chordEvents.length} events`;
+  return `${patternEventTotal(pattern)} events`;
 }
 
 function patternChainReadout(arrangement: ArrangementBlock[]): string {
