@@ -43,6 +43,7 @@ button {
 .transport-band,
 .mode-row,
 .mode-focus,
+.workflow-navigator,
 .quick-action-result,
 .style-inspector,
 .key-compass,
@@ -88,6 +89,7 @@ button {
 .session-meter,
 .mode-row,
 .mode-focus-heading > div,
+.workflow-navigator-heading > div,
 .style-inspector-heading > div,
 .key-compass-heading > div,
 .groove-compass-heading > div,
@@ -566,6 +568,128 @@ h2 {
 }
 
 .mode-focus-card small {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
+}
+
+.workflow-navigator {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.34fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 72px;
+  padding: 10px;
+  border-radius: 8px;
+  border-color: rgba(130, 215, 255, 0.18);
+  background: rgba(130, 215, 255, 0.04);
+}
+
+.workflow-navigator-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.workflow-navigator-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.workflow-navigator-heading svg {
+  color: #82d7ff;
+}
+
+.workflow-navigator-heading strong,
+.workflow-navigator-heading small,
+.workflow-navigator-card span,
+.workflow-navigator-card strong,
+.workflow-navigator-card small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflow-navigator-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.workflow-navigator-heading small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.workflow-navigator-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.workflow-navigator-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 6px;
+  align-content: center;
+  min-width: 0;
+  min-height: 52px;
+  border: 1px solid rgba(130, 215, 255, 0.18);
+  border-inline-start: 3px solid #82d7ff;
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  color: #f4efe7;
+  padding: 7px 8px;
+  text-align: start;
+}
+
+.workflow-navigator-card:hover {
+  border-color: rgba(130, 215, 255, 0.38);
+  background: rgba(130, 215, 255, 0.065);
+}
+
+.workflow-navigator-card.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  border-inline-start-color: #f0c36a;
+}
+
+.workflow-navigator-card.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  border-inline-start-color: #ff7a4f;
+}
+
+.workflow-navigator-card svg {
+  grid-row: span 3;
+  align-self: center;
+  color: #82d7ff;
+}
+
+.workflow-navigator-card.warn svg {
+  color: #f0c36a;
+}
+
+.workflow-navigator-card.danger svg {
+  color: #ff7a4f;
+}
+
+.workflow-navigator-card span {
+  color: rgba(244, 239, 231, 0.56);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.workflow-navigator-card strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.workflow-navigator-card small {
   color: rgba(244, 239, 231, 0.68);
   font-size: 10px;
 }
@@ -6867,6 +6991,10 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .workflow-navigator {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
   .key-compass {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -6917,6 +7045,10 @@ input[type="range"] {
 
   .production-snapshot-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .workflow-navigator-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .export-preflight-grid {

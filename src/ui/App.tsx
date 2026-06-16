@@ -25,7 +25,7 @@ import {
   Waves,
   X
 } from "lucide-react";
-import type { ChangeEvent, CSSProperties, ReactElement, ReactNode } from "react";
+import type { ChangeEvent, CSSProperties, ReactElement, ReactNode, Ref } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { exportMidi } from "../audio/midi";
 import {
@@ -1358,6 +1358,16 @@ type ExportPreflightSummary = {
   cards: ExportPreflightCard[];
 };
 
+type WorkflowZoneId = "compose" | "arrange" | "mix" | "deliver";
+
+type WorkflowNavigatorItem = {
+  id: WorkflowZoneId;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
 type SelectedDrumStep = {
   lane: DrumLane;
   step: number;
@@ -1722,6 +1732,10 @@ export function App(): ReactElement {
   const projectRef = useRef<ProjectState>(starterProject);
   const controllerRef = useRef<PlaybackController | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const composePanelRef = useRef<HTMLElement | null>(null);
+  const arrangePanelRef = useRef<HTMLElement | null>(null);
+  const mixPanelRef = useRef<HTMLElement | null>(null);
+  const deliverPanelRef = useRef<HTMLElement | null>(null);
   const masterPanelRef = useRef<HTMLElement | null>(null);
   const style = getStyle(project);
   const deliveryTarget = activeDeliveryTarget(project);
@@ -1766,6 +1780,10 @@ export function App(): ReactElement {
   const exportPreflightSummary = useMemo(
     () => createExportPreflightSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
+  );
+  const workflowNavigatorItems = useMemo(
+    () => createWorkflowNavigatorItems(project, beatMapSummary, exportPreflightSummary, exportAnalysis),
+    [project, beatMapSummary, exportPreflightSummary, exportAnalysis]
   );
   const snapshotCompareSummary = useMemo(() => createSnapshotCompareSummary(project), [project]);
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
@@ -4182,6 +4200,17 @@ export function App(): ReactElement {
     setComposerActionResult(createComposerActionResult(action, beforeProject, projectRef.current));
   }
 
+  function jumpToWorkflowZone(zone: WorkflowZoneId): void {
+    const targetRefs: Record<WorkflowZoneId, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    targetRefs[zone]?.scrollIntoView({ block: "start", behavior: "auto" });
+  }
+
   function openQuickActions(): void {
     setQuickActionQuery("");
     setQuickActionsOpen(true);
@@ -4453,6 +4482,8 @@ export function App(): ReactElement {
 
       <ModeFocus summary={modeFocusSummary} />
 
+      <WorkflowNavigator items={workflowNavigatorItems} onJump={jumpToWorkflowZone} />
+
       {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
 
       <StyleInspector
@@ -4484,7 +4515,7 @@ export function App(): ReactElement {
 
       <ProductionSnapshot summary={productionSnapshotSummary} />
 
-      <ExportPreflight summary={exportPreflightSummary} />
+      <ExportPreflight sectionRef={deliverPanelRef} summary={exportPreflightSummary} />
 
       <HandoffPack
         analysis={exportAnalysis}
@@ -4520,7 +4551,7 @@ export function App(): ReactElement {
       <SnapshotCompare summary={snapshotCompareSummary} />
 
       <section className="workspace-grid">
-        <section className="panel pattern-panel" aria-label="Pattern editor">
+        <section className="panel pattern-panel" data-testid="workflow-target-compose" aria-label="Pattern editor" ref={composePanelRef}>
           <PanelTitle icon={<Drum size={18} />} title="Drums" meta="16 step rack" />
           <div className="pattern-tabs" aria-label="Pattern">
             {patternSlots.map((pattern) => (
@@ -4802,7 +4833,7 @@ export function App(): ReactElement {
           />
         </section>
 
-        <section className="panel arrangement-panel" aria-label="Arrangement">
+        <section className="panel arrangement-panel" data-testid="workflow-target-arrange" aria-label="Arrangement" ref={arrangePanelRef}>
           <PanelTitle icon={<Music2 size={18} />} title="Arrangement" meta={`${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`} />
           <div className="arrangement-template-row" aria-label="Arrangement templates">
             {arrangementTemplateIds.map((template) => {
@@ -5097,7 +5128,7 @@ export function App(): ReactElement {
           )}
         </section>
 
-        <section className="panel mixer-panel" aria-label="Mixer">
+        <section className="panel mixer-panel" data-testid="workflow-target-mix" aria-label="Mixer" ref={mixPanelRef}>
           <PanelTitle icon={<SlidersHorizontal size={18} />} title="Mixer" meta={`${activeChannels} audible`} />
           <MixBalancePads pads={mixBalancePadOptions} onApply={applyMixBalancePad} />
           <StemAuditionPads pads={stemAuditionPadOptions} onApply={applyStemAuditionPad} />
@@ -6509,9 +6540,53 @@ function ModeFocus({ summary }: { summary: ModeFocusSummary }): ReactElement {
   );
 }
 
-function ExportPreflight({ summary }: { summary: ExportPreflightSummary }): ReactElement {
+function WorkflowNavigator({
+  items,
+  onJump
+}: {
+  items: WorkflowNavigatorItem[];
+  onJump: (zone: WorkflowZoneId) => void;
+}): ReactElement {
   return (
-    <section className={`export-preflight ${summary.tone}`} data-testid="export-preflight" aria-label="Export preflight">
+    <nav className="workflow-navigator" data-testid="workflow-navigator" aria-label="Workflow navigator">
+      <div className="workflow-navigator-heading">
+        <div>
+          <ArrowRight size={16} aria-hidden="true" />
+          <span>Workflow</span>
+        </div>
+        <strong>Compose to deliver</strong>
+        <small>Jump across the workstation</small>
+      </div>
+      <div className="workflow-navigator-grid">
+        {items.map((item) => (
+          <button
+            className={`workflow-navigator-card ${item.tone}`}
+            data-testid={`workflow-jump-${item.id}`}
+            key={item.id}
+            onClick={() => onJump(item.id)}
+            title={`Jump to ${item.label}`}
+            type="button"
+          >
+            {workflowNavigatorIcon(item.id)}
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <small>{item.detail}</small>
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function ExportPreflight({
+  sectionRef,
+  summary
+}: {
+  sectionRef?: Ref<HTMLElement>;
+  summary: ExportPreflightSummary;
+}): ReactElement {
+  return (
+    <section className={`export-preflight ${summary.tone}`} data-testid="export-preflight" aria-label="Export preflight" ref={sectionRef}>
       <div className="export-preflight-heading">
         <div>
           <ListChecks size={17} aria-hidden="true" />
@@ -8188,6 +8263,49 @@ function createReviewQueueSummary(
   };
 }
 
+function createWorkflowNavigatorItems(
+  project: ProjectState,
+  beatMap: BeatMapSummary,
+  exportPreflight: ExportPreflightSummary,
+  analysis: ExportAnalysis
+): WorkflowNavigatorItem[] {
+  const composeStage = beatMap.stages.find((stage) => stage.id === "compose") ?? beatMap.stages[1];
+  const arrangeStage = beatMap.stages.find((stage) => stage.id === "arrange") ?? beatMap.stages[2];
+  const polishStage = beatMap.stages.find((stage) => stage.id === "polish") ?? beatMap.stages[3];
+  const deliverStage = beatMap.stages.find((stage) => stage.id === "deliver") ?? beatMap.stages[4];
+
+  return [
+    {
+      id: "compose",
+      label: "Compose",
+      value: `Pattern ${project.selectedPattern}`,
+      detail: `${composeStage.status} / ${composeStage.detail}`,
+      tone: composeStage.tone
+    },
+    {
+      id: "arrange",
+      label: "Arrange",
+      value: barCountLabel(arrangementTotalBars(project)),
+      detail: `${arrangeStage.status} / ${arrangeStage.detail}`,
+      tone: arrangeStage.tone
+    },
+    {
+      id: "mix",
+      label: "Mix",
+      value: analysis.status,
+      detail: `${polishStage.status} / ${polishStage.detail}`,
+      tone: polishStage.tone
+    },
+    {
+      id: "deliver",
+      label: "Deliver",
+      value: exportPreflight.headline,
+      detail: `${deliverStage.status} / ${exportPreflight.detail}`,
+      tone: weakestTone([deliverStage.tone, exportPreflight.tone])
+    }
+  ];
+}
+
 function createExportPreflightSummary(
   project: ProjectState,
   checks: BeatReadinessCheck[],
@@ -8252,6 +8370,19 @@ function createExportPreflightSummary(
     tone,
     cards
   };
+}
+
+function workflowNavigatorIcon(zone: WorkflowZoneId): ReactElement {
+  switch (zone) {
+    case "compose":
+      return <Drum size={15} aria-hidden="true" />;
+    case "arrange":
+      return <Music2 size={15} aria-hidden="true" />;
+    case "mix":
+      return <SlidersHorizontal size={15} aria-hidden="true" />;
+    case "deliver":
+      return <Download size={15} aria-hidden="true" />;
+  }
 }
 
 function createModeFocusSummary(
