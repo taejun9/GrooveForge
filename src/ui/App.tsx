@@ -1736,12 +1736,20 @@ type SessionBriefRoleSummary = {
 };
 
 type ExportPreflightCardId = "readiness" | "mix" | "deliverables" | "handoff";
+type ExportPreflightFocusId = ExportPreflightCardId;
+type ExportPreflightFocusTarget = ReviewQueueFocusTarget;
 
-type ExportPreflightCard = {
-  id: ExportPreflightCardId;
+type ExportPreflightFocusItem = {
+  focusId: ExportPreflightFocusId;
   label: string;
   value: string;
   detail: string;
+  focusTarget: ExportPreflightFocusTarget;
+  focusLabel: string;
+};
+
+type ExportPreflightCard = ExportPreflightFocusItem & {
+  id: ExportPreflightCardId;
   tone: MixCoachTone;
 };
 
@@ -1750,6 +1758,15 @@ type ExportPreflightSummary = {
   detail: string;
   tone: MixCoachTone;
   cards: ExportPreflightCard[];
+};
+
+type ExportPreflightFocusSummary = {
+  focusId: ExportPreflightFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
 };
 
 type WorkflowZoneId = "compose" | "arrange" | "mix" | "deliver";
@@ -2177,6 +2194,7 @@ export function App(): ReactElement {
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
   const [finishChecklistFocusId, setFinishChecklistFocusId] = useState<FinishChecklistCardId | null>(null);
+  const [exportPreflightFocusId, setExportPreflightFocusId] = useState<ExportPreflightFocusId | null>(null);
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const [projectFileLabel, setProjectFileLabel] = useState<string | null>(null);
   const [projectHasUnsavedChanges, setProjectHasUnsavedChanges] = useState(false);
@@ -5295,6 +5313,20 @@ export function App(): ReactElement {
     setProjectStatus(`Finish ${card.label}: ${card.status}`);
   }
 
+  function focusExportPreflightCard(card: ExportPreflightFocusItem): void {
+    const targetRefs: Record<ExportPreflightFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    setExportPreflightFocusId(card.focusId);
+    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Preflight ${card.label}: ${card.value}`);
+  }
+
   function focusReviewQueueItem(item: ReviewQueueItem): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5708,7 +5740,12 @@ export function App(): ReactElement {
 
       <ProductionSnapshot focusedMetricId={productionSnapshotFocusId} onFocus={focusProductionSnapshotMetric} summary={productionSnapshotSummary} />
 
-      <ExportPreflight sectionRef={deliverPanelRef} summary={exportPreflightSummary} />
+      <ExportPreflight
+        focusedCardId={exportPreflightFocusId}
+        onFocus={focusExportPreflightCard}
+        sectionRef={deliverPanelRef}
+        summary={exportPreflightSummary}
+      />
 
       <HandoffPack
         analysis={exportAnalysis}
@@ -8425,12 +8462,18 @@ function WorkflowNavigator({
 }
 
 function ExportPreflight({
+  focusedCardId,
+  onFocus,
   sectionRef,
   summary
 }: {
+  focusedCardId: ExportPreflightFocusId | null;
+  onFocus: (card: ExportPreflightFocusItem) => void;
   sectionRef?: Ref<HTMLElement>;
   summary: ExportPreflightSummary;
 }): ReactElement {
+  const focusSummary = createExportPreflightFocusSummary(summary, focusedCardId);
+
   return (
     <section className={`export-preflight ${summary.tone}`} data-testid="export-preflight" aria-label="Export preflight" ref={sectionRef}>
       <div className="export-preflight-heading">
@@ -8441,14 +8484,42 @@ function ExportPreflight({
         <strong data-testid="export-preflight-headline">{summary.headline}</strong>
         <small data-testid="export-preflight-detail">{summary.detail}</small>
       </div>
+      <div
+        className={`export-preflight-focus-readout ${focusSummary.tone}`}
+        data-testid="export-preflight-focus-readout"
+        title={focusSummary.detailTitle}
+      >
+        <span data-testid="export-preflight-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="export-preflight-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="export-preflight-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
       <div className="export-preflight-grid" data-testid="export-preflight-grid">
-        {summary.cards.map((card) => (
-          <div className={`export-preflight-card ${card.tone}`} data-testid={`export-preflight-${card.id}`} key={card.id}>
-            <span>{card.label}</span>
-            <strong>{card.value}</strong>
-            <small>{card.detail}</small>
-          </div>
-        ))}
+        {summary.cards.map((card) => {
+          const focused = focusedCardId === card.focusId;
+          return (
+            <div
+              className={["export-preflight-card", card.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`export-preflight-${card.id}`}
+              key={card.id}
+            >
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <button
+                aria-pressed={focused}
+                className="export-preflight-focus-button"
+                data-testid={`export-preflight-focus-${card.id}`}
+                onClick={() => onFocus(card)}
+                title={`Focus ${card.focusLabel}: ${card.label} ${card.value}`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{card.focusLabel}</span>
+              </button>
+              <small>{card.detail}</small>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -10741,33 +10812,45 @@ function createExportPreflightSummary(
   const cards: ExportPreflightCard[] = [
     {
       id: "readiness",
+      focusId: "readiness",
       label: "Readiness",
       value: `${readyCount}/${checks.length} green`,
       detail: firstOpenCheck ? `${firstOpenCheck.label}: ${firstOpenCheck.status}` : "Composition and arrangement checks green",
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: readinessTone
     },
     {
       id: "mix",
+      focusId: "mix",
       label: "Mix / Master",
       value: analysis.status,
       detail:
         openMixChecks === 0
           ? `${formatDb(analysis.headroomDb)} headroom / Mix Coach clear`
           : `${formatDb(analysis.headroomDb)} headroom / ${openMixChecks} mix checks`,
+      focusTarget: "master",
+      focusLabel: "Master",
       tone: weakestTone([exportTone, mixTone])
     },
     {
       id: "deliverables",
+      focusId: "deliverables",
       label: "Deliverables",
       value: `${deliverableReady}/3 clear`,
       detail: `WAV ${analysis.status} / ${audibleStems.length}/${target.stemGoal} stems / ${barCountLabel(bars)} MIDI`,
+      focusTarget: "deliver",
+      focusLabel: "Deliver",
       tone: weakestTone([exportTone, stemTone, midiTone])
     },
     {
       id: "handoff",
+      focusId: "handoff",
       label: "Handoff",
       value: briefStatus.value,
       detail: `${briefStatus.detail} / ${handoffSheetFileName(project)}`,
+      focusTarget: "deliver",
+      focusLabel: "Deliver",
       tone: briefStatus.tone
     }
   ];
@@ -10780,6 +10863,37 @@ function createExportPreflightSummary(
     detail: `${target.name} / ${readyCount}/${checks.length} readiness / ${analysis.status}`,
     tone,
     cards
+  };
+}
+
+function createExportPreflightFocusSummary(
+  summary: ExportPreflightSummary,
+  focusedCardId: ExportPreflightFocusId | null
+): ExportPreflightFocusSummary {
+  const focusedCard = focusedCardId ? summary.cards.find((card) => card.focusId === focusedCardId) ?? null : null;
+  const card = focusedCard ?? summary.cards.find((candidate) => candidate.tone !== "good") ?? summary.cards[0] ?? null;
+
+  if (!card) {
+    return {
+      focusId: null,
+      statusLabel: "Preflight clear",
+      areaLabel: "No preflight focus",
+      detailLabel: "No Export Preflight cards available",
+      detailTitle: "Export Preflight has no focusable cards.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel = focusedCard ? "Focused Preflight" : "Preflight Focus";
+  const detailLabel = `${card.focusLabel} panel / ${card.detail}`;
+
+  return {
+    focusId: card.focusId,
+    statusLabel,
+    areaLabel: `${card.label}: ${card.value}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
+    tone: card.tone
   };
 }
 

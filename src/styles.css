@@ -3419,9 +3419,10 @@ h2 {
 .export-preflight {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 10px;
   align-items: stretch;
-  min-height: 78px;
+  min-height: 118px;
   border-color: rgba(130, 215, 255, 0.18);
   border-radius: 8px;
   background: rgba(130, 215, 255, 0.04);
@@ -3440,6 +3441,7 @@ h2 {
 
 .export-preflight-heading {
   display: grid;
+  grid-row: 1 / 3;
   gap: 4px;
   align-content: center;
   min-width: 0;
@@ -3467,9 +3469,13 @@ h2 {
 
 .export-preflight-heading strong,
 .export-preflight-heading small,
+.export-preflight-focus-readout span,
+.export-preflight-focus-readout strong,
+.export-preflight-focus-readout small,
 .export-preflight-card span,
 .export-preflight-card strong,
-.export-preflight-card small {
+.export-preflight-card small,
+.export-preflight-focus-button span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3486,8 +3492,50 @@ h2 {
   font-size: 11px;
 }
 
+.export-preflight-focus-readout {
+  display: grid;
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(130, 215, 255, 0.055);
+  padding: 7px 8px;
+}
+
+.export-preflight-focus-readout.good {
+  border-color: rgba(120, 240, 200, 0.22);
+  background: rgba(120, 240, 200, 0.045);
+}
+
+.export-preflight-focus-readout.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.export-preflight-focus-readout.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.export-preflight-focus-readout span,
+.export-preflight-focus-readout small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+}
+
+.export-preflight-focus-readout strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
 .export-preflight-grid {
   display: grid;
+  grid-column: 2;
+  grid-row: 2;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
   min-width: 0;
@@ -3495,8 +3543,10 @@ h2 {
 
 .export-preflight-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 4px;
   align-content: center;
+  align-items: center;
   min-width: 0;
   border: 1px solid rgba(130, 215, 255, 0.18);
   border-inline-start: 3px solid #82d7ff;
@@ -3515,6 +3565,24 @@ h2 {
   border-inline-start-color: #ff7a4f;
 }
 
+.export-preflight-card.focused {
+  box-shadow:
+    inset 0 0 0 1px rgba(130, 215, 255, 0.22),
+    0 0 14px rgba(130, 215, 255, 0.12);
+}
+
+.export-preflight-card.warn.focused {
+  box-shadow:
+    inset 0 0 0 1px rgba(240, 195, 106, 0.2),
+    0 0 14px rgba(240, 195, 106, 0.12);
+}
+
+.export-preflight-card.danger.focused {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 122, 79, 0.2),
+    0 0 14px rgba(255, 122, 79, 0.12);
+}
+
 .export-preflight-card span {
   color: rgba(244, 239, 231, 0.58);
   font-size: 10px;
@@ -3526,8 +3594,33 @@ h2 {
 }
 
 .export-preflight-card small {
+  grid-column: 1 / -1;
   color: rgba(244, 239, 231, 0.68);
   font-size: 10px;
+}
+
+.export-preflight-focus-button {
+  display: inline-flex;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-inline-size: 66px;
+  max-inline-size: 82px;
+  border: 1px solid rgba(130, 215, 255, 0.26);
+  border-radius: 5px;
+  background: rgba(130, 215, 255, 0.065);
+  color: #f4efe7;
+  padding: 4px 5px;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.export-preflight-focus-button:hover,
+.export-preflight-focus-button[aria-pressed="true"] {
+  border-color: rgba(130, 215, 255, 0.52);
+  background: rgba(130, 215, 255, 0.12);
 }
 
 .handoff-pack {
@@ -9211,6 +9304,11 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .export-preflight-focus-readout {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
   .handoff-pack {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -9389,6 +9487,28 @@ input[type="range"] {
 }
 
 @media (max-width: 620px) {
+  .export-preflight {
+    grid-template-columns: 1fr;
+  }
+
+  .export-preflight-heading {
+    grid-row: auto;
+    border-inline-end: 0;
+    border-block-end: 1px solid rgba(244, 239, 231, 0.1);
+    padding-inline-end: 0;
+    padding-block-end: 7px;
+  }
+
+  .export-preflight-focus-readout,
+  .export-preflight-grid {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .export-preflight-grid {
+    grid-template-columns: 1fr;
+  }
+
   .blueprint-row {
     grid-template-columns: 1fr;
   }
