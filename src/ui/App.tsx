@@ -512,6 +512,17 @@ type MixFixAction = {
   tone: MixCoachTone;
 };
 
+type MixFixPreviewSummary = {
+  fixId: MixFixPreset | "none";
+  statusLabel: string;
+  fixLabel: string;
+  scopeLabel: string;
+  detailLabel: string;
+  changeLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type MixBalancePadId = "clean" | "vocal" | "club" | "wide";
 
 type MixBalanceChannelUpdate = Partial<
@@ -6886,6 +6897,7 @@ export function App(): ReactElement {
           <MixCoach
             analysis={exportAnalysis}
             focusedCheckId={mixCoachFocusId}
+            project={project}
             stemAnalyses={stemAnalyses}
             onApplyFix={applyMixFixPreset}
           />
@@ -14556,17 +14568,20 @@ function ExportMeter({ analysis }: { analysis: ExportAnalysis }): ReactElement {
 function MixCoach({
   analysis,
   focusedCheckId,
+  project,
   stemAnalyses,
   onApplyFix
 }: {
   analysis: ExportAnalysis;
   focusedCheckId: string | null;
+  project: ProjectState;
   stemAnalyses: StemExportAnalyses;
   onApplyFix: (preset: MixFixPreset) => void;
 }): ReactElement {
   const checks = createMixCoachChecks(analysis, stemAnalyses);
   const focusSummary = createMixCoachFocusSummary(checks, focusedCheckId);
   const fixes = createMixFixActions(analysis, stemAnalyses);
+  const fixPreview = createMixFixPreviewSummary(project, fixes, stemAnalyses);
 
   return (
     <div className="mix-coach" data-testid="mix-coach">
@@ -14582,6 +14597,18 @@ function MixCoach({
         <span data-testid="mix-coach-focus-status">{focusSummary.statusLabel}</span>
         <strong data-testid="mix-coach-focus-label">{focusSummary.roleLabel}</strong>
         <small data-testid="mix-coach-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
+      <div
+        className={`mix-fix-preview ${fixPreview.tone}`}
+        data-preview-fix={fixPreview.fixId}
+        data-testid="mix-fix-preview"
+        title={fixPreview.detailTitle}
+      >
+        <span data-testid="mix-fix-preview-status">{fixPreview.statusLabel}</span>
+        <strong data-testid="mix-fix-preview-label">{fixPreview.fixLabel}</strong>
+        <small data-testid="mix-fix-preview-scope">{fixPreview.scopeLabel}</small>
+        <small data-testid="mix-fix-preview-detail">{fixPreview.detailLabel}</small>
+        <small data-testid="mix-fix-preview-changes">{fixPreview.changeLabel}</small>
       </div>
       <div className="mix-coach-list">
         {checks.map((check) => {
@@ -14650,6 +14677,66 @@ function createMixFixActions(analysis: ExportAnalysis, stemAnalyses: StemExportA
       tone: lowEndTone
     }
   ];
+}
+
+function createMixFixPreviewSummary(
+  project: ProjectState,
+  fixes: MixFixAction[],
+  stemAnalyses: StemExportAnalyses
+): MixFixPreviewSummary {
+  const suggestedFix = fixes.find((fix) => fix.tone !== "good") ?? null;
+
+  if (!suggestedFix) {
+    return {
+      fixId: "none",
+      statusLabel: "Mix fixes clear",
+      fixLabel: "No suggested fix",
+      scopeLabel: "Manual fixes available",
+      detailLabel: "Headroom, stem balance, and low end are not asking for a fix.",
+      changeLabel: "0 suggested moves",
+      detailTitle: "Mix Fix Preview: no suggested fix; manual fixes remain available.",
+      tone: "good"
+    };
+  }
+
+  const nextProject = applyMixFixToProject(project, suggestedFix.preset, stemAnalyses);
+  const changeCount = mixFixChangedCount(project, nextProject);
+  const statusLabel = suggestedFix.tone === "danger" ? "Fix blocker" : "Suggested fix";
+  const changeLabel = `${changeCount} mix move${changeCount === 1 ? "" : "s"}`;
+  const scopeLabel = mixFixScopeLabel(suggestedFix.preset);
+  const detailTitle = `${statusLabel}: ${suggestedFix.label}; ${scopeLabel}; ${suggestedFix.detail}; ${changeLabel}`;
+
+  return {
+    fixId: suggestedFix.preset,
+    statusLabel,
+    fixLabel: suggestedFix.label,
+    scopeLabel,
+    detailLabel: suggestedFix.detail,
+    changeLabel,
+    detailTitle,
+    tone: suggestedFix.tone
+  };
+}
+
+function mixFixScopeLabel(preset: MixFixPreset): string {
+  switch (preset) {
+    case "headroom":
+      return "Master + channel dynamics";
+    case "stem_balance":
+      return "Core stem volumes";
+    case "low_end":
+      return "Drums + 808 relation";
+  }
+}
+
+function mixFixChangedCount(current: ProjectState, nextProject: ProjectState): number {
+  const mixerChanges = nextProject.mixer.filter(
+    (channel, index) => !sameMixerChannel(channel, current.mixer[index])
+  ).length;
+  return [
+    current.masterPreset !== nextProject.masterPreset,
+    current.masterCeilingDb !== nextProject.masterCeilingDb
+  ].filter(Boolean).length + mixerChanges;
 }
 
 function createMixCoachChecks(analysis: ExportAnalysis, stemAnalyses: StemExportAnalyses): MixCoachCheck[] {
