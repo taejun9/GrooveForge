@@ -143,6 +143,8 @@ h2 {
 .melody-motif-row button span,
 .melody-accent-heading span,
 .melody-accent-row button span,
+.melody-contour-heading span,
+.melody-contour-row button span,
 .chord-rhythm-heading span,
 .chord-rhythm-row button span,
 .chord-voicing-heading span,
@@ -258,6 +260,7 @@ h2 {
 .bass-glide-row button,
 .melody-motif-row button,
 .melody-accent-row button,
+.melody-contour-row button,
 .chord-tools > button,
 .preset-row button,
 .mini-toggle {
@@ -368,6 +371,7 @@ h2 {
 .bass-glide-row button,
 .melody-motif-row button,
 .melody-accent-row button,
+.melody-contour-row button,
 .chord-inversion-row button,
 .chord-tools > button,
 .preset-row button {
@@ -2962,6 +2966,62 @@ input[type="range"] {
 }
 
 .melody-accent-row button small {
+  color: rgba(244, 239, 231, 0.48);
+  font-size: 10px;
+}
+
+.melody-contour-panel {
+  display: grid;
+  gap: 8px;
+  margin-block-end: 14px;
+  border: 1px solid rgba(158, 231, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(158, 231, 255, 0.055);
+  padding: 10px;
+}
+
+.melody-contour-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.melody-contour-heading strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.melody-contour-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.melody-contour-row button {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.melody-contour-row button span,
+.melody-contour-row button strong,
+.melody-contour-row button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.melody-contour-row button strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.melody-contour-row button small {
   color: rgba(244, 239, 231, 0.48);
   font-size: 10px;
 }

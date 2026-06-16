@@ -607,6 +607,19 @@ type MelodyAccentOption = MelodyAccentDefinition & {
   chanceCount: number;
 };
 
+type MelodyContourId = "rise" | "fall" | "answer" | "anchor";
+
+type MelodyContourDefinition = {
+  id: MelodyContourId;
+  label: string;
+  detail: string;
+};
+
+type MelodyContourOption = MelodyContourDefinition & {
+  preview: string;
+  pitchSpan: string;
+};
+
 type ChordPadId = "home" | "lift" | "tension" | "color";
 
 type ChordPadDefinition = {
@@ -976,6 +989,13 @@ const melodyAccentDefinitions: MelodyAccentDefinition[] = [
   { id: "fade", label: "Fade", detail: "tail" }
 ];
 
+const melodyContourDefinitions: MelodyContourDefinition[] = [
+  { id: "rise", label: "Rise", detail: "lift line" },
+  { id: "fall", label: "Fall", detail: "resolve down" },
+  { id: "answer", label: "Answer", detail: "call reply" },
+  { id: "anchor", label: "Anchor", detail: "center hook" }
+];
+
 const patternStackDefinitions: PatternStackDefinition[] = [
   { id: "pocket", label: "Pocket", detail: "verse", bassline: "bounce", chordPreset: "sparse", motif: "pocket" },
   { id: "hook", label: "Hook", detail: "main", bassline: "slide", chordPreset: "moody", motif: "hook" },
@@ -1103,6 +1123,10 @@ export function App(): ReactElement {
   const bassGlidePadOptions = useMemo(() => createBassGlidePadOptions(currentPattern.bassNotes), [currentPattern.bassNotes]);
   const melodyMotifOptions = useMemo(() => createMelodyMotifOptions(project.key), [project.key]);
   const melodyAccentOptions = useMemo(() => createMelodyAccentOptions(currentPattern.melodyNotes), [currentPattern.melodyNotes]);
+  const melodyContourOptions = useMemo(
+    () => createMelodyContourOptions(project.key, currentPattern.melodyNotes),
+    [project.key, currentPattern.melodyNotes]
+  );
   const patternStackOptions = useMemo(() => createPatternStackOptions(project.key), [project.key]);
   const grooveFeelOptions = useMemo(() => createGrooveFeelOptions(), []);
   const drumAccentOptions = useMemo(() => createDrumAccentOptions(), []);
@@ -2433,6 +2457,35 @@ export function App(): ReactElement {
     setSelectedChordIndex(null);
   }
 
+  function applyMelodyContour(contourId: MelodyContourId): void {
+    const contour = melodyContourDefinitions.find((candidate) => candidate.id === contourId);
+    if (!contour) {
+      setProjectStatus("Melody contour pad not found");
+      return;
+    }
+
+    const currentMelodyNotes = projectRef.current.patterns[projectRef.current.selectedPattern].melodyNotes;
+    if (currentMelodyNotes.length === 0) {
+      setProjectStatus(`Add a Synth note before using ${contour.label} contour`);
+      return;
+    }
+
+    const melodyNotes = applyMelodyContourToNotes(projectRef.current.key, currentMelodyNotes, contour.id);
+    const changed = updateCurrentPattern(
+      (pattern) => (sameMelodyNotes(pattern.melodyNotes, melodyNotes) ? pattern : { ...pattern, melodyNotes }),
+      `${contour.label} melody contour applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (!changed) {
+      setProjectStatus(`${contour.label} melody contour already selected`);
+      return;
+    }
+
+    const firstNote = melodyNotes[0];
+    setSelectedNote(firstNote ? { track: "melody", step: firstNote.step, pitch: firstNote.pitch } : null);
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
+  }
+
   function updateSelectedLength(length: number): void {
     if (!selectedNote) {
       return;
@@ -3743,6 +3796,7 @@ export function App(): ReactElement {
           <BassGlidePads pads={bassGlidePadOptions} onApply={applyBassGlidePad} />
           <MelodyMotifPads motifs={melodyMotifOptions} onApply={applyMelodyMotif} />
           <MelodyAccentPads accents={melodyAccentOptions} onApply={applyMelodyAccent} />
+          <MelodyContourPads contours={melodyContourOptions} onApply={applyMelodyContour} />
           <div className="note-lanes">
             <NoteEditor
               title="808"
@@ -7785,6 +7839,38 @@ function MelodyAccentPads({
   );
 }
 
+function MelodyContourPads({
+  contours,
+  onApply
+}: {
+  contours: MelodyContourOption[];
+  onApply: (contour: MelodyContourId) => void;
+}): ReactElement {
+  return (
+    <div className="melody-contour-panel" data-testid="melody-contour-pads">
+      <div className="melody-contour-heading">
+        <span>Melody Contour</span>
+        <strong>Pitch Shape</strong>
+      </div>
+      <div className="melody-contour-row" aria-label="Melody Contour Pads">
+        {contours.map((contour) => (
+          <button
+            data-testid={`melody-contour-${contour.id}`}
+            key={contour.id}
+            onClick={() => onApply(contour.id)}
+            title={`${contour.label} ${contour.preview}`}
+            type="button"
+          >
+            <span>{contour.label}</span>
+            <strong>{contour.preview}</strong>
+            <small>{contour.pitchSpan} / {contour.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function KeyboardCapturePanel({
   enabled,
   target,
@@ -9120,6 +9206,108 @@ function createMelodyAccentOptions(notes: MelodyNote[]): MelodyAccentOption[] {
       chanceCount: transformed.filter((note) => normalizeEventProbability(note.probability) < 1).length
     };
   });
+}
+
+function createMelodyContourOptions(key: string, notes: MelodyNote[]): MelodyContourOption[] {
+  return melodyContourDefinitions.map((contour) => {
+    const transformed = applyMelodyContourToNotes(key, notes, contour.id);
+    return {
+      ...contour,
+      preview: transformed.length === 0 ? "add synth" : `${transformed[0]?.pitch ?? "-"}>${transformed[transformed.length - 1]?.pitch ?? "-"}`,
+      pitchSpan: melodyPitchSpanLabel(transformed)
+    };
+  });
+}
+
+function applyMelodyContourToNotes(key: string, notes: MelodyNote[], contourId: MelodyContourId): MelodyNote[] {
+  const pitches = melodyPitchLanes(key);
+  if (notes.length === 0 || pitches.length === 0) {
+    return notes;
+  }
+
+  const orderedNotes = sortMelodyNotes(notes);
+  const center = Math.floor((pitches.length - 1) / 2);
+  return sortMelodyNotes(
+    orderedNotes.map((note, index) => {
+      const pitchIndex = melodyContourPitchIndex(note, index, orderedNotes.length, pitches, center, contourId);
+      const length = melodyContourLength(note, index, contourId);
+      return {
+        ...note,
+        pitch: pitches[pitchIndex] ?? note.pitch,
+        length,
+        velocity: melodyContourVelocity(index, orderedNotes.length, contourId),
+        probability: melodyContourProbability(index, orderedNotes.length, contourId)
+      };
+    })
+  );
+}
+
+function melodyContourPitchIndex(
+  note: MelodyNote,
+  index: number,
+  noteCount: number,
+  pitches: string[],
+  center: number,
+  contourId: MelodyContourId
+): number {
+  const current = Math.max(0, pitches.indexOf(note.pitch));
+  if (contourId === "rise") {
+    return Math.min(pitches.length - 1, Math.max(0, center - 2 + index));
+  }
+  if (contourId === "fall") {
+    return Math.min(pitches.length - 1, Math.max(0, center + 2 - index));
+  }
+  if (contourId === "answer") {
+    const half = Math.max(1, Math.ceil(noteCount / 2));
+    return index < half
+      ? Math.min(pitches.length - 1, center + (index % 3))
+      : Math.max(0, center - ((index - half) % 3));
+  }
+  return Math.min(pitches.length - 1, Math.max(0, current === 0 ? center : Math.round((current + center) / 2)));
+}
+
+function melodyContourLength(note: MelodyNote, index: number, contourId: MelodyContourId): number {
+  const maxLength = Math.max(1, 16 - note.step);
+  if (contourId === "anchor") {
+    return Math.min(maxLength, Math.max(note.length, index % 2 === 0 ? 2 : 1));
+  }
+  if (contourId === "answer") {
+    return Math.min(maxLength, index % 2 === 0 ? 2 : 1);
+  }
+  return Math.min(maxLength, Math.max(1, note.length));
+}
+
+function melodyContourVelocity(index: number, noteCount: number, contourId: MelodyContourId): number {
+  if (contourId === "rise") {
+    const progress = noteCount <= 1 ? 1 : index / Math.max(1, noteCount - 1);
+    return clampVelocity(0.58 + progress * 0.24);
+  }
+  if (contourId === "fall") {
+    const progress = noteCount <= 1 ? 0 : index / Math.max(1, noteCount - 1);
+    return clampVelocity(0.8 - progress * 0.2);
+  }
+  if (contourId === "answer") {
+    return clampVelocity(index % 2 === 0 ? 0.76 : 0.62);
+  }
+  return clampVelocity(index % 3 === 0 ? 0.78 : 0.64);
+}
+
+function melodyContourProbability(index: number, noteCount: number, contourId: MelodyContourId): number {
+  if (contourId === "answer") {
+    return normalizeEventProbability(index >= Math.ceil(noteCount / 2) ? 0.94 : 1);
+  }
+  if (contourId === "anchor") {
+    return normalizeEventProbability(index % 4 === 3 ? 0.92 : 1);
+  }
+  return normalizeEventProbability(1);
+}
+
+function melodyPitchSpanLabel(notes: MelodyNote[]): string {
+  if (notes.length === 0) {
+    return "0 notes";
+  }
+  const uniquePitches = new Set(notes.map((note) => note.pitch));
+  return `${uniquePitches.size} pitches`;
 }
 
 function applyMelodyAccentToNotes(notes: MelodyNote[], accentId: MelodyAccentId): MelodyNote[] {
