@@ -304,6 +304,49 @@ h2 {
   font-size: 11px;
 }
 
+.edit-history-readout {
+  display: grid;
+  min-width: 142px;
+  max-width: 176px;
+  min-height: 38px;
+  align-content: center;
+  gap: 1px;
+  padding: 4px 10px;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+}
+
+.edit-history-readout.good {
+  border-color: rgba(120, 240, 200, 0.24);
+  background: rgba(120, 240, 200, 0.065);
+}
+
+.edit-history-readout.warn {
+  border-color: rgba(244, 204, 120, 0.24);
+  background: rgba(244, 204, 120, 0.06);
+}
+
+.edit-history-readout span,
+.edit-history-readout strong,
+.edit-history-readout small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.edit-history-readout span,
+.edit-history-readout small {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.edit-history-readout strong {
+  color: #f4efe7;
+  font-size: 12px;
+  line-height: 1.05;
+}
+
 .icon-button,
 .segmented button,
 .style-quick-picks button,

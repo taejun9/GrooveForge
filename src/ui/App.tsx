@@ -1402,6 +1402,14 @@ type SnapshotSlotRoleSummary = {
   tone: MixCoachTone;
 };
 
+type EditHistoryReadoutSummary = {
+  roleLabel: string;
+  statusLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type HandoffPackItem = {
   id: "wav" | "stems" | "midi" | "sheet";
   label: string;
@@ -1953,6 +1961,7 @@ export function App(): ReactElement {
   );
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
+  const editHistoryReadout = createEditHistoryReadoutSummary(undoStack.length, redoStack.length, projectStatus);
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
   const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const selectedArrangementBars = selectedArrangementBlock ? normalizeArrangementBars(selectedArrangementBlock.bars) : 1;
@@ -4847,6 +4856,15 @@ export function App(): ReactElement {
           <div className="transport-status" aria-live="polite">
             <strong>{transportPrimary}</strong>
             <span>{transportSecondary}</span>
+          </div>
+          <div
+            className={`edit-history-readout ${editHistoryReadout.tone}`}
+            data-testid="edit-history-readout"
+            title={editHistoryReadout.detailTitle}
+          >
+            <span data-testid="edit-history-status">{editHistoryReadout.statusLabel}</span>
+            <strong data-testid="edit-history-label">{editHistoryReadout.roleLabel}</strong>
+            <small data-testid="edit-history-detail">{editHistoryReadout.detailLabel}</small>
           </div>
           <div className="segmented playback-mode-row" aria-label="Transport loop">
             <button
@@ -8535,6 +8553,43 @@ function createSnapshotSlotRoleSummary(project: ProjectState): SnapshotSlotRoleS
     detailLabel: `${savedCount} takes ready`,
     detailTitle: `${statusLabel} / Latest ${latestSnapshot?.name ?? "saved take"} / Compare takes before restore or delete`,
     tone: "good"
+  };
+}
+
+function createEditHistoryReadoutSummary(
+  undoDepth: number,
+  redoDepth: number,
+  projectStatus: string
+): EditHistoryReadoutSummary {
+  const statusLabel = `${undoDepth} undo / ${redoDepth} redo`;
+  const statusDetail = projectStatus.trim() || "Project ready";
+
+  if (redoDepth > 0) {
+    return {
+      roleLabel: "Redo window",
+      statusLabel,
+      detailLabel: `${redoDepth} redo ready`,
+      detailTitle: `${statusLabel} / ${statusDetail}`,
+      tone: "good"
+    };
+  }
+
+  if (undoDepth > 0) {
+    return {
+      roleLabel: "Undo ready",
+      statusLabel,
+      detailLabel: `${undoDepth} ${undoDepth === 1 ? "edit" : "edits"} backed up`,
+      detailTitle: `${statusLabel} / ${statusDetail}`,
+      tone: "good"
+    };
+  }
+
+  return {
+    roleLabel: "Clean slate",
+    statusLabel,
+    detailLabel: "No edit history",
+    detailTitle: `${statusLabel} / ${statusDetail}`,
+    tone: "warn"
   };
 }
 

@@ -229,7 +229,7 @@ Arrangement Arc Pad work must derive full-song section, Pattern A/B/C assignment
 
 Live playback edit work must read current project state while scheduling future steps, let selected-pattern preview and arrangement playback respond to edits without stopping, update BPM and master output changes on future scheduling/output, preserve Stop and Space behavior, and state that already-triggered audio is not rewritten.
 
-Undo/redo work must record bounded local project-edit history for editing actions, ignore playback/export side effects, keep keyboard shortcuts out of focused inputs, and clear history when a different project file is loaded.
+Undo/redo work must record bounded local project-edit history for editing actions, ignore playback/export side effects, keep keyboard shortcuts out of focused inputs, clear history when a different project file is loaded, and keep edit history readouts UI-local, derived only from undo/redo stack depth and project status, and out of persisted project schema.
 
 Desktop shortcut work must keep playback, Pattern A/B/C selection, save/open, undo/redo, and selected event deletion scoped to the app window, must not fire from focused editable controls, and must route destructive deletion through normal undoable project history.
 

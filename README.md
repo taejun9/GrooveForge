@@ -67,7 +67,7 @@ The first usable result is an Electron desktop workstation that can create a sam
 - Next Move strip that turns readiness/export state into explicit local actions such as Blueprint, target alignment, Pattern Compare, Pattern Fill, Pattern Chain, Hook Lift, Master Finish, Save Slot, and Mix Check, then shows post-click local result metrics, audition cues, and next checks.
 - Arrangement templates for 8-bar loop, full beat, hook-first, and breakdown song structures with explicit section lengths, plus Arrangement Arc Pads for one-click full-song energy shaping.
 - Desktop editing shortcuts, Keyboard Capture, and Quick Actions command search for arrangement playback, Pattern A/B/C switching, selected event deletion, save, open, undo, redo, snapshots, blueprints, pattern fills, Arrangement Focus, mix fixes, master finish, and export, with post-run local result metrics, audition cues, and next checks after explicit command clicks.
-- Undo/redo edit history for safer pattern, arrangement, mixer, sound, and master experimentation.
+- Undo/redo edit history with a command-strip readout for undo/redo depth across pattern, arrangement, mixer, sound, and master experimentation.
 - Local draft recovery that keeps a bounded browser/Electron renderer draft in localStorage, then shows explicit Restore Draft and Clear Draft controls on the next session without replacing `.grooveforge.json` Save/Open.
 - Project Snapshots for local idea slots that can save, rename, restore, and delete beat states inside the project file, with a slot role readout for save/compare readiness.
 - Snapshot Compare for local read-only comparison of the current beat against saved snapshots by setup, length, readiness, export, stems, and master posture.
