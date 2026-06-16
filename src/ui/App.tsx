@@ -936,6 +936,7 @@ type MelodyAccentDefinition = {
 
 type MelodyAccentOption = MelodyAccentDefinition & {
   preview: string;
+  changedCount: number;
   chanceCount: number;
 };
 
@@ -949,7 +950,22 @@ type MelodyContourDefinition = {
 
 type MelodyContourOption = MelodyContourDefinition & {
   preview: string;
+  changedCount: number;
   pitchSpan: string;
+};
+
+type MelodyMovePreviewSummary = {
+  statusLabel: string;
+  phraseLabel: string;
+  motifLabel: string;
+  accentLabel: string;
+  contourLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+  motifId: MelodyMotifId | "none";
+  accentId: MelodyAccentId | "none";
+  contourId: MelodyContourId | "none";
 };
 
 type TapTempoState = {
@@ -2499,6 +2515,17 @@ export function App(): ReactElement {
   const melodyContourOptions = useMemo(
     () => createMelodyContourOptions(project.key, currentPattern.melodyNotes),
     [project.key, currentPattern.melodyNotes]
+  );
+  const melodyMovePreviewSummary = useMemo(
+    () =>
+      createMelodyMovePreviewSummary(
+        project.key,
+        currentPattern.melodyNotes,
+        melodyMotifOptions,
+        melodyAccentOptions,
+        melodyContourOptions
+      ),
+    [project.key, currentPattern.melodyNotes, melodyMotifOptions, melodyAccentOptions, melodyContourOptions]
   );
   const patternStackOptions = useMemo(() => createPatternStackOptions(project.key), [project.key]);
   const patternCloneOptions = useMemo(() => createPatternClonePadOptions(project.selectedPattern), [project.selectedPattern]);
@@ -6222,6 +6249,7 @@ export function App(): ReactElement {
           <BasslinePads pads={basslinePadOptions} onApply={applyBasslinePad} />
           <BassGlidePads pads={bassGlidePadOptions} onApply={applyBassGlidePad} />
           <BassContourPads contours={bassContourOptions} onApply={applyBassContour} />
+          <MelodyMovePreview preview={melodyMovePreviewSummary} />
           <MelodyMotifPads motifs={melodyMotifOptions} onApply={applyMelodyMotif} />
           <MelodyAccentPads accents={melodyAccentOptions} onApply={applyMelodyAccent} />
           <MelodyContourPads contours={melodyContourOptions} onApply={applyMelodyContour} />
@@ -16069,6 +16097,26 @@ function BassContourPads({
   );
 }
 
+function MelodyMovePreview({ preview }: { preview: MelodyMovePreviewSummary }): ReactElement {
+  return (
+    <div
+      className={`melody-move-preview ${preview.tone}`}
+      data-preview-melody-accent={preview.accentId}
+      data-preview-melody-contour={preview.contourId}
+      data-preview-melody-motif={preview.motifId}
+      data-testid="melody-move-preview"
+      title={preview.detailTitle}
+    >
+      <span data-testid="melody-move-preview-status">{preview.statusLabel}</span>
+      <strong data-testid="melody-move-preview-phrase">{preview.phraseLabel}</strong>
+      <small data-testid="melody-move-preview-motif">{preview.motifLabel}</small>
+      <small data-testid="melody-move-preview-accent">{preview.accentLabel}</small>
+      <small data-testid="melody-move-preview-contour">{preview.contourLabel}</small>
+      <small data-testid="melody-move-preview-moves">{preview.moveLabel}</small>
+    </div>
+  );
+}
+
 function MelodyMotifPads({
   motifs,
   onApply
@@ -17936,6 +17984,7 @@ function createMelodyAccentOptions(notes: MelodyNote[]): MelodyAccentOption[] {
     return {
       ...accent,
       preview: transformed.length === 0 ? "add synth" : `${Math.round(averageVelocity * 100)}% vel`,
+      changedCount: melodyNotesChangedCount(notes, transformed),
       chanceCount: transformed.filter((note) => normalizeEventProbability(note.probability) < 1).length
     };
   });
@@ -17947,9 +17996,73 @@ function createMelodyContourOptions(key: string, notes: MelodyNote[]): MelodyCon
     return {
       ...contour,
       preview: transformed.length === 0 ? "add synth" : `${transformed[0]?.pitch ?? "-"}>${transformed[transformed.length - 1]?.pitch ?? "-"}`,
+      changedCount: melodyNotesChangedCount(notes, transformed),
       pitchSpan: melodyPitchSpanLabel(transformed)
     };
   });
+}
+
+function createMelodyMovePreviewSummary(
+  key: string,
+  notes: MelodyNote[],
+  motifs: MelodyMotifOption[],
+  accents: MelodyAccentOption[],
+  contours: MelodyContourOption[]
+): MelodyMovePreviewSummary {
+  const motif =
+    motifs.find((option) => melodyMotifMoveCount(key, notes, option) > 0) ?? motifs[0];
+  const accent = accents.find((option) => option.changedCount > 0) ?? accents[0];
+  const contour = contours.find((option) => option.changedCount > 0) ?? contours[0];
+  const motifMoveCount = motif ? melodyMotifMoveCount(key, notes, motif) : 0;
+  const accentMoveCount = notes.length === 0 ? 0 : accent?.changedCount ?? 0;
+  const contourMoveCount = notes.length === 0 ? 0 : contour?.changedCount ?? 0;
+  const totalMoveCount = motifMoveCount + accentMoveCount + contourMoveCount;
+  const phraseLabel = notes.length === 0 ? "No synth phrase" : `${notes.length} notes / ${melodyPitchSpanLabel(notes)}`;
+  const motifLabel = motif ? `${motif.label}: ${motif.preview}` : "Motif ready";
+  const accentLabel = notes.length === 0 ? "Accent waits" : accent ? `${accent.label}: ${accent.preview}` : "Accent ready";
+  const contourLabel = notes.length === 0 ? "Contour waits" : contour ? `${contour.label}: ${contour.preview}` : "Contour ready";
+  const statusLabel = notes.length === 0 ? "Start phrase" : totalMoveCount === 0 ? "Melody aligned" : "Suggested move";
+  const moveLabel = `M ${motifMoveCount} / A ${accentMoveCount} / C ${contourMoveCount}`;
+  return {
+    statusLabel,
+    phraseLabel,
+    motifLabel,
+    accentLabel,
+    contourLabel,
+    moveLabel,
+    detailTitle: `${statusLabel}: ${phraseLabel}; ${motifLabel}; ${accentLabel}; ${contourLabel}; ${moveLabel}.`,
+    tone: notes.length === 0 ? "warn" : totalMoveCount === 0 ? "good" : "warn",
+    motifId: motif?.id ?? "none",
+    accentId: notes.length === 0 ? "none" : accent?.id ?? "none",
+    contourId: notes.length === 0 ? "none" : contour?.id ?? "none"
+  };
+}
+
+function melodyMotifMoveCount(key: string, notes: MelodyNote[], motif: MelodyMotifOption): number {
+  return melodyNotesChangedCount(notes, createMelodyMotifNotes(key, motif));
+}
+
+function melodyNotesChangedCount(current: MelodyNote[], transformed: MelodyNote[]): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentNote = current[index];
+    const transformedNote = transformed[index];
+    if (!currentNote || !transformedNote || !sameMelodyNote(currentNote, transformedNote)) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function sameMelodyNote(first: MelodyNote, second: MelodyNote): boolean {
+  return (
+    first.step === second.step &&
+    first.pitch === second.pitch &&
+    first.length === second.length &&
+    first.velocity === second.velocity &&
+    normalizeEventProbability(first.probability) === normalizeEventProbability(second.probability)
+  );
 }
 
 function applyMelodyContourToNotes(key: string, notes: MelodyNote[], contourId: MelodyContourId): MelodyNote[] {

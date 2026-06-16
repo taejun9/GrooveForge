@@ -212,6 +212,7 @@ h2 {
 .melody-accent-row button span,
 .melody-contour-heading span,
 .melody-contour-row button span,
+.melody-move-preview span,
 .chord-rhythm-heading span,
 .chord-rhythm-row button span,
 .chord-voicing-heading span,
@@ -6670,6 +6671,65 @@ input[type="range"] {
   font-size: 10px;
 }
 
+.melody-move-preview {
+  display: grid;
+  grid-template-columns: minmax(86px, 0.72fr) minmax(96px, 0.86fr) minmax(104px, 1fr) minmax(112px, 1.05fr) minmax(112px, 1.05fr) minmax(76px, 0.6fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  margin-block-end: 8px;
+  border: 1px solid rgba(138, 168, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(138, 168, 255, 0.06);
+  padding: 6px 7px;
+}
+
+.melody-move-preview.warn {
+  border-color: rgba(255, 209, 102, 0.3);
+  background: rgba(255, 209, 102, 0.07);
+}
+
+.melody-move-preview.danger {
+  border-color: rgba(255, 122, 79, 0.32);
+  background: rgba(255, 122, 79, 0.07);
+}
+
+.melody-move-preview > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.melody-move-preview span {
+  color: #08120f;
+  background: #8aa8ff;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.melody-move-preview.warn span {
+  background: #ffd166;
+}
+
+.melody-move-preview.danger span {
+  background: #ff7a4f;
+}
+
+.melody-move-preview strong {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.melody-move-preview small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 10px;
+}
+
 .melody-motif-panel {
   display: grid;
   gap: 8px;
@@ -9966,6 +10026,10 @@ input[type="range"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .melody-move-preview {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .chord-move-preview {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -10130,6 +10194,11 @@ input[type="range"] {
   }
 
   .master-finish-preview {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .melody-move-preview {
     grid-template-columns: 1fr;
     gap: 4px;
   }
