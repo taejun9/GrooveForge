@@ -1021,6 +1021,15 @@ type MixerChannelRoleSummary = {
   isShaped: boolean;
 };
 
+type MasterOutputRoleSummary = {
+  roleLabel: string;
+  statusLabel: string;
+  levelLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  isAtRisk: boolean;
+};
+
 type ProductionSnapshotMetricId = "target" | "form" | "patterns" | "mix" | "handoff";
 
 type ProductionSnapshotMetric = {
@@ -1903,6 +1912,10 @@ export function App(): ReactElement {
   const soundFocusPadOptions = useMemo(() => createSoundFocusPadOptions(project.sound), [project.sound]);
   const drumKitPadOptions = useMemo(() => createDrumKitPadOptions(project), [project]);
   const masterFinishPadOptions = useMemo(() => createMasterFinishPadOptions(project), [project]);
+  const masterOutputRoleSummary = useMemo(
+    () => createMasterOutputRoleSummary(project, exportAnalysis),
+    [project, exportAnalysis]
+  );
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
@@ -5889,6 +5902,21 @@ export function App(): ReactElement {
           <div className="master-readout">
             <strong>{project.masterPreset}</strong>
             <span>{project.masterCeilingDb} dB ceiling</span>
+          </div>
+          <div
+            className={
+              masterOutputRoleSummary.isAtRisk
+                ? "master-output-role-readout risk"
+                : "master-output-role-readout"
+            }
+            aria-label={masterOutputRoleSummary.detailTitle}
+            data-testid="master-output-role-readout"
+            title={masterOutputRoleSummary.detailTitle}
+          >
+            <span data-testid="master-output-role-status">{masterOutputRoleSummary.statusLabel}</span>
+            <strong data-testid="master-output-role-label">{masterOutputRoleSummary.roleLabel}</strong>
+            <small data-testid="master-output-role-level">{masterOutputRoleSummary.levelLabel}</small>
+            <small data-testid="master-output-role-detail">{masterOutputRoleSummary.detailLabel}</small>
           </div>
           <FinishChecklist summary={finishChecklistSummary} />
           <ReviewQueue summary={reviewQueueSummary} />
@@ -11658,6 +11686,39 @@ function applyMasterFinishPadToProject(project: ProjectState, pad: MasterFinishP
     mixer
   };
   return masterFinishChangedCount(project, nextProject) === 0 ? project : nextProject;
+}
+
+function createMasterOutputRoleSummary(project: ProjectState, analysis: ExportAnalysis): MasterOutputRoleSummary {
+  const outputDb = masterChannelVolumeDb(project.mixer);
+  const limitedLabel = analysis.limitedSamples > 0 ? `limiter ${formatPercent(analysis.limitedPercent)}` : "limiter clear";
+
+  return {
+    roleLabel: masterOutputRoleLabel(project.masterPreset, analysis),
+    statusLabel: `${project.masterPreset} / ${analysis.status}`,
+    levelLabel: `${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(outputDb)} output`,
+    detailLabel: `${formatDb(analysis.headroomDb)} headroom / ${limitedLabel}`,
+    detailTitle: `${project.masterPreset} / ${analysis.status} / ${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(outputDb)} output / ${formatDb(analysis.headroomDb)} headroom / ${limitedLabel}`,
+    isAtRisk: analysis.status !== "Ready" || analysis.headroomDb < 0.5 || analysis.limitedSamples > 0
+  };
+}
+
+function masterOutputRoleLabel(preset: MasterPreset, analysis: ExportAnalysis): string {
+  if (analysis.status === "Silent") {
+    return "No signal";
+  }
+  if (analysis.status === "Hot" || analysis.status === "Limiter active" || analysis.headroomDb < 0.5) {
+    return "Headroom watch";
+  }
+  switch (preset) {
+    case "Headroom for Vocal":
+      return "Vocal handoff";
+    case "Streaming Safe":
+      return "Balanced store";
+    case "Clean Demo":
+      return "Demo output";
+    default:
+      return "Output guard";
+  }
 }
 
 function masterChannelVolumeDb(mixer: MixerChannel[]): number {

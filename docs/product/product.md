@@ -96,7 +96,7 @@ Primary feature areas:
 - Quick Actions: searchable local command palette for transport, project, creative, arrangement, mix, master finish, and export actions, with a UI-only post-run result strip that shows command status, one local metric, audition cue, and next check.
 - Project snapshots: local idea slots for saving, renaming, restoring, and deleting beat states inside the project file.
 - Snapshot Compare: local read-only comparison of the current beat against saved Project Snapshots by setup, arrangement length, readiness, export, stems, and master posture.
-- Mixer/master: volume, pan, mute, solo, mixer channel role readouts, Stem Audition Pads for Full Mix/Drums/808/Synth/Chords solo checks, Mix Balance Pads for one-click editable rough balance, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Mix Fix actions, Master Finish Pads for editable demo/vocal/store/club output posture, master preset ceiling, limiter, loudness/peak metering.
+- Mixer/master: volume, pan, mute, solo, mixer channel role readouts, Stem Audition Pads for Full Mix/Drums/808/Synth/Chords solo checks, Mix Balance Pads for one-click editable rough balance, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Mix Fix actions, Master Finish Pads for editable demo/vocal/store/club output posture, master preset ceiling, master output role readout, limiter, loudness/peak metering.
 - Export: WAV export, stem export, arrangement MIDI export, and local Handoff Sheet text export after the event/render paths are reliable.
 
 ## First-Class Data
@@ -192,8 +192,8 @@ MVP capabilities:
 - Transport playback modes for full arrangement playback by default, selected-block loop audition, and fast selected-pattern preview while editing.
 - Realtime metronome toggle with accented downbeat clicks that helps users program to the grid during playback without adding click audio to WAV or stem export.
 - Live playback reads the current project while scheduling future steps, so selected-pattern preview, arrangement block edits, arrangement track mutes, arrangement length, arrangement energy, BPM, mixer, sound, and master changes can be heard without stopping and restarting.
-- Mixer volume, pan, mute, solo, mixer channel role readouts, Stem Audition Pads that explicitly set Full Mix/Drums/808/Synth/Chords audition through existing mixer solo/mute state, Mix Balance Pads, low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Headroom/Stem Balance/Low End Mix Fix actions, and Master Finish Pads reflected in deterministic render feedback.
-- Master preset ceiling, Master Finish Pads, and output gain.
+- Mixer volume, pan, mute, solo, mixer channel role readouts, Stem Audition Pads that explicitly set Full Mix/Drums/808/Synth/Chords audition through existing mixer solo/mute state, Mix Balance Pads, low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Headroom/Stem Balance/Low End Mix Fix actions, Master Finish Pads, and master output role readout reflected in deterministic render feedback.
+- Master preset ceiling, Master Finish Pads, master output role readout, and output gain.
 - Reproducible export peak/RMS/headroom meter with limiter activity status for the current arrangement.
 - Local project save/load as a `.grooveforge.json` file.
 - Local draft recovery as a session-loss safety net only; explicit project files remain the durable save/load workflow.
@@ -214,7 +214,7 @@ Phase 3 adds melody/chords: simple poly synth, scale lock, Melody Motif Pads, Me
 
 Phase 4 adds arrangement and editing speed: pattern blocks, song section markers, per-block bar lengths, arrangement templates, duplicate/move/delete, selected-block copy/paste, split/merge controls, desktop editing shortcuts, then deeper mute/reorder refinements, and variation A/B/C.
 
-Phase 5 adds mixer/master/export: volume, pan, mute, solo, mixer channel role readouts, Mix Balance Pads, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, Master Finish Pads, master preset ceiling first, then limiter, peak/LUFS metering, WAV export, stem export, and MIDI export.
+Phase 5 adds mixer/master/export: volume, pan, mute, solo, mixer channel role readouts, Mix Balance Pads, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, Master Finish Pads, master preset ceiling, master output role readout first, then limiter, peak/LUFS metering, WAV export, stem export, and MIDI export.
 
 Phase 6 scopes optional sampling as an extension only after the beat-making core is useful: audio import, sampler mapping, chopping, reverse, pitch, and stretch.
 

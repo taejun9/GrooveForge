@@ -176,6 +176,9 @@ h2 {
 .style-inspector-metric span,
 .style-inspector-pattern span,
 .master-readout span,
+.master-output-role-readout span,
+.master-output-role-readout strong,
+.master-output-role-readout small,
 .strip > span,
 .strip-control span,
 .strip-readout span,
@@ -6973,6 +6976,56 @@ input[type="range"] {
 
 .master-readout strong {
   font-size: 18px;
+}
+
+.master-output-role-readout {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.42fr) minmax(92px, 0.58fr);
+  gap: 5px 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.16);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px 9px;
+}
+
+.master-output-role-readout span,
+.master-output-role-readout strong,
+.master-output-role-readout small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.master-output-role-readout span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.master-output-role-readout strong {
+  color: #78f0c8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.master-output-role-readout small {
+  color: rgba(244, 239, 231, 0.52);
+  font-size: 10px;
+}
+
+.master-output-role-readout small:last-child {
+  grid-column: 1 / -1;
+}
+
+.master-output-role-readout.risk {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.065);
+}
+
+.master-output-role-readout.risk strong {
+  color: #ffb199;
 }
 
 .master-finish-panel {
