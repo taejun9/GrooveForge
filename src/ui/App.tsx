@@ -905,6 +905,20 @@ type DrumFoundationOption = DrumFoundationDefinition & {
   hitCount: number;
 };
 
+type DrumMovePreviewSummary = {
+  statusLabel: string;
+  patternLabel: string;
+  foundationLabel: string;
+  feelLabel: string;
+  accentLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+  foundationId: DrumFoundationId | "none";
+  feelId: GrooveFeelId | "none";
+  accentId: DrumAccentId | "none";
+};
+
 type MelodyMotifId = "hook" | "pocket" | "rise" | "answer";
 
 type MelodyMotifStep = {
@@ -2532,6 +2546,10 @@ export function App(): ReactElement {
   const drumFoundationOptions = useMemo(() => createDrumFoundationOptions(), []);
   const grooveFeelOptions = useMemo(() => createGrooveFeelOptions(), []);
   const drumAccentOptions = useMemo(() => createDrumAccentOptions(), []);
+  const drumMovePreviewSummary = useMemo(
+    () => createDrumMovePreviewSummary(currentPattern, drumFoundationOptions, grooveFeelOptions, drumAccentOptions),
+    [currentPattern, drumFoundationOptions, grooveFeelOptions, drumAccentOptions]
+  );
   const keyboardCaptureNextStep = nextKeyboardCaptureStep(
     currentPattern,
     keyboardCaptureTarget,
@@ -6074,6 +6092,7 @@ export function App(): ReactElement {
           <PatternDna summary={patternDnaSummary} focusedCardId={patternDnaFocusId} onFocus={focusPatternDnaCard} />
           <PatternClonePads clones={patternCloneOptions} onApply={cloneSelectedPatternVariation} />
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
+          <DrumMovePreview preview={drumMovePreviewSummary} />
           <DrumFoundationPads foundations={drumFoundationOptions} onApply={applyDrumFoundation} />
           <GrooveFeelPads feels={grooveFeelOptions} onApply={applyGrooveFeel} />
           <DrumAccentPads accents={drumAccentOptions} onApply={applyDrumAccent} />
@@ -15841,6 +15860,26 @@ function DrumStepInspector({
   );
 }
 
+function DrumMovePreview({ preview }: { preview: DrumMovePreviewSummary }): ReactElement {
+  return (
+    <div
+      className={`drum-move-preview ${preview.tone}`}
+      data-preview-drum-accent={preview.accentId}
+      data-preview-drum-feel={preview.feelId}
+      data-preview-drum-foundation={preview.foundationId}
+      data-testid="drum-move-preview"
+      title={preview.detailTitle}
+    >
+      <span data-testid="drum-move-preview-status">{preview.statusLabel}</span>
+      <strong data-testid="drum-move-preview-pattern">{preview.patternLabel}</strong>
+      <small data-testid="drum-move-preview-foundation">{preview.foundationLabel}</small>
+      <small data-testid="drum-move-preview-feel">{preview.feelLabel}</small>
+      <small data-testid="drum-move-preview-accent">{preview.accentLabel}</small>
+      <small data-testid="drum-move-preview-moves">{preview.moveLabel}</small>
+    </div>
+  );
+}
+
 function GrooveFeelPads({
   feels,
   onApply
@@ -17648,6 +17687,125 @@ function createDrumFoundationOptions(): DrumFoundationOption[] {
     preview: `K${foundation.kick.length} C${foundation.clap.length} H${foundation.hat.length}`,
     hitCount: foundation.kick.length + foundation.clap.length + foundation.hat.length + foundation.perc.length
   }));
+}
+
+function createDrumMovePreviewSummary(
+  pattern: PatternData,
+  foundations: DrumFoundationOption[],
+  feels: GrooveFeelOption[],
+  accents: DrumAccentOption[]
+): DrumMovePreviewSummary {
+  const foundation = foundations.find((option) => drumFoundationMoveCount(pattern, option) > 0) ?? foundations[0];
+  const feel = feels.find((option) => drumFeelMoveCount(pattern, option) > 0) ?? feels[0];
+  const accent = accents.find((option) => drumAccentMoveCount(pattern, option) > 0) ?? accents[0];
+  const foundationMoveCount = foundation ? drumFoundationMoveCount(pattern, foundation) : 0;
+  const feelMoveCount = feel ? drumFeelMoveCount(pattern, feel) : 0;
+  const accentMoveCount = accent ? drumAccentMoveCount(pattern, accent) : 0;
+  const totalMoveCount = foundationMoveCount + feelMoveCount + accentMoveCount;
+  const hitCount = activeDrumHitCount(pattern);
+  const patternLabel = hitCount === 0 ? "No drum hits" : drumPatternHitLabel(pattern);
+  const foundationLabel = foundation ? `${foundation.label}: ${foundation.preview}` : "Foundation ready";
+  const feelLabel = feel ? `${feel.label}: ${feel.timingPreview}` : "Feel ready";
+  const accentLabel = accent ? `${accent.label}: ${accent.preview}` : "Accent ready";
+  const statusLabel = hitCount === 0 ? "Start drums" : totalMoveCount === 0 ? "Drums aligned" : "Suggested move";
+  const moveLabel = `F ${foundationMoveCount} / G ${feelMoveCount} / A ${accentMoveCount}`;
+  return {
+    statusLabel,
+    patternLabel,
+    foundationLabel,
+    feelLabel,
+    accentLabel,
+    moveLabel,
+    detailTitle: `${statusLabel}: ${patternLabel}; ${foundationLabel}; ${feelLabel}; ${accentLabel}; ${moveLabel}.`,
+    tone: hitCount === 0 ? "warn" : totalMoveCount === 0 ? "good" : "warn",
+    foundationId: foundation?.id ?? "none",
+    feelId: feel?.id ?? "none",
+    accentId: accent?.id ?? "none"
+  };
+}
+
+function activeDrumHitCount(pattern: PatternData): number {
+  return (Object.keys(drumLabels) as DrumLane[]).reduce(
+    (total, lane) => total + pattern.drumPattern[lane].filter(Boolean).length,
+    0
+  );
+}
+
+function drumPatternHitLabel(pattern: PatternData): string {
+  const kickCount = pattern.drumPattern.kick.filter(Boolean).length;
+  const clapCount = pattern.drumPattern.clap.filter(Boolean).length;
+  const hatCount = pattern.drumPattern.hat.filter(Boolean).length;
+  const percCount = pattern.drumPattern.perc.filter(Boolean).length;
+  return `K${kickCount} C${clapCount} H${hatCount} P${percCount}`;
+}
+
+function drumFoundationMoveCount(pattern: PatternData, foundation: DrumFoundationDefinition): number {
+  return drumPatternMoveCount(pattern, applyDrumFoundationToPattern(pattern, foundation));
+}
+
+function drumFeelMoveCount(pattern: PatternData, feel: GrooveFeelDefinition): number {
+  return drumPatternMoveCount(pattern, applyGrooveFeelToPattern(pattern, feel));
+}
+
+function drumAccentMoveCount(pattern: PatternData, accent: DrumAccentDefinition): number {
+  return drumPatternMoveCount(pattern, applyDrumAccentToPattern(pattern, accent.id));
+}
+
+function drumPatternMoveCount(current: PatternData, transformed: PatternData): number {
+  let changed = 0;
+  for (const lane of Object.keys(drumLabels) as DrumLane[]) {
+    for (const step of steps) {
+      if (current.drumPattern[lane][step] !== transformed.drumPattern[lane][step]) {
+        changed += 1;
+      }
+      if (
+        normalizeDrumVelocity(current.drumVelocities[lane][step] ?? defaultDrumVelocity(lane, step)) !==
+        normalizeDrumVelocity(transformed.drumVelocities[lane][step] ?? defaultDrumVelocity(lane, step))
+      ) {
+        changed += 1;
+      }
+      if (normalizeDrumTimingMs(current.drumTimings[lane][step] ?? 0) !== normalizeDrumTimingMs(transformed.drumTimings[lane][step] ?? 0)) {
+        changed += 1;
+      }
+      if (
+        normalizeDrumProbability(current.drumProbabilities[lane][step] ?? 1) !==
+        normalizeDrumProbability(transformed.drumProbabilities[lane][step] ?? 1)
+      ) {
+        changed += 1;
+      }
+    }
+  }
+  for (const step of steps) {
+    if (normalizeHatRepeat(current.hatRepeats[step] ?? 1) !== normalizeHatRepeat(transformed.hatRepeats[step] ?? 1)) {
+      changed += 1;
+    }
+  }
+  changed += noteProbabilityMoveCount(current.bassNotes, transformed.bassNotes);
+  changed += noteProbabilityMoveCount(current.melodyNotes, transformed.melodyNotes);
+  changed += chordProbabilityMoveCount(current.chordEvents, transformed.chordEvents);
+  return changed;
+}
+
+function noteProbabilityMoveCount(current: Array<BassNote | MelodyNote>, transformed: Array<BassNote | MelodyNote>): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    if (normalizeEventProbability(current[index]?.probability ?? 1) !== normalizeEventProbability(transformed[index]?.probability ?? 1)) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function chordProbabilityMoveCount(current: ChordEvent[], transformed: ChordEvent[]): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    if (normalizeEventProbability(current[index]?.probability ?? 1) !== normalizeEventProbability(transformed[index]?.probability ?? 1)) {
+      changed += 1;
+    }
+  }
+  return changed;
 }
 
 function applyDrumFoundationToPattern(pattern: PatternData, foundation: DrumFoundationDefinition): PatternData {
