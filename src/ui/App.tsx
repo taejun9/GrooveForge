@@ -1472,11 +1472,21 @@ const composerStyleActionProfiles: Record<StyleId, ComposerStyleActionProfile> =
   }
 };
 
-type BeatPassportMetric = {
-  id: string;
+type BeatPassportMetricId = "target" | "length" | "patterns" | "readiness" | "export" | "stems" | "master";
+type BeatPassportFocusId = BeatPassportMetricId;
+type BeatPassportFocusTarget = ReviewQueueFocusTarget;
+
+type BeatPassportFocusItem = {
+  focusId: BeatPassportFocusId;
   label: string;
   value: string;
   detail: string;
+  focusTarget: BeatPassportFocusTarget;
+  focusLabel: string;
+};
+
+type BeatPassportMetric = BeatPassportFocusItem & {
+  id: BeatPassportMetricId;
   tone: MixCoachTone;
 };
 
@@ -1485,6 +1495,15 @@ type BeatPassportSummary = {
   detail: string;
   tone: MixCoachTone;
   metrics: BeatPassportMetric[];
+};
+
+type BeatPassportFocusSummary = {
+  focusId: BeatPassportFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
 };
 
 type FinishChecklistCardId = "compose" | "arrange" | "mix" | "master" | "handoff";
@@ -2116,6 +2135,7 @@ export function App(): ReactElement {
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
+  const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
   const [keyCompassFocusId, setKeyCompassFocusId] = useState<KeyCompassFocusId | null>(null);
   const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
@@ -5143,6 +5163,20 @@ export function App(): ReactElement {
     targetRefs[zone]?.scrollIntoView({ block: "start", behavior: "auto" });
   }
 
+  function focusBeatPassportMetric(metric: BeatPassportFocusItem): void {
+    const targetRefs: Record<BeatPassportFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    setBeatPassportFocusId(metric.focusId);
+    targetRefs[metric.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Passport ${metric.label}: ${metric.value}`);
+  }
+
   function focusProductionSnapshotMetric(metric: ProductionSnapshotFocusItem): void {
     const targetRefs: Record<ProductionSnapshotFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5631,7 +5665,7 @@ export function App(): ReactElement {
 
       <SessionBriefPanel brief={project.sessionBrief} onChange={updateSessionBrief} onClear={clearSessionBrief} />
 
-      <BeatPassport summary={beatPassportSummary} />
+      <BeatPassport focusedMetricId={beatPassportFocusId} onFocus={focusBeatPassportMetric} summary={beatPassportSummary} />
 
       <ProductionSnapshot focusedMetricId={productionSnapshotFocusId} onFocus={focusProductionSnapshotMetric} summary={productionSnapshotSummary} />
 
@@ -7700,7 +7734,17 @@ function BeatReadiness({ checks }: { checks: BeatReadinessCheck[] }): ReactEleme
   );
 }
 
-function BeatPassport({ summary }: { summary: BeatPassportSummary }): ReactElement {
+function BeatPassport({
+  focusedMetricId,
+  onFocus,
+  summary
+}: {
+  focusedMetricId: BeatPassportFocusId | null;
+  onFocus: (metric: BeatPassportFocusItem) => void;
+  summary: BeatPassportSummary;
+}): ReactElement {
+  const focusSummary = createBeatPassportFocusSummary(summary, focusedMetricId);
+
   return (
     <section className={`beat-passport ${summary.tone}`} data-testid="beat-passport" aria-label="Beat passport">
       <div className="beat-passport-heading">
@@ -7711,14 +7755,38 @@ function BeatPassport({ summary }: { summary: BeatPassportSummary }): ReactEleme
         <strong data-testid="beat-passport-headline">{summary.headline}</strong>
         <small data-testid="beat-passport-detail">{summary.detail}</small>
       </div>
+      <div className={`beat-passport-focus-readout ${focusSummary.tone}`} data-testid="beat-passport-focus-readout" title={focusSummary.detailTitle}>
+        <span data-testid="beat-passport-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="beat-passport-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="beat-passport-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
       <div className="beat-passport-grid" data-testid="beat-passport-grid">
-        {summary.metrics.map((metric) => (
-          <div className={`beat-passport-card ${metric.tone}`} data-testid={`beat-passport-${metric.id}`} key={metric.id}>
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-            <small>{metric.detail}</small>
-          </div>
-        ))}
+        {summary.metrics.map((metric) => {
+          const focused = focusedMetricId === metric.focusId;
+          return (
+            <div
+              className={["beat-passport-card", metric.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`beat-passport-${metric.id}`}
+              key={metric.id}
+            >
+              <span>{metric.label}</span>
+              <strong>{metric.value}</strong>
+              <button
+                aria-pressed={focused}
+                className="beat-passport-focus-button"
+                data-testid={`beat-passport-focus-${metric.id}`}
+                onClick={() => onFocus(metric)}
+                title={`Focus ${metric.focusLabel}: ${metric.value}`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{metric.focusLabel}</span>
+              </button>
+              <small>{metric.detail}</small>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -9921,54 +9989,103 @@ function createBeatPassportSummary(
     metrics: [
       {
         id: "target",
+        focusId: "target",
         label: "Target",
         value: target.name,
         detail: target.focus,
+        focusTarget: "deliver",
+        focusLabel: "Deliver",
         tone: isDeliveryTargetAligned(project, target) ? "good" : "warn"
       },
       {
         id: "length",
+        focusId: "length",
         label: "Length",
         value: barCountLabel(bars),
         detail: `${barCountLabel(target.targetBars)} target`,
+        focusTarget: "arrange",
+        focusLabel: "Arrange",
         tone: lengthTone
       },
       {
         id: "patterns",
+        focusId: "patterns",
         label: "Patterns",
         value: patternLabel,
         detail: `${slots.length}/3 slots used`,
+        focusTarget: "compose",
+        focusLabel: "Compose",
         tone: patternTone
       },
       {
         id: "readiness",
+        focusId: "readiness",
         label: "Ready",
         value: `${readyCount}/${checks.length}`,
         detail: checksLeft === 0 ? "All checks green" : `${checksLeft} checks left`,
+        focusTarget: "compose",
+        focusLabel: "Compose",
         tone: readinessTone
       },
       {
         id: "export",
+        focusId: "export",
         label: "Export",
         value: analysis.status,
         detail: `${formatDb(analysis.headroomDb)} headroom`,
+        focusTarget: "deliver",
+        focusLabel: "Deliver",
         tone: exportTone
       },
       {
         id: "stems",
+        focusId: "stems",
         label: "Stems",
         value: `${audibleStems.length}/${target.stemGoal}`,
         detail: stemLabel,
+        focusTarget: "deliver",
+        focusLabel: "Deliver",
         tone: stemTone
       },
       {
         id: "master",
+        focusId: "master",
         label: "Master",
         value: project.masterPreset,
         detail: `${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(masterChannelVolumeDb(project.mixer))} output`,
+        focusTarget: "master",
+        focusLabel: "Master",
         tone: masterTone
       }
     ]
+  };
+}
+
+function createBeatPassportFocusSummary(summary: BeatPassportSummary, focusedMetricId: BeatPassportFocusId | null): BeatPassportFocusSummary {
+  const focusedMetric = focusedMetricId ? summary.metrics.find((metric) => metric.focusId === focusedMetricId) ?? null : null;
+  const metric = focusedMetric ?? summary.metrics[0] ?? null;
+
+  if (!metric) {
+    return {
+      focusId: null,
+      statusLabel: "Passport clear",
+      areaLabel: "No passport focus",
+      detailLabel: "No Beat Passport metrics available",
+      detailTitle: "Beat Passport has no focusable metrics.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel = focusedMetric ? "Focused Passport" : "Passport Focus";
+  const detailLabel = `${metric.focusLabel} panel / ${metric.detail}`;
+
+  return {
+    focusId: metric.focusId,
+    statusLabel,
+    areaLabel: `${metric.label}: ${metric.value}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${metric.label}: ${metric.value} / ${detailLabel}`,
+    tone: metric.tone
   };
 }
 
