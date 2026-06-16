@@ -841,6 +841,14 @@ type ChordVoicingOption = ChordVoicingDefinition & {
   selected: boolean;
 };
 
+type ChordHarmonicSummary = {
+  degreeLabel: string;
+  romanLabel: string;
+  roleLabel: string;
+  detailLabel: string;
+  inKey: boolean;
+};
+
 type ArrangementFocusPresetId = "intro_space" | "verse_pocket" | "hook_peak" | "bridge_drop" | "outro_release";
 
 type ArrangementFocusPreset = {
@@ -5269,6 +5277,7 @@ export function App(): ReactElement {
             chordRhythms={chordRhythmOptions}
             chordVoicings={chordVoicingOptions}
             chords={currentPattern.chordEvents}
+            currentKey={project.key}
             rootOptions={chordRootOptions}
             selectedIndex={selectedChordIndex}
             onAdd={addChordEvent}
@@ -10022,6 +10031,53 @@ function scaleDegreeRoleLabel(degree: number): string {
   return ["Root", "Step", "Color", "Lift", "Anchor", "Mood", "Lead"][degree] ?? "Scale";
 }
 
+function selectedChordHarmonicSummary(key: string, chord: ChordEvent): ChordHarmonicSummary {
+  const inversion = normalizeChordInversion(chord.inversion);
+  const detailLabel = `${chord.root}${chord.quality} / ${chordInversionLabel(inversion)}`;
+  const degree = keyCompassScaleDegree(key, chord.root);
+  if (degree === null) {
+    return {
+      degreeLabel: "Out",
+      romanLabel: "Out",
+      roleLabel: "Outside key",
+      detailLabel,
+      inKey: false
+    };
+  }
+
+  return {
+    degreeLabel: `D${degree + 1}`,
+    romanLabel: romanChordLabel(degree, chord.quality),
+    roleLabel: chordDegreeRoleLabel(degree),
+    detailLabel,
+    inKey: true
+  };
+}
+
+function romanChordLabel(degree: number, quality: ChordQuality): string {
+  const base = ["I", "II", "III", "IV", "V", "VI", "VII"][degree] ?? "I";
+  if (quality === "min") {
+    return base.toLowerCase();
+  }
+  if (quality === "m7") {
+    return `${base.toLowerCase()}7`;
+  }
+  if (quality === "dim") {
+    return `${base.toLowerCase()}dim`;
+  }
+  if (quality === "7") {
+    return `${base}7`;
+  }
+  if (quality === "sus2" || quality === "sus4") {
+    return `${base}${quality}`;
+  }
+  return base;
+}
+
+function chordDegreeRoleLabel(degree: number): string {
+  return ["Home", "Step", "Color", "Lift", "Tension", "Mood", "Lead"][degree] ?? "Function";
+}
+
 function keyCompassScaleDegreeLabel(key: string, pitchName: string): string {
   const degree = keyCompassScaleDegree(key, pitchName);
   return degree === null ? "out" : `D${degree + 1}`;
@@ -13111,6 +13167,7 @@ function ChordEditor({
   chordRhythms,
   chordVoicings,
   chords,
+  currentKey,
   rootOptions,
   selectedIndex,
   onAdd,
@@ -13132,6 +13189,7 @@ function ChordEditor({
   chordRhythms: ChordRhythmOption[];
   chordVoicings: ChordVoicingOption[];
   chords: ChordEvent[];
+  currentKey: string;
   rootOptions: string[];
   selectedIndex: number | null;
   onAdd: () => void;
@@ -13150,6 +13208,7 @@ function ChordEditor({
 }): ReactElement {
   const selectedChord = selectedIndex === null ? undefined : chords[selectedIndex];
   const selectedInversion = selectedChord ? normalizeChordInversion(selectedChord.inversion) : 0;
+  const harmonicSummary = selectedChord ? selectedChordHarmonicSummary(currentKey, selectedChord) : null;
   const chordClipboardLabel = chordClipboard ? `${chordClipboard.root}${chordClipboard.quality}.${chordClipboard.step + 1}` : "Empty";
   const canMoveLeft =
     selectedIndex !== null &&
@@ -13253,6 +13312,15 @@ function ChordEditor({
           ))}
         </div>
       </div>
+      {harmonicSummary && (
+        <div className={harmonicSummary.inKey ? "chord-harmonic-readout" : "chord-harmonic-readout warn"} data-testid="chord-harmonic-readout">
+          <span>Function</span>
+          <strong data-testid="chord-harmonic-label">{harmonicSummary.romanLabel}</strong>
+          <small data-testid="chord-harmonic-role">
+            {harmonicSummary.degreeLabel} / {harmonicSummary.roleLabel} / {harmonicSummary.detailLabel}
+          </small>
+        </div>
+      )}
       <div className="chord-edit-row" aria-label="Selected chord edit tools">
         <button
           data-testid="chord-move-left"

@@ -5722,6 +5722,46 @@ input[type="range"] {
   gap: 6px;
 }
 
+.chord-harmonic-readout {
+  display: grid;
+  grid-template-columns: minmax(54px, 0.34fr) minmax(40px, 0.24fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(213, 140, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(213, 140, 255, 0.07);
+  padding: 6px 8px;
+}
+
+.chord-harmonic-readout span,
+.chord-harmonic-readout strong,
+.chord-harmonic-readout small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chord-harmonic-readout strong {
+  color: #d58cff;
+  font-size: 12px;
+}
+
+.chord-harmonic-readout small {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 11px;
+}
+
+.chord-harmonic-readout.warn {
+  border-color: rgba(255, 122, 79, 0.24);
+  background: rgba(255, 122, 79, 0.07);
+}
+
+.chord-harmonic-readout.warn strong {
+  color: #ff7a4f;
+}
+
 .chord-preset-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
