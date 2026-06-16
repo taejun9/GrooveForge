@@ -25,4 +25,4 @@ No blocking findings.
 
 ## Residual Risk
 
-The in-app Browser tool was not exposed in this session, so UI smoke used headless Chrome CDP against `http://127.0.0.1:5221/`. The tested desktop viewport had no horizontal overflow in the readout.
+The in-app Browser tool was not exposed in this session, so UI smoke used headless Chrome CDP against `http://127.0.0.1:5223/`. The tested desktop viewport had no horizontal overflow in the readout.
