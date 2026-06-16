@@ -64,11 +64,11 @@ Electron is used for the first desktop MVP because it gets the existing web audi
 
 ## Data Model Direction
 
-The architecture follows a direct-composition pipeline first: BPM/key/style, pattern programming, drum sequencing, 808/bass synthesis, melody/chord composition, sound design, arrangement, mixer/master, and export. Optional sampling attaches after this pipeline as an additional sound source or instrument layer; it must not become the foundation of project creation, playback, arrangement, save/load, or export.
+The architecture follows a direct-composition pipeline: BPM/key/style, pattern programming, drum sequencing, 808/bass synthesis, melody/chord composition, sound design, arrangement, mixer/master, and export. Optional sampling attaches after this pipeline as an additional sound source or instrument layer; it must not become the foundation of project creation, playback, arrangement, save/load, or export.
 
-Architectural center: Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export. Audio import, chopping, stretching, one-shot mapping, and sampler devices are secondary extension paths that plug into this center only after it works without samples.
+Architectural center: Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export. Style profiles, musical events, built-in instruments, arrangement blocks, mixer state, master state, and render state are the first-class data that make a beat without imported audio.
 
-Architecture diagrams and draft flows should not place a sampling pipeline beside the composition pipeline as an equal starting path. The core layer map should stay centered on event editing, built-in instruments, arrangement, mixer/master, and export, with sampler/audio-clip concepts separated into a later extension section.
+Audio import, chopping, stretching, one-shot mapping, and sampler devices are secondary extension paths that plug into this center only after it works without samples. Architecture diagrams and draft flows should keep the core layer map centered on event editing, built-in instruments, arrangement, mixer/master, and export, with sampler/audio-clip concepts separated into a later extension section.
 
 Composition-first invariant: GrooveForge must remain fully usable when audio import, sampler tracks, chop pads, and audio warping are absent. Core playback, arrangement, save/load, and export paths should depend on musical events, built-in instruments, mixer state, and master state before they depend on user audio assets.
 
@@ -86,7 +86,7 @@ The core project model should make composition events first-class. In the core a
 
 MVP type examples must not place `AudioClipEvent`, `audio`, or `sampler` beside the core event, clip, or track unions. Those names are reserved for the optional sampling extension section unless the user explicitly starts sampling-phase work.
 
-Sampling is an extension model, not a core dependency. When it is added, it can introduce audio clips, sampler devices, audio tracks, and source/license metadata without changing the requirement that a valid beat can be made from generated and performed events alone. Sampling architecture should attach to the beat workstation; it should not replace the workstation model. `AudioClipEvent` belongs in that extension layer, not in the core MVP `MusicalEvent` union.
+Sampling is an extension model, not a core dependency. When it is added, it can introduce audio clips, sampler devices, audio tracks, and source/license metadata without changing the requirement that a valid beat can be made from generated and performed events alone. `AudioClipEvent` belongs in that extension layer, not in the core MVP `MusicalEvent` union.
 
 Optional sampling schemas must preserve the existing event-first contract: `NoteEvent`, `DrumHitEvent`, and automation stay sufficient for a complete beat, while any future `AudioClipEvent` remains additive, opt-in, and absent from the core MVP proof.
 
