@@ -980,6 +980,33 @@ type ComposerGuideSummary = {
   cards: ComposerGuideCard[];
 };
 
+type ComposerActionCommand =
+  | { kind: "blueprint"; blueprintId: BeatBlueprintId }
+  | { kind: "drumFoundation"; foundation: DrumFoundationId }
+  | { kind: "bassline"; pad: BasslinePadId }
+  | { kind: "chordProgression"; preset: ChordProgressionPreset }
+  | { kind: "melodyMotif"; motif: MelodyMotifId }
+  | { kind: "patternFill"; preset: PatternFillPreset }
+  | { kind: "patternChain"; chain: PatternChainId }
+  | { kind: "arrangementTemplate"; template: ArrangementTemplateId }
+  | { kind: "masterFinish"; pad: MasterFinishPadId };
+
+type ComposerAction = {
+  id: string;
+  label: string;
+  detail: string;
+  buttonLabel: string;
+  tone: MixCoachTone;
+  command: ComposerActionCommand;
+};
+
+type ComposerActionsSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  actions: ComposerAction[];
+};
+
 type BeatPassportMetric = {
   id: string;
   label: string;
@@ -1575,6 +1602,10 @@ export function App(): ReactElement {
   );
   const composerGuideSummary = useMemo(
     () => createComposerGuideSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
+  );
+  const composerActionsSummary = useMemo(
+    () => createComposerActionsSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
   const chordPadOptions = useMemo(
@@ -3825,6 +3856,38 @@ export function App(): ReactElement {
     }
   }
 
+  function runComposerAction(action: ComposerAction): void {
+    switch (action.command.kind) {
+      case "blueprint":
+        applySelectedBeatBlueprint(action.command.blueprintId);
+        return;
+      case "drumFoundation":
+        applyDrumFoundation(action.command.foundation);
+        return;
+      case "bassline":
+        applyBasslinePad(action.command.pad);
+        return;
+      case "chordProgression":
+        applyChordProgressionPreset(action.command.preset);
+        return;
+      case "melodyMotif":
+        applyMelodyMotif(action.command.motif);
+        return;
+      case "patternFill":
+        applyPatternFill(action.command.preset);
+        return;
+      case "patternChain":
+        applyPatternChain(action.command.chain);
+        return;
+      case "arrangementTemplate":
+        applyArrangementTemplate(action.command.template);
+        return;
+      case "masterFinish":
+        applyMasterFinishPad(action.command.pad);
+        return;
+    }
+  }
+
   function openQuickActions(): void {
     setQuickActionQuery("");
     setQuickActionsOpen(true);
@@ -4096,6 +4159,8 @@ export function App(): ReactElement {
       <GrooveCompass summary={grooveCompassSummary} />
 
       <ComposerGuide summary={composerGuideSummary} />
+
+      <ComposerActions summary={composerActionsSummary} onRun={runComposerAction} />
 
       <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
 
@@ -5904,6 +5969,66 @@ function ComposerGuide({ summary }: { summary: ComposerGuideSummary }): ReactEle
   );
 }
 
+function ComposerActions({
+  summary,
+  onRun
+}: {
+  summary: ComposerActionsSummary;
+  onRun: (action: ComposerAction) => void;
+}): ReactElement {
+  return (
+    <section className={`composer-actions ${summary.tone}`} data-testid="composer-actions" aria-label="Composer actions">
+      <div className="composer-actions-heading">
+        <div>
+          <Sparkles size={17} aria-hidden="true" />
+          <span>Composer Actions</span>
+        </div>
+        <strong data-testid="composer-actions-headline">{summary.headline}</strong>
+        <small data-testid="composer-actions-detail">{summary.detail}</small>
+      </div>
+      <div className="composer-actions-grid" data-testid="composer-actions-grid">
+        {summary.actions.map((action) => (
+          <button
+            className={action.tone}
+            data-testid={`composer-action-${action.id}`}
+            key={action.id}
+            onClick={() => onRun(action)}
+            title={action.label}
+            type="button"
+          >
+            {composerActionIcon(action)}
+            <span>
+              <strong>{action.buttonLabel}</strong>
+              <small>{action.detail}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function composerActionIcon(action: ComposerAction): ReactElement {
+  switch (action.command.kind) {
+    case "drumFoundation":
+      return <Drum size={14} aria-hidden="true" />;
+    case "bassline":
+      return <Waves size={14} aria-hidden="true" />;
+    case "chordProgression":
+      return <KeyboardMusic size={14} aria-hidden="true" />;
+    case "melodyMotif":
+      return <Music2 size={14} aria-hidden="true" />;
+    case "arrangementTemplate":
+    case "patternChain":
+      return <ListChecks size={14} aria-hidden="true" />;
+    case "masterFinish":
+      return <Gauge size={14} aria-hidden="true" />;
+    case "blueprint":
+    case "patternFill":
+      return <Sparkles size={14} aria-hidden="true" />;
+  }
+}
+
 function FinishChecklist({ summary }: { summary: FinishChecklistSummary }): ReactElement {
   return (
     <section className={`finish-checklist ${summary.tone}`} data-testid="finish-checklist" aria-label="Finish checklist">
@@ -7683,6 +7808,257 @@ function composerGuideFocus(cards: ComposerGuideCard[]): string {
     return `${firstWarn.label} needs one more pass`;
   }
   return "Beat has a complete writing path";
+}
+
+function createComposerActionsSummary(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): ComposerActionsSummary {
+  const pattern = activePattern(project);
+  const target = activeDeliveryTarget(project);
+  const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const drumHits = drumHitCount(pattern);
+  const bassCount = pattern.bassNotes.length;
+  const chordCount = pattern.chordEvents.length;
+  const melodyCount = pattern.melodyNotes.length;
+  const bars = arrangementTotalBars(project);
+  const mixTone = weakestTone(createMixCoachChecks(analysis, stemAnalyses).map((check) => check.tone));
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+
+  const actions: ComposerAction[] = [
+    composerDrumAction(project, checks, drumHits),
+    composerBassAction(project, bassCount),
+    composerHarmonyAction(project, chordCount),
+    composerMelodyAction(project, melodyCount),
+    composerArrangementAction(project, bars, target),
+    composerFinishAction(project, analysis, mixTone, audibleStemCount, target)
+  ];
+
+  return {
+    headline: composerActionsFocus(actions),
+    detail: `${styleName} / Pattern ${project.selectedPattern} / ${actions.length} explicit writing moves`,
+    tone: weakestTone(actions.map((action) => action.tone)),
+    actions
+  };
+}
+
+function composerDrumAction(project: ProjectState, checks: BeatReadinessCheck[], drumHits: number): ComposerAction {
+  const drums = readinessCheckForId(checks, "drums");
+  if (drumHits < 10 || drums?.tone === "danger") {
+    const foundation = drumHits === 0 ? "straight" : "bounce";
+    return {
+      id: "drums-foundation",
+      label: "Build rhythm foundation",
+      detail: `Pattern ${project.selectedPattern} / ${drumHits} hits`,
+      buttonLabel: "Drum Foundation",
+      tone: drums?.tone ?? (drumHits > 0 ? "warn" : "danger"),
+      command: { kind: "drumFoundation", foundation }
+    };
+  }
+
+  return {
+    id: "drums-fill",
+    label: "Add drum movement",
+    detail: `Pattern ${project.selectedPattern} tail move`,
+    buttonLabel: "Drum Fill",
+    tone: "good",
+    command: { kind: "patternFill", preset: "drum_fill" }
+  };
+}
+
+function composerBassAction(project: ProjectState, bassCount: number): ComposerAction {
+  if (bassCount < 4) {
+    const pad = composerBasslinePad(project);
+    return {
+      id: "bassline",
+      label: "Write low end",
+      detail: `${basslinePadLabel(pad)} / Pattern ${project.selectedPattern}`,
+      buttonLabel: "808 Bassline",
+      tone: bassCount === 0 ? "danger" : "warn",
+      command: { kind: "bassline", pad }
+    };
+  }
+
+  return {
+    id: "bass-pickup",
+    label: "Add low-end pickup",
+    detail: `Pattern ${project.selectedPattern} tail move`,
+    buttonLabel: "808 Pickup",
+    tone: "good",
+    command: { kind: "patternFill", preset: "bass_pickup" }
+  };
+}
+
+function composerHarmonyAction(project: ProjectState, chordCount: number): ComposerAction {
+  const preset = composerChordPreset(project);
+  return {
+    id: chordCount < 3 ? "chord-progression" : "chord-color",
+    label: chordCount < 3 ? "Set chord motion" : "Refresh chord color",
+    detail: `${chordProgressionPresetLabel(preset)} / ${project.key}`,
+    buttonLabel: chordCount < 3 ? "Chord Progression" : "Chord Color",
+    tone: chordCount >= 3 ? "good" : chordCount > 0 ? "warn" : "danger",
+    command: { kind: "chordProgression", preset }
+  };
+}
+
+function composerMelodyAction(project: ProjectState, melodyCount: number): ComposerAction {
+  if (melodyCount < 4) {
+    const motif = composerMelodyMotif(project);
+    return {
+      id: "melody-motif",
+      label: "Seed hook motif",
+      detail: `${melodyMotifLabel(motif)} / ${project.key}`,
+      buttonLabel: "Melody Motif",
+      tone: melodyCount === 0 ? "danger" : "warn",
+      command: { kind: "melodyMotif", motif }
+    };
+  }
+
+  return {
+    id: "melody-turn",
+    label: "Turn the melody tail",
+    detail: `Pattern ${project.selectedPattern} tail move`,
+    buttonLabel: "Melody Turn",
+    tone: "good",
+    command: { kind: "patternFill", preset: "melody_turn" }
+  };
+}
+
+function composerArrangementAction(project: ProjectState, bars: number, target: DeliveryTarget): ComposerAction {
+  if (bars < 8) {
+    return {
+      id: "arrange-chain",
+      label: "Sketch song form",
+      detail: `${barCountLabel(bars)} now / 8-bar chain`,
+      buttonLabel: "8 Bar Chain",
+      tone: "danger",
+      command: { kind: "patternChain", chain: "eight_bar" }
+    };
+  }
+
+  if (bars < target.targetBars) {
+    return {
+      id: "arrange-template",
+      label: `Reach ${target.name}`,
+      detail: `${barCountLabel(bars)} now / ${barCountLabel(target.targetBars)} target`,
+      buttonLabel: arrangementTemplateLabel(target.preferredTemplate),
+      tone: "warn",
+      command: { kind: "arrangementTemplate", template: target.preferredTemplate }
+    };
+  }
+
+  return {
+    id: "arrange-switch",
+    label: "Add section contrast",
+    detail: `${barCountLabel(bars)} form / Pattern A/B/C`,
+    buttonLabel: "Hook Switch",
+    tone: "good",
+    command: { kind: "patternChain", chain: "hook_switch" }
+  };
+}
+
+function composerFinishAction(
+  project: ProjectState,
+  analysis: ExportAnalysis,
+  mixTone: MixCoachTone,
+  audibleStemCount: number,
+  target: DeliveryTarget
+): ComposerAction {
+  const pad = suggestedMasterFinishPad(project);
+  const tone: MixCoachTone =
+    analysis.status === "Ready" && mixTone === "good" && audibleStemCount >= target.stemGoal ? "good" : "warn";
+
+  return {
+    id: "finish-master",
+    label: "Set output posture",
+    detail: `${analysis.status} / ${audibleStemCount}/${target.stemGoal} stems`,
+    buttonLabel: `${masterFinishPadLabel(pad)} Finish`,
+    tone,
+    command: { kind: "masterFinish", pad }
+  };
+}
+
+function composerActionsFocus(actions: ComposerAction[]): string {
+  const firstDanger = actions.find((action) => action.tone === "danger");
+  if (firstDanger) {
+    return `${firstDanger.label} is ready to run`;
+  }
+  const firstWarn = actions.find((action) => action.tone === "warn");
+  if (firstWarn) {
+    return `${firstWarn.label} is the next safe move`;
+  }
+  return "Writing actions are ready for variation";
+}
+
+function composerBasslinePad(project: ProjectState): BasslinePadId {
+  switch (project.styleId) {
+    case "house":
+    case "jersey":
+    case "garage":
+      return "offbeat";
+    case "trap":
+    case "drill":
+    case "phonk":
+      return "slide";
+    case "boom_bap":
+    case "lofi":
+    case "rnb":
+      return "bounce";
+    case "experimental":
+      return "root";
+  }
+}
+
+function composerChordPreset(project: ProjectState): ChordProgressionPreset {
+  switch (project.styleId) {
+    case "house":
+    case "jersey":
+    case "garage":
+      return "bounce";
+    case "rnb":
+      return "lift";
+    case "boom_bap":
+    case "lofi":
+      return "sparse";
+    case "trap":
+    case "drill":
+    case "phonk":
+    case "experimental":
+      return "moody";
+  }
+}
+
+function composerMelodyMotif(project: ProjectState): MelodyMotifId {
+  switch (project.styleId) {
+    case "house":
+    case "jersey":
+    case "garage":
+      return "rise";
+    case "boom_bap":
+    case "lofi":
+      return "answer";
+    case "rnb":
+      return "pocket";
+    case "trap":
+    case "drill":
+    case "phonk":
+    case "experimental":
+      return "hook";
+  }
+}
+
+function basslinePadLabel(pad: BasslinePadId): string {
+  return basslinePadDefinitions.find((definition) => definition.id === pad)?.label ?? pad;
+}
+
+function melodyMotifLabel(motif: MelodyMotifId): string {
+  return melodyMotifDefinitions.find((definition) => definition.id === motif)?.label ?? motif;
+}
+
+function masterFinishPadLabel(pad: MasterFinishPadId): string {
+  return masterFinishPadDefinitions.find((definition) => definition.id === pad)?.label ?? pad;
 }
 
 function keyCompassFocusCard(
