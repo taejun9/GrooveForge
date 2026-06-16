@@ -772,6 +772,28 @@ type ArrangementFocusSummary = {
   suggestedPreset: ArrangementFocusPresetId;
 };
 
+type ArrangementArcPadId = "clean" | "lift" | "break" | "rise";
+
+type ArrangementArcPoint = {
+  section: ArrangementSection;
+  pattern: PatternSlot;
+  bars: number;
+  energy: number;
+  mutedTracks: ArrangementMuteTrack[];
+};
+
+type ArrangementArcPadDefinition = {
+  id: ArrangementArcPadId;
+  label: string;
+  detail: string;
+  points: ArrangementArcPoint[];
+};
+
+type ArrangementArcPadOption = ArrangementArcPadDefinition & {
+  preview: string;
+  changedCount: number;
+};
+
 type NextMoveCommand =
   | { kind: "blueprint"; blueprintId: BeatBlueprintId }
   | { kind: "patternFill"; preset: PatternFillPreset }
@@ -926,6 +948,57 @@ const arrangementFocusPresets: ArrangementFocusPreset[] = [
     bars: 2,
     energy: 0.46,
     mutedTracks: ["drum_rack", "bass_808"]
+  }
+];
+
+const arrangementArcPadDefinitions: ArrangementArcPadDefinition[] = [
+  {
+    id: "clean",
+    label: "Clean Arc",
+    detail: "steady song",
+    points: [
+      { section: "Intro", pattern: "A", bars: 2, energy: 0.42, mutedTracks: ["bass_808"] },
+      { section: "Verse", pattern: "A", bars: 4, energy: 0.68, mutedTracks: ["synth"] },
+      { section: "Hook", pattern: "B", bars: 4, energy: 0.9, mutedTracks: [] },
+      { section: "Bridge", pattern: "C", bars: 2, energy: 0.54, mutedTracks: ["drum_rack"] },
+      { section: "Outro", pattern: "A", bars: 2, energy: 0.34, mutedTracks: ["bass_808", "synth"] }
+    ]
+  },
+  {
+    id: "lift",
+    label: "Hook Lift",
+    detail: "wide peak",
+    points: [
+      { section: "Intro", pattern: "A", bars: 1, energy: 0.46, mutedTracks: ["synth"] },
+      { section: "Verse", pattern: "A", bars: 4, energy: 0.64, mutedTracks: ["synth"] },
+      { section: "Hook", pattern: "B", bars: 4, energy: 0.96, mutedTracks: [] },
+      { section: "Hook", pattern: "C", bars: 2, energy: 0.82, mutedTracks: ["bass_808"] },
+      { section: "Outro", pattern: "A", bars: 1, energy: 0.38, mutedTracks: ["drum_rack", "bass_808"] }
+    ]
+  },
+  {
+    id: "break",
+    label: "Break Arc",
+    detail: "drop turn",
+    points: [
+      { section: "Intro", pattern: "A", bars: 2, energy: 0.32, mutedTracks: ["bass_808", "synth"] },
+      { section: "Verse", pattern: "A", bars: 4, energy: 0.58, mutedTracks: [] },
+      { section: "Bridge", pattern: "C", bars: 2, energy: 0.34, mutedTracks: ["drum_rack", "bass_808"] },
+      { section: "Hook", pattern: "B", bars: 4, energy: 0.92, mutedTracks: [] },
+      { section: "Outro", pattern: "C", bars: 2, energy: 0.42, mutedTracks: ["drum_rack"] }
+    ]
+  },
+  {
+    id: "rise",
+    label: "Club Rise",
+    detail: "late energy",
+    points: [
+      { section: "Intro", pattern: "A", bars: 1, energy: 0.5, mutedTracks: ["bass_808"] },
+      { section: "Verse", pattern: "A", bars: 2, energy: 0.72, mutedTracks: [] },
+      { section: "Bridge", pattern: "C", bars: 2, energy: 0.78, mutedTracks: ["synth"] },
+      { section: "Hook", pattern: "B", bars: 4, energy: 0.98, mutedTracks: [] },
+      { section: "Outro", pattern: "B", bars: 1, energy: 0.64, mutedTracks: ["synth"] }
+    ]
   }
 ];
 
@@ -1231,6 +1304,10 @@ export function App(): ReactElement {
   const selectedArrangementNextBars = selectedArrangementNextBlock ? normalizeArrangementBars(selectedArrangementNextBlock.bars) : 0;
   const selectedArrangementFocus = useMemo(
     () => createArrangementFocusSummary(project, selectedArrangementIndex),
+    [project, selectedArrangementIndex]
+  );
+  const arrangementArcPadOptions = useMemo(
+    () => createArrangementArcPadOptions(project, selectedArrangementIndex),
     [project, selectedArrangementIndex]
   );
   const canSplitArrangementBlock = selectedArrangementBars > 1;
@@ -1900,6 +1977,27 @@ export function App(): ReactElement {
     );
     if (changed) {
       selectTransportLoopScope("block", false);
+    }
+  }
+
+  function applyArrangementArcPad(padId: ArrangementArcPadId): void {
+    const pad = arrangementArcPadDefinitions.find((definition) => definition.id === padId);
+    if (!pad) {
+      setProjectStatus("Arrangement arc pad not found");
+      return;
+    }
+
+    const changed = updateProject(
+      (current) => applyArrangementArcPadToProject(current, pad, selectedArrangementIndex),
+      `Applied ${pad.label} arc`
+    );
+    if (changed) {
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+      selectTransportLoopScope("arrangement", false);
+    } else {
+      setProjectStatus(`${pad.label} arc already selected`);
     }
   }
 
@@ -4105,6 +4203,7 @@ export function App(): ReactElement {
               );
             })}
           </div>
+          <ArrangementArcPads pads={arrangementArcPadOptions} onApply={applyArrangementArcPad} />
           <div className="pattern-chain-row" aria-label="Pattern chain">
             <div className="pattern-chain-heading">
               <span>Chain</span>
@@ -4880,6 +4979,39 @@ function ArrangementFocusPanel({
             <small>
               Pattern {preset.pattern} / {barCountLabel(preset.bars)} / {Math.round(preset.energy * 100)}%
             </small>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ArrangementArcPads({
+  pads,
+  onApply
+}: {
+  pads: ArrangementArcPadOption[];
+  onApply: (pad: ArrangementArcPadId) => void;
+}): ReactElement {
+  return (
+    <section className="arrangement-arc" data-testid="arrangement-arc-pads" aria-label="Arrangement Arc Pads">
+      <div className="arrangement-arc-heading">
+        <span>Arc</span>
+        <strong>Song energy</strong>
+      </div>
+      <div className="arrangement-arc-row">
+        {pads.map((pad) => (
+          <button
+            data-testid={`arrangement-arc-${pad.id}`}
+            key={pad.id}
+            onClick={() => onApply(pad.id)}
+            title={`${pad.label}: ${pad.detail}`}
+            type="button"
+          >
+            <Waves size={14} aria-hidden="true" />
+            <span>{pad.label}</span>
+            <strong>{pad.preview}</strong>
+            <small>{pad.changedCount} blocks / {pad.detail}</small>
           </button>
         ))}
       </div>
@@ -6622,6 +6754,85 @@ function structureArcSignal(project: ProjectState): StructureLensSignal {
     detail: `low ${percentLabel(low)} / high ${percentLabel(high)}`,
     tone
   };
+}
+
+function createArrangementArcPadOptions(project: ProjectState, selectedIndex: number): ArrangementArcPadOption[] {
+  return arrangementArcPadDefinitions.map((pad) => {
+    const transformed = applyArrangementArcPadToProject(project, pad, selectedIndex);
+    return {
+      ...pad,
+      preview: arrangementArcPreview(transformed.arrangement),
+      changedCount: arrangementArcChangedCount(project.arrangement, transformed.arrangement)
+    };
+  });
+}
+
+function arrangementArcPreview(arrangement: ArrangementBlock[]): string {
+  const bars = arrangementBlocksTotalBars(arrangement);
+  const peak = arrangement.length === 0 ? 0 : Math.max(...arrangement.map((block) => normalizeArrangementEnergy(block.energy)));
+  return `${barCountLabel(bars)} / peak ${percentLabel(peak)}`;
+}
+
+function applyArrangementArcPadToProject(
+  project: ProjectState,
+  pad: ArrangementArcPadDefinition,
+  selectedIndex: number
+): ProjectState {
+  if (project.arrangement.length === 0 || pad.points.length === 0) {
+    return project;
+  }
+
+  const nextArrangement = project.arrangement.map((block, index, arrangement) => {
+    const point = arrangementArcPointForIndex(pad.points, index, arrangement.length);
+    return {
+      ...block,
+      section: point.section,
+      pattern: point.pattern,
+      bars: normalizeArrangementBars(point.bars),
+      energy: normalizeArrangementEnergy(point.energy),
+      mutedTracks: normalizeArrangementMutedTracks(point.mutedTracks)
+    };
+  });
+  const boundedSelectedIndex = Math.min(Math.max(0, selectedIndex), nextArrangement.length - 1);
+  const selectedBlock = nextArrangement[boundedSelectedIndex] ?? nextArrangement[0];
+
+  const nextProject = {
+    ...project,
+    selectedPattern: selectedBlock.pattern,
+    arrangement: nextArrangement
+  };
+  const arrangementChanged = arrangementArcChangedCount(project.arrangement, nextArrangement) > 0;
+  return arrangementChanged || project.selectedPattern !== nextProject.selectedPattern ? nextProject : project;
+}
+
+function arrangementArcPointForIndex(points: ArrangementArcPoint[], index: number, totalBlocks: number): ArrangementArcPoint {
+  if (points.length === 1 || totalBlocks <= 1) {
+    return points[0];
+  }
+  const pointIndex = Math.round((index / Math.max(1, totalBlocks - 1)) * (points.length - 1));
+  return points[Math.min(points.length - 1, Math.max(0, pointIndex))];
+}
+
+function arrangementBlocksTotalBars(arrangement: ArrangementBlock[]): number {
+  return arrangement.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+}
+
+function arrangementArcChangedCount(current: ArrangementBlock[], nextArrangement: ArrangementBlock[]): number {
+  return nextArrangement.filter((block, index) => !sameArrangementBlockPosture(current[index], block)).length;
+}
+
+function sameArrangementBlockPosture(current: ArrangementBlock | undefined, nextBlock: ArrangementBlock): boolean {
+  if (!current) {
+    return false;
+  }
+  return (
+    current.section === nextBlock.section &&
+    current.pattern === nextBlock.pattern &&
+    normalizeArrangementBars(current.bars) === normalizeArrangementBars(nextBlock.bars) &&
+    normalizeArrangementEnergy(current.energy) === normalizeArrangementEnergy(nextBlock.energy) &&
+    normalizeArrangementMutedTracks(current.mutedTracks).join(",") ===
+      normalizeArrangementMutedTracks(nextBlock.mutedTracks).join(",")
+  );
 }
 
 function usedPatternSlots(project: ProjectState): PatternSlot[] {

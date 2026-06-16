@@ -166,6 +166,8 @@ h2 {
 .master-panel label span,
 .inspector-heading span,
 .note-inspector label span,
+.arrangement-arc-heading span,
+.arrangement-arc-row button span,
 .arrangement-editor-heading span,
 .arrangement-editor label span,
 .chord-slot label span,
@@ -252,6 +254,7 @@ h2 {
 .next-move-actions button,
 .snapshot-actions button,
 .arrangement-template-row button,
+.arrangement-arc-row button,
 .arrangement-focus-actions button,
 .block-pattern-row button,
 .arrangement-mute-row button,
@@ -367,6 +370,7 @@ h2 {
 .snapshot-heading button,
 .snapshot-actions button,
 .arrangement-template-row button,
+.arrangement-arc-row button,
 .arrangement-focus-actions button,
 .block-pattern-row button,
 .arrangement-mute-row button,
@@ -3853,6 +3857,80 @@ input[type="range"] {
   font-size: 10px;
 }
 
+.arrangement-arc {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.arrangement-arc-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border: 1px solid rgba(138, 168, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(138, 168, 255, 0.055);
+  padding: 8px 10px;
+}
+
+.arrangement-arc-heading strong {
+  overflow: hidden;
+  color: #f4efe7;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrangement-arc-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.arrangement-arc-row button {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 2px 6px;
+  align-items: center;
+  min-width: 0;
+  min-height: 54px;
+  padding: 6px 7px;
+  text-align: start;
+}
+
+.arrangement-arc-row button svg {
+  grid-row: span 3;
+  color: #8aa8ff;
+}
+
+.arrangement-arc-row button span,
+.arrangement-arc-row button strong,
+.arrangement-arc-row button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrangement-arc-row button span {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.arrangement-arc-row button strong {
+  color: rgba(244, 239, 231, 0.74);
+  font-size: 10px;
+}
+
+.arrangement-arc-row button small {
+  color: rgba(244, 239, 231, 0.5);
+  font-size: 10px;
+}
+
 .pattern-chain-row {
   display: grid;
   grid-template-columns: 148px minmax(112px, 0.42fr) minmax(0, 1fr);
@@ -4824,6 +4902,14 @@ input[type="range"] {
   .session-brief-clear {
     grid-column: 1 / -1;
     min-height: 34px;
+  }
+
+  .arrangement-arc {
+    grid-template-columns: 1fr;
+  }
+
+  .arrangement-arc-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .pattern-chain-row {
