@@ -5197,7 +5197,15 @@ input[type="range"] {
   gap: 5px;
 }
 
-.note-action-row button {
+.note-clipboard-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  align-items: center;
+}
+
+.note-action-row button,
+.note-clipboard-row button {
   display: inline-flex;
   min-width: 0;
   min-height: 30px;
@@ -5212,9 +5220,25 @@ input[type="range"] {
   font-size: 10px;
 }
 
-.note-action-row button span {
+.note-action-row button span,
+.note-clipboard-row button span {
   min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-clipboard-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.note-clipboard-row small {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  color: #aba193;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

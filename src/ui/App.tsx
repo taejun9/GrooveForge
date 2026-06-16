@@ -407,6 +407,16 @@ type SelectedNote = {
   pitch: string;
 };
 
+type NoteClipboard =
+  | {
+      track: "bass";
+      note: BassNote;
+    }
+  | {
+      track: "melody";
+      note: MelodyNote;
+    };
+
 type MixCoachTone = "good" | "warn" | "danger";
 
 type MixCoachCheck = {
@@ -1728,6 +1738,7 @@ export function App(): ReactElement {
   const [transportLoopScope, setTransportLoopScope] = useState<TransportLoopScope>("arrangement");
   const [playbackPosition, setPlaybackPosition] = useState<PlaybackSnapshot | null>(null);
   const [selectedNote, setSelectedNote] = useState<SelectedNote | null>(null);
+  const [noteClipboard, setNoteClipboard] = useState<NoteClipboard | null>(null);
   const [keyboardCaptureEnabled, setKeyboardCaptureEnabled] = useState(false);
   const [keyboardCaptureTarget, setKeyboardCaptureTarget] = useState<NoteTrack>("bass");
   const [selectedDrumStep, setSelectedDrumStep] = useState<SelectedDrumStep | null>(null);
@@ -3566,6 +3577,84 @@ export function App(): ReactElement {
     }
   }
 
+  function copySelectedNote(): void {
+    const target = selectedNote;
+    if (!target) {
+      setProjectStatus("Select an 808 or Synth note");
+      return;
+    }
+
+    const pattern = activePattern(projectRef.current);
+    if (target.track === "bass") {
+      const source = pattern.bassNotes.find((note) => matchesSelectedNote(note, target));
+      if (!source) {
+        setProjectStatus("Select an active note");
+        return;
+      }
+      setNoteClipboard({ track: "bass", note: { ...source } });
+      setProjectStatus(`Copied 808 ${source.pitch}.${source.step + 1}`);
+      return;
+    }
+
+    const source = pattern.melodyNotes.find((note) => matchesSelectedNote(note, target));
+    if (!source) {
+      setProjectStatus("Select an active note");
+      return;
+    }
+    setNoteClipboard({ track: "melody", note: { ...source } });
+    setProjectStatus(`Copied Synth ${source.pitch}.${source.step + 1}`);
+  }
+
+  function pasteCopiedNote(): void {
+    const clipboard = noteClipboard;
+    if (!clipboard) {
+      setProjectStatus("Copy a note first");
+      return;
+    }
+
+    const pattern = activePattern(projectRef.current);
+    if (clipboard.track === "bass") {
+      const nextStep = nextEmptyStepForPitch(pattern.bassNotes, clipboard.note.pitch, clipboard.note.step);
+      if (nextStep === null) {
+        setProjectStatus("No empty step for pasted 808");
+        return;
+      }
+      const pastedNote = { ...clipboard.note, step: nextStep };
+      const changed = updateCurrentPattern(
+        (currentPatternData) => ({
+          ...currentPatternData,
+          bassNotes: sortBassNotes([...currentPatternData.bassNotes, pastedNote])
+        }),
+        "Pasted 808 note"
+      );
+      if (changed) {
+        setSelectedNote({ track: "bass", step: nextStep, pitch: pastedNote.pitch });
+        setSelectedDrumStep(null);
+        setSelectedChordIndex(null);
+      }
+      return;
+    }
+
+    const nextStep = nextEmptyStepForPitch(pattern.melodyNotes, clipboard.note.pitch, clipboard.note.step);
+    if (nextStep === null) {
+      setProjectStatus("No empty step for pasted Synth");
+      return;
+    }
+    const pastedNote = { ...clipboard.note, step: nextStep };
+    const changed = updateCurrentPattern(
+      (currentPatternData) => ({
+        ...currentPatternData,
+        melodyNotes: sortMelodyNotes([...currentPatternData.melodyNotes, pastedNote])
+      }),
+      "Pasted Synth note"
+    );
+    if (changed) {
+      setSelectedNote({ track: "melody", step: nextStep, pitch: pastedNote.pitch });
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+    }
+  }
+
   function duplicateSelectedNote(): void {
     const target = selectedNote;
     if (!target) {
@@ -4808,6 +4897,7 @@ export function App(): ReactElement {
           {project.mode === "studio" && (
             <NoteInspector
               selectedNote={selectedNote}
+              noteClipboard={noteClipboard}
               bassNote={selectedBassNote}
               melodyNote={selectedMelodyNote}
               onLengthChange={updateSelectedLength}
@@ -4817,6 +4907,8 @@ export function App(): ReactElement {
               onStepMove={moveSelectedNoteStep}
               onPitchMove={moveSelectedNotePitch}
               onOctaveMove={moveSelectedNoteOctave}
+              onCopy={copySelectedNote}
+              onPaste={pasteCopiedNote}
               onDuplicate={duplicateSelectedNote}
             />
           )}
@@ -12056,6 +12148,7 @@ function NoteEditor({
 
 function NoteInspector({
   selectedNote,
+  noteClipboard,
   bassNote,
   melodyNote,
   onLengthChange,
@@ -12065,9 +12158,12 @@ function NoteInspector({
   onStepMove,
   onPitchMove,
   onOctaveMove,
+  onCopy,
+  onPaste,
   onDuplicate
 }: {
   selectedNote: SelectedNote | null;
+  noteClipboard: NoteClipboard | null;
   bassNote?: BassNote;
   melodyNote?: MelodyNote;
   onLengthChange: (length: number) => void;
@@ -12077,10 +12173,15 @@ function NoteInspector({
   onStepMove: (direction: -1 | 1) => void;
   onPitchMove: (direction: -1 | 1) => void;
   onOctaveMove: (direction: -1 | 1) => void;
+  onCopy: () => void;
+  onPaste: () => void;
   onDuplicate: () => void;
 }): ReactElement {
   const activeNote = bassNote ?? melodyNote;
   const label = selectedNote ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}` : "None";
+  const clipboardLabel = noteClipboard
+    ? `${noteClipboard.track === "bass" ? "808" : "Synth"} ${noteClipboard.note.pitch}.${noteClipboard.note.step + 1}`
+    : "Empty";
   const probabilityValue = activeNote ? normalizeEventProbability(activeNote.probability) : 1;
   return (
     <div className="note-inspector">
@@ -12180,6 +12281,17 @@ function NoteInspector({
           </div>
         </>
       )}
+      <div className="note-clipboard-row" aria-label="Note clipboard">
+        <button data-testid="note-copy" disabled={!activeNote} onClick={onCopy} title="Copy selected note shape" type="button">
+          <Copy size={14} aria-hidden="true" />
+          <span>Copy</span>
+        </button>
+        <button data-testid="note-paste" disabled={!noteClipboard} onClick={onPaste} title="Paste copied note to the next empty step" type="button">
+          <Plus size={14} aria-hidden="true" />
+          <span>Paste</span>
+        </button>
+        <small data-testid="note-clipboard-detail">{noteClipboard ? `Clipboard ${clipboardLabel}` : "Clipboard empty"}</small>
+      </div>
     </div>
   );
 }
