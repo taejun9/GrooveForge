@@ -58,6 +58,7 @@ The first usable result is an Electron desktop workstation that can create a sam
 - Beat Passport summary for target, length, Pattern A/B/C use, readiness, export, stems, and master posture from local project/render state.
 - Production Snapshot for local read-only target, form, Pattern A/B/C coverage, mix, and handoff posture so producers can scan a session fast and beginners can see what matters next.
 - Finish Checklist for local read-only Compose, Arrange, Mix, Master, and Handoff readiness before export.
+- Finish Checklist Focus adds explicit Focus controls that jump Compose, Arrange, Mix, Master, and Handoff readiness cards to the matching workstation panels without changing checklist scoring or project data.
 - Review Queue for local read-only prioritized production issues across composition, arrangement, mix/master, target, and handoff.
 - Review Queue Focus adds explicit Focus controls that jump queued issues to Compose, Arrange, Mix, Master, or Deliver panels without changing issue priority or project data.
 - Export Preflight for a read-only delivery-risk scan of readiness, mix/master posture, WAV/stem/MIDI deliverables, and handoff brief status before users export or send files.

@@ -1383,6 +1383,17 @@ type FinishChecklistCard = {
   status: string;
   detail: string;
   tone: MixCoachTone;
+  focusTarget: ReviewQueueFocusTarget;
+  focusLabel: string;
+};
+
+type FinishChecklistFocusSummary = {
+  cardId: FinishChecklistCardId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
 };
 
 type FinishChecklistSummary = {
@@ -1993,6 +2004,7 @@ export function App(): ReactElement {
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
+  const [finishChecklistFocusId, setFinishChecklistFocusId] = useState<FinishChecklistCardId | null>(null);
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const [projectFileLabel, setProjectFileLabel] = useState<string | null>(null);
   const [projectHasUnsavedChanges, setProjectHasUnsavedChanges] = useState(false);
@@ -5010,6 +5022,20 @@ export function App(): ReactElement {
     targetRefs[zone]?.scrollIntoView({ block: "start", behavior: "auto" });
   }
 
+  function focusFinishChecklistCard(card: FinishChecklistCard): void {
+    const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    setFinishChecklistFocusId(card.id);
+    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Finish ${card.label}: ${card.status}`);
+  }
+
   function focusReviewQueueItem(item: ReviewQueueItem): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -6367,7 +6393,11 @@ export function App(): ReactElement {
             <small data-testid="master-output-role-level">{masterOutputRoleSummary.levelLabel}</small>
             <small data-testid="master-output-role-detail">{masterOutputRoleSummary.detailLabel}</small>
           </div>
-          <FinishChecklist summary={finishChecklistSummary} />
+          <FinishChecklist
+            summary={finishChecklistSummary}
+            focusedCardId={finishChecklistFocusId}
+            onFocus={focusFinishChecklistCard}
+          />
           <ReviewQueue
             summary={reviewQueueSummary}
             focusedItemId={reviewQueueFocusId}
@@ -7602,7 +7632,17 @@ function composerActionIcon(action: ComposerAction): ReactElement {
   }
 }
 
-function FinishChecklist({ summary }: { summary: FinishChecklistSummary }): ReactElement {
+function FinishChecklist({
+  summary,
+  focusedCardId,
+  onFocus
+}: {
+  summary: FinishChecklistSummary;
+  focusedCardId: FinishChecklistCardId | null;
+  onFocus: (card: FinishChecklistCard) => void;
+}): ReactElement {
+  const focusSummary = createFinishChecklistFocusSummary(summary, focusedCardId);
+
   return (
     <section className={`finish-checklist ${summary.tone}`} data-testid="finish-checklist" aria-label="Finish checklist">
       <div className="finish-checklist-heading">
@@ -7613,14 +7653,42 @@ function FinishChecklist({ summary }: { summary: FinishChecklistSummary }): Reac
         <strong data-testid="finish-checklist-headline">{summary.headline}</strong>
         <small data-testid="finish-checklist-detail">{summary.detail}</small>
       </div>
+      <div
+        className={`finish-checklist-focus-readout ${focusSummary.tone}`}
+        data-testid="finish-checklist-focus-readout"
+        title={focusSummary.detailTitle}
+      >
+        <span data-testid="finish-checklist-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="finish-checklist-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="finish-checklist-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
       <div className="finish-checklist-grid" data-testid="finish-checklist-grid">
-        {summary.cards.map((card) => (
-          <div className={`finish-checklist-card ${card.tone}`} data-testid={`finish-checklist-${card.id}`} key={card.id}>
-            <span>{card.label}</span>
-            <strong>{card.status}</strong>
-            <small>{card.detail}</small>
-          </div>
-        ))}
+        {summary.cards.map((card) => {
+          const focused = focusedCardId !== null && card.id === focusedCardId;
+          return (
+            <div
+              className={["finish-checklist-card", card.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`finish-checklist-${card.id}`}
+              key={card.id}
+            >
+              <span>{card.label}</span>
+              <strong>{card.status}</strong>
+              <button
+                aria-pressed={focused}
+                className="finish-checklist-focus-button"
+                data-testid={`finish-checklist-focus-${card.id}`}
+                onClick={() => onFocus(card)}
+                title={`Focus ${card.focusLabel}: ${card.status}`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{card.focusLabel}</span>
+              </button>
+              <small>{card.detail}</small>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -9605,7 +9673,7 @@ function createFinishChecklistSummary(
       : analysis.status !== "Silent" && (audibleStems.length >= 2 || briefFields > 0)
         ? "warn"
         : "danger";
-  const cards: FinishChecklistCard[] = [
+  const baseCards: Array<Omit<FinishChecklistCard, "focusTarget" | "focusLabel">> = [
     {
       id: "compose",
       label: "Compose",
@@ -9642,6 +9710,14 @@ function createFinishChecklistSummary(
       tone: handoffTone
     }
   ];
+  const cards: FinishChecklistCard[] = baseCards.map((card) => {
+    const focusTarget = finishChecklistFocusTarget(card.id);
+    return {
+      ...card,
+      focusTarget,
+      focusLabel: reviewQueueFocusLabel(focusTarget)
+    };
+  });
   const tone = weakestTone(cards.map((card) => card.tone));
   const readyCount = cards.filter((card) => card.tone === "good").length;
   const headline =
@@ -10018,6 +10094,52 @@ function mixReviewArea(id: string): string {
     default:
       return "Mix";
   }
+}
+
+function finishChecklistFocusTarget(cardId: FinishChecklistCardId): ReviewQueueFocusTarget {
+  switch (cardId) {
+    case "compose":
+      return "compose";
+    case "arrange":
+      return "arrange";
+    case "mix":
+      return "mix";
+    case "master":
+      return "master";
+    case "handoff":
+      return "deliver";
+  }
+}
+
+function createFinishChecklistFocusSummary(
+  summary: FinishChecklistSummary,
+  focusedCardId: FinishChecklistCardId | null
+): FinishChecklistFocusSummary {
+  const focusedCard = focusedCardId ? summary.cards.find((card) => card.id === focusedCardId) ?? null : null;
+  const card = focusedCard ?? summary.cards.find((candidate) => candidate.tone !== "good") ?? summary.cards[0] ?? null;
+
+  if (!card) {
+    return {
+      cardId: null,
+      statusLabel: "Finish clear",
+      areaLabel: "No finish cards",
+      detailLabel: "No Finish Checklist cards available",
+      detailTitle: "Finish Checklist has no cards to focus.",
+      tone: "good"
+    };
+  }
+
+  const statusLabel = focusedCard ? "Focused Finish" : card.tone === "good" ? "Finish clear" : "Top Finish Check";
+  const detailLabel = `${card.focusLabel} panel / ${card.detail}`;
+
+  return {
+    cardId: card.id,
+    statusLabel,
+    areaLabel: `${card.label}: ${card.status}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${card.label}: ${card.status} / ${detailLabel}`,
+    tone: card.tone
+  };
 }
 
 function reviewQueueFocusTarget(item: Pick<ReviewQueueItem, "id" | "area">): ReviewQueueFocusTarget {
