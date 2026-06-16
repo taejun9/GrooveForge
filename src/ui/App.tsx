@@ -1398,6 +1398,19 @@ type ReviewQueueItem = {
   status: string;
   detail: string;
   tone: MixCoachTone;
+  focusTarget: ReviewQueueFocusTarget;
+  focusLabel: string;
+};
+
+type ReviewQueueFocusTarget = "compose" | "arrange" | "mix" | "master" | "deliver";
+
+type ReviewQueueFocusSummary = {
+  itemId: string | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
 };
 
 type ReviewQueueSummary = {
@@ -1979,6 +1992,7 @@ export function App(): ReactElement {
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
+  const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const [projectFileLabel, setProjectFileLabel] = useState<string | null>(null);
   const [projectHasUnsavedChanges, setProjectHasUnsavedChanges] = useState(false);
@@ -4996,6 +5010,24 @@ export function App(): ReactElement {
     targetRefs[zone]?.scrollIntoView({ block: "start", behavior: "auto" });
   }
 
+  function focusReviewQueueItem(item: ReviewQueueItem): void {
+    const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+    const mixCheckId = item.id.startsWith("mix-") ? item.id.slice(4) : null;
+
+    setReviewQueueFocusId(item.id);
+    if (mixCheckId) {
+      setMixCoachFocusId(mixCheckId);
+    }
+    targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Review ${item.area}: ${item.status}`);
+  }
+
   function openQuickActions(): void {
     setQuickActionQuery("");
     setQuickActionsOpen(true);
@@ -5336,7 +5368,7 @@ export function App(): ReactElement {
             <strong data-testid="project-safety-label">{projectSafetyReadout.roleLabel}</strong>
             <small data-testid="project-safety-detail">{projectSafetyReadout.detailLabel}</small>
           </div>
-          <span>{projectStatus}</span>
+          <span data-testid="project-status">{projectStatus}</span>
         </div>
       </section>
 
@@ -6336,7 +6368,11 @@ export function App(): ReactElement {
             <small data-testid="master-output-role-detail">{masterOutputRoleSummary.detailLabel}</small>
           </div>
           <FinishChecklist summary={finishChecklistSummary} />
-          <ReviewQueue summary={reviewQueueSummary} />
+          <ReviewQueue
+            summary={reviewQueueSummary}
+            focusedItemId={reviewQueueFocusId}
+            onFocus={focusReviewQueueItem}
+          />
           <ExportMeter analysis={exportAnalysis} />
           <MixCoach
             analysis={exportAnalysis}
@@ -7590,7 +7626,17 @@ function FinishChecklist({ summary }: { summary: FinishChecklistSummary }): Reac
   );
 }
 
-function ReviewQueue({ summary }: { summary: ReviewQueueSummary }): ReactElement {
+function ReviewQueue({
+  summary,
+  focusedItemId,
+  onFocus
+}: {
+  summary: ReviewQueueSummary;
+  focusedItemId: string | null;
+  onFocus: (item: ReviewQueueItem) => void;
+}): ReactElement {
+  const focusSummary = createReviewQueueFocusSummary(summary, focusedItemId);
+
   return (
     <section className={`review-queue ${summary.tone}`} data-testid="review-queue" aria-label="Review queue">
       <div className="review-queue-heading">
@@ -7601,14 +7647,42 @@ function ReviewQueue({ summary }: { summary: ReviewQueueSummary }): ReactElement
         <strong data-testid="review-queue-headline">{summary.headline}</strong>
         <small data-testid="review-queue-detail">{summary.detail}</small>
       </div>
+      <div
+        className={`review-queue-focus-readout ${focusSummary.tone}`}
+        data-testid="review-queue-focus-readout"
+        title={focusSummary.detailTitle}
+      >
+        <span data-testid="review-queue-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="review-queue-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="review-queue-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
       <div className="review-queue-list" data-testid="review-queue-list">
-        {summary.items.map((item) => (
-          <div className={`review-queue-item ${item.tone}`} data-testid={`review-queue-${item.id}`} key={item.id}>
-            <span>{item.area}</span>
-            <strong>{item.status}</strong>
-            <small>{item.detail}</small>
-          </div>
-        ))}
+        {summary.items.map((item) => {
+          const focused = focusedItemId !== null && item.id === focusedItemId;
+          return (
+            <div
+              className={["review-queue-item", item.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`review-queue-${item.id}`}
+              key={item.id}
+            >
+              <span>{item.area}</span>
+              <strong>{item.status}</strong>
+              <button
+                aria-pressed={focused}
+                className="review-queue-focus-button"
+                data-testid={`review-queue-focus-${item.id}`}
+                onClick={() => onFocus(item)}
+                title={`Focus ${item.focusLabel}: ${item.status}`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{item.focusLabel}</span>
+              </button>
+              <small>{item.detail}</small>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -9594,8 +9668,9 @@ function createReviewQueueSummary(
   const briefFields = sessionBriefFilledFields(project.sessionBrief);
   const candidates: Array<ReviewQueueItem & { order: number }> = [];
   let order = 0;
-  const pushIssue = (item: ReviewQueueItem): void => {
-    candidates.push({ ...item, order });
+  const pushIssue = (item: Omit<ReviewQueueItem, "focusTarget" | "focusLabel">): void => {
+    const focusTarget = reviewQueueFocusTarget(item);
+    candidates.push({ ...item, focusTarget, focusLabel: reviewQueueFocusLabel(focusTarget), order });
     order += 1;
   };
 
@@ -9676,13 +9751,16 @@ function createReviewQueueSummary(
   }
 
   if (candidates.length === 0) {
+    const readyFocusTarget: ReviewQueueFocusTarget = "deliver";
     const items: ReviewQueueItem[] = [
       {
         id: "ready",
         area: "Review",
         status: "No queued issues",
         detail: `${target.name} / ${analysis.status} / ${formatDb(analysis.headroomDb)} headroom`,
-        tone: "good"
+        tone: "good",
+        focusTarget: readyFocusTarget,
+        focusLabel: reviewQueueFocusLabel(readyFocusTarget)
       }
     ];
     return {
@@ -9940,6 +10018,74 @@ function mixReviewArea(id: string): string {
     default:
       return "Mix";
   }
+}
+
+function reviewQueueFocusTarget(item: Pick<ReviewQueueItem, "id" | "area">): ReviewQueueFocusTarget {
+  if (item.id === "target-alignment" || item.id === "stem-coverage" || item.id === "session-brief") {
+    return "deliver";
+  }
+  if (item.area === "Compose") {
+    return "compose";
+  }
+  if (item.area === "Arrange") {
+    return "arrange";
+  }
+  if (item.area === "Mix") {
+    return "mix";
+  }
+  if (item.area === "Master" || item.area === "Export") {
+    return "master";
+  }
+  if (item.area === "Handoff" || item.area === "Target") {
+    return "deliver";
+  }
+  return "deliver";
+}
+
+function reviewQueueFocusLabel(target: ReviewQueueFocusTarget): string {
+  switch (target) {
+    case "compose":
+      return "Compose";
+    case "arrange":
+      return "Arrange";
+    case "mix":
+      return "Mix";
+    case "master":
+      return "Master";
+    case "deliver":
+      return "Deliver";
+  }
+}
+
+function createReviewQueueFocusSummary(
+  summary: ReviewQueueSummary,
+  focusedItemId: string | null
+): ReviewQueueFocusSummary {
+  const focusedItem = focusedItemId ? summary.items.find((item) => item.id === focusedItemId) ?? null : null;
+  const item = focusedItem ?? summary.items[0] ?? null;
+
+  if (!item) {
+    return {
+      itemId: null,
+      statusLabel: "Review clear",
+      areaLabel: "No queued issues",
+      detailLabel: "No Review Queue items available",
+      detailTitle: "Review Queue has no items to focus.",
+      tone: "good"
+    };
+  }
+
+  const statusLabel = focusedItem ? "Focused Review" : item.tone === "good" ? "Review clear" : "Top Review";
+  const detailLabel = `${item.focusLabel} panel / ${item.detail}`;
+
+  return {
+    itemId: item.id,
+    statusLabel,
+    areaLabel: `${item.area}: ${item.status}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${item.area}: ${item.status} / ${detailLabel}`,
+    tone: item.tone
+  };
 }
 
 function reviewToneRank(tone: MixCoachTone): number {

@@ -7885,6 +7885,45 @@ input[type="range"] {
   font-size: 11px;
 }
 
+.review-queue-focus-readout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr) minmax(0, 1.28fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(120, 240, 200, 0.22);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.05);
+  padding: 7px 8px;
+}
+
+.review-queue-focus-readout.warn {
+  border-color: rgba(240, 195, 106, 0.3);
+  background: rgba(240, 195, 106, 0.07);
+}
+
+.review-queue-focus-readout.danger {
+  border-color: rgba(255, 122, 79, 0.32);
+  background: rgba(255, 122, 79, 0.07);
+}
+
+.review-queue-focus-readout > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-queue-focus-readout span,
+.review-queue-focus-readout small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.review-queue-focus-readout strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
 .review-queue-list {
   display: grid;
   gap: 6px;
@@ -7893,8 +7932,9 @@ input[type="range"] {
 
 .review-queue-item {
   display: grid;
-  grid-template-columns: minmax(58px, 0.42fr) minmax(0, 1fr);
+  grid-template-columns: minmax(58px, 0.42fr) minmax(0, 1fr) auto;
   gap: 3px 7px;
+  align-items: center;
   min-width: 0;
   border-inline-start: 3px solid #78f0c8;
   border-radius: 6px;
@@ -7908,6 +7948,12 @@ input[type="range"] {
 
 .review-queue-item.danger {
   border-inline-start-color: #ff7a4f;
+}
+
+.review-queue-item.focused {
+  box-shadow:
+    inset 0 0 0 1px rgba(138, 168, 255, 0.34),
+    0 0 16px rgba(138, 168, 255, 0.12);
 }
 
 .review-queue-item strong,
@@ -7927,6 +7973,27 @@ input[type="range"] {
   grid-column: 1 / -1;
   color: rgba(244, 239, 231, 0.66);
   font-size: 10px;
+}
+
+.review-queue-focus-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-inline-size: 72px;
+  border: 1px solid rgba(138, 168, 255, 0.22);
+  border-radius: 5px;
+  background: rgba(138, 168, 255, 0.08);
+  color: #f4efe7;
+  padding: 4px 6px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.review-queue-focus-button:hover,
+.review-queue-focus-button[aria-pressed="true"] {
+  border-color: rgba(138, 168, 255, 0.42);
+  background: rgba(138, 168, 255, 0.16);
 }
 
 .export-meter {

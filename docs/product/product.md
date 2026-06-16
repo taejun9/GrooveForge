@@ -96,6 +96,7 @@ Primary feature areas:
 - Production Snapshot: local read-only target, song form, Pattern A/B/C coverage, mix, and handoff posture summary for fast producer session scanning and beginner next-step judgment.
 - Finish Checklist: read-only Compose, Arrange, Mix, Master, and Handoff readiness scan from local project, render, stem, target, and Session Brief state.
 - Review Queue: read-only prioritized production issue scan from local readiness, structure, mix, master, target, stem, and Session Brief state.
+- Review Queue Focus: UI-local Focus controls that route queued issues to Compose, Arrange, Mix, Master, or Deliver panels so users can triage problems without changing issue priority, scoring, or project data.
 - Export Preflight: read-only delivery-risk scan of readiness, mix/master posture, WAV/stem/MIDI deliverables, and handoff brief status so beginners know what blocks a clean export and producers can check send risk quickly.
 - Handoff Pack: explicit WAV, stem, MIDI, and Handoff Sheet export buttons with local deliverable status, a handoff route readout, and a file manifest preview for final beat delivery.
 - Beat Map: deterministic production overview that maps the current beat into Start, Compose, Arrange, Polish, and Deliver stages against the selected fixed or custom Delivery Target, plus song length, Pattern A/B/C usage, export, and stem metrics for faster beginner and producer decisions.
