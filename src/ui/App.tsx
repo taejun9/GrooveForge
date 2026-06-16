@@ -2040,6 +2040,7 @@ export function App(): ReactElement {
   const editHistoryReadout = createEditHistoryReadoutSummary(undoStack.length, redoStack.length, projectStatus);
   const currentPlaybackStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
   const currentEditorStep = playbackPosition?.pattern === project.selectedPattern ? currentPlaybackStep : null;
+  const playingPattern = isPlaying ? playbackPosition?.pattern ?? null : null;
   const playingArrangementIndex =
     isPlaying && playbackPosition?.mode === "arrangement" && typeof playbackPosition.arrangementIndex === "number"
       ? playbackPosition.arrangementIndex
@@ -5362,18 +5363,24 @@ export function App(): ReactElement {
         <section className="panel pattern-panel" data-testid="workflow-target-compose" aria-label="Pattern editor" ref={composePanelRef}>
           <PanelTitle icon={<Drum size={18} />} title="Drums" meta="16 step rack" />
           <div className="pattern-tabs" aria-label="Pattern">
-            {patternSlots.map((pattern) => (
-              <button
-                key={pattern}
-                className={project.selectedPattern === pattern ? "selected" : ""}
-                data-testid={`pattern-tab-${pattern}`}
-                type="button"
-                onClick={() => selectPattern(pattern)}
-              >
-                <span>{pattern}</span>
-                <small>{patternEventCount(project.patterns[pattern])}</small>
-              </button>
-            ))}
+            {patternSlots.map((pattern) => {
+              const selected = project.selectedPattern === pattern;
+              const playing = playingPattern === pattern;
+              return (
+                <button
+                  key={pattern}
+                  aria-current={playing ? "step" : undefined}
+                  className={["pattern-tab", selected ? "selected" : "", playing ? "playing" : ""].filter(Boolean).join(" ")}
+                  data-playing={playing ? "true" : "false"}
+                  data-testid={`pattern-tab-${pattern}`}
+                  type="button"
+                  onClick={() => selectPattern(pattern)}
+                >
+                  <span>{pattern}</span>
+                  <small>{playing ? "Playing" : patternEventCount(project.patterns[pattern])}</small>
+                </button>
+              );
+            })}
           </div>
           <PatternCompareStrip
             playbackMode={playbackMode}

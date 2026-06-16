@@ -4255,6 +4255,29 @@ h2 {
   color: rgba(17, 16, 15, 0.62);
 }
 
+.pattern-tabs button.playing {
+  border-color: rgba(240, 195, 106, 0.62);
+  box-shadow:
+    inset 0 0 0 1px rgba(240, 195, 106, 0.26),
+    0 0 14px rgba(240, 195, 106, 0.12);
+}
+
+.pattern-tabs button.playing small {
+  color: #f0c36a;
+}
+
+.pattern-tabs button.selected.playing {
+  border-color: rgba(120, 240, 200, 0.72);
+  box-shadow:
+    inset 0 0 0 1px rgba(120, 240, 200, 0.28),
+    0 0 0 2px rgba(240, 195, 106, 0.28),
+    0 0 14px rgba(240, 195, 106, 0.12);
+}
+
+.pattern-tabs button.selected.playing small {
+  color: rgba(17, 16, 15, 0.68);
+}
+
 .pattern-compare {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
