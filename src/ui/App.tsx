@@ -1411,6 +1411,13 @@ type SelectedDrumStep = {
   step: number;
 };
 
+type DrumPocketSummary = {
+  positionLabel: string;
+  roleLabel: string;
+  detailLabel: string;
+  isShaped: boolean;
+};
+
 type DrumClipboard = {
   lane: DrumLane;
   step: number;
@@ -9299,6 +9306,60 @@ function grooveCompassFocusCard(
   };
 }
 
+function selectedDrumPocketSummary(
+  selectedStep: SelectedDrumStep,
+  velocity: number,
+  chance: number,
+  timingMs: number,
+  repeat: number
+): DrumPocketSummary {
+  const normalizedVelocity = normalizeDrumVelocity(velocity);
+  const normalizedChance = normalizeDrumProbability(chance);
+  const normalizedTiming = normalizeDrumTimingMs(timingMs);
+  const normalizedRepeat = selectedStep.lane === "hat" ? normalizeHatRepeat(repeat) : 1;
+
+  return {
+    positionLabel: `${drumLabels[selectedStep.lane]} ${selectedStep.step + 1} / ${drumPocketPositionLabel(selectedStep.step)}`,
+    roleLabel: drumPocketRoleLabel(selectedStep.lane, selectedStep.step, normalizedRepeat),
+    detailLabel: `${percentLabel(normalizedVelocity)} vel / ${percentLabel(normalizedChance)} chance / ${timingLabel(normalizedTiming)}${
+      selectedStep.lane === "hat" ? ` / x${normalizedRepeat}` : " / single"
+    }`,
+    isShaped: normalizedChance < 1 || normalizedTiming !== 0 || normalizedRepeat > 1 || normalizedVelocity >= 0.9
+  };
+}
+
+function drumPocketPositionLabel(step: number): string {
+  const beat = Math.floor(step / 4) + 1;
+  const slot = (step % 4) + 1;
+  return slot === 1 ? `Beat ${beat}` : `Beat ${beat}.${slot}`;
+}
+
+function drumPocketRoleLabel(lane: DrumLane, step: number, repeat: number): string {
+  const slot = step % 4;
+  if (lane === "clap") {
+    if (step === 4 || step === 12) {
+      return "Backbeat";
+    }
+    return slot === 0 ? "Clap anchor" : "Clap fill";
+  }
+  if (lane === "kick") {
+    if (step === 0) {
+      return "Downbeat";
+    }
+    if (slot === 0) {
+      return "Anchor";
+    }
+    return slot === 3 ? "Pickup" : "Kick pocket";
+  }
+  if (lane === "hat") {
+    if (repeat > 1) {
+      return "Hat roll";
+    }
+    return step % 2 === 0 ? "Pulse" : "Offbeat";
+  }
+  return slot === 3 ? "Pickup" : step % 2 === 0 ? "Texture" : "Syncopation";
+}
+
 function createComposerGuideSummary(
   project: ProjectState,
   checks: BeatReadinessCheck[],
@@ -11969,6 +12030,8 @@ function DrumStepInspector({
   const skipNextTimingBlurCommit = useRef(false);
   const label = selectedStep ? `${drumLabels[selectedStep.lane]} ${selectedStep.step + 1}` : "No step";
   const clipboardLabel = drumClipboard ? `${drumLabels[drumClipboard.lane]} ${drumClipboard.step + 1}` : "Empty";
+  const pocketSummary =
+    selectedStep && active ? selectedDrumPocketSummary(selectedStep, velocityValue, probabilityValue, timingValue, hatRepeat) : null;
 
   useEffect(() => {
     if (!isEditingTiming) {
@@ -11998,6 +12061,13 @@ function DrumStepInspector({
             : "Select step"}
         </strong>
       </div>
+      {pocketSummary && (
+        <div className={pocketSummary.isShaped ? "drum-pocket-readout shaped" : "drum-pocket-readout"} data-testid="drum-pocket-readout">
+          <span data-testid="drum-pocket-position">{pocketSummary.positionLabel}</span>
+          <strong data-testid="drum-pocket-role">{pocketSummary.roleLabel}</strong>
+          <small data-testid="drum-pocket-detail">{pocketSummary.detailLabel}</small>
+        </div>
+      )}
       <label>
         <span>Velocity {active ? percentLabel(velocityValue) : "--"}</span>
         <div className="drum-value-row">
