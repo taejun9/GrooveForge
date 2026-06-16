@@ -63,6 +63,8 @@ npm run desktop
 
 P0 scheduler work must prove stable play/stop/loop behavior, BPM changes, current-step feedback, and separation between UI timing and audio timing.
 
+Tap Tempo work must keep tap history UI-local and out of saved project schema, update only the project BPM through explicit user clicks and existing undoable project history, clamp calculated BPM to the supported transport range, preserve manual BPM entry, playback, metronome, save/load, WAV/stem/MIDI export semantics, and avoid audio input, recording, beat detection, tempo automation, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.
+
 Metronome work must keep click playback realtime-only, accent beat 1 distinctly from beats 2-4, persist the transport toggle through save/load migration, follow live BPM changes while playing, preserve Stop/Space behavior, and keep WAV/stem exports free of metronome audio.
 
 Drum, bass, melody, and arrangement work must preserve editable project state without losing event timing, pitch, velocity, glide, track routing, or mixer state.

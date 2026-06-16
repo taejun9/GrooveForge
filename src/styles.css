@@ -304,6 +304,7 @@ h2 {
   font-size: 11px;
 }
 
+.tap-tempo-readout,
 .edit-history-readout,
 .keyboard-capture-posture {
   display: grid;
@@ -318,18 +319,23 @@ h2 {
   background: rgba(244, 239, 231, 0.045);
 }
 
+.tap-tempo-readout.good,
 .edit-history-readout.good,
 .keyboard-capture-posture.good {
   border-color: rgba(120, 240, 200, 0.24);
   background: rgba(120, 240, 200, 0.065);
 }
 
+.tap-tempo-readout.warn,
 .edit-history-readout.warn,
 .keyboard-capture-posture.warn {
   border-color: rgba(244, 204, 120, 0.24);
   background: rgba(244, 204, 120, 0.06);
 }
 
+.tap-tempo-readout span,
+.tap-tempo-readout strong,
+.tap-tempo-readout small,
 .edit-history-readout span,
 .edit-history-readout strong,
 .edit-history-readout small,
@@ -341,6 +347,8 @@ h2 {
   text-overflow: ellipsis;
 }
 
+.tap-tempo-readout span,
+.tap-tempo-readout small,
 .edit-history-readout span,
 .edit-history-readout small,
 .keyboard-capture-posture span,
@@ -349,6 +357,7 @@ h2 {
   font-size: 10px;
 }
 
+.tap-tempo-readout strong,
 .edit-history-readout strong,
 .keyboard-capture-posture strong {
   color: #f4efe7;
@@ -413,6 +422,10 @@ h2 {
   min-width: 74px;
   min-height: 38px;
   padding: 0 12px;
+}
+
+.tap-tempo-button {
+  min-width: 64px;
 }
 
 .icon-button.primary {

@@ -187,6 +187,11 @@ const drumLabels: Record<DrumLane, string> = {
 const localDraftStorageKey = "grooveforge.localDraft.v1";
 const localDraftRecordVersion = 1;
 const localDraftMaxCharacters = 1_500_000;
+const minProjectBpm = 60;
+const maxProjectBpm = 220;
+const tapTempoWindowMs = 2500;
+const tapTempoMaxTaps = 6;
+const tapTempoCommitDelayMs = 650;
 
 const mixPostureOptions: { id: MixPosture; label: string }[] = [
   { id: "loose", label: "Loose sketch" },
@@ -792,6 +797,12 @@ type MelodyContourDefinition = {
 type MelodyContourOption = MelodyContourDefinition & {
   preview: string;
   pitchSpan: string;
+};
+
+type TapTempoState = {
+  taps: number;
+  bpm: number | null;
+  applied: boolean;
 };
 
 type ChordPadId = "home" | "lift" | "tension" | "color";
@@ -1410,6 +1421,14 @@ type EditHistoryReadoutSummary = {
   tone: MixCoachTone;
 };
 
+type TapTempoReadoutSummary = {
+  roleLabel: string;
+  statusLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type KeyboardCapturePostureSummary = {
   roleLabel: string;
   statusLabel: string;
@@ -1894,10 +1913,13 @@ export function App(): ReactElement {
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const [projectFileLabel, setProjectFileLabel] = useState<string | null>(null);
   const [projectHasUnsavedChanges, setProjectHasUnsavedChanges] = useState(false);
+  const [tapTempo, setTapTempo] = useState<TapTempoState>({ taps: 0, bpm: null, applied: true });
   const [localDraftRecovery, setLocalDraftRecovery] = useState<LocalDraftRecovery | null>(() => readLocalDraftRecovery());
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState<string | null>(localDraftRecovery?.savedAt ?? null);
   const [localDraftWriteArmed, setLocalDraftWriteArmed] = useState(false);
   const projectRef = useRef<ProjectState>(starterProject);
+  const tapTempoTimesRef = useRef<number[]>([]);
+  const tapTempoCommitTimerRef = useRef<number | null>(null);
   const localDraftReadyRef = useRef(false);
   const localDraftSkipNextWriteRef = useRef(false);
   const controllerRef = useRef<PlaybackController | null>(null);
@@ -1998,6 +2020,7 @@ export function App(): ReactElement {
   const transportSecondary = isPlaying
     ? `${transportLoopLabel(transportLoopScope)} / Pattern ${playbackPosition?.pattern ?? project.selectedPattern} / Step ${(currentPatternStep ?? 0) + 1}`
     : transportLoopReadout;
+  const tapTempoReadout = createTapTempoReadoutSummary(project.bpm, tapTempo);
   const localDraftStatusLabel = localDraftSavedAt ? `Draft ${formatLocalDraftSavedAt(localDraftSavedAt)}` : "Draft local";
   const projectSafetyReadout = createProjectSafetyReadoutSummary(
     localDraftRecovery,
@@ -2134,6 +2157,10 @@ export function App(): ReactElement {
     return () => {
       controllerRef.current?.stop();
       controllerRef.current = null;
+      if (tapTempoCommitTimerRef.current !== null) {
+        window.clearTimeout(tapTempoCommitTimerRef.current);
+        tapTempoCommitTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -2312,9 +2339,63 @@ export function App(): ReactElement {
     setProjectStatus(status);
   }
 
+  function resetTapTempo(): void {
+    if (tapTempoCommitTimerRef.current !== null) {
+      window.clearTimeout(tapTempoCommitTimerRef.current);
+      tapTempoCommitTimerRef.current = null;
+    }
+    tapTempoTimesRef.current = [];
+    setTapTempo({ taps: 0, bpm: null, applied: true });
+  }
+
+  function updateProjectBpm(value: number): void {
+    const nextBpm = clampProjectBpm(value);
+    resetTapTempo();
+    updateProject((current) => (current.bpm === nextBpm ? current : { ...current, bpm: nextBpm }));
+  }
+
+  function commitTapTempoBpm(nextBpm: number): void {
+    tapTempoCommitTimerRef.current = null;
+    const changed = updateProject(
+      (current) => (current.bpm === nextBpm ? current : { ...current, bpm: nextBpm }),
+      `Tap tempo ${nextBpm} BPM`
+    );
+    setTapTempo((current) => (current.bpm === nextBpm ? { ...current, applied: true } : current));
+    if (!changed) {
+      setProjectStatus(`Tap tempo ${nextBpm} BPM`);
+    }
+  }
+
+  function tapProjectTempo(): void {
+    const now = performance.now();
+    const recentTaps = [...tapTempoTimesRef.current.filter((tapTime) => now - tapTime <= tapTempoWindowMs), now].slice(
+      -tapTempoMaxTaps
+    );
+    const nextBpm = calculateTapTempoBpm(recentTaps);
+
+    tapTempoTimesRef.current = recentTaps;
+    setTapTempo({ taps: recentTaps.length, bpm: nextBpm, applied: nextBpm === null });
+
+    if (nextBpm === null) {
+      if (tapTempoCommitTimerRef.current !== null) {
+        window.clearTimeout(tapTempoCommitTimerRef.current);
+        tapTempoCommitTimerRef.current = null;
+      }
+      setProjectStatus("Tap tempo armed");
+      return;
+    }
+
+    if (tapTempoCommitTimerRef.current !== null) {
+      window.clearTimeout(tapTempoCommitTimerRef.current);
+    }
+    tapTempoCommitTimerRef.current = window.setTimeout(() => commitTapTempoBpm(nextBpm), tapTempoCommitDelayMs);
+    setProjectStatus(`Tap tempo ${nextBpm} BPM`);
+  }
+
   function replaceProject(nextProject: ProjectState, status: string, fileLabel: string | null = null): void {
     projectRef.current = nextProject;
     localDraftSkipNextWriteRef.current = true;
+    resetTapTempo();
     setProjectFileLabel(fileLabel);
     setProjectHasUnsavedChanges(false);
     setLocalDraftWriteArmed(false);
@@ -2334,6 +2415,7 @@ export function App(): ReactElement {
 
   function restoreProjectFromHistory(nextProject: ProjectState, status: string): void {
     projectRef.current = nextProject;
+    resetTapTempo();
     setProject(nextProject);
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, nextProject.arrangement.length - 1)));
     setSelectedNote(null);
@@ -4863,12 +4945,10 @@ export function App(): ReactElement {
             <span>BPM</span>
             <input
               type="number"
-              min={60}
-              max={220}
+              min={minProjectBpm}
+              max={maxProjectBpm}
               value={project.bpm}
-              onChange={(event) =>
-                updateProject((current) => ({ ...current, bpm: Number(event.target.value) || current.bpm }))
-              }
+              onChange={(event) => updateProjectBpm(Number(event.target.value) || projectRef.current.bpm)}
             />
           </label>
           <label className="field">
@@ -4900,6 +4980,25 @@ export function App(): ReactElement {
           <div className="transport-status" aria-live="polite">
             <strong>{transportPrimary}</strong>
             <span>{transportSecondary}</span>
+          </div>
+          <button
+            className="icon-button tap-tempo-button"
+            data-testid="tap-tempo-button"
+            type="button"
+            title="Tap repeatedly to set the project BPM"
+            onClick={tapProjectTempo}
+          >
+            <Gauge size={18} aria-hidden="true" />
+            <span>Tap</span>
+          </button>
+          <div
+            className={`tap-tempo-readout ${tapTempoReadout.tone}`}
+            data-testid="tap-tempo-readout"
+            title={tapTempoReadout.detailTitle}
+          >
+            <span data-testid="tap-tempo-status">{tapTempoReadout.statusLabel}</span>
+            <strong data-testid="tap-tempo-label">{tapTempoReadout.roleLabel}</strong>
+            <small data-testid="tap-tempo-detail">{tapTempoReadout.detailLabel}</small>
           </div>
           <div
             className={`edit-history-readout ${editHistoryReadout.tone}`}
@@ -8614,6 +8713,38 @@ function createSnapshotSlotRoleSummary(project: ProjectState): SnapshotSlotRoleS
     statusLabel,
     detailLabel: `${savedCount} takes ready`,
     detailTitle: `${statusLabel} / Latest ${latestSnapshot?.name ?? "saved take"} / Compare takes before restore or delete`,
+    tone: "good"
+  };
+}
+
+function createTapTempoReadoutSummary(currentBpm: number, tapTempo: TapTempoState): TapTempoReadoutSummary {
+  if (tapTempo.bpm !== null) {
+    return {
+      roleLabel: `${tapTempo.bpm} BPM`,
+      statusLabel: `${tapTempo.taps} taps`,
+      detailLabel: tapTempo.applied ? "Applied tempo" : "Release to apply",
+      detailTitle: tapTempo.applied
+        ? `${tapTempo.taps} tap tempo pulses averaged into ${tapTempo.bpm} BPM`
+        : `${tapTempo.taps} tap tempo pulses averaging ${tapTempo.bpm} BPM / pause briefly to apply`,
+      tone: "good"
+    };
+  }
+
+  if (tapTempo.taps === 1) {
+    return {
+      roleLabel: "Keep tapping",
+      statusLabel: "1 tap",
+      detailLabel: `${currentBpm} BPM now`,
+      detailTitle: `One tap captured / Tap again within ${Math.round(tapTempoWindowMs / 1000)} seconds to calculate tempo`,
+      tone: "warn"
+    };
+  }
+
+  return {
+    roleLabel: `${currentBpm} BPM`,
+    statusLabel: "Tap BPM",
+    detailLabel: "2+ taps",
+    detailTitle: `Tap repeatedly to set the project BPM between ${minProjectBpm} and ${maxProjectBpm}`,
     tone: "good"
   };
 }
@@ -15513,6 +15644,27 @@ function clampMasterCeilingDb(value: number): number {
     return -1;
   }
   return Math.min(0, Math.max(-6, Math.round(value * 10) / 10));
+}
+
+function clampProjectBpm(value: number): number {
+  if (!Number.isFinite(value)) {
+    return starterProject.bpm;
+  }
+  return Math.min(maxProjectBpm, Math.max(minProjectBpm, Math.round(value)));
+}
+
+function calculateTapTempoBpm(tapTimes: number[]): number | null {
+  if (tapTimes.length < 2) {
+    return null;
+  }
+
+  const intervals = tapTimes.slice(1).map((tapTime, index) => tapTime - tapTimes[index]);
+  const averageInterval = intervals.reduce((total, interval) => total + interval, 0) / intervals.length;
+  if (!Number.isFinite(averageInterval) || averageInterval <= 0) {
+    return null;
+  }
+
+  return clampProjectBpm(60_000 / averageInterval);
 }
 
 function clampSplitAfterBars(value: number, blockBars: number): number {
