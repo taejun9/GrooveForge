@@ -3,7 +3,7 @@
 
 ## Summary
 
-GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres with pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, Session Brief, Space send FX, MIDI export, and WAV/stem export. It opens on direct beat writing with built-in instruments and editable musical events. Optional sampling can be added later as a secondary sound-source workflow.
+GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres with pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, Session Brief, Space send FX, MIDI export, and WAV/stem export. It opens on direct beat writing with built-in instruments and editable musical events.
 
 ## Type
 
@@ -14,6 +14,10 @@ GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats
 Corrected concept: GrooveForge is a beat-production mini DAW for directly composing beats across genres, designing sounds, arranging sections, mixing/mastering, and exporting finished audio. In the user's terms, it is "비트(모든 장르)를 만드는" app and "직접 비트를 작곡하고 사운드를 설계하고 믹싱/마스터링까지 하는 비트 제작 미니 DAW." It can support sampling later as an optional extension, but the identity, first-run workflow, MVP proof, and core architecture are direct beat production.
 
 GrooveForge is a code-driven all-genre beat workstation: a mini DAW with a JSON-based project format, programmable style profiles, editable musical events, local synthesis, mixing/mastering controls, and offline export. The center is writing and shaping the beat directly.
+
+Product summaries should stay centered on direct beat writing before any extension workflow is mentioned.
+
+First-read drafts should state the beat-making path before naming any sampling extension. The expected first impression is "make a beat from events and instruments," not "start by importing audio."
 
 The primary object is a beat project built from musical events, patterns, tracks, devices, arrangement blocks, mixer state, master state, and render state. Audio samples can become assets inside that project later, but they are not the default starting point.
 
@@ -40,6 +44,8 @@ Later optional sound-source extension, outside the MVP:
 - Sampling, audio import, chopping, and sampler mapping.
 
 Sampling can be useful, but it must stay behind the composition engine, instrument engine, arrangement, mixer/master, and export pipeline in priority, architecture, roadmap order, and UI copy. A user should be able to make the first complete beat with only built-in instruments and editable musical events. When sampling appears later, it should behave like an optional sound source or instrument layer inside the beat workstation.
+
+Keep sampling language in boundary, roadmap, or optional-phase sections. Do not move it into the top-line summary, MVP proof, or first-run creative loop.
 
 Primary navigation and the first empty project should expose beat-making controls first: transport, style/key/BPM, pattern editor, drum programming, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sampling entry points, when added, should be opt-in secondary paths.
 

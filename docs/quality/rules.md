@@ -267,6 +267,8 @@ Handoff Pack route readout work must derive only from local project state, selec
 
 Product framing work must preserve the core boundary: GrooveForge is for all-genre beat creation, pattern programming, sound design, arrangement, mixing/mastering, and export first; sampling is an optional extension and should not dominate MVP docs, UI copy, architecture, roadmap order, or plan titles.
 
+Product framing work must lead with a positive beat-workstation definition: users directly create drums, 808/bass, melody/chords, sound design, arrangement, mix/master, and export. Sampling guardrails belong in boundary or optional-phase sections, not as the first product summary.
+
 Concept correction work must make the all-genre beat-production mini DAW framing explicit: direct beat composition, sound design, arrangement, mixing/mastering, and export are the product spine, while sample import, chopping, pitch/stretch, one-shot mapping, and sampler workflows are optional later paths.
 
 Concept correction work must preserve this center list in durable docs: Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export.

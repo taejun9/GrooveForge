@@ -1,7 +1,7 @@
 
 # GrooveForge
 
-GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres: pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, Session Brief, Space send FX, MIDI export, and WAV/stem export. It opens on direct beat composition with built-in instruments and editable musical events; sampling remains a later optional sound-source module.
+GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats across genres: pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixing, mastering, Session Brief, Space send FX, MIDI export, and WAV/stem export. It opens on direct beat composition with built-in instruments and editable musical events, so the first read is a beat workstation built around making music directly.
 
 Project type: `web-first TypeScript mini DAW / beat workstation`.
 
@@ -11,9 +11,9 @@ Agent team: `Team Forge`. See `AGENTS.md`.
 
 ## Product Spine
 
-Concept lock: GrooveForge is an all-genre beat-production mini DAW for directly composing beats, designing sounds, arranging sections, mixing/mastering, and exporting finished audio. In the user's terms, it is "비트(모든 장르)를 만드는" app and "직접 비트를 작곡하고 사운드를 설계하고 믹싱/마스터링까지 하는 비트 제작 미니 DAW." Sampling can be added later as an optional workflow after the beat workstation core is already valuable.
+Concept lock: GrooveForge is an all-genre beat-production mini DAW for directly composing beats, designing sounds, arranging sections, mixing/mastering, and exporting finished audio. In the user's terms, it is "비트(모든 장르)를 만드는" app and "직접 비트를 작곡하고 사운드를 설계하고 믹싱/마스터링까지 하는 비트 제작 미니 DAW." This sentence is the anchor for every plan and product draft.
 
-GrooveForge is a code-driven all-genre beat workstation with a programmable project format and style engine. Direct composition is the product spine: users should be able to program drums, 808/bass, melody, chords, FX, and automation as editable musical events, shape built-in instruments, arrange a song section, mix/master it, and export audio before they ever import a sample. The product center is Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export.
+GrooveForge is a code-driven all-genre beat workstation with a programmable project format and style engine. Direct composition is the product spine: users should be able to program drums, 808/bass, melody, chords, FX, and automation as editable musical events, shape built-in instruments, arrange a song section, mix/master it, and export audio from built-in instruments alone. The product center is Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export.
 
 The first-run experience should feel like opening a compact beat-making DAW: choose BPM/key/style, write drums, build 808/bass, add melody/chords, shape sounds, arrange, mix, master, then export.
 
@@ -25,7 +25,7 @@ The core flow is:
 BPM/key/style -> pattern programming -> drums -> 808/bass -> melody/chords -> sound design -> arrangement -> mixing -> mastering -> export
 ```
 
-Optional sampling scope is intentionally subordinate: after core beat-making works, a future module may add audio import, chopping/slicing, pitch/stretch, one-shot mapping, or sampler instruments. It must attach as an opt-in sound source inside the workstation. A complete GrooveForge beat must still be possible with no imported audio.
+Extension boundary: Sampling is subordinate and opt-in. After the core beat-making loop works, a future module may add audio import, chopping/slicing, pitch/stretch, one-shot mapping, or sampler instruments. It must attach as an optional sound source inside the workstation. A complete GrooveForge beat must still be possible with no imported audio.
 
 Concept audit rule: do not read any sampling reference as the main workflow. Sampling is an accessory module, not the app category. If a draft starts from sample import, sample browsing, chopping, loop stretching, one-shot mapping, or sampler setup, it is out of alignment until it is explicitly labeled optional sampling-phase work.
 
@@ -87,6 +87,7 @@ The first desktop runtime is an Electron + Vite + TypeScript app. It opens direc
 - Keep sample import, chopping, sampler tracks, and audio warping in P3/v2 extension scope unless a user-approved plan explicitly says otherwise.
 - Keep first-run UI and default navigation focused on making beats across genres, not on finding or slicing samples.
 - Keep default screens, plan titles, and roadmap ordering anchored to editable musical events and beat-making controls.
+- Lead summaries with what users create directly: drums, 808/bass, melody/chords, sound design, arrangement, mix/master, and export. Mention sampling only as an explicitly optional extension boundary or sampling-phase plan.
 - Keep sensitive real user, customer, credential, and production data out of samples, tests, docs, and screenshots.
 - Keep validation commands current as the stack becomes concrete.
 
