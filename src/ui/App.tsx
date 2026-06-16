@@ -5635,6 +5635,7 @@ export function App(): ReactElement {
             chordRhythms={chordRhythmOptions}
             chordVoicings={chordVoicingOptions}
             chords={currentPattern.chordEvents}
+            currentStep={currentPatternStep}
             currentKey={project.key}
             rootOptions={chordRootOptions}
             selectedIndex={selectedChordIndex}
@@ -14280,6 +14281,7 @@ function ChordEditor({
   chordVoicings,
   chords,
   currentKey,
+  currentStep,
   rootOptions,
   selectedIndex,
   onAdd,
@@ -14302,6 +14304,7 @@ function ChordEditor({
   chordVoicings: ChordVoicingOption[];
   chords: ChordEvent[];
   currentKey: string;
+  currentStep: number | null;
   rootOptions: string[];
   selectedIndex: number | null;
   onAdd: () => void;
@@ -14497,171 +14500,177 @@ function ChordEditor({
         <small data-testid="chord-clipboard-detail">{chordClipboard ? `Clipboard ${chordClipboardLabel}` : "Clipboard empty"}</small>
       </div>
       <div className="chord-slots">
-        {chords.map((chord, index) => (
-          <div
-            aria-label={`Chord ${index + 1} ${chord.root}${chord.quality} step ${chord.step + 1}`}
-            className={["chord-slot", selectedIndex === index ? "selected" : ""].filter(Boolean).join(" ")}
-            data-testid={`chord-slot-${index}`}
-            key={`${chord.step}-${index}`}
-            onClick={() => onSelect(index)}
-            onFocusCapture={() => onSelect(index)}
-            onPointerDownCapture={() => onSelect(index)}
-            role="group"
-            tabIndex={0}
-          >
-            <div className="chord-slot-heading">
-              <span>{chord.step + 1}</span>
-              <strong>
-                {chord.root}
-                {chord.quality}
-              </strong>
-              <small data-testid={`chord-inversion-badge-${index}`}>{chordInversionLabel(normalizeChordInversion(chord.inversion))}</small>
-              {chord.probability < 1 && (
-                <small className="chance-badge" data-testid={`chord-chance-badge-${index}`}>
-                  {chanceBadgeLabel(chord.probability)}
-                </small>
-              )}
-              <button
-                data-testid={`chord-delete-${index}`}
-                disabled={chords.length <= 1}
-                onClick={() => onDelete(index)}
-                title="Delete chord event"
-                type="button"
-              >
-                <Trash2 size={13} aria-hidden="true" />
-              </button>
+        {chords.map((chord, index) => {
+          const selected = selectedIndex === index;
+          const playing = currentStep !== null && currentStep >= chord.step && currentStep < chord.step + chord.length;
+          return (
+            <div
+              aria-current={playing ? "step" : undefined}
+              aria-label={`Chord ${index + 1} ${chord.root}${chord.quality} step ${chord.step + 1}`}
+              className={["chord-slot", selected ? "selected" : "", playing ? "playing" : ""].filter(Boolean).join(" ")}
+              data-playing={playing ? "true" : "false"}
+              data-testid={`chord-slot-${index}`}
+              key={`${chord.step}-${index}`}
+              onClick={() => onSelect(index)}
+              onFocusCapture={() => onSelect(index)}
+              onPointerDownCapture={() => onSelect(index)}
+              role="group"
+              tabIndex={0}
+            >
+              <div className="chord-slot-heading">
+                <span>{chord.step + 1}</span>
+                <strong>
+                  {chord.root}
+                  {chord.quality}
+                </strong>
+                <small data-testid={`chord-inversion-badge-${index}`}>{chordInversionLabel(normalizeChordInversion(chord.inversion))}</small>
+                {chord.probability < 1 && (
+                  <small className="chance-badge" data-testid={`chord-chance-badge-${index}`}>
+                    {chanceBadgeLabel(chord.probability)}
+                  </small>
+                )}
+                <button
+                  data-testid={`chord-delete-${index}`}
+                  disabled={chords.length <= 1}
+                  onClick={() => onDelete(index)}
+                  title="Delete chord event"
+                  type="button"
+                >
+                  <Trash2 size={13} aria-hidden="true" />
+                </button>
+              </div>
+              <label>
+                <span>Step</span>
+                <input
+                  data-testid={`chord-step-${index}`}
+                  max={16}
+                  min={1}
+                  onChange={(event) => onChange(index, { step: clampStepStart(Number(event.target.value) - 1) })}
+                  step={1}
+                  type="number"
+                  value={chord.step + 1}
+                />
+              </label>
+              <label>
+                <span>Root</span>
+                <select
+                  data-testid={`chord-root-${index}`}
+                  value={chord.root}
+                  onChange={(event) => onChange(index, { root: event.target.value })}
+                >
+                  {rootOptions.map((root) => (
+                    <option key={root} value={root}>
+                      {root}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Quality</span>
+                <select
+                  data-testid={`chord-quality-${index}`}
+                  value={chord.quality}
+                  onChange={(event) => onChange(index, { quality: event.target.value as ChordQuality })}
+                >
+                  {chordQualities.map((quality) => (
+                    <option key={quality} value={quality}>
+                      {quality}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Voicing {chordInversionLabel(normalizeChordInversion(chord.inversion))}</span>
+                <div className="chord-inversion-row" aria-label={`Chord ${index + 1} inversion`}>
+                  {chordInversions.map((inversion) => (
+                    <button
+                      className={normalizeChordInversion(chord.inversion) === inversion ? "selected" : ""}
+                      data-testid={`chord-inversion-${index}-${inversion}`}
+                      key={inversion}
+                      onClick={() => onChange(index, { inversion })}
+                      type="button"
+                    >
+                      {chordInversionLabel(inversion)}
+                    </button>
+                  ))}
+                </div>
+              </label>
+              <label>
+                <span>Length {chord.length}</span>
+                <div className="chord-value-inputs">
+                  <input
+                    data-testid={`chord-length-${index}`}
+                    max={8}
+                    min={1}
+                    onChange={(event) => onChange(index, { length: Number(event.target.value) })}
+                    step={1}
+                    type="range"
+                    value={chord.length}
+                  />
+                  <input
+                    aria-label={`Chord ${index + 1} length`}
+                    data-testid={`chord-length-input-${index}`}
+                    max={8}
+                    min={1}
+                    onChange={(event) => onChange(index, { length: Number(event.target.value) })}
+                    step={1}
+                    type="number"
+                    value={chord.length}
+                  />
+                </div>
+              </label>
+              <label>
+                <span>Velocity {Math.round(chord.velocity * 100)}%</span>
+                <div className="chord-value-inputs">
+                  <input
+                    data-testid={`chord-velocity-${index}`}
+                    max={1}
+                    min={0.1}
+                    onChange={(event) => onChange(index, { velocity: Number(event.target.value) })}
+                    step={0.01}
+                    type="range"
+                    value={chord.velocity}
+                  />
+                  <input
+                    aria-label={`Chord ${index + 1} velocity percent`}
+                    data-testid={`chord-velocity-input-${index}`}
+                    max={100}
+                    min={10}
+                    onChange={(event) => onChange(index, { velocity: Number(event.target.value) / 100 })}
+                    step={1}
+                    type="number"
+                    value={Math.round(chord.velocity * 100)}
+                  />
+                </div>
+              </label>
+              <label>
+                <span>Chance {percentLabel(chord.probability)}</span>
+                <div className="chord-value-inputs">
+                  <input
+                    aria-label={`Chord ${index + 1} probability`}
+                    data-testid={`chord-probability-${index}`}
+                    max={1}
+                    min={0}
+                    onChange={(event) => onChange(index, { probability: Number(event.target.value) })}
+                    step={0.01}
+                    type="range"
+                    value={normalizeEventProbability(chord.probability)}
+                  />
+                  <input
+                    aria-label={`Chord ${index + 1} probability percent`}
+                    data-testid={`chord-probability-input-${index}`}
+                    inputMode="numeric"
+                    onChange={(event) => onChange(index, { probability: Number(event.target.value) / 100 })}
+                    pattern="[0-9]*"
+                    step={1}
+                    type="text"
+                    value={`${Math.round(normalizeEventProbability(chord.probability) * 100)}`}
+                  />
+                </div>
+              </label>
             </div>
-            <label>
-              <span>Step</span>
-              <input
-                data-testid={`chord-step-${index}`}
-                max={16}
-                min={1}
-                onChange={(event) => onChange(index, { step: clampStepStart(Number(event.target.value) - 1) })}
-                step={1}
-                type="number"
-                value={chord.step + 1}
-              />
-            </label>
-            <label>
-              <span>Root</span>
-              <select
-                data-testid={`chord-root-${index}`}
-                value={chord.root}
-                onChange={(event) => onChange(index, { root: event.target.value })}
-              >
-                {rootOptions.map((root) => (
-                  <option key={root} value={root}>
-                    {root}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Quality</span>
-              <select
-                data-testid={`chord-quality-${index}`}
-                value={chord.quality}
-                onChange={(event) => onChange(index, { quality: event.target.value as ChordQuality })}
-              >
-                {chordQualities.map((quality) => (
-                  <option key={quality} value={quality}>
-                    {quality}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Voicing {chordInversionLabel(normalizeChordInversion(chord.inversion))}</span>
-              <div className="chord-inversion-row" aria-label={`Chord ${index + 1} inversion`}>
-                {chordInversions.map((inversion) => (
-                  <button
-                    className={normalizeChordInversion(chord.inversion) === inversion ? "selected" : ""}
-                    data-testid={`chord-inversion-${index}-${inversion}`}
-                    key={inversion}
-                    onClick={() => onChange(index, { inversion })}
-                    type="button"
-                  >
-                    {chordInversionLabel(inversion)}
-                  </button>
-                ))}
-              </div>
-            </label>
-            <label>
-              <span>Length {chord.length}</span>
-              <div className="chord-value-inputs">
-                <input
-                  data-testid={`chord-length-${index}`}
-                  max={8}
-                  min={1}
-                  onChange={(event) => onChange(index, { length: Number(event.target.value) })}
-                  step={1}
-                  type="range"
-                  value={chord.length}
-                />
-                <input
-                  aria-label={`Chord ${index + 1} length`}
-                  data-testid={`chord-length-input-${index}`}
-                  max={8}
-                  min={1}
-                  onChange={(event) => onChange(index, { length: Number(event.target.value) })}
-                  step={1}
-                  type="number"
-                  value={chord.length}
-                />
-              </div>
-            </label>
-            <label>
-              <span>Velocity {Math.round(chord.velocity * 100)}%</span>
-              <div className="chord-value-inputs">
-                <input
-                  data-testid={`chord-velocity-${index}`}
-                  max={1}
-                  min={0.1}
-                  onChange={(event) => onChange(index, { velocity: Number(event.target.value) })}
-                  step={0.01}
-                  type="range"
-                  value={chord.velocity}
-                />
-                <input
-                  aria-label={`Chord ${index + 1} velocity percent`}
-                  data-testid={`chord-velocity-input-${index}`}
-                  max={100}
-                  min={10}
-                  onChange={(event) => onChange(index, { velocity: Number(event.target.value) / 100 })}
-                  step={1}
-                  type="number"
-                  value={Math.round(chord.velocity * 100)}
-                />
-              </div>
-            </label>
-            <label>
-              <span>Chance {percentLabel(chord.probability)}</span>
-              <div className="chord-value-inputs">
-                <input
-                  aria-label={`Chord ${index + 1} probability`}
-                  data-testid={`chord-probability-${index}`}
-                  max={1}
-                  min={0}
-                  onChange={(event) => onChange(index, { probability: Number(event.target.value) })}
-                  step={0.01}
-                  type="range"
-                  value={normalizeEventProbability(chord.probability)}
-                />
-                <input
-                  aria-label={`Chord ${index + 1} probability percent`}
-                  data-testid={`chord-probability-input-${index}`}
-                  inputMode="numeric"
-                  onChange={(event) => onChange(index, { probability: Number(event.target.value) / 100 })}
-                  pattern="[0-9]*"
-                  step={1}
-                  type="text"
-                  value={`${Math.round(normalizeEventProbability(chord.probability) * 100)}`}
-                />
-              </div>
-            </label>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
