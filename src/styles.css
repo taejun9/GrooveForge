@@ -217,6 +217,7 @@ h2 {
 .chord-voicing-heading span,
 .chord-voicing-row button span,
 .sound-focus-heading span,
+.sound-focus-preview span,
 .sound-focus-row button span,
 .drum-kit-heading span,
 .drum-kit-row button span,
@@ -7196,6 +7197,64 @@ input[type="range"] {
   font-size: 11px;
 }
 
+.sound-focus-preview {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.75fr) minmax(90px, 0.8fr) minmax(96px, 1fr) minmax(104px, 1.05fr) minmax(80px, 0.7fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 6px 7px;
+}
+
+.sound-focus-preview.warn {
+  border-color: rgba(255, 209, 102, 0.3);
+  background: rgba(255, 209, 102, 0.07);
+}
+
+.sound-focus-preview.danger {
+  border-color: rgba(255, 122, 79, 0.32);
+  background: rgba(255, 122, 79, 0.07);
+}
+
+.sound-focus-preview > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sound-focus-preview span {
+  color: #08120f;
+  background: #78f0c8;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.sound-focus-preview.warn span {
+  background: #ffd166;
+}
+
+.sound-focus-preview.danger span {
+  background: #ff7a4f;
+}
+
+.sound-focus-preview strong {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sound-focus-preview small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 10px;
+}
+
 .sound-focus-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -9848,6 +9907,10 @@ input[type="range"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .sound-focus-preview {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .mix-fix-preview {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -10004,6 +10067,11 @@ input[type="range"] {
   }
 
   .master-finish-preview {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .sound-focus-preview {
     grid-template-columns: 1fr;
     gap: 4px;
   }

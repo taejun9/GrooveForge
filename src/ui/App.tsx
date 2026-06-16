@@ -572,6 +572,17 @@ type SoundFocusPadOption = SoundFocusPadDefinition & {
   changedCount: number;
 };
 
+type SoundFocusPreviewSummary = {
+  padId: SoundFocusPadId;
+  statusLabel: string;
+  padLabel: string;
+  focusLabel: string;
+  parameterLabel: string;
+  changeLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type DrumKitPadId = "clean" | "knock" | "dust" | "air";
 
 type DrumKitSoundParameter = "kickPunch" | "snareSnap" | "hatBrightness";
@@ -2360,6 +2371,10 @@ export function App(): ReactElement {
   const stemAuditionPadOptions = useMemo(() => createStemAuditionPadOptions(project.mixer), [project.mixer]);
   const stemAuditionReadout = useMemo(() => createStemAuditionReadoutSummary(project.mixer), [project.mixer]);
   const soundFocusPadOptions = useMemo(() => createSoundFocusPadOptions(project.sound), [project.sound]);
+  const soundFocusPreviewSummary = useMemo(
+    () => createSoundFocusPreviewSummary(project.sound, soundFocusPadOptions),
+    [project.sound, soundFocusPadOptions]
+  );
   const drumKitPadOptions = useMemo(() => createDrumKitPadOptions(project), [project]);
   const masterFinishPadOptions = useMemo(() => createMasterFinishPadOptions(project), [project]);
   const masterFinishPreviewSummary = useMemo(
@@ -6241,6 +6256,7 @@ export function App(): ReactElement {
           </div>
           <SoundDesigner
             drumKitPads={drumKitPadOptions}
+            focusPreview={soundFocusPreviewSummary}
             focusPads={soundFocusPadOptions}
             mode={project.mode}
             sound={project.sound}
@@ -15153,6 +15169,86 @@ function createSoundFocusPadOptions(sound: SoundDesign): SoundFocusPadOption[] {
   });
 }
 
+function createSoundFocusPreviewSummary(sound: SoundDesign, pads: SoundFocusPadOption[]): SoundFocusPreviewSummary {
+  const pad = pads.find((option) => option.changedCount > 0) ?? pads[0];
+  if (!pad) {
+    return {
+      padId: "punch",
+      statusLabel: "Sound aligned",
+      padLabel: "Punch focus",
+      focusLabel: "No focus target",
+      parameterLabel: "No target values",
+      changeLabel: "0 moves ready",
+      detailTitle: "No Sound Focus pads are available.",
+      tone: "good"
+    };
+  }
+
+  const changedParameters = soundFocusChangedParameters(sound, pad);
+  const parameterPreview = soundFocusPreviewParameterLabel(pad);
+  const changedLabel = soundFocusChangedParameterLabel(changedParameters);
+  const tone: MixCoachTone = pad.changedCount === 0 ? "good" : "warn";
+
+  return {
+    padId: pad.id,
+    statusLabel: pad.changedCount === 0 ? "Sound aligned" : "Suggested focus",
+    padLabel: `${pad.label} focus`,
+    focusLabel: `${pad.detail} tone posture`,
+    parameterLabel: parameterPreview,
+    changeLabel: `${pad.changedCount} ${pad.changedCount === 1 ? "move" : "moves"} ready`,
+    detailTitle:
+      changedParameters.length === 0
+        ? `${pad.label} focus already matches the editable SoundDesign state.`
+        : `${pad.label} focus targets ${parameterPreview}; ${changedLabel}.`,
+    tone
+  };
+}
+
+function soundFocusChangedParameters(sound: SoundDesign, pad: SoundFocusPadDefinition): SoundFocusParameter[] {
+  return soundFocusParameters.filter((parameter) => {
+    const value = pad.values[parameter];
+    return value !== undefined && clampUnit(value) !== sound[parameter];
+  });
+}
+
+function soundFocusPreviewParameterLabel(pad: SoundFocusPadDefinition): string {
+  return `K ${compactUnitPercent(pad.values.kickPunch)} / 8 ${compactUnitPercent(pad.values.bassDrive)} / Ch ${compactUnitPercent(pad.values.chordWidth)}`;
+}
+
+function soundFocusChangedParameterLabel(parameters: SoundFocusParameter[]): string {
+  if (parameters.length === 0) {
+    return "no editable tone parameters need to move";
+  }
+  const names = parameters.slice(0, 3).map(soundFocusParameterLabel);
+  const suffix = parameters.length > names.length ? ` +${parameters.length - names.length}` : "";
+  return `touches ${names.join(", ")}${suffix}`;
+}
+
+function soundFocusParameterLabel(parameter: SoundFocusParameter): string {
+  switch (parameter) {
+    case "kickPunch":
+      return "kick";
+    case "snareSnap":
+      return "snare";
+    case "hatBrightness":
+      return "hat";
+    case "bassDrive":
+      return "808 drive";
+    case "bassDecay":
+      return "808 decay";
+    case "sidechainDuck":
+      return "duck";
+    case "synthBrightness":
+      return "synth";
+    case "synthRelease":
+      return "release";
+    case "chordWarmth":
+      return "warmth";
+    case "chordWidth":
+      return "width";
+  }
+}
+
 function soundFocusPreview(pad: SoundFocusPadDefinition): string {
   return `K ${compactUnitPercent(pad.values.kickPunch)} / 8 ${compactUnitPercent(pad.values.bassDrive)}`;
 }
@@ -16433,6 +16529,7 @@ function Device({
 
 function SoundDesigner({
   drumKitPads,
+  focusPreview,
   focusPads,
   mode,
   sound,
@@ -16442,6 +16539,7 @@ function SoundDesigner({
   onChange
 }: {
   drumKitPads: DrumKitPadOption[];
+  focusPreview: SoundFocusPreviewSummary;
   focusPads: SoundFocusPadOption[];
   mode: ProjectState["mode"];
   sound: SoundDesign;
@@ -16470,7 +16568,7 @@ function SoundDesigner({
         ))}
       </div>
       <DrumKitPads pads={drumKitPads} onApply={onDrumKitPad} />
-      <SoundFocusPads pads={focusPads} onApply={onFocusPad} />
+      <SoundFocusPads pads={focusPads} preview={focusPreview} onApply={onFocusPad} />
       <div className="sound-readout" aria-label="Sound design state">
         <span data-testid="sound-kick-readout">Kick {percentLabel(sound.kickPunch)}</span>
         <span data-testid="sound-bass-readout">808 {percentLabel(sound.bassDrive)}</span>
@@ -16580,9 +16678,11 @@ function DrumKitPads({
 
 function SoundFocusPads({
   pads,
+  preview,
   onApply
 }: {
   pads: SoundFocusPadOption[];
+  preview: SoundFocusPreviewSummary;
   onApply: (pad: SoundFocusPadId) => void;
 }): ReactElement {
   return (
@@ -16590,6 +16690,18 @@ function SoundFocusPads({
       <div className="sound-focus-heading">
         <span>Sound Focus</span>
         <strong>Tone posture</strong>
+      </div>
+      <div
+        className={`sound-focus-preview ${preview.tone}`}
+        data-preview-sound-focus={preview.padId}
+        data-testid="sound-focus-preview"
+        title={preview.detailTitle}
+      >
+        <span data-testid="sound-focus-preview-status">{preview.statusLabel}</span>
+        <strong data-testid="sound-focus-preview-pad">{preview.padLabel}</strong>
+        <small data-testid="sound-focus-preview-focus">{preview.focusLabel}</small>
+        <small data-testid="sound-focus-preview-parameters">{preview.parameterLabel}</small>
+        <small data-testid="sound-focus-preview-changes">{preview.changeLabel}</small>
       </div>
       <div className="sound-focus-row" aria-label="Sound Focus Pads">
         {pads.map((pad) => (
