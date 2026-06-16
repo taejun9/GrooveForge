@@ -848,6 +848,29 @@ type BassMovePreviewSummary = {
   contourId: BassContourId | "none";
 };
 
+type BassMoveResultKind = "Bassline" | "Glide" | "Contour";
+
+type BassMoveResultMetric = {
+  id: "notes" | "rhythm" | "glide" | "chance" | "range";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type BassMoveResult = {
+  moveId: string;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: BassMoveResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type PatternStackId = "pocket" | "hook" | "lift" | "break";
 
 type PatternStackDefinition = {
@@ -2389,6 +2412,7 @@ export function App(): ReactElement {
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [patternStackResult, setPatternStackResult] = useState<PatternStackResult | null>(null);
   const [drumMoveResult, setDrumMoveResult] = useState<DrumMoveResult | null>(null);
+  const [bassMoveResult, setBassMoveResult] = useState<BassMoveResult | null>(null);
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
@@ -2900,6 +2924,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
+    setBassMoveResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -2913,6 +2938,7 @@ export function App(): ReactElement {
       setQuickActionResult(null);
       setPatternStackResult(null);
       setDrumMoveResult(null);
+      setBassMoveResult(null);
     }
     setProjectStatus(status);
   }
@@ -3001,6 +3027,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
+    setBassMoveResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
   }
@@ -3019,6 +3046,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
+    setBassMoveResult(null);
     setProjectStatus(status);
   }
 
@@ -4338,20 +4366,24 @@ export function App(): ReactElement {
   function applyBasslinePad(padId: BasslinePadId): void {
     const pad = basslinePadDefinitions.find((candidate) => candidate.id === padId);
     if (!pad) {
+      setBassMoveResult(null);
       setProjectStatus("808 bassline pad not found");
       return;
     }
 
+    const beforeProject = projectRef.current;
     const bassNotes = createBasslinePadNotes(projectRef.current.key, pad);
     const changed = updateCurrentPattern(
       (pattern) => (sameBassNotes(pattern.bassNotes, bassNotes) ? pattern : { ...pattern, bassNotes }),
       `${pad.label} 808 bassline applied to Pattern ${projectRef.current.selectedPattern}`
     );
     if (!changed) {
+      setBassMoveResult(null);
       setProjectStatus(`${pad.label} 808 bassline already selected`);
       return;
     }
 
+    setBassMoveResult(createBassMoveResult("Bassline", pad.id, pad.label, pad.detail, beforeProject, projectRef.current));
     const firstNote = bassNotes[0];
     setSelectedNote(firstNote ? { track: "bass", step: firstNote.step, pitch: firstNote.pitch } : null);
     setSelectedDrumStep(null);
@@ -4361,26 +4393,31 @@ export function App(): ReactElement {
   function applyBassGlidePad(padId: BassGlidePadId): void {
     const pad = bassGlidePadDefinitions.find((candidate) => candidate.id === padId);
     if (!pad) {
+      setBassMoveResult(null);
       setProjectStatus("808 glide pad not found");
       return;
     }
 
     const currentBassNotes = projectRef.current.patterns[projectRef.current.selectedPattern].bassNotes;
     if (currentBassNotes.length === 0) {
+      setBassMoveResult(null);
       setProjectStatus(`Add an 808 note before using ${pad.label} glide`);
       return;
     }
 
+    const beforeProject = projectRef.current;
     const bassNotes = applyBassGlidePadToNotes(currentBassNotes, pad.id);
     const changed = updateCurrentPattern(
       (pattern) => (sameBassNotes(pattern.bassNotes, bassNotes) ? pattern : { ...pattern, bassNotes }),
       `${pad.label} 808 glide applied to Pattern ${projectRef.current.selectedPattern}`
     );
     if (!changed) {
+      setBassMoveResult(null);
       setProjectStatus(`${pad.label} 808 glide already selected`);
       return;
     }
 
+    setBassMoveResult(createBassMoveResult("Glide", pad.id, pad.label, pad.detail, beforeProject, projectRef.current));
     const firstNote = bassNotes[0];
     setSelectedNote(firstNote ? { track: "bass", step: firstNote.step, pitch: firstNote.pitch } : null);
     setSelectedDrumStep(null);
@@ -4390,26 +4427,31 @@ export function App(): ReactElement {
   function applyBassContour(contourId: BassContourId): void {
     const contour = bassContourDefinitions.find((candidate) => candidate.id === contourId);
     if (!contour) {
+      setBassMoveResult(null);
       setProjectStatus("808 contour pad not found");
       return;
     }
 
     const currentBassNotes = projectRef.current.patterns[projectRef.current.selectedPattern].bassNotes;
     if (currentBassNotes.length === 0) {
+      setBassMoveResult(null);
       setProjectStatus(`Add an 808 note before using ${contour.label} contour`);
       return;
     }
 
+    const beforeProject = projectRef.current;
     const bassNotes = applyBassContourToNotes(projectRef.current.key, currentBassNotes, contour.id);
     const changed = updateCurrentPattern(
       (pattern) => (sameBassNotes(pattern.bassNotes, bassNotes) ? pattern : { ...pattern, bassNotes }),
       `${contour.label} 808 contour applied to Pattern ${projectRef.current.selectedPattern}`
     );
     if (!changed) {
+      setBassMoveResult(null);
       setProjectStatus(`${contour.label} 808 contour already selected`);
       return;
     }
 
+    setBassMoveResult(createBassMoveResult("Contour", contour.id, contour.label, contour.detail, beforeProject, projectRef.current));
     const firstNote = bassNotes[0];
     setSelectedNote(firstNote ? { track: "bass", step: firstNote.step, pitch: firstNote.pitch } : null);
     setSelectedDrumStep(null);
@@ -6381,6 +6423,7 @@ export function App(): ReactElement {
             target={keyboardCaptureTarget}
           />
           <BassMovePreview preview={bassMovePreviewSummary} />
+          {bassMoveResult && <BassMoveResultStrip result={bassMoveResult} />}
           <BasslinePads pads={basslinePadOptions} onApply={applyBasslinePad} />
           <BassGlidePads pads={bassGlidePadOptions} onApply={applyBassGlidePad} />
           <BassContourPads contours={bassContourOptions} onApply={applyBassContour} />
@@ -16274,6 +16317,48 @@ function BassMovePreview({ preview }: { preview: BassMovePreviewSummary }): Reac
   );
 }
 
+function BassMoveResultStrip({ result }: { result: BassMoveResult }): ReactElement {
+  return (
+    <div
+      className={`bass-move-result ${result.tone}`}
+      data-result-bass-move={result.moveId}
+      data-testid="bass-move-result"
+      aria-live="polite"
+    >
+      <div className="bass-move-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="bass-move-result-title">{result.title}</strong>
+          <small data-testid="bass-move-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="bass-move-result-meta">
+        <span data-testid="bass-move-result-status">{result.status}</span>
+        <span data-testid="bass-move-result-scope">{result.scope}</span>
+        <span data-testid="bass-move-result-impact">{result.impact}</span>
+      </div>
+      <div className="bass-move-result-metrics" data-testid="bass-move-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`bass-move-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="bass-move-result-followup" data-testid="bass-move-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="bass-move-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="bass-move-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function BasslinePads({
   pads,
   onApply
@@ -18538,6 +18623,60 @@ function createBassMovePreviewSummary(
   };
 }
 
+function createBassMoveResult(
+  kind: BassMoveResultKind,
+  id: string,
+  label: string,
+  detail: string,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): BassMoveResult {
+  const beforeNotes = activePattern(beforeProject).bassNotes;
+  const afterNotes = activePattern(afterProject).bassNotes;
+  const noteMoves = Math.abs(beforeNotes.length - afterNotes.length);
+  const rhythmMoves = bassRhythmMoveCount(beforeNotes, afterNotes);
+  const glideMoves = bassGlideMoveCountForResult(beforeNotes, afterNotes);
+  const chanceMoves = bassChanceMoveCountForResult(beforeNotes, afterNotes);
+  const rangeMoves = bassRangeMoveCount(beforeNotes, afterNotes);
+  const metrics: BassMoveResultMetric[] = [
+    createBassMoveResultMetric("notes", "Notes", bassNoteCountLabel(beforeNotes), bassNoteCountLabel(afterNotes), noteMoves),
+    createBassMoveResultMetric("rhythm", "Rhythm", bassRhythmLabel(beforeNotes), bassRhythmLabel(afterNotes), rhythmMoves),
+    createBassMoveResultMetric("glide", "Glide", bassGlideLabel(beforeNotes), bassGlideLabel(afterNotes), glideMoves),
+    createBassMoveResultMetric("chance", "Chance", bassChanceLabel(beforeNotes), bassChanceLabel(afterNotes), chanceMoves),
+    createBassMoveResultMetric("range", "Range", bassRangeLabel(beforeNotes), bassRangeLabel(afterNotes), rangeMoves)
+  ];
+  const changedGroups = [noteMoves, rhythmMoves, glideMoves, chanceMoves, rangeMoves].filter((count) => count > 0).length;
+
+  return {
+    moveId: `${kind.toLowerCase()}-${id}`,
+    title: `${label} ${kind} applied`,
+    status: "Applied",
+    detail: `Pattern ${afterProject.selectedPattern} / ${detail}`,
+    scope: `Pattern ${afterProject.selectedPattern} 808`,
+    impact: `N ${noteMoves} / R ${rhythmMoves} / G ${glideMoves} / C ${chanceMoves} / P ${rangeMoves}`,
+    metrics,
+    auditionCue: `Loop Pattern ${afterProject.selectedPattern}; check kick-to-808 lock, slides, and low-end contour.`,
+    nextCheck: "Use selected-note degree/role and 808 edit tools for manual corrections.",
+    tone: changedGroups > 0 ? "good" : "warn"
+  };
+}
+
+function createBassMoveResultMetric(
+  id: BassMoveResultMetric["id"],
+  label: string,
+  before: string,
+  after: string,
+  changedEvents: number
+): BassMoveResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: changedEvents === 0 ? "warn" : "good"
+  };
+}
+
 function basslinePadMoveCount(key: string, notes: BassNote[], bassline: BasslinePadOption): number {
   return basslineMoveCountForOption(key, notes, bassline);
 }
@@ -18565,6 +18704,101 @@ function bassNotesChangedCount(current: BassNote[], transformed: BassNote[]): nu
     }
   }
   return changed;
+}
+
+function bassRhythmMoveCount(current: BassNote[], transformed: BassNote[]): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentNote = current[index];
+    const transformedNote = transformed[index];
+    if (!currentNote || !transformedNote || currentNote.step !== transformedNote.step || currentNote.length !== transformedNote.length) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function bassGlideMoveCountForResult(current: BassNote[], transformed: BassNote[]): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentNote = current[index];
+    const transformedNote = transformed[index];
+    if (!currentNote || !transformedNote || currentNote.glide !== transformedNote.glide || currentNote.length !== transformedNote.length) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function bassChanceMoveCountForResult(current: BassNote[], transformed: BassNote[]): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentNote = current[index];
+    const transformedNote = transformed[index];
+    if (
+      !currentNote ||
+      !transformedNote ||
+      normalizeEventProbability(currentNote.probability) !== normalizeEventProbability(transformedNote.probability)
+    ) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function bassRangeMoveCount(current: BassNote[], transformed: BassNote[]): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentNote = current[index];
+    const transformedNote = transformed[index];
+    if (!currentNote || !transformedNote || currentNote.pitch !== transformedNote.pitch) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function bassNoteCountLabel(notes: BassNote[]): string {
+  return `${notes.length} notes`;
+}
+
+function bassRhythmLabel(notes: BassNote[]): string {
+  if (notes.length === 0) {
+    return "No 808";
+  }
+  const labels = sortBassNotes(notes).map((note) => `${note.step + 1}:${note.length}`);
+  return labels.length > 4 ? `${labels.slice(0, 4).join("/")} +${labels.length - 4}` : labels.join("/");
+}
+
+function bassGlideLabel(notes: BassNote[]): string {
+  if (notes.length === 0) {
+    return "0 glide";
+  }
+  const glideCount = notes.filter((note) => note.glide).length;
+  const averageLength = notes.reduce((total, note) => total + note.length, 0) / notes.length;
+  return `${glideCount} glide / ${averageLength.toFixed(1)} len`;
+}
+
+function bassChanceLabel(notes: BassNote[]): string {
+  if (notes.length === 0) {
+    return "No 808";
+  }
+  const average = notes.reduce((total, note) => total + normalizeEventProbability(note.probability), 0) / notes.length;
+  return percentLabel(average);
+}
+
+function bassRangeLabel(notes: BassNote[]): string {
+  if (notes.length === 0) {
+    return "No 808";
+  }
+  const ordered = [...notes].sort((first, second) => pitchMidi(first.pitch) - pitchMidi(second.pitch));
+  const low = ordered[0]?.pitch ?? "-";
+  const high = ordered[ordered.length - 1]?.pitch ?? "-";
+  return low === high ? low : `${low}-${high}`;
 }
 
 function sameBassNote(first: BassNote, second: BassNote): boolean {
