@@ -1811,6 +1811,16 @@ type WorkflowNavigatorItem = {
   tone: MixCoachTone;
 };
 
+type WorkflowSpotlightSummary = {
+  zoneId: WorkflowZoneId | null;
+  statusLabel: string;
+  zoneLabel: string;
+  detailLabel: string;
+  countLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type SelectedDrumStep = {
   lane: DrumLane;
   step: number;
@@ -8582,6 +8592,8 @@ function WorkflowNavigator({
   items: WorkflowNavigatorItem[];
   onJump: (zone: WorkflowZoneId) => void;
 }): ReactElement {
+  const spotlight = createWorkflowSpotlightSummary(items);
+
   return (
     <nav className="workflow-navigator" data-testid="workflow-navigator" aria-label="Workflow navigator">
       <div className="workflow-navigator-heading">
@@ -8591,6 +8603,18 @@ function WorkflowNavigator({
         </div>
         <strong>Compose to deliver</strong>
         <small>Jump across the workstation</small>
+      </div>
+      <div
+        aria-label={spotlight.detailTitle}
+        className={`workflow-spotlight ${spotlight.tone}`}
+        data-spotlight-zone={spotlight.zoneId ?? "none"}
+        data-testid="workflow-spotlight"
+        title={spotlight.detailTitle}
+      >
+        <span data-testid="workflow-spotlight-status">{spotlight.statusLabel}</span>
+        <strong data-testid="workflow-spotlight-zone">{spotlight.zoneLabel}</strong>
+        <small data-testid="workflow-spotlight-detail">{spotlight.detailLabel}</small>
+        <small data-testid="workflow-spotlight-count">{spotlight.countLabel}</small>
       </div>
       <div className="workflow-navigator-grid">
         {items.map((item) => (
@@ -8611,6 +8635,43 @@ function WorkflowNavigator({
       </div>
     </nav>
   );
+}
+
+function createWorkflowSpotlightSummary(items: WorkflowNavigatorItem[]): WorkflowSpotlightSummary {
+  const blockerCount = items.filter((item) => item.tone === "danger").length;
+  const reviewCount = items.filter((item) => item.tone === "warn").length;
+  const readyCount = items.filter((item) => item.tone === "good").length;
+  const countLabel = `${readyCount} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+  const focusItem = items.find((item) => item.tone === "danger") ?? items.find((item) => item.tone === "warn") ?? items[0] ?? null;
+
+  if (!focusItem) {
+    return {
+      zoneId: null,
+      statusLabel: "No workflow zones",
+      zoneLabel: "No jump target",
+      detailLabel: "Workflow Navigator has no visible zones",
+      countLabel,
+      detailTitle: `No workflow zones / ${countLabel}`,
+      tone: "warn"
+    };
+  }
+
+  const statusLabel = focusItem.tone === "danger" ? "Next blocker" : focusItem.tone === "warn" ? "Next review" : "Workflow clear";
+  const detailLabel = `Jump target: ${focusItem.label} / ${focusItem.detail}`;
+
+  return {
+    zoneId: focusItem.id,
+    statusLabel,
+    zoneLabel: `${focusItem.label}: ${focusItem.value}`,
+    detailLabel,
+    countLabel,
+    detailTitle: `${statusLabel} / ${focusItem.label}: ${focusItem.value} / ${focusItem.detail} / ${countLabel}`,
+    tone: focusItem.tone
+  };
+}
+
+function workflowCountLabel(count: number, label: string): string {
+  return `${count} ${label}${count === 1 ? "" : "s"}`;
 }
 
 function ExportPreflight({
