@@ -2038,7 +2038,8 @@ export function App(): ReactElement {
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
   const editHistoryReadout = createEditHistoryReadoutSummary(undoStack.length, redoStack.length, projectStatus);
-  const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
+  const currentPlaybackStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
+  const currentEditorStep = playbackPosition?.pattern === project.selectedPattern ? currentPlaybackStep : null;
   const playingArrangementIndex =
     isPlaying && playbackPosition?.mode === "arrangement" && typeof playbackPosition.arrangementIndex === "number"
       ? playbackPosition.arrangementIndex
@@ -2057,7 +2058,7 @@ export function App(): ReactElement {
       : `${playbackPosition?.section ?? "Arrangement"} ${playbackPosition?.bar ?? 1}.${playbackPosition?.beat ?? 1}`
     : "Ready";
   const transportSecondary = isPlaying
-    ? `${transportLoopLabel(transportLoopScope)} / Pattern ${playbackPosition?.pattern ?? project.selectedPattern} / Step ${(currentPatternStep ?? 0) + 1}`
+    ? `${transportLoopLabel(transportLoopScope)} / Pattern ${playbackPosition?.pattern ?? project.selectedPattern} / Step ${(currentPlaybackStep ?? 0) + 1}`
     : transportLoopReadout;
   const transportPositionReadout = createTransportPositionReadoutSummary(
     project,
@@ -5469,7 +5470,7 @@ export function App(): ReactElement {
                         "step",
                         active ? "active" : "",
                         selectedDrumStep?.lane === lane && selectedDrumStep.step === step ? "selected" : "",
-                        currentPatternStep === step ? "playhead" : ""
+                        currentEditorStep === step ? "playhead" : ""
                       ]
                         .filter(Boolean)
                         .join(" ")}
@@ -5570,7 +5571,7 @@ export function App(): ReactElement {
               notes={currentPattern.bassNotes.map((note) => ({ ...note, velocity: note.glide ? 0.95 : 0.82 }))}
               pitches={bassPitches}
               color="#ff7a4f"
-              currentStep={currentPatternStep}
+              currentStep={currentEditorStep}
               selectedNote={selectedNote}
               onToggle={toggleBassNote}
             />
@@ -5580,7 +5581,7 @@ export function App(): ReactElement {
               notes={currentPattern.melodyNotes}
               pitches={melodyPitches}
               color="#8aa8ff"
-              currentStep={currentPatternStep}
+              currentStep={currentEditorStep}
               selectedNote={selectedNote}
               onToggle={toggleMelodyNote}
             />
@@ -5635,7 +5636,7 @@ export function App(): ReactElement {
             chordRhythms={chordRhythmOptions}
             chordVoicings={chordVoicingOptions}
             chords={currentPattern.chordEvents}
-            currentStep={currentPatternStep}
+            currentStep={currentEditorStep}
             currentKey={project.key}
             rootOptions={chordRootOptions}
             selectedIndex={selectedChordIndex}
