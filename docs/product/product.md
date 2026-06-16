@@ -23,6 +23,8 @@ The primary object is a beat project built from musical events, patterns, tracks
 
 The product should make a blank beat feel playable without imported audio: set BPM/key/style, write rhythm, compose 808/bass, melody, and chords, shape tone and FX, arrange sections, mix/master, and export. The product center is Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export.
 
+Core schema examples must reflect that order. Do not place `AudioClipEvent`, `audio`, or `sampler` beside core MVP event, clip, or track unions unless the user has explicitly started optional sampling-phase work.
+
 Trap, drill, boom bap, house, lofi, jersey, phonk, R&B, garage, and experimental workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
 
 When there is ambiguity, read the product draft in this order: all-genre beat creation first, direct composition and sound design second, arrangement/mixing/mastering/export third, optional sampling extensions last.

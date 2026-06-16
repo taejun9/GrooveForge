@@ -29,6 +29,8 @@ Extension boundary: Sampling is subordinate and opt-in. After the core beat-maki
 
 Concept audit rule: do not read any sampling reference as the main workflow. Sampling is an accessory module, not the app category. If a draft starts from sample import, sample browsing, chopping, loop stretching, one-shot mapping, or sampler setup, it is out of alignment until it is explicitly labeled optional sampling-phase work.
 
+Core model rule: do not copy optional sampling examples into the MVP data model. The core project starts from editable notes, drum hits, automation, pattern/MIDI clips, built-in instruments, arrangement, mixer/master, and export; `AudioClipEvent`, `audio`, and `sampler` belong only to an explicitly approved optional sampling phase.
+
 Drafting rule: the default empty project, first visible actions, MVP proof, primary navigation, and new plan titles should lead with editable musical events and beat-making controls. Do not present optional sampling as a co-equal product spine.
 
 ## MVP Target

@@ -56,7 +56,7 @@ The current MVP stack is:
 
 - Desktop shell: Electron.
 - Renderer/build: Vite, React, TypeScript.
-- UI rendering: DOM/CSS for the current workstation surface; Canvas/WebGL remains available for dense piano-roll and waveform work later.
+- UI rendering: DOM/CSS for the current workstation surface; Canvas/WebGL remains available for dense piano-roll work, while waveform views belong only to a later optional sampling phase.
 - Audio: Web Audio API for realtime loop playback and a local WAV renderer for the first export path.
 - Storage: JSON project files and IndexedDB/local file cache in later plans.
 
@@ -85,6 +85,8 @@ The core project model should make composition events first-class. In the core a
 - `StyleProfile`: genre rules for BPM range, swing, density, quantize strength, humanization, bass style, and melody style.
 
 MVP type examples must not place `AudioClipEvent`, `audio`, or `sampler` beside the core event, clip, or track unions. Those names are reserved for the optional sampling extension section unless the user explicitly starts sampling-phase work.
+
+If an exploratory draft includes audio clip, sampler, or waveform examples, move them to an optional sampling section before they enter architecture diagrams, schema examples, default tracks, or MVP validation.
 
 Sampling is an extension model, not a core dependency. When it is added, it can introduce audio clips, sampler devices, audio tracks, and source/license metadata without changing the requirement that a valid beat can be made from generated and performed events alone. `AudioClipEvent` belongs in that extension layer, not in the core MVP `MusicalEvent` union.
 
