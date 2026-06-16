@@ -42,6 +42,7 @@ button {
 
 .transport-band,
 .mode-row,
+.quick-action-result,
 .style-inspector,
 .key-compass,
 .groove-compass,
@@ -1417,6 +1418,109 @@ h2 {
 .quick-actions-list button small {
   color: rgba(244, 239, 231, 0.62);
   font-size: 11px;
+}
+
+.quick-action-result {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.75fr) minmax(180px, 0.75fr) minmax(300px, 1.5fr);
+  gap: 8px;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 62px;
+  padding: 10px;
+  border-radius: 8px;
+  border-color: rgba(120, 240, 200, 0.18);
+  background: rgba(120, 240, 200, 0.045);
+}
+
+.quick-action-result.warn {
+  border-color: rgba(240, 195, 106, 0.2);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.quick-action-result.danger {
+  border-color: rgba(255, 122, 79, 0.24);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.quick-action-result-main,
+.quick-action-result-metric,
+.quick-action-result-followup,
+.quick-action-result-followup span {
+  min-width: 0;
+}
+
+.quick-action-result-main,
+.quick-action-result-metric {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid rgba(244, 239, 231, 0.08);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.035);
+}
+
+.quick-action-result-main span,
+.quick-action-result-metric span,
+.quick-action-result-followup b {
+  color: rgba(244, 239, 231, 0.55);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.quick-action-result-main strong,
+.quick-action-result-main small,
+.quick-action-result-metric strong,
+.quick-action-result-followup em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-action-result-main strong,
+.quick-action-result-metric strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.quick-action-result-main small,
+.quick-action-result-followup em {
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.quick-action-result-metric.good {
+  border-color: rgba(120, 240, 200, 0.18);
+  background: rgba(120, 240, 200, 0.055);
+}
+
+.quick-action-result-metric.warn {
+  border-color: rgba(240, 195, 106, 0.18);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.quick-action-result-metric.danger {
+  border-color: rgba(255, 122, 79, 0.22);
+  background: rgba(255, 122, 79, 0.055);
+}
+
+.quick-action-result-followup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.quick-action-result-followup span {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(244, 239, 231, 0.08);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.03);
 }
 
 .blueprint-row {
@@ -6467,6 +6571,11 @@ input[type="range"] {
 
   .next-move-result,
   .next-move-result-followup {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-action-result,
+  .quick-action-result-followup {
     grid-template-columns: 1fr;
   }
 

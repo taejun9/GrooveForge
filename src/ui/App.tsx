@@ -520,6 +520,26 @@ type QuickAction = {
   run: () => void | Promise<void>;
 };
 
+type QuickActionResultMetric = {
+  id: string;
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type QuickActionResult = {
+  actionId: string;
+  title: string;
+  status: string;
+  group: string;
+  detail: string;
+  metric: QuickActionResultMetric;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type BeatReadinessCheck = {
   id: string;
   label: string;
@@ -1646,6 +1666,7 @@ export function App(): ReactElement {
   const [quickActionQuery, setQuickActionQuery] = useState("");
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
+  const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const projectRef = useRef<ProjectState>(starterProject);
   const controllerRef = useRef<PlaybackController | null>(null);
@@ -1980,6 +2001,7 @@ export function App(): ReactElement {
     setProject(nextProject);
     setComposerActionResult(null);
     setNextMoveResult(null);
+    setQuickActionResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -1990,6 +2012,7 @@ export function App(): ReactElement {
     if (nextProject !== current) {
       projectRef.current = nextProject;
       setProject(nextProject);
+      setQuickActionResult(null);
     }
     setProjectStatus(status);
   }
@@ -2005,6 +2028,7 @@ export function App(): ReactElement {
     setSelectedChordIndex(null);
     setComposerActionResult(null);
     setNextMoveResult(null);
+    setQuickActionResult(null);
     setProjectStatus(status);
   }
 
@@ -2018,6 +2042,7 @@ export function App(): ReactElement {
     setPlaybackPosition(null);
     setComposerActionResult(null);
     setNextMoveResult(null);
+    setQuickActionResult(null);
     setProjectStatus(status);
   }
 
@@ -4111,15 +4136,22 @@ export function App(): ReactElement {
     if (action.disabled) {
       return;
     }
+    const beforeProject = projectRef.current;
     closeQuickActions();
     try {
-      void Promise.resolve(action.run()).catch((error: unknown) => {
-        console.error(error);
-        setProjectStatus("Quick action failed");
-      });
+      void Promise.resolve(action.run())
+        .then(() => {
+          setQuickActionResult(createQuickActionResult(action, beforeProject, projectRef.current, "complete"));
+        })
+        .catch((error: unknown) => {
+          console.error(error);
+          setProjectStatus("Quick action failed");
+          setQuickActionResult(createQuickActionResult(action, beforeProject, projectRef.current, "failed"));
+        });
     } catch (error) {
       console.error(error);
       setProjectStatus("Quick action failed");
+      setQuickActionResult(createQuickActionResult(action, beforeProject, projectRef.current, "failed"));
     }
   }
 
@@ -4356,6 +4388,8 @@ export function App(): ReactElement {
           <span>{projectStatus}</span>
         </div>
       </section>
+
+      {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
 
       <StyleInspector
         onSelectStyle={selectStyle}
@@ -5893,6 +5927,34 @@ function QuickActions({
   );
 }
 
+function QuickActionResultStrip({ result }: { result: QuickActionResult }): ReactElement {
+  return (
+    <section className={`quick-action-result ${result.tone}`} data-testid="quick-action-result" aria-live="polite">
+      <div className="quick-action-result-main">
+        <span data-testid="quick-action-result-status">{result.status}</span>
+        <strong data-testid="quick-action-result-title">{result.title}</strong>
+        <small data-testid="quick-action-result-detail">{result.group} / {result.detail}</small>
+      </div>
+      <div className={`quick-action-result-metric ${result.metric.tone}`} data-testid="quick-action-result-metric">
+        <span>{result.metric.label}</span>
+        <strong data-testid="quick-action-result-metric-value">
+          {result.metric.before} -&gt; {result.metric.after}
+        </strong>
+      </div>
+      <div className="quick-action-result-followup" data-testid="quick-action-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="quick-action-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="quick-action-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </section>
+  );
+}
+
 function ProjectSnapshots({
   nameDrafts,
   project,
@@ -6922,6 +6984,166 @@ function quickActionSearchTokens(action: QuickAction): string[] {
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
+}
+
+function createQuickActionResult(
+  action: QuickAction,
+  beforeProject: ProjectState,
+  afterProject: ProjectState,
+  outcome: "complete" | "failed"
+): QuickActionResult {
+  const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action);
+  const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
+  const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
+  const metric: QuickActionResultMetric = {
+    id: afterMetric.id,
+    label: afterMetric.label,
+    before: beforeMetric.value,
+    after: afterMetric.value,
+    tone: outcome === "failed" ? "danger" : changed ? "good" : "warn"
+  };
+  const followup = quickActionResultFollowup(action, afterProject, outcome);
+
+  return {
+    actionId: action.id,
+    title: action.title,
+    status: outcome === "failed" ? "Failed" : changed ? "Applied" : "Ran",
+    group: action.group,
+    detail: action.detail,
+    metric,
+    auditionCue: followup.auditionCue,
+    nextCheck: followup.nextCheck,
+    tone: outcome === "failed" ? "danger" : changed ? "good" : "warn"
+  };
+}
+
+function quickActionResultMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } {
+  const analysis = action.group === "Mix" || action.group === "Export" ? analyzeExport(project) : null;
+
+  if (action.id === "save-snapshot") {
+    return { id: "snapshots", label: "Snapshots", value: `${project.snapshots.length} slots` };
+  }
+
+  if (action.id === "blueprint") {
+    return { id: "project-events", label: "Project events", value: `${projectEventTotal(project)} events` };
+  }
+
+  if (action.id.startsWith("fill-")) {
+    return {
+      id: "pattern-events",
+      label: `Pattern ${project.selectedPattern}`,
+      value: `${patternEventTotal(activePattern(project))} events`
+    };
+  }
+
+  if (action.id === "hook-lift" || action.id === "hook-peak-focus") {
+    return {
+      id: "song-energy",
+      label: "Song energy",
+      value: `${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
+    };
+  }
+
+  if (action.id === "pattern-chain") {
+    return { id: "song-length", label: "Song length", value: barCountLabel(arrangementTotalBars(project)) };
+  }
+
+  if (action.id.startsWith("mix-") || action.id.startsWith("master-finish-")) {
+    return {
+      id: "mix-posture",
+      label: "Mix posture",
+      value: `${project.masterPreset} / ${analysis ? formatDb(analysis.headroomDb) : formatDb(project.masterCeilingDb)}`
+    };
+  }
+
+  if (action.group === "Export") {
+    return {
+      id: "export",
+      label: "Export scan",
+      value: analysis ? `${analysis.status} / ${formatDb(analysis.headroomDb)}` : "n/a"
+    };
+  }
+
+  if (action.group === "Transport") {
+    return {
+      id: "transport",
+      label: "Audition scope",
+      value: `${project.selectedPattern} / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
+  if (action.group === "Edit") {
+    return { id: "project-events", label: "Project events", value: `${projectEventTotal(project)} events` };
+  }
+
+  if (action.group === "Project") {
+    return { id: "project", label: "Project", value: `${project.title} / ${project.snapshots.length} slots` };
+  }
+
+  return { id: "project-events", label: "Project events", value: `${projectEventTotal(project)} events` };
+}
+
+function quickActionResultFollowup(
+  action: QuickAction,
+  project: ProjectState,
+  outcome: "complete" | "failed"
+): { auditionCue: string; nextCheck: string } {
+  if (outcome === "failed") {
+    return {
+      auditionCue: "Keep playback stopped until the command is retried.",
+      nextCheck: "Check the project status text before running another export or file action."
+    };
+  }
+
+  const analysis = analyzeExport(project);
+  const target = activeDeliveryTarget(project);
+  const pattern = activePattern(project);
+
+  switch (action.group) {
+    case "Transport":
+      return {
+        auditionCue: `Use the current ${project.selectedPattern} / Song loop choice to hear the edit in context.`,
+        nextCheck: `${barCountLabel(arrangementTotalBars(project))} arranged; switch loop scope only when playback is stopped.`
+      };
+    case "Project":
+      return {
+        auditionCue: "Keep listening only if you are comparing the saved or loaded state.",
+        nextCheck: `${project.snapshots.length}/${maxProjectSnapshots} snapshots; use Snapshot Compare before major edits.`
+      };
+    case "Edit":
+      return {
+        auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the edit history restored the intended beat.`,
+        nextCheck: `${projectEventTotal(project)} project events now; continue only after the groove still works.`
+      };
+    case "Create":
+      return {
+        auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, chords, and Synth together.`,
+        nextCheck: `${patternEventTotal(pattern)} Pattern ${project.selectedPattern} events now; arrange when the hook works.`
+      };
+    case "Arrange":
+      return {
+        auditionCue: "Play Song loop; listen for section contrast and hook lift.",
+        nextCheck: `${barCountLabel(arrangementTotalBars(project))} arranged for ${target.name}; scan Song Form next.`
+      };
+    case "Mix":
+      return {
+        auditionCue: `Play full mix; watch ${formatDb(analysis.headroomDb)} headroom.`,
+        nextCheck: `${analysis.status} export scan; use Mix Coach before final export.`
+      };
+    case "Export":
+      return {
+        auditionCue: "Audition the exported deliverable outside the app if needed.",
+        nextCheck: `${analysis.status} mix state; confirm Handoff Pack statuses before sending.`
+      };
+    default:
+      return {
+        auditionCue: `Loop Pattern ${project.selectedPattern}; verify the command result in context.`,
+        nextCheck: `${projectEventTotal(project)} project events now; continue with the next local action.`
+      };
+  }
 }
 
 function nextMoveIcon(action: NextMoveAction): ReactElement {
