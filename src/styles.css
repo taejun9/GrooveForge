@@ -44,6 +44,7 @@ button {
 .mode-row,
 .style-inspector,
 .key-compass,
+.groove-compass,
 .blueprint-row,
 .delivery-target-row,
 .session-brief-row,
@@ -83,6 +84,7 @@ button {
 .mode-row,
 .style-inspector-heading > div,
 .key-compass-heading > div,
+.groove-compass-heading > div,
 .blueprint-heading > div,
 .delivery-target-heading > div,
 .session-brief-heading > div,
@@ -732,6 +734,125 @@ h2 {
 }
 
 .key-compass-card small {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
+}
+
+.groove-compass {
+  display: grid;
+  grid-template-columns: 178px minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  min-height: 84px;
+  border-color: rgba(89, 213, 197, 0.22);
+  border-radius: 8px;
+  background: rgba(89, 213, 197, 0.04);
+  padding: 10px;
+}
+
+.groove-compass.warn {
+  border-color: rgba(240, 195, 106, 0.28);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.groove-compass.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.groove-compass-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.groove-compass-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.groove-compass-heading svg {
+  color: #59d5c5;
+}
+
+.groove-compass.warn .groove-compass-heading svg {
+  color: #f0c36a;
+}
+
+.groove-compass.danger .groove-compass-heading svg {
+  color: #ff7a4f;
+}
+
+.groove-compass-heading strong,
+.groove-compass-heading small,
+.groove-compass-card span,
+.groove-compass-card strong,
+.groove-compass-card small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groove-compass-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.groove-compass-heading small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.groove-compass-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.groove-compass-card {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+  border: 1px solid rgba(89, 213, 197, 0.2);
+  border-inline-start: 3px solid #59d5c5;
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 8px 9px;
+}
+
+.groove-compass-card.good {
+  border-color: rgba(120, 240, 200, 0.2);
+  border-inline-start-color: #78f0c8;
+}
+
+.groove-compass-card.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  border-inline-start-color: #f0c36a;
+}
+
+.groove-compass-card.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  border-inline-start-color: #ff7a4f;
+}
+
+.groove-compass-card span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.groove-compass-card strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.groove-compass-card small {
   color: rgba(244, 239, 231, 0.68);
   font-size: 10px;
 }
@@ -5754,6 +5875,10 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .groove-compass {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
   .structure-lens {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -5787,6 +5912,10 @@ input[type="range"] {
   }
 
   .key-compass-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .groove-compass-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 

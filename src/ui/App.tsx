@@ -946,6 +946,23 @@ type KeyCompassSummary = {
   cards: KeyCompassCard[];
 };
 
+type GrooveCompassCardId = "density" | "anchors" | "hats" | "timing" | "chance" | "focus";
+
+type GrooveCompassCard = {
+  id: GrooveCompassCardId;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type GrooveCompassSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: GrooveCompassCard[];
+};
+
 type BeatPassportMetric = {
   id: string;
   label: string;
@@ -1534,6 +1551,10 @@ export function App(): ReactElement {
   const keyCompassSummary = useMemo(
     () => createKeyCompassSummary(project, selectedNote, selectedChord, selectedDrumStep),
     [project, selectedNote, selectedChord, selectedDrumStep]
+  );
+  const grooveCompassSummary = useMemo(
+    () => createGrooveCompassSummary(project, selectedDrumStep),
+    [project, selectedDrumStep]
   );
   const chordPadOptions = useMemo(
     () => createChordPadOptions(project.key, selectedChord),
@@ -4051,6 +4072,8 @@ export function App(): ReactElement {
 
       <KeyCompass summary={keyCompassSummary} />
 
+      <GrooveCompass summary={grooveCompassSummary} />
+
       <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
 
       <DeliveryTargets
@@ -5810,6 +5833,30 @@ function KeyCompass({ summary }: { summary: KeyCompassSummary }): ReactElement {
   );
 }
 
+function GrooveCompass({ summary }: { summary: GrooveCompassSummary }): ReactElement {
+  return (
+    <section className={`groove-compass ${summary.tone}`} data-testid="groove-compass" aria-label="Groove compass">
+      <div className="groove-compass-heading">
+        <div>
+          <Drum size={17} aria-hidden="true" />
+          <span>Groove Compass</span>
+        </div>
+        <strong data-testid="groove-compass-headline">{summary.headline}</strong>
+        <small data-testid="groove-compass-detail">{summary.detail}</small>
+      </div>
+      <div className="groove-compass-grid" data-testid="groove-compass-grid">
+        {summary.cards.map((card) => (
+          <div className={`groove-compass-card ${card.tone}`} data-testid={`groove-compass-${card.id}`} key={card.id}>
+            <span>{card.label}</span>
+            <strong>{card.value}</strong>
+            <small>{card.detail}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function FinishChecklist({ summary }: { summary: FinishChecklistSummary }): ReactElement {
   return (
     <section className={`finish-checklist ${summary.tone}`} data-testid="finish-checklist" aria-label="Finish checklist">
@@ -7361,6 +7408,140 @@ function createKeyCompassSummary(
     tone: weakestTone(cards.map((card) => card.tone)),
     scaleNotes,
     cards
+  };
+}
+
+function createGrooveCompassSummary(project: ProjectState, selectedDrumStep: SelectedDrumStep | null): GrooveCompassSummary {
+  const pattern = activePattern(project);
+  const lanes = Object.keys(drumLabels) as DrumLane[];
+  const laneHits = lanes.reduce<Record<DrumLane, number>>(
+    (counts, lane) => ({
+      ...counts,
+      [lane]: pattern.drumPattern[lane].filter(Boolean).length
+    }),
+    { kick: 0, clap: 0, hat: 0, perc: 0 }
+  );
+  const activeSteps = new Set<number>();
+  const activeTimings: number[] = [];
+  const activeChances: number[] = [];
+
+  lanes.forEach((lane) => {
+    pattern.drumPattern[lane].forEach((enabled, step) => {
+      if (!enabled) {
+        return;
+      }
+      activeSteps.add(step);
+      activeTimings.push(drumStepTimingMs(pattern, lane, step));
+      activeChances.push(drumStepProbability(pattern, lane, step));
+    });
+  });
+
+  const totalHits = drumHitCount(pattern);
+  const repeatedHatHits = pattern.drumPattern.hat.reduce(
+    (total, enabled, step) => total + (enabled ? hatRepeatCount(pattern, step) - 1 : 0),
+    0
+  );
+  const timingSpread =
+    activeTimings.length > 0 ? Math.max(...activeTimings) - Math.min(...activeTimings) : 0;
+  const shiftedHits = activeTimings.filter((timing) => timing !== 0).length;
+  const chanceAverage =
+    activeChances.length > 0 ? activeChances.reduce((total, chance) => total + chance, 0) / activeChances.length : 1;
+  const chanceFloor = activeChances.length > 0 ? Math.min(...activeChances) : 1;
+  const hasDrums = totalHits > 0;
+  const densityTone: MixCoachTone = totalHits >= 20 ? "good" : totalHits >= 10 ? "warn" : "danger";
+  const anchorTone: MixCoachTone =
+    laneHits.kick > 0 && laneHits.clap > 0 ? "good" : laneHits.kick > 0 || laneHits.clap > 0 ? "warn" : "danger";
+  const hatTone: MixCoachTone =
+    laneHits.hat >= 6 && repeatedHatHits >= 2 ? "good" : laneHits.hat >= 4 || repeatedHatHits > 0 ? "warn" : "danger";
+  const timingTone: MixCoachTone =
+    !hasDrums || activeTimings.length === 0 ? "danger" : shiftedHits >= 3 && timingSpread >= 8 ? "good" : shiftedHits > 0 ? "warn" : "good";
+  const chanceTone: MixCoachTone = !hasDrums ? "danger" : chanceFloor < 0.88 ? "good" : chanceAverage < 0.98 ? "warn" : "good";
+  const focusCard = grooveCompassFocusCard(pattern, project.selectedPattern, selectedDrumStep);
+  const cards: GrooveCompassCard[] = [
+    {
+      id: "density",
+      label: "Density",
+      value: `${totalHits} hits`,
+      detail: `${activeSteps.size}/16 active steps`,
+      tone: densityTone
+    },
+    {
+      id: "anchors",
+      label: "Anchors",
+      value: `K${laneHits.kick} / C${laneHits.clap}`,
+      detail: `kick + clap foundation / ${laneHits.perc} perc`,
+      tone: anchorTone
+    },
+    {
+      id: "hats",
+      label: "Hat Motion",
+      value: `${laneHits.hat} hats`,
+      detail: `${repeatedHatHits} repeat hits`,
+      tone: hatTone
+    },
+    {
+      id: "timing",
+      label: "Timing Feel",
+      value: `${Math.round(timingSpread)} ms spread`,
+      detail: `${shiftedHits} shifted hits`,
+      tone: timingTone
+    },
+    {
+      id: "chance",
+      label: "Chance",
+      value: `${Math.round(chanceAverage * 100)}% avg`,
+      detail: `${Math.round(chanceFloor * 100)}% floor`,
+      tone: chanceTone
+    },
+    focusCard
+  ];
+
+  return {
+    headline: `Pattern ${project.selectedPattern} groove compass`,
+    detail: `${totalHits} drum hits / ${activeSteps.size}/16 steps / ${shiftedHits} timed moves`,
+    tone: weakestTone(cards.map((card) => card.tone)),
+    cards
+  };
+}
+
+function grooveCompassFocusCard(
+  pattern: PatternData,
+  selectedPattern: PatternSlot,
+  selectedDrumStep: SelectedDrumStep | null
+): GrooveCompassCard {
+  if (!selectedDrumStep) {
+    return {
+      id: "focus",
+      label: "Focus",
+      value: `Pattern ${selectedPattern}`,
+      detail: "Select a drum step for pocket detail",
+      tone: "warn"
+    };
+  }
+
+  const { lane, step } = selectedDrumStep;
+  const isActive = Boolean(pattern.drumPattern[lane][step]);
+  if (!isActive) {
+    return {
+      id: "focus",
+      label: "Focus",
+      value: `${drumLabels[lane]} ${step + 1}`,
+      detail: `Inactive step in Pattern ${selectedPattern}`,
+      tone: "warn"
+    };
+  }
+
+  const velocity = drumStepVelocity(pattern, lane, step);
+  const chance = drumStepProbability(pattern, lane, step);
+  const timing = drumStepTimingMs(pattern, lane, step);
+  const repeat = lane === "hat" ? hatRepeatCount(pattern, step) : 1;
+
+  return {
+    id: "focus",
+    label: "Focus",
+    value: `${drumLabels[lane]} ${step + 1}`,
+    detail: `${percentLabel(velocity)} vel / ${percentLabel(chance)} chance / ${timingLabel(timing)} / x${repeat}`,
+    tone: chance < 1 || timing !== 0 || repeat > 1 ? "good" : "warn"
   };
 }
 
