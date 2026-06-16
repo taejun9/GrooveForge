@@ -1147,6 +1147,17 @@ type ComposerGuideCard = {
   status: string;
   detail: string;
   tone: MixCoachTone;
+  focusTarget: ReviewQueueFocusTarget;
+  focusLabel: string;
+};
+
+type ComposerGuideFocusSummary = {
+  cardId: ComposerGuideCardId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
 };
 
 type ComposerGuideSummary = {
@@ -2002,6 +2013,7 @@ export function App(): ReactElement {
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
+  const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
   const [finishChecklistFocusId, setFinishChecklistFocusId] = useState<FinishChecklistCardId | null>(null);
@@ -5022,6 +5034,20 @@ export function App(): ReactElement {
     targetRefs[zone]?.scrollIntoView({ block: "start", behavior: "auto" });
   }
 
+  function focusComposerGuideCard(card: ComposerGuideCard): void {
+    const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    setComposerGuideFocusId(card.id);
+    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Guide ${card.label}: ${card.status}`);
+  }
+
   function focusFinishChecklistCard(card: FinishChecklistCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5414,7 +5440,11 @@ export function App(): ReactElement {
 
       <GrooveCompass summary={grooveCompassSummary} />
 
-      <ComposerGuide summary={composerGuideSummary} />
+      <ComposerGuide
+        summary={composerGuideSummary}
+        focusedCardId={composerGuideFocusId}
+        onFocus={focusComposerGuideCard}
+      />
 
       <ComposerActions summary={composerActionsSummary} result={composerActionResult} onRun={runComposerAction} />
 
@@ -6372,7 +6402,7 @@ export function App(): ReactElement {
           </div>
         </section>
 
-        <section className="panel master-panel" aria-label="Master" ref={masterPanelRef}>
+        <section className="panel master-panel" data-testid="workflow-target-master" aria-label="Master" ref={masterPanelRef}>
           <PanelTitle icon={<Gauge size={18} />} title="Master" meta="export ready" />
           <div className="master-readout">
             <strong>{project.masterPreset}</strong>
@@ -7503,7 +7533,17 @@ function GrooveCompass({ summary }: { summary: GrooveCompassSummary }): ReactEle
   );
 }
 
-function ComposerGuide({ summary }: { summary: ComposerGuideSummary }): ReactElement {
+function ComposerGuide({
+  summary,
+  focusedCardId,
+  onFocus
+}: {
+  summary: ComposerGuideSummary;
+  focusedCardId: ComposerGuideCardId | null;
+  onFocus: (card: ComposerGuideCard) => void;
+}): ReactElement {
+  const focusSummary = createComposerGuideFocusSummary(summary, focusedCardId);
+
   return (
     <section className={`composer-guide ${summary.tone}`} data-testid="composer-guide" aria-label="Composer guide">
       <div className="composer-guide-heading">
@@ -7514,14 +7554,42 @@ function ComposerGuide({ summary }: { summary: ComposerGuideSummary }): ReactEle
         <strong data-testid="composer-guide-headline">{summary.headline}</strong>
         <small data-testid="composer-guide-detail">{summary.detail}</small>
       </div>
+      <div
+        className={`composer-guide-focus-readout ${focusSummary.tone}`}
+        data-testid="composer-guide-focus-readout"
+        title={focusSummary.detailTitle}
+      >
+        <span data-testid="composer-guide-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="composer-guide-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="composer-guide-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
       <div className="composer-guide-grid" data-testid="composer-guide-grid">
-        {summary.cards.map((card) => (
-          <div className={`composer-guide-card ${card.tone}`} data-testid={`composer-guide-${card.id}`} key={card.id}>
-            <span>{card.label}</span>
-            <strong>{card.status}</strong>
-            <small>{card.detail}</small>
-          </div>
-        ))}
+        {summary.cards.map((card) => {
+          const focused = focusedCardId !== null && card.id === focusedCardId;
+          return (
+            <div
+              className={["composer-guide-card", card.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`composer-guide-${card.id}`}
+              key={card.id}
+            >
+              <span>{card.label}</span>
+              <strong>{card.status}</strong>
+              <button
+                aria-pressed={focused}
+                className="composer-guide-focus-button"
+                data-testid={`composer-guide-focus-${card.id}`}
+                onClick={() => onFocus(card)}
+                title={`Focus ${card.focusLabel}: ${card.status}`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{card.focusLabel}</span>
+              </button>
+              <small>{card.detail}</small>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -10639,7 +10707,7 @@ function createComposerGuideSummary(
       : analysis.status === "Ready" && mixTone === "good" && audibleStemCount >= target.stemGoal
         ? "good"
         : "warn";
-  const cards: ComposerGuideCard[] = [
+  const baseCards: Array<Omit<ComposerGuideCard, "focusTarget" | "focusLabel">> = [
     {
       id: "drums",
       label: "Drums",
@@ -10683,6 +10751,14 @@ function createComposerGuideSummary(
       tone: finishTone
     }
   ];
+  const cards: ComposerGuideCard[] = baseCards.map((card) => {
+    const focusTarget = composerGuideFocusTarget(card.id);
+    return {
+      ...card,
+      focusTarget,
+      focusLabel: reviewQueueFocusLabel(focusTarget)
+    };
+  });
   const focus = composerGuideFocus(cards);
 
   return {
@@ -10703,6 +10779,51 @@ function composerGuideFocus(cards: ComposerGuideCard[]): string {
     return `${firstWarn.label} needs one more pass`;
   }
   return "Beat has a complete writing path";
+}
+
+function composerGuideFocusTarget(cardId: ComposerGuideCardId): ReviewQueueFocusTarget {
+  switch (cardId) {
+    case "drums":
+    case "bass":
+    case "harmony":
+    case "melody":
+      return "compose";
+    case "arrange":
+      return "arrange";
+    case "finish":
+      return "master";
+  }
+}
+
+function createComposerGuideFocusSummary(
+  summary: ComposerGuideSummary,
+  focusedCardId: ComposerGuideCardId | null
+): ComposerGuideFocusSummary {
+  const focusedCard = focusedCardId ? summary.cards.find((card) => card.id === focusedCardId) ?? null : null;
+  const card = focusedCard ?? summary.cards.find((candidate) => candidate.tone !== "good") ?? summary.cards[0] ?? null;
+
+  if (!card) {
+    return {
+      cardId: null,
+      statusLabel: "Guide clear",
+      areaLabel: "No guide cards",
+      detailLabel: "No Composer Guide cards available",
+      detailTitle: "Composer Guide has no cards to focus.",
+      tone: "good"
+    };
+  }
+
+  const statusLabel = focusedCard ? "Focused Guide" : card.tone === "good" ? "Guide clear" : "Top Guide Focus";
+  const detailLabel = `${card.focusLabel} panel / ${card.detail}`;
+
+  return {
+    cardId: card.id,
+    statusLabel,
+    areaLabel: `${card.label}: ${card.status}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${card.label}: ${card.status} / ${detailLabel}`,
+    tone: card.tone
+  };
 }
 
 function createComposerActionsSummary(
