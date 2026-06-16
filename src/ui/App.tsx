@@ -834,6 +834,20 @@ type BassContourOption = BassContourDefinition & {
   pitchSpan: string;
 };
 
+type BassMovePreviewSummary = {
+  statusLabel: string;
+  phraseLabel: string;
+  basslineLabel: string;
+  glideLabel: string;
+  contourLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+  basslineId: BasslinePadId | "none";
+  glideId: BassGlidePadId | "none";
+  contourId: BassContourId | "none";
+};
+
 type PatternStackId = "pocket" | "hook" | "lift" | "break";
 
 type PatternStackDefinition = {
@@ -2523,6 +2537,17 @@ export function App(): ReactElement {
   const bassContourOptions = useMemo(
     () => createBassContourOptions(project.key, currentPattern.bassNotes),
     [project.key, currentPattern.bassNotes]
+  );
+  const bassMovePreviewSummary = useMemo(
+    () =>
+      createBassMovePreviewSummary(
+        project.key,
+        currentPattern.bassNotes,
+        basslinePadOptions,
+        bassGlidePadOptions,
+        bassContourOptions
+      ),
+    [project.key, currentPattern.bassNotes, basslinePadOptions, bassGlidePadOptions, bassContourOptions]
   );
   const melodyMotifOptions = useMemo(() => createMelodyMotifOptions(project.key), [project.key]);
   const melodyAccentOptions = useMemo(() => createMelodyAccentOptions(currentPattern.melodyNotes), [currentPattern.melodyNotes]);
@@ -6265,6 +6290,7 @@ export function App(): ReactElement {
             selectedNote={selectedNote}
             target={keyboardCaptureTarget}
           />
+          <BassMovePreview preview={bassMovePreviewSummary} />
           <BasslinePads pads={basslinePadOptions} onApply={applyBasslinePad} />
           <BassGlidePads pads={bassGlidePadOptions} onApply={applyBassGlidePad} />
           <BassContourPads contours={bassContourOptions} onApply={applyBassContour} />
@@ -16040,6 +16066,26 @@ function DrumFoundationPads({
   );
 }
 
+function BassMovePreview({ preview }: { preview: BassMovePreviewSummary }): ReactElement {
+  return (
+    <div
+      className={`bass-move-preview ${preview.tone}`}
+      data-preview-bass-contour={preview.contourId}
+      data-preview-bass-glide={preview.glideId}
+      data-preview-bassline={preview.basslineId}
+      data-testid="bass-move-preview"
+      title={preview.detailTitle}
+    >
+      <span data-testid="bass-move-preview-status">{preview.statusLabel}</span>
+      <strong data-testid="bass-move-preview-phrase">{preview.phraseLabel}</strong>
+      <small data-testid="bass-move-preview-bassline">{preview.basslineLabel}</small>
+      <small data-testid="bass-move-preview-glide">{preview.glideLabel}</small>
+      <small data-testid="bass-move-preview-contour">{preview.contourLabel}</small>
+      <small data-testid="bass-move-preview-moves">{preview.moveLabel}</small>
+    </div>
+  );
+}
+
 function BasslinePads({
   pads,
   onApply
@@ -18024,6 +18070,80 @@ function createBassContourOptions(key: string, notes: BassNote[]): BassContourOp
       pitchSpan: bassPitchSpanLabel(transformed)
     };
   });
+}
+
+function createBassMovePreviewSummary(
+  key: string,
+  notes: BassNote[],
+  basslines: BasslinePadOption[],
+  glides: BassGlidePadOption[],
+  contours: BassContourOption[]
+): BassMovePreviewSummary {
+  const bassline = basslines.find((option) => basslinePadMoveCount(key, notes, option) > 0) ?? basslines[0];
+  const glide = glides.find((option) => bassGlideMoveCount(notes, option) > 0) ?? glides[0];
+  const contour = contours.find((option) => bassContourMoveCount(key, notes, option) > 0) ?? contours[0];
+  const basslineMoveCount = bassline ? basslineMoveCountForOption(key, notes, bassline) : 0;
+  const glideMoveCount = notes.length === 0 ? 0 : glide ? bassGlideMoveCount(notes, glide) : 0;
+  const contourMoveCount = notes.length === 0 ? 0 : contour ? bassContourMoveCount(key, notes, contour) : 0;
+  const totalMoveCount = basslineMoveCount + glideMoveCount + contourMoveCount;
+  const phraseLabel = notes.length === 0 ? "No 808 line" : `${notes.length} notes / ${bassPitchSpanLabel(notes)}`;
+  const basslineLabel = bassline ? `${bassline.label}: ${bassline.preview}` : "Bassline ready";
+  const glideLabel = notes.length === 0 ? "Glide waits" : glide ? `${glide.label}: ${glide.preview}` : "Glide ready";
+  const contourLabel = notes.length === 0 ? "Contour waits" : contour ? `${contour.label}: ${contour.preview}` : "Contour ready";
+  const statusLabel = notes.length === 0 ? "Start 808" : totalMoveCount === 0 ? "808 aligned" : "Suggested move";
+  const moveLabel = `B ${basslineMoveCount} / G ${glideMoveCount} / C ${contourMoveCount}`;
+  return {
+    statusLabel,
+    phraseLabel,
+    basslineLabel,
+    glideLabel,
+    contourLabel,
+    moveLabel,
+    detailTitle: `${statusLabel}: ${phraseLabel}; ${basslineLabel}; ${glideLabel}; ${contourLabel}; ${moveLabel}.`,
+    tone: notes.length === 0 ? "warn" : totalMoveCount === 0 ? "good" : "warn",
+    basslineId: bassline?.id ?? "none",
+    glideId: notes.length === 0 ? "none" : glide?.id ?? "none",
+    contourId: notes.length === 0 ? "none" : contour?.id ?? "none"
+  };
+}
+
+function basslinePadMoveCount(key: string, notes: BassNote[], bassline: BasslinePadOption): number {
+  return basslineMoveCountForOption(key, notes, bassline);
+}
+
+function basslineMoveCountForOption(key: string, notes: BassNote[], bassline: BasslinePadDefinition): number {
+  return bassNotesChangedCount(notes, createBasslinePadNotes(key, bassline));
+}
+
+function bassGlideMoveCount(notes: BassNote[], glide: BassGlidePadDefinition): number {
+  return bassNotesChangedCount(notes, applyBassGlidePadToNotes(notes, glide.id));
+}
+
+function bassContourMoveCount(key: string, notes: BassNote[], contour: BassContourDefinition): number {
+  return bassNotesChangedCount(notes, applyBassContourToNotes(key, notes, contour.id));
+}
+
+function bassNotesChangedCount(current: BassNote[], transformed: BassNote[]): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentNote = current[index];
+    const transformedNote = transformed[index];
+    if (!currentNote || !transformedNote || !sameBassNote(currentNote, transformedNote)) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function sameBassNote(first: BassNote, second: BassNote): boolean {
+  return (
+    first.step === second.step &&
+    first.pitch === second.pitch &&
+    first.length === second.length &&
+    first.glide === second.glide &&
+    normalizeEventProbability(first.probability ?? 1) === normalizeEventProbability(second.probability ?? 1)
+  );
 }
 
 function applyBassContourToNotes(key: string, notes: BassNote[], contourId: BassContourId): BassNote[] {
