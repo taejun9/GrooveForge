@@ -649,11 +649,32 @@ type PatternDnaFocusSummary = {
   tone: MixCoachTone;
 };
 
+type StyleInspectorMetricId = "bpm" | "swing" | "bass" | "melody" | "sound";
+type StyleInspectorFocusId = StyleInspectorMetricId | `density-${PatternSlot}`;
+type StyleInspectorFocusTarget = "transport" | "compose" | "sound";
+
+type StyleInspectorFocusItem = {
+  focusId: StyleInspectorFocusId;
+  label: string;
+  value: string;
+  detail: string;
+  focusTarget: StyleInspectorFocusTarget;
+  focusLabel: string;
+};
+
+type StyleInspectorMetric = StyleInspectorFocusItem & {
+  id: StyleInspectorMetricId;
+};
+
 type StylePatternDensity = {
   slot: PatternSlot;
   label: string;
+  value: string;
   eventCount: number;
   detail: string;
+  focusId: `density-${PatternSlot}`;
+  focusTarget: "compose";
+  focusLabel: "Compose";
 };
 
 type StyleInspectorSummary = {
@@ -664,7 +685,16 @@ type StyleInspectorSummary = {
   melody: string;
   soundPreset: string;
   totalEvents: number;
+  metrics: StyleInspectorMetric[];
   patterns: StylePatternDensity[];
+};
+
+type StyleInspectorFocusSummary = {
+  focusId: StyleInspectorFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
 };
 
 type BasslinePadId = "root" | "bounce" | "slide" | "offbeat";
@@ -2036,6 +2066,7 @@ export function App(): ReactElement {
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
+  const [styleInspectorFocusId, setStyleInspectorFocusId] = useState<StyleInspectorFocusId | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
   const [finishChecklistFocusId, setFinishChecklistFocusId] = useState<FinishChecklistCardId | null>(null);
@@ -2053,7 +2084,9 @@ export function App(): ReactElement {
   const localDraftSkipNextWriteRef = useRef(false);
   const controllerRef = useRef<PlaybackController | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const transportPanelRef = useRef<HTMLElement | null>(null);
   const composePanelRef = useRef<HTMLElement | null>(null);
+  const soundPanelRef = useRef<HTMLElement | null>(null);
   const arrangePanelRef = useRef<HTMLElement | null>(null);
   const mixPanelRef = useRef<HTMLElement | null>(null);
   const deliverPanelRef = useRef<HTMLElement | null>(null);
@@ -5081,6 +5114,18 @@ export function App(): ReactElement {
     setProjectStatus(`Pattern DNA ${card.label}: ${card.value}`);
   }
 
+  function focusStyleInspectorItem(item: StyleInspectorFocusItem): void {
+    const targetRefs: Record<StyleInspectorFocusTarget, HTMLElement | null> = {
+      transport: transportPanelRef.current,
+      compose: composePanelRef.current,
+      sound: soundPanelRef.current
+    };
+
+    setStyleInspectorFocusId(item.focusId);
+    targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Style ${item.label}: ${item.value}`);
+  }
+
   function focusFinishChecklistCard(card: FinishChecklistCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5179,7 +5224,7 @@ export function App(): ReactElement {
 
   return (
     <main className="app-shell">
-      <header className="transport-band">
+      <header className="transport-band" data-testid="workflow-target-transport" ref={transportPanelRef}>
         <div className="brand-lockup">
           <Disc3 size={28} aria-hidden="true" />
           <div>
@@ -5469,7 +5514,9 @@ export function App(): ReactElement {
       {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
 
       <StyleInspector
+        focusedItemId={styleInspectorFocusId}
         onSelectStyle={selectStyle}
+        onFocus={focusStyleInspectorItem}
         selectedStyleId={project.styleId}
         summary={styleInspectorSummary}
       />
@@ -5804,7 +5851,7 @@ export function App(): ReactElement {
           )}
         </section>
 
-        <section className="panel instrument-panel" aria-label="Instrument panel">
+        <section className="panel instrument-panel" data-testid="workflow-target-sound" aria-label="Instrument panel" ref={soundPanelRef}>
           <PanelTitle icon={<Sparkles size={18} />} title="Instruments" meta={project.mode === "guided" ? "curated" : "editable"} />
           <div className="device-list">
             <Device icon={<Drum size={17} />} name="Drum Rack" value={`${soundPresetLabel(project.sound.preset)} kit`} color="#78f0c8" />
@@ -6525,21 +6572,19 @@ function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; met
 }
 
 function StyleInspector({
+  focusedItemId,
+  onFocus,
   onSelectStyle,
   selectedStyleId,
   summary
 }: {
+  focusedItemId: StyleInspectorFocusId | null;
+  onFocus: (item: StyleInspectorFocusItem) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
   selectedStyleId: ProjectState["styleId"];
   summary: StyleInspectorSummary;
 }): ReactElement {
-  const metrics = [
-    { label: "BPM range", value: summary.bpm },
-    { label: "Swing", value: summary.swing },
-    { label: "Bass role", value: summary.bass },
-    { label: "Melody role", value: summary.melody },
-    { label: "Sound", value: summary.soundPreset }
-  ];
+  const focusSummary = createStyleInspectorFocusSummary(summary, focusedItemId);
 
   return (
     <section
@@ -6556,13 +6601,38 @@ function StyleInspector({
         <strong data-testid="style-inspector-name">{summary.profile.name}</strong>
         <p>{summary.totalEvents} editable Pattern A/B/C events from local style data</p>
       </div>
+      <div className="style-inspector-focus-readout" data-testid="style-inspector-focus-readout" title={focusSummary.detailTitle}>
+        <span data-testid="style-inspector-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="style-inspector-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="style-inspector-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
       <div className="style-inspector-metrics">
-        {metrics.map((metric) => (
-          <div className="style-inspector-metric" key={metric.label}>
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-          </div>
-        ))}
+        {summary.metrics.map((metric) => {
+          const focused = focusedItemId === metric.focusId;
+          return (
+            <div
+              className={["style-inspector-metric", focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`style-metric-${metric.id}`}
+              key={metric.id}
+            >
+              <span>{metric.label}</span>
+              <strong>{metric.value}</strong>
+              <button
+                aria-pressed={focused}
+                className="style-inspector-focus-button"
+                data-testid={`style-focus-${metric.id}`}
+                onClick={() => onFocus(metric)}
+                title={`Focus ${metric.focusLabel}: ${metric.value}`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{metric.focusLabel}</span>
+              </button>
+              <small>{metric.detail}</small>
+            </div>
+          );
+        })}
       </div>
       <div className="style-quick-picks" aria-label="Style quick picks" data-testid="style-quick-picks">
         {styleProfiles.map((profile) => {
@@ -6588,13 +6658,32 @@ function StyleInspector({
         })}
       </div>
       <div className="style-inspector-patterns" aria-label="Pattern density">
-        {summary.patterns.map((pattern) => (
-          <div className="style-inspector-pattern" data-testid={`style-density-${pattern.slot}`} key={pattern.slot}>
-            <span>Pattern {pattern.slot}</span>
-            <strong>{pattern.label}</strong>
-            <small>{pattern.detail}</small>
-          </div>
-        ))}
+        {summary.patterns.map((pattern) => {
+          const focused = focusedItemId === pattern.focusId;
+          return (
+            <div
+              className={["style-inspector-pattern", focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`style-density-${pattern.slot}`}
+              key={pattern.slot}
+            >
+              <span>Pattern {pattern.slot}</span>
+              <strong>{pattern.label}</strong>
+              <button
+                aria-pressed={focused}
+                className="style-inspector-focus-button"
+                data-testid={`style-focus-density-${pattern.slot}`}
+                onClick={() => onFocus(pattern)}
+                title={`Focus ${pattern.focusLabel}: Pattern ${pattern.slot} ${pattern.label}`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{pattern.focusLabel}</span>
+              </button>
+              <small>{pattern.detail}</small>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -12732,21 +12821,108 @@ function createStyleInspectorSummary(
 ): StyleInspectorSummary {
   const totalEvents = patternSummaries.reduce((total, pattern) => total + pattern.eventCount, 0);
   const soundPreset = styleSoundPreset(profile.id);
+  const bpm = `${project.bpm} active / ${profile.bpmRange[0]}-${profile.bpmRange[1]}`;
+  const swing = `${percentLabel(project.swing)} active / ${percentLabel(profile.defaultSwing)} default`;
+  const bass = bassStyleRoleLabel(profile.bassStyle);
+  const melody = melodyStyleRoleLabel(profile.melodyStyle);
+  const soundPresetName = soundPresetLabel(soundPreset);
+  const metrics: StyleInspectorMetric[] = [
+    {
+      id: "bpm",
+      focusId: "bpm",
+      label: "BPM range",
+      value: bpm,
+      detail: "Tempo controls define the writing grid",
+      focusTarget: "transport",
+      focusLabel: "Transport"
+    },
+    {
+      id: "swing",
+      focusId: "swing",
+      label: "Swing",
+      value: swing,
+      detail: "Groove feel shapes Pattern timing",
+      focusTarget: "compose",
+      focusLabel: "Compose"
+    },
+    {
+      id: "bass",
+      focusId: "bass",
+      label: "Bass role",
+      value: bass,
+      detail: "Low-end role guides 808 writing",
+      focusTarget: "compose",
+      focusLabel: "Compose"
+    },
+    {
+      id: "melody",
+      focusId: "melody",
+      label: "Melody role",
+      value: melody,
+      detail: "Topline role guides Synth writing",
+      focusTarget: "compose",
+      focusLabel: "Compose"
+    },
+    {
+      id: "sound",
+      focusId: "sound",
+      label: "Sound",
+      value: soundPresetName,
+      detail: "Tone preset maps into instruments",
+      focusTarget: "sound",
+      focusLabel: "Sound"
+    }
+  ];
 
   return {
     profile,
-    bpm: `${project.bpm} active / ${profile.bpmRange[0]}-${profile.bpmRange[1]}`,
-    swing: `${percentLabel(project.swing)} active / ${percentLabel(profile.defaultSwing)} default`,
-    bass: bassStyleRoleLabel(profile.bassStyle),
-    melody: melodyStyleRoleLabel(profile.melodyStyle),
-    soundPreset: soundPresetLabel(soundPreset),
+    bpm,
+    swing,
+    bass,
+    melody,
+    soundPreset: soundPresetName,
     totalEvents,
+    metrics,
     patterns: patternSummaries.map((pattern) => ({
       slot: pattern.slot,
       label: styleDensityLabel(pattern.eventCount),
+      value: styleDensityLabel(pattern.eventCount),
       eventCount: pattern.eventCount,
-      detail: `${pattern.eventCount} events / ${pattern.drumHits} drums / ${pattern.bassNotes + pattern.melodyNotes} notes`
+      detail: `${pattern.eventCount} events / ${pattern.drumHits} drums / ${pattern.bassNotes + pattern.melodyNotes} notes`,
+      focusId: `density-${pattern.slot}`,
+      focusTarget: "compose",
+      focusLabel: "Compose"
     }))
+  };
+}
+
+function createStyleInspectorFocusSummary(
+  summary: StyleInspectorSummary,
+  focusedItemId: StyleInspectorFocusId | null
+): StyleInspectorFocusSummary {
+  const items: StyleInspectorFocusItem[] = [...summary.metrics, ...summary.patterns];
+  const focusedItem = focusedItemId ? items.find((item) => item.focusId === focusedItemId) ?? null : null;
+  const item = focusedItem ?? items[0] ?? null;
+
+  if (!item) {
+    return {
+      focusId: null,
+      statusLabel: "Style clear",
+      areaLabel: "No style focus",
+      detailLabel: "No Style Inspector items available",
+      detailTitle: "Style Inspector has no focusable items."
+    };
+  }
+
+  const statusLabel = focusedItem ? "Focused Style" : "Style Focus";
+  const detailLabel = `${item.focusLabel} panel / ${item.detail}`;
+
+  return {
+    focusId: item.focusId,
+    statusLabel,
+    areaLabel: `${item.label}: ${item.value}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${item.label}: ${item.value} / ${detailLabel}`
   };
 }
 

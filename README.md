@@ -39,6 +39,7 @@ The first usable result is an Electron desktop workstation that can create a sam
 - Key changes that retarget Pattern A/B/C 808, synth, and chord-root event data instead of only changing the project label.
 - Style selector that applies editable genre groove templates for Trap, Drill, Boom Bap, Lo-fi, House, R&B, Jersey Club, Phonk, Garage, and Experimental Pattern A/B/C, BPM, swing, and sound preset.
 - Style Inspector with Style Quick Picks that explain and apply each genre's BPM range, active/default swing, bass role, melody role, sound preset, and Pattern A/B/C event density from local project data.
+- Style Inspector Focus adds explicit Focus controls that jump BPM, swing, bass, melody, sound, and Pattern A/B/C density diagnostics to the matching Transport, Compose, or Sound panels without changing style application or project data.
 - Key Compass for local read-only scale notes, chord motion, 808/bass posture, melody posture, and selected-note or selected-chord focus so beginners can compose inside the key and producers can scan harmony quickly.
 - Groove Compass for local read-only selected-pattern drum density, kick/clap anchors, hat motion, timing feel, chance posture, and selected drum focus so beginners can understand groove foundations and producers can scan pocket quickly.
 - Composer Guide for local read-only drums, 808/bass, harmony, melody, arrangement, and finish posture so beginners know the next writing focus and producers can scan missing layers quickly.

@@ -897,6 +897,7 @@ h2 {
 
 .style-inspector-heading {
   display: grid;
+  grid-row: 1 / 3;
   gap: 5px;
   align-content: center;
   border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
@@ -913,11 +914,16 @@ h2 {
 
 .style-inspector-heading strong,
 .style-inspector-heading p,
+.style-inspector-focus-readout span,
+.style-inspector-focus-readout strong,
+.style-inspector-focus-readout small,
 .style-inspector-metric span,
 .style-inspector-metric strong,
+.style-inspector-metric small,
 .style-inspector-pattern span,
 .style-inspector-pattern strong,
-.style-inspector-pattern small {
+.style-inspector-pattern small,
+.style-inspector-focus-button span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -935,8 +941,35 @@ h2 {
   font-size: 11px;
 }
 
+.style-inspector-focus-readout {
+  display: grid;
+  grid-column: 2 / -1;
+  grid-row: 1;
+  grid-template-columns: minmax(0, 0.68fr) minmax(0, 1fr) minmax(0, 1.32fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--style-color) 30%, rgba(244, 239, 231, 0.12));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--style-color) 8%, rgba(244, 239, 231, 0.035));
+  padding: 7px 8px;
+}
+
+.style-inspector-focus-readout span,
+.style-inspector-focus-readout small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+}
+
+.style-inspector-focus-readout strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
 .style-inspector-metrics {
   display: grid;
+  grid-column: 2;
+  grid-row: 2;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 7px;
 }
@@ -944,7 +977,9 @@ h2 {
 .style-inspector-metric,
 .style-inspector-pattern {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 4px;
+  align-items: center;
   align-content: center;
   min-width: 0;
   border: 1px solid rgba(244, 239, 231, 0.1);
@@ -957,6 +992,20 @@ h2 {
   border-inline-start: 3px solid color-mix(in srgb, var(--style-color) 74%, #f4efe7);
 }
 
+.style-inspector-metric.focused,
+.style-inspector-pattern.focused {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--style-color) 44%, rgba(244, 239, 231, 0.1)),
+    0 0 15px color-mix(in srgb, var(--style-color) 18%, transparent);
+}
+
+.style-inspector-metric > span,
+.style-inspector-metric > strong,
+.style-inspector-pattern > span,
+.style-inspector-pattern > strong {
+  grid-column: 1 / 2;
+}
+
 .style-inspector-metric strong,
 .style-inspector-pattern strong {
   color: #f4efe7;
@@ -965,12 +1014,15 @@ h2 {
 
 .style-inspector-patterns {
   display: grid;
+  grid-column: 3;
+  grid-row: 2;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
 }
 
 .style-quick-picks {
   grid-column: 1 / -1;
+  grid-row: 3;
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
   gap: 6px;
@@ -1028,8 +1080,39 @@ h2 {
 }
 
 .style-inspector-pattern small {
+  grid-column: 1 / -1;
   color: rgba(244, 239, 231, 0.66);
   font-size: 10px;
+}
+
+.style-inspector-metric small {
+  grid-column: 1 / -1;
+  color: rgba(244, 239, 231, 0.56);
+  font-size: 9px;
+}
+
+.style-inspector-focus-button {
+  display: inline-flex;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-inline-size: 58px;
+  max-inline-size: 78px;
+  border: 1px solid color-mix(in srgb, var(--style-color) 28%, rgba(244, 239, 231, 0.13));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--style-color) 10%, rgba(244, 239, 231, 0.035));
+  color: #f4efe7;
+  padding: 4px 5px;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.style-inspector-focus-button:hover,
+.style-inspector-focus-button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--style-color) 58%, rgba(244, 239, 231, 0.2));
+  background: color-mix(in srgb, var(--style-color) 18%, rgba(244, 239, 231, 0.06));
 }
 
 .key-compass {
