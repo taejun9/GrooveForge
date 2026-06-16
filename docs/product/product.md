@@ -11,7 +11,7 @@ GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats
 
 ## Product Definition
 
-Corrected concept: GrooveForge is a beat-production mini DAW for directly composing beats across genres, designing sounds, arranging sections, mixing/mastering, and exporting finished audio. In the user's terms, it is "직접 비트를 작곡하고 사운드를 설계하고 믹싱/마스터링까지 하는 비트 제작 미니 DAW." It can support sampling later, but sampling is not the project identity, first-run workflow, MVP proof, or core architecture.
+Corrected concept: GrooveForge is a beat-production mini DAW for directly composing beats across genres, designing sounds, arranging sections, mixing/mastering, and exporting finished audio. In the user's terms, it is "비트(모든 장르)를 만드는" app and "직접 비트를 작곡하고 사운드를 설계하고 믹싱/마스터링까지 하는 비트 제작 미니 DAW." It can support sampling later, but sampling is not the project identity, first-run workflow, MVP proof, or core architecture.
 
 GrooveForge is a code-driven all-genre beat workstation: a mini DAW with a JSON-based project format, programmable style profiles, editable musical events, local synthesis, mixing/mastering controls, and offline export. The center is making a beat directly, not finding a sample to start from.
 
@@ -20,6 +20,8 @@ The primary object is a beat project built from musical events, patterns, tracks
 The product should make a blank beat feel playable without imported audio: set BPM/key/style, write rhythm, compose 808/bass, melody, and chords, shape tone and FX, arrange sections, mix/master, and export. The product center is Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export.
 
 It is not a trap-only app and not a sample-chopping tool. Trap, drill, boom bap, house, lofi, jersey, phonk, R&B, garage, and experimental workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
+
+The product draft should be read in this order whenever there is ambiguity: all-genre beat creation first, direct composition and sound design second, arrangement/mixing/mastering/export third, optional sampling last. If a proposed screen, plan, or roadmap item starts with sample browsing, chopping, or sampler setup, it must be reframed as an optional extension unless the user explicitly approves a sampling-phase exception.
 
 ## Product Boundary
 
@@ -43,6 +45,8 @@ Primary navigation and the first empty project should expose beat-making control
 
 Any future sampler UI should be framed as an additional instrument or sound-source lane after direct composition exists, not as the first screen, first task, or reason the project file exists.
 
+Sampling placement rule: the default empty project, first visible actions, MVP proof, primary navigation, onboarding language, and plan titles must start from editable musical events and beat-making controls. Optional sampling can add sound sources later, but it must not be the first required action, first proof of value, or default explanation of what GrooveForge is.
+
 ## Users
 
 - Developers and technically comfortable producers who want programmable beat construction.
@@ -57,6 +61,8 @@ The core product loop is:
 ```text
 BPM/key/style -> pattern programming -> drum pattern -> 808/bass line -> melody/chords -> sound design -> arrangement -> mixer -> master -> export
 ```
+
+This loop is the product spine for all supported genres. Style presets may change BPM, swing, density, sound posture, and event blueprints, but they should still produce editable drums, 808/bass, melody/chords, arrangement, mixer/master, and export state without requiring samples.
 
 Optional sampling path, later:
 

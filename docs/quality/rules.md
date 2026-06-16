@@ -225,7 +225,11 @@ Concept correction work must make the all-genre beat-production mini DAW framing
 
 Concept correction work must preserve this center list in durable docs: Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export.
 
+Concept correction work must preserve the user's intent that GrooveForge is for "비트(모든 장르)를 만드는" work, not a trap-only, sample-pack, or sampler-first product.
+
 First-run UX, default navigation, and roadmap work must lead with direct beat composition: pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sample browsing, chopping, sampler setup, audio clips, and audio warping must stay opt-in optional-sampling paths unless the user explicitly changes the product direction.
+
+Sampling placement work fails if the default empty project, first visible action, MVP proof, primary navigation, onboarding language, priority table, or plan title makes sample browsing, sample import, chopping, sampler setup, or audio clips appear before editable musical events and beat-making controls.
 
 Docs that mention clips before optional sampling is implemented must clarify that core clips are pattern, MIDI, or automation containers, not imported audio assets.
 
@@ -234,6 +238,8 @@ Any new plan that mentions sample import, chopping, sampler tracks, or audio war
 Any product, architecture, UI, roadmap, or QA wording that implies users must import, chop, browse, or map samples before making a complete beat fails the product boundary. The expected proof remains a sample-free beat made from built-in drums, synth 808/bass, melody/chords, arrangement, mixer/master, and export.
 
 Any product or architecture wording that promotes `AudioClipEvent`, sampler assets, sample browsing, or chopping above editable musical events fails the product boundary until optional sampling is explicitly in scope.
+
+Any future optional-sampling schema must keep `NoteEvent`, `DrumHitEvent`, and automation sufficient for a complete beat, and must keep `AudioClipEvent` additive, opt-in, and outside the core MVP proof.
 
 Mixer/master work must keep mixing and mastering separate. Volume, pan, mute, solo, master output gain, and preset ceiling controls must affect both realtime playback and WAV export when implemented. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.
 

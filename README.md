@@ -11,11 +11,13 @@ Agent team: `Team Forge`. See `AGENTS.md`.
 
 ## Product Spine
 
-Concept lock: GrooveForge is not a sampling app. It is an all-genre beat-production mini DAW for directly composing beats, designing sounds, arranging sections, mixing/mastering, and exporting finished audio. In the user's terms, it is "직접 비트를 작곡하고 사운드를 설계하고 믹싱/마스터링까지 하는 비트 제작 미니 DAW." Sampling is a useful optional module only after the beat workstation core is already valuable.
+Concept lock: GrooveForge is not a sampling app. It is an all-genre beat-production mini DAW for directly composing beats, designing sounds, arranging sections, mixing/mastering, and exporting finished audio. In the user's terms, it is "비트(모든 장르)를 만드는" app and "직접 비트를 작곡하고 사운드를 설계하고 믹싱/마스터링까지 하는 비트 제작 미니 DAW." Sampling is a useful optional module only after the beat workstation core is already valuable.
 
 GrooveForge is a code-driven all-genre beat workstation with a programmable project format and style engine. Direct composition is the product spine: users should be able to program drums, 808/bass, melody, chords, FX, and automation as editable musical events, shape built-in instruments, arrange a song section, mix/master it, and export audio before they ever import a sample. The product center is Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export.
 
 The first-run experience should feel like opening a compact beat-making DAW, not a sample browser: choose BPM/key/style, write drums, build 808/bass, add melody/chords, shape sounds, arrange, mix, master, then export.
+
+Genre breadth is part of the core, not a future sampling pack. Trap, drill, boom bap, lo-fi, house, R&B, jersey club, phonk, garage, and experimental starts should come from editable style profiles, built-in instruments, and musical events before sample import appears.
 
 The core flow is:
 
@@ -32,6 +34,8 @@ sample import -> chop/slice -> pitch/stretch -> one-shot or sampler mapping
 Sampling is a secondary add-on. It can be added later for users who want audio import, chopping, loop stretching, one-shot mapping, or sampler workflows, but it must not define the MVP, the first-run experience, or the core data model. It should enter as an optional sound source or instrument layer inside the beat workstation, not as the product's starting assumption. A complete GrooveForge beat must be possible with no imported audio.
 
 If a draft, screen, or roadmap has to choose what appears first, the answer is direct beat creation: pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sample browsing, chopping, and sampler setup are opt-in extension paths after the beat workstation core is useful.
+
+Sampling placement rule: the default empty project, first visible actions, MVP proof, primary navigation, and new plan titles must lead with editable musical events and beat-making controls. Sampling may appear only as a clearly labeled optional sound-source path unless the user explicitly changes the product direction.
 
 ## MVP Target
 
@@ -74,6 +78,7 @@ The first desktop runtime is an Electron + Vite + TypeScript app. It opens direc
 - Treat sample-free beat creation as the proof of the product: built-in drums, synth 808/bass, synth melody/chords, arrangement, mixer/master, and WAV/stem/MIDI export should work before optional sampling entry points become prominent.
 - Treat sample import, chopping, sampler tracks, and audio warping as P3/v2 optional modules unless a user-approved plan explicitly says otherwise.
 - Keep first-run UI and default navigation focused on making beats across genres, not on finding or slicing samples.
+- Keep default screens, plan titles, and roadmap ordering anchored to editable musical events; do not let sample browsing, chopping, or sampler setup become the first task a user sees.
 - Keep sensitive real user, customer, credential, and production data out of samples, tests, docs, and screenshots.
 - Keep validation commands current as the stack becomes concrete.
 
