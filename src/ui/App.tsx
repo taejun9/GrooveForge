@@ -450,6 +450,15 @@ type MixCoachCheck = {
   tone: MixCoachTone;
 };
 
+type MixCoachFocusSummary = {
+  checkId: string | null;
+  roleLabel: string;
+  statusLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type MixFixPreset = "headroom" | "stem_balance" | "low_end";
 
 type MixFixAction = {
@@ -1969,6 +1978,7 @@ export function App(): ReactElement {
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
+  const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const [projectFileLabel, setProjectFileLabel] = useState<string | null>(null);
   const [projectHasUnsavedChanges, setProjectHasUnsavedChanges] = useState(false);
@@ -4894,6 +4904,13 @@ export function App(): ReactElement {
     }, "Cleared session brief");
   }
 
+  function focusMixCoach(): MixCoachCheck | null {
+    const check = mixCoachFocusCheck(createMixCoachChecks(exportAnalysis, stemAnalyses));
+    setMixCoachFocusId(check?.id ?? null);
+    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    return check;
+  }
+
   function runNextMove(action: NextMoveAction): void {
     const beforeProject = projectRef.current;
     switch (action.command.kind) {
@@ -4925,8 +4942,10 @@ export function App(): ReactElement {
         saveCurrentSnapshot();
         break;
       case "reviewMix":
-        masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-        setProjectStatus("Review Mix Coach");
+        {
+          const check = focusMixCoach();
+          setProjectStatus(check ? `Review ${check.label}` : "Review Mix Coach");
+        }
         break;
     }
     setNextMoveResult(createNextMoveResult(action, beforeProject, projectRef.current));
@@ -6319,7 +6338,12 @@ export function App(): ReactElement {
           <FinishChecklist summary={finishChecklistSummary} />
           <ReviewQueue summary={reviewQueueSummary} />
           <ExportMeter analysis={exportAnalysis} />
-          <MixCoach analysis={exportAnalysis} stemAnalyses={stemAnalyses} onApplyFix={applyMixFixPreset} />
+          <MixCoach
+            analysis={exportAnalysis}
+            focusedCheckId={mixCoachFocusId}
+            stemAnalyses={stemAnalyses}
+            onApplyFix={applyMixFixPreset}
+          />
           <MasterFinishPads pads={masterFinishPadOptions} onApply={applyMasterFinishPad} />
           <label>
             <span>Ceiling</span>
@@ -12524,14 +12548,17 @@ function ExportMeter({ analysis }: { analysis: ExportAnalysis }): ReactElement {
 
 function MixCoach({
   analysis,
+  focusedCheckId,
   stemAnalyses,
   onApplyFix
 }: {
   analysis: ExportAnalysis;
+  focusedCheckId: string | null;
   stemAnalyses: StemExportAnalyses;
   onApplyFix: (preset: MixFixPreset) => void;
 }): ReactElement {
   const checks = createMixCoachChecks(analysis, stemAnalyses);
+  const focusSummary = createMixCoachFocusSummary(checks, focusedCheckId);
   const fixes = createMixFixActions(analysis, stemAnalyses);
 
   return (
@@ -12540,14 +12567,31 @@ function MixCoach({
         <span>Mix Coach</span>
         <strong data-testid="mix-coach-summary">{mixCoachSummary(checks)}</strong>
       </div>
+      <div
+        className={`mix-coach-focus-readout ${focusSummary.tone}`}
+        data-testid="mix-coach-focus-readout"
+        title={focusSummary.detailTitle}
+      >
+        <span data-testid="mix-coach-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="mix-coach-focus-label">{focusSummary.roleLabel}</strong>
+        <small data-testid="mix-coach-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
       <div className="mix-coach-list">
-        {checks.map((check) => (
-          <div className={`mix-coach-card ${check.tone}`} data-testid={`mix-coach-check-${check.id}`} key={check.id}>
-            <span>{check.label}</span>
-            <strong>{check.status}</strong>
-            <p>{check.detail}</p>
-          </div>
-        ))}
+        {checks.map((check) => {
+          const focused = focusedCheckId !== null && check.id === focusSummary.checkId;
+          return (
+            <div
+              className={["mix-coach-card", check.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`mix-coach-check-${check.id}`}
+              key={check.id}
+            >
+              <span>{check.label}</span>
+              <strong>{check.status}</strong>
+              <p>{check.detail}</p>
+            </div>
+          );
+        })}
       </div>
       <div className="mix-fix-row" aria-label="Mix fixes">
         {fixes.map((fix) => (
@@ -12626,6 +12670,37 @@ function createMixCoachChecks(analysis: ExportAnalysis, stemAnalyses: StemExport
     stemBalanceCheck(loudestStem, quietestStem, stemSpread),
     lowEndBlendCheck(lowEndDelta)
   ];
+}
+
+function mixCoachFocusCheck(checks: MixCoachCheck[]): MixCoachCheck | null {
+  return checks.find((check) => check.tone !== "good") ?? checks[0] ?? null;
+}
+
+function createMixCoachFocusSummary(checks: MixCoachCheck[], focusedCheckId: string | null): MixCoachFocusSummary {
+  const focusedCheck = focusedCheckId ? checks.find((check) => check.id === focusedCheckId) ?? null : null;
+  const check = focusedCheck ?? mixCoachFocusCheck(checks);
+
+  if (!check) {
+    return {
+      checkId: null,
+      roleLabel: "No checks",
+      statusLabel: "Mix Coach clear",
+      detailLabel: "No mix checks available",
+      detailTitle: "Mix Coach has no checks to focus.",
+      tone: "good"
+    };
+  }
+
+  const statusLabel = focusedCheck ? "Focused Mix Check" : check.tone === "good" ? "Mix Coach clear" : "Top Mix Check";
+
+  return {
+    checkId: check.id,
+    roleLabel: `${check.label}: ${check.status}`,
+    statusLabel,
+    detailLabel: check.detail,
+    detailTitle: `${statusLabel} / ${check.label}: ${check.status} / ${check.detail}`,
+    tone: check.tone
+  };
 }
 
 function createMixBalancePadOptions(mixer: MixerChannel[]): MixBalancePadOption[] {
