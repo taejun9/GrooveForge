@@ -1392,6 +1392,14 @@ type SnapshotCompareSummary = {
   cards: SnapshotCompareCard[];
 };
 
+type SnapshotSlotRoleSummary = {
+  roleLabel: string;
+  statusLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type HandoffPackItem = {
   id: "wav" | "stems" | "midi" | "sheet";
   label: string;
@@ -6725,6 +6733,8 @@ function ProjectSnapshots({
   onRestore: (snapshotId: string) => void;
   onSave: () => void;
 }): ReactElement {
+  const roleSummary = createSnapshotSlotRoleSummary(project);
+
   return (
     <section className="snapshot-row" data-testid="project-snapshots" aria-label="Project snapshots">
       <div className="snapshot-heading">
@@ -6735,6 +6745,15 @@ function ProjectSnapshots({
         <strong data-testid="snapshot-count">
           {project.snapshots.length}/{maxProjectSnapshots} slots
         </strong>
+        <div
+          className={`snapshot-slot-role-readout ${roleSummary.tone}`}
+          data-testid="snapshot-slot-role-readout"
+          title={roleSummary.detailTitle}
+        >
+          <span data-testid="snapshot-slot-role-status">{roleSummary.statusLabel}</span>
+          <strong data-testid="snapshot-slot-role-label">{roleSummary.roleLabel}</strong>
+          <small data-testid="snapshot-slot-role-detail">{roleSummary.detailLabel}</small>
+        </div>
         <button data-testid="snapshot-save" onClick={onSave} title="Save current project snapshot" type="button">
           <Save size={14} aria-hidden="true" />
           <span>Save Slot</span>
@@ -8453,6 +8472,50 @@ function createSessionBriefRoleSummary(brief: SessionBrief): SessionBriefRoleSum
 
 function sessionBriefFilledFields(brief: SessionBrief): number {
   return sessionBriefFields.filter((field) => brief[field].trim().length > 0).length;
+}
+
+function createSnapshotSlotRoleSummary(project: ProjectState): SnapshotSlotRoleSummary {
+  const savedCount = project.snapshots.length;
+  const statusLabel = `${savedCount}/${maxProjectSnapshots} slots`;
+  const latestSnapshot = project.snapshots[0];
+
+  if (savedCount === 0) {
+    return {
+      roleLabel: "Save first take",
+      statusLabel,
+      detailLabel: "Next Save Slot",
+      detailTitle: `${statusLabel} / Save a local version before major edits`,
+      tone: "warn"
+    };
+  }
+
+  if (savedCount >= maxProjectSnapshots) {
+    return {
+      roleLabel: "Slot bank full",
+      statusLabel,
+      detailLabel: "Compare or clear",
+      detailTitle: `${statusLabel} / Latest ${latestSnapshot?.name ?? "saved take"} / Delete a stale slot before saving more`,
+      tone: "warn"
+    };
+  }
+
+  if (savedCount === 1) {
+    return {
+      roleLabel: "Compare ready",
+      statusLabel,
+      detailLabel: latestSnapshot ? latestSnapshot.name : "1 saved take",
+      detailTitle: `${statusLabel} / Latest ${latestSnapshot?.name ?? "saved take"} / Use Snapshot Compare before big edits`,
+      tone: "good"
+    };
+  }
+
+  return {
+    roleLabel: "Version bank",
+    statusLabel,
+    detailLabel: `${savedCount} takes ready`,
+    detailTitle: `${statusLabel} / Latest ${latestSnapshot?.name ?? "saved take"} / Compare takes before restore or delete`,
+    tone: "good"
+  };
 }
 
 function boundedSessionBriefText(value: string, maxLength: number): string {

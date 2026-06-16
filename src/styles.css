@@ -3649,6 +3649,50 @@ h2 {
   font-size: 12px;
 }
 
+.snapshot-heading .snapshot-slot-role-readout {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  border: 1px solid rgba(240, 195, 106, 0.22);
+  border-radius: 7px;
+  background: rgba(240, 195, 106, 0.055);
+  padding: 6px;
+}
+
+.snapshot-slot-role-readout span,
+.snapshot-slot-role-readout strong,
+.snapshot-slot-role-readout small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-slot-role-readout span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.snapshot-slot-role-readout strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.snapshot-slot-role-readout small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+}
+
+.snapshot-slot-role-readout.good {
+  border-color: rgba(116, 214, 158, 0.24);
+  background: rgba(116, 214, 158, 0.06);
+}
+
+.snapshot-slot-role-readout.good strong {
+  color: #bff4d0;
+}
+
 .snapshot-heading button,
 .snapshot-actions button {
   display: inline-flex;
