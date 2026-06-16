@@ -1719,6 +1719,16 @@ type HandoffPackRouteSummary = {
   tone: MixCoachTone;
 };
 
+type HandoffPackSendOrderSummary = {
+  nextItemId: HandoffPackItem["id"] | null;
+  statusLabel: string;
+  nextLabel: string;
+  detailLabel: string;
+  sequenceLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type HandoffFileManifestItem = {
   id: HandoffPackItem["id"];
   label: string;
@@ -8554,6 +8564,7 @@ function HandoffPack({
   const readyCount = items.filter((item) => item.tone === "good").length;
   const tone = weakestTone(items.map((item) => item.tone));
   const routeSummary = createHandoffPackRouteSummary(project, stemAnalyses, items, tone);
+  const sendOrderSummary = createHandoffPackSendOrderSummary(project, items);
   const fileManifest = createHandoffFileManifest(project, stemAnalyses, items);
 
   return (
@@ -8580,6 +8591,18 @@ function HandoffPack({
           <small data-testid="handoff-pack-route-detail">{routeSummary.detailLabel}</small>
           <small data-testid="handoff-pack-route-file">{routeSummary.fileLabel}</small>
         </div>
+      </div>
+      <div
+        aria-label={sendOrderSummary.detailTitle}
+        className={`handoff-pack-send-order ${sendOrderSummary.tone}`}
+        data-next-item={sendOrderSummary.nextItemId ?? "clear"}
+        data-testid="handoff-pack-send-order"
+        title={sendOrderSummary.detailTitle}
+      >
+        <span data-testid="handoff-pack-send-order-status">{sendOrderSummary.statusLabel}</span>
+        <strong data-testid="handoff-pack-send-order-next">{sendOrderSummary.nextLabel}</strong>
+        <small data-testid="handoff-pack-send-order-detail">{sendOrderSummary.detailLabel}</small>
+        <small data-testid="handoff-pack-send-order-sequence">{sendOrderSummary.sequenceLabel}</small>
       </div>
       <div className="handoff-pack-grid" data-testid="handoff-pack-grid">
         {items.map((item) => (
@@ -11235,6 +11258,50 @@ function createHandoffPackRouteSummary(
     detailTitle: `${target.name} handoff / ${readyCount}/${items.length} ready / ${audibleStems.length}/${target.stemGoal} target stems / ${briefStatus.detail} / ${openTitle} / ${handoffSheetFileName(project)}`,
     tone
   };
+}
+
+function createHandoffPackSendOrderSummary(
+  project: ProjectState,
+  items: HandoffPackItem[]
+): HandoffPackSendOrderSummary {
+  const target = activeDeliveryTarget(project);
+  const orderedItems = handoffPackSendOrder(items);
+  const nextItem = orderedItems.find((item) => item.tone !== "good") ?? null;
+  const sequenceLabel = orderedItems.map((item, index) => `${index + 1} ${item.buttonLabel}`).join(" -> ");
+
+  if (!nextItem) {
+    const detailLabel = `${target.name} package is ready for explicit exports`;
+    return {
+      nextItemId: null,
+      statusLabel: "Send order clear",
+      nextLabel: "All deliverables ready",
+      detailLabel,
+      sequenceLabel,
+      detailTitle: `Send order clear / ${detailLabel} / ${sequenceLabel}`,
+      tone: "good"
+    };
+  }
+
+  const statusLabel = nextItem.tone === "danger" ? "Send blocker" : "Next send step";
+  const detailLabel = `${nextItem.label}: ${nextItem.value} / ${nextItem.detail}`;
+
+  return {
+    nextItemId: nextItem.id,
+    statusLabel,
+    nextLabel: `Next: ${nextItem.buttonLabel}`,
+    detailLabel,
+    sequenceLabel,
+    detailTitle: `${statusLabel} / ${nextItem.label}: ${nextItem.value} / ${nextItem.detail} / ${sequenceLabel}`,
+    tone: nextItem.tone
+  };
+}
+
+function handoffPackSendOrder(items: HandoffPackItem[]): HandoffPackItem[] {
+  const order: HandoffPackItem["id"][] = ["wav", "stems", "midi", "sheet"];
+  return order.flatMap((id) => {
+    const item = items.find((candidate) => candidate.id === id);
+    return item ? [item] : [];
+  });
 }
 
 function createHandoffFileManifest(

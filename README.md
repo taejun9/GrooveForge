@@ -71,6 +71,7 @@ The first usable result is an Electron desktop workstation that can create a sam
 - Export Preflight for a read-only delivery-risk scan of readiness, mix/master posture, WAV/stem/MIDI deliverables, and handoff brief status before users export or send files.
 - Export Preflight Focus adds explicit Focus controls that jump readiness, mix/master, deliverables, and handoff risks to Compose, Master, or Deliver panels without changing export scoring, files, renders, or project data.
 - Handoff Pack panel that groups explicit WAV, stem, MIDI, and Handoff Sheet export actions with local deliverable status, handoff route readout, and file manifest preview.
+- Handoff Pack Send Order adds a UI-local next-step readout for WAV, stems, MIDI, and Handoff Sheet delivery sequence without auto-exporting, rendering, downloading, or changing file contents.
 - Beat Map production overview that uses the selected fixed or custom Delivery Target to show beginner workflow stages, producer-facing song/pattern/mix/stem metrics, and explicit local action buttons from the current project state.
 - Structure Lens panel that checks target fit, section coverage, hook contrast, and energy arc from the current arrangement with explicit local arrangement actions.
 - Song Form Overview for a compact visual map of sections, Pattern A/B/C usage, bar ranges, energy, muted tracks, selected arrangement block navigation, and realtime playing-block context.

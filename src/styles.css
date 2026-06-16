@@ -3626,9 +3626,10 @@ h2 {
 .handoff-pack {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
   gap: 10px;
   align-items: stretch;
-  min-height: 84px;
+  min-height: 124px;
   border-color: rgba(120, 240, 200, 0.18);
   border-radius: 8px;
   background: rgba(120, 240, 200, 0.04);
@@ -3647,6 +3648,7 @@ h2 {
 
 .handoff-pack-heading {
   display: grid;
+  grid-row: 1 / 4;
   gap: 4px;
   align-content: center;
   min-width: 0;
@@ -3677,6 +3679,9 @@ h2 {
 .handoff-pack-route-readout span,
 .handoff-pack-route-readout strong,
 .handoff-pack-route-readout small,
+.handoff-pack-send-order span,
+.handoff-pack-send-order strong,
+.handoff-pack-send-order small,
 .handoff-pack-card span,
 .handoff-pack-card strong,
 .handoff-pack-card small,
@@ -3745,8 +3750,45 @@ h2 {
   color: #ffb199;
 }
 
+.handoff-pack-send-order {
+  display: grid;
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 0.82fr) minmax(0, 1.35fr) minmax(0, 1.1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 7px 8px;
+}
+
+.handoff-pack-send-order.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.handoff-pack-send-order.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.055);
+}
+
+.handoff-pack-send-order span,
+.handoff-pack-send-order small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+}
+
+.handoff-pack-send-order strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
 .handoff-pack-grid {
   display: grid;
+  grid-column: 2;
+  grid-row: 2;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
   min-width: 0;
@@ -3755,6 +3797,7 @@ h2 {
 .handoff-pack-file-manifest {
   display: grid;
   grid-column: 2;
+  grid-row: 3;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
   min-width: 0;
@@ -9313,6 +9356,11 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .handoff-pack-send-order {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 8px;
+  }
+
   .snapshot-compare {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -9506,6 +9554,35 @@ input[type="range"] {
   }
 
   .export-preflight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .handoff-pack {
+    grid-template-columns: 1fr;
+  }
+
+  .handoff-pack-heading {
+    grid-row: auto;
+    border-inline-end: 0;
+    border-block-end: 1px solid rgba(244, 239, 231, 0.1);
+    padding-inline-end: 0;
+    padding-block-end: 7px;
+  }
+
+  .handoff-pack-send-order,
+  .handoff-pack-grid,
+  .handoff-pack-file-manifest {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .handoff-pack-send-order {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .handoff-pack-grid,
+  .handoff-pack-file-manifest {
     grid-template-columns: 1fr;
   }
 
