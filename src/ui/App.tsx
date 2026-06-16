@@ -963,6 +963,23 @@ type GrooveCompassSummary = {
   cards: GrooveCompassCard[];
 };
 
+type ComposerGuideCardId = "drums" | "bass" | "harmony" | "melody" | "arrange" | "finish";
+
+type ComposerGuideCard = {
+  id: ComposerGuideCardId;
+  label: string;
+  status: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type ComposerGuideSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: ComposerGuideCard[];
+};
+
 type BeatPassportMetric = {
   id: string;
   label: string;
@@ -1555,6 +1572,10 @@ export function App(): ReactElement {
   const grooveCompassSummary = useMemo(
     () => createGrooveCompassSummary(project, selectedDrumStep),
     [project, selectedDrumStep]
+  );
+  const composerGuideSummary = useMemo(
+    () => createComposerGuideSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
   const chordPadOptions = useMemo(
     () => createChordPadOptions(project.key, selectedChord),
@@ -4074,6 +4095,8 @@ export function App(): ReactElement {
 
       <GrooveCompass summary={grooveCompassSummary} />
 
+      <ComposerGuide summary={composerGuideSummary} />
+
       <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
 
       <DeliveryTargets
@@ -5857,6 +5880,30 @@ function GrooveCompass({ summary }: { summary: GrooveCompassSummary }): ReactEle
   );
 }
 
+function ComposerGuide({ summary }: { summary: ComposerGuideSummary }): ReactElement {
+  return (
+    <section className={`composer-guide ${summary.tone}`} data-testid="composer-guide" aria-label="Composer guide">
+      <div className="composer-guide-heading">
+        <div>
+          <ListChecks size={17} aria-hidden="true" />
+          <span>Composer Guide</span>
+        </div>
+        <strong data-testid="composer-guide-headline">{summary.headline}</strong>
+        <small data-testid="composer-guide-detail">{summary.detail}</small>
+      </div>
+      <div className="composer-guide-grid" data-testid="composer-guide-grid">
+        {summary.cards.map((card) => (
+          <div className={`composer-guide-card ${card.tone}`} data-testid={`composer-guide-${card.id}`} key={card.id}>
+            <span>{card.label}</span>
+            <strong>{card.status}</strong>
+            <small>{card.detail}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function FinishChecklist({ summary }: { summary: FinishChecklistSummary }): ReactElement {
   return (
     <section className={`finish-checklist ${summary.tone}`} data-testid="finish-checklist" aria-label="Finish checklist">
@@ -7543,6 +7590,99 @@ function grooveCompassFocusCard(
     detail: `${percentLabel(velocity)} vel / ${percentLabel(chance)} chance / ${timingLabel(timing)} / x${repeat}`,
     tone: chance < 1 || timing !== 0 || repeat > 1 ? "good" : "warn"
   };
+}
+
+function createComposerGuideSummary(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): ComposerGuideSummary {
+  const pattern = activePattern(project);
+  const target = activeDeliveryTarget(project);
+  const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const drumHits = drumHitCount(pattern);
+  const bassCount = pattern.bassNotes.length;
+  const chordCount = pattern.chordEvents.length;
+  const melodyCount = pattern.melodyNotes.length;
+  const bars = arrangementTotalBars(project);
+  const mixTone = weakestTone(createMixCoachChecks(analysis, stemAnalyses).map((check) => check.tone));
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const drums = readinessCheckForId(checks, "drums");
+  const bassTone = bassCount >= 4 ? "good" : bassCount > 0 ? "warn" : "danger";
+  const harmonyTone = chordCount >= 3 ? "good" : chordCount > 0 ? "warn" : "danger";
+  const melodyTone = melodyCount >= 4 ? "good" : melodyCount > 0 ? "warn" : "danger";
+  const arrangeTone: MixCoachTone = bars >= target.targetBars ? "good" : bars >= 8 ? "warn" : "danger";
+  const finishTone: MixCoachTone =
+    analysis.status === "Silent"
+      ? "danger"
+      : analysis.status === "Ready" && mixTone === "good" && audibleStemCount >= target.stemGoal
+        ? "good"
+        : "warn";
+  const cards: ComposerGuideCard[] = [
+    {
+      id: "drums",
+      label: "Drums",
+      status: drumHits >= 20 ? "Full groove" : drumHits >= 10 ? "Pocket sketch" : "Needs rhythm",
+      detail: `${drumHits} hits / ${drums?.status ?? "Drums"}`,
+      tone: drums?.tone ?? (drumHits > 0 ? "warn" : "danger")
+    },
+    {
+      id: "bass",
+      label: "808/Bass",
+      status: bassCount >= 4 ? "Line ready" : bassCount > 0 ? "Seeded" : "Needs low end",
+      detail: `${bassCount} notes / ${keyCompassPitchSpread(pattern.bassNotes.map((note) => note.pitch))}`,
+      tone: bassTone
+    },
+    {
+      id: "harmony",
+      label: "Harmony",
+      status: chordCount >= 3 ? "Motion ready" : chordCount > 0 ? "Loop seed" : "Needs chords",
+      detail: `${chordCount} chords / ${keyCompassChordMotion(project.key, pattern.chordEvents)}`,
+      tone: harmonyTone
+    },
+    {
+      id: "melody",
+      label: "Melody",
+      status: melodyCount >= 4 ? "Hook seeded" : melodyCount > 0 ? "Motif seed" : "Open lane",
+      detail: `${melodyCount} notes / ${keyCompassPitchSpread(pattern.melodyNotes.map((note) => note.pitch))}`,
+      tone: melodyTone
+    },
+    {
+      id: "arrange",
+      label: "Arrange",
+      status: bars >= target.targetBars ? "Target met" : bars >= 8 ? "Song sketch" : "Loop stage",
+      detail: `${barCountLabel(bars)} / ${barCountLabel(target.targetBars)} ${target.name}`,
+      tone: arrangeTone
+    },
+    {
+      id: "finish",
+      label: "Finish",
+      status: finishTone === "good" ? "Handoff ready" : finishTone === "warn" ? "Needs polish" : "No signal",
+      detail: `${analysis.status} / ${audibleStemCount}/${target.stemGoal} stems`,
+      tone: finishTone
+    }
+  ];
+  const focus = composerGuideFocus(cards);
+
+  return {
+    headline: focus,
+    detail: `${styleName} / Pattern ${project.selectedPattern} / ${drumHits} drums / ${bassCount + chordCount + melodyCount} notes`,
+    tone: weakestTone(cards.map((card) => card.tone)),
+    cards
+  };
+}
+
+function composerGuideFocus(cards: ComposerGuideCard[]): string {
+  const firstDanger = cards.find((card) => card.tone === "danger");
+  if (firstDanger) {
+    return `${firstDanger.label} is the next writing focus`;
+  }
+  const firstWarn = cards.find((card) => card.tone === "warn");
+  if (firstWarn) {
+    return `${firstWarn.label} needs one more pass`;
+  }
+  return "Beat has a complete writing path";
 }
 
 function keyCompassFocusCard(

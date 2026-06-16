@@ -45,6 +45,7 @@ button {
 .style-inspector,
 .key-compass,
 .groove-compass,
+.composer-guide,
 .blueprint-row,
 .delivery-target-row,
 .session-brief-row,
@@ -85,6 +86,7 @@ button {
 .style-inspector-heading > div,
 .key-compass-heading > div,
 .groove-compass-heading > div,
+.composer-guide-heading > div,
 .blueprint-heading > div,
 .delivery-target-heading > div,
 .session-brief-heading > div,
@@ -853,6 +855,125 @@ h2 {
 }
 
 .groove-compass-card small {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
+}
+
+.composer-guide {
+  display: grid;
+  grid-template-columns: 178px minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  min-height: 84px;
+  border-color: rgba(175, 138, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(175, 138, 255, 0.04);
+  padding: 10px;
+}
+
+.composer-guide.warn {
+  border-color: rgba(240, 195, 106, 0.28);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.composer-guide.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.composer-guide-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.composer-guide-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.composer-guide-heading svg {
+  color: #af8aff;
+}
+
+.composer-guide.warn .composer-guide-heading svg {
+  color: #f0c36a;
+}
+
+.composer-guide.danger .composer-guide-heading svg {
+  color: #ff7a4f;
+}
+
+.composer-guide-heading strong,
+.composer-guide-heading small,
+.composer-guide-card span,
+.composer-guide-card strong,
+.composer-guide-card small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-guide-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.composer-guide-heading small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.composer-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.composer-guide-card {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+  border: 1px solid rgba(175, 138, 255, 0.2);
+  border-inline-start: 3px solid #af8aff;
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 8px 9px;
+}
+
+.composer-guide-card.good {
+  border-color: rgba(120, 240, 200, 0.2);
+  border-inline-start-color: #78f0c8;
+}
+
+.composer-guide-card.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  border-inline-start-color: #f0c36a;
+}
+
+.composer-guide-card.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  border-inline-start-color: #ff7a4f;
+}
+
+.composer-guide-card span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.composer-guide-card strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.composer-guide-card small {
   color: rgba(244, 239, 231, 0.68);
   font-size: 10px;
 }
@@ -5879,6 +6000,10 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .composer-guide {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
   .structure-lens {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -5916,6 +6041,10 @@ input[type="range"] {
   }
 
   .groove-compass-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .composer-guide-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
