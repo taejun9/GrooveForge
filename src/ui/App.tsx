@@ -559,6 +559,16 @@ type PatternCompareSummary = {
   arrangedBars: number;
 };
 
+type PatternClonePadOption = {
+  id: string;
+  source: PatternSlot;
+  target: PatternSlot;
+  preset: PatternVariationPreset;
+  label: string;
+  preview: string;
+  detail: string;
+};
+
 type PatternDnaCardId = "layers" | "density" | "variation" | "arrangement";
 
 type PatternDnaCard = {
@@ -1651,6 +1661,8 @@ const patternStackDefinitions: PatternStackDefinition[] = [
   { id: "break", label: "Break", detail: "space", bassline: "offbeat", chordPreset: "bounce", motif: "answer" }
 ];
 
+const patternCloneVariationPresets: PatternVariationPreset[] = ["hook", "breakdown"];
+
 const grooveFeelDefinitions: GrooveFeelDefinition[] = [
   { id: "tight", label: "Tight", detail: "grid", musicChance: 1, chordChance: 1, hatChance: 1, percChance: 0.96 },
   { id: "pocket", label: "Pocket", detail: "behind", musicChance: 0.94, chordChance: 0.96, hatChance: 0.94, percChance: 0.86 },
@@ -1861,6 +1873,7 @@ export function App(): ReactElement {
     [project.key, currentPattern.melodyNotes]
   );
   const patternStackOptions = useMemo(() => createPatternStackOptions(project.key), [project.key]);
+  const patternCloneOptions = useMemo(() => createPatternClonePadOptions(project.selectedPattern), [project.selectedPattern]);
   const drumFoundationOptions = useMemo(() => createDrumFoundationOptions(), []);
   const grooveFeelOptions = useMemo(() => createGrooveFeelOptions(), []);
   const drumAccentOptions = useMemo(() => createDrumAccentOptions(), []);
@@ -2301,6 +2314,25 @@ export function App(): ReactElement {
         }
       }),
       `Copied Pattern ${sourceSlot} to ${target}`
+    );
+    setSelectedNote(null);
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(0);
+  }
+
+  function cloneSelectedPatternVariation(target: PatternSlot, preset: PatternVariationPreset): void {
+    const sourceSlot = projectRef.current.selectedPattern;
+    const presetLabel = patternVariationPresetLabel(preset);
+    updateProject(
+      (current) => ({
+        ...current,
+        selectedPattern: target,
+        patterns: {
+          ...current.patterns,
+          [target]: createPatternVariation(current.patterns[current.selectedPattern], preset)
+        }
+      }),
+      `Cloned Pattern ${sourceSlot} to ${target} as ${presetLabel}`
     );
     setSelectedNote(null);
     setSelectedDrumStep(null);
@@ -4576,6 +4608,7 @@ export function App(): ReactElement {
             onUse={usePatternInSelectedBlock}
           />
           <PatternDna summary={patternDnaSummary} />
+          <PatternClonePads clones={patternCloneOptions} onApply={cloneSelectedPatternVariation} />
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
           <DrumFoundationPads foundations={drumFoundationOptions} onApply={applyDrumFoundation} />
           <GrooveFeelPads feels={grooveFeelOptions} onApply={applyGrooveFeel} />
@@ -11586,6 +11619,38 @@ function DrumAccentPads({
   );
 }
 
+function PatternClonePads({
+  clones,
+  onApply
+}: {
+  clones: PatternClonePadOption[];
+  onApply: (target: PatternSlot, preset: PatternVariationPreset) => void;
+}): ReactElement {
+  return (
+    <div className="pattern-clone-panel" data-testid="pattern-clone-pads">
+      <div className="pattern-clone-heading">
+        <span>Pattern Clone Pads</span>
+        <strong>A/B/C Variation</strong>
+      </div>
+      <div className="pattern-clone-row" aria-label="Pattern Clone Pads">
+        {clones.map((clone) => (
+          <button
+            data-testid={`pattern-clone-${clone.target}-${clone.preset}`}
+            key={clone.id}
+            onClick={() => onApply(clone.target, clone.preset)}
+            title={`${clone.detail} as ${clone.preview}`}
+            type="button"
+          >
+            <span>{clone.label}</span>
+            <strong>{clone.preview}</strong>
+            <small>{clone.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PatternStackPads({
   stacks,
   onApply
@@ -13024,6 +13089,22 @@ function createPatternStackOptions(key: string): PatternStackOption[] {
       melodyCount: events.melodyNotes.length
     };
   });
+}
+
+function createPatternClonePadOptions(source: PatternSlot): PatternClonePadOption[] {
+  return patternSlots
+    .filter((target) => target !== source)
+    .flatMap((target) =>
+      patternCloneVariationPresets.map((preset) => ({
+        id: `${target}-${preset}`,
+        source,
+        target,
+        preset,
+        label: `To ${target}`,
+        preview: patternVariationPresetLabel(preset),
+        detail: `Clone ${source} -> ${target}`
+      }))
+    );
 }
 
 function createPatternStackEvents(key: string, stack: PatternStackDefinition): PatternStackEvents {
