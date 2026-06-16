@@ -872,6 +872,19 @@ type PatternStackOption = PatternStackDefinition & {
   melodyCount: number;
 };
 
+type PatternStackPreviewSummary = {
+  statusLabel: string;
+  patternLabel: string;
+  stackLabel: string;
+  bassLabel: string;
+  chordLabel: string;
+  melodyLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+  stackId: PatternStackId | "none";
+};
+
 type GrooveFeelId = "tight" | "pocket" | "push" | "lazy";
 
 type GrooveFeelDefinition = {
@@ -2567,6 +2580,10 @@ export function App(): ReactElement {
     [project.key, currentPattern.melodyNotes, melodyMotifOptions, melodyAccentOptions, melodyContourOptions]
   );
   const patternStackOptions = useMemo(() => createPatternStackOptions(project.key), [project.key]);
+  const patternStackPreviewSummary = useMemo(
+    () => createPatternStackPreviewSummary(project.key, currentPattern, patternStackOptions),
+    [project.key, currentPattern, patternStackOptions]
+  );
   const patternCloneOptions = useMemo(() => createPatternClonePadOptions(project.selectedPattern), [project.selectedPattern]);
   const drumFoundationOptions = useMemo(() => createDrumFoundationOptions(), []);
   const grooveFeelOptions = useMemo(() => createGrooveFeelOptions(), []);
@@ -6116,6 +6133,7 @@ export function App(): ReactElement {
           />
           <PatternDna summary={patternDnaSummary} focusedCardId={patternDnaFocusId} onFocus={focusPatternDnaCard} />
           <PatternClonePads clones={patternCloneOptions} onApply={cloneSelectedPatternVariation} />
+          <PatternStackPreview preview={patternStackPreviewSummary} />
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
           <DrumMovePreview preview={drumMovePreviewSummary} />
           <DrumFoundationPads foundations={drumFoundationOptions} onApply={applyDrumFoundation} />
@@ -16002,6 +16020,25 @@ function PatternClonePads({
   );
 }
 
+function PatternStackPreview({ preview }: { preview: PatternStackPreviewSummary }): ReactElement {
+  return (
+    <div
+      className={`pattern-stack-preview ${preview.tone}`}
+      data-preview-pattern-stack={preview.stackId}
+      data-testid="pattern-stack-preview"
+      title={preview.detailTitle}
+    >
+      <span data-testid="pattern-stack-preview-status">{preview.statusLabel}</span>
+      <strong data-testid="pattern-stack-preview-pattern">{preview.patternLabel}</strong>
+      <small data-testid="pattern-stack-preview-stack">{preview.stackLabel}</small>
+      <small data-testid="pattern-stack-preview-bass">{preview.bassLabel}</small>
+      <small data-testid="pattern-stack-preview-chord">{preview.chordLabel}</small>
+      <small data-testid="pattern-stack-preview-melody">{preview.melodyLabel}</small>
+      <small data-testid="pattern-stack-preview-moves">{preview.moveLabel}</small>
+    </div>
+  );
+}
+
 function PatternStackPads({
   stacks,
   onApply
@@ -17691,6 +17728,58 @@ function createPatternStackOptions(key: string): PatternStackOption[] {
       melodyCount: events.melodyNotes.length
     };
   });
+}
+
+function createPatternStackPreviewSummary(key: string, pattern: PatternData, stacks: PatternStackOption[]): PatternStackPreviewSummary {
+  const stackMoves = stacks.map((option) => ({ stack: option, moves: patternStackMoveCount(key, pattern, option) }));
+  const selected = stackMoves.find((option) => option.moves.total === 0) ?? stackMoves.find((option) => option.moves.total > 0);
+  const stack = selected?.stack;
+  const moves = selected?.moves ?? { bass: 0, chord: 0, melody: 0, total: 0 };
+  const currentCount = pattern.bassNotes.length + pattern.chordEvents.length + pattern.melodyNotes.length;
+  const patternLabel = `${pattern.bassNotes.length} 808 / ${pattern.chordEvents.length} chords / ${pattern.melodyNotes.length} synth`;
+  const stackLabel = stack ? `${stack.label}: ${stack.preview}` : "Stack ready";
+  const bassLabel = stack ? `${stack.bassCount} 808 notes` : "808 ready";
+  const chordLabel = stack ? `${stack.chordCount} chords` : "Chords ready";
+  const melodyLabel = stack ? `${stack.melodyCount} synth notes` : "Synth ready";
+  const statusLabel = currentCount === 0 ? "Start stack" : moves.total === 0 ? "Stack aligned" : "Suggested stack";
+  const moveLabel = `B ${moves.bass} / C ${moves.chord} / S ${moves.melody}`;
+  return {
+    statusLabel,
+    patternLabel,
+    stackLabel,
+    bassLabel,
+    chordLabel,
+    melodyLabel,
+    moveLabel,
+    detailTitle: `${statusLabel}: ${patternLabel}; ${stackLabel}; ${bassLabel}; ${chordLabel}; ${melodyLabel}; ${moveLabel}.`,
+    tone: currentCount === 0 ? "warn" : moves.total === 0 ? "good" : "warn",
+    stackId: stack?.id ?? "none"
+  };
+}
+
+function patternStackMoveCount(
+  key: string,
+  pattern: PatternData,
+  stack: PatternStackDefinition
+): { bass: number; chord: number; melody: number; total: number } {
+  const events = createPatternStackEvents(key, stack);
+  const bass = bassNotesChangedCount(pattern.bassNotes, events.bassNotes);
+  const chord = chordEventsChangedCount(pattern.chordEvents, events.chordEvents);
+  const melody = melodyNotesChangedCount(pattern.melodyNotes, events.melodyNotes);
+  return { bass, chord, melody, total: bass + chord + melody };
+}
+
+function chordEventsChangedCount(current: ChordEvent[], transformed: ChordEvent[]): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentChord = current[index];
+    const transformedChord = transformed[index];
+    if (!currentChord || !transformedChord || !sameChordEvent(currentChord, transformedChord)) {
+      changed += 1;
+    }
+  }
+  return changed;
 }
 
 function createPatternClonePadOptions(source: PatternSlot): PatternClonePadOption[] {
