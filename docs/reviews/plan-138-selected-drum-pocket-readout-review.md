@@ -25,4 +25,4 @@ No blocking findings.
 
 ## Residual Risk
 
-The in-app Browser tool was not exposed in this session, so UI smoke used headless Chrome CDP against `http://127.0.0.1:5221/`. A narrow viewport keeps the app's dense workstation layout horizontally scrollable, but the new pocket readout children stayed inside the readout bounds.
+The in-app Browser tool was not exposed in this session, so UI smoke used headless Chrome CDP against `http://127.0.0.1:5222/`. A narrow viewport keeps the app's dense workstation layout horizontally scrollable, but the new pocket readout children stayed inside the readout bounds.
