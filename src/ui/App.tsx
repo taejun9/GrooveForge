@@ -1402,6 +1402,15 @@ type HandoffPackItem = {
   run: () => void;
 };
 
+type HandoffPackRouteSummary = {
+  routeLabel: string;
+  statusLabel: string;
+  detailLabel: string;
+  fileLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type ExportPreflightCardId = "readiness" | "mix" | "deliverables" | "handoff";
 
 type ExportPreflightCard = {
@@ -7236,6 +7245,7 @@ function HandoffPack({
   });
   const readyCount = items.filter((item) => item.tone === "good").length;
   const tone = weakestTone(items.map((item) => item.tone));
+  const routeSummary = createHandoffPackRouteSummary(project, stemAnalyses, items, tone);
 
   return (
     <section className={`handoff-pack ${tone}`} data-testid="handoff-pack" aria-label="Handoff pack">
@@ -7250,6 +7260,17 @@ function HandoffPack({
         <small data-testid="handoff-pack-detail">
           {handoffSheetFileName(project)}
         </small>
+        <div
+          aria-label={routeSummary.detailTitle}
+          className={`handoff-pack-route-readout ${routeSummary.tone}`}
+          data-testid="handoff-pack-route-readout"
+          title={routeSummary.detailTitle}
+        >
+          <span data-testid="handoff-pack-route-status">{routeSummary.statusLabel}</span>
+          <strong data-testid="handoff-pack-route-label">{routeSummary.routeLabel}</strong>
+          <small data-testid="handoff-pack-route-detail">{routeSummary.detailLabel}</small>
+          <small data-testid="handoff-pack-route-file">{routeSummary.fileLabel}</small>
+        </div>
       </div>
       <div className="handoff-pack-grid" data-testid="handoff-pack-grid">
         {items.map((item) => (
@@ -9172,6 +9193,30 @@ function createHandoffPackItems({
       run: onExportHandoffSheet
     }
   ];
+}
+
+function createHandoffPackRouteSummary(
+  project: ProjectState,
+  stemAnalyses: StemExportAnalyses,
+  items: HandoffPackItem[],
+  tone: MixCoachTone
+): HandoffPackRouteSummary {
+  const target = activeDeliveryTarget(project);
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
+  const briefFields = sessionBriefFilledFields(project.sessionBrief);
+  const readyCount = items.filter((item) => item.tone === "good").length;
+  const openItems = items.filter((item) => item.tone !== "good").map((item) => item.label);
+  const openTitle = openItems.length === 0 ? "all deliverables clear" : `review ${openItems.join("/")}`;
+
+  return {
+    routeLabel: `${target.name} handoff`,
+    statusLabel: `${readyCount}/${items.length} ready`,
+    detailLabel: `${audibleStems.length}/${target.stemGoal} stems / ${briefFields}/4 brief`,
+    fileLabel: handoffSheetFileName(project),
+    detailTitle: `${target.name} handoff / ${readyCount}/${items.length} ready / ${audibleStems.length}/${target.stemGoal} target stems / ${briefStatus.detail} / ${openTitle} / ${handoffSheetFileName(project)}`,
+    tone
+  };
 }
 
 function createKeyCompassSummary(

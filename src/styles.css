@@ -2654,6 +2654,9 @@ h2 {
 
 .handoff-pack-heading strong,
 .handoff-pack-heading small,
+.handoff-pack-route-readout span,
+.handoff-pack-route-readout strong,
+.handoff-pack-route-readout small,
 .handoff-pack-card span,
 .handoff-pack-card strong,
 .handoff-pack-card small,
@@ -2672,6 +2675,54 @@ h2 {
 .handoff-pack-heading small {
   color: rgba(244, 239, 231, 0.66);
   font-size: 11px;
+}
+
+.handoff-pack-route-readout {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.16);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 7px 8px;
+}
+
+.handoff-pack-route-readout span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.handoff-pack-route-readout strong {
+  color: #78f0c8;
+  font-size: 12px;
+}
+
+.handoff-pack-route-readout small {
+  color: rgba(244, 239, 231, 0.52);
+  font-size: 10px;
+  line-height: 1.25;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.handoff-pack-route-readout.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.065);
+}
+
+.handoff-pack-route-readout.warn strong {
+  color: #f0c36a;
+}
+
+.handoff-pack-route-readout.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.065);
+}
+
+.handoff-pack-route-readout.danger strong {
+  color: #ffb199;
 }
 
 .handoff-pack-grid {
