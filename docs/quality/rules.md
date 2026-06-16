@@ -269,6 +269,8 @@ Any product or architecture wording that promotes `AudioClipEvent`, sampler asse
 
 Any future optional-sampling schema must keep `NoteEvent`, `DrumHitEvent`, and automation sufficient for a complete beat, and must keep `AudioClipEvent` additive, opt-in, and outside the core MVP proof.
 
+Data model examples fail the product boundary if they add `AudioClipEvent` to the core `MusicalEvent` union or include `audio`/`sampler` in the MVP track union or default project track list before an explicit optional-sampling plan exists.
+
 Mixer/master work must keep mixing and mastering separate. Volume, pan, mute, solo, master output gain, and preset ceiling controls must affect both realtime playback and WAV export when implemented. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.
 
 Channel EQ work must keep low-cut/air controls in mixer state, migrate older project files safely, keep non-master track EQ separate from master processing, and make EQ values affect realtime playback, full-mix WAV export, and stem export.

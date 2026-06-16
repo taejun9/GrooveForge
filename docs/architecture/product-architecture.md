@@ -84,6 +84,8 @@ The core project model should make composition events first-class. In the core a
 - `Device`: synth, drum rack, EQ, compressor, saturation, limiter, meter, send effect.
 - `StyleProfile`: genre rules for BPM range, swing, density, quantize strength, humanization, bass style, and melody style.
 
+MVP type examples must not place `AudioClipEvent`, `audio`, or `sampler` beside the core event, clip, or track unions. Those names are reserved for the optional sampling extension section unless the user explicitly starts sampling-phase work.
+
 Sampling is an extension model, not a core dependency. When it is added, it can introduce audio clips, sampler devices, audio tracks, and source/license metadata without changing the requirement that a valid beat can be made from generated and performed events alone. Sampling architecture should attach to the beat workstation; it should not replace the workstation model. `AudioClipEvent` belongs in that extension layer, not in the core MVP `MusicalEvent` union.
 
 Optional sampling schemas must preserve the existing event-first contract: `NoteEvent`, `DrumHitEvent`, and automation stay sufficient for a complete beat, while any future `AudioClipEvent` remains additive, opt-in, and absent from the core MVP proof.
@@ -105,7 +107,7 @@ Initial track types:
 - `fx_return`
 - `master`
 
-MVP tracks should be `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master`.
+MVP tracks should be `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master`. `audio` and `sampler` must not appear in the MVP track union or default project track list.
 
 The MVP `fx_return` is a built-in Space send/return path for shared ambience. It is deterministic project processing, not plugin hosting, imported impulse responses, sample playback, or a sampling workflow.
 

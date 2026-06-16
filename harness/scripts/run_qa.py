@@ -189,6 +189,8 @@ TEXT_EXPECTATIONS = {
         "Sampling entry points, when added, should be opt-in secondary paths",
         "Any future sampler UI should be framed as an additional instrument or sound-source lane after direct composition exists",
         "The core model centers on editable musical events, not audio clips or a sampler asset graph",
+        "This is the core MVP event union.",
+        "Drafts must not add `AudioClipEvent` beside `NoteEvent`, `DrumHitEvent`, and `AutomationEvent` unless an optional-sampling phase has been explicitly approved.",
         "it means a pattern, MIDI, or automation container",
         "Local project save/load",
         "Key changes retarget Pattern A/B/C 808/bass, melody, and chord-root musical events",
@@ -465,6 +467,8 @@ TEXT_EXPECTATIONS = {
         "core clips are pattern, MIDI, or automation containers",
         "Any product or architecture wording that promotes `AudioClipEvent`, sampler assets, sample browsing, or chopping above editable musical events fails the product boundary",
         "Any future optional-sampling schema must keep `NoteEvent`, `DrumHitEvent`, and automation sufficient for a complete beat",
+        "Data model examples fail the product boundary if they add `AudioClipEvent` to the core `MusicalEvent` union",
+        "include `audio`/`sampler` in the MVP track union or default project track list before an explicit optional-sampling plan exists",
     ],
     "docs/architecture/product-architecture.md": [
         "The architecture follows a direct-composition pipeline first",
@@ -478,6 +482,7 @@ TEXT_EXPECTATIONS = {
         "SessionBrief",
         "bounded local artist, vibe, reference, and notes text for project intent and handoff context",
         "not an imported audio asset",
+        "MVP type examples must not place `AudioClipEvent`, `audio`, or `sampler` beside the core event, clip, or track unions.",
         "Sampling architecture should attach to the beat workstation",
         "`AudioClipEvent` belongs in that extension layer, not in the core MVP `MusicalEvent` union.",
         "Optional sampling schemas must preserve the existing event-first contract",
@@ -485,6 +490,7 @@ TEXT_EXPECTATIONS = {
         "Key and scale changes are composition edits over musical event data.",
         "sample browsing, chopping, sampler mapping, and audio warping belong behind explicit optional-sampling entry points",
         "Roadmap and architecture plans should treat `audio` and `sampler` as extension track types until the direct beat workstation is already useful.",
+        "`audio` and `sampler` must not appear in the MVP track union or default project track list.",
         "Extension track types for optional sampling, later:",
     ],
     "harness/scripts/run_qa.py": [
