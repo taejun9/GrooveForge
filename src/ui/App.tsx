@@ -583,6 +583,27 @@ type SoundFocusPreviewSummary = {
   tone: MixCoachTone;
 };
 
+type SoundFocusResultMetric = {
+  id: "preset" | "drums" | "bass" | "duck" | "synth" | "chords";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type SoundFocusResult = {
+  moveId: string;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: SoundFocusResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type DrumKitPadId = "clean" | "knock" | "dust" | "air";
 
 type DrumKitSoundParameter = "kickPunch" | "snareSnap" | "hatBrightness";
@@ -2461,6 +2482,7 @@ export function App(): ReactElement {
   const [bassMoveResult, setBassMoveResult] = useState<BassMoveResult | null>(null);
   const [melodyMoveResult, setMelodyMoveResult] = useState<MelodyMoveResult | null>(null);
   const [chordMoveResult, setChordMoveResult] = useState<ChordMoveResult | null>(null);
+  const [soundFocusResult, setSoundFocusResult] = useState<SoundFocusResult | null>(null);
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
@@ -2975,6 +2997,7 @@ export function App(): ReactElement {
     setBassMoveResult(null);
     setMelodyMoveResult(null);
     setChordMoveResult(null);
+    setSoundFocusResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -2991,6 +3014,7 @@ export function App(): ReactElement {
       setBassMoveResult(null);
       setMelodyMoveResult(null);
       setChordMoveResult(null);
+      setSoundFocusResult(null);
     }
     setProjectStatus(status);
   }
@@ -3082,6 +3106,7 @@ export function App(): ReactElement {
     setBassMoveResult(null);
     setMelodyMoveResult(null);
     setChordMoveResult(null);
+    setSoundFocusResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
   }
@@ -3103,6 +3128,7 @@ export function App(): ReactElement {
     setBassMoveResult(null);
     setMelodyMoveResult(null);
     setChordMoveResult(null);
+    setSoundFocusResult(null);
     setProjectStatus(status);
   }
 
@@ -3796,10 +3822,12 @@ export function App(): ReactElement {
   function applySoundFocusPad(padId: SoundFocusPadId): void {
     const pad = soundFocusPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
+      setSoundFocusResult(null);
       setProjectStatus("Sound focus pad not found");
       return;
     }
 
+    const beforeSound = projectRef.current.sound;
     const changed = updateProject((current) => {
       const sound = applySoundFocusPadToSound(current.sound, pad);
       return sameSoundDesign(current.sound, sound) ? current : { ...current, sound };
@@ -3809,7 +3837,9 @@ export function App(): ReactElement {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
+      setSoundFocusResult(createSoundFocusResult(pad, beforeSound, projectRef.current.sound));
     } else {
+      setSoundFocusResult(null);
       setProjectStatus(`${pad.label} sound focus already selected`);
     }
   }
@@ -6580,6 +6610,7 @@ export function App(): ReactElement {
             drumKitPads={drumKitPadOptions}
             focusPreview={soundFocusPreviewSummary}
             focusPads={soundFocusPadOptions}
+            focusResult={soundFocusResult}
             mode={project.mode}
             sound={project.sound}
             onChange={updateSoundDesign}
@@ -15528,6 +15559,54 @@ function createSoundFocusPreviewSummary(sound: SoundDesign, pads: SoundFocusPadO
   };
 }
 
+function createSoundFocusResult(pad: SoundFocusPadDefinition, beforeSound: SoundDesign, afterSound: SoundDesign): SoundFocusResult {
+  const presetMoves = beforeSound.preset === afterSound.preset ? 0 : 1;
+  const drumMoves = soundFocusGroupMoveCount(beforeSound, afterSound, ["kickPunch", "snareSnap", "hatBrightness"]);
+  const bassMoves = soundFocusGroupMoveCount(beforeSound, afterSound, ["bassDrive", "bassDecay"]);
+  const duckMoves = soundFocusGroupMoveCount(beforeSound, afterSound, ["sidechainDuck"]);
+  const synthMoves = soundFocusGroupMoveCount(beforeSound, afterSound, ["synthBrightness", "synthRelease"]);
+  const chordMoves = soundFocusGroupMoveCount(beforeSound, afterSound, ["chordWarmth", "chordWidth"]);
+  const metrics: SoundFocusResultMetric[] = [
+    createSoundFocusResultMetric("preset", "Preset", soundPresetLabel(beforeSound.preset), soundPresetLabel(afterSound.preset), presetMoves),
+    createSoundFocusResultMetric("drums", "Drums", soundFocusDrumLabel(beforeSound), soundFocusDrumLabel(afterSound), drumMoves),
+    createSoundFocusResultMetric("bass", "808", soundFocusBassLabel(beforeSound), soundFocusBassLabel(afterSound), bassMoves),
+    createSoundFocusResultMetric("duck", "Duck", soundFocusDuckLabel(beforeSound), soundFocusDuckLabel(afterSound), duckMoves),
+    createSoundFocusResultMetric("synth", "Synth", soundFocusSynthLabel(beforeSound), soundFocusSynthLabel(afterSound), synthMoves),
+    createSoundFocusResultMetric("chords", "Chords", soundFocusChordLabel(beforeSound), soundFocusChordLabel(afterSound), chordMoves)
+  ];
+  const changedGroups = [presetMoves, drumMoves, bassMoves, duckMoves, synthMoves, chordMoves].filter((count) => count > 0).length;
+  const changedParameters = soundFocusParameters.filter((parameter) => beforeSound[parameter] !== afterSound[parameter]).length;
+
+  return {
+    moveId: pad.id,
+    title: `${pad.label} Sound Focus applied`,
+    status: "Applied",
+    detail: pad.detail,
+    scope: "Built-in tone controls",
+    impact: `${changedParameters} parameters / ${changedGroups} groups`,
+    metrics,
+    auditionCue: "Loop Pattern A/B/C with drums, 808, Synth, and Chords active.",
+    nextCheck: "Use Studio tone controls for manual kick, 808, Synth, and Chord corrections.",
+    tone: changedGroups > 0 ? "good" : "warn"
+  };
+}
+
+function createSoundFocusResultMetric(
+  id: SoundFocusResultMetric["id"],
+  label: string,
+  before: string,
+  after: string,
+  changedEvents: number
+): SoundFocusResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: changedEvents === 0 ? "warn" : "good"
+  };
+}
+
 function soundFocusChangedParameters(sound: SoundDesign, pad: SoundFocusPadDefinition): SoundFocusParameter[] {
   return soundFocusParameters.filter((parameter) => {
     const value = pad.values[parameter];
@@ -15575,6 +15654,30 @@ function soundFocusParameterLabel(parameter: SoundFocusParameter): string {
 
 function soundFocusPreview(pad: SoundFocusPadDefinition): string {
   return `K ${compactUnitPercent(pad.values.kickPunch)} / 8 ${compactUnitPercent(pad.values.bassDrive)}`;
+}
+
+function soundFocusGroupMoveCount(beforeSound: SoundDesign, afterSound: SoundDesign, parameters: SoundFocusParameter[]): number {
+  return parameters.filter((parameter) => beforeSound[parameter] !== afterSound[parameter]).length;
+}
+
+function soundFocusDrumLabel(sound: SoundDesign): string {
+  return `K${compactUnitPercent(sound.kickPunch)}/S${compactUnitPercent(sound.snareSnap)}/H${compactUnitPercent(sound.hatBrightness)}`;
+}
+
+function soundFocusBassLabel(sound: SoundDesign): string {
+  return `D${compactUnitPercent(sound.bassDrive)}/Len${compactUnitPercent(sound.bassDecay)}`;
+}
+
+function soundFocusDuckLabel(sound: SoundDesign): string {
+  return compactUnitPercent(sound.sidechainDuck);
+}
+
+function soundFocusSynthLabel(sound: SoundDesign): string {
+  return `B${compactUnitPercent(sound.synthBrightness)}/R${compactUnitPercent(sound.synthRelease)}`;
+}
+
+function soundFocusChordLabel(sound: SoundDesign): string {
+  return `Wm${compactUnitPercent(sound.chordWarmth)}/Wd${compactUnitPercent(sound.chordWidth)}`;
 }
 
 function compactUnitPercent(value: number | undefined): string {
@@ -17097,6 +17200,7 @@ function SoundDesigner({
   drumKitPads,
   focusPreview,
   focusPads,
+  focusResult,
   mode,
   sound,
   onDrumKitPad,
@@ -17107,6 +17211,7 @@ function SoundDesigner({
   drumKitPads: DrumKitPadOption[];
   focusPreview: SoundFocusPreviewSummary;
   focusPads: SoundFocusPadOption[];
+  focusResult: SoundFocusResult | null;
   mode: ProjectState["mode"];
   sound: SoundDesign;
   onDrumKitPad: (pad: DrumKitPadId) => void;
@@ -17134,7 +17239,7 @@ function SoundDesigner({
         ))}
       </div>
       <DrumKitPads pads={drumKitPads} onApply={onDrumKitPad} />
-      <SoundFocusPads pads={focusPads} preview={focusPreview} onApply={onFocusPad} />
+      <SoundFocusPads pads={focusPads} preview={focusPreview} result={focusResult} onApply={onFocusPad} />
       <div className="sound-readout" aria-label="Sound design state">
         <span data-testid="sound-kick-readout">Kick {percentLabel(sound.kickPunch)}</span>
         <span data-testid="sound-bass-readout">808 {percentLabel(sound.bassDrive)}</span>
@@ -17245,10 +17350,12 @@ function DrumKitPads({
 function SoundFocusPads({
   pads,
   preview,
+  result,
   onApply
 }: {
   pads: SoundFocusPadOption[];
   preview: SoundFocusPreviewSummary;
+  result: SoundFocusResult | null;
   onApply: (pad: SoundFocusPadId) => void;
 }): ReactElement {
   return (
@@ -17269,6 +17376,7 @@ function SoundFocusPads({
         <small data-testid="sound-focus-preview-parameters">{preview.parameterLabel}</small>
         <small data-testid="sound-focus-preview-changes">{preview.changeLabel}</small>
       </div>
+      {result && <SoundFocusResultStrip result={result} />}
       <div className="sound-focus-row" aria-label="Sound Focus Pads">
         {pads.map((pad) => (
           <button
@@ -17283,6 +17391,48 @@ function SoundFocusPads({
             <small>{pad.changedCount} moves / {pad.detail}</small>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function SoundFocusResultStrip({ result }: { result: SoundFocusResult }): ReactElement {
+  return (
+    <div
+      className={`sound-focus-result ${result.tone}`}
+      data-result-sound-focus={result.moveId}
+      data-testid="sound-focus-result"
+      aria-live="polite"
+    >
+      <div className="sound-focus-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="sound-focus-result-title">{result.title}</strong>
+          <small data-testid="sound-focus-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="sound-focus-result-meta">
+        <span data-testid="sound-focus-result-status">{result.status}</span>
+        <span data-testid="sound-focus-result-scope">{result.scope}</span>
+        <span data-testid="sound-focus-result-impact">{result.impact}</span>
+      </div>
+      <div className="sound-focus-result-metrics" data-testid="sound-focus-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`sound-focus-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="sound-focus-result-followup" data-testid="sound-focus-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="sound-focus-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="sound-focus-result-next-check">{result.nextCheck}</em>
+        </span>
       </div>
     </div>
   );

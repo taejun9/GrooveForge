@@ -8112,6 +8112,160 @@ input[type="range"] {
   font-size: 10px;
 }
 
+.sound-focus-result {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.84fr) minmax(170px, 0.86fr) minmax(300px, 1.32fr);
+  gap: 7px;
+  align-items: stretch;
+  min-width: 0;
+  margin-block: 0 8px;
+  border: 1px solid rgba(120, 240, 200, 0.24);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px;
+}
+
+.sound-focus-result.warn {
+  border-color: rgba(255, 209, 102, 0.28);
+  background: rgba(255, 209, 102, 0.06);
+}
+
+.sound-focus-result-main,
+.sound-focus-result-meta,
+.sound-focus-result-metrics,
+.sound-focus-result-followup,
+.sound-focus-result-main span,
+.sound-focus-result-metrics span,
+.sound-focus-result-followup span {
+  min-width: 0;
+}
+
+.sound-focus-result-main,
+.sound-focus-result-meta,
+.sound-focus-result-metrics {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(244, 239, 231, 0.08);
+  border-radius: 6px;
+  background: rgba(244, 239, 231, 0.034);
+  padding: 7px;
+}
+
+.sound-focus-result-main {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.sound-focus-result-main svg {
+  color: #78f0c8;
+}
+
+.sound-focus-result.warn .sound-focus-result-main svg {
+  color: #ffd166;
+}
+
+.sound-focus-result-main span,
+.sound-focus-result-metrics span {
+  display: grid;
+  gap: 2px;
+}
+
+.sound-focus-result-main strong,
+.sound-focus-result-main small,
+.sound-focus-result-meta span,
+.sound-focus-result-metrics b,
+.sound-focus-result-metrics em,
+.sound-focus-result-followup b,
+.sound-focus-result-followup em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sound-focus-result-main strong {
+  color: #f4efe7;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sound-focus-result-main small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 9px;
+}
+
+.sound-focus-result-meta {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sound-focus-result-meta span {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 9px;
+}
+
+.sound-focus-result-meta span:first-child {
+  color: #78f0c8;
+  font-weight: 800;
+}
+
+.sound-focus-result.warn .sound-focus-result-meta span:first-child {
+  color: #ffd166;
+}
+
+.sound-focus-result-metrics {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.sound-focus-result-metrics span {
+  border-inline-start: 2px solid rgba(120, 240, 200, 0.42);
+  padding-inline-start: 6px;
+}
+
+.sound-focus-result-metrics span.warn {
+  border-inline-start-color: rgba(255, 209, 102, 0.44);
+}
+
+.sound-focus-result-metrics b {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.sound-focus-result-metrics em {
+  color: rgba(244, 239, 231, 0.82);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.sound-focus-result-followup {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sound-focus-result-followup span {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  border-block-start: 1px solid rgba(244, 239, 231, 0.08);
+  padding-block-start: 6px;
+}
+
+.sound-focus-result-followup b {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.sound-focus-result-followup em {
+  color: rgba(244, 239, 231, 0.76);
+  font-size: 10px;
+  font-style: normal;
+}
+
 .sound-focus-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -11020,6 +11174,10 @@ input[type="range"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .sound-focus-result {
+    grid-template-columns: 1fr;
+  }
+
   .mix-fix-preview {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -11243,6 +11401,13 @@ input[type="range"] {
   .sound-focus-preview {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+
+  .sound-focus-result,
+  .sound-focus-result-meta,
+  .sound-focus-result-metrics,
+  .sound-focus-result-followup {
+    grid-template-columns: 1fr;
   }
 
   .mix-fix-preview {
