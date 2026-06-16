@@ -25,17 +25,11 @@ The core flow is:
 BPM/key/style -> pattern programming -> drums -> 808/bass -> melody/chords -> sound design -> arrangement -> mixing -> mastering -> export
 ```
 
-Optional sampling path, later:
-
-```text
-sample import -> chop/slice -> pitch/stretch -> one-shot or sampler mapping
-```
-
-Sampling is a secondary add-on. It can be added later for users who want audio import, chopping, loop stretching, one-shot mapping, or sampler workflows, but it must not define the MVP, the first-run experience, or the core data model. It should enter as an optional sound source or instrument layer inside the beat workstation, not as the product's starting assumption. A complete GrooveForge beat must be possible with no imported audio.
+Sampling is not a parallel core flow. Later optional sampling may add audio import, chopping/slicing, pitch/stretch, one-shot mapping, or sampler instruments for users who want that workflow, but those items belong under future extension scope rather than beside the core beat-making path. It should enter as an optional sound source or instrument layer inside the beat workstation, not as the product's starting assumption. A complete GrooveForge beat must be possible with no imported audio.
 
 If a draft, screen, or roadmap has to choose what appears first, the answer is direct beat creation: pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sample browsing, chopping, and sampler setup are opt-in extension paths after the beat workstation core is useful.
 
-Sampling placement rule: the default empty project, first visible actions, MVP proof, primary navigation, and new plan titles must lead with editable musical events and beat-making controls. Sampling may appear only as a clearly labeled optional sound-source path unless the user explicitly changes the product direction.
+Sampling placement rule: the default empty project, first visible actions, MVP proof, primary navigation, and new plan titles must lead with editable musical events and beat-making controls. Sampling may appear only as a clearly labeled optional sound-source path unless the user explicitly changes the product direction, and sampling explanations must not be laid out as a co-equal second product spine.
 
 ## MVP Target
 
@@ -86,6 +80,7 @@ The first desktop runtime is an Electron + Vite + TypeScript app. It opens direc
 - Keep pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export ahead of sampling work.
 - Treat sample-free beat creation as the proof of the product: built-in drums, synth 808/bass, synth melody/chords, arrangement, mixer/master, and WAV/stem/MIDI export should work before optional sampling entry points become prominent.
 - Treat sample import, chopping, sampler tracks, and audio warping as P3/v2 optional modules unless a user-approved plan explicitly says otherwise.
+- Keep sampling mentions structurally subordinate to the beat-making core; do not place an optional sampling sequence next to the primary composition sequence as if both are equal starting workflows.
 - Keep first-run UI and default navigation focused on making beats across genres, not on finding or slicing samples.
 - Keep default screens, plan titles, and roadmap ordering anchored to editable musical events; do not let sample browsing, chopping, or sampler setup become the first task a user sees.
 - Keep sensitive real user, customer, credential, and production data out of samples, tests, docs, and screenshots.

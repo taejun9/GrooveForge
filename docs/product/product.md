@@ -45,7 +45,7 @@ Primary navigation and the first empty project should expose beat-making control
 
 Any future sampler UI should be framed as an additional instrument or sound-source lane after direct composition exists, not as the first screen, first task, or reason the project file exists.
 
-Sampling placement rule: the default empty project, first visible actions, MVP proof, primary navigation, onboarding language, and plan titles must start from editable musical events and beat-making controls. Optional sampling can add sound sources later, but it must not be the first required action, first proof of value, or default explanation of what GrooveForge is.
+Sampling placement rule: the default empty project, first visible actions, MVP proof, primary navigation, onboarding language, and plan titles must start from editable musical events and beat-making controls. Optional sampling can add sound sources later, but it must not be the first required action, first proof of value, default explanation of what GrooveForge is, or a co-equal product spine beside direct composition.
 
 ## Users
 
@@ -64,11 +64,7 @@ BPM/key/style -> pattern programming -> drum pattern -> 808/bass line -> melody/
 
 This loop is the product spine for all supported genres. Style presets may change BPM, swing, density, sound posture, and event blueprints, but they should still produce editable drums, 808/bass, melody/chords, arrangement, mixer/master, and export state without requiring samples.
 
-Optional sampling path, later:
-
-```text
-audio sample import -> chop/slice -> pitch/stretch -> one-shot or sampler mapping
-```
+Sampling is a later optional extension, not the second core product loop. Future sampling scope may include audio import, chopping/slicing, pitch/stretch, one-shot mapping, and sampler instruments, but product drafts should keep that list under extension planning after the direct beat workstation is already useful.
 
 Primary feature areas:
 

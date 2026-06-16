@@ -257,6 +257,8 @@ First-run UX, default navigation, and roadmap work must lead with direct beat co
 
 Sampling placement work fails if the default empty project, first visible action, MVP proof, primary navigation, onboarding language, priority table, or plan title makes sample browsing, sample import, chopping, sampler setup, or audio clips appear before editable musical events and beat-making controls.
 
+Sampling placement work also fails if product drafts, README sections, architecture diagrams, or roadmap summaries present an optional sampling sequence as a co-equal product spine beside the direct beat-composition sequence. Sampling references must stay structurally subordinate to the all-genre beat-making core unless the user explicitly starts an optional-sampling phase.
+
 Docs that mention clips before optional sampling is implemented must clarify that core clips are pattern, MIDI, or automation containers, not imported audio assets.
 
 Any new plan that mentions sample import, chopping, sampler tracks, or audio warping must explicitly mark that work as optional sampling-phase work or document the user-approved exception in its Decision Log.
