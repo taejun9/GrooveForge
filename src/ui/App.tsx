@@ -1024,6 +1024,8 @@ type ComposerActionResult = {
   scope: string;
   impact: string;
   safety: string;
+  auditionCue: string;
+  nextCheck: string;
   tone: MixCoachTone;
   metrics: ComposerActionResultMetric[];
 };
@@ -6221,6 +6223,16 @@ function ComposerActionResultStrip({ result }: { result: ComposerActionResult })
           </span>
         ))}
       </div>
+      <div className="composer-action-result-followup" data-testid="composer-action-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="composer-action-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="composer-action-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
     </div>
   );
 }
@@ -8340,6 +8352,7 @@ function createComposerActionResult(
     };
   });
   const changed = beforeProject !== afterProject || metrics.some((metric) => metric.before !== metric.after);
+  const followup = composerActionFollowupCues(action, afterProject);
 
   return {
     actionId: action.id,
@@ -8349,9 +8362,54 @@ function createComposerActionResult(
     scope: action.scope,
     impact: action.impact,
     safety: action.safety,
+    auditionCue: followup.auditionCue,
+    nextCheck: followup.nextCheck,
     tone: changed ? "good" : "warn",
     metrics
   };
+}
+
+function composerActionFollowupCues(
+  action: ComposerAction,
+  project: ProjectState
+): { auditionCue: string; nextCheck: string } {
+  const pattern = activePattern(project);
+  const target = activeDeliveryTarget(project);
+
+  switch (action.area) {
+    case "drums":
+      return {
+        auditionCue: `Loop Pattern ${project.selectedPattern}; check kick/clap against hat motion.`,
+        nextCheck: `${drumHitCount(pattern)} drum hits now; check 808 support before adding melody.`
+      };
+    case "bass":
+      return {
+        auditionCue: `Loop Pattern ${project.selectedPattern}; hear 808 against the kick.`,
+        nextCheck: `${pattern.bassNotes.filter((note) => note.glide).length} glide notes now; leave room before melody.`
+      };
+    case "harmony":
+      return {
+        auditionCue: `Loop Pattern ${project.selectedPattern}; hear chords under 808 and Synth.`,
+        nextCheck: `${chordMotionLabel(pattern.chordEvents)} motion; confirm hook notes stay in key.`
+      };
+    case "melody":
+      return {
+        auditionCue: `Loop Pattern ${project.selectedPattern}; hear the Synth motif against chords.`,
+        nextCheck: `${pattern.melodyNotes.length} Synth notes now; check hook contrast before arranging.`
+      };
+    case "arrange":
+      return {
+        auditionCue: `Play Song loop; scan ${barCountLabel(arrangementTotalBars(project))} form.`,
+        nextCheck: `${project.arrangement.length} blocks now; compare against ${target.name}.`
+      };
+    case "finish": {
+      const analysis = analyzeExport(project);
+      return {
+        auditionCue: `Play full mix; watch ${formatDb(analysis.headroomDb)} headroom.`,
+        nextCheck: `${project.masterPreset} selected; export only after Mix Coach is clear.`
+      };
+    }
+  }
 }
 
 function composerActionResultMetricSnapshots(
