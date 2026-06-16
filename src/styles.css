@@ -4774,7 +4774,7 @@ input[type="range"] {
 
 .capture-defaults {
   display: grid;
-  grid-template-columns: minmax(92px, 0.42fr) minmax(120px, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 8px;
   align-items: stretch;
 }

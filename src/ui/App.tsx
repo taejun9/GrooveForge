@@ -1430,6 +1430,7 @@ type KeyboardCaptureKeyMapItem = {
   pitch: string | null;
 };
 type KeyboardCaptureDefaults = {
+  octave: number;
   length: number;
   velocity: number;
   glide: boolean;
@@ -1770,8 +1771,8 @@ export function App(): ReactElement {
   const [keyboardCaptureEnabled, setKeyboardCaptureEnabled] = useState(false);
   const [keyboardCaptureTarget, setKeyboardCaptureTarget] = useState<NoteTrack>("bass");
   const [keyboardCaptureDefaults, setKeyboardCaptureDefaults] = useState<Record<NoteTrack, KeyboardCaptureDefaults>>({
-    bass: { length: 2, velocity: 0.68, glide: false },
-    melody: { length: 1, velocity: 0.68, glide: false }
+    bass: { octave: 1, length: 2, velocity: 0.68, glide: false },
+    melody: { octave: 4, length: 1, velocity: 0.68, glide: false }
   });
   const [selectedDrumStep, setSelectedDrumStep] = useState<SelectedDrumStep | null>(null);
   const [drumClipboard, setDrumClipboard] = useState<DrumClipboard | null>(null);
@@ -1907,11 +1908,11 @@ export function App(): ReactElement {
     () => mergePitchLanes(melodyPitchLanes(project.key), currentPattern.melodyNotes.map((note) => note.pitch)),
     [currentPattern.melodyNotes, project.key]
   );
-  const keyboardCaptureKeyMap = useMemo(
-    () => createKeyboardCaptureKeyMap(keyboardCaptureTarget === "bass" ? bassPitchLanes(project.key) : melodyPitchLanes(project.key)),
-    [keyboardCaptureTarget, project.key]
-  );
   const activeKeyboardCaptureDefaults = keyboardCaptureDefaults[keyboardCaptureTarget];
+  const keyboardCaptureKeyMap = useMemo(
+    () => createKeyboardCaptureKeyMap(keyboardCapturePitchLanes(project.key, keyboardCaptureTarget, activeKeyboardCaptureDefaults)),
+    [activeKeyboardCaptureDefaults, keyboardCaptureTarget, project.key]
+  );
   const basslinePadOptions = useMemo(() => createBasslinePadOptions(project.key), [project.key]);
   const bassGlidePadOptions = useMemo(() => createBassGlidePadOptions(currentPattern.bassNotes), [currentPattern.bassNotes]);
   const bassContourOptions = useMemo(
@@ -2394,6 +2395,10 @@ export function App(): ReactElement {
         [keyboardCaptureTarget]: {
           ...targetDefaults,
           ...update,
+          octave:
+            update.octave === undefined
+              ? targetDefaults.octave
+              : clampKeyboardCaptureOctave(keyboardCaptureTarget, update.octave),
           length: update.length === undefined ? targetDefaults.length : clampStepLength(update.length),
           velocity: update.velocity === undefined ? targetDefaults.velocity : clampVelocity(update.velocity)
         }
@@ -3374,16 +3379,13 @@ export function App(): ReactElement {
     const current = projectRef.current;
     const pattern = activePattern(current);
     const target = keyboardCaptureTarget;
-    const pitch = keyboardCapturePitchForKey(
-      key,
-      target === "bass" ? bassPitchLanes(current.key) : melodyPitchLanes(current.key)
-    );
+    const captureDefaults = keyboardCaptureDefaults[target];
+    const pitch = keyboardCapturePitchForKey(key, keyboardCapturePitchLanes(current.key, target, captureDefaults));
     if (!pitch) {
       setProjectStatus("Keyboard Capture key is out of range");
       return;
     }
 
-    const captureDefaults = keyboardCaptureDefaults[target];
     const step = nextKeyboardCaptureStep(
       pattern,
       target,
@@ -12420,6 +12422,7 @@ function KeyboardCapturePanel({
     ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}`
     : "None";
   const velocityPercent = Math.round(defaults.velocity * 100);
+  const [minOctave, maxOctave] = trackOctaveRange(target);
 
   return (
     <div className="keyboard-capture" data-testid="keyboard-capture">
@@ -12467,6 +12470,18 @@ function KeyboardCapturePanel({
         </div>
       </div>
       <div className="capture-defaults" aria-label="Keyboard Capture defaults">
+        <label className="capture-default-field">
+          <span>Octave</span>
+          <input
+            data-testid="keyboard-capture-octave"
+            max={maxOctave}
+            min={minOctave}
+            onChange={(event) => onDefaultsChange({ octave: Number(event.currentTarget.value) })}
+            step={1}
+            type="number"
+            value={defaults.octave}
+          />
+        </label>
         <label className="capture-default-field">
           <span>Length</span>
           <input
@@ -13440,6 +13455,18 @@ function createKeyboardCaptureKeyMap(pitches: string[]): KeyboardCaptureKeyMapIt
 
 function keyboardCapturePitchForKey(key: KeyboardCaptureKey, pitches: string[]): string | null {
   return pitches[keyboardCaptureKeys.indexOf(key)] ?? null;
+}
+
+function keyboardCapturePitchLanes(key: string, track: NoteTrack, defaults: KeyboardCaptureDefaults): string[] {
+  return scalePitches(key, clampKeyboardCaptureOctave(track, defaults.octave));
+}
+
+function clampKeyboardCaptureOctave(track: NoteTrack, octave: number): number {
+  const [minOctave, maxOctave] = trackOctaveRange(track);
+  if (!Number.isFinite(octave)) {
+    return track === "bass" ? 1 : 4;
+  }
+  return Math.min(maxOctave, Math.max(minOctave, Math.round(octave)));
 }
 
 function isKeyboardCaptureKey(key: string): key is KeyboardCaptureKey {
