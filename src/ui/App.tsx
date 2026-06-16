@@ -840,6 +840,25 @@ type NextMoveAction = {
   command: NextMoveCommand;
 };
 
+type NextMoveResultMetric = {
+  id: string;
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type NextMoveResult = {
+  actionId: string;
+  title: string;
+  status: string;
+  detail: string;
+  metric: NextMoveResultMetric;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type BeatMapStage = {
   id: string;
   label: string;
@@ -1626,6 +1645,7 @@ export function App(): ReactElement {
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [quickActionQuery, setQuickActionQuery] = useState("");
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
+  const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const projectRef = useRef<ProjectState>(starterProject);
   const controllerRef = useRef<PlaybackController | null>(null);
@@ -1959,6 +1979,7 @@ export function App(): ReactElement {
     setRedoStack([]);
     setProject(nextProject);
     setComposerActionResult(null);
+    setNextMoveResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -1983,6 +2004,7 @@ export function App(): ReactElement {
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
     setComposerActionResult(null);
+    setNextMoveResult(null);
     setProjectStatus(status);
   }
 
@@ -1995,6 +2017,7 @@ export function App(): ReactElement {
     setSelectedChordIndex(null);
     setPlaybackPosition(null);
     setComposerActionResult(null);
+    setNextMoveResult(null);
     setProjectStatus(status);
   }
 
@@ -4003,39 +4026,41 @@ export function App(): ReactElement {
   }
 
   function runNextMove(action: NextMoveAction): void {
+    const beforeProject = projectRef.current;
     switch (action.command.kind) {
       case "blueprint":
         applySelectedBeatBlueprint(action.command.blueprintId);
-        return;
+        break;
       case "patternFill":
         applyPatternFill(action.command.preset);
-        return;
+        break;
       case "arrangementMove":
         applyArrangementMoveToSelected(action.command.preset);
-        return;
+        break;
       case "patternChain":
         applyPatternChain(action.command.chain);
-        return;
+        break;
       case "chainExpand":
         expandPatternChain();
-        return;
+        break;
       case "arrangementTemplate":
         applyArrangementTemplate(action.command.template);
-        return;
+        break;
       case "deliveryTarget":
         alignDeliveryTarget(action.command.target);
-        return;
+        break;
       case "masterFinish":
         applyMasterFinishPad(action.command.pad);
-        return;
+        break;
       case "snapshot":
         saveCurrentSnapshot();
-        return;
+        break;
       case "reviewMix":
         masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
         setProjectStatus("Review Mix Coach");
-        return;
+        break;
     }
+    setNextMoveResult(createNextMoveResult(action, beforeProject, projectRef.current));
   }
 
   function runComposerAction(action: ComposerAction): void {
@@ -4379,7 +4404,7 @@ export function App(): ReactElement {
 
       <SongFormOverview summary={songFormOverviewSummary} onSelectBlock={selectArrangementBlock} />
 
-      <NextMove actions={nextMoveActions} onRun={runNextMove} />
+      <NextMove actions={nextMoveActions} result={nextMoveResult} onRun={runNextMove} />
 
       <ProjectSnapshots
         nameDrafts={snapshotNameDrafts}
@@ -6542,9 +6567,11 @@ function SongFormOverview({
 
 function NextMove({
   actions,
+  result,
   onRun
 }: {
   actions: NextMoveAction[];
+  result: NextMoveResult | null;
   onRun: (action: NextMoveAction) => void;
 }): ReactElement {
   const [primaryAction, ...secondaryActions] = actions;
@@ -6583,7 +6610,36 @@ function NextMove({
           </button>
         ))}
       </div>
+      {result && <NextMoveResultStrip result={result} />}
     </section>
+  );
+}
+
+function NextMoveResultStrip({ result }: { result: NextMoveResult }): ReactElement {
+  return (
+    <div className={`next-move-result ${result.tone}`} data-testid="next-move-result" aria-live="polite">
+      <div className="next-move-result-main">
+        <span data-testid="next-move-result-status">{result.status}</span>
+        <strong data-testid="next-move-result-title">{result.title}</strong>
+        <small data-testid="next-move-result-detail">{result.detail}</small>
+      </div>
+      <div className={`next-move-result-metric ${result.metric.tone}`} data-testid="next-move-result-metric">
+        <span>{result.metric.label}</span>
+        <strong data-testid="next-move-result-metric-value">
+          {result.metric.before} -&gt; {result.metric.after}
+        </strong>
+      </div>
+      <div className="next-move-result-followup" data-testid="next-move-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="next-move-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="next-move-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -6885,6 +6941,140 @@ function nextMoveIcon(action: NextMoveAction): ReactElement {
     case "blueprint":
     case "patternFill":
       return <Sparkles size={14} aria-hidden="true" />;
+  }
+}
+
+function createNextMoveResult(
+  action: NextMoveAction,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): NextMoveResult {
+  const beforeMetric = nextMoveResultMetricSnapshot(beforeProject, action);
+  const afterMetric = nextMoveResultMetricSnapshot(afterProject, action);
+  const metric: NextMoveResultMetric = {
+    id: afterMetric.id,
+    label: afterMetric.label,
+    before: beforeMetric.value,
+    after: afterMetric.value,
+    tone: beforeMetric.value === afterMetric.value ? "warn" : "good"
+  };
+  const changed = beforeProject !== afterProject || metric.before !== metric.after;
+  const followup = nextMoveResultFollowup(action, afterProject);
+
+  return {
+    actionId: action.id,
+    title: `${action.buttonLabel} ${changed ? "applied" : "checked"}`,
+    status: changed ? "Applied" : "Checked",
+    detail: action.title,
+    metric,
+    auditionCue: followup.auditionCue,
+    nextCheck: followup.nextCheck,
+    tone: changed ? "good" : action.tone
+  };
+}
+
+function nextMoveResultMetricSnapshot(
+  project: ProjectState,
+  action: NextMoveAction
+): { id: string; label: string; value: string } {
+  switch (action.command.kind) {
+    case "blueprint":
+      return { id: "project-events", label: "Project events", value: `${projectEventTotal(project)} events` };
+    case "patternFill":
+      return {
+        id: "pattern-events",
+        label: `Pattern ${project.selectedPattern}`,
+        value: `${patternEventTotal(activePattern(project))} events`
+      };
+    case "arrangementMove":
+      return {
+        id: "song-energy",
+        label: "Song energy",
+        value: `${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
+      };
+    case "patternChain":
+    case "chainExpand":
+    case "arrangementTemplate":
+      return { id: "song-length", label: "Song length", value: barCountLabel(arrangementTotalBars(project)) };
+    case "deliveryTarget":
+      return {
+        id: "target",
+        label: "Target",
+        value: `${activeDeliveryTarget(project).name} / ${barCountLabel(arrangementTotalBars(project))}`
+      };
+    case "masterFinish":
+      return { id: "master", label: "Master", value: `${project.masterPreset} / ${formatDb(project.masterCeilingDb)}` };
+    case "snapshot":
+      return { id: "snapshots", label: "Snapshots", value: `${project.snapshots.length} slots` };
+    case "reviewMix": {
+      const analysis = analyzeExport(project);
+      return { id: "export", label: "Export", value: `${analysis.status} / ${formatDb(analysis.headroomDb)}` };
+    }
+  }
+}
+
+function nextMoveResultFollowup(
+  action: NextMoveAction,
+  project: ProjectState
+): { auditionCue: string; nextCheck: string } {
+  const target = activeDeliveryTarget(project);
+  const pattern = activePattern(project);
+
+  switch (action.command.kind) {
+    case "blueprint":
+      return {
+        auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, chords, and Synth together.`,
+        nextCheck: `${patternEventTotal(pattern)} Pattern ${project.selectedPattern} events now; move to Pattern Chain when the hook works.`
+      };
+    case "patternFill":
+      return {
+        auditionCue: `Loop Pattern ${project.selectedPattern}; listen to the final bar turn.`,
+        nextCheck: `${patternEventTotal(pattern)} events now; compare Pattern A/B/C before arranging.`
+      };
+    case "arrangementMove":
+      return {
+        auditionCue: "Loop selected Block; hear energy and mute contrast in context.",
+        nextCheck: `${Math.round(arrangementAverageEnergy(project) * 100)}% average energy; scan Song Form next.`
+      };
+    case "patternChain":
+      return {
+        auditionCue: "Play Song loop; hear A/B/C pattern contrast across 8 bars.",
+        nextCheck: `${project.arrangement.length} blocks now; expand when verse/hook shape is clear.`
+      };
+    case "chainExpand":
+      return {
+        auditionCue: "Play Song loop; scan intro, verse, hook, bridge, and outro flow.",
+        nextCheck: `${barCountLabel(arrangementTotalBars(project))} now; compare against ${target.name}.`
+      };
+    case "arrangementTemplate":
+      return {
+        auditionCue: "Play Song loop; check section order and hook placement.",
+        nextCheck: `${barCountLabel(arrangementTotalBars(project))} arranged; adjust block energy before mix.`
+      };
+    case "deliveryTarget":
+      return {
+        auditionCue: "Play Song loop; judge length and master posture against the target.",
+        nextCheck: `${target.name} target active; confirm stems and handoff context.`
+      };
+    case "masterFinish": {
+      const analysis = analyzeExport(project);
+      return {
+        auditionCue: `Play full mix; watch ${formatDb(analysis.headroomDb)} headroom.`,
+        nextCheck: `${project.masterPreset} selected; use Mix Coach before exporting.`
+      };
+    }
+    case "snapshot":
+      return {
+        auditionCue: "Keep current loop playing only if you want to compare this saved state.",
+        nextCheck: `${project.snapshots.length}/${maxProjectSnapshots} idea slots saved; use Snapshot Compare before major changes.`
+      };
+    case "reviewMix": {
+      const analysis = analyzeExport(project);
+      return {
+        auditionCue: "Read Mix Coach, then play the full mix if a check needs attention.",
+        nextCheck: `${analysis.status} export scan; use an explicit Mix Fix if needed.`
+      };
+    }
   }
 }
 
@@ -9106,6 +9296,18 @@ function patternEventTotal(pattern: PatternData): number {
     0
   );
   return drumHits + repeatedHats + pattern.bassNotes.length + pattern.melodyNotes.length + pattern.chordEvents.length;
+}
+
+function projectEventTotal(project: ProjectState): number {
+  return patternSlots.reduce((total, slot) => total + patternEventTotal(project.patterns[slot]), 0);
+}
+
+function arrangementAverageEnergy(project: ProjectState): number {
+  if (project.arrangement.length === 0) {
+    return 0;
+  }
+  const energyTotal = project.arrangement.reduce((total, block) => total + block.energy, 0);
+  return energyTotal / project.arrangement.length;
 }
 
 function structureHookSignal(project: ProjectState): StructureLensSignal {
