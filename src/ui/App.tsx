@@ -1155,12 +1155,20 @@ type ProductionSnapshotSummary = {
 };
 
 type KeyCompassCardId = "scale" | "chords" | "bass" | "melody" | "focus";
+type KeyCompassFocusId = KeyCompassCardId;
+type KeyCompassFocusTarget = "compose";
 
-type KeyCompassCard = {
-  id: KeyCompassCardId;
+type KeyCompassFocusItem = {
+  focusId: KeyCompassFocusId;
   label: string;
   value: string;
   detail: string;
+  focusTarget: KeyCompassFocusTarget;
+  focusLabel: "Compose";
+};
+
+type KeyCompassCard = KeyCompassFocusItem & {
+  id: KeyCompassCardId;
   tone: MixCoachTone;
 };
 
@@ -1170,6 +1178,15 @@ type KeyCompassSummary = {
   tone: MixCoachTone;
   scaleNotes: string[];
   cards: KeyCompassCard[];
+};
+
+type KeyCompassFocusSummary = {
+  focusId: KeyCompassFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
 };
 
 type GrooveCompassCardId = "density" | "anchors" | "hats" | "timing" | "chance" | "focus";
@@ -2065,6 +2082,7 @@ export function App(): ReactElement {
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
+  const [keyCompassFocusId, setKeyCompassFocusId] = useState<KeyCompassFocusId | null>(null);
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
   const [styleInspectorFocusId, setStyleInspectorFocusId] = useState<StyleInspectorFocusId | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
@@ -5103,6 +5121,16 @@ export function App(): ReactElement {
     setProjectStatus(`Guide ${card.label}: ${card.status}`);
   }
 
+  function focusKeyCompassItem(item: KeyCompassFocusItem): void {
+    const targetRefs: Record<KeyCompassFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current
+    };
+
+    setKeyCompassFocusId(item.focusId);
+    targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Key ${item.label}: ${item.value}`);
+  }
+
   function focusPatternDnaCard(card: PatternDnaCard): void {
     const targetRefs: Record<PatternDnaFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5521,7 +5549,7 @@ export function App(): ReactElement {
         summary={styleInspectorSummary}
       />
 
-      <KeyCompass summary={keyCompassSummary} />
+      <KeyCompass focusedCardId={keyCompassFocusId} onFocus={focusKeyCompassItem} summary={keyCompassSummary} />
 
       <GrooveCompass summary={grooveCompassSummary} />
 
@@ -7661,7 +7689,17 @@ function ProductionSnapshot({ summary }: { summary: ProductionSnapshotSummary })
   );
 }
 
-function KeyCompass({ summary }: { summary: KeyCompassSummary }): ReactElement {
+function KeyCompass({
+  focusedCardId,
+  onFocus,
+  summary
+}: {
+  focusedCardId: KeyCompassFocusId | null;
+  onFocus: (item: KeyCompassFocusItem) => void;
+  summary: KeyCompassSummary;
+}): ReactElement {
+  const focusSummary = createKeyCompassFocusSummary(summary, focusedCardId);
+
   return (
     <section className={`key-compass ${summary.tone}`} data-testid="key-compass" aria-label="Key compass">
       <div className="key-compass-heading">
@@ -7680,14 +7718,38 @@ function KeyCompass({ summary }: { summary: KeyCompassSummary }): ReactElement {
             </span>
           ))}
         </div>
+        <div className={`key-compass-focus-readout ${focusSummary.tone}`} data-testid="key-compass-focus-readout" title={focusSummary.detailTitle}>
+          <span data-testid="key-compass-focus-status">{focusSummary.statusLabel}</span>
+          <strong data-testid="key-compass-focus-label">{focusSummary.areaLabel}</strong>
+          <small data-testid="key-compass-focus-detail">{focusSummary.detailLabel}</small>
+        </div>
         <div className="key-compass-grid" data-testid="key-compass-grid">
-          {summary.cards.map((card) => (
-            <div className={`key-compass-card ${card.tone}`} data-testid={`key-compass-${card.id}`} key={card.id}>
-              <span>{card.label}</span>
-              <strong>{card.value}</strong>
-              <small>{card.detail}</small>
-            </div>
-          ))}
+          {summary.cards.map((card) => {
+            const focused = focusedCardId === card.focusId;
+            return (
+              <div
+                className={["key-compass-card", card.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+                data-focused={focused ? "true" : "false"}
+                data-testid={`key-compass-${card.id}`}
+                key={card.id}
+              >
+                <span>{card.label}</span>
+                <strong>{card.value}</strong>
+                <button
+                  aria-pressed={focused}
+                  className="key-compass-focus-button"
+                  data-testid={`key-compass-focus-${card.id}`}
+                  onClick={() => onFocus(card)}
+                  title={`Focus ${card.focusLabel}: ${card.value}`}
+                  type="button"
+                >
+                  <ArrowRight size={13} aria-hidden="true" />
+                  <span>{card.focusLabel}</span>
+                </button>
+                <small>{card.detail}</small>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -10674,39 +10736,51 @@ function createKeyCompassSummary(
   const cards: KeyCompassCard[] = [
     {
       id: "scale",
+      focusId: "scale",
       label: "Scale",
       value: scaleNotes.join(" "),
       detail: `${scaleNotes.length} safe notes for Pattern ${project.selectedPattern}`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: "good"
     },
     {
       id: "chords",
+      focusId: "chords",
       label: "Chords",
       value: keyCompassChordMotion(project.key, pattern.chordEvents),
       detail:
         chordRootWarnings > 0
           ? `${chordRootWarnings} root outside scale`
           : `${pattern.chordEvents.length} chord events in Pattern ${project.selectedPattern}`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: chordTone
     },
     {
       id: "bass",
+      focusId: "bass",
       label: "808/Bass",
       value: keyCompassPitchSpread(pattern.bassNotes.map((note) => note.pitch)),
       detail:
         bassWarnings > 0
           ? `${bassWarnings} bass notes outside scale`
           : `${pattern.bassNotes.length} notes / ${keyCompassStepSpread(pattern.bassNotes.map((note) => note.step))}`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: bassTone
     },
     {
       id: "melody",
+      focusId: "melody",
       label: "Melody",
       value: keyCompassPitchSpread(pattern.melodyNotes.map((note) => note.pitch)),
       detail:
         melodyWarnings > 0
           ? `${melodyWarnings} melody notes outside scale`
           : `${pattern.melodyNotes.length} notes / ${keyCompassStepSpread(pattern.melodyNotes.map((note) => note.step))}`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: melodyTone
     },
     focusCard
@@ -10718,6 +10792,34 @@ function createKeyCompassSummary(
     tone: weakestTone(cards.map((card) => card.tone)),
     scaleNotes,
     cards
+  };
+}
+
+function createKeyCompassFocusSummary(summary: KeyCompassSummary, focusedCardId: KeyCompassFocusId | null): KeyCompassFocusSummary {
+  const focusedCard = focusedCardId ? summary.cards.find((card) => card.focusId === focusedCardId) ?? null : null;
+  const card = focusedCard ?? summary.cards[0] ?? null;
+
+  if (!card) {
+    return {
+      focusId: null,
+      statusLabel: "Key clear",
+      areaLabel: "No key focus",
+      detailLabel: "No Key Compass cards available",
+      detailTitle: "Key Compass has no focusable cards.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel = focusedCard ? "Focused Key" : "Key Focus";
+  const detailLabel = `${card.focusLabel} panel / ${card.detail}`;
+
+  return {
+    focusId: card.focusId,
+    statusLabel,
+    areaLabel: `${card.label}: ${card.value}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
+    tone: card.tone
   };
 }
 
@@ -11580,9 +11682,12 @@ function keyCompassFocusCard(
     const degree = keyCompassScaleDegreeLabel(project.key, selectedChord.root);
     return {
       id: "focus",
+      focusId: "focus",
       label: "Focus",
       value: `${degree} ${selectedChord.root} ${selectedChord.quality}`,
       detail: `Step ${selectedChord.step + 1} / ${selectedChord.length} step length / ${chordInversionLabel(normalizeChordInversion(selectedChord.inversion))}`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: keyCompassScaleDegree(project.key, selectedChord.root) === null ? "warn" : "good"
     };
   }
@@ -11592,9 +11697,12 @@ function keyCompassFocusCard(
     const trackLabel = selectedNote.track === "bass" ? "808" : "Synth";
     return {
       id: "focus",
+      focusId: "focus",
       label: "Focus",
       value: `${trackLabel} ${selectedNote.pitch}`,
       detail: `${degree} / Step ${selectedNote.step + 1}`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: keyCompassPitchInKey(project.key, selectedNote.pitch) ? "good" : "warn"
     };
   }
@@ -11602,18 +11710,24 @@ function keyCompassFocusCard(
   if (selectedDrumStep) {
     return {
       id: "focus",
+      focusId: "focus",
       label: "Focus",
       value: `${drumLabels[selectedDrumStep.lane]} step`,
       detail: `Step ${selectedDrumStep.step + 1} selected / harmony unchanged`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: "warn"
     };
   }
 
   return {
     id: "focus",
+    focusId: "focus",
     label: "Focus",
     value: `Pattern ${project.selectedPattern}`,
     detail: "Select a note or chord for degree context",
+    focusTarget: "compose",
+    focusLabel: "Compose",
     tone: "warn"
   };
 }
