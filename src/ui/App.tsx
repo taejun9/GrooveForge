@@ -235,6 +235,14 @@ const mixBalancePadDefinitions: MixBalancePadDefinition[] = [
   }
 ];
 
+const stemAuditionPadDefinitions: StemAuditionPadDefinition[] = [
+  { id: "full", label: "Full", detail: "all stems", trackId: null },
+  { id: "drum_rack", label: "Drums", detail: "rhythm", trackId: "drum_rack" },
+  { id: "bass_808", label: "808", detail: "low end", trackId: "bass_808" },
+  { id: "synth", label: "Synth", detail: "lead", trackId: "synth" },
+  { id: "chord", label: "Chords", detail: "harmony", trackId: "chord" }
+];
+
 const soundFocusPadDefinitions: SoundFocusPadDefinition[] = [
   {
     id: "punch",
@@ -431,6 +439,21 @@ type MixBalancePadDefinition = {
 };
 
 type MixBalancePadOption = MixBalancePadDefinition & {
+  preview: string;
+  changedCount: number;
+};
+
+type StemAuditionPadId = "full" | StemTrackId;
+
+type StemAuditionPadDefinition = {
+  id: StemAuditionPadId;
+  label: string;
+  detail: string;
+  trackId: StemTrackId | null;
+};
+
+type StemAuditionPadOption = StemAuditionPadDefinition & {
+  active: boolean;
   preview: string;
   changedCount: number;
 };
@@ -1319,6 +1342,7 @@ export function App(): ReactElement {
   }, [project.mixer]);
   const activeChannelLabel = `${activeChannels} active ${activeChannels === 1 ? "channel" : "channels"}`;
   const mixBalancePadOptions = useMemo(() => createMixBalancePadOptions(project.mixer), [project.mixer]);
+  const stemAuditionPadOptions = useMemo(() => createStemAuditionPadOptions(project.mixer), [project.mixer]);
   const soundFocusPadOptions = useMemo(() => createSoundFocusPadOptions(project.sound), [project.sound]);
   const drumKitPadOptions = useMemo(() => createDrumKitPadOptions(project), [project]);
   const masterFinishPadOptions = useMemo(() => createMasterFinishPadOptions(project), [project]);
@@ -2160,6 +2184,23 @@ export function App(): ReactElement {
       (current) => applyMixFixToProject(current, preset, stemSnapshot),
       `Applied ${mixFixPresetLabel(preset)} mix fix`
     );
+  }
+
+  function applyStemAuditionPad(padId: StemAuditionPadId): void {
+    const pad = stemAuditionPadDefinitions.find((definition) => definition.id === padId);
+    if (!pad) {
+      setProjectStatus("Stem audition pad not found");
+      return;
+    }
+
+    const changed = updateProject((current) => {
+      const mixer = applyStemAuditionPadToMixer(current.mixer, pad);
+      return sameMixerChannels(current.mixer, mixer) ? current : { ...current, mixer };
+    }, `${pad.label} stem audition`);
+
+    if (!changed) {
+      setProjectStatus(`${pad.label} stem audition already selected`);
+    }
   }
 
   function applyMixBalancePad(padId: MixBalancePadId): void {
@@ -4522,6 +4563,7 @@ export function App(): ReactElement {
         <section className="panel mixer-panel" aria-label="Mixer">
           <PanelTitle icon={<SlidersHorizontal size={18} />} title="Mixer" meta={`${activeChannels} audible`} />
           <MixBalancePads pads={mixBalancePadOptions} onApply={applyMixBalancePad} />
+          <StemAuditionPads pads={stemAuditionPadOptions} onApply={applyStemAuditionPad} />
           <div className="mixer-strips">
             {project.mixer.map((channel) => (
               <div className="strip" key={channel.id} style={{ "--strip": channel.accent } as CSSProperties}>
@@ -7577,6 +7619,39 @@ function MixBalancePads({
   );
 }
 
+function StemAuditionPads({
+  pads,
+  onApply
+}: {
+  pads: StemAuditionPadOption[];
+  onApply: (pad: StemAuditionPadId) => void;
+}): ReactElement {
+  return (
+    <div className="stem-audition-panel" data-testid="stem-audition-pads">
+      <div className="stem-audition-heading">
+        <span>Stem Audition</span>
+        <strong>Solo check</strong>
+      </div>
+      <div className="stem-audition-row" aria-label="Stem Audition Pads">
+        {pads.map((pad) => (
+          <button
+            className={pad.active ? "active" : ""}
+            data-testid={`stem-audition-${pad.id}`}
+            key={pad.id}
+            onClick={() => onApply(pad.id)}
+            title={`${pad.label} ${pad.preview}`}
+            type="button"
+          >
+            <span>{pad.label}</span>
+            <strong>{pad.preview}</strong>
+            <small>{pad.changedCount} moves / {pad.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MasterFinishPads({
   pads,
   onApply
@@ -7748,6 +7823,22 @@ function createMixBalancePadOptions(mixer: MixerChannel[]): MixBalancePadOption[
   });
 }
 
+function createStemAuditionPadOptions(mixer: MixerChannel[]): StemAuditionPadOption[] {
+  return stemAuditionPadDefinitions.map((pad) => {
+    const transformed = applyStemAuditionPadToMixer(mixer, pad);
+    return {
+      ...pad,
+      active: isStemAuditionPadActive(mixer, pad),
+      preview: stemAuditionPreview(pad),
+      changedCount: transformed.filter((channel, index) => !sameMixerChannel(channel, mixer[index])).length
+    };
+  });
+}
+
+function stemAuditionPreview(pad: StemAuditionPadDefinition): string {
+  return pad.trackId === null ? "All" : stemTrackLabel(pad.trackId);
+}
+
 function mixBalancePreview(pad: MixBalancePadDefinition): string {
   const drumVolume = pad.channels.drum_rack?.volumeDb ?? 0;
   const bassVolume = pad.channels.bass_808?.volumeDb ?? 0;
@@ -7819,6 +7910,30 @@ function applyMixBalancePadToMixer(mixer: MixerChannel[], pad: MixBalancePadDefi
       solo: false
     };
   });
+}
+
+function applyStemAuditionPadToMixer(mixer: MixerChannel[], pad: StemAuditionPadDefinition): MixerChannel[] {
+  return mixer.map((channel) => {
+    if (channel.id === "master") {
+      return channel;
+    }
+    if (pad.trackId === null) {
+      return { ...channel, muted: false, solo: false };
+    }
+    return {
+      ...channel,
+      muted: false,
+      solo: channel.id === pad.trackId
+    };
+  });
+}
+
+function isStemAuditionPadActive(mixer: MixerChannel[], pad: StemAuditionPadDefinition): boolean {
+  const coreChannels = mixer.filter((channel) => channel.id !== "master");
+  if (pad.trackId === null) {
+    return coreChannels.every((channel) => !channel.muted && !channel.solo);
+  }
+  return coreChannels.every((channel) => !channel.muted && channel.solo === (channel.id === pad.trackId));
 }
 
 function sameMixerChannels(first: MixerChannel[], second: MixerChannel[]): boolean {

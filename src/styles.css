@@ -159,6 +159,8 @@ h2 {
 .drum-kit-row button span,
 .mix-balance-heading span,
 .mix-balance-row button span,
+.stem-audition-heading span,
+.stem-audition-row button span,
 .master-finish-heading span,
 .master-finish-row button span,
 .studio-controls span,
@@ -4415,6 +4417,69 @@ input[type="range"] {
 }
 
 .mix-balance-row button small {
+  color: rgba(244, 239, 231, 0.48);
+  font-size: 10px;
+}
+
+.stem-audition-panel {
+  display: grid;
+  gap: 7px;
+}
+
+.stem-audition-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.stem-audition-heading strong {
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 11px;
+}
+
+.stem-audition-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: 7px;
+}
+
+.stem-audition-row button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 48px;
+  border-color: rgba(120, 240, 200, 0.16);
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.stem-audition-row button.active {
+  border-color: rgba(120, 240, 200, 0.62);
+  background: rgba(120, 240, 200, 0.14);
+}
+
+.stem-audition-row button span,
+.stem-audition-row button strong,
+.stem-audition-row button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stem-audition-row button span {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 11px;
+}
+
+.stem-audition-row button strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.stem-audition-row button small {
   color: rgba(244, 239, 231, 0.48);
   font-size: 10px;
 }

@@ -89,7 +89,7 @@ Primary feature areas:
 - Next Move: explicit local action recommendations that connect readiness/export state to Blueprint, target alignment, Pattern Fill, Pattern Chain, Hook Lift, Master Finish, Save Slot, and Mix Check commands.
 - Quick Actions: searchable local command palette for transport, project, creative, arrangement, mix, master finish, and export actions.
 - Project snapshots: local idea slots for saving, renaming, restoring, and deleting beat states inside the project file.
-- Mixer/master: volume, pan, mute, solo, Mix Balance Pads for one-click editable rough balance, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Mix Fix actions, Master Finish Pads for editable demo/vocal/store/club output posture, master preset ceiling, limiter, loudness/peak metering.
+- Mixer/master: volume, pan, mute, solo, Stem Audition Pads for Full Mix/Drums/808/Synth/Chords solo checks, Mix Balance Pads for one-click editable rough balance, channel low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Mix Fix actions, Master Finish Pads for editable demo/vocal/store/club output posture, master preset ceiling, limiter, loudness/peak metering.
 - Export: WAV export, stem export, arrangement MIDI export, and local Handoff Sheet text export after the event/render paths are reliable.
 
 ## First-Class Data
@@ -171,7 +171,7 @@ MVP capabilities:
 - Transport playback modes for full arrangement playback by default, selected-block loop audition, and fast selected-pattern preview while editing.
 - Realtime metronome toggle with accented downbeat clicks that helps users program to the grid during playback without adding click audio to WAV or stem export.
 - Live playback reads the current project while scheduling future steps, so selected-pattern preview, arrangement block edits, arrangement track mutes, arrangement length, arrangement energy, BPM, mixer, sound, and master changes can be heard without stopping and restarting.
-- Mixer volume, pan, mute, solo, Mix Balance Pads, low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Headroom/Stem Balance/Low End Mix Fix actions, and Master Finish Pads reflected in deterministic render feedback.
+- Mixer volume, pan, mute, solo, Stem Audition Pads that explicitly set Full Mix/Drums/808/Synth/Chords audition through existing mixer solo/mute state, Mix Balance Pads, low-cut/air EQ, Drive/Glue mix controls, built-in Space send FX, per-stem export level meters, deterministic Mix Coach checks, explicit Headroom/Stem Balance/Low End Mix Fix actions, and Master Finish Pads reflected in deterministic render feedback.
 - Master preset ceiling, Master Finish Pads, and output gain.
 - Reproducible export peak/RMS/headroom meter with limiter activity status for the current arrangement.
 - Local project save/load as a `.grooveforge.json` file.
