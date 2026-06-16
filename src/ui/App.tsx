@@ -911,6 +911,23 @@ type SongFormOverviewSummary = {
   selectedIndex: number;
 };
 
+type ProductionSnapshotMetricId = "target" | "form" | "patterns" | "mix" | "handoff";
+
+type ProductionSnapshotMetric = {
+  id: ProductionSnapshotMetricId;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type ProductionSnapshotSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  metrics: ProductionSnapshotMetric[];
+};
+
 type BeatPassportMetric = {
   id: string;
   label: string;
@@ -1379,6 +1396,10 @@ export function App(): ReactElement {
   const songFormOverviewSummary = useMemo(
     () => createSongFormOverviewSummary(project, selectedArrangementIndex),
     [project, selectedArrangementIndex]
+  );
+  const productionSnapshotSummary = useMemo(
+    () => createProductionSnapshotSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
   const beatPassportSummary = useMemo(
     () => createBeatPassportSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
@@ -4019,6 +4040,8 @@ export function App(): ReactElement {
 
       <BeatPassport summary={beatPassportSummary} />
 
+      <ProductionSnapshot summary={productionSnapshotSummary} />
+
       <HandoffPack
         analysis={exportAnalysis}
         project={project}
@@ -5706,6 +5729,30 @@ function BeatPassport({ summary }: { summary: BeatPassportSummary }): ReactEleme
   );
 }
 
+function ProductionSnapshot({ summary }: { summary: ProductionSnapshotSummary }): ReactElement {
+  return (
+    <section className={`production-snapshot ${summary.tone}`} data-testid="production-snapshot" aria-label="Production snapshot">
+      <div className="production-snapshot-heading">
+        <div>
+          <SlidersHorizontal size={17} aria-hidden="true" />
+          <span>Production Snapshot</span>
+        </div>
+        <strong data-testid="production-snapshot-headline">{summary.headline}</strong>
+        <small data-testid="production-snapshot-detail">{summary.detail}</small>
+      </div>
+      <div className="production-snapshot-grid" data-testid="production-snapshot-grid">
+        {summary.metrics.map((metric) => (
+          <div className={`production-snapshot-card ${metric.tone}`} data-testid={`production-snapshot-${metric.id}`} key={metric.id}>
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+            <small>{metric.detail}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function FinishChecklist({ summary }: { summary: FinishChecklistSummary }): ReactElement {
   return (
     <section className={`finish-checklist ${summary.tone}`} data-testid="finish-checklist" aria-label="Finish checklist">
@@ -7189,6 +7236,89 @@ function createHandoffPackItems({
       run: onExportHandoffSheet
     }
   ];
+}
+
+function createProductionSnapshotSummary(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): ProductionSnapshotSummary {
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const slots = usedPatternSlots(project);
+  const sectionLabels = arrangementSections.filter((section) => project.arrangement.some((block) => block.section === section));
+  const hasVerse = sectionLabels.includes("Verse");
+  const hasHook = sectionLabels.includes("Hook");
+  const patternEvents = slots.reduce((total, slot) => total + patternEventTotal(project.patterns[slot]), 0);
+  const mixChecks = createMixCoachChecks(analysis, stemAnalyses);
+  const mixTone = weakestTone(mixChecks.map((check) => check.tone));
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
+  const targetTone: MixCoachTone = bars >= target.targetBars ? "good" : bars >= Math.min(8, target.targetBars) ? "warn" : "danger";
+  const formTone: MixCoachTone =
+    hasVerse && hasHook && sectionLabels.length >= 4 ? "good" : hasHook && sectionLabels.length >= 3 ? "warn" : "danger";
+  const patternTone: MixCoachTone = slots.length >= 3 && patternEvents >= 36 ? "good" : slots.length >= 2 && patternEvents >= 20 ? "warn" : "danger";
+  const handoffTone: MixCoachTone =
+    analysis.status === "Silent" || audibleStems.length === 0
+      ? "danger"
+      : analysis.status === "Ready" && audibleStems.length >= target.stemGoal && briefStatus.tone === "good"
+        ? "good"
+        : "warn";
+  const readyCount = checks.filter((check) => check.tone === "good").length;
+  const tone = weakestTone([targetTone, formTone, patternTone, mixTone, handoffTone]);
+  const headline =
+    tone === "good"
+      ? `${target.name} production pass`
+      : tone === "warn"
+        ? `${target.name} production check`
+        : `${target.name} needs core work`;
+  const detail = `${barCountLabel(bars)} / ${readyCount}/${checks.length} readiness / ${analysis.status} export`;
+  const stemLabel = audibleStems.length > 0 ? audibleStems.map(stemTrackLabel).join("/") : "No audible stems";
+  const mixIssueCount = mixChecks.filter((check) => check.tone !== "good").length;
+
+  return {
+    headline,
+    detail,
+    tone,
+    metrics: [
+      {
+        id: "target",
+        label: "Target",
+        value: `${bars}/${target.targetBars} bars`,
+        detail: `${target.name} / ${target.mixPosture.replace("_", " ")}`,
+        tone: targetTone
+      },
+      {
+        id: "form",
+        label: "Form",
+        value: `${sectionLabels.length}/${arrangementSections.length} sections`,
+        detail: sectionLabels.length > 0 ? sectionLabels.join("/") : "No arrangement blocks",
+        tone: formTone
+      },
+      {
+        id: "patterns",
+        label: "Patterns",
+        value: `${slots.length}/3 slots`,
+        detail: `${patternEvents} events across Pattern ${slots.join("/") || project.selectedPattern}`,
+        tone: patternTone
+      },
+      {
+        id: "mix",
+        label: "Mix",
+        value: mixTone === "good" ? "Balanced" : mixTone === "warn" ? "Check" : "Needs signal",
+        detail: `${formatDb(analysis.headroomDb)} headroom / ${mixIssueCount} flagged checks`,
+        tone: mixTone
+      },
+      {
+        id: "handoff",
+        label: "Handoff",
+        value: `${audibleStems.length}/${target.stemGoal} stems`,
+        detail: `${stemLabel} / brief ${briefStatus.value}`,
+        tone: handoffTone
+      }
+    ]
+  };
 }
 
 function createBeatMapSummary(
