@@ -49,6 +49,7 @@ import {
   ArrangementSection,
   ArrangementTemplateId,
   BassNote,
+  BeatBlueprint,
   BeatBlueprintId,
   ChordEvent,
   ChordInversion,
@@ -435,6 +436,37 @@ type NoteClipboard =
     };
 
 type MixCoachTone = "good" | "warn" | "danger";
+
+type BeatBlueprintPreviewMetricId = "style" | "key" | "tempo" | "arrangement" | "sound" | "master";
+
+type BeatBlueprintPreviewMetric = {
+  id: BeatBlueprintPreviewMetricId;
+  label: string;
+  value: string;
+  detail: string;
+  status: "Keep" | "Change";
+  tone: MixCoachTone;
+};
+
+type BeatBlueprintPreviewSummary = {
+  blueprintId: BeatBlueprintId;
+  name: string;
+  focus: string;
+  statusLabel: string;
+  detailLabel: string;
+  applyLabel: string;
+  tone: MixCoachTone;
+  metrics: BeatBlueprintPreviewMetric[];
+};
+
+const beatBlueprintPreviewMetricTestIds: Record<BeatBlueprintPreviewMetricId, string> = {
+  style: "beat-blueprint-preview-style",
+  key: "beat-blueprint-preview-key",
+  tempo: "beat-blueprint-preview-tempo",
+  arrangement: "beat-blueprint-preview-arrangement",
+  sound: "beat-blueprint-preview-sound",
+  master: "beat-blueprint-preview-master"
+};
 
 type LocalDraftRecovery = {
   savedAt: string;
@@ -2134,6 +2166,7 @@ export function App(): ReactElement {
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
+  const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
@@ -4986,6 +5019,7 @@ export function App(): ReactElement {
 
   function applySelectedBeatBlueprint(blueprintId: BeatBlueprintId): void {
     const blueprint = beatBlueprints.find((candidate) => candidate.id === blueprintId);
+    setBeatBlueprintPreviewId(blueprintId);
     const changed = updateProject(
       (current) => applyBeatBlueprint(current, blueprintId),
       blueprint ? `Applied ${blueprint.name} blueprint` : "Applied beat blueprint"
@@ -5654,7 +5688,12 @@ export function App(): ReactElement {
 
       <ComposerActions summary={composerActionsSummary} result={composerActionResult} onRun={runComposerAction} />
 
-      <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
+      <BeatBlueprints
+        onApply={applySelectedBeatBlueprint}
+        onPreview={setBeatBlueprintPreviewId}
+        previewBlueprintId={beatBlueprintPreviewId}
+        project={project}
+      />
 
       <DeliveryTargets
         project={project}
@@ -6811,12 +6850,19 @@ function StyleInspector({
 }
 
 function BeatBlueprints({
-  project,
-  onApply
+  onApply,
+  onPreview,
+  previewBlueprintId,
+  project
 }: {
-  project: ProjectState;
   onApply: (blueprintId: BeatBlueprintId) => void;
+  onPreview: (blueprintId: BeatBlueprintId) => void;
+  previewBlueprintId: BeatBlueprintId;
+  project: ProjectState;
 }): ReactElement {
+  const previewBlueprint = beatBlueprints.find((blueprint) => blueprint.id === previewBlueprintId) ?? beatBlueprints[0];
+  const previewSummary = createBeatBlueprintPreviewSummary(project, previewBlueprint);
+
   return (
     <section className="blueprint-row" data-testid="beat-blueprints" aria-label="Beat blueprints">
       <div className="blueprint-heading">
@@ -6827,29 +6873,75 @@ function BeatBlueprints({
         <strong data-testid="beat-blueprint-current">
           {project.bpm} BPM / {project.key}
         </strong>
+        <small data-testid="beat-blueprint-preview-status">{previewSummary.statusLabel}</small>
+      </div>
+      <div className={`blueprint-preview ${previewSummary.tone}`} data-testid="beat-blueprint-preview">
+        <div className="blueprint-preview-head">
+          <span>{previewSummary.focus}</span>
+          <strong data-testid="beat-blueprint-preview-label">{previewSummary.name}</strong>
+          <small data-testid="beat-blueprint-preview-detail">{previewSummary.detailLabel}</small>
+        </div>
+        <div className="blueprint-preview-metrics" data-testid="beat-blueprint-preview-metrics">
+          {previewSummary.metrics.map((metric) => (
+            <span
+              className={`blueprint-preview-chip ${metric.tone}`}
+              data-testid={beatBlueprintPreviewMetricTestIds[metric.id]}
+              key={metric.id}
+              title={`${metric.label}: ${metric.value} / ${metric.detail}`}
+            >
+              <span>{metric.status}</span>
+              <strong>{metric.value}</strong>
+              <small>{metric.label}</small>
+            </span>
+          ))}
+        </div>
+        <button
+          className="blueprint-preview-apply"
+          data-testid="beat-blueprint-preview-apply"
+          onClick={() => onApply(previewSummary.blueprintId)}
+          title={`Apply ${previewSummary.name} blueprint`}
+          type="button"
+        >
+          <Sparkles size={13} aria-hidden="true" />
+          <span>{previewSummary.applyLabel}</span>
+        </button>
       </div>
       <div className="blueprint-list">
         {beatBlueprints.map((blueprint) => {
-          const selected =
-            project.styleId === blueprint.styleId &&
-            project.key === blueprint.key &&
-            project.bpm === blueprint.bpm;
+          const blueprintSummary = createBeatBlueprintPreviewSummary(project, blueprint);
+          const current = blueprintSummary.metrics.every((metric) => metric.status === "Keep");
+          const previewed = previewSummary.blueprintId === blueprint.id;
           const styleName = styleProfiles.find((profile) => profile.id === blueprint.styleId)?.name ?? blueprint.styleId;
           return (
-            <button
-              className={selected ? "selected" : ""}
-              data-testid={`beat-blueprint-${blueprint.id}`}
+            <div
+              className={["blueprint-card", current ? "current" : "", previewed ? "previewed" : ""].filter(Boolean).join(" ")}
               key={blueprint.id}
-              onClick={() => onApply(blueprint.id)}
-              title={`Apply ${blueprint.name} blueprint`}
-              type="button"
             >
-              <span>{blueprint.name}</span>
-              <strong>{blueprint.focus}</strong>
-              <small>
-                {styleName} / {blueprint.key} / {blueprint.bpm} BPM / {arrangementTemplateLabel(blueprint.arrangementTemplate)}
-              </small>
-            </button>
+              <button
+                aria-pressed={previewed}
+                className="blueprint-preview-button"
+                data-testid={`beat-blueprint-select-${blueprint.id}`}
+                onClick={() => onPreview(blueprint.id)}
+                title={`Preview ${blueprint.name} blueprint`}
+                type="button"
+              >
+                <span>{blueprint.name}</span>
+                <strong>{blueprint.focus}</strong>
+                <small>
+                  {styleName} / {blueprint.key} / {blueprint.bpm} BPM / {arrangementTemplateLabel(blueprint.arrangementTemplate)}
+                </small>
+              </button>
+              <button
+                className="blueprint-apply-button"
+                data-testid={`beat-blueprint-${blueprint.id}`}
+                onClick={() => onApply(blueprint.id)}
+                title={`Apply ${blueprint.name} blueprint`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>Apply</span>
+              </button>
+            </div>
           );
         })}
       </div>
@@ -9956,6 +10048,117 @@ function sessionBriefFieldLabel(field: keyof SessionBrief): string {
     notes: "notes"
   };
   return labels[field];
+}
+
+function createBeatBlueprintPreviewSummary(project: ProjectState, blueprint: BeatBlueprint): BeatBlueprintPreviewSummary {
+  const targetArrangement = createArrangementTemplate(blueprint.arrangementTemplate);
+  const targetBars = arrangementBarsFromBlocks(targetArrangement);
+  const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const targetStyleName = styleProfiles.find((profile) => profile.id === blueprint.styleId)?.name ?? blueprint.styleId;
+  const targetSoundLabel = soundPresetLabel(blueprint.soundPreset);
+  const currentSoundLabel = soundPresetLabel(project.sound.preset);
+  const targetMasterCeiling = masterPresetCeilingDb(blueprint.masterPreset);
+  const styleChanged = project.styleId !== blueprint.styleId;
+  const keyChanged = project.key !== blueprint.key;
+  const tempoChanged = project.bpm !== blueprint.bpm;
+  const arrangementChanged = !arrangementMatchesTemplate(project.arrangement, targetArrangement);
+  const soundChanged = project.sound.preset !== blueprint.soundPreset;
+  const masterChanged = project.masterPreset !== blueprint.masterPreset || project.masterCeilingDb !== targetMasterCeiling;
+
+  const metrics: BeatBlueprintPreviewMetric[] = [
+    beatBlueprintPreviewMetric(
+      "style",
+      "Style",
+      targetStyleName,
+      styleChanged ? `${currentStyleName} -> ${targetStyleName}` : "Current style",
+      styleChanged
+    ),
+    beatBlueprintPreviewMetric(
+      "key",
+      "Key",
+      blueprint.key,
+      keyChanged ? `${project.key} -> ${blueprint.key}` : "Current key",
+      keyChanged
+    ),
+    beatBlueprintPreviewMetric(
+      "tempo",
+      "Tempo",
+      `${blueprint.bpm} BPM`,
+      tempoChanged ? `${project.bpm} BPM -> ${blueprint.bpm} BPM` : "Current tempo",
+      tempoChanged
+    ),
+    beatBlueprintPreviewMetric(
+      "arrangement",
+      "Arrangement",
+      arrangementTemplateLabel(blueprint.arrangementTemplate),
+      arrangementChanged ? `${barCountLabel(arrangementTotalBars(project))} -> ${barCountLabel(targetBars)}` : "Current form",
+      arrangementChanged
+    ),
+    beatBlueprintPreviewMetric(
+      "sound",
+      "Sound",
+      targetSoundLabel,
+      soundChanged ? `${currentSoundLabel} -> ${targetSoundLabel}` : "Current sound",
+      soundChanged
+    ),
+    beatBlueprintPreviewMetric(
+      "master",
+      "Master",
+      blueprint.masterPreset,
+      masterChanged ? `${formatDb(project.masterCeilingDb)} -> ${formatDb(targetMasterCeiling)} ceiling` : "Current master",
+      masterChanged
+    )
+  ];
+  const changedCount = metrics.filter((metric) => metric.status === "Change").length;
+
+  return {
+    blueprintId: blueprint.id,
+    name: blueprint.name,
+    focus: blueprint.focus,
+    statusLabel: changedCount === 0 ? "Current blueprint" : `${changedCount} changes previewed`,
+    detailLabel: `${targetStyleName} / ${blueprint.key} / ${blueprint.bpm} BPM / ${barCountLabel(targetBars)} / ${targetSoundLabel}`,
+    applyLabel: changedCount === 0 ? "Reapply" : "Apply preview",
+    tone: changedCount === 0 ? "good" : "warn",
+    metrics
+  };
+}
+
+function beatBlueprintPreviewMetric(
+  id: BeatBlueprintPreviewMetricId,
+  label: string,
+  value: string,
+  detail: string,
+  changed: boolean
+): BeatBlueprintPreviewMetric {
+  return {
+    id,
+    label,
+    value,
+    detail,
+    status: changed ? "Change" : "Keep",
+    tone: changed ? "warn" : "good"
+  };
+}
+
+function arrangementBarsFromBlocks(blocks: ArrangementBlock[]): number {
+  return blocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+}
+
+function arrangementMatchesTemplate(arrangement: ArrangementBlock[], template: ArrangementBlock[]): boolean {
+  if (arrangement.length !== template.length) {
+    return false;
+  }
+
+  return arrangement.every((block, index) => {
+    const templateBlock = template[index];
+    return (
+      block.section === templateBlock.section &&
+      block.pattern === templateBlock.pattern &&
+      normalizeArrangementBars(block.bars) === normalizeArrangementBars(templateBlock.bars) &&
+      normalizeArrangementEnergy(block.energy) === normalizeArrangementEnergy(templateBlock.energy) &&
+      normalizeArrangementMutedTracks(block.mutedTracks).join("/") === normalizeArrangementMutedTracks(templateBlock.mutedTracks).join("/")
+    );
+  });
 }
 
 function createBeatPassportSummary(
