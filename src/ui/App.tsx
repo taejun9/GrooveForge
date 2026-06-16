@@ -1008,6 +1008,26 @@ type ComposerAction = {
   command: ComposerActionCommand;
 };
 
+type ComposerActionResultMetric = {
+  id: string;
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type ComposerActionResult = {
+  actionId: string;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  safety: string;
+  tone: MixCoachTone;
+  metrics: ComposerActionResultMetric[];
+};
+
 type ComposerActionsSummary = {
   headline: string;
   detail: string;
@@ -1603,6 +1623,7 @@ export function App(): ReactElement {
   const [snapshotNameDrafts, setSnapshotNameDrafts] = useState<Record<string, string>>({});
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [quickActionQuery, setQuickActionQuery] = useState("");
+  const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const projectRef = useRef<ProjectState>(starterProject);
   const controllerRef = useRef<PlaybackController | null>(null);
@@ -1935,6 +1956,7 @@ export function App(): ReactElement {
     setUndoStack((history) => appendHistory(history, current));
     setRedoStack([]);
     setProject(nextProject);
+    setComposerActionResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -1958,6 +1980,7 @@ export function App(): ReactElement {
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
+    setComposerActionResult(null);
     setProjectStatus(status);
   }
 
@@ -1969,6 +1992,7 @@ export function App(): ReactElement {
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
     setPlaybackPosition(null);
+    setComposerActionResult(null);
     setProjectStatus(status);
   }
 
@@ -4013,35 +4037,37 @@ export function App(): ReactElement {
   }
 
   function runComposerAction(action: ComposerAction): void {
+    const beforeProject = projectRef.current;
     switch (action.command.kind) {
       case "blueprint":
         applySelectedBeatBlueprint(action.command.blueprintId);
-        return;
+        break;
       case "drumFoundation":
         applyDrumFoundation(action.command.foundation);
-        return;
+        break;
       case "bassline":
         applyBasslinePad(action.command.pad);
-        return;
+        break;
       case "chordProgression":
         applyChordProgressionPreset(action.command.preset);
-        return;
+        break;
       case "melodyMotif":
         applyMelodyMotif(action.command.motif);
-        return;
+        break;
       case "patternFill":
         applyPatternFill(action.command.preset);
-        return;
+        break;
       case "patternChain":
         applyPatternChain(action.command.chain);
-        return;
+        break;
       case "arrangementTemplate":
         applyArrangementTemplate(action.command.template);
-        return;
+        break;
       case "masterFinish":
         applyMasterFinishPad(action.command.pad);
-        return;
+        break;
     }
+    setComposerActionResult(createComposerActionResult(action, beforeProject, projectRef.current));
   }
 
   function openQuickActions(): void {
@@ -4316,7 +4342,7 @@ export function App(): ReactElement {
 
       <ComposerGuide summary={composerGuideSummary} />
 
-      <ComposerActions summary={composerActionsSummary} onRun={runComposerAction} />
+      <ComposerActions summary={composerActionsSummary} result={composerActionResult} onRun={runComposerAction} />
 
       <BeatBlueprints project={project} onApply={applySelectedBeatBlueprint} />
 
@@ -6127,9 +6153,11 @@ function ComposerGuide({ summary }: { summary: ComposerGuideSummary }): ReactEle
 
 function ComposerActions({
   summary,
+  result,
   onRun
 }: {
   summary: ComposerActionsSummary;
+  result: ComposerActionResult | null;
   onRun: (action: ComposerAction) => void;
 }): ReactElement {
   return (
@@ -6142,6 +6170,7 @@ function ComposerActions({
         <strong data-testid="composer-actions-headline">{summary.headline}</strong>
         <small data-testid="composer-actions-detail">{summary.detail}</small>
       </div>
+      {result && <ComposerActionResultStrip result={result} />}
       <div className="composer-actions-grid" data-testid="composer-actions-grid">
         {summary.actions.map((action) => (
           <button
@@ -6165,6 +6194,34 @@ function ComposerActions({
         ))}
       </div>
     </section>
+  );
+}
+
+function ComposerActionResultStrip({ result }: { result: ComposerActionResult }): ReactElement {
+  return (
+    <div className={`composer-action-result ${result.tone}`} data-testid="composer-action-result">
+      <div className="composer-action-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="composer-action-result-title">{result.title}</strong>
+          <small data-testid="composer-action-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="composer-action-result-meta">
+        <span data-testid="composer-action-result-status">{result.status}</span>
+        <span data-testid="composer-action-result-scope">{result.scope}</span>
+        <span data-testid="composer-action-result-impact">{result.impact}</span>
+        <span data-testid="composer-action-result-safety">{result.safety}</span>
+      </div>
+      <div className="composer-action-result-metrics" data-testid="composer-action-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`composer-action-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -8262,6 +8319,94 @@ function composerActionsFocus(actions: ComposerAction[], styleName: string): str
     return `${styleName}: ${firstWarn.label} is the next safe move`;
   }
   return `${styleName}: writing actions are ready for variation`;
+}
+
+function createComposerActionResult(
+  action: ComposerAction,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): ComposerActionResult {
+  const beforeMetrics = composerActionResultMetricSnapshots(beforeProject, action);
+  const afterMetrics = composerActionResultMetricSnapshots(afterProject, action);
+  const metrics = afterMetrics.map((metric, index) => {
+    const before = beforeMetrics[index]?.value ?? "n/a";
+    const tone: MixCoachTone = before === metric.value ? "warn" : "good";
+    return {
+      id: metric.id,
+      label: metric.label,
+      before,
+      after: metric.value,
+      tone
+    };
+  });
+  const changed = beforeProject !== afterProject || metrics.some((metric) => metric.before !== metric.after);
+
+  return {
+    actionId: action.id,
+    title: `${action.buttonLabel} ${changed ? "applied" : "already current"}`,
+    status: changed ? "Applied" : "Already current",
+    detail: `${action.label} / ${action.scope}`,
+    scope: action.scope,
+    impact: action.impact,
+    safety: action.safety,
+    tone: changed ? "good" : "warn",
+    metrics
+  };
+}
+
+function composerActionResultMetricSnapshots(
+  project: ProjectState,
+  action: ComposerAction
+): { id: string; label: string; value: string }[] {
+  const pattern = activePattern(project);
+
+  switch (action.area) {
+    case "drums":
+      return [
+        { id: "drums", label: "Drums", value: `${drumHitCount(pattern)} hits` },
+        {
+          id: "hat-motion",
+          label: "Hat motion",
+          value: `${pattern.hatRepeats.filter((repeat) => repeat > 1).length} repeats`
+        }
+      ];
+    case "bass":
+      return [
+        { id: "bass", label: "808", value: `${pattern.bassNotes.length} notes` },
+        { id: "glide", label: "Glide", value: `${pattern.bassNotes.filter((note) => note.glide).length} notes` }
+      ];
+    case "harmony":
+      return [
+        { id: "chords", label: "Chords", value: `${pattern.chordEvents.length} events` },
+        { id: "roots", label: "Roots", value: chordMotionLabel(pattern.chordEvents) }
+      ];
+    case "melody":
+      return [
+        { id: "melody", label: "Synth", value: `${pattern.melodyNotes.length} notes` },
+        {
+          id: "chance",
+          label: "Chance",
+          value: `${pattern.melodyNotes.filter((note) => (note.probability ?? 1) < 1).length} varied`
+        }
+      ];
+    case "arrange":
+      return [
+        { id: "bars", label: "Length", value: barCountLabel(arrangementTotalBars(project)) },
+        { id: "blocks", label: "Blocks", value: `${project.arrangement.length} blocks` }
+      ];
+    case "finish":
+      return [
+        { id: "master", label: "Master", value: project.masterPreset },
+        { id: "ceiling", label: "Ceiling", value: formatDb(project.masterCeilingDb) }
+      ];
+  }
+}
+
+function chordMotionLabel(chords: ChordEvent[]): string {
+  if (chords.length === 0) {
+    return "none";
+  }
+  return chords.map((event) => event.root).join("-");
 }
 
 function composerDrumFoundation(project: ProjectState): DrumFoundationId {
