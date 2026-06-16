@@ -1185,6 +1185,29 @@ type ChordMovePreviewSummary = {
   voicingId: ChordVoicingId | "none";
 };
 
+type ChordMoveResultKind = "Pad" | "Rhythm" | "Voicing";
+
+type ChordMoveResultMetric = {
+  id: "chords" | "harmony" | "inversion" | "rhythm" | "velocity" | "chance";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type ChordMoveResult = {
+  moveId: string;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: ChordMoveResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type ArrangementFocusPresetId = "intro_space" | "verse_pocket" | "hook_peak" | "bridge_drop" | "outro_release";
 
 type ArrangementFocusPreset = {
@@ -2437,6 +2460,7 @@ export function App(): ReactElement {
   const [drumMoveResult, setDrumMoveResult] = useState<DrumMoveResult | null>(null);
   const [bassMoveResult, setBassMoveResult] = useState<BassMoveResult | null>(null);
   const [melodyMoveResult, setMelodyMoveResult] = useState<MelodyMoveResult | null>(null);
+  const [chordMoveResult, setChordMoveResult] = useState<ChordMoveResult | null>(null);
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
@@ -2950,6 +2974,7 @@ export function App(): ReactElement {
     setDrumMoveResult(null);
     setBassMoveResult(null);
     setMelodyMoveResult(null);
+    setChordMoveResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -2965,6 +2990,7 @@ export function App(): ReactElement {
       setDrumMoveResult(null);
       setBassMoveResult(null);
       setMelodyMoveResult(null);
+      setChordMoveResult(null);
     }
     setProjectStatus(status);
   }
@@ -3055,6 +3081,7 @@ export function App(): ReactElement {
     setDrumMoveResult(null);
     setBassMoveResult(null);
     setMelodyMoveResult(null);
+    setChordMoveResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
   }
@@ -3075,6 +3102,7 @@ export function App(): ReactElement {
     setDrumMoveResult(null);
     setBassMoveResult(null);
     setMelodyMoveResult(null);
+    setChordMoveResult(null);
     setProjectStatus(status);
   }
 
@@ -4959,34 +4987,43 @@ export function App(): ReactElement {
 
   function applyChordPad(padId: ChordPadId): void {
     if (selectedChordIndex === null || !selectedChord) {
+      setChordMoveResult(null);
       setProjectStatus("Select a chord event");
       return;
     }
 
     const option = createChordPadOptions(projectRef.current.key, selectedChord).find((pad) => pad.id === padId);
     if (!option) {
+      setChordMoveResult(null);
       setProjectStatus("Chord pad not found");
       return;
     }
 
+    const beforeProject = projectRef.current;
     const changed = updateChordEvent(
       selectedChordIndex,
       { root: option.root, quality: option.quality, inversion: option.inversion },
       `${option.label} chord pad applied to Pattern ${projectRef.current.selectedPattern}`
     );
     if (!changed) {
+      setChordMoveResult(null);
       setProjectStatus(`${option.label} chord pad already selected`);
+      return;
     }
+
+    setChordMoveResult(createChordMoveResult("Pad", option.id, option.label, option.detail, beforeProject, projectRef.current));
   }
 
   function applyChordRhythm(rhythmId: ChordRhythmId): void {
     const rhythm = chordRhythmDefinitions.find((definition) => definition.id === rhythmId);
     if (!rhythm) {
+      setChordMoveResult(null);
       setProjectStatus("Chord rhythm not found");
       return;
     }
 
     let nextSelectedIndex: number | null = selectedChordIndex;
+    const beforeProject = projectRef.current;
     const changed = updateCurrentPattern((pattern) => {
       if (pattern.chordEvents.length === 0) {
         return pattern;
@@ -5010,23 +5047,28 @@ export function App(): ReactElement {
       setSelectedChordIndex(nextSelectedIndex);
       setSelectedNote(null);
       setSelectedDrumStep(null);
+      setChordMoveResult(createChordMoveResult("Rhythm", rhythm.id, rhythm.label, rhythm.detail, beforeProject, projectRef.current));
     } else {
+      setChordMoveResult(null);
       setProjectStatus(`${rhythm.label} chord rhythm already selected`);
     }
   }
 
   function applyChordVoicingPad(voicingId: ChordVoicingId): void {
     if (selectedChordIndex === null || !selectedChord) {
+      setChordMoveResult(null);
       setProjectStatus("Select a chord event");
       return;
     }
 
     const option = createChordVoicingOptions(selectedChord).find((voicing) => voicing.id === voicingId);
     if (!option) {
+      setChordMoveResult(null);
       setProjectStatus("Chord voicing pad not found");
       return;
     }
 
+    const beforeProject = projectRef.current;
     const changed = updateChordEvent(
       selectedChordIndex,
       {
@@ -5039,8 +5081,12 @@ export function App(): ReactElement {
       `${option.label} chord voicing applied to Pattern ${projectRef.current.selectedPattern}`
     );
     if (!changed) {
+      setChordMoveResult(null);
       setProjectStatus(`${option.label} chord voicing already selected`);
+      return;
     }
+
+    setChordMoveResult(createChordMoveResult("Voicing", option.id, option.label, option.detail, beforeProject, projectRef.current));
   }
 
   function addChordEvent(): void {
@@ -6545,6 +6591,7 @@ export function App(): ReactElement {
             chordPads={chordPadOptions}
             chordClipboard={chordClipboard}
             chordMovePreview={chordMovePreviewSummary}
+            chordMoveResult={chordMoveResult}
             chordRhythms={chordRhythmOptions}
             chordVoicings={chordVoicingOptions}
             chords={currentPattern.chordEvents}
@@ -17343,6 +17390,7 @@ function ChordEditor({
   chordPads,
   chordClipboard,
   chordMovePreview,
+  chordMoveResult,
   chordRhythms,
   chordVoicings,
   chords,
@@ -17367,6 +17415,7 @@ function ChordEditor({
   chordPads: ChordPadOption[];
   chordClipboard: ChordClipboard | null;
   chordMovePreview: ChordMovePreviewSummary;
+  chordMoveResult: ChordMoveResult | null;
   chordRhythms: ChordRhythmOption[];
   chordVoicings: ChordVoicingOption[];
   chords: ChordEvent[];
@@ -17444,6 +17493,7 @@ function ChordEditor({
         <small data-testid="chord-move-preview-voicing">{chordMovePreview.voicingLabel}</small>
         <small data-testid="chord-move-preview-moves">{chordMovePreview.moveLabel}</small>
       </div>
+      {chordMoveResult && <ChordMoveResultStrip result={chordMoveResult} />}
       <div className="chord-pad-row" aria-label="Chord Pads">
         {chordPads.map((pad) => (
           <button
@@ -17753,6 +17803,48 @@ function ChordEditor({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function ChordMoveResultStrip({ result }: { result: ChordMoveResult }): ReactElement {
+  return (
+    <div
+      className={`chord-move-result ${result.tone}`}
+      data-result-chord-move={result.moveId}
+      data-testid="chord-move-result"
+      aria-live="polite"
+    >
+      <div className="chord-move-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="chord-move-result-title">{result.title}</strong>
+          <small data-testid="chord-move-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="chord-move-result-meta">
+        <span data-testid="chord-move-result-status">{result.status}</span>
+        <span data-testid="chord-move-result-scope">{result.scope}</span>
+        <span data-testid="chord-move-result-impact">{result.impact}</span>
+      </div>
+      <div className="chord-move-result-metrics" data-testid="chord-move-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`chord-move-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="chord-move-result-followup" data-testid="chord-move-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="chord-move-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="chord-move-result-next-check">{result.nextCheck}</em>
+        </span>
       </div>
     </div>
   );
@@ -19480,6 +19572,62 @@ function createChordMovePreviewSummary(
   };
 }
 
+function createChordMoveResult(
+  kind: ChordMoveResultKind,
+  id: string,
+  label: string,
+  detail: string,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): ChordMoveResult {
+  const beforeChords = activePattern(beforeProject).chordEvents;
+  const afterChords = activePattern(afterProject).chordEvents;
+  const countMoves = Math.abs(beforeChords.length - afterChords.length);
+  const harmonyMoves = chordHarmonyMoveCount(beforeChords, afterChords);
+  const inversionMoves = chordInversionMoveCount(beforeChords, afterChords);
+  const rhythmMoves = chordResultRhythmMoveCount(beforeChords, afterChords);
+  const velocityMoves = chordVelocityMoveCount(beforeChords, afterChords);
+  const chanceMoves = chordChanceMoveCount(beforeChords, afterChords);
+  const metrics: ChordMoveResultMetric[] = [
+    createChordMoveResultMetric("chords", "Chords", chordCountLabel(beforeChords), chordCountLabel(afterChords), countMoves),
+    createChordMoveResultMetric("harmony", "Harmony", chordHarmonyLabel(beforeChords), chordHarmonyLabel(afterChords), harmonyMoves),
+    createChordMoveResultMetric("inversion", "Inversion", chordInversionSummaryLabel(beforeChords), chordInversionSummaryLabel(afterChords), inversionMoves),
+    createChordMoveResultMetric("rhythm", "Rhythm", chordRhythmSummaryLabel(beforeChords), chordRhythmSummaryLabel(afterChords), rhythmMoves),
+    createChordMoveResultMetric("velocity", "Velocity", chordVelocityLabel(beforeChords), chordVelocityLabel(afterChords), velocityMoves),
+    createChordMoveResultMetric("chance", "Chance", chordChanceLabel(beforeChords), chordChanceLabel(afterChords), chanceMoves)
+  ];
+  const changedGroups = [countMoves, harmonyMoves, inversionMoves, rhythmMoves, velocityMoves, chanceMoves].filter((count) => count > 0).length;
+
+  return {
+    moveId: `${kind.toLowerCase()}-${id}`,
+    title: `${label} Chord ${kind} applied`,
+    status: "Applied",
+    detail: `Pattern ${afterProject.selectedPattern} / ${detail}`,
+    scope: `Pattern ${afterProject.selectedPattern} Chords`,
+    impact: `Count ${countMoves} / H ${harmonyMoves} / I ${inversionMoves} / R ${rhythmMoves} / V ${velocityMoves} / Ch ${chanceMoves}`,
+    metrics,
+    auditionCue: `Loop Pattern ${afterProject.selectedPattern}; check chord color against 808 and Synth.`,
+    nextCheck: "Use selected-chord harmonic readout and chord edit tools for manual corrections.",
+    tone: changedGroups > 0 ? "good" : "warn"
+  };
+}
+
+function createChordMoveResultMetric(
+  id: ChordMoveResultMetric["id"],
+  label: string,
+  before: string,
+  after: string,
+  changedEvents: number
+): ChordMoveResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: changedEvents === 0 ? "warn" : "good"
+  };
+}
+
 function chordPadMoveCount(chord: ChordEvent, pad: ChordPadOption): number {
   return [
     chord.root !== pad.root,
@@ -19500,6 +19648,134 @@ function chordVoicingMoveCount(chord: ChordEvent, voicing: ChordVoicingOption): 
 
 function chordRhythmChangedCount(current: ChordEvent[], transformed: ChordEvent[]): number {
   return transformed.filter((chord, index) => current[index] === undefined || !sameChordEvent(current[index], chord)).length;
+}
+
+function chordHarmonyMoveCount(current: ChordEvent[], transformed: ChordEvent[]): number {
+  const currentChords = sortChordEvents(current);
+  const transformedChords = sortChordEvents(transformed);
+  const count = Math.max(currentChords.length, transformedChords.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentChord = currentChords[index];
+    const transformedChord = transformedChords[index];
+    if (!currentChord || !transformedChord || currentChord.root !== transformedChord.root || currentChord.quality !== transformedChord.quality) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function chordInversionMoveCount(current: ChordEvent[], transformed: ChordEvent[]): number {
+  const currentChords = sortChordEvents(current);
+  const transformedChords = sortChordEvents(transformed);
+  const count = Math.max(currentChords.length, transformedChords.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentChord = currentChords[index];
+    const transformedChord = transformedChords[index];
+    if (
+      !currentChord ||
+      !transformedChord ||
+      normalizeChordInversion(currentChord.inversion) !== normalizeChordInversion(transformedChord.inversion)
+    ) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function chordResultRhythmMoveCount(current: ChordEvent[], transformed: ChordEvent[]): number {
+  const currentChords = sortChordEvents(current);
+  const transformedChords = sortChordEvents(transformed);
+  const count = Math.max(currentChords.length, transformedChords.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentChord = currentChords[index];
+    const transformedChord = transformedChords[index];
+    if (!currentChord || !transformedChord || currentChord.step !== transformedChord.step || currentChord.length !== transformedChord.length) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function chordVelocityMoveCount(current: ChordEvent[], transformed: ChordEvent[]): number {
+  const currentChords = sortChordEvents(current);
+  const transformedChords = sortChordEvents(transformed);
+  const count = Math.max(currentChords.length, transformedChords.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentChord = currentChords[index];
+    const transformedChord = transformedChords[index];
+    if (!currentChord || !transformedChord || currentChord.velocity !== transformedChord.velocity) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function chordChanceMoveCount(current: ChordEvent[], transformed: ChordEvent[]): number {
+  const currentChords = sortChordEvents(current);
+  const transformedChords = sortChordEvents(transformed);
+  const count = Math.max(currentChords.length, transformedChords.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentChord = currentChords[index];
+    const transformedChord = transformedChords[index];
+    if (
+      !currentChord ||
+      !transformedChord ||
+      normalizeEventProbability(currentChord.probability) !== normalizeEventProbability(transformedChord.probability)
+    ) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function chordCountLabel(chords: ChordEvent[]): string {
+  return `${chords.length} chords`;
+}
+
+function chordHarmonyLabel(chords: ChordEvent[]): string {
+  if (chords.length === 0) {
+    return "No chords";
+  }
+  return compactChordResultLabels(sortChordEvents(chords).map((chord) => `${chord.root}${chord.quality}`));
+}
+
+function chordInversionSummaryLabel(chords: ChordEvent[]): string {
+  if (chords.length === 0) {
+    return "No chords";
+  }
+  return compactChordResultLabels(sortChordEvents(chords).map((chord) => chordInversionLabel(normalizeChordInversion(chord.inversion))));
+}
+
+function chordRhythmSummaryLabel(chords: ChordEvent[]): string {
+  if (chords.length === 0) {
+    return "No chords";
+  }
+  return compactChordResultLabels(sortChordEvents(chords).map((chord) => `${chord.step + 1}:${chord.length}`));
+}
+
+function chordVelocityLabel(chords: ChordEvent[]): string {
+  if (chords.length === 0) {
+    return "No chords";
+  }
+  const average = chords.reduce((total, chord) => total + clampVelocity(chord.velocity), 0) / chords.length;
+  return percentLabel(average);
+}
+
+function chordChanceLabel(chords: ChordEvent[]): string {
+  if (chords.length === 0) {
+    return "No chords";
+  }
+  const average = chords.reduce((total, chord) => total + normalizeEventProbability(chord.probability), 0) / chords.length;
+  return percentLabel(average);
+}
+
+function compactChordResultLabels(labels: string[]): string {
+  return labels.length > 4 ? `${labels.slice(0, 4).join("/")} +${labels.length - 4}` : labels.join("/");
 }
 
 function createChordVoicingOptions(selectedChord?: ChordEvent): ChordVoicingOption[] {
