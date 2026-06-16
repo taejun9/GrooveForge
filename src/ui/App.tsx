@@ -1464,6 +1464,14 @@ type TransportPositionReadoutSummary = {
   tone: MixCoachTone;
 };
 
+type PatternPlaybackReadoutSummary = {
+  roleLabel: string;
+  statusLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type KeyboardCapturePostureSummary = {
   roleLabel: string;
   statusLabel: string;
@@ -2041,6 +2049,12 @@ export function App(): ReactElement {
   const currentPlaybackStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
   const currentEditorStep = playbackPosition?.pattern === project.selectedPattern ? currentPlaybackStep : null;
   const playingPattern = isPlaying ? playbackPosition?.pattern ?? null : null;
+  const patternPlaybackReadout = createPatternPlaybackReadoutSummary(
+    project.selectedPattern,
+    playingPattern,
+    patternEventCount(currentPattern),
+    playingPattern ? patternEventCount(project.patterns[playingPattern]) : null
+  );
   const playingArrangementIndex =
     isPlaying && playbackPosition?.mode === "arrangement" && typeof playbackPosition.arrangementIndex === "number"
       ? playbackPosition.arrangementIndex
@@ -5381,6 +5395,15 @@ export function App(): ReactElement {
                 </button>
               );
             })}
+          </div>
+          <div
+            className={`pattern-playback-readout ${patternPlaybackReadout.tone}`}
+            data-testid="pattern-playback-readout"
+            title={patternPlaybackReadout.detailTitle}
+          >
+            <span data-testid="pattern-playback-status">{patternPlaybackReadout.statusLabel}</span>
+            <strong data-testid="pattern-playback-label">{patternPlaybackReadout.roleLabel}</strong>
+            <small data-testid="pattern-playback-detail">{patternPlaybackReadout.detailLabel}</small>
           </div>
           <PatternCompareStrip
             playbackMode={playbackMode}
@@ -8997,6 +9020,44 @@ function createProjectSafetyReadoutSummary(
     statusLabel: "Local project",
     detailLabel: "Draft writes after edits",
     detailTitle: `${trimmedStatus || "Project ready"} / Use Save for a durable .grooveforge project file`,
+    tone: "warn"
+  };
+}
+
+function createPatternPlaybackReadoutSummary(
+  selectedPattern: PatternSlot,
+  playingPattern: PatternSlot | null,
+  selectedEventCount: string,
+  playingEventCount: string | null
+): PatternPlaybackReadoutSummary {
+  const roleLabel = `Editing Pattern ${selectedPattern}`;
+  if (!playingPattern) {
+    return {
+      roleLabel,
+      statusLabel: "Pattern idle",
+      detailLabel: selectedEventCount,
+      detailTitle: `${roleLabel} / playback stopped / ${selectedEventCount}`,
+      tone: "warn"
+    };
+  }
+
+  const statusLabel = `Hearing Pattern ${playingPattern}`;
+  if (playingPattern === selectedPattern) {
+    return {
+      roleLabel,
+      statusLabel,
+      detailLabel: `${selectedEventCount} live`,
+      detailTitle: `${roleLabel} / ${statusLabel} / ${selectedEventCount} live`,
+      tone: "good"
+    };
+  }
+
+  const detailLabel = `${selectedEventCount} edit / ${playingEventCount ?? "audible"} heard`;
+  return {
+    roleLabel,
+    statusLabel,
+    detailLabel,
+    detailTitle: `${roleLabel} / ${statusLabel} / ${detailLabel}`,
     tone: "warn"
   };
 }
