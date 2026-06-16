@@ -1138,12 +1138,20 @@ type MasterOutputRoleSummary = {
 };
 
 type ProductionSnapshotMetricId = "target" | "form" | "patterns" | "mix" | "handoff";
+type ProductionSnapshotFocusId = ProductionSnapshotMetricId;
+type ProductionSnapshotFocusTarget = WorkflowZoneId;
 
-type ProductionSnapshotMetric = {
-  id: ProductionSnapshotMetricId;
+type ProductionSnapshotFocusItem = {
+  focusId: ProductionSnapshotFocusId;
   label: string;
   value: string;
   detail: string;
+  focusTarget: ProductionSnapshotFocusTarget;
+  focusLabel: string;
+};
+
+type ProductionSnapshotMetric = ProductionSnapshotFocusItem & {
+  id: ProductionSnapshotMetricId;
   tone: MixCoachTone;
 };
 
@@ -1152,6 +1160,15 @@ type ProductionSnapshotSummary = {
   detail: string;
   tone: MixCoachTone;
   metrics: ProductionSnapshotMetric[];
+};
+
+type ProductionSnapshotFocusSummary = {
+  focusId: ProductionSnapshotFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
 };
 
 type KeyCompassCardId = "scale" | "chords" | "bass" | "melody" | "focus";
@@ -2099,6 +2116,7 @@ export function App(): ReactElement {
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
+  const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
   const [keyCompassFocusId, setKeyCompassFocusId] = useState<KeyCompassFocusId | null>(null);
   const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
@@ -5125,6 +5143,19 @@ export function App(): ReactElement {
     targetRefs[zone]?.scrollIntoView({ block: "start", behavior: "auto" });
   }
 
+  function focusProductionSnapshotMetric(metric: ProductionSnapshotFocusItem): void {
+    const targetRefs: Record<ProductionSnapshotFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    setProductionSnapshotFocusId(metric.focusId);
+    targetRefs[metric.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Snapshot ${metric.label}: ${metric.value}`);
+  }
+
   function focusComposerGuideCard(card: ComposerGuideCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5602,7 +5633,7 @@ export function App(): ReactElement {
 
       <BeatPassport summary={beatPassportSummary} />
 
-      <ProductionSnapshot summary={productionSnapshotSummary} />
+      <ProductionSnapshot focusedMetricId={productionSnapshotFocusId} onFocus={focusProductionSnapshotMetric} summary={productionSnapshotSummary} />
 
       <ExportPreflight sectionRef={deliverPanelRef} summary={exportPreflightSummary} />
 
@@ -7693,7 +7724,17 @@ function BeatPassport({ summary }: { summary: BeatPassportSummary }): ReactEleme
   );
 }
 
-function ProductionSnapshot({ summary }: { summary: ProductionSnapshotSummary }): ReactElement {
+function ProductionSnapshot({
+  focusedMetricId,
+  onFocus,
+  summary
+}: {
+  focusedMetricId: ProductionSnapshotFocusId | null;
+  onFocus: (metric: ProductionSnapshotFocusItem) => void;
+  summary: ProductionSnapshotSummary;
+}): ReactElement {
+  const focusSummary = createProductionSnapshotFocusSummary(summary, focusedMetricId);
+
   return (
     <section className={`production-snapshot ${summary.tone}`} data-testid="production-snapshot" aria-label="Production snapshot">
       <div className="production-snapshot-heading">
@@ -7704,14 +7745,42 @@ function ProductionSnapshot({ summary }: { summary: ProductionSnapshotSummary })
         <strong data-testid="production-snapshot-headline">{summary.headline}</strong>
         <small data-testid="production-snapshot-detail">{summary.detail}</small>
       </div>
+      <div
+        className={`production-snapshot-focus-readout ${focusSummary.tone}`}
+        data-testid="production-snapshot-focus-readout"
+        title={focusSummary.detailTitle}
+      >
+        <span data-testid="production-snapshot-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="production-snapshot-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="production-snapshot-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
       <div className="production-snapshot-grid" data-testid="production-snapshot-grid">
-        {summary.metrics.map((metric) => (
-          <div className={`production-snapshot-card ${metric.tone}`} data-testid={`production-snapshot-${metric.id}`} key={metric.id}>
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-            <small>{metric.detail}</small>
-          </div>
-        ))}
+        {summary.metrics.map((metric) => {
+          const focused = focusedMetricId === metric.focusId;
+          return (
+            <div
+              className={["production-snapshot-card", metric.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`production-snapshot-${metric.id}`}
+              key={metric.id}
+            >
+              <span>{metric.label}</span>
+              <strong>{metric.value}</strong>
+              <button
+                aria-pressed={focused}
+                className="production-snapshot-focus-button"
+                data-testid={`production-snapshot-focus-${metric.id}`}
+                onClick={() => onFocus(metric)}
+                title={`Focus ${metric.focusLabel}: ${metric.value}`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{metric.focusLabel}</span>
+              </button>
+              <small>{metric.detail}</small>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -12041,40 +12110,86 @@ function createProductionSnapshotSummary(
     metrics: [
       {
         id: "target",
+        focusId: "target",
         label: "Target",
         value: `${bars}/${target.targetBars} bars`,
         detail: `${target.name} / ${target.mixPosture.replace("_", " ")}`,
+        focusTarget: "deliver",
+        focusLabel: "Deliver",
         tone: targetTone
       },
       {
         id: "form",
+        focusId: "form",
         label: "Form",
         value: `${sectionLabels.length}/${arrangementSections.length} sections`,
         detail: sectionLabels.length > 0 ? sectionLabels.join("/") : "No arrangement blocks",
+        focusTarget: "arrange",
+        focusLabel: "Arrange",
         tone: formTone
       },
       {
         id: "patterns",
+        focusId: "patterns",
         label: "Patterns",
         value: `${slots.length}/3 slots`,
         detail: `${patternEvents} events across Pattern ${slots.join("/") || project.selectedPattern}`,
+        focusTarget: "compose",
+        focusLabel: "Compose",
         tone: patternTone
       },
       {
         id: "mix",
+        focusId: "mix",
         label: "Mix",
         value: mixTone === "good" ? "Balanced" : mixTone === "warn" ? "Check" : "Needs signal",
         detail: `${formatDb(analysis.headroomDb)} headroom / ${mixIssueCount} flagged checks`,
+        focusTarget: "mix",
+        focusLabel: "Mix",
         tone: mixTone
       },
       {
         id: "handoff",
+        focusId: "handoff",
         label: "Handoff",
         value: `${audibleStems.length}/${target.stemGoal} stems`,
         detail: `${stemLabel} / brief ${briefStatus.value}`,
+        focusTarget: "deliver",
+        focusLabel: "Deliver",
         tone: handoffTone
       }
     ]
+  };
+}
+
+function createProductionSnapshotFocusSummary(
+  summary: ProductionSnapshotSummary,
+  focusedMetricId: ProductionSnapshotFocusId | null
+): ProductionSnapshotFocusSummary {
+  const focusedMetric = focusedMetricId ? summary.metrics.find((metric) => metric.focusId === focusedMetricId) ?? null : null;
+  const metric = focusedMetric ?? summary.metrics[0] ?? null;
+
+  if (!metric) {
+    return {
+      focusId: null,
+      statusLabel: "Snapshot clear",
+      areaLabel: "No snapshot focus",
+      detailLabel: "No Production Snapshot metrics available",
+      detailTitle: "Production Snapshot has no focusable metrics.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel = focusedMetric ? "Focused Snapshot" : "Snapshot Focus";
+  const detailLabel = `${metric.focusLabel} panel / ${metric.detail}`;
+
+  return {
+    focusId: metric.focusId,
+    statusLabel,
+    areaLabel: `${metric.label}: ${metric.value}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${metric.label}: ${metric.value} / ${detailLabel}`,
+    tone: metric.tone
   };
 }
 
