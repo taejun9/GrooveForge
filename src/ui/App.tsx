@@ -1429,6 +1429,11 @@ type KeyboardCaptureKeyMapItem = {
   key: KeyboardCaptureKey;
   pitch: string | null;
 };
+type KeyboardCaptureDefaults = {
+  length: number;
+  velocity: number;
+  glide: boolean;
+};
 
 const arrangementFocusPresets: ArrangementFocusPreset[] = [
   {
@@ -1764,6 +1769,10 @@ export function App(): ReactElement {
   const [noteClipboard, setNoteClipboard] = useState<NoteClipboard | null>(null);
   const [keyboardCaptureEnabled, setKeyboardCaptureEnabled] = useState(false);
   const [keyboardCaptureTarget, setKeyboardCaptureTarget] = useState<NoteTrack>("bass");
+  const [keyboardCaptureDefaults, setKeyboardCaptureDefaults] = useState<Record<NoteTrack, KeyboardCaptureDefaults>>({
+    bass: { length: 2, velocity: 0.68, glide: false },
+    melody: { length: 1, velocity: 0.68, glide: false }
+  });
   const [selectedDrumStep, setSelectedDrumStep] = useState<SelectedDrumStep | null>(null);
   const [drumClipboard, setDrumClipboard] = useState<DrumClipboard | null>(null);
   const [selectedChordIndex, setSelectedChordIndex] = useState<number | null>(0);
@@ -1902,6 +1911,7 @@ export function App(): ReactElement {
     () => createKeyboardCaptureKeyMap(keyboardCaptureTarget === "bass" ? bassPitchLanes(project.key) : melodyPitchLanes(project.key)),
     [keyboardCaptureTarget, project.key]
   );
+  const activeKeyboardCaptureDefaults = keyboardCaptureDefaults[keyboardCaptureTarget];
   const basslinePadOptions = useMemo(() => createBasslinePadOptions(project.key), [project.key]);
   const bassGlidePadOptions = useMemo(() => createBassGlidePadOptions(currentPattern.bassNotes), [currentPattern.bassNotes]);
   const bassContourOptions = useMemo(
@@ -2053,7 +2063,8 @@ export function App(): ReactElement {
     selectedChordIndex,
     quickActionsOpen,
     keyboardCaptureEnabled,
-    keyboardCaptureTarget
+    keyboardCaptureTarget,
+    keyboardCaptureDefaults
   ]);
 
   function handleDesktopShortcut(event: KeyboardEvent): void {
@@ -2373,6 +2384,21 @@ export function App(): ReactElement {
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(0);
+  }
+
+  function updateKeyboardCaptureDefaults(update: Partial<KeyboardCaptureDefaults>): void {
+    setKeyboardCaptureDefaults((current) => {
+      const targetDefaults = current[keyboardCaptureTarget];
+      return {
+        ...current,
+        [keyboardCaptureTarget]: {
+          ...targetDefaults,
+          ...update,
+          length: update.length === undefined ? targetDefaults.length : clampStepLength(update.length),
+          velocity: update.velocity === undefined ? targetDefaults.velocity : clampVelocity(update.velocity)
+        }
+      };
+    });
   }
 
   function selectTransportLoopScope(scope: TransportLoopScope, showStatus = true): void {
@@ -3357,14 +3383,15 @@ export function App(): ReactElement {
       return;
     }
 
+    const captureDefaults = keyboardCaptureDefaults[target];
     const step = nextKeyboardCaptureStep(
       pattern,
       target,
       selectedNote?.track === target ? selectedNote.step + 1 : 0
     );
     const changed = updateCurrentPattern(
-      (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch),
-      `Captured ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} on Pattern ${current.selectedPattern}`
+      (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch, captureDefaults),
+      `Captured ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} length ${captureDefaults.length} on Pattern ${current.selectedPattern}`
     );
 
     if (!changed) {
@@ -5145,9 +5172,11 @@ export function App(): ReactElement {
         <section className="panel piano-panel" aria-label="Bass and melody editor">
           <PanelTitle icon={<KeyboardMusic size={18} />} title="808 / Melody" meta="scale locked grid" />
           <KeyboardCapturePanel
+            defaults={activeKeyboardCaptureDefaults}
             enabled={keyboardCaptureEnabled}
             keyMap={keyboardCaptureKeyMap}
             nextStep={keyboardCaptureNextStep}
+            onDefaultsChange={updateKeyboardCaptureDefaults}
             onEnabledChange={setKeyboardCaptureEnabled}
             onTargetChange={setKeyboardCaptureTarget}
             selectedNote={selectedNote}
@@ -12367,25 +12396,31 @@ function MelodyContourPads({
 }
 
 function KeyboardCapturePanel({
+  defaults,
   enabled,
   target,
   nextStep,
   keyMap,
   selectedNote,
+  onDefaultsChange,
   onEnabledChange,
   onTargetChange
 }: {
+  defaults: KeyboardCaptureDefaults;
   enabled: boolean;
   target: NoteTrack;
   nextStep: number;
   keyMap: KeyboardCaptureKeyMapItem[];
   selectedNote: SelectedNote | null;
+  onDefaultsChange: (update: Partial<KeyboardCaptureDefaults>) => void;
   onEnabledChange: (enabled: boolean) => void;
   onTargetChange: (target: NoteTrack) => void;
 }): ReactElement {
   const selectedLabel = selectedNote
     ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}`
     : "None";
+  const velocityPercent = Math.round(defaults.velocity * 100);
+
   return (
     <div className="keyboard-capture" data-testid="keyboard-capture">
       <div className="keyboard-capture-heading">
@@ -12430,6 +12465,46 @@ function KeyboardCapturePanel({
           <span>Selected</span>
           <strong>{selectedLabel}</strong>
         </div>
+      </div>
+      <div className="capture-defaults" aria-label="Keyboard Capture defaults">
+        <label className="capture-default-field">
+          <span>Length</span>
+          <input
+            data-testid="keyboard-capture-length"
+            max={16}
+            min={1}
+            onChange={(event) => onDefaultsChange({ length: Number(event.currentTarget.value) })}
+            step={1}
+            type="number"
+            value={defaults.length}
+          />
+        </label>
+        {target === "melody" ? (
+          <label className="capture-default-field velocity">
+            <span>Velocity</span>
+            <input
+              data-testid="keyboard-capture-velocity"
+              max={100}
+              min={0}
+              onChange={(event) => onDefaultsChange({ velocity: Number(event.currentTarget.value) / 100 })}
+              step={1}
+              type="range"
+              value={velocityPercent}
+            />
+            <strong data-testid="keyboard-capture-velocity-value">{velocityPercent}%</strong>
+          </label>
+        ) : (
+          <button
+            aria-pressed={defaults.glide}
+            className={defaults.glide ? "mini-toggle selected" : "mini-toggle"}
+            data-testid="keyboard-capture-glide"
+            onClick={() => onDefaultsChange({ glide: !defaults.glide })}
+            title="Toggle captured 808 glide"
+            type="button"
+          >
+            Glide {defaults.glide ? "On" : "Off"}
+          </button>
+        )}
       </div>
       <div className="capture-key-map" aria-label="Keyboard Capture key map">
         {keyMap.map((item) => (
@@ -13383,7 +13458,14 @@ function nextKeyboardCaptureStep(pattern: PatternData, track: NoteTrack, startSt
   return normalizedStart;
 }
 
-function addKeyboardCaptureNote(pattern: PatternData, track: NoteTrack, step: number, pitch: string): PatternData {
+function addKeyboardCaptureNote(
+  pattern: PatternData,
+  track: NoteTrack,
+  step: number,
+  pitch: string,
+  defaults: KeyboardCaptureDefaults
+): PatternData {
+  const length = clampStepLength(defaults.length);
   if (track === "bass") {
     if (pattern.bassNotes.some((note) => note.step === step && note.pitch === pitch)) {
       return pattern;
@@ -13392,7 +13474,7 @@ function addKeyboardCaptureNote(pattern: PatternData, track: NoteTrack, step: nu
       ...pattern,
       bassNotes: sortBassNotes([
         ...pattern.bassNotes.filter((note) => note.step !== step),
-        { step, pitch, length: 2, glide: false, probability: 1 }
+        { step, pitch, length, glide: defaults.glide, probability: 1 }
       ])
     };
   }
@@ -13404,7 +13486,7 @@ function addKeyboardCaptureNote(pattern: PatternData, track: NoteTrack, step: nu
     ...pattern,
     melodyNotes: sortMelodyNotes([
       ...pattern.melodyNotes,
-      { step, pitch, length: 1, velocity: 0.68, probability: 1 }
+      { step, pitch, length, velocity: clampVelocity(defaults.velocity), probability: 1 }
     ])
   };
 }
