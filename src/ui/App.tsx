@@ -620,6 +620,7 @@ type PatternClonePadOption = {
 };
 
 type PatternDnaCardId = "layers" | "density" | "variation" | "arrangement";
+type PatternDnaFocusTarget = "compose" | "arrange";
 
 type PatternDnaCard = {
   id: PatternDnaCardId;
@@ -627,6 +628,8 @@ type PatternDnaCard = {
   value: string;
   detail: string;
   tone: MixCoachTone;
+  focusTarget: PatternDnaFocusTarget;
+  focusLabel: string;
 };
 
 type PatternDnaSummary = {
@@ -635,6 +638,15 @@ type PatternDnaSummary = {
   detail: string;
   tone: MixCoachTone;
   cards: PatternDnaCard[];
+};
+
+type PatternDnaFocusSummary = {
+  cardId: PatternDnaCardId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
 };
 
 type StylePatternDensity = {
@@ -2023,6 +2035,7 @@ export function App(): ReactElement {
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
+  const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
   const [finishChecklistFocusId, setFinishChecklistFocusId] = useState<FinishChecklistCardId | null>(null);
@@ -5057,6 +5070,17 @@ export function App(): ReactElement {
     setProjectStatus(`Guide ${card.label}: ${card.status}`);
   }
 
+  function focusPatternDnaCard(card: PatternDnaCard): void {
+    const targetRefs: Record<PatternDnaFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current
+    };
+
+    setPatternDnaFocusId(card.id);
+    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Pattern DNA ${card.label}: ${card.value}`);
+  }
+
   function focusFinishChecklistCard(card: FinishChecklistCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5556,7 +5580,7 @@ export function App(): ReactElement {
             onCue={cuePattern}
             onUse={usePatternInSelectedBlock}
           />
-          <PatternDna summary={patternDnaSummary} />
+          <PatternDna summary={patternDnaSummary} focusedCardId={patternDnaFocusId} onFocus={focusPatternDnaCard} />
           <PatternClonePads clones={patternCloneOptions} onApply={cloneSelectedPatternVariation} />
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
           <DrumFoundationPads foundations={drumFoundationOptions} onApply={applyDrumFoundation} />
@@ -6694,7 +6718,17 @@ function PatternCompareStrip({
   );
 }
 
-function PatternDna({ summary }: { summary: PatternDnaSummary }): ReactElement {
+function PatternDna({
+  summary,
+  focusedCardId,
+  onFocus
+}: {
+  summary: PatternDnaSummary;
+  focusedCardId: PatternDnaCardId | null;
+  onFocus: (card: PatternDnaCard) => void;
+}): ReactElement {
+  const focusSummary = createPatternDnaFocusSummary(summary, focusedCardId);
+
   return (
     <section className={`pattern-dna ${summary.tone}`} data-testid="pattern-dna" aria-label="Pattern DNA">
       <div className="pattern-dna-heading">
@@ -6705,14 +6739,38 @@ function PatternDna({ summary }: { summary: PatternDnaSummary }): ReactElement {
         <strong data-testid="pattern-dna-headline">{summary.headline}</strong>
         <small data-testid="pattern-dna-detail">{summary.detail}</small>
       </div>
+      <div className={`pattern-dna-focus-readout ${focusSummary.tone}`} data-testid="pattern-dna-focus-readout" title={focusSummary.detailTitle}>
+        <span data-testid="pattern-dna-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="pattern-dna-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="pattern-dna-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
       <div className="pattern-dna-grid" data-testid="pattern-dna-grid">
-        {summary.cards.map((card) => (
-          <div className={`pattern-dna-card ${card.tone}`} data-testid={`pattern-dna-${card.id}`} key={card.id}>
-            <span>{card.label}</span>
-            <strong>{card.value}</strong>
-            <small>{card.detail}</small>
-          </div>
-        ))}
+        {summary.cards.map((card) => {
+          const focused = focusedCardId !== null && card.id === focusedCardId;
+          return (
+            <div
+              className={["pattern-dna-card", card.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`pattern-dna-${card.id}`}
+              key={card.id}
+            >
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <button
+                aria-pressed={focused}
+                className="pattern-dna-focus-button"
+                data-testid={`pattern-dna-focus-${card.id}`}
+                onClick={() => onFocus(card)}
+                title={`Focus ${card.focusLabel}: ${card.value}`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{card.focusLabel}</span>
+              </button>
+              <small>{card.detail}</small>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -12552,21 +12610,27 @@ function createPatternDnaSummary(project: ProjectState): PatternDnaSummary {
         readyLayers.length === layers.length
           ? readyLayers.map((layer) => layer.label).join(" / ")
           : `Add ${missingLayers.map((layer) => layer.label).join(" / ")}`,
-      tone: layerTone
+      tone: layerTone,
+      focusTarget: "compose",
+      focusLabel: "Compose"
     },
     {
       id: "density",
       label: "Density",
       value: densityLabel,
       detail: `${drumHits} drums / ${bassNotes + melodyNotes} notes / ${chordEvents} chords`,
-      tone: densityTone
+      tone: densityTone,
+      focusTarget: "compose",
+      focusLabel: "Compose"
     },
     {
       id: "variation",
       label: "Variation",
       value: variationSignals.length > 0 ? `${variationSignals.length} signals` : "Straight loop",
       detail: variationSignals.length > 0 ? variationSignals.join(" / ") : "Add chance, timing, glide, or rolls",
-      tone: variationTone
+      tone: variationTone,
+      focusTarget: "compose",
+      focusLabel: "Compose"
     },
     {
       id: "arrangement",
@@ -12576,7 +12640,9 @@ function createPatternDnaSummary(project: ProjectState): PatternDnaSummary {
         arrangedBlocks.length > 0
           ? `${arrangedBlocks.length} block${arrangedBlocks.length === 1 ? "" : "s"} / ${arrangedSections.join("/")}`
           : "Use in a block or Pattern Chain",
-      tone: arrangementTone
+      tone: arrangementTone,
+      focusTarget: "arrange",
+      focusLabel: "Arrange"
     }
   ];
 
@@ -12596,6 +12662,37 @@ function createPatternDnaSummary(project: ProjectState): PatternDnaSummary {
     detail: `${densityLabel} / ${readyLayers.length}/4 layers / ${arrangedBars > 0 ? barCountLabel(arrangedBars) : "not arranged"}`,
     tone,
     cards
+  };
+}
+
+function createPatternDnaFocusSummary(
+  summary: PatternDnaSummary,
+  focusedCardId: PatternDnaCardId | null
+): PatternDnaFocusSummary {
+  const focusedCard = focusedCardId ? summary.cards.find((card) => card.id === focusedCardId) ?? null : null;
+  const card = focusedCard ?? summary.cards.find((candidate) => candidate.tone !== "good") ?? summary.cards[0] ?? null;
+
+  if (!card) {
+    return {
+      cardId: null,
+      statusLabel: "DNA clear",
+      areaLabel: "No DNA cards",
+      detailLabel: "No Pattern DNA cards available",
+      detailTitle: "Pattern DNA has no cards to focus.",
+      tone: "good"
+    };
+  }
+
+  const statusLabel = focusedCard ? "Focused DNA" : card.tone === "good" ? "DNA clear" : "Top DNA Focus";
+  const detailLabel = `${card.focusLabel} panel / ${card.detail}`;
+
+  return {
+    cardId: card.id,
+    statusLabel,
+    areaLabel: `${card.label}: ${card.value}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
+    tone: card.tone
   };
 }
 
