@@ -410,6 +410,7 @@ h2 {
 .snapshot-actions button,
 .arrangement-template-row button,
 .arrangement-arc-row button,
+.section-locator-row button,
 .arrangement-focus-actions button,
 .block-pattern-row button,
 .arrangement-mute-row button,
@@ -483,6 +484,7 @@ h2 {
 .beat-map-actions button:disabled,
 .next-move-actions button:disabled,
 .snapshot-actions button:disabled,
+.section-locator-row button:disabled,
 .chord-pad-row button:disabled,
 .chord-rhythm-row button:disabled,
 .chord-voicing-row button:disabled,
@@ -539,6 +541,7 @@ h2 {
 .snapshot-actions button,
 .arrangement-template-row button,
 .arrangement-arc-row button,
+.section-locator-row button,
 .arrangement-focus-actions button,
 .block-pattern-row button,
 .arrangement-mute-row button,
@@ -568,6 +571,7 @@ h2 {
 .pattern-tabs button.selected,
 .capture-target-row button.selected,
 .arrangement-template-row button.selected,
+.section-locator-row button.selected,
 .arrangement-focus-actions button.suggested,
 .block-pattern-row button.selected,
 .arrangement-mute-row button.selected,
@@ -6472,6 +6476,88 @@ input[type="range"] {
 }
 
 .arrangement-arc-row button small {
+  color: rgba(244, 239, 231, 0.5);
+  font-size: 10px;
+}
+
+.section-locator {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.section-locator-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.16);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px 10px;
+}
+
+.section-locator-heading strong {
+  overflow: hidden;
+  color: #f4efe7;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section-locator-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.section-locator-row button {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  min-width: 0;
+  min-height: 58px;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.section-locator-row button.good {
+  border-color: rgba(120, 240, 200, 0.24);
+  background: rgba(120, 240, 200, 0.07);
+}
+
+.section-locator-row button.warn {
+  border-color: rgba(244, 204, 120, 0.24);
+  background: rgba(244, 204, 120, 0.065);
+}
+
+.section-locator-row button.missing {
+  color: rgba(244, 239, 231, 0.48);
+  background: rgba(244, 239, 231, 0.03);
+}
+
+.section-locator-row button span,
+.section-locator-row button strong,
+.section-locator-row button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section-locator-row button span {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 11px;
+}
+
+.section-locator-row button strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.section-locator-row button small {
   color: rgba(244, 239, 231, 0.5);
   font-size: 10px;
 }

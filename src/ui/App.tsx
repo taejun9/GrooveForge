@@ -1034,6 +1034,18 @@ type SongFormOverviewSummary = {
   selectedIndex: number;
 };
 
+type SectionLocatorPad = {
+  section: ArrangementSection;
+  index: number | null;
+  pattern: PatternSlot | null;
+  startBar: number | null;
+  endBar: number | null;
+  energy: number;
+  eventCount: number;
+  selected: boolean;
+  tone: MixCoachTone;
+};
+
 type ArrangementBlockRoleSummary = {
   roleLabel: string;
   timelineLabel: string;
@@ -2065,6 +2077,10 @@ export function App(): ReactElement {
     () => createArrangementFocusSummary(project, selectedArrangementIndex),
     [project, selectedArrangementIndex]
   );
+  const sectionLocatorPads = useMemo(
+    () => createSectionLocatorPads(project, selectedArrangementIndex),
+    [project, selectedArrangementIndex]
+  );
   const selectedArrangementBlockRole = useMemo(
     () => selectedArrangementBlockRoleSummary(project, selectedArrangementIndex),
     [project, selectedArrangementIndex]
@@ -2868,6 +2884,23 @@ export function App(): ReactElement {
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
+  }
+
+  function cueSectionLocator(section: ArrangementSection): void {
+    if (isPlaying) {
+      setProjectStatus("Stop playback before cueing a section");
+      return;
+    }
+
+    const index = firstArrangementSectionIndex(projectRef.current, section);
+    if (index === null) {
+      setProjectStatus(`${section} section not in arrangement`);
+      return;
+    }
+
+    selectArrangementBlock(index);
+    selectTransportLoopScope("block", false);
+    setProjectStatus(`${section} section cued as Block loop`);
   }
 
   function updateArrangementBlock(index: number, update: Partial<ArrangementBlock>, status = "Unsaved changes"): boolean {
@@ -5633,6 +5666,7 @@ export function App(): ReactElement {
             })}
           </div>
           <ArrangementArcPads pads={arrangementArcPadOptions} onApply={applyArrangementArcPad} />
+          <SectionLocatorPads disabled={isPlaying} pads={sectionLocatorPads} onCue={cueSectionLocator} />
           <div className="pattern-chain-row" aria-label="Pattern chain">
             <div className="pattern-chain-heading">
               <span>Chain</span>
@@ -6536,6 +6570,57 @@ function ArrangementArcPads({
             <small>{pad.changedCount} blocks / {pad.detail}</small>
           </button>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function SectionLocatorPads({
+  disabled,
+  onCue,
+  pads
+}: {
+  disabled: boolean;
+  onCue: (section: ArrangementSection) => void;
+  pads: SectionLocatorPad[];
+}): ReactElement {
+  return (
+    <section className="section-locator" data-testid="section-locator-pads" aria-label="Section Locator Pads">
+      <div className="section-locator-heading">
+        <span>Locator</span>
+        <strong>Section cue</strong>
+      </div>
+      <div className="section-locator-row">
+        {pads.map((pad) => {
+          const missing = pad.index === null;
+          const disabledPad = disabled || missing;
+          const rangeLabel =
+            pad.startBar === null || pad.endBar === null
+              ? "Missing"
+              : pad.startBar === pad.endBar
+                ? `Bar ${pad.startBar}`
+                : `Bars ${pad.startBar}-${pad.endBar}`;
+          return (
+            <button
+              aria-pressed={pad.selected}
+              className={[pad.tone, pad.selected ? "selected" : "", missing ? "missing" : ""].filter(Boolean).join(" ")}
+              data-testid={`section-locator-${sectionLocatorTestId(pad.section)}`}
+              disabled={disabledPad}
+              key={pad.section}
+              onClick={() => onCue(pad.section)}
+              title={
+                missing
+                  ? `${pad.section} section is not in the arrangement`
+                  : `Cue ${pad.section} as Block loop: Pattern ${pad.pattern}, ${rangeLabel}`
+              }
+              type="button"
+            >
+              <span>{pad.section}</span>
+              <strong>{missing ? "Missing" : `Pattern ${pad.pattern}`}</strong>
+              <small>{missing ? "Add section" : `${rangeLabel} / ${Math.round(pad.energy * 100)}% / ${pad.eventCount} events`}</small>
+            </button>
+          );
+        })}
       </div>
     </section>
   );
@@ -11245,6 +11330,54 @@ function createSongFormSegments(project: ProjectState): SongFormSegment[] {
     startBar = endBar + 1;
     return segment;
   });
+}
+
+function createSectionLocatorPads(project: ProjectState, selectedIndex: number): SectionLocatorPad[] {
+  return arrangementSections.map((section) => {
+    const index = firstArrangementSectionIndex(project, section);
+    if (index === null) {
+      return {
+        section,
+        index: null,
+        pattern: null,
+        startBar: null,
+        endBar: null,
+        energy: 0,
+        eventCount: 0,
+        selected: false,
+        tone: "danger"
+      };
+    }
+
+    const block = project.arrangement[index];
+    const bars = normalizeArrangementBars(block.bars);
+    const startBar = arrangementStartBar(project, index) + 1;
+    const endBar = startBar + bars - 1;
+    const eventCount = patternEventTotal(project.patterns[block.pattern]);
+    const energy = normalizeArrangementEnergy(block.energy);
+    const mutedTracks = normalizeArrangementMutedTracks(block.mutedTracks);
+
+    return {
+      section,
+      index,
+      pattern: block.pattern,
+      startBar,
+      endBar,
+      energy,
+      eventCount,
+      selected: selectedIndex === index,
+      tone: songFormSegmentTone(eventCount, energy, mutedTracks.length)
+    };
+  });
+}
+
+function firstArrangementSectionIndex(project: ProjectState, section: ArrangementSection): number | null {
+  const index = project.arrangement.findIndex((block) => block.section === section);
+  return index >= 0 ? index : null;
+}
+
+function sectionLocatorTestId(section: ArrangementSection): string {
+  return section.toLowerCase();
 }
 
 function songFormSegmentTone(eventCount: number, energy: number, mutedTrackCount: number): MixCoachTone {
