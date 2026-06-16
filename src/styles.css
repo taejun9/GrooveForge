@@ -2181,7 +2181,10 @@ h2 {
 }
 
 .session-brief-heading strong,
-.session-brief-heading small {
+.session-brief-heading small,
+.session-brief-role-readout span,
+.session-brief-role-readout strong,
+.session-brief-role-readout small {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2196,6 +2199,46 @@ h2 {
 .session-brief-heading small {
   color: rgba(244, 239, 231, 0.56);
   font-size: 11px;
+}
+
+.session-brief-role-readout {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid rgba(213, 140, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(213, 140, 255, 0.06);
+  padding: 6px 7px;
+}
+
+.session-brief-role-readout span {
+  color: rgba(244, 239, 231, 0.56);
+  font-size: 10px;
+}
+
+.session-brief-role-readout strong {
+  color: #d58cff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.session-brief-role-readout small {
+  color: rgba(244, 239, 231, 0.5);
+  font-size: 10px;
+  line-height: 1.25;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.session-brief-role-readout.good {
+  border-color: rgba(120, 240, 200, 0.2);
+  background: rgba(120, 240, 200, 0.055);
+}
+
+.session-brief-role-readout.good strong {
+  color: #78f0c8;
 }
 
 .session-brief-fields {

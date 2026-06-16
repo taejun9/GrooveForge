@@ -1411,6 +1411,14 @@ type HandoffPackRouteSummary = {
   tone: MixCoachTone;
 };
 
+type SessionBriefRoleSummary = {
+  roleLabel: string;
+  statusLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type ExportPreflightCardId = "readiness" | "mix" | "deliverables" | "handoff";
 
 type ExportPreflightCard = {
@@ -6467,6 +6475,7 @@ function SessionBriefPanel({
   onClear: () => void;
 }): ReactElement {
   const filledFields = sessionBriefFilledFields(brief);
+  const roleSummary = createSessionBriefRoleSummary(brief);
 
   return (
     <section className="session-brief-row" data-testid="session-brief" aria-label="Session brief">
@@ -6477,6 +6486,16 @@ function SessionBriefPanel({
         </div>
         <strong data-testid="session-brief-summary">{filledFields}/4 fields</strong>
         <small>{sessionBriefStatus(brief).value}</small>
+        <div
+          aria-label={roleSummary.detailTitle}
+          className={`session-brief-role-readout ${roleSummary.tone}`}
+          data-testid="session-brief-role-readout"
+          title={roleSummary.detailTitle}
+        >
+          <span data-testid="session-brief-role-status">{roleSummary.statusLabel}</span>
+          <strong data-testid="session-brief-role-label">{roleSummary.roleLabel}</strong>
+          <small data-testid="session-brief-role-detail">{roleSummary.detailLabel}</small>
+        </div>
       </div>
       <div className="session-brief-fields">
         <label className="session-brief-field">
@@ -8395,6 +8414,40 @@ function sessionBriefStatus(brief: SessionBrief): Pick<BeatMapMetric, "value" | 
     value: "Empty",
     detail: "Add artist, vibe, reference, or notes",
     tone: "warn"
+  };
+}
+
+function createSessionBriefRoleSummary(brief: SessionBrief): SessionBriefRoleSummary {
+  const filledFields = sessionBriefFilledFields(brief);
+  const status = sessionBriefStatus(brief);
+  const hasArtist = brief.artist.trim().length > 0;
+  const hasVibe = brief.vibe.trim().length > 0;
+  const hasReference = brief.reference.trim().length > 0;
+  const hasNotes = brief.notes.trim().length > 0;
+  const hasContext = hasArtist || hasReference || hasNotes;
+  const nextField = [
+    hasVibe ? null : "Vibe",
+    hasContext ? null : "Artist/ref/notes",
+    hasArtist ? null : "Artist",
+    hasReference ? null : "Reference",
+    hasNotes ? null : "Notes"
+  ].find(Boolean);
+
+  const roleLabel = hasVibe && hasContext
+    ? "Handoff context"
+    : hasVibe
+      ? "Direction seed"
+      : filledFields > 0
+        ? "Brief sketch"
+        : "Open brief";
+  const detailLabel = nextField ? `Next ${nextField}` : "Ready for sheet";
+
+  return {
+    roleLabel,
+    statusLabel: status.value,
+    detailLabel,
+    detailTitle: `${filledFields}/4 fields / ${status.detail} / ${detailLabel}`,
+    tone: status.tone
   };
 }
 
