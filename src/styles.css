@@ -164,6 +164,8 @@ h2 {
 .studio-controls span,
 .sound-control span,
 .master-panel label span,
+.finish-checklist-heading span,
+.finish-checklist-card span,
 .inspector-heading span,
 .note-inspector label span,
 .arrangement-arc-heading span,
@@ -4626,6 +4628,115 @@ input[type="range"] {
 
 .master-finish-row button small {
   color: rgba(244, 239, 231, 0.48);
+  font-size: 10px;
+}
+
+.finish-checklist {
+  display: grid;
+  gap: 9px;
+  border: 1px solid rgba(120, 240, 200, 0.16);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.045);
+  padding: 10px;
+}
+
+.finish-checklist.warn {
+  border-color: rgba(240, 195, 106, 0.2);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.finish-checklist.danger {
+  border-color: rgba(255, 122, 79, 0.24);
+  background: rgba(255, 122, 79, 0.055);
+}
+
+.finish-checklist-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.finish-checklist-heading > div {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.finish-checklist-heading svg {
+  color: #78f0c8;
+}
+
+.finish-checklist.warn .finish-checklist-heading svg {
+  color: #f0c36a;
+}
+
+.finish-checklist.danger .finish-checklist-heading svg {
+  color: #ff7a4f;
+}
+
+.finish-checklist-heading strong,
+.finish-checklist-heading small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finish-checklist-heading strong {
+  color: #f4efe7;
+  font-size: 12px;
+  text-align: end;
+}
+
+.finish-checklist-heading small {
+  grid-column: 1 / -1;
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.finish-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.finish-checklist-card {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border-inline-start: 3px solid #78f0c8;
+  border-radius: 6px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 7px 8px;
+}
+
+.finish-checklist-card.warn {
+  border-inline-start-color: #f0c36a;
+}
+
+.finish-checklist-card.danger {
+  border-inline-start-color: #ff7a4f;
+}
+
+.finish-checklist-card strong,
+.finish-checklist-card small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finish-checklist-card strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.finish-checklist-card small {
+  color: rgba(244, 239, 231, 0.66);
   font-size: 10px;
 }
 

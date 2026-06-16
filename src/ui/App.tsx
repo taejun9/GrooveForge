@@ -869,6 +869,23 @@ type BeatPassportSummary = {
   metrics: BeatPassportMetric[];
 };
 
+type FinishChecklistCardId = "compose" | "arrange" | "mix" | "master" | "handoff";
+
+type FinishChecklistCard = {
+  id: FinishChecklistCardId;
+  label: string;
+  status: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type FinishChecklistSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: FinishChecklistCard[];
+};
+
 type HandoffPackItem = {
   id: "wav" | "stems" | "midi" | "sheet";
   label: string;
@@ -1263,6 +1280,10 @@ export function App(): ReactElement {
   const structureLensActions = useMemo(() => createStructureLensActions(project), [project]);
   const beatPassportSummary = useMemo(
     () => createBeatPassportSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
+  );
+  const finishChecklistSummary = useMemo(
+    () => createFinishChecklistSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
@@ -4700,6 +4721,7 @@ export function App(): ReactElement {
             <strong>{project.masterPreset}</strong>
             <span>{project.masterCeilingDb} dB ceiling</span>
           </div>
+          <FinishChecklist summary={finishChecklistSummary} />
           <ExportMeter analysis={exportAnalysis} />
           <MixCoach analysis={exportAnalysis} stemAnalyses={stemAnalyses} onApplyFix={applyMixFixPreset} />
           <MasterFinishPads pads={masterFinishPadOptions} onApply={applyMasterFinishPad} />
@@ -5502,6 +5524,30 @@ function BeatPassport({ summary }: { summary: BeatPassportSummary }): ReactEleme
             <span>{metric.label}</span>
             <strong>{metric.value}</strong>
             <small>{metric.detail}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FinishChecklist({ summary }: { summary: FinishChecklistSummary }): ReactElement {
+  return (
+    <section className={`finish-checklist ${summary.tone}`} data-testid="finish-checklist" aria-label="Finish checklist">
+      <div className="finish-checklist-heading">
+        <div>
+          <Gauge size={16} aria-hidden="true" />
+          <span>Finish Checklist</span>
+        </div>
+        <strong data-testid="finish-checklist-headline">{summary.headline}</strong>
+        <small data-testid="finish-checklist-detail">{summary.detail}</small>
+      </div>
+      <div className="finish-checklist-grid" data-testid="finish-checklist-grid">
+        {summary.cards.map((card) => (
+          <div className={`finish-checklist-card ${card.tone}`} data-testid={`finish-checklist-${card.id}`} key={card.id}>
+            <span>{card.label}</span>
+            <strong>{card.status}</strong>
+            <small>{card.detail}</small>
           </div>
         ))}
       </div>
@@ -6403,6 +6449,92 @@ function createBeatPassportSummary(
         tone: masterTone
       }
     ]
+  };
+}
+
+function createFinishChecklistSummary(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): FinishChecklistSummary {
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const briefFields = sessionBriefFilledFields(project.sessionBrief);
+  const drums = readinessCheckForId(checks, "drums");
+  const bass = readinessCheckForId(checks, "bass");
+  const harmony = readinessCheckForId(checks, "harmony");
+  const arrangement = readinessCheckForId(checks, "arrangement");
+  const mixChecks = createMixCoachChecks(analysis, stemAnalyses);
+  const mixTone = weakestTone(mixChecks.map((check) => check.tone));
+  const mixReviewCount = mixChecks.filter((check) => check.tone !== "good").length;
+  const structureTone = createStructureLensSummary(project).tone;
+  const composeTone = weakestTone([drums?.tone ?? "danger", bass?.tone ?? "danger", harmony?.tone ?? "danger"]);
+  const arrangeTone = weakestTone([
+    arrangement?.tone ?? "danger",
+    structureTone,
+    isDeliveryTargetAligned(project, target) ? "good" : "warn"
+  ]);
+  const masterTone: MixCoachTone =
+    analysis.status === "Silent"
+      ? "danger"
+      : analysis.status === "Ready" && project.masterPreset === target.preferredMasterPreset
+        ? "good"
+        : "warn";
+  const handoffTone: MixCoachTone =
+    analysis.status === "Ready" && audibleStems.length >= target.stemGoal && briefFields >= 2
+      ? "good"
+      : analysis.status !== "Silent" && (audibleStems.length >= 2 || briefFields > 0)
+        ? "warn"
+        : "danger";
+  const cards: FinishChecklistCard[] = [
+    {
+      id: "compose",
+      label: "Compose",
+      status: composeTone === "good" ? "Playable" : composeTone === "warn" ? "Sketch" : "Needs core",
+      detail: `${drums?.status ?? "Drums"} / ${bass?.status ?? "808"} / ${harmony?.status ?? "Harmony"}`,
+      tone: composeTone
+    },
+    {
+      id: "arrange",
+      label: "Arrange",
+      status: arrangeTone === "good" ? "Target fit" : arrangeTone === "warn" ? "Review shape" : "Too short",
+      detail: `${barCountLabel(bars)} of ${barCountLabel(target.targetBars)} / ${target.name}`,
+      tone: arrangeTone
+    },
+    {
+      id: "mix",
+      label: "Mix",
+      status: mixTone === "good" ? "Balanced" : mixTone === "warn" ? "Check mix" : "Needs signal",
+      detail: mixReviewCount === 0 ? "Mix Coach checks green" : `${mixReviewCount} Mix Coach check${mixReviewCount === 1 ? "" : "s"} to review`,
+      tone: mixTone
+    },
+    {
+      id: "master",
+      label: "Master",
+      status: project.masterPreset,
+      detail: `${analysis.status} / ${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(analysis.headroomDb)} headroom`,
+      tone: masterTone
+    },
+    {
+      id: "handoff",
+      label: "Handoff",
+      status: `${audibleStems.length}/${target.stemGoal} stems`,
+      detail: `${briefFields}/4 brief fields / ${handoffSheetFileName(project)}`,
+      tone: handoffTone
+    }
+  ];
+  const tone = weakestTone(cards.map((card) => card.tone));
+  const readyCount = cards.filter((card) => card.tone === "good").length;
+  const headline =
+    tone === "good" ? "Ready to deliver" : tone === "warn" ? "Finish checks need review" : "Build core before export";
+
+  return {
+    headline,
+    detail: `${readyCount}/${cards.length} ready / ${target.name} / ${analysis.status}`,
+    tone,
+    cards
   };
 }
 
