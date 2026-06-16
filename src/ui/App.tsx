@@ -1418,6 +1418,14 @@ type KeyboardCapturePostureSummary = {
   tone: MixCoachTone;
 };
 
+type ProjectSafetyReadoutSummary = {
+  roleLabel: string;
+  statusLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type HandoffPackItem = {
   id: "wav" | "stems" | "midi" | "sheet";
   label: string;
@@ -1886,6 +1894,7 @@ export function App(): ReactElement {
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const [localDraftRecovery, setLocalDraftRecovery] = useState<LocalDraftRecovery | null>(() => readLocalDraftRecovery());
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState<string | null>(localDraftRecovery?.savedAt ?? null);
+  const [localDraftWriteArmed, setLocalDraftWriteArmed] = useState(false);
   const projectRef = useRef<ProjectState>(starterProject);
   const localDraftReadyRef = useRef(false);
   const localDraftSkipNextWriteRef = useRef(false);
@@ -1988,6 +1997,7 @@ export function App(): ReactElement {
     ? `${transportLoopLabel(transportLoopScope)} / Pattern ${playbackPosition?.pattern ?? project.selectedPattern} / Step ${(currentPatternStep ?? 0) + 1}`
     : transportLoopReadout;
   const localDraftStatusLabel = localDraftSavedAt ? `Draft ${formatLocalDraftSavedAt(localDraftSavedAt)}` : "Draft local";
+  const projectSafetyReadout = createProjectSafetyReadoutSummary(localDraftRecovery, localDraftSavedAt, projectStatus);
   const selectedArrangementNextBlock = project.arrangement[selectedArrangementIndex + 1];
   const selectedArrangementNextBars = selectedArrangementNextBlock ? normalizeArrangementBars(selectedArrangementNextBlock.bars) : 0;
   const selectedArrangementFocus = useMemo(
@@ -2124,6 +2134,9 @@ export function App(): ReactElement {
       localDraftReadyRef.current = true;
       return;
     }
+    if (!localDraftWriteArmed) {
+      return;
+    }
     if (localDraftSkipNextWriteRef.current) {
       localDraftSkipNextWriteRef.current = false;
       return;
@@ -2133,7 +2146,7 @@ export function App(): ReactElement {
     if (savedAt) {
       setLocalDraftSavedAt(savedAt);
     }
-  }, [project]);
+  }, [localDraftWriteArmed, project]);
 
   useEffect(() => {
     setSelectedArrangementIndex((index) => Math.min(index, Math.max(0, project.arrangement.length - 1)));
@@ -2270,6 +2283,7 @@ export function App(): ReactElement {
     projectRef.current = nextProject;
     setUndoStack((history) => appendHistory(history, current));
     setRedoStack([]);
+    setLocalDraftWriteArmed(true);
     setProject(nextProject);
     setComposerActionResult(null);
     setNextMoveResult(null);
@@ -5039,6 +5053,15 @@ export function App(): ReactElement {
           <span>{activeChannelLabel}</span>
           <span>{project.masterPreset}</span>
           <span data-testid="local-draft-status">{localDraftStatusLabel}</span>
+          <div
+            className={`project-safety-readout ${projectSafetyReadout.tone}`}
+            data-testid="project-safety-readout"
+            title={projectSafetyReadout.detailTitle}
+          >
+            <span data-testid="project-safety-status">{projectSafetyReadout.statusLabel}</span>
+            <strong data-testid="project-safety-label">{projectSafetyReadout.roleLabel}</strong>
+            <small data-testid="project-safety-detail">{projectSafetyReadout.detailLabel}</small>
+          </div>
           <span>{projectStatus}</span>
         </div>
       </section>
@@ -8576,6 +8599,54 @@ function createSnapshotSlotRoleSummary(project: ProjectState): SnapshotSlotRoleS
     detailLabel: `${savedCount} takes ready`,
     detailTitle: `${statusLabel} / Latest ${latestSnapshot?.name ?? "saved take"} / Compare takes before restore or delete`,
     tone: "good"
+  };
+}
+
+function createProjectSafetyReadoutSummary(
+  recovery: LocalDraftRecovery | null,
+  localDraftSavedAt: string | null,
+  projectStatus: string
+): ProjectSafetyReadoutSummary {
+  const trimmedStatus = projectStatus.trim();
+
+  if (recovery) {
+    const savedLabel = formatLocalDraftSavedAt(recovery.savedAt);
+    return {
+      roleLabel: "Restore or clear",
+      statusLabel: "Draft found",
+      detailLabel: `${savedLabel} / local only`,
+      detailTitle: `Draft found / ${savedLabel} / Restore Draft or Clear Draft before deciding what to keep`,
+      tone: "warn"
+    };
+  }
+
+  if (localDraftSavedAt) {
+    const savedLabel = formatLocalDraftSavedAt(localDraftSavedAt);
+    return {
+      roleLabel: "Safety net",
+      statusLabel: `Draft ${savedLabel}`,
+      detailLabel: "Save .grooveforge next",
+      detailTitle: `Renderer-local draft written ${savedLabel} / Save a .grooveforge file for a durable copy`,
+      tone: "warn"
+    };
+  }
+
+  if (trimmedStatus.startsWith("Saved ") || trimmedStatus.startsWith("Downloaded ")) {
+    return {
+      roleLabel: "Durable copy",
+      statusLabel: "File saved",
+      detailLabel: "Draft cleared",
+      detailTitle: `${trimmedStatus} / Local draft recovery cleared after explicit save`,
+      tone: "good"
+    };
+  }
+
+  return {
+    roleLabel: "Save file",
+    statusLabel: "Local project",
+    detailLabel: "Draft writes after edits",
+    detailTitle: `${trimmedStatus || "Project ready"} / Use Save for a durable .grooveforge project file`,
+    tone: "warn"
   };
 }
 

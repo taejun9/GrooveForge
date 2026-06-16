@@ -191,7 +191,7 @@ MVP capabilities:
 - Editable arrangement blocks and templates for 8-bar loop, full beat, hook-first, and breakdown structures, using assigned Pattern A/B/C data, selected-block role readout, Arrangement Arc Pads for one-click full-song energy/section posture, Arrangement Focus presets, one-click Drop/Build/Hook Lift moves, per-block track mutes, per-block bar length, selected-block copy/paste, split/merge controls, audible per-block energy, and structure controls for duplicate, move, and delete.
 - Pattern Chain presets, per-step A/B/C cycling, and Chain Expand song-form outlining that edit only arrangement block assignments while preserving Pattern A/B/C musical event data, mixer state, sound design, master state, and existing export paths.
 - Undo/redo edit history for project-level pattern, arrangement, mixer, sound, and master changes, with a UI-local command-strip readout for undo/redo depth.
-- Local draft recovery that writes a bounded versioned project JSON draft to renderer localStorage after project edits, then shows explicit Restore Draft and Clear Draft controls on the next session without replacing `.grooveforge.json` Save/Open.
+- Local draft recovery that writes a bounded versioned project JSON draft to renderer localStorage after project edits, shows a UI-local project safety readout that distinguishes local draft safety from durable `.grooveforge.json` saves, then shows explicit Restore Draft and Clear Draft controls on the next session without replacing `.grooveforge.json` Save/Open.
 - Project Snapshots that save, rename, restore, and delete local beat idea states inside the `.grooveforge.json` file, plus a UI-local slot role readout for save/compare readiness, without cloud sync or nested snapshot recursion.
 - Snapshot Compare derived from local current project state and saved Project Snapshot payloads so users can compare setup, arrangement length, readiness, export, stems, and master posture without restoring, deleting, renaming, saving, or mutating the beat.
 - Desktop editing shortcuts, Keyboard Capture, and Quick Actions command search for arrangement playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, redo, snapshots, blueprints, pattern fills, Arrangement Focus, mix fixes, master finish, and export while leaving focused inputs alone, then showing UI-only local result metrics, audition cues, and next checks after explicit command clicks.
@@ -202,7 +202,7 @@ MVP capabilities:
 - Master preset ceiling, Master Finish Pads, master output role readout, and output gain.
 - Reproducible export peak/RMS/headroom meter with limiter activity status for the current arrangement.
 - Local project save/load as a `.grooveforge.json` file.
-- Local draft recovery as a session-loss safety net only; explicit project files remain the durable save/load workflow.
+- Local draft recovery as a session-loss safety net only, with a UI-local project safety readout; explicit project files remain the durable save/load workflow.
 - WAV export through deterministic offline rendering.
 - Stem export through deterministic offline rendering for isolated drum, 808, synth, and chord WAV files from the current arrangement.
 - MIDI export as a deterministic Standard MIDI File with drum, 808, synth, and chord tracks from the current arrangement.
