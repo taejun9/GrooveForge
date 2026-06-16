@@ -1402,6 +1402,8 @@ type DrumClipboard = {
   hatRepeat: number;
 };
 
+type ChordClipboard = ChordEvent;
+
 type NoteView = {
   step: number;
   pitch: string;
@@ -1753,6 +1755,7 @@ export function App(): ReactElement {
   const [selectedDrumStep, setSelectedDrumStep] = useState<SelectedDrumStep | null>(null);
   const [drumClipboard, setDrumClipboard] = useState<DrumClipboard | null>(null);
   const [selectedChordIndex, setSelectedChordIndex] = useState<number | null>(0);
+  const [chordClipboard, setChordClipboard] = useState<ChordClipboard | null>(null);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
   const [splitAfterBars, setSplitAfterBars] = useState(1);
   const [snapshotNameDrafts, setSnapshotNameDrafts] = useState<Record<string, string>>({});
@@ -4022,6 +4025,55 @@ export function App(): ReactElement {
     );
   }
 
+  function copySelectedChord(): void {
+    if (selectedChordIndex === null) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+
+    const source = activePattern(projectRef.current).chordEvents[selectedChordIndex];
+    if (!source) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+
+    setChordClipboard({ ...source });
+    setProjectStatus(`Copied ${source.root}${source.quality} chord`);
+  }
+
+  function pasteCopiedChord(): void {
+    const clipboard = chordClipboard;
+    if (!clipboard) {
+      setProjectStatus("Copy a chord first");
+      return;
+    }
+
+    let nextSelectedIndex: number | null = null;
+    let rejectedStatus = "";
+    const changed = updateCurrentPattern((pattern) => {
+      const nextStep = nextEmptyChordStep(pattern.chordEvents, clipboard.step);
+      if (nextStep === null) {
+        rejectedStatus = "No empty step for pasted chord";
+        return pattern;
+      }
+      const pastedChord: ChordEvent = { ...clipboard, step: nextStep };
+      const chordEvents = sortChordEvents([...pattern.chordEvents, pastedChord]);
+      nextSelectedIndex = findChordEventIndex(chordEvents, pastedChord);
+      return {
+        ...pattern,
+        chordEvents
+      };
+    }, "Pasted chord event");
+
+    if (changed) {
+      setSelectedChordIndex(nextSelectedIndex);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+    } else if (rejectedStatus) {
+      setProjectStatus(rejectedStatus);
+    }
+  }
+
   function duplicateSelectedChord(): void {
     if (selectedChordIndex === null) {
       setProjectStatus("Select a chord event");
@@ -5034,6 +5086,7 @@ export function App(): ReactElement {
           />
           <ChordEditor
             chordPads={chordPadOptions}
+            chordClipboard={chordClipboard}
             chordRhythms={chordRhythmOptions}
             chordVoicings={chordVoicingOptions}
             chords={currentPattern.chordEvents}
@@ -5041,11 +5094,13 @@ export function App(): ReactElement {
             selectedIndex={selectedChordIndex}
             onAdd={addChordEvent}
             onChange={updateChordEvent}
+            onCopy={copySelectedChord}
             onDelete={deleteChordEvent}
             onDuplicate={duplicateSelectedChord}
             onInvert={moveSelectedChordInversion}
             onMoveStep={moveSelectedChordStep}
             onPad={applyChordPad}
+            onPaste={pasteCopiedChord}
             onPreset={applyChordProgressionPreset}
             onRhythm={applyChordRhythm}
             onSelect={selectChordEvent}
@@ -12708,6 +12763,7 @@ function SoundControl({
 
 function ChordEditor({
   chordPads,
+  chordClipboard,
   chordRhythms,
   chordVoicings,
   chords,
@@ -12715,17 +12771,20 @@ function ChordEditor({
   selectedIndex,
   onAdd,
   onChange,
+  onCopy,
   onDelete,
   onDuplicate,
   onInvert,
   onMoveStep,
   onPad,
+  onPaste,
   onPreset,
   onRhythm,
   onSelect,
   onVoicing
 }: {
   chordPads: ChordPadOption[];
+  chordClipboard: ChordClipboard | null;
   chordRhythms: ChordRhythmOption[];
   chordVoicings: ChordVoicingOption[];
   chords: ChordEvent[];
@@ -12733,11 +12792,13 @@ function ChordEditor({
   selectedIndex: number | null;
   onAdd: () => void;
   onChange: (index: number, update: Partial<ChordEvent>) => boolean;
+  onCopy: () => void;
   onDelete: (index: number) => boolean;
   onDuplicate: () => void;
   onInvert: (direction: -1 | 1) => void;
   onMoveStep: (direction: -1 | 1) => void;
   onPad: (pad: ChordPadId) => void;
+  onPaste: () => void;
   onPreset: (preset: ChordProgressionPreset) => void;
   onRhythm: (rhythm: ChordRhythmId) => void;
   onSelect: (index: number) => void;
@@ -12745,6 +12806,7 @@ function ChordEditor({
 }): ReactElement {
   const selectedChord = selectedIndex === null ? undefined : chords[selectedIndex];
   const selectedInversion = selectedChord ? normalizeChordInversion(selectedChord.inversion) : 0;
+  const chordClipboardLabel = chordClipboard ? `${chordClipboard.root}${chordClipboard.quality}.${chordClipboard.step + 1}` : "Empty";
   const canMoveLeft =
     selectedIndex !== null &&
     selectedChord !== undefined &&
@@ -12756,6 +12818,7 @@ function ChordEditor({
     selectedChord.step < 15 &&
     !chords.some((chord, index) => index !== selectedIndex && chord.step === selectedChord.step + 1);
   const canDuplicate = selectedChord ? nextEmptyChordStep(chords, selectedChord.step) !== null : false;
+  const canPaste = chordClipboard ? nextEmptyChordStep(chords, chordClipboard.step) !== null : false;
 
   return (
     <div className="chord-editor">
@@ -12875,7 +12938,7 @@ function ChordEditor({
           type="button"
         >
           <Copy size={13} aria-hidden="true" />
-          <span>Copy</span>
+          <span>Dup</span>
         </button>
         <button
           data-testid="chord-invert-down"
@@ -12897,6 +12960,17 @@ function ChordEditor({
           <ArrowUp size={13} aria-hidden="true" />
           <span>Voice</span>
         </button>
+      </div>
+      <div className="chord-clipboard-row" aria-label="Chord clipboard">
+        <button data-testid="chord-copy" disabled={!selectedChord} onClick={onCopy} title="Copy selected chord shape" type="button">
+          <Copy size={13} aria-hidden="true" />
+          <span>Copy</span>
+        </button>
+        <button data-testid="chord-paste" disabled={!canPaste} onClick={onPaste} title="Paste copied chord to the next empty step" type="button">
+          <Plus size={13} aria-hidden="true" />
+          <span>Paste</span>
+        </button>
+        <small data-testid="chord-clipboard-detail">{chordClipboard ? `Clipboard ${chordClipboardLabel}` : "Clipboard empty"}</small>
       </div>
       <div className="chord-slots">
         {chords.map((chord, index) => (

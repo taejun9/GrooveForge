@@ -5534,6 +5534,13 @@ input[type="range"] {
   gap: 6px;
 }
 
+.chord-clipboard-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-items: center;
+}
+
 .chord-pad-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5595,7 +5602,8 @@ input[type="range"] {
 .chord-rhythm-row button,
 .chord-voicing-row button,
 .chord-tools > button,
-.chord-edit-row button {
+.chord-edit-row button,
+.chord-clipboard-row button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5675,11 +5683,24 @@ input[type="range"] {
   opacity: 0.42;
 }
 
-.chord-edit-row button span {
+.chord-clipboard-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.chord-edit-row button span,
+.chord-clipboard-row button span,
+.chord-clipboard-row small {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chord-clipboard-row small {
+  grid-column: 1 / -1;
+  color: #aba193;
+  font-size: 11px;
 }
 
 .chord-slots {
