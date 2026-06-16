@@ -167,6 +167,7 @@ import {
   soundPresetDesign,
   soundPresetIds,
   soundPresetLabel,
+  StyleId,
   StyleProfile,
   styleSoundPreset,
   starterProject,
@@ -980,6 +981,8 @@ type ComposerGuideSummary = {
   cards: ComposerGuideCard[];
 };
 
+type ComposerActionArea = "drums" | "bass" | "harmony" | "melody" | "arrange" | "finish";
+
 type ComposerActionCommand =
   | { kind: "blueprint"; blueprintId: BeatBlueprintId }
   | { kind: "drumFoundation"; foundation: DrumFoundationId }
@@ -993,10 +996,12 @@ type ComposerActionCommand =
 
 type ComposerAction = {
   id: string;
+  area: ComposerActionArea;
   label: string;
   detail: string;
   buttonLabel: string;
   tone: MixCoachTone;
+  priority: number;
   command: ComposerActionCommand;
 };
 
@@ -1005,6 +1010,154 @@ type ComposerActionsSummary = {
   detail: string;
   tone: MixCoachTone;
   actions: ComposerAction[];
+};
+
+type ComposerStyleActionGoals = {
+  drumHits: number;
+  bassNotes: number;
+  chordEvents: number;
+  melodyNotes: number;
+  arrangementBars: number;
+};
+
+type ComposerStyleActionProfile = {
+  focus: string;
+  priorities: Record<ComposerActionArea, number>;
+  goals: ComposerStyleActionGoals;
+  cues: Record<ComposerActionArea, string>;
+};
+
+const composerStyleActionProfiles: Record<StyleId, ComposerStyleActionProfile> = {
+  trap: {
+    focus: "808 pocket first",
+    priorities: { bass: 1, drums: 2, melody: 3, arrange: 4, harmony: 5, finish: 6 },
+    goals: { drumHits: 12, bassNotes: 5, chordEvents: 2, melodyNotes: 4, arrangementBars: 8 },
+    cues: {
+      drums: "bounce grid",
+      bass: "slide 808",
+      harmony: "dark loop",
+      melody: "hook riff",
+      arrange: "drop contrast",
+      finish: "headroom check"
+    }
+  },
+  drill: {
+    focus: "808 and space",
+    priorities: { bass: 1, drums: 2, arrange: 3, melody: 4, harmony: 5, finish: 6 },
+    goals: { drumHits: 10, bassNotes: 5, chordEvents: 2, melodyNotes: 3, arrangementBars: 8 },
+    cues: {
+      drums: "half-time pocket",
+      bass: "slide 808",
+      harmony: "dark bed",
+      melody: "ambient lead",
+      arrange: "switch sections",
+      finish: "headroom check"
+    }
+  },
+  boom_bap: {
+    focus: "drum pocket first",
+    priorities: { drums: 1, harmony: 2, bass: 3, melody: 4, arrange: 5, finish: 6 },
+    goals: { drumHits: 14, bassNotes: 3, chordEvents: 2, melodyNotes: 3, arrangementBars: 8 },
+    cues: {
+      drums: "swing pocket",
+      bass: "walking anchor",
+      harmony: "loop color",
+      melody: "call back",
+      arrange: "A/B contrast",
+      finish: "warm demo"
+    }
+  },
+  lofi: {
+    focus: "harmony and pocket",
+    priorities: { harmony: 1, drums: 2, melody: 3, bass: 4, arrange: 5, finish: 6 },
+    goals: { drumHits: 10, bassNotes: 3, chordEvents: 4, melodyNotes: 3, arrangementBars: 8 },
+    cues: {
+      drums: "laid-back grid",
+      bass: "soft anchor",
+      harmony: "warm chords",
+      melody: "answer phrase",
+      arrange: "loop variation",
+      finish: "soft ceiling"
+    }
+  },
+  house: {
+    focus: "groove and form",
+    priorities: { drums: 1, bass: 2, arrange: 3, harmony: 4, melody: 5, finish: 6 },
+    goals: { drumHits: 18, bassNotes: 4, chordEvents: 3, melodyNotes: 2, arrangementBars: 16 },
+    cues: {
+      drums: "club pulse",
+      bass: "offbeat bass",
+      harmony: "chord stab",
+      melody: "lift motif",
+      arrange: "club sections",
+      finish: "club preview"
+    }
+  },
+  rnb: {
+    focus: "chords and pocket",
+    priorities: { harmony: 1, bass: 2, melody: 3, drums: 4, arrange: 5, finish: 6 },
+    goals: { drumHits: 10, bassNotes: 4, chordEvents: 4, melodyNotes: 4, arrangementBars: 8 },
+    cues: {
+      drums: "soft pocket",
+      bass: "sub movement",
+      harmony: "lush chords",
+      melody: "vocal pocket",
+      arrange: "vocal space",
+      finish: "vocal headroom"
+    }
+  },
+  jersey: {
+    focus: "bounce and sections",
+    priorities: { drums: 1, bass: 2, arrange: 3, melody: 4, harmony: 5, finish: 6 },
+    goals: { drumHits: 18, bassNotes: 4, chordEvents: 2, melodyNotes: 4, arrangementBars: 8 },
+    cues: {
+      drums: "club bounce",
+      bass: "offbeat sub",
+      harmony: "simple color",
+      melody: "riff energy",
+      arrange: "switch-ups",
+      finish: "club preview"
+    }
+  },
+  phonk: {
+    focus: "808 grit first",
+    priorities: { bass: 1, drums: 2, melody: 3, harmony: 4, arrange: 5, finish: 6 },
+    goals: { drumHits: 12, bassNotes: 5, chordEvents: 2, melodyNotes: 3, arrangementBars: 8 },
+    cues: {
+      drums: "knock grid",
+      bass: "slide 808",
+      harmony: "dark loop",
+      melody: "grit motif",
+      arrange: "drop contrast",
+      finish: "drive check"
+    }
+  },
+  garage: {
+    focus: "shuffle and bass",
+    priorities: { drums: 1, bass: 2, melody: 3, arrange: 4, harmony: 5, finish: 6 },
+    goals: { drumHits: 16, bassNotes: 4, chordEvents: 3, melodyNotes: 3, arrangementBars: 8 },
+    cues: {
+      drums: "shuffle pocket",
+      bass: "sync bass",
+      harmony: "chord color",
+      melody: "riff lift",
+      arrange: "A/B switch",
+      finish: "club preview"
+    }
+  },
+  experimental: {
+    focus: "shape and contrast",
+    priorities: { arrange: 1, melody: 2, bass: 3, drums: 4, harmony: 5, finish: 6 },
+    goals: { drumHits: 8, bassNotes: 3, chordEvents: 2, melodyNotes: 3, arrangementBars: 8 },
+    cues: {
+      drums: "open rhythm",
+      bass: "reese anchor",
+      harmony: "tension bed",
+      melody: "texture phrase",
+      arrange: "contrast map",
+      finish: "safe output"
+    }
+  }
 };
 
 type BeatPassportMetric = {
@@ -7819,6 +7972,7 @@ function createComposerActionsSummary(
   const pattern = activePattern(project);
   const target = activeDeliveryTarget(project);
   const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const styleActionProfile = composerActionStyleProfile(project);
   const drumHits = drumHitCount(pattern);
   const bassCount = pattern.bassNotes.length;
   const chordCount = pattern.chordEvents.length;
@@ -7827,113 +7981,160 @@ function createComposerActionsSummary(
   const mixTone = weakestTone(createMixCoachChecks(analysis, stemAnalyses).map((check) => check.tone));
   const audibleStemCount = audibleStemTracks(stemAnalyses).length;
 
-  const actions: ComposerAction[] = [
-    composerDrumAction(project, checks, drumHits),
-    composerBassAction(project, bassCount),
-    composerHarmonyAction(project, chordCount),
-    composerMelodyAction(project, melodyCount),
-    composerArrangementAction(project, bars, target),
-    composerFinishAction(project, analysis, mixTone, audibleStemCount, target)
-  ];
+  const actions = [
+    composerDrumAction(project, checks, drumHits, styleActionProfile),
+    composerBassAction(project, bassCount, styleActionProfile),
+    composerHarmonyAction(project, chordCount, styleActionProfile),
+    composerMelodyAction(project, melodyCount, styleActionProfile),
+    composerArrangementAction(project, bars, target, styleActionProfile),
+    composerFinishAction(project, analysis, mixTone, audibleStemCount, target, styleActionProfile)
+  ].sort(composerActionSort);
 
   return {
-    headline: composerActionsFocus(actions),
-    detail: `${styleName} / Pattern ${project.selectedPattern} / ${actions.length} explicit writing moves`,
+    headline: composerActionsFocus(actions, styleName),
+    detail: `${styleName} priority: ${styleActionProfile.focus} / Pattern ${project.selectedPattern} / ${actions.length} moves`,
     tone: weakestTone(actions.map((action) => action.tone)),
     actions
   };
 }
 
-function composerDrumAction(project: ProjectState, checks: BeatReadinessCheck[], drumHits: number): ComposerAction {
+function composerDrumAction(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  drumHits: number,
+  styleActionProfile: ComposerStyleActionProfile
+): ComposerAction {
   const drums = readinessCheckForId(checks, "drums");
-  if (drumHits < 10 || drums?.tone === "danger") {
-    const foundation = drumHits === 0 ? "straight" : "bounce";
+  const goal = styleActionProfile.goals.drumHits;
+  const tone = composerActionTone(drumHits, goal);
+  if (drumHits < goal || drums?.tone === "danger") {
+    const foundation = composerDrumFoundation(project);
     return {
       id: "drums-foundation",
+      area: "drums",
       label: "Build rhythm foundation",
-      detail: `Pattern ${project.selectedPattern} / ${drumHits} hits`,
+      detail: `${styleActionProfile.cues.drums} / ${drumHits}/${goal} hits`,
       buttonLabel: "Drum Foundation",
-      tone: drums?.tone ?? (drumHits > 0 ? "warn" : "danger"),
+      tone: drums?.tone === "danger" ? "danger" : tone,
+      priority: composerActionPriority("drums", drums?.tone === "danger" ? "danger" : tone, styleActionProfile),
       command: { kind: "drumFoundation", foundation }
     };
   }
 
   return {
     id: "drums-fill",
+    area: "drums",
     label: "Add drum movement",
-    detail: `Pattern ${project.selectedPattern} tail move`,
+    detail: `${styleActionProfile.cues.drums} / tail move`,
     buttonLabel: "Drum Fill",
     tone: "good",
+    priority: composerActionPriority("drums", "good", styleActionProfile),
     command: { kind: "patternFill", preset: "drum_fill" }
   };
 }
 
-function composerBassAction(project: ProjectState, bassCount: number): ComposerAction {
-  if (bassCount < 4) {
+function composerBassAction(
+  project: ProjectState,
+  bassCount: number,
+  styleActionProfile: ComposerStyleActionProfile
+): ComposerAction {
+  const goal = styleActionProfile.goals.bassNotes;
+  const tone = composerActionTone(bassCount, goal);
+  if (bassCount < goal) {
     const pad = composerBasslinePad(project);
     return {
       id: "bassline",
+      area: "bass",
       label: "Write low end",
-      detail: `${basslinePadLabel(pad)} / Pattern ${project.selectedPattern}`,
+      detail: `${styleActionProfile.cues.bass} / ${basslinePadLabel(pad)} ${bassCount}/${goal}`,
       buttonLabel: "808 Bassline",
-      tone: bassCount === 0 ? "danger" : "warn",
+      tone,
+      priority: composerActionPriority("bass", tone, styleActionProfile),
       command: { kind: "bassline", pad }
     };
   }
 
   return {
     id: "bass-pickup",
+    area: "bass",
     label: "Add low-end pickup",
-    detail: `Pattern ${project.selectedPattern} tail move`,
+    detail: `${styleActionProfile.cues.bass} / tail move`,
     buttonLabel: "808 Pickup",
     tone: "good",
+    priority: composerActionPriority("bass", "good", styleActionProfile),
     command: { kind: "patternFill", preset: "bass_pickup" }
   };
 }
 
-function composerHarmonyAction(project: ProjectState, chordCount: number): ComposerAction {
+function composerHarmonyAction(
+  project: ProjectState,
+  chordCount: number,
+  styleActionProfile: ComposerStyleActionProfile
+): ComposerAction {
   const preset = composerChordPreset(project);
+  const goal = styleActionProfile.goals.chordEvents;
+  const tone = composerActionTone(chordCount, goal);
   return {
-    id: chordCount < 3 ? "chord-progression" : "chord-color",
-    label: chordCount < 3 ? "Set chord motion" : "Refresh chord color",
-    detail: `${chordProgressionPresetLabel(preset)} / ${project.key}`,
-    buttonLabel: chordCount < 3 ? "Chord Progression" : "Chord Color",
-    tone: chordCount >= 3 ? "good" : chordCount > 0 ? "warn" : "danger",
+    id: chordCount < goal ? "chord-progression" : "chord-color",
+    area: "harmony",
+    label: chordCount < goal ? "Set chord motion" : "Refresh chord color",
+    detail: `${styleActionProfile.cues.harmony} / ${chordProgressionPresetLabel(preset)} ${chordCount}/${goal}`,
+    buttonLabel: chordCount < goal ? "Chord Progression" : "Chord Color",
+    tone,
+    priority: composerActionPriority("harmony", tone, styleActionProfile),
     command: { kind: "chordProgression", preset }
   };
 }
 
-function composerMelodyAction(project: ProjectState, melodyCount: number): ComposerAction {
-  if (melodyCount < 4) {
+function composerMelodyAction(
+  project: ProjectState,
+  melodyCount: number,
+  styleActionProfile: ComposerStyleActionProfile
+): ComposerAction {
+  const goal = styleActionProfile.goals.melodyNotes;
+  const tone = composerActionTone(melodyCount, goal);
+  if (melodyCount < goal) {
     const motif = composerMelodyMotif(project);
     return {
       id: "melody-motif",
+      area: "melody",
       label: "Seed hook motif",
-      detail: `${melodyMotifLabel(motif)} / ${project.key}`,
+      detail: `${styleActionProfile.cues.melody} / ${melodyMotifLabel(motif)} ${melodyCount}/${goal}`,
       buttonLabel: "Melody Motif",
-      tone: melodyCount === 0 ? "danger" : "warn",
+      tone,
+      priority: composerActionPriority("melody", tone, styleActionProfile),
       command: { kind: "melodyMotif", motif }
     };
   }
 
   return {
     id: "melody-turn",
+    area: "melody",
     label: "Turn the melody tail",
-    detail: `Pattern ${project.selectedPattern} tail move`,
+    detail: `${styleActionProfile.cues.melody} / tail move`,
     buttonLabel: "Melody Turn",
     tone: "good",
+    priority: composerActionPriority("melody", "good", styleActionProfile),
     command: { kind: "patternFill", preset: "melody_turn" }
   };
 }
 
-function composerArrangementAction(project: ProjectState, bars: number, target: DeliveryTarget): ComposerAction {
-  if (bars < 8) {
+function composerArrangementAction(
+  project: ProjectState,
+  bars: number,
+  target: DeliveryTarget,
+  styleActionProfile: ComposerStyleActionProfile
+): ComposerAction {
+  const styleBarGoal = Math.min(target.targetBars, styleActionProfile.goals.arrangementBars);
+  if (bars < styleBarGoal) {
     return {
       id: "arrange-chain",
+      area: "arrange",
       label: "Sketch song form",
-      detail: `${barCountLabel(bars)} now / 8-bar chain`,
+      detail: `${styleActionProfile.cues.arrange} / ${barCountLabel(bars)} now`,
       buttonLabel: "8 Bar Chain",
       tone: "danger",
+      priority: composerActionPriority("arrange", "danger", styleActionProfile),
       command: { kind: "patternChain", chain: "eight_bar" }
     };
   }
@@ -7941,20 +8142,24 @@ function composerArrangementAction(project: ProjectState, bars: number, target: 
   if (bars < target.targetBars) {
     return {
       id: "arrange-template",
+      area: "arrange",
       label: `Reach ${target.name}`,
-      detail: `${barCountLabel(bars)} now / ${barCountLabel(target.targetBars)} target`,
+      detail: `${styleActionProfile.cues.arrange} / ${barCountLabel(target.targetBars)} target`,
       buttonLabel: arrangementTemplateLabel(target.preferredTemplate),
       tone: "warn",
+      priority: composerActionPriority("arrange", "warn", styleActionProfile),
       command: { kind: "arrangementTemplate", template: target.preferredTemplate }
     };
   }
 
   return {
     id: "arrange-switch",
+    area: "arrange",
     label: "Add section contrast",
-    detail: `${barCountLabel(bars)} form / Pattern A/B/C`,
+    detail: `${styleActionProfile.cues.arrange} / ${barCountLabel(bars)} form`,
     buttonLabel: "Hook Switch",
     tone: "good",
+    priority: composerActionPriority("arrange", "good", styleActionProfile),
     command: { kind: "patternChain", chain: "hook_switch" }
   };
 }
@@ -7964,7 +8169,8 @@ function composerFinishAction(
   analysis: ExportAnalysis,
   mixTone: MixCoachTone,
   audibleStemCount: number,
-  target: DeliveryTarget
+  target: DeliveryTarget,
+  styleActionProfile: ComposerStyleActionProfile
 ): ComposerAction {
   const pad = suggestedMasterFinishPad(project);
   const tone: MixCoachTone =
@@ -7972,24 +8178,68 @@ function composerFinishAction(
 
   return {
     id: "finish-master",
+    area: "finish",
     label: "Set output posture",
-    detail: `${analysis.status} / ${audibleStemCount}/${target.stemGoal} stems`,
+    detail: `${styleActionProfile.cues.finish} / ${audibleStemCount}/${target.stemGoal} stems`,
     buttonLabel: `${masterFinishPadLabel(pad)} Finish`,
     tone,
+    priority: composerActionPriority("finish", tone, styleActionProfile),
     command: { kind: "masterFinish", pad }
   };
 }
 
-function composerActionsFocus(actions: ComposerAction[]): string {
+function composerActionStyleProfile(project: ProjectState): ComposerStyleActionProfile {
+  return composerStyleActionProfiles[project.styleId];
+}
+
+function composerActionPriority(
+  area: ComposerActionArea,
+  tone: MixCoachTone,
+  styleActionProfile: ComposerStyleActionProfile
+): number {
+  const toneOffset = tone === "danger" ? 0 : tone === "warn" ? 20 : 40;
+  return toneOffset + styleActionProfile.priorities[area];
+}
+
+function composerActionSort(first: ComposerAction, second: ComposerAction): number {
+  return first.priority - second.priority || first.label.localeCompare(second.label);
+}
+
+function composerActionTone(current: number, goal: number): MixCoachTone {
+  if (current >= goal) {
+    return "good";
+  }
+  return current > 0 ? "warn" : "danger";
+}
+
+function composerActionsFocus(actions: ComposerAction[], styleName: string): string {
   const firstDanger = actions.find((action) => action.tone === "danger");
   if (firstDanger) {
-    return `${firstDanger.label} is ready to run`;
+    return `${styleName}: ${firstDanger.label} is ready to run`;
   }
   const firstWarn = actions.find((action) => action.tone === "warn");
   if (firstWarn) {
-    return `${firstWarn.label} is the next safe move`;
+    return `${styleName}: ${firstWarn.label} is the next safe move`;
   }
-  return "Writing actions are ready for variation";
+  return `${styleName}: writing actions are ready for variation`;
+}
+
+function composerDrumFoundation(project: ProjectState): DrumFoundationId {
+  switch (project.styleId) {
+    case "house":
+    case "jersey":
+    case "garage":
+      return "club";
+    case "drill":
+    case "experimental":
+      return "half";
+    case "trap":
+    case "boom_bap":
+    case "lofi":
+    case "rnb":
+    case "phonk":
+      return "bounce";
+  }
 }
 
 function composerBasslinePad(project: ProjectState): BasslinePadId {
