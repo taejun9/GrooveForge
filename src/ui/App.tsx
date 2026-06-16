@@ -1043,6 +1043,7 @@ type SectionLocatorPad = {
   energy: number;
   eventCount: number;
   selected: boolean;
+  playing: boolean;
   tone: MixCoachTone;
 };
 
@@ -2038,6 +2039,10 @@ export function App(): ReactElement {
   const canRedo = redoStack.length > 0;
   const editHistoryReadout = createEditHistoryReadoutSummary(undoStack.length, redoStack.length, projectStatus);
   const currentPatternStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
+  const playingArrangementIndex =
+    isPlaying && playbackPosition?.mode === "arrangement" && typeof playbackPosition.arrangementIndex === "number"
+      ? playbackPosition.arrangementIndex
+      : null;
   const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const selectedArrangementBars = selectedArrangementBlock ? normalizeArrangementBars(selectedArrangementBlock.bars) : 1;
   const selectedArrangementStartBar = arrangementStartBar(project, selectedArrangementIndex);
@@ -2078,8 +2083,8 @@ export function App(): ReactElement {
     [project, selectedArrangementIndex]
   );
   const sectionLocatorPads = useMemo(
-    () => createSectionLocatorPads(project, selectedArrangementIndex),
-    [project, selectedArrangementIndex]
+    () => createSectionLocatorPads(project, selectedArrangementIndex, playingArrangementIndex),
+    [playingArrangementIndex, project, selectedArrangementIndex]
   );
   const selectedArrangementBlockRole = useMemo(
     () => selectedArrangementBlockRoleSummary(project, selectedArrangementIndex),
@@ -5331,7 +5336,11 @@ export function App(): ReactElement {
 
       <StructureLens summary={structureLensSummary} actions={structureLensActions} onRun={runNextMove} />
 
-      <SongFormOverview summary={songFormOverviewSummary} onSelectBlock={selectArrangementBlock} />
+      <SongFormOverview
+        playingArrangementIndex={playingArrangementIndex}
+        summary={songFormOverviewSummary}
+        onSelectBlock={selectArrangementBlock}
+      />
 
       <NextMove actions={nextMoveActions} result={nextMoveResult} onRun={runNextMove} />
 
@@ -5727,25 +5736,30 @@ export function App(): ReactElement {
           </div>
           <ArrangementFocusPanel summary={selectedArrangementFocus} onApply={applyArrangementFocusPreset} />
           <div className="arrangement-track">
-            {project.arrangement.map((block, index) => (
-              <button
-                aria-label={`Block ${index + 1} ${block.section} Pattern ${block.pattern} ${barCountLabel(block.bars)}`}
-                aria-pressed={selectedArrangementIndex === index}
-                className={["arrangement-block", selectedArrangementIndex === index ? "selected" : ""]
-                  .filter(Boolean)
-                  .join(" ")}
-                data-testid={`arrangement-block-${index}`}
-                key={`${block.section}-${index}`}
-                onClick={() => selectArrangementBlock(index)}
-                type="button"
-              >
-                <span>{block.section}</span>
-                <strong>{block.pattern}</strong>
-                <small>{barCountLabel(block.bars)}</small>
-                {block.mutedTracks.length > 0 && <em>{block.mutedTracks.length} mute</em>}
-                <i style={{ inlineSize: `${Math.max(18, block.energy * 100)}%` }} />
-              </button>
-            ))}
+            {project.arrangement.map((block, index) => {
+              const selected = selectedArrangementIndex === index;
+              const playing = playingArrangementIndex === index;
+              return (
+                <button
+                  aria-label={`Block ${index + 1} ${block.section} Pattern ${block.pattern} ${barCountLabel(block.bars)}`}
+                  aria-pressed={selected}
+                  className={["arrangement-block", selected ? "selected" : "", playing ? "playing" : ""]
+                    .filter(Boolean)
+                    .join(" ")}
+                  data-playing={playing ? "true" : "false"}
+                  data-testid={`arrangement-block-${index}`}
+                  key={`${block.section}-${index}`}
+                  onClick={() => selectArrangementBlock(index)}
+                  type="button"
+                >
+                  <span>{block.section}</span>
+                  <strong>{block.pattern}</strong>
+                  <small>{barCountLabel(block.bars)}</small>
+                  {block.mutedTracks.length > 0 && <em>{block.mutedTracks.length} mute</em>}
+                  <i style={{ inlineSize: `${Math.max(18, block.energy * 100)}%` }} />
+                </button>
+              );
+            })}
           </div>
           {selectedArrangementBlock && (
             <div className="arrangement-editor" aria-label="Selected arrangement block editor">
@@ -6603,7 +6617,10 @@ function SectionLocatorPads({
           return (
             <button
               aria-pressed={pad.selected}
-              className={[pad.tone, pad.selected ? "selected" : "", missing ? "missing" : ""].filter(Boolean).join(" ")}
+              className={[pad.tone, pad.selected ? "selected" : "", pad.playing ? "playing" : "", missing ? "missing" : ""]
+                .filter(Boolean)
+                .join(" ")}
+              data-playing={pad.playing ? "true" : "false"}
               data-testid={`section-locator-${sectionLocatorTestId(pad.section)}`}
               disabled={disabledPad}
               key={pad.section}
@@ -7788,9 +7805,11 @@ function StructureLens({
 
 function SongFormOverview({
   onSelectBlock,
+  playingArrangementIndex,
   summary
 }: {
   onSelectBlock: (index: number) => void;
+  playingArrangementIndex: number | null;
   summary: SongFormOverviewSummary;
 }): ReactElement {
   return (
@@ -7815,10 +7834,14 @@ function SongFormOverview({
       <div className="song-form-timeline" data-testid="song-form-timeline">
         {summary.segments.map((segment) => {
           const selected = segment.index === summary.selectedIndex;
+          const playing = segment.index === playingArrangementIndex;
           return (
             <button
               aria-pressed={selected}
-              className={["song-form-segment", segment.tone, selected ? "selected" : ""].filter(Boolean).join(" ")}
+              className={["song-form-segment", segment.tone, selected ? "selected" : "", playing ? "playing" : ""]
+                .filter(Boolean)
+                .join(" ")}
+              data-playing={playing ? "true" : "false"}
               data-testid={`song-form-segment-${segment.index}`}
               key={`${segment.section}-${segment.index}-${segment.pattern}`}
               onClick={() => onSelectBlock(segment.index)}
@@ -11332,7 +11355,11 @@ function createSongFormSegments(project: ProjectState): SongFormSegment[] {
   });
 }
 
-function createSectionLocatorPads(project: ProjectState, selectedIndex: number): SectionLocatorPad[] {
+function createSectionLocatorPads(
+  project: ProjectState,
+  selectedIndex: number,
+  playingIndex: number | null
+): SectionLocatorPad[] {
   return arrangementSections.map((section) => {
     const index = firstArrangementSectionIndex(project, section);
     if (index === null) {
@@ -11345,6 +11372,7 @@ function createSectionLocatorPads(project: ProjectState, selectedIndex: number):
         energy: 0,
         eventCount: 0,
         selected: false,
+        playing: false,
         tone: "danger"
       };
     }
@@ -11366,6 +11394,7 @@ function createSectionLocatorPads(project: ProjectState, selectedIndex: number):
       energy,
       eventCount,
       selected: selectedIndex === index,
+      playing: playingIndex === index,
       tone: songFormSegmentTone(eventCount, energy, mutedTracks.length)
     };
   });
