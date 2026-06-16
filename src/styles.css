@@ -316,6 +316,7 @@ h2 {
 }
 
 .tap-tempo-readout,
+.transport-position-readout,
 .edit-history-readout,
 .keyboard-capture-posture {
   display: grid;
@@ -331,6 +332,7 @@ h2 {
 }
 
 .tap-tempo-readout.good,
+.transport-position-readout.good,
 .edit-history-readout.good,
 .keyboard-capture-posture.good {
   border-color: rgba(120, 240, 200, 0.24);
@@ -338,15 +340,24 @@ h2 {
 }
 
 .tap-tempo-readout.warn,
+.transport-position-readout.warn,
 .edit-history-readout.warn,
 .keyboard-capture-posture.warn {
   border-color: rgba(244, 204, 120, 0.24);
   background: rgba(244, 204, 120, 0.06);
 }
 
+.transport-position-readout.danger {
+  border-color: rgba(255, 117, 117, 0.24);
+  background: rgba(255, 117, 117, 0.07);
+}
+
 .tap-tempo-readout span,
 .tap-tempo-readout strong,
 .tap-tempo-readout small,
+.transport-position-readout span,
+.transport-position-readout strong,
+.transport-position-readout small,
 .edit-history-readout span,
 .edit-history-readout strong,
 .edit-history-readout small,

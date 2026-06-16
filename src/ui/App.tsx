@@ -1443,6 +1443,14 @@ type TapTempoReadoutSummary = {
   tone: MixCoachTone;
 };
 
+type TransportPositionReadoutSummary = {
+  roleLabel: string;
+  statusLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type KeyboardCapturePostureSummary = {
   roleLabel: string;
   statusLabel: string;
@@ -2034,6 +2042,14 @@ export function App(): ReactElement {
   const transportSecondary = isPlaying
     ? `${transportLoopLabel(transportLoopScope)} / Pattern ${playbackPosition?.pattern ?? project.selectedPattern} / Step ${(currentPatternStep ?? 0) + 1}`
     : transportLoopReadout;
+  const transportPositionReadout = createTransportPositionReadoutSummary(
+    project,
+    isPlaying,
+    playbackPosition,
+    transportLoopScope,
+    selectedArrangementIndex,
+    selectedArrangementStartBar
+  );
   const tapTempoReadout = createTapTempoReadoutSummary(project.bpm, tapTempo);
   const localDraftStatusLabel = localDraftSavedAt ? `Draft ${formatLocalDraftSavedAt(localDraftSavedAt)}` : "Draft local";
   const projectSafetyReadout = createProjectSafetyReadoutSummary(
@@ -5019,6 +5035,15 @@ export function App(): ReactElement {
           <div className="transport-status" aria-live="polite">
             <strong>{transportPrimary}</strong>
             <span>{transportSecondary}</span>
+          </div>
+          <div
+            className={`transport-position-readout ${transportPositionReadout.tone}`}
+            data-testid="transport-position-readout"
+            title={transportPositionReadout.detailTitle}
+          >
+            <span data-testid="transport-position-status">{transportPositionReadout.statusLabel}</span>
+            <strong data-testid="transport-position-label">{transportPositionReadout.roleLabel}</strong>
+            <small data-testid="transport-position-detail">{transportPositionReadout.detailLabel}</small>
           </div>
           <button
             className="icon-button tap-tempo-button"
@@ -11527,6 +11552,78 @@ function transportLoopStatus(project: ProjectState, scope: TransportLoopScope, s
   }
 
   return `${barCountLabel(arrangementTotalBars(project))} song loop`;
+}
+
+function createTransportPositionReadoutSummary(
+  project: ProjectState,
+  isPlaying: boolean,
+  playbackPosition: PlaybackSnapshot | null,
+  scope: TransportLoopScope,
+  selectedIndex: number,
+  selectedStartBar: number
+): TransportPositionReadoutSummary {
+  const loopLabel = transportLoopLabel(scope);
+  if (isPlaying && playbackPosition) {
+    const step = (playbackPosition.loopStep % 16) + 1;
+    const playingBlockStartBar =
+      typeof playbackPosition.arrangementIndex === "number"
+        ? arrangementStartBar(project, playbackPosition.arrangementIndex)
+        : selectedStartBar;
+    const songBar = scope === "block" ? playingBlockStartBar + playbackPosition.bar : playbackPosition.bar;
+    const sectionLabel =
+      playbackPosition.mode === "pattern" ? `Pattern ${playbackPosition.pattern}` : playbackPosition.section ?? "Arrangement";
+
+    return {
+      roleLabel: `Bar ${songBar}.${playbackPosition.beat}`,
+      statusLabel: `Playing ${loopLabel}`,
+      detailLabel: `${sectionLabel} / Step ${step}`,
+      detailTitle: `${loopLabel} loop is playing at song bar ${songBar}, beat ${playbackPosition.beat}, step ${step}, Pattern ${playbackPosition.pattern}.`,
+      tone: "good"
+    };
+  }
+
+  if (scope === "pattern") {
+    return {
+      roleLabel: "Bar 1.1",
+      statusLabel: "Cued Pattern",
+      detailLabel: `Pattern ${project.selectedPattern} / Step 1`,
+      detailTitle: `Pattern loop is cued at bar 1, beat 1, step 1 for Pattern ${project.selectedPattern}.`,
+      tone: "warn"
+    };
+  }
+
+  if (scope === "block") {
+    const boundedIndex = Math.min(Math.max(0, selectedIndex), project.arrangement.length - 1);
+    const block = project.arrangement[boundedIndex];
+    if (!block) {
+      return {
+        roleLabel: "No block",
+        statusLabel: "Cued Block",
+        detailLabel: "Select an arrangement block",
+        detailTitle: "Block loop has no arrangement block to cue.",
+        tone: "danger"
+      };
+    }
+
+    const blockNumber = boundedIndex + 1;
+    const blockStartBar = arrangementStartBar(project, boundedIndex);
+    return {
+      roleLabel: `Bar ${blockStartBar + 1}.1`,
+      statusLabel: `Cued ${block.section}`,
+      detailLabel: `Block ${blockNumber} / Pattern ${block.pattern}`,
+      detailTitle: `Block loop is cued at song bar ${blockStartBar + 1}, beat 1, step 1 for ${block.section} block ${blockNumber}, Pattern ${block.pattern}, ${barCountLabel(block.bars)}.`,
+      tone: "warn"
+    };
+  }
+
+  const firstBlock = project.arrangement[0];
+  return {
+    roleLabel: "Bar 1.1",
+    statusLabel: "Cued Song",
+    detailLabel: firstBlock ? `${firstBlock.section} / Pattern ${firstBlock.pattern}` : `${barCountLabel(arrangementTotalBars(project))} loop`,
+    detailTitle: `Song loop is cued at bar 1, beat 1, step 1 across ${barCountLabel(arrangementTotalBars(project))}.`,
+    tone: "warn"
+  };
 }
 
 function createArrangementFocusSummary(project: ProjectState, selectedIndex: number): ArrangementFocusSummary | null {

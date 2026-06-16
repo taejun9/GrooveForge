@@ -67,6 +67,8 @@ Tap Tempo work must keep tap history UI-local and out of saved project schema, u
 
 Tempo Nudge Pad work must derive -1, +1, half-time, and double-time BPM changes only from the current project BPM, clamp results to the supported transport range, reset UI-local Tap Tempo state, route every pad through explicit undoable project history, preserve manual BPM entry, Tap Tempo, playback, metronome, save/load, WAV/stem/MIDI export semantics, and avoid hidden tempo automation, audio input, recording, beat detection, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.
 
+Transport Position Readout work must derive Bar/Beat/Step, section, Pattern A/B/C, and Song/Block/Pattern loop-scope labels only from local playback snapshots, selected arrangement block state, selected pattern state, and current transport loop scope; stay UI-local and out of saved project schema; preserve playback scheduling, loop selection, metronome, Tap Tempo, Tempo Nudge Pads, save/load, undo/redo, WAV/stem/MIDI export semantics; and avoid count-in, marker editing, hidden arrangement mutation, audio input, recording, beat detection, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.
+
 Metronome work must keep click playback realtime-only, accent beat 1 distinctly from beats 2-4, persist the transport toggle through save/load migration, follow live BPM changes while playing, preserve Stop/Space behavior, and keep WAV/stem exports free of metronome audio.
 
 Drum, bass, melody, and arrangement work must preserve editable project state without losing event timing, pitch, velocity, glide, track routing, or mixer state.

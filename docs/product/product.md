@@ -74,7 +74,7 @@ Optional sampling remains a later extension after the direct beat workstation is
 
 Primary feature areas:
 
-- Transport: BPM, Tap Tempo, Tempo Nudge Pads, key, play, stop, Song/Block/Pattern loop audition, metronome.
+- Transport: BPM, Tap Tempo, Tempo Nudge Pads, key, play, stop, Song/Block/Pattern loop audition, Transport Position Readout, metronome.
 - Beat blueprints: sample-free editable project starts that combine style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset.
 - Delivery Targets: local starter sketch, vocal session, beat-store demo, club demo, and editable custom targets that can be set without changing the beat or explicitly aligned to arrangement length, master preset, and mix posture.
 - Session Brief: bounded local artist, vibe, reference, and notes fields stored in the project file for beat intent and handoff context, with a UI-only role readout for brief usefulness and next missing context.
@@ -196,6 +196,7 @@ MVP capabilities:
 - Snapshot Compare derived from local current project state and saved Project Snapshot payloads so users can compare setup, arrangement length, readiness, export, stems, and master posture without restoring, deleting, renaming, saving, or mutating the beat.
 - Desktop editing shortcuts, Keyboard Capture, and Quick Actions command search for arrangement playback, Pattern A/B/C selection, selected drum/note deletion, save, open, undo, redo, snapshots, blueprints, pattern fills, Arrangement Focus, mix fixes, master finish, and export while leaving focused inputs alone, then showing UI-only local result metrics, audition cues, and next checks after explicit command clicks.
 - Transport playback modes for full arrangement playback by default, selected-block loop audition, and fast selected-pattern preview while editing.
+- Transport Position Readout derived from local playback snapshots and selected loop state, showing Bar/Beat/Step, section, Pattern A/B/C, and Song/Block/Pattern loop scope without mutating project data.
 - Tap Tempo that averages recent explicit clicks into a bounded project BPM through undoable project history without audio input, hidden beat detection, or tempo automation.
 - Tempo Nudge Pads that apply -1, +1, half-time, and double-time BPM moves through explicit undoable project history while resetting UI-local Tap Tempo state.
 - Realtime metronome toggle with accented downbeat clicks that helps users program to the grid during playback without adding click audio to WAV or stem export.
@@ -212,7 +213,7 @@ MVP capabilities:
 
 ## Roadmap
 
-Phase 0 validates the audio scheduler: BPM clock, Tap Tempo helper, Tempo Nudge Pads, tick/bar/beat math, play/stop/loop, metronome, and simple kick playback.
+Phase 0 validates the audio scheduler: BPM clock, Tap Tempo helper, Tempo Nudge Pads, Transport Position Readout, tick/bar/beat math, play/stop/loop, metronome, and simple kick playback.
 
 Phase 1 builds the drum sequencer: 16/32-step grid, kick/snare/clap/hat lanes, velocity, swing, pattern save/load, and hat repeat.
 
