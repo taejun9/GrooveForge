@@ -193,7 +193,7 @@ Arrangement editor work must let users change a block's section, Pattern A/B/C a
 
 Arrangement track mute work must migrate older arrangement blocks to no muted tracks, keep mutes scoped to the selected block without mutating Pattern A/B/C events, apply the same mute decisions to realtime arrangement playback, full-mix WAV export, and stem export, and preserve selected-pattern preview behavior.
 
-Arrangement structure work must preserve at least one block, keep selection/pattern alignment after duplicate, move, and delete actions, and make WAV export follow the current arrangement length.
+Arrangement structure work must preserve at least one block, keep selection/pattern alignment after copy, paste, duplicate, move, and delete actions, keep arrangement block clipboard state UI-local and out of saved project schema, paste copied blocks after the selected block, preserve section, Pattern A/B/C assignment, bar length, energy, and muted-track fields unless directly edited, avoid mutating Pattern A/B/C musical event data, keep paste/duplicate/move/delete actions undoable, and make realtime playback plus WAV/stem/MIDI export follow the current arrangement length.
 
 Arrangement split work must split only the selected arrangement block, preserve total arrangement bars, duplicate the selected block's section, Pattern A/B/C assignment, energy, and muted tracks into the resulting blocks, select the new second block, keep the action undoable, avoid mutating Pattern A/B/C event data, and make realtime playback, WAV/stem export, and MIDI export follow the split structure.
 

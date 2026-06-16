@@ -1404,6 +1404,8 @@ type DrumClipboard = {
 
 type ChordClipboard = ChordEvent;
 
+type ArrangementBlockClipboard = ArrangementBlock;
+
 type NoteView = {
   step: number;
   pitch: string;
@@ -1757,6 +1759,7 @@ export function App(): ReactElement {
   const [selectedChordIndex, setSelectedChordIndex] = useState<number | null>(0);
   const [chordClipboard, setChordClipboard] = useState<ChordClipboard | null>(null);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
+  const [arrangementBlockClipboard, setArrangementBlockClipboard] = useState<ArrangementBlockClipboard | null>(null);
   const [splitAfterBars, setSplitAfterBars] = useState(1);
   const [snapshotNameDrafts, setSnapshotNameDrafts] = useState<Record<string, string>>({});
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
@@ -2846,6 +2849,60 @@ export function App(): ReactElement {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
+    }
+  }
+
+  function copySelectedArrangementBlock(): void {
+    const source = projectRef.current.arrangement[selectedArrangementIndex];
+    if (!source) {
+      setProjectStatus("Select an arrangement block");
+      return;
+    }
+
+    setArrangementBlockClipboard({
+      ...source,
+      mutedTracks: [...source.mutedTracks]
+    });
+    setProjectStatus(`Copied ${source.section} Pattern ${source.pattern} block`);
+  }
+
+  function pasteArrangementBlockAfterSelected(): void {
+    const clipboard = arrangementBlockClipboard;
+    if (!clipboard) {
+      setProjectStatus("Copy an arrangement block first");
+      return;
+    }
+
+    const changed = updateProject((current) => {
+      const selectedBlock = current.arrangement[selectedArrangementIndex];
+      if (!selectedBlock) {
+        return current;
+      }
+      const nextIndex = Math.min(selectedArrangementIndex + 1, current.arrangement.length);
+      const pastedBlock: ArrangementBlock = {
+        ...clipboard,
+        bars: normalizeArrangementBars(clipboard.bars),
+        energy: normalizeArrangementEnergy(clipboard.energy),
+        mutedTracks: normalizeArrangementMutedTracks(clipboard.mutedTracks)
+      };
+      setSelectedArrangementIndex(nextIndex);
+      setSplitAfterBars(clampSplitAfterBars(1, pastedBlock.bars));
+      return {
+        ...current,
+        selectedPattern: pastedBlock.pattern,
+        arrangement: [
+          ...current.arrangement.slice(0, nextIndex),
+          pastedBlock,
+          ...current.arrangement.slice(nextIndex)
+        ]
+      };
+    }, "Pasted arrangement block");
+    if (changed) {
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+    } else {
+      setProjectStatus("Select an arrangement block");
     }
   }
 
@@ -5278,6 +5335,32 @@ export function App(): ReactElement {
                     {arrangementMovePresetLabel(preset)}
                   </button>
                 ))}
+              </div>
+              <div className="arrangement-clipboard-row" aria-label="Arrangement block clipboard">
+                <button
+                  data-testid="arrangement-copy"
+                  onClick={copySelectedArrangementBlock}
+                  title="Copy selected arrangement block"
+                  type="button"
+                >
+                  <Copy size={14} aria-hidden="true" />
+                  <span>Copy Block</span>
+                </button>
+                <button
+                  data-testid="arrangement-paste"
+                  disabled={!arrangementBlockClipboard}
+                  onClick={pasteArrangementBlockAfterSelected}
+                  title="Paste copied arrangement block after the selected block"
+                  type="button"
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  <span>Paste After</span>
+                </button>
+                <small data-testid="arrangement-clipboard-detail">
+                  {arrangementBlockClipboard
+                    ? `Clipboard ${arrangementBlockClipboard.section} ${arrangementBlockClipboard.pattern} / ${barCountLabel(arrangementBlockClipboard.bars)}`
+                    : "Clipboard empty"}
+                </small>
               </div>
               <label>
                 <span>Bars</span>
