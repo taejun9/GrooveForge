@@ -1341,6 +1341,23 @@ type HandoffPackItem = {
   run: () => void;
 };
 
+type ExportPreflightCardId = "readiness" | "mix" | "deliverables" | "handoff";
+
+type ExportPreflightCard = {
+  id: ExportPreflightCardId;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+type ExportPreflightSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: ExportPreflightCard[];
+};
+
 type SelectedDrumStep = {
   lane: DrumLane;
   step: number;
@@ -1744,6 +1761,10 @@ export function App(): ReactElement {
   );
   const reviewQueueSummary = useMemo(
     () => createReviewQueueSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
+  );
+  const exportPreflightSummary = useMemo(
+    () => createExportPreflightSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
   const snapshotCompareSummary = useMemo(() => createSnapshotCompareSummary(project), [project]);
@@ -4463,6 +4484,8 @@ export function App(): ReactElement {
 
       <ProductionSnapshot summary={productionSnapshotSummary} />
 
+      <ExportPreflight summary={exportPreflightSummary} />
+
       <HandoffPack
         analysis={exportAnalysis}
         project={project}
@@ -6486,6 +6509,30 @@ function ModeFocus({ summary }: { summary: ModeFocusSummary }): ReactElement {
   );
 }
 
+function ExportPreflight({ summary }: { summary: ExportPreflightSummary }): ReactElement {
+  return (
+    <section className={`export-preflight ${summary.tone}`} data-testid="export-preflight" aria-label="Export preflight">
+      <div className="export-preflight-heading">
+        <div>
+          <ListChecks size={17} aria-hidden="true" />
+          <span>Export Preflight</span>
+        </div>
+        <strong data-testid="export-preflight-headline">{summary.headline}</strong>
+        <small data-testid="export-preflight-detail">{summary.detail}</small>
+      </div>
+      <div className="export-preflight-grid" data-testid="export-preflight-grid">
+        {summary.cards.map((card) => (
+          <div className={`export-preflight-card ${card.tone}`} data-testid={`export-preflight-${card.id}`} key={card.id}>
+            <span>{card.label}</span>
+            <strong>{card.value}</strong>
+            <small>{card.detail}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function HandoffPack({
   analysis,
   project,
@@ -8138,6 +8185,72 @@ function createReviewQueueSummary(
     detail: hiddenCount > 0 ? `${issueLabel} shown / ${hiddenCount} more queued` : `${issueLabel} queued / ${target.name}`,
     tone,
     items
+  };
+}
+
+function createExportPreflightSummary(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): ExportPreflightSummary {
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const readyCount = checks.filter((check) => check.tone === "good").length;
+  const readinessTone = weakestTone(checks.map((check) => check.tone));
+  const firstOpenCheck = checks.find((check) => check.tone !== "good");
+  const exportTone: MixCoachTone = analysis.status === "Ready" ? "good" : analysis.status === "Silent" ? "danger" : "warn";
+  const mixChecks = createMixCoachChecks(analysis, stemAnalyses);
+  const mixTone = weakestTone(mixChecks.map((check) => check.tone));
+  const openMixChecks = mixChecks.filter((check) => check.tone !== "good").length;
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const stemTone: MixCoachTone =
+    audibleStems.length >= target.stemGoal ? "good" : audibleStems.length >= 2 ? "warn" : "danger";
+  const midiTone: MixCoachTone = bars >= 8 ? "good" : bars >= 4 ? "warn" : "danger";
+  const deliverableReady = [exportTone, stemTone, midiTone].filter((tone) => tone === "good").length;
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
+  const cards: ExportPreflightCard[] = [
+    {
+      id: "readiness",
+      label: "Readiness",
+      value: `${readyCount}/${checks.length} green`,
+      detail: firstOpenCheck ? `${firstOpenCheck.label}: ${firstOpenCheck.status}` : "Composition and arrangement checks green",
+      tone: readinessTone
+    },
+    {
+      id: "mix",
+      label: "Mix / Master",
+      value: analysis.status,
+      detail:
+        openMixChecks === 0
+          ? `${formatDb(analysis.headroomDb)} headroom / Mix Coach clear`
+          : `${formatDb(analysis.headroomDb)} headroom / ${openMixChecks} mix checks`,
+      tone: weakestTone([exportTone, mixTone])
+    },
+    {
+      id: "deliverables",
+      label: "Deliverables",
+      value: `${deliverableReady}/3 clear`,
+      detail: `WAV ${analysis.status} / ${audibleStems.length}/${target.stemGoal} stems / ${barCountLabel(bars)} MIDI`,
+      tone: weakestTone([exportTone, stemTone, midiTone])
+    },
+    {
+      id: "handoff",
+      label: "Handoff",
+      value: briefStatus.value,
+      detail: `${briefStatus.detail} / ${handoffSheetFileName(project)}`,
+      tone: briefStatus.tone
+    }
+  ];
+  const tone = weakestTone(cards.map((card) => card.tone));
+  const headline =
+    tone === "good" ? "Ready to send" : tone === "warn" ? "Review before send" : "Hold export";
+
+  return {
+    headline,
+    detail: `${target.name} / ${readyCount}/${checks.length} readiness / ${analysis.status}`,
+    tone,
+    cards
   };
 }
 

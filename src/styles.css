@@ -54,6 +54,7 @@ button {
 .session-brief-row,
 .beat-passport,
 .production-snapshot,
+.export-preflight,
 .handoff-pack,
 .beat-readiness,
 .beat-map,
@@ -97,6 +98,7 @@ button {
 .session-brief-heading > div,
 .beat-passport-heading > div,
 .production-snapshot-heading > div,
+.export-preflight-heading > div,
 .handoff-pack-heading > div,
 .beat-map-heading > div,
 .structure-lens-heading > div,
@@ -2313,6 +2315,120 @@ h2 {
 }
 
 .production-snapshot-card small {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
+}
+
+.export-preflight {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  min-height: 78px;
+  border-color: rgba(130, 215, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(130, 215, 255, 0.04);
+  padding: 10px;
+}
+
+.export-preflight.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.export-preflight.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.export-preflight-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.export-preflight-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.export-preflight-heading svg {
+  color: #82d7ff;
+}
+
+.export-preflight.warn .export-preflight-heading svg {
+  color: #f0c36a;
+}
+
+.export-preflight.danger .export-preflight-heading svg {
+  color: #ff7a4f;
+}
+
+.export-preflight-heading strong,
+.export-preflight-heading small,
+.export-preflight-card span,
+.export-preflight-card strong,
+.export-preflight-card small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-preflight-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.export-preflight-heading small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.export-preflight-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.export-preflight-card {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.18);
+  border-inline-start: 3px solid #82d7ff;
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 8px 9px;
+}
+
+.export-preflight-card.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  border-inline-start-color: #f0c36a;
+}
+
+.export-preflight-card.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  border-inline-start-color: #ff7a4f;
+}
+
+.export-preflight-card span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.export-preflight-card strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.export-preflight-card small {
   color: rgba(244, 239, 231, 0.68);
   font-size: 10px;
 }
@@ -6783,6 +6899,10 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .export-preflight {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
   .handoff-pack {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -6797,6 +6917,10 @@ input[type="range"] {
 
   .production-snapshot-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .export-preflight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .key-compass-grid {
