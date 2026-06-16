@@ -586,6 +586,24 @@ type DrumAccentOption = DrumAccentDefinition & {
   preview: string;
 };
 
+type DrumFoundationId = "straight" | "bounce" | "half" | "club";
+
+type DrumFoundationDefinition = {
+  id: DrumFoundationId;
+  label: string;
+  detail: string;
+  kick: number[];
+  clap: number[];
+  hat: number[];
+  perc: number[];
+  hatRepeats?: Partial<Record<number, number>>;
+};
+
+type DrumFoundationOption = DrumFoundationDefinition & {
+  preview: string;
+  hitCount: number;
+};
+
 type MelodyMotifId = "hook" | "pocket" | "rise" | "answer";
 
 type MelodyMotifStep = {
@@ -1037,6 +1055,48 @@ const drumAccentDefinitions: DrumAccentDefinition[] = [
   { id: "lift", label: "Lift", detail: "rise" }
 ];
 
+const drumFoundationDefinitions: DrumFoundationDefinition[] = [
+  {
+    id: "straight",
+    label: "Straight",
+    detail: "starter grid",
+    kick: [0, 8],
+    clap: [4, 12],
+    hat: [0, 2, 4, 6, 8, 10, 12, 14],
+    perc: [6, 14]
+  },
+  {
+    id: "bounce",
+    label: "Bounce",
+    detail: "offbeat pocket",
+    kick: [0, 3, 8, 11],
+    clap: [4, 12],
+    hat: [0, 2, 4, 5, 6, 8, 10, 12, 13, 14],
+    perc: [2, 7, 10, 15],
+    hatRepeats: { 5: 2, 13: 2 }
+  },
+  {
+    id: "half",
+    label: "Half",
+    detail: "wide downbeat",
+    kick: [0, 7, 10],
+    clap: [12],
+    hat: [0, 3, 6, 8, 11, 14],
+    perc: [5, 15],
+    hatRepeats: { 14: 2 }
+  },
+  {
+    id: "club",
+    label: "Club",
+    detail: "floor drive",
+    kick: [0, 4, 8, 12],
+    clap: [4, 12],
+    hat: [2, 6, 10, 14],
+    perc: [3, 7, 11, 15],
+    hatRepeats: { 14: 3 }
+  }
+];
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<ProjectState[]>([]);
@@ -1152,6 +1212,7 @@ export function App(): ReactElement {
     [project.key, currentPattern.melodyNotes]
   );
   const patternStackOptions = useMemo(() => createPatternStackOptions(project.key), [project.key]);
+  const drumFoundationOptions = useMemo(() => createDrumFoundationOptions(), []);
   const grooveFeelOptions = useMemo(() => createGrooveFeelOptions(), []);
   const drumAccentOptions = useMemo(() => createDrumAccentOptions(), []);
   const keyboardCaptureNextStep = nextKeyboardCaptureStep(
@@ -2337,6 +2398,29 @@ export function App(): ReactElement {
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(0);
+  }
+
+  function applyDrumFoundation(foundationId: DrumFoundationId): void {
+    const foundation = drumFoundationDefinitions.find((candidate) => candidate.id === foundationId);
+    if (!foundation) {
+      setProjectStatus("Drum foundation pad not found");
+      return;
+    }
+
+    const currentPatternData = projectRef.current.patterns[projectRef.current.selectedPattern];
+    const nextPatternData = applyDrumFoundationToPattern(currentPatternData, foundation);
+    const changed = updateCurrentPattern(
+      (pattern) => (sameDrumFoundationState(pattern, nextPatternData) ? pattern : nextPatternData),
+      `${foundation.label} drum foundation applied to Pattern ${projectRef.current.selectedPattern}`
+    );
+    if (!changed) {
+      setProjectStatus(`${foundation.label} drum foundation already selected`);
+      return;
+    }
+
+    setSelectedDrumStep(firstActiveDrumStep(nextPatternData));
+    setSelectedNote(null);
+    setSelectedChordIndex(null);
   }
 
   function applyGrooveFeel(feelId: GrooveFeelId): void {
@@ -3679,6 +3763,7 @@ export function App(): ReactElement {
             onUse={usePatternInSelectedBlock}
           />
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
+          <DrumFoundationPads foundations={drumFoundationOptions} onApply={applyDrumFoundation} />
           <GrooveFeelPads feels={grooveFeelOptions} onApply={applyGrooveFeel} />
           <DrumAccentPads accents={drumAccentOptions} onApply={applyDrumAccent} />
           <div className="pattern-tools" aria-label="Pattern tools">
@@ -7765,6 +7850,38 @@ function PatternStackPads({
   );
 }
 
+function DrumFoundationPads({
+  foundations,
+  onApply
+}: {
+  foundations: DrumFoundationOption[];
+  onApply: (foundation: DrumFoundationId) => void;
+}): ReactElement {
+  return (
+    <div className="drum-foundation-panel" data-testid="drum-foundation-pads">
+      <div className="drum-foundation-heading">
+        <span>Drum Foundation</span>
+        <strong>Kick / Clap / Hat</strong>
+      </div>
+      <div className="drum-foundation-row" aria-label="Drum Foundation Pads">
+        {foundations.map((foundation) => (
+          <button
+            data-testid={`drum-foundation-${foundation.id}`}
+            key={foundation.id}
+            onClick={() => onApply(foundation.id)}
+            title={`${foundation.label} ${foundation.preview}`}
+            type="button"
+          >
+            <span>{foundation.label}</span>
+            <strong>{foundation.preview}</strong>
+            <small>{foundation.hitCount} hits / {foundation.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function BasslinePads({
   pads,
   onApply
@@ -9120,6 +9237,127 @@ function samePatternStackEvents(pattern: PatternData, events: PatternStackEvents
     sameChordEvents(pattern.chordEvents, events.chordEvents) &&
     sameMelodyNotes(pattern.melodyNotes, events.melodyNotes)
   );
+}
+
+function createDrumFoundationOptions(): DrumFoundationOption[] {
+  return drumFoundationDefinitions.map((foundation) => ({
+    ...foundation,
+    preview: `K${foundation.kick.length} C${foundation.clap.length} H${foundation.hat.length}`,
+    hitCount: foundation.kick.length + foundation.clap.length + foundation.hat.length + foundation.perc.length
+  }));
+}
+
+function applyDrumFoundationToPattern(pattern: PatternData, foundation: DrumFoundationDefinition): PatternData {
+  const nextPatternData = clonePatternData(pattern);
+  const foundationSteps: Record<DrumLane, Set<number>> = {
+    kick: new Set(foundation.kick.map(clampStepStart)),
+    clap: new Set(foundation.clap.map(clampStepStart)),
+    hat: new Set(foundation.hat.map(clampStepStart)),
+    perc: new Set(foundation.perc.map(clampStepStart))
+  };
+
+  (Object.keys(drumLabels) as DrumLane[]).forEach((lane) => {
+    nextPatternData.drumPattern[lane] = steps.map((step) => foundationSteps[lane].has(step));
+    nextPatternData.drumVelocities[lane] = steps.map((step) =>
+      foundationSteps[lane].has(step)
+        ? drumFoundationVelocity(lane, step, foundation.id)
+        : normalizeDrumVelocity(pattern.drumVelocities[lane][step] ?? defaultDrumVelocity(lane, step))
+    );
+    nextPatternData.drumTimings[lane] = steps.map((step) => (foundationSteps[lane].has(step) ? drumFoundationTimingMs(lane, step, foundation.id) : 0));
+    nextPatternData.drumProbabilities[lane] = steps.map((step) =>
+      foundationSteps[lane].has(step)
+        ? drumFoundationProbability(lane, step, foundation.id)
+        : normalizeDrumProbability(pattern.drumProbabilities[lane][step] ?? 1)
+    );
+  });
+
+  nextPatternData.hatRepeats = steps.map((step) =>
+    foundationSteps.hat.has(step) ? normalizeHatRepeat(foundation.hatRepeats?.[step] ?? drumFoundationHatRepeat(step, foundation.id)) : 1
+  );
+  return nextPatternData;
+}
+
+function drumFoundationVelocity(lane: DrumLane, step: number, foundationId: DrumFoundationId): number {
+  if (foundationId === "club") {
+    const base = lane === "kick" ? 0.98 : lane === "clap" ? 0.88 : lane === "hat" ? 0.66 : 0.58;
+    return normalizeDrumVelocity(base + (step % 8 === 0 ? 0.02 : 0));
+  }
+  if (foundationId === "half") {
+    const base = lane === "kick" ? 0.92 : lane === "clap" ? 0.9 : lane === "hat" ? 0.48 : 0.52;
+    return normalizeDrumVelocity(base + (step === 0 || step === 12 ? 0.05 : 0));
+  }
+  if (foundationId === "bounce") {
+    const base = lane === "kick" ? 0.94 : lane === "clap" ? 0.86 : lane === "hat" ? 0.54 : 0.56;
+    const lift = step % 4 === 0 ? 0.1 : step % 2 === 0 ? 0.04 : -0.02;
+    return normalizeDrumVelocity(base + lift);
+  }
+  return normalizeDrumVelocity(defaultDrumVelocity(lane, step));
+}
+
+function drumFoundationTimingMs(lane: DrumLane, step: number, foundationId: DrumFoundationId): number {
+  if (foundationId === "bounce") {
+    const timing = lane === "clap" ? 8 : lane === "hat" ? (step % 2 === 0 ? 3 : 8) : lane === "perc" ? 10 : step % 8 === 0 ? 0 : -4;
+    return normalizeDrumTimingMs(timing);
+  }
+  if (foundationId === "half") {
+    const timing = lane === "clap" ? 12 : lane === "hat" ? (step % 2 === 0 ? 6 : 12) : lane === "perc" ? 14 : 0;
+    return normalizeDrumTimingMs(timing);
+  }
+  if (foundationId === "club") {
+    const timing = lane === "kick" ? 0 : lane === "hat" ? -5 : lane === "perc" ? -3 : 2;
+    return normalizeDrumTimingMs(timing);
+  }
+  return normalizeDrumTimingMs(0);
+}
+
+function drumFoundationProbability(lane: DrumLane, step: number, foundationId: DrumFoundationId): number {
+  if (lane === "kick" || lane === "clap") {
+    return normalizeDrumProbability(1);
+  }
+  if (foundationId === "half") {
+    return normalizeDrumProbability(lane === "hat" && step % 2 !== 0 ? 0.88 : 0.96);
+  }
+  if (foundationId === "bounce") {
+    return normalizeDrumProbability(lane === "perc" ? 0.9 : step % 4 === 0 ? 0.98 : 0.94);
+  }
+  return normalizeDrumProbability(foundationId === "club" ? 0.96 : 1);
+}
+
+function drumFoundationHatRepeat(step: number, foundationId: DrumFoundationId): number {
+  if (foundationId === "club") {
+    return step === 14 ? 3 : 1;
+  }
+  if (foundationId === "bounce") {
+    return step % 8 === 5 ? 2 : 1;
+  }
+  return 1;
+}
+
+function sameDrumFoundationState(first: PatternData, second: PatternData): boolean {
+  const lanes = Object.keys(drumLabels) as DrumLane[];
+  return (
+    lanes.every((lane) =>
+      steps.every(
+        (step) =>
+          first.drumPattern[lane][step] === second.drumPattern[lane][step] &&
+          normalizeDrumVelocity(first.drumVelocities[lane][step] ?? defaultDrumVelocity(lane, step)) ===
+            normalizeDrumVelocity(second.drumVelocities[lane][step] ?? defaultDrumVelocity(lane, step)) &&
+          normalizeDrumTimingMs(first.drumTimings[lane][step] ?? 0) === normalizeDrumTimingMs(second.drumTimings[lane][step] ?? 0) &&
+          normalizeDrumProbability(first.drumProbabilities[lane][step] ?? 1) ===
+            normalizeDrumProbability(second.drumProbabilities[lane][step] ?? 1)
+      )
+    ) && steps.every((step) => normalizeHatRepeat(first.hatRepeats[step] ?? 1) === normalizeHatRepeat(second.hatRepeats[step] ?? 1))
+  );
+}
+
+function firstActiveDrumStep(pattern: PatternData): SelectedDrumStep | null {
+  for (const lane of Object.keys(drumLabels) as DrumLane[]) {
+    const step = pattern.drumPattern[lane].findIndex(Boolean);
+    if (step >= 0) {
+      return { lane, step };
+    }
+  }
+  return null;
 }
 
 function createBasslinePadOptions(key: string): BasslinePadOption[] {
