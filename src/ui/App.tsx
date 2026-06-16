@@ -1393,6 +1393,15 @@ type SelectedDrumStep = {
   step: number;
 };
 
+type DrumClipboard = {
+  lane: DrumLane;
+  step: number;
+  velocity: number;
+  probability: number;
+  timingMs: number;
+  hatRepeat: number;
+};
+
 type NoteView = {
   step: number;
   pitch: string;
@@ -1742,6 +1751,7 @@ export function App(): ReactElement {
   const [keyboardCaptureEnabled, setKeyboardCaptureEnabled] = useState(false);
   const [keyboardCaptureTarget, setKeyboardCaptureTarget] = useState<NoteTrack>("bass");
   const [selectedDrumStep, setSelectedDrumStep] = useState<SelectedDrumStep | null>(null);
+  const [drumClipboard, setDrumClipboard] = useState<DrumClipboard | null>(null);
   const [selectedChordIndex, setSelectedChordIndex] = useState<number | null>(0);
   const [selectedArrangementIndex, setSelectedArrangementIndex] = useState(0);
   const [splitAfterBars, setSplitAfterBars] = useState(1);
@@ -3072,6 +3082,88 @@ export function App(): ReactElement {
         )
       }
     }));
+  }
+
+  function copySelectedDrumHit(): void {
+    const target = selectedDrumStep;
+    if (!target) {
+      setProjectStatus("Select an active drum step");
+      return;
+    }
+
+    const pattern = activePattern(projectRef.current);
+    if (!pattern.drumPattern[target.lane][target.step]) {
+      setProjectStatus("Select an active drum step");
+      return;
+    }
+
+    setDrumClipboard({
+      lane: target.lane,
+      step: target.step,
+      velocity: drumStepVelocity(pattern, target.lane, target.step),
+      probability: drumStepProbability(pattern, target.lane, target.step),
+      timingMs: drumStepTimingMs(pattern, target.lane, target.step),
+      hatRepeat: target.lane === "hat" ? hatRepeatCount(pattern, target.step) : 1
+    });
+    setProjectStatus(`Copied ${drumLabels[target.lane]} step ${target.step + 1}`);
+  }
+
+  function pasteCopiedDrumHit(): void {
+    const clipboard = drumClipboard;
+    if (!clipboard) {
+      setProjectStatus("Copy a drum hit first");
+      return;
+    }
+
+    const pattern = activePattern(projectRef.current);
+    const nextStep = nextEmptyDrumStep(pattern, clipboard.lane, clipboard.step);
+    if (nextStep === null) {
+      setProjectStatus(`No empty ${drumLabels[clipboard.lane]} step`);
+      return;
+    }
+
+    const changed = updateCurrentPattern(
+      (currentPatternData) => ({
+        ...currentPatternData,
+        drumPattern: {
+          ...currentPatternData.drumPattern,
+          [clipboard.lane]: currentPatternData.drumPattern[clipboard.lane].map((enabled, index) =>
+            index === nextStep ? true : enabled
+          )
+        },
+        drumVelocities: {
+          ...currentPatternData.drumVelocities,
+          [clipboard.lane]: currentPatternData.drumVelocities[clipboard.lane].map((velocity, index) =>
+            index === nextStep ? normalizeDrumVelocity(clipboard.velocity) : velocity
+          )
+        },
+        drumTimings: {
+          ...currentPatternData.drumTimings,
+          [clipboard.lane]: currentPatternData.drumTimings[clipboard.lane].map((timing, index) =>
+            index === nextStep ? normalizeDrumTimingMs(clipboard.timingMs) : timing
+          )
+        },
+        drumProbabilities: {
+          ...currentPatternData.drumProbabilities,
+          [clipboard.lane]: currentPatternData.drumProbabilities[clipboard.lane].map((probability, index) =>
+            index === nextStep ? normalizeDrumProbability(clipboard.probability) : probability
+          )
+        },
+        hatRepeats:
+          clipboard.lane === "hat"
+            ? currentPatternData.hatRepeats.map((repeat, index) =>
+                index === nextStep ? normalizeHatRepeat(clipboard.hatRepeat) : repeat
+              )
+            : currentPatternData.hatRepeats
+      }),
+      `Pasted ${drumLabels[clipboard.lane]} hit`
+    );
+
+    if (changed) {
+      setSelectedDrumStep({ lane: clipboard.lane, step: nextStep });
+      setSelectedNote(null);
+      setSelectedChordIndex(null);
+    }
   }
 
   function applySelectedDrumGroove(preset: DrumGroovePreset): void {
@@ -4842,6 +4934,7 @@ export function App(): ReactElement {
             </div>
             <DrumStepInspector
               selectedStep={selectedDrumStep}
+              drumClipboard={drumClipboard}
               active={selectedDrumActive}
               velocity={selectedDrumVelocity}
               timingMs={selectedDrumTiming}
@@ -4851,6 +4944,8 @@ export function App(): ReactElement {
               onProbabilityChange={updateSelectedDrumProbability}
               onTimingChange={updateSelectedDrumTiming}
               onHatRepeatChange={updateSelectedHatRepeat}
+              onCopy={copySelectedDrumHit}
+              onPaste={pasteCopiedDrumHit}
             />
           </div>
         </section>
@@ -11456,6 +11551,7 @@ function StemLevelMeter({
 
 function DrumStepInspector({
   selectedStep,
+  drumClipboard,
   active,
   velocity,
   timingMs,
@@ -11464,9 +11560,12 @@ function DrumStepInspector({
   onVelocityChange,
   onProbabilityChange,
   onTimingChange,
-  onHatRepeatChange
+  onHatRepeatChange,
+  onCopy,
+  onPaste
 }: {
   selectedStep: SelectedDrumStep | null;
+  drumClipboard: DrumClipboard | null;
   active: boolean;
   velocity?: number;
   timingMs: number;
@@ -11476,6 +11575,8 @@ function DrumStepInspector({
   onProbabilityChange: (probability: number) => void;
   onTimingChange: (timingMs: number) => void;
   onHatRepeatChange: (repeat: number) => void;
+  onCopy: () => void;
+  onPaste: () => void;
 }): ReactElement {
   const velocityValue = velocity ?? 0.75;
   const probabilityValue = probability ?? 1;
@@ -11485,6 +11586,7 @@ function DrumStepInspector({
   const [isEditingTiming, setIsEditingTiming] = useState(false);
   const skipNextTimingBlurCommit = useRef(false);
   const label = selectedStep ? `${drumLabels[selectedStep.lane]} ${selectedStep.step + 1}` : "No step";
+  const clipboardLabel = drumClipboard ? `${drumLabels[drumClipboard.lane]} ${drumClipboard.step + 1}` : "Empty";
 
   useEffect(() => {
     if (!isEditingTiming) {
@@ -11643,6 +11745,17 @@ function DrumStepInspector({
           ))}
         </div>
       )}
+      <div className="drum-clipboard-row" aria-label="Drum hit clipboard">
+        <button data-testid="drum-copy" disabled={!selectedStep || !active} onClick={onCopy} title="Copy selected drum hit shape" type="button">
+          <Copy size={14} aria-hidden="true" />
+          <span>Copy</span>
+        </button>
+        <button data-testid="drum-paste" disabled={!drumClipboard} onClick={onPaste} title="Paste copied hit to the next empty step" type="button">
+          <Plus size={14} aria-hidden="true" />
+          <span>Paste</span>
+        </button>
+        <small data-testid="drum-clipboard-detail">{drumClipboard ? `Clipboard ${clipboardLabel}` : "Clipboard empty"}</small>
+      </div>
     </div>
   );
 }
@@ -13922,6 +14035,16 @@ function nextEmptyChordStep(chords: ChordEvent[], startStep: number): number | n
   for (let offset = 1; offset < steps.length; offset += 1) {
     const step = (startStep + offset) % steps.length;
     if (!chords.some((chord) => chord.step === step)) {
+      return step;
+    }
+  }
+  return null;
+}
+
+function nextEmptyDrumStep(pattern: PatternData, lane: DrumLane, startStep: number): number | null {
+  for (let offset = 1; offset < steps.length; offset += 1) {
+    const step = (startStep + offset) % steps.length;
+    if (!pattern.drumPattern[lane][step]) {
       return step;
     }
   }
