@@ -1076,6 +1076,29 @@ type MelodyMovePreviewSummary = {
   contourId: MelodyContourId | "none";
 };
 
+type MelodyMoveResultKind = "Motif" | "Accent" | "Contour";
+
+type MelodyMoveResultMetric = {
+  id: "notes" | "rhythm" | "range" | "velocity" | "chance";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type MelodyMoveResult = {
+  moveId: string;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: MelodyMoveResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type TapTempoState = {
   taps: number;
   bpm: number | null;
@@ -2413,6 +2436,7 @@ export function App(): ReactElement {
   const [patternStackResult, setPatternStackResult] = useState<PatternStackResult | null>(null);
   const [drumMoveResult, setDrumMoveResult] = useState<DrumMoveResult | null>(null);
   const [bassMoveResult, setBassMoveResult] = useState<BassMoveResult | null>(null);
+  const [melodyMoveResult, setMelodyMoveResult] = useState<MelodyMoveResult | null>(null);
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
@@ -2925,6 +2949,7 @@ export function App(): ReactElement {
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
+    setMelodyMoveResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -2939,6 +2964,7 @@ export function App(): ReactElement {
       setPatternStackResult(null);
       setDrumMoveResult(null);
       setBassMoveResult(null);
+      setMelodyMoveResult(null);
     }
     setProjectStatus(status);
   }
@@ -3028,6 +3054,7 @@ export function App(): ReactElement {
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
+    setMelodyMoveResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
   }
@@ -3047,6 +3074,7 @@ export function App(): ReactElement {
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
+    setMelodyMoveResult(null);
     setProjectStatus(status);
   }
 
@@ -4461,20 +4489,24 @@ export function App(): ReactElement {
   function applyMelodyMotif(motifId: MelodyMotifId): void {
     const motif = melodyMotifDefinitions.find((candidate) => candidate.id === motifId);
     if (!motif) {
+      setMelodyMoveResult(null);
       setProjectStatus("Melody motif not found");
       return;
     }
 
+    const beforeProject = projectRef.current;
     const melodyNotes = createMelodyMotifNotes(projectRef.current.key, motif);
     const changed = updateCurrentPattern(
       (pattern) => (sameMelodyNotes(pattern.melodyNotes, melodyNotes) ? pattern : { ...pattern, melodyNotes }),
       `${motif.label} melody motif applied to Pattern ${projectRef.current.selectedPattern}`
     );
     if (!changed) {
+      setMelodyMoveResult(null);
       setProjectStatus(`${motif.label} melody motif already selected`);
       return;
     }
 
+    setMelodyMoveResult(createMelodyMoveResult("Motif", motif.id, motif.label, motif.detail, beforeProject, projectRef.current));
     const firstNote = melodyNotes[0];
     setSelectedNote(firstNote ? { track: "melody", step: firstNote.step, pitch: firstNote.pitch } : null);
     setSelectedDrumStep(null);
@@ -4484,26 +4516,31 @@ export function App(): ReactElement {
   function applyMelodyAccent(accentId: MelodyAccentId): void {
     const accent = melodyAccentDefinitions.find((candidate) => candidate.id === accentId);
     if (!accent) {
+      setMelodyMoveResult(null);
       setProjectStatus("Melody accent pad not found");
       return;
     }
 
     const currentMelodyNotes = projectRef.current.patterns[projectRef.current.selectedPattern].melodyNotes;
     if (currentMelodyNotes.length === 0) {
+      setMelodyMoveResult(null);
       setProjectStatus(`Add a Synth note before using ${accent.label} accent`);
       return;
     }
 
+    const beforeProject = projectRef.current;
     const melodyNotes = applyMelodyAccentToNotes(currentMelodyNotes, accent.id);
     const changed = updateCurrentPattern(
       (pattern) => (sameMelodyNotes(pattern.melodyNotes, melodyNotes) ? pattern : { ...pattern, melodyNotes }),
       `${accent.label} melody accent applied to Pattern ${projectRef.current.selectedPattern}`
     );
     if (!changed) {
+      setMelodyMoveResult(null);
       setProjectStatus(`${accent.label} melody accent already selected`);
       return;
     }
 
+    setMelodyMoveResult(createMelodyMoveResult("Accent", accent.id, accent.label, accent.detail, beforeProject, projectRef.current));
     const firstNote = melodyNotes[0];
     setSelectedNote(firstNote ? { track: "melody", step: firstNote.step, pitch: firstNote.pitch } : null);
     setSelectedDrumStep(null);
@@ -4513,26 +4550,31 @@ export function App(): ReactElement {
   function applyMelodyContour(contourId: MelodyContourId): void {
     const contour = melodyContourDefinitions.find((candidate) => candidate.id === contourId);
     if (!contour) {
+      setMelodyMoveResult(null);
       setProjectStatus("Melody contour pad not found");
       return;
     }
 
     const currentMelodyNotes = projectRef.current.patterns[projectRef.current.selectedPattern].melodyNotes;
     if (currentMelodyNotes.length === 0) {
+      setMelodyMoveResult(null);
       setProjectStatus(`Add a Synth note before using ${contour.label} contour`);
       return;
     }
 
+    const beforeProject = projectRef.current;
     const melodyNotes = applyMelodyContourToNotes(projectRef.current.key, currentMelodyNotes, contour.id);
     const changed = updateCurrentPattern(
       (pattern) => (sameMelodyNotes(pattern.melodyNotes, melodyNotes) ? pattern : { ...pattern, melodyNotes }),
       `${contour.label} melody contour applied to Pattern ${projectRef.current.selectedPattern}`
     );
     if (!changed) {
+      setMelodyMoveResult(null);
       setProjectStatus(`${contour.label} melody contour already selected`);
       return;
     }
 
+    setMelodyMoveResult(createMelodyMoveResult("Contour", contour.id, contour.label, contour.detail, beforeProject, projectRef.current));
     const firstNote = melodyNotes[0];
     setSelectedNote(firstNote ? { track: "melody", step: firstNote.step, pitch: firstNote.pitch } : null);
     setSelectedDrumStep(null);
@@ -6428,6 +6470,7 @@ export function App(): ReactElement {
           <BassGlidePads pads={bassGlidePadOptions} onApply={applyBassGlidePad} />
           <BassContourPads contours={bassContourOptions} onApply={applyBassContour} />
           <MelodyMovePreview preview={melodyMovePreviewSummary} />
+          {melodyMoveResult && <MelodyMoveResultStrip result={melodyMoveResult} />}
           <MelodyMotifPads motifs={melodyMotifOptions} onApply={applyMelodyMotif} />
           <MelodyAccentPads accents={melodyAccentOptions} onApply={applyMelodyAccent} />
           <MelodyContourPads contours={melodyContourOptions} onApply={applyMelodyContour} />
@@ -16475,6 +16518,48 @@ function MelodyMovePreview({ preview }: { preview: MelodyMovePreviewSummary }): 
   );
 }
 
+function MelodyMoveResultStrip({ result }: { result: MelodyMoveResult }): ReactElement {
+  return (
+    <div
+      className={`melody-move-result ${result.tone}`}
+      data-result-melody-move={result.moveId}
+      data-testid="melody-move-result"
+      aria-live="polite"
+    >
+      <div className="melody-move-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="melody-move-result-title">{result.title}</strong>
+          <small data-testid="melody-move-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="melody-move-result-meta">
+        <span data-testid="melody-move-result-status">{result.status}</span>
+        <span data-testid="melody-move-result-scope">{result.scope}</span>
+        <span data-testid="melody-move-result-impact">{result.impact}</span>
+      </div>
+      <div className="melody-move-result-metrics" data-testid="melody-move-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`melody-move-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="melody-move-result-followup" data-testid="melody-move-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="melody-move-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="melody-move-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function MelodyMotifPads({
   motifs,
   onApply
@@ -18985,6 +19070,60 @@ function melodyMotifMoveCount(key: string, notes: MelodyNote[], motif: MelodyMot
   return melodyNotesChangedCount(notes, createMelodyMotifNotes(key, motif));
 }
 
+function createMelodyMoveResult(
+  kind: MelodyMoveResultKind,
+  id: string,
+  label: string,
+  detail: string,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): MelodyMoveResult {
+  const beforeNotes = activePattern(beforeProject).melodyNotes;
+  const afterNotes = activePattern(afterProject).melodyNotes;
+  const noteMoves = Math.abs(beforeNotes.length - afterNotes.length);
+  const rhythmMoves = melodyRhythmMoveCount(beforeNotes, afterNotes);
+  const rangeMoves = melodyRangeMoveCount(beforeNotes, afterNotes);
+  const velocityMoves = melodyVelocityMoveCount(beforeNotes, afterNotes);
+  const chanceMoves = melodyChanceMoveCount(beforeNotes, afterNotes);
+  const metrics: MelodyMoveResultMetric[] = [
+    createMelodyMoveResultMetric("notes", "Notes", melodyNoteCountLabel(beforeNotes), melodyNoteCountLabel(afterNotes), noteMoves),
+    createMelodyMoveResultMetric("rhythm", "Rhythm", melodyRhythmLabel(beforeNotes), melodyRhythmLabel(afterNotes), rhythmMoves),
+    createMelodyMoveResultMetric("range", "Range", melodyRangeLabel(beforeNotes), melodyRangeLabel(afterNotes), rangeMoves),
+    createMelodyMoveResultMetric("velocity", "Velocity", melodyVelocityLabel(beforeNotes), melodyVelocityLabel(afterNotes), velocityMoves),
+    createMelodyMoveResultMetric("chance", "Chance", melodyChanceLabel(beforeNotes), melodyChanceLabel(afterNotes), chanceMoves)
+  ];
+  const changedGroups = [noteMoves, rhythmMoves, rangeMoves, velocityMoves, chanceMoves].filter((count) => count > 0).length;
+
+  return {
+    moveId: `${kind.toLowerCase()}-${id}`,
+    title: `${label} ${kind} applied`,
+    status: "Applied",
+    detail: `Pattern ${afterProject.selectedPattern} / ${detail}`,
+    scope: `Pattern ${afterProject.selectedPattern} Synth`,
+    impact: `N ${noteMoves} / R ${rhythmMoves} / P ${rangeMoves} / V ${velocityMoves} / C ${chanceMoves}`,
+    metrics,
+    auditionCue: `Loop Pattern ${afterProject.selectedPattern}; check synth hook shape against chords and 808.`,
+    nextCheck: "Use selected-note degree/role and melody edit tools for manual corrections.",
+    tone: changedGroups > 0 ? "good" : "warn"
+  };
+}
+
+function createMelodyMoveResultMetric(
+  id: MelodyMoveResultMetric["id"],
+  label: string,
+  before: string,
+  after: string,
+  changedEvents: number
+): MelodyMoveResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: changedEvents === 0 ? "warn" : "good"
+  };
+}
+
 function melodyNotesChangedCount(current: MelodyNote[], transformed: MelodyNote[]): number {
   const count = Math.max(current.length, transformed.length);
   let changed = 0;
@@ -18996,6 +19135,100 @@ function melodyNotesChangedCount(current: MelodyNote[], transformed: MelodyNote[
     }
   }
   return changed;
+}
+
+function melodyRhythmMoveCount(current: MelodyNote[], transformed: MelodyNote[]): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentNote = current[index];
+    const transformedNote = transformed[index];
+    if (!currentNote || !transformedNote || currentNote.step !== transformedNote.step || currentNote.length !== transformedNote.length) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function melodyRangeMoveCount(current: MelodyNote[], transformed: MelodyNote[]): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentNote = current[index];
+    const transformedNote = transformed[index];
+    if (!currentNote || !transformedNote || currentNote.pitch !== transformedNote.pitch) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function melodyVelocityMoveCount(current: MelodyNote[], transformed: MelodyNote[]): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentNote = current[index];
+    const transformedNote = transformed[index];
+    if (!currentNote || !transformedNote || currentNote.velocity !== transformedNote.velocity) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function melodyChanceMoveCount(current: MelodyNote[], transformed: MelodyNote[]): number {
+  const count = Math.max(current.length, transformed.length);
+  let changed = 0;
+  for (let index = 0; index < count; index += 1) {
+    const currentNote = current[index];
+    const transformedNote = transformed[index];
+    if (
+      !currentNote ||
+      !transformedNote ||
+      normalizeEventProbability(currentNote.probability) !== normalizeEventProbability(transformedNote.probability)
+    ) {
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+function melodyNoteCountLabel(notes: MelodyNote[]): string {
+  return `${notes.length} notes`;
+}
+
+function melodyRhythmLabel(notes: MelodyNote[]): string {
+  if (notes.length === 0) {
+    return "No synth";
+  }
+  const labels = sortMelodyNotes(notes).map((note) => `${note.step + 1}:${note.length}`);
+  return labels.length > 4 ? `${labels.slice(0, 4).join("/")} +${labels.length - 4}` : labels.join("/");
+}
+
+function melodyRangeLabel(notes: MelodyNote[]): string {
+  if (notes.length === 0) {
+    return "No synth";
+  }
+  const ordered = [...notes].sort((first, second) => pitchMidi(first.pitch) - pitchMidi(second.pitch));
+  const low = ordered[0]?.pitch ?? "-";
+  const high = ordered[ordered.length - 1]?.pitch ?? "-";
+  return low === high ? low : `${low}-${high}`;
+}
+
+function melodyVelocityLabel(notes: MelodyNote[]): string {
+  if (notes.length === 0) {
+    return "No synth";
+  }
+  const average = notes.reduce((total, note) => total + clampVelocity(note.velocity), 0) / notes.length;
+  return percentLabel(average);
+}
+
+function melodyChanceLabel(notes: MelodyNote[]): string {
+  if (notes.length === 0) {
+    return "No synth";
+  }
+  const average = notes.reduce((total, note) => total + normalizeEventProbability(note.probability), 0) / notes.length;
+  return percentLabel(average);
 }
 
 function sameMelodyNote(first: MelodyNote, second: MelodyNote): boolean {
