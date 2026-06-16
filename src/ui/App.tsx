@@ -602,6 +602,16 @@ type QuickActionScopeOption = {
   count: number;
 };
 
+type QuickActionSpotlightSummary = {
+  actionId: string | null;
+  statusLabel: string;
+  titleLabel: string;
+  detailLabel: string;
+  contextLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type QuickActionResultMetric = {
   id: string;
   label: string;
@@ -7687,6 +7697,7 @@ function QuickActions({
   }
 
   const firstRunnableAction = actions.find((action) => !action.disabled);
+  const spotlight = createQuickActionSpotlightSummary(actions, firstRunnableAction, scope, scopeOptions, query);
 
   return (
     <div
@@ -7744,6 +7755,18 @@ function QuickActions({
         </div>
         <div className="quick-actions-count" data-testid="quick-actions-count">
           {actions.length} shown / {scopeOptions.find((option) => option.id === scope)?.count ?? 0} matching
+        </div>
+        <div
+          aria-label={spotlight.detailTitle}
+          className={`quick-actions-spotlight ${spotlight.tone}`}
+          data-spotlight-action={spotlight.actionId ?? "none"}
+          data-testid="quick-actions-spotlight"
+          title={spotlight.detailTitle}
+        >
+          <span data-testid="quick-actions-spotlight-status">{spotlight.statusLabel}</span>
+          <strong data-testid="quick-actions-spotlight-title">{spotlight.titleLabel}</strong>
+          <small data-testid="quick-actions-spotlight-detail">{spotlight.detailLabel}</small>
+          <small data-testid="quick-actions-spotlight-context">{spotlight.contextLabel}</small>
         </div>
         <div className="quick-actions-list" data-testid="quick-actions-list">
           {actions.length === 0 ? (
@@ -9281,6 +9304,44 @@ function createQuickActionScopeOptions(actions: QuickAction[], query: string): Q
     ...definition,
     count: queryMatches.filter((action) => quickActionMatchesScope(action, definition.id)).length
   }));
+}
+
+function createQuickActionSpotlightSummary(
+  actions: QuickAction[],
+  firstRunnableAction: QuickAction | undefined,
+  scope: QuickActionScopeId,
+  scopeOptions: QuickActionScopeOption[],
+  query: string
+): QuickActionSpotlightSummary {
+  const scopeLabel = scopeOptions.find((option) => option.id === scope)?.label ?? "All";
+  const matchingCount = scopeOptions.find((option) => option.id === scope)?.count ?? 0;
+  const queryLabel = query.trim().length > 0 ? `Search "${query.trim()}"` : "No search";
+  const contextLabel = `${scopeLabel} scope / ${actions.length} shown / ${matchingCount} matching / ${queryLabel}`;
+
+  if (!firstRunnableAction) {
+    const detailLabel =
+      actions.length > 0 ? "Visible commands are disabled in the current state" : "No visible command matches the current scope and search";
+    return {
+      actionId: null,
+      statusLabel: "No Enter target",
+      titleLabel: "No command ready",
+      detailLabel,
+      contextLabel,
+      detailTitle: `No Enter target / ${detailLabel} / ${contextLabel}`,
+      tone: "warn"
+    };
+  }
+
+  const detailLabel = `${firstRunnableAction.group} / ${firstRunnableAction.detail}`;
+  return {
+    actionId: firstRunnableAction.id,
+    statusLabel: "Enter target",
+    titleLabel: firstRunnableAction.title,
+    detailLabel,
+    contextLabel,
+    detailTitle: `Enter target / ${firstRunnableAction.title} / ${detailLabel} / ${contextLabel}`,
+    tone: "good"
+  };
 }
 
 function quickActionMatchesQuery(action: QuickAction, query: string): boolean {
