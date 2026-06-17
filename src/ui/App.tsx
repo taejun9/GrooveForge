@@ -7173,6 +7173,7 @@ export function App(): ReactElement {
     keyCompassSummary,
     layerStarterOptions,
     listeningPassSummary,
+    mixBalancePreviewSummary,
     modeFocusSummary,
     patternDnaSummary,
     playbackMode,
@@ -7196,6 +7197,7 @@ export function App(): ReactElement {
     onApplyDrumKit: applyDrumKitPad,
     onApplyLayerStarter: applyLayerStarter,
     onApplyMasterFinish: applyMasterFinishPad,
+    onApplyMixBalance: applyMixBalancePad,
     onApplyMixFix: applyMixFixPreset,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternFill: applyPatternFill,
@@ -12313,6 +12315,7 @@ function createQuickActions({
   keyCompassSummary,
   layerStarterOptions,
   listeningPassSummary,
+  mixBalancePreviewSummary,
   modeFocusSummary,
   patternDnaSummary,
   playbackMode,
@@ -12336,6 +12339,7 @@ function createQuickActions({
   onApplyDrumKit,
   onApplyLayerStarter,
   onApplyMasterFinish,
+  onApplyMixBalance,
   onApplyMixFix,
   onApplyPatternChain,
   onApplyPatternFill,
@@ -12384,6 +12388,7 @@ function createQuickActions({
   keyCompassSummary: KeyCompassSummary;
   layerStarterOptions: LayerStarterOption[];
   listeningPassSummary: ListeningPassSummary;
+  mixBalancePreviewSummary: MixBalancePreviewSummary;
   modeFocusSummary: ModeFocusSummary;
   patternDnaSummary: PatternDnaSummary;
   playbackMode: PlaybackMode;
@@ -12407,6 +12412,7 @@ function createQuickActions({
   onApplyDrumKit: (pad: DrumKitPadId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
+  onApplyMixBalance: (pad: MixBalancePadId) => void;
   onApplyMixFix: (preset: MixFixPreset) => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
@@ -12466,6 +12472,7 @@ function createQuickActions({
     arrangementTemplatePreviewSummary.templateId === "aligned" ? null : arrangementTemplatePreviewSummary.templateId;
   const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
   const drumKitReady = drumKitPreviewSummary.statusLabel !== "Kit aligned";
+  const mixBalanceReady = mixBalancePreviewSummary.statusLabel !== "Balance aligned";
   const soundFocusReady = soundFocusPreviewSummary.statusLabel !== "Sound aligned";
   const soundPresetReady = soundPresetPreviewSummary.statusLabel !== "Preset aligned";
 
@@ -12925,6 +12932,21 @@ function createQuickActions({
       }
     },
     {
+      id: "mix-balance",
+      title: mixBalanceReady ? `Apply ${mixBalancePreviewSummary.padLabel}` : "Apply Mix Balance",
+      detail: mixBalanceReady
+        ? `${mixBalancePreviewSummary.channelLabel} / ${mixBalancePreviewSummary.auditionLabel}`
+        : "Current mixer already matches the previewed balance.",
+      group: "Mix",
+      keywords: `mix balance rough levels drums 808 bass synth chords stem audition ${mixBalancePreviewSummary.padId} ${mixBalancePreviewSummary.padLabel} beginner producer`,
+      disabled: !mixBalanceReady,
+      run: () => {
+        if (mixBalanceReady) {
+          onApplyMixBalance(mixBalancePreviewSummary.padId);
+        }
+      }
+    },
+    {
       id: "mix-headroom",
       title: "Mix Fix Headroom",
       detail: "Set a vocal-safe ceiling and reduce master gain.",
@@ -13346,6 +13368,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "mix-balance") {
+    return {
+      id: "mix-balance",
+      label: "Mix balance",
+      value: `Drums ${mixBalanceChannelPosture(project.mixer, "drum_rack")} / 808 ${mixBalanceChannelPosture(project.mixer, "bass_808")}`
+    };
+  }
+
   if (action.id === "pattern-chain" || action.id === "chain-expand" || action.id === "arrangement-template") {
     return { id: "song-length", label: "Song length", value: barCountLabel(arrangementTotalBars(project)) };
   }
@@ -13566,6 +13596,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Song loop; listen for intro, verse, hook, bridge, and outro energy movement.",
       nextCheck: `${Math.round(arrangementAverageEnergy(project) * 100)}% average energy; scan Song Form Overview before detailed block edits.`
+    };
+  }
+
+  if (action.id === "mix-balance") {
+    return {
+      auditionCue: "Play Full Mix, then solo Drums and 808 to confirm the rough balance supports the beat.",
+      nextCheck: "Use the Mix Balance Result, Stem Audition Pads, and manual mixer controls for final level, pan, EQ, and send trim."
     };
   }
 
