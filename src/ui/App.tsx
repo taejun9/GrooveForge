@@ -7277,6 +7277,7 @@ export function App(): ReactElement {
     onRequestMidiInputAccess: requestMidiInputAccess,
     onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
+    onUsePatternInSelectedBlock: usePatternInSelectedBlock,
     onSetKeyboardCaptureEnabled: setKeyboardCaptureEnabled,
     onSetKeyboardCaptureTarget: setKeyboardCaptureTarget,
     onUpdateKeyboardCaptureDefaults: updateKeyboardCaptureDefaults,
@@ -12680,6 +12681,7 @@ function createQuickActions({
   onRequestMidiInputAccess,
   onSelectPattern,
   onSelectStyle,
+  onUsePatternInSelectedBlock,
   onSetKeyboardCaptureEnabled,
   onSetKeyboardCaptureTarget,
   onUpdateKeyboardCaptureDefaults,
@@ -12833,6 +12835,7 @@ function createQuickActions({
   onRequestMidiInputAccess: () => Promise<void>;
   onSelectPattern: (pattern: PatternSlot) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
+  onUsePatternInSelectedBlock: (pattern: PatternSlot) => void;
   onSetKeyboardCaptureEnabled: (enabled: boolean) => void;
   onSetKeyboardCaptureTarget: (target: NoteTrack) => void;
   onUpdateKeyboardCaptureDefaults: (update: Partial<KeyboardCaptureDefaults>) => void;
@@ -13683,6 +13686,23 @@ function createQuickActions({
       run: () => onSelectPattern(pattern)
     };
   });
+  const patternUseActions: QuickAction[] = patternSlots.map((pattern) => {
+    const current = selectedBlock?.pattern === pattern;
+    const eventCount = patternEventTotal(project.patterns[pattern]);
+    return {
+      id: `pattern-use-${pattern.toLowerCase()}`,
+      title: current ? `Selected block already uses Pattern ${pattern}` : `Use Pattern ${pattern} in selected block`,
+      detail: selectedBlock
+        ? current
+          ? `${selectedBlockLabel} / ${eventCount} events`
+          : `${selectedBlockLabel} -> Pattern ${pattern} / ${eventCount} events`
+        : "Select an arrangement block first.",
+      group: "Arrange",
+      keywords: `pattern use assign selected block arrangement song form pattern compare ${pattern} a b c variation section beginner producer`,
+      disabled: !selectedBlock || current,
+      run: () => onUsePatternInSelectedBlock(pattern)
+    };
+  });
   const patternCloneActions: QuickAction[] = patternCloneOptions.map((clone) => ({
     id: `pattern-clone-${clone.target}-${clone.preset}`,
     title: `Clone Pattern ${clone.source} to ${clone.target} as ${clone.preview}`,
@@ -14258,6 +14278,7 @@ function createQuickActions({
       run: () => onApplyPatternFill("melody_turn")
     },
     ...selectedBlockActions,
+    ...patternUseActions,
     {
       id: "arrangement-move",
       title: arrangementMoveReady ? `Apply ${arrangementMoveLabel} Move` : "Apply Arrangement Move",
@@ -14860,6 +14881,15 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("pattern-use-")) {
+    const usedSlots = usedPatternSlots(project).join("/") || project.selectedPattern;
+    return {
+      id: "pattern-use",
+      label: "Arrangement pattern",
+      value: `Edit ${project.selectedPattern} / used ${usedSlots}`
+    };
+  }
+
   if (action.id === "groove-compass-focus") {
     return {
       id: "groove-compass",
@@ -15339,6 +15369,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm this variation's drums, 808, chords, and Synth before editing.`,
       nextCheck: "Use Pattern Compare, Pattern DNA, Pattern Clone, or Pattern Chain when the selected variation should feed the arrangement."
+    };
+  }
+
+  if (action.id.startsWith("pattern-use-")) {
+    return {
+      auditionCue: `Play Block loop; confirm the selected arrangement block now works with Pattern ${project.selectedPattern}.`,
+      nextCheck: "Scan Song Form Overview, Pattern Compare, and Arrangement Playback Readout before placing the next variation."
     };
   }
 

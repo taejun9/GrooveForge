@@ -78,6 +78,8 @@ Metronome and Quick Actions work must keep click playback realtime-only, accent 
 
 Pattern Switch Quick Actions work must expose only Pattern A/B/C edit-focus commands, route each command through the existing Pattern tab selection handler, reset selected note/drum/chord focus the same way tab clicks do, preserve Pattern A/B/C event data, arrangement blocks, playback scheduling, loop scope, save/load, mixer/master, WAV/stem/MIDI export semantics, and avoid hidden generation, command chains, autoplay, auto-arrangement, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.
 
+Pattern Use Quick Actions work must expose only selected-arrangement-block Pattern A/B/C assignment commands, route each command through the existing Pattern Compare Use handler and undoable arrangement block update path, disable no-op commands when the selected block already uses the target Pattern, update only the selected block's Pattern assignment plus selected edit Pattern, preserve Pattern A/B/C event data, arrangement length, section, energy, muted tracks, playback scheduling, loop scope, save/load, mixer/master, WAV/stem/MIDI export semantics, and avoid hidden generation, command chains, autoplay, auto-arrangement, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.
+
 Drum, bass, melody, and arrangement work must preserve editable project state without losing event timing, pitch, velocity, glide, track routing, or mixer state.
 
 Drum dynamics work must migrate old patterns, preserve per-step velocity and hat repeat data across Pattern A/B/C copy, save/load, undo/redo, realtime playback, WAV export, and stem export.
