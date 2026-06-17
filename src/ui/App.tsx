@@ -973,6 +973,28 @@ type LayerStarterOption = {
   tone: MixCoachTone;
 };
 
+type ListeningPassId = "composition" | "arrangement" | "mix" | "delivery";
+type ListeningPassTarget = "compose" | "arrange" | "mix" | "master" | "deliver";
+
+type ListeningPassItem = {
+  id: ListeningPassId;
+  label: string;
+  status: string;
+  cue: string;
+  detail: string;
+  metric: string;
+  focusTarget: ListeningPassTarget;
+  focusLabel: string;
+  tone: MixCoachTone;
+};
+
+type ListeningPassSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  items: ListeningPassItem[];
+};
+
 type PatternDnaFocusSummary = {
   cardId: PatternDnaCardId | null;
   statusLabel: string;
@@ -2969,6 +2991,10 @@ export function App(): ReactElement {
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
   const patternDnaSummary = useMemo(() => createPatternDnaSummary(project), [project]);
   const layerStarterOptions = useMemo(() => createLayerStarterOptions(project), [project]);
+  const listeningPassSummary = useMemo(
+    () => createListeningPassSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
+  );
   const styleInspectorSummary = useMemo(
     () => createStyleInspectorSummary(project, style, patternCompareSummaries),
     [patternCompareSummaries, project, style]
@@ -6426,6 +6452,19 @@ export function App(): ReactElement {
     setProjectStatus(`Pattern DNA ${card.label}: ${card.value}`);
   }
 
+  function focusListeningPassItem(item: ListeningPassItem): void {
+    const targetRefs: Record<ListeningPassTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Listening ${item.label}: ${item.status}`);
+  }
+
   function focusStyleInspectorItem(item: StyleInspectorFocusItem): void {
     const targetRefs: Record<StyleInspectorFocusTarget, HTMLElement | null> = {
       transport: transportPanelRef.current,
@@ -6902,6 +6941,8 @@ export function App(): ReactElement {
       />
 
       <BeatReadiness checks={beatReadinessChecks} />
+
+      <ListeningPass summary={listeningPassSummary} onFocus={focusListeningPassItem} />
 
       <BeatMap summary={beatMapSummary} actions={beatMapActions} onRun={runNextMove} />
 
@@ -9451,6 +9492,48 @@ function BeatReadiness({ checks }: { checks: BeatReadinessCheck[] }): ReactEleme
             <span>{check.label}</span>
             <strong>{check.status}</strong>
             <p>{check.detail}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ListeningPass({
+  onFocus,
+  summary
+}: {
+  onFocus: (item: ListeningPassItem) => void;
+  summary: ListeningPassSummary;
+}): ReactElement {
+  return (
+    <section className={`listening-pass ${summary.tone}`} data-testid="listening-pass" aria-label="Listening pass">
+      <div className="listening-pass-heading">
+        <div>
+          <Disc3 size={17} aria-hidden="true" />
+          <span>Listening Pass</span>
+        </div>
+        <strong data-testid="listening-pass-headline">{summary.headline}</strong>
+        <small data-testid="listening-pass-detail">{summary.detail}</small>
+      </div>
+      <div className="listening-pass-grid" data-testid="listening-pass-grid">
+        {summary.items.map((item) => (
+          <div className={`listening-pass-card ${item.tone}`} data-testid={`listening-pass-${item.id}`} key={item.id}>
+            <span>{item.label}</span>
+            <strong>{item.status}</strong>
+            <button
+              className="listening-pass-focus-button"
+              data-testid={`listening-pass-focus-${item.id}`}
+              onClick={() => onFocus(item)}
+              title={`Focus ${item.focusLabel}: ${item.status}`}
+              type="button"
+            >
+              <ArrowRight size={13} aria-hidden="true" />
+              <span>{item.focusLabel}</span>
+            </button>
+            <small>{item.cue}</small>
+            <em>{item.detail}</em>
+            <b>{item.metric}</b>
           </div>
         ))}
       </div>
@@ -16705,6 +16788,120 @@ function createBeatReadinessChecks(project: ProjectState, analysis: ExportAnalys
     arrangementReadinessCheck(project.arrangement.length, bars),
     exportReadinessCheck(analysis)
   ];
+}
+
+function createListeningPassSummary(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): ListeningPassSummary {
+  const target = activeDeliveryTarget(project);
+  const selectedPattern = activePattern(project);
+  const drums = readinessCheckForId(checks, "drums");
+  const bass = readinessCheckForId(checks, "bass");
+  const harmony = readinessCheckForId(checks, "harmony");
+  const arrangement = readinessCheckForId(checks, "arrangement");
+  const exportCheck = readinessCheckForId(checks, "export");
+  const compositionTone = weakestTone([drums?.tone ?? "danger", bass?.tone ?? "danger", harmony?.tone ?? "danger"]);
+  const structure = createStructureLensSummary(project);
+  const arrangementTone = weakestTone([
+    arrangement?.tone ?? "danger",
+    structure.tone,
+    isDeliveryTargetAligned(project, target) ? "good" : "warn"
+  ]);
+  const mixChecks = createMixCoachChecks(analysis, stemAnalyses);
+  const mixTone = weakestTone(mixChecks.map((check) => check.tone));
+  const mixReviewCount = mixChecks.filter((check) => check.tone !== "good").length;
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const briefFields = sessionBriefFilledFields(project.sessionBrief);
+  const deliveryTone: MixCoachTone =
+    analysis.status === "Ready" && audibleStems.length >= target.stemGoal && briefFields >= 2
+      ? "good"
+      : analysis.status !== "Silent" && (audibleStems.length >= 2 || briefFields > 0)
+        ? "warn"
+        : "danger";
+  const compositionLayerCount = [
+    drumHitCount(selectedPattern) > 0,
+    selectedPattern.bassNotes.length > 0,
+    selectedPattern.chordEvents.length > 0 || selectedPattern.melodyNotes.length > 0
+  ].filter(Boolean).length;
+  const usedSlots = usedPatternSlots(project);
+  const targetAligned = isDeliveryTargetAligned(project, target);
+  const deliveryTarget: ListeningPassTarget =
+    project.masterPreset !== target.preferredMasterPreset || analysis.status !== "Ready" ? "master" : "deliver";
+  const items: ListeningPassItem[] = [
+    {
+      id: "composition",
+      label: "Composition",
+      status: compositionTone === "good" ? "Loop balanced" : compositionTone === "warn" ? "Layer check" : "Core missing",
+      cue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, chords, and Synth together.`,
+      detail: `${drumHitCount(selectedPattern)} drums / ${selectedPattern.bassNotes.length} 808 / ${selectedPattern.chordEvents.length} chords / ${selectedPattern.melodyNotes.length} Synth`,
+      metric: `${compositionLayerCount}/3 layer groups`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
+      tone: compositionTone
+    },
+    {
+      id: "arrangement",
+      label: "Arrangement",
+      status: arrangementTone === "good" ? "Form pass" : arrangementTone === "warn" ? "Shape review" : "Too short",
+      cue: "Play Song loop; compare intro, verse, hook, bridge, and outro energy.",
+      detail: `${barCountLabel(arrangementTotalBars(project))} / ${usedSlots.length}/3 patterns used / ${targetAligned ? "target aligned" : target.name}`,
+      metric: `${structure.signals.filter((signal) => signal.tone === "good").length}/${structure.signals.length} structure`,
+      focusTarget: "arrange",
+      focusLabel: "Arrange",
+      tone: arrangementTone
+    },
+    {
+      id: "mix",
+      label: "Mix",
+      status: mixTone === "good" ? "Balance pass" : mixTone === "warn" ? "Mix review" : "Signal check",
+      cue: "Play Full Mix, then compare Drums, 808, Synth, and Chords stems.",
+      detail: `${analysis.status} / ${formatDb(analysis.headroomDb)} headroom / ${audibleStems.length} audible stems`,
+      metric: mixReviewCount === 0 ? "Mix Coach clear" : `${mixReviewCount} mix checks`,
+      focusTarget: "mix",
+      focusLabel: "Mix",
+      tone: mixTone
+    },
+    {
+      id: "delivery",
+      label: "Delivery",
+      status: deliveryTone === "good" ? "Send check" : deliveryTone === "warn" ? "Pack review" : "Not ready",
+      cue: "Play Full Mix against the delivery target, then confirm WAV, stems, MIDI, and sheet posture.",
+      detail: `${target.name} / ${audibleStems.length}/${target.stemGoal} stems / ${briefFields}/4 brief fields`,
+      metric: exportCheck ? `${exportCheck.label}: ${exportCheck.status}` : analysis.status,
+      focusTarget: deliveryTarget,
+      focusLabel: listeningPassFocusLabel(deliveryTarget),
+      tone: deliveryTone
+    }
+  ];
+  const tone = weakestTone(items.map((item) => item.tone));
+  const readyCount = items.filter((item) => item.tone === "good").length;
+  const headline =
+    tone === "good" ? "Audition path ready" : tone === "warn" ? "Audition checks need review" : "Build the beat before delivery";
+
+  return {
+    headline,
+    detail: `${readyCount}/${items.length} passes ready / Pattern ${project.selectedPattern} / ${target.name}`,
+    tone,
+    items
+  };
+}
+
+function listeningPassFocusLabel(target: ListeningPassTarget): string {
+  switch (target) {
+    case "compose":
+      return "Compose";
+    case "arrange":
+      return "Arrange";
+    case "mix":
+      return "Mix";
+    case "master":
+      return "Master";
+    case "deliver":
+      return "Deliver";
+  }
 }
 
 function arrangedPatternData(project: ProjectState): PatternData[] {

@@ -60,6 +60,7 @@ button {
 .export-preflight,
 .handoff-pack,
 .beat-readiness,
+.listening-pass,
 .beat-map,
 .structure-lens,
 .song-form-overview,
@@ -138,6 +139,7 @@ button {
 .production-snapshot-heading > div,
 .export-preflight-heading > div,
 .handoff-pack-heading > div,
+.listening-pass-heading > div,
 .beat-map-heading > div,
 .structure-lens-heading > div,
 .song-form-heading > div,
@@ -200,6 +202,8 @@ h2 {
 .pattern-stack-row button span,
 .layer-starter-heading span,
 .layer-starter-row button span,
+.listening-pass-heading span,
+.listening-pass-focus-button span,
 .drum-move-preview span,
 .drum-foundation-heading span,
 .drum-foundation-row button span,
@@ -4721,6 +4725,177 @@ h2 {
   color: rgba(244, 239, 231, 0.72);
   font-size: 11px;
   line-height: 1.3;
+}
+
+.listening-pass {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  min-height: 104px;
+  border-color: rgba(130, 215, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(130, 215, 255, 0.045);
+  padding: 10px;
+}
+
+.listening-pass.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.listening-pass.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.listening-pass-heading {
+  display: grid;
+  gap: 5px;
+  align-content: center;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.listening-pass-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.listening-pass-heading svg {
+  color: #82d7ff;
+}
+
+.listening-pass.warn .listening-pass-heading svg {
+  color: #f0c36a;
+}
+
+.listening-pass.danger .listening-pass-heading svg {
+  color: #ff7a4f;
+}
+
+.listening-pass-heading strong,
+.listening-pass-heading small,
+.listening-pass-card span,
+.listening-pass-card strong,
+.listening-pass-card small,
+.listening-pass-card em,
+.listening-pass-card b,
+.listening-pass-focus-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listening-pass-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.listening-pass-heading small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.listening-pass-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.listening-pass-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 7px;
+  align-content: start;
+  min-width: 0;
+  min-height: 84px;
+  border: 1px solid rgba(120, 240, 200, 0.18);
+  border-inline-start: 3px solid #78f0c8;
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.045);
+  padding: 8px 9px;
+}
+
+.listening-pass-card.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  border-inline-start-color: #f0c36a;
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.listening-pass-card.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  border-inline-start-color: #ff7a4f;
+  background: rgba(255, 122, 79, 0.055);
+}
+
+.listening-pass-card span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.listening-pass-card strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.listening-pass-card small,
+.listening-pass-card em {
+  grid-column: 1 / -1;
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.listening-pass-card b {
+  grid-column: 1 / -1;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 5px;
+  background: rgba(120, 240, 200, 0.1);
+  color: #78f0c8;
+  padding: 3px 5px;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.listening-pass-card.warn b {
+  background: rgba(240, 195, 106, 0.12);
+  color: #f0c36a;
+}
+
+.listening-pass-card.danger b {
+  background: rgba(255, 122, 79, 0.12);
+  color: #ff7a4f;
+}
+
+.listening-pass-focus-button {
+  display: inline-flex;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-inline-size: 62px;
+  max-inline-size: 82px;
+  border: 1px solid rgba(130, 215, 255, 0.24);
+  border-radius: 5px;
+  background: rgba(130, 215, 255, 0.065);
+  color: #f4efe7;
+  padding: 4px 5px;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.listening-pass-focus-button:hover {
+  border-color: rgba(130, 215, 255, 0.48);
+  background: rgba(130, 215, 255, 0.12);
 }
 
 .beat-map {
@@ -13344,6 +13519,14 @@ input[type="range"] {
     gap: 4px 8px;
   }
 
+  .listening-pass {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
+  .listening-pass-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .quick-actions-spotlight {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px 8px;
@@ -13854,6 +14037,21 @@ input[type="range"] {
 
   .handoff-pack-grid,
   .handoff-pack-file-manifest {
+    grid-template-columns: 1fr;
+  }
+
+  .listening-pass {
+    grid-template-columns: 1fr;
+  }
+
+  .listening-pass-heading {
+    border-inline-end: 0;
+    border-block-end: 1px solid rgba(244, 239, 231, 0.1);
+    padding-inline-end: 0;
+    padding-block-end: 7px;
+  }
+
+  .listening-pass-grid {
     grid-template-columns: 1fr;
   }
 
