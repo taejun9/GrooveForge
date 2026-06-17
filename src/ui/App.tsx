@@ -3347,6 +3347,26 @@ export function App(): ReactElement {
     keyboardCaptureDefaults
   ]);
 
+  useEffect(() => {
+    return window.grooveforge?.onMenuCommand?.(handleNativeMenuCommand);
+  }, [
+    project,
+    undoStack,
+    redoStack,
+    isPlaying,
+    transportLoopMode,
+    transportLoopBars,
+    transportLoopStartBar,
+    selectedNote,
+    selectedDrumStep,
+    selectedDrumActive,
+    selectedChordIndex,
+    quickActionsOpen,
+    keyboardCaptureEnabled,
+    keyboardCaptureTarget,
+    keyboardCaptureDefaults
+  ]);
+
   function handleDesktopShortcut(event: KeyboardEvent): void {
     if (isEditableShortcutTarget(event.target)) {
       return;
@@ -3425,6 +3445,32 @@ export function App(): ReactElement {
       if (!event.repeat) {
         deleteSelectedEvent();
       }
+    }
+  }
+
+  function handleNativeMenuCommand(command: NativeMenuCommand): void {
+    switch (command) {
+      case "open-project":
+        void handleOpenProject();
+        return;
+      case "save-project":
+        void handleSaveProject();
+        return;
+      case "undo":
+        undoProject();
+        return;
+      case "redo":
+        redoProject();
+        return;
+      case "quick-actions":
+        openQuickActions();
+        return;
+      case "toggle-playback":
+        togglePlayback();
+        return;
+      case "delete-selected-event":
+        deleteSelectedEvent();
+        return;
     }
   }
 
