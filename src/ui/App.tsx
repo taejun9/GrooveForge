@@ -13029,6 +13029,14 @@ function createQuickActions({
     run: () => onFocusFinishChecklist(card)
   }));
   const grooveCompassItem = activeGrooveCompassQuickActionItem(grooveCompassSummary);
+  const grooveCompassActions: QuickAction[] = grooveCompassSummary.cards.map((item) => ({
+    id: `groove-compass-card-${item.id}`,
+    title: `Focus Groove Compass: ${item.label}`,
+    detail: `${item.value} / ${item.focusLabel} / ${item.detail}`,
+    group: "Create",
+    keywords: `groove compass focus card rhythm pocket drums density anchors hats timing chance selected drum inspect ${item.id} ${item.label} ${item.value} ${item.focusLabel} ${item.detail} beginner producer`,
+    run: () => onFocusGrooveCompass(item)
+  }));
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
   const keyCompassActions: QuickAction[] = keyCompassSummary.cards.map((item) => ({
     id: `key-compass-card-${item.id}`,
@@ -14170,6 +14178,7 @@ function createQuickActions({
         }
       }
     },
+    ...grooveCompassActions,
     {
       id: "pattern-dna-focus",
       title: patternDnaCard ? `Focus Pattern DNA: ${patternDnaCard.label}` : "Focus Pattern DNA",
@@ -14898,6 +14907,7 @@ function createQuickActionResult(
     action.id === "key-compass-focus" ||
     action.id.startsWith("key-compass-card-") ||
     action.id === "groove-compass-focus" ||
+    action.id.startsWith("groove-compass-card-") ||
     action.id === "pattern-dna-focus" ||
     action.id === "beat-passport-focus" ||
     action.id.startsWith("beat-passport-metric-") ||
@@ -15246,6 +15256,14 @@ function quickActionResultMetricSnapshot(
       id: "groove-compass",
       label: "Groove compass",
       value: `Pattern ${project.selectedPattern} / ${drumHitCount(activePattern(project))} hits`
+    };
+  }
+
+  if (action.id.startsWith("groove-compass-card-")) {
+    return {
+      id: "groove-compass",
+      label: "Groove compass",
+      value: action.detail
     };
   }
 
@@ -15847,6 +15865,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Groove Compass card to inspect rhythm density, anchors, hats, timing, or chance before editing drums.",
       nextCheck: "Return to Groove Compass after the focused pocket lane changes."
+    };
+  }
+
+  if (action.id.startsWith("groove-compass-card-")) {
+    return {
+      auditionCue: "Use the focused Groove Compass card to inspect that pocket lane before editing drums.",
+      nextCheck: "Return to Groove Compass when you need another direct density, anchors, hats, timing, chance, or selected-drum focus."
     };
   }
 
