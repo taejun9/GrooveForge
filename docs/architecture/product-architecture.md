@@ -86,7 +86,7 @@ The core project model should make composition events first-class. In the core a
 
 Default device palette: drum rack, synth 808/bass, simple synth, chord synth, built-in FX, mixer, and master devices. A sampler device is not part of the MVP default palette; it belongs to the optional sampling extension after the direct beat workstation can stand without imported audio.
 
-MVP type examples must not place `AudioClipEvent`, `audio`, or `sampler` beside the core event, clip, or track unions. Those names are reserved for the optional sampling extension section unless the user explicitly starts sampling-phase work.
+MVP type examples must not place `AudioClipEvent`, `audio`, or `sampler` beside the core event, clip, or track unions. Those names are reserved for the optional sampling extension section unless the user explicitly starts sampling-phase work. External examples that include `AudioClipEvent` in `MusicalEvent` or include `audio`/`sampler` in `TrackType` must be split into a core MVP union plus a clearly labeled optional sampling extension.
 
 If an exploratory draft includes audio clip, sampler, or waveform examples, move them to an optional sampling section before they enter architecture diagrams, schema examples, default tracks, or MVP validation.
 
@@ -116,6 +116,8 @@ Initial track types:
 MVP tracks should be `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master`. `audio` and `sampler` must not appear in the MVP track union or default project track list.
 
 The MVP `fx_return` is a built-in Space send/return path for shared ambience. It is deterministic project processing, not plugin hosting, imported impulse responses, sample playback, or a sampling workflow.
+
+If a draft proposes a default Instrument Panel with `drum kit`, `808`, `synth`, `sampler`, and `FX`, rewrite the default list to `drum rack`, `synth 808/bass`, `simple synth`, `chord synth`, built-in FX, mixer, and master devices. Put `sampler` only under the optional sampling extension.
 
 Extension track types for optional sampling, later:
 

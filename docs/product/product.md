@@ -23,7 +23,7 @@ The primary object is a beat project built from musical events, patterns, tracks
 
 The product should make a blank beat feel playable without imported audio: set BPM/key/style, write rhythm, compose 808/bass, melody, and chords, shape tone and FX, arrange sections, mix/master, and export. The product center is Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export.
 
-Core schema examples must reflect that order. Do not place `AudioClipEvent`, `audio`, or `sampler` beside core MVP event, clip, or track unions unless the user has explicitly started optional sampling-phase work.
+Core schema examples must reflect that order. Do not place `AudioClipEvent`, `audio`, or `sampler` beside core MVP event, clip, or track unions unless the user has explicitly started optional sampling-phase work. If an incoming brief includes `type MusicalEvent = ... | AudioClipEvent` or `type TrackType = ... | "audio" | "sampler"`, treat those lines as optional extension examples and rewrite the MVP union around direct musical events and built-in instrument tracks.
 
 Trap, drill, boom bap, house, lofi, jersey, phonk, R&B, garage, and experimental workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
 
@@ -55,7 +55,7 @@ Default instrument-panel rule: the base instrument panel is built-in drum rack, 
 
 Accessory rule: sampling can expand available source material, but it is not the product category, the first proof of value, or the main creative loop. A feature draft should first explain which beat event, instrument, arrangement, mix/master, or export outcome it improves; if the answer is sample import, chopping, loop stretch, one-shot mapping, or sampler setup, the draft belongs in an optional sampling phase.
 
-Placement rule: the default empty project, first visible actions, MVP proof, primary navigation, onboarding language, and plan titles must start from editable musical events and beat-making controls. Optional sampling can add sound sources later, but it must not become the first required action, first proof of value, default explanation of GrooveForge, or a co-equal product spine beside direct composition.
+Placement rule: the default empty project, first visible actions, MVP proof, primary navigation, onboarding language, and plan titles must start from editable musical events and beat-making controls. Optional sampling can add sound sources later, but it must not become the first required action, first proof of value, default explanation of GrooveForge, or a co-equal product spine beside direct composition. A five-area starter UI can include Transport, Pattern Editor, Instrument Panel, Arrangement View, and Mixer/Master, but the Instrument Panel defaults are drum kit, synth 808/bass, simple synth, chord synth, effects, and sound-design controls, with sampler entry points deferred.
 
 ## Users
 
@@ -179,6 +179,20 @@ This is the core MVP event union. Drafts must not add `AudioClipEvent` beside `N
 Audio clip events belong to a later extension model. A project must be able to produce a complete beat with only drum, bass, synth, chord, automation, mixer, and master data.
 
 When product docs use the word clip before the sampling phase, it means a pattern, MIDI, or automation container. It must not imply that imported audio clips are required for the core workflow.
+
+Core MVP track examples should stay in this family until optional sampling is explicitly in scope:
+
+```ts
+type MvpTrackType =
+  | "drum_rack"
+  | "bass_808"
+  | "synth"
+  | "chord"
+  | "fx_return"
+  | "master";
+```
+
+`audio` and `sampler` are valid only as later optional sampling extension track types, not as default project tracks or first-run instrument-panel entries.
 
 ## MVP Scope
 

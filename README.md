@@ -29,9 +29,9 @@ Extension boundary: Sampling is subordinate and opt-in. After the core beat-maki
 
 Concept audit rule: do not read any sampling reference as the main workflow. Sampling is an accessory module, not the app category. If a draft starts from sample import, sample browsing, chopping, loop stretching, one-shot mapping, sampler setup, or lists a sampler as a default instrument-panel item, it is out of alignment until it is explicitly labeled optional sampling-phase work.
 
-Core model rule: do not copy optional sampling examples into the MVP data model. The core project starts from editable notes, drum hits, automation, pattern/MIDI clips, built-in instruments, arrangement, mixer/master, and export; `AudioClipEvent`, `audio`, and `sampler` belong only to an explicitly approved optional sampling phase.
+Core model rule: do not copy optional sampling examples into the MVP data model. The core project starts from editable notes, drum hits, automation, pattern/MIDI clips, built-in instruments, arrangement, mixer/master, and export; `AudioClipEvent`, `audio`, and `sampler` belong only to an explicitly approved optional sampling phase. If an incoming draft defines `MusicalEvent` with `AudioClipEvent` or a core `TrackType` with `audio`/`sampler`, rewrite those entries into an optional-sampling extension section before they reach the MVP model.
 
-Drafting rule: the default empty project, first visible actions, MVP proof, primary navigation, default instrument panel, and new plan titles should lead with editable musical events, built-in drum rack, synth 808/bass, synth/chord instruments, FX, and beat-making controls. Do not present optional sampling as a co-equal product spine.
+Drafting rule: the default empty project, first visible actions, MVP proof, primary navigation, default instrument panel, and new plan titles should lead with editable musical events, built-in drum rack, synth 808/bass, synth/chord instruments, FX, and beat-making controls. Do not present optional sampling as a co-equal product spine. If a suggested basic-screen layout includes `sampler` in the default Instrument Panel, move it to a later optional-sampling section and keep the first screen focused on direct beat composition.
 
 ## MVP Target
 
@@ -127,6 +127,7 @@ The first desktop runtime is an Electron + Vite + TypeScript app. It opens direc
 - Keep sample import, chopping, sampler tracks, and audio warping in P3/v2 extension scope unless a user-approved plan explicitly says otherwise.
 - Keep first-run UI and default navigation focused on making beats across genres, not on finding or slicing samples.
 - Keep default screens, plan titles, and roadmap ordering anchored to editable musical events and beat-making controls.
+- Keep external brief examples that include `AudioClipEvent`, `audio`, or `sampler` out of the core MVP unions unless the plan is explicitly optional sampling-phase work.
 - Lead summaries with what users create directly: drums, 808/bass, melody/chords, sound design, arrangement, mix/master, and export. Mention sampling only as an explicitly optional extension boundary or sampling-phase plan.
 - Keep sensitive real user, customer, credential, and production data out of samples, tests, docs, and screenshots.
 - Keep validation commands current as the stack becomes concrete.

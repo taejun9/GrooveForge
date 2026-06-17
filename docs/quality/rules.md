@@ -458,9 +458,13 @@ Any future optional-sampling schema must keep `NoteEvent`, `DrumHitEvent`, and a
 
 Data model examples fail the product boundary if they add `AudioClipEvent` to the core `MusicalEvent` union or include `audio`/`sampler` in the MVP track union or default project track list before an explicit optional-sampling plan exists.
 
+External-brief correction work must rewrite any `type MusicalEvent = ... | AudioClipEvent` or `type TrackType = ... | "audio" | "sampler"` example into a core MVP union plus a clearly labeled optional sampling extension. The core MVP union remains `NoteEvent`, `DrumHitEvent`, and `AutomationEvent`; the core MVP track family remains `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master`.
+
 Concept-audit work must also catch sampling drift introduced through technical examples: waveform UI, audio clip schemas, sampler tracks, sample asset graphs, and `AudioClipEvent` examples belong in an optional sampling section until the user explicitly starts that phase.
 
 Default instrument panel, device-palette, and architecture-diagram work fails if it lists `sampler`, sample browser, chop pads, or audio clips beside the MVP built-in drum rack, synth 808/bass, simple synth, chord synth, FX, mixer, and master devices. Those entries must move to an explicitly optional sampling section unless the user starts sampling-phase work.
+
+Five-area starter UI drafts may use Transport, Pattern Editor, Instrument Panel, Arrangement View, and Mixer/Master, but they fail if the default Instrument Panel includes `sampler`; the first-run panel must lead with built-in drum kit/rack, synth 808/bass, simple synth, chord synth, effects, and sound-design controls.
 
 Brief alignment work must rewrite external examples that include `AudioClipEvent` in the core `MusicalEvent` union so the MVP union remains `NoteEvent`, `DrumHitEvent`, and `AutomationEvent`, with `AudioClipEvent` documented only as a future optional extension.
 

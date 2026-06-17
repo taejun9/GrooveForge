@@ -73,12 +73,15 @@ TEXT_EXPECTATIONS = {
         "Core model rule: do not copy optional sampling examples into the MVP data model.",
         "The core project starts from editable notes, drum hits, automation, pattern/MIDI clips, built-in instruments, arrangement, mixer/master, and export",
         "`AudioClipEvent`, `audio`, and `sampler` belong only to an explicitly approved optional sampling phase.",
+        "If an incoming draft defines `MusicalEvent` with `AudioClipEvent` or a core `TrackType` with `audio`/`sampler`, rewrite those entries into an optional-sampling extension section before they reach the MVP model.",
         "Drafting rule: the default empty project, first visible actions, MVP proof, primary navigation, default instrument panel, and new plan titles should lead with editable musical events, built-in drum rack, synth 808/bass, synth/chord instruments, FX, and beat-making controls.",
         "Do not present optional sampling as a co-equal product spine.",
+        "If a suggested basic-screen layout includes `sampler` in the default Instrument Panel, move it to a later optional-sampling section and keep the first screen focused on direct beat composition.",
         "Keep first-run UI and default navigation focused on making beats across genres",
         "Treat sample-free beat creation as the proof of the product",
         "Keep sample import, chopping, sampler tracks, and audio warping in P3/v2 extension scope",
         "Keep default screens, plan titles, and roadmap ordering anchored to editable musical events and beat-making controls",
+        "Keep external brief examples that include `AudioClipEvent`, `audio`, or `sampler` out of the core MVP unions unless the plan is explicitly optional sampling-phase work.",
         "Lead summaries with what users create directly: drums, 808/bass, melody/chords, sound design, arrangement, mix/master, and export.",
         "Production builds use Vite 8 / Rolldown code splitting groups for `react-vendor`, `icons-vendor`, `vendor`, `audio-engine`, and `workstation-core` while preserving `dist` output and sourcemaps",
         "not by raising `chunkSizeWarningLimit`",
@@ -263,6 +266,7 @@ TEXT_EXPECTATIONS = {
         "Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export.",
         "Core schema examples must reflect that order.",
         "Do not place `AudioClipEvent`, `audio`, or `sampler` beside core MVP event, clip, or track unions unless the user has explicitly started optional sampling-phase work.",
+        "If an incoming brief includes `type MusicalEvent = ... | AudioClipEvent` or `type TrackType = ... | \"audio\" | \"sampler\"`, treat those lines as optional extension examples and rewrite the MVP union around direct musical events and built-in instrument tracks.",
         "When there is ambiguity, read the product draft in this order: all-genre beat creation first",
         "Pattern programming for all supported styles.",
         "Later optional sound-source extension, outside the MVP:",
@@ -275,6 +279,7 @@ TEXT_EXPECTATIONS = {
         "the draft belongs in an optional sampling phase",
         "Placement rule: the default empty project, first visible actions, MVP proof, primary navigation, onboarding language, and plan titles must start from editable musical events and beat-making controls.",
         "co-equal product spine beside direct composition",
+        "A five-area starter UI can include Transport, Pattern Editor, Instrument Panel, Arrangement View, and Mixer/Master, but the Instrument Panel defaults are drum kit, synth 808/bass, simple synth, chord synth, effects, and sound-design controls, with sampler entry points deferred.",
         "This loop is the product spine for all supported genres.",
         "샘플 없이도 8마디 비트를 만들고 WAV로 export할 수 있어야 한다.",
         "This sentence is the MVP proof.",
@@ -289,6 +294,9 @@ TEXT_EXPECTATIONS = {
         "Drafts must not add `AudioClipEvent` beside `NoteEvent`, `DrumHitEvent`, and `AutomationEvent` unless an optional-sampling phase has been explicitly approved.",
         "If an external brief includes `AudioClipEvent` in `MusicalEvent`, rewrite it as an optional extension example instead of copying it into the core schema.",
         "it means a pattern, MIDI, or automation container",
+        "Core MVP track examples should stay in this family until optional sampling is explicitly in scope:",
+        "type MvpTrackType =",
+        "`audio` and `sampler` are valid only as later optional sampling extension track types, not as default project tracks or first-run instrument-panel entries.",
         "Local project save/load",
         "Local project save/load as a `.grooveforge.json` file, with UI-local current-file identity and unsaved-edit status.",
         "Local draft recovery that writes a bounded versioned project JSON draft to renderer localStorage",
@@ -913,9 +921,12 @@ TEXT_EXPECTATIONS = {
         "Any future optional-sampling schema must keep `NoteEvent`, `DrumHitEvent`, and automation sufficient for a complete beat",
         "Data model examples fail the product boundary if they add `AudioClipEvent` to the core `MusicalEvent` union",
         "include `audio`/`sampler` in the MVP track union or default project track list before an explicit optional-sampling plan exists",
+        "External-brief correction work must rewrite any `type MusicalEvent = ... | AudioClipEvent` or `type TrackType = ... | \"audio\" | \"sampler\"` example into a core MVP union plus a clearly labeled optional sampling extension.",
+        "the core MVP track family remains `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master`.",
         "Concept-audit work must also catch sampling drift introduced through technical examples",
         "waveform UI, audio clip schemas, sampler tracks, sample asset graphs, and `AudioClipEvent` examples belong in an optional sampling section",
         "Default instrument panel, device-palette, and architecture-diagram work fails if it lists `sampler`, sample browser, chop pads, or audio clips beside the MVP built-in drum rack",
+        "Five-area starter UI drafts may use Transport, Pattern Editor, Instrument Panel, Arrangement View, and Mixer/Master, but they fail if the default Instrument Panel includes `sampler`",
         "Brief alignment work must rewrite external examples that include `AudioClipEvent` in the core `MusicalEvent` union",
     ],
     "docs/architecture/product-architecture.md": [
@@ -935,6 +946,7 @@ TEXT_EXPECTATIONS = {
         "bounded local artist, vibe, reference, and notes text for project intent and handoff context",
         "not an imported audio asset",
         "MVP type examples must not place `AudioClipEvent`, `audio`, or `sampler` beside the core event, clip, or track unions.",
+        "External examples that include `AudioClipEvent` in `MusicalEvent` or include `audio`/`sampler` in `TrackType` must be split into a core MVP union plus a clearly labeled optional sampling extension.",
         "If an exploratory draft includes audio clip, sampler, or waveform examples, move them to an optional sampling section before they enter architecture diagrams, schema examples, default tracks, or MVP validation.",
         "`AudioClipEvent` belongs in that extension layer, not in the core MVP `MusicalEvent` union.",
         "Optional sampling schemas must preserve the existing event-first contract",
@@ -945,6 +957,7 @@ TEXT_EXPECTATIONS = {
         "sample browsing, chopping, sampler mapping, and audio warping belong behind explicit optional-sampling entry points",
         "Roadmap and architecture plans should treat `audio` and `sampler` as extension track types until the direct beat workstation is already useful.",
         "`audio` and `sampler` must not appear in the MVP track union or default project track list.",
+        "If a draft proposes a default Instrument Panel with `drum kit`, `808`, `synth`, `sampler`, and `FX`, rewrite the default list to `drum rack`, `synth 808/bass`, `simple synth`, `chord synth`, built-in FX, mixer, and master devices.",
         "Do not list `sampler` in the default instrument panel, first-run track list, or MVP architecture diagram.",
         "Extension track types for optional sampling, later:",
     ],
@@ -980,6 +993,7 @@ TEXT_EXPECTATIONS = {
         '"harness/scripts/run_runtime_smoke.mjs"',
         '"harness/scripts/ts_extension_loader.mjs"',
         '"harness/scripts/register_ts_loader.mjs"',
+        "check_domain_sampling_boundaries",
     ],
     "harness/scripts/run_runtime_smoke.mjs": [
         "GrooveForge runtime smoke passed.",
@@ -4294,6 +4308,7 @@ TEXT_EXPECTATIONS = {
         "import type { ArrangementBlock, ArrangementMuteTrack, DrumLane, ProjectState }",
     ],
     "src/domain/workstation.ts": [
+        'export type TrackType = "drum_rack" | "bass_808" | "synth" | "chord" | "fx_return" | "master";',
         "styleProfiles",
         '"jersey"',
         '"phonk"',
@@ -4536,6 +4551,20 @@ def check_build_chunk_config(errors: list[str]) -> None:
         errors.append("vite.config.ts must use real chunk splitting instead of chunkSizeWarningLimit")
 
 
+def check_domain_sampling_boundaries(errors: list[str]) -> None:
+    domain_text = (ROOT / "src/domain/workstation.ts").read_text(encoding="utf-8")
+    track_type_match = re.search(r"export type TrackType\s*=([^;]+);", domain_text, re.S)
+    if not track_type_match:
+        errors.append("src/domain/workstation.ts must define the core TrackType union")
+        return
+
+    track_type_union = track_type_match.group(1)
+    if re.search(r'"(?:audio|sampler)"', track_type_union):
+        errors.append("core TrackType union must not include audio or sampler before optional sampling-phase work")
+    if "AudioClipEvent" in domain_text:
+        errors.append("core domain model must not include AudioClipEvent before optional sampling-phase work")
+
+
 def run_checks(strict: bool = False) -> list[str]:
     errors: list[str] = []
     check_required_paths(errors)
@@ -4546,6 +4575,7 @@ def run_checks(strict: bool = False) -> list[str]:
     check_official_sources(errors)
     check_offline_render_determinism(errors)
     check_build_chunk_config(errors)
+    check_domain_sampling_boundaries(errors)
     if strict:
         check_strict_todos(errors)
     return errors
