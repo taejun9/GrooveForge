@@ -1219,6 +1219,11 @@ type BassMoveResult = {
   tone: MixCoachTone;
 };
 
+type BassMoveQuickActionTarget =
+  | { kind: "Bassline"; id: BasslinePadId; label: string }
+  | { kind: "Glide"; id: BassGlidePadId; label: string }
+  | { kind: "Contour"; id: BassContourId; label: string };
+
 type PatternStackId = "pocket" | "hook" | "lift" | "break";
 
 type PatternStackDefinition = {
@@ -7161,6 +7166,7 @@ export function App(): ReactElement {
   const quickActions = createQuickActions({
     arrangementArcPreviewSummary,
     arrangementTemplatePreviewSummary,
+    bassMovePreviewSummary,
     canRedo,
     canUndo,
     beatPassportSummary,
@@ -7193,6 +7199,9 @@ export function App(): ReactElement {
     onApplyArrangementArc: applyArrangementArcPad,
     onApplyArrangementFocus: applyArrangementFocusPreset,
     onApplyArrangementTemplate: applyArrangementTemplate,
+    onApplyBasslinePad: applyBasslinePad,
+    onApplyBassGlidePad: applyBassGlidePad,
+    onApplyBassContour: applyBassContour,
     onApplyBeatSpine: applyBeatSpineAction,
     onApplyBlueprint: applyQuickActionBeatBlueprint,
     onApplyDrumKit: applyDrumKitPad,
@@ -11783,6 +11792,41 @@ function activeLayerStarterQuickActionOption(options: LayerStarterOption[]): Lay
   return options.find((option) => option.tone === "danger") ?? options.find((option) => option.tone === "warn") ?? null;
 }
 
+function activeBassMoveQuickActionTarget(
+  project: ProjectState,
+  preview: BassMovePreviewSummary
+): BassMoveQuickActionTarget | null {
+  if (preview.statusLabel === "808 aligned") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const bassline =
+    preview.basslineId === "none" ? null : basslinePadDefinitions.find((definition) => definition.id === preview.basslineId) ?? null;
+  const glide =
+    preview.glideId === "none" ? null : bassGlidePadDefinitions.find((definition) => definition.id === preview.glideId) ?? null;
+  const contour =
+    preview.contourId === "none" ? null : bassContourDefinitions.find((definition) => definition.id === preview.contourId) ?? null;
+
+  if (pattern.bassNotes.length === 0 && bassline) {
+    return { kind: "Bassline", id: bassline.id, label: bassline.label };
+  }
+
+  if (pattern.bassNotes.some((note) => note.glide) && contour) {
+    return { kind: "Contour", id: contour.id, label: contour.label };
+  }
+
+  if (glide) {
+    return { kind: "Glide", id: glide.id, label: glide.label };
+  }
+
+  if (contour) {
+    return { kind: "Contour", id: contour.id, label: contour.label };
+  }
+
+  return bassline ? { kind: "Bassline", id: bassline.id, label: bassline.label } : null;
+}
+
 function activeListeningPassQuickActionItem(summary: ListeningPassSummary): ListeningPassItem | null {
   return summary.items.find((item) => item.tone !== "good") ?? summary.items[0] ?? null;
 }
@@ -12305,6 +12349,7 @@ function NextMoveResultStrip({ result }: { result: NextMoveResult }): ReactEleme
 function createQuickActions({
   arrangementArcPreviewSummary,
   arrangementTemplatePreviewSummary,
+  bassMovePreviewSummary,
   beatPassportSummary,
   beatSpineSummary,
   canRedo,
@@ -12337,6 +12382,9 @@ function createQuickActions({
   onApplyArrangementArc,
   onApplyArrangementFocus,
   onApplyArrangementTemplate,
+  onApplyBasslinePad,
+  onApplyBassGlidePad,
+  onApplyBassContour,
   onApplyBeatSpine,
   onApplyBlueprint,
   onApplyDrumKit,
@@ -12380,6 +12428,7 @@ function createQuickActions({
 }: {
   arrangementArcPreviewSummary: ArrangementArcPreviewSummary;
   arrangementTemplatePreviewSummary: ArrangementTemplatePreviewSummary;
+  bassMovePreviewSummary: BassMovePreviewSummary;
   beatPassportSummary: BeatPassportSummary;
   beatSpineSummary: BeatSpineSummary;
   canRedo: boolean;
@@ -12412,6 +12461,9 @@ function createQuickActions({
   onApplyArrangementArc: (pad: ArrangementArcPadId) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
+  onApplyBasslinePad: (pad: BasslinePadId) => void;
+  onApplyBassGlidePad: (pad: BassGlidePadId) => void;
+  onApplyBassContour: (contour: BassContourId) => void;
   onApplyBeatSpine: (action: BeatSpineAction) => void;
   onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
   onApplyDrumKit: (pad: DrumKitPadId) => void;
@@ -12467,6 +12519,7 @@ function createQuickActions({
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
   const listeningPassItem = activeListeningPassQuickActionItem(listeningPassSummary);
+  const bassMoveTarget = activeBassMoveQuickActionTarget(project, bassMovePreviewSummary);
   const modeFocusCard = activeModeFocusQuickActionCard(modeFocusSummary);
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
   const productionSnapshotMetric = activeProductionSnapshotQuickActionMetric(productionSnapshotSummary);
@@ -12687,6 +12740,28 @@ function createQuickActions({
       run: () => {
         if (patternStackId) {
           onApplyPatternStack(patternStackId);
+        }
+      }
+    },
+    {
+      id: "808-move",
+      title: bassMoveTarget ? `Apply ${bassMoveTarget.label} 808 ${bassMoveTarget.kind}` : "Apply 808 Move",
+      detail: bassMoveTarget
+        ? `${bassMovePreviewSummary.phraseLabel} / ${bassMovePreviewSummary.moveLabel}`
+        : "Current 808 move preview has no active target.",
+      group: "Create",
+      keywords: `808 move bass low end bassline glide contour rhythm chance ${bassMovePreviewSummary.basslineId} ${bassMovePreviewSummary.glideId} ${bassMovePreviewSummary.contourId} ${bassMoveTarget?.label ?? "none"} beginner producer`,
+      disabled: !bassMoveTarget,
+      run: () => {
+        if (!bassMoveTarget) {
+          return;
+        }
+        if (bassMoveTarget.kind === "Bassline") {
+          onApplyBasslinePad(bassMoveTarget.id);
+        } else if (bassMoveTarget.kind === "Glide") {
+          onApplyBassGlidePad(bassMoveTarget.id);
+        } else {
+          onApplyBassContour(bassMoveTarget.id);
         }
       }
     },
@@ -13297,6 +13372,15 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "808-move") {
+    const bassNotes = activePattern(project).bassNotes;
+    return {
+      id: "808-move",
+      label: "808 move",
+      value: `${bassNotes.length} notes / ${bassGlideLabel(bassNotes)} / ${bassPitchSpanLabel(bassNotes)}`
+    };
+  }
+
   if (action.id === "sound-focus") {
     return {
       id: "sound-focus",
@@ -13546,6 +13630,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear 808, Chords, and Synth against the drums before arranging.`,
       nextCheck: "Use the Pattern Stack Result, selected-note tools, and selected-chord tools for manual edits."
+    };
+  }
+
+  if (action.id === "808-move") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; check kick-to-808 lock, slides, and low-end contour.`,
+      nextCheck: "Use the 808 Move Result plus selected-note degree/role and 808 edit tools for manual corrections."
     };
   }
 
