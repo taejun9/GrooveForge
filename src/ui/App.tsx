@@ -7211,6 +7211,7 @@ export function App(): ReactElement {
     sessionPassSummary,
     soundFocusPreviewSummary,
     soundPresetPreviewSummary,
+    spaceFxPadOptions,
     styleInspectorSummary,
     transportLoopScope,
     workflowNavigatorItems,
@@ -7241,6 +7242,7 @@ export function App(): ReactElement {
     onApplyPatternChain: applyPatternChain,
     onApplyPatternFill: applyPatternFill,
     onApplyPatternStack: applyPatternStack,
+    onApplySpaceFx: applySpaceFxPad,
     onApplySoundFocus: applySoundFocusPad,
     onApplySoundPreset: applySoundPreset,
     onExpandPatternChain: expandPatternChain,
@@ -12554,6 +12556,7 @@ function createQuickActions({
   sessionPassSummary,
   soundFocusPreviewSummary,
   soundPresetPreviewSummary,
+  spaceFxPadOptions,
   styleInspectorSummary,
   transportLoopScope,
   workflowNavigatorItems,
@@ -12584,6 +12587,7 @@ function createQuickActions({
   onApplyPatternChain,
   onApplyPatternFill,
   onApplyPatternStack,
+  onApplySpaceFx,
   onApplySoundFocus,
   onApplySoundPreset,
   onExpandPatternChain,
@@ -12647,6 +12651,7 @@ function createQuickActions({
   sessionPassSummary: SessionPassSummary;
   soundFocusPreviewSummary: SoundFocusPreviewSummary;
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
+  spaceFxPadOptions: SpaceFxPadOption[];
   styleInspectorSummary: StyleInspectorSummary;
   transportLoopScope: TransportLoopScope;
   workflowNavigatorItems: WorkflowNavigatorItem[];
@@ -12677,6 +12682,7 @@ function createQuickActions({
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
+  onApplySpaceFx: (pad: SpaceFxPadId) => void;
   onApplySoundFocus: (pad: SoundFocusPadId) => void;
   onApplySoundPreset: (preset: SoundPresetTarget) => void;
   onExpandPatternChain: () => void;
@@ -13371,6 +13377,18 @@ function createQuickActions({
         }
       }
     },
+    ...spaceFxPadOptions.map((pad): QuickAction => ({
+      id: `space-fx-${pad.id}`,
+      title: `Apply ${pad.label} Space FX`,
+      detail:
+        pad.changedCount > 0
+          ? `${pad.preview} / ${pad.changedCount} send${pad.changedCount === 1 ? "" : "s"}`
+          : `${pad.label} Space FX already selected.`,
+      group: "Mix",
+      keywords: `space fx send ambience reverb room wide wash dry ${pad.id} ${pad.label} ${pad.detail} drums 808 synth chords beginner producer`,
+      disabled: pad.changedCount === 0,
+      run: () => onApplySpaceFx(pad.id)
+    })),
     {
       id: "mix-headroom",
       title: "Mix Fix Headroom",
@@ -13862,6 +13880,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("space-fx-")) {
+    return {
+      id: "space-fx",
+      label: "Space FX",
+      value: `D ${spaceFxTrackPosture(project.mixer, "drum_rack")} / 8 ${spaceFxTrackPosture(project.mixer, "bass_808")} / Sy ${spaceFxTrackPosture(project.mixer, "synth")} / Ch ${spaceFxTrackPosture(project.mixer, "chord")}`
+    };
+  }
+
   if (action.id === "pattern-chain" || action.id === "chain-expand" || action.id === "arrangement-template") {
     return { id: "song-length", label: "Song length", value: barCountLabel(arrangementTotalBars(project)) };
   }
@@ -14145,6 +14171,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Full Mix, then solo Drums and 808 to confirm the rough balance supports the beat.",
       nextCheck: "Use the Mix Balance Result, Stem Audition Pads, and manual mixer controls for final level, pan, EQ, and send trim."
+    };
+  }
+
+  if (action.id.startsWith("space-fx-")) {
+    return {
+      auditionCue: "Play Full Mix, then solo Synth and Chords to hear the shared Space send around the drums and 808.",
+      nextCheck: "Use the Space FX Result and manual Space sliders for final dry, room, wide, or wash trim."
     };
   }
 
