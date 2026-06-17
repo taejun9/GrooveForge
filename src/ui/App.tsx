@@ -7170,6 +7170,7 @@ export function App(): ReactElement {
     patternDnaSummary,
     playbackMode,
     project,
+    productionSnapshotSummary,
     exportPreflightSummary,
     reviewQueueSummary,
     selectedArrangementIndex,
@@ -7195,6 +7196,7 @@ export function App(): ReactElement {
     onFocusKeyCompass: focusKeyCompassItem,
     onFocusListeningPass: focusListeningPassItem,
     onFocusPatternDna: focusPatternDnaCard,
+    onFocusProductionSnapshot: focusProductionSnapshotMetric,
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusSessionPass: focusSessionPassCard,
     onFocusWorkflowSpotlight: jumpToWorkflowZone,
@@ -11741,6 +11743,10 @@ function activeListeningPassQuickActionItem(summary: ListeningPassSummary): List
   return summary.items.find((item) => item.tone !== "good") ?? summary.items[0] ?? null;
 }
 
+function activeProductionSnapshotQuickActionMetric(summary: ProductionSnapshotSummary): ProductionSnapshotMetric | null {
+  return summary.metrics.find((metric) => metric.tone !== "good") ?? summary.metrics[0] ?? null;
+}
+
 function activeExportPreflightQuickActionCard(summary: ExportPreflightSummary): ExportPreflightCard | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
@@ -12233,6 +12239,7 @@ function createQuickActions({
   patternDnaSummary,
   playbackMode,
   project,
+  productionSnapshotSummary,
   exportPreflightSummary,
   reviewQueueSummary,
   selectedArrangementIndex,
@@ -12258,6 +12265,7 @@ function createQuickActions({
   onFocusKeyCompass,
   onFocusListeningPass,
   onFocusPatternDna,
+  onFocusProductionSnapshot,
   onFocusReviewQueue,
   onFocusSessionPass,
   onFocusWorkflowSpotlight,
@@ -12280,6 +12288,7 @@ function createQuickActions({
   patternDnaSummary: PatternDnaSummary;
   playbackMode: PlaybackMode;
   project: ProjectState;
+  productionSnapshotSummary: ProductionSnapshotSummary;
   exportPreflightSummary: ExportPreflightSummary;
   reviewQueueSummary: ReviewQueueSummary;
   selectedArrangementIndex: number;
@@ -12305,6 +12314,7 @@ function createQuickActions({
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
   onFocusListeningPass: (item: ListeningPassItem) => void;
   onFocusPatternDna: (card: PatternDnaCard) => void;
+  onFocusProductionSnapshot: (metric: ProductionSnapshotFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
   onFocusWorkflowSpotlight: (zone: WorkflowZoneId) => void;
@@ -12327,6 +12337,7 @@ function createQuickActions({
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
   const listeningPassItem = activeListeningPassQuickActionItem(listeningPassSummary);
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
+  const productionSnapshotMetric = activeProductionSnapshotQuickActionMetric(productionSnapshotSummary);
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
@@ -12476,6 +12487,21 @@ function createQuickActions({
       run: () => {
         if (listeningPassItem) {
           onFocusListeningPass(listeningPassItem);
+        }
+      }
+    },
+    {
+      id: "production-snapshot-focus",
+      title: productionSnapshotMetric ? `Focus Production Snapshot: ${productionSnapshotMetric.label}` : "Focus Production Snapshot",
+      detail: productionSnapshotMetric
+        ? `${productionSnapshotMetric.value} / ${productionSnapshotMetric.focusLabel}`
+        : "No Production Snapshot metric available.",
+      group: "Project",
+      keywords: `production snapshot focus session scan target form patterns mix handoff inspect ${productionSnapshotMetric?.id ?? "none"} ${productionSnapshotMetric?.focusLabel ?? "none"} beginner producer`,
+      disabled: !productionSnapshotMetric,
+      run: () => {
+        if (productionSnapshotMetric) {
+          onFocusProductionSnapshot(productionSnapshotMetric);
         }
       }
     },
@@ -12908,6 +12934,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "production-snapshot-focus") {
+    return {
+      id: "production-snapshot",
+      label: "Production snapshot",
+      value: `${activeDeliveryTarget(project).name} / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
   if (action.id === "review-queue-focus") {
     return {
       id: "review-queue",
@@ -13057,6 +13091,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Listening Pass checkpoint to choose Pattern, Song, Full Mix, stem, or delivery-target audition scope.",
       nextCheck: "Return to Listening Pass after the focused composition, arrangement, mix, or delivery checkpoint changes."
+    };
+  }
+
+  if (action.id === "production-snapshot-focus") {
+    return {
+      auditionCue: "Use the focused Production Snapshot metric to inspect target fit, song form, pattern coverage, mix posture, or handoff posture.",
+      nextCheck: "Return to Production Snapshot after the focused session metric is ready or intentionally deferred."
     };
   }
 
