@@ -7207,6 +7207,7 @@ export function App(): ReactElement {
     composerGuideSummary,
     drumKitPreviewSummary,
     drumMovePreviewSummary,
+    firstBeatPathSummary,
     finishChecklistSummary,
     grooveCompassSummary,
     isPlaying,
@@ -7332,6 +7333,7 @@ export function App(): ReactElement {
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
     onExportWav: handleExportWav,
+    onJumpFirstBeatPath: jumpToFirstBeatPathTarget,
     onJumpBeatSpine: jumpToBeatSpineTarget,
     onFocusBeatPassport: focusBeatPassportMetric,
     onFocusComposerGuide: focusComposerGuideCard,
@@ -11860,6 +11862,10 @@ function activeSessionPassQuickActionCard(summary: SessionPassSummary): SessionP
   return summary.mode === "guided" ? summary.cards[0] : summary.cards[1];
 }
 
+function activeFirstBeatPathQuickActionStep(summary: FirstBeatPathSummary): FirstBeatPathStep | null {
+  return summary.steps.find((step) => step.id === summary.nextStepId) ?? summary.steps.find((step) => step.tone !== "good") ?? summary.steps[0] ?? null;
+}
+
 function activeModeFocusQuickActionCard(summary: ModeFocusSummary): ModeFocusCard | null {
   const preferredId = summary.mode === "guided" ? "stage" : "issue";
   return summary.cards.find((card) => card.id === preferredId) ?? summary.cards[0] ?? null;
@@ -12616,6 +12622,7 @@ function createQuickActions({
   composerGuideSummary,
   drumKitPreviewSummary,
   drumMovePreviewSummary,
+  firstBeatPathSummary,
   finishChecklistSummary,
   grooveCompassSummary,
   isPlaying,
@@ -12741,6 +12748,7 @@ function createQuickActions({
   onExportMidi,
   onExportStems,
   onExportWav,
+  onJumpFirstBeatPath,
   onJumpBeatSpine,
   onFocusBeatPassport,
   onFocusComposerGuide,
@@ -12775,6 +12783,7 @@ function createQuickActions({
   composerGuideSummary: ComposerGuideSummary;
   drumKitPreviewSummary: DrumKitPreviewSummary;
   drumMovePreviewSummary: DrumMovePreviewSummary;
+  firstBeatPathSummary: FirstBeatPathSummary;
   finishChecklistSummary: FinishChecklistSummary;
   grooveCompassSummary: GrooveCompassSummary;
   isPlaying: boolean;
@@ -12900,6 +12909,7 @@ function createQuickActions({
   onExportMidi: () => void;
   onExportStems: () => void;
   onExportWav: () => void;
+  onJumpFirstBeatPath: (target: FirstBeatPathTarget) => void;
   onJumpBeatSpine: (card: BeatSpineCard) => void;
   onFocusBeatPassport: (metric: BeatPassportFocusItem) => void;
   onFocusComposerGuide: (card: ComposerGuideCard) => void;
@@ -12977,6 +12987,7 @@ function createQuickActions({
     };
   });
   const beatPassportMetric = activeBeatPassportQuickActionMetric(beatPassportSummary);
+  const firstBeatPathStep = activeFirstBeatPathQuickActionStep(firstBeatPathSummary);
   const beatSpineCard = activeBeatSpineQuickActionCard(beatSpineSummary);
   const beatSpineApplyCard = activeBeatSpineQuickActionApplyCard(beatSpineSummary);
   const composerGuideCard = activeComposerGuideQuickActionCard(composerGuideSummary);
@@ -13977,6 +13988,21 @@ function createQuickActions({
       }
     },
     {
+      id: "first-beat-path-jump",
+      title: firstBeatPathStep ? `Jump First Beat Path: ${firstBeatPathStep.label}` : "Jump First Beat Path",
+      detail: firstBeatPathStep
+        ? `${firstBeatPathStep.value} / ${firstBeatPathStep.detail} / ${firstBeatPathSummary.countLabel}`
+        : "No First Beat Path step available.",
+      group: "Project",
+      keywords: `first beat path next step jump setup compose arrange mix deliver beginner producer ${firstBeatPathStep?.id ?? "none"} ${firstBeatPathStep?.jumpLabel ?? "none"}`,
+      disabled: !firstBeatPathStep,
+      run: () => {
+        if (firstBeatPathStep) {
+          onJumpFirstBeatPath(firstBeatPathStep.target);
+        }
+      }
+    },
+    {
       id: "beat-spine-jump",
       title: beatSpineCard ? `Jump Beat Spine: ${beatSpineCard.label}` : "Jump Beat Spine",
       detail: beatSpineCard ? `${beatSpineCard.value} / ${beatSpineCard.focusLabel}` : "No Beat Spine card available.",
@@ -14769,6 +14795,7 @@ function createQuickActionResult(
   const previewOnly = action.id === "blueprint-preview-style-match";
   const focusOnly =
     action.id === "session-pass-focus" ||
+    action.id === "first-beat-path-jump" ||
     action.id === "composer-guide-focus" ||
     action.id === "key-compass-focus" ||
     action.id === "groove-compass-focus" ||
@@ -14856,6 +14883,14 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "session-pass-focus") {
     return { id: "session-pass", label: "Session pass", value: `${project.mode} mode` };
+  }
+
+  if (action.id === "first-beat-path-jump") {
+    return {
+      id: "first-beat-path",
+      label: "First Beat Path",
+      value: action.detail
+    };
   }
 
   if (action.id === "midi-input-connect") {
@@ -15386,6 +15421,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused workstation panel to inspect the highlighted Session Pass target.",
       nextCheck: "Run the visible Session Pass Focus cards when you want another guided, studio, finish, or delivery jump."
+    };
+  }
+
+  if (action.id === "first-beat-path-jump") {
+    return {
+      auditionCue: "Use the jumped First Beat Path panel area to handle the highlighted setup, compose, arrange, mix, or deliver step.",
+      nextCheck: "Return to First Beat Path after the highlighted step looks ready, then run the command again for the next beat-making step."
     };
   }
 
