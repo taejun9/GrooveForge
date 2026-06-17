@@ -9376,6 +9376,7 @@ input[type="range"] {
 
 .arrangement-arc-heading {
   display: grid;
+  grid-row: span 2;
   gap: 4px;
   align-content: center;
   min-width: 0;
@@ -9393,8 +9394,70 @@ input[type="range"] {
   white-space: nowrap;
 }
 
+.arrangement-arc-preview {
+  display: grid;
+  grid-column: 2;
+  grid-template-columns:
+    minmax(94px, 0.72fr) minmax(116px, 0.82fr) minmax(170px, 1.2fr) minmax(106px, 0.78fr)
+    minmax(150px, 1fr) minmax(156px, 1fr) minmax(128px, 0.88fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(138, 168, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(138, 168, 255, 0.06);
+  padding: 6px 7px;
+}
+
+.arrangement-arc-preview.warn {
+  border-color: rgba(255, 209, 102, 0.3);
+  background: rgba(255, 209, 102, 0.07);
+}
+
+.arrangement-arc-preview.danger {
+  border-color: rgba(255, 122, 79, 0.32);
+  background: rgba(255, 122, 79, 0.07);
+}
+
+.arrangement-arc-preview > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrangement-arc-preview span {
+  color: #08120f;
+  background: #8aa8ff;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.arrangement-arc-preview.warn span {
+  background: #ffd166;
+}
+
+.arrangement-arc-preview.danger span {
+  background: #ff7a4f;
+}
+
+.arrangement-arc-preview strong {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.arrangement-arc-preview small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+}
+
 .arrangement-arc-row {
   display: grid;
+  grid-column: 2;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   min-width: 0;
@@ -12090,6 +12153,20 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 
+  .arrangement-arc-heading,
+  .arrangement-arc-preview,
+  .arrangement-arc-row {
+    grid-column: auto;
+  }
+
+  .arrangement-arc-heading {
+    grid-row: auto;
+  }
+
+  .arrangement-arc-preview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .arrangement-arc-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -12110,6 +12187,11 @@ input[type="range"] {
 }
 
 @media (max-width: 620px) {
+  .arrangement-arc-preview {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
   .quick-actions-spotlight {
     grid-template-columns: 1fr;
     gap: 3px;

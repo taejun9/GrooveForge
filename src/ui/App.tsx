@@ -1402,6 +1402,19 @@ type ArrangementArcPadOption = ArrangementArcPadDefinition & {
   changedCount: number;
 };
 
+type ArrangementArcPreviewSummary = {
+  padId: ArrangementArcPadId;
+  statusLabel: string;
+  padLabel: string;
+  sectionLabel: string;
+  patternLabel: string;
+  energyLabel: string;
+  muteLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type NextMoveCommand =
   | { kind: "blueprint"; blueprintId: BeatBlueprintId }
   | { kind: "patternFill"; preset: PatternFillPreset }
@@ -2808,6 +2821,10 @@ export function App(): ReactElement {
   const arrangementArcPadOptions = useMemo(
     () => createArrangementArcPadOptions(project, selectedArrangementIndex),
     [project, selectedArrangementIndex]
+  );
+  const arrangementArcPreviewSummary = useMemo(
+    () => createArrangementArcPreviewSummary(project, selectedArrangementIndex, arrangementArcPadOptions),
+    [arrangementArcPadOptions, project, selectedArrangementIndex]
   );
   const canSplitArrangementBlock = selectedArrangementBars > 1;
   const canMergeArrangementBlock =
@@ -6877,7 +6894,11 @@ export function App(): ReactElement {
               );
             })}
           </div>
-          <ArrangementArcPads pads={arrangementArcPadOptions} onApply={applyArrangementArcPad} />
+          <ArrangementArcPads
+            pads={arrangementArcPadOptions}
+            preview={arrangementArcPreviewSummary}
+            onApply={applyArrangementArcPad}
+          />
           <SectionLocatorPads disabled={isPlaying} pads={sectionLocatorPads} onCue={cueSectionLocator} />
           <div className="pattern-chain-row" aria-label="Pattern chain">
             <div className="pattern-chain-heading">
@@ -7933,9 +7954,11 @@ function ArrangementFocusPanel({
 
 function ArrangementArcPads({
   pads,
+  preview,
   onApply
 }: {
   pads: ArrangementArcPadOption[];
+  preview: ArrangementArcPreviewSummary;
   onApply: (pad: ArrangementArcPadId) => void;
 }): ReactElement {
   return (
@@ -7943,6 +7966,20 @@ function ArrangementArcPads({
       <div className="arrangement-arc-heading">
         <span>Arc</span>
         <strong>Song energy</strong>
+      </div>
+      <div
+        className={`arrangement-arc-preview ${preview.tone}`}
+        data-preview-arrangement-arc={preview.padId}
+        data-testid="arrangement-arc-preview"
+        title={preview.detailTitle}
+      >
+        <span data-testid="arrangement-arc-preview-status">{preview.statusLabel}</span>
+        <strong data-testid="arrangement-arc-preview-pad">{preview.padLabel}</strong>
+        <small data-testid="arrangement-arc-preview-sections">{preview.sectionLabel}</small>
+        <small data-testid="arrangement-arc-preview-patterns">{preview.patternLabel}</small>
+        <small data-testid="arrangement-arc-preview-energy">{preview.energyLabel}</small>
+        <small data-testid="arrangement-arc-preview-mutes">{preview.muteLabel}</small>
+        <small data-testid="arrangement-arc-preview-moves">{preview.moveLabel}</small>
       </div>
       <div className="arrangement-arc-row">
         {pads.map((pad) => (
@@ -14334,6 +14371,93 @@ function createArrangementArcPadOptions(project: ProjectState, selectedIndex: nu
   });
 }
 
+function createArrangementArcPreviewSummary(
+  project: ProjectState,
+  selectedIndex: number,
+  pads: ArrangementArcPadOption[]
+): ArrangementArcPreviewSummary {
+  const pad = pads.find((option) => option.changedCount > 0) ?? pads[0];
+  if (!pad) {
+    return {
+      padId: "clean",
+      statusLabel: "Arc aligned",
+      padLabel: "No arc target",
+      sectionLabel: "No arrangement blocks",
+      patternLabel: "No Pattern spread",
+      energyLabel: "No energy posture",
+      muteLabel: "No mute posture",
+      moveLabel: "0 blocks / 0 fields",
+      detailTitle: "No Arrangement Arc pads are available.",
+      tone: "good"
+    };
+  }
+
+  const transformed = applyArrangementArcPadToProject(project, pad, selectedIndex);
+  const changedBlocks = arrangementArcChangedCount(project.arrangement, transformed.arrangement);
+  const changedFields = arrangementArcChangedFieldCount(project.arrangement, transformed.arrangement);
+  const tone: MixCoachTone = changedFields === 0 ? "good" : changedBlocks <= 2 ? "warn" : "danger";
+  const sectionLabel = arrangementArcPreviewSectionLabel(transformed.arrangement);
+  const patternLabel = arrangementArcPreviewPatternLabel(transformed.arrangement);
+  const energyLabel = arrangementArcPreviewEnergyLabel(transformed.arrangement);
+  const muteLabel = arrangementArcPreviewMuteLabel(transformed.arrangement);
+  const moveLabel = `${changedBlocks} blocks / ${changedFields} fields`;
+
+  return {
+    padId: pad.id,
+    statusLabel: changedFields === 0 ? "Arc aligned" : "Suggested arc",
+    padLabel: pad.label,
+    sectionLabel,
+    patternLabel,
+    energyLabel,
+    muteLabel,
+    moveLabel,
+    detailTitle:
+      changedFields === 0
+        ? `${pad.label} already matches the current arrangement posture.`
+        : `${pad.label}: ${sectionLabel}; ${patternLabel}; ${energyLabel}; ${muteLabel}; ${moveLabel}.`,
+    tone
+  };
+}
+
+function arrangementArcPreviewSectionLabel(arrangement: ArrangementBlock[]): string {
+  return `${barCountLabel(arrangementBlocksTotalBars(arrangement))} / ${compactSectionFlow(arrangement)}`;
+}
+
+function arrangementArcPreviewPatternLabel(arrangement: ArrangementBlock[]): string {
+  const counts = patternSlots.map((pattern) => {
+    const count = arrangement.filter((block) => block.pattern === pattern).length;
+    return `${pattern}${count}`;
+  });
+  return `Patterns ${counts.join(" / ")}`;
+}
+
+function arrangementArcPreviewEnergyLabel(arrangement: ArrangementBlock[]): string {
+  if (arrangement.length === 0) {
+    return "Energy empty";
+  }
+  const energies = arrangement.map((block) => normalizeArrangementEnergy(block.energy));
+  const low = Math.min(...energies);
+  const high = Math.max(...energies);
+  const peakIndex = energies.indexOf(high);
+  const peakBlock = arrangement[peakIndex] ?? arrangement[0];
+  return `Energy ${percentLabel(low)}-${percentLabel(high)} / peak ${peakBlock.section}`;
+}
+
+function arrangementArcPreviewMuteLabel(arrangement: ArrangementBlock[]): string {
+  const counts = arrangementMuteTrackIds
+    .map((track) => ({
+      track,
+      count: arrangement.filter((block) => normalizeArrangementMutedTracks(block.mutedTracks).includes(track)).length
+    }))
+    .filter((entry) => entry.count > 0);
+
+  if (counts.length === 0) {
+    return "No block mutes";
+  }
+
+  return `Mutes ${counts.map((entry) => `${arrangementMuteTrackLabel(entry.track)} ${entry.count}`).join(" / ")}`;
+}
+
 function arrangementArcPreview(arrangement: ArrangementBlock[]): string {
   const bars = arrangementBlocksTotalBars(arrangement);
   const peak = arrangement.length === 0 ? 0 : Math.max(...arrangement.map((block) => normalizeArrangementEnergy(block.energy)));
@@ -14386,6 +14510,27 @@ function arrangementBlocksTotalBars(arrangement: ArrangementBlock[]): number {
 
 function arrangementArcChangedCount(current: ArrangementBlock[], nextArrangement: ArrangementBlock[]): number {
   return nextArrangement.filter((block, index) => !sameArrangementBlockPosture(current[index], block)).length;
+}
+
+function arrangementArcChangedFieldCount(current: ArrangementBlock[], nextArrangement: ArrangementBlock[]): number {
+  return nextArrangement.reduce((total, nextBlock, index) => {
+    const currentBlock = current[index];
+    if (!currentBlock) {
+      return total + 5;
+    }
+
+    return (
+      total +
+      [
+        currentBlock.section !== nextBlock.section,
+        currentBlock.pattern !== nextBlock.pattern,
+        normalizeArrangementBars(currentBlock.bars) !== normalizeArrangementBars(nextBlock.bars),
+        normalizeArrangementEnergy(currentBlock.energy) !== normalizeArrangementEnergy(nextBlock.energy),
+        normalizeArrangementMutedTracks(currentBlock.mutedTracks).join(",") !==
+          normalizeArrangementMutedTracks(nextBlock.mutedTracks).join(",")
+      ].filter(Boolean).length
+    );
+  }, 0);
 }
 
 function sameArrangementBlockPosture(current: ArrangementBlock | undefined, nextBlock: ArrangementBlock): boolean {
