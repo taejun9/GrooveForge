@@ -684,6 +684,27 @@ type DrumKitPadOption = DrumKitPadDefinition & {
   changedCount: number;
 };
 
+type DrumKitResultMetric = {
+  id: "kit" | "kick" | "clap" | "hat" | "rack";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type DrumKitResult = {
+  padId: DrumKitPadId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: DrumKitResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type MasterFinishPadId = "demo" | "vocal" | "store" | "club";
 
 type MasterFinishPadDefinition = {
@@ -2567,6 +2588,7 @@ export function App(): ReactElement {
   const [melodyMoveResult, setMelodyMoveResult] = useState<MelodyMoveResult | null>(null);
   const [chordMoveResult, setChordMoveResult] = useState<ChordMoveResult | null>(null);
   const [soundFocusResult, setSoundFocusResult] = useState<SoundFocusResult | null>(null);
+  const [drumKitResult, setDrumKitResult] = useState<DrumKitResult | null>(null);
   const [masterFinishResult, setMasterFinishResult] = useState<MasterFinishResult | null>(null);
   const [mixBalanceResult, setMixBalanceResult] = useState<MixBalanceResult | null>(null);
   const [mixFixResult, setMixFixResult] = useState<MixFixResult | null>(null);
@@ -3086,6 +3108,7 @@ export function App(): ReactElement {
     setMelodyMoveResult(null);
     setChordMoveResult(null);
     setSoundFocusResult(null);
+    setDrumKitResult(null);
     setMasterFinishResult(null);
     setMixBalanceResult(null);
     setMixFixResult(null);
@@ -3107,6 +3130,7 @@ export function App(): ReactElement {
       setMelodyMoveResult(null);
       setChordMoveResult(null);
       setSoundFocusResult(null);
+      setDrumKitResult(null);
       setMasterFinishResult(null);
       setMixBalanceResult(null);
       setMixFixResult(null);
@@ -3203,6 +3227,7 @@ export function App(): ReactElement {
     setMelodyMoveResult(null);
     setChordMoveResult(null);
     setSoundFocusResult(null);
+    setDrumKitResult(null);
     setMasterFinishResult(null);
     setMixBalanceResult(null);
     setMixFixResult(null);
@@ -3229,6 +3254,7 @@ export function App(): ReactElement {
     setMelodyMoveResult(null);
     setChordMoveResult(null);
     setSoundFocusResult(null);
+    setDrumKitResult(null);
     setMasterFinishResult(null);
     setMixBalanceResult(null);
     setMixFixResult(null);
@@ -3986,16 +4012,20 @@ export function App(): ReactElement {
   function applyDrumKitPad(padId: DrumKitPadId): void {
     const pad = drumKitPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
+      setDrumKitResult(null);
       setProjectStatus("Drum kit pad not found");
       return;
     }
 
+    const beforeProject = projectRef.current;
     const changed = updateProject((current) => applyDrumKitPadToProject(current, pad), `${pad.label} drum kit applied`);
     if (changed) {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
+      setDrumKitResult(createDrumKitResult(pad, beforeProject, projectRef.current));
     } else {
+      setDrumKitResult(null);
       setProjectStatus(`${pad.label} drum kit already selected`);
     }
   }
@@ -6757,6 +6787,7 @@ export function App(): ReactElement {
           </div>
           <SoundDesigner
             drumKitPads={drumKitPadOptions}
+            drumKitResult={drumKitResult}
             focusPreview={soundFocusPreviewSummary}
             focusPads={soundFocusPadOptions}
             focusResult={soundFocusResult}
@@ -16200,6 +16231,105 @@ function drumKitPadChangedCount(current: ProjectState, nextProject: ProjectState
   ].filter(Boolean).length;
 }
 
+function createDrumKitResult(
+  pad: DrumKitPadDefinition,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): DrumKitResult {
+  const changedMoves = drumKitPadChangedCount(beforeProject, afterProject);
+  const changedControls = drumKitMixerChangedControlCount(beforeProject.mixer, afterProject.mixer);
+  const metrics: DrumKitResultMetric[] = [
+    createDrumKitResultMetric(
+      "kit",
+      "Kit",
+      soundPresetLabel(beforeProject.sound.preset),
+      soundPresetLabel(afterProject.sound.preset)
+    ),
+    createDrumKitResultMetric(
+      "kick",
+      "Kick",
+      drumKitKickLabel(beforeProject.sound),
+      drumKitKickLabel(afterProject.sound)
+    ),
+    createDrumKitResultMetric(
+      "clap",
+      "Clap",
+      drumKitClapLabel(beforeProject.sound),
+      drumKitClapLabel(afterProject.sound)
+    ),
+    createDrumKitResultMetric(
+      "hat",
+      "Hat",
+      drumKitHatLabel(beforeProject.sound),
+      drumKitHatLabel(afterProject.sound)
+    ),
+    createDrumKitResultMetric(
+      "rack",
+      "Rack",
+      drumKitRackLabel(beforeProject.mixer),
+      drumKitRackLabel(afterProject.mixer)
+    )
+  ];
+
+  return {
+    padId: pad.id,
+    title: `${pad.label} Drum Kit applied`,
+    status: "Applied",
+    detail: pad.detail,
+    scope: "Kick, clap, hat, and drum rack",
+    impact: `${changedMoves} kit move${changedMoves === 1 ? "" : "s"} / ${changedControls} rack controls`,
+    metrics,
+    auditionCue: "Loop Pattern A/B/C with drums and 808 active; listen for kick/clap/hat balance.",
+    nextCheck: "Use Studio kick, snare, hat, and drum rack mixer controls for manual trim.",
+    tone: changedMoves > 0 ? "good" : "warn"
+  };
+}
+
+function createDrumKitResultMetric(
+  id: DrumKitResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): DrumKitResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: before === after ? "warn" : "good"
+  };
+}
+
+function drumKitKickLabel(sound: SoundDesign): string {
+  return `Punch ${compactUnitPercent(sound.kickPunch)}`;
+}
+
+function drumKitClapLabel(sound: SoundDesign): string {
+  return `Snap ${compactUnitPercent(sound.snareSnap)}`;
+}
+
+function drumKitHatLabel(sound: SoundDesign): string {
+  return `Bright ${compactUnitPercent(sound.hatBrightness)}`;
+}
+
+function drumKitRackLabel(mixer: MixerChannel[]): string {
+  const channel = mixer.find((candidate) => candidate.id === "drum_rack");
+  if (!channel) {
+    return "missing";
+  }
+  return `Vol ${formatDb(channel.volumeDb)} / Air ${compactUnitPercent(channel.air)} / Drive ${compactUnitPercent(channel.drive)} / Glue ${compactUnitPercent(channel.glue)}`;
+}
+
+function drumKitMixerChangedControlCount(beforeMixer: MixerChannel[], afterMixer: MixerChannel[]): number {
+  const beforeDrums = beforeMixer.find((channel) => channel.id === "drum_rack");
+  const afterDrums = afterMixer.find((channel) => channel.id === "drum_rack");
+  if (!beforeDrums || !afterDrums) {
+    return beforeDrums === afterDrums ? 0 : 1;
+  }
+  const controls: Array<keyof MixerChannel> = ["volumeDb", "pan", "lowCut", "air", "drive", "glue", "send", "muted", "solo"];
+  return controls.filter((control) => beforeDrums[control] !== afterDrums[control]).length;
+}
+
 function createSoundFocusPadOptions(sound: SoundDesign): SoundFocusPadOption[] {
   return soundFocusPadDefinitions.map((pad) => {
     const transformed = applySoundFocusPadToSound(sound, pad);
@@ -17885,6 +18015,7 @@ function Device({
 
 function SoundDesigner({
   drumKitPads,
+  drumKitResult,
   focusPreview,
   focusPads,
   focusResult,
@@ -17896,6 +18027,7 @@ function SoundDesigner({
   onChange
 }: {
   drumKitPads: DrumKitPadOption[];
+  drumKitResult: DrumKitResult | null;
   focusPreview: SoundFocusPreviewSummary;
   focusPads: SoundFocusPadOption[];
   focusResult: SoundFocusResult | null;
@@ -17925,7 +18057,7 @@ function SoundDesigner({
           </button>
         ))}
       </div>
-      <DrumKitPads pads={drumKitPads} onApply={onDrumKitPad} />
+      <DrumKitPads pads={drumKitPads} result={drumKitResult} onApply={onDrumKitPad} />
       <SoundFocusPads pads={focusPads} preview={focusPreview} result={focusResult} onApply={onFocusPad} />
       <div className="sound-readout" aria-label="Sound design state">
         <span data-testid="sound-kick-readout">Kick {percentLabel(sound.kickPunch)}</span>
@@ -18004,9 +18136,11 @@ function SoundDesigner({
 
 function DrumKitPads({
   pads,
+  result,
   onApply
 }: {
   pads: DrumKitPadOption[];
+  result: DrumKitResult | null;
   onApply: (pad: DrumKitPadId) => void;
 }): ReactElement {
   return (
@@ -18029,6 +18163,49 @@ function DrumKitPads({
             <small>{pad.changedCount} moves / {pad.detail}</small>
           </button>
         ))}
+      </div>
+      {result && <DrumKitResultStrip result={result} />}
+    </div>
+  );
+}
+
+function DrumKitResultStrip({ result }: { result: DrumKitResult }): ReactElement {
+  return (
+    <div
+      className={`drum-kit-result ${result.tone}`}
+      data-result-drum-kit={result.padId}
+      data-testid="drum-kit-result"
+      aria-live="polite"
+    >
+      <div className="drum-kit-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="drum-kit-result-title">{result.title}</strong>
+          <small data-testid="drum-kit-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="drum-kit-result-meta">
+        <span data-testid="drum-kit-result-status">{result.status}</span>
+        <span data-testid="drum-kit-result-scope">{result.scope}</span>
+        <span data-testid="drum-kit-result-impact">{result.impact}</span>
+      </div>
+      <div className="drum-kit-result-metrics" data-testid="drum-kit-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`drum-kit-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="drum-kit-result-followup" data-testid="drum-kit-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="drum-kit-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="drum-kit-result-next-check">{result.nextCheck}</em>
+        </span>
       </div>
     </div>
   );
