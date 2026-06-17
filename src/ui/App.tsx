@@ -254,6 +254,33 @@ const mixBalancePadDefinitions: MixBalancePadDefinition[] = [
   }
 ];
 
+const spaceFxPadDefinitions: SpaceFxPadDefinition[] = [
+  {
+    id: "dry",
+    label: "Dry",
+    detail: "front",
+    sends: { drum_rack: 0.04, bass_808: 0.01, synth: 0.08, chord: 0.1 }
+  },
+  {
+    id: "room",
+    label: "Room",
+    detail: "glue",
+    sends: { drum_rack: 0.1, bass_808: 0.02, synth: 0.18, chord: 0.22 }
+  },
+  {
+    id: "wide",
+    label: "Wide",
+    detail: "hook",
+    sends: { drum_rack: 0.12, bass_808: 0.03, synth: 0.34, chord: 0.38 }
+  },
+  {
+    id: "wash",
+    label: "Wash",
+    detail: "ambient",
+    sends: { drum_rack: 0.22, bass_808: 0.06, synth: 0.48, chord: 0.52 }
+  }
+];
+
 const stemAuditionPadDefinitions: StemAuditionPadDefinition[] = [
   { id: "full", label: "Full", detail: "all stems", trackId: null },
   { id: "drum_rack", label: "Drums", detail: "rhythm", trackId: "drum_rack" },
@@ -632,6 +659,41 @@ type MixBalanceResult = {
   scope: string;
   impact: string;
   metrics: MixBalanceResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
+type SpaceFxPadId = "dry" | "room" | "wide" | "wash";
+
+type SpaceFxPadDefinition = {
+  id: SpaceFxPadId;
+  label: string;
+  detail: string;
+  sends: Record<StemTrackId, number>;
+};
+
+type SpaceFxPadOption = SpaceFxPadDefinition & {
+  preview: string;
+  changedCount: number;
+};
+
+type SpaceFxResultMetric = {
+  id: "drums" | "bass" | "synth" | "chords";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type SpaceFxResult = {
+  padId: SpaceFxPadId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: SpaceFxResultMetric[];
   auditionCue: string;
   nextCheck: string;
   tone: MixCoachTone;
@@ -2801,6 +2863,7 @@ export function App(): ReactElement {
   const [drumKitResult, setDrumKitResult] = useState<DrumKitResult | null>(null);
   const [masterFinishResult, setMasterFinishResult] = useState<MasterFinishResult | null>(null);
   const [mixBalanceResult, setMixBalanceResult] = useState<MixBalanceResult | null>(null);
+  const [spaceFxResult, setSpaceFxResult] = useState<SpaceFxResult | null>(null);
   const [mixFixResult, setMixFixResult] = useState<MixFixResult | null>(null);
   const [deliveryTargetAlignmentResult, setDeliveryTargetAlignmentResult] = useState<DeliveryTargetAlignmentResult | null>(null);
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
@@ -2908,6 +2971,7 @@ export function App(): ReactElement {
     () => createMixBalancePreviewSummary(project.mixer, mixBalancePadOptions),
     [project.mixer, mixBalancePadOptions]
   );
+  const spaceFxPadOptions = useMemo(() => createSpaceFxPadOptions(project.mixer), [project.mixer]);
   const stemAuditionPadOptions = useMemo(() => createStemAuditionPadOptions(project.mixer), [project.mixer]);
   const stemAuditionReadout = useMemo(() => createStemAuditionReadoutSummary(project.mixer), [project.mixer]);
   const soundFocusPadOptions = useMemo(() => createSoundFocusPadOptions(project.sound), [project.sound]);
@@ -3354,6 +3418,7 @@ export function App(): ReactElement {
     setDrumKitResult(null);
     setMasterFinishResult(null);
     setMixBalanceResult(null);
+    setSpaceFxResult(null);
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setProjectStatus(status);
@@ -3381,6 +3446,7 @@ export function App(): ReactElement {
       setDrumKitResult(null);
       setMasterFinishResult(null);
       setMixBalanceResult(null);
+      setSpaceFxResult(null);
       setMixFixResult(null);
       setDeliveryTargetAlignmentResult(null);
     }
@@ -3483,6 +3549,7 @@ export function App(): ReactElement {
     setDrumKitResult(null);
     setMasterFinishResult(null);
     setMixBalanceResult(null);
+    setSpaceFxResult(null);
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     clearLocalDraftState();
@@ -3515,6 +3582,7 @@ export function App(): ReactElement {
     setDrumKitResult(null);
     setMasterFinishResult(null);
     setMixBalanceResult(null);
+    setSpaceFxResult(null);
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setProjectStatus(status);
@@ -4260,6 +4328,31 @@ export function App(): ReactElement {
     } else {
       setMixBalanceResult(null);
       setProjectStatus(`${pad.label} mix balance already selected`);
+    }
+  }
+
+  function applySpaceFxPad(padId: SpaceFxPadId): void {
+    const pad = spaceFxPadDefinitions.find((definition) => definition.id === padId);
+    if (!pad) {
+      setSpaceFxResult(null);
+      setProjectStatus("Space FX pad not found");
+      return;
+    }
+
+    const beforeMixer = projectRef.current.mixer;
+    const changed = updateProject((current) => {
+      const mixer = applySpaceFxPadToMixer(current.mixer, pad);
+      return sameMixerChannels(current.mixer, mixer) ? current : { ...current, mixer };
+    }, `${pad.label} space FX applied`);
+
+    if (changed) {
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+      setSpaceFxResult(createSpaceFxResult(pad, beforeMixer, projectRef.current.mixer));
+    } else {
+      setSpaceFxResult(null);
+      setProjectStatus(`${pad.label} space FX already selected`);
     }
   }
 
@@ -7488,6 +7581,7 @@ export function App(): ReactElement {
             result={mixBalanceResult}
             onApply={applyMixBalancePad}
           />
+          <SpaceFxPads pads={spaceFxPadOptions} result={spaceFxResult} onApply={applySpaceFxPad} />
           <StemAuditionPads pads={stemAuditionPadOptions} onApply={applyStemAuditionPad} />
           <div
             className={["stem-audition-readout", stemAuditionReadout.tone].join(" ")}
@@ -16733,6 +16827,83 @@ function MixBalanceResultStrip({ result }: { result: MixBalanceResult }): ReactE
   );
 }
 
+function SpaceFxPads({
+  pads,
+  result,
+  onApply
+}: {
+  pads: SpaceFxPadOption[];
+  result: SpaceFxResult | null;
+  onApply: (pad: SpaceFxPadId) => void;
+}): ReactElement {
+  return (
+    <div className="space-fx-panel" data-testid="space-fx-pads">
+      <div className="space-fx-heading">
+        <span>Space FX</span>
+        <strong>Built-in send</strong>
+      </div>
+      {result && <SpaceFxResultStrip result={result} />}
+      <div className="space-fx-row" aria-label="Space FX Pads">
+        {pads.map((pad) => (
+          <button
+            data-testid={`space-fx-${pad.id}`}
+            key={pad.id}
+            onClick={() => onApply(pad.id)}
+            title={`${pad.label} ${pad.preview}`}
+            type="button"
+          >
+            <span>{pad.label}</span>
+            <strong>{pad.preview}</strong>
+            <small>{pad.changedCount} sends / {pad.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SpaceFxResultStrip({ result }: { result: SpaceFxResult }): ReactElement {
+  return (
+    <div
+      className={`space-fx-result ${result.tone}`}
+      data-result-space-fx={result.padId}
+      data-testid="space-fx-result"
+      aria-live="polite"
+    >
+      <div className="space-fx-result-main">
+        <SlidersHorizontal size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="space-fx-result-title">{result.title}</strong>
+          <small data-testid="space-fx-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="space-fx-result-meta">
+        <span data-testid="space-fx-result-status">{result.status}</span>
+        <span data-testid="space-fx-result-scope">{result.scope}</span>
+        <span data-testid="space-fx-result-impact">{result.impact}</span>
+      </div>
+      <div className="space-fx-result-metrics" data-testid="space-fx-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`space-fx-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="space-fx-result-followup" data-testid="space-fx-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="space-fx-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="space-fx-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function StemAuditionPads({
   pads,
   onApply
@@ -17422,6 +17593,98 @@ function mixBalanceChangedControlCount(beforeMixer: MixerChannel[], afterMixer: 
   }, 0);
 }
 
+function createSpaceFxPadOptions(mixer: MixerChannel[]): SpaceFxPadOption[] {
+  return spaceFxPadDefinitions.map((pad) => {
+    const transformed = applySpaceFxPadToMixer(mixer, pad);
+    return {
+      ...pad,
+      preview: spaceFxPreview(pad),
+      changedCount: spaceFxChangedSendCount(mixer, transformed)
+    };
+  });
+}
+
+function createSpaceFxResult(
+  pad: SpaceFxPadDefinition,
+  beforeMixer: MixerChannel[],
+  afterMixer: MixerChannel[]
+): SpaceFxResult {
+  const changedSends = spaceFxChangedSendCount(beforeMixer, afterMixer);
+  const metrics: SpaceFxResultMetric[] = [
+    createSpaceFxResultMetric(
+      "drums",
+      "Drums",
+      spaceFxTrackPosture(beforeMixer, "drum_rack"),
+      spaceFxTrackPosture(afterMixer, "drum_rack")
+    ),
+    createSpaceFxResultMetric(
+      "bass",
+      "808",
+      spaceFxTrackPosture(beforeMixer, "bass_808"),
+      spaceFxTrackPosture(afterMixer, "bass_808")
+    ),
+    createSpaceFxResultMetric(
+      "synth",
+      "Synth",
+      spaceFxTrackPosture(beforeMixer, "synth"),
+      spaceFxTrackPosture(afterMixer, "synth")
+    ),
+    createSpaceFxResultMetric(
+      "chords",
+      "Chords",
+      spaceFxTrackPosture(beforeMixer, "chord"),
+      spaceFxTrackPosture(afterMixer, "chord")
+    )
+  ];
+
+  return {
+    padId: pad.id,
+    title: `${pad.label} Space FX applied`,
+    status: "Applied",
+    detail: pad.detail,
+    scope: "Editable Space sends",
+    impact: `${changedSends} send${changedSends === 1 ? "" : "s"} changed`,
+    metrics,
+    auditionCue: "Play Full Mix, then compare Synth and Chords against Drums/808.",
+    nextCheck: "Use Space sliders for manual trim if the hook feels too dry or washed.",
+    tone: changedSends > 0 ? "good" : "warn"
+  };
+}
+
+function createSpaceFxResultMetric(
+  id: SpaceFxResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): SpaceFxResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: before === after ? "warn" : "good"
+  };
+}
+
+function spaceFxPreview(pad: SpaceFxPadDefinition): string {
+  const drums = percentLabel(pad.sends.drum_rack);
+  const bass = percentLabel(pad.sends.bass_808);
+  const synth = percentLabel(pad.sends.synth);
+  const chords = percentLabel(pad.sends.chord);
+  return `D ${drums} / 8 ${bass} / Sy ${synth} / Ch ${chords}`;
+}
+
+function spaceFxTrackPosture(mixer: MixerChannel[], trackId: StemTrackId): string {
+  const channel = mixer.find((candidate) => candidate.id === trackId);
+  return channel ? percentLabel(channel.send) : "missing";
+}
+
+function spaceFxChangedSendCount(beforeMixer: MixerChannel[], afterMixer: MixerChannel[]): number {
+  return stemTrackIds.filter(
+    (trackId) => spaceFxTrackPosture(beforeMixer, trackId) !== spaceFxTrackPosture(afterMixer, trackId)
+  ).length;
+}
+
 function createStemAuditionPadOptions(mixer: MixerChannel[]): StemAuditionPadOption[] {
   return stemAuditionPadDefinitions.map((pad) => {
     const transformed = applyStemAuditionPadToMixer(mixer, pad);
@@ -17682,6 +17945,19 @@ function applyMixBalancePadToMixer(mixer: MixerChannel[], pad: MixBalancePadDefi
       send: update.send === undefined ? channel.send : normalizeMixerEq(update.send),
       muted: false,
       solo: false
+    };
+  });
+}
+
+function applySpaceFxPadToMixer(mixer: MixerChannel[], pad: SpaceFxPadDefinition): MixerChannel[] {
+  return mixer.map((channel) => {
+    if (!isStemTrackId(channel.id)) {
+      return channel;
+    }
+
+    return {
+      ...channel,
+      send: normalizeMixerEq(pad.sends[channel.id])
     };
   });
 }
