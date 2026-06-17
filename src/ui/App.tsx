@@ -7175,6 +7175,7 @@ export function App(): ReactElement {
     listeningPassSummary,
     mixBalancePreviewSummary,
     modeFocusSummary,
+    patternStackPreviewSummary,
     patternDnaSummary,
     playbackMode,
     project,
@@ -7201,6 +7202,7 @@ export function App(): ReactElement {
     onApplyMixFix: applyMixFixPreset,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternFill: applyPatternFill,
+    onApplyPatternStack: applyPatternStack,
     onApplySoundFocus: applySoundFocusPad,
     onApplySoundPreset: applySoundPreset,
     onExpandPatternChain: expandPatternChain,
@@ -12317,6 +12319,7 @@ function createQuickActions({
   listeningPassSummary,
   mixBalancePreviewSummary,
   modeFocusSummary,
+  patternStackPreviewSummary,
   patternDnaSummary,
   playbackMode,
   project,
@@ -12343,6 +12346,7 @@ function createQuickActions({
   onApplyMixFix,
   onApplyPatternChain,
   onApplyPatternFill,
+  onApplyPatternStack,
   onApplySoundFocus,
   onApplySoundPreset,
   onExpandPatternChain,
@@ -12390,6 +12394,7 @@ function createQuickActions({
   listeningPassSummary: ListeningPassSummary;
   mixBalancePreviewSummary: MixBalancePreviewSummary;
   modeFocusSummary: ModeFocusSummary;
+  patternStackPreviewSummary: PatternStackPreviewSummary;
   patternDnaSummary: PatternDnaSummary;
   playbackMode: PlaybackMode;
   project: ProjectState;
@@ -12416,6 +12421,7 @@ function createQuickActions({
   onApplyMixFix: (preset: MixFixPreset) => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
+  onApplyPatternStack: (stack: PatternStackId) => void;
   onApplySoundFocus: (pad: SoundFocusPadId) => void;
   onApplySoundPreset: (preset: SoundPresetTarget) => void;
   onExpandPatternChain: () => void;
@@ -12473,6 +12479,10 @@ function createQuickActions({
   const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
   const drumKitReady = drumKitPreviewSummary.statusLabel !== "Kit aligned";
   const mixBalanceReady = mixBalancePreviewSummary.statusLabel !== "Balance aligned";
+  const patternStackId =
+    patternStackPreviewSummary.stackId === "none" || patternStackPreviewSummary.statusLabel === "Stack aligned"
+      ? null
+      : patternStackPreviewSummary.stackId;
   const soundFocusReady = soundFocusPreviewSummary.statusLabel !== "Sound aligned";
   const soundPresetReady = soundPresetPreviewSummary.statusLabel !== "Preset aligned";
 
@@ -12662,6 +12672,21 @@ function createQuickActions({
       run: () => {
         if (layerStarterOption) {
           onApplyLayerStarter(layerStarterOption.id);
+        }
+      }
+    },
+    {
+      id: "pattern-stack",
+      title: patternStackId ? `Apply ${patternStackPreviewSummary.stackLabel}` : "Apply Pattern Stack",
+      detail: patternStackId
+        ? `${patternStackPreviewSummary.patternLabel} / ${patternStackPreviewSummary.moveLabel}`
+        : "Current Pattern already matches the previewed stack.",
+      group: "Create",
+      keywords: `pattern stack 808 bass chords synth melody sketch harmony starter ${patternStackPreviewSummary.stackId} ${patternStackPreviewSummary.stackLabel} beginner producer`,
+      disabled: !patternStackId,
+      run: () => {
+        if (patternStackId) {
+          onApplyPatternStack(patternStackId);
         }
       }
     },
@@ -13263,6 +13288,15 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "pattern-stack") {
+    const pattern = activePattern(project);
+    return {
+      id: "pattern-stack",
+      label: "Pattern stack",
+      value: `${pattern.bassNotes.length} 808 / ${pattern.chordEvents.length} chords / ${pattern.melodyNotes.length} synth`
+    };
+  }
+
   if (action.id === "sound-focus") {
     return {
       id: "sound-focus",
@@ -13505,6 +13539,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the starter layer supports the groove, 808, harmony, and melody balance.`,
       nextCheck: "Return to Layer Starter or Pattern DNA after the selected layer is no longer missing or thin."
+    };
+  }
+
+  if (action.id === "pattern-stack") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; hear 808, Chords, and Synth against the drums before arranging.`,
+      nextCheck: "Use the Pattern Stack Result, selected-note tools, and selected-chord tools for manual edits."
     };
   }
 
