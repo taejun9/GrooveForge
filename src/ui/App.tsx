@@ -2635,6 +2635,29 @@ type FirstBeatPathSummary = {
   steps: FirstBeatPathStep[];
 };
 
+type BeatSpineCardId = "setup" | "drums" | "bass" | "harmony" | "melody" | "sound" | "arrange" | "finish";
+type BeatSpineTarget = "transport" | "compose" | "sound" | "arrange" | "mix" | "master" | "deliver";
+
+type BeatSpineCard = {
+  id: BeatSpineCardId;
+  label: string;
+  value: string;
+  detail: string;
+  focusLabel: string;
+  target: BeatSpineTarget;
+  tone: MixCoachTone;
+};
+
+type BeatSpineSummary = {
+  statusLabel: string;
+  headline: string;
+  detail: string;
+  countLabel: string;
+  nextCardId: BeatSpineCardId;
+  tone: MixCoachTone;
+  cards: BeatSpineCard[];
+};
+
 type SelectedDrumStep = {
   lane: DrumLane;
   step: number;
@@ -3168,6 +3191,10 @@ export function App(): ReactElement {
   const firstBeatPathSummary = useMemo(
     () => createFirstBeatPathSummary(project, style, workflowNavigatorItems, beatMapSummary, exportPreflightSummary, exportAnalysis),
     [project, style, workflowNavigatorItems, beatMapSummary, exportPreflightSummary, exportAnalysis]
+  );
+  const beatSpineSummary = useMemo(
+    () => createBeatSpineSummary(project, style, beatReadinessChecks, exportPreflightSummary, exportAnalysis),
+    [project, style, beatReadinessChecks, exportPreflightSummary, exportAnalysis]
   );
   const sessionPassSummary = useMemo(
     () =>
@@ -6823,6 +6850,21 @@ export function App(): ReactElement {
     jumpToWorkflowZone(target);
   }
 
+  function jumpToBeatSpineTarget(card: BeatSpineCard): void {
+    const targetRefs: Record<BeatSpineTarget, HTMLElement | null> = {
+      transport: transportPanelRef.current,
+      compose: composePanelRef.current,
+      sound: soundPanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    targetRefs[card.target]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Beat Spine ${card.label}: ${card.value}`);
+  }
+
   function focusBeatPassportMetric(metric: BeatPassportFocusItem): void {
     const targetRefs: Record<BeatPassportFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -7353,6 +7395,8 @@ export function App(): ReactElement {
       <ModeFocus summary={modeFocusSummary} onFocus={focusModeFocusCard} />
 
       <FirstBeatPath summary={firstBeatPathSummary} onJump={jumpToFirstBeatPathTarget} />
+
+      <BeatSpine summary={beatSpineSummary} onJump={jumpToBeatSpineTarget} />
 
       <SessionPass summary={sessionPassSummary} onFocus={focusSessionPassCard} />
 
@@ -10764,6 +10808,53 @@ function FirstBeatPath({
   );
 }
 
+function BeatSpine({
+  onJump,
+  summary
+}: {
+  summary: BeatSpineSummary;
+  onJump: (card: BeatSpineCard) => void;
+}): ReactElement {
+  return (
+    <section className={`beat-spine ${summary.tone}`} data-testid="beat-spine" aria-label="Beat spine">
+      <div className="beat-spine-heading">
+        <div>
+          <KeyboardMusic size={16} aria-hidden="true" />
+          <span data-testid="beat-spine-status">{summary.statusLabel}</span>
+        </div>
+        <strong data-testid="beat-spine-headline">{summary.headline}</strong>
+        <small data-testid="beat-spine-detail">{summary.detail}</small>
+      </div>
+      <div className="beat-spine-count" data-next-card={summary.nextCardId} data-testid="beat-spine-count">
+        <span>Beat core</span>
+        <strong>{summary.countLabel}</strong>
+        <small>{summary.tone === "good" ? "Core path clear" : "Jump to the highlighted axis"}</small>
+      </div>
+      <div className="beat-spine-grid" data-testid="beat-spine-grid">
+        {summary.cards.map((card) => {
+          const next = card.id === summary.nextCardId;
+          return (
+            <button
+              className={["beat-spine-card", card.tone, next ? "next" : ""].filter(Boolean).join(" ")}
+              data-next={next ? "true" : "false"}
+              data-testid={`beat-spine-${card.id}`}
+              key={card.id}
+              onClick={() => onJump(card)}
+              title={`Jump to ${card.focusLabel}: ${card.detail}`}
+              type="button"
+            >
+              {beatSpineIcon(card.id)}
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <small>{card.detail}</small>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function SessionPass({
   onFocus,
   summary
@@ -10891,6 +10982,143 @@ function createWorkflowSpotlightSummary(items: WorkflowNavigatorItem[]): Workflo
 
 function workflowCountLabel(count: number, label: string): string {
   return `${count} ${label}${count === 1 ? "" : "s"}`;
+}
+
+function createBeatSpineSummary(
+  project: ProjectState,
+  style: StyleProfile,
+  checks: BeatReadinessCheck[],
+  exportPreflight: ExportPreflightSummary,
+  analysis: ExportAnalysis
+): BeatSpineSummary {
+  const target = activeDeliveryTarget(project);
+  const arrangedPatterns = arrangedPatternData(project);
+  const chordCount = arrangedPatterns.reduce((total, pattern) => total + pattern.chordEvents.length, 0);
+  const melodyCount = arrangedPatterns.reduce((total, pattern) => total + pattern.melodyNotes.length, 0);
+  const arrangement = readinessCheckForId(checks, "arrangement");
+  const drums = readinessCheckForId(checks, "drums");
+  const bass = readinessCheckForId(checks, "bass");
+  const exportCheck = readinessCheckForId(checks, "export");
+  const setupTone: MixCoachTone = project.bpm >= style.bpmRange[0] && project.bpm <= style.bpmRange[1] ? "good" : "warn";
+  const harmonyTone: MixCoachTone = chordCount >= 2 ? "good" : chordCount > 0 ? "warn" : "danger";
+  const melodyTone: MixCoachTone =
+    melodyCount >= 3 ? "good" : melodyCount > 0 ? "warn" : style.melodyStyle === "none" ? "warn" : "danger";
+  const soundTone: MixCoachTone = project.sound.preset === styleSoundPreset(style.id) || project.sound.preset !== "custom" ? "good" : "warn";
+  const finishTone = weakestTone([exportCheck?.tone ?? "danger", exportPreflight.tone, analysis.status === "Silent" ? "danger" : "good"]);
+  const cards: BeatSpineCard[] = [
+    {
+      id: "setup",
+      label: "Setup",
+      value: `${style.name} / ${project.key}`,
+      detail: `${project.bpm} BPM / ${target.name}`,
+      focusLabel: "Transport",
+      target: "transport",
+      tone: setupTone
+    },
+    {
+      id: "drums",
+      label: "Drums",
+      value: drums?.status ?? "Check",
+      detail: drums?.detail ?? "Scan kick, clap, hat, and perc events.",
+      focusLabel: "Compose",
+      target: "compose",
+      tone: drums?.tone ?? "danger"
+    },
+    {
+      id: "bass",
+      label: "808 / Bass",
+      value: bass?.status ?? "Check",
+      detail: bass?.detail ?? "Scan arranged 808 or bass notes.",
+      focusLabel: "Compose",
+      target: "compose",
+      tone: bass?.tone ?? "danger"
+    },
+    {
+      id: "harmony",
+      label: "Harmony",
+      value: chordCount >= 2 ? "Set" : chordCount > 0 ? "Sketch" : "Missing",
+      detail: `${chordCount} arranged chord event${chordCount === 1 ? "" : "s"}.`,
+      focusLabel: "Compose",
+      target: "compose",
+      tone: harmonyTone
+    },
+    {
+      id: "melody",
+      label: "Melody",
+      value: melodyCount >= 3 ? "Set" : melodyCount > 0 ? "Sketch" : "Missing",
+      detail:
+        melodyCount > 0
+          ? `${melodyCount} arranged Synth note${melodyCount === 1 ? "" : "s"}.`
+          : `${melodyStyleRoleLabel(style.melodyStyle)} needs an editable motif.`,
+      focusLabel: "Compose",
+      target: "compose",
+      tone: melodyTone
+    },
+    {
+      id: "sound",
+      label: "Sound",
+      value: soundPresetLabel(project.sound.preset),
+      detail: `Built-in tone design / style target ${soundPresetLabel(styleSoundPreset(style.id))}.`,
+      focusLabel: "Sound",
+      target: "sound",
+      tone: soundTone
+    },
+    {
+      id: "arrange",
+      label: "Arrange",
+      value: arrangement?.status ?? barCountLabel(arrangementTotalBars(project)),
+      detail: arrangement?.detail ?? "Place Pattern A/B/C into a song form.",
+      focusLabel: "Arrange",
+      target: "arrange",
+      tone: arrangement?.tone ?? "warn"
+    },
+    {
+      id: "finish",
+      label: "Finish",
+      value: analysis.status,
+      detail: `${formatDb(analysis.headroomDb)} headroom / ${exportPreflight.headline}`,
+      focusLabel: finishTone === "danger" || analysis.status !== "Ready" ? "Master" : "Deliver",
+      target: finishTone === "danger" || analysis.status !== "Ready" ? "master" : "deliver",
+      tone: finishTone
+    }
+  ];
+  const readyCount = cards.filter((card) => card.tone === "good").length;
+  const reviewCount = cards.filter((card) => card.tone === "warn").length;
+  const blockerCount = cards.filter((card) => card.tone === "danger").length;
+  const nextCard = cards.find((card) => card.tone === "danger") ?? cards.find((card) => card.tone === "warn") ?? cards[cards.length - 1];
+  const tone = weakestTone(cards.map((card) => card.tone));
+  const statusLabel = tone === "good" ? "Beat Spine ready" : tone === "warn" ? "Beat Spine review" : "Beat Spine blocker";
+
+  return {
+    statusLabel,
+    headline: `${nextCard.label}: ${nextCard.value}`,
+    detail: `${style.name} direct composition / ${target.name} / Pattern ${project.selectedPattern}`,
+    countLabel: `${readyCount}/${cards.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`,
+    nextCardId: nextCard.id,
+    tone,
+    cards
+  };
+}
+
+function beatSpineIcon(cardId: BeatSpineCardId): ReactElement {
+  switch (cardId) {
+    case "setup":
+      return <Gauge size={15} aria-hidden="true" />;
+    case "drums":
+      return <Drum size={15} aria-hidden="true" />;
+    case "bass":
+      return <Waves size={15} aria-hidden="true" />;
+    case "harmony":
+      return <Music2 size={15} aria-hidden="true" />;
+    case "melody":
+      return <KeyboardMusic size={15} aria-hidden="true" />;
+    case "sound":
+      return <Sparkles size={15} aria-hidden="true" />;
+    case "arrange":
+      return <ListChecks size={15} aria-hidden="true" />;
+    case "finish":
+      return <Download size={15} aria-hidden="true" />;
+  }
 }
 
 function createFirstBeatPathSummary(
