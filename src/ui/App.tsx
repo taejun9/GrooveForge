@@ -1452,6 +1452,11 @@ type MelodyMoveResult = {
   tone: MixCoachTone;
 };
 
+type MelodyMoveQuickActionTarget =
+  | { kind: "Motif"; id: MelodyMotifId; label: string }
+  | { kind: "Accent"; id: MelodyAccentId; label: string }
+  | { kind: "Contour"; id: MelodyContourId; label: string };
+
 type TapTempoState = {
   taps: number;
   bpm: number | null;
@@ -7179,6 +7184,7 @@ export function App(): ReactElement {
     keyCompassSummary,
     layerStarterOptions,
     listeningPassSummary,
+    melodyMovePreviewSummary,
     mixBalancePreviewSummary,
     modeFocusSummary,
     patternStackPreviewSummary,
@@ -7207,6 +7213,9 @@ export function App(): ReactElement {
     onApplyDrumKit: applyDrumKitPad,
     onApplyLayerStarter: applyLayerStarter,
     onApplyMasterFinish: applyMasterFinishPad,
+    onApplyMelodyMotif: applyMelodyMotif,
+    onApplyMelodyAccent: applyMelodyAccent,
+    onApplyMelodyContour: applyMelodyContour,
     onApplyMixBalance: applyMixBalancePad,
     onApplyMixFix: applyMixFixPreset,
     onApplyPatternChain: applyPatternChain,
@@ -11827,6 +11836,42 @@ function activeBassMoveQuickActionTarget(
   return bassline ? { kind: "Bassline", id: bassline.id, label: bassline.label } : null;
 }
 
+function activeMelodyMoveQuickActionTarget(
+  project: ProjectState,
+  preview: MelodyMovePreviewSummary
+): MelodyMoveQuickActionTarget | null {
+  if (preview.statusLabel === "Melody aligned") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const motif =
+    preview.motifId === "none" ? null : melodyMotifDefinitions.find((definition) => definition.id === preview.motifId) ?? null;
+  const accent =
+    preview.accentId === "none" ? null : melodyAccentDefinitions.find((definition) => definition.id === preview.accentId) ?? null;
+  const contour =
+    preview.contourId === "none" ? null : melodyContourDefinitions.find((definition) => definition.id === preview.contourId) ?? null;
+
+  if (pattern.melodyNotes.length === 0 && motif) {
+    return { kind: "Motif", id: motif.id, label: motif.label };
+  }
+
+  const pitchCount = new Set(pattern.melodyNotes.map((note) => note.pitch)).size;
+  if (pitchCount <= 2 && contour) {
+    return { kind: "Contour", id: contour.id, label: contour.label };
+  }
+
+  if (accent) {
+    return { kind: "Accent", id: accent.id, label: accent.label };
+  }
+
+  if (contour) {
+    return { kind: "Contour", id: contour.id, label: contour.label };
+  }
+
+  return motif ? { kind: "Motif", id: motif.id, label: motif.label } : null;
+}
+
 function activeListeningPassQuickActionItem(summary: ListeningPassSummary): ListeningPassItem | null {
   return summary.items.find((item) => item.tone !== "good") ?? summary.items[0] ?? null;
 }
@@ -12362,6 +12407,7 @@ function createQuickActions({
   keyCompassSummary,
   layerStarterOptions,
   listeningPassSummary,
+  melodyMovePreviewSummary,
   mixBalancePreviewSummary,
   modeFocusSummary,
   patternStackPreviewSummary,
@@ -12390,6 +12436,9 @@ function createQuickActions({
   onApplyDrumKit,
   onApplyLayerStarter,
   onApplyMasterFinish,
+  onApplyMelodyMotif,
+  onApplyMelodyAccent,
+  onApplyMelodyContour,
   onApplyMixBalance,
   onApplyMixFix,
   onApplyPatternChain,
@@ -12441,6 +12490,7 @@ function createQuickActions({
   keyCompassSummary: KeyCompassSummary;
   layerStarterOptions: LayerStarterOption[];
   listeningPassSummary: ListeningPassSummary;
+  melodyMovePreviewSummary: MelodyMovePreviewSummary;
   mixBalancePreviewSummary: MixBalancePreviewSummary;
   modeFocusSummary: ModeFocusSummary;
   patternStackPreviewSummary: PatternStackPreviewSummary;
@@ -12469,6 +12519,9 @@ function createQuickActions({
   onApplyDrumKit: (pad: DrumKitPadId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
+  onApplyMelodyMotif: (motif: MelodyMotifId) => void;
+  onApplyMelodyAccent: (accent: MelodyAccentId) => void;
+  onApplyMelodyContour: (contour: MelodyContourId) => void;
   onApplyMixBalance: (pad: MixBalancePadId) => void;
   onApplyMixFix: (preset: MixFixPreset) => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
@@ -12520,6 +12573,7 @@ function createQuickActions({
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
   const listeningPassItem = activeListeningPassQuickActionItem(listeningPassSummary);
   const bassMoveTarget = activeBassMoveQuickActionTarget(project, bassMovePreviewSummary);
+  const melodyMoveTarget = activeMelodyMoveQuickActionTarget(project, melodyMovePreviewSummary);
   const modeFocusCard = activeModeFocusQuickActionCard(modeFocusSummary);
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
   const productionSnapshotMetric = activeProductionSnapshotQuickActionMetric(productionSnapshotSummary);
@@ -12762,6 +12816,28 @@ function createQuickActions({
           onApplyBassGlidePad(bassMoveTarget.id);
         } else {
           onApplyBassContour(bassMoveTarget.id);
+        }
+      }
+    },
+    {
+      id: "melody-move",
+      title: melodyMoveTarget ? `Apply ${melodyMoveTarget.label} Melody ${melodyMoveTarget.kind}` : "Apply Melody Move",
+      detail: melodyMoveTarget
+        ? `${melodyMovePreviewSummary.phraseLabel} / ${melodyMovePreviewSummary.moveLabel}`
+        : "Current Melody move preview has no active target.",
+      group: "Create",
+      keywords: `melody move synth phrase motif accent contour hook velocity chance ${melodyMovePreviewSummary.motifId} ${melodyMovePreviewSummary.accentId} ${melodyMovePreviewSummary.contourId} ${melodyMoveTarget?.label ?? "none"} beginner producer`,
+      disabled: !melodyMoveTarget,
+      run: () => {
+        if (!melodyMoveTarget) {
+          return;
+        }
+        if (melodyMoveTarget.kind === "Motif") {
+          onApplyMelodyMotif(melodyMoveTarget.id);
+        } else if (melodyMoveTarget.kind === "Accent") {
+          onApplyMelodyAccent(melodyMoveTarget.id);
+        } else {
+          onApplyMelodyContour(melodyMoveTarget.id);
         }
       }
     },
@@ -13381,6 +13457,15 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "melody-move") {
+    const melodyNotes = activePattern(project).melodyNotes;
+    return {
+      id: "melody-move",
+      label: "Melody move",
+      value: `${melodyNotes.length} notes / ${melodyRangeLabel(melodyNotes)} / ${melodyVelocityLabel(melodyNotes)}`
+    };
+  }
+
   if (action.id === "sound-focus") {
     return {
       id: "sound-focus",
@@ -13637,6 +13722,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; check kick-to-808 lock, slides, and low-end contour.`,
       nextCheck: "Use the 808 Move Result plus selected-note degree/role and 808 edit tools for manual corrections."
+    };
+  }
+
+  if (action.id === "melody-move") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; check Synth phrase shape against chords, 808, and drums.`,
+      nextCheck: "Use the Melody Move Result plus selected-note degree/role and melody edit tools for manual corrections."
     };
   }
 
