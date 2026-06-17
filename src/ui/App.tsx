@@ -12711,6 +12711,13 @@ function createQuickActions({
   const deliveryTargetAlignReady = !isDeliveryTargetAligned(project, deliveryTarget);
   const arrangementTemplateId =
     arrangementTemplatePreviewSummary.templateId === "aligned" ? null : arrangementTemplatePreviewSummary.templateId;
+  const arrangementFocusSummary = createArrangementFocusSummary(project, selectedArrangementIndex);
+  const arrangementFocusPreviewSummary = createArrangementFocusPreviewSummary(
+    project,
+    selectedArrangementIndex,
+    arrangementFocusSummary
+  );
+  const arrangementFocusReady = Boolean(arrangementFocusPreviewSummary && arrangementFocusPreviewSummary.statusLabel !== "Focus aligned");
   const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
   const drumKitReady = drumKitPreviewSummary.statusLabel !== "Kit aligned";
   const mixBalanceReady = mixBalancePreviewSummary.statusLabel !== "Balance aligned";
@@ -13241,12 +13248,24 @@ function createQuickActions({
       run: () => onApplyArrangementMove("hook_lift")
     },
     {
-      id: "hook-peak-focus",
-      title: "Apply Hook Peak Focus",
-      detail: "Set the selected block to a full-energy Hook using Pattern B.",
+      id: "arrangement-focus",
+      title:
+        arrangementFocusReady && arrangementFocusPreviewSummary
+          ? `Apply ${arrangementFocusPreviewSummary.presetLabel} Focus`
+          : "Apply Arrangement Focus",
+      detail: arrangementFocusPreviewSummary
+        ? arrangementFocusReady
+          ? `${arrangementFocusPreviewSummary.blockLabel} / ${arrangementFocusPreviewSummary.sectionLabel} / ${arrangementFocusPreviewSummary.energyLabel}`
+          : `${arrangementFocusPreviewSummary.blockLabel} already matches ${arrangementFocusPreviewSummary.presetLabel}.`
+        : "No arrangement block selected.",
       group: "Arrange",
-      keywords: "arrangement focus hook peak pattern b energy selected block",
-      run: () => onApplyArrangementFocus("hook_peak")
+      keywords: `arrangement focus selected block section pattern energy mutes intro verse hook bridge outro ${arrangementFocusPreviewSummary?.presetId ?? "none"} ${arrangementFocusPreviewSummary?.presetLabel ?? "none"} beginner producer`,
+      disabled: !arrangementFocusReady,
+      run: () => {
+        if (arrangementFocusReady && arrangementFocusPreviewSummary) {
+          onApplyArrangementFocus(arrangementFocusPreviewSummary.presetId);
+        }
+      }
     },
     {
       id: "pattern-chain",
@@ -13768,11 +13787,19 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "hook-lift" || action.id === "hook-peak-focus") {
+  if (action.id === "hook-lift") {
     return {
       id: "song-energy",
       label: "Song energy",
       value: `${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
+    };
+  }
+
+  if (action.id === "arrangement-focus") {
+    return {
+      id: "arrangement-focus",
+      label: "Arrangement focus",
+      value: `${barCountLabel(arrangementTotalBars(project))} / ${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
     };
   }
 
@@ -14047,6 +14074,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Song loop; check section order, Pattern A/B/C spread, and hook placement.",
       nextCheck: `${barCountLabel(arrangementTotalBars(project))} arranged; scan Song Form Overview before mix decisions.`
+    };
+  }
+
+  if (action.id === "arrangement-focus") {
+    return {
+      auditionCue: "Play Block loop; hear the selected block's section role, Pattern assignment, energy, and mutes in context.",
+      nextCheck: "Use the Arrangement Focus Result, Arrangement Playback Readout, and Song Form Overview before changing nearby blocks."
     };
   }
 
