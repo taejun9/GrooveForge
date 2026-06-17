@@ -1557,10 +1557,24 @@ h2 {
   gap: 4px;
   align-content: center;
   min-width: 0;
+  width: 100%;
   border: 1px solid rgba(130, 215, 255, 0.16);
   border-radius: 7px;
   background: rgba(130, 215, 255, 0.055);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
   padding: 8px;
+  text-align: left;
+}
+
+.workflow-spotlight:hover:not(:disabled) {
+  border-color: rgba(130, 215, 255, 0.32);
+  background: rgba(130, 215, 255, 0.09);
+}
+
+.workflow-spotlight:disabled {
+  cursor: default;
 }
 
 .workflow-spotlight.warn {
@@ -1568,9 +1582,19 @@ h2 {
   background: rgba(240, 195, 106, 0.055);
 }
 
+.workflow-spotlight.warn:hover:not(:disabled) {
+  border-color: rgba(240, 195, 106, 0.34);
+  background: rgba(240, 195, 106, 0.09);
+}
+
 .workflow-spotlight.danger {
   border-color: rgba(255, 122, 79, 0.24);
   background: rgba(255, 122, 79, 0.05);
+}
+
+.workflow-spotlight.danger:hover:not(:disabled) {
+  border-color: rgba(255, 122, 79, 0.4);
+  background: rgba(255, 122, 79, 0.09);
 }
 
 .workflow-spotlight span,

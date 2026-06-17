@@ -11255,18 +11255,25 @@ function WorkflowNavigator({
         <strong>Compose to deliver</strong>
         <small>Jump across the workstation</small>
       </div>
-      <div
+      <button
         aria-label={spotlight.detailTitle}
         className={`workflow-spotlight ${spotlight.tone}`}
         data-spotlight-zone={spotlight.zoneId ?? "none"}
         data-testid="workflow-spotlight"
-        title={spotlight.detailTitle}
+        disabled={!spotlight.zoneId}
+        onClick={() => {
+          if (spotlight.zoneId) {
+            onJump(spotlight.zoneId);
+          }
+        }}
+        title={spotlight.zoneId ? `Jump to ${spotlight.zoneLabel}` : spotlight.detailTitle}
+        type="button"
       >
         <span data-testid="workflow-spotlight-status">{spotlight.statusLabel}</span>
         <strong data-testid="workflow-spotlight-zone">{spotlight.zoneLabel}</strong>
         <small data-testid="workflow-spotlight-detail">{spotlight.detailLabel}</small>
         <small data-testid="workflow-spotlight-count">{spotlight.countLabel}</small>
-      </div>
+      </button>
       <div className="workflow-navigator-grid">
         {items.map((item) => (
           <button
