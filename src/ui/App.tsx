@@ -7191,6 +7191,7 @@ export function App(): ReactElement {
     onApplyMixFix: applyMixFixPreset,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternFill: applyPatternFill,
+    onExpandPatternChain: expandPatternChain,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onExportHandoffSheet: handleExportHandoffSheet,
     onExportMidi: handleExportMidi,
@@ -12320,6 +12321,7 @@ function createQuickActions({
   onApplyMixFix,
   onApplyPatternChain,
   onApplyPatternFill,
+  onExpandPatternChain,
   onPreviewBlueprint,
   onExportHandoffSheet,
   onExportMidi,
@@ -12380,6 +12382,7 @@ function createQuickActions({
   onApplyMixFix: (preset: MixFixPreset) => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
+  onExpandPatternChain: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onExportHandoffSheet: () => void;
   onExportMidi: () => void;
@@ -12803,6 +12806,14 @@ function createQuickActions({
       run: () => onApplyPatternChain("eight_bar")
     },
     {
+      id: "chain-expand",
+      title: "Expand Pattern Chain",
+      detail: "Turn the current Pattern A/B/C chain into a 16-bar song-form outline.",
+      group: "Arrange",
+      keywords: "chain expand pattern chain arrangement song form intro verse hook bridge outro structure",
+      run: onExpandPatternChain
+    },
+    {
       id: "mix-headroom",
       title: "Mix Fix Headroom",
       detail: "Set a vocal-safe ceiling and reduce master gain.",
@@ -13192,7 +13203,7 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "pattern-chain") {
+  if (action.id === "pattern-chain" || action.id === "chain-expand") {
     return { id: "song-length", label: "Song length", value: barCountLabel(arrangementTotalBars(project)) };
   }
 
@@ -13370,6 +13381,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused workflow panel to inspect the highlighted blocker or review zone.",
       nextCheck: "Return to Workflow Spotlight after the zone looks ready and run the command again for the next jump."
+    };
+  }
+
+  if (action.id === "chain-expand") {
+    return {
+      auditionCue: "Play Song loop; scan intro, verse, hook, bridge, hook, and outro flow.",
+      nextCheck: `${barCountLabel(arrangementTotalBars(project))} now; compare the song form against ${target.name}.`
     };
   }
 
