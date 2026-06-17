@@ -7207,6 +7207,7 @@ export function App(): ReactElement {
     mixBalancePreviewSummary,
     mixSnapshots,
     modeFocusSummary,
+    patternCloneOptions,
     patternStackPreviewSummary,
     patternDnaSummary,
     playbackMode,
@@ -7260,6 +7261,7 @@ export function App(): ReactElement {
     onCaptureMixSnapshot: captureMixSnapshot,
     onClearMixSnapshots: clearMixSnapshots,
     onApplyPatternChain: applyPatternChain,
+    onApplyPatternClone: cloneSelectedPatternVariation,
     onApplyPatternFill: applyPatternFill,
     onApplyPatternStack: applyPatternStack,
     onApplySpaceFx: applySpaceFxPad,
@@ -12602,6 +12604,7 @@ function createQuickActions({
   mixBalancePreviewSummary,
   mixSnapshots,
   modeFocusSummary,
+  patternCloneOptions,
   patternStackPreviewSummary,
   patternDnaSummary,
   playbackMode,
@@ -12655,6 +12658,7 @@ function createQuickActions({
   onCaptureMixSnapshot,
   onClearMixSnapshots,
   onApplyPatternChain,
+  onApplyPatternClone,
   onApplyPatternFill,
   onApplyPatternStack,
   onApplySpaceFx,
@@ -12747,6 +12751,7 @@ function createQuickActions({
   mixBalancePreviewSummary: MixBalancePreviewSummary;
   mixSnapshots: MixSnapshotSlotMap;
   modeFocusSummary: ModeFocusSummary;
+  patternCloneOptions: PatternClonePadOption[];
   patternStackPreviewSummary: PatternStackPreviewSummary;
   patternDnaSummary: PatternDnaSummary;
   playbackMode: PlaybackMode;
@@ -12800,6 +12805,7 @@ function createQuickActions({
   onCaptureMixSnapshot: (slot: MixSnapshotSlotId) => void;
   onClearMixSnapshots: () => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
+  onApplyPatternClone: (target: PatternSlot, preset: PatternVariationPreset) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
   onApplySpaceFx: (pad: SpaceFxPadId) => void;
@@ -13605,6 +13611,14 @@ function createQuickActions({
   const nextHandoffItem = handoffSendOrder.nextItemId
     ? (handoffPackItems.find((item) => item.id === handoffSendOrder.nextItemId) ?? null)
     : null;
+  const patternCloneActions: QuickAction[] = patternCloneOptions.map((clone) => ({
+    id: `pattern-clone-${clone.target}-${clone.preset}`,
+    title: `Clone Pattern ${clone.source} to ${clone.target} as ${clone.preview}`,
+    detail: `${clone.detail} / ${clone.preview} variation`,
+    group: "Create",
+    keywords: `pattern clone variation copy ${clone.source} ${clone.target} ${clone.preset} ${clone.preview} a b c hook breakdown beginner producer`,
+    run: () => onApplyPatternClone(clone.target, clone.preset)
+  }));
 
   return [
     {
@@ -13843,6 +13857,7 @@ function createQuickActions({
         }
       }
     },
+    ...patternCloneActions,
     {
       id: "pattern-stack",
       title: patternStackId ? `Apply ${patternStackPreviewSummary.stackLabel}` : "Apply Pattern Stack",
@@ -14856,6 +14871,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("pattern-clone-")) {
+    return {
+      id: "pattern-clone",
+      label: `Pattern ${project.selectedPattern}`,
+      value: `${patternEventTotal(activePattern(project))} events`
+    };
+  }
+
   if (action.id.startsWith("fill-")) {
     return {
       id: "pattern-events",
@@ -15146,6 +15169,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the starter layer supports the groove, 808, harmony, and melody balance.`,
       nextCheck: "Return to Layer Starter or Pattern DNA after the selected layer is no longer missing or thin."
+    };
+  }
+
+  if (action.id.startsWith("pattern-clone-")) {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; compare the cloned variation against the source Pattern before arranging it.`,
+      nextCheck: "Use Pattern Compare, Pattern DNA, and selected-note/chord/drum tools to refine the cloned variation."
     };
   }
 
