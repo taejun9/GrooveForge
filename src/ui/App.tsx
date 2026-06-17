@@ -7166,6 +7166,7 @@ export function App(): ReactElement {
     isPlaying,
     keyCompassSummary,
     layerStarterOptions,
+    listeningPassSummary,
     patternDnaSummary,
     playbackMode,
     project,
@@ -7192,6 +7193,7 @@ export function App(): ReactElement {
     onFocusExportPreflight: focusExportPreflightCard,
     onFocusGrooveCompass: focusGrooveCompassItem,
     onFocusKeyCompass: focusKeyCompassItem,
+    onFocusListeningPass: focusListeningPassItem,
     onFocusPatternDna: focusPatternDnaCard,
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusSessionPass: focusSessionPassCard,
@@ -11735,6 +11737,10 @@ function activeLayerStarterQuickActionOption(options: LayerStarterOption[]): Lay
   return options.find((option) => option.tone === "danger") ?? options.find((option) => option.tone === "warn") ?? null;
 }
 
+function activeListeningPassQuickActionItem(summary: ListeningPassSummary): ListeningPassItem | null {
+  return summary.items.find((item) => item.tone !== "good") ?? summary.items[0] ?? null;
+}
+
 function activeExportPreflightQuickActionCard(summary: ExportPreflightSummary): ExportPreflightCard | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
@@ -12223,6 +12229,7 @@ function createQuickActions({
   isPlaying,
   keyCompassSummary,
   layerStarterOptions,
+  listeningPassSummary,
   patternDnaSummary,
   playbackMode,
   project,
@@ -12249,6 +12256,7 @@ function createQuickActions({
   onFocusExportPreflight,
   onFocusGrooveCompass,
   onFocusKeyCompass,
+  onFocusListeningPass,
   onFocusPatternDna,
   onFocusReviewQueue,
   onFocusSessionPass,
@@ -12268,6 +12276,7 @@ function createQuickActions({
   isPlaying: boolean;
   keyCompassSummary: KeyCompassSummary;
   layerStarterOptions: LayerStarterOption[];
+  listeningPassSummary: ListeningPassSummary;
   patternDnaSummary: PatternDnaSummary;
   playbackMode: PlaybackMode;
   project: ProjectState;
@@ -12294,6 +12303,7 @@ function createQuickActions({
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
+  onFocusListeningPass: (item: ListeningPassItem) => void;
   onFocusPatternDna: (card: PatternDnaCard) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
@@ -12315,6 +12325,7 @@ function createQuickActions({
   const grooveCompassItem = activeGrooveCompassQuickActionItem(grooveCompassSummary);
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
+  const listeningPassItem = activeListeningPassQuickActionItem(listeningPassSummary);
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
@@ -12452,6 +12463,19 @@ function createQuickActions({
       run: () => {
         if (layerStarterOption) {
           onApplyLayerStarter(layerStarterOption.id);
+        }
+      }
+    },
+    {
+      id: "listening-pass-focus",
+      title: listeningPassItem ? `Focus Listening Pass: ${listeningPassItem.label}` : "Focus Listening Pass",
+      detail: listeningPassItem ? `${listeningPassItem.status} / ${listeningPassItem.focusLabel}` : "No Listening Pass checkpoint available.",
+      group: "Project",
+      keywords: `listening pass focus audition checkpoint compose arrange mix delivery listen inspect ${listeningPassItem?.id ?? "none"} ${listeningPassItem?.focusLabel ?? "none"} beginner producer`,
+      disabled: !listeningPassItem,
+      run: () => {
+        if (listeningPassItem) {
+          onFocusListeningPass(listeningPassItem);
         }
       }
     },
@@ -12876,6 +12900,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "listening-pass-focus") {
+    return {
+      id: "listening-pass",
+      label: "Listening pass",
+      value: `Pattern ${project.selectedPattern} / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
   if (action.id === "review-queue-focus") {
     return {
       id: "review-queue",
@@ -13018,6 +13050,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the starter layer supports the groove, 808, harmony, and melody balance.`,
       nextCheck: "Return to Layer Starter or Pattern DNA after the selected layer is no longer missing or thin."
+    };
+  }
+
+  if (action.id === "listening-pass-focus") {
+    return {
+      auditionCue: "Use the focused Listening Pass checkpoint to choose Pattern, Song, Full Mix, stem, or delivery-target audition scope.",
+      nextCheck: "Return to Listening Pass after the focused composition, arrangement, mix, or delivery checkpoint changes."
     };
   }
 
