@@ -7166,6 +7166,7 @@ export function App(): ReactElement {
     beatPassportSummary,
     beatSpineSummary,
     composerGuideSummary,
+    drumKitPreviewSummary,
     finishChecklistSummary,
     grooveCompassSummary,
     isPlaying,
@@ -7191,6 +7192,7 @@ export function App(): ReactElement {
     onApplyArrangementTemplate: applyArrangementTemplate,
     onApplyBeatSpine: applyBeatSpineAction,
     onApplyBlueprint: applyQuickActionBeatBlueprint,
+    onApplyDrumKit: applyDrumKitPad,
     onApplyLayerStarter: applyLayerStarter,
     onApplyMasterFinish: applyMasterFinishPad,
     onApplyMixFix: applyMixFixPreset,
@@ -12302,6 +12304,7 @@ function createQuickActions({
   canRedo,
   canUndo,
   composerGuideSummary,
+  drumKitPreviewSummary,
   finishChecklistSummary,
   grooveCompassSummary,
   isPlaying,
@@ -12327,6 +12330,7 @@ function createQuickActions({
   onApplyArrangementTemplate,
   onApplyBeatSpine,
   onApplyBlueprint,
+  onApplyDrumKit,
   onApplyLayerStarter,
   onApplyMasterFinish,
   onApplyMixFix,
@@ -12369,6 +12373,7 @@ function createQuickActions({
   canRedo: boolean;
   canUndo: boolean;
   composerGuideSummary: ComposerGuideSummary;
+  drumKitPreviewSummary: DrumKitPreviewSummary;
   finishChecklistSummary: FinishChecklistSummary;
   grooveCompassSummary: GrooveCompassSummary;
   isPlaying: boolean;
@@ -12394,6 +12399,7 @@ function createQuickActions({
   onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
   onApplyBeatSpine: (action: BeatSpineAction) => void;
   onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
+  onApplyDrumKit: (pad: DrumKitPadId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
   onApplyMixFix: (preset: MixFixPreset) => void;
@@ -12453,6 +12459,7 @@ function createQuickActions({
   const arrangementTemplateId =
     arrangementTemplatePreviewSummary.templateId === "aligned" ? null : arrangementTemplatePreviewSummary.templateId;
   const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
+  const drumKitReady = drumKitPreviewSummary.statusLabel !== "Kit aligned";
   const soundFocusReady = soundFocusPreviewSummary.statusLabel !== "Sound aligned";
 
   return [
@@ -12641,6 +12648,21 @@ function createQuickActions({
       run: () => {
         if (layerStarterOption) {
           onApplyLayerStarter(layerStarterOption.id);
+        }
+      }
+    },
+    {
+      id: "drum-kit",
+      title: drumKitReady ? `Apply ${drumKitPreviewSummary.kitLabel}` : "Apply Drum Kit",
+      detail: drumKitReady
+        ? `${drumKitPreviewSummary.drumLabel} / ${drumKitPreviewSummary.rackLabel}`
+        : "Current drums already match the suggested kit.",
+      group: "Create",
+      keywords: `drum kit tone kick clap snare hat rack punch clean knock dust air ${drumKitPreviewSummary.padId} ${drumKitPreviewSummary.kitLabel} beginner producer`,
+      disabled: !drumKitReady,
+      run: () => {
+        if (drumKitReady) {
+          onApplyDrumKit(drumKitPreviewSummary.padId);
         }
       }
     },
@@ -13205,6 +13227,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "drum-kit") {
+    return {
+      id: "drum-kit",
+      label: "Drum kit",
+      value: `K ${compactUnitPercent(project.sound.kickPunch)} / C ${compactUnitPercent(project.sound.snareSnap)} / H ${compactUnitPercent(project.sound.hatBrightness)}`
+    };
+  }
+
   if (action.id === "listening-pass-focus") {
     return {
       id: "listening-pass",
@@ -13422,6 +13452,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, Synth, and Chords with the new tone posture.`,
       nextCheck: "Use the Sound Focus Result and Studio tone controls for manual kick, 808, Synth, and Chord corrections."
+    };
+  }
+
+  if (action.id === "drum-kit") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; hear kick, clap, hat, and 808 balance after the kit change.`,
+      nextCheck: "Use the Drum Kit Result plus Studio tone and drum rack mixer controls for manual trim."
     };
   }
 
