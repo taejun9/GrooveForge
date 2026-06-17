@@ -12990,6 +12990,14 @@ function createQuickActions({
     };
   });
   const beatPassportMetric = activeBeatPassportQuickActionMetric(beatPassportSummary);
+  const beatPassportActions: QuickAction[] = beatPassportSummary.metrics.map((metric) => ({
+    id: `beat-passport-metric-${metric.id}`,
+    title: `Focus Beat Passport: ${metric.label}`,
+    detail: `${metric.value} / ${metric.focusLabel} / ${metric.detail}`,
+    group: "Project",
+    keywords: `beat passport focus metric identity status ${metric.id} ${metric.label} ${metric.value} ${metric.focusLabel} ${metric.detail} target length patterns readiness export stems master beginner producer`,
+    run: () => onFocusBeatPassport(metric)
+  }));
   const firstBeatPathStep = activeFirstBeatPathQuickActionStep(firstBeatPathSummary);
   const beatSpineCard = activeBeatSpineQuickActionCard(beatSpineSummary);
   const beatSpineApplyCard = activeBeatSpineQuickActionApplyCard(beatSpineSummary);
@@ -14346,6 +14354,7 @@ function createQuickActions({
         }
       }
     },
+    ...beatPassportActions,
     {
       id: "production-snapshot-focus",
       title: productionSnapshotMetric ? `Focus Production Snapshot: ${productionSnapshotMetric.label}` : "Focus Production Snapshot",
@@ -14869,6 +14878,8 @@ function createQuickActionResult(
     action.id === "key-compass-focus" ||
     action.id === "groove-compass-focus" ||
     action.id === "pattern-dna-focus" ||
+    action.id === "beat-passport-focus" ||
+    action.id.startsWith("beat-passport-metric-") ||
     action.id === "production-snapshot-focus" ||
     action.id.startsWith("production-snapshot-metric-") ||
     action.id.startsWith("arrangement-block-cue-") ||
@@ -15307,6 +15318,14 @@ function quickActionResultMetricSnapshot(
       id: "beat-passport",
       label: "Beat passport",
       value: `${activeDeliveryTarget(project).name} / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
+  if (action.id.startsWith("beat-passport-metric-")) {
+    return {
+      id: "beat-passport",
+      label: "Beat passport",
+      value: action.detail
     };
   }
 
@@ -15875,6 +15894,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Beat Passport metric to inspect target, length, Pattern use, readiness, export, stems, or master posture.",
       nextCheck: "Return to Beat Passport after the focused identity metric is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id.startsWith("beat-passport-metric-")) {
+    return {
+      auditionCue: "Use the focused Beat Passport metric to inspect that identity lane before changing the beat.",
+      nextCheck: "Return to Beat Passport when you need another direct target, length, Pattern, readiness, export, stem, or master focus."
     };
   }
 
