@@ -7349,6 +7349,7 @@ export function App(): ReactElement {
     onFocusSessionPass: focusSessionPassCard,
     onFocusStyleInspector: focusStyleInspectorItem,
     onFocusWorkflowSpotlight: jumpToWorkflowZone,
+    onJumpWorkflowZone: jumpToWorkflowZone,
     onOpenProject: handleOpenProject,
     onRedo: redoProject,
     onSaveProject: handleSaveProject,
@@ -12764,6 +12765,7 @@ function createQuickActions({
   onFocusSessionPass,
   onFocusStyleInspector,
   onFocusWorkflowSpotlight,
+  onJumpWorkflowZone,
   onOpenProject,
   onRedo,
   onSaveProject,
@@ -12925,6 +12927,7 @@ function createQuickActions({
   onFocusSessionPass: (card: SessionPassCard) => void;
   onFocusStyleInspector: (item: StyleInspectorFocusItem) => void;
   onFocusWorkflowSpotlight: (zone: WorkflowZoneId) => void;
+  onJumpWorkflowZone: (zone: WorkflowZoneId) => void;
   onOpenProject: () => Promise<void>;
   onRedo: () => void;
   onSaveProject: () => Promise<void>;
@@ -13008,6 +13011,14 @@ function createQuickActions({
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
   const styleInspectorItem = activeStyleInspectorQuickActionItem(styleInspectorSummary, project);
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
+  const workflowNavigatorActions: QuickAction[] = workflowNavigatorItems.map((item) => ({
+    id: `workflow-navigator-${item.id}`,
+    title: `Jump Workflow: ${item.label}`,
+    detail: `${item.value} / ${item.detail}`,
+    group: "Project",
+    keywords: `workflow navigator jump ${item.id} ${item.label} ${item.value} ${item.detail} compose arrange mix deliver beginner producer`,
+    run: () => onJumpWorkflowZone(item.id)
+  }));
   const deliveryTarget = activeDeliveryTarget(project);
   const deliveryTargetAlignmentPreview = createDeliveryTargetAlignmentPreview(project, deliveryTarget);
   const deliveryTargetAlignReady = !isDeliveryTargetAligned(project, deliveryTarget);
@@ -14352,6 +14363,7 @@ function createQuickActions({
         }
       }
     },
+    ...workflowNavigatorActions,
     {
       id: "undo",
       title: "Undo",
@@ -14806,6 +14818,7 @@ function createQuickActionResult(
     action.id.startsWith("pattern-cue-") ||
     action.id.startsWith("pattern-switch-") ||
     action.id === "workflow-spotlight-focus" ||
+    action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-focus" ||
     action.id === "export-preflight-focus";
   const inputSetupOnly =
@@ -15267,6 +15280,14 @@ function quickActionResultMetricSnapshot(
       id: "workflow-spotlight",
       label: "Workflow spotlight",
       value: `${project.selectedPattern} / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
+  if (action.id.startsWith("workflow-navigator-")) {
+    return {
+      id: "workflow-navigator",
+      label: "Workflow navigator",
+      value: action.detail
     };
   }
 
@@ -15765,6 +15786,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused workflow panel to inspect the highlighted blocker or review zone.",
       nextCheck: "Return to Workflow Spotlight after the zone looks ready and run the command again for the next jump."
+    };
+  }
+
+  if (action.id.startsWith("workflow-navigator-")) {
+    return {
+      auditionCue: "Use the jumped workflow panel to continue the current compose, arrange, mix, or deliver pass.",
+      nextCheck: "Return to Workflow Navigator when you need another direct workstation zone jump."
     };
   }
 
