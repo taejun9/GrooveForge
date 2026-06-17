@@ -7218,6 +7218,8 @@ export function App(): ReactElement {
     selectedNote,
     noteClipboard,
     selectedArrangementIndex,
+    arrangementBlockClipboard,
+    splitAfterBars,
     selectedDrumStep,
     drumClipboard,
     selectedChord,
@@ -7271,6 +7273,13 @@ export function App(): ReactElement {
     onSetKeyboardCaptureTarget: setKeyboardCaptureTarget,
     onUpdateKeyboardCaptureDefaults: updateKeyboardCaptureDefaults,
     onSetMidiCaptureArmed: setMidiCaptureArmed,
+    onCopySelectedArrangementBlock: copySelectedArrangementBlock,
+    onPasteArrangementBlockAfterSelected: pasteArrangementBlockAfterSelected,
+    onDuplicateArrangementBlock: duplicateArrangementBlock,
+    onMoveArrangementBlock: moveArrangementBlock,
+    onSplitArrangementBlock: splitArrangementBlock,
+    onMergeArrangementBlock: mergeArrangementBlock,
+    onDeleteArrangementBlock: deleteArrangementBlock,
     onMoveSelectedNoteStep: moveSelectedNoteStep,
     onMoveSelectedNotePitch: moveSelectedNotePitch,
     onMoveSelectedNoteOctave: moveSelectedNoteOctave,
@@ -12604,6 +12613,8 @@ function createQuickActions({
   selectedNote,
   noteClipboard,
   selectedArrangementIndex,
+  arrangementBlockClipboard,
+  splitAfterBars,
   selectedDrumStep,
   drumClipboard,
   selectedChord,
@@ -12657,6 +12668,13 @@ function createQuickActions({
   onSetKeyboardCaptureTarget,
   onUpdateKeyboardCaptureDefaults,
   onSetMidiCaptureArmed,
+  onCopySelectedArrangementBlock,
+  onPasteArrangementBlockAfterSelected,
+  onDuplicateArrangementBlock,
+  onMoveArrangementBlock,
+  onSplitArrangementBlock,
+  onMergeArrangementBlock,
+  onDeleteArrangementBlock,
   onMoveSelectedNoteStep,
   onMoveSelectedNotePitch,
   onMoveSelectedNoteOctave,
@@ -12740,6 +12758,8 @@ function createQuickActions({
   selectedNote: SelectedNote | null;
   noteClipboard: NoteClipboard | null;
   selectedArrangementIndex: number;
+  arrangementBlockClipboard: ArrangementBlockClipboard | null;
+  splitAfterBars: number;
   selectedDrumStep: SelectedDrumStep | null;
   drumClipboard: DrumClipboard | null;
   selectedChord: ChordEvent | undefined;
@@ -12793,6 +12813,13 @@ function createQuickActions({
   onSetKeyboardCaptureTarget: (target: NoteTrack) => void;
   onUpdateKeyboardCaptureDefaults: (update: Partial<KeyboardCaptureDefaults>) => void;
   onSetMidiCaptureArmed: (armed: boolean) => void;
+  onCopySelectedArrangementBlock: () => void;
+  onPasteArrangementBlockAfterSelected: () => void;
+  onDuplicateArrangementBlock: () => void;
+  onMoveArrangementBlock: (direction: -1 | 1) => void;
+  onSplitArrangementBlock: () => void;
+  onMergeArrangementBlock: () => void;
+  onDeleteArrangementBlock: () => void;
   onMoveSelectedNoteStep: (direction: -1 | 1) => void;
   onMoveSelectedNotePitch: (direction: -1 | 1) => void;
   onMoveSelectedNoteOctave: (direction: -1 | 1) => void;
@@ -12841,6 +12868,18 @@ function createQuickActions({
   const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
+  const selectedBlockNumber = selectedBlock ? Math.min(selectedArrangementIndex + 1, project.arrangement.length) : 0;
+  const selectedBlockBars = selectedBlock ? normalizeArrangementBars(selectedBlock.bars) : 0;
+  const selectedBlockLabel = selectedBlock
+    ? `Block ${selectedBlockNumber} ${selectedBlock.section} Pattern ${selectedBlock.pattern}`
+    : "No selected block";
+  const selectedBlockSplitAfter = selectedBlock ? clampSplitAfterBars(splitAfterBars, selectedBlockBars) : 1;
+  const nextArrangementBlock = project.arrangement[selectedArrangementIndex + 1] ?? null;
+  const nextArrangementBlockBars = nextArrangementBlock ? normalizeArrangementBars(nextArrangementBlock.bars) : 0;
+  const canMergeSelectedBlock = Boolean(selectedBlock && nextArrangementBlock && selectedBlockBars + nextArrangementBlockBars <= maxArrangementBars);
+  const arrangementBlockClipboardLabel = arrangementBlockClipboard
+    ? `${arrangementBlockClipboard.section} Pattern ${arrangementBlockClipboard.pattern} / ${barCountLabel(normalizeArrangementBars(arrangementBlockClipboard.bars))}`
+    : "Clipboard empty";
   const beatPassportMetric = activeBeatPassportQuickActionMetric(beatPassportSummary);
   const beatSpineCard = activeBeatSpineQuickActionCard(beatSpineSummary);
   const beatSpineApplyCard = activeBeatSpineQuickActionApplyCard(beatSpineSummary);
@@ -13421,6 +13460,112 @@ function createQuickActions({
       keywords: "selected chord duplicate copy next empty step harmony progression edit beginner producer",
       disabled: !selectedChordActive || selectedChordDuplicateStep === null,
       run: onDuplicateSelectedChord
+    }
+  ];
+  const selectedBlockActions: QuickAction[] = [
+    {
+      id: "selected-block-copy",
+      title: "Copy selected block",
+      detail: selectedBlock ? `${selectedBlockLabel} -> local arrangement clipboard` : "Select an arrangement block first.",
+      group: "Arrange",
+      keywords: "selected block copy clipboard arrangement song form section pattern edit beginner producer",
+      disabled: !selectedBlock,
+      run: onCopySelectedArrangementBlock
+    },
+    {
+      id: "selected-block-paste",
+      title: "Paste copied block after selected",
+      detail:
+        arrangementBlockClipboard && selectedBlock
+          ? `${arrangementBlockClipboardLabel} -> after ${selectedBlockLabel}`
+          : arrangementBlockClipboard
+            ? "Select an arrangement block before pasting."
+            : "Copy an arrangement block first.",
+      group: "Arrange",
+      keywords: "selected block paste clipboard arrangement song form section pattern after edit beginner producer",
+      disabled: !arrangementBlockClipboard || !selectedBlock,
+      run: onPasteArrangementBlockAfterSelected
+    },
+    {
+      id: "selected-block-duplicate",
+      title: "Duplicate selected block",
+      detail: selectedBlock ? `${selectedBlockLabel} -> after block ${selectedBlockNumber}` : "Select an arrangement block first.",
+      group: "Arrange",
+      keywords: "selected block duplicate arrangement copy song form section pattern edit beginner producer",
+      disabled: !selectedBlock,
+      run: onDuplicateArrangementBlock
+    },
+    {
+      id: "selected-block-move-left",
+      title: "Move selected block left",
+      detail: selectedBlock
+        ? selectedArrangementIndex > 0
+          ? `${selectedBlockLabel} -> position ${selectedArrangementIndex}`
+          : `${selectedBlockLabel} is already first.`
+        : "Select an arrangement block first.",
+      group: "Arrange",
+      keywords: "selected block move left earlier reorder arrangement song form edit beginner producer",
+      disabled: !selectedBlock || selectedArrangementIndex <= 0,
+      run: () => onMoveArrangementBlock(-1)
+    },
+    {
+      id: "selected-block-move-right",
+      title: "Move selected block right",
+      detail: selectedBlock
+        ? selectedArrangementIndex < project.arrangement.length - 1
+          ? `${selectedBlockLabel} -> position ${selectedArrangementIndex + 2}`
+          : `${selectedBlockLabel} is already last.`
+        : "Select an arrangement block first.",
+      group: "Arrange",
+      keywords: "selected block move right later reorder arrangement song form edit beginner producer",
+      disabled: !selectedBlock || selectedArrangementIndex >= project.arrangement.length - 1,
+      run: () => onMoveArrangementBlock(1)
+    },
+    {
+      id: "selected-block-split",
+      title: "Split selected block",
+      detail:
+        selectedBlock && selectedBlockBars > 1
+          ? `${selectedBlockLabel} / ${selectedBlockSplitAfter}+${selectedBlockBars - selectedBlockSplitAfter} bars`
+          : selectedBlock
+            ? `${selectedBlockLabel} needs 2+ bars.`
+            : "Select an arrangement block first.",
+      group: "Arrange",
+      keywords: "selected block split arrangement bars section pattern song form edit beginner producer",
+      disabled: !selectedBlock || selectedBlockBars <= 1,
+      run: onSplitArrangementBlock
+    },
+    {
+      id: "selected-block-merge",
+      title: "Merge selected block with next",
+      detail:
+        selectedBlock && nextArrangementBlock
+          ? canMergeSelectedBlock
+            ? `${selectedBlockLabel} + ${nextArrangementBlock.section} Pattern ${nextArrangementBlock.pattern} / ${barCountLabel(
+                selectedBlockBars + nextArrangementBlockBars
+              )}`
+            : `${selectedBlockLabel} + next block exceeds ${maxArrangementBars} bars.`
+          : selectedBlock
+            ? `${selectedBlockLabel} has no next block.`
+            : "Select an arrangement block first.",
+      group: "Arrange",
+      keywords: "selected block merge next arrangement bars section pattern song form edit beginner producer",
+      disabled: !canMergeSelectedBlock,
+      run: onMergeArrangementBlock
+    },
+    {
+      id: "selected-block-delete",
+      title: "Delete selected block",
+      detail:
+        selectedBlock && project.arrangement.length > 1
+          ? `${selectedBlockLabel} / ${project.arrangement.length - 1} blocks remain`
+          : selectedBlock
+            ? "Arrangement needs at least one block."
+            : "Select an arrangement block first.",
+      group: "Arrange",
+      keywords: "selected block delete remove arrangement song form section pattern edit beginner producer",
+      disabled: !selectedBlock || project.arrangement.length <= 1,
+      run: onDeleteArrangementBlock
     }
   ];
   const arrangementMovePreset = selectedArrangementMoveQuickActionPreset(selectedBlock);
@@ -14005,6 +14150,7 @@ function createQuickActions({
       keywords: "melody turn fill pattern synth",
       run: () => onApplyPatternFill("melody_turn")
     },
+    ...selectedBlockActions,
     {
       id: "arrangement-move",
       title: arrangementMoveReady ? `Apply ${arrangementMoveLabel} Move` : "Apply Arrangement Move",
@@ -14392,10 +14538,12 @@ function createQuickActionResult(
     action.id === "midi-input-arm" ||
     action.id.startsWith("capture-target-") ||
     action.id.startsWith("capture-default-");
+  const blockClipboardOnly = action.id === "selected-block-copy";
   const noteClipboardOnly = action.id === "selected-note-copy";
   const drumClipboardOnly = action.id === "selected-drum-copy";
   const chordClipboardOnly = action.id === "selected-chord-copy";
-  const uiLocal = action.id.startsWith("mix-snapshot-") || inputSetupOnly || noteClipboardOnly || drumClipboardOnly || chordClipboardOnly;
+  const uiLocal =
+    action.id.startsWith("mix-snapshot-") || inputSetupOnly || blockClipboardOnly || noteClipboardOnly || drumClipboardOnly || chordClipboardOnly;
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
     id: afterMetric.id,
@@ -14416,7 +14564,7 @@ function createQuickActionResult(
           ? "Previewed"
           : focusOnly
             ? "Focused"
-            : noteClipboardOnly || drumClipboardOnly || chordClipboardOnly
+            : blockClipboardOnly || noteClipboardOnly || drumClipboardOnly || chordClipboardOnly
               ? "Copied"
               : uiLocal && action.id === "mix-snapshot-clear"
                 ? "Cleared"
@@ -14721,6 +14869,14 @@ function quickActionResultMetricSnapshot(
       id: "arrangement-move",
       label: "Arrangement move",
       value: `${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
+    };
+  }
+
+  if (action.id.startsWith("selected-block-")) {
+    return {
+      id: "selected-block",
+      label: "Selected block",
+      value: `${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`
     };
   }
 
@@ -15116,6 +15272,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Block loop; hear the selected block's energy and mute contrast against the surrounding song form.",
       nextCheck: "Use Arrangement Playback Readout, Song Form Overview, and Arrangement Focus before changing nearby blocks."
+    };
+  }
+
+  if (action.id === "selected-block-copy") {
+    return {
+      auditionCue: "Use Paste copied block when the copied section shape should repeat in the arrangement.",
+      nextCheck: "The arrangement block clipboard is UI-local; paste explicitly before changing to another editing task."
+    };
+  }
+
+  if (action.id.startsWith("selected-block-")) {
+    return {
+      auditionCue: "Play Song or Block loop to hear the selected block edit in the full song form.",
+      nextCheck: "Scan Song Form Overview and Arrangement Playback before the next structure edit."
     };
   }
 
