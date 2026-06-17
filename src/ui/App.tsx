@@ -13003,6 +13003,14 @@ function createQuickActions({
     run: () => onFocusComposerGuide(card)
   }));
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
+  const exportPreflightActions: QuickAction[] = exportPreflightSummary.cards.map((card) => ({
+    id: `export-preflight-card-${card.id}`,
+    title: `Focus Export Preflight: ${card.label}`,
+    detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
+    group: "Export",
+    keywords: `export preflight focus card delivery risk ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} readiness mix master deliverables handoff beginner producer`,
+    run: () => onFocusExportPreflight(card)
+  }));
   const finishChecklistCard = activeFinishChecklistQuickActionCard(finishChecklistSummary);
   const finishChecklistActions: QuickAction[] = finishChecklistSummary.cards.map((card) => ({
     id: `finish-checklist-card-${card.id}`,
@@ -14377,6 +14385,7 @@ function createQuickActions({
         }
       }
     },
+    ...exportPreflightActions,
     {
       id: "workflow-spotlight-focus",
       title: `Focus ${workflowSpotlight.zoneLabel}`,
@@ -14850,7 +14859,8 @@ function createQuickActionResult(
     action.id === "review-queue-focus" ||
     action.id.startsWith("review-queue-item-") ||
     action.id.startsWith("finish-checklist-card-") ||
-    action.id === "export-preflight-focus";
+    action.id === "export-preflight-focus" ||
+    action.id.startsWith("export-preflight-card-");
   const inputSetupOnly =
     action.id === "keyboard-capture-toggle" ||
     action.id === "midi-input-connect" ||
@@ -15316,6 +15326,14 @@ function quickActionResultMetricSnapshot(
       id: "export-preflight",
       label: "Export preflight",
       value: `${exportAnalysis.status} / ${activeDeliveryTarget(project).name}`
+    };
+  }
+
+  if (action.id.startsWith("export-preflight-card-")) {
+    return {
+      id: "export-preflight",
+      label: "Export preflight",
+      value: action.detail
     };
   }
 
@@ -15854,6 +15872,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Export Preflight card to inspect the current delivery risk before exporting.",
       nextCheck: "Return to Export Preflight after the focused readiness, mix, deliverable, or handoff item looks clear."
+    };
+  }
+
+  if (action.id.startsWith("export-preflight-card-")) {
+    return {
+      auditionCue: "Use the focused Export Preflight card to inspect that delivery-risk lane before exporting.",
+      nextCheck: "Return to Export Preflight when you need another direct readiness, mix, deliverable, or handoff focus."
     };
   }
 
