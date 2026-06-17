@@ -7275,6 +7275,7 @@ export function App(): ReactElement {
     onTapTempo: tapProjectTempo,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onRequestMidiInputAccess: requestMidiInputAccess,
+    onCuePattern: cuePattern,
     onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
     onUsePatternInSelectedBlock: usePatternInSelectedBlock,
@@ -12679,6 +12680,7 @@ function createQuickActions({
   onTapTempo,
   onPreviewBlueprint,
   onRequestMidiInputAccess,
+  onCuePattern,
   onSelectPattern,
   onSelectStyle,
   onUsePatternInSelectedBlock,
@@ -12833,6 +12835,7 @@ function createQuickActions({
   onTapTempo: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onRequestMidiInputAccess: () => Promise<void>;
+  onCuePattern: (pattern: PatternSlot) => void;
   onSelectPattern: (pattern: PatternSlot) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
   onUsePatternInSelectedBlock: (pattern: PatternSlot) => void;
@@ -13672,6 +13675,20 @@ function createQuickActions({
       run: () => onSelectStyle(profile.id)
     };
   });
+  const patternCueActions: QuickAction[] = patternSlots.map((pattern) => {
+    const cued = pattern === project.selectedPattern && transportLoopScope === "pattern";
+    const eventCount = patternEventTotal(project.patterns[pattern]);
+    return {
+      id: `pattern-cue-${pattern.toLowerCase()}`,
+      title: cued ? `Pattern ${pattern} loop already cued` : `Cue Pattern ${pattern} loop`,
+      detail: cued
+        ? `Pattern ${pattern} loop scope / ${eventCount} events`
+        : `Pattern ${pattern} / ${eventCount} events / prepares Pattern loop`,
+      group: "Transport",
+      keywords: `pattern cue preview audition loop transport compare ${pattern} a b c variation listen beginner producer`,
+      run: () => onCuePattern(pattern)
+    };
+  });
   const patternSwitchActions: QuickAction[] = patternSlots.map((pattern) => {
     const selected = pattern === project.selectedPattern;
     const eventCount = patternEventTotal(project.patterns[pattern]);
@@ -13767,6 +13784,7 @@ function createQuickActions({
       run: onTapTempo
     },
     ...tempoNudgeActions,
+    ...patternCueActions,
     ...patternSwitchActions,
     {
       id: "midi-input-connect",
@@ -14657,6 +14675,7 @@ function createQuickActionResult(
     action.id === "key-compass-focus" ||
     action.id === "groove-compass-focus" ||
     action.id === "pattern-dna-focus" ||
+    action.id.startsWith("pattern-cue-") ||
     action.id.startsWith("pattern-switch-") ||
     action.id === "workflow-spotlight-focus" ||
     action.id === "review-queue-focus" ||
@@ -14878,6 +14897,14 @@ function quickActionResultMetricSnapshot(
       id: "pattern-switch",
       label: "Edit pattern",
       value: `Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
+    };
+  }
+
+  if (action.id.startsWith("pattern-cue-")) {
+    return {
+      id: "pattern-cue",
+      label: "Pattern cue",
+      value: `Loop Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
     };
   }
 
@@ -15369,6 +15396,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm this variation's drums, 808, chords, and Synth before editing.`,
       nextCheck: "Use Pattern Compare, Pattern DNA, Pattern Clone, or Pattern Chain when the selected variation should feed the arrangement."
+    };
+  }
+
+  if (action.id.startsWith("pattern-cue-")) {
+    return {
+      auditionCue: `Play Pattern loop; compare Pattern ${project.selectedPattern}'s drums, 808, chords, and Synth before editing or arranging.`,
+      nextCheck: "Use Pattern Switch to edit the cued variation or Pattern Use to place it into the selected arrangement block."
     };
   }
 
