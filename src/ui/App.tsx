@@ -7165,6 +7165,7 @@ export function App(): ReactElement {
     grooveCompassSummary,
     isPlaying,
     keyCompassSummary,
+    patternDnaSummary,
     playbackMode,
     project,
     exportPreflightSummary,
@@ -7189,6 +7190,7 @@ export function App(): ReactElement {
     onFocusExportPreflight: focusExportPreflightCard,
     onFocusGrooveCompass: focusGrooveCompassItem,
     onFocusKeyCompass: focusKeyCompassItem,
+    onFocusPatternDna: focusPatternDnaCard,
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusSessionPass: focusSessionPassCard,
     onFocusWorkflowSpotlight: jumpToWorkflowZone,
@@ -11723,6 +11725,10 @@ function activeGrooveCompassQuickActionItem(summary: GrooveCompassSummary): Groo
   );
 }
 
+function activePatternDnaQuickActionCard(summary: PatternDnaSummary): PatternDnaCard | null {
+  return summary.cards.find((card) => card.tone !== "good") ?? summary.cards[0] ?? null;
+}
+
 function activeExportPreflightQuickActionCard(summary: ExportPreflightSummary): ExportPreflightCard | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
@@ -12210,6 +12216,7 @@ function createQuickActions({
   grooveCompassSummary,
   isPlaying,
   keyCompassSummary,
+  patternDnaSummary,
   playbackMode,
   project,
   exportPreflightSummary,
@@ -12234,6 +12241,7 @@ function createQuickActions({
   onFocusExportPreflight,
   onFocusGrooveCompass,
   onFocusKeyCompass,
+  onFocusPatternDna,
   onFocusReviewQueue,
   onFocusSessionPass,
   onFocusWorkflowSpotlight,
@@ -12251,6 +12259,7 @@ function createQuickActions({
   grooveCompassSummary: GrooveCompassSummary;
   isPlaying: boolean;
   keyCompassSummary: KeyCompassSummary;
+  patternDnaSummary: PatternDnaSummary;
   playbackMode: PlaybackMode;
   project: ProjectState;
   exportPreflightSummary: ExportPreflightSummary;
@@ -12275,6 +12284,7 @@ function createQuickActions({
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
+  onFocusPatternDna: (card: PatternDnaCard) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
   onFocusWorkflowSpotlight: (zone: WorkflowZoneId) => void;
@@ -12294,6 +12304,7 @@ function createQuickActions({
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
   const grooveCompassItem = activeGrooveCompassQuickActionItem(grooveCompassSummary);
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
+  const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
@@ -12404,6 +12415,19 @@ function createQuickActions({
       run: () => {
         if (grooveCompassItem) {
           onFocusGrooveCompass(grooveCompassItem);
+        }
+      }
+    },
+    {
+      id: "pattern-dna-focus",
+      title: patternDnaCard ? `Focus Pattern DNA: ${patternDnaCard.label}` : "Focus Pattern DNA",
+      detail: patternDnaCard ? `${patternDnaCard.value} / ${patternDnaCard.focusLabel}` : "No Pattern DNA card available.",
+      group: "Create",
+      keywords: `pattern dna focus loop layers density variation arrangement inspect ${patternDnaCard?.id ?? "none"} ${patternDnaCard?.focusLabel ?? "none"} beginner producer`,
+      disabled: !patternDnaCard,
+      run: () => {
+        if (patternDnaCard) {
+          onFocusPatternDna(patternDnaCard);
         }
       }
     },
@@ -12743,6 +12767,7 @@ function createQuickActionResult(
     action.id === "composer-guide-focus" ||
     action.id === "key-compass-focus" ||
     action.id === "groove-compass-focus" ||
+    action.id === "pattern-dna-focus" ||
     action.id === "workflow-spotlight-focus" ||
     action.id === "review-queue-focus" ||
     action.id === "export-preflight-focus";
@@ -12808,6 +12833,14 @@ function quickActionResultMetricSnapshot(
       id: "groove-compass",
       label: "Groove compass",
       value: `Pattern ${project.selectedPattern} / ${drumHitCount(activePattern(project))} hits`
+    };
+  }
+
+  if (action.id === "pattern-dna-focus") {
+    return {
+      id: "pattern-dna",
+      label: "Pattern DNA",
+      value: `Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
     };
   }
 
@@ -12939,6 +12972,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Groove Compass card to inspect rhythm density, anchors, hats, timing, or chance before editing drums.",
       nextCheck: "Return to Groove Compass after the focused pocket lane changes."
+    };
+  }
+
+  if (action.id === "pattern-dna-focus") {
+    return {
+      auditionCue: "Use the focused Pattern DNA card to inspect layers, density, variation, or arrangement use before changing the loop.",
+      nextCheck: "Return to Pattern DNA after the focused loop or arrangement lane changes."
     };
   }
 
