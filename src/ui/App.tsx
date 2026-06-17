@@ -7226,6 +7226,7 @@ export function App(): ReactElement {
     onApplyChordPad: applyChordPad,
     onApplyChordRhythm: applyChordRhythm,
     onApplyChordVoicing: applyChordVoicingPad,
+    onAlignDeliveryTarget: alignDeliveryTarget,
     onApplyDrumAccent: applyDrumAccent,
     onApplyDrumFoundation: applyDrumFoundation,
     onApplyDrumKit: applyDrumKitPad,
@@ -12541,6 +12542,7 @@ function createQuickActions({
   onApplyChordPad,
   onApplyChordRhythm,
   onApplyChordVoicing,
+  onAlignDeliveryTarget,
   onApplyDrumAccent,
   onApplyDrumFoundation,
   onApplyDrumKit,
@@ -12633,6 +12635,7 @@ function createQuickActions({
   onApplyChordPad: (pad: ChordPadId) => void;
   onApplyChordRhythm: (rhythm: ChordRhythmId) => void;
   onApplyChordVoicing: (voicing: ChordVoicingId) => void;
+  onAlignDeliveryTarget: (target: DeliveryTargetId) => void;
   onApplyDrumAccent: (accent: DrumAccentId) => void;
   onApplyDrumFoundation: (foundation: DrumFoundationId) => void;
   onApplyDrumKit: (pad: DrumKitPadId) => void;
@@ -12703,6 +12706,9 @@ function createQuickActions({
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
   const styleInspectorItem = activeStyleInspectorQuickActionItem(styleInspectorSummary, project);
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
+  const deliveryTarget = activeDeliveryTarget(project);
+  const deliveryTargetAlignmentPreview = createDeliveryTargetAlignmentPreview(project, deliveryTarget);
+  const deliveryTargetAlignReady = !isDeliveryTargetAligned(project, deliveryTarget);
   const arrangementTemplateId =
     arrangementTemplatePreviewSummary.templateId === "aligned" ? null : arrangementTemplatePreviewSummary.templateId;
   const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
@@ -12784,6 +12790,21 @@ function createQuickActions({
       group: "Project",
       keywords: `session pass focus guided studio next workflow ${sessionPassCard.id} ${sessionPassCard.focusLabel} beginner producer`,
       run: () => onFocusSessionPass(sessionPassCard)
+    },
+    {
+      id: "delivery-target-align",
+      title: deliveryTargetAlignReady ? `Align ${deliveryTarget.name} target` : "Align Delivery Target",
+      detail: deliveryTargetAlignReady
+        ? `${deliveryTargetAlignmentPreview.statusLabel} / ${deliveryTargetAlignmentPreview.lengthLabel} / ${deliveryTargetAlignmentPreview.masterLabel}`
+        : `${deliveryTarget.name} target already aligned.`,
+      group: "Project",
+      keywords: `delivery target align handoff export session goal length arrangement master mix stems ${deliveryTarget.id} ${deliveryTarget.name} ${deliveryTargetAlignmentPreview.statusLabel} beginner producer`,
+      disabled: !deliveryTargetAlignReady,
+      run: () => {
+        if (deliveryTargetAlignReady) {
+          onAlignDeliveryTarget(deliveryTarget.id);
+        }
+      }
     },
     {
       id: "mode-focus-jump",
@@ -13540,6 +13561,14 @@ function quickActionResultMetricSnapshot(
     return { id: "session-pass", label: "Session pass", value: `${project.mode} mode` };
   }
 
+  if (action.id === "delivery-target-align") {
+    return {
+      id: "delivery-target",
+      label: "Delivery target",
+      value: `${activeDeliveryTarget(project).name} / ${barCountLabel(arrangementTotalBars(project))} / ${deliveryTargetMasterLabel(project)}`
+    };
+  }
+
   if (action.id === "mode-focus-jump") {
     return {
       id: "mode-focus",
@@ -13829,6 +13858,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused workstation panel to inspect the highlighted Session Pass target.",
       nextCheck: "Run the visible Session Pass Focus cards when you want another guided, studio, finish, or delivery jump."
+    };
+  }
+
+  if (action.id === "delivery-target-align") {
+    return {
+      auditionCue: "Play Song loop; check arrangement length, hook energy, and Full Mix export posture against the active target.",
+      nextCheck: "Use the Delivery Target Alignment Result, Export Preflight, and Handoff Pack before exporting files."
     };
   }
 
