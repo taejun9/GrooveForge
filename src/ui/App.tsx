@@ -7194,6 +7194,7 @@ export function App(): ReactElement {
     grooveCompassSummary,
     isPlaying,
     keyCompassSummary,
+    keyboardCaptureDefaults,
     keyboardCaptureTarget,
     layerStarterOptions,
     listeningPassSummary,
@@ -7261,6 +7262,7 @@ export function App(): ReactElement {
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onRequestMidiInputAccess: requestMidiInputAccess,
     onSetKeyboardCaptureTarget: setKeyboardCaptureTarget,
+    onUpdateKeyboardCaptureDefaults: updateKeyboardCaptureDefaults,
     onSetMidiCaptureArmed: setMidiCaptureArmed,
     onExportHandoffSheet: handleExportHandoffSheet,
     onExportMidi: handleExportMidi,
@@ -12554,6 +12556,7 @@ function createQuickActions({
   grooveCompassSummary,
   isPlaying,
   keyCompassSummary,
+  keyboardCaptureDefaults,
   keyboardCaptureTarget,
   layerStarterOptions,
   listeningPassSummary,
@@ -12621,6 +12624,7 @@ function createQuickActions({
   onPreviewBlueprint,
   onRequestMidiInputAccess,
   onSetKeyboardCaptureTarget,
+  onUpdateKeyboardCaptureDefaults,
   onSetMidiCaptureArmed,
   onExportHandoffSheet,
   onExportMidi,
@@ -12664,6 +12668,7 @@ function createQuickActions({
   grooveCompassSummary: GrooveCompassSummary;
   isPlaying: boolean;
   keyCompassSummary: KeyCompassSummary;
+  keyboardCaptureDefaults: Record<NoteTrack, KeyboardCaptureDefaults>;
   keyboardCaptureTarget: NoteTrack;
   layerStarterOptions: LayerStarterOption[];
   listeningPassSummary: ListeningPassSummary;
@@ -12731,6 +12736,7 @@ function createQuickActions({
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onRequestMidiInputAccess: () => Promise<void>;
   onSetKeyboardCaptureTarget: (target: NoteTrack) => void;
+  onUpdateKeyboardCaptureDefaults: (update: Partial<KeyboardCaptureDefaults>) => void;
   onSetMidiCaptureArmed: (armed: boolean) => void;
   onExportHandoffSheet: () => void;
   onExportMidi: () => void;
@@ -12798,6 +12804,12 @@ function createQuickActions({
     midiCaptureStatus !== "denied" &&
     connectedMidiInputCount > 0;
   const midiInputArmTitle = midiCaptureArmed ? "Disarm MIDI input" : "Arm MIDI input";
+  const activeCaptureDefaults = keyboardCaptureDefaults[keyboardCaptureTarget];
+  const [minCaptureOctave, maxCaptureOctave] = trackOctaveRange(keyboardCaptureTarget);
+  const shorterCaptureLength = clampStepLength(activeCaptureDefaults.length - 1);
+  const longerCaptureLength = clampStepLength(activeCaptureDefaults.length + 1);
+  const softerSynthVelocity = clampVelocity(activeCaptureDefaults.velocity - 0.1);
+  const louderSynthVelocity = clampVelocity(activeCaptureDefaults.velocity + 0.1);
   const captureTargetActions: QuickAction[] = [
     { id: "capture-target-bass", target: "bass" as NoteTrack, targetLabel: "808" },
     { id: "capture-target-melody", target: "melody" as NoteTrack, targetLabel: "Synth" }
@@ -12812,6 +12824,86 @@ function createQuickActions({
       run: () => onSetKeyboardCaptureTarget(target)
     };
   });
+  const captureDefaultActions: QuickAction[] = [
+    {
+      id: "capture-default-octave-down",
+      title: "Capture octave down",
+      detail: `${keyboardCaptureTargetLabel} octave ${activeCaptureDefaults.octave} -> ${Math.max(
+        minCaptureOctave,
+        activeCaptureDefaults.octave - 1
+      )} / Pattern ${project.selectedPattern}`,
+      group: "Create",
+      keywords: `capture default octave down lower keyboard midi input notes ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} beginner producer`,
+      disabled: activeCaptureDefaults.octave <= minCaptureOctave,
+      run: () => onUpdateKeyboardCaptureDefaults({ octave: activeCaptureDefaults.octave - 1 })
+    },
+    {
+      id: "capture-default-octave-up",
+      title: "Capture octave up",
+      detail: `${keyboardCaptureTargetLabel} octave ${activeCaptureDefaults.octave} -> ${Math.min(
+        maxCaptureOctave,
+        activeCaptureDefaults.octave + 1
+      )} / Pattern ${project.selectedPattern}`,
+      group: "Create",
+      keywords: `capture default octave up higher keyboard midi input notes ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} beginner producer`,
+      disabled: activeCaptureDefaults.octave >= maxCaptureOctave,
+      run: () => onUpdateKeyboardCaptureDefaults({ octave: activeCaptureDefaults.octave + 1 })
+    },
+    {
+      id: "capture-default-length-short",
+      title: "Shorten capture length",
+      detail: `${keyboardCaptureTargetLabel} length ${activeCaptureDefaults.length} -> ${shorterCaptureLength} steps / Pattern ${project.selectedPattern}`,
+      group: "Create",
+      keywords: `capture default length shorter short keyboard midi input notes ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} beginner producer`,
+      disabled: activeCaptureDefaults.length <= 1,
+      run: () => onUpdateKeyboardCaptureDefaults({ length: activeCaptureDefaults.length - 1 })
+    },
+    {
+      id: "capture-default-length-long",
+      title: "Lengthen capture length",
+      detail: `${keyboardCaptureTargetLabel} length ${activeCaptureDefaults.length} -> ${longerCaptureLength} steps / Pattern ${project.selectedPattern}`,
+      group: "Create",
+      keywords: `capture default length longer long keyboard midi input notes ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} beginner producer`,
+      disabled: activeCaptureDefaults.length >= 16,
+      run: () => onUpdateKeyboardCaptureDefaults({ length: activeCaptureDefaults.length + 1 })
+    },
+    {
+      id: "capture-default-velocity-down",
+      title: "Lower Synth capture velocity",
+      detail:
+        keyboardCaptureTarget === "melody"
+          ? `Synth velocity ${percentLabel(activeCaptureDefaults.velocity)} -> ${percentLabel(softerSynthVelocity)}`
+          : "Switch capture target to Synth to edit velocity defaults.",
+      group: "Create",
+      keywords: "capture default synth velocity lower softer keyboard midi input melody notes beginner producer",
+      disabled: keyboardCaptureTarget !== "melody" || activeCaptureDefaults.velocity <= 0,
+      run: () => onUpdateKeyboardCaptureDefaults({ velocity: activeCaptureDefaults.velocity - 0.1 })
+    },
+    {
+      id: "capture-default-velocity-up",
+      title: "Raise Synth capture velocity",
+      detail:
+        keyboardCaptureTarget === "melody"
+          ? `Synth velocity ${percentLabel(activeCaptureDefaults.velocity)} -> ${percentLabel(louderSynthVelocity)}`
+          : "Switch capture target to Synth to edit velocity defaults.",
+      group: "Create",
+      keywords: "capture default synth velocity raise louder keyboard midi input melody notes beginner producer",
+      disabled: keyboardCaptureTarget !== "melody" || activeCaptureDefaults.velocity >= 1,
+      run: () => onUpdateKeyboardCaptureDefaults({ velocity: activeCaptureDefaults.velocity + 0.1 })
+    },
+    {
+      id: "capture-default-glide-toggle",
+      title: activeCaptureDefaults.glide ? "Turn 808 capture glide off" : "Turn 808 capture glide on",
+      detail:
+        keyboardCaptureTarget === "bass"
+          ? `808 captured notes will use glide ${activeCaptureDefaults.glide ? "Off" : "On"} next.`
+          : "Switch capture target to 808 to edit glide defaults.",
+      group: "Create",
+      keywords: "capture default 808 bass glide toggle slide keyboard midi input notes beginner producer",
+      disabled: keyboardCaptureTarget !== "bass",
+      run: () => onUpdateKeyboardCaptureDefaults({ glide: !activeCaptureDefaults.glide })
+    }
+  ];
   const arrangementMovePreset = selectedArrangementMoveQuickActionPreset(selectedBlock);
   const arrangementMoveReady = Boolean(
     selectedBlock && arrangementMovePreset && !isArrangementMovePresetApplied(selectedBlock, arrangementMovePreset)
@@ -12898,6 +12990,7 @@ function createQuickActions({
       run: onRequestMidiInputAccess
     },
     ...captureTargetActions,
+    ...captureDefaultActions,
     {
       id: "midi-input-arm",
       title: midiInputArmTitle,
@@ -13762,7 +13855,10 @@ function createQuickActionResult(
     action.id === "review-queue-focus" ||
     action.id === "export-preflight-focus";
   const inputSetupOnly =
-    action.id === "midi-input-connect" || action.id === "midi-input-arm" || action.id.startsWith("capture-target-");
+    action.id === "midi-input-connect" ||
+    action.id === "midi-input-arm" ||
+    action.id.startsWith("capture-target-") ||
+    action.id.startsWith("capture-default-");
   const uiLocal = action.id.startsWith("mix-snapshot-") || inputSetupOnly;
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
@@ -13828,7 +13924,7 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "midi-input-arm" || action.id.startsWith("capture-target-")) {
+  if (action.id === "midi-input-arm" || action.id.startsWith("capture-target-") || action.id.startsWith("capture-default-")) {
     return {
       id: "input-capture",
       label: "Input capture",
@@ -14194,6 +14290,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play desktop keys or a MIDI controller only after confirming the intended 808 or Synth target is selected.",
       nextCheck: "Check the Keyboard Capture target, octave/length defaults, and Web MIDI target before entering the next phrase."
+    };
+  }
+
+  if (action.id.startsWith("capture-default-")) {
+    return {
+      auditionCue: "Play desktop keys or a MIDI controller after confirming the new octave, length, velocity, or glide default.",
+      nextCheck: "Captured defaults affect only the next Keyboard Capture or Web MIDI notes; existing notes stay editable in the grid."
     };
   }
 
