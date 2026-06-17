@@ -7169,6 +7169,7 @@ export function App(): ReactElement {
     keyCompassSummary,
     layerStarterOptions,
     listeningPassSummary,
+    modeFocusSummary,
     patternDnaSummary,
     playbackMode,
     project,
@@ -7200,6 +7201,7 @@ export function App(): ReactElement {
     onFocusGrooveCompass: focusGrooveCompassItem,
     onFocusKeyCompass: focusKeyCompassItem,
     onFocusListeningPass: focusListeningPassItem,
+    onFocusModeFocus: focusModeFocusCard,
     onFocusPatternDna: focusPatternDnaCard,
     onFocusProductionSnapshot: focusProductionSnapshotMetric,
     onFocusReviewQueue: focusReviewQueueItem,
@@ -11719,6 +11721,11 @@ function activeSessionPassQuickActionCard(summary: SessionPassSummary): SessionP
   return summary.mode === "guided" ? summary.cards[0] : summary.cards[1];
 }
 
+function activeModeFocusQuickActionCard(summary: ModeFocusSummary): ModeFocusCard | null {
+  const preferredId = summary.mode === "guided" ? "stage" : "issue";
+  return summary.cards.find((card) => card.id === preferredId) ?? summary.cards[0] ?? null;
+}
+
 function activeKeyCompassQuickActionItem(summary: KeyCompassSummary): KeyCompassFocusItem | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
@@ -12275,6 +12282,7 @@ function createQuickActions({
   keyCompassSummary,
   layerStarterOptions,
   listeningPassSummary,
+  modeFocusSummary,
   patternDnaSummary,
   playbackMode,
   project,
@@ -12306,6 +12314,7 @@ function createQuickActions({
   onFocusGrooveCompass,
   onFocusKeyCompass,
   onFocusListeningPass,
+  onFocusModeFocus,
   onFocusPatternDna,
   onFocusProductionSnapshot,
   onFocusReviewQueue,
@@ -12330,6 +12339,7 @@ function createQuickActions({
   keyCompassSummary: KeyCompassSummary;
   layerStarterOptions: LayerStarterOption[];
   listeningPassSummary: ListeningPassSummary;
+  modeFocusSummary: ModeFocusSummary;
   patternDnaSummary: PatternDnaSummary;
   playbackMode: PlaybackMode;
   project: ProjectState;
@@ -12361,6 +12371,7 @@ function createQuickActions({
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
   onFocusListeningPass: (item: ListeningPassItem) => void;
+  onFocusModeFocus: (card: ModeFocusCard) => void;
   onFocusPatternDna: (card: PatternDnaCard) => void;
   onFocusProductionSnapshot: (metric: ProductionSnapshotFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
@@ -12387,6 +12398,7 @@ function createQuickActions({
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
   const listeningPassItem = activeListeningPassQuickActionItem(listeningPassSummary);
+  const modeFocusCard = activeModeFocusQuickActionCard(modeFocusSummary);
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
   const productionSnapshotMetric = activeProductionSnapshotQuickActionMetric(productionSnapshotSummary);
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
@@ -12463,6 +12475,19 @@ function createQuickActions({
       group: "Project",
       keywords: `session pass focus guided studio next workflow ${sessionPassCard.id} ${sessionPassCard.focusLabel} beginner producer`,
       run: () => onFocusSessionPass(sessionPassCard)
+    },
+    {
+      id: "mode-focus-jump",
+      title: modeFocusCard ? `Jump Mode Focus: ${modeFocusCard.label}` : "Jump Mode Focus",
+      detail: modeFocusCard ? `${modeFocusCard.value} / ${modeFocusCard.focusLabel}` : "No Mode Focus card available.",
+      group: "Project",
+      keywords: `mode focus jump guided studio orientation stage issue session handoff ${modeFocusCard?.id ?? "none"} ${modeFocusCard?.focusLabel ?? "none"} beginner producer`,
+      disabled: !modeFocusCard,
+      run: () => {
+        if (modeFocusCard) {
+          onFocusModeFocus(modeFocusCard);
+        }
+      }
     },
     {
       id: "composer-guide-focus",
@@ -12977,6 +13002,14 @@ function quickActionResultMetricSnapshot(
     return { id: "session-pass", label: "Session pass", value: `${project.mode} mode` };
   }
 
+  if (action.id === "mode-focus-jump") {
+    return {
+      id: "mode-focus",
+      label: "Mode focus",
+      value: `${project.mode} / ${project.selectedPattern}`
+    };
+  }
+
   if (action.id === "composer-guide-focus") {
     return {
       id: "composer-guide",
@@ -13165,6 +13198,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused workstation panel to inspect the highlighted Session Pass target.",
       nextCheck: "Run the visible Session Pass Focus cards when you want another guided, studio, finish, or delivery jump."
+    };
+  }
+
+  if (action.id === "mode-focus-jump") {
+    return {
+      auditionCue: "Use the jumped Mode Focus panel to inspect the current Guided stage or Studio issue before running edits.",
+      nextCheck: "Return to Mode Focus after the current orientation card is ready or intentionally deferred."
     };
   }
 
