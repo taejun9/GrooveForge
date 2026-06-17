@@ -614,6 +614,48 @@ type MixFixResult = {
   tone: MixCoachTone;
 };
 
+type MixSnapshotSlotId = "A" | "B";
+
+type MixSnapshotSlotMap = Record<MixSnapshotSlotId, MixSnapshot | null>;
+
+type MixSnapshot = {
+  slot: MixSnapshotSlotId;
+  capturedAtLabel: string;
+  projectTitle: string;
+  statusLabel: string;
+  exportLabel: string;
+  headroomDb: number;
+  limitedPercent: number;
+  peakDb: number;
+  rmsDb: number;
+  balanceSpreadDb: number | null;
+  balanceLabel: string;
+  masterLabel: string;
+  stemLabel: string;
+  audibleStemCount: number;
+  score: number;
+  tone: MixCoachTone;
+};
+
+type MixSnapshotMetricId = "headroom" | "balance" | "master" | "stems";
+
+type MixSnapshotComparisonMetric = {
+  id: MixSnapshotMetricId;
+  label: string;
+  aLabel: string;
+  bLabel: string;
+  tone: MixCoachTone;
+};
+
+type MixSnapshotComparisonSummary = {
+  statusLabel: string;
+  winnerLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+  metrics: MixSnapshotComparisonMetric[];
+};
+
 type MixBalancePadId = "clean" | "vocal" | "club" | "wide";
 
 type MixBalanceChannelUpdate = Partial<
@@ -2977,6 +3019,7 @@ export function App(): ReactElement {
   const [drumKitResult, setDrumKitResult] = useState<DrumKitResult | null>(null);
   const [masterFinishResult, setMasterFinishResult] = useState<MasterFinishResult | null>(null);
   const [mixBalanceResult, setMixBalanceResult] = useState<MixBalanceResult | null>(null);
+  const [mixSnapshots, setMixSnapshots] = useState<MixSnapshotSlotMap>({ A: null, B: null });
   const [spaceFxResult, setSpaceFxResult] = useState<SpaceFxResult | null>(null);
   const [mixFixResult, setMixFixResult] = useState<MixFixResult | null>(null);
   const [deliveryTargetAlignmentResult, setDeliveryTargetAlignmentResult] = useState<DeliveryTargetAlignmentResult | null>(null);
@@ -3101,6 +3144,7 @@ export function App(): ReactElement {
     () => createMixBalancePreviewSummary(project.mixer, mixBalancePadOptions),
     [project.mixer, mixBalancePadOptions]
   );
+  const mixSnapshotComparison = useMemo(() => createMixSnapshotComparison(mixSnapshots), [mixSnapshots]);
   const spaceFxPadOptions = useMemo(() => createSpaceFxPadOptions(project.mixer), [project.mixer]);
   const stemAuditionPadOptions = useMemo(() => createStemAuditionPadOptions(project.mixer), [project.mixer]);
   const stemAuditionReadout = useMemo(() => createStemAuditionReadoutSummary(project.mixer), [project.mixer]);
@@ -3790,6 +3834,7 @@ export function App(): ReactElement {
     setDrumKitResult(null);
     setMasterFinishResult(null);
     setMixBalanceResult(null);
+    setMixSnapshots({ A: null, B: null });
     setSpaceFxResult(null);
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
@@ -4631,6 +4676,21 @@ export function App(): ReactElement {
     if (!changed) {
       setProjectStatus(`${pad.label} stem audition already selected`);
     }
+  }
+
+  function captureMixSnapshot(slot: MixSnapshotSlotId): void {
+    const snapshot = createMixSnapshot(slot, projectRef.current, exportAnalysis, stemAnalyses);
+    setMixSnapshots((current) => ({ ...current, [slot]: snapshot }));
+    setProjectStatus(`Captured Mix Snapshot ${slot}: ${snapshot.statusLabel}`);
+  }
+
+  function clearMixSnapshots(): void {
+    if (!mixSnapshots.A && !mixSnapshots.B) {
+      setProjectStatus("Mix Snapshot A/B already clear");
+      return;
+    }
+    setMixSnapshots({ A: null, B: null });
+    setProjectStatus("Cleared Mix Snapshot A/B");
   }
 
   function applyMixBalancePad(padId: MixBalancePadId): void {
@@ -8004,6 +8064,12 @@ export function App(): ReactElement {
             <strong data-testid="stem-audition-label">{stemAuditionReadout.roleLabel}</strong>
             <small data-testid="stem-audition-detail">{stemAuditionReadout.detailLabel}</small>
           </div>
+          <MixSnapshotAB
+            snapshots={mixSnapshots}
+            summary={mixSnapshotComparison}
+            onCapture={captureMixSnapshot}
+            onClear={clearMixSnapshots}
+          />
           <div className="mixer-strips">
             {project.mixer.map((channel) => {
               const roleSummary = mixerChannelRoleSummary(channel);
@@ -17729,6 +17795,103 @@ function StemAuditionPads({
   );
 }
 
+function MixSnapshotAB({
+  snapshots,
+  summary,
+  onCapture,
+  onClear
+}: {
+  snapshots: MixSnapshotSlotMap;
+  summary: MixSnapshotComparisonSummary;
+  onCapture: (slot: MixSnapshotSlotId) => void;
+  onClear: () => void;
+}): ReactElement {
+  const slotIds: MixSnapshotSlotId[] = ["A", "B"];
+
+  return (
+    <div className={`mix-snapshot-ab ${summary.tone}`} data-testid="mix-snapshot-ab">
+      <div className="mix-snapshot-head">
+        <span>Mix Snapshot A/B</span>
+        <strong>Safer pass</strong>
+        <div className="mix-snapshot-actions" aria-label="Mix Snapshot A/B actions">
+          <button
+            data-testid="mix-snapshot-capture-a"
+            onClick={() => onCapture("A")}
+            title="Capture current mix as Snapshot A"
+            type="button"
+          >
+            <Save size={13} aria-hidden="true" />
+            <span>Capture A</span>
+          </button>
+          <button
+            data-testid="mix-snapshot-capture-b"
+            onClick={() => onCapture("B")}
+            title="Capture current mix as Snapshot B"
+            type="button"
+          >
+            <Copy size={13} aria-hidden="true" />
+            <span>Capture B</span>
+          </button>
+          <button data-testid="mix-snapshot-clear" onClick={onClear} title="Clear Mix Snapshot A/B" type="button">
+            <X size={13} aria-hidden="true" />
+            <span>Clear</span>
+          </button>
+        </div>
+      </div>
+      <div className={`mix-snapshot-status ${summary.tone}`} data-testid="mix-snapshot-status-card" title={summary.detailTitle}>
+        <span data-testid="mix-snapshot-status">{summary.statusLabel}</span>
+        <strong data-testid="mix-snapshot-winner">{summary.winnerLabel}</strong>
+        <small data-testid="mix-snapshot-detail">{summary.detailLabel}</small>
+      </div>
+      <div className="mix-snapshot-slots">
+        {slotIds.map((slot) => (
+          <MixSnapshotSlotCard key={slot} snapshot={snapshots[slot]} slot={slot} />
+        ))}
+      </div>
+      <div className="mix-snapshot-metrics" data-testid="mix-snapshot-metrics">
+        {summary.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`mix-snapshot-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em data-testid={`mix-snapshot-metric-${metric.id}-a`}>A {metric.aLabel}</em>
+            <em data-testid={`mix-snapshot-metric-${metric.id}-b`}>B {metric.bLabel}</em>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MixSnapshotSlotCard({
+  snapshot,
+  slot
+}: {
+  snapshot: MixSnapshot | null;
+  slot: MixSnapshotSlotId;
+}): ReactElement {
+  const testSlot = slot.toLowerCase();
+  if (!snapshot) {
+    return (
+      <div className="mix-snapshot-slot empty" data-testid={`mix-snapshot-slot-${testSlot}`}>
+        <span data-testid={`mix-snapshot-slot-${testSlot}-time`}>Mix {slot}</span>
+        <strong data-testid={`mix-snapshot-slot-${testSlot}-export`}>Empty slot</strong>
+        <small data-testid={`mix-snapshot-slot-${testSlot}-master`}>No master pass</small>
+        <small data-testid={`mix-snapshot-slot-${testSlot}-balance`}>No balance pass</small>
+        <small data-testid={`mix-snapshot-slot-${testSlot}-stems`}>No stem pass</small>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`mix-snapshot-slot ${snapshot.tone}`} data-testid={`mix-snapshot-slot-${testSlot}`}>
+      <span data-testid={`mix-snapshot-slot-${testSlot}-time`}>Mix {slot} / {snapshot.capturedAtLabel}</span>
+      <strong data-testid={`mix-snapshot-slot-${testSlot}-export`}>{snapshot.exportLabel}</strong>
+      <small data-testid={`mix-snapshot-slot-${testSlot}-master`}>{snapshot.masterLabel}</small>
+      <small data-testid={`mix-snapshot-slot-${testSlot}-balance`}>{snapshot.balanceLabel}</small>
+      <small data-testid={`mix-snapshot-slot-${testSlot}-stems`}>{snapshot.stemLabel}</small>
+    </div>
+  );
+}
+
 function MasterFinishPads({
   pads,
   preview,
@@ -17967,6 +18130,193 @@ function MixFixResultStrip({ result }: { result: MixFixResult }): ReactElement {
       </div>
     </div>
   );
+}
+
+function createMixSnapshot(
+  slot: MixSnapshotSlotId,
+  project: ProjectState,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): MixSnapshot {
+  const balanceSpreadDb = stemSpreadDb(stemAnalyses);
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const mixTone = weakestTone(createMixCoachChecks(analysis, stemAnalyses).map((check) => check.tone));
+  const limitedLabel = analysis.limitedSamples > 0 ? ` / L ${formatPercent(analysis.limitedPercent)}` : "";
+  const balanceLabel =
+    balanceSpreadDb === null ? "Balance needs 2 stems" : `${balanceSpreadDb.toFixed(1)} dB stem spread`;
+  const stemNames = audibleStems.length > 0 ? audibleStems.map(stemTrackLabel).join("/") : "silent";
+
+  return {
+    slot,
+    capturedAtLabel: mixSnapshotCapturedAtLabel(),
+    projectTitle: project.title,
+    statusLabel: mixSnapshotStatusLabel(mixTone),
+    exportLabel: `${analysis.status} / H ${formatDb(analysis.headroomDb)}${limitedLabel}`,
+    headroomDb: analysis.headroomDb,
+    limitedPercent: analysis.limitedPercent,
+    peakDb: analysis.peakDb,
+    rmsDb: analysis.rmsDb,
+    balanceSpreadDb,
+    balanceLabel,
+    masterLabel: `${project.masterPreset} / C ${formatDb(project.masterCeilingDb)} / O ${formatDb(masterChannelVolumeDb(project.mixer))}`,
+    stemLabel: `${audibleStems.length}/${stemTrackIds.length} stems / ${stemNames}`,
+    audibleStemCount: audibleStems.length,
+    score: mixSnapshotScore(analysis, balanceSpreadDb, audibleStems.length, mixTone),
+    tone: mixTone
+  };
+}
+
+function createMixSnapshotComparison(snapshots: MixSnapshotSlotMap): MixSnapshotComparisonSummary {
+  const { A, B } = snapshots;
+  const metrics = createMixSnapshotComparisonMetrics(A, B);
+
+  if (!A && !B) {
+    return {
+      statusLabel: "No captures",
+      winnerLabel: "A/B empty",
+      detailLabel: "Capture a current mix into A or B.",
+      detailTitle: "Mix Snapshot A/B has no captured mix passes.",
+      tone: "warn",
+      metrics
+    };
+  }
+
+  if (!A || !B) {
+    const captured = A ?? B;
+    const missingSlot: MixSnapshotSlotId = A ? "B" : "A";
+    const capturedSlot = captured?.slot ?? "A";
+    return {
+      statusLabel: "One capture",
+      winnerLabel: `Mix ${capturedSlot} held`,
+      detailLabel: `Capture ${missingSlot} to compare against ${captured?.exportLabel ?? "the held mix"}.`,
+      detailTitle: `Mix ${capturedSlot} is captured for ${captured?.projectTitle ?? "current project"}; Mix ${missingSlot} is empty.`,
+      tone: captured?.tone ?? "warn",
+      metrics
+    };
+  }
+
+  const scoreDelta = A.score - B.score;
+  if (Math.abs(scoreDelta) <= 2) {
+    return {
+      statusLabel: "Close passes",
+      winnerLabel: "A/B close",
+      detailLabel: `${A.exportLabel} vs ${B.exportLabel}; choose by listening context.`,
+      detailTitle: `Mix A and Mix B are close. A score ${A.score}, B score ${B.score}; A ${A.balanceLabel}; B ${B.balanceLabel}.`,
+      tone: weakestTone([A.tone, B.tone]),
+      metrics
+    };
+  }
+
+  const winner = scoreDelta > 0 ? A : B;
+  const runnerUp = scoreDelta > 0 ? B : A;
+  return {
+    statusLabel: "Safer pass",
+    winnerLabel: `Mix ${winner.slot} safer`,
+    detailLabel: `${winner.exportLabel}; ${winner.balanceLabel}; ${winner.stemLabel}.`,
+    detailTitle: `Mix ${winner.slot} scored ${winner.score} against Mix ${runnerUp.slot} at ${runnerUp.score}; ${winner.masterLabel}.`,
+    tone: winner.tone === "danger" ? "warn" : winner.tone,
+    metrics
+  };
+}
+
+function createMixSnapshotComparisonMetrics(
+  aSnapshot: MixSnapshot | null,
+  bSnapshot: MixSnapshot | null
+): MixSnapshotComparisonMetric[] {
+  const metricLabels: Array<{ id: MixSnapshotMetricId; label: string }> = [
+    { id: "headroom", label: "Headroom" },
+    { id: "balance", label: "Balance" },
+    { id: "master", label: "Master" },
+    { id: "stems", label: "Stems" }
+  ];
+
+  return metricLabels.map(({ id, label }) => ({
+    id,
+    label,
+    aLabel: mixSnapshotMetricLabel(aSnapshot, id),
+    bLabel: mixSnapshotMetricLabel(bSnapshot, id),
+    tone: mixSnapshotMetricTone(aSnapshot, bSnapshot, id)
+  }));
+}
+
+function mixSnapshotMetricLabel(snapshot: MixSnapshot | null, id: MixSnapshotMetricId): string {
+  if (!snapshot) {
+    return "waiting";
+  }
+  switch (id) {
+    case "headroom":
+      return snapshot.exportLabel;
+    case "balance":
+      return snapshot.balanceLabel;
+    case "master":
+      return snapshot.masterLabel;
+    case "stems":
+      return snapshot.stemLabel;
+  }
+}
+
+function mixSnapshotMetricTone(
+  aSnapshot: MixSnapshot | null,
+  bSnapshot: MixSnapshot | null,
+  id: MixSnapshotMetricId
+): MixCoachTone {
+  const tones = [mixSnapshotSingleMetricTone(aSnapshot, id), mixSnapshotSingleMetricTone(bSnapshot, id)].filter(
+    (tone): tone is MixCoachTone => tone !== null
+  );
+  return tones.length === 0 ? "warn" : weakestTone(tones);
+}
+
+function mixSnapshotSingleMetricTone(snapshot: MixSnapshot | null, id: MixSnapshotMetricId): MixCoachTone | null {
+  if (!snapshot) {
+    return null;
+  }
+  switch (id) {
+    case "headroom":
+      if (snapshot.exportLabel.startsWith("Silent")) {
+        return "danger";
+      }
+      return snapshot.headroomDb < 0.5 || snapshot.limitedPercent > 0 ? "warn" : "good";
+    case "balance":
+      if (snapshot.balanceSpreadDb === null) {
+        return "danger";
+      }
+      return snapshot.balanceSpreadDb > 18 ? "warn" : "good";
+    case "master":
+      return snapshot.tone;
+    case "stems":
+      return snapshot.audibleStemCount === 0 ? "danger" : snapshot.audibleStemCount < 2 ? "warn" : "good";
+  }
+}
+
+function mixSnapshotStatusLabel(tone: MixCoachTone): string {
+  switch (tone) {
+    case "good":
+      return "Ready pass";
+    case "warn":
+      return "Review pass";
+    case "danger":
+      return "Risk pass";
+  }
+}
+
+function mixSnapshotScore(
+  analysis: ExportAnalysis,
+  balanceSpreadDb: number | null,
+  audibleStemCount: number,
+  tone: MixCoachTone
+): number {
+  const statusScore =
+    analysis.status === "Ready" ? 42 : analysis.status === "Hot" || analysis.status === "Limiter active" ? 20 : 0;
+  const headroomScore = Math.max(0, 18 - Math.abs(analysis.headroomDb - 3.5) * 3);
+  const balanceScore = balanceSpreadDb === null ? 0 : Math.max(0, 20 - Math.max(0, balanceSpreadDb - 8) * 2);
+  const stemScore = audibleStemCount * 4;
+  const limiterPenalty = Math.min(22, analysis.limitedPercent * 2);
+  const tonePenalty = tone === "danger" ? 24 : tone === "warn" ? 9 : 0;
+  return Math.round(statusScore + headroomScore + balanceScore + stemScore - limiterPenalty - tonePenalty);
+}
+
+function mixSnapshotCapturedAtLabel(): string {
+  return new Date().toTimeString().slice(0, 8);
 }
 
 function createMixFixActions(analysis: ExportAnalysis, stemAnalyses: StemExportAnalyses): MixFixAction[] {
