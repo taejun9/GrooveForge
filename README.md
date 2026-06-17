@@ -31,6 +31,8 @@ Concept audit rule: do not read any sampling reference as the main workflow. Sam
 
 Core model rule: do not copy optional sampling examples into the MVP data model. The core project starts from editable notes, drum hits, automation, pattern/MIDI clips, built-in instruments, arrangement, mixer/master, and export; `AudioClipEvent`, `audio`, and `sampler` belong only to an explicitly approved optional sampling phase. If an incoming draft defines `MusicalEvent` with `AudioClipEvent` or a core `TrackType` with `audio`/`sampler`, rewrite those entries into an optional-sampling extension section before they reach the MVP model.
 
+Source wording rule: built-in drum kits, internal one-shots, and any future sample 808 option are sound-source details inside drum sequencing or the 808/Bass engine. They must not be used to reframe the app as sample import, sample-pack browsing, chopping, or sampler setup. The default path is built-in drum rack plus synth 808/bass before any user-file source is introduced.
+
 Drafting rule: the default empty project, first visible actions, MVP proof, primary navigation, default instrument panel, and new plan titles should lead with editable musical events, built-in drum rack, synth 808/bass, synth/chord instruments, FX, and beat-making controls. Do not present optional sampling as a co-equal product spine. If a suggested basic-screen layout includes `sampler` in the default Instrument Panel, move it to a later optional-sampling section and keep the first screen focused on direct beat composition.
 
 ## MVP Target
@@ -129,6 +131,8 @@ The first desktop runtime is an Electron + Vite + TypeScript app. It opens direc
 - Keep default screens, plan titles, and roadmap ordering anchored to editable musical events and beat-making controls.
 - Keep external brief examples that include `AudioClipEvent`, `audio`, or `sampler` out of the core MVP unions unless the plan is explicitly optional sampling-phase work.
 - Lead summaries with what users create directly: drums, 808/bass, melody/chords, sound design, arrangement, mix/master, and export. Mention sampling only as an explicitly optional extension boundary or sampling-phase plan.
+- Treat built-in one-shot drum sounds and any later sample 808 source as internal sound-source choices, not as the main workflow. Drum sequencing and 808/Bass synthesis stay first.
+- Keep mixing and mastering as distinct stages in docs and UI plans; mastering is a final output posture after a usable mix, not a substitute for the mixer.
 - Keep sensitive real user, customer, credential, and production data out of samples, tests, docs, and screenshots.
 - Keep validation commands current as the stack becomes concrete.
 
