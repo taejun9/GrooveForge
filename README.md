@@ -113,6 +113,7 @@ The first usable result is an Electron desktop workstation that can create a sam
 - Snapshot Compare for local read-only comparison of the current beat against saved snapshots by setup, length, readiness, export, stems, and master posture.
 - Realtime transport loop controls for Song, selected Block, and Pattern audition, with a command-strip Transport Position Readout for Bar/Beat/Step, section, pattern, and loop-scope context, plus Tap Tempo and Tempo Nudge Pads for click-to-set, half-time, double-time, and +/-1 BPM changes, and a metronome toggle with accented downbeat clicks for timing reference during arrangement or Pattern playback.
 - Quick Actions Tempo Nudge commands expose the existing -1, +1, half-time, and double-time BPM pads from command search while routing through the same explicit undoable tempo nudge path.
+- Quick Actions Metronome command exposes the existing realtime click toggle from command search while preserving export-free metronome behavior.
 - Pattern-aware editor playheads keep drum, 808, Synth, and Chord grid highlights tied to the selected Pattern A/B/C, while Transport and arrangement playheads continue to show the actually playing Pattern during Song/Block playback.
 - Playing Pattern Tabs mark the audible Pattern A/B/C separately from the selected editing Pattern, so Song/Block playback can be followed without changing the Pattern being edited.
 - Pattern Playback Readout summarizes the current edit Pattern and audible Pattern in the Pattern editor without changing playback, selection, or Pattern A/B/C data.

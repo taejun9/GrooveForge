@@ -7271,6 +7271,7 @@ export function App(): ReactElement {
     onExpandPatternChain: expandPatternChain,
     onApplyProjectKey: applyProjectKey,
     onApplyTempoNudge: applyTempoNudgePad,
+    onToggleMetronome: toggleMetronome,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onRequestMidiInputAccess: requestMidiInputAccess,
     onSelectStyle: selectStyle,
@@ -12671,6 +12672,7 @@ function createQuickActions({
   onExpandPatternChain,
   onApplyProjectKey,
   onApplyTempoNudge,
+  onToggleMetronome,
   onPreviewBlueprint,
   onRequestMidiInputAccess,
   onSelectStyle,
@@ -12821,6 +12823,7 @@ function createQuickActions({
   onExpandPatternChain: () => void;
   onApplyProjectKey: (key: string) => void;
   onApplyTempoNudge: (pad: TempoNudgePadDefinition) => void;
+  onToggleMetronome: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onRequestMidiInputAccess: () => Promise<void>;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
@@ -13706,6 +13709,14 @@ function createQuickActions({
       keywords: "loop pattern preview selected a b c transport",
       disabled: isPlaying && transportLoopScope !== "pattern",
       run: () => onSelectTransportLoopScope("pattern")
+    },
+    {
+      id: "metronome-toggle",
+      title: project.metronomeEnabled ? "Turn metronome off" : "Turn metronome on",
+      detail: `${project.metronomeEnabled ? "On" : "Off"} / ${project.bpm} BPM / realtime click only, export stays clean`,
+      group: "Transport",
+      keywords: `metronome click timing grid bpm transport ${project.metronomeEnabled ? "on off disable" : "off on enable"} beginner producer`,
+      run: onToggleMetronome
     },
     ...tempoNudgeActions,
     {
@@ -14762,6 +14773,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "metronome-toggle") {
+    return {
+      id: "metronome",
+      label: "Metronome",
+      value: `${project.metronomeEnabled ? "On" : "Off"} / ${project.bpm} BPM`
+    };
+  }
+
   if (action.id.startsWith("key-quick-")) {
     return {
       id: "key-quick",
@@ -15225,6 +15244,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the tempo supports the groove pocket, 808 movement, and melody timing.`,
       nextCheck: "Use Tap Tempo, Tempo Nudge Pads, Style Inspector BPM range, and transport playback to refine the final BPM."
+    };
+  }
+
+  if (action.id === "metronome-toggle") {
+    return {
+      auditionCue: "Play the current loop and use the click only as a timing reference.",
+      nextCheck: "Confirm the grid feel while programming, then export WAV/stems knowing the metronome stays out of rendered audio."
     };
   }
 
