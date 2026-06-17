@@ -7162,6 +7162,7 @@ export function App(): ReactElement {
     canRedo,
     canUndo,
     beatPassportSummary,
+    beatSpineSummary,
     composerGuideSummary,
     finishChecklistSummary,
     grooveCompassSummary,
@@ -7183,6 +7184,7 @@ export function App(): ReactElement {
     workflowNavigatorItems,
     onApplyArrangementMove: applyArrangementMoveToSelected,
     onApplyArrangementFocus: applyArrangementFocusPreset,
+    onApplyBeatSpine: applyBeatSpineAction,
     onApplyBlueprint: applyQuickActionBeatBlueprint,
     onApplyLayerStarter: applyLayerStarter,
     onApplyMasterFinish: applyMasterFinishPad,
@@ -7194,6 +7196,7 @@ export function App(): ReactElement {
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
     onExportWav: handleExportWav,
+    onJumpBeatSpine: jumpToBeatSpineTarget,
     onFocusBeatPassport: focusBeatPassportMetric,
     onFocusComposerGuide: focusComposerGuideCard,
     onFocusExportPreflight: focusExportPreflightCard,
@@ -11726,6 +11729,19 @@ function activeModeFocusQuickActionCard(summary: ModeFocusSummary): ModeFocusCar
   return summary.cards.find((card) => card.id === preferredId) ?? summary.cards[0] ?? null;
 }
 
+function activeBeatSpineQuickActionCard(summary: BeatSpineSummary): BeatSpineCard | null {
+  return summary.cards.find((card) => card.id === summary.nextCardId) ?? summary.cards[0] ?? null;
+}
+
+function activeBeatSpineQuickActionApplyCard(summary: BeatSpineSummary): BeatSpineCard | null {
+  const nextCard = activeBeatSpineQuickActionCard(summary);
+  if (nextCard?.action) {
+    return nextCard;
+  }
+
+  return summary.cards.find((card) => card.tone !== "good" && card.action) ?? summary.cards.find((card) => card.action) ?? null;
+}
+
 function activeKeyCompassQuickActionItem(summary: KeyCompassSummary): KeyCompassFocusItem | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
@@ -12273,6 +12289,7 @@ function NextMoveResultStrip({ result }: { result: NextMoveResult }): ReactEleme
 
 function createQuickActions({
   beatPassportSummary,
+  beatSpineSummary,
   canRedo,
   canUndo,
   composerGuideSummary,
@@ -12296,6 +12313,7 @@ function createQuickActions({
   workflowNavigatorItems,
   onApplyArrangementMove,
   onApplyArrangementFocus,
+  onApplyBeatSpine,
   onApplyBlueprint,
   onApplyLayerStarter,
   onApplyMasterFinish,
@@ -12307,6 +12325,7 @@ function createQuickActions({
   onExportMidi,
   onExportStems,
   onExportWav,
+  onJumpBeatSpine,
   onFocusBeatPassport,
   onFocusComposerGuide,
   onFocusExportPreflight,
@@ -12330,6 +12349,7 @@ function createQuickActions({
   onUndo
 }: {
   beatPassportSummary: BeatPassportSummary;
+  beatSpineSummary: BeatSpineSummary;
   canRedo: boolean;
   canUndo: boolean;
   composerGuideSummary: ComposerGuideSummary;
@@ -12353,6 +12373,7 @@ function createQuickActions({
   workflowNavigatorItems: WorkflowNavigatorItem[];
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
+  onApplyBeatSpine: (action: BeatSpineAction) => void;
   onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
@@ -12364,6 +12385,7 @@ function createQuickActions({
   onExportMidi: () => void;
   onExportStems: () => void;
   onExportWav: () => void;
+  onJumpBeatSpine: (card: BeatSpineCard) => void;
   onFocusBeatPassport: (metric: BeatPassportFocusItem) => void;
   onFocusComposerGuide: (card: ComposerGuideCard) => void;
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
@@ -12391,6 +12413,8 @@ function createQuickActions({
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const beatPassportMetric = activeBeatPassportQuickActionMetric(beatPassportSummary);
+  const beatSpineCard = activeBeatSpineQuickActionCard(beatSpineSummary);
+  const beatSpineApplyCard = activeBeatSpineQuickActionApplyCard(beatSpineSummary);
   const composerGuideCard = activeComposerGuideQuickActionCard(composerGuideSummary);
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
   const finishChecklistCard = activeFinishChecklistQuickActionCard(finishChecklistSummary);
@@ -12486,6 +12510,34 @@ function createQuickActions({
       run: () => {
         if (modeFocusCard) {
           onFocusModeFocus(modeFocusCard);
+        }
+      }
+    },
+    {
+      id: "beat-spine-jump",
+      title: beatSpineCard ? `Jump Beat Spine: ${beatSpineCard.label}` : "Jump Beat Spine",
+      detail: beatSpineCard ? `${beatSpineCard.value} / ${beatSpineCard.focusLabel}` : "No Beat Spine card available.",
+      group: "Project",
+      keywords: `beat spine jump core setup drums 808 bass harmony melody sound arrange finish ${beatSpineCard?.id ?? "none"} ${beatSpineCard?.focusLabel ?? "none"} beginner producer`,
+      disabled: !beatSpineCard,
+      run: () => {
+        if (beatSpineCard) {
+          onJumpBeatSpine(beatSpineCard);
+        }
+      }
+    },
+    {
+      id: "beat-spine-apply",
+      title: beatSpineApplyCard?.action ? `Apply Beat Spine: ${beatSpineApplyCard.label}` : "Apply Beat Spine",
+      detail: beatSpineApplyCard?.action
+        ? `${beatSpineApplyCard.action.label} / ${beatSpineApplyCard.action.detail}`
+        : "No Beat Spine action available.",
+      group: "Create",
+      keywords: `beat spine apply core action setup drums 808 bass harmony melody sound arrange finish ${beatSpineApplyCard?.id ?? "none"} ${beatSpineApplyCard?.action?.label ?? "none"} beginner producer sample free`,
+      disabled: !beatSpineApplyCard?.action,
+      run: () => {
+        if (beatSpineApplyCard?.action) {
+          onApplyBeatSpine(beatSpineApplyCard.action);
         }
       }
     },
@@ -13010,6 +13062,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "beat-spine-jump" || action.id === "beat-spine-apply") {
+    return {
+      id: "beat-spine",
+      label: "Beat spine",
+      value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
+    };
+  }
+
   if (action.id === "composer-guide-focus") {
     return {
       id: "composer-guide",
@@ -13205,6 +13265,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the jumped Mode Focus panel to inspect the current Guided stage or Studio issue before running edits.",
       nextCheck: "Return to Mode Focus after the current orientation card is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id === "beat-spine-jump") {
+    return {
+      auditionCue: "Use the jumped Beat Spine card to inspect the next setup, writing, sound, arrangement, or finish axis.",
+      nextCheck: "Return to Beat Spine after the highlighted core card is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id === "beat-spine-apply") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern} or the full Song to confirm the applied Beat Spine move supports the beat.`,
+      nextCheck: "Read the Beat Spine Apply Result, then continue with the next highlighted core card."
     };
   }
 
