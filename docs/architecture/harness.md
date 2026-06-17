@@ -61,3 +61,5 @@ npm run verify
 ```
 
 These commands validate the base structure, documentation rules, runtime sample-free all-style export smoke, TypeScript contracts, and production build. `npm run verify` runs the strict quality gate, runtime smoke, typecheck, and build.
+
+Production build validation depends on Vite 8 / Rolldown output code splitting, not warning suppression. `vite.config.ts` keeps `outDir: "dist"` and `sourcemap: true`, then uses `build.rolldownOptions.output.codeSplitting.groups` for `react-vendor`, `icons-vendor`, remaining `vendor`, `audio-engine`, and `workstation-core` paths so eligible modules split when present and stable dependencies plus audio engine code do not stay in one large client chunk.

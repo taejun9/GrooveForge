@@ -80,6 +80,8 @@ TEXT_EXPECTATIONS = {
         "Keep sample import, chopping, sampler tracks, and audio warping in P3/v2 extension scope",
         "Keep default screens, plan titles, and roadmap ordering anchored to editable musical events and beat-making controls",
         "Lead summaries with what users create directly: drums, 808/bass, melody/chords, sound design, arrangement, mix/master, and export.",
+        "Production builds use Vite 8 / Rolldown code splitting groups for `react-vendor`, `icons-vendor`, `vendor`, `audio-engine`, and `workstation-core` while preserving `dist` output and sourcemaps",
+        "not by raising `chunkSizeWarningLimit`",
         "Runtime smoke validation that builds sample-free 8-bar beats from every supported style profile and every Beat Blueprint using real domain data, verifies full-mix and stem export analysis, verifies WAV headers and file names, and verifies arrangement MIDI bytes without writing media artifacts.",
         "local project save/load",
         "Local draft recovery that keeps a bounded browser/Electron renderer draft in localStorage",
@@ -473,6 +475,10 @@ TEXT_EXPECTATIONS = {
         "verify non-silent full-mix plus drum, 808, synth, and chord stem analysis for each case",
         "verify WAV RIFF/WAVE headers, WAV/stem file names, Standard MIDI header, and MIDI file name",
         "avoid writing media artifacts",
+        "Production build hygiene work must preserve `outDir: \"dist\"` and `sourcemap: true`",
+        "use Vite 8 / Rolldown `build.rolldownOptions.output.codeSplitting.groups` for real chunk separation",
+        "must not hide large-chunk warnings by setting `chunkSizeWarningLimit`",
+        "Build chunk changes must not alter app UI behavior, project schema, playback, audio rendering, WAV/stem/MIDI export, Handoff behavior, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.",
         "Metronome work must keep click playback realtime-only",
         "Tap Tempo work must keep tap history UI-local and out of saved project schema",
         "update only the project BPM through explicit user clicks and existing undoable project history",
@@ -939,6 +945,33 @@ TEXT_EXPECTATIONS = {
         "`audio` and `sampler` must not appear in the MVP track union or default project track list.",
         "Do not list `sampler` in the default instrument panel, first-run track list, or MVP architecture diagram.",
         "Extension track types for optional sampling, later:",
+    ],
+    "docs/architecture/harness.md": [
+        "Production build validation depends on Vite 8 / Rolldown output code splitting, not warning suppression.",
+        "`vite.config.ts` keeps `outDir: \"dist\"` and `sourcemap: true`",
+        "uses `build.rolldownOptions.output.codeSplitting.groups`",
+        "react-vendor",
+        "icons-vendor",
+        "remaining `vendor`",
+        "audio-engine",
+        "workstation-core",
+        "eligible modules split when present",
+        "do not stay in one large client chunk",
+    ],
+    "vite.config.ts": [
+        'outDir: "dist"',
+        "sourcemap: true",
+        "rolldownOptions",
+        "codeSplitting",
+        "groups",
+        "react-vendor",
+        "icons-vendor",
+        "vendor",
+        "audio-engine",
+        "workstation-core",
+        "node_modules",
+        "src[\\\\/]audio",
+        "src[\\\\/]domain",
     ],
     "harness/scripts/run_qa.py": [
         '".worktree/"',
@@ -4482,6 +4515,12 @@ def check_offline_render_determinism(errors: list[str]) -> None:
         errors.append("src/audio/render.ts must not use Math.random in the offline render path")
 
 
+def check_build_chunk_config(errors: list[str]) -> None:
+    vite_text = (ROOT / "vite.config.ts").read_text(encoding="utf-8")
+    if "chunkSizeWarningLimit" in vite_text:
+        errors.append("vite.config.ts must use real chunk splitting instead of chunkSizeWarningLimit")
+
+
 def run_checks(strict: bool = False) -> list[str]:
     errors: list[str] = []
     check_required_paths(errors)
@@ -4491,6 +4530,7 @@ def run_checks(strict: bool = False) -> list[str]:
     check_text_expectations(errors)
     check_official_sources(errors)
     check_offline_render_determinism(errors)
+    check_build_chunk_config(errors)
     if strict:
         check_strict_todos(errors)
     return errors
