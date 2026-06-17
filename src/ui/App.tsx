@@ -13024,6 +13024,14 @@ function createQuickActions({
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
   const listeningPassItem = activeListeningPassQuickActionItem(listeningPassSummary);
+  const listeningPassActions: QuickAction[] = listeningPassSummary.items.map((item) => ({
+    id: `listening-pass-checkpoint-${item.id}`,
+    title: `Focus Listening Pass: ${item.label}`,
+    detail: `${item.status} / ${item.focusLabel} / ${item.cue}`,
+    group: "Project",
+    keywords: `listening pass focus checkpoint audition ${item.id} ${item.label} ${item.status} ${item.focusLabel} ${item.cue} composition arrangement mix delivery beginner producer`,
+    run: () => onFocusListeningPass(item)
+  }));
   const bassMoveTarget = activeBassMoveQuickActionTarget(project, bassMovePreviewSummary);
   const chordMoveTarget = activeChordMoveQuickActionTarget(project, selectedChord, chordMovePreviewSummary);
   const drumMoveTarget = activeDrumMoveQuickActionTarget(project, drumMovePreviewSummary);
@@ -14316,6 +14324,7 @@ function createQuickActions({
         }
       }
     },
+    ...listeningPassActions,
     {
       id: "beat-passport-focus",
       title: beatPassportMetric ? `Focus Beat Passport: ${beatPassportMetric.label}` : "Focus Beat Passport",
@@ -14846,6 +14855,8 @@ function createQuickActionResult(
     action.id === "first-beat-path-jump" ||
     action.id === "composer-guide-focus" ||
     action.id.startsWith("composer-guide-card-") ||
+    action.id === "listening-pass-focus" ||
+    action.id.startsWith("listening-pass-checkpoint-") ||
     action.id === "key-compass-focus" ||
     action.id === "groove-compass-focus" ||
     action.id === "pattern-dna-focus" ||
@@ -15269,6 +15280,14 @@ function quickActionResultMetricSnapshot(
       id: "listening-pass",
       label: "Listening pass",
       value: `Pattern ${project.selectedPattern} / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
+  if (action.id.startsWith("listening-pass-checkpoint-")) {
+    return {
+      id: "listening-pass",
+      label: "Listening pass",
+      value: action.detail
     };
   }
 
@@ -15823,6 +15842,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Listening Pass checkpoint to choose Pattern, Song, Full Mix, stem, or delivery-target audition scope.",
       nextCheck: "Return to Listening Pass after the focused composition, arrangement, mix, or delivery checkpoint changes."
+    };
+  }
+
+  if (action.id.startsWith("listening-pass-checkpoint-")) {
+    return {
+      auditionCue: "Use the focused Listening Pass checkpoint to inspect that audition lane before changing the beat.",
+      nextCheck: "Return to Listening Pass when you need another direct composition, arrangement, mix, or delivery listening focus."
     };
   }
 
