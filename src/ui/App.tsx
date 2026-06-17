@@ -13039,6 +13039,14 @@ function createQuickActions({
   const modeFocusCard = activeModeFocusQuickActionCard(modeFocusSummary);
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
   const productionSnapshotMetric = activeProductionSnapshotQuickActionMetric(productionSnapshotSummary);
+  const productionSnapshotActions: QuickAction[] = productionSnapshotSummary.metrics.map((metric) => ({
+    id: `production-snapshot-metric-${metric.id}`,
+    title: `Focus Production Snapshot: ${metric.label}`,
+    detail: `${metric.value} / ${metric.focusLabel} / ${metric.detail}`,
+    group: "Project",
+    keywords: `production snapshot focus metric session scan ${metric.id} ${metric.label} ${metric.value} ${metric.focusLabel} ${metric.detail} target form patterns mix handoff beginner producer`,
+    run: () => onFocusProductionSnapshot(metric)
+  }));
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const reviewQueueActions: QuickAction[] = reviewQueueSummary.items.map((item) => ({
     id: `review-queue-item-${item.id}`,
@@ -14353,6 +14361,7 @@ function createQuickActions({
         }
       }
     },
+    ...productionSnapshotActions,
     {
       id: "finish-checklist-focus",
       title: finishChecklistCard ? `Focus Finish Checklist: ${finishChecklistCard.label}` : "Focus Finish Checklist",
@@ -14860,6 +14869,8 @@ function createQuickActionResult(
     action.id === "key-compass-focus" ||
     action.id === "groove-compass-focus" ||
     action.id === "pattern-dna-focus" ||
+    action.id === "production-snapshot-focus" ||
+    action.id.startsWith("production-snapshot-metric-") ||
     action.id.startsWith("arrangement-block-cue-") ||
     action.id.startsWith("arrangement-block-jump-") ||
     action.id.startsWith("section-locator-") ||
@@ -15304,6 +15315,14 @@ function quickActionResultMetricSnapshot(
       id: "production-snapshot",
       label: "Production snapshot",
       value: `${activeDeliveryTarget(project).name} / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
+  if (action.id.startsWith("production-snapshot-metric-")) {
+    return {
+      id: "production-snapshot",
+      label: "Production snapshot",
+      value: action.detail
     };
   }
 
@@ -15863,6 +15882,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Production Snapshot metric to inspect target fit, song form, pattern coverage, mix posture, or handoff posture.",
       nextCheck: "Return to Production Snapshot after the focused session metric is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id.startsWith("production-snapshot-metric-")) {
+    return {
+      auditionCue: "Use the focused Production Snapshot metric to inspect that session-scan lane before changing the beat.",
+      nextCheck: "Return to Production Snapshot when you need another direct target, form, pattern, mix, or handoff focus."
     };
   }
 
