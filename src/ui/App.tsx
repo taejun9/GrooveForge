@@ -7164,6 +7164,7 @@ export function App(): ReactElement {
     isPlaying,
     playbackMode,
     project,
+    exportPreflightSummary,
     reviewQueueSummary,
     selectedArrangementIndex,
     sessionPassSummary,
@@ -7181,6 +7182,7 @@ export function App(): ReactElement {
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
     onExportWav: handleExportWav,
+    onFocusExportPreflight: focusExportPreflightCard,
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusSessionPass: focusSessionPassCard,
     onFocusWorkflowSpotlight: jumpToWorkflowZone,
@@ -11638,10 +11640,7 @@ function createSessionPassSummary(
     finishChecklist.cards.find((card) => card.tone === "danger") ??
     finishChecklist.cards.find((card) => card.tone === "warn") ??
     finishChecklist.cards[finishChecklist.cards.length - 1];
-  const deliveryCard =
-    exportPreflight.cards.find((card) => card.tone === "danger") ??
-    exportPreflight.cards.find((card) => card.tone === "warn") ??
-    exportPreflight.cards[0];
+  const deliveryCard = activeExportPreflightQuickActionCard(exportPreflight);
   const guidedTarget = guidedStep?.target ?? "compose";
   const studioTarget = studioIssue?.focusTarget ?? "deliver";
   const finishTarget = finishCard?.focusTarget ?? "master";
@@ -11698,6 +11697,15 @@ function createSessionPassSummary(
 
 function activeSessionPassQuickActionCard(summary: SessionPassSummary): SessionPassCard {
   return summary.mode === "guided" ? summary.cards[0] : summary.cards[1];
+}
+
+function activeExportPreflightQuickActionCard(summary: ExportPreflightSummary): ExportPreflightCard | null {
+  return (
+    summary.cards.find((card) => card.tone === "danger") ??
+    summary.cards.find((card) => card.tone === "warn") ??
+    summary.cards[0] ??
+    null
+  );
 }
 
 function sessionPassFocusLabel(target: SessionPassTarget): string {
@@ -12177,6 +12185,7 @@ function createQuickActions({
   isPlaying,
   playbackMode,
   project,
+  exportPreflightSummary,
   reviewQueueSummary,
   selectedArrangementIndex,
   sessionPassSummary,
@@ -12194,6 +12203,7 @@ function createQuickActions({
   onExportMidi,
   onExportStems,
   onExportWav,
+  onFocusExportPreflight,
   onFocusReviewQueue,
   onFocusSessionPass,
   onFocusWorkflowSpotlight,
@@ -12210,6 +12220,7 @@ function createQuickActions({
   isPlaying: boolean;
   playbackMode: PlaybackMode;
   project: ProjectState;
+  exportPreflightSummary: ExportPreflightSummary;
   reviewQueueSummary: ReviewQueueSummary;
   selectedArrangementIndex: number;
   sessionPassSummary: SessionPassSummary;
@@ -12227,6 +12238,7 @@ function createQuickActions({
   onExportMidi: () => void;
   onExportStems: () => void;
   onExportWav: () => void;
+  onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
   onFocusWorkflowSpotlight: (zone: WorkflowZoneId) => void;
@@ -12242,6 +12254,7 @@ function createQuickActions({
   const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
+  const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
@@ -12326,6 +12339,19 @@ function createQuickActions({
       run: () => {
         if (reviewQueueItem) {
           onFocusReviewQueue(reviewQueueItem);
+        }
+      }
+    },
+    {
+      id: "export-preflight-focus",
+      title: exportPreflightCard ? `Focus Export Preflight: ${exportPreflightCard.label}` : "Focus Export Preflight",
+      detail: exportPreflightCard ? `${exportPreflightCard.value} / ${exportPreflightCard.focusLabel}` : "No Export Preflight card available.",
+      group: "Export",
+      keywords: `export preflight focus delivery risk send blocker ${exportPreflightCard?.id ?? "none"} ${exportPreflightCard?.focusLabel ?? "none"} beginner producer`,
+      disabled: !exportPreflightCard,
+      run: () => {
+        if (exportPreflightCard) {
+          onFocusExportPreflight(exportPreflightCard);
         }
       }
     },
@@ -12635,7 +12661,10 @@ function createQuickActionResult(
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
   const previewOnly = action.id === "blueprint-preview-style-match";
   const focusOnly =
-    action.id === "session-pass-focus" || action.id === "workflow-spotlight-focus" || action.id === "review-queue-focus";
+    action.id === "session-pass-focus" ||
+    action.id === "workflow-spotlight-focus" ||
+    action.id === "review-queue-focus" ||
+    action.id === "export-preflight-focus";
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
     id: afterMetric.id,
@@ -12682,6 +12711,15 @@ function quickActionResultMetricSnapshot(
       id: "review-queue",
       label: "Review queue",
       value: `${project.selectedPattern} / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
+  if (action.id === "export-preflight-focus") {
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    return {
+      id: "export-preflight",
+      label: "Export preflight",
+      value: `${exportAnalysis.status} / ${activeDeliveryTarget(project).name}`
     };
   }
 
@@ -12782,6 +12820,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Review Queue panel to inspect the highest-priority production issue.",
       nextCheck: "Run the visible Review Queue Focus buttons after you address the top issue."
+    };
+  }
+
+  if (action.id === "export-preflight-focus") {
+    return {
+      auditionCue: "Use the focused Export Preflight card to inspect the current delivery risk before exporting.",
+      nextCheck: "Return to Export Preflight after the focused readiness, mix, deliverable, or handoff item looks clear."
     };
   }
 
