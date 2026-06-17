@@ -7162,6 +7162,7 @@ export function App(): ReactElement {
     canRedo,
     canUndo,
     composerGuideSummary,
+    grooveCompassSummary,
     isPlaying,
     keyCompassSummary,
     playbackMode,
@@ -7186,6 +7187,7 @@ export function App(): ReactElement {
     onExportWav: handleExportWav,
     onFocusComposerGuide: focusComposerGuideCard,
     onFocusExportPreflight: focusExportPreflightCard,
+    onFocusGrooveCompass: focusGrooveCompassItem,
     onFocusKeyCompass: focusKeyCompassItem,
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusSessionPass: focusSessionPassCard,
@@ -11712,6 +11714,15 @@ function activeKeyCompassQuickActionItem(summary: KeyCompassSummary): KeyCompass
   );
 }
 
+function activeGrooveCompassQuickActionItem(summary: GrooveCompassSummary): GrooveCompassFocusItem | null {
+  return (
+    summary.cards.find((card) => card.tone === "danger") ??
+    summary.cards.find((card) => card.tone === "warn") ??
+    summary.cards[0] ??
+    null
+  );
+}
+
 function activeExportPreflightQuickActionCard(summary: ExportPreflightSummary): ExportPreflightCard | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
@@ -12196,6 +12207,7 @@ function createQuickActions({
   canRedo,
   canUndo,
   composerGuideSummary,
+  grooveCompassSummary,
   isPlaying,
   keyCompassSummary,
   playbackMode,
@@ -12220,6 +12232,7 @@ function createQuickActions({
   onExportWav,
   onFocusComposerGuide,
   onFocusExportPreflight,
+  onFocusGrooveCompass,
   onFocusKeyCompass,
   onFocusReviewQueue,
   onFocusSessionPass,
@@ -12235,6 +12248,7 @@ function createQuickActions({
   canRedo: boolean;
   canUndo: boolean;
   composerGuideSummary: ComposerGuideSummary;
+  grooveCompassSummary: GrooveCompassSummary;
   isPlaying: boolean;
   keyCompassSummary: KeyCompassSummary;
   playbackMode: PlaybackMode;
@@ -12259,6 +12273,7 @@ function createQuickActions({
   onExportWav: () => void;
   onFocusComposerGuide: (card: ComposerGuideCard) => void;
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
+  onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
@@ -12277,6 +12292,7 @@ function createQuickActions({
   const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const composerGuideCard = activeComposerGuideQuickActionCard(composerGuideSummary);
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
+  const grooveCompassItem = activeGrooveCompassQuickActionItem(grooveCompassSummary);
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
@@ -12375,6 +12391,19 @@ function createQuickActions({
       run: () => {
         if (keyCompassItem) {
           onFocusKeyCompass(keyCompassItem);
+        }
+      }
+    },
+    {
+      id: "groove-compass-focus",
+      title: grooveCompassItem ? `Focus Groove Compass: ${grooveCompassItem.label}` : "Focus Groove Compass",
+      detail: grooveCompassItem ? `${grooveCompassItem.value} / ${grooveCompassItem.focusLabel}` : "No Groove Compass card available.",
+      group: "Create",
+      keywords: `groove compass focus rhythm pocket drums density anchors hats timing chance inspect ${grooveCompassItem?.focusId ?? "none"} ${grooveCompassItem?.focusLabel ?? "none"} beginner producer`,
+      disabled: !grooveCompassItem,
+      run: () => {
+        if (grooveCompassItem) {
+          onFocusGrooveCompass(grooveCompassItem);
         }
       }
     },
@@ -12713,6 +12742,7 @@ function createQuickActionResult(
     action.id === "session-pass-focus" ||
     action.id === "composer-guide-focus" ||
     action.id === "key-compass-focus" ||
+    action.id === "groove-compass-focus" ||
     action.id === "workflow-spotlight-focus" ||
     action.id === "review-queue-focus" ||
     action.id === "export-preflight-focus";
@@ -12770,6 +12800,14 @@ function quickActionResultMetricSnapshot(
       id: "key-compass",
       label: "Key compass",
       value: `${project.key} / Pattern ${project.selectedPattern}`
+    };
+  }
+
+  if (action.id === "groove-compass-focus") {
+    return {
+      id: "groove-compass",
+      label: "Groove compass",
+      value: `Pattern ${project.selectedPattern} / ${drumHitCount(activePattern(project))} hits`
     };
   }
 
@@ -12894,6 +12932,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Key Compass card to inspect scale, chord, bass, or melody posture before editing notes.",
       nextCheck: "Return to Key Compass after the focused harmony lane changes."
+    };
+  }
+
+  if (action.id === "groove-compass-focus") {
+    return {
+      auditionCue: "Use the focused Groove Compass card to inspect rhythm density, anchors, hats, timing, or chance before editing drums.",
+      nextCheck: "Return to Groove Compass after the focused pocket lane changes."
     };
   }
 
