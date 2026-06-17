@@ -7194,6 +7194,7 @@ export function App(): ReactElement {
     grooveCompassSummary,
     isPlaying,
     keyCompassSummary,
+    keyboardCaptureEnabled,
     keyboardCaptureDefaults,
     keyboardCaptureTarget,
     layerStarterOptions,
@@ -7261,6 +7262,7 @@ export function App(): ReactElement {
     onExpandPatternChain: expandPatternChain,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onRequestMidiInputAccess: requestMidiInputAccess,
+    onSetKeyboardCaptureEnabled: setKeyboardCaptureEnabled,
     onSetKeyboardCaptureTarget: setKeyboardCaptureTarget,
     onUpdateKeyboardCaptureDefaults: updateKeyboardCaptureDefaults,
     onSetMidiCaptureArmed: setMidiCaptureArmed,
@@ -12556,6 +12558,7 @@ function createQuickActions({
   grooveCompassSummary,
   isPlaying,
   keyCompassSummary,
+  keyboardCaptureEnabled,
   keyboardCaptureDefaults,
   keyboardCaptureTarget,
   layerStarterOptions,
@@ -12623,6 +12626,7 @@ function createQuickActions({
   onExpandPatternChain,
   onPreviewBlueprint,
   onRequestMidiInputAccess,
+  onSetKeyboardCaptureEnabled,
   onSetKeyboardCaptureTarget,
   onUpdateKeyboardCaptureDefaults,
   onSetMidiCaptureArmed,
@@ -12668,6 +12672,7 @@ function createQuickActions({
   grooveCompassSummary: GrooveCompassSummary;
   isPlaying: boolean;
   keyCompassSummary: KeyCompassSummary;
+  keyboardCaptureEnabled: boolean;
   keyboardCaptureDefaults: Record<NoteTrack, KeyboardCaptureDefaults>;
   keyboardCaptureTarget: NoteTrack;
   layerStarterOptions: LayerStarterOption[];
@@ -12735,6 +12740,7 @@ function createQuickActions({
   onExpandPatternChain: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onRequestMidiInputAccess: () => Promise<void>;
+  onSetKeyboardCaptureEnabled: (enabled: boolean) => void;
   onSetKeyboardCaptureTarget: (target: NoteTrack) => void;
   onUpdateKeyboardCaptureDefaults: (update: Partial<KeyboardCaptureDefaults>) => void;
   onSetMidiCaptureArmed: (armed: boolean) => void;
@@ -12810,6 +12816,13 @@ function createQuickActions({
   const longerCaptureLength = clampStepLength(activeCaptureDefaults.length + 1);
   const softerSynthVelocity = clampVelocity(activeCaptureDefaults.velocity - 0.1);
   const louderSynthVelocity = clampVelocity(activeCaptureDefaults.velocity + 0.1);
+  const keyboardCaptureToggleTitle = keyboardCaptureEnabled ? "Turn Keyboard Capture off" : "Turn Keyboard Capture on";
+  const keyboardCaptureDefaultDetail =
+    keyboardCaptureTarget === "melody"
+      ? `oct ${activeCaptureDefaults.octave} / len ${activeCaptureDefaults.length} / vel ${percentLabel(activeCaptureDefaults.velocity)}`
+      : `oct ${activeCaptureDefaults.octave} / len ${activeCaptureDefaults.length} / glide ${
+          activeCaptureDefaults.glide ? "On" : "Off"
+        }`;
   const captureTargetActions: QuickAction[] = [
     { id: "capture-target-bass", target: "bass" as NoteTrack, targetLabel: "808" },
     { id: "capture-target-melody", target: "melody" as NoteTrack, targetLabel: "Synth" }
@@ -12988,6 +13001,16 @@ function createQuickActions({
       keywords: `midi input connect refresh web midi controller keyboard note capture 808 synth ${midiCaptureStatus} ${midiCaptureSummary.statusLabel} beginner producer`,
       disabled: !midiInputConnectReady,
       run: onRequestMidiInputAccess
+    },
+    {
+      id: "keyboard-capture-toggle",
+      title: keyboardCaptureToggleTitle,
+      detail: `${keyboardCaptureEnabled ? "Armed" : "Off"} / Target ${keyboardCaptureTargetLabel} / Pattern ${
+        project.selectedPattern
+      } / ${keyboardCaptureDefaultDetail}`,
+      group: "Create",
+      keywords: `keyboard capture toggle on off arm disarm desktop keys note input ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} ${project.selectedPattern} direct composition beginner producer`,
+      run: () => onSetKeyboardCaptureEnabled(!keyboardCaptureEnabled)
     },
     ...captureTargetActions,
     ...captureDefaultActions,
@@ -13855,6 +13878,7 @@ function createQuickActionResult(
     action.id === "review-queue-focus" ||
     action.id === "export-preflight-focus";
   const inputSetupOnly =
+    action.id === "keyboard-capture-toggle" ||
     action.id === "midi-input-connect" ||
     action.id === "midi-input-arm" ||
     action.id.startsWith("capture-target-") ||
@@ -13924,7 +13948,12 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "midi-input-arm" || action.id.startsWith("capture-target-") || action.id.startsWith("capture-default-")) {
+  if (
+    action.id === "keyboard-capture-toggle" ||
+    action.id === "midi-input-arm" ||
+    action.id.startsWith("capture-target-") ||
+    action.id.startsWith("capture-default-")
+  ) {
     return {
       id: "input-capture",
       label: "Input capture",
@@ -14283,6 +14312,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Arm Web MIDI Input in the Compose panel, then play a controller note into the selected 808 or Synth target.",
       nextCheck: "Check the Web MIDI status, input selector, latest-note readout, and Keyboard Capture defaults before recording the next phrase."
+    };
+  }
+
+  if (action.id === "keyboard-capture-toggle") {
+    return {
+      auditionCue: "Use the desktop key map only after confirming Keyboard Capture is armed and the intended 808 or Synth target is selected.",
+      nextCheck: "Keyboard Capture toggling does not insert notes; press mapped desktop keys when the next phrase should be captured."
     };
   }
 
