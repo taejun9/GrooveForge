@@ -1566,6 +1566,11 @@ type ChordMoveResult = {
   tone: MixCoachTone;
 };
 
+type ChordMoveQuickActionTarget =
+  | { kind: "Pad"; id: ChordPadId; label: string }
+  | { kind: "Rhythm"; id: ChordRhythmId; label: string }
+  | { kind: "Voicing"; id: ChordVoicingId; label: string };
+
 type ArrangementFocusPresetId = "intro_space" | "verse_pocket" | "hook_peak" | "bridge_drop" | "outro_release";
 
 type ArrangementFocusPreset = {
@@ -7176,6 +7181,7 @@ export function App(): ReactElement {
     canUndo,
     beatPassportSummary,
     beatSpineSummary,
+    chordMovePreviewSummary,
     composerGuideSummary,
     drumKitPreviewSummary,
     finishChecklistSummary,
@@ -7195,6 +7201,7 @@ export function App(): ReactElement {
     exportPreflightSummary,
     reviewQueueSummary,
     selectedArrangementIndex,
+    selectedChord,
     sessionPassSummary,
     soundFocusPreviewSummary,
     soundPresetPreviewSummary,
@@ -7210,6 +7217,9 @@ export function App(): ReactElement {
     onApplyBassContour: applyBassContour,
     onApplyBeatSpine: applyBeatSpineAction,
     onApplyBlueprint: applyQuickActionBeatBlueprint,
+    onApplyChordPad: applyChordPad,
+    onApplyChordRhythm: applyChordRhythm,
+    onApplyChordVoicing: applyChordVoicingPad,
     onApplyDrumKit: applyDrumKitPad,
     onApplyLayerStarter: applyLayerStarter,
     onApplyMasterFinish: applyMasterFinishPad,
@@ -11836,6 +11846,49 @@ function activeBassMoveQuickActionTarget(
   return bassline ? { kind: "Bassline", id: bassline.id, label: bassline.label } : null;
 }
 
+function activeChordMoveQuickActionTarget(
+  project: ProjectState,
+  selectedChord: ChordEvent | undefined,
+  preview: ChordMovePreviewSummary
+): ChordMoveQuickActionTarget | null {
+  if (!selectedChord || preview.statusLabel === "Select chord" || preview.statusLabel === "Chord aligned") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const pad =
+    preview.padId === "none"
+      ? null
+      : createChordPadOptions(project.key, selectedChord).find((option) => option.id === preview.padId) ?? null;
+  const rhythm =
+    preview.rhythmId === "none"
+      ? null
+      : createChordRhythmOptions(pattern.chordEvents).find((option) => option.id === preview.rhythmId) ?? null;
+  const voicing =
+    preview.voicingId === "none"
+      ? null
+      : createChordVoicingOptions(selectedChord).find((option) => option.id === preview.voicingId) ?? null;
+  const harmonicSummary = selectedChordHarmonicSummary(project.key, selectedChord);
+
+  if (!harmonicSummary.inKey && pad && !pad.selected) {
+    return { kind: "Pad", id: pad.id, label: pad.label };
+  }
+
+  if (rhythm && rhythm.changedCount > 0) {
+    return { kind: "Rhythm", id: rhythm.id, label: rhythm.label };
+  }
+
+  if (voicing && !voicing.selected) {
+    return { kind: "Voicing", id: voicing.id, label: voicing.label };
+  }
+
+  if (pad && !pad.selected) {
+    return { kind: "Pad", id: pad.id, label: pad.label };
+  }
+
+  return null;
+}
+
 function activeMelodyMoveQuickActionTarget(
   project: ProjectState,
   preview: MelodyMovePreviewSummary
@@ -12397,6 +12450,7 @@ function createQuickActions({
   bassMovePreviewSummary,
   beatPassportSummary,
   beatSpineSummary,
+  chordMovePreviewSummary,
   canRedo,
   canUndo,
   composerGuideSummary,
@@ -12418,6 +12472,7 @@ function createQuickActions({
   exportPreflightSummary,
   reviewQueueSummary,
   selectedArrangementIndex,
+  selectedChord,
   sessionPassSummary,
   soundFocusPreviewSummary,
   soundPresetPreviewSummary,
@@ -12433,6 +12488,9 @@ function createQuickActions({
   onApplyBassContour,
   onApplyBeatSpine,
   onApplyBlueprint,
+  onApplyChordPad,
+  onApplyChordRhythm,
+  onApplyChordVoicing,
   onApplyDrumKit,
   onApplyLayerStarter,
   onApplyMasterFinish,
@@ -12480,6 +12538,7 @@ function createQuickActions({
   bassMovePreviewSummary: BassMovePreviewSummary;
   beatPassportSummary: BeatPassportSummary;
   beatSpineSummary: BeatSpineSummary;
+  chordMovePreviewSummary: ChordMovePreviewSummary;
   canRedo: boolean;
   canUndo: boolean;
   composerGuideSummary: ComposerGuideSummary;
@@ -12501,6 +12560,7 @@ function createQuickActions({
   exportPreflightSummary: ExportPreflightSummary;
   reviewQueueSummary: ReviewQueueSummary;
   selectedArrangementIndex: number;
+  selectedChord: ChordEvent | undefined;
   sessionPassSummary: SessionPassSummary;
   soundFocusPreviewSummary: SoundFocusPreviewSummary;
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
@@ -12516,6 +12576,9 @@ function createQuickActions({
   onApplyBassContour: (contour: BassContourId) => void;
   onApplyBeatSpine: (action: BeatSpineAction) => void;
   onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
+  onApplyChordPad: (pad: ChordPadId) => void;
+  onApplyChordRhythm: (rhythm: ChordRhythmId) => void;
+  onApplyChordVoicing: (voicing: ChordVoicingId) => void;
   onApplyDrumKit: (pad: DrumKitPadId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
@@ -12573,6 +12636,7 @@ function createQuickActions({
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
   const listeningPassItem = activeListeningPassQuickActionItem(listeningPassSummary);
   const bassMoveTarget = activeBassMoveQuickActionTarget(project, bassMovePreviewSummary);
+  const chordMoveTarget = activeChordMoveQuickActionTarget(project, selectedChord, chordMovePreviewSummary);
   const melodyMoveTarget = activeMelodyMoveQuickActionTarget(project, melodyMovePreviewSummary);
   const modeFocusCard = activeModeFocusQuickActionCard(modeFocusSummary);
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
@@ -12838,6 +12902,28 @@ function createQuickActions({
           onApplyMelodyAccent(melodyMoveTarget.id);
         } else {
           onApplyMelodyContour(melodyMoveTarget.id);
+        }
+      }
+    },
+    {
+      id: "chord-move",
+      title: chordMoveTarget ? `Apply ${chordMoveTarget.label} Chord ${chordMoveTarget.kind}` : "Apply Chord Move",
+      detail: chordMoveTarget
+        ? `${chordMovePreviewSummary.selectedLabel} / ${chordMovePreviewSummary.moveLabel}`
+        : "Select a chord event before applying the Chord move preview.",
+      group: "Create",
+      keywords: `chord move harmony progression rhythm voicing inversion color chance ${chordMovePreviewSummary.padId} ${chordMovePreviewSummary.rhythmId} ${chordMovePreviewSummary.voicingId} ${chordMoveTarget?.label ?? "none"} beginner producer`,
+      disabled: !chordMoveTarget,
+      run: () => {
+        if (!chordMoveTarget) {
+          return;
+        }
+        if (chordMoveTarget.kind === "Pad") {
+          onApplyChordPad(chordMoveTarget.id);
+        } else if (chordMoveTarget.kind === "Rhythm") {
+          onApplyChordRhythm(chordMoveTarget.id);
+        } else {
+          onApplyChordVoicing(chordMoveTarget.id);
         }
       }
     },
@@ -13466,6 +13552,15 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "chord-move") {
+    const chordEvents = activePattern(project).chordEvents;
+    return {
+      id: "chord-move",
+      label: "Chord move",
+      value: `${chordEvents.length} chords / ${chordHarmonyLabel(chordEvents)} / ${chordRhythmSummaryLabel(chordEvents)}`
+    };
+  }
+
   if (action.id === "sound-focus") {
     return {
       id: "sound-focus",
@@ -13729,6 +13824,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; check Synth phrase shape against chords, 808, and drums.`,
       nextCheck: "Use the Melody Move Result plus selected-note degree/role and melody edit tools for manual corrections."
+    };
+  }
+
+  if (action.id === "chord-move") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; check chord color, rhythm, and voicing against 808 and Synth.`,
+      nextCheck: "Use the Chord Move Result plus selected-chord harmonic readout and chord edit tools for manual corrections."
     };
   }
 
