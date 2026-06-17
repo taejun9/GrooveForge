@@ -7278,6 +7278,7 @@ export function App(): ReactElement {
     onRequestMidiInputAccess: requestMidiInputAccess,
     onCueSectionLocator: cueSectionLocator,
     onCuePattern: cuePattern,
+    onSelectArrangementBlock: selectArrangementBlock,
     onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
     onUsePatternInSelectedBlock: usePatternInSelectedBlock,
@@ -12685,6 +12686,7 @@ function createQuickActions({
   onRequestMidiInputAccess,
   onCueSectionLocator,
   onCuePattern,
+  onSelectArrangementBlock,
   onSelectPattern,
   onSelectStyle,
   onUsePatternInSelectedBlock,
@@ -12842,6 +12844,7 @@ function createQuickActions({
   onRequestMidiInputAccess: () => Promise<void>;
   onCueSectionLocator: (section: ArrangementSection) => void;
   onCuePattern: (pattern: PatternSlot) => void;
+  onSelectArrangementBlock: (index: number) => void;
   onSelectPattern: (pattern: PatternSlot) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
   onUsePatternInSelectedBlock: (pattern: PatternSlot) => void;
@@ -12916,6 +12919,23 @@ function createQuickActions({
   const arrangementBlockClipboardLabel = arrangementBlockClipboard
     ? `${arrangementBlockClipboard.section} Pattern ${arrangementBlockClipboard.pattern} / ${barCountLabel(normalizeArrangementBars(arrangementBlockClipboard.bars))}`
     : "Clipboard empty";
+  const arrangementBlockJumpActions: QuickAction[] = project.arrangement.map((block, index) => {
+    const blockNumber = index + 1;
+    const bars = normalizeArrangementBars(block.bars);
+    const startBar = arrangementStartBar(project, index) + 1;
+    const endBar = startBar + bars - 1;
+    const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+    const selected = selectedArrangementIndex === index;
+    const eventCount = patternEventTotal(project.patterns[block.pattern]);
+    return {
+      id: `arrangement-block-jump-${blockNumber}`,
+      title: selected ? `Block ${blockNumber} ${block.section} already selected` : `Jump to Block ${blockNumber} ${block.section}`,
+      detail: `Pattern ${block.pattern} / ${rangeLabel} / ${Math.round(normalizeArrangementEnergy(block.energy) * 100)}% energy / ${eventCount} events`,
+      group: "Arrange",
+      keywords: `arrangement block jump select navigate song form section ${block.section} block ${blockNumber} pattern ${block.pattern} ${rangeLabel} beginner producer`,
+      run: () => onSelectArrangementBlock(index)
+    };
+  });
   const beatPassportMetric = activeBeatPassportQuickActionMetric(beatPassportSummary);
   const beatSpineCard = activeBeatSpineQuickActionCard(beatSpineSummary);
   const beatSpineApplyCard = activeBeatSpineQuickActionApplyCard(beatSpineSummary);
@@ -14331,6 +14351,7 @@ function createQuickActions({
       keywords: "melody turn fill pattern synth",
       run: () => onApplyPatternFill("melody_turn")
     },
+    ...arrangementBlockJumpActions,
     ...selectedBlockActions,
     ...patternUseActions,
     {
@@ -14711,6 +14732,7 @@ function createQuickActionResult(
     action.id === "key-compass-focus" ||
     action.id === "groove-compass-focus" ||
     action.id === "pattern-dna-focus" ||
+    action.id.startsWith("arrangement-block-jump-") ||
     action.id.startsWith("section-locator-") ||
     action.id.startsWith("pattern-cue-") ||
     action.id.startsWith("pattern-switch-") ||
@@ -14901,6 +14923,23 @@ function quickActionResultMetricSnapshot(
       label: "Tap Tempo",
       value: `${project.bpm} BPM`
     };
+  }
+
+  if (action.id.startsWith("arrangement-block-jump-")) {
+    const index = arrangementBlockJumpIndex(action.id);
+    if (index !== null) {
+      const block = project.arrangement[index];
+      if (block) {
+        const startBar = arrangementStartBar(project, index) + 1;
+        const endBar = startBar + normalizeArrangementBars(block.bars) - 1;
+        const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+        return {
+          id: "arrangement-block-jump",
+          label: "Block jump",
+          value: `Block ${index + 1} ${block.section} / Pattern ${block.pattern} / ${rangeLabel} / preview ${project.selectedPattern}`
+        };
+      }
+    }
   }
 
   if (action.id.startsWith("section-locator-")) {
@@ -15436,6 +15475,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Play Block loop; hear the cued ${section} block against its assigned Pattern before changing the arrangement.`,
       nextCheck: "Use Song Form Overview, Arrangement Playback Readout, or Arrangement Focus before editing nearby blocks."
+    };
+  }
+
+  if (action.id.startsWith("arrangement-block-jump-")) {
+    return {
+      auditionCue: `Play Block loop or Song loop to hear Block navigation against Pattern ${project.selectedPattern}.`,
+      nextCheck: "Use the selected-block editor, Arrangement Focus, or Section Locator before changing the song form."
     };
   }
 
@@ -19947,6 +19993,15 @@ function sectionLocatorTestId(section: ArrangementSection): string {
 
 function sectionLocatorActionSection(actionId: string): ArrangementSection | null {
   return arrangementSections.find((section) => actionId === `section-locator-${sectionLocatorTestId(section)}`) ?? null;
+}
+
+function arrangementBlockJumpIndex(actionId: string): number | null {
+  const match = /^arrangement-block-jump-(\d+)$/.exec(actionId);
+  if (!match) {
+    return null;
+  }
+  const index = Number(match[1]) - 1;
+  return Number.isInteger(index) && index >= 0 ? index : null;
 }
 
 function songFormSegmentTone(eventCount: number, energy: number, mutedTrackCount: number): MixCoachTone {
