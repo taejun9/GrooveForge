@@ -4508,6 +4508,23 @@ export function App(): ReactElement {
     setSelectedChordIndex(null);
   }
 
+  function cueArrangementBlock(index: number): void {
+    if (isPlaying) {
+      setProjectStatus("Stop playback before cueing a block");
+      return;
+    }
+
+    const block = projectRef.current.arrangement[index];
+    if (!block) {
+      setProjectStatus("Arrangement block not found");
+      return;
+    }
+
+    selectArrangementBlock(index);
+    selectTransportLoopScope("block", false);
+    setProjectStatus(`Block ${index + 1} ${block.section} cued as Block loop`);
+  }
+
   function cueSectionLocator(section: ArrangementSection): void {
     if (isPlaying) {
       setProjectStatus("Stop playback before cueing a section");
@@ -7276,6 +7293,7 @@ export function App(): ReactElement {
     onTapTempo: tapProjectTempo,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onRequestMidiInputAccess: requestMidiInputAccess,
+    onCueArrangementBlock: cueArrangementBlock,
     onCueSectionLocator: cueSectionLocator,
     onCuePattern: cuePattern,
     onSelectArrangementBlock: selectArrangementBlock,
@@ -12684,6 +12702,7 @@ function createQuickActions({
   onTapTempo,
   onPreviewBlueprint,
   onRequestMidiInputAccess,
+  onCueArrangementBlock,
   onCueSectionLocator,
   onCuePattern,
   onSelectArrangementBlock,
@@ -12842,6 +12861,7 @@ function createQuickActions({
   onTapTempo: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onRequestMidiInputAccess: () => Promise<void>;
+  onCueArrangementBlock: (index: number) => void;
   onCueSectionLocator: (section: ArrangementSection) => void;
   onCuePattern: (pattern: PatternSlot) => void;
   onSelectArrangementBlock: (index: number) => void;
@@ -12934,6 +12954,26 @@ function createQuickActions({
       group: "Arrange",
       keywords: `arrangement block jump select navigate song form section ${block.section} block ${blockNumber} pattern ${block.pattern} ${rangeLabel} beginner producer`,
       run: () => onSelectArrangementBlock(index)
+    };
+  });
+  const arrangementBlockCueActions: QuickAction[] = project.arrangement.map((block, index) => {
+    const blockNumber = index + 1;
+    const bars = normalizeArrangementBars(block.bars);
+    const startBar = arrangementStartBar(project, index) + 1;
+    const endBar = startBar + bars - 1;
+    const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+    const cued = selectedArrangementIndex === index && transportLoopScope === "block";
+    const eventCount = patternEventTotal(project.patterns[block.pattern]);
+    return {
+      id: `arrangement-block-cue-${blockNumber}`,
+      title: cued ? `Block ${blockNumber} ${block.section} already cued` : `Cue Block ${blockNumber} ${block.section}`,
+      detail: isPlaying
+        ? "Stop playback before cueing a block."
+        : `Pattern ${block.pattern} / ${rangeLabel} / ${Math.round(normalizeArrangementEnergy(block.energy) * 100)}% energy / ${eventCount} events`,
+      group: "Transport",
+      keywords: `arrangement block cue audition loop transport song form section ${block.section} block ${blockNumber} pattern ${block.pattern} ${rangeLabel} beginner producer`,
+      disabled: isPlaying,
+      run: () => onCueArrangementBlock(index)
     };
   });
   const beatPassportMetric = activeBeatPassportQuickActionMetric(beatPassportSummary);
@@ -13823,6 +13863,7 @@ function createQuickActions({
       run: () => onSelectTransportLoopScope("pattern")
     },
     ...sectionLocatorActions,
+    ...arrangementBlockCueActions,
     {
       id: "metronome-toggle",
       title: project.metronomeEnabled ? "Turn metronome off" : "Turn metronome on",
@@ -14732,6 +14773,7 @@ function createQuickActionResult(
     action.id === "key-compass-focus" ||
     action.id === "groove-compass-focus" ||
     action.id === "pattern-dna-focus" ||
+    action.id.startsWith("arrangement-block-cue-") ||
     action.id.startsWith("arrangement-block-jump-") ||
     action.id.startsWith("section-locator-") ||
     action.id.startsWith("pattern-cue-") ||
@@ -14936,6 +14978,23 @@ function quickActionResultMetricSnapshot(
         return {
           id: "arrangement-block-jump",
           label: "Block jump",
+          value: `Block ${index + 1} ${block.section} / Pattern ${block.pattern} / ${rangeLabel} / preview ${project.selectedPattern}`
+        };
+      }
+    }
+  }
+
+  if (action.id.startsWith("arrangement-block-cue-")) {
+    const index = arrangementBlockCueIndex(action.id);
+    if (index !== null) {
+      const block = project.arrangement[index];
+      if (block) {
+        const startBar = arrangementStartBar(project, index) + 1;
+        const endBar = startBar + normalizeArrangementBars(block.bars) - 1;
+        const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+        return {
+          id: "arrangement-block-cue",
+          label: "Block cue",
           value: `Block ${index + 1} ${block.section} / Pattern ${block.pattern} / ${rangeLabel} / preview ${project.selectedPattern}`
         };
       }
@@ -15482,6 +15541,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Play Block loop or Song loop to hear Block navigation against Pattern ${project.selectedPattern}.`,
       nextCheck: "Use the selected-block editor, Arrangement Focus, or Section Locator before changing the song form."
+    };
+  }
+
+  if (action.id.startsWith("arrangement-block-cue-")) {
+    return {
+      auditionCue: `Play Block loop; audition the cued block against Pattern ${project.selectedPattern} before editing arrangement details.`,
+      nextCheck: "Use Arrangement Playback Readout, Song Form Overview, or Arrangement Focus before changing nearby blocks."
     };
   }
 
@@ -19997,6 +20063,15 @@ function sectionLocatorActionSection(actionId: string): ArrangementSection | nul
 
 function arrangementBlockJumpIndex(actionId: string): number | null {
   const match = /^arrangement-block-jump-(\d+)$/.exec(actionId);
+  if (!match) {
+    return null;
+  }
+  const index = Number(match[1]) - 1;
+  return Number.isInteger(index) && index >= 0 ? index : null;
+}
+
+function arrangementBlockCueIndex(actionId: string): number | null {
+  const match = /^arrangement-block-cue-(\d+)$/.exec(actionId);
   if (!match) {
     return null;
   }
