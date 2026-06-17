@@ -84,6 +84,8 @@ The core project model should make composition events first-class. In the core a
 - `Device`: synth, drum rack, EQ, compressor, saturation, limiter, meter, send effect.
 - `StyleProfile`: genre rules for BPM range, swing, density, quantize strength, humanization, bass style, and melody style.
 
+Default device palette: drum rack, synth 808/bass, simple synth, chord synth, built-in FX, mixer, and master devices. A sampler device is not part of the MVP default palette; it belongs to the optional sampling extension after the direct beat workstation can stand without imported audio.
+
 MVP type examples must not place `AudioClipEvent`, `audio`, or `sampler` beside the core event, clip, or track unions. Those names are reserved for the optional sampling extension section unless the user explicitly starts sampling-phase work.
 
 If an exploratory draft includes audio clip, sampler, or waveform examples, move them to an optional sampling section before they enter architecture diagrams, schema examples, default tracks, or MVP validation.
@@ -119,6 +121,8 @@ Extension track types for optional sampling, later:
 
 - `audio`
 - `sampler`
+
+Do not list `sampler` in the default instrument panel, first-run track list, or MVP architecture diagram. It can appear only inside an explicitly marked optional sampling section until sampling-phase work is approved.
 
 ## Genre Rule
 

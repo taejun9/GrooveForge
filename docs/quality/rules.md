@@ -399,6 +399,10 @@ Data model examples fail the product boundary if they add `AudioClipEvent` to th
 
 Concept-audit work must also catch sampling drift introduced through technical examples: waveform UI, audio clip schemas, sampler tracks, sample asset graphs, and `AudioClipEvent` examples belong in an optional sampling section until the user explicitly starts that phase.
 
+Default instrument panel, device-palette, and architecture-diagram work fails if it lists `sampler`, sample browser, chop pads, or audio clips beside the MVP built-in drum rack, synth 808/bass, simple synth, chord synth, FX, mixer, and master devices. Those entries must move to an explicitly optional sampling section unless the user starts sampling-phase work.
+
+Brief alignment work must rewrite external examples that include `AudioClipEvent` in the core `MusicalEvent` union so the MVP union remains `NoteEvent`, `DrumHitEvent`, and `AutomationEvent`, with `AudioClipEvent` documented only as a future optional extension.
+
 Mixer/master work must keep mixing and mastering separate. Volume, pan, mute, solo, master output gain, and preset ceiling controls must affect both realtime playback and WAV export when implemented. Mixer channel role readouts must derive only from local mixer channel volume, pan, mute, solo, low-cut, air, Drive/Glue, and Space send fields, stay UI-local and out of saved project schema, avoid changing Mix Coach, Mix Balance Pads, Stem Audition Pads, Master Finish, playback, or export semantics, and avoid hidden mixing, mastering, LUFS/true-peak, platform-safety claims, sampling, imported audio, remote AI, accounts, analytics, or cloud sync. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.
 
 Channel EQ work must keep low-cut/air controls in mixer state, migrate older project files safely, keep non-master track EQ separate from master processing, and make EQ values affect realtime playback, full-mix WAV export, and stem export.

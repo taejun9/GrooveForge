@@ -51,6 +51,8 @@ Keep sampling language in boundary, roadmap, or optional-phase sections. Do not 
 
 Primary navigation and the first empty project should expose beat-making controls first: transport, style/key/BPM, pattern editor, drum programming, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sampling entry points, when added, should be opt-in secondary paths.
 
+Default instrument-panel rule: the base instrument panel is built-in drum rack, synth 808/bass, simple synth, chord synth, effects, and sound-design controls. If a draft lists `sampler` beside those default instruments, move it to the optional sampling extension section unless the user explicitly starts sampling-phase work.
+
 Accessory rule: sampling can expand available source material, but it is not the product category, the first proof of value, or the main creative loop. A feature draft should first explain which beat event, instrument, arrangement, mix/master, or export outcome it improves; if the answer is sample import, chopping, loop stretch, one-shot mapping, or sampler setup, the draft belongs in an optional sampling phase.
 
 Placement rule: the default empty project, first visible actions, MVP proof, primary navigation, onboarding language, and plan titles must start from editable musical events and beat-making controls. Optional sampling can add sound sources later, but it must not become the first required action, first proof of value, default explanation of GrooveForge, or a co-equal product spine beside direct composition.
@@ -98,7 +100,7 @@ Primary feature areas:
 - Pattern Playback Readout: a compact Pattern editor status line summarizes selected editing Pattern, audible Pattern, and event counts from local playback snapshots and Pattern A/B/C data without changing edit focus.
 - Pattern DNA: read-only selected Pattern A/B/C layer, density, variation-signal, and arrangement-use summary derived from local Pattern A/B/C event data and arrangement blocks so beginners can understand the loop and producers can scan edit posture.
 - Pattern DNA Focus: UI-local Focus controls that route Layers, Density, Variation, and Arrangement DNA cards to matching Compose or Arrange panels so users can correct a loop faster without changing Pattern DNA derivation or project data.
-- Instrument panel: drum kit, synth 808, simple synth, chord synth, effects, Drum Kit Pads with local Drum Kit Result for built-in drum tone posture, Sound Focus Pads with a local Sound Focus Preview and Result, and sound-design controls.
+- Instrument panel: built-in drum kit, synth 808, simple synth, chord synth, effects, Drum Kit Pads with local Drum Kit Result for built-in drum tone posture, Sound Focus Pads with a local Sound Focus Preview and Result, and sound-design controls; sampler entry points belong only to the later optional sampling extension.
 - Arrangement view: editable pattern blocks placed into intro, verse, hook, bridge, and outro structures, with selected-block role readout, Arrangement Playback Readout for edit-versus-audible block context, Arrangement Playhead Highlighting across Arrangement Track, Section Locator Pads, and Song Form Overview from local playback snapshots, Arrangement Arc Pads for full-song energy shaping, Section Locator Pads for Intro/Verse/Hook/Bridge/Outro block cueing, Arrangement Focus presets, Pattern Chain 8-bar sketches, per-step A/B/C chain cycling, Chain Expand song-form outlining, one-click Drop/Build/Hook Lift moves, per-block bar lengths, selected-block copy/paste, split/merge controls, arrangement templates plus duplicate, move, and delete controls.
 - Project readiness: read-only checks for drums, 808/bass, melody/chords, arrangement, and export completeness.
 - Beat Passport: compact read-only target, length, Pattern A/B/C, readiness, export, stem, and master posture summary from local project/render state.
@@ -163,7 +165,7 @@ type DrumHitEvent = {
 };
 ```
 
-This is the core MVP event union. Drafts must not add `AudioClipEvent` beside `NoteEvent`, `DrumHitEvent`, and `AutomationEvent` unless an optional-sampling phase has been explicitly approved.
+This is the core MVP event union. Drafts must not add `AudioClipEvent` beside `NoteEvent`, `DrumHitEvent`, and `AutomationEvent` unless an optional-sampling phase has been explicitly approved. If an external brief includes `AudioClipEvent` in `MusicalEvent`, rewrite it as an optional extension example instead of copying it into the core schema.
 
 Audio clip events belong to a later extension model. A project must be able to produce a complete beat with only drum, bass, synth, chord, automation, mixer, and master data.
 
