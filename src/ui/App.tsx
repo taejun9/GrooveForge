@@ -7183,6 +7183,7 @@ export function App(): ReactElement {
     selectedArrangementIndex,
     sessionPassSummary,
     soundFocusPreviewSummary,
+    soundPresetPreviewSummary,
     styleInspectorSummary,
     transportLoopScope,
     workflowNavigatorItems,
@@ -7199,6 +7200,7 @@ export function App(): ReactElement {
     onApplyPatternChain: applyPatternChain,
     onApplyPatternFill: applyPatternFill,
     onApplySoundFocus: applySoundFocusPad,
+    onApplySoundPreset: applySoundPreset,
     onExpandPatternChain: expandPatternChain,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onExportHandoffSheet: handleExportHandoffSheet,
@@ -12321,6 +12323,7 @@ function createQuickActions({
   selectedArrangementIndex,
   sessionPassSummary,
   soundFocusPreviewSummary,
+  soundPresetPreviewSummary,
   styleInspectorSummary,
   transportLoopScope,
   workflowNavigatorItems,
@@ -12337,6 +12340,7 @@ function createQuickActions({
   onApplyPatternChain,
   onApplyPatternFill,
   onApplySoundFocus,
+  onApplySoundPreset,
   onExpandPatternChain,
   onPreviewBlueprint,
   onExportHandoffSheet,
@@ -12390,6 +12394,7 @@ function createQuickActions({
   selectedArrangementIndex: number;
   sessionPassSummary: SessionPassSummary;
   soundFocusPreviewSummary: SoundFocusPreviewSummary;
+  soundPresetPreviewSummary: SoundPresetPreviewSummary;
   styleInspectorSummary: StyleInspectorSummary;
   transportLoopScope: TransportLoopScope;
   workflowNavigatorItems: WorkflowNavigatorItem[];
@@ -12406,6 +12411,7 @@ function createQuickActions({
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
   onApplySoundFocus: (pad: SoundFocusPadId) => void;
+  onApplySoundPreset: (preset: SoundPresetTarget) => void;
   onExpandPatternChain: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onExportHandoffSheet: () => void;
@@ -12461,6 +12467,7 @@ function createQuickActions({
   const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
   const drumKitReady = drumKitPreviewSummary.statusLabel !== "Kit aligned";
   const soundFocusReady = soundFocusPreviewSummary.statusLabel !== "Sound aligned";
+  const soundPresetReady = soundPresetPreviewSummary.statusLabel !== "Preset aligned";
 
   return [
     {
@@ -12678,6 +12685,21 @@ function createQuickActions({
       run: () => {
         if (soundFocusReady) {
           onApplySoundFocus(soundFocusPreviewSummary.padId);
+        }
+      }
+    },
+    {
+      id: "sound-preset",
+      title: soundPresetReady ? `Apply ${soundPresetPreviewSummary.presetLabel}` : "Apply Sound Preset",
+      detail: soundPresetReady
+        ? `${soundPresetPreviewSummary.toneLabel} / ${soundPresetPreviewSummary.changeLabel}`
+        : "Current sound already matches the previewed preset.",
+      group: "Create",
+      keywords: `sound preset tone design full drums 808 bass duck sidechain synth chords ${soundPresetPreviewSummary.presetId} ${soundPresetPreviewSummary.presetLabel} beginner producer`,
+      disabled: !soundPresetReady,
+      run: () => {
+        if (soundPresetReady) {
+          onApplySoundPreset(soundPresetPreviewSummary.presetId);
         }
       }
     },
@@ -13227,6 +13249,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "sound-preset") {
+    return {
+      id: "sound-preset",
+      label: "Sound preset",
+      value: `${soundPresetLabel(project.sound.preset)} / ${soundPresetToneLabel(project.sound)}`
+    };
+  }
+
   if (action.id === "drum-kit") {
     return {
       id: "drum-kit",
@@ -13452,6 +13482,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, Synth, and Chords with the new tone posture.`,
       nextCheck: "Use the Sound Focus Result and Studio tone controls for manual kick, 808, Synth, and Chord corrections."
+    };
+  }
+
+  if (action.id === "sound-preset") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, Synth, and Chords under the applied full-tone preset.`,
+      nextCheck: "Use the Sound Preset Result, then trim with Drum Kit, Sound Focus, or Studio tone controls."
     };
   }
 
