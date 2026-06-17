@@ -12994,6 +12994,14 @@ function createQuickActions({
   const beatSpineCard = activeBeatSpineQuickActionCard(beatSpineSummary);
   const beatSpineApplyCard = activeBeatSpineQuickActionApplyCard(beatSpineSummary);
   const composerGuideCard = activeComposerGuideQuickActionCard(composerGuideSummary);
+  const composerGuideActions: QuickAction[] = composerGuideSummary.cards.map((card) => ({
+    id: `composer-guide-card-${card.id}`,
+    title: `Focus Composer Guide: ${card.label}`,
+    detail: `${card.status} / ${card.focusLabel} / ${card.detail}`,
+    group: "Create",
+    keywords: `composer guide focus card writing lane ${card.id} ${card.label} ${card.status} ${card.focusLabel} ${card.detail} drums 808 bass harmony melody arrange finish beginner producer`,
+    run: () => onFocusComposerGuide(card)
+  }));
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
   const finishChecklistCard = activeFinishChecklistQuickActionCard(finishChecklistSummary);
   const grooveCompassItem = activeGrooveCompassQuickActionItem(grooveCompassSummary);
@@ -14054,6 +14062,7 @@ function createQuickActions({
         }
       }
     },
+    ...composerGuideActions,
     {
       id: "style-inspector-focus",
       title: styleInspectorItem ? `Focus Style Inspector: ${styleInspectorItem.label}` : "Focus Style Inspector",
@@ -14809,6 +14818,7 @@ function createQuickActionResult(
     action.id === "session-pass-focus" ||
     action.id === "first-beat-path-jump" ||
     action.id === "composer-guide-focus" ||
+    action.id.startsWith("composer-guide-card-") ||
     action.id === "key-compass-focus" ||
     action.id === "groove-compass-focus" ||
     action.id === "pattern-dna-focus" ||
@@ -14980,6 +14990,14 @@ function quickActionResultMetricSnapshot(
       id: "composer-guide",
       label: "Composer guide",
       value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
+    };
+  }
+
+  if (action.id.startsWith("composer-guide-card-")) {
+    return {
+      id: "composer-guide",
+      label: "Composer guide",
+      value: action.detail
     };
   }
 
@@ -15561,6 +15579,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Composer Guide card to inspect the next writing gap before applying any move.",
       nextCheck: "Run the visible Composer Guide Focus buttons after the drums, 808, harmony, melody, arrangement, or finish lane changes."
+    };
+  }
+
+  if (action.id.startsWith("composer-guide-card-")) {
+    return {
+      auditionCue: "Use the focused Composer Guide lane to inspect that writing area before applying any move.",
+      nextCheck: "Return to Composer Guide when you need another direct drums, 808, harmony, melody, arrangement, or finish focus."
     };
   }
 
