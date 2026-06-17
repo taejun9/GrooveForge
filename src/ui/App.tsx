@@ -7197,6 +7197,8 @@ export function App(): ReactElement {
     layerStarterOptions,
     listeningPassSummary,
     melodyMovePreviewSummary,
+    midiCaptureStatus,
+    midiCaptureSummary,
     mixBalancePreviewSummary,
     mixSnapshots,
     modeFocusSummary,
@@ -7254,6 +7256,7 @@ export function App(): ReactElement {
     onApplySoundPreset: applySoundPreset,
     onExpandPatternChain: expandPatternChain,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
+    onRequestMidiInputAccess: requestMidiInputAccess,
     onExportHandoffSheet: handleExportHandoffSheet,
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
@@ -12549,6 +12552,8 @@ function createQuickActions({
   layerStarterOptions,
   listeningPassSummary,
   melodyMovePreviewSummary,
+  midiCaptureStatus,
+  midiCaptureSummary,
   mixBalancePreviewSummary,
   mixSnapshots,
   modeFocusSummary,
@@ -12606,6 +12611,7 @@ function createQuickActions({
   onApplySoundPreset,
   onExpandPatternChain,
   onPreviewBlueprint,
+  onRequestMidiInputAccess,
   onExportHandoffSheet,
   onExportMidi,
   onExportStems,
@@ -12651,6 +12657,8 @@ function createQuickActions({
   layerStarterOptions: LayerStarterOption[];
   listeningPassSummary: ListeningPassSummary;
   melodyMovePreviewSummary: MelodyMovePreviewSummary;
+  midiCaptureStatus: MidiCaptureStatus;
+  midiCaptureSummary: MidiCaptureSummary;
   mixBalancePreviewSummary: MixBalancePreviewSummary;
   mixSnapshots: MixSnapshotSlotMap;
   modeFocusSummary: ModeFocusSummary;
@@ -12708,6 +12716,7 @@ function createQuickActions({
   onApplySoundPreset: (preset: SoundPresetTarget) => void;
   onExpandPatternChain: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
+  onRequestMidiInputAccess: () => Promise<void>;
   onExportHandoffSheet: () => void;
   onExportMidi: () => void;
   onExportStems: () => void;
@@ -12763,6 +12772,9 @@ function createQuickActions({
   const deliveryTarget = activeDeliveryTarget(project);
   const deliveryTargetAlignmentPreview = createDeliveryTargetAlignmentPreview(project, deliveryTarget);
   const deliveryTargetAlignReady = !isDeliveryTargetAligned(project, deliveryTarget);
+  const midiInputConnectReady = midiCaptureStatus !== "unsupported" && midiCaptureStatus !== "requesting";
+  const midiInputConnectTitle =
+    midiCaptureStatus === "ready" || midiCaptureStatus === "listening" ? "Refresh MIDI input" : "Connect MIDI input";
   const arrangementMovePreset = selectedArrangementMoveQuickActionPreset(selectedBlock);
   const arrangementMoveReady = Boolean(
     selectedBlock && arrangementMovePreset && !isArrangementMovePresetApplied(selectedBlock, arrangementMovePreset)
@@ -12838,6 +12850,15 @@ function createQuickActions({
       keywords: "loop pattern preview selected a b c transport",
       disabled: isPlaying && transportLoopScope !== "pattern",
       run: () => onSelectTransportLoopScope("pattern")
+    },
+    {
+      id: "midi-input-connect",
+      title: midiInputConnectTitle,
+      detail: `${midiCaptureSummary.statusLabel} / ${midiCaptureSummary.detailLabel}`,
+      group: "Create",
+      keywords: `midi input connect refresh web midi controller keyboard note capture 808 synth ${midiCaptureStatus} ${midiCaptureSummary.statusLabel} beginner producer`,
+      disabled: !midiInputConnectReady,
+      run: onRequestMidiInputAccess
     },
     {
       id: "save-project",
@@ -13693,7 +13714,7 @@ function createQuickActionResult(
     action.id === "workflow-spotlight-focus" ||
     action.id === "review-queue-focus" ||
     action.id === "export-preflight-focus";
-  const uiLocal = action.id.startsWith("mix-snapshot-");
+  const uiLocal = action.id.startsWith("mix-snapshot-") || action.id === "midi-input-connect";
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
     id: afterMetric.id,
@@ -13717,7 +13738,9 @@ function createQuickActionResult(
             : uiLocal && action.id === "mix-snapshot-clear"
               ? "Cleared"
               : uiLocal
-                ? "Captured"
+                ? action.id === "midi-input-connect"
+                  ? "Checked"
+                  : "Captured"
                 : changed
                   ? "Applied"
                   : "Ran",
@@ -13746,6 +13769,14 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "session-pass-focus") {
     return { id: "session-pass", label: "Session pass", value: `${project.mode} mode` };
+  }
+
+  if (action.id === "midi-input-connect") {
+    return {
+      id: "midi-input",
+      label: "MIDI input",
+      value: `Pattern ${project.selectedPattern} / ${project.key} / local capture`
+    };
   }
 
   if (action.id === "delivery-target-align") {
@@ -14092,6 +14123,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused workstation panel to inspect the highlighted Session Pass target.",
       nextCheck: "Run the visible Session Pass Focus cards when you want another guided, studio, finish, or delivery jump."
+    };
+  }
+
+  if (action.id === "midi-input-connect") {
+    return {
+      auditionCue: "Arm Web MIDI Input in the Compose panel, then play a controller note into the selected 808 or Synth target.",
+      nextCheck: "Check the Web MIDI status, input selector, latest-note readout, and Keyboard Capture defaults before recording the next phrase."
     };
   }
 
