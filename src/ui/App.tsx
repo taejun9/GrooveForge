@@ -7159,6 +7159,7 @@ export function App(): ReactElement {
   }
 
   const quickActions = createQuickActions({
+    arrangementTemplatePreviewSummary,
     canRedo,
     canUndo,
     beatPassportSummary,
@@ -7184,6 +7185,7 @@ export function App(): ReactElement {
     workflowNavigatorItems,
     onApplyArrangementMove: applyArrangementMoveToSelected,
     onApplyArrangementFocus: applyArrangementFocusPreset,
+    onApplyArrangementTemplate: applyArrangementTemplate,
     onApplyBeatSpine: applyBeatSpineAction,
     onApplyBlueprint: applyQuickActionBeatBlueprint,
     onApplyLayerStarter: applyLayerStarter,
@@ -12289,6 +12291,7 @@ function NextMoveResultStrip({ result }: { result: NextMoveResult }): ReactEleme
 }
 
 function createQuickActions({
+  arrangementTemplatePreviewSummary,
   beatPassportSummary,
   beatSpineSummary,
   canRedo,
@@ -12314,6 +12317,7 @@ function createQuickActions({
   workflowNavigatorItems,
   onApplyArrangementMove,
   onApplyArrangementFocus,
+  onApplyArrangementTemplate,
   onApplyBeatSpine,
   onApplyBlueprint,
   onApplyLayerStarter,
@@ -12350,6 +12354,7 @@ function createQuickActions({
   onTogglePlayback,
   onUndo
 }: {
+  arrangementTemplatePreviewSummary: ArrangementTemplatePreviewSummary;
   beatPassportSummary: BeatPassportSummary;
   beatSpineSummary: BeatSpineSummary;
   canRedo: boolean;
@@ -12375,6 +12380,7 @@ function createQuickActions({
   workflowNavigatorItems: WorkflowNavigatorItem[];
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
+  onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
   onApplyBeatSpine: (action: BeatSpineAction) => void;
   onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
@@ -12432,6 +12438,8 @@ function createQuickActions({
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
   const styleInspectorItem = activeStyleInspectorQuickActionItem(styleInspectorSummary, project);
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
+  const arrangementTemplateId =
+    arrangementTemplatePreviewSummary.templateId === "aligned" ? null : arrangementTemplatePreviewSummary.templateId;
 
   return [
     {
@@ -12812,6 +12820,21 @@ function createQuickActions({
       group: "Arrange",
       keywords: "chain expand pattern chain arrangement song form intro verse hook bridge outro structure",
       run: onExpandPatternChain
+    },
+    {
+      id: "arrangement-template",
+      title: arrangementTemplateId ? `Apply ${arrangementTemplatePreviewSummary.templateLabel} Template` : "Apply Arrangement Template",
+      detail: arrangementTemplateId
+        ? `${arrangementTemplatePreviewSummary.sectionLabel} / ${arrangementTemplatePreviewSummary.patternLabel}`
+        : "Current arrangement already matches available templates.",
+      group: "Arrange",
+      keywords: `arrangement template song form full beat hook first breakdown structure ${arrangementTemplateId ?? "aligned"} ${arrangementTemplatePreviewSummary.templateLabel} beginner producer`,
+      disabled: !arrangementTemplateId,
+      run: () => {
+        if (arrangementTemplateId) {
+          onApplyArrangementTemplate(arrangementTemplateId);
+        }
+      }
     },
     {
       id: "mix-headroom",
@@ -13203,7 +13226,7 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "pattern-chain" || action.id === "chain-expand") {
+  if (action.id === "pattern-chain" || action.id === "chain-expand" || action.id === "arrangement-template") {
     return { id: "song-length", label: "Song length", value: barCountLabel(arrangementTotalBars(project)) };
   }
 
@@ -13388,6 +13411,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Song loop; scan intro, verse, hook, bridge, hook, and outro flow.",
       nextCheck: `${barCountLabel(arrangementTotalBars(project))} now; compare the song form against ${target.name}.`
+    };
+  }
+
+  if (action.id === "arrangement-template") {
+    return {
+      auditionCue: "Play Song loop; check section order, Pattern A/B/C spread, and hook placement.",
+      nextCheck: `${barCountLabel(arrangementTotalBars(project))} arranged; scan Song Form Overview before mix decisions.`
     };
   }
 
