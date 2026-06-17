@@ -960,6 +960,19 @@ type PatternDnaSummary = {
   cards: PatternDnaCard[];
 };
 
+type LayerStarterId = "drums" | "bass" | "chords" | "melody";
+
+type LayerStarterOption = {
+  id: LayerStarterId;
+  label: string;
+  status: string;
+  detail: string;
+  actionLabel: string;
+  targetLabel: string;
+  countLabel: string;
+  tone: MixCoachTone;
+};
+
 type PatternDnaFocusSummary = {
   cardId: PatternDnaCardId | null;
   statusLabel: string;
@@ -2955,6 +2968,7 @@ export function App(): ReactElement {
   const snapshotCompareSummary = useMemo(() => createSnapshotCompareSummary(project), [project]);
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
   const patternDnaSummary = useMemo(() => createPatternDnaSummary(project), [project]);
+  const layerStarterOptions = useMemo(() => createLayerStarterOptions(project), [project]);
   const styleInspectorSummary = useMemo(
     () => createStyleInspectorSummary(project, style, patternCompareSummaries),
     [patternCompareSummaries, project, style]
@@ -4921,6 +4935,23 @@ export function App(): ReactElement {
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(0);
+  }
+
+  function applyLayerStarter(starterId: LayerStarterId): void {
+    switch (starterId) {
+      case "drums":
+        applyDrumFoundation(composerDrumFoundation(projectRef.current));
+        return;
+      case "bass":
+        applyBasslinePad(composerBasslinePad(projectRef.current));
+        return;
+      case "chords":
+        applyChordProgressionPreset(composerChordPreset(projectRef.current));
+        return;
+      case "melody":
+        applyMelodyMotif(composerMelodyMotif(projectRef.current));
+        return;
+    }
   }
 
   function applyDrumFoundation(foundationId: DrumFoundationId): void {
@@ -6938,6 +6969,7 @@ export function App(): ReactElement {
             onUse={usePatternInSelectedBlock}
           />
           <PatternDna summary={patternDnaSummary} focusedCardId={patternDnaFocusId} onFocus={focusPatternDnaCard} />
+          <LayerStarterPads options={layerStarterOptions} onApply={applyLayerStarter} />
           <PatternClonePads clones={patternCloneOptions} onApply={cloneSelectedPatternVariation} />
           <PatternStackPreview preview={patternStackPreviewSummary} />
           {patternStackResult && <PatternStackResultStrip result={patternStackResult} />}
@@ -8296,6 +8328,40 @@ function PatternDna({
         })}
       </div>
     </section>
+  );
+}
+
+function LayerStarterPads({
+  options,
+  onApply
+}: {
+  options: LayerStarterOption[];
+  onApply: (starterId: LayerStarterId) => void;
+}): ReactElement {
+  return (
+    <div className="layer-starter-panel" data-testid="layer-starter-pads">
+      <div className="layer-starter-heading">
+        <span>Layer Starter</span>
+        <strong>Selected Pattern</strong>
+      </div>
+      <div className="layer-starter-row" aria-label="Layer Starter Pads">
+        {options.map((option) => (
+          <button
+            className={option.tone}
+            data-testid={`layer-starter-${option.id}`}
+            key={option.id}
+            onClick={() => onApply(option.id)}
+            title={`${option.label}: ${option.detail}`}
+            type="button"
+          >
+            <span>{option.status}</span>
+            <strong>{option.label}</strong>
+            <small>{option.actionLabel}</small>
+            <em>{option.countLabel} / {option.targetLabel}</em>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -14413,6 +14479,10 @@ function basslinePadLabel(pad: BasslinePadId): string {
   return basslinePadDefinitions.find((definition) => definition.id === pad)?.label ?? pad;
 }
 
+function drumFoundationLabel(foundation: DrumFoundationId): string {
+  return drumFoundationDefinitions.find((definition) => definition.id === foundation)?.label ?? foundation;
+}
+
 function melodyMotifLabel(motif: MelodyMotifId): string {
   return melodyMotifDefinitions.find((definition) => definition.id === motif)?.label ?? motif;
 }
@@ -16316,6 +16386,74 @@ function createPatternDnaSummary(project: ProjectState): PatternDnaSummary {
     detail: `${densityLabel} / ${readyLayers.length}/4 layers / ${arrangedBars > 0 ? barCountLabel(arrangedBars) : "not arranged"}`,
     tone,
     cards
+  };
+}
+
+function createLayerStarterOptions(project: ProjectState): LayerStarterOption[] {
+  const pattern = activePattern(project);
+  const styleActionProfile = composerActionStyleProfile(project);
+  const drumHits = drumHitCount(pattern);
+  const bassNotes = pattern.bassNotes.length;
+  const chordEvents = pattern.chordEvents.length;
+  const melodyNotes = pattern.melodyNotes.length;
+
+  return [
+    createLayerStarterOption(
+      "drums",
+      "Drums",
+      drumHits,
+      styleActionProfile.goals.drumHits,
+      drumFoundationLabel(composerDrumFoundation(project)),
+      styleActionProfile.cues.drums
+    ),
+    createLayerStarterOption(
+      "bass",
+      "808",
+      bassNotes,
+      styleActionProfile.goals.bassNotes,
+      basslinePadLabel(composerBasslinePad(project)),
+      styleActionProfile.cues.bass
+    ),
+    createLayerStarterOption(
+      "chords",
+      "Chords",
+      chordEvents,
+      styleActionProfile.goals.chordEvents,
+      chordProgressionPresetLabel(composerChordPreset(project)),
+      styleActionProfile.cues.harmony
+    ),
+    createLayerStarterOption(
+      "melody",
+      "Synth",
+      melodyNotes,
+      styleActionProfile.goals.melodyNotes,
+      melodyMotifLabel(composerMelodyMotif(project)),
+      styleActionProfile.cues.melody
+    )
+  ];
+}
+
+function createLayerStarterOption(
+  id: LayerStarterId,
+  label: string,
+  count: number,
+  goal: number,
+  actionLabel: string,
+  targetLabel: string
+): LayerStarterOption {
+  const tone = composerActionTone(count, goal);
+  const status = count === 0 ? "Missing" : tone === "good" ? "Ready" : "Thin";
+  const countLabel = `${count}/${goal}`;
+
+  return {
+    id,
+    label,
+    status,
+    detail: `${label} ${countLabel} / ${targetLabel} / ${actionLabel}`,
+    actionLabel,
+    targetLabel,
+    countLabel,
+    tone
   };
 }
 

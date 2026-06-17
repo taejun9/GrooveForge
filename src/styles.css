@@ -198,6 +198,8 @@ h2 {
 .pattern-stack-preview span,
 .pattern-stack-heading span,
 .pattern-stack-row button span,
+.layer-starter-heading span,
+.layer-starter-row button span,
 .drum-move-preview span,
 .drum-foundation-heading span,
 .drum-foundation-row button span,
@@ -407,6 +409,7 @@ h2 {
 .groove-feel-row button,
 .pattern-clone-row button,
 .pattern-stack-row button,
+.layer-starter-row button,
 .drum-foundation-row button,
 .pattern-tools button,
 .pattern-fill-row button,
@@ -545,6 +548,7 @@ h2 {
 .groove-feel-row button,
 .pattern-clone-row button,
 .pattern-stack-row button,
+.layer-starter-row button,
 .drum-foundation-row button,
 .pattern-tools button,
 .pattern-fill-row button,
@@ -6544,6 +6548,102 @@ h2 {
 .pattern-stack-row button small {
   color: rgba(244, 239, 231, 0.48);
   font-size: 10px;
+}
+
+.layer-starter-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.052);
+  padding: 10px;
+}
+
+.layer-starter-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.layer-starter-heading strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.layer-starter-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.layer-starter-row button {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 6px 7px;
+  text-align: center;
+}
+
+.layer-starter-row button.good {
+  border-color: rgba(120, 240, 200, 0.28);
+  background: rgba(120, 240, 200, 0.08);
+}
+
+.layer-starter-row button.warn {
+  border-color: rgba(255, 205, 112, 0.28);
+  background: rgba(255, 205, 112, 0.08);
+}
+
+.layer-starter-row button.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.08);
+}
+
+.layer-starter-row button span,
+.layer-starter-row button strong,
+.layer-starter-row button small,
+.layer-starter-row button em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-starter-row button span {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.layer-starter-row button.good span {
+  color: #78f0c8;
+}
+
+.layer-starter-row button.warn span {
+  color: #ffcd70;
+}
+
+.layer-starter-row button.danger span {
+  color: #ff7a4f;
+}
+
+.layer-starter-row button strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.layer-starter-row button small {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
+}
+
+.layer-starter-row button em {
+  color: rgba(244, 239, 231, 0.48);
+  font-size: 9px;
+  font-style: normal;
 }
 
 .drum-move-preview {
@@ -13823,6 +13923,10 @@ input[type="range"] {
   .pattern-stack-result-metrics,
   .pattern-stack-result-followup {
     grid-template-columns: 1fr;
+  }
+
+  .layer-starter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .drum-move-preview {
