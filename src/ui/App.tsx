@@ -7275,6 +7275,7 @@ export function App(): ReactElement {
     onTapTempo: tapProjectTempo,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onRequestMidiInputAccess: requestMidiInputAccess,
+    onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
     onSetKeyboardCaptureEnabled: setKeyboardCaptureEnabled,
     onSetKeyboardCaptureTarget: setKeyboardCaptureTarget,
@@ -12677,6 +12678,7 @@ function createQuickActions({
   onTapTempo,
   onPreviewBlueprint,
   onRequestMidiInputAccess,
+  onSelectPattern,
   onSelectStyle,
   onSetKeyboardCaptureEnabled,
   onSetKeyboardCaptureTarget,
@@ -12829,6 +12831,7 @@ function createQuickActions({
   onTapTempo: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onRequestMidiInputAccess: () => Promise<void>;
+  onSelectPattern: (pattern: PatternSlot) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
   onSetKeyboardCaptureEnabled: (enabled: boolean) => void;
   onSetKeyboardCaptureTarget: (target: NoteTrack) => void;
@@ -13666,6 +13669,20 @@ function createQuickActions({
       run: () => onSelectStyle(profile.id)
     };
   });
+  const patternSwitchActions: QuickAction[] = patternSlots.map((pattern) => {
+    const selected = pattern === project.selectedPattern;
+    const eventCount = patternEventTotal(project.patterns[pattern]);
+    return {
+      id: `pattern-switch-${pattern.toLowerCase()}`,
+      title: selected ? `Refocus Pattern ${pattern}` : `Switch to Pattern ${pattern}`,
+      detail: selected
+        ? `Pattern ${pattern} is the current edit focus / ${eventCount} events`
+        : `Pattern ${pattern} / ${eventCount} events / changes edit focus only`,
+      group: "Create",
+      keywords: `pattern switch select focus edit variation ${pattern} a b c loop compose arrange compare beginner producer`,
+      run: () => onSelectPattern(pattern)
+    };
+  });
   const patternCloneActions: QuickAction[] = patternCloneOptions.map((clone) => ({
     id: `pattern-clone-${clone.target}-${clone.preset}`,
     title: `Clone Pattern ${clone.source} to ${clone.target} as ${clone.preview}`,
@@ -13730,6 +13747,7 @@ function createQuickActions({
       run: onTapTempo
     },
     ...tempoNudgeActions,
+    ...patternSwitchActions,
     {
       id: "midi-input-connect",
       title: midiInputConnectTitle,
@@ -14618,6 +14636,7 @@ function createQuickActionResult(
     action.id === "key-compass-focus" ||
     action.id === "groove-compass-focus" ||
     action.id === "pattern-dna-focus" ||
+    action.id.startsWith("pattern-switch-") ||
     action.id === "workflow-spotlight-focus" ||
     action.id === "review-queue-focus" ||
     action.id === "export-preflight-focus";
@@ -14830,6 +14849,14 @@ function quickActionResultMetricSnapshot(
       id: "style-quick",
       label: "Style",
       value: `${styleName} / ${project.bpm} BPM / ${percentLabel(project.swing)} swing`
+    };
+  }
+
+  if (action.id.startsWith("pattern-switch-")) {
+    return {
+      id: "pattern-switch",
+      label: "Edit pattern",
+      value: `Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
     };
   }
 
@@ -15305,6 +15332,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the applied style's drums, 808, harmony, melody, and swing before arranging.`,
       nextCheck: "Use Style Inspector, current-style starter preview, and manual Pattern editors to refine the new style direction."
+    };
+  }
+
+  if (action.id.startsWith("pattern-switch-")) {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; confirm this variation's drums, 808, chords, and Synth before editing.`,
+      nextCheck: "Use Pattern Compare, Pattern DNA, Pattern Clone, or Pattern Chain when the selected variation should feed the arrangement."
     };
   }
 

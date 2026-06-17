@@ -76,6 +76,8 @@ Transport Position Readout work must derive Bar/Beat/Step, section, Pattern A/B/
 
 Metronome and Quick Actions work must keep click playback realtime-only, accent beat 1 distinctly from beats 2-4, persist the transport toggle through save/load migration, route the transport button and command run only through the existing metronome toggle handler, follow live BPM changes while playing, preserve Stop/Space behavior, and keep WAV/stem exports free of metronome audio.
 
+Pattern Switch Quick Actions work must expose only Pattern A/B/C edit-focus commands, route each command through the existing Pattern tab selection handler, reset selected note/drum/chord focus the same way tab clicks do, preserve Pattern A/B/C event data, arrangement blocks, playback scheduling, loop scope, save/load, mixer/master, WAV/stem/MIDI export semantics, and avoid hidden generation, command chains, autoplay, auto-arrangement, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.
+
 Drum, bass, melody, and arrangement work must preserve editable project state without losing event timing, pitch, velocity, glide, track routing, or mixer state.
 
 Drum dynamics work must migrate old patterns, preserve per-step velocity and hat repeat data across Pattern A/B/C copy, save/load, undo/redo, realtime playback, WAV export, and stem export.
