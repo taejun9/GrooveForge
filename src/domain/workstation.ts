@@ -182,7 +182,18 @@ export type ProjectState = ProjectCoreState & {
   snapshots: ProjectSnapshot[];
 };
 
-export const beatBlueprintIds = ["dark_808", "rnb_pocket", "club_bounce", "warm_loop"] as const;
+export const beatBlueprintIds = [
+  "trap_bounce",
+  "dark_808",
+  "boom_bap_knock",
+  "warm_loop",
+  "rnb_pocket",
+  "club_bounce",
+  "jersey_drive",
+  "phonk_cruise",
+  "garage_skip",
+  "experimental_pulse"
+] as const;
 export type BeatBlueprintId = (typeof beatBlueprintIds)[number];
 
 export type BeatBlueprint = {
@@ -371,6 +382,24 @@ export const soundPresetLabels: Record<SoundPresetId, string> = {
 
 export const beatBlueprints: BeatBlueprint[] = [
   {
+    id: "trap_bounce",
+    name: "Trap Bounce",
+    focus: "fast hats, hard 808 turns, and hook-ready drums",
+    styleId: "trap",
+    key: "F minor",
+    bpm: 145,
+    arrangementTemplate: "hook_first",
+    soundPreset: "club_punch",
+    masterPreset: "Headroom for Vocal",
+    mixer: {
+      drum_rack: { volumeDb: -3.8, lowCut: 0.05, air: 0.32, drive: 0.2, glue: 0.28, send: 0.08 },
+      bass_808: { volumeDb: -4.8, lowCut: 0, air: 0.08, drive: 0.38, glue: 0.22, send: 0.02 },
+      synth: { volumeDb: -9.5, pan: -14, lowCut: 0.24, air: 0.48, drive: 0.08, glue: 0.12, send: 0.26 },
+      chord: { volumeDb: -11.5, pan: 12, lowCut: 0.2, air: 0.34, drive: 0.06, glue: 0.16, send: 0.32 },
+      master: { volumeDb: -1.5 }
+    }
+  },
+  {
     id: "dark_808",
     name: "Dark 808 Sketch",
     focus: "drill/trap hook with vocal headroom",
@@ -386,6 +415,42 @@ export const beatBlueprints: BeatBlueprint[] = [
       synth: { volumeDb: -10, pan: -18, lowCut: 0.22, air: 0.44, drive: 0.08, glue: 0.12, send: 0.38 },
       chord: { volumeDb: -12, pan: 18, lowCut: 0.18, air: 0.32, drive: 0.06, glue: 0.16, send: 0.42 },
       master: { volumeDb: -1.6 }
+    }
+  },
+  {
+    id: "boom_bap_knock",
+    name: "Boom Bap Knock",
+    focus: "swung drums, warm keys, and pocket-ready bass",
+    styleId: "boom_bap",
+    key: "E minor",
+    bpm: 92,
+    arrangementTemplate: "full",
+    soundPreset: "warm_tape",
+    masterPreset: "Headroom for Vocal",
+    mixer: {
+      drum_rack: { volumeDb: -4.6, lowCut: 0.12, air: 0.12, drive: 0.24, glue: 0.34, send: 0.22 },
+      bass_808: { volumeDb: -7.6, lowCut: 0.02, air: 0.04, drive: 0.2, glue: 0.2, send: 0.08 },
+      synth: { volumeDb: -10.8, pan: -18, lowCut: 0.32, air: 0.18, drive: 0.12, glue: 0.16, send: 0.42 },
+      chord: { volumeDb: -8.4, pan: 16, lowCut: 0.16, air: 0.14, drive: 0.1, glue: 0.24, send: 0.36 },
+      master: { volumeDb: -2.1 }
+    }
+  },
+  {
+    id: "warm_loop",
+    name: "Warm Loop",
+    focus: "boom bap/lo-fi sketch with swing",
+    styleId: "lofi",
+    key: "A minor",
+    bpm: 82,
+    arrangementTemplate: "breakdown",
+    soundPreset: "warm_tape",
+    masterPreset: "Headroom for Vocal",
+    mixer: {
+      drum_rack: { volumeDb: -5, lowCut: 0.12, air: 0.1, drive: 0.2, glue: 0.32, send: 0.2 },
+      bass_808: { volumeDb: -8, lowCut: 0.02, air: 0.04, drive: 0.18, glue: 0.18, send: 0.08 },
+      synth: { volumeDb: -11, pan: -20, lowCut: 0.3, air: 0.18, drive: 0.12, glue: 0.16, send: 0.4 },
+      chord: { volumeDb: -8, pan: 20, lowCut: 0.16, air: 0.14, drive: 0.1, glue: 0.24, send: 0.36 },
+      master: { volumeDb: -2 }
     }
   },
   {
@@ -425,21 +490,75 @@ export const beatBlueprints: BeatBlueprint[] = [
     }
   },
   {
-    id: "warm_loop",
-    name: "Warm Loop",
-    focus: "boom bap/lo-fi sketch with swing",
-    styleId: "lofi",
+    id: "jersey_drive",
+    name: "Jersey Drive",
+    focus: "club kick pattern, quick bass stabs, and bright hook motion",
+    styleId: "jersey",
+    key: "F# minor",
+    bpm: 140,
+    arrangementTemplate: "hook_first",
+    soundPreset: "club_punch",
+    masterPreset: "Clean Demo",
+    mixer: {
+      drum_rack: { volumeDb: -2.8, lowCut: 0.04, air: 0.34, drive: 0.24, glue: 0.38, send: 0.08 },
+      bass_808: { volumeDb: -6.2, lowCut: 0.02, air: 0.08, drive: 0.26, glue: 0.2, send: 0.04 },
+      synth: { volumeDb: -8.2, pan: -10, lowCut: 0.22, air: 0.54, drive: 0.08, glue: 0.14, send: 0.2 },
+      chord: { volumeDb: -10.2, pan: 12, lowCut: 0.2, air: 0.42, drive: 0.06, glue: 0.16, send: 0.22 },
+      master: { volumeDb: -0.9 }
+    }
+  },
+  {
+    id: "phonk_cruise",
+    name: "Phonk Cruise",
+    focus: "distorted low end, rolling drums, and dark loop energy",
+    styleId: "phonk",
+    key: "G minor",
+    bpm: 132,
+    arrangementTemplate: "full",
+    soundPreset: "club_punch",
+    masterPreset: "Clean Demo",
+    mixer: {
+      drum_rack: { volumeDb: -3.2, lowCut: 0.06, air: 0.22, drive: 0.3, glue: 0.34, send: 0.1 },
+      bass_808: { volumeDb: -5.6, lowCut: 0, air: 0.06, drive: 0.42, glue: 0.24, send: 0.03 },
+      synth: { volumeDb: -9.6, pan: -16, lowCut: 0.28, air: 0.3, drive: 0.18, glue: 0.16, send: 0.3 },
+      chord: { volumeDb: -10.4, pan: 14, lowCut: 0.18, air: 0.18, drive: 0.14, glue: 0.24, send: 0.28 },
+      master: { volumeDb: -1.1 }
+    }
+  },
+  {
+    id: "garage_skip",
+    name: "Garage Skip",
+    focus: "shuffling drums, plucky bass, and clean club motion",
+    styleId: "garage",
     key: "A minor",
-    bpm: 82,
+    bpm: 132,
+    arrangementTemplate: "hook_first",
+    soundPreset: "club_punch",
+    masterPreset: "Streaming Safe",
+    mixer: {
+      drum_rack: { volumeDb: -3.4, lowCut: 0.06, air: 0.3, drive: 0.18, glue: 0.3, send: 0.12 },
+      bass_808: { volumeDb: -6.8, lowCut: 0.02, air: 0.1, drive: 0.24, glue: 0.22, send: 0.06 },
+      synth: { volumeDb: -8.6, pan: -12, lowCut: 0.24, air: 0.5, drive: 0.08, glue: 0.12, send: 0.24 },
+      chord: { volumeDb: -9.8, pan: 12, lowCut: 0.18, air: 0.4, drive: 0.06, glue: 0.16, send: 0.32 },
+      master: { volumeDb: -1 }
+    }
+  },
+  {
+    id: "experimental_pulse",
+    name: "Experimental Pulse",
+    focus: "uneven pulse, spacious synths, and editable abstract motion",
+    styleId: "experimental",
+    key: "D minor",
+    bpm: 110,
     arrangementTemplate: "breakdown",
-    soundPreset: "warm_tape",
+    soundPreset: "air_space",
     masterPreset: "Headroom for Vocal",
     mixer: {
-      drum_rack: { volumeDb: -5, lowCut: 0.12, air: 0.1, drive: 0.2, glue: 0.32, send: 0.2 },
-      bass_808: { volumeDb: -8, lowCut: 0.02, air: 0.04, drive: 0.18, glue: 0.18, send: 0.08 },
-      synth: { volumeDb: -11, pan: -20, lowCut: 0.3, air: 0.18, drive: 0.12, glue: 0.16, send: 0.4 },
-      chord: { volumeDb: -8, pan: 20, lowCut: 0.16, air: 0.14, drive: 0.1, glue: 0.24, send: 0.36 },
-      master: { volumeDb: -2 }
+      drum_rack: { volumeDb: -5.2, lowCut: 0.08, air: 0.26, drive: 0.16, glue: 0.22, send: 0.18 },
+      bass_808: { volumeDb: -7.2, lowCut: 0.02, air: 0.08, drive: 0.24, glue: 0.18, send: 0.08 },
+      synth: { volumeDb: -9.2, pan: -22, lowCut: 0.28, air: 0.6, drive: 0.08, glue: 0.1, send: 0.46 },
+      chord: { volumeDb: -10.8, pan: 20, lowCut: 0.2, air: 0.44, drive: 0.06, glue: 0.14, send: 0.5 },
+      master: { volumeDb: -2.2 }
     }
   }
 ];

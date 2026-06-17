@@ -12870,20 +12870,26 @@ function blueprintNextMoveAction(project: ProjectState): NextMoveAction {
 
 function suggestedBlueprintId(project: ProjectState): BeatBlueprintId {
   switch (project.styleId) {
-    case "rnb":
-      return "rnb_pocket";
-    case "house":
-    case "jersey":
-    case "garage":
-      return "club_bounce";
+    case "trap":
+      return "trap_bounce";
+    case "drill":
+      return "dark_808";
     case "boom_bap":
+      return "boom_bap_knock";
     case "lofi":
       return "warm_loop";
-    case "trap":
-    case "drill":
+    case "house":
+      return "club_bounce";
+    case "rnb":
+      return "rnb_pocket";
+    case "jersey":
+      return "jersey_drive";
     case "phonk":
+      return "phonk_cruise";
+    case "garage":
+      return "garage_skip";
     case "experimental":
-      return "dark_808";
+      return "experimental_pulse";
   }
 }
 

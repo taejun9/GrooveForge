@@ -134,6 +134,10 @@ async function validateProjectExportSmoke(smokeCase) {
 const supportedStyleIds = workstation.styleProfiles.map((profile) => profile.id);
 check(new Set(supportedStyleIds).size === supportedStyleIds.length, "styleProfiles should not contain duplicate style ids");
 check(workstation.styleProfiles.length > 0, "styleProfiles should contain at least one supported style");
+const blueprintStyleIds = new Set(workstation.beatBlueprints.map((blueprint) => blueprint.styleId));
+for (const styleId of supportedStyleIds) {
+  check(blueprintStyleIds.has(styleId), `style:${styleId} should have a dedicated Beat Blueprint`);
+}
 
 const blueprintCases = workstation.beatBlueprints.map((blueprint) => ({
   kind: "blueprint",
