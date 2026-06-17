@@ -1380,6 +1380,19 @@ type ArrangementFocusSummary = {
   suggestedPreset: ArrangementFocusPresetId;
 };
 
+type ArrangementFocusPreviewSummary = {
+  presetId: ArrangementFocusPresetId;
+  statusLabel: string;
+  presetLabel: string;
+  blockLabel: string;
+  sectionLabel: string;
+  energyLabel: string;
+  muteLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type ArrangementArcPadId = "clean" | "lift" | "break" | "rise";
 
 type ArrangementArcPoint = {
@@ -2821,6 +2834,10 @@ export function App(): ReactElement {
   const selectedArrangementFocus = useMemo(
     () => createArrangementFocusSummary(project, selectedArrangementIndex),
     [project, selectedArrangementIndex]
+  );
+  const arrangementFocusPreviewSummary = useMemo(
+    () => createArrangementFocusPreviewSummary(project, selectedArrangementIndex, selectedArrangementFocus),
+    [project, selectedArrangementFocus, selectedArrangementIndex]
   );
   const sectionLocatorPads = useMemo(
     () => createSectionLocatorPads(project, selectedArrangementIndex, playingArrangementIndex),
@@ -6975,7 +6992,11 @@ export function App(): ReactElement {
               })}
             </div>
           </div>
-          <ArrangementFocusPanel summary={selectedArrangementFocus} onApply={applyArrangementFocusPreset} />
+          <ArrangementFocusPanel
+            preview={arrangementFocusPreviewSummary}
+            summary={selectedArrangementFocus}
+            onApply={applyArrangementFocusPreset}
+          />
           <div
             className={["arrangement-playback-readout", arrangementPlaybackReadout.tone].join(" ")}
             data-testid="arrangement-playback-readout"
@@ -7927,12 +7948,14 @@ function PatternDna({
 
 function ArrangementFocusPanel({
   onApply,
+  preview,
   summary
 }: {
   onApply: (preset: ArrangementFocusPresetId) => void;
+  preview: ArrangementFocusPreviewSummary | null;
   summary: ArrangementFocusSummary | null;
 }): ReactElement | null {
-  if (!summary) {
+  if (!summary || !preview) {
     return null;
   }
 
@@ -7946,6 +7969,20 @@ function ArrangementFocusPanel({
         <small>
           {barCountLabel(summary.bars)} / {Math.round(summary.energy * 100)}% energy / {summary.eventCount} events / {summary.mutedLabel}
         </small>
+      </div>
+      <div
+        className={`arrangement-focus-preview ${preview.tone}`}
+        data-preview-arrangement-focus={preview.presetId}
+        data-testid="arrangement-focus-preview"
+        title={preview.detailTitle}
+      >
+        <span data-testid="arrangement-focus-preview-status">{preview.statusLabel}</span>
+        <strong data-testid="arrangement-focus-preview-preset">{preview.presetLabel}</strong>
+        <small data-testid="arrangement-focus-preview-block">{preview.blockLabel}</small>
+        <small data-testid="arrangement-focus-preview-section">{preview.sectionLabel}</small>
+        <small data-testid="arrangement-focus-preview-energy">{preview.energyLabel}</small>
+        <small data-testid="arrangement-focus-preview-mutes">{preview.muteLabel}</small>
+        <small data-testid="arrangement-focus-preview-moves">{preview.moveLabel}</small>
       </div>
       <div className="arrangement-focus-actions">
         {arrangementFocusPresets.map((preset) => (
@@ -14918,6 +14955,58 @@ function createArrangementFocusSummary(project: ProjectState, selectedIndex: num
     mutedLabel: mutedLabels.length === 0 ? "no mutes" : `${mutedLabels.join(", ")} muted`,
     suggestedPreset: suggestedArrangementFocusPreset(block)
   };
+}
+
+function createArrangementFocusPreviewSummary(
+  project: ProjectState,
+  selectedIndex: number,
+  summary: ArrangementFocusSummary | null
+): ArrangementFocusPreviewSummary | null {
+  const block = project.arrangement[selectedIndex] ?? project.arrangement[0];
+  if (!block || !summary) {
+    return null;
+  }
+
+  const preset = arrangementFocusPresets.find((candidate) => candidate.id === summary.suggestedPreset) ?? arrangementFocusPresets[0];
+  const changedFields = arrangementFocusChangedFieldCount(block, preset);
+  const tone: MixCoachTone = changedFields === 0 ? "good" : changedFields <= 2 ? "warn" : "danger";
+  const blockLabel = `Block ${summary.blockNumber}`;
+  const sectionLabel = `${preset.section} / Pattern ${preset.pattern} / ${barCountLabel(preset.bars)}`;
+  const energyLabel = `Energy ${percentLabel(preset.energy)}`;
+  const muteLabel = arrangementFocusPreviewMuteLabel(preset.mutedTracks);
+  const moveLabel = `${changedFields} field${changedFields === 1 ? "" : "s"}`;
+
+  return {
+    presetId: preset.id,
+    statusLabel: changedFields === 0 ? "Focus aligned" : "Suggested focus",
+    presetLabel: preset.label,
+    blockLabel,
+    sectionLabel,
+    energyLabel,
+    muteLabel,
+    moveLabel,
+    detailTitle:
+      changedFields === 0
+        ? `${preset.label} already matches ${blockLabel}.`
+        : `${preset.label}: ${blockLabel}; ${sectionLabel}; ${energyLabel}; ${muteLabel}; ${moveLabel}.`,
+    tone
+  };
+}
+
+function arrangementFocusPreviewMuteLabel(mutedTracks: ArrangementMuteTrack[]): string {
+  const muted = normalizeArrangementMutedTracks(mutedTracks);
+  return muted.length === 0 ? "No block mutes" : `${muted.map(arrangementMuteTrackLabel).join(" / ")} muted`;
+}
+
+function arrangementFocusChangedFieldCount(block: ArrangementBlock, preset: ArrangementFocusPreset): number {
+  return [
+    block.section !== preset.section,
+    block.pattern !== preset.pattern,
+    normalizeArrangementBars(block.bars) !== normalizeArrangementBars(preset.bars),
+    normalizeArrangementEnergy(block.energy) !== normalizeArrangementEnergy(preset.energy),
+    normalizeArrangementMutedTracks(block.mutedTracks).join(",") !==
+      normalizeArrangementMutedTracks(preset.mutedTracks).join(",")
+  ].filter(Boolean).length;
 }
 
 function suggestedArrangementFocusPreset(block: ArrangementBlock): ArrangementFocusPresetId {
