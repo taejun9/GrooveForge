@@ -7162,6 +7162,7 @@ export function App(): ReactElement {
     canRedo,
     canUndo,
     composerGuideSummary,
+    finishChecklistSummary,
     grooveCompassSummary,
     isPlaying,
     keyCompassSummary,
@@ -7192,6 +7193,7 @@ export function App(): ReactElement {
     onExportWav: handleExportWav,
     onFocusComposerGuide: focusComposerGuideCard,
     onFocusExportPreflight: focusExportPreflightCard,
+    onFocusFinishChecklist: focusFinishChecklistCard,
     onFocusGrooveCompass: focusGrooveCompassItem,
     onFocusKeyCompass: focusKeyCompassItem,
     onFocusListeningPass: focusListeningPassItem,
@@ -11747,6 +11749,10 @@ function activeProductionSnapshotQuickActionMetric(summary: ProductionSnapshotSu
   return summary.metrics.find((metric) => metric.tone !== "good") ?? summary.metrics[0] ?? null;
 }
 
+function activeFinishChecklistQuickActionCard(summary: FinishChecklistSummary): FinishChecklistCard | null {
+  return summary.cards.find((card) => card.tone !== "good") ?? summary.cards[0] ?? null;
+}
+
 function activeExportPreflightQuickActionCard(summary: ExportPreflightSummary): ExportPreflightCard | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
@@ -12231,6 +12237,7 @@ function createQuickActions({
   canRedo,
   canUndo,
   composerGuideSummary,
+  finishChecklistSummary,
   grooveCompassSummary,
   isPlaying,
   keyCompassSummary,
@@ -12261,6 +12268,7 @@ function createQuickActions({
   onExportWav,
   onFocusComposerGuide,
   onFocusExportPreflight,
+  onFocusFinishChecklist,
   onFocusGrooveCompass,
   onFocusKeyCompass,
   onFocusListeningPass,
@@ -12280,6 +12288,7 @@ function createQuickActions({
   canRedo: boolean;
   canUndo: boolean;
   composerGuideSummary: ComposerGuideSummary;
+  finishChecklistSummary: FinishChecklistSummary;
   grooveCompassSummary: GrooveCompassSummary;
   isPlaying: boolean;
   keyCompassSummary: KeyCompassSummary;
@@ -12310,6 +12319,7 @@ function createQuickActions({
   onExportWav: () => void;
   onFocusComposerGuide: (card: ComposerGuideCard) => void;
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
+  onFocusFinishChecklist: (card: FinishChecklistCard) => void;
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
   onFocusListeningPass: (item: ListeningPassItem) => void;
@@ -12332,6 +12342,7 @@ function createQuickActions({
   const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const composerGuideCard = activeComposerGuideQuickActionCard(composerGuideSummary);
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
+  const finishChecklistCard = activeFinishChecklistQuickActionCard(finishChecklistSummary);
   const grooveCompassItem = activeGrooveCompassQuickActionItem(grooveCompassSummary);
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
@@ -12502,6 +12513,19 @@ function createQuickActions({
       run: () => {
         if (productionSnapshotMetric) {
           onFocusProductionSnapshot(productionSnapshotMetric);
+        }
+      }
+    },
+    {
+      id: "finish-checklist-focus",
+      title: finishChecklistCard ? `Focus Finish Checklist: ${finishChecklistCard.label}` : "Focus Finish Checklist",
+      detail: finishChecklistCard ? `${finishChecklistCard.status} / ${finishChecklistCard.focusLabel}` : "No Finish Checklist card available.",
+      group: "Project",
+      keywords: `finish checklist focus ready review compose arrange mix master handoff export inspect ${finishChecklistCard?.id ?? "none"} ${finishChecklistCard?.focusLabel ?? "none"} beginner producer`,
+      disabled: !finishChecklistCard,
+      run: () => {
+        if (finishChecklistCard) {
+          onFocusFinishChecklist(finishChecklistCard);
         }
       }
     },
@@ -12942,6 +12966,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "finish-checklist-focus") {
+    return {
+      id: "finish-checklist",
+      label: "Finish checklist",
+      value: `${activeDeliveryTarget(project).name} / ${analyzeExport(project).status}`
+    };
+  }
+
   if (action.id === "review-queue-focus") {
     return {
       id: "review-queue",
@@ -13098,6 +13130,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Production Snapshot metric to inspect target fit, song form, pattern coverage, mix posture, or handoff posture.",
       nextCheck: "Return to Production Snapshot after the focused session metric is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id === "finish-checklist-focus") {
+    return {
+      auditionCue: "Use the focused Finish Checklist card to inspect the next Compose, Arrange, Mix, Master, or Handoff readiness step.",
+      nextCheck: "Return to Finish Checklist after the focused finish card is ready or intentionally deferred."
     };
   }
 
