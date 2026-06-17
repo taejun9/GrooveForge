@@ -7167,6 +7167,7 @@ export function App(): ReactElement {
     selectedArrangementIndex,
     sessionPassSummary,
     transportLoopScope,
+    workflowNavigatorItems,
     onApplyArrangementMove: applyArrangementMoveToSelected,
     onApplyArrangementFocus: applyArrangementFocusPreset,
     onApplyBlueprint: applyQuickActionBeatBlueprint,
@@ -7180,6 +7181,7 @@ export function App(): ReactElement {
     onExportStems: handleExportStems,
     onExportWav: handleExportWav,
     onFocusSessionPass: focusSessionPassCard,
+    onFocusWorkflowSpotlight: jumpToWorkflowZone,
     onOpenProject: handleOpenProject,
     onRedo: redoProject,
     onSaveProject: handleSaveProject,
@@ -12176,6 +12178,7 @@ function createQuickActions({
   selectedArrangementIndex,
   sessionPassSummary,
   transportLoopScope,
+  workflowNavigatorItems,
   onApplyArrangementMove,
   onApplyArrangementFocus,
   onApplyBlueprint,
@@ -12189,6 +12192,7 @@ function createQuickActions({
   onExportStems,
   onExportWav,
   onFocusSessionPass,
+  onFocusWorkflowSpotlight,
   onOpenProject,
   onRedo,
   onSaveProject,
@@ -12205,6 +12209,7 @@ function createQuickActions({
   selectedArrangementIndex: number;
   sessionPassSummary: SessionPassSummary;
   transportLoopScope: TransportLoopScope;
+  workflowNavigatorItems: WorkflowNavigatorItem[];
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
@@ -12218,6 +12223,7 @@ function createQuickActions({
   onExportStems: () => void;
   onExportWav: () => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
+  onFocusWorkflowSpotlight: (zone: WorkflowZoneId) => void;
   onOpenProject: () => Promise<void>;
   onRedo: () => void;
   onSaveProject: () => Promise<void>;
@@ -12231,6 +12237,7 @@ function createQuickActions({
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
+  const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
 
   return [
     {
@@ -12301,6 +12308,19 @@ function createQuickActions({
       group: "Project",
       keywords: `session pass focus guided studio next workflow ${sessionPassCard.id} ${sessionPassCard.focusLabel} beginner producer`,
       run: () => onFocusSessionPass(sessionPassCard)
+    },
+    {
+      id: "workflow-spotlight-focus",
+      title: `Focus ${workflowSpotlight.zoneLabel}`,
+      detail: `${workflowSpotlight.statusLabel} / ${workflowSpotlight.detailLabel}`,
+      group: "Project",
+      keywords: `workflow spotlight focus navigator next blocker review jump ${workflowSpotlight.zoneId ?? "none"} compose arrange mix deliver beginner producer`,
+      disabled: !workflowSpotlight.zoneId,
+      run: () => {
+        if (workflowSpotlight.zoneId) {
+          onFocusWorkflowSpotlight(workflowSpotlight.zoneId);
+        }
+      }
     },
     {
       id: "undo",
@@ -12594,7 +12614,7 @@ function createQuickActionResult(
   const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action);
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
   const previewOnly = action.id === "blueprint-preview-style-match";
-  const focusOnly = action.id === "session-pass-focus";
+  const focusOnly = action.id === "session-pass-focus" || action.id === "workflow-spotlight-focus";
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
     id: afterMetric.id,
@@ -12634,6 +12654,14 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "session-pass-focus") {
     return { id: "session-pass", label: "Session pass", value: `${project.mode} mode` };
+  }
+
+  if (action.id === "workflow-spotlight-focus") {
+    return {
+      id: "workflow-spotlight",
+      label: "Workflow spotlight",
+      value: `${project.selectedPattern} / ${barCountLabel(arrangementTotalBars(project))}`
+    };
   }
 
   if (action.id.startsWith("fill-")) {
@@ -12718,6 +12746,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused workstation panel to inspect the highlighted Session Pass target.",
       nextCheck: "Run the visible Session Pass Focus cards when you want another guided, studio, finish, or delivery jump."
+    };
+  }
+
+  if (action.id === "workflow-spotlight-focus") {
+    return {
+      auditionCue: "Use the focused workflow panel to inspect the highlighted blocker or review zone.",
+      nextCheck: "Return to Workflow Spotlight after the zone looks ready and run the command again for the next jump."
     };
   }
 
