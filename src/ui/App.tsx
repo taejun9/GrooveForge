@@ -7219,6 +7219,7 @@ export function App(): ReactElement {
     noteClipboard,
     selectedArrangementIndex,
     selectedChord,
+    chordClipboard,
     sessionPassSummary,
     soundFocusPreviewSummary,
     soundPresetPreviewSummary,
@@ -7274,6 +7275,11 @@ export function App(): ReactElement {
     onCopySelectedNote: copySelectedNote,
     onPasteCopiedNote: pasteCopiedNote,
     onDuplicateSelectedNote: duplicateSelectedNote,
+    onMoveSelectedChordStep: moveSelectedChordStep,
+    onCopySelectedChord: copySelectedChord,
+    onPasteCopiedChord: pasteCopiedChord,
+    onDuplicateSelectedChord: duplicateSelectedChord,
+    onMoveSelectedChordInversion: moveSelectedChordInversion,
     onExportHandoffSheet: handleExportHandoffSheet,
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
@@ -12591,6 +12597,7 @@ function createQuickActions({
   noteClipboard,
   selectedArrangementIndex,
   selectedChord,
+  chordClipboard,
   sessionPassSummary,
   soundFocusPreviewSummary,
   soundPresetPreviewSummary,
@@ -12646,6 +12653,11 @@ function createQuickActions({
   onCopySelectedNote,
   onPasteCopiedNote,
   onDuplicateSelectedNote,
+  onMoveSelectedChordStep,
+  onCopySelectedChord,
+  onPasteCopiedChord,
+  onDuplicateSelectedChord,
+  onMoveSelectedChordInversion,
   onExportHandoffSheet,
   onExportMidi,
   onExportStems,
@@ -12713,6 +12725,7 @@ function createQuickActions({
   noteClipboard: NoteClipboard | null;
   selectedArrangementIndex: number;
   selectedChord: ChordEvent | undefined;
+  chordClipboard: ChordClipboard | null;
   sessionPassSummary: SessionPassSummary;
   soundFocusPreviewSummary: SoundFocusPreviewSummary;
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
@@ -12768,6 +12781,11 @@ function createQuickActions({
   onCopySelectedNote: () => void;
   onPasteCopiedNote: () => void;
   onDuplicateSelectedNote: () => void;
+  onMoveSelectedChordStep: (direction: -1 | 1) => void;
+  onCopySelectedChord: () => void;
+  onPasteCopiedChord: () => void;
+  onDuplicateSelectedChord: () => void;
+  onMoveSelectedChordInversion: (direction: -1 | 1) => void;
   onExportHandoffSheet: () => void;
   onExportMidi: () => void;
   onExportStems: () => void;
@@ -12891,6 +12909,28 @@ function createQuickActions({
     noteClipboard?.track === "bass" ? selectedPatternData.bassNotes : selectedPatternData.melodyNotes;
   const noteClipboardPasteStep = noteClipboard
     ? nextEmptyStepForPitch(noteClipboardPatternNotes, noteClipboard.note.pitch, noteClipboard.note.step)
+    : null;
+  const selectedChordActive = Boolean(
+    selectedChord && selectedPatternData.chordEvents.some((chord) => sameChordEvent(chord, selectedChord))
+  );
+  const selectedChordLabel = selectedChord
+    ? `${selectedChord.root}${selectedChord.quality}.${selectedChord.step + 1}`
+    : "No selected chord";
+  const selectedChordInversion = selectedChord ? normalizeChordInversion(selectedChord.inversion) : 0;
+  const selectedChordInversionIndex = chordInversions.indexOf(selectedChordInversion);
+  const selectedChordInversionDown =
+    selectedChordInversionIndex > 0 ? chordInversions[selectedChordInversionIndex - 1] : null;
+  const selectedChordInversionUp =
+    selectedChordInversionIndex >= 0 && selectedChordInversionIndex < chordInversions.length - 1
+      ? chordInversions[selectedChordInversionIndex + 1]
+      : null;
+  const selectedChordDuplicateStep =
+    selectedChord && selectedChordActive ? nextEmptyChordStep(selectedPatternData.chordEvents, selectedChord.step) : null;
+  const chordClipboardLabel = chordClipboard
+    ? `${chordClipboard.root}${chordClipboard.quality}.${chordClipboard.step + 1}`
+    : "Clipboard empty";
+  const chordClipboardPasteStep = chordClipboard
+    ? nextEmptyChordStep(selectedPatternData.chordEvents, chordClipboard.step)
     : null;
   const captureTargetActions: QuickAction[] = [
     { id: "capture-target-bass", target: "bass" as NoteTrack, targetLabel: "808" },
@@ -13099,6 +13139,101 @@ function createQuickActions({
       run: onDuplicateSelectedNote
     }
   ];
+  const selectedChordActions: QuickAction[] = [
+    {
+      id: "selected-chord-step-left",
+      title: "Move selected chord left",
+      detail: selectedChord
+        ? `${selectedChordLabel} / Pattern ${project.selectedPattern} / one step earlier`
+        : "Select a chord first.",
+      group: "Create",
+      keywords: "selected chord move left step nudge harmony progression edit beginner producer",
+      disabled:
+        !selectedChordActive ||
+        !selectedChord ||
+        selectedChord.step <= 0 ||
+        selectedPatternData.chordEvents.some((chord) => chord.step === selectedChord.step - 1),
+      run: () => onMoveSelectedChordStep(-1)
+    },
+    {
+      id: "selected-chord-step-right",
+      title: "Move selected chord right",
+      detail: selectedChord
+        ? `${selectedChordLabel} / Pattern ${project.selectedPattern} / one step later`
+        : "Select a chord first.",
+      group: "Create",
+      keywords: "selected chord move right step nudge harmony progression edit beginner producer",
+      disabled:
+        !selectedChordActive ||
+        !selectedChord ||
+        selectedChord.step >= steps.length - 1 ||
+        selectedPatternData.chordEvents.some((chord) => chord.step === selectedChord.step + 1),
+      run: () => onMoveSelectedChordStep(1)
+    },
+    {
+      id: "selected-chord-inversion-down",
+      title: "Move selected chord voicing down",
+      detail: selectedChordActive
+        ? `${selectedChordLabel} / ${chordInversionLabel(selectedChordInversion)} -> ${
+            selectedChordInversionDown === null ? "root" : chordInversionLabel(selectedChordInversionDown)
+          }`
+        : "Select a chord first.",
+      group: "Create",
+      keywords: "selected chord inversion voicing down lower harmony progression edit beginner producer",
+      disabled: !selectedChordActive || selectedChordInversionDown === null,
+      run: () => onMoveSelectedChordInversion(-1)
+    },
+    {
+      id: "selected-chord-inversion-up",
+      title: "Move selected chord voicing up",
+      detail: selectedChordActive
+        ? `${selectedChordLabel} / ${chordInversionLabel(selectedChordInversion)} -> ${
+            selectedChordInversionUp === null ? "top" : chordInversionLabel(selectedChordInversionUp)
+          }`
+        : "Select a chord first.",
+      group: "Create",
+      keywords: "selected chord inversion voicing up higher harmony progression edit beginner producer",
+      disabled: !selectedChordActive || selectedChordInversionUp === null,
+      run: () => onMoveSelectedChordInversion(1)
+    },
+    {
+      id: "selected-chord-copy",
+      title: "Copy selected chord",
+      detail: selectedChordActive ? `${selectedChordLabel} -> local chord clipboard` : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord copy clipboard harmony progression edit beginner producer",
+      disabled: !selectedChordActive,
+      run: onCopySelectedChord
+    },
+    {
+      id: "selected-chord-paste",
+      title: "Paste copied chord",
+      detail:
+        chordClipboard && chordClipboardPasteStep !== null
+          ? `${chordClipboardLabel} -> step ${chordClipboardPasteStep + 1} / Pattern ${project.selectedPattern}`
+          : chordClipboard
+            ? `${chordClipboardLabel} has no empty paste step.`
+            : "Copy a chord first.",
+      group: "Create",
+      keywords: "selected chord paste clipboard harmony progression edit beginner producer",
+      disabled: !chordClipboard || chordClipboardPasteStep === null,
+      run: onPasteCopiedChord
+    },
+    {
+      id: "selected-chord-duplicate",
+      title: "Duplicate selected chord",
+      detail:
+        selectedChordActive && selectedChordDuplicateStep !== null
+          ? `${selectedChordLabel} -> step ${selectedChordDuplicateStep + 1} / Pattern ${project.selectedPattern}`
+          : selectedChord
+            ? `${selectedChordLabel} has no empty duplicate step.`
+            : "Select a chord first.",
+      group: "Create",
+      keywords: "selected chord duplicate copy next empty step harmony progression edit beginner producer",
+      disabled: !selectedChordActive || selectedChordDuplicateStep === null,
+      run: onDuplicateSelectedChord
+    }
+  ];
   const arrangementMovePreset = selectedArrangementMoveQuickActionPreset(selectedBlock);
   const arrangementMoveReady = Boolean(
     selectedBlock && arrangementMovePreset && !isArrangementMovePresetApplied(selectedBlock, arrangementMovePreset)
@@ -13197,6 +13332,7 @@ function createQuickActions({
     ...captureTargetActions,
     ...captureDefaultActions,
     ...selectedNoteActions,
+    ...selectedChordActions,
     {
       id: "midi-input-arm",
       title: midiInputArmTitle,
@@ -14067,7 +14203,8 @@ function createQuickActionResult(
     action.id.startsWith("capture-target-") ||
     action.id.startsWith("capture-default-");
   const noteClipboardOnly = action.id === "selected-note-copy";
-  const uiLocal = action.id.startsWith("mix-snapshot-") || inputSetupOnly || noteClipboardOnly;
+  const chordClipboardOnly = action.id === "selected-chord-copy";
+  const uiLocal = action.id.startsWith("mix-snapshot-") || inputSetupOnly || noteClipboardOnly || chordClipboardOnly;
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
     id: afterMetric.id,
@@ -14088,7 +14225,7 @@ function createQuickActionResult(
           ? "Previewed"
           : focusOnly
             ? "Focused"
-            : noteClipboardOnly
+            : noteClipboardOnly || chordClipboardOnly
               ? "Copied"
               : uiLocal && action.id === "mix-snapshot-clear"
                 ? "Cleared"
@@ -14151,6 +14288,14 @@ function quickActionResultMetricSnapshot(
     return {
       id: "selected-note",
       label: "Selected note",
+      value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
+    };
+  }
+
+  if (action.id.startsWith("selected-chord-")) {
+    return {
+      id: "selected-chord",
+      label: "Selected chord",
       value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
     };
   }
@@ -14541,6 +14686,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Loop the selected Pattern to hear the corrected 808 or Synth note against drums and chords.",
       nextCheck: "Use selected-note tools again for another small correction, or move to Pattern Compare once the phrase feels right."
+    };
+  }
+
+  if (action.id === "selected-chord-copy") {
+    return {
+      auditionCue: "Use Paste copied chord when the copied harmony shape should repeat in the current Pattern.",
+      nextCheck: "The chord clipboard is UI-local; paste or duplicate explicitly before changing to another editing task."
+    };
+  }
+
+  if (action.id.startsWith("selected-chord-")) {
+    return {
+      auditionCue: "Loop the selected Pattern to hear the corrected chord movement against the 808 and melody.",
+      nextCheck: "Use selected-chord tools again for another small harmonic correction, or move to Chord Move when the progression needs a broader change."
     };
   }
 
