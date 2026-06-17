@@ -4645,7 +4645,7 @@ h2 {
 .handoff-pack {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
-  grid-template-rows: auto auto auto auto;
+  grid-template-rows: auto auto auto auto auto;
   gap: 10px;
   align-items: stretch;
   min-height: 156px;
@@ -4667,7 +4667,7 @@ h2 {
 
 .handoff-pack-heading {
   display: grid;
-  grid-row: 1 / 5;
+  grid-row: 1 / 6;
   gap: 4px;
   align-content: center;
   min-width: 0;
@@ -4704,6 +4704,13 @@ h2 {
 .handoff-export-receipt span,
 .handoff-export-receipt strong,
 .handoff-export-receipt small,
+.handoff-manifest-audit-main b,
+.handoff-manifest-audit-main strong,
+.handoff-manifest-audit-main small,
+.handoff-manifest-audit-meta span,
+.handoff-manifest-audit-checks b,
+.handoff-manifest-audit-checks strong,
+.handoff-manifest-audit-checks small,
 .handoff-pack-card span,
 .handoff-pack-card strong,
 .handoff-pack-card small,
@@ -4842,10 +4849,146 @@ h2 {
   font-size: 11px;
 }
 
-.handoff-pack-grid {
+.handoff-manifest-audit {
   display: grid;
   grid-column: 2;
   grid-row: 3;
+  grid-template-columns: minmax(160px, 0.85fr) minmax(160px, 0.85fr) minmax(260px, 1.6fr);
+  gap: 7px;
+  align-items: stretch;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.22);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px;
+}
+
+.handoff-manifest-audit.warn {
+  border-color: rgba(240, 195, 106, 0.25);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.handoff-manifest-audit.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.handoff-manifest-audit-main,
+.handoff-manifest-audit-meta,
+.handoff-manifest-audit-checks,
+.handoff-manifest-audit-main span,
+.handoff-manifest-audit-checks span {
+  min-width: 0;
+}
+
+.handoff-manifest-audit-main,
+.handoff-manifest-audit-meta,
+.handoff-manifest-audit-checks {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(244, 239, 231, 0.08);
+  border-radius: 6px;
+  background: rgba(17, 16, 15, 0.2);
+  padding: 7px;
+}
+
+.handoff-manifest-audit-main {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.handoff-manifest-audit-main svg {
+  color: #78f0c8;
+}
+
+.handoff-manifest-audit.warn .handoff-manifest-audit-main svg {
+  color: #f0c36a;
+}
+
+.handoff-manifest-audit.danger .handoff-manifest-audit-main svg {
+  color: #ffb199;
+}
+
+.handoff-manifest-audit-main span,
+.handoff-manifest-audit-checks span {
+  display: grid;
+  gap: 2px;
+}
+
+.handoff-manifest-audit-main b {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 9px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.handoff-manifest-audit-main strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.handoff-manifest-audit-main small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 9px;
+}
+
+.handoff-manifest-audit-meta {
+  align-content: center;
+}
+
+.handoff-manifest-audit-meta span {
+  border-inline-start: 2px solid rgba(120, 240, 200, 0.38);
+  color: rgba(244, 239, 231, 0.66);
+  padding-inline-start: 7px;
+  font-size: 10px;
+}
+
+.handoff-manifest-audit.warn .handoff-manifest-audit-meta span {
+  border-inline-start-color: rgba(240, 195, 106, 0.42);
+}
+
+.handoff-manifest-audit.danger .handoff-manifest-audit-meta span {
+  border-inline-start-color: rgba(255, 122, 79, 0.44);
+}
+
+.handoff-manifest-audit-checks {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.handoff-manifest-audit-checks span {
+  border-inline-start: 2px solid rgba(120, 240, 200, 0.42);
+  padding-inline-start: 6px;
+}
+
+.handoff-manifest-audit-checks span.warn {
+  border-inline-start-color: rgba(240, 195, 106, 0.48);
+}
+
+.handoff-manifest-audit-checks span.danger {
+  border-inline-start-color: rgba(255, 122, 79, 0.52);
+}
+
+.handoff-manifest-audit-checks b {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.handoff-manifest-audit-checks strong {
+  color: #f4efe7;
+  font-size: 10px;
+}
+
+.handoff-manifest-audit-checks small {
+  color: rgba(244, 239, 231, 0.52);
+  font-size: 9px;
+}
+
+.handoff-pack-grid {
+  display: grid;
+  grid-column: 2;
+  grid-row: 4;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
   min-width: 0;
@@ -4854,7 +4997,7 @@ h2 {
 .handoff-pack-file-manifest {
   display: grid;
   grid-column: 2;
-  grid-row: 4;
+  grid-row: 5;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
   min-width: 0;
@@ -14414,6 +14557,14 @@ input[type="range"] {
     gap: 4px 8px;
   }
 
+  .handoff-manifest-audit {
+    grid-template-columns: 1fr;
+  }
+
+  .handoff-manifest-audit-checks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .listening-pass {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -14991,6 +15142,7 @@ input[type="range"] {
 
   .handoff-pack-send-order,
   .handoff-export-receipt,
+  .handoff-manifest-audit,
   .handoff-pack-grid,
   .handoff-pack-file-manifest {
     grid-column: 1;
@@ -15005,6 +15157,11 @@ input[type="range"] {
   .handoff-export-receipt {
     grid-template-columns: 1fr;
     gap: 3px;
+  }
+
+  .handoff-manifest-audit,
+  .handoff-manifest-audit-checks {
+    grid-template-columns: 1fr;
   }
 
   .handoff-pack-grid,

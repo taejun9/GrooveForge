@@ -2492,6 +2492,26 @@ type HandoffFileManifestItem = {
   tone: MixCoachTone;
 };
 
+type HandoffManifestAuditCheck = {
+  id: HandoffPackItem["id"];
+  label: string;
+  statusLabel: string;
+  fileLabel: string;
+  detailLabel: string;
+  tone: MixCoachTone;
+};
+
+type HandoffManifestAuditSummary = {
+  statusLabel: string;
+  titleLabel: string;
+  detailLabel: string;
+  receiptLabel: string;
+  nextLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+  checks: HandoffManifestAuditCheck[];
+};
+
 type SessionBriefRoleSummary = {
   roleLabel: string;
   statusLabel: string;
@@ -11103,6 +11123,7 @@ function HandoffPack({
   const sendOrderSummary = createHandoffPackSendOrderSummary(project, items);
   const receiptSummary = exportReceipt ?? emptyHandoffExportReceipt();
   const fileManifest = createHandoffFileManifest(project, stemAnalyses, items);
+  const manifestAudit = createHandoffManifestAudit(project, items, fileManifest, receiptSummary, sendOrderSummary);
 
   return (
     <section className={`handoff-pack ${tone}`} data-testid="handoff-pack" aria-label="Handoff pack">
@@ -11152,6 +11173,40 @@ function HandoffPack({
         <strong data-testid="handoff-export-receipt-file">{receiptSummary.fileLabel}</strong>
         <small data-testid="handoff-export-receipt-detail">{receiptSummary.detailLabel}</small>
         <small data-testid="handoff-export-receipt-next">{receiptSummary.nextLabel}</small>
+      </div>
+      <div
+        aria-label={manifestAudit.detailTitle}
+        className={`handoff-manifest-audit ${manifestAudit.tone}`}
+        data-audit-handoff-manifest={manifestAudit.tone}
+        data-testid="handoff-manifest-audit"
+        title={manifestAudit.detailTitle}
+      >
+        <div className="handoff-manifest-audit-main">
+          <ListChecks size={14} aria-hidden="true" />
+          <span>
+            <b data-testid="handoff-manifest-audit-status">{manifestAudit.statusLabel}</b>
+            <strong data-testid="handoff-manifest-audit-title">{manifestAudit.titleLabel}</strong>
+            <small data-testid="handoff-manifest-audit-detail">{manifestAudit.detailLabel}</small>
+          </span>
+        </div>
+        <div className="handoff-manifest-audit-meta">
+          <span data-testid="handoff-manifest-audit-receipt">{manifestAudit.receiptLabel}</span>
+          <span data-testid="handoff-manifest-audit-next">{manifestAudit.nextLabel}</span>
+        </div>
+        <div className="handoff-manifest-audit-checks" data-testid="handoff-manifest-audit-checks">
+          {manifestAudit.checks.map((check) => (
+            <span
+              className={check.tone}
+              data-testid={`handoff-manifest-audit-${check.id}`}
+              key={check.id}
+              title={`${check.fileLabel} / ${check.detailLabel}`}
+            >
+              <b>{check.label}</b>
+              <strong>{check.statusLabel}</strong>
+              <small>{check.fileLabel}</small>
+            </span>
+          ))}
+        </div>
       </div>
       <div className="handoff-pack-grid" data-testid="handoff-pack-grid">
         {items.map((item) => (
@@ -14356,6 +14411,59 @@ function createHandoffFileManifest(
       tone: itemTone("sheet")
     }
   ];
+}
+
+function createHandoffManifestAudit(
+  project: ProjectState,
+  items: HandoffPackItem[],
+  manifest: HandoffFileManifestItem[],
+  receipt: HandoffExportReceipt,
+  sendOrder: HandoffPackSendOrderSummary
+): HandoffManifestAuditSummary {
+  const target = activeDeliveryTarget(project);
+  const readyCount = items.filter((item) => item.tone === "good").length;
+  const plannedCount = manifest.length;
+  const receiptTone: MixCoachTone = receipt.itemId ? receipt.tone : "warn";
+  const tone = weakestTone([...items.map((item) => item.tone), receiptTone]);
+  const checks = manifest.map((manifestItem) =>
+    createHandoffManifestAuditCheck(manifestItem, items.find((item) => item.id === manifestItem.id), receipt)
+  );
+  const statusLabel = tone === "good" ? "Manifest clear" : tone === "warn" ? "Manifest review" : "Manifest blocker";
+  const titleLabel = `${target.name} package audit`;
+  const detailLabel = `${readyCount}/${items.length} ready / ${plannedCount} planned file sets`;
+  const receiptLabel = receipt.itemId ? `Latest: ${receipt.statusLabel}` : "Latest: no export receipt";
+  const nextLabel = receipt.itemId ? sendOrder.nextLabel : "Run WAV export first";
+
+  return {
+    statusLabel,
+    titleLabel,
+    detailLabel,
+    receiptLabel,
+    nextLabel,
+    detailTitle: `${statusLabel} / ${titleLabel} / ${detailLabel} / ${receipt.fileLabel} / ${nextLabel}`,
+    tone,
+    checks
+  };
+}
+
+function createHandoffManifestAuditCheck(
+  manifestItem: HandoffFileManifestItem,
+  item: HandoffPackItem | undefined,
+  receipt: HandoffExportReceipt
+): HandoffManifestAuditCheck {
+  const latestReceiptMatches = receipt.itemId === manifestItem.id;
+  const tone = latestReceiptMatches ? weakestTone([manifestItem.tone, receipt.tone]) : manifestItem.tone;
+  const planStatus =
+    manifestItem.tone === "good" ? "Ready plan" : manifestItem.tone === "warn" ? "Review plan" : "Blocked plan";
+
+  return {
+    id: manifestItem.id,
+    label: manifestItem.label,
+    statusLabel: latestReceiptMatches ? receipt.statusLabel : planStatus,
+    fileLabel: manifestItem.fileLabel,
+    detailLabel: latestReceiptMatches ? receipt.detailLabel : item?.detail ?? manifestItem.detail,
+    tone
+  };
 }
 
 function createKeyCompassSummary(
