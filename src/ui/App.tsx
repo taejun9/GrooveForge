@@ -1393,6 +1393,28 @@ type ArrangementFocusPreviewSummary = {
   tone: MixCoachTone;
 };
 
+type ArrangementFocusResultMetric = {
+  id: "section" | "pattern" | "bars" | "energy" | "mutes";
+  label: string;
+  before: string;
+  after: string;
+  changed: boolean;
+  tone: MixCoachTone;
+};
+
+type ArrangementFocusResultSummary = {
+  presetId: ArrangementFocusPresetId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: ArrangementFocusResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type ArrangementArcPadId = "clean" | "lift" | "break" | "rise";
 
 type ArrangementArcPoint = {
@@ -2647,6 +2669,7 @@ export function App(): ReactElement {
   const [bassMoveResult, setBassMoveResult] = useState<BassMoveResult | null>(null);
   const [melodyMoveResult, setMelodyMoveResult] = useState<MelodyMoveResult | null>(null);
   const [chordMoveResult, setChordMoveResult] = useState<ChordMoveResult | null>(null);
+  const [arrangementFocusResult, setArrangementFocusResult] = useState<ArrangementFocusResultSummary | null>(null);
   const [soundFocusResult, setSoundFocusResult] = useState<SoundFocusResult | null>(null);
   const [drumKitResult, setDrumKitResult] = useState<DrumKitResult | null>(null);
   const [masterFinishResult, setMasterFinishResult] = useState<MasterFinishResult | null>(null);
@@ -3187,6 +3210,7 @@ export function App(): ReactElement {
     setBassMoveResult(null);
     setMelodyMoveResult(null);
     setChordMoveResult(null);
+    setArrangementFocusResult(null);
     setSoundFocusResult(null);
     setDrumKitResult(null);
     setMasterFinishResult(null);
@@ -3209,6 +3233,7 @@ export function App(): ReactElement {
       setBassMoveResult(null);
       setMelodyMoveResult(null);
       setChordMoveResult(null);
+      setArrangementFocusResult(null);
       setSoundFocusResult(null);
       setDrumKitResult(null);
       setMasterFinishResult(null);
@@ -3306,6 +3331,7 @@ export function App(): ReactElement {
     setBassMoveResult(null);
     setMelodyMoveResult(null);
     setChordMoveResult(null);
+    setArrangementFocusResult(null);
     setSoundFocusResult(null);
     setDrumKitResult(null);
     setMasterFinishResult(null);
@@ -3333,6 +3359,7 @@ export function App(): ReactElement {
     setBassMoveResult(null);
     setMelodyMoveResult(null);
     setChordMoveResult(null);
+    setArrangementFocusResult(null);
     setSoundFocusResult(null);
     setDrumKitResult(null);
     setMasterFinishResult(null);
@@ -3736,6 +3763,7 @@ export function App(): ReactElement {
     }
 
     setSelectedArrangementIndex(index);
+    setArrangementFocusResult(null);
     updateProjectView((current) => ({ ...current, selectedPattern: block.pattern }), `Arranging ${block.section}`);
     setSelectedNote(null);
     setSelectedDrumStep(null);
@@ -3821,14 +3849,17 @@ export function App(): ReactElement {
 
   function applyArrangementFocusPreset(presetId: ArrangementFocusPresetId): void {
     const preset = arrangementFocusPresets.find((candidate) => candidate.id === presetId);
-    const block = projectRef.current.arrangement[selectedArrangementIndex];
+    const beforeProject = projectRef.current;
+    const blockIndex = selectedArrangementIndex;
+    const block = beforeProject.arrangement[blockIndex];
     if (!preset || !block) {
+      setArrangementFocusResult(null);
       setProjectStatus("Select an arrangement block");
       return;
     }
 
     const changed = updateArrangementBlock(
-      selectedArrangementIndex,
+      blockIndex,
       {
         section: preset.section,
         pattern: preset.pattern,
@@ -3840,6 +3871,9 @@ export function App(): ReactElement {
     );
     if (changed) {
       selectTransportLoopScope("block", false);
+      setArrangementFocusResult(createArrangementFocusResult(preset, blockIndex, beforeProject, projectRef.current));
+    } else {
+      setArrangementFocusResult(null);
     }
   }
 
@@ -6994,6 +7028,7 @@ export function App(): ReactElement {
           </div>
           <ArrangementFocusPanel
             preview={arrangementFocusPreviewSummary}
+            result={arrangementFocusResult}
             summary={selectedArrangementFocus}
             onApply={applyArrangementFocusPreset}
           />
@@ -7949,10 +7984,12 @@ function PatternDna({
 function ArrangementFocusPanel({
   onApply,
   preview,
+  result,
   summary
 }: {
   onApply: (preset: ArrangementFocusPresetId) => void;
   preview: ArrangementFocusPreviewSummary | null;
+  result: ArrangementFocusResultSummary | null;
   summary: ArrangementFocusSummary | null;
 }): ReactElement | null {
   if (!summary || !preview) {
@@ -8002,7 +8039,50 @@ function ArrangementFocusPanel({
           </button>
         ))}
       </div>
+      {result && <ArrangementFocusResultStrip result={result} />}
     </section>
+  );
+}
+
+function ArrangementFocusResultStrip({ result }: { result: ArrangementFocusResultSummary }): ReactElement {
+  return (
+    <div
+      className={`arrangement-focus-result ${result.tone}`}
+      data-result-arrangement-focus={result.presetId}
+      data-testid="arrangement-focus-result"
+      aria-live="polite"
+    >
+      <div className="arrangement-focus-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="arrangement-focus-result-title">{result.title}</strong>
+          <small data-testid="arrangement-focus-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="arrangement-focus-result-meta">
+        <span data-testid="arrangement-focus-result-status">{result.status}</span>
+        <span data-testid="arrangement-focus-result-scope">{result.scope}</span>
+        <span data-testid="arrangement-focus-result-impact">{result.impact}</span>
+      </div>
+      <div className="arrangement-focus-result-metrics" data-testid="arrangement-focus-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`arrangement-focus-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="arrangement-focus-result-followup" data-testid="arrangement-focus-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="arrangement-focus-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="arrangement-focus-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -15007,6 +15087,86 @@ function arrangementFocusChangedFieldCount(block: ArrangementBlock, preset: Arra
     normalizeArrangementMutedTracks(block.mutedTracks).join(",") !==
       normalizeArrangementMutedTracks(preset.mutedTracks).join(",")
   ].filter(Boolean).length;
+}
+
+function createArrangementFocusResult(
+  preset: ArrangementFocusPreset,
+  selectedIndex: number,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): ArrangementFocusResultSummary {
+  const beforeBlock = beforeProject.arrangement[selectedIndex] ?? beforeProject.arrangement[0];
+  const afterBlock = afterProject.arrangement[selectedIndex] ?? afterProject.arrangement[0];
+  const blockNumber = Math.min(selectedIndex + 1, afterProject.arrangement.length);
+  if (!beforeBlock || !afterBlock) {
+    return {
+      presetId: preset.id,
+      title: `${preset.label} skipped`,
+      status: "No block",
+      detail: "Select an arrangement block before applying focus.",
+      scope: "No arrangement block",
+      impact: "0 fields changed",
+      metrics: [],
+      auditionCue: "Select a block before auditioning focus.",
+      nextCheck: "Add or select an arrangement block.",
+      tone: "danger"
+    };
+  }
+
+  const metrics: ArrangementFocusResultMetric[] = [
+    createArrangementFocusResultMetric("section", "Section", beforeBlock.section, afterBlock.section),
+    createArrangementFocusResultMetric("pattern", "Pattern", `Pattern ${beforeBlock.pattern}`, `Pattern ${afterBlock.pattern}`),
+    createArrangementFocusResultMetric(
+      "bars",
+      "Bars",
+      barCountLabel(beforeBlock.bars),
+      barCountLabel(afterBlock.bars)
+    ),
+    createArrangementFocusResultMetric(
+      "energy",
+      "Energy",
+      percentLabel(beforeBlock.energy),
+      percentLabel(afterBlock.energy)
+    ),
+    createArrangementFocusResultMetric(
+      "mutes",
+      "Mutes",
+      arrangementFocusPreviewMuteLabel(beforeBlock.mutedTracks),
+      arrangementFocusPreviewMuteLabel(afterBlock.mutedTracks)
+    )
+  ];
+  const changedCount = metrics.filter((metric) => metric.changed).length;
+  const tone: MixCoachTone = changedCount === 0 ? "good" : changedCount <= 2 ? "warn" : "danger";
+
+  return {
+    presetId: preset.id,
+    title: `${preset.label} applied`,
+    status: changedCount === 0 ? "Already aligned" : "Focus applied",
+    detail: `Block ${blockNumber} now ${afterBlock.section} / Pattern ${afterBlock.pattern} / ${barCountLabel(afterBlock.bars)}`,
+    scope: `Block ${blockNumber} arrangement fields`,
+    impact: `${changedCount} field${changedCount === 1 ? "" : "s"} changed`,
+    metrics,
+    auditionCue: `Play Block ${blockNumber} to hear ${afterBlock.section} with Pattern ${afterBlock.pattern}.`,
+    nextCheck: `Scan Song Form Overview for ${afterBlock.section} flow and Arrangement Playback for audible block context.`,
+    tone
+  };
+}
+
+function createArrangementFocusResultMetric(
+  id: ArrangementFocusResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): ArrangementFocusResultMetric {
+  const changed = before !== after;
+  return {
+    id,
+    label,
+    before,
+    after,
+    changed,
+    tone: changed ? "warn" : "good"
+  };
 }
 
 function suggestedArrangementFocusPreset(block: ArrangementBlock): ArrangementFocusPresetId {
