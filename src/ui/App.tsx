@@ -7177,6 +7177,7 @@ export function App(): ReactElement {
     reviewQueueSummary,
     selectedArrangementIndex,
     sessionPassSummary,
+    styleInspectorSummary,
     transportLoopScope,
     workflowNavigatorItems,
     onApplyArrangementMove: applyArrangementMoveToSelected,
@@ -7203,6 +7204,7 @@ export function App(): ReactElement {
     onFocusProductionSnapshot: focusProductionSnapshotMetric,
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusSessionPass: focusSessionPassCard,
+    onFocusStyleInspector: focusStyleInspectorItem,
     onFocusWorkflowSpotlight: jumpToWorkflowZone,
     onOpenProject: handleOpenProject,
     onRedo: redoProject,
@@ -11759,6 +11761,29 @@ function activeBeatPassportQuickActionMetric(summary: BeatPassportSummary): Beat
   return summary.metrics.find((metric) => metric.tone !== "good") ?? summary.metrics[0] ?? null;
 }
 
+function activeStyleInspectorQuickActionItem(
+  summary: StyleInspectorSummary,
+  project: ProjectState
+): StyleInspectorFocusItem | null {
+  const bpmMetric = summary.metrics.find((metric) => metric.id === "bpm") ?? null;
+  if (bpmMetric && (project.bpm < summary.profile.bpmRange[0] || project.bpm > summary.profile.bpmRange[1])) {
+    return bpmMetric;
+  }
+
+  const swingMetric = summary.metrics.find((metric) => metric.id === "swing") ?? null;
+  if (swingMetric && Math.abs(project.swing - summary.profile.defaultSwing) > 0.001) {
+    return swingMetric;
+  }
+
+  return (
+    summary.patterns.find((pattern) => pattern.eventCount < 12) ??
+    summary.patterns.find((pattern) => pattern.eventCount < 20) ??
+    summary.metrics[0] ??
+    summary.patterns[0] ??
+    null
+  );
+}
+
 function activeExportPreflightQuickActionCard(summary: ExportPreflightSummary): ExportPreflightCard | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
@@ -12258,6 +12283,7 @@ function createQuickActions({
   reviewQueueSummary,
   selectedArrangementIndex,
   sessionPassSummary,
+  styleInspectorSummary,
   transportLoopScope,
   workflowNavigatorItems,
   onApplyArrangementMove,
@@ -12284,6 +12310,7 @@ function createQuickActions({
   onFocusProductionSnapshot,
   onFocusReviewQueue,
   onFocusSessionPass,
+  onFocusStyleInspector,
   onFocusWorkflowSpotlight,
   onOpenProject,
   onRedo,
@@ -12311,6 +12338,7 @@ function createQuickActions({
   reviewQueueSummary: ReviewQueueSummary;
   selectedArrangementIndex: number;
   sessionPassSummary: SessionPassSummary;
+  styleInspectorSummary: StyleInspectorSummary;
   transportLoopScope: TransportLoopScope;
   workflowNavigatorItems: WorkflowNavigatorItem[];
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
@@ -12337,6 +12365,7 @@ function createQuickActions({
   onFocusProductionSnapshot: (metric: ProductionSnapshotFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
+  onFocusStyleInspector: (item: StyleInspectorFocusItem) => void;
   onFocusWorkflowSpotlight: (zone: WorkflowZoneId) => void;
   onOpenProject: () => Promise<void>;
   onRedo: () => void;
@@ -12362,6 +12391,7 @@ function createQuickActions({
   const productionSnapshotMetric = activeProductionSnapshotQuickActionMetric(productionSnapshotSummary);
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
+  const styleInspectorItem = activeStyleInspectorQuickActionItem(styleInspectorSummary, project);
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
 
   return [
@@ -12444,6 +12474,19 @@ function createQuickActions({
       run: () => {
         if (composerGuideCard) {
           onFocusComposerGuide(composerGuideCard);
+        }
+      }
+    },
+    {
+      id: "style-inspector-focus",
+      title: styleInspectorItem ? `Focus Style Inspector: ${styleInspectorItem.label}` : "Focus Style Inspector",
+      detail: styleInspectorItem ? `${styleInspectorItem.value} / ${styleInspectorItem.focusLabel}` : "No Style Inspector item available.",
+      group: "Create",
+      keywords: `style inspector focus genre bpm swing bass melody sound density pattern inspect ${styleInspectorItem?.focusId ?? "none"} ${styleInspectorItem?.focusLabel ?? "none"} beginner producer`,
+      disabled: !styleInspectorItem,
+      run: () => {
+        if (styleInspectorItem) {
+          onFocusStyleInspector(styleInspectorItem);
         }
       }
     },
@@ -12950,6 +12993,15 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "style-inspector-focus") {
+    const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+    return {
+      id: "style-inspector",
+      label: "Style inspector",
+      value: `${styleName} / ${project.bpm} BPM`
+    };
+  }
+
   if (action.id === "groove-compass-focus") {
     return {
       id: "groove-compass",
@@ -13127,6 +13179,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Key Compass card to inspect scale, chord, bass, or melody posture before editing notes.",
       nextCheck: "Return to Key Compass after the focused harmony lane changes."
+    };
+  }
+
+  if (action.id === "style-inspector-focus") {
+    return {
+      auditionCue: "Use the focused Style Inspector item to inspect BPM, swing, bass, melody, sound, or Pattern density before changing style or writing parts.",
+      nextCheck: "Return to Style Inspector after the focused style posture item is ready or intentionally deferred."
     };
   }
 
