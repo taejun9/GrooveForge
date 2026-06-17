@@ -7218,6 +7218,8 @@ export function App(): ReactElement {
     selectedNote,
     noteClipboard,
     selectedArrangementIndex,
+    selectedDrumStep,
+    drumClipboard,
     selectedChord,
     chordClipboard,
     sessionPassSummary,
@@ -7275,6 +7277,12 @@ export function App(): ReactElement {
     onCopySelectedNote: copySelectedNote,
     onPasteCopiedNote: pasteCopiedNote,
     onDuplicateSelectedNote: duplicateSelectedNote,
+    onUpdateSelectedDrumVelocity: updateSelectedDrumVelocity,
+    onUpdateSelectedDrumProbability: updateSelectedDrumProbability,
+    onUpdateSelectedDrumTiming: updateSelectedDrumTiming,
+    onUpdateSelectedHatRepeat: updateSelectedHatRepeat,
+    onCopySelectedDrumHit: copySelectedDrumHit,
+    onPasteCopiedDrumHit: pasteCopiedDrumHit,
     onMoveSelectedChordStep: moveSelectedChordStep,
     onCopySelectedChord: copySelectedChord,
     onPasteCopiedChord: pasteCopiedChord,
@@ -12596,6 +12604,8 @@ function createQuickActions({
   selectedNote,
   noteClipboard,
   selectedArrangementIndex,
+  selectedDrumStep,
+  drumClipboard,
   selectedChord,
   chordClipboard,
   sessionPassSummary,
@@ -12653,6 +12663,12 @@ function createQuickActions({
   onCopySelectedNote,
   onPasteCopiedNote,
   onDuplicateSelectedNote,
+  onUpdateSelectedDrumVelocity,
+  onUpdateSelectedDrumProbability,
+  onUpdateSelectedDrumTiming,
+  onUpdateSelectedHatRepeat,
+  onCopySelectedDrumHit,
+  onPasteCopiedDrumHit,
   onMoveSelectedChordStep,
   onCopySelectedChord,
   onPasteCopiedChord,
@@ -12724,6 +12740,8 @@ function createQuickActions({
   selectedNote: SelectedNote | null;
   noteClipboard: NoteClipboard | null;
   selectedArrangementIndex: number;
+  selectedDrumStep: SelectedDrumStep | null;
+  drumClipboard: DrumClipboard | null;
   selectedChord: ChordEvent | undefined;
   chordClipboard: ChordClipboard | null;
   sessionPassSummary: SessionPassSummary;
@@ -12781,6 +12799,12 @@ function createQuickActions({
   onCopySelectedNote: () => void;
   onPasteCopiedNote: () => void;
   onDuplicateSelectedNote: () => void;
+  onUpdateSelectedDrumVelocity: (velocity: number) => void;
+  onUpdateSelectedDrumProbability: (probability: number) => void;
+  onUpdateSelectedDrumTiming: (timingMs: number) => void;
+  onUpdateSelectedHatRepeat: (repeat: number) => void;
+  onCopySelectedDrumHit: () => void;
+  onPasteCopiedDrumHit: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
   onCopySelectedChord: () => void;
   onPasteCopiedChord: () => void;
@@ -12910,6 +12934,18 @@ function createQuickActions({
   const noteClipboardPasteStep = noteClipboard
     ? nextEmptyStepForPitch(noteClipboardPatternNotes, noteClipboard.note.pitch, noteClipboard.note.step)
     : null;
+  const selectedDrumActive = Boolean(selectedDrumStep && selectedPatternData.drumPattern[selectedDrumStep.lane][selectedDrumStep.step]);
+  const selectedDrumLabel = selectedDrumStep ? `${drumLabels[selectedDrumStep.lane]} ${selectedDrumStep.step + 1}` : "No selected drum hit";
+  const selectedDrumVelocity =
+    selectedDrumStep && selectedDrumActive ? drumStepVelocity(selectedPatternData, selectedDrumStep.lane, selectedDrumStep.step) : null;
+  const selectedDrumProbability =
+    selectedDrumStep && selectedDrumActive ? drumStepProbability(selectedPatternData, selectedDrumStep.lane, selectedDrumStep.step) : null;
+  const selectedDrumTiming =
+    selectedDrumStep && selectedDrumActive ? drumStepTimingMs(selectedPatternData, selectedDrumStep.lane, selectedDrumStep.step) : null;
+  const selectedHatRepeat =
+    selectedDrumStep?.lane === "hat" && selectedDrumActive ? hatRepeatCount(selectedPatternData, selectedDrumStep.step) : null;
+  const drumClipboardLabel = drumClipboard ? `${drumLabels[drumClipboard.lane]} ${drumClipboard.step + 1}` : "Clipboard empty";
+  const drumClipboardPasteStep = drumClipboard ? nextEmptyDrumStep(selectedPatternData, drumClipboard.lane, drumClipboard.step) : null;
   const selectedChordActive = Boolean(
     selectedChord && selectedPatternData.chordEvents.some((chord) => sameChordEvent(chord, selectedChord))
   );
@@ -13139,6 +13175,159 @@ function createQuickActions({
       run: onDuplicateSelectedNote
     }
   ];
+  const selectedDrumActions: QuickAction[] = [
+    {
+      id: "selected-drum-velocity-down",
+      title: "Soften selected drum hit",
+      detail:
+        selectedDrumVelocity !== null
+          ? `${selectedDrumLabel} velocity ${percentLabel(selectedDrumVelocity)} -> ${percentLabel(normalizeDrumVelocity(selectedDrumVelocity - 0.05))}`
+          : "Select an active drum hit first.",
+      group: "Create",
+      keywords: "selected drum velocity down softer dynamics pocket hit edit beginner producer",
+      disabled: selectedDrumVelocity === null || selectedDrumVelocity <= 0.15,
+      run: () => {
+        if (selectedDrumVelocity !== null) {
+          onUpdateSelectedDrumVelocity(selectedDrumVelocity - 0.05);
+        }
+      }
+    },
+    {
+      id: "selected-drum-velocity-up",
+      title: "Punch selected drum hit",
+      detail:
+        selectedDrumVelocity !== null
+          ? `${selectedDrumLabel} velocity ${percentLabel(selectedDrumVelocity)} -> ${percentLabel(normalizeDrumVelocity(selectedDrumVelocity + 0.05))}`
+          : "Select an active drum hit first.",
+      group: "Create",
+      keywords: "selected drum velocity up louder punch dynamics pocket hit edit beginner producer",
+      disabled: selectedDrumVelocity === null || selectedDrumVelocity >= 1,
+      run: () => {
+        if (selectedDrumVelocity !== null) {
+          onUpdateSelectedDrumVelocity(selectedDrumVelocity + 0.05);
+        }
+      }
+    },
+    {
+      id: "selected-drum-chance-down",
+      title: "Lower selected drum chance",
+      detail:
+        selectedDrumProbability !== null
+          ? `${selectedDrumLabel} chance ${percentLabel(selectedDrumProbability)} -> ${percentLabel(normalizeDrumProbability(selectedDrumProbability - 0.05))}`
+          : "Select an active drum hit first.",
+      group: "Create",
+      keywords: "selected drum chance probability down ghost variation pocket hit edit beginner producer",
+      disabled: selectedDrumProbability === null || selectedDrumProbability <= 0,
+      run: () => {
+        if (selectedDrumProbability !== null) {
+          onUpdateSelectedDrumProbability(selectedDrumProbability - 0.05);
+        }
+      }
+    },
+    {
+      id: "selected-drum-chance-up",
+      title: "Raise selected drum chance",
+      detail:
+        selectedDrumProbability !== null
+          ? `${selectedDrumLabel} chance ${percentLabel(selectedDrumProbability)} -> ${percentLabel(normalizeDrumProbability(selectedDrumProbability + 0.05))}`
+          : "Select an active drum hit first.",
+      group: "Create",
+      keywords: "selected drum chance probability up reliable variation pocket hit edit beginner producer",
+      disabled: selectedDrumProbability === null || selectedDrumProbability >= 1,
+      run: () => {
+        if (selectedDrumProbability !== null) {
+          onUpdateSelectedDrumProbability(selectedDrumProbability + 0.05);
+        }
+      }
+    },
+    {
+      id: "selected-drum-timing-earlier",
+      title: "Push selected drum earlier",
+      detail:
+        selectedDrumTiming !== null
+          ? `${selectedDrumLabel} timing ${timingLabel(selectedDrumTiming)} -> ${timingLabel(normalizeDrumTimingMs(selectedDrumTiming - 5))}`
+          : "Select an active drum hit first.",
+      group: "Create",
+      keywords: "selected drum timing earlier ahead microtiming pocket hit edit beginner producer",
+      disabled: selectedDrumTiming === null || selectedDrumTiming <= minDrumTimingMs,
+      run: () => {
+        if (selectedDrumTiming !== null) {
+          onUpdateSelectedDrumTiming(selectedDrumTiming - 5);
+        }
+      }
+    },
+    {
+      id: "selected-drum-timing-later",
+      title: "Lay selected drum later",
+      detail:
+        selectedDrumTiming !== null
+          ? `${selectedDrumLabel} timing ${timingLabel(selectedDrumTiming)} -> ${timingLabel(normalizeDrumTimingMs(selectedDrumTiming + 5))}`
+          : "Select an active drum hit first.",
+      group: "Create",
+      keywords: "selected drum timing later behind microtiming pocket hit edit beginner producer",
+      disabled: selectedDrumTiming === null || selectedDrumTiming >= maxDrumTimingMs,
+      run: () => {
+        if (selectedDrumTiming !== null) {
+          onUpdateSelectedDrumTiming(selectedDrumTiming + 5);
+        }
+      }
+    },
+    {
+      id: "selected-drum-hat-repeat-down",
+      title: "Reduce selected hat repeat",
+      detail:
+        selectedDrumStep?.lane === "hat" && selectedHatRepeat !== null
+          ? `${selectedDrumLabel} repeat ${selectedHatRepeat}x -> ${normalizeHatRepeat(selectedHatRepeat - 1)}x`
+          : "Select an active hat hit first.",
+      group: "Create",
+      keywords: "selected drum hat repeat roll reduce dynamics pocket hit edit beginner producer",
+      disabled: selectedDrumStep?.lane !== "hat" || selectedHatRepeat === null || selectedHatRepeat <= 1,
+      run: () => {
+        if (selectedHatRepeat !== null) {
+          onUpdateSelectedHatRepeat(selectedHatRepeat - 1);
+        }
+      }
+    },
+    {
+      id: "selected-drum-hat-repeat-up",
+      title: "Increase selected hat repeat",
+      detail:
+        selectedDrumStep?.lane === "hat" && selectedHatRepeat !== null
+          ? `${selectedDrumLabel} repeat ${selectedHatRepeat}x -> ${normalizeHatRepeat(selectedHatRepeat + 1)}x`
+          : "Select an active hat hit first.",
+      group: "Create",
+      keywords: "selected drum hat repeat roll increase dynamics pocket hit edit beginner producer",
+      disabled: selectedDrumStep?.lane !== "hat" || selectedHatRepeat === null || selectedHatRepeat >= 4,
+      run: () => {
+        if (selectedHatRepeat !== null) {
+          onUpdateSelectedHatRepeat(selectedHatRepeat + 1);
+        }
+      }
+    },
+    {
+      id: "selected-drum-copy",
+      title: "Copy selected drum hit",
+      detail: selectedDrumActive ? `${selectedDrumLabel} -> local drum clipboard` : "Select an active drum hit first.",
+      group: "Create",
+      keywords: "selected drum copy clipboard hit dynamics timing chance repeat pocket edit beginner producer",
+      disabled: !selectedDrumActive,
+      run: onCopySelectedDrumHit
+    },
+    {
+      id: "selected-drum-paste",
+      title: "Paste copied drum hit",
+      detail:
+        drumClipboard && drumClipboardPasteStep !== null
+          ? `${drumClipboardLabel} -> ${drumLabels[drumClipboard.lane]} ${drumClipboardPasteStep + 1} / Pattern ${project.selectedPattern}`
+          : drumClipboard
+            ? `${drumClipboardLabel} has no empty paste step.`
+            : "Copy a drum hit first.",
+      group: "Create",
+      keywords: "selected drum paste clipboard hit next empty dynamics timing chance repeat pocket edit beginner producer",
+      disabled: !drumClipboard || drumClipboardPasteStep === null,
+      run: onPasteCopiedDrumHit
+    }
+  ];
   const selectedChordActions: QuickAction[] = [
     {
       id: "selected-chord-step-left",
@@ -13331,6 +13520,7 @@ function createQuickActions({
     },
     ...captureTargetActions,
     ...captureDefaultActions,
+    ...selectedDrumActions,
     ...selectedNoteActions,
     ...selectedChordActions,
     {
@@ -14203,8 +14393,9 @@ function createQuickActionResult(
     action.id.startsWith("capture-target-") ||
     action.id.startsWith("capture-default-");
   const noteClipboardOnly = action.id === "selected-note-copy";
+  const drumClipboardOnly = action.id === "selected-drum-copy";
   const chordClipboardOnly = action.id === "selected-chord-copy";
-  const uiLocal = action.id.startsWith("mix-snapshot-") || inputSetupOnly || noteClipboardOnly || chordClipboardOnly;
+  const uiLocal = action.id.startsWith("mix-snapshot-") || inputSetupOnly || noteClipboardOnly || drumClipboardOnly || chordClipboardOnly;
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
     id: afterMetric.id,
@@ -14225,7 +14416,7 @@ function createQuickActionResult(
           ? "Previewed"
           : focusOnly
             ? "Focused"
-            : noteClipboardOnly || chordClipboardOnly
+            : noteClipboardOnly || drumClipboardOnly || chordClipboardOnly
               ? "Copied"
               : uiLocal && action.id === "mix-snapshot-clear"
                 ? "Cleared"
@@ -14288,6 +14479,14 @@ function quickActionResultMetricSnapshot(
     return {
       id: "selected-note",
       label: "Selected note",
+      value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
+    };
+  }
+
+  if (action.id.startsWith("selected-drum-")) {
+    return {
+      id: "selected-drum",
+      label: "Selected drum",
       value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
     };
   }
@@ -14686,6 +14885,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Loop the selected Pattern to hear the corrected 808 or Synth note against drums and chords.",
       nextCheck: "Use selected-note tools again for another small correction, or move to Pattern Compare once the phrase feels right."
+    };
+  }
+
+  if (action.id === "selected-drum-copy") {
+    return {
+      auditionCue: "Use Paste copied drum hit when the copied groove shape should repeat in the current Pattern.",
+      nextCheck: "The drum clipboard is UI-local; paste explicitly before changing to another editing task."
+    };
+  }
+
+  if (action.id.startsWith("selected-drum-")) {
+    return {
+      auditionCue: "Loop the selected Pattern to hear the corrected drum pocket against the 808, chords, and Synth.",
+      nextCheck: "Use selected-drum tools again for another small correction, or move to Drum Move when the rhythm needs a broader change."
     };
   }
 
