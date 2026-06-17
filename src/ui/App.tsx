@@ -7165,6 +7165,7 @@ export function App(): ReactElement {
     grooveCompassSummary,
     isPlaying,
     keyCompassSummary,
+    layerStarterOptions,
     patternDnaSummary,
     playbackMode,
     project,
@@ -7177,6 +7178,7 @@ export function App(): ReactElement {
     onApplyArrangementMove: applyArrangementMoveToSelected,
     onApplyArrangementFocus: applyArrangementFocusPreset,
     onApplyBlueprint: applyQuickActionBeatBlueprint,
+    onApplyLayerStarter: applyLayerStarter,
     onApplyMasterFinish: applyMasterFinishPad,
     onApplyMixFix: applyMixFixPreset,
     onApplyPatternChain: applyPatternChain,
@@ -11729,6 +11731,10 @@ function activePatternDnaQuickActionCard(summary: PatternDnaSummary): PatternDna
   return summary.cards.find((card) => card.tone !== "good") ?? summary.cards[0] ?? null;
 }
 
+function activeLayerStarterQuickActionOption(options: LayerStarterOption[]): LayerStarterOption | null {
+  return options.find((option) => option.tone === "danger") ?? options.find((option) => option.tone === "warn") ?? null;
+}
+
 function activeExportPreflightQuickActionCard(summary: ExportPreflightSummary): ExportPreflightCard | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
@@ -12216,6 +12222,7 @@ function createQuickActions({
   grooveCompassSummary,
   isPlaying,
   keyCompassSummary,
+  layerStarterOptions,
   patternDnaSummary,
   playbackMode,
   project,
@@ -12228,6 +12235,7 @@ function createQuickActions({
   onApplyArrangementMove,
   onApplyArrangementFocus,
   onApplyBlueprint,
+  onApplyLayerStarter,
   onApplyMasterFinish,
   onApplyMixFix,
   onApplyPatternChain,
@@ -12259,6 +12267,7 @@ function createQuickActions({
   grooveCompassSummary: GrooveCompassSummary;
   isPlaying: boolean;
   keyCompassSummary: KeyCompassSummary;
+  layerStarterOptions: LayerStarterOption[];
   patternDnaSummary: PatternDnaSummary;
   playbackMode: PlaybackMode;
   project: ProjectState;
@@ -12271,6 +12280,7 @@ function createQuickActions({
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
+  onApplyLayerStarter: (starterId: LayerStarterId) => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
   onApplyMixFix: (preset: MixFixPreset) => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
@@ -12304,6 +12314,7 @@ function createQuickActions({
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
   const grooveCompassItem = activeGrooveCompassQuickActionItem(grooveCompassSummary);
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
+  const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
@@ -12428,6 +12439,19 @@ function createQuickActions({
       run: () => {
         if (patternDnaCard) {
           onFocusPatternDna(patternDnaCard);
+        }
+      }
+    },
+    {
+      id: "layer-starter",
+      title: layerStarterOption ? `Start ${layerStarterOption.label} layer` : "Start missing layer",
+      detail: layerStarterOption ? `${layerStarterOption.status} / ${layerStarterOption.detail}` : "No missing or thin Layer Starter option.",
+      group: "Create",
+      keywords: `layer starter missing thin start seed drums 808 bass chords synth ${layerStarterOption?.id ?? "none"} ${layerStarterOption?.actionLabel ?? "none"} ${layerStarterOption?.targetLabel ?? "none"} beginner producer`,
+      disabled: !layerStarterOption,
+      run: () => {
+        if (layerStarterOption) {
+          onApplyLayerStarter(layerStarterOption.id);
         }
       }
     },
@@ -12844,6 +12868,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "layer-starter") {
+    return {
+      id: "layer-starter",
+      label: "Layer starter",
+      value: `Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
+    };
+  }
+
   if (action.id === "review-queue-focus") {
     return {
       id: "review-queue",
@@ -12979,6 +13011,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Pattern DNA card to inspect layers, density, variation, or arrangement use before changing the loop.",
       nextCheck: "Return to Pattern DNA after the focused loop or arrangement lane changes."
+    };
+  }
+
+  if (action.id === "layer-starter") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the starter layer supports the groove, 808, harmony, and melody balance.`,
+      nextCheck: "Return to Layer Starter or Pattern DNA after the selected layer is no longer missing or thin."
     };
   }
 
