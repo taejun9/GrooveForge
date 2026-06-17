@@ -2360,6 +2360,29 @@ type WorkflowSpotlightSummary = {
   tone: MixCoachTone;
 };
 
+type FirstBeatPathStepId = "setup" | "compose" | "arrange" | "mix" | "deliver";
+type FirstBeatPathTarget = "transport" | WorkflowZoneId;
+
+type FirstBeatPathStep = {
+  id: FirstBeatPathStepId;
+  label: string;
+  value: string;
+  detail: string;
+  jumpLabel: string;
+  target: FirstBeatPathTarget;
+  tone: MixCoachTone;
+};
+
+type FirstBeatPathSummary = {
+  statusLabel: string;
+  headline: string;
+  detail: string;
+  countLabel: string;
+  nextStepId: FirstBeatPathStepId;
+  tone: MixCoachTone;
+  steps: FirstBeatPathStep[];
+};
+
 type SelectedDrumStep = {
   lane: DrumLane;
   step: number;
@@ -2861,6 +2884,10 @@ export function App(): ReactElement {
   const workflowNavigatorItems = useMemo(
     () => createWorkflowNavigatorItems(project, beatMapSummary, exportPreflightSummary, exportAnalysis),
     [project, beatMapSummary, exportPreflightSummary, exportAnalysis]
+  );
+  const firstBeatPathSummary = useMemo(
+    () => createFirstBeatPathSummary(project, style, workflowNavigatorItems, beatMapSummary, exportPreflightSummary, exportAnalysis),
+    [project, style, workflowNavigatorItems, beatMapSummary, exportPreflightSummary, exportAnalysis]
   );
   const snapshotCompareSummary = useMemo(() => createSnapshotCompareSummary(project), [project]);
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
@@ -6181,6 +6208,15 @@ export function App(): ReactElement {
     targetRefs[zone]?.scrollIntoView({ block: "start", behavior: "auto" });
   }
 
+  function jumpToFirstBeatPathTarget(target: FirstBeatPathTarget): void {
+    if (target === "transport") {
+      transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+      return;
+    }
+
+    jumpToWorkflowZone(target);
+  }
+
   function focusBeatPassportMetric(metric: BeatPassportFocusItem): void {
     const targetRefs: Record<BeatPassportFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -6674,6 +6710,8 @@ export function App(): ReactElement {
       </section>
 
       <ModeFocus summary={modeFocusSummary} onFocus={focusModeFocusCard} />
+
+      <FirstBeatPath summary={firstBeatPathSummary} onJump={jumpToFirstBeatPathTarget} />
 
       <WorkflowNavigator items={workflowNavigatorItems} onJump={jumpToWorkflowZone} />
 
@@ -9830,6 +9868,53 @@ function ModeFocus({ onFocus, summary }: { summary: ModeFocusSummary; onFocus: (
   );
 }
 
+function FirstBeatPath({
+  onJump,
+  summary
+}: {
+  summary: FirstBeatPathSummary;
+  onJump: (target: FirstBeatPathTarget) => void;
+}): ReactElement {
+  return (
+    <section className={`first-beat-path ${summary.tone}`} data-testid="first-beat-path" aria-label="First beat path">
+      <div className="first-beat-path-heading">
+        <div>
+          <ListChecks size={16} aria-hidden="true" />
+          <span data-testid="first-beat-path-status">{summary.statusLabel}</span>
+        </div>
+        <strong data-testid="first-beat-path-headline">{summary.headline}</strong>
+        <small data-testid="first-beat-path-detail">{summary.detail}</small>
+      </div>
+      <div className="first-beat-path-count" data-next-step={summary.nextStepId} data-testid="first-beat-path-count">
+        <span>Path</span>
+        <strong>{summary.countLabel}</strong>
+        <small>{firstBeatPathToneLabel(summary.tone)}</small>
+      </div>
+      <div className="first-beat-path-steps" data-testid="first-beat-path-steps">
+        {summary.steps.map((step) => {
+          const next = step.id === summary.nextStepId;
+          return (
+            <button
+              className={["first-beat-path-step", step.tone, next ? "next" : ""].filter(Boolean).join(" ")}
+              data-next={next ? "true" : "false"}
+              data-testid={`first-beat-path-${step.id}`}
+              key={step.id}
+              onClick={() => onJump(step.target)}
+              title={`Jump to ${step.jumpLabel}: ${step.detail}`}
+              type="button"
+            >
+              {firstBeatPathIcon(step.id)}
+              <span>{step.label}</span>
+              <strong>{step.value}</strong>
+              <small>{step.detail}</small>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function WorkflowNavigator({
   items,
   onJump
@@ -9917,6 +10002,114 @@ function createWorkflowSpotlightSummary(items: WorkflowNavigatorItem[]): Workflo
 
 function workflowCountLabel(count: number, label: string): string {
   return `${count} ${label}${count === 1 ? "" : "s"}`;
+}
+
+function createFirstBeatPathSummary(
+  project: ProjectState,
+  style: StyleProfile,
+  workflowItems: WorkflowNavigatorItem[],
+  beatMap: BeatMapSummary,
+  exportPreflight: ExportPreflightSummary,
+  analysis: ExportAnalysis
+): FirstBeatPathSummary {
+  const target = activeDeliveryTarget(project);
+  const stage = (id: string): BeatMapStage | null => beatMap.stages.find((candidate) => candidate.id === id) ?? null;
+  const workflow = (id: WorkflowZoneId): WorkflowNavigatorItem | null =>
+    workflowItems.find((candidate) => candidate.id === id) ?? null;
+  const startStage = stage("start");
+  const composeItem = workflow("compose");
+  const arrangeItem = workflow("arrange");
+  const mixItem = workflow("mix");
+  const deliverItem = workflow("deliver");
+  const setupTone: MixCoachTone = project.bpm >= style.bpmRange[0] && project.bpm <= style.bpmRange[1] ? "good" : "warn";
+  const steps: FirstBeatPathStep[] = [
+    {
+      id: "setup",
+      label: "Setup",
+      value: `${style.name} / ${project.key}`,
+      detail: `${project.bpm} BPM / ${startStage?.status ?? "Start ready"}`,
+      jumpLabel: "Transport",
+      target: "transport",
+      tone: weakestTone([setupTone, startStage?.tone ?? "good"])
+    },
+    {
+      id: "compose",
+      label: "Compose",
+      value: composeItem?.value ?? `Pattern ${project.selectedPattern}`,
+      detail: composeItem?.detail ?? "Write drums, 808, chords, and melody",
+      jumpLabel: "Compose",
+      target: "compose",
+      tone: composeItem?.tone ?? "warn"
+    },
+    {
+      id: "arrange",
+      label: "Arrange",
+      value: arrangeItem?.value ?? barCountLabel(arrangementTotalBars(project)),
+      detail: arrangeItem?.detail ?? "Place Pattern A/B/C into song sections",
+      jumpLabel: "Arrange",
+      target: "arrange",
+      tone: arrangeItem?.tone ?? "warn"
+    },
+    {
+      id: "mix",
+      label: "Mix",
+      value: mixItem?.value ?? analysis.status,
+      detail: mixItem?.detail ?? `${formatDb(analysis.headroomDb)} headroom / scan balance`,
+      jumpLabel: "Mix",
+      target: "mix",
+      tone: mixItem?.tone ?? "warn"
+    },
+    {
+      id: "deliver",
+      label: "Deliver",
+      value: deliverItem?.value ?? exportPreflight.headline,
+      detail: deliverItem?.detail ?? exportPreflight.detail,
+      jumpLabel: "Deliver",
+      target: "deliver",
+      tone: weakestTone([deliverItem?.tone ?? "warn", exportPreflight.tone])
+    }
+  ];
+  const readyCount = steps.filter((step) => step.tone === "good").length;
+  const reviewCount = steps.filter((step) => step.tone === "warn").length;
+  const blockerCount = steps.filter((step) => step.tone === "danger").length;
+  const nextStep = steps.find((step) => step.tone === "danger") ?? steps.find((step) => step.tone === "warn") ?? steps[steps.length - 1];
+  const tone = weakestTone(steps.map((step) => step.tone));
+  const statusLabel = tone === "good" ? "Beat path ready" : tone === "warn" ? "Beat path review" : "Beat path blocker";
+
+  return {
+    statusLabel,
+    headline: `${nextStep.label}: ${nextStep.value}`,
+    detail: `${target.name} / ${project.mode === "guided" ? "guided route" : "studio scan"} / next jump ${nextStep.jumpLabel}`,
+    countLabel: `${readyCount}/5 ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`,
+    nextStepId: nextStep.id,
+    tone,
+    steps
+  };
+}
+
+function firstBeatPathIcon(stepId: FirstBeatPathStepId): ReactElement {
+  switch (stepId) {
+    case "setup":
+      return <Gauge size={15} aria-hidden="true" />;
+    case "compose":
+      return <Drum size={15} aria-hidden="true" />;
+    case "arrange":
+      return <Music2 size={15} aria-hidden="true" />;
+    case "mix":
+      return <SlidersHorizontal size={15} aria-hidden="true" />;
+    case "deliver":
+      return <Download size={15} aria-hidden="true" />;
+  }
+}
+
+function firstBeatPathToneLabel(tone: MixCoachTone): string {
+  if (tone === "good") {
+    return "Ready to finish";
+  }
+  if (tone === "warn") {
+    return "Review the highlighted step";
+  }
+  return "Fix the highlighted blocker";
 }
 
 function ExportPreflight({
