@@ -13030,6 +13030,14 @@ function createQuickActions({
   }));
   const grooveCompassItem = activeGrooveCompassQuickActionItem(grooveCompassSummary);
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
+  const keyCompassActions: QuickAction[] = keyCompassSummary.cards.map((item) => ({
+    id: `key-compass-card-${item.id}`,
+    title: `Focus Key Compass: ${item.label}`,
+    detail: `${item.value} / ${item.focusLabel} / ${item.detail}`,
+    group: "Create",
+    keywords: `key compass focus card harmony scale chord 808 bass melody selected note selected chord inspect ${item.id} ${item.label} ${item.value} ${item.focusLabel} ${item.detail} beginner producer`,
+    run: () => onFocusKeyCompass(item)
+  }));
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
   const listeningPassItem = activeListeningPassQuickActionItem(listeningPassSummary);
   const listeningPassActions: QuickAction[] = listeningPassSummary.items.map((item) => ({
@@ -14148,6 +14156,7 @@ function createQuickActions({
         }
       }
     },
+    ...keyCompassActions,
     {
       id: "groove-compass-focus",
       title: grooveCompassItem ? `Focus Groove Compass: ${grooveCompassItem.label}` : "Focus Groove Compass",
@@ -14887,6 +14896,7 @@ function createQuickActionResult(
     action.id === "listening-pass-focus" ||
     action.id.startsWith("listening-pass-checkpoint-") ||
     action.id === "key-compass-focus" ||
+    action.id.startsWith("key-compass-card-") ||
     action.id === "groove-compass-focus" ||
     action.id === "pattern-dna-focus" ||
     action.id === "beat-passport-focus" ||
@@ -15080,6 +15090,14 @@ function quickActionResultMetricSnapshot(
       id: "key-compass",
       label: "Key compass",
       value: `${project.key} / Pattern ${project.selectedPattern}`
+    };
+  }
+
+  if (action.id.startsWith("key-compass-card-")) {
+    return {
+      id: "key-compass",
+      label: "Key compass",
+      value: action.detail
     };
   }
 
@@ -15723,6 +15741,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Key Compass card to inspect scale, chord, bass, or melody posture before editing notes.",
       nextCheck: "Return to Key Compass after the focused harmony lane changes."
+    };
+  }
+
+  if (action.id.startsWith("key-compass-card-")) {
+    return {
+      auditionCue: "Use the focused Key Compass card to inspect that harmony lane before editing notes or chords.",
+      nextCheck: "Return to Key Compass when you need another direct scale, chord, 808/bass, melody, or selected focus."
     };
   }
 
