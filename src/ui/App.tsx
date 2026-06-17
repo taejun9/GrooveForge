@@ -684,6 +684,17 @@ type DrumKitPadOption = DrumKitPadDefinition & {
   changedCount: number;
 };
 
+type DrumKitPreviewSummary = {
+  padId: DrumKitPadId;
+  statusLabel: string;
+  kitLabel: string;
+  drumLabel: string;
+  rackLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type DrumKitResultMetric = {
   id: "kit" | "kick" | "clap" | "hat" | "rack";
   label: string;
@@ -2698,6 +2709,10 @@ export function App(): ReactElement {
     [project.sound, soundFocusPadOptions]
   );
   const drumKitPadOptions = useMemo(() => createDrumKitPadOptions(project), [project]);
+  const drumKitPreviewSummary = useMemo(
+    () => createDrumKitPreviewSummary(drumKitPadOptions),
+    [drumKitPadOptions]
+  );
   const masterFinishPadOptions = useMemo(() => createMasterFinishPadOptions(project), [project]);
   const masterFinishPreviewSummary = useMemo(
     () => createMasterFinishPreviewSummary(project, masterFinishPadOptions),
@@ -6787,6 +6802,7 @@ export function App(): ReactElement {
           </div>
           <SoundDesigner
             drumKitPads={drumKitPadOptions}
+            drumKitPreview={drumKitPreviewSummary}
             drumKitResult={drumKitResult}
             focusPreview={soundFocusPreviewSummary}
             focusPads={soundFocusPadOptions}
@@ -16188,6 +16204,65 @@ function drumKitPadPreview(pad: DrumKitPadDefinition): string {
   return `K ${compactUnitPercent(pad.sound.kickPunch)} / H ${compactUnitPercent(pad.sound.hatBrightness)}`;
 }
 
+function createDrumKitPreviewSummary(pads: DrumKitPadOption[]): DrumKitPreviewSummary {
+  const pad = pads.find((option) => option.changedCount > 0) ?? pads[0];
+  if (!pad) {
+    return {
+      padId: "clean",
+      statusLabel: "Kit aligned",
+      kitLabel: "No kit target",
+      drumLabel: "No drum tone target",
+      rackLabel: "No rack target",
+      moveLabel: "0 kit moves",
+      detailTitle: "No Drum Kit pads are available.",
+      tone: "good"
+    };
+  }
+
+  const tone: MixCoachTone = pad.changedCount === 0 ? "good" : pad.changedCount === 1 ? "warn" : "danger";
+  const drumLabel = drumKitPreviewDrumLabel(pad);
+  const rackLabel = drumKitPreviewRackLabel(pad);
+  const moveLabel = `${pad.changedCount} kit move${pad.changedCount === 1 ? "" : "s"}`;
+
+  return {
+    padId: pad.id,
+    statusLabel: pad.changedCount === 0 ? "Kit aligned" : "Suggested kit",
+    kitLabel: `${pad.label} kit`,
+    drumLabel,
+    rackLabel,
+    moveLabel,
+    detailTitle:
+      pad.changedCount === 0
+        ? `${pad.label} already matches the current built-in drum tone and drum rack posture.`
+        : `${pad.label} targets ${drumLabel}; ${rackLabel}; ${moveLabel}.`,
+    tone
+  };
+}
+
+function drumKitPreviewDrumLabel(pad: DrumKitPadOption): string {
+  return `K ${compactUnitPercent(pad.sound.kickPunch)} / C ${compactUnitPercent(pad.sound.snareSnap)} / H ${compactUnitPercent(pad.sound.hatBrightness)}`;
+}
+
+function drumKitPreviewRackLabel(pad: DrumKitPadOption): string {
+  const rackParts: string[] = [];
+  if (pad.mixer.volumeDb !== undefined) {
+    rackParts.push(`Vol ${formatDb(clampMixFixVolume(pad.mixer.volumeDb))}`);
+  }
+  if (pad.mixer.air !== undefined) {
+    rackParts.push(`Air ${compactUnitPercent(normalizeMixerEq(pad.mixer.air))}`);
+  }
+  if (pad.mixer.drive !== undefined) {
+    rackParts.push(`Drive ${compactUnitPercent(normalizeMixerEq(pad.mixer.drive))}`);
+  }
+  if (pad.mixer.glue !== undefined) {
+    rackParts.push(`Glue ${compactUnitPercent(normalizeMixerEq(pad.mixer.glue))}`);
+  }
+  if (pad.mixer.send !== undefined) {
+    rackParts.push(`Space ${compactUnitPercent(normalizeMixerEq(pad.mixer.send))}`);
+  }
+  return rackParts.length > 0 ? `Rack ${rackParts.join(" / ")}` : "Rack keep current mix";
+}
+
 function applyDrumKitPadToProject(project: ProjectState, pad: DrumKitPadDefinition): ProjectState {
   const sound: SoundDesign = {
     ...project.sound,
@@ -18015,6 +18090,7 @@ function Device({
 
 function SoundDesigner({
   drumKitPads,
+  drumKitPreview,
   drumKitResult,
   focusPreview,
   focusPads,
@@ -18027,6 +18103,7 @@ function SoundDesigner({
   onChange
 }: {
   drumKitPads: DrumKitPadOption[];
+  drumKitPreview: DrumKitPreviewSummary;
   drumKitResult: DrumKitResult | null;
   focusPreview: SoundFocusPreviewSummary;
   focusPads: SoundFocusPadOption[];
@@ -18057,7 +18134,7 @@ function SoundDesigner({
           </button>
         ))}
       </div>
-      <DrumKitPads pads={drumKitPads} result={drumKitResult} onApply={onDrumKitPad} />
+      <DrumKitPads pads={drumKitPads} preview={drumKitPreview} result={drumKitResult} onApply={onDrumKitPad} />
       <SoundFocusPads pads={focusPads} preview={focusPreview} result={focusResult} onApply={onFocusPad} />
       <div className="sound-readout" aria-label="Sound design state">
         <span data-testid="sound-kick-readout">Kick {percentLabel(sound.kickPunch)}</span>
@@ -18136,10 +18213,12 @@ function SoundDesigner({
 
 function DrumKitPads({
   pads,
+  preview,
   result,
   onApply
 }: {
   pads: DrumKitPadOption[];
+  preview: DrumKitPreviewSummary;
   result: DrumKitResult | null;
   onApply: (pad: DrumKitPadId) => void;
 }): ReactElement {
@@ -18148,6 +18227,18 @@ function DrumKitPads({
       <div className="drum-kit-heading">
         <span>Drum Kit</span>
         <strong>Kick / Clap / Hat</strong>
+      </div>
+      <div
+        className={`drum-kit-preview ${preview.tone}`}
+        data-preview-drum-kit={preview.padId}
+        data-testid="drum-kit-preview"
+        title={preview.detailTitle}
+      >
+        <span data-testid="drum-kit-preview-status">{preview.statusLabel}</span>
+        <strong data-testid="drum-kit-preview-kit">{preview.kitLabel}</strong>
+        <small data-testid="drum-kit-preview-drums">{preview.drumLabel}</small>
+        <small data-testid="drum-kit-preview-rack">{preview.rackLabel}</small>
+        <small data-testid="drum-kit-preview-moves">{preview.moveLabel}</small>
       </div>
       <div className="drum-kit-row" aria-label="Drum Kit Pads">
         {pads.map((pad) => (
