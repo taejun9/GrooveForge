@@ -7269,6 +7269,7 @@ export function App(): ReactElement {
     onApplySoundFocus: applySoundFocusPad,
     onApplySoundPreset: applySoundPreset,
     onExpandPatternChain: expandPatternChain,
+    onApplyProjectKey: applyProjectKey,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onRequestMidiInputAccess: requestMidiInputAccess,
     onSelectStyle: selectStyle,
@@ -12667,6 +12668,7 @@ function createQuickActions({
   onApplySoundFocus,
   onApplySoundPreset,
   onExpandPatternChain,
+  onApplyProjectKey,
   onPreviewBlueprint,
   onRequestMidiInputAccess,
   onSelectStyle,
@@ -12815,6 +12817,7 @@ function createQuickActions({
   onApplySoundFocus: (pad: SoundFocusPadId) => void;
   onApplySoundPreset: (preset: SoundPresetTarget) => void;
   onExpandPatternChain: () => void;
+  onApplyProjectKey: (key: string) => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onRequestMidiInputAccess: () => Promise<void>;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
@@ -13614,6 +13617,20 @@ function createQuickActions({
   const nextHandoffItem = handoffSendOrder.nextItemId
     ? (handoffPackItems.find((item) => item.id === handoffSendOrder.nextItemId) ?? null)
     : null;
+  const keyQuickActions: QuickAction[] = keys.map((key) => {
+    const selected = key === project.key;
+    const keySlug = key.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    return {
+      id: `key-quick-${keySlug}`,
+      title: `${selected ? "Reapply" : "Retarget to"} ${key}`,
+      detail: selected
+        ? `${key} is the current key / Pattern A/B/C stays editable`
+        : `${project.key} -> ${key} / retarget Pattern A/B/C notes and chord roots`,
+      group: "Create",
+      keywords: `key retarget transpose scale harmony 808 bass melody chords ${key} ${keySlug} ${selected ? "current" : "change"} beginner producer`,
+      run: () => onApplyProjectKey(key)
+    };
+  });
   const styleQuickActions: QuickAction[] = styleProfiles.map((profile) => {
     const selected = profile.id === project.styleId;
     return {
@@ -13824,6 +13841,7 @@ function createQuickActions({
       }
     },
     ...styleQuickActions,
+    ...keyQuickActions,
     {
       id: "key-compass-focus",
       title: keyCompassItem ? `Focus Key Compass: ${keyCompassItem.label}` : "Focus Key Compass",
@@ -14721,6 +14739,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("key-quick-")) {
+    return {
+      id: "key-quick",
+      label: "Key",
+      value: `${project.key} / Pattern ${project.selectedPattern}`
+    };
+  }
+
   if (action.id === "style-inspector-focus") {
     const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
     return {
@@ -15169,6 +15195,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Key Compass card to inspect scale, chord, bass, or melody posture before editing notes.",
       nextCheck: "Return to Key Compass after the focused harmony lane changes."
+    };
+  }
+
+  if (action.id.startsWith("key-quick-")) {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; confirm retargeted 808, Synth, and chord roots still support the beat.`,
+      nextCheck: "Use Key Compass, selected-note degree readout, and selected-chord harmonic readout to refine the retargeted key."
     };
   }
 
