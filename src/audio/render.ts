@@ -1,8 +1,6 @@
 import {
-  ArrangementBlock,
   arrangementBlockMutesTrack,
   arrangementEnergyGain,
-  ArrangementMuteTrack,
   arrangementTotalBars,
   chordEventShouldPlay,
   chordPitches,
@@ -15,12 +13,10 @@ import {
   noteToFrequency,
   patternForSlot,
   projectStepDurationSeconds,
-  ProjectState,
   normalizeArrangementBars,
   sidechainGainForStep,
-  SoundDesign,
-  TrackType
 } from "../domain/workstation";
+import type { ArrangementBlock, ArrangementMuteTrack, ProjectState, SoundDesign, TrackType } from "../domain/workstation";
 
 const sampleRate = 44100;
 const channels = 2;
@@ -624,8 +620,7 @@ export function stemWavFileNames(project: ProjectState): string[] {
   return stemTrackIds.map((track) => `${slug}-${track.replace("_", "-")}-stem.wav`);
 }
 
-function downloadWav(buffer: AudioChannels, fileName: string): void {
-  const blob = encodeWav(buffer);
+function downloadWavBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -634,15 +629,23 @@ function downloadWav(buffer: AudioChannels, fileName: string): void {
   URL.revokeObjectURL(url);
 }
 
+export function createMixWavBlob(project: ProjectState): Blob {
+  return encodeWav(renderProject(project).buffer);
+}
+
+export function createStemWavBlob(project: ProjectState, stemTarget: StemTrackId): Blob {
+  return encodeWav(renderProject(project, arrangementBarCount(project), stemTarget).buffer);
+}
+
 export function exportWav(project: ProjectState): void {
-  downloadWav(renderProject(project).buffer, mixWavFileName(project));
+  downloadWavBlob(createMixWavBlob(project), mixWavFileName(project));
 }
 
 export function exportStems(project: ProjectState): string[] {
   const fileNames = stemWavFileNames(project);
   fileNames.forEach((fileName, index) => {
     const track = stemTrackIds[index];
-    downloadWav(renderProject(project, arrangementBarCount(project), track).buffer, fileName);
+    downloadWavBlob(createStemWavBlob(project, track), fileName);
   });
   return fileNames;
 }

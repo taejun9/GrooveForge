@@ -38,6 +38,7 @@ Drafting rule: the default empty project, first visible actions, MVP proof, prim
 The first usable result is an Electron desktop workstation that can create a sample-free 8-bar beat in any supported style profile and export it as WAV:
 
 - 145 BPM / F minor starter project.
+- Runtime smoke validation that builds a sample-free 8-bar beat from real domain data, verifies full-mix and stem export analysis, verifies WAV headers and file names, and verifies arrangement MIDI bytes without writing media artifacts.
 - Key changes that retarget Pattern A/B/C 808, synth, and chord-root event data instead of only changing the project label.
 - Style selector that applies editable genre groove templates for Trap, Drill, Boom Bap, Lo-fi, House, R&B, Jersey Club, Phonk, Garage, and Experimental Pattern A/B/C, BPM, swing, and sound preset.
 - Style Inspector with Style Quick Picks that explain and apply each genre's BPM range, active/default swing, bass role, melody role, sound preset, and Pattern A/B/C event density from local project data.
@@ -168,13 +169,14 @@ Validation:
 ```sh
 python3 harness/scripts/run_qa.py
 python3 harness/scripts/run_quality_gate.py
+npm run harness:smoke
 npm run typecheck
 npm run build
 npm run qa
 npm run verify
 ```
 
-`npm run desktop` performs a production build and launches Electron from the built files.
+`npm run verify` includes the runtime smoke harness, typecheck, and production build. `npm run desktop` performs a production build and launches Electron from the built files.
 
 ## Layout
 

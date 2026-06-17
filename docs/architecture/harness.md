@@ -53,6 +53,11 @@ If an answer only exists in chat, move it into an exec plan, meeting note, revie
 ```sh
 python3 harness/scripts/run_qa.py
 python3 harness/scripts/run_quality_gate.py
+npm run harness:smoke
+npm run typecheck
+npm run build
+npm run qa
+npm run verify
 ```
 
-These commands validate the base structure and documentation rules. Add package-manager commands only after the web app stack exists.
+These commands validate the base structure, documentation rules, runtime sample-free export smoke, TypeScript contracts, and production build. `npm run verify` runs the strict quality gate, runtime smoke, typecheck, and build.

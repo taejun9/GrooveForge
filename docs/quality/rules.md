@@ -47,6 +47,7 @@ Current commands:
 ```sh
 python3 harness/scripts/run_qa.py
 python3 harness/scripts/run_quality_gate.py
+npm run harness:smoke
 npm run typecheck
 npm run build
 npm run qa
@@ -62,6 +63,8 @@ npm run desktop
 ## Product QA Gates
 
 P0 scheduler work must prove stable play/stop/loop behavior, BPM changes, current-step feedback, and separation between UI timing and audio timing.
+
+Runtime smoke work must execute the real local TypeScript domain, render, and MIDI modules through `npm run harness:smoke`; construct a sample-free 8-bar beat from existing project data; verify non-silent full-mix plus drum, 808, synth, and chord stem analysis; verify WAV RIFF/WAVE headers, WAV/stem file names, Standard MIDI header, and MIDI file name; avoid writing media artifacts; and avoid browser, Electron, network, imported audio, sampling, remote AI, accounts, analytics, or cloud sync dependencies.
 
 Tap Tempo work must keep tap history UI-local and out of saved project schema, update only the project BPM through explicit user clicks and existing undoable project history, clamp calculated BPM to the supported transport range, preserve manual BPM entry, playback, metronome, save/load, WAV/stem/MIDI export semantics, and avoid audio input, recording, beat detection, tempo automation, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.
 

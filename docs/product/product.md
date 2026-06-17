@@ -192,6 +192,7 @@ This sentence is the MVP proof.
 
 MVP capabilities:
 
+- Runtime smoke validation that executes the real local TypeScript domain, render, and MIDI modules to build a sample-free 8-bar beat, verify non-silent full-mix and drum/808/synth/chord stem analysis, verify WAV RIFF/WAVE headers and file names, and verify deterministic arrangement MIDI bytes without writing export artifacts.
 - BPM/key setup, including Tap Tempo and Tempo Nudge Pads for explicit click-to-set, half-time, double-time, and +/-1 BPM changes.
 - Key changes retarget Pattern A/B/C 808/bass, melody, and chord-root musical events so existing beats stay in the selected key.
 - Style selector that applies key-aware editable groove templates for Trap, Drill, Boom Bap, Lo-fi, House, R&B, Jersey Club, Phonk, Garage, and Experimental Pattern A/B/C, BPM, swing, and sound preset.

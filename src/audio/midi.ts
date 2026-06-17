@@ -1,8 +1,4 @@
 import {
-  ArrangementBlock,
-  ArrangementMuteTrack,
-  DrumLane,
-  ProjectState,
   arrangementBlockMutesTrack,
   arrangementEnergyGain,
   arrangementTotalBars,
@@ -18,6 +14,7 @@ import {
   projectStepDurationSeconds,
   stepsPerBar
 } from "../domain/workstation";
+import type { ArrangementBlock, ArrangementMuteTrack, DrumLane, ProjectState } from "../domain/workstation";
 
 const ticksPerQuarter = 480;
 const ticksPerStep = ticksPerQuarter / 4;
