@@ -1450,6 +1450,40 @@ type ArrangementArcPreviewSummary = {
   tone: MixCoachTone;
 };
 
+type ArrangementTemplatePreviewSummary = {
+  templateId: ArrangementTemplateId | "aligned";
+  statusLabel: string;
+  templateLabel: string;
+  sectionLabel: string;
+  patternLabel: string;
+  energyLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+type ArrangementTemplateResultMetric = {
+  id: "sections" | "patterns" | "bars" | "energy" | "mutes";
+  label: string;
+  before: string;
+  after: string;
+  changed: boolean;
+  tone: MixCoachTone;
+};
+
+type ArrangementTemplateResultSummary = {
+  templateId: ArrangementTemplateId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: ArrangementTemplateResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type ArrangementArcResultMetric = {
   id: "sections" | "patterns" | "bars" | "energy" | "mutes";
   label: string;
@@ -2713,6 +2747,7 @@ export function App(): ReactElement {
   const [bassMoveResult, setBassMoveResult] = useState<BassMoveResult | null>(null);
   const [melodyMoveResult, setMelodyMoveResult] = useState<MelodyMoveResult | null>(null);
   const [chordMoveResult, setChordMoveResult] = useState<ChordMoveResult | null>(null);
+  const [arrangementTemplateResult, setArrangementTemplateResult] = useState<ArrangementTemplateResultSummary | null>(null);
   const [arrangementArcResult, setArrangementArcResult] = useState<ArrangementArcResultSummary | null>(null);
   const [arrangementFocusResult, setArrangementFocusResult] = useState<ArrangementFocusResultSummary | null>(null);
   const [patternChainResult, setPatternChainResult] = useState<PatternChainResultSummary | null>(null);
@@ -2915,6 +2950,10 @@ export function App(): ReactElement {
   const selectedArrangementBlockRole = useMemo(
     () => selectedArrangementBlockRoleSummary(project, selectedArrangementIndex),
     [project, selectedArrangementIndex]
+  );
+  const arrangementTemplatePreviewSummary = useMemo(
+    () => createArrangementTemplatePreviewSummary(project.arrangement),
+    [project.arrangement]
   );
   const arrangementArcPadOptions = useMemo(
     () => createArrangementArcPadOptions(project, selectedArrangementIndex),
@@ -3256,6 +3295,7 @@ export function App(): ReactElement {
     setBassMoveResult(null);
     setMelodyMoveResult(null);
     setChordMoveResult(null);
+    setArrangementTemplateResult(null);
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
     setPatternChainResult(null);
@@ -3281,6 +3321,7 @@ export function App(): ReactElement {
       setBassMoveResult(null);
       setMelodyMoveResult(null);
       setChordMoveResult(null);
+      setArrangementTemplateResult(null);
       setArrangementArcResult(null);
       setArrangementFocusResult(null);
       setPatternChainResult(null);
@@ -3381,6 +3422,7 @@ export function App(): ReactElement {
     setBassMoveResult(null);
     setMelodyMoveResult(null);
     setChordMoveResult(null);
+    setArrangementTemplateResult(null);
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
     setPatternChainResult(null);
@@ -3411,6 +3453,7 @@ export function App(): ReactElement {
     setBassMoveResult(null);
     setMelodyMoveResult(null);
     setChordMoveResult(null);
+    setArrangementTemplateResult(null);
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
     setPatternChainResult(null);
@@ -3968,6 +4011,7 @@ export function App(): ReactElement {
   }
 
   function applyArrangementTemplate(template: ArrangementTemplateId): void {
+    const beforeProject = projectRef.current;
     const arrangement = createArrangementTemplate(template);
     const firstBlock = arrangement[0];
     const changed = updateProject(
@@ -3983,6 +4027,12 @@ export function App(): ReactElement {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
+      setArrangementTemplateResult(
+        createArrangementTemplateResult(template, arrangementTemplateLabel(template), beforeProject.arrangement, projectRef.current.arrangement)
+      );
+    } else {
+      setArrangementTemplateResult(null);
+      setProjectStatus(`${arrangementTemplateLabel(template)} arrangement already selected`);
     }
   }
 
@@ -7011,24 +7061,11 @@ export function App(): ReactElement {
 
         <section className="panel arrangement-panel" data-testid="workflow-target-arrange" aria-label="Arrangement" ref={arrangePanelRef}>
           <PanelTitle icon={<Music2 size={18} />} title="Arrangement" meta={`${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`} />
-          <div className="arrangement-template-row" aria-label="Arrangement templates">
-            {arrangementTemplateIds.map((template) => {
-              const templateBlocks = createArrangementTemplate(template);
-              const templateBars = templateBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
-              return (
-                <button
-                  data-testid={`arrangement-template-${template}`}
-                  key={template}
-                  onClick={() => applyArrangementTemplate(template)}
-                  title={`Apply ${arrangementTemplateLabel(template)} arrangement`}
-                  type="button"
-                >
-                  <span>{arrangementTemplateLabel(template)}</span>
-                  <small>{templateBlocks.length} blocks / {barCountLabel(templateBars)}</small>
-                </button>
-              );
-            })}
-          </div>
+          <ArrangementTemplateControls
+            preview={arrangementTemplatePreviewSummary}
+            result={arrangementTemplateResult}
+            onApply={applyArrangementTemplate}
+          />
           <ArrangementArcPads
             pads={arrangementArcPadOptions}
             preview={arrangementArcPreviewSummary}
@@ -8048,6 +8085,96 @@ function PatternDna({
         })}
       </div>
     </section>
+  );
+}
+
+function ArrangementTemplateControls({
+  onApply,
+  preview,
+  result
+}: {
+  onApply: (template: ArrangementTemplateId) => void;
+  preview: ArrangementTemplatePreviewSummary;
+  result: ArrangementTemplateResultSummary | null;
+}): ReactElement {
+  return (
+    <section className="arrangement-template-panel" data-testid="arrangement-template-panel" aria-label="Arrangement templates">
+      <div
+        className={`arrangement-template-preview ${preview.tone}`}
+        data-preview-arrangement-template={preview.templateId}
+        data-testid="arrangement-template-preview"
+        title={preview.detailTitle}
+      >
+        <span data-testid="arrangement-template-preview-status">{preview.statusLabel}</span>
+        <strong data-testid="arrangement-template-preview-template">{preview.templateLabel}</strong>
+        <small data-testid="arrangement-template-preview-sections">{preview.sectionLabel}</small>
+        <small data-testid="arrangement-template-preview-patterns">{preview.patternLabel}</small>
+        <small data-testid="arrangement-template-preview-energy">{preview.energyLabel}</small>
+        <small data-testid="arrangement-template-preview-moves">{preview.moveLabel}</small>
+      </div>
+      <div className="arrangement-template-row" aria-label="Arrangement template buttons">
+        {arrangementTemplateIds.map((template) => {
+          const templateBlocks = createArrangementTemplate(template);
+          const templateBars = templateBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+          return (
+            <button
+              data-testid={`arrangement-template-${template}`}
+              key={template}
+              onClick={() => onApply(template)}
+              title={`Apply ${arrangementTemplateLabel(template)} arrangement`}
+              type="button"
+            >
+              <ArrowRight size={14} aria-hidden="true" />
+              <span>{arrangementTemplateLabel(template)}</span>
+              <small>{templateBlocks.length} blocks / {barCountLabel(templateBars)}</small>
+            </button>
+          );
+        })}
+      </div>
+      {result && <ArrangementTemplateResultStrip result={result} />}
+    </section>
+  );
+}
+
+function ArrangementTemplateResultStrip({ result }: { result: ArrangementTemplateResultSummary }): ReactElement {
+  return (
+    <div
+      className={`arrangement-template-result ${result.tone}`}
+      data-result-arrangement-template={result.templateId}
+      data-testid="arrangement-template-result"
+      aria-live="polite"
+    >
+      <div className="arrangement-template-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="arrangement-template-result-title">{result.title}</strong>
+          <small data-testid="arrangement-template-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="arrangement-template-result-meta">
+        <span data-testid="arrangement-template-result-status">{result.status}</span>
+        <span data-testid="arrangement-template-result-scope">{result.scope}</span>
+        <span data-testid="arrangement-template-result-impact">{result.impact}</span>
+      </div>
+      <div className="arrangement-template-result-metrics" data-testid="arrangement-template-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`arrangement-template-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="arrangement-template-result-followup" data-testid="arrangement-template-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="arrangement-template-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="arrangement-template-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -14667,6 +14794,163 @@ function structureArcSignal(project: ProjectState): StructureLensSignal {
     detail: `low ${percentLabel(low)} / high ${percentLabel(high)}`,
     tone
   };
+}
+
+function createArrangementTemplatePreviewSummary(arrangement: ArrangementBlock[]): ArrangementTemplatePreviewSummary {
+  const currentBars = arrangementBlocksTotalBars(arrangement);
+  const candidates = arrangementTemplateIds.map((template) => ({
+    templateId: template,
+    templateLabel: arrangementTemplateLabel(template),
+    arrangement: createArrangementTemplate(template)
+  }));
+  const preferredTemplateId: ArrangementTemplateId = currentBars <= 8 ? "full" : currentBars < 16 ? "full" : "hook_first";
+  const preferredCandidate =
+    candidates.find((candidate) => candidate.templateId === preferredTemplateId) ??
+    candidates.find((candidate) => candidate.templateId === "full") ??
+    candidates[0];
+  const candidate =
+    preferredCandidate && arrangementTemplateChangedFieldCount(arrangement, preferredCandidate.arrangement) > 0
+      ? preferredCandidate
+      : candidates.find((entry) => arrangementTemplateChangedFieldCount(arrangement, entry.arrangement) > 0);
+
+  if (!candidate) {
+    return {
+      templateId: "aligned",
+      statusLabel: "Template aligned",
+      templateLabel: "No template target",
+      sectionLabel: arrangementTemplatePreviewSectionLabel(arrangement),
+      patternLabel: arrangementArcPreviewPatternLabel(arrangement),
+      energyLabel: arrangementArcPreviewEnergyLabel(arrangement),
+      moveLabel: "0 blocks / 0 fields",
+      detailTitle: "Current arrangement already matches available Arrangement Template targets.",
+      tone: "good"
+    };
+  }
+
+  const changedBlocks = arrangementTemplateChangedBlockCount(arrangement, candidate.arrangement);
+  const changedFields = arrangementTemplateChangedFieldCount(arrangement, candidate.arrangement);
+  const tone: MixCoachTone = changedFields === 0 ? "good" : changedBlocks <= 3 ? "warn" : "danger";
+  const sectionLabel = arrangementTemplatePreviewSectionLabel(candidate.arrangement);
+  const patternLabel = arrangementArcPreviewPatternLabel(candidate.arrangement);
+  const energyLabel = arrangementArcPreviewEnergyLabel(candidate.arrangement);
+  const moveLabel = `${changedBlocks} blocks / ${changedFields} fields`;
+
+  return {
+    templateId: candidate.templateId,
+    statusLabel: changedFields === 0 ? "Template aligned" : "Suggested template",
+    templateLabel: candidate.templateLabel,
+    sectionLabel,
+    patternLabel,
+    energyLabel,
+    moveLabel,
+    detailTitle:
+      changedFields === 0
+        ? `${candidate.templateLabel} already matches the current arrangement posture.`
+        : `${candidate.templateLabel}: ${sectionLabel}; ${patternLabel}; ${energyLabel}; ${moveLabel}.`,
+    tone
+  };
+}
+
+function createArrangementTemplateResult(
+  templateId: ArrangementTemplateId,
+  label: string,
+  beforeArrangement: ArrangementBlock[],
+  afterArrangement: ArrangementBlock[]
+): ArrangementTemplateResultSummary {
+  const changedBlocks = arrangementTemplateChangedBlockCount(beforeArrangement, afterArrangement);
+  const changedFields = arrangementTemplateChangedFieldCount(beforeArrangement, afterArrangement);
+  const tone: MixCoachTone = changedFields === 0 ? "good" : changedBlocks <= 3 ? "warn" : "danger";
+  const metrics: ArrangementTemplateResultMetric[] = [
+    createArrangementTemplateResultMetric("sections", "Sections", compactSectionFlow(beforeArrangement), compactSectionFlow(afterArrangement)),
+    createArrangementTemplateResultMetric(
+      "patterns",
+      "Patterns",
+      arrangementArcPreviewPatternLabel(beforeArrangement),
+      arrangementArcPreviewPatternLabel(afterArrangement)
+    ),
+    createArrangementTemplateResultMetric(
+      "bars",
+      "Bars",
+      barCountLabel(arrangementBlocksTotalBars(beforeArrangement)),
+      barCountLabel(arrangementBlocksTotalBars(afterArrangement))
+    ),
+    createArrangementTemplateResultMetric(
+      "energy",
+      "Energy",
+      arrangementArcPreviewEnergyLabel(beforeArrangement),
+      arrangementArcPreviewEnergyLabel(afterArrangement)
+    ),
+    createArrangementTemplateResultMetric(
+      "mutes",
+      "Mutes",
+      arrangementArcPreviewMuteLabel(beforeArrangement),
+      arrangementArcPreviewMuteLabel(afterArrangement)
+    )
+  ];
+
+  return {
+    templateId,
+    title: `${label} applied`,
+    status: changedFields === 0 ? "Template aligned" : "Template applied",
+    detail: `${barCountLabel(arrangementBlocksTotalBars(afterArrangement))} / ${compactSectionFlow(afterArrangement)}`,
+    scope: `${afterArrangement.length} block${afterArrangement.length === 1 ? "" : "s"} shaped`,
+    impact: `${changedBlocks} block${changedBlocks === 1 ? "" : "s"} / ${changedFields} field${changedFields === 1 ? "" : "s"}`,
+    metrics,
+    auditionCue: `Play Song to hear ${label} across ${barCountLabel(arrangementBlocksTotalBars(afterArrangement))}.`,
+    nextCheck: "Scan Song Form Overview for section flow and Arrangement Playback for the audible block.",
+    tone
+  };
+}
+
+function createArrangementTemplateResultMetric(
+  id: ArrangementTemplateResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): ArrangementTemplateResultMetric {
+  const changed = before !== after;
+  return {
+    id,
+    label,
+    before,
+    after,
+    changed,
+    tone: changed ? "warn" : "good"
+  };
+}
+
+function arrangementTemplatePreviewSectionLabel(arrangement: ArrangementBlock[]): string {
+  return `${barCountLabel(arrangementBlocksTotalBars(arrangement))} / ${compactSectionFlow(arrangement)}`;
+}
+
+function arrangementTemplateChangedBlockCount(current: ArrangementBlock[], nextArrangement: ArrangementBlock[]): number {
+  const length = Math.max(current.length, nextArrangement.length);
+  return Array.from({ length }).filter(
+    (_entry, index) => !current[index] || !nextArrangement[index] || !sameArrangementBlockPosture(current[index], nextArrangement[index])
+  ).length;
+}
+
+function arrangementTemplateChangedFieldCount(current: ArrangementBlock[], nextArrangement: ArrangementBlock[]): number {
+  const length = Math.max(current.length, nextArrangement.length);
+  return Array.from({ length }).reduce<number>((total, _entry, index) => {
+    const currentBlock = current[index];
+    const nextBlock = nextArrangement[index];
+    if (!currentBlock || !nextBlock) {
+      return total + 5;
+    }
+
+    return (
+      total +
+      [
+        currentBlock.section !== nextBlock.section,
+        currentBlock.pattern !== nextBlock.pattern,
+        normalizeArrangementBars(currentBlock.bars) !== normalizeArrangementBars(nextBlock.bars),
+        normalizeArrangementEnergy(currentBlock.energy) !== normalizeArrangementEnergy(nextBlock.energy),
+        normalizeArrangementMutedTracks(currentBlock.mutedTracks).join(",") !==
+          normalizeArrangementMutedTracks(nextBlock.mutedTracks).join(",")
+      ].filter(Boolean).length
+    );
+  }, 0);
 }
 
 function createPatternChainPreviewSummary(arrangement: ArrangementBlock[]): PatternChainPreviewSummary {
