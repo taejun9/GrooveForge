@@ -7272,6 +7272,7 @@ export function App(): ReactElement {
     onApplyProjectKey: applyProjectKey,
     onApplyTempoNudge: applyTempoNudgePad,
     onToggleMetronome: toggleMetronome,
+    onTapTempo: tapProjectTempo,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onRequestMidiInputAccess: requestMidiInputAccess,
     onSelectStyle: selectStyle,
@@ -12673,6 +12674,7 @@ function createQuickActions({
   onApplyProjectKey,
   onApplyTempoNudge,
   onToggleMetronome,
+  onTapTempo,
   onPreviewBlueprint,
   onRequestMidiInputAccess,
   onSelectStyle,
@@ -12824,6 +12826,7 @@ function createQuickActions({
   onApplyProjectKey: (key: string) => void;
   onApplyTempoNudge: (pad: TempoNudgePadDefinition) => void;
   onToggleMetronome: () => void;
+  onTapTempo: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onRequestMidiInputAccess: () => Promise<void>;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
@@ -13717,6 +13720,14 @@ function createQuickActions({
       group: "Transport",
       keywords: `metronome click timing grid bpm transport ${project.metronomeEnabled ? "on off disable" : "off on enable"} beginner producer`,
       run: onToggleMetronome
+    },
+    {
+      id: "tap-tempo",
+      title: "Tap tempo pulse",
+      detail: `${project.bpm} BPM now / run repeatedly, then pause briefly to apply`,
+      group: "Transport",
+      keywords: "tap tempo bpm pulse average timing feel transport beginner producer",
+      run: onTapTempo
     },
     ...tempoNudgeActions,
     {
@@ -14620,8 +14631,15 @@ function createQuickActionResult(
   const noteClipboardOnly = action.id === "selected-note-copy";
   const drumClipboardOnly = action.id === "selected-drum-copy";
   const chordClipboardOnly = action.id === "selected-chord-copy";
+  const tapTempoPulseOnly = action.id === "tap-tempo";
   const uiLocal =
-    action.id.startsWith("mix-snapshot-") || inputSetupOnly || blockClipboardOnly || noteClipboardOnly || drumClipboardOnly || chordClipboardOnly;
+    action.id.startsWith("mix-snapshot-") ||
+    inputSetupOnly ||
+    tapTempoPulseOnly ||
+    blockClipboardOnly ||
+    noteClipboardOnly ||
+    drumClipboardOnly ||
+    chordClipboardOnly;
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
     id: afterMetric.id,
@@ -14778,6 +14796,14 @@ function quickActionResultMetricSnapshot(
       id: "metronome",
       label: "Metronome",
       value: `${project.metronomeEnabled ? "On" : "Off"} / ${project.bpm} BPM`
+    };
+  }
+
+  if (action.id === "tap-tempo") {
+    return {
+      id: "tap-tempo",
+      label: "Tap Tempo",
+      value: `${project.bpm} BPM`
     };
   }
 
@@ -15251,6 +15277,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play the current loop and use the click only as a timing reference.",
       nextCheck: "Confirm the grid feel while programming, then export WAV/stems knowing the metronome stays out of rendered audio."
+    };
+  }
+
+  if (action.id === "tap-tempo") {
+    return {
+      auditionCue: "Run Tap tempo pulse repeatedly in time with the groove, then pause briefly so the existing Tap Tempo commit can apply the averaged BPM.",
+      nextCheck: "Check the Tap Tempo readout and project BPM before locking arrangement, metronome, or export timing."
     };
   }
 

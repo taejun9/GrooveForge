@@ -292,6 +292,7 @@ MVP capabilities:
 - Pattern Playback Readout derived from local playback snapshots, selected Pattern A/B/C, and Pattern event counts, showing edit-versus-audible Pattern context without mutating project data or changing edit focus.
 - Arrangement Playback Readout derived from local playback snapshots and selected arrangement block state, showing edit-versus-audible block context without mutating project data or changing edit focus.
 - Tap Tempo that averages recent explicit clicks into a bounded project BPM through undoable project history without audio input, hidden beat detection, or tempo automation.
+- Tap Tempo Quick Action exposes the same explicit tap pulse from command search while preserving UI-local tap history, delayed bounded BPM commit behavior, playback, metronome, save/load, and export semantics.
 - Tempo Nudge Pads that apply -1, +1, half-time, and double-time BPM moves through explicit undoable project history while resetting UI-local Tap Tempo state.
 - Tempo Nudge Quick Actions expose those same bounded BPM moves from command search while preserving manual BPM input, Tap Tempo history reset behavior, playback, metronome, save/load, and export semantics.
 - Realtime metronome toggle with accented downbeat clicks that helps users program to the grid during playback without adding click audio to WAV or stem export.
