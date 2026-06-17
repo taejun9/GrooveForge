@@ -12186,6 +12186,7 @@ function createQuickActions({
 }): QuickAction[] {
   const suggestedBlueprint = suggestedBlueprintId(project);
   const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
+  const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
 
   return [
@@ -12274,6 +12275,14 @@ function createQuickActions({
       detail: "Start from an editable beat with drums, 808, harmony, arrangement, and mix.",
       group: "Create",
       keywords: "blueprint starter beat drums 808 chords arrangement mix",
+      run: () => onApplyBlueprint(suggestedBlueprint)
+    },
+    {
+      id: "blueprint-style-match",
+      title: `Apply ${currentStyleName} starter`,
+      detail: `${suggestedBlueprintName} / sample-free drums, 808, harmony, arrangement, sound, and master.`,
+      group: "Create",
+      keywords: `current style match blueprint starter ${currentStyleName} ${project.styleId} ${suggestedBlueprintName} beat drums 808 bass chords synth arrangement sound master sample free`,
       run: () => onApplyBlueprint(suggestedBlueprint)
     },
     {
@@ -12558,7 +12567,7 @@ function quickActionResultMetricSnapshot(
     return { id: "snapshots", label: "Snapshots", value: `${project.snapshots.length} slots` };
   }
 
-  if (action.id === "blueprint") {
+  if (action.id === "blueprint" || action.id === "blueprint-style-match") {
     return { id: "project-events", label: "Project events", value: `${projectEventTotal(project)} events` };
   }
 
