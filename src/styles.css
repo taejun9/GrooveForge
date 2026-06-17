@@ -2505,7 +2505,7 @@ h2 {
 
 .quick-actions-panel {
   display: grid;
-  grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto auto auto minmax(0, 1fr);
   width: min(640px, calc(100vw - 48px));
   max-height: min(680px, calc(100vh - 120px));
   gap: 10px;
@@ -2634,7 +2634,14 @@ h2 {
 
 .quick-actions-spotlight span,
 .quick-actions-spotlight strong,
-.quick-actions-spotlight small {
+.quick-actions-spotlight small,
+.quick-actions-recents-head span,
+.quick-actions-recents-head strong,
+.quick-actions-recents-head small,
+.quick-actions-recents-list button span,
+.quick-actions-recents-list button strong,
+.quick-actions-recents-list button small,
+.quick-actions-recent-empty {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2650,6 +2657,96 @@ h2 {
 .quick-actions-spotlight strong {
   color: #f4efe7;
   font-size: 11px;
+}
+
+.quick-actions-recents {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.18);
+  border-radius: 7px;
+  background: rgba(130, 215, 255, 0.04);
+  padding: 8px;
+}
+
+.quick-actions-recents-head {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.08);
+  padding-inline-end: 8px;
+}
+
+.quick-actions-recents-head span,
+.quick-actions-recents-head small {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.quick-actions-recents-head strong {
+  color: #82d7ff;
+  font-size: 11px;
+}
+
+.quick-actions-recents-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.quick-actions-recent-empty,
+.quick-actions-recents-list button {
+  min-height: 48px;
+  border: 1px solid rgba(130, 215, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(17, 16, 15, 0.18);
+  padding: 6px 7px;
+}
+
+.quick-actions-recent-empty {
+  display: grid;
+  align-items: center;
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 11px;
+}
+
+.quick-actions-recents-list button {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: #f4efe7;
+  text-align: start;
+}
+
+.quick-actions-recents-list button.good {
+  border-color: rgba(120, 240, 200, 0.24);
+}
+
+.quick-actions-recents-list button.warn {
+  border-color: rgba(240, 195, 106, 0.3);
+}
+
+.quick-actions-recents-list button.danger {
+  border-color: rgba(255, 122, 79, 0.32);
+}
+
+.quick-actions-recents-list button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.quick-actions-recents-list button span,
+.quick-actions-recents-list button small {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 9px;
+}
+
+.quick-actions-recents-list button strong {
+  color: #f4efe7;
+  font-size: 10px;
 }
 
 .quick-actions-list {
@@ -14578,6 +14675,21 @@ input[type="range"] {
     gap: 4px 8px;
   }
 
+  .quick-actions-recents {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-actions-recents-head {
+    border-inline-end: 0;
+    border-block-end: 1px solid rgba(244, 239, 231, 0.08);
+    padding-inline-end: 0;
+    padding-block-end: 6px;
+  }
+
+  .quick-actions-recents-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .snapshot-compare {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -15051,6 +15163,10 @@ input[type="range"] {
   .quick-actions-spotlight {
     grid-template-columns: 1fr;
     gap: 3px;
+  }
+
+  .quick-actions-recents-list {
+    grid-template-columns: 1fr;
   }
 
   .mix-snapshot-head,

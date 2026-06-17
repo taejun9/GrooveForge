@@ -947,6 +947,12 @@ type QuickAction = {
   run: () => void | Promise<void>;
 };
 
+type QuickActionRecent = {
+  actionId: string;
+  status: QuickActionResult["status"];
+  tone: MixCoachTone;
+};
+
 type QuickActionScopeId = "all" | "transport" | "compose" | "arrange" | "mix" | "master" | "project" | "export";
 
 type QuickActionScopeOption = {
@@ -3050,6 +3056,7 @@ export function App(): ReactElement {
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [quickActionQuery, setQuickActionQuery] = useState("");
   const [quickActionScope, setQuickActionScope] = useState<QuickActionScopeId>("all");
+  const [quickActionRecents, setQuickActionRecents] = useState<QuickActionRecent[]>([]);
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
@@ -7006,17 +7013,23 @@ export function App(): ReactElement {
     try {
       void Promise.resolve(action.run())
         .then(() => {
-          setQuickActionResult(createQuickActionResult(action, beforeProject, projectRef.current, "complete"));
+          const result = createQuickActionResult(action, beforeProject, projectRef.current, "complete");
+          setQuickActionResult(result);
+          setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
         })
         .catch((error: unknown) => {
           console.error(error);
           setProjectStatus("Quick action failed");
-          setQuickActionResult(createQuickActionResult(action, beforeProject, projectRef.current, "failed"));
+          const result = createQuickActionResult(action, beforeProject, projectRef.current, "failed");
+          setQuickActionResult(result);
+          setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
         });
     } catch (error) {
       console.error(error);
       setProjectStatus("Quick action failed");
-      setQuickActionResult(createQuickActionResult(action, beforeProject, projectRef.current, "failed"));
+      const result = createQuickActionResult(action, beforeProject, projectRef.current, "failed");
+      setQuickActionResult(result);
+      setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
     }
   }
 
@@ -7273,6 +7286,8 @@ export function App(): ReactElement {
         actions={filteredQuickActions}
         open={quickActionsOpen}
         query={quickActionQuery}
+        recentActionSource={quickActions}
+        recents={quickActionRecents}
         scope={quickActionScope}
         scopeOptions={quickActionScopeOptions}
         onClose={closeQuickActions}
@@ -9736,6 +9751,8 @@ function QuickActions({
   actions,
   open,
   query,
+  recentActionSource,
+  recents,
   scope,
   scopeOptions,
   onClose,
@@ -9746,6 +9763,8 @@ function QuickActions({
   actions: QuickAction[];
   open: boolean;
   query: string;
+  recentActionSource: QuickAction[];
+  recents: QuickActionRecent[];
   scope: QuickActionScopeId;
   scopeOptions: QuickActionScopeOption[];
   onClose: () => void;
@@ -9759,6 +9778,7 @@ function QuickActions({
 
   const firstRunnableAction = actions.find((action) => !action.disabled);
   const spotlight = createQuickActionSpotlightSummary(actions, firstRunnableAction, scope, scopeOptions, query);
+  const recentActions = createQuickActionRecentOptions(recents, recentActionSource);
 
   return (
     <div
@@ -9828,6 +9848,40 @@ function QuickActions({
           <strong data-testid="quick-actions-spotlight-title">{spotlight.titleLabel}</strong>
           <small data-testid="quick-actions-spotlight-detail">{spotlight.detailLabel}</small>
           <small data-testid="quick-actions-spotlight-context">{spotlight.contextLabel}</small>
+        </div>
+        <div className="quick-actions-recents" data-testid="quick-actions-recents" aria-label="Recent Quick Actions">
+          <div className="quick-actions-recents-head">
+            <span data-testid="quick-actions-recents-status">
+              {recentActions.length > 0 ? `${recentActions.length} recent` : "No recent"}
+            </span>
+            <strong data-testid="quick-actions-recents-title">Recent commands</strong>
+            <small data-testid="quick-actions-recents-detail">
+              {recentActions.length > 0 ? "Explicit rerun only" : "Run a command to fill this row"}
+            </small>
+          </div>
+          <div className="quick-actions-recents-list" data-testid="quick-actions-recents-list">
+            {recentActions.length === 0 ? (
+              <span className="quick-actions-recent-empty" data-testid="quick-actions-recent-empty">
+                No command history in this session
+              </span>
+            ) : (
+              recentActions.map(({ action, recent }) => (
+                <button
+                  className={recent.tone}
+                  data-testid={`quick-actions-recent-${action.id}`}
+                  disabled={action.disabled}
+                  key={action.id}
+                  onClick={() => onRun(action)}
+                  title={`${recent.status}: ${action.detail}`}
+                  type="button"
+                >
+                  <span>{action.group}</span>
+                  <strong>{action.title}</strong>
+                  <small>{recent.status}</small>
+                </button>
+              ))
+            )}
+          </div>
         </div>
         <div className="quick-actions-list" data-testid="quick-actions-list">
           {actions.length === 0 ? (
@@ -11853,6 +11907,29 @@ function quickActionSearchTokens(action: QuickAction): string[] {
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
+}
+
+function prependQuickActionRecent(
+  recents: QuickActionRecent[],
+  action: QuickAction,
+  result: QuickActionResult
+): QuickActionRecent[] {
+  const nextRecent: QuickActionRecent = {
+    actionId: action.id,
+    status: result.status,
+    tone: result.tone
+  };
+  return [nextRecent, ...recents.filter((recent) => recent.actionId !== action.id)].slice(0, 4);
+}
+
+function createQuickActionRecentOptions(
+  recents: QuickActionRecent[],
+  actions: QuickAction[]
+): Array<{ recent: QuickActionRecent; action: QuickAction }> {
+  return recents.flatMap((recent) => {
+    const action = actions.find((candidate) => candidate.id === recent.actionId);
+    return action ? [{ recent, action }] : [];
+  });
 }
 
 function createQuickActionResult(
