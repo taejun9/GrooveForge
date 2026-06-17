@@ -60,4 +60,4 @@ npm run qa
 npm run verify
 ```
 
-These commands validate the base structure, documentation rules, runtime sample-free export smoke, TypeScript contracts, and production build. `npm run verify` runs the strict quality gate, runtime smoke, typecheck, and build.
+These commands validate the base structure, documentation rules, runtime sample-free all-style export smoke, TypeScript contracts, and production build. `npm run verify` runs the strict quality gate, runtime smoke, typecheck, and build.
