@@ -13004,6 +13004,14 @@ function createQuickActions({
   }));
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
   const finishChecklistCard = activeFinishChecklistQuickActionCard(finishChecklistSummary);
+  const finishChecklistActions: QuickAction[] = finishChecklistSummary.cards.map((card) => ({
+    id: `finish-checklist-card-${card.id}`,
+    title: `Focus Finish Checklist: ${card.label}`,
+    detail: `${card.status} / ${card.focusLabel} / ${card.detail}`,
+    group: "Project",
+    keywords: `finish checklist focus card readiness ${card.id} ${card.label} ${card.status} ${card.focusLabel} ${card.detail} compose arrange mix master handoff deliver beginner producer`,
+    run: () => onFocusFinishChecklist(card)
+  }));
   const grooveCompassItem = activeGrooveCompassQuickActionItem(grooveCompassSummary);
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
@@ -13016,6 +13024,14 @@ function createQuickActions({
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
   const productionSnapshotMetric = activeProductionSnapshotQuickActionMetric(productionSnapshotSummary);
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
+  const reviewQueueActions: QuickAction[] = reviewQueueSummary.items.map((item) => ({
+    id: `review-queue-item-${item.id}`,
+    title: `Focus Review Queue: ${item.area}`,
+    detail: `${item.status} / ${item.focusLabel} / ${item.detail}`,
+    group: "Project",
+    keywords: `review queue focus issue triage ${item.id} ${item.area} ${item.status} ${item.focusLabel} ${item.detail} compose arrange mix master deliver beginner producer`,
+    run: () => onFocusReviewQueue(item)
+  }));
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
   const styleInspectorItem = activeStyleInspectorQuickActionItem(styleInspectorSummary, project);
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
@@ -14333,6 +14349,7 @@ function createQuickActions({
         }
       }
     },
+    ...finishChecklistActions,
     {
       id: "review-queue-focus",
       title: reviewQueueItem ? `Focus Review Queue: ${reviewQueueItem.area}` : "Focus Review Queue",
@@ -14346,6 +14363,7 @@ function createQuickActions({
         }
       }
     },
+    ...reviewQueueActions,
     {
       id: "export-preflight-focus",
       title: exportPreflightCard ? `Focus Export Preflight: ${exportPreflightCard.label}` : "Focus Export Preflight",
@@ -14830,6 +14848,8 @@ function createQuickActionResult(
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-focus" ||
+    action.id.startsWith("review-queue-item-") ||
+    action.id.startsWith("finish-checklist-card-") ||
     action.id === "export-preflight-focus";
   const inputSetupOnly =
     action.id === "keyboard-capture-toggle" ||
@@ -15266,11 +15286,27 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("finish-checklist-card-")) {
+    return {
+      id: "finish-checklist",
+      label: "Finish checklist",
+      value: action.detail
+    };
+  }
+
   if (action.id === "review-queue-focus") {
     return {
       id: "review-queue",
       label: "Review queue",
       value: `${project.selectedPattern} / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
+  if (action.id.startsWith("review-queue-item-")) {
+    return {
+      id: "review-queue",
+      label: "Review queue",
+      value: action.detail
     };
   }
 
@@ -15793,10 +15829,24 @@ function quickActionResultFollowup(
     };
   }
 
+  if (action.id.startsWith("finish-checklist-card-")) {
+    return {
+      auditionCue: "Use the focused Finish Checklist card to inspect that finish-readiness lane before applying any move.",
+      nextCheck: "Return to Finish Checklist when you need another direct Compose, Arrange, Mix, Master, or Handoff readiness focus."
+    };
+  }
+
   if (action.id === "review-queue-focus") {
     return {
       auditionCue: "Use the focused Review Queue panel to inspect the highest-priority production issue.",
       nextCheck: "Run the visible Review Queue Focus buttons after you address the top issue."
+    };
+  }
+
+  if (action.id.startsWith("review-queue-item-")) {
+    return {
+      auditionCue: "Use the focused Review Queue item to inspect that production issue before applying any fix.",
+      nextCheck: "Return to Review Queue when you need another direct issue triage focus."
     };
   }
 
