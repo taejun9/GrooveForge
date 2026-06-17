@@ -7163,6 +7163,7 @@ export function App(): ReactElement {
     canUndo,
     composerGuideSummary,
     isPlaying,
+    keyCompassSummary,
     playbackMode,
     project,
     exportPreflightSummary,
@@ -7185,6 +7186,7 @@ export function App(): ReactElement {
     onExportWav: handleExportWav,
     onFocusComposerGuide: focusComposerGuideCard,
     onFocusExportPreflight: focusExportPreflightCard,
+    onFocusKeyCompass: focusKeyCompassItem,
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusSessionPass: focusSessionPassCard,
     onFocusWorkflowSpotlight: jumpToWorkflowZone,
@@ -11701,6 +11703,15 @@ function activeSessionPassQuickActionCard(summary: SessionPassSummary): SessionP
   return summary.mode === "guided" ? summary.cards[0] : summary.cards[1];
 }
 
+function activeKeyCompassQuickActionItem(summary: KeyCompassSummary): KeyCompassFocusItem | null {
+  return (
+    summary.cards.find((card) => card.tone === "danger") ??
+    summary.cards.find((card) => card.tone === "warn") ??
+    summary.cards[0] ??
+    null
+  );
+}
+
 function activeExportPreflightQuickActionCard(summary: ExportPreflightSummary): ExportPreflightCard | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
@@ -12186,6 +12197,7 @@ function createQuickActions({
   canUndo,
   composerGuideSummary,
   isPlaying,
+  keyCompassSummary,
   playbackMode,
   project,
   exportPreflightSummary,
@@ -12208,6 +12220,7 @@ function createQuickActions({
   onExportWav,
   onFocusComposerGuide,
   onFocusExportPreflight,
+  onFocusKeyCompass,
   onFocusReviewQueue,
   onFocusSessionPass,
   onFocusWorkflowSpotlight,
@@ -12223,6 +12236,7 @@ function createQuickActions({
   canUndo: boolean;
   composerGuideSummary: ComposerGuideSummary;
   isPlaying: boolean;
+  keyCompassSummary: KeyCompassSummary;
   playbackMode: PlaybackMode;
   project: ProjectState;
   exportPreflightSummary: ExportPreflightSummary;
@@ -12245,6 +12259,7 @@ function createQuickActions({
   onExportWav: () => void;
   onFocusComposerGuide: (card: ComposerGuideCard) => void;
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
+  onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
   onFocusWorkflowSpotlight: (zone: WorkflowZoneId) => void;
@@ -12262,6 +12277,7 @@ function createQuickActions({
   const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const composerGuideCard = activeComposerGuideQuickActionCard(composerGuideSummary);
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
+  const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
@@ -12346,6 +12362,19 @@ function createQuickActions({
       run: () => {
         if (composerGuideCard) {
           onFocusComposerGuide(composerGuideCard);
+        }
+      }
+    },
+    {
+      id: "key-compass-focus",
+      title: keyCompassItem ? `Focus Key Compass: ${keyCompassItem.label}` : "Focus Key Compass",
+      detail: keyCompassItem ? `${keyCompassItem.value} / ${keyCompassItem.focusLabel}` : "No Key Compass card available.",
+      group: "Create",
+      keywords: `key compass focus harmony scale chord 808 melody inspect ${keyCompassItem?.focusId ?? "none"} ${keyCompassItem?.focusLabel ?? "none"} beginner producer`,
+      disabled: !keyCompassItem,
+      run: () => {
+        if (keyCompassItem) {
+          onFocusKeyCompass(keyCompassItem);
         }
       }
     },
@@ -12683,6 +12712,7 @@ function createQuickActionResult(
   const focusOnly =
     action.id === "session-pass-focus" ||
     action.id === "composer-guide-focus" ||
+    action.id === "key-compass-focus" ||
     action.id === "workflow-spotlight-focus" ||
     action.id === "review-queue-focus" ||
     action.id === "export-preflight-focus";
@@ -12732,6 +12762,14 @@ function quickActionResultMetricSnapshot(
       id: "composer-guide",
       label: "Composer guide",
       value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
+    };
+  }
+
+  if (action.id === "key-compass-focus") {
+    return {
+      id: "key-compass",
+      label: "Key compass",
+      value: `${project.key} / Pattern ${project.selectedPattern}`
     };
   }
 
@@ -12849,6 +12887,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Composer Guide card to inspect the next writing gap before applying any move.",
       nextCheck: "Run the visible Composer Guide Focus buttons after the drums, 808, harmony, melody, arrangement, or finish lane changes."
+    };
+  }
+
+  if (action.id === "key-compass-focus") {
+    return {
+      auditionCue: "Use the focused Key Compass card to inspect scale, chord, bass, or melody posture before editing notes.",
+      nextCheck: "Return to Key Compass after the focused harmony lane changes."
     };
   }
 
