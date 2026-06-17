@@ -12494,6 +12494,33 @@ function NextMoveResultStrip({ result }: { result: NextMoveResult }): ReactEleme
   );
 }
 
+function selectedArrangementMoveQuickActionPreset(block: ArrangementBlock | undefined): ArrangementMovePreset | null {
+  if (!block) {
+    return null;
+  }
+
+  switch (block.section) {
+    case "Hook":
+      return "hook_lift";
+    case "Verse":
+      return "build";
+    case "Intro":
+    case "Bridge":
+    case "Outro":
+      return "drop";
+  }
+  return null;
+}
+
+function isArrangementMovePresetApplied(block: ArrangementBlock, preset: ArrangementMovePreset): boolean {
+  const transformed = applyArrangementMovePreset(block, preset);
+  return (
+    normalizeArrangementEnergy(block.energy) === normalizeArrangementEnergy(transformed.energy) &&
+    normalizeArrangementMutedTracks(block.mutedTracks).join(",") ===
+      normalizeArrangementMutedTracks(transformed.mutedTracks).join(",")
+  );
+}
+
 function createQuickActions({
   arrangementArcPreviewSummary,
   arrangementTemplatePreviewSummary,
@@ -12709,6 +12736,12 @@ function createQuickActions({
   const deliveryTarget = activeDeliveryTarget(project);
   const deliveryTargetAlignmentPreview = createDeliveryTargetAlignmentPreview(project, deliveryTarget);
   const deliveryTargetAlignReady = !isDeliveryTargetAligned(project, deliveryTarget);
+  const arrangementMovePreset = selectedArrangementMoveQuickActionPreset(selectedBlock);
+  const arrangementMoveReady = Boolean(
+    selectedBlock && arrangementMovePreset && !isArrangementMovePresetApplied(selectedBlock, arrangementMovePreset)
+  );
+  const arrangementMoveLabel = arrangementMovePreset ? arrangementMovePresetLabel(arrangementMovePreset) : "Arrangement Move";
+  const arrangementMoveBlockNumber = selectedBlock ? Math.min(selectedArrangementIndex + 1, project.arrangement.length) : 0;
   const arrangementTemplateId =
     arrangementTemplatePreviewSummary.templateId === "aligned" ? null : arrangementTemplatePreviewSummary.templateId;
   const arrangementFocusSummary = createArrangementFocusSummary(project, selectedArrangementIndex);
@@ -13240,12 +13273,22 @@ function createQuickActions({
       run: () => onApplyPatternFill("melody_turn")
     },
     {
-      id: "hook-lift",
-      title: "Apply Hook Lift",
-      detail: "Push arrangement energy and mutes on the selected block.",
+      id: "arrangement-move",
+      title: arrangementMoveReady ? `Apply ${arrangementMoveLabel} Move` : "Apply Arrangement Move",
+      detail:
+        selectedBlock && arrangementMovePreset
+          ? arrangementMoveReady
+            ? `Block ${arrangementMoveBlockNumber} ${selectedBlock.section} / ${arrangementMoveLabel} energy-mute move.`
+            : `Block ${arrangementMoveBlockNumber} already matches ${arrangementMoveLabel}.`
+          : "No arrangement block selected.",
       group: "Arrange",
-      keywords: "hook lift arrangement energy mute build drop",
-      run: () => onApplyArrangementMove("hook_lift")
+      keywords: `arrangement move selected block energy mute drop build hook lift reset ${arrangementMovePreset ?? "none"} ${arrangementMoveLabel} ${selectedBlock?.section ?? "none"} beginner producer`,
+      disabled: !arrangementMoveReady,
+      run: () => {
+        if (arrangementMoveReady && arrangementMovePreset) {
+          onApplyArrangementMove(arrangementMovePreset);
+        }
+      }
     },
     {
       id: "arrangement-focus",
@@ -13787,10 +13830,10 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "hook-lift") {
+  if (action.id === "arrangement-move") {
     return {
-      id: "song-energy",
-      label: "Song energy",
+      id: "arrangement-move",
+      label: "Arrangement move",
       value: `${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
     };
   }
@@ -14074,6 +14117,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Song loop; check section order, Pattern A/B/C spread, and hook placement.",
       nextCheck: `${barCountLabel(arrangementTotalBars(project))} arranged; scan Song Form Overview before mix decisions.`
+    };
+  }
+
+  if (action.id === "arrangement-move") {
+    return {
+      auditionCue: "Play Block loop; hear the selected block's energy and mute contrast against the surrounding song form.",
+      nextCheck: "Use Arrangement Playback Readout, Song Form Overview, and Arrangement Focus before changing nearby blocks."
     };
   }
 
