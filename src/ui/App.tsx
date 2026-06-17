@@ -2500,6 +2500,38 @@ type SessionBriefRoleSummary = {
   tone: MixCoachTone;
 };
 
+type SessionBriefStarterPadId = "starter" | "vocal" | "store" | "club";
+
+type SessionBriefStarterPadDefinition = {
+  id: SessionBriefStarterPadId;
+  label: string;
+  detail: string;
+};
+
+type SessionBriefStarterPadOption = SessionBriefStarterPadDefinition & {
+  preview: string;
+  changedCount: number;
+};
+
+type SessionBriefStarterResultMetric = {
+  id: keyof SessionBrief;
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type SessionBriefStarterResult = {
+  padId: SessionBriefStarterPadId;
+  title: string;
+  status: string;
+  detail: string;
+  impact: string;
+  metrics: SessionBriefStarterResultMetric[];
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type ExportPreflightCardId = "readiness" | "mix" | "deliverables" | "handoff";
 type ExportPreflightFocusId = ExportPreflightCardId;
 type ExportPreflightFocusTarget = ReviewQueueFocusTarget;
@@ -3023,6 +3055,7 @@ export function App(): ReactElement {
   const [spaceFxResult, setSpaceFxResult] = useState<SpaceFxResult | null>(null);
   const [mixFixResult, setMixFixResult] = useState<MixFixResult | null>(null);
   const [deliveryTargetAlignmentResult, setDeliveryTargetAlignmentResult] = useState<DeliveryTargetAlignmentResult | null>(null);
+  const [sessionBriefStarterResult, setSessionBriefStarterResult] = useState<SessionBriefStarterResult | null>(null);
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
@@ -3120,6 +3153,7 @@ export function App(): ReactElement {
       ),
     [project, firstBeatPathSummary, reviewQueueSummary, finishChecklistSummary, exportPreflightSummary]
   );
+  const sessionBriefStarterPads = useMemo(() => createSessionBriefStarterPadOptions(project), [project]);
   const snapshotCompareSummary = useMemo(() => createSnapshotCompareSummary(project), [project]);
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
   const patternDnaSummary = useMemo(() => createPatternDnaSummary(project), [project]);
@@ -3703,6 +3737,7 @@ export function App(): ReactElement {
     setSpaceFxResult(null);
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
+    setSessionBriefStarterResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -3732,6 +3767,7 @@ export function App(): ReactElement {
       setSpaceFxResult(null);
       setMixFixResult(null);
       setDeliveryTargetAlignmentResult(null);
+      setSessionBriefStarterResult(null);
     }
     setProjectStatus(status);
   }
@@ -3838,6 +3874,7 @@ export function App(): ReactElement {
     setSpaceFxResult(null);
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
+    setSessionBriefStarterResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
   }
@@ -3873,6 +3910,7 @@ export function App(): ReactElement {
     setSpaceFxResult(null);
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
+    setSessionBriefStarterResult(null);
     setProjectStatus(status);
   }
 
@@ -6620,6 +6658,31 @@ export function App(): ReactElement {
     }, `Updated ${sessionBriefFieldLabel(field)} brief`);
   }
 
+  function applySessionBriefStarterPad(padId: SessionBriefStarterPadId): void {
+    const pad = sessionBriefStarterPadDefinitions.find((definition) => definition.id === padId);
+    if (!pad) {
+      setSessionBriefStarterResult(null);
+      setProjectStatus("Session Brief starter not found");
+      return;
+    }
+
+    const beforeProject = projectRef.current;
+    const changed = updateProject((current) => {
+      const starterBrief = createSessionBriefStarterBrief(current, pad.id);
+      const sessionBrief = applySessionBriefStarter(current.sessionBrief, starterBrief);
+      return sameSessionBrief(current.sessionBrief, sessionBrief) ? current : { ...current, sessionBrief };
+    }, `Applied ${pad.label} brief starter`);
+
+    if (changed) {
+      setSessionBriefStarterResult(
+        createSessionBriefStarterResult(pad, beforeProject.sessionBrief, projectRef.current.sessionBrief, projectRef.current)
+      );
+    } else {
+      setSessionBriefStarterResult(null);
+      setProjectStatus(`${pad.label} brief starter already covered`);
+    }
+  }
+
   function clearSessionBrief(): void {
     updateProject((current) => {
       if (sessionBriefFilledFields(current.sessionBrief) === 0) {
@@ -7298,7 +7361,14 @@ export function App(): ReactElement {
         onSelect={selectDeliveryTarget}
       />
 
-      <SessionBriefPanel brief={project.sessionBrief} onChange={updateSessionBrief} onClear={clearSessionBrief} />
+      <SessionBriefPanel
+        brief={project.sessionBrief}
+        result={sessionBriefStarterResult}
+        starterPads={sessionBriefStarterPads}
+        onApplyStarter={applySessionBriefStarterPad}
+        onChange={updateSessionBrief}
+        onClear={clearSessionBrief}
+      />
 
       <BeatPassport focusedMetricId={beatPassportFocusId} onFocus={focusBeatPassportMetric} summary={beatPassportSummary} />
 
@@ -9461,10 +9531,16 @@ function DeliveryTargetAlignmentResultStrip({ result }: { result: DeliveryTarget
 
 function SessionBriefPanel({
   brief,
+  result,
+  starterPads,
+  onApplyStarter,
   onChange,
   onClear
 }: {
   brief: SessionBrief;
+  result: SessionBriefStarterResult | null;
+  starterPads: SessionBriefStarterPadOption[];
+  onApplyStarter: (pad: SessionBriefStarterPadId) => void;
   onChange: (field: keyof SessionBrief, value: string) => void;
   onClear: () => void;
 }): ReactElement {
@@ -9491,51 +9567,70 @@ function SessionBriefPanel({
           <small data-testid="session-brief-role-detail">{roleSummary.detailLabel}</small>
         </div>
       </div>
-      <div className="session-brief-fields">
-        <label className="session-brief-field">
-          <span>Artist</span>
-          <input
-            data-testid="session-brief-artist"
-            maxLength={maxSessionBriefFieldLength}
-            onChange={(event) => onChange("artist", event.target.value)}
-            placeholder="Artist or client"
-            type="text"
-            value={brief.artist}
-          />
-        </label>
-        <label className="session-brief-field">
-          <span>Vibe</span>
-          <input
-            data-testid="session-brief-vibe"
-            maxLength={maxSessionBriefFieldLength}
-            onChange={(event) => onChange("vibe", event.target.value)}
-            placeholder="Mood or energy"
-            type="text"
-            value={brief.vibe}
-          />
-        </label>
-        <label className="session-brief-field">
-          <span>Reference</span>
-          <input
-            data-testid="session-brief-reference"
-            maxLength={maxSessionBriefFieldLength}
-            onChange={(event) => onChange("reference", event.target.value)}
-            placeholder="Track or scene"
-            type="text"
-            value={brief.reference}
-          />
-        </label>
-        <label className="session-brief-field notes">
-          <span>Notes</span>
-          <textarea
-            data-testid="session-brief-notes"
-            maxLength={maxSessionBriefNotesLength}
-            onChange={(event) => onChange("notes", event.target.value)}
-            placeholder="Handoff notes"
-            rows={2}
-            value={brief.notes}
-          />
-        </label>
+      <div className="session-brief-body">
+        <div className="session-brief-starters" aria-label="Session Brief Starter Pads">
+          {starterPads.map((pad) => (
+            <button
+              data-testid={`session-brief-starter-${pad.id}`}
+              key={pad.id}
+              onClick={() => onApplyStarter(pad.id)}
+              title={`${pad.label}: ${pad.detail}`}
+              type="button"
+            >
+              <ListChecks size={13} aria-hidden="true" />
+              <span>{pad.label}</span>
+              <strong>{pad.preview}</strong>
+              <small>{pad.changedCount} blanks / {pad.detail}</small>
+            </button>
+          ))}
+        </div>
+        {result && <SessionBriefStarterResultStrip result={result} />}
+        <div className="session-brief-fields">
+          <label className="session-brief-field">
+            <span>Artist</span>
+            <input
+              data-testid="session-brief-artist"
+              maxLength={maxSessionBriefFieldLength}
+              onChange={(event) => onChange("artist", event.target.value)}
+              placeholder="Artist or client"
+              type="text"
+              value={brief.artist}
+            />
+          </label>
+          <label className="session-brief-field">
+            <span>Vibe</span>
+            <input
+              data-testid="session-brief-vibe"
+              maxLength={maxSessionBriefFieldLength}
+              onChange={(event) => onChange("vibe", event.target.value)}
+              placeholder="Mood or energy"
+              type="text"
+              value={brief.vibe}
+            />
+          </label>
+          <label className="session-brief-field">
+            <span>Reference</span>
+            <input
+              data-testid="session-brief-reference"
+              maxLength={maxSessionBriefFieldLength}
+              onChange={(event) => onChange("reference", event.target.value)}
+              placeholder="Track or scene"
+              type="text"
+              value={brief.reference}
+            />
+          </label>
+          <label className="session-brief-field notes">
+            <span>Notes</span>
+            <textarea
+              data-testid="session-brief-notes"
+              maxLength={maxSessionBriefNotesLength}
+              onChange={(event) => onChange("notes", event.target.value)}
+              placeholder="Handoff notes"
+              rows={2}
+              value={brief.notes}
+            />
+          </label>
+        </div>
       </div>
       <button
         className="session-brief-clear"
@@ -9549,6 +9644,38 @@ function SessionBriefPanel({
         <span>Clear</span>
       </button>
     </section>
+  );
+}
+
+function SessionBriefStarterResultStrip({ result }: { result: SessionBriefStarterResult }): ReactElement {
+  return (
+    <div
+      className={`session-brief-starter-result ${result.tone}`}
+      data-result-session-brief-starter={result.padId}
+      data-testid="session-brief-starter-result"
+      aria-live="polite"
+    >
+      <div className="session-brief-starter-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="session-brief-starter-result-title">{result.title}</strong>
+          <small data-testid="session-brief-starter-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="session-brief-starter-result-meta">
+        <span data-testid="session-brief-starter-result-status">{result.status}</span>
+        <span data-testid="session-brief-starter-result-impact">{result.impact}</span>
+        <span data-testid="session-brief-starter-result-next-check">{result.nextCheck}</span>
+      </div>
+      <div className="session-brief-starter-result-metrics" data-testid="session-brief-starter-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`session-brief-starter-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -12372,6 +12499,29 @@ function mixPostureLabel(posture: MixPosture): string {
 
 const sessionBriefFields: (keyof SessionBrief)[] = ["artist", "vibe", "reference", "notes"];
 
+const sessionBriefStarterPadDefinitions: SessionBriefStarterPadDefinition[] = [
+  {
+    id: "starter",
+    label: "Starter",
+    detail: "General song handoff"
+  },
+  {
+    id: "vocal",
+    label: "Vocal",
+    detail: "Topline room"
+  },
+  {
+    id: "store",
+    label: "Store",
+    detail: "Beat-store demo"
+  },
+  {
+    id: "club",
+    label: "Club",
+    detail: "DJ energy"
+  }
+];
+
 function sessionBriefStatus(brief: SessionBrief): Pick<BeatMapMetric, "value" | "detail" | "tone"> {
   const filledFields = sessionBriefFilledFields(brief);
   const hasVibe = brief.vibe.trim().length > 0;
@@ -12436,6 +12586,134 @@ function createSessionBriefRoleSummary(brief: SessionBrief): SessionBriefRoleSum
 
 function sessionBriefFilledFields(brief: SessionBrief): number {
   return sessionBriefFields.filter((field) => brief[field].trim().length > 0).length;
+}
+
+function createSessionBriefStarterPadOptions(project: ProjectState): SessionBriefStarterPadOption[] {
+  return sessionBriefStarterPadDefinitions.map((pad) => {
+    const starterBrief = createSessionBriefStarterBrief(project, pad.id);
+    const nextBrief = applySessionBriefStarter(project.sessionBrief, starterBrief);
+    const changedCount = sessionBriefChangedFieldCount(project.sessionBrief, nextBrief);
+    return {
+      ...pad,
+      preview: sessionBriefStarterPreview(starterBrief),
+      changedCount
+    };
+  });
+}
+
+function createSessionBriefStarterBrief(project: ProjectState, padId: SessionBriefStarterPadId): SessionBrief {
+  const target = activeDeliveryTarget(project);
+  const styleProfile = getStyle(project);
+  const bars = barCountLabel(arrangementTotalBars(project));
+  const mixLabel = mixPostureLabel(target.mixPosture);
+  const styleKeyTempo = `${styleProfile.name} / ${project.key} / ${project.bpm} BPM`;
+  const titleLabel = boundedSessionBriefText(project.title.trim() || "Untitled Beat", 40);
+
+  switch (padId) {
+    case "starter":
+      return normalizeSessionBriefStarter({
+        artist: "Open artist",
+        vibe: `${styleProfile.name} ${target.name}`,
+        reference: styleKeyTempo,
+        notes: `Title ${titleLabel}; ${target.name}: ${bars}, ${target.stemGoal} stems, ${mixLabel} mix. Build hook, then export WAV/stems/MIDI.`
+      });
+    case "vocal":
+      return normalizeSessionBriefStarter({
+        artist: "Vocalist TBD",
+        vibe: `${styleProfile.name} pocket for vocal`,
+        reference: `${project.key} ${project.bpm} BPM vocal pocket`,
+        notes: `Title ${titleLabel}; leave room for topline; keep hook clear; target ${target.name} with ${target.stemGoal} stems.`
+      });
+    case "store":
+      return normalizeSessionBriefStarter({
+        artist: "Beat store buyer",
+        vibe: `${styleProfile.name} polished demo`,
+        reference: `${project.bpm} BPM ${styleProfile.name} beat-store`,
+        notes: `Title ${titleLabel}; tag clean demo; check 8 bar hook, mix snapshot, WAV/stems/MIDI, and handoff sheet.`
+      });
+    case "club":
+      return normalizeSessionBriefStarter({
+        artist: "DJ / club set",
+        vibe: `${styleProfile.name} high-energy bounce`,
+        reference: `${project.bpm} BPM club pass`,
+        notes: `Title ${titleLabel}; prioritize intro/drop energy, drums/808 punch, and ${mixLabel} mix before export.`
+      });
+  }
+}
+
+function normalizeSessionBriefStarter(brief: SessionBrief): SessionBrief {
+  return {
+    artist: boundedSessionBriefText(brief.artist, maxSessionBriefFieldLength),
+    vibe: boundedSessionBriefText(brief.vibe, maxSessionBriefFieldLength),
+    reference: boundedSessionBriefText(brief.reference, maxSessionBriefFieldLength),
+    notes: boundedSessionBriefText(brief.notes, maxSessionBriefNotesLength)
+  };
+}
+
+function applySessionBriefStarter(current: SessionBrief, starter: SessionBrief): SessionBrief {
+  return {
+    artist: current.artist.trim().length > 0 ? current.artist : starter.artist,
+    vibe: current.vibe.trim().length > 0 ? current.vibe : starter.vibe,
+    reference: current.reference.trim().length > 0 ? current.reference : starter.reference,
+    notes: current.notes.trim().length > 0 ? current.notes : starter.notes
+  };
+}
+
+function createSessionBriefStarterResult(
+  pad: SessionBriefStarterPadDefinition,
+  beforeBrief: SessionBrief,
+  afterBrief: SessionBrief,
+  project: ProjectState
+): SessionBriefStarterResult {
+  const metrics = sessionBriefFields.map((field) =>
+    createSessionBriefStarterResultMetric(field, sessionBriefFieldLabel(field), beforeBrief[field], afterBrief[field])
+  );
+  const changedCount = metrics.filter((metric) => metric.tone === "good").length;
+  return {
+    padId: pad.id,
+    title: `${pad.label} brief starter applied`,
+    status: "Brief updated",
+    detail: `${activeDeliveryTarget(project).name} / ${pad.detail}`,
+    impact: `${changedCount}/4 fields filled`,
+    metrics,
+    nextCheck: "Review Handoff Pack",
+    tone: changedCount > 0 ? "good" : "warn"
+  };
+}
+
+function createSessionBriefStarterResultMetric(
+  id: keyof SessionBrief,
+  label: string,
+  before: string,
+  after: string
+): SessionBriefStarterResultMetric {
+  return {
+    id,
+    label,
+    before: compactSessionBriefValue(before),
+    after: compactSessionBriefValue(after),
+    tone: before === after ? "warn" : "good"
+  };
+}
+
+function sessionBriefStarterPreview(brief: SessionBrief): string {
+  return `${brief.vibe} / ${brief.reference}`;
+}
+
+function compactSessionBriefValue(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "empty";
+  }
+  return trimmed.length > 28 ? `${trimmed.slice(0, 25)}...` : trimmed;
+}
+
+function sessionBriefChangedFieldCount(beforeBrief: SessionBrief, afterBrief: SessionBrief): number {
+  return sessionBriefFields.filter((field) => beforeBrief[field] !== afterBrief[field]).length;
+}
+
+function sameSessionBrief(first: SessionBrief, second: SessionBrief): boolean {
+  return sessionBriefFields.every((field) => first[field] === second[field]);
 }
 
 function createSnapshotSlotRoleSummary(project: ProjectState): SnapshotSlotRoleSummary {
