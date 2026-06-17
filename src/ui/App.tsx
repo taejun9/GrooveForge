@@ -7225,6 +7225,7 @@ export function App(): ReactElement {
     drumClipboard,
     selectedChord,
     chordClipboard,
+    sectionLocatorPads,
     sessionPassSummary,
     soundFocusPreviewSummary,
     soundPresetPreviewSummary,
@@ -7275,6 +7276,7 @@ export function App(): ReactElement {
     onTapTempo: tapProjectTempo,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onRequestMidiInputAccess: requestMidiInputAccess,
+    onCueSectionLocator: cueSectionLocator,
     onCuePattern: cuePattern,
     onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
@@ -12630,6 +12632,7 @@ function createQuickActions({
   drumClipboard,
   selectedChord,
   chordClipboard,
+  sectionLocatorPads,
   sessionPassSummary,
   soundFocusPreviewSummary,
   soundPresetPreviewSummary,
@@ -12680,6 +12683,7 @@ function createQuickActions({
   onTapTempo,
   onPreviewBlueprint,
   onRequestMidiInputAccess,
+  onCueSectionLocator,
   onCuePattern,
   onSelectPattern,
   onSelectStyle,
@@ -12785,6 +12789,7 @@ function createQuickActions({
   drumClipboard: DrumClipboard | null;
   selectedChord: ChordEvent | undefined;
   chordClipboard: ChordClipboard | null;
+  sectionLocatorPads: SectionLocatorPad[];
   sessionPassSummary: SessionPassSummary;
   soundFocusPreviewSummary: SoundFocusPreviewSummary;
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
@@ -12835,6 +12840,7 @@ function createQuickActions({
   onTapTempo: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onRequestMidiInputAccess: () => Promise<void>;
+  onCueSectionLocator: (section: ArrangementSection) => void;
   onCuePattern: (pattern: PatternSlot) => void;
   onSelectPattern: (pattern: PatternSlot) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
@@ -13646,6 +13652,35 @@ function createQuickActions({
       run: () => onApplyTempoNudge(pad)
     };
   });
+  const sectionLocatorActions: QuickAction[] = sectionLocatorPads.map((pad) => {
+    const selected = pad.selected && transportLoopScope === "block";
+    const missing = pad.index === null;
+    const rangeLabel =
+      pad.startBar === null || pad.endBar === null
+        ? "Missing"
+        : pad.startBar === pad.endBar
+          ? `Bar ${pad.startBar}`
+          : `Bars ${pad.startBar}-${pad.endBar}`;
+    return {
+      id: `section-locator-${sectionLocatorTestId(pad.section)}`,
+      title: missing
+        ? `Cue ${pad.section} section unavailable`
+        : selected
+          ? `${pad.section} block already cued`
+          : `Cue ${pad.section} section`,
+      detail: missing
+        ? `${pad.section} is not in the arrangement.`
+        : isPlaying
+          ? "Stop playback before cueing a section."
+          : `Block ${pad.index === null ? "?" : pad.index + 1} / Pattern ${pad.pattern} / ${rangeLabel} / ${pad.eventCount} events`,
+      group: "Transport",
+      keywords: `section locator cue ${pad.section} ${sectionLocatorTestId(
+        pad.section
+      )} arrangement block loop transport intro verse hook bridge outro audition beginner producer`,
+      disabled: isPlaying || missing,
+      run: () => onCueSectionLocator(pad.section)
+    };
+  });
   const keyQuickActions: QuickAction[] = keys.map((key) => {
     const selected = key === project.key;
     const keySlug = key.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -13767,6 +13802,7 @@ function createQuickActions({
       disabled: isPlaying && transportLoopScope !== "pattern",
       run: () => onSelectTransportLoopScope("pattern")
     },
+    ...sectionLocatorActions,
     {
       id: "metronome-toggle",
       title: project.metronomeEnabled ? "Turn metronome off" : "Turn metronome on",
@@ -14675,6 +14711,7 @@ function createQuickActionResult(
     action.id === "key-compass-focus" ||
     action.id === "groove-compass-focus" ||
     action.id === "pattern-dna-focus" ||
+    action.id.startsWith("section-locator-") ||
     action.id.startsWith("pattern-cue-") ||
     action.id.startsWith("pattern-switch-") ||
     action.id === "workflow-spotlight-focus" ||
@@ -14864,6 +14901,29 @@ function quickActionResultMetricSnapshot(
       label: "Tap Tempo",
       value: `${project.bpm} BPM`
     };
+  }
+
+  if (action.id.startsWith("section-locator-")) {
+    const section = sectionLocatorActionSection(action.id);
+    if (section) {
+      const index = firstArrangementSectionIndex(project, section);
+      if (index !== null) {
+        const block = project.arrangement[index];
+        const startBar = arrangementStartBar(project, index) + 1;
+        const endBar = startBar + normalizeArrangementBars(block.bars) - 1;
+        const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+        return {
+          id: "section-locator",
+          label: "Section cue",
+          value: `${section} Block ${index + 1} / Pattern ${block.pattern} / ${rangeLabel} / preview ${project.selectedPattern}`
+        };
+      }
+      return {
+        id: "section-locator",
+        label: "Section cue",
+        value: `${section} missing / edit Pattern ${project.selectedPattern}`
+      };
+    }
   }
 
   if (action.id.startsWith("key-quick-")) {
@@ -15368,6 +15428,14 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Run Tap tempo pulse repeatedly in time with the groove, then pause briefly so the existing Tap Tempo commit can apply the averaged BPM.",
       nextCheck: "Check the Tap Tempo readout and project BPM before locking arrangement, metronome, or export timing."
+    };
+  }
+
+  if (action.id.startsWith("section-locator-")) {
+    const section = sectionLocatorActionSection(action.id) ?? "section";
+    return {
+      auditionCue: `Play Block loop; hear the cued ${section} block against its assigned Pattern before changing the arrangement.`,
+      nextCheck: "Use Song Form Overview, Arrangement Playback Readout, or Arrangement Focus before editing nearby blocks."
     };
   }
 
@@ -19875,6 +19943,10 @@ function firstArrangementSectionIndex(project: ProjectState, section: Arrangemen
 
 function sectionLocatorTestId(section: ArrangementSection): string {
   return section.toLowerCase();
+}
+
+function sectionLocatorActionSection(actionId: string): ArrangementSection | null {
+  return arrangementSections.find((section) => actionId === `section-locator-${sectionLocatorTestId(section)}`) ?? null;
 }
 
 function songFormSegmentTone(eventCount: number, energy: number, mutedTrackCount: number): MixCoachTone {
