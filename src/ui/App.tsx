@@ -7205,6 +7205,7 @@ export function App(): ReactElement {
     playbackMode,
     project,
     productionSnapshotSummary,
+    exportAnalysis,
     exportPreflightSummary,
     reviewQueueSummary,
     selectedArrangementIndex,
@@ -7213,6 +7214,7 @@ export function App(): ReactElement {
     soundFocusPreviewSummary,
     soundPresetPreviewSummary,
     spaceFxPadOptions,
+    stemAnalyses,
     stemAuditionPadOptions,
     styleInspectorSummary,
     transportLoopScope,
@@ -12555,6 +12557,7 @@ function createQuickActions({
   playbackMode,
   project,
   productionSnapshotSummary,
+  exportAnalysis,
   exportPreflightSummary,
   reviewQueueSummary,
   selectedArrangementIndex,
@@ -12563,6 +12566,7 @@ function createQuickActions({
   soundFocusPreviewSummary,
   soundPresetPreviewSummary,
   spaceFxPadOptions,
+  stemAnalyses,
   stemAuditionPadOptions,
   styleInspectorSummary,
   transportLoopScope,
@@ -12655,6 +12659,7 @@ function createQuickActions({
   playbackMode: PlaybackMode;
   project: ProjectState;
   productionSnapshotSummary: ProductionSnapshotSummary;
+  exportAnalysis: ExportAnalysis;
   exportPreflightSummary: ExportPreflightSummary;
   reviewQueueSummary: ReviewQueueSummary;
   selectedArrangementIndex: number;
@@ -12663,6 +12668,7 @@ function createQuickActions({
   soundFocusPreviewSummary: SoundFocusPreviewSummary;
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
   spaceFxPadOptions: SpaceFxPadOption[];
+  stemAnalyses: StemExportAnalyses;
   stemAuditionPadOptions: StemAuditionPadOption[];
   styleInspectorSummary: StyleInspectorSummary;
   transportLoopScope: TransportLoopScope;
@@ -12781,6 +12787,19 @@ function createQuickActions({
       : patternStackPreviewSummary.stackId;
   const soundFocusReady = soundFocusPreviewSummary.statusLabel !== "Sound aligned";
   const soundPresetReady = soundPresetPreviewSummary.statusLabel !== "Preset aligned";
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet,
+    onExportMidi,
+    onExportStems,
+    onExportWav
+  });
+  const handoffSendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const nextHandoffItem = handoffSendOrder.nextItemId
+    ? (handoffPackItems.find((item) => item.id === handoffSendOrder.nextItemId) ?? null)
+    : null;
 
   return [
     {
@@ -13481,6 +13500,21 @@ function createQuickActions({
       run: () => onApplyMasterFinish(pad.id)
     })),
     {
+      id: "handoff-next-export",
+      title: nextHandoffItem ? `Export next handoff: ${nextHandoffItem.buttonLabel}` : "Export next handoff item",
+      detail: nextHandoffItem
+        ? `${handoffSendOrder.statusLabel} / ${nextHandoffItem.label}: ${nextHandoffItem.value} / ${nextHandoffItem.detail}`
+        : "Handoff Pack send order is already clear.",
+      group: "Export",
+      keywords: `handoff pack next export send order wav stems midi sheet deliverable ${nextHandoffItem?.id ?? "complete"} ${handoffSendOrder.sequenceLabel} beginner producer`,
+      disabled: !nextHandoffItem,
+      run: () => {
+        if (nextHandoffItem) {
+          nextHandoffItem.run();
+        }
+      }
+    },
+    {
       id: "export-wav",
       title: "Export WAV",
       detail: "Render the full arrangement as a mix WAV.",
@@ -13905,6 +13939,16 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "handoff-next-export") {
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const stemCount = audibleStemTracks(analyzeStemExports(project)).length;
+    return {
+      id: "handoff",
+      label: "Handoff",
+      value: `${exportAnalysis.status} / ${stemCount}/${stemTrackIds.length} stems / ${sessionBriefFilledFields(project.sessionBrief)}/4 brief`
+    };
+  }
+
   if (action.id === "workflow-spotlight-focus") {
     return {
       id: "workflow-spotlight",
@@ -14285,6 +14329,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Full Mix and compare the held snapshot against the alternate slot after a concrete mix change.",
       nextCheck: "Use Mix Snapshot A/B metrics for headroom, balance, master, and stem posture before Mix Fix or Master Finish."
+    };
+  }
+
+  if (action.id === "handoff-next-export") {
+    return {
+      auditionCue: "Confirm the downloaded deliverable outside the app, then return to Handoff Pack before exporting the next item.",
+      nextCheck: "Use Handoff Export Receipt, Manifest Audit, and Send Order to verify the next WAV, stems, MIDI, or sheet step."
     };
   }
 
