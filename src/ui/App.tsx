@@ -2666,6 +2666,27 @@ type BeatSpineSummary = {
   cards: BeatSpineCard[];
 };
 
+type BeatSpineApplyResultMetric = {
+  id: BeatSpineActionId;
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type BeatSpineApplyResult = {
+  actionId: BeatSpineActionId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metric: BeatSpineApplyResultMetric;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type SelectedDrumStep = {
   lane: DrumLane;
   step: number;
@@ -3092,6 +3113,7 @@ export function App(): ReactElement {
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [beatBlueprintResult, setBeatBlueprintResult] = useState<BeatBlueprintResult | null>(null);
+  const [beatSpineResult, setBeatSpineResult] = useState<BeatSpineApplyResult | null>(null);
   const [patternStackResult, setPatternStackResult] = useState<PatternStackResult | null>(null);
   const [drumMoveResult, setDrumMoveResult] = useState<DrumMoveResult | null>(null);
   const [bassMoveResult, setBassMoveResult] = useState<BassMoveResult | null>(null);
@@ -3782,6 +3804,7 @@ export function App(): ReactElement {
     setNextMoveResult(null);
     setQuickActionResult(null);
     setBeatBlueprintResult(null);
+    setBeatSpineResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -3812,6 +3835,7 @@ export function App(): ReactElement {
       setProject(nextProject);
       setQuickActionResult(null);
       setBeatBlueprintResult(null);
+      setBeatSpineResult(null);
       setPatternStackResult(null);
       setDrumMoveResult(null);
       setBassMoveResult(null);
@@ -3917,6 +3941,7 @@ export function App(): ReactElement {
     setNextMoveResult(null);
     setQuickActionResult(null);
     setBeatBlueprintResult(null);
+    setBeatSpineResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -3954,6 +3979,7 @@ export function App(): ReactElement {
     setNextMoveResult(null);
     setQuickActionResult(null);
     setBeatBlueprintResult(null);
+    setBeatSpineResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -6874,31 +6900,33 @@ export function App(): ReactElement {
   }
 
   function applyBeatSpineAction(action: BeatSpineAction): void {
+    const beforeProject = projectRef.current;
     switch (action.id) {
       case "drums":
         applyLayerStarter("drums");
-        return;
+        break;
       case "bass":
         applyLayerStarter("bass");
-        return;
+        break;
       case "harmony":
         applyLayerStarter("chords");
-        return;
+        break;
       case "melody":
         applyLayerStarter("melody");
-        return;
+        break;
       case "sound": {
         const soundPreset = styleSoundPreset(projectRef.current.styleId);
         applySoundPreset(soundPreset);
-        return;
+        break;
       }
       case "arrange":
         applyPatternChain("eight_bar");
-        return;
+        break;
       case "finish":
         applyMasterFinishPad(suggestedMasterFinishPad(projectRef.current), { showResult: true });
-        return;
+        break;
     }
+    setBeatSpineResult(createBeatSpineApplyResult(action, beforeProject, projectRef.current));
   }
 
   function focusBeatPassportMetric(metric: BeatPassportFocusItem): void {
@@ -7432,7 +7460,12 @@ export function App(): ReactElement {
 
       <FirstBeatPath summary={firstBeatPathSummary} onJump={jumpToFirstBeatPathTarget} />
 
-      <BeatSpine summary={beatSpineSummary} onApply={applyBeatSpineAction} onJump={jumpToBeatSpineTarget} />
+      <BeatSpine
+        result={beatSpineResult}
+        summary={beatSpineSummary}
+        onApply={applyBeatSpineAction}
+        onJump={jumpToBeatSpineTarget}
+      />
 
       <SessionPass summary={sessionPassSummary} onFocus={focusSessionPassCard} />
 
@@ -10844,12 +10877,156 @@ function FirstBeatPath({
   );
 }
 
+function createBeatSpineApplyResult(
+  action: BeatSpineAction,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): BeatSpineApplyResult {
+  const metric = createBeatSpineApplyResultMetric(action.id, beforeProject, afterProject);
+  const changed = metric.before !== metric.after;
+  const tone: MixCoachTone = changed ? "good" : "warn";
+  return {
+    actionId: action.id,
+    title: `${action.label} ${changed ? "applied" : "already aligned"}`,
+    status: changed ? "Applied" : "Already aligned",
+    detail: action.detail,
+    scope: beatSpineApplyResultScope(action.id, beforeProject.selectedPattern),
+    impact: changed ? `${metric.label} updated` : "No change needed",
+    metric,
+    auditionCue: beatSpineApplyResultAudition(action.id, beforeProject.selectedPattern),
+    nextCheck: beatSpineApplyResultNextCheck(action.id),
+    tone
+  };
+}
+
+function createBeatSpineApplyResultMetric(
+  actionId: BeatSpineActionId,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): BeatSpineApplyResultMetric {
+  const patternSlot = beforeProject.selectedPattern;
+  const beforePattern = beforeProject.patterns[patternSlot];
+  const afterPattern = afterProject.patterns[patternSlot] ?? beforePattern;
+  const metric = (() => {
+    switch (actionId) {
+      case "drums":
+        return {
+          label: "Drum hits",
+          before: `${drumHitCount(beforePattern)} hits`,
+          after: `${drumHitCount(afterPattern)} hits`
+        };
+      case "bass":
+        return {
+          label: "808 notes",
+          before: `${beforePattern.bassNotes.length} notes`,
+          after: `${afterPattern.bassNotes.length} notes`
+        };
+      case "harmony":
+        return {
+          label: "Chords",
+          before: `${beforePattern.chordEvents.length} chords`,
+          after: `${afterPattern.chordEvents.length} chords`
+        };
+      case "melody":
+        return {
+          label: "Synth notes",
+          before: `${beforePattern.melodyNotes.length} notes`,
+          after: `${afterPattern.melodyNotes.length} notes`
+        };
+      case "sound":
+        return {
+          label: "Sound preset",
+          before: soundPresetLabel(beforeProject.sound.preset),
+          after: soundPresetLabel(afterProject.sound.preset)
+        };
+      case "arrange":
+        return {
+          label: "Arrangement",
+          before: `${barCountLabel(arrangementTotalBars(beforeProject))} / ${beforeProject.arrangement.length} blocks`,
+          after: `${barCountLabel(arrangementTotalBars(afterProject))} / ${afterProject.arrangement.length} blocks`
+        };
+      case "finish":
+        return {
+          label: "Master",
+          before: `${beforeProject.masterPreset} / ${formatDb(beforeProject.masterCeilingDb)}`,
+          after: `${afterProject.masterPreset} / ${formatDb(afterProject.masterCeilingDb)}`
+        };
+    }
+  })();
+  return {
+    id: actionId,
+    label: metric.label,
+    before: metric.before,
+    after: metric.after,
+    tone: metric.before === metric.after ? "warn" : "good"
+  };
+}
+
+function beatSpineApplyResultScope(actionId: BeatSpineActionId, patternSlot: PatternSlot): string {
+  switch (actionId) {
+    case "drums":
+      return `Pattern ${patternSlot} drums`;
+    case "bass":
+      return `Pattern ${patternSlot} 808`;
+    case "harmony":
+      return `Pattern ${patternSlot} chords`;
+    case "melody":
+      return `Pattern ${patternSlot} Synth`;
+    case "sound":
+      return "Built-in sound design";
+    case "arrange":
+      return "Arrangement blocks";
+    case "finish":
+      return "Master output";
+  }
+}
+
+function beatSpineApplyResultAudition(actionId: BeatSpineActionId, patternSlot: PatternSlot): string {
+  switch (actionId) {
+    case "drums":
+      return `Loop Pattern ${patternSlot} and check the kick, clap, hat, and perc foundation.`;
+    case "bass":
+      return `Loop Pattern ${patternSlot} with drums and check the 808-to-kick pocket.`;
+    case "harmony":
+      return `Loop Pattern ${patternSlot} and check whether the chords support the hook.`;
+    case "melody":
+      return `Loop Pattern ${patternSlot} and check whether the Synth motif leaves space for the beat.`;
+    case "sound":
+      return "Play the hook or full mix and check whether the built-in tone fits the style.";
+    case "arrange":
+      return "Play the Song loop and check section flow across Pattern A/B/C.";
+    case "finish":
+      return "Play Full Mix and confirm the master posture before exporting.";
+  }
+}
+
+function beatSpineApplyResultNextCheck(actionId: BeatSpineActionId): string {
+  switch (actionId) {
+    case "drums":
+      return "Check 808/Bass in Beat Spine or Groove Compass for pocket.";
+    case "bass":
+      return "Check Harmony or Melody so the low end supports the hook.";
+    case "harmony":
+      return "Check Melody and Sound after the chord motion is set.";
+    case "melody":
+      return "Check Sound and Arrange so the motif sits in the beat.";
+    case "sound":
+      return "Check Arrange and Mix after the tone preset is set.";
+    case "arrange":
+      return "Check Finish, Export Preflight, and Listening Pass.";
+    case "finish":
+      return "Check Export Preflight, then export WAV, stems, MIDI, or handoff sheet explicitly.";
+  }
+}
+
 function BeatSpine({
   onApply,
   onJump,
+  result,
   summary
 }: {
   summary: BeatSpineSummary;
+  result: BeatSpineApplyResult | null;
   onApply: (action: BeatSpineAction) => void;
   onJump: (card: BeatSpineCard) => void;
 }): ReactElement {
@@ -10910,7 +11087,48 @@ function BeatSpine({
           );
         })}
       </div>
+      {result && <BeatSpineResultStrip result={result} />}
     </section>
+  );
+}
+
+function BeatSpineResultStrip({ result }: { result: BeatSpineApplyResult }): ReactElement {
+  return (
+    <div
+      className={`beat-spine-result ${result.tone}`}
+      data-result-beat-spine={result.actionId}
+      data-testid="beat-spine-result"
+      aria-live="polite"
+    >
+      <div className="beat-spine-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="beat-spine-result-title">{result.title}</strong>
+          <small data-testid="beat-spine-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="beat-spine-result-meta">
+        <span data-testid="beat-spine-result-status">{result.status}</span>
+        <span data-testid="beat-spine-result-scope">{result.scope}</span>
+        <span data-testid="beat-spine-result-impact">{result.impact}</span>
+      </div>
+      <div className={`beat-spine-result-metric ${result.metric.tone}`} data-testid="beat-spine-result-metric">
+        <span>{result.metric.label}</span>
+        <strong data-testid="beat-spine-result-metric-value">
+          {result.metric.before} -&gt; {result.metric.after}
+        </strong>
+      </div>
+      <div className="beat-spine-result-followup" data-testid="beat-spine-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="beat-spine-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="beat-spine-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
   );
 }
 
