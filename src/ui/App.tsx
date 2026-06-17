@@ -13062,6 +13062,14 @@ function createQuickActions({
   const melodyMoveTarget = activeMelodyMoveQuickActionTarget(project, melodyMovePreviewSummary);
   const modeFocusCard = activeModeFocusQuickActionCard(modeFocusSummary);
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
+  const patternDnaActions: QuickAction[] = patternDnaSummary.cards.map((card) => ({
+    id: `pattern-dna-card-${card.id}`,
+    title: `Focus Pattern DNA: ${card.label}`,
+    detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
+    group: "Create",
+    keywords: `pattern dna focus card loop layers density variation arrangement inspect ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} compose arrange beginner producer`,
+    run: () => onFocusPatternDna(card)
+  }));
   const productionSnapshotMetric = activeProductionSnapshotQuickActionMetric(productionSnapshotSummary);
   const productionSnapshotActions: QuickAction[] = productionSnapshotSummary.metrics.map((metric) => ({
     id: `production-snapshot-metric-${metric.id}`,
@@ -14192,6 +14200,7 @@ function createQuickActions({
         }
       }
     },
+    ...patternDnaActions,
     {
       id: "layer-starter",
       title: layerStarterOption ? `Start ${layerStarterOption.label} layer` : "Start missing layer",
@@ -14909,6 +14918,7 @@ function createQuickActionResult(
     action.id === "groove-compass-focus" ||
     action.id.startsWith("groove-compass-card-") ||
     action.id === "pattern-dna-focus" ||
+    action.id.startsWith("pattern-dna-card-") ||
     action.id === "beat-passport-focus" ||
     action.id.startsWith("beat-passport-metric-") ||
     action.id === "production-snapshot-focus" ||
@@ -15272,6 +15282,14 @@ function quickActionResultMetricSnapshot(
       id: "pattern-dna",
       label: "Pattern DNA",
       value: `Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
+    };
+  }
+
+  if (action.id.startsWith("pattern-dna-card-")) {
+    return {
+      id: "pattern-dna",
+      label: "Pattern DNA",
+      value: action.detail
     };
   }
 
@@ -15879,6 +15897,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Pattern DNA card to inspect layers, density, variation, or arrangement use before changing the loop.",
       nextCheck: "Return to Pattern DNA after the focused loop or arrangement lane changes."
+    };
+  }
+
+  if (action.id.startsWith("pattern-dna-card-")) {
+    return {
+      auditionCue: "Use the focused Pattern DNA card to inspect that loop posture lane before changing events or arrangement.",
+      nextCheck: "Return to Pattern DNA when you need another direct layers, density, variation, or arrangement focus."
     };
   }
 
