@@ -583,6 +583,17 @@ type MixBalancePadOption = MixBalancePadDefinition & {
   changedCount: number;
 };
 
+type MixBalancePreviewSummary = {
+  padId: MixBalancePadId;
+  statusLabel: string;
+  padLabel: string;
+  channelLabel: string;
+  auditionLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type MixBalanceResultMetric = {
   id: "drums" | "bass" | "synth" | "chords" | "audition";
   label: string;
@@ -2701,6 +2712,10 @@ export function App(): ReactElement {
   }, [project.mixer]);
   const activeChannelLabel = `${activeChannels} active ${activeChannels === 1 ? "channel" : "channels"}`;
   const mixBalancePadOptions = useMemo(() => createMixBalancePadOptions(project.mixer), [project.mixer]);
+  const mixBalancePreviewSummary = useMemo(
+    () => createMixBalancePreviewSummary(project.mixer, mixBalancePadOptions),
+    [project.mixer, mixBalancePadOptions]
+  );
   const stemAuditionPadOptions = useMemo(() => createStemAuditionPadOptions(project.mixer), [project.mixer]);
   const stemAuditionReadout = useMemo(() => createStemAuditionReadoutSummary(project.mixer), [project.mixer]);
   const soundFocusPadOptions = useMemo(() => createSoundFocusPadOptions(project.sound), [project.sound]);
@@ -7194,7 +7209,12 @@ export function App(): ReactElement {
 
         <section className="panel mixer-panel" data-testid="workflow-target-mix" aria-label="Mixer" ref={mixPanelRef}>
           <PanelTitle icon={<SlidersHorizontal size={18} />} title="Mixer" meta={`${activeChannels} audible`} />
-          <MixBalancePads pads={mixBalancePadOptions} result={mixBalanceResult} onApply={applyMixBalancePad} />
+          <MixBalancePads
+            pads={mixBalancePadOptions}
+            preview={mixBalancePreviewSummary}
+            result={mixBalanceResult}
+            onApply={applyMixBalancePad}
+          />
           <StemAuditionPads pads={stemAuditionPadOptions} onApply={applyStemAuditionPad} />
           <div
             className={["stem-audition-readout", stemAuditionReadout.tone].join(" ")}
@@ -15158,10 +15178,12 @@ function exportReadinessCheck(analysis: ExportAnalysis): BeatReadinessCheck {
 
 function MixBalancePads({
   pads,
+  preview,
   result,
   onApply
 }: {
   pads: MixBalancePadOption[];
+  preview: MixBalancePreviewSummary;
   result: MixBalanceResult | null;
   onApply: (pad: MixBalancePadId) => void;
 }): ReactElement {
@@ -15170,6 +15192,18 @@ function MixBalancePads({
       <div className="mix-balance-heading">
         <span>Mix Balance</span>
         <strong>Rough posture</strong>
+      </div>
+      <div
+        className={`mix-balance-preview ${preview.tone}`}
+        data-preview-mix-balance={preview.padId}
+        data-testid="mix-balance-preview"
+        title={preview.detailTitle}
+      >
+        <span data-testid="mix-balance-preview-status">{preview.statusLabel}</span>
+        <strong data-testid="mix-balance-preview-label">{preview.padLabel}</strong>
+        <small data-testid="mix-balance-preview-channels">{preview.channelLabel}</small>
+        <small data-testid="mix-balance-preview-audition">{preview.auditionLabel}</small>
+        <small data-testid="mix-balance-preview-moves">{preview.moveLabel}</small>
       </div>
       {result && <MixBalanceResultStrip result={result} />}
       <div className="mix-balance-row" aria-label="Mix Balance Pads">
@@ -15772,6 +15806,66 @@ function createMixBalancePadOptions(mixer: MixerChannel[]): MixBalancePadOption[
       changedCount: transformed.filter((channel, index) => !sameMixerChannel(channel, mixer[index])).length
     };
   });
+}
+
+function createMixBalancePreviewSummary(mixer: MixerChannel[], pads: MixBalancePadOption[]): MixBalancePreviewSummary {
+  const pad = pads.find((option) => option.changedCount > 0) ?? pads[0];
+  if (!pad) {
+    return {
+      padId: "clean",
+      statusLabel: "Balance aligned",
+      padLabel: "No balance target",
+      channelLabel: "No channel target",
+      auditionLabel: "No audition target",
+      moveLabel: "0 mix moves",
+      detailTitle: "No Mix Balance pads are available.",
+      tone: "good"
+    };
+  }
+
+  const transformed = applyMixBalancePadToMixer(mixer, pad);
+  const changedControls = mixBalanceChangedControlCount(mixer, transformed);
+  const tone: MixCoachTone = changedControls === 0 ? "good" : pad.changedCount <= 2 ? "warn" : "danger";
+  const channelLabel = mixBalancePreviewChannelLabel(pad);
+  const auditionLabel = createStemAuditionReadoutSummary(transformed).roleLabel;
+  const moveLabel = `${pad.changedCount} channels / ${changedControls} controls`;
+
+  return {
+    padId: pad.id,
+    statusLabel: changedControls === 0 ? "Balance aligned" : "Suggested balance",
+    padLabel: `${pad.label} balance`,
+    channelLabel,
+    auditionLabel,
+    moveLabel,
+    detailTitle:
+      changedControls === 0
+        ? `${pad.label} already matches the current mixer posture.`
+        : `${pad.label} targets ${channelLabel}; ${auditionLabel}; ${moveLabel}.`,
+    tone
+  };
+}
+
+function mixBalancePreviewChannelLabel(pad: MixBalancePadOption): string {
+  const channelTargets: Array<[string, StemTrackId]> = [
+    ["D", "drum_rack"],
+    ["8", "bass_808"],
+    ["Sy", "synth"],
+    ["Ch", "chord"]
+  ];
+  return channelTargets
+    .map(([label, trackId]) => `${label} ${mixBalancePreviewPostureLabel(pad.channels[trackId])}`)
+    .join(" / ");
+}
+
+function mixBalancePreviewPostureLabel(update: MixBalanceChannelUpdate | undefined): string {
+  if (!update) {
+    return "keep";
+  }
+  const volumeLabel = update.volumeDb === undefined ? "keep" : compactMixDb(update.volumeDb);
+  const panValue = update.pan === undefined ? null : Math.round(update.pan);
+  const panLabel = panValue === null ? null : panValue === 0 ? "C" : panValue > 0 ? `R${panValue}` : `L${Math.abs(panValue)}`;
+  const sendLabel = update.send === undefined ? null : `S${Math.round(update.send * 100)}`;
+  return [volumeLabel, panLabel, sendLabel].filter(Boolean).join(" ");
 }
 
 function createMixBalanceResult(
