@@ -7212,6 +7212,7 @@ export function App(): ReactElement {
     soundFocusPreviewSummary,
     soundPresetPreviewSummary,
     spaceFxPadOptions,
+    stemAuditionPadOptions,
     styleInspectorSummary,
     transportLoopScope,
     workflowNavigatorItems,
@@ -7243,6 +7244,7 @@ export function App(): ReactElement {
     onApplyPatternFill: applyPatternFill,
     onApplyPatternStack: applyPatternStack,
     onApplySpaceFx: applySpaceFxPad,
+    onApplyStemAudition: applyStemAuditionPad,
     onApplySoundFocus: applySoundFocusPad,
     onApplySoundPreset: applySoundPreset,
     onExpandPatternChain: expandPatternChain,
@@ -12557,6 +12559,7 @@ function createQuickActions({
   soundFocusPreviewSummary,
   soundPresetPreviewSummary,
   spaceFxPadOptions,
+  stemAuditionPadOptions,
   styleInspectorSummary,
   transportLoopScope,
   workflowNavigatorItems,
@@ -12588,6 +12591,7 @@ function createQuickActions({
   onApplyPatternFill,
   onApplyPatternStack,
   onApplySpaceFx,
+  onApplyStemAudition,
   onApplySoundFocus,
   onApplySoundPreset,
   onExpandPatternChain,
@@ -12652,6 +12656,7 @@ function createQuickActions({
   soundFocusPreviewSummary: SoundFocusPreviewSummary;
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
   spaceFxPadOptions: SpaceFxPadOption[];
+  stemAuditionPadOptions: StemAuditionPadOption[];
   styleInspectorSummary: StyleInspectorSummary;
   transportLoopScope: TransportLoopScope;
   workflowNavigatorItems: WorkflowNavigatorItem[];
@@ -12683,6 +12688,7 @@ function createQuickActions({
   onApplyPatternFill: (preset: PatternFillPreset) => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
   onApplySpaceFx: (pad: SpaceFxPadId) => void;
+  onApplyStemAudition: (pad: StemAuditionPadId) => void;
   onApplySoundFocus: (pad: SoundFocusPadId) => void;
   onApplySoundPreset: (preset: SoundPresetTarget) => void;
   onExpandPatternChain: () => void;
@@ -13362,6 +13368,18 @@ function createQuickActions({
         }
       }
     },
+    ...stemAuditionPadOptions.map((pad): QuickAction => ({
+      id: `stem-audition-${pad.id}`,
+      title: pad.trackId === null ? "Audition Full Mix" : `Audition ${pad.label} Stem`,
+      detail:
+        pad.changedCount > 0
+          ? `${pad.preview} / ${pad.changedCount} mixer change${pad.changedCount === 1 ? "" : "s"}`
+          : `${pad.label} stem audition already selected.`,
+      group: "Mix",
+      keywords: `stem audition solo mute full mix drums 808 bass synth chords ${pad.id} ${pad.label} ${pad.detail} mixer compare beginner producer`,
+      disabled: pad.active,
+      run: () => onApplyStemAudition(pad.id)
+    })),
     {
       id: "mix-balance",
       title: mixBalanceReady ? `Apply ${mixBalancePreviewSummary.padLabel}` : "Apply Mix Balance",
@@ -13880,6 +13898,15 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("stem-audition-")) {
+    const readout = createStemAuditionReadoutSummary(project.mixer);
+    return {
+      id: "stem-audition",
+      label: "Audition",
+      value: `${readout.roleLabel} / ${readout.detailLabel}`
+    };
+  }
+
   if (action.id.startsWith("space-fx-")) {
     return {
       id: "space-fx",
@@ -14171,6 +14198,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Full Mix, then solo Drums and 808 to confirm the rough balance supports the beat.",
       nextCheck: "Use the Mix Balance Result, Stem Audition Pads, and manual mixer controls for final level, pan, EQ, and send trim."
+    };
+  }
+
+  if (action.id.startsWith("stem-audition-")) {
+    return {
+      auditionCue: "Play the current loop and compare the selected stem against the Full Mix before changing levels.",
+      nextCheck: "Use the Stem Audition Readout, Mix Balance Pads, and manual mixer controls to trim the lane you heard."
     };
   }
 
