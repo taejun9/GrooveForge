@@ -471,6 +471,27 @@ type DeliveryTargetAlignmentPreviewSummary = {
   tone: MixCoachTone;
 };
 
+type DeliveryTargetAlignmentResultMetric = {
+  id: "target" | "length" | "master" | "mix" | "stems";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type DeliveryTargetAlignmentResult = {
+  targetId: DeliveryTargetId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: DeliveryTargetAlignmentResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 const beatBlueprintPreviewMetricTestIds: Record<BeatBlueprintPreviewMetricId, string> = {
   style: "beat-blueprint-preview-style",
   key: "beat-blueprint-preview-key",
@@ -2549,6 +2570,7 @@ export function App(): ReactElement {
   const [masterFinishResult, setMasterFinishResult] = useState<MasterFinishResult | null>(null);
   const [mixBalanceResult, setMixBalanceResult] = useState<MixBalanceResult | null>(null);
   const [mixFixResult, setMixFixResult] = useState<MixFixResult | null>(null);
+  const [deliveryTargetAlignmentResult, setDeliveryTargetAlignmentResult] = useState<DeliveryTargetAlignmentResult | null>(null);
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
@@ -3067,6 +3089,7 @@ export function App(): ReactElement {
     setMasterFinishResult(null);
     setMixBalanceResult(null);
     setMixFixResult(null);
+    setDeliveryTargetAlignmentResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -3087,6 +3110,7 @@ export function App(): ReactElement {
       setMasterFinishResult(null);
       setMixBalanceResult(null);
       setMixFixResult(null);
+      setDeliveryTargetAlignmentResult(null);
     }
     setProjectStatus(status);
   }
@@ -3182,6 +3206,7 @@ export function App(): ReactElement {
     setMasterFinishResult(null);
     setMixBalanceResult(null);
     setMixFixResult(null);
+    setDeliveryTargetAlignmentResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
   }
@@ -3207,6 +3232,7 @@ export function App(): ReactElement {
     setMasterFinishResult(null);
     setMixBalanceResult(null);
     setMixFixResult(null);
+    setDeliveryTargetAlignmentResult(null);
     setProjectStatus(status);
   }
 
@@ -5700,14 +5726,23 @@ export function App(): ReactElement {
 
   function alignDeliveryTarget(targetId: DeliveryTargetId): void {
     const target = deliveryTargetForId(targetId, projectRef.current.customDeliveryTarget);
-    const changed = updateProject((current) => applyDeliveryTarget(current, target.id), `Aligned ${target.name} target`);
-    if (changed) {
-      setSelectedArrangementIndex(0);
-      setSelectedNote(null);
-      setSelectedDrumStep(null);
-      setSelectedChordIndex(null);
-      selectTransportLoopScope("arrangement", false);
+    const beforeProject = projectRef.current;
+    const changed = updateProject((current) => {
+      const nextProject = applyDeliveryTarget(current, target.id);
+      return deliveryTargetAlignmentChangedCount(current, nextProject) === 0 ? current : nextProject;
+    }, `Aligned ${target.name} target`);
+    if (!changed) {
+      setDeliveryTargetAlignmentResult(null);
+      setProjectStatus(`${target.name} target already aligned`);
+      return;
     }
+
+    setSelectedArrangementIndex(0);
+    setSelectedNote(null);
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
+    selectTransportLoopScope("arrangement", false);
+    setDeliveryTargetAlignmentResult(createDeliveryTargetAlignmentResult(target, beforeProject, projectRef.current));
   }
 
   function updateCustomDeliveryTarget(update: Partial<CustomDeliveryTarget>): void {
@@ -6378,6 +6413,7 @@ export function App(): ReactElement {
 
       <DeliveryTargets
         project={project}
+        result={deliveryTargetAlignmentResult}
         onApply={alignDeliveryTarget}
         onCustomChange={updateCustomDeliveryTarget}
         onSelect={selectDeliveryTarget}
@@ -7919,12 +7955,14 @@ function DeliveryTargets({
   onApply,
   onCustomChange,
   onSelect,
-  project
+  project,
+  result
 }: {
   onApply: (targetId: DeliveryTargetId) => void;
   onCustomChange: (update: Partial<CustomDeliveryTarget>) => void;
   onSelect: (targetId: DeliveryTargetId) => void;
   project: ProjectState;
+  result: DeliveryTargetAlignmentResult | null;
 }): ReactElement {
   const currentTarget = activeDeliveryTarget(project);
   const customTarget = deliveryTargetForId("custom", project.customDeliveryTarget);
@@ -7958,6 +7996,7 @@ function DeliveryTargets({
           <small data-testid="delivery-target-preview-mix">{alignmentPreview.mixLabel}</small>
           <small data-testid="delivery-target-preview-stems">{alignmentPreview.stemLabel}</small>
         </div>
+        {result && <DeliveryTargetAlignmentResultStrip result={result} />}
         <div className="delivery-target-list">
           {deliveryTargets.map((target) => {
             const selected = project.deliveryTarget === target.id;
@@ -8112,6 +8151,48 @@ function DeliveryTargets({
         </div>
       </div>
     </section>
+  );
+}
+
+function DeliveryTargetAlignmentResultStrip({ result }: { result: DeliveryTargetAlignmentResult }): ReactElement {
+  return (
+    <div
+      className={`delivery-target-result ${result.tone}`}
+      data-result-delivery-target={result.targetId}
+      data-testid="delivery-target-result"
+      aria-live="polite"
+    >
+      <div className="delivery-target-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="delivery-target-result-title">{result.title}</strong>
+          <small data-testid="delivery-target-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="delivery-target-result-meta">
+        <span data-testid="delivery-target-result-status">{result.status}</span>
+        <span data-testid="delivery-target-result-scope">{result.scope}</span>
+        <span data-testid="delivery-target-result-impact">{result.impact}</span>
+      </div>
+      <div className="delivery-target-result-metrics" data-testid="delivery-target-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`delivery-target-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="delivery-target-result-followup" data-testid="delivery-target-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="delivery-target-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="delivery-target-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -10594,6 +10675,117 @@ function createDeliveryTargetAlignmentPreview(
     detailTitle,
     tone
   };
+}
+
+function createDeliveryTargetAlignmentResult(
+  target: DeliveryTarget,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): DeliveryTargetAlignmentResult {
+  const afterTarget = activeDeliveryTarget(afterProject);
+  const changedMoves = deliveryTargetAlignmentChangedCount(beforeProject, afterProject);
+  const changedControls = mixBalanceChangedControlCount(beforeProject.mixer, afterProject.mixer);
+  const metrics: DeliveryTargetAlignmentResultMetric[] = [
+    createDeliveryTargetAlignmentResultMetric(
+      "target",
+      "Target",
+      activeDeliveryTarget(beforeProject).name,
+      afterTarget.name
+    ),
+    createDeliveryTargetAlignmentResultMetric(
+      "length",
+      "Length",
+      deliveryTargetLengthLabel(beforeProject),
+      deliveryTargetLengthLabel(afterProject)
+    ),
+    createDeliveryTargetAlignmentResultMetric(
+      "master",
+      "Master",
+      deliveryTargetMasterLabel(beforeProject),
+      deliveryTargetMasterLabel(afterProject)
+    ),
+    createDeliveryTargetAlignmentResultMetric(
+      "mix",
+      "Mix",
+      deliveryTargetMixLabel(beforeProject),
+      deliveryTargetMixLabel(afterProject)
+    ),
+    createDeliveryTargetAlignmentResultMetric(
+      "stems",
+      "Stems",
+      deliveryTargetStemLabel(beforeProject),
+      deliveryTargetStemLabel(afterProject)
+    )
+  ];
+
+  return {
+    targetId: afterTarget.id,
+    title: `${target.name} Delivery Target aligned`,
+    status: "Applied",
+    detail: afterTarget.focus,
+    scope: "Target, arrangement, master, and mix posture",
+    impact: `${changedMoves} alignment move${changedMoves === 1 ? "" : "s"} / ${changedControls} mixer controls`,
+    metrics,
+    auditionCue: "Play Song loop; check arrangement length, hook energy, and Full Mix export posture.",
+    nextCheck: "Use Export Preflight or Handoff Pack to confirm WAV/stems/MIDI delivery.",
+    tone: changedMoves > 0 ? "good" : "warn"
+  };
+}
+
+function createDeliveryTargetAlignmentResultMetric(
+  id: DeliveryTargetAlignmentResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): DeliveryTargetAlignmentResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: before === after ? "warn" : "good"
+  };
+}
+
+function deliveryTargetAlignmentChangedCount(beforeProject: ProjectState, afterProject: ProjectState): number {
+  const changed = [
+    beforeProject.deliveryTarget !== afterProject.deliveryTarget,
+    deliveryTargetArrangementFingerprint(beforeProject) !== deliveryTargetArrangementFingerprint(afterProject),
+    deliveryTargetMasterLabel(beforeProject) !== deliveryTargetMasterLabel(afterProject),
+    mixBalanceChangedControlCount(beforeProject.mixer, afterProject.mixer) > 0,
+    deliveryTargetStemLabel(beforeProject) !== deliveryTargetStemLabel(afterProject)
+  ];
+  return changed.filter(Boolean).length;
+}
+
+function deliveryTargetArrangementFingerprint(project: ProjectState): string {
+  return project.arrangement
+    .map(
+      (block) =>
+        `${block.section}:${block.pattern}:${block.bars}:${block.energy}:${block.mutedTracks.join(",")}`
+    )
+    .join("|");
+}
+
+function deliveryTargetLengthLabel(project: ProjectState): string {
+  return `${barCountLabel(arrangementTotalBars(project))} / ${project.arrangement.length} sections`;
+}
+
+function deliveryTargetMasterLabel(project: ProjectState): string {
+  return `${project.masterPreset} / ${formatDb(project.masterCeilingDb)} ceiling`;
+}
+
+function deliveryTargetMixLabel(project: ProjectState): string {
+  const master = formatDb(masterChannelVolumeDb(project.mixer));
+  const drums = mixerTrackVolumeDb(project.mixer, "drum_rack");
+  const bass = mixerTrackVolumeDb(project.mixer, "bass_808");
+  const synth = mixerTrackVolumeDb(project.mixer, "synth");
+  const chords = mixerTrackVolumeDb(project.mixer, "chord");
+  return `M ${master} / D ${drums} / 8 ${bass} / S ${synth} / C ${chords}`;
+}
+
+function deliveryTargetStemLabel(project: ProjectState): string {
+  return `${activeDeliveryTarget(project).stemGoal} stem target`;
 }
 
 function mixPostureLabel(posture: MixPosture): string {
