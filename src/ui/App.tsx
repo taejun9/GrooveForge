@@ -2258,6 +2258,28 @@ type ModeFocusSummary = {
   cards: ModeFocusCard[];
 };
 
+type SessionPassTarget = "transport" | ReviewQueueFocusTarget;
+
+type SessionPassCardId = "guided" | "studio" | "finish" | "deliver";
+
+type SessionPassCard = {
+  id: SessionPassCardId;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+  focusTarget: SessionPassTarget;
+  focusLabel: string;
+};
+
+type SessionPassSummary = {
+  mode: ProjectState["mode"];
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: SessionPassCard[];
+};
+
 type SnapshotCompareMetricId = "setup" | "length" | "readiness" | "export" | "stems" | "master";
 
 type SnapshotCompareMetric = {
@@ -2986,6 +3008,17 @@ export function App(): ReactElement {
   const firstBeatPathSummary = useMemo(
     () => createFirstBeatPathSummary(project, style, workflowNavigatorItems, beatMapSummary, exportPreflightSummary, exportAnalysis),
     [project, style, workflowNavigatorItems, beatMapSummary, exportPreflightSummary, exportAnalysis]
+  );
+  const sessionPassSummary = useMemo(
+    () =>
+      createSessionPassSummary(
+        project,
+        firstBeatPathSummary,
+        reviewQueueSummary,
+        finishChecklistSummary,
+        exportPreflightSummary
+      ),
+    [project, firstBeatPathSummary, reviewQueueSummary, finishChecklistSummary, exportPreflightSummary]
   );
   const snapshotCompareSummary = useMemo(() => createSnapshotCompareSummary(project), [project]);
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
@@ -6453,6 +6486,20 @@ export function App(): ReactElement {
     setProjectStatus(`Mode ${card.label}: ${card.value}`);
   }
 
+  function focusSessionPassCard(card: SessionPassCard): void {
+    const targetRefs: Record<SessionPassTarget, HTMLElement | null> = {
+      transport: transportPanelRef.current,
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Session Pass ${card.label}: ${card.value}`);
+  }
+
   function focusComposerGuideCard(card: ComposerGuideCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -6921,6 +6968,8 @@ export function App(): ReactElement {
       <ModeFocus summary={modeFocusSummary} onFocus={focusModeFocusCard} />
 
       <FirstBeatPath summary={firstBeatPathSummary} onJump={jumpToFirstBeatPathTarget} />
+
+      <SessionPass summary={sessionPassSummary} onFocus={focusSessionPassCard} />
 
       <WorkflowNavigator items={workflowNavigatorItems} onJump={jumpToWorkflowZone} />
 
@@ -10204,6 +10253,46 @@ function FirstBeatPath({
   );
 }
 
+function SessionPass({
+  onFocus,
+  summary
+}: {
+  summary: SessionPassSummary;
+  onFocus: (card: SessionPassCard) => void;
+}): ReactElement {
+  return (
+    <section className={`session-pass ${summary.tone}`} data-testid="session-pass" aria-label="Session pass">
+      <div className="session-pass-heading">
+        <div>
+          <ListChecks size={16} aria-hidden="true" />
+          <span data-testid="session-pass-mode">{summary.mode === "guided" ? "Guided Session Pass" : "Studio Session Pass"}</span>
+        </div>
+        <strong data-testid="session-pass-headline">{summary.headline}</strong>
+        <small data-testid="session-pass-detail">{summary.detail}</small>
+      </div>
+      <div className="session-pass-grid" data-testid="session-pass-grid">
+        {summary.cards.map((card) => (
+          <div className={`session-pass-card ${card.tone}`} data-testid={`session-pass-${card.id}`} key={card.id}>
+            <span>{card.label}</span>
+            <strong>{card.value}</strong>
+            <button
+              className="session-pass-focus"
+              data-testid={`session-pass-focus-${card.id}`}
+              onClick={() => onFocus(card)}
+              title={`Focus ${card.focusLabel}: ${card.value}`}
+              type="button"
+            >
+              <ArrowRight size={13} aria-hidden="true" />
+              <span>{card.focusLabel}</span>
+            </button>
+            <small>{card.detail}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function WorkflowNavigator({
   items,
   onJump
@@ -10399,6 +10488,84 @@ function firstBeatPathToneLabel(tone: MixCoachTone): string {
     return "Review the highlighted step";
   }
   return "Fix the highlighted blocker";
+}
+
+function createSessionPassSummary(
+  project: ProjectState,
+  firstBeatPath: FirstBeatPathSummary,
+  reviewQueue: ReviewQueueSummary,
+  finishChecklist: FinishChecklistSummary,
+  exportPreflight: ExportPreflightSummary
+): SessionPassSummary {
+  const guidedStep =
+    firstBeatPath.steps.find((step) => step.id === firstBeatPath.nextStepId) ??
+    firstBeatPath.steps.find((step) => step.tone !== "good") ??
+    firstBeatPath.steps[0];
+  const studioIssue = reviewQueue.items[0];
+  const finishCard =
+    finishChecklist.cards.find((card) => card.tone === "danger") ??
+    finishChecklist.cards.find((card) => card.tone === "warn") ??
+    finishChecklist.cards[finishChecklist.cards.length - 1];
+  const deliveryCard =
+    exportPreflight.cards.find((card) => card.tone === "danger") ??
+    exportPreflight.cards.find((card) => card.tone === "warn") ??
+    exportPreflight.cards[0];
+  const guidedTarget = guidedStep?.target ?? "compose";
+  const studioTarget = studioIssue?.focusTarget ?? "deliver";
+  const finishTarget = finishCard?.focusTarget ?? "master";
+  const deliveryTarget = deliveryCard?.focusTarget ?? "deliver";
+  const cards: SessionPassCard[] = [
+    {
+      id: "guided",
+      label: "Guided pass",
+      value: guidedStep ? `${guidedStep.label}: ${guidedStep.value}` : firstBeatPath.headline,
+      detail: guidedStep?.detail ?? firstBeatPath.detail,
+      tone: guidedStep?.tone ?? firstBeatPath.tone,
+      focusTarget: guidedTarget,
+      focusLabel: sessionPassFocusLabel(guidedTarget)
+    },
+    {
+      id: "studio",
+      label: "Studio pass",
+      value: studioIssue ? `${studioIssue.area}: ${studioIssue.status}` : reviewQueue.headline,
+      detail: studioIssue?.detail ?? reviewQueue.detail,
+      tone: studioIssue?.tone ?? reviewQueue.tone,
+      focusTarget: studioTarget,
+      focusLabel: sessionPassFocusLabel(studioTarget)
+    },
+    {
+      id: "finish",
+      label: "Finish pass",
+      value: finishCard ? `${finishCard.label}: ${finishCard.status}` : finishChecklist.headline,
+      detail: finishCard?.detail ?? finishChecklist.detail,
+      tone: finishCard?.tone ?? finishChecklist.tone,
+      focusTarget: finishTarget,
+      focusLabel: sessionPassFocusLabel(finishTarget)
+    },
+    {
+      id: "deliver",
+      label: "Delivery pass",
+      value: deliveryCard ? `${deliveryCard.label}: ${deliveryCard.value}` : exportPreflight.headline,
+      detail: deliveryCard?.detail ?? exportPreflight.detail,
+      tone: deliveryCard?.tone ?? exportPreflight.tone,
+      focusTarget: deliveryTarget,
+      focusLabel: sessionPassFocusLabel(deliveryTarget)
+    }
+  ];
+  const activeCard = project.mode === "guided" ? cards[0] : cards[1];
+  const tone = weakestTone(cards.map((card) => card.tone));
+
+  return {
+    mode: project.mode,
+    headline: `${activeCard.label}: ${activeCard.value}`,
+    detail: `${firstBeatPath.countLabel} / ${reviewQueue.headline} / ${exportPreflight.headline}`,
+    tone,
+    cards
+  };
+}
+
+function sessionPassFocusLabel(target: SessionPassTarget): string {
+  return target === "transport" ? "Transport" : reviewQueueFocusLabel(target);
 }
 
 function ExportPreflight({
