@@ -3170,6 +3170,7 @@ export function App(): ReactElement {
   const mixPanelRef = useRef<HTMLElement | null>(null);
   const deliverPanelRef = useRef<HTMLElement | null>(null);
   const masterPanelRef = useRef<HTMLElement | null>(null);
+  const beatBlueprintPanelRef = useRef<HTMLElement | null>(null);
   const style = getStyle(project);
   const deliveryTarget = activeDeliveryTarget(project);
   const currentPattern = activePattern(project);
@@ -6681,6 +6682,20 @@ export function App(): ReactElement {
     setBeatBlueprintPreviewId(blueprintId);
   }
 
+  function focusBeatBlueprintsPanel(): void {
+    beatBlueprintPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+  }
+
+  function applyQuickActionBeatBlueprint(blueprintId: BeatBlueprintId): void {
+    applySelectedBeatBlueprint(blueprintId);
+    focusBeatBlueprintsPanel();
+  }
+
+  function previewQuickActionBeatBlueprint(blueprintId: BeatBlueprintId): void {
+    previewBeatBlueprint(blueprintId);
+    focusBeatBlueprintsPanel();
+  }
+
   function selectDeliveryTarget(targetId: DeliveryTargetId): void {
     const target = deliveryTargetForId(targetId, projectRef.current.customDeliveryTarget);
     updateProject((current) => {
@@ -7153,12 +7168,12 @@ export function App(): ReactElement {
     transportLoopScope,
     onApplyArrangementMove: applyArrangementMoveToSelected,
     onApplyArrangementFocus: applyArrangementFocusPreset,
-    onApplyBlueprint: applySelectedBeatBlueprint,
+    onApplyBlueprint: applyQuickActionBeatBlueprint,
     onApplyMasterFinish: applyMasterFinishPad,
     onApplyMixFix: applyMixFixPreset,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternFill: applyPatternFill,
-    onPreviewBlueprint: previewBeatBlueprint,
+    onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onExportHandoffSheet: handleExportHandoffSheet,
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
@@ -7504,6 +7519,7 @@ export function App(): ReactElement {
         previewBlueprintId={beatBlueprintPreviewId}
         project={project}
         result={beatBlueprintResult}
+        sectionRef={beatBlueprintPanelRef}
       />
 
       <DeliveryTargets
@@ -8731,13 +8747,15 @@ function BeatBlueprints({
   onPreview,
   previewBlueprintId,
   project,
-  result
+  result,
+  sectionRef
 }: {
   onApply: (blueprintId: BeatBlueprintId) => void;
   onPreview: (blueprintId: BeatBlueprintId) => void;
   previewBlueprintId: BeatBlueprintId;
   project: ProjectState;
   result: BeatBlueprintResult | null;
+  sectionRef?: Ref<HTMLElement>;
 }): ReactElement {
   const previewBlueprint = beatBlueprints.find((blueprint) => blueprint.id === previewBlueprintId) ?? beatBlueprints[0];
   const previewSummary = createBeatBlueprintPreviewSummary(project, previewBlueprint);
@@ -8748,7 +8766,7 @@ function BeatBlueprints({
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
 
   return (
-    <section className="blueprint-row" data-testid="beat-blueprints" aria-label="Beat blueprints">
+    <section className="blueprint-row" data-testid="beat-blueprints" aria-label="Beat blueprints" ref={sectionRef}>
       <div className="blueprint-heading">
         <div>
           <Sparkles size={17} aria-hidden="true" />
