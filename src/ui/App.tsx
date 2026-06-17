@@ -7198,6 +7198,7 @@ export function App(): ReactElement {
     listeningPassSummary,
     melodyMovePreviewSummary,
     mixBalancePreviewSummary,
+    mixSnapshots,
     modeFocusSummary,
     patternStackPreviewSummary,
     patternDnaSummary,
@@ -7240,6 +7241,8 @@ export function App(): ReactElement {
     onApplyMelodyContour: applyMelodyContour,
     onApplyMixBalance: applyMixBalancePad,
     onApplyMixFix: applyMixFixPreset,
+    onCaptureMixSnapshot: captureMixSnapshot,
+    onClearMixSnapshots: clearMixSnapshots,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternFill: applyPatternFill,
     onApplyPatternStack: applyPatternStack,
@@ -12545,6 +12548,7 @@ function createQuickActions({
   listeningPassSummary,
   melodyMovePreviewSummary,
   mixBalancePreviewSummary,
+  mixSnapshots,
   modeFocusSummary,
   patternStackPreviewSummary,
   patternDnaSummary,
@@ -12587,6 +12591,8 @@ function createQuickActions({
   onApplyMelodyContour,
   onApplyMixBalance,
   onApplyMixFix,
+  onCaptureMixSnapshot,
+  onClearMixSnapshots,
   onApplyPatternChain,
   onApplyPatternFill,
   onApplyPatternStack,
@@ -12642,6 +12648,7 @@ function createQuickActions({
   listeningPassSummary: ListeningPassSummary;
   melodyMovePreviewSummary: MelodyMovePreviewSummary;
   mixBalancePreviewSummary: MixBalancePreviewSummary;
+  mixSnapshots: MixSnapshotSlotMap;
   modeFocusSummary: ModeFocusSummary;
   patternStackPreviewSummary: PatternStackPreviewSummary;
   patternDnaSummary: PatternDnaSummary;
@@ -12684,6 +12691,8 @@ function createQuickActions({
   onApplyMelodyContour: (contour: MelodyContourId) => void;
   onApplyMixBalance: (pad: MixBalancePadId) => void;
   onApplyMixFix: (preset: MixFixPreset) => void;
+  onCaptureMixSnapshot: (slot: MixSnapshotSlotId) => void;
+  onClearMixSnapshots: () => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
@@ -13381,6 +13390,38 @@ function createQuickActions({
       run: () => onApplyStemAudition(pad.id)
     })),
     {
+      id: "mix-snapshot-capture-a",
+      title: "Capture Mix Snapshot A",
+      detail: mixSnapshots.A
+        ? `Replace A / ${mixSnapshots.A.exportLabel} / ${mixSnapshots.A.balanceLabel}`
+        : "Capture current mix into A for A/B comparison.",
+      group: "Mix",
+      keywords: "mix snapshot capture a ab compare headroom balance master stems save slot producer beginner",
+      run: () => onCaptureMixSnapshot("A")
+    },
+    {
+      id: "mix-snapshot-capture-b",
+      title: "Capture Mix Snapshot B",
+      detail: mixSnapshots.B
+        ? `Replace B / ${mixSnapshots.B.exportLabel} / ${mixSnapshots.B.balanceLabel}`
+        : "Capture current mix into B for A/B comparison.",
+      group: "Mix",
+      keywords: "mix snapshot capture b ab compare headroom balance master stems save slot producer beginner",
+      run: () => onCaptureMixSnapshot("B")
+    },
+    {
+      id: "mix-snapshot-clear",
+      title: "Clear Mix Snapshot A/B",
+      detail:
+        mixSnapshots.A || mixSnapshots.B
+          ? `${mixSnapshots.A ? "A held" : "A empty"} / ${mixSnapshots.B ? "B held" : "B empty"}`
+          : "Mix Snapshot A/B already clear.",
+      group: "Mix",
+      keywords: "mix snapshot clear reset ab compare headroom balance master stems producer beginner",
+      disabled: !mixSnapshots.A && !mixSnapshots.B,
+      run: onClearMixSnapshots
+    },
+    {
       id: "mix-balance",
       title: mixBalanceReady ? `Apply ${mixBalancePreviewSummary.padLabel}` : "Apply Mix Balance",
       detail: mixBalanceReady
@@ -13618,26 +13659,40 @@ function createQuickActionResult(
     action.id === "workflow-spotlight-focus" ||
     action.id === "review-queue-focus" ||
     action.id === "export-preflight-focus";
+  const uiLocal = action.id.startsWith("mix-snapshot-");
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
     id: afterMetric.id,
     label: afterMetric.label,
     before: beforeMetric.value,
     after: afterMetric.value,
-    tone: outcome === "failed" ? "danger" : previewOnly || focusOnly ? "good" : changed ? "good" : "warn"
+    tone: outcome === "failed" ? "danger" : previewOnly || focusOnly || uiLocal ? "good" : changed ? "good" : "warn"
   };
   const followup = quickActionResultFollowup(action, afterProject, outcome);
 
   return {
     actionId: action.id,
     title: action.title,
-    status: outcome === "failed" ? "Failed" : previewOnly ? "Previewed" : focusOnly ? "Focused" : changed ? "Applied" : "Ran",
+    status:
+      outcome === "failed"
+        ? "Failed"
+        : previewOnly
+          ? "Previewed"
+          : focusOnly
+            ? "Focused"
+            : uiLocal && action.id === "mix-snapshot-clear"
+              ? "Cleared"
+              : uiLocal
+                ? "Captured"
+                : changed
+                  ? "Applied"
+                  : "Ran",
     group: action.group,
     detail: action.detail,
     metric,
     auditionCue: followup.auditionCue,
     nextCheck: followup.nextCheck,
-    tone: outcome === "failed" ? "danger" : previewOnly || focusOnly ? "good" : changed ? "good" : "warn"
+    tone: outcome === "failed" ? "danger" : previewOnly || focusOnly || uiLocal ? "good" : changed ? "good" : "warn"
   };
 }
 
@@ -13904,6 +13959,18 @@ function quickActionResultMetricSnapshot(
       id: "stem-audition",
       label: "Audition",
       value: `${readout.roleLabel} / ${readout.detailLabel}`
+    };
+  }
+
+  if (action.id.startsWith("mix-snapshot-")) {
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const stemSpread = stemSpreadDb(analyzeStemExports(project));
+    return {
+      id: "mix-snapshot",
+      label: "Mix snapshot",
+      value: `${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)} / ${
+        stemSpread === null ? "stems n/a" : `${stemSpread.toFixed(1)} dB spread`
+      }`
     };
   }
 
@@ -14205,6 +14272,19 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play the current loop and compare the selected stem against the Full Mix before changing levels.",
       nextCheck: "Use the Stem Audition Readout, Mix Balance Pads, and manual mixer controls to trim the lane you heard."
+    };
+  }
+
+  if (action.id.startsWith("mix-snapshot-")) {
+    if (action.id === "mix-snapshot-clear") {
+      return {
+        auditionCue: "Play Full Mix after the next concrete mix change, then capture A before capturing B.",
+        nextCheck: "Use Mix Snapshot A/B after at least one level, space, or master change creates something worth comparing."
+      };
+    }
+    return {
+      auditionCue: "Play Full Mix and compare the held snapshot against the alternate slot after a concrete mix change.",
+      nextCheck: "Use Mix Snapshot A/B metrics for headroom, balance, master, and stem posture before Mix Fix or Master Finish."
     };
   }
 
