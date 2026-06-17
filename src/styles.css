@@ -9851,6 +9851,160 @@ input[type="range"] {
   font-size: 10px;
 }
 
+.pattern-chain-result {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(170px, 0.72fr) minmax(0, 1.28fr);
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.22);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.06);
+  padding: 8px;
+}
+
+.pattern-chain-result.warn {
+  border-color: rgba(240, 195, 106, 0.25);
+  background: rgba(240, 195, 106, 0.07);
+}
+
+.pattern-chain-result.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.075);
+}
+
+.pattern-chain-result-main,
+.pattern-chain-result-meta,
+.pattern-chain-result-metrics,
+.pattern-chain-result-followup,
+.pattern-chain-result-main span,
+.pattern-chain-result-metrics span,
+.pattern-chain-result-followup span {
+  min-width: 0;
+}
+
+.pattern-chain-result-main,
+.pattern-chain-result-meta,
+.pattern-chain-result-metrics {
+  display: grid;
+  gap: 5px;
+}
+
+.pattern-chain-result-main {
+  grid-row: span 3;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+}
+
+.pattern-chain-result-main svg {
+  color: #78f0c8;
+}
+
+.pattern-chain-result.warn .pattern-chain-result-main svg {
+  color: #f0c36a;
+}
+
+.pattern-chain-result.danger .pattern-chain-result-main svg {
+  color: #ff7a4f;
+}
+
+.pattern-chain-result-main span,
+.pattern-chain-result-metrics span,
+.pattern-chain-result-followup span {
+  display: grid;
+  gap: 2px;
+}
+
+.pattern-chain-result-main strong,
+.pattern-chain-result-main small,
+.pattern-chain-result-meta span,
+.pattern-chain-result-metrics b,
+.pattern-chain-result-metrics em,
+.pattern-chain-result-followup b,
+.pattern-chain-result-followup em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pattern-chain-result-main strong {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.pattern-chain-result-main small {
+  color: rgba(244, 239, 231, 0.6);
+  font-size: 10px;
+}
+
+.pattern-chain-result-meta {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pattern-chain-result-meta span {
+  border-radius: 5px;
+  background: rgba(244, 239, 231, 0.06);
+  color: rgba(244, 239, 231, 0.64);
+  padding: 5px 6px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.pattern-chain-result-meta span:first-child {
+  color: #08120f;
+  background: #78f0c8;
+}
+
+.pattern-chain-result.warn .pattern-chain-result-meta span:first-child {
+  background: #f0c36a;
+}
+
+.pattern-chain-result.danger .pattern-chain-result-meta span:first-child {
+  background: #ff7a4f;
+}
+
+.pattern-chain-result-metrics {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.pattern-chain-result-metrics span {
+  border: 1px solid rgba(244, 239, 231, 0.08);
+  border-radius: 5px;
+  padding: 5px 6px;
+}
+
+.pattern-chain-result-metrics span.warn {
+  border-color: rgba(240, 195, 106, 0.2);
+  background: rgba(240, 195, 106, 0.07);
+}
+
+.pattern-chain-result-metrics b,
+.pattern-chain-result-followup b {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.pattern-chain-result-metrics em,
+.pattern-chain-result-followup em {
+  color: rgba(244, 239, 231, 0.82);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.pattern-chain-result-followup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.pattern-chain-result-followup span {
+  border-radius: 5px;
+  background: rgba(244, 239, 231, 0.055);
+  padding: 5px 6px;
+}
+
 .pattern-chain-expand {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
@@ -12653,6 +12807,19 @@ input[type="range"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .pattern-chain-result {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
+  }
+
+  .pattern-chain-result-main {
+    grid-row: auto;
+  }
+
+  .pattern-chain-result-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .pattern-chain-actions {
     grid-column: 1 / -1;
   }
@@ -12690,6 +12857,12 @@ input[type="range"] {
   .pattern-chain-preview {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+
+  .pattern-chain-result-meta,
+  .pattern-chain-result-metrics,
+  .pattern-chain-result-followup {
+    grid-template-columns: 1fr;
   }
 
   .quick-actions-spotlight {

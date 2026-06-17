@@ -1484,6 +1484,28 @@ type PatternChainPreviewSummary = {
   tone: MixCoachTone;
 };
 
+type PatternChainResultMetric = {
+  id: "sequence" | "sections" | "bars" | "energy" | "mutes";
+  label: string;
+  before: string;
+  after: string;
+  changed: boolean;
+  tone: MixCoachTone;
+};
+
+type PatternChainResultSummary = {
+  actionId: PatternChainId | "expand";
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: PatternChainResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type NextMoveCommand =
   | { kind: "blueprint"; blueprintId: BeatBlueprintId }
   | { kind: "patternFill"; preset: PatternFillPreset }
@@ -2693,6 +2715,7 @@ export function App(): ReactElement {
   const [chordMoveResult, setChordMoveResult] = useState<ChordMoveResult | null>(null);
   const [arrangementArcResult, setArrangementArcResult] = useState<ArrangementArcResultSummary | null>(null);
   const [arrangementFocusResult, setArrangementFocusResult] = useState<ArrangementFocusResultSummary | null>(null);
+  const [patternChainResult, setPatternChainResult] = useState<PatternChainResultSummary | null>(null);
   const [soundFocusResult, setSoundFocusResult] = useState<SoundFocusResult | null>(null);
   const [drumKitResult, setDrumKitResult] = useState<DrumKitResult | null>(null);
   const [masterFinishResult, setMasterFinishResult] = useState<MasterFinishResult | null>(null);
@@ -3235,6 +3258,7 @@ export function App(): ReactElement {
     setChordMoveResult(null);
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
+    setPatternChainResult(null);
     setSoundFocusResult(null);
     setDrumKitResult(null);
     setMasterFinishResult(null);
@@ -3259,6 +3283,7 @@ export function App(): ReactElement {
       setChordMoveResult(null);
       setArrangementArcResult(null);
       setArrangementFocusResult(null);
+      setPatternChainResult(null);
       setSoundFocusResult(null);
       setDrumKitResult(null);
       setMasterFinishResult(null);
@@ -3358,6 +3383,7 @@ export function App(): ReactElement {
     setChordMoveResult(null);
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
+    setPatternChainResult(null);
     setSoundFocusResult(null);
     setDrumKitResult(null);
     setMasterFinishResult(null);
@@ -3387,6 +3413,7 @@ export function App(): ReactElement {
     setChordMoveResult(null);
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
+    setPatternChainResult(null);
     setSoundFocusResult(null);
     setDrumKitResult(null);
     setMasterFinishResult(null);
@@ -3960,6 +3987,7 @@ export function App(): ReactElement {
   }
 
   function applyPatternChain(chain: PatternChainId): void {
+    const beforeProject = projectRef.current;
     const arrangement = createPatternChain(chain);
     const firstBlock = arrangement[0];
     const changed = updateProject(
@@ -3975,10 +4003,16 @@ export function App(): ReactElement {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
+      setPatternChainResult(
+        createPatternChainResult(chain, patternChainLabel(chain), beforeProject.arrangement, projectRef.current.arrangement)
+      );
+    } else {
+      setPatternChainResult(null);
     }
   }
 
   function expandPatternChain(): void {
+    const beforeProject = projectRef.current;
     const arrangement = expandPatternChainArrangement(projectRef.current.arrangement);
     const firstBlock = arrangement[0];
     const changed = updateProject(
@@ -3994,6 +4028,9 @@ export function App(): ReactElement {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
+      setPatternChainResult(createPatternChainResult("expand", "Chain Expand", beforeProject.arrangement, projectRef.current.arrangement));
+    } else {
+      setPatternChainResult(null);
     }
   }
 
@@ -7057,6 +7094,7 @@ export function App(): ReactElement {
                 );
               })}
             </div>
+            {patternChainResult && <PatternChainResultStrip result={patternChainResult} />}
           </div>
           <ArrangementFocusPanel
             preview={arrangementFocusPreviewSummary}
@@ -8226,6 +8264,48 @@ function PatternChainPreview({ preview }: { preview: PatternChainPreviewSummary 
       <small data-testid="pattern-chain-preview-sections">{preview.sectionLabel}</small>
       <small data-testid="pattern-chain-preview-energy">{preview.energyLabel}</small>
       <small data-testid="pattern-chain-preview-moves">{preview.moveLabel}</small>
+    </div>
+  );
+}
+
+function PatternChainResultStrip({ result }: { result: PatternChainResultSummary }): ReactElement {
+  return (
+    <div
+      className={`pattern-chain-result ${result.tone}`}
+      data-result-pattern-chain={result.actionId}
+      data-testid="pattern-chain-result"
+      aria-live="polite"
+    >
+      <div className="pattern-chain-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="pattern-chain-result-title">{result.title}</strong>
+          <small data-testid="pattern-chain-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="pattern-chain-result-meta">
+        <span data-testid="pattern-chain-result-status">{result.status}</span>
+        <span data-testid="pattern-chain-result-scope">{result.scope}</span>
+        <span data-testid="pattern-chain-result-impact">{result.impact}</span>
+      </div>
+      <div className="pattern-chain-result-metrics" data-testid="pattern-chain-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`pattern-chain-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="pattern-chain-result-followup" data-testid="pattern-chain-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="pattern-chain-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="pattern-chain-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
     </div>
   );
 }
@@ -14697,6 +14777,86 @@ function patternChainChangedFieldCount(current: ArrangementBlock[], nextArrangem
       ].filter(Boolean).length
     );
   }, 0);
+}
+
+function createPatternChainResult(
+  actionId: PatternChainResultSummary["actionId"],
+  label: string,
+  beforeArrangement: ArrangementBlock[],
+  afterArrangement: ArrangementBlock[]
+): PatternChainResultSummary {
+  const changedBlocks = patternChainChangedBlockCount(beforeArrangement, afterArrangement);
+  const changedFields = patternChainChangedFieldCount(beforeArrangement, afterArrangement);
+  const tone: MixCoachTone = changedFields === 0 ? "good" : changedBlocks <= 2 ? "warn" : "danger";
+  const afterBars = arrangementBlocksTotalBars(afterArrangement);
+  const afterSequence = patternChainResultSequenceLabel(afterArrangement);
+  const metrics: PatternChainResultMetric[] = [
+    createPatternChainResultMetric(
+      "sequence",
+      "Sequence",
+      patternChainResultSequenceLabel(beforeArrangement),
+      patternChainResultSequenceLabel(afterArrangement)
+    ),
+    createPatternChainResultMetric(
+      "sections",
+      "Sections",
+      patternChainPreviewSectionLabel(beforeArrangement),
+      patternChainPreviewSectionLabel(afterArrangement)
+    ),
+    createPatternChainResultMetric(
+      "bars",
+      "Bars",
+      barCountLabel(arrangementBlocksTotalBars(beforeArrangement)),
+      barCountLabel(arrangementBlocksTotalBars(afterArrangement))
+    ),
+    createPatternChainResultMetric(
+      "energy",
+      "Energy",
+      patternChainPreviewEnergyLabel(beforeArrangement),
+      patternChainPreviewEnergyLabel(afterArrangement)
+    ),
+    createPatternChainResultMetric(
+      "mutes",
+      "Mutes",
+      arrangementArcPreviewMuteLabel(beforeArrangement),
+      arrangementArcPreviewMuteLabel(afterArrangement)
+    )
+  ];
+
+  return {
+    actionId,
+    title: `${label} applied`,
+    status: changedFields === 0 ? "Chain aligned" : "Chain applied",
+    detail: `${barCountLabel(afterBars)} / ${afterSequence}`,
+    scope: `${afterArrangement.length} step${afterArrangement.length === 1 ? "" : "s"} shaped`,
+    impact: `${changedBlocks} block${changedBlocks === 1 ? "" : "s"} / ${changedFields} field${changedFields === 1 ? "" : "s"}`,
+    metrics,
+    auditionCue: `Play Song to hear ${label} across ${barCountLabel(afterBars)}.`,
+    nextCheck: "Scan Song Form Overview for Pattern spread and Arrangement Playback for the audible block.",
+    tone
+  };
+}
+
+function createPatternChainResultMetric(
+  id: PatternChainResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): PatternChainResultMetric {
+  const changed = before !== after;
+  return {
+    id,
+    label,
+    before,
+    after,
+    changed,
+    tone: changed ? "warn" : "good"
+  };
+}
+
+function patternChainResultSequenceLabel(arrangement: ArrangementBlock[]): string {
+  const readout = patternChainReadout(arrangement);
+  return readout ? readout : "No sequence";
 }
 
 function createArrangementArcPadOptions(project: ProjectState, selectedIndex: number): ArrangementArcPadOption[] {
