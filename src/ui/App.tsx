@@ -8736,6 +8736,11 @@ function BeatBlueprints({
 }): ReactElement {
   const previewBlueprint = beatBlueprints.find((blueprint) => blueprint.id === previewBlueprintId) ?? beatBlueprints[0];
   const previewSummary = createBeatBlueprintPreviewSummary(project, previewBlueprint);
+  const styleMatchBlueprint =
+    beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprintId(project)) ?? previewBlueprint;
+  const styleMatchSummary = createBeatBlueprintPreviewSummary(project, styleMatchBlueprint);
+  const styleMatchPreviewed = previewSummary.blueprintId === styleMatchSummary.blueprintId;
+  const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
 
   return (
     <section className="blueprint-row" data-testid="beat-blueprints" aria-label="Beat blueprints">
@@ -8748,6 +8753,40 @@ function BeatBlueprints({
           {project.bpm} BPM / {project.key}
         </strong>
         <small data-testid="beat-blueprint-preview-status">{previewSummary.statusLabel}</small>
+      </div>
+      <div className={`blueprint-style-match ${styleMatchSummary.tone}`} data-testid="beat-blueprint-style-match">
+        <div className="blueprint-style-match-main">
+          <Sparkles size={14} aria-hidden="true" />
+          <span>
+            <b data-testid="beat-blueprint-style-match-label">{currentStyleName} starter</b>
+            <strong data-testid="beat-blueprint-style-match-name">{styleMatchSummary.name}</strong>
+            <small data-testid="beat-blueprint-style-match-detail">{styleMatchSummary.detailLabel}</small>
+          </span>
+        </div>
+        <div className="blueprint-style-match-state">
+          <span data-testid="beat-blueprint-style-match-status">
+            {styleMatchPreviewed ? "Previewing style match" : styleMatchSummary.statusLabel}
+          </span>
+          <button
+            className="blueprint-style-match-preview"
+            data-testid="beat-blueprint-style-match-preview"
+            onClick={() => onPreview(styleMatchSummary.blueprintId)}
+            title={`Preview ${styleMatchSummary.name} for ${currentStyleName}`}
+            type="button"
+          >
+            Preview
+          </button>
+          <button
+            className="blueprint-style-match-apply"
+            data-testid="beat-blueprint-style-match-apply"
+            onClick={() => onApply(styleMatchSummary.blueprintId)}
+            title={`Apply ${styleMatchSummary.name} for ${currentStyleName}`}
+            type="button"
+          >
+            <ArrowRight size={13} aria-hidden="true" />
+            <span>Apply</span>
+          </button>
+        </div>
       </div>
       <div className={`blueprint-preview ${previewSummary.tone}`} data-testid="beat-blueprint-preview">
         <div className="blueprint-preview-head">
