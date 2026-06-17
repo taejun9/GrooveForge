@@ -7181,6 +7181,7 @@ export function App(): ReactElement {
     reviewQueueSummary,
     selectedArrangementIndex,
     sessionPassSummary,
+    soundFocusPreviewSummary,
     styleInspectorSummary,
     transportLoopScope,
     workflowNavigatorItems,
@@ -7195,6 +7196,7 @@ export function App(): ReactElement {
     onApplyMixFix: applyMixFixPreset,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternFill: applyPatternFill,
+    onApplySoundFocus: applySoundFocusPad,
     onExpandPatternChain: expandPatternChain,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onExportHandoffSheet: handleExportHandoffSheet,
@@ -12315,6 +12317,7 @@ function createQuickActions({
   reviewQueueSummary,
   selectedArrangementIndex,
   sessionPassSummary,
+  soundFocusPreviewSummary,
   styleInspectorSummary,
   transportLoopScope,
   workflowNavigatorItems,
@@ -12329,6 +12332,7 @@ function createQuickActions({
   onApplyMixFix,
   onApplyPatternChain,
   onApplyPatternFill,
+  onApplySoundFocus,
   onExpandPatternChain,
   onPreviewBlueprint,
   onExportHandoffSheet,
@@ -12380,6 +12384,7 @@ function createQuickActions({
   reviewQueueSummary: ReviewQueueSummary;
   selectedArrangementIndex: number;
   sessionPassSummary: SessionPassSummary;
+  soundFocusPreviewSummary: SoundFocusPreviewSummary;
   styleInspectorSummary: StyleInspectorSummary;
   transportLoopScope: TransportLoopScope;
   workflowNavigatorItems: WorkflowNavigatorItem[];
@@ -12394,6 +12399,7 @@ function createQuickActions({
   onApplyMixFix: (preset: MixFixPreset) => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
+  onApplySoundFocus: (pad: SoundFocusPadId) => void;
   onExpandPatternChain: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onExportHandoffSheet: () => void;
@@ -12447,6 +12453,7 @@ function createQuickActions({
   const arrangementTemplateId =
     arrangementTemplatePreviewSummary.templateId === "aligned" ? null : arrangementTemplatePreviewSummary.templateId;
   const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
+  const soundFocusReady = soundFocusPreviewSummary.statusLabel !== "Sound aligned";
 
   return [
     {
@@ -12634,6 +12641,21 @@ function createQuickActions({
       run: () => {
         if (layerStarterOption) {
           onApplyLayerStarter(layerStarterOption.id);
+        }
+      }
+    },
+    {
+      id: "sound-focus",
+      title: soundFocusReady ? `Apply ${soundFocusPreviewSummary.padLabel}` : "Apply Sound Focus",
+      detail: soundFocusReady
+        ? `${soundFocusPreviewSummary.focusLabel} / ${soundFocusPreviewSummary.parameterLabel}`
+        : "Current sound already matches the suggested focus.",
+      group: "Create",
+      keywords: `sound focus tone design studio kick drums 808 bass duck sidechain synth chords ${soundFocusPreviewSummary.padId} ${soundFocusPreviewSummary.padLabel} beginner producer`,
+      disabled: !soundFocusReady,
+      run: () => {
+        if (soundFocusReady) {
+          onApplySoundFocus(soundFocusPreviewSummary.padId);
         }
       }
     },
@@ -13175,6 +13197,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "sound-focus") {
+    return {
+      id: "sound-focus",
+      label: "Sound focus",
+      value: soundPresetToneLabel(project.sound)
+    };
+  }
+
   if (action.id === "listening-pass-focus") {
     return {
       id: "listening-pass",
@@ -13385,6 +13415,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the starter layer supports the groove, 808, harmony, and melody balance.`,
       nextCheck: "Return to Layer Starter or Pattern DNA after the selected layer is no longer missing or thin."
+    };
+  }
+
+  if (action.id === "sound-focus") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, Synth, and Chords with the new tone posture.`,
+      nextCheck: "Use the Sound Focus Result and Studio tone controls for manual kick, 808, Synth, and Chord corrections."
     };
   }
 
