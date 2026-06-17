@@ -7161,6 +7161,7 @@ export function App(): ReactElement {
   const quickActions = createQuickActions({
     canRedo,
     canUndo,
+    composerGuideSummary,
     isPlaying,
     playbackMode,
     project,
@@ -7182,6 +7183,7 @@ export function App(): ReactElement {
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
     onExportWav: handleExportWav,
+    onFocusComposerGuide: focusComposerGuideCard,
     onFocusExportPreflight: focusExportPreflightCard,
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusSessionPass: focusSessionPassCard,
@@ -12182,6 +12184,7 @@ function NextMoveResultStrip({ result }: { result: NextMoveResult }): ReactEleme
 function createQuickActions({
   canRedo,
   canUndo,
+  composerGuideSummary,
   isPlaying,
   playbackMode,
   project,
@@ -12203,6 +12206,7 @@ function createQuickActions({
   onExportMidi,
   onExportStems,
   onExportWav,
+  onFocusComposerGuide,
   onFocusExportPreflight,
   onFocusReviewQueue,
   onFocusSessionPass,
@@ -12217,6 +12221,7 @@ function createQuickActions({
 }: {
   canRedo: boolean;
   canUndo: boolean;
+  composerGuideSummary: ComposerGuideSummary;
   isPlaying: boolean;
   playbackMode: PlaybackMode;
   project: ProjectState;
@@ -12238,6 +12243,7 @@ function createQuickActions({
   onExportMidi: () => void;
   onExportStems: () => void;
   onExportWav: () => void;
+  onFocusComposerGuide: (card: ComposerGuideCard) => void;
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
@@ -12254,6 +12260,7 @@ function createQuickActions({
   const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
+  const composerGuideCard = activeComposerGuideQuickActionCard(composerGuideSummary);
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
@@ -12328,6 +12335,19 @@ function createQuickActions({
       group: "Project",
       keywords: `session pass focus guided studio next workflow ${sessionPassCard.id} ${sessionPassCard.focusLabel} beginner producer`,
       run: () => onFocusSessionPass(sessionPassCard)
+    },
+    {
+      id: "composer-guide-focus",
+      title: composerGuideCard ? `Focus Composer Guide: ${composerGuideCard.label}` : "Focus Composer Guide",
+      detail: composerGuideCard ? `${composerGuideCard.status} / ${composerGuideCard.focusLabel}` : "No Composer Guide card available.",
+      group: "Create",
+      keywords: `composer guide focus writing next layer inspect ${composerGuideCard?.id ?? "none"} ${composerGuideCard?.focusLabel ?? "none"} beginner producer`,
+      disabled: !composerGuideCard,
+      run: () => {
+        if (composerGuideCard) {
+          onFocusComposerGuide(composerGuideCard);
+        }
+      }
     },
     {
       id: "review-queue-focus",
@@ -12662,6 +12682,7 @@ function createQuickActionResult(
   const previewOnly = action.id === "blueprint-preview-style-match";
   const focusOnly =
     action.id === "session-pass-focus" ||
+    action.id === "composer-guide-focus" ||
     action.id === "workflow-spotlight-focus" ||
     action.id === "review-queue-focus" ||
     action.id === "export-preflight-focus";
@@ -12704,6 +12725,14 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "session-pass-focus") {
     return { id: "session-pass", label: "Session pass", value: `${project.mode} mode` };
+  }
+
+  if (action.id === "composer-guide-focus") {
+    return {
+      id: "composer-guide",
+      label: "Composer guide",
+      value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
+    };
   }
 
   if (action.id === "review-queue-focus") {
@@ -12813,6 +12842,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused workstation panel to inspect the highlighted Session Pass target.",
       nextCheck: "Run the visible Session Pass Focus cards when you want another guided, studio, finish, or delivery jump."
+    };
+  }
+
+  if (action.id === "composer-guide-focus") {
+    return {
+      auditionCue: "Use the focused Composer Guide card to inspect the next writing gap before applying any move.",
+      nextCheck: "Run the visible Composer Guide Focus buttons after the drums, 808, harmony, melody, arrangement, or finish lane changes."
     };
   }
 
@@ -15789,6 +15825,15 @@ function composerGuideFocus(cards: ComposerGuideCard[]): string {
     return `${firstWarn.label} needs one more pass`;
   }
   return "Beat has a complete writing path";
+}
+
+function activeComposerGuideQuickActionCard(summary: ComposerGuideSummary): ComposerGuideCard | null {
+  return (
+    summary.cards.find((card) => card.tone === "danger") ??
+    summary.cards.find((card) => card.tone === "warn") ??
+    summary.cards[0] ??
+    null
+  );
 }
 
 function composerGuideFocusTarget(cardId: ComposerGuideCardId): ReviewQueueFocusTarget {
