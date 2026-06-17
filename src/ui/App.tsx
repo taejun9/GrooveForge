@@ -6677,6 +6677,10 @@ export function App(): ReactElement {
     }
   }
 
+  function previewBeatBlueprint(blueprintId: BeatBlueprintId): void {
+    setBeatBlueprintPreviewId(blueprintId);
+  }
+
   function selectDeliveryTarget(targetId: DeliveryTargetId): void {
     const target = deliveryTargetForId(targetId, projectRef.current.customDeliveryTarget);
     updateProject((current) => {
@@ -7154,6 +7158,7 @@ export function App(): ReactElement {
     onApplyMixFix: applyMixFixPreset,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternFill: applyPatternFill,
+    onPreviewBlueprint: previewBeatBlueprint,
     onExportHandoffSheet: handleExportHandoffSheet,
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
@@ -12146,6 +12151,7 @@ function createQuickActions({
   onApplyMixFix,
   onApplyPatternChain,
   onApplyPatternFill,
+  onPreviewBlueprint,
   onExportHandoffSheet,
   onExportMidi,
   onExportStems,
@@ -12172,6 +12178,7 @@ function createQuickActions({
   onApplyMixFix: (preset: MixFixPreset) => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
+  onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onExportHandoffSheet: () => void;
   onExportMidi: () => void;
   onExportStems: () => void;
@@ -12284,6 +12291,14 @@ function createQuickActions({
       group: "Create",
       keywords: `current style match blueprint starter ${currentStyleName} ${project.styleId} ${suggestedBlueprintName} beat drums 808 bass chords synth arrangement sound master sample free`,
       run: () => onApplyBlueprint(suggestedBlueprint)
+    },
+    {
+      id: "blueprint-preview-style-match",
+      title: `Preview ${currentStyleName} starter`,
+      detail: `${suggestedBlueprintName} preview only / no project edits until Apply.`,
+      group: "Create",
+      keywords: `preview current style match blueprint starter ${currentStyleName} ${project.styleId} ${suggestedBlueprintName} beat drums 808 bass chords synth arrangement sound master sample free safe`,
+      run: () => onPreviewBlueprint(suggestedBlueprint)
     },
     {
       id: "fill-drums",
@@ -12534,26 +12549,27 @@ function createQuickActionResult(
 ): QuickActionResult {
   const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action);
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
+  const previewOnly = action.id === "blueprint-preview-style-match";
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
     id: afterMetric.id,
     label: afterMetric.label,
     before: beforeMetric.value,
     after: afterMetric.value,
-    tone: outcome === "failed" ? "danger" : changed ? "good" : "warn"
+    tone: outcome === "failed" ? "danger" : previewOnly ? "good" : changed ? "good" : "warn"
   };
   const followup = quickActionResultFollowup(action, afterProject, outcome);
 
   return {
     actionId: action.id,
     title: action.title,
-    status: outcome === "failed" ? "Failed" : changed ? "Applied" : "Ran",
+    status: outcome === "failed" ? "Failed" : previewOnly ? "Previewed" : changed ? "Applied" : "Ran",
     group: action.group,
     detail: action.detail,
     metric,
     auditionCue: followup.auditionCue,
     nextCheck: followup.nextCheck,
-    tone: outcome === "failed" ? "danger" : changed ? "good" : "warn"
+    tone: outcome === "failed" ? "danger" : previewOnly ? "good" : changed ? "good" : "warn"
   };
 }
 
@@ -12567,7 +12583,7 @@ function quickActionResultMetricSnapshot(
     return { id: "snapshots", label: "Snapshots", value: `${project.snapshots.length} slots` };
   }
 
-  if (action.id === "blueprint" || action.id === "blueprint-style-match") {
+  if (action.id === "blueprint" || action.id === "blueprint-style-match" || action.id === "blueprint-preview-style-match") {
     return { id: "project-events", label: "Project events", value: `${projectEventTotal(project)} events` };
   }
 
@@ -12641,6 +12657,13 @@ function quickActionResultFollowup(
   const analysis = analyzeExport(project);
   const target = activeDeliveryTarget(project);
   const pattern = activePattern(project);
+
+  if (action.id === "blueprint-preview-style-match") {
+    return {
+      auditionCue: "Read the Beat Blueprint preview before applying the starter.",
+      nextCheck: "Use Apply current-style starter only when the previewed style, key, BPM, sound, and master fit the session."
+    };
+  }
 
   switch (action.group) {
     case "Transport":
