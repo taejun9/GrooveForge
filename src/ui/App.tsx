@@ -459,6 +459,28 @@ type BeatBlueprintPreviewSummary = {
   metrics: BeatBlueprintPreviewMetric[];
 };
 
+type BeatBlueprintResultMetric = {
+  id: BeatBlueprintPreviewMetricId;
+  label: string;
+  before: string;
+  after: string;
+  changed: boolean;
+  tone: MixCoachTone;
+};
+
+type BeatBlueprintResult = {
+  blueprintId: BeatBlueprintId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: BeatBlueprintResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type DeliveryTargetAlignmentPreviewSummary = {
   targetId: DeliveryTargetId;
   statusLabel: string;
@@ -2742,6 +2764,7 @@ export function App(): ReactElement {
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
+  const [beatBlueprintResult, setBeatBlueprintResult] = useState<BeatBlueprintResult | null>(null);
   const [patternStackResult, setPatternStackResult] = useState<PatternStackResult | null>(null);
   const [drumMoveResult, setDrumMoveResult] = useState<DrumMoveResult | null>(null);
   const [bassMoveResult, setBassMoveResult] = useState<BassMoveResult | null>(null);
@@ -3290,6 +3313,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setBeatBlueprintResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -3316,6 +3340,7 @@ export function App(): ReactElement {
       projectRef.current = nextProject;
       setProject(nextProject);
       setQuickActionResult(null);
+      setBeatBlueprintResult(null);
       setPatternStackResult(null);
       setDrumMoveResult(null);
       setBassMoveResult(null);
@@ -3417,6 +3442,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setBeatBlueprintResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -3448,6 +3474,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setBeatBlueprintResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -5961,6 +5988,7 @@ export function App(): ReactElement {
 
   function applySelectedBeatBlueprint(blueprintId: BeatBlueprintId): void {
     const blueprint = beatBlueprints.find((candidate) => candidate.id === blueprintId);
+    const beforeProject = projectRef.current;
     setBeatBlueprintPreviewId(blueprintId);
     const changed = updateProject(
       (current) => applyBeatBlueprint(current, blueprintId),
@@ -5972,6 +6000,11 @@ export function App(): ReactElement {
       setSelectedChordIndex(0);
       setSelectedArrangementIndex(0);
       selectTransportLoopScope("arrangement", false);
+      if (blueprint) {
+        setBeatBlueprintResult(createBeatBlueprintResult(blueprint, beforeProject, projectRef.current));
+      }
+    } else {
+      setBeatBlueprintResult(null);
     }
   }
 
@@ -6671,6 +6704,7 @@ export function App(): ReactElement {
         onPreview={setBeatBlueprintPreviewId}
         previewBlueprintId={beatBlueprintPreviewId}
         project={project}
+        result={beatBlueprintResult}
       />
 
       <DeliveryTargets
@@ -7863,12 +7897,14 @@ function BeatBlueprints({
   onApply,
   onPreview,
   previewBlueprintId,
-  project
+  project,
+  result
 }: {
   onApply: (blueprintId: BeatBlueprintId) => void;
   onPreview: (blueprintId: BeatBlueprintId) => void;
   previewBlueprintId: BeatBlueprintId;
   project: ProjectState;
+  result: BeatBlueprintResult | null;
 }): ReactElement {
   const previewBlueprint = beatBlueprints.find((blueprint) => blueprint.id === previewBlueprintId) ?? beatBlueprints[0];
   const previewSummary = createBeatBlueprintPreviewSummary(project, previewBlueprint);
@@ -7915,6 +7951,7 @@ function BeatBlueprints({
           <Sparkles size={13} aria-hidden="true" />
           <span>{previewSummary.applyLabel}</span>
         </button>
+        {result && <BeatBlueprintResultStrip result={result} />}
       </div>
       <div className="blueprint-list">
         {beatBlueprints.map((blueprint) => {
@@ -7956,6 +7993,48 @@ function BeatBlueprints({
         })}
       </div>
     </section>
+  );
+}
+
+function BeatBlueprintResultStrip({ result }: { result: BeatBlueprintResult }): ReactElement {
+  return (
+    <div
+      className={`blueprint-result ${result.tone}`}
+      data-result-blueprint={result.blueprintId}
+      data-testid="beat-blueprint-result"
+      aria-live="polite"
+    >
+      <div className="blueprint-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="beat-blueprint-result-title">{result.title}</strong>
+          <small data-testid="beat-blueprint-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="blueprint-result-meta">
+        <span data-testid="beat-blueprint-result-status">{result.status}</span>
+        <span data-testid="beat-blueprint-result-scope">{result.scope}</span>
+        <span data-testid="beat-blueprint-result-impact">{result.impact}</span>
+      </div>
+      <div className="blueprint-result-metrics" data-testid="beat-blueprint-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`beat-blueprint-result-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="blueprint-result-followup" data-testid="beat-blueprint-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="beat-blueprint-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="beat-blueprint-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -11715,6 +11794,71 @@ function sessionBriefFieldLabel(field: keyof SessionBrief): string {
     notes: "notes"
   };
   return labels[field];
+}
+
+function createBeatBlueprintResult(blueprint: BeatBlueprint, beforeProject: ProjectState, afterProject: ProjectState): BeatBlueprintResult {
+  const metrics: BeatBlueprintResultMetric[] = [
+    createBeatBlueprintResultMetric("style", "Style", beatBlueprintStyleLabel(beforeProject), beatBlueprintStyleLabel(afterProject)),
+    createBeatBlueprintResultMetric("key", "Key", beforeProject.key, afterProject.key),
+    createBeatBlueprintResultMetric("tempo", "Tempo", `${beforeProject.bpm} BPM`, `${afterProject.bpm} BPM`),
+    createBeatBlueprintResultMetric(
+      "arrangement",
+      "Arrangement",
+      beatBlueprintArrangementLabel(beforeProject),
+      beatBlueprintArrangementLabel(afterProject)
+    ),
+    createBeatBlueprintResultMetric(
+      "sound",
+      "Sound",
+      soundPresetLabel(beforeProject.sound.preset),
+      soundPresetLabel(afterProject.sound.preset)
+    ),
+    createBeatBlueprintResultMetric("master", "Master", beatBlueprintMasterLabel(beforeProject), beatBlueprintMasterLabel(afterProject))
+  ];
+  const changedCount = metrics.filter((metric) => metric.changed).length;
+  const tone: MixCoachTone = changedCount === 0 ? "good" : changedCount <= 3 ? "warn" : "danger";
+
+  return {
+    blueprintId: blueprint.id,
+    title: `${blueprint.name} applied`,
+    status: changedCount === 0 ? "Blueprint aligned" : "Blueprint applied",
+    detail: `${beatBlueprintStyleLabel(afterProject)} / ${afterProject.key} / ${afterProject.bpm} BPM / ${barCountLabel(arrangementTotalBars(afterProject))}`,
+    scope: `${projectEventTotal(afterProject)} events / ${afterProject.arrangement.length} block${afterProject.arrangement.length === 1 ? "" : "s"}`,
+    impact: `${changedCount} posture${changedCount === 1 ? "" : "s"} changed`,
+    metrics,
+    auditionCue: `Play Song to hear ${blueprint.name} across ${barCountLabel(arrangementTotalBars(afterProject))}.`,
+    nextCheck: "Open Composer Guide for the next writing focus, then scan Beat Passport before arranging further.",
+    tone
+  };
+}
+
+function createBeatBlueprintResultMetric(
+  id: BeatBlueprintResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): BeatBlueprintResultMetric {
+  const changed = before !== after;
+  return {
+    id,
+    label,
+    before,
+    after,
+    changed,
+    tone: changed ? "warn" : "good"
+  };
+}
+
+function beatBlueprintStyleLabel(project: ProjectState): string {
+  return styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+}
+
+function beatBlueprintArrangementLabel(project: ProjectState): string {
+  return `${barCountLabel(arrangementTotalBars(project))} / ${compactSectionFlow(project.arrangement)}`;
+}
+
+function beatBlueprintMasterLabel(project: ProjectState): string {
+  return `${project.masterPreset} / ${formatDb(project.masterCeilingDb)}`;
 }
 
 function createBeatBlueprintPreviewSummary(project: ProjectState, blueprint: BeatBlueprint): BeatBlueprintPreviewSummary {

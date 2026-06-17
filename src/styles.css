@@ -2623,6 +2623,160 @@ h2 {
   background: rgba(120, 240, 200, 0.16);
 }
 
+.blueprint-result {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(170px, 0.72fr) minmax(0, 1.28fr);
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.22);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px;
+}
+
+.blueprint-result.warn {
+  border-color: rgba(240, 195, 106, 0.25);
+  background: rgba(240, 195, 106, 0.07);
+}
+
+.blueprint-result.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.075);
+}
+
+.blueprint-result-main,
+.blueprint-result-meta,
+.blueprint-result-metrics,
+.blueprint-result-followup,
+.blueprint-result-main span,
+.blueprint-result-metrics span,
+.blueprint-result-followup span {
+  min-width: 0;
+}
+
+.blueprint-result-main,
+.blueprint-result-meta,
+.blueprint-result-metrics {
+  display: grid;
+  gap: 5px;
+}
+
+.blueprint-result-main {
+  grid-row: span 3;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+}
+
+.blueprint-result-main svg {
+  color: #78f0c8;
+}
+
+.blueprint-result.warn .blueprint-result-main svg {
+  color: #f0c36a;
+}
+
+.blueprint-result.danger .blueprint-result-main svg {
+  color: #ff7a4f;
+}
+
+.blueprint-result-main span,
+.blueprint-result-metrics span,
+.blueprint-result-followup span {
+  display: grid;
+  gap: 2px;
+}
+
+.blueprint-result-main strong,
+.blueprint-result-main small,
+.blueprint-result-meta span,
+.blueprint-result-metrics b,
+.blueprint-result-metrics em,
+.blueprint-result-followup b,
+.blueprint-result-followup em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blueprint-result-main strong {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.blueprint-result-main small {
+  color: rgba(244, 239, 231, 0.6);
+  font-size: 10px;
+}
+
+.blueprint-result-meta {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.blueprint-result-meta span {
+  border-radius: 5px;
+  background: rgba(244, 239, 231, 0.06);
+  color: rgba(244, 239, 231, 0.64);
+  padding: 5px 6px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.blueprint-result-meta span:first-child {
+  color: #08120f;
+  background: #78f0c8;
+}
+
+.blueprint-result.warn .blueprint-result-meta span:first-child {
+  background: #f0c36a;
+}
+
+.blueprint-result.danger .blueprint-result-meta span:first-child {
+  background: #ff7a4f;
+}
+
+.blueprint-result-metrics {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.blueprint-result-metrics span {
+  border: 1px solid rgba(244, 239, 231, 0.08);
+  border-radius: 5px;
+  padding: 5px 6px;
+}
+
+.blueprint-result-metrics span.warn {
+  border-color: rgba(240, 195, 106, 0.2);
+  background: rgba(240, 195, 106, 0.07);
+}
+
+.blueprint-result-metrics b,
+.blueprint-result-followup b {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.blueprint-result-metrics em,
+.blueprint-result-followup em {
+  color: rgba(244, 239, 231, 0.82);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.blueprint-result-followup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.blueprint-result-followup span {
+  border-radius: 5px;
+  background: rgba(244, 239, 231, 0.055);
+  padding: 5px 6px;
+}
+
 .blueprint-list {
   display: grid;
   grid-column: 2;
@@ -12732,6 +12886,18 @@ input[type="range"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .blueprint-result {
+    grid-template-columns: 1fr;
+  }
+
+  .blueprint-result-main {
+    grid-row: auto;
+  }
+
+  .blueprint-result-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .blueprint-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -13202,6 +13368,12 @@ input[type="range"] {
 
   .blueprint-preview-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .blueprint-result-meta,
+  .blueprint-result-metrics,
+  .blueprint-result-followup {
+    grid-template-columns: 1fr;
   }
 
   .blueprint-list {
