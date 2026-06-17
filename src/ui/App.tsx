@@ -7215,6 +7215,8 @@ export function App(): ReactElement {
     exportAnalysis,
     exportPreflightSummary,
     reviewQueueSummary,
+    selectedNote,
+    noteClipboard,
     selectedArrangementIndex,
     selectedChord,
     sessionPassSummary,
@@ -7266,6 +7268,12 @@ export function App(): ReactElement {
     onSetKeyboardCaptureTarget: setKeyboardCaptureTarget,
     onUpdateKeyboardCaptureDefaults: updateKeyboardCaptureDefaults,
     onSetMidiCaptureArmed: setMidiCaptureArmed,
+    onMoveSelectedNoteStep: moveSelectedNoteStep,
+    onMoveSelectedNotePitch: moveSelectedNotePitch,
+    onMoveSelectedNoteOctave: moveSelectedNoteOctave,
+    onCopySelectedNote: copySelectedNote,
+    onPasteCopiedNote: pasteCopiedNote,
+    onDuplicateSelectedNote: duplicateSelectedNote,
     onExportHandoffSheet: handleExportHandoffSheet,
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
@@ -12579,6 +12587,8 @@ function createQuickActions({
   exportAnalysis,
   exportPreflightSummary,
   reviewQueueSummary,
+  selectedNote,
+  noteClipboard,
   selectedArrangementIndex,
   selectedChord,
   sessionPassSummary,
@@ -12630,6 +12640,12 @@ function createQuickActions({
   onSetKeyboardCaptureTarget,
   onUpdateKeyboardCaptureDefaults,
   onSetMidiCaptureArmed,
+  onMoveSelectedNoteStep,
+  onMoveSelectedNotePitch,
+  onMoveSelectedNoteOctave,
+  onCopySelectedNote,
+  onPasteCopiedNote,
+  onDuplicateSelectedNote,
   onExportHandoffSheet,
   onExportMidi,
   onExportStems,
@@ -12693,6 +12709,8 @@ function createQuickActions({
   exportAnalysis: ExportAnalysis;
   exportPreflightSummary: ExportPreflightSummary;
   reviewQueueSummary: ReviewQueueSummary;
+  selectedNote: SelectedNote | null;
+  noteClipboard: NoteClipboard | null;
   selectedArrangementIndex: number;
   selectedChord: ChordEvent | undefined;
   sessionPassSummary: SessionPassSummary;
@@ -12744,6 +12762,12 @@ function createQuickActions({
   onSetKeyboardCaptureTarget: (target: NoteTrack) => void;
   onUpdateKeyboardCaptureDefaults: (update: Partial<KeyboardCaptureDefaults>) => void;
   onSetMidiCaptureArmed: (armed: boolean) => void;
+  onMoveSelectedNoteStep: (direction: -1 | 1) => void;
+  onMoveSelectedNotePitch: (direction: -1 | 1) => void;
+  onMoveSelectedNoteOctave: (direction: -1 | 1) => void;
+  onCopySelectedNote: () => void;
+  onPasteCopiedNote: () => void;
+  onDuplicateSelectedNote: () => void;
   onExportHandoffSheet: () => void;
   onExportMidi: () => void;
   onExportStems: () => void;
@@ -12823,6 +12847,51 @@ function createQuickActions({
       : `oct ${activeCaptureDefaults.octave} / len ${activeCaptureDefaults.length} / glide ${
           activeCaptureDefaults.glide ? "On" : "Off"
         }`;
+  const selectedPatternData = activePattern(project);
+  const selectedNoteTrackLabel = selectedNote?.track === "bass" ? "808" : "Synth";
+  const selectedNoteLabel = selectedNote
+    ? `${selectedNoteTrackLabel} ${selectedNote.pitch}.${selectedNote.step + 1}`
+    : "No selected note";
+  const selectedNoteActive = Boolean(
+    selectedNote &&
+      (selectedNote.track === "bass"
+        ? selectedPatternData.bassNotes.some((note) => matchesSelectedNote(note, selectedNote))
+        : selectedPatternData.melodyNotes.some((note) => matchesSelectedNote(note, selectedNote)))
+  );
+  const selectedNoteUsedPitches =
+    selectedNote?.track === "bass"
+      ? selectedPatternData.bassNotes.map((note) => note.pitch)
+      : selectedNote?.track === "melody"
+        ? selectedPatternData.melodyNotes.map((note) => note.pitch)
+        : [];
+  const selectedNotePitchDown =
+    selectedNote && selectedNoteActive
+      ? adjacentTrackPitch(selectedNote.track, project.key, selectedNote.pitch, -1, selectedNoteUsedPitches)
+      : null;
+  const selectedNotePitchUp =
+    selectedNote && selectedNoteActive
+      ? adjacentTrackPitch(selectedNote.track, project.key, selectedNote.pitch, 1, selectedNoteUsedPitches)
+      : null;
+  const selectedNoteOctaveDown =
+    selectedNote && selectedNoteActive ? octaveShiftPitch(selectedNote.track, selectedNote.pitch, -1) : null;
+  const selectedNoteOctaveUp =
+    selectedNote && selectedNoteActive ? octaveShiftPitch(selectedNote.track, selectedNote.pitch, 1) : null;
+  const selectedNoteDuplicateStep =
+    selectedNote && selectedNoteActive
+      ? nextEmptyStepForPitch(
+          selectedNote.track === "bass" ? selectedPatternData.bassNotes : selectedPatternData.melodyNotes,
+          selectedNote.pitch,
+          selectedNote.step
+        )
+      : null;
+  const noteClipboardLabel = noteClipboard
+    ? `${noteClipboard.track === "bass" ? "808" : "Synth"} ${noteClipboard.note.pitch}.${noteClipboard.note.step + 1}`
+    : "Clipboard empty";
+  const noteClipboardPatternNotes =
+    noteClipboard?.track === "bass" ? selectedPatternData.bassNotes : selectedPatternData.melodyNotes;
+  const noteClipboardPasteStep = noteClipboard
+    ? nextEmptyStepForPitch(noteClipboardPatternNotes, noteClipboard.note.pitch, noteClipboard.note.step)
+    : null;
   const captureTargetActions: QuickAction[] = [
     { id: "capture-target-bass", target: "bass" as NoteTrack, targetLabel: "808" },
     { id: "capture-target-melody", target: "melody" as NoteTrack, targetLabel: "Synth" }
@@ -12915,6 +12984,119 @@ function createQuickActions({
       keywords: "capture default 808 bass glide toggle slide keyboard midi input notes beginner producer",
       disabled: keyboardCaptureTarget !== "bass",
       run: () => onUpdateKeyboardCaptureDefaults({ glide: !activeCaptureDefaults.glide })
+    }
+  ];
+  const selectedNoteActions: QuickAction[] = [
+    {
+      id: "selected-note-step-left",
+      title: "Move selected note left",
+      detail: selectedNote
+        ? `${selectedNoteLabel} / Pattern ${project.selectedPattern} / one step earlier`
+        : "Select an 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note move left step nudge 808 synth edit keyboard capture midi beginner producer",
+      disabled: !selectedNoteActive || !selectedNote || selectedNote.step <= 0,
+      run: () => onMoveSelectedNoteStep(-1)
+    },
+    {
+      id: "selected-note-step-right",
+      title: "Move selected note right",
+      detail: selectedNote
+        ? `${selectedNoteLabel} / Pattern ${project.selectedPattern} / one step later`
+        : "Select an 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note move right step nudge 808 synth edit keyboard capture midi beginner producer",
+      disabled: !selectedNoteActive || !selectedNote || selectedNote.step >= steps.length - 1,
+      run: () => onMoveSelectedNoteStep(1)
+    },
+    {
+      id: "selected-note-pitch-down",
+      title: "Move selected note down",
+      detail: selectedNotePitchDown
+        ? `${selectedNoteLabel} -> ${selectedNotePitchDown} / Pattern ${project.selectedPattern}`
+        : selectedNote
+          ? `${selectedNoteLabel} is at the low pitch edge.`
+          : "Select an 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note pitch down lower scale 808 synth edit keyboard capture midi beginner producer",
+      disabled: !selectedNoteActive || !selectedNotePitchDown,
+      run: () => onMoveSelectedNotePitch(-1)
+    },
+    {
+      id: "selected-note-pitch-up",
+      title: "Move selected note up",
+      detail: selectedNotePitchUp
+        ? `${selectedNoteLabel} -> ${selectedNotePitchUp} / Pattern ${project.selectedPattern}`
+        : selectedNote
+          ? `${selectedNoteLabel} is at the high pitch edge.`
+          : "Select an 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note pitch up higher scale 808 synth edit keyboard capture midi beginner producer",
+      disabled: !selectedNoteActive || !selectedNotePitchUp,
+      run: () => onMoveSelectedNotePitch(1)
+    },
+    {
+      id: "selected-note-octave-down",
+      title: "Move selected note down octave",
+      detail: selectedNoteOctaveDown
+        ? `${selectedNoteLabel} -> ${selectedNoteOctaveDown} / Pattern ${project.selectedPattern}`
+        : selectedNote
+          ? `${selectedNoteLabel} is at the low octave edge.`
+          : "Select an 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note octave down lower 808 synth edit keyboard capture midi beginner producer",
+      disabled: !selectedNoteActive || !selectedNoteOctaveDown,
+      run: () => onMoveSelectedNoteOctave(-1)
+    },
+    {
+      id: "selected-note-octave-up",
+      title: "Move selected note up octave",
+      detail: selectedNoteOctaveUp
+        ? `${selectedNoteLabel} -> ${selectedNoteOctaveUp} / Pattern ${project.selectedPattern}`
+        : selectedNote
+          ? `${selectedNoteLabel} is at the high octave edge.`
+          : "Select an 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note octave up higher 808 synth edit keyboard capture midi beginner producer",
+      disabled: !selectedNoteActive || !selectedNoteOctaveUp,
+      run: () => onMoveSelectedNoteOctave(1)
+    },
+    {
+      id: "selected-note-copy",
+      title: "Copy selected note",
+      detail: selectedNoteActive ? `${selectedNoteLabel} -> local note clipboard` : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note copy clipboard 808 synth edit keyboard capture midi beginner producer",
+      disabled: !selectedNoteActive,
+      run: onCopySelectedNote
+    },
+    {
+      id: "selected-note-paste",
+      title: "Paste copied note",
+      detail:
+        noteClipboard && noteClipboardPasteStep !== null
+          ? `${noteClipboardLabel} -> step ${noteClipboardPasteStep + 1} / Pattern ${project.selectedPattern}`
+          : noteClipboard
+            ? `${noteClipboardLabel} has no empty paste step.`
+            : "Copy an 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note paste clipboard 808 synth edit keyboard capture midi beginner producer",
+      disabled: !noteClipboard || noteClipboardPasteStep === null,
+      run: onPasteCopiedNote
+    },
+    {
+      id: "selected-note-duplicate",
+      title: "Duplicate selected note",
+      detail:
+        selectedNoteActive && selectedNoteDuplicateStep !== null
+          ? `${selectedNoteLabel} -> step ${selectedNoteDuplicateStep + 1} / Pattern ${project.selectedPattern}`
+          : selectedNote
+            ? `${selectedNoteLabel} has no empty duplicate step.`
+            : "Select an 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note duplicate copy next empty step 808 synth edit keyboard capture midi beginner producer",
+      disabled: !selectedNoteActive || selectedNoteDuplicateStep === null,
+      run: onDuplicateSelectedNote
     }
   ];
   const arrangementMovePreset = selectedArrangementMoveQuickActionPreset(selectedBlock);
@@ -13014,6 +13196,7 @@ function createQuickActions({
     },
     ...captureTargetActions,
     ...captureDefaultActions,
+    ...selectedNoteActions,
     {
       id: "midi-input-arm",
       title: midiInputArmTitle,
@@ -13883,7 +14066,8 @@ function createQuickActionResult(
     action.id === "midi-input-arm" ||
     action.id.startsWith("capture-target-") ||
     action.id.startsWith("capture-default-");
-  const uiLocal = action.id.startsWith("mix-snapshot-") || inputSetupOnly;
+  const noteClipboardOnly = action.id === "selected-note-copy";
+  const uiLocal = action.id.startsWith("mix-snapshot-") || inputSetupOnly || noteClipboardOnly;
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
     id: afterMetric.id,
@@ -13904,15 +14088,17 @@ function createQuickActionResult(
           ? "Previewed"
           : focusOnly
             ? "Focused"
-            : uiLocal && action.id === "mix-snapshot-clear"
-              ? "Cleared"
-              : uiLocal
-                ? inputSetupOnly
-                  ? "Checked"
-                  : "Captured"
-                : changed
-                  ? "Applied"
-                  : "Ran",
+            : noteClipboardOnly
+              ? "Copied"
+              : uiLocal && action.id === "mix-snapshot-clear"
+                ? "Cleared"
+                : uiLocal
+                  ? inputSetupOnly
+                    ? "Checked"
+                    : "Captured"
+                  : changed
+                    ? "Applied"
+                    : "Ran",
     group: action.group,
     detail: action.detail,
     metric,
@@ -13958,6 +14144,14 @@ function quickActionResultMetricSnapshot(
       id: "input-capture",
       label: "Input capture",
       value: `Pattern ${project.selectedPattern} / ${project.key} / local setup`
+    };
+  }
+
+  if (action.id.startsWith("selected-note-")) {
+    return {
+      id: "selected-note",
+      label: "Selected note",
+      value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
     };
   }
 
@@ -14333,6 +14527,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play desktop keys or a MIDI controller after confirming the new octave, length, velocity, or glide default.",
       nextCheck: "Captured defaults affect only the next Keyboard Capture or Web MIDI notes; existing notes stay editable in the grid."
+    };
+  }
+
+  if (action.id === "selected-note-copy") {
+    return {
+      auditionCue: "Use Paste copied note when the copied 808 or Synth shape should repeat in the current Pattern.",
+      nextCheck: "The note clipboard is UI-local; paste or duplicate explicitly before changing to another editing task."
+    };
+  }
+
+  if (action.id.startsWith("selected-note-")) {
+    return {
+      auditionCue: "Loop the selected Pattern to hear the corrected 808 or Synth note against drums and chords.",
+      nextCheck: "Use selected-note tools again for another small correction, or move to Pattern Compare once the phrase feels right."
     };
   }
 
