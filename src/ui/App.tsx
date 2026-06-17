@@ -2637,6 +2637,13 @@ type FirstBeatPathSummary = {
 
 type BeatSpineCardId = "setup" | "drums" | "bass" | "harmony" | "melody" | "sound" | "arrange" | "finish";
 type BeatSpineTarget = "transport" | "compose" | "sound" | "arrange" | "mix" | "master" | "deliver";
+type BeatSpineActionId = "drums" | "bass" | "harmony" | "melody" | "sound" | "arrange" | "finish";
+
+type BeatSpineAction = {
+  id: BeatSpineActionId;
+  label: string;
+  detail: string;
+};
 
 type BeatSpineCard = {
   id: BeatSpineCardId;
@@ -2645,6 +2652,7 @@ type BeatSpineCard = {
   detail: string;
   focusLabel: string;
   target: BeatSpineTarget;
+  action?: BeatSpineAction;
   tone: MixCoachTone;
 };
 
@@ -6865,6 +6873,34 @@ export function App(): ReactElement {
     setProjectStatus(`Beat Spine ${card.label}: ${card.value}`);
   }
 
+  function applyBeatSpineAction(action: BeatSpineAction): void {
+    switch (action.id) {
+      case "drums":
+        applyLayerStarter("drums");
+        return;
+      case "bass":
+        applyLayerStarter("bass");
+        return;
+      case "harmony":
+        applyLayerStarter("chords");
+        return;
+      case "melody":
+        applyLayerStarter("melody");
+        return;
+      case "sound": {
+        const soundPreset = styleSoundPreset(projectRef.current.styleId);
+        applySoundPreset(soundPreset);
+        return;
+      }
+      case "arrange":
+        applyPatternChain("eight_bar");
+        return;
+      case "finish":
+        applyMasterFinishPad(suggestedMasterFinishPad(projectRef.current), { showResult: true });
+        return;
+    }
+  }
+
   function focusBeatPassportMetric(metric: BeatPassportFocusItem): void {
     const targetRefs: Record<BeatPassportFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -7396,7 +7432,7 @@ export function App(): ReactElement {
 
       <FirstBeatPath summary={firstBeatPathSummary} onJump={jumpToFirstBeatPathTarget} />
 
-      <BeatSpine summary={beatSpineSummary} onJump={jumpToBeatSpineTarget} />
+      <BeatSpine summary={beatSpineSummary} onApply={applyBeatSpineAction} onJump={jumpToBeatSpineTarget} />
 
       <SessionPass summary={sessionPassSummary} onFocus={focusSessionPassCard} />
 
@@ -10809,10 +10845,12 @@ function FirstBeatPath({
 }
 
 function BeatSpine({
+  onApply,
   onJump,
   summary
 }: {
   summary: BeatSpineSummary;
+  onApply: (action: BeatSpineAction) => void;
   onJump: (card: BeatSpineCard) => void;
 }): ReactElement {
   return (
@@ -10833,21 +10871,42 @@ function BeatSpine({
       <div className="beat-spine-grid" data-testid="beat-spine-grid">
         {summary.cards.map((card) => {
           const next = card.id === summary.nextCardId;
+          const action = card.action;
           return (
-            <button
+            <div
               className={["beat-spine-card", card.tone, next ? "next" : ""].filter(Boolean).join(" ")}
               data-next={next ? "true" : "false"}
               data-testid={`beat-spine-${card.id}`}
               key={card.id}
-              onClick={() => onJump(card)}
-              title={`Jump to ${card.focusLabel}: ${card.detail}`}
-              type="button"
             >
               {beatSpineIcon(card.id)}
               <span>{card.label}</span>
               <strong>{card.value}</strong>
               <small>{card.detail}</small>
-            </button>
+              <div className={["beat-spine-card-actions", action ? "" : "single"].filter(Boolean).join(" ")}>
+                <button
+                  data-testid={`beat-spine-jump-${card.id}`}
+                  onClick={() => onJump(card)}
+                  title={`Jump to ${card.focusLabel}: ${card.detail}`}
+                  type="button"
+                >
+                  <ArrowRight size={12} aria-hidden="true" />
+                  <span>{card.focusLabel}</span>
+                </button>
+                {action && (
+                  <button
+                    className="primary"
+                    data-testid={`beat-spine-apply-${card.id}`}
+                    onClick={() => onApply(action)}
+                    title={`${action.label}: ${action.detail}`}
+                    type="button"
+                  >
+                    <Sparkles size={12} aria-hidden="true" />
+                    <span>{action.label}</span>
+                  </button>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>
@@ -10999,11 +11058,17 @@ function createBeatSpineSummary(
   const drums = readinessCheckForId(checks, "drums");
   const bass = readinessCheckForId(checks, "bass");
   const exportCheck = readinessCheckForId(checks, "export");
+  const drumFoundation = composerDrumFoundation(project);
+  const bassline = composerBasslinePad(project);
+  const chordPreset = composerChordPreset(project);
+  const melodyMotif = composerMelodyMotif(project);
+  const targetSoundPreset = styleSoundPreset(style.id);
+  const finishPad = suggestedMasterFinishPad(project);
   const setupTone: MixCoachTone = project.bpm >= style.bpmRange[0] && project.bpm <= style.bpmRange[1] ? "good" : "warn";
   const harmonyTone: MixCoachTone = chordCount >= 2 ? "good" : chordCount > 0 ? "warn" : "danger";
   const melodyTone: MixCoachTone =
     melodyCount >= 3 ? "good" : melodyCount > 0 ? "warn" : style.melodyStyle === "none" ? "warn" : "danger";
-  const soundTone: MixCoachTone = project.sound.preset === styleSoundPreset(style.id) || project.sound.preset !== "custom" ? "good" : "warn";
+  const soundTone: MixCoachTone = project.sound.preset === targetSoundPreset || project.sound.preset !== "custom" ? "good" : "warn";
   const finishTone = weakestTone([exportCheck?.tone ?? "danger", exportPreflight.tone, analysis.status === "Silent" ? "danger" : "good"]);
   const cards: BeatSpineCard[] = [
     {
@@ -11022,6 +11087,11 @@ function createBeatSpineSummary(
       detail: drums?.detail ?? "Scan kick, clap, hat, and perc events.",
       focusLabel: "Compose",
       target: "compose",
+      action: {
+        id: "drums",
+        label: drumFoundationLabel(drumFoundation),
+        detail: `Apply ${drumFoundationLabel(drumFoundation)} drums to Pattern ${project.selectedPattern}.`
+      },
       tone: drums?.tone ?? "danger"
     },
     {
@@ -11031,6 +11101,11 @@ function createBeatSpineSummary(
       detail: bass?.detail ?? "Scan arranged 808 or bass notes.",
       focusLabel: "Compose",
       target: "compose",
+      action: {
+        id: "bass",
+        label: basslinePadLabel(bassline),
+        detail: `Apply ${basslinePadLabel(bassline)} 808 to Pattern ${project.selectedPattern}.`
+      },
       tone: bass?.tone ?? "danger"
     },
     {
@@ -11040,6 +11115,11 @@ function createBeatSpineSummary(
       detail: `${chordCount} arranged chord event${chordCount === 1 ? "" : "s"}.`,
       focusLabel: "Compose",
       target: "compose",
+      action: {
+        id: "harmony",
+        label: chordProgressionPresetLabel(chordPreset),
+        detail: `Apply ${chordProgressionPresetLabel(chordPreset)} chords to Pattern ${project.selectedPattern}.`
+      },
       tone: harmonyTone
     },
     {
@@ -11052,15 +11132,25 @@ function createBeatSpineSummary(
           : `${melodyStyleRoleLabel(style.melodyStyle)} needs an editable motif.`,
       focusLabel: "Compose",
       target: "compose",
+      action: {
+        id: "melody",
+        label: melodyMotifLabel(melodyMotif),
+        detail: `Apply ${melodyMotifLabel(melodyMotif)} Synth motif to Pattern ${project.selectedPattern}.`
+      },
       tone: melodyTone
     },
     {
       id: "sound",
       label: "Sound",
       value: soundPresetLabel(project.sound.preset),
-      detail: `Built-in tone design / style target ${soundPresetLabel(styleSoundPreset(style.id))}.`,
+      detail: `Built-in tone design / style target ${soundPresetLabel(targetSoundPreset)}.`,
       focusLabel: "Sound",
       target: "sound",
+      action: {
+        id: "sound",
+        label: soundPresetLabel(targetSoundPreset),
+        detail: `Apply ${soundPresetLabel(targetSoundPreset)} built-in sound preset.`
+      },
       tone: soundTone
     },
     {
@@ -11070,6 +11160,11 @@ function createBeatSpineSummary(
       detail: arrangement?.detail ?? "Place Pattern A/B/C into a song form.",
       focusLabel: "Arrange",
       target: "arrange",
+      action: {
+        id: "arrange",
+        label: patternChainLabel("eight_bar"),
+        detail: `Apply ${patternChainLabel("eight_bar")} using Pattern A/B/C.`
+      },
       tone: arrangement?.tone ?? "warn"
     },
     {
@@ -11079,6 +11174,11 @@ function createBeatSpineSummary(
       detail: `${formatDb(analysis.headroomDb)} headroom / ${exportPreflight.headline}`,
       focusLabel: finishTone === "danger" || analysis.status !== "Ready" ? "Master" : "Deliver",
       target: finishTone === "danger" || analysis.status !== "Ready" ? "master" : "deliver",
+      action: {
+        id: "finish",
+        label: `${masterFinishPadLabel(finishPad)} Finish`,
+        detail: `Apply ${masterFinishPadLabel(finishPad)} master finish posture.`
+      },
       tone: finishTone
     }
   ];

@@ -1066,9 +1066,10 @@ h2 {
 .beat-spine-count span,
 .beat-spine-count strong,
 .beat-spine-count small,
-.beat-spine-card span,
-.beat-spine-card strong,
-.beat-spine-card small {
+.beat-spine-card > span,
+.beat-spine-card > strong,
+.beat-spine-card > small,
+.beat-spine-card-actions button span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1126,10 +1127,10 @@ h2 {
 .beat-spine-card {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto auto auto;
   gap: 2px 6px;
   align-content: center;
-  min-height: 58px;
+  min-height: 86px;
   border: 1px solid rgba(244, 239, 231, 0.1);
   border-radius: 7px;
   color: #f4efe7;
@@ -1161,34 +1162,83 @@ h2 {
   background: rgba(135, 174, 255, 0.08);
 }
 
-.beat-spine-card svg {
+.beat-spine-card > svg {
   grid-row: 1 / span 3;
   color: #87aeff;
 }
 
-.beat-spine-card.warn svg {
+.beat-spine-card.warn > svg {
   color: #f0c36a;
 }
 
-.beat-spine-card.danger svg {
+.beat-spine-card.danger > svg {
   color: #ff7a4f;
 }
 
-.beat-spine-card span {
+.beat-spine-card > span {
   color: rgba(244, 239, 231, 0.58);
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
 }
 
-.beat-spine-card strong {
+.beat-spine-card > strong {
   color: #f4efe7;
   font-size: 11px;
 }
 
-.beat-spine-card small {
+.beat-spine-card > small {
   color: rgba(244, 239, 231, 0.64);
   font-size: 10px;
+}
+
+.beat-spine-card-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.beat-spine-card-actions.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.beat-spine-card-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 26px;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 6px;
+  background: rgba(244, 239, 231, 0.045);
+  color: rgba(244, 239, 231, 0.76);
+  padding: 5px 6px;
+}
+
+.beat-spine-card-actions button:hover {
+  border-color: rgba(135, 174, 255, 0.36);
+  background: rgba(135, 174, 255, 0.08);
+}
+
+.beat-spine-card-actions button.primary {
+  border-color: rgba(135, 174, 255, 0.24);
+  background: rgba(135, 174, 255, 0.1);
+  color: #f4efe7;
+}
+
+.beat-spine-card-actions svg {
+  flex: 0 0 auto;
+  color: currentColor;
+}
+
+.beat-spine-card-actions span {
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .session-pass {
