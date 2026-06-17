@@ -7271,6 +7271,7 @@ export function App(): ReactElement {
     onExpandPatternChain: expandPatternChain,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onRequestMidiInputAccess: requestMidiInputAccess,
+    onSelectStyle: selectStyle,
     onSetKeyboardCaptureEnabled: setKeyboardCaptureEnabled,
     onSetKeyboardCaptureTarget: setKeyboardCaptureTarget,
     onUpdateKeyboardCaptureDefaults: updateKeyboardCaptureDefaults,
@@ -12668,6 +12669,7 @@ function createQuickActions({
   onExpandPatternChain,
   onPreviewBlueprint,
   onRequestMidiInputAccess,
+  onSelectStyle,
   onSetKeyboardCaptureEnabled,
   onSetKeyboardCaptureTarget,
   onUpdateKeyboardCaptureDefaults,
@@ -12815,6 +12817,7 @@ function createQuickActions({
   onExpandPatternChain: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onRequestMidiInputAccess: () => Promise<void>;
+  onSelectStyle: (styleId: ProjectState["styleId"]) => void;
   onSetKeyboardCaptureEnabled: (enabled: boolean) => void;
   onSetKeyboardCaptureTarget: (target: NoteTrack) => void;
   onUpdateKeyboardCaptureDefaults: (update: Partial<KeyboardCaptureDefaults>) => void;
@@ -13611,6 +13614,21 @@ function createQuickActions({
   const nextHandoffItem = handoffSendOrder.nextItemId
     ? (handoffPackItems.find((item) => item.id === handoffSendOrder.nextItemId) ?? null)
     : null;
+  const styleQuickActions: QuickAction[] = styleProfiles.map((profile) => {
+    const selected = profile.id === project.styleId;
+    return {
+      id: `style-quick-${profile.id}`,
+      title: `${selected ? "Reapply" : "Apply"} ${profile.name} style`,
+      detail: `${profile.defaultBpm} BPM / ${percentLabel(profile.defaultSwing)} swing / ${bassStyleRoleLabel(
+        profile.bassStyle
+      )} / ${melodyStyleRoleLabel(profile.melodyStyle)}`,
+      group: "Create",
+      keywords: `style genre groove quick pick ${profile.name} ${profile.id} ${profile.bassStyle} ${profile.melodyStyle} ${styleSoundPreset(
+        profile.id
+      )} bpm swing all genre sample free beginner producer`,
+      run: () => onSelectStyle(profile.id)
+    };
+  });
   const patternCloneActions: QuickAction[] = patternCloneOptions.map((clone) => ({
     id: `pattern-clone-${clone.target}-${clone.preset}`,
     title: `Clone Pattern ${clone.source} to ${clone.target} as ${clone.preview}`,
@@ -13805,6 +13823,7 @@ function createQuickActions({
         }
       }
     },
+    ...styleQuickActions,
     {
       id: "key-compass-focus",
       title: keyCompassItem ? `Focus Key Compass: ${keyCompassItem.label}` : "Focus Key Compass",
@@ -14711,6 +14730,15 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("style-quick-")) {
+    const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+    return {
+      id: "style-quick",
+      label: "Style",
+      value: `${styleName} / ${project.bpm} BPM / ${percentLabel(project.swing)} swing`
+    };
+  }
+
   if (action.id === "groove-compass-focus") {
     return {
       id: "groove-compass",
@@ -15148,6 +15176,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Style Inspector item to inspect BPM, swing, bass, melody, sound, or Pattern density before changing style or writing parts.",
       nextCheck: "Return to Style Inspector after the focused style posture item is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id.startsWith("style-quick-")) {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the applied style's drums, 808, harmony, melody, and swing before arranging.`,
+      nextCheck: "Use Style Inspector, current-style starter preview, and manual Pattern editors to refine the new style direction."
     };
   }
 
