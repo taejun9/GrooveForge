@@ -2547,6 +2547,18 @@ type KeyboardCaptureDefaults = {
   velocity: number;
   glide: boolean;
 };
+type MidiCaptureStatus = "unsupported" | "idle" | "requesting" | "ready" | "listening" | "denied" | "error";
+type MidiInputOption = {
+  id: string;
+  label: string;
+  detail: string;
+  connected: boolean;
+};
+type MidiCaptureSummary = {
+  statusLabel: string;
+  detailLabel: string;
+  tone: MixCoachTone;
+};
 type NoteDegreeSummary = {
   degreeLabel: string;
   roleLabel: string;
@@ -2892,6 +2904,14 @@ export function App(): ReactElement {
     bass: { octave: 1, length: 2, velocity: 0.68, glide: false },
     melody: { octave: 4, length: 1, velocity: 0.68, glide: false }
   });
+  const [midiAccess, setMidiAccess] = useState<MIDIAccess | null>(null);
+  const [midiPortRevision, setMidiPortRevision] = useState(0);
+  const [midiCaptureStatus, setMidiCaptureStatus] = useState<MidiCaptureStatus>(() =>
+    isMidiInputSupported() ? "idle" : "unsupported"
+  );
+  const [midiCaptureArmed, setMidiCaptureArmed] = useState(false);
+  const [midiSelectedInputId, setMidiSelectedInputId] = useState("all");
+  const [midiLastNoteLabel, setMidiLastNoteLabel] = useState("No MIDI note captured");
   const [selectedDrumStep, setSelectedDrumStep] = useState<SelectedDrumStep | null>(null);
   const [drumClipboard, setDrumClipboard] = useState<DrumClipboard | null>(null);
   const [selectedChordIndex, setSelectedChordIndex] = useState<number | null>(0);
@@ -3228,6 +3248,13 @@ export function App(): ReactElement {
     activeKeyboardCaptureDefaults,
     keyboardCaptureNextStep
   );
+  const midiInputOptions = useMemo(() => createMidiInputOptions(midiAccess), [midiAccess, midiPortRevision]);
+  const midiCaptureSummary = createMidiCaptureSummary(
+    midiCaptureStatus,
+    midiCaptureArmed,
+    midiInputOptions,
+    midiLastNoteLabel
+  );
   const chordRootOptions = useMemo(
     () => mergeChordRoots(scalePitchNames(project.key), currentPattern.chordEvents.map((event) => event.root)),
     [currentPattern.chordEvents, project.key]
@@ -3360,6 +3387,56 @@ export function App(): ReactElement {
       return Object.keys(nextDrafts).length === Object.keys(current).length ? current : nextDrafts;
     });
   }, [project.snapshots]);
+
+  useEffect(() => {
+    if (!midiAccess) {
+      return;
+    }
+
+    const handleStateChange = (): void => {
+      setMidiPortRevision((revision) => revision + 1);
+      setMidiCaptureStatus((status) => (status === "requesting" || status === "unsupported" ? status : "ready"));
+    };
+
+    midiAccess.onstatechange = handleStateChange;
+    return () => {
+      if (midiAccess.onstatechange === handleStateChange) {
+        midiAccess.onstatechange = null;
+      }
+    };
+  }, [midiAccess]);
+
+  useEffect(() => {
+    if (!midiAccess) {
+      return;
+    }
+
+    const inputs = Array.from(midiAccess.inputs.values());
+    const listeningInputs = inputs.filter((input) => midiInputMatchesSelection(input, midiSelectedInputId));
+    const handleMidiMessage = (event: MIDIMessageEvent): void => {
+      captureMidiNoteEvent(event);
+    };
+
+    for (const input of inputs) {
+      input.onmidimessage = midiCaptureArmed && midiInputMatchesSelection(input, midiSelectedInputId) ? handleMidiMessage : null;
+    }
+
+    setMidiCaptureStatus(midiCaptureArmed && listeningInputs.length > 0 ? "listening" : "ready");
+
+    return () => {
+      for (const input of inputs) {
+        if (input.onmidimessage === handleMidiMessage) {
+          input.onmidimessage = null;
+        }
+      }
+    };
+  }, [midiAccess, midiPortRevision, midiCaptureArmed, midiSelectedInputId, keyboardCaptureTarget, keyboardCaptureDefaults, selectedNote]);
+
+  useEffect(() => {
+    if (midiSelectedInputId !== "all" && !midiInputOptions.some((input) => input.id === midiSelectedInputId)) {
+      setMidiSelectedInputId("all");
+    }
+  }, [midiInputOptions, midiSelectedInputId]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleDesktopShortcut);
@@ -3862,6 +3939,90 @@ export function App(): ReactElement {
         }
       };
     }, status);
+  }
+
+  async function requestMidiInputAccess(): Promise<void> {
+    if (!isMidiInputSupported()) {
+      setMidiCaptureStatus("unsupported");
+      setProjectStatus("Web MIDI input is not available");
+      return;
+    }
+
+    setMidiCaptureStatus("requesting");
+    try {
+      const access = await navigator.requestMIDIAccess?.({ sysex: false, software: false });
+      if (!access) {
+        setMidiCaptureStatus("unsupported");
+        setProjectStatus("Web MIDI input is not available");
+        return;
+      }
+
+      setMidiAccess(access);
+      setMidiPortRevision((revision) => revision + 1);
+      setMidiCaptureStatus("ready");
+      setProjectStatus("MIDI input ready");
+    } catch (error) {
+      console.error(error);
+      setMidiCaptureStatus("denied");
+      setMidiCaptureArmed(false);
+      setProjectStatus("MIDI input permission denied");
+    }
+  }
+
+  function refreshMidiInputPorts(): void {
+    if (!midiAccess) {
+      void requestMidiInputAccess();
+      return;
+    }
+
+    setMidiPortRevision((revision) => revision + 1);
+    setMidiCaptureStatus(midiCaptureArmed ? "listening" : "ready");
+    setProjectStatus("MIDI inputs refreshed");
+  }
+
+  function captureMidiNoteEvent(event: MIDIMessageEvent): void {
+    if (!event.data) {
+      return;
+    }
+
+    const note = midiNoteOnFromMessage(event.data);
+    if (!note) {
+      return;
+    }
+
+    const current = projectRef.current;
+    const pattern = activePattern(current);
+    const target = keyboardCaptureTarget;
+    const captureDefaults = keyboardCaptureDefaults[target];
+    const pitch = midiNoteToScalePitch(note.noteNumber, current.key, target);
+    if (!pitch) {
+      setMidiLastNoteLabel(`Ignored ${midiNoteLabel(note.noteNumber)}`);
+      setProjectStatus("MIDI note is out of range");
+      return;
+    }
+
+    const step = nextKeyboardCaptureStep(
+      pattern,
+      target,
+      selectedNote?.track === target ? selectedNote.step + 1 : 0
+    );
+    const midiDefaults: KeyboardCaptureDefaults =
+      target === "melody" ? { ...captureDefaults, velocity: note.velocity } : captureDefaults;
+    const changed = updateCurrentPattern(
+      (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch, midiDefaults),
+      `MIDI captured ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} on Pattern ${current.selectedPattern}`
+    );
+    const noteLabel = `${midiNoteLabel(note.noteNumber)} -> ${pitch}.${step + 1} / ${Math.round(note.velocity * 100)}%`;
+
+    setMidiLastNoteLabel(noteLabel);
+    if (!changed) {
+      setProjectStatus("MIDI note already exists");
+      return;
+    }
+
+    setSelectedNote({ track: target, step, pitch });
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
   }
 
   function selectPattern(pattern: PatternSlot): void {
@@ -7283,6 +7444,19 @@ export function App(): ReactElement {
             onTargetChange={setKeyboardCaptureTarget}
             selectedNote={selectedNote}
             target={keyboardCaptureTarget}
+          />
+          <MidiCapturePanel
+            armed={midiCaptureArmed}
+            inputOptions={midiInputOptions}
+            lastNoteLabel={midiLastNoteLabel}
+            selectedInputId={midiSelectedInputId}
+            status={midiCaptureStatus}
+            summary={midiCaptureSummary}
+            target={keyboardCaptureTarget}
+            onArmChange={setMidiCaptureArmed}
+            onInputChange={setMidiSelectedInputId}
+            onRefresh={refreshMidiInputPorts}
+            onRequestAccess={() => void requestMidiInputAccess()}
           />
           <BassMovePreview preview={bassMovePreviewSummary} />
           {bassMoveResult && <BassMoveResultStrip result={bassMoveResult} />}
@@ -20224,6 +20398,99 @@ function KeyboardCapturePanel({
   );
 }
 
+function MidiCapturePanel({
+  armed,
+  inputOptions,
+  lastNoteLabel,
+  selectedInputId,
+  status,
+  summary,
+  target,
+  onArmChange,
+  onInputChange,
+  onRefresh,
+  onRequestAccess
+}: {
+  armed: boolean;
+  inputOptions: MidiInputOption[];
+  lastNoteLabel: string;
+  selectedInputId: string;
+  status: MidiCaptureStatus;
+  summary: MidiCaptureSummary;
+  target: NoteTrack;
+  onArmChange: (armed: boolean) => void;
+  onInputChange: (inputId: string) => void;
+  onRefresh: () => void;
+  onRequestAccess: () => void;
+}): ReactElement {
+  const hasInputs = inputOptions.length > 0;
+  const hasConnectedInput = inputOptions.some((input) => input.connected);
+  const canArm = status !== "unsupported" && status !== "requesting" && status !== "denied" && hasConnectedInput;
+  const targetLabel = target === "bass" ? "808" : "Synth";
+
+  return (
+    <div className={`midi-capture ${summary.tone}`} data-testid="midi-capture">
+      <div className="midi-capture-heading">
+        <div>
+          <span>Web MIDI Input</span>
+          <strong data-testid="midi-capture-status">{summary.statusLabel}</strong>
+        </div>
+        <div className="midi-capture-actions">
+          <button
+            className="mini-toggle"
+            data-testid="midi-capture-request"
+            disabled={status === "requesting"}
+            onClick={onRequestAccess}
+            type="button"
+          >
+            {status === "requesting" ? "Requesting" : "Connect"}
+          </button>
+          <button
+            className={armed ? "mini-toggle selected" : "mini-toggle"}
+            aria-pressed={armed}
+            data-testid="midi-capture-arm"
+            disabled={!canArm}
+            onClick={() => onArmChange(!armed)}
+            type="button"
+          >
+            {armed ? "Armed" : "Arm"}
+          </button>
+        </div>
+      </div>
+      <div className="midi-capture-controls">
+        <label className="midi-input-field">
+          <span>Input</span>
+          <select
+            data-testid="midi-input-select"
+            disabled={!hasInputs}
+            value={selectedInputId}
+            onChange={(event) => onInputChange(event.currentTarget.value)}
+          >
+            <option value="all">All connected inputs</option>
+            {inputOptions.map((input) => (
+              <option key={input.id} value={input.id}>
+                {input.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="midi-capture-readout" data-testid="midi-capture-target">
+          <span>Target</span>
+          <strong>{targetLabel}</strong>
+        </div>
+        <div className="midi-capture-readout" data-testid="midi-capture-last-note">
+          <span>Latest</span>
+          <strong>{lastNoteLabel}</strong>
+        </div>
+        <button className="mini-toggle" data-testid="midi-capture-refresh" onClick={onRefresh} type="button">
+          Refresh
+        </button>
+      </div>
+      <small data-testid="midi-capture-detail">{summary.detailLabel}</small>
+    </div>
+  );
+}
+
 function NoteEditor({
   title,
   track,
@@ -21450,6 +21717,110 @@ function addKeyboardCaptureNote(
       { step, pitch, length, velocity: clampVelocity(defaults.velocity), probability: 1 }
     ])
   };
+}
+
+function isMidiInputSupported(): boolean {
+  return typeof navigator !== "undefined" && typeof navigator.requestMIDIAccess === "function";
+}
+
+function createMidiInputOptions(access: MIDIAccess | null): MidiInputOption[] {
+  if (!access) {
+    return [];
+  }
+
+  return Array.from(access.inputs.values()).map((input) => {
+    const label = input.name || input.manufacturer || `MIDI Input ${input.id.slice(0, 4)}`;
+    return {
+      id: input.id,
+      label,
+      detail: `${input.state} / ${input.connection}`,
+      connected: input.state === "connected"
+    };
+  });
+}
+
+function createMidiCaptureSummary(
+  status: MidiCaptureStatus,
+  armed: boolean,
+  inputs: MidiInputOption[],
+  lastNoteLabel: string
+): MidiCaptureSummary {
+  if (status === "unsupported") {
+    return {
+      statusLabel: "MIDI unavailable",
+      detailLabel: "This browser or shell does not expose Web MIDI input.",
+      tone: "danger"
+    };
+  }
+  if (status === "requesting") {
+    return {
+      statusLabel: "Requesting MIDI",
+      detailLabel: "Waiting for the browser or OS permission prompt.",
+      tone: "warn"
+    };
+  }
+  if (status === "denied") {
+    return {
+      statusLabel: "MIDI denied",
+      detailLabel: "Permission was rejected or blocked by the environment.",
+      tone: "danger"
+    };
+  }
+
+  const connectedCount = inputs.filter((input) => input.connected).length;
+  if (inputs.length === 0) {
+    return {
+      statusLabel: status === "idle" ? "MIDI not connected" : "No MIDI inputs",
+      detailLabel: "Connect a MIDI keyboard, then request or refresh local MIDI access.",
+      tone: "warn"
+    };
+  }
+
+  return {
+    statusLabel: armed ? "MIDI armed" : "MIDI ready",
+    detailLabel: `${connectedCount}/${inputs.length} connected / ${lastNoteLabel}`,
+    tone: armed ? "good" : "warn"
+  };
+}
+
+function midiInputMatchesSelection(input: MIDIInput, selectedInputId: string): boolean {
+  return input.state === "connected" && (selectedInputId === "all" || input.id === selectedInputId);
+}
+
+function midiNoteOnFromMessage(data: Uint8Array): { noteNumber: number; velocity: number } | null {
+  if (data.length < 3) {
+    return null;
+  }
+
+  const command = data[0] & 0xf0;
+  const noteNumber = data[1];
+  const velocityByte = data[2];
+  if (command !== 0x90 || velocityByte === 0 || noteNumber < 0 || noteNumber > 127) {
+    return null;
+  }
+
+  return {
+    noteNumber,
+    velocity: clampVelocity(velocityByte / 127)
+  };
+}
+
+function midiNoteToScalePitch(noteNumber: number, key: string, track: NoteTrack): string | null {
+  const pitches = trackScalePitches(track, key, []);
+  if (pitches.length === 0) {
+    return null;
+  }
+
+  return pitches.reduce((closest, pitch) =>
+    Math.abs(pitchMidi(pitch) - noteNumber) < Math.abs(pitchMidi(closest) - noteNumber) ? pitch : closest
+  );
+}
+
+function midiNoteLabel(noteNumber: number): string {
+  const names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const name = names[((noteNumber % 12) + 12) % 12] ?? "MIDI";
+  const octave = Math.floor(noteNumber / 12) - 1;
+  return `${name}${octave}`;
 }
 
 function createGrooveFeelOptions(): GrooveFeelOption[] {

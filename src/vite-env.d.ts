@@ -9,6 +9,40 @@ type NativeMenuCommand =
   | "toggle-playback"
   | "delete-selected-event";
 
+type MIDIPortDeviceState = "disconnected" | "connected";
+type MIDIPortConnectionState = "open" | "closed" | "pending";
+
+interface MIDIMessageEvent extends Event {
+  readonly data: Uint8Array;
+}
+
+interface MIDIConnectionEvent extends Event {
+  readonly port: MIDIInput | null;
+}
+
+interface MIDIInput {
+  readonly id: string;
+  readonly manufacturer: string | null;
+  readonly name: string | null;
+  readonly state: MIDIPortDeviceState;
+  readonly connection: MIDIPortConnectionState;
+  onmidimessage: ((event: MIDIMessageEvent) => void) | null;
+}
+
+interface MIDIInputMap {
+  values(): IterableIterator<MIDIInput>;
+}
+
+interface MIDIAccess {
+  readonly inputs: MIDIInputMap;
+  onstatechange: ((event: MIDIConnectionEvent) => void) | null;
+}
+
+type MIDIOptions = {
+  sysex?: boolean;
+  software?: boolean;
+};
+
 interface Window {
   grooveforge?: {
     platform: NodeJS.Platform;
@@ -18,4 +52,8 @@ interface Window {
     onMenuCommand?: (callback: (command: NativeMenuCommand) => void) => () => void;
   };
   webkitAudioContext?: typeof AudioContext;
+}
+
+interface Navigator {
+  requestMIDIAccess?: (options?: MIDIOptions) => Promise<MIDIAccess>;
 }

@@ -7,7 +7,7 @@ Record official documentation, platform docs, standards, laws, policies, or vend
 |---|---|---|---|---|
 | W3C Web Audio API | https://www.w3.org/TR/webaudio/ | Browser audio graph, AudioContext, OfflineAudioContext, AudioWorklet references | 2026-06-15 | Web audio engine and export architecture |
 | MDN AudioWorkletNode | https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode | Browser implementation guide for custom audio nodes | 2026-06-15 | Custom DSP planning |
-| W3C Web MIDI API | https://www.w3.org/TR/webmidi/ | Browser MIDI input/output API | 2026-06-15 | Later MIDI keyboard support |
+| W3C Web MIDI API | https://webaudio.github.io/web-midi-api/ | Browser MIDI devices, messages, permission gating, and System Exclusive boundary | 2026-06-17 | Web MIDI input capture for explicit local 808/Synth note entry |
 | MDN IndexedDB API | https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API | Browser local structured data and blob storage | 2026-06-15 | Local project and asset cache |
 | Electron Docs | https://www.electronjs.org/docs/latest/ | Cross-platform desktop app shell using JavaScript, HTML, and CSS | 2026-06-15 | Desktop MVP shell |
 | Vite Guide | https://vite.dev/guide/ | Dev server and production build tool for modern web projects | 2026-06-15 | Renderer build system |
