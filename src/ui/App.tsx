@@ -1415,6 +1415,18 @@ type ArrangementArcPreviewSummary = {
   tone: MixCoachTone;
 };
 
+type PatternChainPreviewSummary = {
+  actionId: PatternChainId | "expand" | "aligned";
+  statusLabel: string;
+  actionLabel: string;
+  sequenceLabel: string;
+  sectionLabel: string;
+  energyLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 type NextMoveCommand =
   | { kind: "blueprint"; blueprintId: BeatBlueprintId }
   | { kind: "patternFill"; preset: PatternFillPreset }
@@ -2825,6 +2837,10 @@ export function App(): ReactElement {
   const arrangementArcPreviewSummary = useMemo(
     () => createArrangementArcPreviewSummary(project, selectedArrangementIndex, arrangementArcPadOptions),
     [arrangementArcPadOptions, project, selectedArrangementIndex]
+  );
+  const patternChainPreviewSummary = useMemo(
+    () => createPatternChainPreviewSummary(project.arrangement),
+    [project.arrangement]
   );
   const canSplitArrangementBlock = selectedArrangementBars > 1;
   const canMergeArrangementBlock =
@@ -6901,6 +6917,7 @@ export function App(): ReactElement {
           />
           <SectionLocatorPads disabled={isPlaying} pads={sectionLocatorPads} onCue={cueSectionLocator} />
           <div className="pattern-chain-row" aria-label="Pattern chain">
+            <PatternChainPreview preview={patternChainPreviewSummary} />
             <div className="pattern-chain-heading">
               <span>Chain</span>
               <strong data-testid="pattern-chain-current">{patternChainReadout(project.arrangement)}</strong>
@@ -7998,6 +8015,24 @@ function ArrangementArcPads({
         ))}
       </div>
     </section>
+  );
+}
+
+function PatternChainPreview({ preview }: { preview: PatternChainPreviewSummary }): ReactElement {
+  return (
+    <div
+      className={`pattern-chain-preview ${preview.tone}`}
+      data-preview-pattern-chain={preview.actionId}
+      data-testid="pattern-chain-preview"
+      title={preview.detailTitle}
+    >
+      <span data-testid="pattern-chain-preview-status">{preview.statusLabel}</span>
+      <strong data-testid="pattern-chain-preview-action">{preview.actionLabel}</strong>
+      <small data-testid="pattern-chain-preview-sequence">{preview.sequenceLabel}</small>
+      <small data-testid="pattern-chain-preview-sections">{preview.sectionLabel}</small>
+      <small data-testid="pattern-chain-preview-energy">{preview.energyLabel}</small>
+      <small data-testid="pattern-chain-preview-moves">{preview.moveLabel}</small>
+    </div>
   );
 }
 
@@ -14358,6 +14393,116 @@ function structureArcSignal(project: ProjectState): StructureLensSignal {
     detail: `low ${percentLabel(low)} / high ${percentLabel(high)}`,
     tone
   };
+}
+
+function createPatternChainPreviewSummary(arrangement: ArrangementBlock[]): PatternChainPreviewSummary {
+  const currentBars = arrangementBlocksTotalBars(arrangement);
+  const chainCandidates = patternChainIds.map((chain) => ({
+    actionId: chain,
+    actionLabel: `${patternChainLabel(chain)} chain`,
+    arrangement: createPatternChain(chain)
+  }));
+  const expandCandidate = {
+    actionId: "expand" as const,
+    actionLabel: "Chain Expand",
+    arrangement: expandPatternChainArrangement(arrangement)
+  };
+  const preferredCandidate =
+    currentBars < 8
+      ? chainCandidates.find((candidate) => candidate.actionId === "eight_bar") ?? chainCandidates[0]
+      : currentBars < 16
+        ? expandCandidate
+        : chainCandidates.find((candidate) => patternChainChangedBlockCount(arrangement, candidate.arrangement) > 0) ??
+          expandCandidate;
+  const candidate =
+    preferredCandidate && patternChainChangedFieldCount(arrangement, preferredCandidate.arrangement) > 0
+      ? preferredCandidate
+      : [...chainCandidates, expandCandidate].find(
+          (entry) => patternChainChangedFieldCount(arrangement, entry.arrangement) > 0
+        );
+
+  if (!candidate) {
+    return {
+      actionId: "aligned",
+      statusLabel: "Chain aligned",
+      actionLabel: "No chain target",
+      sequenceLabel: `Sequence ${patternChainReadout(arrangement) || "empty"}`,
+      sectionLabel: patternChainPreviewSectionLabel(arrangement),
+      energyLabel: patternChainPreviewEnergyLabel(arrangement),
+      moveLabel: "0 blocks / 0 fields",
+      detailTitle: "Current arrangement already matches available Pattern Chain targets.",
+      tone: "good"
+    };
+  }
+
+  const changedBlocks = patternChainChangedBlockCount(arrangement, candidate.arrangement);
+  const changedFields = patternChainChangedFieldCount(arrangement, candidate.arrangement);
+  const tone: MixCoachTone = changedFields === 0 ? "good" : changedBlocks <= 4 ? "warn" : "danger";
+  const sequenceLabel = `Sequence ${patternChainReadout(candidate.arrangement)}`;
+  const sectionLabel = patternChainPreviewSectionLabel(candidate.arrangement);
+  const energyLabel = patternChainPreviewEnergyLabel(candidate.arrangement);
+  const moveLabel = `${changedBlocks} blocks / ${changedFields} fields`;
+
+  return {
+    actionId: candidate.actionId,
+    statusLabel: changedFields === 0 ? "Chain aligned" : "Suggested chain",
+    actionLabel: candidate.actionLabel,
+    sequenceLabel,
+    sectionLabel,
+    energyLabel,
+    moveLabel,
+    detailTitle:
+      changedFields === 0
+        ? `${candidate.actionLabel} already matches the current arrangement.`
+        : `${candidate.actionLabel}: ${sequenceLabel}; ${sectionLabel}; ${energyLabel}; ${moveLabel}.`,
+    tone
+  };
+}
+
+function patternChainPreviewSectionLabel(arrangement: ArrangementBlock[]): string {
+  return `${barCountLabel(arrangementBlocksTotalBars(arrangement))} / ${compactSectionFlow(arrangement)}`;
+}
+
+function patternChainPreviewEnergyLabel(arrangement: ArrangementBlock[]): string {
+  if (arrangement.length === 0) {
+    return "Energy empty";
+  }
+  const energies = arrangement.map((block) => normalizeArrangementEnergy(block.energy));
+  const low = Math.min(...energies);
+  const high = Math.max(...energies);
+  const peakIndex = energies.indexOf(high);
+  const peakBlock = arrangement[peakIndex] ?? arrangement[0];
+  return `Energy ${percentLabel(low)}-${percentLabel(high)} / peak ${peakBlock.section}`;
+}
+
+function patternChainChangedBlockCount(current: ArrangementBlock[], nextArrangement: ArrangementBlock[]): number {
+  const length = Math.max(current.length, nextArrangement.length);
+  return Array.from({ length }).filter(
+    (_entry, index) => !current[index] || !nextArrangement[index] || !sameArrangementBlockPosture(current[index], nextArrangement[index])
+  ).length;
+}
+
+function patternChainChangedFieldCount(current: ArrangementBlock[], nextArrangement: ArrangementBlock[]): number {
+  const length = Math.max(current.length, nextArrangement.length);
+  return Array.from({ length }).reduce<number>((total, _entry, index) => {
+    const currentBlock = current[index];
+    const nextBlock = nextArrangement[index];
+    if (!currentBlock || !nextBlock) {
+      return total + 5;
+    }
+
+    return (
+      total +
+      [
+        currentBlock.section !== nextBlock.section,
+        currentBlock.pattern !== nextBlock.pattern,
+        normalizeArrangementBars(currentBlock.bars) !== normalizeArrangementBars(nextBlock.bars),
+        normalizeArrangementEnergy(currentBlock.energy) !== normalizeArrangementEnergy(nextBlock.energy),
+        normalizeArrangementMutedTracks(currentBlock.mutedTracks).join(",") !==
+          normalizeArrangementMutedTracks(nextBlock.mutedTracks).join(",")
+      ].filter(Boolean).length
+    );
+  }, 0);
 }
 
 function createArrangementArcPadOptions(project: ProjectState, selectedIndex: number): ArrangementArcPadOption[] {
