@@ -13066,6 +13066,14 @@ function createQuickActions({
   }));
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
   const styleInspectorItem = activeStyleInspectorQuickActionItem(styleInspectorSummary, project);
+  const styleInspectorActions: QuickAction[] = [...styleInspectorSummary.metrics, ...styleInspectorSummary.patterns].map((item) => ({
+    id: `style-inspector-item-${item.focusId}`,
+    title: `Focus Style Inspector: ${item.label}`,
+    detail: `${item.value} / ${item.focusLabel} / ${item.detail}`,
+    group: "Create",
+    keywords: `style inspector focus genre lane ${item.focusId} ${item.label} ${item.value} ${item.focusLabel} ${item.detail} bpm swing bass melody sound density pattern beginner producer`,
+    run: () => onFocusStyleInspector(item)
+  }));
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
   const workflowNavigatorActions: QuickAction[] = workflowNavigatorItems.map((item) => ({
     id: `workflow-navigator-${item.id}`,
@@ -14124,6 +14132,7 @@ function createQuickActions({
         }
       }
     },
+    ...styleInspectorActions,
     ...styleQuickActions,
     ...keyQuickActions,
     {
@@ -14873,6 +14882,8 @@ function createQuickActionResult(
     action.id === "first-beat-path-jump" ||
     action.id === "composer-guide-focus" ||
     action.id.startsWith("composer-guide-card-") ||
+    action.id === "style-inspector-focus" ||
+    action.id.startsWith("style-inspector-item-") ||
     action.id === "listening-pass-focus" ||
     action.id.startsWith("listening-pass-checkpoint-") ||
     action.id === "key-compass-focus" ||
@@ -15167,6 +15178,14 @@ function quickActionResultMetricSnapshot(
       id: "style-inspector",
       label: "Style inspector",
       value: `${styleName} / ${project.bpm} BPM`
+    };
+  }
+
+  if (action.id.startsWith("style-inspector-item-")) {
+    return {
+      id: "style-inspector",
+      label: "Style inspector",
+      value: action.detail
     };
   }
 
@@ -15761,6 +15780,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Style Inspector item to inspect BPM, swing, bass, melody, sound, or Pattern density before changing style or writing parts.",
       nextCheck: "Return to Style Inspector after the focused style posture item is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id.startsWith("style-inspector-item-")) {
+    return {
+      auditionCue: "Use the focused Style Inspector lane to inspect genre fit before changing style or writing parts.",
+      nextCheck: "Return to Style Inspector when you need another direct BPM, swing, bass, melody, sound, or density focus."
     };
   }
 
