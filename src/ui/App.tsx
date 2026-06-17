@@ -7165,6 +7165,7 @@ export function App(): ReactElement {
     playbackMode,
     project,
     selectedArrangementIndex,
+    sessionPassSummary,
     transportLoopScope,
     onApplyArrangementMove: applyArrangementMoveToSelected,
     onApplyArrangementFocus: applyArrangementFocusPreset,
@@ -7178,6 +7179,7 @@ export function App(): ReactElement {
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
     onExportWav: handleExportWav,
+    onFocusSessionPass: focusSessionPassCard,
     onOpenProject: handleOpenProject,
     onRedo: redoProject,
     onSaveProject: handleSaveProject,
@@ -11683,6 +11685,10 @@ function createSessionPassSummary(
   };
 }
 
+function activeSessionPassQuickActionCard(summary: SessionPassSummary): SessionPassCard {
+  return summary.mode === "guided" ? summary.cards[0] : summary.cards[1];
+}
+
 function sessionPassFocusLabel(target: SessionPassTarget): string {
   return target === "transport" ? "Transport" : reviewQueueFocusLabel(target);
 }
@@ -12161,6 +12167,7 @@ function createQuickActions({
   playbackMode,
   project,
   selectedArrangementIndex,
+  sessionPassSummary,
   transportLoopScope,
   onApplyArrangementMove,
   onApplyArrangementFocus,
@@ -12174,6 +12181,7 @@ function createQuickActions({
   onExportMidi,
   onExportStems,
   onExportWav,
+  onFocusSessionPass,
   onOpenProject,
   onRedo,
   onSaveProject,
@@ -12188,6 +12196,7 @@ function createQuickActions({
   playbackMode: PlaybackMode;
   project: ProjectState;
   selectedArrangementIndex: number;
+  sessionPassSummary: SessionPassSummary;
   transportLoopScope: TransportLoopScope;
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
@@ -12201,6 +12210,7 @@ function createQuickActions({
   onExportMidi: () => void;
   onExportStems: () => void;
   onExportWav: () => void;
+  onFocusSessionPass: (card: SessionPassCard) => void;
   onOpenProject: () => Promise<void>;
   onRedo: () => void;
   onSaveProject: () => Promise<void>;
@@ -12213,6 +12223,7 @@ function createQuickActions({
   const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
+  const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
 
   return [
     {
@@ -12275,6 +12286,14 @@ function createQuickActions({
       group: "Project",
       keywords: "snapshot slot idea save version compare",
       run: onSaveSnapshot
+    },
+    {
+      id: "session-pass-focus",
+      title: `Focus ${sessionPassCard.label}`,
+      detail: `${sessionPassCard.value} / ${sessionPassCard.focusLabel}`,
+      group: "Project",
+      keywords: `session pass focus guided studio next workflow ${sessionPassCard.id} ${sessionPassCard.focusLabel} beginner producer`,
+      run: () => onFocusSessionPass(sessionPassCard)
     },
     {
       id: "undo",
@@ -12568,26 +12587,27 @@ function createQuickActionResult(
   const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action);
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
   const previewOnly = action.id === "blueprint-preview-style-match";
+  const focusOnly = action.id === "session-pass-focus";
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
     id: afterMetric.id,
     label: afterMetric.label,
     before: beforeMetric.value,
     after: afterMetric.value,
-    tone: outcome === "failed" ? "danger" : previewOnly ? "good" : changed ? "good" : "warn"
+    tone: outcome === "failed" ? "danger" : previewOnly || focusOnly ? "good" : changed ? "good" : "warn"
   };
   const followup = quickActionResultFollowup(action, afterProject, outcome);
 
   return {
     actionId: action.id,
     title: action.title,
-    status: outcome === "failed" ? "Failed" : previewOnly ? "Previewed" : changed ? "Applied" : "Ran",
+    status: outcome === "failed" ? "Failed" : previewOnly ? "Previewed" : focusOnly ? "Focused" : changed ? "Applied" : "Ran",
     group: action.group,
     detail: action.detail,
     metric,
     auditionCue: followup.auditionCue,
     nextCheck: followup.nextCheck,
-    tone: outcome === "failed" ? "danger" : previewOnly ? "good" : changed ? "good" : "warn"
+    tone: outcome === "failed" ? "danger" : previewOnly || focusOnly ? "good" : changed ? "good" : "warn"
   };
 }
 
@@ -12603,6 +12623,10 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "blueprint" || action.id === "blueprint-style-match" || action.id === "blueprint-preview-style-match") {
     return { id: "project-events", label: "Project events", value: `${projectEventTotal(project)} events` };
+  }
+
+  if (action.id === "session-pass-focus") {
+    return { id: "session-pass", label: "Session pass", value: `${project.mode} mode` };
   }
 
   if (action.id.startsWith("fill-")) {
@@ -12680,6 +12704,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Read the Beat Blueprint preview before applying the starter.",
       nextCheck: "Use Apply current-style starter only when the previewed style, key, BPM, sound, and master fit the session."
+    };
+  }
+
+  if (action.id === "session-pass-focus") {
+    return {
+      auditionCue: "Use the focused workstation panel to inspect the highlighted Session Pass target.",
+      nextCheck: "Run the visible Session Pass Focus cards when you want another guided, studio, finish, or delivery jump."
     };
   }
 
