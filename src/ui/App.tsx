@@ -1366,6 +1366,11 @@ type DrumMoveResult = {
   tone: MixCoachTone;
 };
 
+type DrumMoveQuickActionTarget =
+  | { kind: "Foundation"; id: DrumFoundationId; label: string }
+  | { kind: "Feel"; id: GrooveFeelId; label: string }
+  | { kind: "Accent"; id: DrumAccentId; label: string };
+
 type MelodyMotifId = "hook" | "pocket" | "rise" | "answer";
 
 type MelodyMotifStep = {
@@ -7184,6 +7189,7 @@ export function App(): ReactElement {
     chordMovePreviewSummary,
     composerGuideSummary,
     drumKitPreviewSummary,
+    drumMovePreviewSummary,
     finishChecklistSummary,
     grooveCompassSummary,
     isPlaying,
@@ -7220,7 +7226,10 @@ export function App(): ReactElement {
     onApplyChordPad: applyChordPad,
     onApplyChordRhythm: applyChordRhythm,
     onApplyChordVoicing: applyChordVoicingPad,
+    onApplyDrumAccent: applyDrumAccent,
+    onApplyDrumFoundation: applyDrumFoundation,
     onApplyDrumKit: applyDrumKitPad,
+    onApplyGrooveFeel: applyGrooveFeel,
     onApplyLayerStarter: applyLayerStarter,
     onApplyMasterFinish: applyMasterFinishPad,
     onApplyMelodyMotif: applyMelodyMotif,
@@ -11811,6 +11820,46 @@ function activeLayerStarterQuickActionOption(options: LayerStarterOption[]): Lay
   return options.find((option) => option.tone === "danger") ?? options.find((option) => option.tone === "warn") ?? null;
 }
 
+function activeDrumMoveQuickActionTarget(
+  project: ProjectState,
+  preview: DrumMovePreviewSummary
+): DrumMoveQuickActionTarget | null {
+  if (preview.statusLabel === "Drums aligned") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const foundation =
+    preview.foundationId === "none"
+      ? null
+      : drumFoundationDefinitions.find((definition) => definition.id === preview.foundationId) ?? null;
+  const feel = preview.feelId === "none" ? null : grooveFeelDefinitions.find((definition) => definition.id === preview.feelId) ?? null;
+  const accent =
+    preview.accentId === "none" ? null : drumAccentDefinitions.find((definition) => definition.id === preview.accentId) ?? null;
+  const hitCount = activeDrumHitCount(pattern);
+  const foundationMoves = foundation ? drumFoundationMoveCount(pattern, foundation) : 0;
+  const feelMoves = feel ? drumFeelMoveCount(pattern, feel) : 0;
+  const accentMoves = accent ? drumAccentMoveCount(pattern, accent) : 0;
+
+  if (hitCount === 0 && foundation && foundationMoves > 0) {
+    return { kind: "Foundation", id: foundation.id, label: foundation.label };
+  }
+
+  if (feel && feelMoves > 0) {
+    return { kind: "Feel", id: feel.id, label: feel.label };
+  }
+
+  if (accent && accentMoves > 0) {
+    return { kind: "Accent", id: accent.id, label: accent.label };
+  }
+
+  if (foundation && foundationMoves > 0) {
+    return { kind: "Foundation", id: foundation.id, label: foundation.label };
+  }
+
+  return null;
+}
+
 function activeBassMoveQuickActionTarget(
   project: ProjectState,
   preview: BassMovePreviewSummary
@@ -12455,6 +12504,7 @@ function createQuickActions({
   canUndo,
   composerGuideSummary,
   drumKitPreviewSummary,
+  drumMovePreviewSummary,
   finishChecklistSummary,
   grooveCompassSummary,
   isPlaying,
@@ -12491,7 +12541,10 @@ function createQuickActions({
   onApplyChordPad,
   onApplyChordRhythm,
   onApplyChordVoicing,
+  onApplyDrumAccent,
+  onApplyDrumFoundation,
   onApplyDrumKit,
+  onApplyGrooveFeel,
   onApplyLayerStarter,
   onApplyMasterFinish,
   onApplyMelodyMotif,
@@ -12543,6 +12596,7 @@ function createQuickActions({
   canUndo: boolean;
   composerGuideSummary: ComposerGuideSummary;
   drumKitPreviewSummary: DrumKitPreviewSummary;
+  drumMovePreviewSummary: DrumMovePreviewSummary;
   finishChecklistSummary: FinishChecklistSummary;
   grooveCompassSummary: GrooveCompassSummary;
   isPlaying: boolean;
@@ -12579,7 +12633,10 @@ function createQuickActions({
   onApplyChordPad: (pad: ChordPadId) => void;
   onApplyChordRhythm: (rhythm: ChordRhythmId) => void;
   onApplyChordVoicing: (voicing: ChordVoicingId) => void;
+  onApplyDrumAccent: (accent: DrumAccentId) => void;
+  onApplyDrumFoundation: (foundation: DrumFoundationId) => void;
   onApplyDrumKit: (pad: DrumKitPadId) => void;
+  onApplyGrooveFeel: (feel: GrooveFeelId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
   onApplyMelodyMotif: (motif: MelodyMotifId) => void;
@@ -12637,6 +12694,7 @@ function createQuickActions({
   const listeningPassItem = activeListeningPassQuickActionItem(listeningPassSummary);
   const bassMoveTarget = activeBassMoveQuickActionTarget(project, bassMovePreviewSummary);
   const chordMoveTarget = activeChordMoveQuickActionTarget(project, selectedChord, chordMovePreviewSummary);
+  const drumMoveTarget = activeDrumMoveQuickActionTarget(project, drumMovePreviewSummary);
   const melodyMoveTarget = activeMelodyMoveQuickActionTarget(project, melodyMovePreviewSummary);
   const modeFocusCard = activeModeFocusQuickActionCard(modeFocusSummary);
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
@@ -12858,6 +12916,28 @@ function createQuickActions({
       run: () => {
         if (patternStackId) {
           onApplyPatternStack(patternStackId);
+        }
+      }
+    },
+    {
+      id: "drum-move",
+      title: drumMoveTarget ? `Apply ${drumMoveTarget.label} Drum ${drumMoveTarget.kind}` : "Apply Drum Move",
+      detail: drumMoveTarget
+        ? `${drumMovePreviewSummary.patternLabel} / ${drumMovePreviewSummary.moveLabel}`
+        : "Current Drum move preview has no active target.",
+      group: "Create",
+      keywords: `drum move rhythm pocket foundation feel accent velocity chance timing hats percussion ${drumMovePreviewSummary.foundationId} ${drumMovePreviewSummary.feelId} ${drumMovePreviewSummary.accentId} ${drumMoveTarget?.label ?? "none"} beginner producer`,
+      disabled: !drumMoveTarget,
+      run: () => {
+        if (!drumMoveTarget) {
+          return;
+        }
+        if (drumMoveTarget.kind === "Foundation") {
+          onApplyDrumFoundation(drumMoveTarget.id);
+        } else if (drumMoveTarget.kind === "Feel") {
+          onApplyGrooveFeel(drumMoveTarget.id);
+        } else {
+          onApplyDrumAccent(drumMoveTarget.id);
         }
       }
     },
@@ -13534,6 +13614,15 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "drum-move") {
+    const pattern = activePattern(project);
+    return {
+      id: "drum-move",
+      label: "Drum move",
+      value: `${drumPatternHitLabel(pattern)} / ${drumAverageTimingLabel(pattern)} / ${drumAverageVelocityLabel(pattern)}`
+    };
+  }
+
   if (action.id === "808-move") {
     const bassNotes = activePattern(project).bassNotes;
     return {
@@ -13810,6 +13899,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear 808, Chords, and Synth against the drums before arranging.`,
       nextCheck: "Use the Pattern Stack Result, selected-note tools, and selected-chord tools for manual edits."
+    };
+  }
+
+  if (action.id === "drum-move") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; check kick/clap anchors, hat pocket, and percussion motion.`,
+      nextCheck: "Use the Drum Move Result plus selected-drum pocket and hit tools for manual corrections."
     };
   }
 
