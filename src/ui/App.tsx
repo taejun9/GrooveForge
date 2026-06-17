@@ -1450,6 +1450,28 @@ type ArrangementArcPreviewSummary = {
   tone: MixCoachTone;
 };
 
+type ArrangementArcResultMetric = {
+  id: "sections" | "patterns" | "bars" | "energy" | "mutes";
+  label: string;
+  before: string;
+  after: string;
+  changed: boolean;
+  tone: MixCoachTone;
+};
+
+type ArrangementArcResultSummary = {
+  padId: ArrangementArcPadId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: ArrangementArcResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type PatternChainPreviewSummary = {
   actionId: PatternChainId | "expand" | "aligned";
   statusLabel: string;
@@ -2669,6 +2691,7 @@ export function App(): ReactElement {
   const [bassMoveResult, setBassMoveResult] = useState<BassMoveResult | null>(null);
   const [melodyMoveResult, setMelodyMoveResult] = useState<MelodyMoveResult | null>(null);
   const [chordMoveResult, setChordMoveResult] = useState<ChordMoveResult | null>(null);
+  const [arrangementArcResult, setArrangementArcResult] = useState<ArrangementArcResultSummary | null>(null);
   const [arrangementFocusResult, setArrangementFocusResult] = useState<ArrangementFocusResultSummary | null>(null);
   const [soundFocusResult, setSoundFocusResult] = useState<SoundFocusResult | null>(null);
   const [drumKitResult, setDrumKitResult] = useState<DrumKitResult | null>(null);
@@ -3210,6 +3233,7 @@ export function App(): ReactElement {
     setBassMoveResult(null);
     setMelodyMoveResult(null);
     setChordMoveResult(null);
+    setArrangementArcResult(null);
     setArrangementFocusResult(null);
     setSoundFocusResult(null);
     setDrumKitResult(null);
@@ -3233,6 +3257,7 @@ export function App(): ReactElement {
       setBassMoveResult(null);
       setMelodyMoveResult(null);
       setChordMoveResult(null);
+      setArrangementArcResult(null);
       setArrangementFocusResult(null);
       setSoundFocusResult(null);
       setDrumKitResult(null);
@@ -3331,6 +3356,7 @@ export function App(): ReactElement {
     setBassMoveResult(null);
     setMelodyMoveResult(null);
     setChordMoveResult(null);
+    setArrangementArcResult(null);
     setArrangementFocusResult(null);
     setSoundFocusResult(null);
     setDrumKitResult(null);
@@ -3359,6 +3385,7 @@ export function App(): ReactElement {
     setBassMoveResult(null);
     setMelodyMoveResult(null);
     setChordMoveResult(null);
+    setArrangementArcResult(null);
     setArrangementFocusResult(null);
     setSoundFocusResult(null);
     setDrumKitResult(null);
@@ -3880,10 +3907,12 @@ export function App(): ReactElement {
   function applyArrangementArcPad(padId: ArrangementArcPadId): void {
     const pad = arrangementArcPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
+      setArrangementArcResult(null);
       setProjectStatus("Arrangement arc pad not found");
       return;
     }
 
+    const beforeProject = projectRef.current;
     const changed = updateProject(
       (current) => applyArrangementArcPadToProject(current, pad, selectedArrangementIndex),
       `Applied ${pad.label} arc`
@@ -3893,7 +3922,9 @@ export function App(): ReactElement {
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
       selectTransportLoopScope("arrangement", false);
+      setArrangementArcResult(createArrangementArcResult(pad, beforeProject, projectRef.current));
     } else {
+      setArrangementArcResult(null);
       setProjectStatus(`${pad.label} arc already selected`);
     }
   }
@@ -6964,6 +6995,7 @@ export function App(): ReactElement {
           <ArrangementArcPads
             pads={arrangementArcPadOptions}
             preview={arrangementArcPreviewSummary}
+            result={arrangementArcResult}
             onApply={applyArrangementArcPad}
           />
           <SectionLocatorPads disabled={isPlaying} pads={sectionLocatorPads} onCue={cueSectionLocator} />
@@ -8089,10 +8121,12 @@ function ArrangementFocusResultStrip({ result }: { result: ArrangementFocusResul
 function ArrangementArcPads({
   pads,
   preview,
+  result,
   onApply
 }: {
   pads: ArrangementArcPadOption[];
   preview: ArrangementArcPreviewSummary;
+  result: ArrangementArcResultSummary | null;
   onApply: (pad: ArrangementArcPadId) => void;
 }): ReactElement {
   return (
@@ -8131,7 +8165,50 @@ function ArrangementArcPads({
           </button>
         ))}
       </div>
+      {result && <ArrangementArcResultStrip result={result} />}
     </section>
+  );
+}
+
+function ArrangementArcResultStrip({ result }: { result: ArrangementArcResultSummary }): ReactElement {
+  return (
+    <div
+      className={`arrangement-arc-result ${result.tone}`}
+      data-result-arrangement-arc={result.padId}
+      data-testid="arrangement-arc-result"
+      aria-live="polite"
+    >
+      <div className="arrangement-arc-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="arrangement-arc-result-title">{result.title}</strong>
+          <small data-testid="arrangement-arc-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="arrangement-arc-result-meta">
+        <span data-testid="arrangement-arc-result-status">{result.status}</span>
+        <span data-testid="arrangement-arc-result-scope">{result.scope}</span>
+        <span data-testid="arrangement-arc-result-impact">{result.impact}</span>
+      </div>
+      <div className="arrangement-arc-result-metrics" data-testid="arrangement-arc-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`arrangement-arc-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="arrangement-arc-result-followup" data-testid="arrangement-arc-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="arrangement-arc-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="arrangement-arc-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -14678,6 +14755,75 @@ function createArrangementArcPreviewSummary(
         ? `${pad.label} already matches the current arrangement posture.`
         : `${pad.label}: ${sectionLabel}; ${patternLabel}; ${energyLabel}; ${muteLabel}; ${moveLabel}.`,
     tone
+  };
+}
+
+function createArrangementArcResult(
+  pad: ArrangementArcPadDefinition,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): ArrangementArcResultSummary {
+  const beforeArrangement = beforeProject.arrangement;
+  const afterArrangement = afterProject.arrangement;
+  const changedBlocks = arrangementArcChangedCount(beforeArrangement, afterArrangement);
+  const changedFields = arrangementArcChangedFieldCount(beforeArrangement, afterArrangement);
+  const tone: MixCoachTone = changedFields === 0 ? "good" : changedBlocks <= 2 ? "warn" : "danger";
+  const metrics: ArrangementArcResultMetric[] = [
+    createArrangementArcResultMetric("sections", "Sections", compactSectionFlow(beforeArrangement), compactSectionFlow(afterArrangement)),
+    createArrangementArcResultMetric(
+      "patterns",
+      "Patterns",
+      arrangementArcPreviewPatternLabel(beforeArrangement),
+      arrangementArcPreviewPatternLabel(afterArrangement)
+    ),
+    createArrangementArcResultMetric(
+      "bars",
+      "Bars",
+      barCountLabel(arrangementBlocksTotalBars(beforeArrangement)),
+      barCountLabel(arrangementBlocksTotalBars(afterArrangement))
+    ),
+    createArrangementArcResultMetric(
+      "energy",
+      "Energy",
+      arrangementArcPreviewEnergyLabel(beforeArrangement),
+      arrangementArcPreviewEnergyLabel(afterArrangement)
+    ),
+    createArrangementArcResultMetric(
+      "mutes",
+      "Mutes",
+      arrangementArcPreviewMuteLabel(beforeArrangement),
+      arrangementArcPreviewMuteLabel(afterArrangement)
+    )
+  ];
+
+  return {
+    padId: pad.id,
+    title: `${pad.label} applied`,
+    status: changedFields === 0 ? "Arc aligned" : "Arc applied",
+    detail: `${barCountLabel(arrangementBlocksTotalBars(afterArrangement))} / ${compactSectionFlow(afterArrangement)}`,
+    scope: `${afterArrangement.length} block${afterArrangement.length === 1 ? "" : "s"} shaped`,
+    impact: `${changedBlocks} block${changedBlocks === 1 ? "" : "s"} / ${changedFields} field${changedFields === 1 ? "" : "s"}`,
+    metrics,
+    auditionCue: `Play Song to hear ${pad.label} across ${barCountLabel(arrangementBlocksTotalBars(afterArrangement))}.`,
+    nextCheck: "Scan Song Form Overview for section flow and Arrangement Playback for the audible block.",
+    tone
+  };
+}
+
+function createArrangementArcResultMetric(
+  id: ArrangementArcResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): ArrangementArcResultMetric {
+  const changed = before !== after;
+  return {
+    id,
+    label,
+    before,
+    after,
+    changed,
+    tone: changed ? "warn" : "good"
   };
 }
 
