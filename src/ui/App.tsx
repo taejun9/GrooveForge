@@ -7159,6 +7159,7 @@ export function App(): ReactElement {
   }
 
   const quickActions = createQuickActions({
+    arrangementArcPreviewSummary,
     arrangementTemplatePreviewSummary,
     canRedo,
     canUndo,
@@ -7184,6 +7185,7 @@ export function App(): ReactElement {
     transportLoopScope,
     workflowNavigatorItems,
     onApplyArrangementMove: applyArrangementMoveToSelected,
+    onApplyArrangementArc: applyArrangementArcPad,
     onApplyArrangementFocus: applyArrangementFocusPreset,
     onApplyArrangementTemplate: applyArrangementTemplate,
     onApplyBeatSpine: applyBeatSpineAction,
@@ -12291,6 +12293,7 @@ function NextMoveResultStrip({ result }: { result: NextMoveResult }): ReactEleme
 }
 
 function createQuickActions({
+  arrangementArcPreviewSummary,
   arrangementTemplatePreviewSummary,
   beatPassportSummary,
   beatSpineSummary,
@@ -12316,6 +12319,7 @@ function createQuickActions({
   transportLoopScope,
   workflowNavigatorItems,
   onApplyArrangementMove,
+  onApplyArrangementArc,
   onApplyArrangementFocus,
   onApplyArrangementTemplate,
   onApplyBeatSpine,
@@ -12354,6 +12358,7 @@ function createQuickActions({
   onTogglePlayback,
   onUndo
 }: {
+  arrangementArcPreviewSummary: ArrangementArcPreviewSummary;
   arrangementTemplatePreviewSummary: ArrangementTemplatePreviewSummary;
   beatPassportSummary: BeatPassportSummary;
   beatSpineSummary: BeatSpineSummary;
@@ -12379,6 +12384,7 @@ function createQuickActions({
   transportLoopScope: TransportLoopScope;
   workflowNavigatorItems: WorkflowNavigatorItem[];
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
+  onApplyArrangementArc: (pad: ArrangementArcPadId) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
   onApplyBeatSpine: (action: BeatSpineAction) => void;
@@ -12440,6 +12446,7 @@ function createQuickActions({
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
   const arrangementTemplateId =
     arrangementTemplatePreviewSummary.templateId === "aligned" ? null : arrangementTemplatePreviewSummary.templateId;
+  const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
 
   return [
     {
@@ -12837,6 +12844,21 @@ function createQuickActions({
       }
     },
     {
+      id: "arrangement-arc",
+      title: arrangementArcReady ? `Apply ${arrangementArcPreviewSummary.padLabel} Arc` : "Apply Arrangement Arc",
+      detail: arrangementArcReady
+        ? `${arrangementArcPreviewSummary.sectionLabel} / ${arrangementArcPreviewSummary.energyLabel}`
+        : "Current arrangement already matches the suggested arc.",
+      group: "Arrange",
+      keywords: `arrangement arc energy song form dynamics hook lift break rise sections mutes ${arrangementArcPreviewSummary.padId} ${arrangementArcPreviewSummary.padLabel} beginner producer`,
+      disabled: !arrangementArcReady,
+      run: () => {
+        if (arrangementArcReady) {
+          onApplyArrangementArc(arrangementArcPreviewSummary.padId);
+        }
+      }
+    },
+    {
       id: "mix-headroom",
       title: "Mix Fix Headroom",
       detail: "Set a vocal-safe ceiling and reduce master gain.",
@@ -13226,6 +13248,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "arrangement-arc") {
+    return {
+      id: "song-arc",
+      label: "Song arc",
+      value: `${barCountLabel(arrangementTotalBars(project))} / ${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
+    };
+  }
+
   if (action.id === "pattern-chain" || action.id === "chain-expand" || action.id === "arrangement-template") {
     return { id: "song-length", label: "Song length", value: barCountLabel(arrangementTotalBars(project)) };
   }
@@ -13418,6 +13448,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Song loop; check section order, Pattern A/B/C spread, and hook placement.",
       nextCheck: `${barCountLabel(arrangementTotalBars(project))} arranged; scan Song Form Overview before mix decisions.`
+    };
+  }
+
+  if (action.id === "arrangement-arc") {
+    return {
+      auditionCue: "Play Song loop; listen for intro, verse, hook, bridge, and outro energy movement.",
+      nextCheck: `${Math.round(arrangementAverageEnergy(project) * 100)}% average energy; scan Song Form Overview before detailed block edits.`
     };
   }
 
