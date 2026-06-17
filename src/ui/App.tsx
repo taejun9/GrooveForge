@@ -7270,6 +7270,7 @@ export function App(): ReactElement {
     onApplySoundPreset: applySoundPreset,
     onExpandPatternChain: expandPatternChain,
     onApplyProjectKey: applyProjectKey,
+    onApplyTempoNudge: applyTempoNudgePad,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onRequestMidiInputAccess: requestMidiInputAccess,
     onSelectStyle: selectStyle,
@@ -12669,6 +12670,7 @@ function createQuickActions({
   onApplySoundPreset,
   onExpandPatternChain,
   onApplyProjectKey,
+  onApplyTempoNudge,
   onPreviewBlueprint,
   onRequestMidiInputAccess,
   onSelectStyle,
@@ -12818,6 +12820,7 @@ function createQuickActions({
   onApplySoundPreset: (preset: SoundPresetTarget) => void;
   onExpandPatternChain: () => void;
   onApplyProjectKey: (key: string) => void;
+  onApplyTempoNudge: (pad: TempoNudgePadDefinition) => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onRequestMidiInputAccess: () => Promise<void>;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
@@ -13617,6 +13620,17 @@ function createQuickActions({
   const nextHandoffItem = handoffSendOrder.nextItemId
     ? (handoffPackItems.find((item) => item.id === handoffSendOrder.nextItemId) ?? null)
     : null;
+  const tempoNudgeActions: QuickAction[] = tempoNudgePads.map((pad) => {
+    const nextBpm = tempoNudgePadBpm(project.bpm, pad.id);
+    return {
+      id: `tempo-nudge-${pad.id}`,
+      title: pad.title,
+      detail: `${project.bpm} BPM -> ${nextBpm} BPM / resets Tap Tempo`,
+      group: "Transport",
+      keywords: `tempo bpm nudge ${pad.id} ${pad.label} ${nextBpm} half double slower faster transport beginner producer`,
+      run: () => onApplyTempoNudge(pad)
+    };
+  });
   const keyQuickActions: QuickAction[] = keys.map((key) => {
     const selected = key === project.key;
     const keySlug = key.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -13693,6 +13707,7 @@ function createQuickActions({
       disabled: isPlaying && transportLoopScope !== "pattern",
       run: () => onSelectTransportLoopScope("pattern")
     },
+    ...tempoNudgeActions,
     {
       id: "midi-input-connect",
       title: midiInputConnectTitle,
@@ -14739,6 +14754,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("tempo-nudge-")) {
+    return {
+      id: "tempo",
+      label: "Tempo",
+      value: `${project.bpm} BPM`
+    };
+  }
+
   if (action.id.startsWith("key-quick-")) {
     return {
       id: "key-quick",
@@ -15195,6 +15218,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Key Compass card to inspect scale, chord, bass, or melody posture before editing notes.",
       nextCheck: "Return to Key Compass after the focused harmony lane changes."
+    };
+  }
+
+  if (action.id.startsWith("tempo-nudge-")) {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the tempo supports the groove pocket, 808 movement, and melody timing.`,
+      nextCheck: "Use Tap Tempo, Tempo Nudge Pads, Style Inspector BPM range, and transport playback to refine the final BPM."
     };
   }
 
