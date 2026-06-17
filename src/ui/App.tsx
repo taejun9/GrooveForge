@@ -7161,6 +7161,7 @@ export function App(): ReactElement {
   const quickActions = createQuickActions({
     canRedo,
     canUndo,
+    beatPassportSummary,
     composerGuideSummary,
     finishChecklistSummary,
     grooveCompassSummary,
@@ -7191,6 +7192,7 @@ export function App(): ReactElement {
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
     onExportWav: handleExportWav,
+    onFocusBeatPassport: focusBeatPassportMetric,
     onFocusComposerGuide: focusComposerGuideCard,
     onFocusExportPreflight: focusExportPreflightCard,
     onFocusFinishChecklist: focusFinishChecklistCard,
@@ -11753,6 +11755,10 @@ function activeFinishChecklistQuickActionCard(summary: FinishChecklistSummary): 
   return summary.cards.find((card) => card.tone !== "good") ?? summary.cards[0] ?? null;
 }
 
+function activeBeatPassportQuickActionMetric(summary: BeatPassportSummary): BeatPassportMetric | null {
+  return summary.metrics.find((metric) => metric.tone !== "good") ?? summary.metrics[0] ?? null;
+}
+
 function activeExportPreflightQuickActionCard(summary: ExportPreflightSummary): ExportPreflightCard | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
@@ -12234,6 +12240,7 @@ function NextMoveResultStrip({ result }: { result: NextMoveResult }): ReactEleme
 }
 
 function createQuickActions({
+  beatPassportSummary,
   canRedo,
   canUndo,
   composerGuideSummary,
@@ -12266,6 +12273,7 @@ function createQuickActions({
   onExportMidi,
   onExportStems,
   onExportWav,
+  onFocusBeatPassport,
   onFocusComposerGuide,
   onFocusExportPreflight,
   onFocusFinishChecklist,
@@ -12285,6 +12293,7 @@ function createQuickActions({
   onTogglePlayback,
   onUndo
 }: {
+  beatPassportSummary: BeatPassportSummary;
   canRedo: boolean;
   canUndo: boolean;
   composerGuideSummary: ComposerGuideSummary;
@@ -12317,6 +12326,7 @@ function createQuickActions({
   onExportMidi: () => void;
   onExportStems: () => void;
   onExportWav: () => void;
+  onFocusBeatPassport: (metric: BeatPassportFocusItem) => void;
   onFocusComposerGuide: (card: ComposerGuideCard) => void;
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
   onFocusFinishChecklist: (card: FinishChecklistCard) => void;
@@ -12340,6 +12350,7 @@ function createQuickActions({
   const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
+  const beatPassportMetric = activeBeatPassportQuickActionMetric(beatPassportSummary);
   const composerGuideCard = activeComposerGuideQuickActionCard(composerGuideSummary);
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
   const finishChecklistCard = activeFinishChecklistQuickActionCard(finishChecklistSummary);
@@ -12498,6 +12509,19 @@ function createQuickActions({
       run: () => {
         if (listeningPassItem) {
           onFocusListeningPass(listeningPassItem);
+        }
+      }
+    },
+    {
+      id: "beat-passport-focus",
+      title: beatPassportMetric ? `Focus Beat Passport: ${beatPassportMetric.label}` : "Focus Beat Passport",
+      detail: beatPassportMetric ? `${beatPassportMetric.value} / ${beatPassportMetric.focusLabel}` : "No Beat Passport metric available.",
+      group: "Project",
+      keywords: `beat passport focus identity status target length patterns readiness export stems master inspect ${beatPassportMetric?.id ?? "none"} ${beatPassportMetric?.focusLabel ?? "none"} beginner producer`,
+      disabled: !beatPassportMetric,
+      run: () => {
+        if (beatPassportMetric) {
+          onFocusBeatPassport(beatPassportMetric);
         }
       }
     },
@@ -12958,6 +12982,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "beat-passport-focus") {
+    return {
+      id: "beat-passport",
+      label: "Beat passport",
+      value: `${activeDeliveryTarget(project).name} / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
   if (action.id === "production-snapshot-focus") {
     return {
       id: "production-snapshot",
@@ -13123,6 +13155,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Listening Pass checkpoint to choose Pattern, Song, Full Mix, stem, or delivery-target audition scope.",
       nextCheck: "Return to Listening Pass after the focused composition, arrangement, mix, or delivery checkpoint changes."
+    };
+  }
+
+  if (action.id === "beat-passport-focus") {
+    return {
+      auditionCue: "Use the focused Beat Passport metric to inspect target, length, Pattern use, readiness, export, stems, or master posture.",
+      nextCheck: "Return to Beat Passport after the focused identity metric is ready or intentionally deferred."
     };
   }
 
