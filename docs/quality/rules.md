@@ -438,6 +438,8 @@ Concept correction work must preserve this center list in durable docs: Pattern 
 
 Concept correction work must preserve the user's intent that GrooveForge is for "비트(모든 장르)를 만드는" work, not a trap-only, sample-pack, or sampler-first product.
 
+Concept correction work must treat built-in drum kits, internal one-shots, and any future sample 808 source as sound-source details inside direct drum sequencing or the 808/Bass engine. These terms must not move the product framing toward sample-pack browsing, chopping, audio-clip arrangement, or sampler setup.
+
 Brief alignment work fails if the project can be summarized as a sampling app, sample-chopping tool, sample-pack workflow, or sampler setup surface. The expected summary is an all-genre beat-production mini DAW where sampling is an accessory module.
 
 First-run UX, default navigation, and roadmap work must lead with direct beat composition: pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sample browsing, chopping, sampler setup, audio clips, and audio warping must stay opt-in optional-sampling paths unless the user explicitly changes the product direction.
@@ -467,6 +469,8 @@ Default instrument panel, device-palette, and architecture-diagram work fails if
 Five-area starter UI drafts may use Transport, Pattern Editor, Instrument Panel, Arrangement View, and Mixer/Master, but they fail if the default Instrument Panel includes `sampler`; the first-run panel must lead with built-in drum kit/rack, synth 808/bass, simple synth, chord synth, effects, and sound-design controls.
 
 Brief alignment work must rewrite external examples that include `AudioClipEvent` in the core `MusicalEvent` union so the MVP union remains `NoteEvent`, `DrumHitEvent`, and `AutomationEvent`, with `AudioClipEvent` documented only as a future optional extension.
+
+808/Bass engine work must keep synth 808 as the default MVP source and treat sample 808 support only as a later optional source mode unless the user explicitly approves optional-sampling work.
 
 Mixer/master work must keep mixing and mastering separate. Volume, pan, mute, solo, master output gain, and preset ceiling controls must affect both realtime playback and WAV export when implemented. Mixer channel role readouts must derive only from local mixer channel volume, pan, mute, solo, low-cut, air, Drive/Glue, and Space send fields, stay UI-local and out of saved project schema, avoid changing Mix Coach, Mix Balance Pads, Stem Audition Pads, Master Finish, playback, or export semantics, and avoid hidden mixing, mastering, LUFS/true-peak, platform-safety claims, sampling, imported audio, remote AI, accounts, analytics, or cloud sync. Loudness presets are targets and checks, not automatic proof that a beat is platform-safe.
 
