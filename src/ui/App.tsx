@@ -762,6 +762,39 @@ type SoundFocusResult = {
   tone: MixCoachTone;
 };
 
+type SoundPresetTarget = (typeof soundPresetIds)[number];
+
+type SoundPresetPreviewSummary = {
+  presetId: SoundPresetTarget;
+  statusLabel: string;
+  presetLabel: string;
+  toneLabel: string;
+  changeLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+type SoundPresetResultMetric = {
+  id: "preset" | "drums" | "bass" | "duck" | "synth" | "chords";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type SoundPresetResult = {
+  presetId: SoundPresetTarget;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: SoundPresetResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type DrumKitPadId = "clean" | "knock" | "dust" | "air";
 
 type DrumKitSoundParameter = "kickPunch" | "snareSnap" | "hatBrightness";
@@ -2936,6 +2969,10 @@ export function App(): ReactElement {
   const [arrangementArcResult, setArrangementArcResult] = useState<ArrangementArcResultSummary | null>(null);
   const [arrangementFocusResult, setArrangementFocusResult] = useState<ArrangementFocusResultSummary | null>(null);
   const [patternChainResult, setPatternChainResult] = useState<PatternChainResultSummary | null>(null);
+  const [soundPresetPreviewId, setSoundPresetPreviewId] = useState<SoundPresetTarget>(() =>
+    defaultSoundPresetPreview(starterProject)
+  );
+  const [soundPresetResult, setSoundPresetResult] = useState<SoundPresetResult | null>(null);
   const [soundFocusResult, setSoundFocusResult] = useState<SoundFocusResult | null>(null);
   const [drumKitResult, setDrumKitResult] = useState<DrumKitResult | null>(null);
   const [masterFinishResult, setMasterFinishResult] = useState<MasterFinishResult | null>(null);
@@ -3067,6 +3104,10 @@ export function App(): ReactElement {
   const spaceFxPadOptions = useMemo(() => createSpaceFxPadOptions(project.mixer), [project.mixer]);
   const stemAuditionPadOptions = useMemo(() => createStemAuditionPadOptions(project.mixer), [project.mixer]);
   const stemAuditionReadout = useMemo(() => createStemAuditionReadoutSummary(project.mixer), [project.mixer]);
+  const soundPresetPreviewSummary = useMemo(
+    () => createSoundPresetPreviewSummary(project.sound, soundPresetPreviewId),
+    [project.sound, soundPresetPreviewId]
+  );
   const soundFocusPadOptions = useMemo(() => createSoundFocusPadOptions(project.sound), [project.sound]);
   const soundFocusPreviewSummary = useMemo(
     () => createSoundFocusPreviewSummary(project.sound, soundFocusPadOptions),
@@ -3610,6 +3651,7 @@ export function App(): ReactElement {
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
     setPatternChainResult(null);
+    setSoundPresetResult(null);
     setSoundFocusResult(null);
     setDrumKitResult(null);
     setMasterFinishResult(null);
@@ -3638,6 +3680,7 @@ export function App(): ReactElement {
       setArrangementArcResult(null);
       setArrangementFocusResult(null);
       setPatternChainResult(null);
+      setSoundPresetResult(null);
       setSoundFocusResult(null);
       setDrumKitResult(null);
       setMasterFinishResult(null);
@@ -3741,6 +3784,8 @@ export function App(): ReactElement {
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
     setPatternChainResult(null);
+    setSoundPresetPreviewId(defaultSoundPresetPreview(nextProject));
+    setSoundPresetResult(null);
     setSoundFocusResult(null);
     setDrumKitResult(null);
     setMasterFinishResult(null);
@@ -3774,6 +3819,8 @@ export function App(): ReactElement {
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
     setPatternChainResult(null);
+    setSoundPresetPreviewId(defaultSoundPresetPreview(nextProject));
+    setSoundPresetResult(null);
     setSoundFocusResult(null);
     setDrumKitResult(null);
     setMasterFinishResult(null);
@@ -4636,11 +4683,30 @@ export function App(): ReactElement {
     }
   }
 
-  function applySoundPreset(preset: (typeof soundPresetIds)[number]): void {
-    updateProject((current) => ({
-      ...current,
-      sound: soundPresetDesign(preset)
-    }));
+  function previewSoundPreset(preset: SoundPresetTarget): void {
+    setSoundPresetPreviewId(preset);
+    setSoundPresetResult(null);
+    setProjectStatus(`${soundPresetLabel(preset)} sound preset preview`);
+  }
+
+  function applySoundPreset(preset: SoundPresetTarget = soundPresetPreviewId): void {
+    const beforeSound = projectRef.current.sound;
+    const targetSound = soundPresetDesign(preset);
+    const changed = updateProject(
+      (current) => (sameSoundDesign(current.sound, targetSound) ? current : { ...current, sound: targetSound }),
+      `${soundPresetLabel(preset)} sound preset applied`
+    );
+
+    setSoundPresetPreviewId(preset);
+    if (changed) {
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+      setSoundPresetResult(createSoundPresetResult(preset, beforeSound, projectRef.current.sound));
+    } else {
+      setSoundPresetResult(null);
+      setProjectStatus(`${soundPresetLabel(preset)} sound preset already selected`);
+    }
   }
 
   function applySoundFocusPad(padId: SoundFocusPadId): void {
@@ -7532,11 +7598,15 @@ export function App(): ReactElement {
             focusPads={soundFocusPadOptions}
             focusResult={soundFocusResult}
             mode={project.mode}
+            presetPreview={soundPresetPreviewSummary}
+            presetPreviewId={soundPresetPreviewId}
+            presetResult={soundPresetResult}
             sound={project.sound}
             onChange={updateSoundDesign}
+            onApplyPreset={applySoundPreset}
             onDrumKitPad={applyDrumKitPad}
             onFocusPad={applySoundFocusPad}
-            onPreset={applySoundPreset}
+            onPreviewPreset={previewSoundPreset}
           />
           <ChordEditor
             chordPads={chordPadOptions}
@@ -18963,6 +19033,97 @@ function drumKitMixerChangedControlCount(beforeMixer: MixerChannel[], afterMixer
   return controls.filter((control) => beforeDrums[control] !== afterDrums[control]).length;
 }
 
+function defaultSoundPresetPreview(project: ProjectState): SoundPresetTarget {
+  return project.sound.preset === "custom" ? styleSoundPreset(project.styleId) : project.sound.preset;
+}
+
+function createSoundPresetPreviewSummary(sound: SoundDesign, presetId: SoundPresetTarget): SoundPresetPreviewSummary {
+  const targetSound = soundPresetDesign(presetId);
+  const changedMoves = soundPresetChangedMoveCount(sound, targetSound);
+  const presetLabel = soundPresetLabel(presetId);
+  const toneLabel = soundPresetToneLabel(targetSound);
+  const currentLabel = soundPresetLabel(sound.preset);
+
+  return {
+    presetId,
+    statusLabel: changedMoves === 0 ? "Preset aligned" : "Preview preset",
+    presetLabel: `${presetLabel} target`,
+    toneLabel,
+    changeLabel:
+      changedMoves === 0
+        ? "Current sound already matches"
+        : `${changedMoves} sound move${changedMoves === 1 ? "" : "s"} before Apply`,
+    detailTitle:
+      changedMoves === 0
+        ? `${presetLabel} already matches the current editable SoundDesign state.`
+        : `${currentLabel} -> ${presetLabel}; ${toneLabel}.`,
+    tone: changedMoves === 0 ? "good" : "warn"
+  };
+}
+
+function createSoundPresetResult(
+  presetId: SoundPresetTarget,
+  beforeSound: SoundDesign,
+  afterSound: SoundDesign
+): SoundPresetResult {
+  const presetMoves = beforeSound.preset === afterSound.preset ? 0 : 1;
+  const drumMoves = soundFocusGroupMoveCount(beforeSound, afterSound, ["kickPunch", "snareSnap", "hatBrightness"]);
+  const bassMoves = soundFocusGroupMoveCount(beforeSound, afterSound, ["bassDrive", "bassDecay"]);
+  const duckMoves = soundFocusGroupMoveCount(beforeSound, afterSound, ["sidechainDuck"]);
+  const synthMoves = soundFocusGroupMoveCount(beforeSound, afterSound, ["synthBrightness", "synthRelease"]);
+  const chordMoves = soundFocusGroupMoveCount(beforeSound, afterSound, ["chordWarmth", "chordWidth"]);
+  const metrics: SoundPresetResultMetric[] = [
+    createSoundPresetResultMetric("preset", "Preset", soundPresetLabel(beforeSound.preset), soundPresetLabel(afterSound.preset), presetMoves),
+    createSoundPresetResultMetric("drums", "Drums", soundFocusDrumLabel(beforeSound), soundFocusDrumLabel(afterSound), drumMoves),
+    createSoundPresetResultMetric("bass", "808", soundFocusBassLabel(beforeSound), soundFocusBassLabel(afterSound), bassMoves),
+    createSoundPresetResultMetric("duck", "Duck", soundFocusDuckLabel(beforeSound), soundFocusDuckLabel(afterSound), duckMoves),
+    createSoundPresetResultMetric("synth", "Synth", soundFocusSynthLabel(beforeSound), soundFocusSynthLabel(afterSound), synthMoves),
+    createSoundPresetResultMetric("chords", "Chords", soundFocusChordLabel(beforeSound), soundFocusChordLabel(afterSound), chordMoves)
+  ];
+  const changedGroups = [presetMoves, drumMoves, bassMoves, duckMoves, synthMoves, chordMoves].filter((count) => count > 0).length;
+  const changedParameters = soundPresetChangedMoveCount(beforeSound, afterSound);
+
+  return {
+    presetId,
+    title: `${soundPresetLabel(presetId)} Sound Preset applied`,
+    status: "Applied",
+    detail: soundPresetToneLabel(afterSound),
+    scope: "Full built-in sound design preset",
+    impact: `${changedParameters} sound move${changedParameters === 1 ? "" : "s"} / ${changedGroups} groups`,
+    metrics,
+    auditionCue: "Loop Pattern A/B/C with drums, 808, Synth, and Chords active before fine-tuning.",
+    nextCheck: "Use Sound Focus Pads or Studio tone controls for manual trim after the preset.",
+    tone: changedGroups > 0 ? "good" : "warn"
+  };
+}
+
+function createSoundPresetResultMetric(
+  id: SoundPresetResultMetric["id"],
+  label: string,
+  before: string,
+  after: string,
+  changedEvents: number
+): SoundPresetResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: changedEvents === 0 ? "warn" : "good"
+  };
+}
+
+function soundPresetChangedMoveCount(beforeSound: SoundDesign, afterSound: SoundDesign): number {
+  return [
+    beforeSound.preset !== afterSound.preset,
+    ...soundFocusParameters.map((parameter) => beforeSound[parameter] !== afterSound[parameter])
+  ].filter(Boolean).length;
+}
+
+function soundPresetToneLabel(sound: SoundDesign): string {
+  return `K ${compactUnitPercent(sound.kickPunch)} / 8 ${compactUnitPercent(sound.bassDrive)} / S ${compactUnitPercent(sound.synthBrightness)} / C ${compactUnitPercent(sound.chordWarmth)}`;
+}
+
 function createSoundFocusPadOptions(sound: SoundDesign): SoundFocusPadOption[] {
   return soundFocusPadDefinitions.map((pad) => {
     const transformed = applySoundFocusPadToSound(sound, pad);
@@ -20747,10 +20908,14 @@ function SoundDesigner({
   focusPads,
   focusResult,
   mode,
+  presetPreview,
+  presetPreviewId,
+  presetResult,
   sound,
+  onApplyPreset,
   onDrumKitPad,
   onFocusPad,
-  onPreset,
+  onPreviewPreset,
   onChange
 }: {
   drumKitPads: DrumKitPadOption[];
@@ -20760,10 +20925,14 @@ function SoundDesigner({
   focusPads: SoundFocusPadOption[];
   focusResult: SoundFocusResult | null;
   mode: ProjectState["mode"];
+  presetPreview: SoundPresetPreviewSummary;
+  presetPreviewId: SoundPresetTarget;
+  presetResult: SoundPresetResult | null;
   sound: SoundDesign;
+  onApplyPreset: (preset?: SoundPresetTarget) => void;
   onDrumKitPad: (pad: DrumKitPadId) => void;
   onFocusPad: (pad: SoundFocusPadId) => void;
-  onPreset: (preset: (typeof soundPresetIds)[number]) => void;
+  onPreviewPreset: (preset: SoundPresetTarget) => void;
   onChange: (update: Partial<Omit<SoundDesign, "preset">>) => void;
 }): ReactElement {
   return (
@@ -20775,16 +20944,19 @@ function SoundDesigner({
       <div className="sound-preset-row" aria-label="Sound presets">
         {soundPresetIds.map((preset) => (
           <button
-            className={sound.preset === preset ? "selected" : ""}
+            className={presetPreviewId === preset ? "selected" : sound.preset === preset ? "current" : ""}
             data-testid={`sound-preset-${preset}`}
             key={preset}
-            onClick={() => onPreset(preset)}
+            onClick={() => onPreviewPreset(preset)}
+            title={`Preview ${soundPresetLabel(preset)} sound preset`}
             type="button"
           >
             {soundPresetLabel(preset)}
           </button>
         ))}
       </div>
+      <SoundPresetPreview summary={presetPreview} onApply={() => onApplyPreset(presetPreviewId)} />
+      {presetResult && <SoundPresetResultStrip result={presetResult} />}
       <DrumKitPads pads={drumKitPads} preview={drumKitPreview} result={drumKitResult} onApply={onDrumKitPad} />
       <SoundFocusPads pads={focusPads} preview={focusPreview} result={focusResult} onApply={onFocusPad} />
       <div className="sound-readout" aria-label="Sound design state">
@@ -20858,6 +21030,73 @@ function SoundDesigner({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function SoundPresetPreview({
+  summary,
+  onApply
+}: {
+  summary: SoundPresetPreviewSummary;
+  onApply: () => void;
+}): ReactElement {
+  return (
+    <div
+      className={`sound-preset-preview ${summary.tone}`}
+      data-preview-sound-preset={summary.presetId}
+      data-testid="sound-preset-preview"
+      title={summary.detailTitle}
+    >
+      <span data-testid="sound-preset-preview-status">{summary.statusLabel}</span>
+      <strong data-testid="sound-preset-preview-preset">{summary.presetLabel}</strong>
+      <small data-testid="sound-preset-preview-tone">{summary.toneLabel}</small>
+      <small data-testid="sound-preset-preview-changes">{summary.changeLabel}</small>
+      <button data-testid="sound-preset-apply" onClick={onApply} type="button">
+        Apply
+      </button>
+    </div>
+  );
+}
+
+function SoundPresetResultStrip({ result }: { result: SoundPresetResult }): ReactElement {
+  return (
+    <div
+      className={`sound-preset-result ${result.tone}`}
+      data-result-sound-preset={result.presetId}
+      data-testid="sound-preset-result"
+      aria-live="polite"
+    >
+      <div className="sound-preset-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="sound-preset-result-title">{result.title}</strong>
+          <small data-testid="sound-preset-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="sound-preset-result-meta">
+        <span data-testid="sound-preset-result-status">{result.status}</span>
+        <span data-testid="sound-preset-result-scope">{result.scope}</span>
+        <span data-testid="sound-preset-result-impact">{result.impact}</span>
+      </div>
+      <div className="sound-preset-result-metrics" data-testid="sound-preset-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`sound-preset-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="sound-preset-result-followup" data-testid="sound-preset-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="sound-preset-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="sound-preset-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
     </div>
   );
 }
