@@ -10148,9 +10148,27 @@ h2 {
   font-size: 10px;
 }
 
+.drum-velocity-label {
+  position: absolute;
+  z-index: 2;
+  inset-block-end: 8px;
+  inset-inline-end: 4px;
+  max-inline-size: calc(100% - 8px);
+  overflow: hidden;
+  color: #11100f;
+  background: rgba(244, 239, 231, 0.72);
+  border-radius: 3px;
+  padding: 1px 2px;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .step small {
   position: absolute;
-  z-index: 1;
+  z-index: 3;
   inset-block-start: 3px;
   inset-inline-end: 3px;
   max-inline-size: calc(100% - 6px);

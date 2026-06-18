@@ -6475,10 +6475,21 @@ export function App(): ReactElement {
                 {steps.map((step) => {
                   const active = currentPattern.drumPattern[lane][step];
                   const velocity = drumStepVelocity(currentPattern, lane, step);
+                  const velocityPercent = Math.min(100, Math.max(0, Math.round(velocity * 100)));
                   const probability = drumStepProbability(currentPattern, lane, step);
                   const hasChanceBadge = probability < 1;
                   const repeat = lane === "hat" ? hatRepeatCount(currentPattern, step) : 1;
                   const timing = drumStepTimingMs(currentPattern, lane, step);
+                  const ariaDetails = active
+                    ? [
+                        `${velocityPercent}% velocity`,
+                        hasChanceBadge ? `${chanceBadgeLabel(probability)} chance` : "",
+                        lane === "hat" && repeat > 1 ? `${repeat}x repeat` : "",
+                        timing === 0 ? "" : timingLabel(timing)
+                      ]
+                        .filter(Boolean)
+                        .join(" ")
+                    : "";
                   const stepBadge = [
                     hasChanceBadge ? compactChanceBadgeLabel(probability) : "",
                     lane === "hat" && repeat > 1 ? `${repeat}x` : "",
@@ -6488,7 +6499,7 @@ export function App(): ReactElement {
                     .join(" ");
                   return (
                     <button
-                      aria-label={`${drumLabels[lane]} step ${step + 1}`}
+                      aria-label={`${drumLabels[lane]} step ${step + 1}${ariaDetails ? ` ${ariaDetails}` : ""}`}
                       className={[
                         "step",
                         active ? "active" : "",
@@ -6509,6 +6520,11 @@ export function App(): ReactElement {
                       type="button"
                     >
                       <span>{step + 1}</span>
+                      {active && (
+                        <strong className="drum-velocity-label" data-testid={`drum-velocity-label-${lane}-${step}`}>
+                          {velocityPercent}
+                        </strong>
+                      )}
                       {active && stepBadge && (
                         <small
                           className={hasChanceBadge ? "chance-badge" : undefined}
