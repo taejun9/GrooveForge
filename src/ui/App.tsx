@@ -1005,6 +1005,7 @@ export function App(): ReactElement {
     () => createToplineSpaceSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
+  const toplineLoopCueTarget = useMemo(() => createToplineLoopCueTarget(project), [project]);
   const songFormOverviewSummary = useMemo(
     () => createSongFormOverviewSummary(project, selectedArrangementIndex),
     [project, selectedArrangementIndex]
@@ -2495,6 +2496,28 @@ export function App(): ReactElement {
     selectArrangementBlock(target.index);
     selectTransportLoopScope("block", false);
     setProjectStatus(`Hook Block ${target.index + 1} cued as Hook loop`);
+  }
+
+  function cueToplineLoop(card?: ToplineSpaceFocusItem): void {
+    if (isPlaying) {
+      setProjectStatus("Stop playback before cueing topline space");
+      return;
+    }
+
+    const target = createToplineLoopCueTarget(projectRef.current);
+    if (card) {
+      setToplineSpaceFocusId(card.focusId);
+    }
+
+    if (target.mode === "block") {
+      selectArrangementBlock(target.index);
+      selectTransportLoopScope("block", false);
+      setProjectStatus(`Topline Hook Block ${target.index + 1} cued as Topline loop`);
+      return;
+    }
+
+    cuePattern(target.pattern);
+    setProjectStatus(`Pattern ${target.pattern} cued as Topline loop`);
   }
 
   function cueSectionLocator(section: ArrangementSection): void {
@@ -5337,6 +5360,7 @@ export function App(): ReactElement {
     stemAuditionPadOptions,
     styleInspectorSummary,
     transportLoopScope,
+    toplineLoopCueTarget,
     toplineSpaceSummary,
     workflowNavigatorItems,
     onApplyArrangementMove: applyArrangementMoveToSelected,
@@ -5345,6 +5369,7 @@ export function App(): ReactElement {
     onApplyArrangementTemplate: applyArrangementTemplate,
     onCueArrangementTransition: cueArrangementTransition,
     onCueHookLoop: cueHookLoop,
+    onCueToplineLoop: cueToplineLoop,
     onFocusArrangementMuteMap: focusArrangementMuteMapLane,
     onFocusArrangementTransitionMap: focusArrangementTransitionMapTransition,
     onApplyBasslinePad: applyBasslinePad,
@@ -5885,7 +5910,15 @@ export function App(): ReactElement {
       />
 
       <ToplineSpace
+        cueTarget={toplineLoopCueTarget}
+        cued={
+          toplineLoopCueTarget.mode === "block"
+            ? transportLoopScope === "block" && selectedArrangementIndex === toplineLoopCueTarget.index
+            : transportLoopScope === "pattern" && project.selectedPattern === toplineLoopCueTarget.pattern
+        }
         focusedCardId={toplineSpaceFocusId}
+        isPlaying={isPlaying}
+        onCue={cueToplineLoop}
         onFocus={focusToplineSpaceCard}
         summary={toplineSpaceSummary}
       />
@@ -10904,11 +10937,19 @@ function HookReadiness({
 }
 
 function ToplineSpace({
+  cueTarget,
+  cued,
   focusedCardId,
+  isPlaying,
+  onCue,
   onFocus,
   summary
 }: {
+  cueTarget: ToplineLoopCueTarget;
+  cued: boolean;
   focusedCardId: ToplineSpaceFocusId | null;
+  isPlaying: boolean;
+  onCue: (card?: ToplineSpaceFocusItem) => void;
   onFocus: (card: ToplineSpaceFocusItem) => void;
   summary: ToplineSpaceSummary;
 }): ReactElement {
@@ -10941,15 +10982,32 @@ function ToplineSpace({
               <span>{card.label}</span>
               <strong>{card.value}</strong>
               <small>{card.detail}</small>
-              <button
-                aria-pressed={focused}
-                className="topline-space-focus-button"
-                onClick={() => onFocus(card)}
-                title={`Focus ${card.focusLabel}: ${card.status}`}
-                type="button"
-              >
-                <span>{card.focusLabel}</span>
-              </button>
+              <div className="topline-space-card-actions">
+                <button
+                  aria-pressed={focused}
+                  className="topline-space-focus-button"
+                  onClick={() => onFocus(card)}
+                  title={`Focus ${card.focusLabel}: ${card.status}`}
+                  type="button"
+                >
+                  <span>{card.focusLabel}</span>
+                </button>
+                <button
+                  aria-pressed={cued}
+                  className="topline-space-cue-button"
+                  data-testid={`topline-space-cue-${card.id}`}
+                  disabled={isPlaying}
+                  onClick={() => onCue(card)}
+                  title={
+                    isPlaying
+                      ? "Stop playback before cueing topline space"
+                      : `Cue Topline loop ${toplineLoopCueDetail(cueTarget)}`
+                  }
+                  type="button"
+                >
+                  <span>Cue</span>
+                </button>
+              </div>
             </div>
           );
         })}
@@ -11392,6 +11450,7 @@ function createQuickActions({
   stemAuditionPadOptions,
   styleInspectorSummary,
   transportLoopScope,
+  toplineLoopCueTarget,
   toplineSpaceSummary,
   workflowNavigatorItems,
   onApplyArrangementMove,
@@ -11400,6 +11459,7 @@ function createQuickActions({
   onApplyArrangementTemplate,
   onCueArrangementTransition,
   onCueHookLoop,
+  onCueToplineLoop,
   onFocusArrangementMuteMap,
   onFocusArrangementTransitionMap,
   onApplyBasslinePad,
@@ -11583,6 +11643,7 @@ function createQuickActions({
   stemAuditionPadOptions: StemAuditionPadOption[];
   styleInspectorSummary: StyleInspectorSummary;
   transportLoopScope: TransportLoopScope;
+  toplineLoopCueTarget: ToplineLoopCueTarget;
   toplineSpaceSummary: ToplineSpaceSummary;
   workflowNavigatorItems: WorkflowNavigatorItem[];
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
@@ -11591,6 +11652,7 @@ function createQuickActions({
   onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
   onCueArrangementTransition: (transition: ArrangementTransitionMapTransition) => void;
   onCueHookLoop: (card?: HookReadinessFocusItem) => void;
+  onCueToplineLoop: (card?: ToplineSpaceFocusItem) => void;
   onFocusArrangementMuteMap: (lane: ArrangementMuteMapLane) => void;
   onFocusArrangementTransitionMap: (transition: ArrangementTransitionMapTransition) => void;
   onApplyBasslinePad: (pad: BasslinePadId) => void;
@@ -11971,6 +12033,15 @@ function createQuickActions({
     group: card.focusTarget === "mix" || card.focusTarget === "master" ? "Mix" : "Project",
     keywords: `topline space vocal pocket focus card singer rapper lead hook ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
     run: () => onFocusToplineSpace(card)
+  }));
+  const toplineSpaceCueActions: QuickAction[] = toplineSpaceSummary.cards.map((card) => ({
+    id: `topline-space-cue-${card.id}`,
+    title: `Cue Topline Loop: ${card.label}`,
+    detail: `${toplineLoopCueDetail(toplineLoopCueTarget)} / ${card.value} / ${card.status}`,
+    group: "Transport",
+    keywords: `topline loop cue vocal pocket audition block pattern transport singer rapper lead hook ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
+    disabled: isPlaying,
+    run: () => onCueToplineLoop(card)
   }));
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const reviewQueueActions: QuickAction[] = reviewQueueSummary.items.map((item) => ({
@@ -13159,6 +13230,20 @@ function createQuickActions({
       run: () => onCueHookLoop(hookReadinessCard ?? undefined)
     },
     {
+      id: "topline-loop-cue",
+      title:
+        toplineLoopCueTarget.mode === "block"
+          ? `Cue Topline Loop: Block ${toplineLoopCueTarget.index + 1}`
+          : `Cue Topline Loop: Pattern ${toplineLoopCueTarget.pattern}`,
+      detail: toplineLoopCueDetail(toplineLoopCueTarget),
+      group: "Transport",
+      keywords: `topline loop cue audition vocal pocket room block pattern transport singer rapper lead hook ${
+        toplineSpaceCard?.id ?? "none"
+      } ${toplineSpaceCard?.label ?? "none"} beginner producer`,
+      disabled: isPlaying,
+      run: () => onCueToplineLoop(toplineSpaceCard ?? undefined)
+    },
+    {
       id: "loop-pattern",
       title: "Loop selected pattern",
       detail: `Pattern ${project.selectedPattern} two-bar preview.`,
@@ -13169,6 +13254,7 @@ function createQuickActions({
     },
     ...arrangementTransitionLoopActions,
     ...hookReadinessCueActions,
+    ...toplineSpaceCueActions,
     ...sectionLocatorActions,
     ...arrangementBlockCueActions,
     {
@@ -14344,6 +14430,8 @@ function createQuickActionResult(
     action.id.startsWith("transition-loop-cue-") ||
     action.id === "hook-loop-cue" ||
     action.id.startsWith("hook-readiness-cue-") ||
+    action.id === "topline-loop-cue" ||
+    action.id.startsWith("topline-space-cue-") ||
     action.id === "handoff-package-check-focus" ||
     action.id.startsWith("handoff-package-check-card-") ||
     action.id.startsWith("arrangement-block-cue-") ||
@@ -15076,6 +15164,14 @@ function quickActionResultMetricSnapshot(
       id: "hook-loop",
       label: "Hook loop",
       value: target ? hookLoopCueDetail(target) : `No Hook section / Pattern ${project.selectedPattern}`
+    };
+  }
+
+  if (action.id === "topline-loop-cue" || action.id.startsWith("topline-space-cue-")) {
+    return {
+      id: "topline-loop",
+      label: "Topline loop",
+      value: toplineLoopCueDetail(createToplineLoopCueTarget(project))
     };
   }
 
@@ -16001,6 +16097,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Hook Block loop and judge the hook section only before changing motif density, contrast, mix support, or handoff context.",
       nextCheck: "Return to Hook Readiness after the loop to decide whether the section, motif, contrast, mix, or handoff lane needs the next edit."
+    };
+  }
+
+  if (action.id === "topline-loop-cue" || action.id.startsWith("topline-space-cue-")) {
+    return {
+      auditionCue: "Play Topline loop and listen only for vocal/lead room before trimming melody density, pocket, hook window, or headroom.",
+      nextCheck: "Return to Topline Space after the loop to decide whether the pocket, lead density, window, mix, or artist cue lane needs the next edit."
     };
   }
 
@@ -20953,6 +21056,56 @@ function createToplineSpaceFocusSummary(
 
 function activeToplineSpaceQuickActionCard(summary: ToplineSpaceSummary): ToplineSpaceCard | null {
   return summary.cards.find((card) => card.tone === "danger") ?? summary.cards.find((card) => card.tone === "warn") ?? summary.cards[0] ?? null;
+}
+
+type ToplineLoopCueTarget =
+  | {
+      mode: "block";
+      index: number;
+      startBar: number;
+      endBar: number;
+      bars: number;
+      pattern: PatternSlot;
+    }
+  | {
+      mode: "pattern";
+      pattern: PatternSlot;
+      bars: number;
+    };
+
+function createToplineLoopCueTarget(project: ProjectState): ToplineLoopCueTarget {
+  const index = firstArrangementSectionIndex(project, "Hook");
+  if (index !== null) {
+    const block = project.arrangement[index];
+    if (block) {
+      const startBar = arrangementStartBar(project, index);
+      const bars = normalizeArrangementBars(block.bars);
+      return {
+        mode: "block",
+        index,
+        startBar,
+        endBar: startBar + bars,
+        bars,
+        pattern: block.pattern
+      };
+    }
+  }
+
+  return {
+    mode: "pattern",
+    pattern: project.selectedPattern,
+    bars: 2
+  };
+}
+
+function toplineLoopCueDetail(target: ToplineLoopCueTarget): string {
+  if (target.mode === "block") {
+    return `Hook Block ${target.index + 1} / Bars ${target.startBar + 1}-${target.endBar} / Pattern ${
+      target.pattern
+    } / ${barCountLabel(target.bars)}`;
+  }
+
+  return `Pattern ${target.pattern} / ${barCountLabel(target.bars)} pocket`;
 }
 
 function createArrangementMuteMapSummary(project: ProjectState): ArrangementMuteMapSummary {
