@@ -156,6 +156,8 @@ Quick Actions Pattern Copy/Clear commands make direct loop duplication and reset
 
 Runtime arrangement editing also exposes Quick Actions selected-block edit commands for copy, paste, duplicate, move, split, merge, and delete while preserving existing arrangement handler behavior.
 
+Quick Actions selected-event reset commands restore selected 808/Synth note chance, selected drum chance, selected drum timing, selected hat repeat, and selected chord chance to reliable defaults through the existing undoable selected-event edit handlers.
+
 ## Core Direction
 
 - Keep product behavior grounded in the project brief and official sources where applicable.

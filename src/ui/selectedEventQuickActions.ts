@@ -395,6 +395,18 @@ export function createSelectedEventQuickActions({
       run: () => selectedNoteProbability !== null && onUpdateSelectedNoteProbability(selectedNoteProbability + 0.05)
     },
     {
+      id: "selected-note-chance-reset",
+      title: "Reset selected note chance",
+      detail:
+        selectedNoteProbability !== null
+          ? `${selectedNoteLabel} chance ${percentLabel(selectedNoteProbability)} -> ${percentLabel(1)}`
+          : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note chance probability reset reliable 100 default variation 808 synth edit keyboard capture midi beginner producer",
+      disabled: selectedNoteProbability === null || selectedNoteProbability >= 1,
+      run: () => onUpdateSelectedNoteProbability(1)
+    },
+    {
       id: "selected-note-copy",
       title: "Copy selected note",
       detail: selectedNoteActive ? `${selectedNoteLabel} -> local note clipboard` : "Select an active 808 or Synth note first.",
@@ -501,6 +513,18 @@ export function createSelectedEventQuickActions({
       run: () => selectedDrumProbability !== null && onUpdateSelectedDrumProbability(selectedDrumProbability + 0.05)
     },
     {
+      id: "selected-drum-chance-reset",
+      title: "Reset selected drum chance",
+      detail:
+        selectedDrumProbability !== null
+          ? `${selectedDrumLabel} chance ${percentLabel(selectedDrumProbability)} -> ${percentLabel(1)}`
+          : "Select an active drum hit first.",
+      group: "Create",
+      keywords: "selected drum chance probability reset reliable 100 default variation pocket hit edit beginner producer",
+      disabled: selectedDrumProbability === null || selectedDrumProbability >= 1,
+      run: () => onUpdateSelectedDrumProbability(1)
+    },
+    {
       id: "selected-drum-timing-earlier",
       title: "Push selected drum earlier",
       detail:
@@ -525,6 +549,18 @@ export function createSelectedEventQuickActions({
       run: () => selectedDrumTiming !== null && onUpdateSelectedDrumTiming(selectedDrumTiming + 5)
     },
     {
+      id: "selected-drum-timing-reset",
+      title: "Reset selected drum timing",
+      detail:
+        selectedDrumTiming !== null
+          ? `${selectedDrumLabel} timing ${timingLabel(selectedDrumTiming)} -> ${timingLabel(0)}`
+          : "Select an active drum hit first.",
+      group: "Create",
+      keywords: "selected drum timing reset quantize grid on-grid default microtiming pocket hit edit beginner producer",
+      disabled: selectedDrumTiming === null || selectedDrumTiming === 0,
+      run: () => onUpdateSelectedDrumTiming(0)
+    },
+    {
       id: "selected-drum-hat-repeat-down",
       title: "Reduce selected hat repeat",
       detail:
@@ -547,6 +583,18 @@ export function createSelectedEventQuickActions({
       keywords: "selected drum hat repeat roll increase dynamics pocket hit edit beginner producer",
       disabled: selectedDrumStep?.lane !== "hat" || selectedHatRepeat === null || selectedHatRepeat >= 4,
       run: () => selectedHatRepeat !== null && onUpdateSelectedHatRepeat(selectedHatRepeat + 1)
+    },
+    {
+      id: "selected-drum-hat-repeat-reset",
+      title: "Reset selected hat repeat",
+      detail:
+        selectedDrumStep?.lane === "hat" && selectedHatRepeat !== null
+          ? `${selectedDrumLabel} repeat ${selectedHatRepeat}x -> 1x`
+          : "Select an active hat hit first.",
+      group: "Create",
+      keywords: "selected drum hat repeat reset roll default 1x pocket hit edit beginner producer",
+      disabled: selectedDrumStep?.lane !== "hat" || selectedHatRepeat === null || selectedHatRepeat <= 1,
+      run: () => onUpdateSelectedHatRepeat(1)
     },
     {
       id: "selected-drum-copy",
@@ -726,6 +774,18 @@ export function createSelectedEventQuickActions({
       keywords: "selected chord chance probability up reliable variation harmony progression edit beginner producer",
       disabled: selectedChordProbability === null || selectedChordProbability >= 1,
       run: () => selectedChordProbability !== null && onUpdateSelectedChordProbability(selectedChordProbability + 0.05)
+    },
+    {
+      id: "selected-chord-chance-reset",
+      title: "Reset selected chord chance",
+      detail:
+        selectedChordProbability !== null
+          ? `${selectedChordLabel} chance ${percentLabel(selectedChordProbability)} -> ${percentLabel(1)}`
+          : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord chance probability reset reliable 100 default variation harmony progression edit beginner producer",
+      disabled: selectedChordProbability === null || selectedChordProbability >= 1,
+      run: () => onUpdateSelectedChordProbability(1)
     },
     {
       id: "selected-chord-copy",
