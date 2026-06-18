@@ -66,6 +66,11 @@ export default defineConfig({
               priority: 2
             },
             {
+              name: "workstation-guidance-panels",
+              test: /src[\\/]ui[\\/]workstationGuidancePanels\.tsx$/,
+              priority: 2
+            },
+            {
               name: "workstation-shell-panels",
               test: /src[\\/]ui[\\/]workstationShellPanels\.tsx$/,
               priority: 2
