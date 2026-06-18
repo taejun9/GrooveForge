@@ -42,7 +42,7 @@ export default defineConfig({
             },
             {
               name: "workstation-pattern-tools",
-              test: /src[\\/]ui[\\/]workstationPatternTools\.ts$/,
+              test: /src[\\/]ui[\\/](workstationPatternTools\.ts|workstationPatternResults\.tsx)$/,
               priority: 2
             }
           ]

@@ -214,6 +214,8 @@ import type {
   BeatReadinessCheck,
   PatternCompareSummary,
   PatternClonePadOption,
+  PatternCloneResultMetric,
+  PatternCloneResult,
   PatternDnaCardId,
   PatternDnaFocusTarget,
   PatternDnaCard,
@@ -1083,6 +1085,78 @@ export function createPatternClonePadOptions(source: PatternSlot): PatternCloneP
         detail: `Clone ${source} -> ${target}`
       }))
     );
+}
+
+export function createPatternCloneResult(
+  source: PatternSlot,
+  target: PatternSlot,
+  preset: PatternVariationPreset,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): PatternCloneResult {
+  const beforeSource = beforeProject.patterns[source];
+  const beforeTarget = beforeProject.patterns[target];
+  const afterTarget = afterProject.patterns[target];
+  const presetLabel = patternVariationPresetLabel(preset);
+  const targetMoveCount = patternCloneChangedCount(beforeTarget, afterTarget);
+  const sourceEventCount = patternEventTotal(beforeSource);
+  const targetBeforeEventCount = patternEventTotal(beforeTarget);
+  const targetAfterEventCount = patternEventTotal(afterTarget);
+  const drumBefore = activeDrumHitCount(beforeTarget);
+  const drumAfter = activeDrumHitCount(afterTarget);
+  const musicBefore = patternMusicEventCount(beforeTarget);
+  const musicAfter = patternMusicEventCount(afterTarget);
+  const metrics: PatternCloneResultMetric[] = [
+    createPatternCloneResultMetric("source", "Source", `${sourceEventCount} events`, `${sourceEventCount} events`, 0, "good"),
+    createPatternCloneResultMetric("target", "Target", `${targetBeforeEventCount} events`, `${targetAfterEventCount} events`, targetMoveCount),
+    createPatternCloneResultMetric("drums", "Drums", `${drumBefore} hits`, `${drumAfter} hits`, Math.abs(drumBefore - drumAfter)),
+    createPatternCloneResultMetric("music", "Music", `${musicBefore} events`, `${musicAfter} events`, Math.abs(musicBefore - musicAfter))
+  ];
+
+  return {
+    source,
+    target,
+    preset,
+    title: `Pattern ${target} ${presetLabel} clone ready`,
+    status: "Cloned",
+    detail: `Pattern ${source} -> ${target} / ${presetLabel}`,
+    scope: `Pattern ${target} edit focus`,
+    impact: `${targetMoveCount} target change${targetMoveCount === 1 ? "" : "s"}`,
+    metrics,
+    auditionCue: `Loop Pattern ${target}; compare it against Pattern ${source} before placing it in the arrangement.`,
+    nextCheck: "Use Pattern Compare, Pattern DNA, or selected event tools to refine the cloned variation.",
+    tone: targetMoveCount > 0 ? "good" : "warn"
+  };
+}
+
+export function createPatternCloneResultMetric(
+  id: PatternCloneResultMetric["id"],
+  label: string,
+  before: string,
+  after: string,
+  changedEvents: number,
+  tone?: PatternCloneResultMetric["tone"]
+): PatternCloneResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: tone ?? (changedEvents === 0 ? "warn" : "good")
+  };
+}
+
+function patternCloneChangedCount(beforePattern: PatternData, afterPattern: PatternData): number {
+  return (
+    drumPatternMoveCount(beforePattern, afterPattern) +
+    bassNotesChangedCount(beforePattern.bassNotes, afterPattern.bassNotes) +
+    chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents) +
+    melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes)
+  );
+}
+
+function patternMusicEventCount(pattern: PatternData): number {
+  return pattern.bassNotes.length + pattern.chordEvents.length + pattern.melodyNotes.length;
 }
 
 export function createPatternStackEvents(key: string, stack: PatternStackDefinition): PatternStackEvents {

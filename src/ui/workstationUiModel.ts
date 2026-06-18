@@ -892,6 +892,29 @@ export type PatternClonePadOption = {
   detail: string;
 };
 
+export type PatternCloneResultMetric = {
+  id: "source" | "target" | "drums" | "music";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+export type PatternCloneResult = {
+  source: PatternSlot;
+  target: PatternSlot;
+  preset: PatternVariationPreset;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: PatternCloneResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type PatternDnaCardId = "layers" | "density" | "variation" | "arrangement";
 export type PatternDnaFocusTarget = "compose" | "arrange";
 

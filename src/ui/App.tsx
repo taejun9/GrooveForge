@@ -259,6 +259,7 @@ import type {
   BeatReadinessCheck,
   PatternCompareSummary,
   PatternClonePadOption,
+  PatternCloneResult,
   PatternDnaCardId,
   PatternDnaFocusTarget,
   PatternDnaCard,
@@ -541,6 +542,7 @@ import {
   drumAccentDefinitions,
   drumFoundationDefinitions
 } from "./workstationUiModel";
+import { PatternCloneResultStrip } from "./workstationPatternResults";
 import {
   laneColor,
   mergePitchLanes,
@@ -579,6 +581,7 @@ import {
   patternStackMoveCount,
   chordEventsChangedCount,
   createPatternClonePadOptions,
+  createPatternCloneResult,
   createPatternStackEvents,
   samePatternStackEvents,
   createDrumFoundationOptions,
@@ -799,6 +802,7 @@ export function App(): ReactElement {
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [beatBlueprintResult, setBeatBlueprintResult] = useState<BeatBlueprintResult | null>(null);
   const [beatSpineResult, setBeatSpineResult] = useState<BeatSpineApplyResult | null>(null);
+  const [patternCloneResult, setPatternCloneResult] = useState<PatternCloneResult | null>(null);
   const [patternStackResult, setPatternStackResult] = useState<PatternStackResult | null>(null);
   const [drumMoveResult, setDrumMoveResult] = useState<DrumMoveResult | null>(null);
   const [bassMoveResult, setBassMoveResult] = useState<BassMoveResult | null>(null);
@@ -1491,6 +1495,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
+    setPatternCloneResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -1522,6 +1527,7 @@ export function App(): ReactElement {
       setQuickActionResult(null);
       setBeatBlueprintResult(null);
       setBeatSpineResult(null);
+      setPatternCloneResult(null);
       setPatternStackResult(null);
       setDrumMoveResult(null);
       setBassMoveResult(null);
@@ -1628,6 +1634,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
+    setPatternCloneResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -1666,6 +1673,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
+    setPatternCloneResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -2014,7 +2022,8 @@ export function App(): ReactElement {
   function cloneSelectedPatternVariation(target: PatternSlot, preset: PatternVariationPreset): void {
     const sourceSlot = projectRef.current.selectedPattern;
     const presetLabel = patternVariationPresetLabel(preset);
-    updateProject(
+    const beforeProject = projectRef.current;
+    const changed = updateProject(
       (current) => ({
         ...current,
         selectedPattern: target,
@@ -2025,6 +2034,9 @@ export function App(): ReactElement {
       }),
       `Cloned Pattern ${sourceSlot} to ${target} as ${presetLabel}`
     );
+    if (changed) {
+      setPatternCloneResult(createPatternCloneResult(sourceSlot, target, preset, beforeProject, projectRef.current));
+    }
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(0);
@@ -5491,6 +5503,7 @@ export function App(): ReactElement {
           <PatternDna summary={patternDnaSummary} focusedCardId={patternDnaFocusId} onFocus={focusPatternDnaCard} />
           <LayerStarterPads options={layerStarterOptions} onApply={applyLayerStarter} />
           <PatternClonePads clones={patternCloneOptions} onApply={cloneSelectedPatternVariation} />
+          {patternCloneResult && <PatternCloneResultStrip result={patternCloneResult} />}
           <PatternStackPreview preview={patternStackPreviewSummary} />
           {patternStackResult && <PatternStackResultStrip result={patternStackResult} />}
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
