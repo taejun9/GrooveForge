@@ -261,6 +261,7 @@ import type {
   PatternClonePadOption,
   PatternCloneResult,
   PatternFillResult,
+  PatternVariationPreviewSummary,
   PatternVariationResult,
   PatternDnaCardId,
   PatternDnaFocusTarget,
@@ -592,6 +593,7 @@ import {
   createPatternClonePadOptions,
   createPatternCloneResult,
   createPatternFillResult,
+  createPatternVariationPreviewSummary,
   createPatternVariationResult,
   createPatternStackEvents,
   samePatternStackEvents,
@@ -816,6 +818,7 @@ export function App(): ReactElement {
   const [layerStarterResult, setLayerStarterResult] = useState<LayerStarterResult | null>(null);
   const [patternCloneResult, setPatternCloneResult] = useState<PatternCloneResult | null>(null);
   const [patternFillResult, setPatternFillResult] = useState<PatternFillResult | null>(null);
+  const [patternVariationPreviewPreset, setPatternVariationPreviewPreset] = useState<PatternVariationPreset>("hook");
   const [patternVariationResult, setPatternVariationResult] = useState<PatternVariationResult | null>(null);
   const [patternStackResult, setPatternStackResult] = useState<PatternStackResult | null>(null);
   const [drumMoveResult, setDrumMoveResult] = useState<DrumMoveResult | null>(null);
@@ -1135,6 +1138,10 @@ export function App(): ReactElement {
   const patternStackPreviewSummary = useMemo(
     () => createPatternStackPreviewSummary(project.key, currentPattern, patternStackOptions),
     [project.key, currentPattern, patternStackOptions]
+  );
+  const patternVariationPreviewSummary = useMemo(
+    () => createPatternVariationPreviewSummary(project.selectedPattern, currentPattern, patternVariationPreviewPreset),
+    [project.selectedPattern, currentPattern, patternVariationPreviewPreset]
   );
   const patternCloneOptions = useMemo(() => createPatternClonePadOptions(project.selectedPattern), [project.selectedPattern]);
   const drumFoundationOptions = useMemo(() => createDrumFoundationOptions(), []);
@@ -5552,6 +5559,7 @@ export function App(): ReactElement {
           <PatternStackPreview preview={patternStackPreviewSummary} />
           {patternStackResult && <PatternStackResultStrip result={patternStackResult} />}
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
+          <PatternVariationPreview preview={patternVariationPreviewSummary} />
           <DrumMovePreview preview={drumMovePreviewSummary} />
           {drumMoveResult && <DrumMoveResultStrip result={drumMoveResult} />}
           <DrumFoundationPads foundations={drumFoundationOptions} onApply={applyDrumFoundation} />
@@ -5562,9 +5570,15 @@ export function App(): ReactElement {
               <button
                 key={preset}
                 data-testid={`pattern-variation-${preset}`}
+                data-previewed={patternVariationPreviewPreset === preset ? "true" : "false"}
                 type="button"
                 title={`Apply ${patternVariationPresetLabel(preset)} variation to Pattern ${project.selectedPattern}`}
-                onClick={() => applyPatternVariation(preset)}
+                onFocus={() => setPatternVariationPreviewPreset(preset)}
+                onMouseEnter={() => setPatternVariationPreviewPreset(preset)}
+                onClick={() => {
+                  setPatternVariationPreviewPreset(preset);
+                  applyPatternVariation(preset);
+                }}
               >
                 <Sparkles size={14} aria-hidden="true" />
                 <span>{patternVariationPresetLabel(preset)}</span>
@@ -23446,6 +23460,26 @@ function PatternStackPreview({ preview }: { preview: PatternStackPreviewSummary 
       <small data-testid="pattern-stack-preview-chord">{preview.chordLabel}</small>
       <small data-testid="pattern-stack-preview-melody">{preview.melodyLabel}</small>
       <small data-testid="pattern-stack-preview-moves">{preview.moveLabel}</small>
+    </div>
+  );
+}
+
+function PatternVariationPreview({ preview }: { preview: PatternVariationPreviewSummary }): ReactElement {
+  return (
+    <div
+      className={`pattern-stack-preview pattern-variation-preview ${preview.tone}`}
+      data-preview-pattern-variation={`${preview.pattern}-${preview.preset}`}
+      data-testid="pattern-variation-preview"
+      title={preview.detailTitle}
+    >
+      <span data-testid="pattern-variation-preview-status">{preview.statusLabel}</span>
+      <strong data-testid="pattern-variation-preview-pattern">{preview.patternLabel}</strong>
+      <small data-testid="pattern-variation-preview-preset">{preview.presetLabel}</small>
+      <small data-testid="pattern-variation-preview-drums">{preview.drumsLabel}</small>
+      <small data-testid="pattern-variation-preview-bass">{preview.bassLabel}</small>
+      <small data-testid="pattern-variation-preview-chord">{preview.chordLabel}</small>
+      <small data-testid="pattern-variation-preview-melody">{preview.melodyLabel}</small>
+      <small data-testid="pattern-variation-preview-moves">{preview.moveLabel}</small>
     </div>
   );
 }

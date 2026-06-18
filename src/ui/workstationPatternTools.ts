@@ -218,6 +218,7 @@ import type {
   PatternCloneResult,
   PatternFillResultMetric,
   PatternFillResult,
+  PatternVariationPreviewSummary,
   PatternVariationResultMetric,
   PatternVariationResult,
   PatternDnaCardId,
@@ -1358,6 +1359,41 @@ function patternFillNextCheck(preset: PatternFillPreset, pattern: PatternData): 
   }
 }
 
+export function createPatternVariationPreviewSummary(
+  patternSlot: PatternSlot,
+  pattern: PatternData,
+  preset: PatternVariationPreset
+): PatternVariationPreviewSummary {
+  const previewPattern = createPatternVariation(pattern, preset);
+  const presetLabel = patternVariationPresetLabel(preset);
+  const changes = patternVariationLayerChanges(pattern, previewPattern);
+  const beforeEvents = patternEventTotal(pattern);
+  const afterEvents = patternEventTotal(previewPattern);
+  const statusLabel = changes.total > 0 ? "Preview variation" : "Variation aligned";
+  const patternLabel = `Pattern ${patternSlot} / ${beforeEvents} -> ${afterEvents} events`;
+  const presetLabelText = `${presetLabel} target`;
+  const drumsLabel = `Drums ${changes.drums}`;
+  const bassLabel = `808 ${changes.bass}`;
+  const chordLabel = `Chords ${changes.chords}`;
+  const melodyLabel = `Synth ${changes.melody}`;
+  const moveLabel = `${changes.total} change${changes.total === 1 ? "" : "s"}`;
+
+  return {
+    preset,
+    pattern: patternSlot,
+    statusLabel,
+    patternLabel,
+    presetLabel: presetLabelText,
+    drumsLabel,
+    bassLabel,
+    chordLabel,
+    melodyLabel,
+    moveLabel,
+    detailTitle: `${statusLabel}: ${patternLabel}; ${presetLabelText}; ${drumsLabel}; ${bassLabel}; ${chordLabel}; ${melodyLabel}; ${moveLabel}.`,
+    tone: changes.total > 0 ? "warn" : "good"
+  };
+}
+
 export function createPatternVariationResult(
   preset: PatternVariationPreset,
   beforeProject: ProjectState,
@@ -1445,12 +1481,18 @@ export function createPatternVariationResultMetric(
 }
 
 function patternVariationChangedCount(beforePattern: PatternData, afterPattern: PatternData): number {
-  return (
-    drumPatternMoveCount(beforePattern, afterPattern) +
-    bassNotesChangedCount(beforePattern.bassNotes, afterPattern.bassNotes) +
-    chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents) +
-    melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes)
-  );
+  return patternVariationLayerChanges(beforePattern, afterPattern).total;
+}
+
+function patternVariationLayerChanges(
+  beforePattern: PatternData,
+  afterPattern: PatternData
+): { drums: number; bass: number; chords: number; melody: number; total: number } {
+  const drums = drumPatternMoveCount(beforePattern, afterPattern);
+  const bass = bassNotesChangedCount(beforePattern.bassNotes, afterPattern.bassNotes);
+  const chords = chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents);
+  const melody = melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes);
+  return { drums, bass, chords, melody, total: drums + bass + chords + melody };
 }
 
 function patternVariationAuditionCue(preset: PatternVariationPreset, pattern: PatternSlot): string {

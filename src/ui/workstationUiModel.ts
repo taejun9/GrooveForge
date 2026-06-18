@@ -937,6 +937,21 @@ export type PatternFillResult = {
   tone: MixCoachTone;
 };
 
+export type PatternVariationPreviewSummary = {
+  preset: PatternVariationPreset;
+  pattern: PatternSlot;
+  statusLabel: string;
+  patternLabel: string;
+  presetLabel: string;
+  drumsLabel: string;
+  bassLabel: string;
+  chordLabel: string;
+  melodyLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type PatternVariationResultMetric = {
   id: "events" | "drums" | "bass" | "chords" | "melody";
   label: string;
