@@ -10974,6 +10974,32 @@ function createQuickActions({
   const suggestedBlueprint = suggestedBlueprintId(project);
   const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const blueprintActions: QuickAction[] = beatBlueprints.flatMap((blueprint): QuickAction[] => {
+    const styleName = styleProfiles.find((profile) => profile.id === blueprint.styleId)?.name ?? blueprint.styleId;
+    const detail = `${styleName} / ${blueprint.key} / ${blueprint.bpm} BPM / ${arrangementTemplateLabel(
+      blueprint.arrangementTemplate
+    )} / ${soundPresetLabel(blueprint.soundPreset)} / ${blueprint.masterPreset}`;
+    const keywords = `beat blueprint direct starter ${blueprint.id} ${blueprint.name} ${blueprint.focus} ${styleName} ${blueprint.styleId} ${blueprint.key} ${blueprint.bpm} ${blueprint.soundPreset} ${blueprint.masterPreset} drums 808 bass chords synth arrangement sound master sample free genre beginner producer`;
+
+    return [
+      {
+        id: `blueprint-preview-${blueprint.id}`,
+        title: `Preview Blueprint: ${blueprint.name}`,
+        detail: `${detail} / preview only`,
+        group: "Create",
+        keywords: `preview ${keywords}`,
+        run: () => onPreviewBlueprint(blueprint.id)
+      },
+      {
+        id: `blueprint-apply-${blueprint.id}`,
+        title: `Apply Blueprint: ${blueprint.name}`,
+        detail,
+        group: "Create",
+        keywords: `apply ${keywords}`,
+        run: () => onApplyBlueprint(blueprint.id)
+      }
+    ];
+  });
   const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
   const selectedBlockNumber = selectedBlock ? Math.min(selectedArrangementIndex + 1, project.arrangement.length) : 0;
   const selectedBlockBars = selectedBlock ? normalizeArrangementBars(selectedBlock.bars) : 0;
@@ -12837,6 +12863,7 @@ function createQuickActions({
       keywords: `preview current style match blueprint starter ${currentStyleName} ${project.styleId} ${suggestedBlueprintName} beat drums 808 bass chords synth arrangement sound master sample free safe`,
       run: () => onPreviewBlueprint(suggestedBlueprint)
     },
+    ...blueprintActions,
     ...patternVariationPresetIds.map((preset): QuickAction => {
       const label = patternVariationPresetLabel(preset);
       return {
@@ -13324,7 +13351,7 @@ function createQuickActionResult(
 ): QuickActionResult {
   const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action);
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
-  const previewOnly = action.id === "blueprint-preview-style-match";
+  const previewOnly = action.id.startsWith("blueprint-preview-");
   const focusOnly =
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -13524,7 +13551,12 @@ function quickActionResultMetricSnapshot(
     return { id: "snapshots", label: "Snapshots", value: `${project.snapshots.length} slots` };
   }
 
-  if (action.id === "blueprint" || action.id === "blueprint-style-match" || action.id === "blueprint-preview-style-match") {
+  if (
+    action.id === "blueprint" ||
+    action.id === "blueprint-style-match" ||
+    action.id.startsWith("blueprint-preview-") ||
+    action.id.startsWith("blueprint-apply-")
+  ) {
     return { id: "project-events", label: "Project events", value: `${projectEventTotal(project)} events` };
   }
 
@@ -14325,10 +14357,17 @@ function quickActionResultFollowup(
   const target = activeDeliveryTarget(project);
   const pattern = activePattern(project);
 
-  if (action.id === "blueprint-preview-style-match") {
+  if (action.id.startsWith("blueprint-preview-")) {
     return {
       auditionCue: "Read the Beat Blueprint preview before applying the starter.",
-      nextCheck: "Use Apply current-style starter only when the previewed style, key, BPM, sound, and master fit the session."
+      nextCheck: "Use the matching Apply Blueprint command only when the previewed style, key, BPM, sound, and master fit the session."
+    };
+  }
+
+  if (action.id === "blueprint" || action.id === "blueprint-style-match" || action.id.startsWith("blueprint-apply-")) {
+    return {
+      auditionCue: "Loop the new starter beat; hear drums, 808, chords, Synth, arrangement, sound, and master together.",
+      nextCheck: "Use Beat Spine, Pattern DNA, and First Beat Path to edit the sample-free starter instead of treating it as fixed audio."
     };
   }
 
