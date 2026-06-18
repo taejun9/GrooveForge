@@ -813,7 +813,7 @@ export type MasterFinishResult = {
   tone: MixCoachTone;
 };
 
-export type TransportLoopScope = "arrangement" | "block" | "pattern";
+export type TransportLoopScope = "arrangement" | "block" | "transition" | "pattern";
 
 export type QuickAction = {
   id: string;

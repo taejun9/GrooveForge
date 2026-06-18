@@ -548,7 +548,7 @@ h2 {
 }
 
 .playback-mode-row {
-  grid-template-columns: repeat(3, minmax(70px, 1fr));
+  grid-template-columns: repeat(4, minmax(64px, 1fr));
 }
 
 .playback-mode-row button {
@@ -7644,7 +7644,8 @@ h2 {
 .arrangement-transition-map-card-main strong,
 .arrangement-transition-map-card-main small,
 .arrangement-transition-map-card-metrics span,
-.arrangement-transition-map-focus-button span {
+.arrangement-transition-map-focus-button span,
+.arrangement-transition-map-cue-button span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -7776,11 +7777,19 @@ h2 {
   line-height: 1.2;
 }
 
-.arrangement-transition-map-focus-button {
+.arrangement-transition-map-card-actions {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(52px, 1fr));
+  gap: 5px;
+  min-width: 0;
+}
+
+.arrangement-transition-map-focus-button,
+.arrangement-transition-map-cue-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-inline-size: 58px;
+  min-inline-size: 52px;
   border: 1px solid rgba(158, 231, 255, 0.24);
   border-radius: 5px;
   background: rgba(158, 231, 255, 0.06);
@@ -7791,9 +7800,16 @@ h2 {
 }
 
 .arrangement-transition-map-focus-button:hover,
-.arrangement-transition-map-focus-button[aria-pressed="true"] {
+.arrangement-transition-map-focus-button[aria-pressed="true"],
+.arrangement-transition-map-cue-button:hover,
+.arrangement-transition-map-cue-button[aria-pressed="true"] {
   border-color: rgba(158, 231, 255, 0.5);
   background: rgba(158, 231, 255, 0.11);
+}
+
+.arrangement-transition-map-cue-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .next-move {
@@ -17375,6 +17391,7 @@ input[type="range"] {
   .arrangement-transition-map-focus-readout,
   .arrangement-transition-map-grid,
   .arrangement-transition-map-card,
+  .arrangement-transition-map-card-actions,
   .arrangement-transition-map-card-metrics {
     grid-template-columns: 1fr;
   }

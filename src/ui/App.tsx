@@ -1010,6 +1010,16 @@ export function App(): ReactElement {
   );
   const arrangementMuteMapSummary = useMemo(() => createArrangementMuteMapSummary(project), [project]);
   const arrangementTransitionMapSummary = useMemo(() => createArrangementTransitionMapSummary(project), [project]);
+  const arrangementTransitionLoopTarget = useMemo(
+    () =>
+      createArrangementTransitionLoopTarget(
+        project,
+        arrangementTransitionMapSummary,
+        arrangementTransitionMapFocusId,
+        selectedArrangementIndex
+      ),
+    [arrangementTransitionMapFocusId, arrangementTransitionMapSummary, project, selectedArrangementIndex]
+  );
   const productionSnapshotSummary = useMemo(
     () => createProductionSnapshotSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
@@ -1139,9 +1149,25 @@ export function App(): ReactElement {
   const selectedArrangementStartBar = arrangementStartBar(project, selectedArrangementIndex);
   const transportLoopMode = transportLoopScope === "pattern" ? "pattern" : "arrangement";
   const transportLoopBars =
-    transportLoopScope === "pattern" ? 2 : transportLoopScope === "block" ? selectedArrangementBars : undefined;
-  const transportLoopStartBar = transportLoopScope === "block" ? selectedArrangementStartBar : 0;
-  const transportLoopReadout = transportLoopStatus(project, transportLoopScope, selectedArrangementIndex);
+    transportLoopScope === "pattern"
+      ? 2
+      : transportLoopScope === "block"
+        ? selectedArrangementBars
+        : transportLoopScope === "transition"
+          ? arrangementTransitionLoopTarget?.bars
+          : undefined;
+  const transportLoopStartBar =
+    transportLoopScope === "block"
+      ? selectedArrangementStartBar
+      : transportLoopScope === "transition"
+        ? arrangementTransitionLoopTarget?.startBar ?? 0
+        : 0;
+  const transportLoopReadout = transportLoopStatus(
+    project,
+    transportLoopScope,
+    selectedArrangementIndex,
+    arrangementTransitionLoopTarget
+  );
   const transportPrimary = isPlaying
     ? playbackPosition?.mode === "pattern"
       ? `Pattern ${playbackPosition.pattern} ${playbackPosition.bar}.${playbackPosition.beat}`
@@ -1156,7 +1182,8 @@ export function App(): ReactElement {
     playbackPosition,
     transportLoopScope,
     selectedArrangementIndex,
-    selectedArrangementStartBar
+    selectedArrangementStartBar,
+    arrangementTransitionLoopTarget
   );
   const tapTempoReadout = createTapTempoReadoutSummary(project.bpm, tapTempo);
   const localDraftStatusLabel = localDraftSavedAt ? `Draft ${formatLocalDraftSavedAt(localDraftSavedAt)}` : "Draft local";
@@ -2167,6 +2194,11 @@ export function App(): ReactElement {
   }
 
   function selectTransportLoopScope(scope: TransportLoopScope, showStatus = true): void {
+    if (scope === "transition" && !arrangementTransitionLoopTarget) {
+      setProjectStatus("Transition loop unavailable");
+      return;
+    }
+
     setTransportLoopScope(scope);
     setPlaybackMode(scope === "pattern" ? "pattern" : "arrangement");
     if (showStatus) {
@@ -2422,6 +2454,26 @@ export function App(): ReactElement {
     selectArrangementBlock(index);
     selectTransportLoopScope("block", false);
     setProjectStatus(`Block ${index + 1} ${block.section} cued as Block loop`);
+  }
+
+  function cueArrangementTransition(transition: ArrangementTransitionMapTransition): void {
+    if (isPlaying) {
+      setProjectStatus("Stop playback before cueing a transition");
+      return;
+    }
+
+    const fromBlock = projectRef.current.arrangement[transition.fromIndex];
+    const toBlock = projectRef.current.arrangement[transition.toIndex];
+    if (!fromBlock || !toBlock) {
+      setProjectStatus("Transition loop unavailable");
+      return;
+    }
+
+    selectArrangementBlock(transition.fromIndex);
+    setArrangementTransitionMapFocusId(transition.id);
+    setTransportLoopScope("transition");
+    setPlaybackMode("arrangement");
+    setProjectStatus(`Transition ${transition.fromIndex + 1}->${transition.toIndex + 1} cued as Transition loop`);
   }
 
   function cueSectionLocator(section: ArrangementSection): void {
@@ -4339,6 +4391,11 @@ export function App(): ReactElement {
       return;
     }
 
+    if (transportLoopScope === "transition" && !arrangementTransitionLoopTarget) {
+      setProjectStatus("Transition loop unavailable");
+      return;
+    }
+
     try {
       setIsPlaying(true);
       controllerRef.current = startRealtimePlayback(project, {
@@ -5195,6 +5252,7 @@ export function App(): ReactElement {
     arrangementArcPreviewSummary,
     arrangementMuteMapSummary,
     arrangementTransitionMapSummary,
+    arrangementTransitionLoopTarget,
     arrangementTemplatePreviewSummary,
     bassMovePreviewSummary,
     canRedo,
@@ -5263,6 +5321,7 @@ export function App(): ReactElement {
     onApplyArrangementArc: applyArrangementArcPad,
     onApplyArrangementFocus: applyArrangementFocusPreset,
     onApplyArrangementTemplate: applyArrangementTemplate,
+    onCueArrangementTransition: cueArrangementTransition,
     onFocusArrangementMuteMap: focusArrangementMuteMapLane,
     onFocusArrangementTransitionMap: focusArrangementTransitionMapTransition,
     onApplyBasslinePad: applyBasslinePad,
@@ -5523,6 +5582,20 @@ export function App(): ReactElement {
               type="button"
             >
               Block
+            </button>
+            <button
+              className={transportLoopScope === "transition" ? "selected" : ""}
+              data-testid="transport-loop-transition"
+              disabled={(isPlaying && transportLoopScope !== "transition") || !arrangementTransitionLoopTarget}
+              onClick={() => selectTransportLoopScope("transition")}
+              title={
+                arrangementTransitionLoopTarget
+                  ? `Loop ${arrangementTransitionLoopTarget.transition.value} transition`
+                  : "Select or focus an adjacent arrangement transition"
+              }
+              type="button"
+            >
+              Turn
             </button>
             <button
               className={transportLoopScope === "pattern" ? "selected" : ""}
@@ -6284,7 +6357,10 @@ export function App(): ReactElement {
             summary={arrangementMuteMapSummary}
           />
           <ArrangementTransitionMap
+            cuedTransitionId={transportLoopScope === "transition" ? arrangementTransitionLoopTarget?.transition.id ?? null : null}
+            isPlaying={isPlaying}
             focusedTransitionId={arrangementTransitionMapFocusId}
+            onCue={cueArrangementTransition}
             onFocus={focusArrangementTransitionMapTransition}
             playingArrangementIndex={playingArrangementIndex}
             summary={arrangementTransitionMapSummary}
@@ -10990,12 +11066,18 @@ function ArrangementMuteMap({
 }
 
 function ArrangementTransitionMap({
+  cuedTransitionId,
   focusedTransitionId,
+  isPlaying,
+  onCue,
   onFocus,
   playingArrangementIndex,
   summary
 }: {
+  cuedTransitionId: ArrangementTransitionMapFocusId | null;
   focusedTransitionId: ArrangementTransitionMapFocusId | null;
+  isPlaying: boolean;
+  onCue: (transition: ArrangementTransitionMapTransition) => void;
   onFocus: (transition: ArrangementTransitionMapTransition) => void;
   playingArrangementIndex: number | null;
   summary: ArrangementTransitionMapSummary;
@@ -11028,6 +11110,7 @@ function ArrangementTransitionMap({
       <div className="arrangement-transition-map-grid" data-testid="arrangement-transition-map-grid">
         {summary.transitions.map((transition) => {
           const focused = focusedTransitionId === transition.id;
+          const cued = cuedTransitionId === transition.id;
           const playing = playingArrangementIndex === transition.fromIndex || playingArrangementIndex === transition.toIndex;
           return (
             <div
@@ -11047,15 +11130,32 @@ function ArrangementTransitionMap({
                 <span data-testid={`arrangement-transition-map-pattern-${transition.id}`}>{transition.patternLabel}</span>
                 <span data-testid={`arrangement-transition-map-mutes-${transition.id}`}>{transition.muteLabel}</span>
               </div>
-              <button
-                aria-pressed={focused}
-                className="arrangement-transition-map-focus-button"
-                onClick={() => onFocus(transition)}
-                title={`Focus transition ${transition.fromIndex + 1} to ${transition.toIndex + 1}: ${transition.status}`}
-                type="button"
-              >
-                <span>{transition.focusLabel}</span>
-              </button>
+              <div className="arrangement-transition-map-card-actions">
+                <button
+                  aria-pressed={focused}
+                  className="arrangement-transition-map-focus-button"
+                  onClick={() => onFocus(transition)}
+                  title={`Focus transition ${transition.fromIndex + 1} to ${transition.toIndex + 1}: ${transition.status}`}
+                  type="button"
+                >
+                  <span>{transition.focusLabel}</span>
+                </button>
+                <button
+                  aria-pressed={cued}
+                  className="arrangement-transition-map-cue-button"
+                  data-testid={`arrangement-transition-map-cue-${transition.id}`}
+                  disabled={isPlaying}
+                  onClick={() => onCue(transition)}
+                  title={
+                    isPlaying
+                      ? "Stop playback before cueing a transition loop"
+                      : `Cue transition loop ${transition.fromIndex + 1} to ${transition.toIndex + 1}`
+                  }
+                  type="button"
+                >
+                  <span>Cue</span>
+                </button>
+              </div>
             </div>
           );
         })}
@@ -11174,6 +11274,7 @@ function createQuickActions({
   arrangementArcPreviewSummary,
   arrangementMuteMapSummary,
   arrangementTransitionMapSummary,
+  arrangementTransitionLoopTarget,
   arrangementTemplatePreviewSummary,
   bassMovePreviewSummary,
   beatPassportSummary,
@@ -11242,6 +11343,7 @@ function createQuickActions({
   onApplyArrangementArc,
   onApplyArrangementFocus,
   onApplyArrangementTemplate,
+  onCueArrangementTransition,
   onFocusArrangementMuteMap,
   onFocusArrangementTransitionMap,
   onApplyBasslinePad,
@@ -11361,6 +11463,7 @@ function createQuickActions({
   arrangementArcPreviewSummary: ArrangementArcPreviewSummary;
   arrangementMuteMapSummary: ArrangementMuteMapSummary;
   arrangementTransitionMapSummary: ArrangementTransitionMapSummary;
+  arrangementTransitionLoopTarget: ArrangementTransitionLoopTarget | null;
   arrangementTemplatePreviewSummary: ArrangementTemplatePreviewSummary;
   bassMovePreviewSummary: BassMovePreviewSummary;
   beatPassportSummary: BeatPassportSummary;
@@ -11429,6 +11532,7 @@ function createQuickActions({
   onApplyArrangementArc: (pad: ArrangementArcPadId) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
+  onCueArrangementTransition: (transition: ArrangementTransitionMapTransition) => void;
   onFocusArrangementMuteMap: (lane: ArrangementMuteMapLane) => void;
   onFocusArrangementTransitionMap: (transition: ArrangementTransitionMapTransition) => void;
   onApplyBasslinePad: (pad: BasslinePadId) => void;
@@ -12570,6 +12674,18 @@ function createQuickActions({
     keywords: `arrangement transition map focus handoff section pattern energy mute drop build turn ${transition.fromSection} ${transition.toSection} ${transition.fromPattern} ${transition.toPattern} ${transition.status} beginner producer`,
     run: () => onFocusArrangementTransitionMap(transition)
   }));
+  const arrangementTransitionLoopActions: QuickAction[] = arrangementTransitionMapSummary.transitions.map((transition) => {
+    const target = createArrangementTransitionLoopTarget(project, arrangementTransitionMapSummary, transition.id, transition.fromIndex);
+    return {
+      id: `transition-loop-cue-${transition.id}`,
+      title: `Cue Transition Loop: ${transition.value}`,
+      detail: target ? arrangementTransitionLoopDetail(target) : "Transition loop unavailable.",
+      group: "Transport",
+      keywords: `transition loop cue audition arrangement handoff turn drop build ${transition.fromSection} ${transition.toSection} ${transition.fromPattern} ${transition.toPattern} ${transition.status} beginner producer`,
+      disabled: isPlaying || !target,
+      run: () => onCueArrangementTransition(transition)
+    };
+  });
   const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
   const arrangementTemplateActions: QuickAction[] = arrangementTemplateIds.map((template) => {
     const targetArrangement = createArrangementTemplate(template);
@@ -12916,9 +13032,9 @@ function createQuickActions({
     {
       id: "toggle-playback",
       title: isPlaying ? "Stop playback" : `Play ${transportLoopLabel(transportLoopScope)} loop`,
-      detail: transportLoopStatus(project, transportLoopScope, selectedArrangementIndex),
+      detail: transportLoopStatus(project, transportLoopScope, selectedArrangementIndex, arrangementTransitionLoopTarget),
       group: "Transport",
-      keywords: "play stop space transport preview arrangement pattern",
+      keywords: "play stop space transport preview arrangement transition pattern",
       run: onTogglePlayback
     },
     {
@@ -12942,6 +13058,25 @@ function createQuickActions({
       run: () => onSelectTransportLoopScope("block")
     },
     {
+      id: "transition-loop-cue",
+      title: arrangementTransitionLoopTarget
+        ? `Cue Transition Loop: ${arrangementTransitionLoopTarget.transition.value}`
+        : "Cue Transition Loop",
+      detail: arrangementTransitionLoopTarget
+        ? arrangementTransitionLoopDetail(arrangementTransitionLoopTarget)
+        : "Focus or select adjacent arrangement blocks first.",
+      group: "Transport",
+      keywords: `transition loop cue audition arrangement handoff turn drop build ${
+        arrangementTransitionLoopTarget?.transition.fromSection ?? "none"
+      } ${arrangementTransitionLoopTarget?.transition.toSection ?? "none"} beginner producer`,
+      disabled: isPlaying || !arrangementTransitionLoopTarget,
+      run: () => {
+        if (arrangementTransitionLoopTarget) {
+          onCueArrangementTransition(arrangementTransitionLoopTarget.transition);
+        }
+      }
+    },
+    {
       id: "loop-pattern",
       title: "Loop selected pattern",
       detail: `Pattern ${project.selectedPattern} two-bar preview.`,
@@ -12950,6 +13085,7 @@ function createQuickActions({
       disabled: isPlaying && transportLoopScope !== "pattern",
       run: () => onSelectTransportLoopScope("pattern")
     },
+    ...arrangementTransitionLoopActions,
     ...sectionLocatorActions,
     ...arrangementBlockCueActions,
     {
@@ -14121,6 +14257,8 @@ function createQuickActionResult(
     action.id.startsWith("arrangement-mute-map-lane-") ||
     action.id === "arrangement-transition-map-focus" ||
     action.id.startsWith("arrangement-transition-map-transition-") ||
+    action.id === "transition-loop-cue" ||
+    action.id.startsWith("transition-loop-cue-") ||
     action.id === "handoff-package-check-focus" ||
     action.id.startsWith("handoff-package-check-card-") ||
     action.id.startsWith("arrangement-block-cue-") ||
@@ -14908,6 +15046,14 @@ function quickActionResultMetricSnapshot(
     return {
       id: "arrangement-transition-map",
       label: "Transition map",
+      value: action.detail
+    };
+  }
+
+  if (action.id === "transition-loop-cue" || action.id.startsWith("transition-loop-cue-")) {
+    return {
+      id: "transition-loop",
+      label: "Transition loop",
       value: action.detail
     };
   }
@@ -15803,6 +15949,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused transition card to check whether the handoff needs a fill, drop, build, pattern change, or layer change.",
       nextCheck: "Edit only the adjacent arrangement blocks or Pattern tail if the transition still feels flat."
+    };
+  }
+
+  if (action.id === "transition-loop-cue" || action.id.startsWith("transition-loop-cue-")) {
+    return {
+      auditionCue: "Play Turn loop and listen only to the cued two-block handoff before editing fills, energy, or mutes.",
+      nextCheck: "Return to Transition Map or Arrangement Focus after the loop to decide whether the boundary needs a Pattern, layer, or energy change."
     };
   }
 
@@ -20974,6 +21127,52 @@ function activeArrangementTransitionMapQuickActionTransition(
   );
 }
 
+type ArrangementTransitionLoopTarget = {
+  transition: ArrangementTransitionMapTransition;
+  startBar: number;
+  endBar: number;
+  bars: number;
+};
+
+function createArrangementTransitionLoopTarget(
+  project: ProjectState,
+  summary: ArrangementTransitionMapSummary,
+  focusedTransitionId: ArrangementTransitionMapFocusId | null,
+  selectedIndex: number
+): ArrangementTransitionLoopTarget | null {
+  const focusedTransition =
+    focusedTransitionId === null ? null : summary.transitions.find((transition) => transition.id === focusedTransitionId) ?? null;
+  const selectedTransition =
+    summary.transitions.find((transition) => transition.fromIndex === selectedIndex) ??
+    summary.transitions.find((transition) => transition.toIndex === selectedIndex) ??
+    null;
+  const transition = focusedTransition ?? selectedTransition ?? activeArrangementTransitionMapQuickActionTransition(summary);
+  if (!transition) {
+    return null;
+  }
+
+  const fromBlock = project.arrangement[transition.fromIndex];
+  const toBlock = project.arrangement[transition.toIndex];
+  if (!fromBlock || !toBlock) {
+    return null;
+  }
+
+  const startBar = arrangementStartBar(project, transition.fromIndex);
+  const bars = normalizeArrangementBars(fromBlock.bars) + normalizeArrangementBars(toBlock.bars);
+  return {
+    transition,
+    startBar,
+    endBar: startBar + bars,
+    bars
+  };
+}
+
+function arrangementTransitionLoopDetail(target: ArrangementTransitionLoopTarget): string {
+  return `Blocks ${target.transition.fromIndex + 1}->${target.transition.toIndex + 1} / Bars ${target.startBar + 1}-${
+    target.endBar
+  } / ${barCountLabel(target.bars)} / ${target.transition.patternLabel}`;
+}
+
 function uniquePatternSlots(slots: PatternSlot[]): PatternSlot[] {
   return patternSlots.filter((slot) => slots.includes(slot));
 }
@@ -21955,12 +22154,19 @@ function transportLoopLabel(scope: TransportLoopScope): string {
       return "Song";
     case "block":
       return "Block";
+    case "transition":
+      return "Turn";
     case "pattern":
       return "Pattern";
   }
 }
 
-function transportLoopStatus(project: ProjectState, scope: TransportLoopScope, selectedIndex: number): string {
+function transportLoopStatus(
+  project: ProjectState,
+  scope: TransportLoopScope,
+  selectedIndex: number,
+  transitionTarget: ArrangementTransitionLoopTarget | null = null
+): string {
   if (scope === "pattern") {
     return `Pattern ${project.selectedPattern} / ${barCountLabel(2)} loop`;
   }
@@ -21973,6 +22179,16 @@ function transportLoopStatus(project: ProjectState, scope: TransportLoopScope, s
     return `Block ${Math.min(selectedIndex + 1, project.arrangement.length)} ${block.section} / Pattern ${block.pattern} / ${barCountLabel(block.bars)}`;
   }
 
+  if (scope === "transition") {
+    if (!transitionTarget) {
+      return "Transition loop unavailable";
+    }
+
+    return `${transitionTarget.transition.value} / Bars ${transitionTarget.startBar + 1}-${transitionTarget.endBar} / ${barCountLabel(
+      transitionTarget.bars
+    )}`;
+  }
+
   return `${barCountLabel(arrangementTotalBars(project))} song loop`;
 }
 
@@ -21982,16 +22198,15 @@ function createTransportPositionReadoutSummary(
   playbackPosition: PlaybackSnapshot | null,
   scope: TransportLoopScope,
   selectedIndex: number,
-  selectedStartBar: number
+  selectedStartBar: number,
+  transitionTarget: ArrangementTransitionLoopTarget | null = null
 ): TransportPositionReadoutSummary {
   const loopLabel = transportLoopLabel(scope);
   if (isPlaying && playbackPosition) {
     const step = (playbackPosition.loopStep % 16) + 1;
-    const playingBlockStartBar =
-      typeof playbackPosition.arrangementIndex === "number"
-        ? arrangementStartBar(project, playbackPosition.arrangementIndex)
-        : selectedStartBar;
-    const songBar = scope === "block" ? playingBlockStartBar + playbackPosition.bar : playbackPosition.bar;
+    const loopStartBar =
+      scope === "block" ? selectedStartBar : scope === "transition" && transitionTarget ? transitionTarget.startBar : 0;
+    const songBar = playbackPosition.mode === "arrangement" ? loopStartBar + playbackPosition.bar : playbackPosition.bar;
     const sectionLabel =
       playbackPosition.mode === "pattern" ? `Pattern ${playbackPosition.pattern}` : playbackPosition.section ?? "Arrangement";
 
@@ -22034,6 +22249,28 @@ function createTransportPositionReadoutSummary(
       statusLabel: `Cued ${block.section}`,
       detailLabel: `Block ${blockNumber} / Pattern ${block.pattern}`,
       detailTitle: `Block loop is cued at song bar ${blockStartBar + 1}, beat 1, step 1 for ${block.section} block ${blockNumber}, Pattern ${block.pattern}, ${barCountLabel(block.bars)}.`,
+      tone: "warn"
+    };
+  }
+
+  if (scope === "transition") {
+    if (!transitionTarget) {
+      return {
+        roleLabel: "No transition",
+        statusLabel: "Cued Turn",
+        detailLabel: "Focus an adjacent handoff",
+        detailTitle: "Transition loop has no adjacent arrangement blocks to cue.",
+        tone: "danger"
+      };
+    }
+
+    return {
+      roleLabel: `Bar ${transitionTarget.startBar + 1}.1`,
+      statusLabel: "Cued Turn",
+      detailLabel: `${transitionTarget.transition.value} / ${barCountLabel(transitionTarget.bars)}`,
+      detailTitle: `Transition loop is cued at song bar ${transitionTarget.startBar + 1}, beat 1, step 1 across ${
+        transitionTarget.transition.value
+      }, ${barCountLabel(transitionTarget.bars)}.`,
       tone: "warn"
     };
   }
