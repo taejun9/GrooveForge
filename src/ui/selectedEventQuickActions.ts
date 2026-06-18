@@ -172,6 +172,8 @@ export function createSelectedEventQuickActions({
     selectedNote && selectedNoteActive ? clampVelocity(keyboardCaptureDefaults[selectedNote.track].velocity) : null;
   const selectedNoteProbability = selectedNoteEvent ? normalizeEventProbability(selectedNoteEvent.probability) : null;
   const selectedNoteLength = selectedNoteEvent ? clampStepLength(selectedNoteEvent.length) : null;
+  const selectedNoteLengthDefault =
+    selectedNote && selectedNoteActive ? clampStepLength(keyboardCaptureDefaults[selectedNote.track].length) : null;
   const selectedNoteGlide =
     selectedNote?.track === "bass" && selectedNoteEvent ? Boolean((selectedNoteEvent as { glide?: boolean }).glide) : null;
   const selectedNoteUsedPitches =
@@ -420,6 +422,18 @@ export function createSelectedEventQuickActions({
       keywords: "selected note length lengthen duration articulation longer sustain 808 synth edit keyboard capture midi beginner producer",
       disabled: selectedNoteLength === null || selectedNoteLength >= steps.length,
       run: () => selectedNoteLength !== null && onUpdateSelectedNoteLength(selectedNoteLength + 1)
+    },
+    {
+      id: "selected-note-length-reset",
+      title: "Reset selected note length",
+      detail:
+        selectedNoteLength !== null && selectedNoteLengthDefault !== null
+          ? `${selectedNoteLabel} length ${selectedNoteLength} -> ${selectedNoteLengthDefault}`
+          : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note length reset default duration articulation keyboard capture 808 synth edit beginner producer",
+      disabled: selectedNoteLength === null || selectedNoteLengthDefault === null || selectedNoteLength === selectedNoteLengthDefault,
+      run: () => selectedNoteLengthDefault !== null && onUpdateSelectedNoteLength(selectedNoteLengthDefault)
     },
     {
       id: "selected-note-glide-toggle",
