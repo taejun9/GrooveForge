@@ -2006,6 +2006,49 @@ export type SongFormOverviewSummary = {
   selectedIndex: number;
 };
 
+export type ArrangementMuteMapFocusId = ArrangementMuteTrack;
+
+export type ArrangementMuteMapLane = {
+  id: ArrangementMuteMapFocusId;
+  label: string;
+  value: string;
+  status: string;
+  detail: string;
+  focusLabel: string;
+  mutedBlocks: number;
+  mutedBars: number;
+  tone: MixCoachTone;
+};
+
+export type ArrangementMuteMapSegment = {
+  index: number;
+  section: ArrangementSection;
+  pattern: PatternSlot;
+  startBar: number;
+  endBar: number;
+  bars: number;
+  mutedTracks: ArrangementMuteTrack[];
+  muteCount: number;
+  tone: MixCoachTone;
+};
+
+export type ArrangementMuteMapSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  lanes: ArrangementMuteMapLane[];
+  segments: ArrangementMuteMapSegment[];
+};
+
+export type ArrangementMuteMapFocusSummary = {
+  focusId: ArrangementMuteMapFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type SectionLocatorPad = {
   section: ArrangementSection;
   index: number | null;

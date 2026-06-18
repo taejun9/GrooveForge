@@ -404,6 +404,11 @@ import type {
   SongFormMetric,
   SongFormSegment,
   SongFormOverviewSummary,
+  ArrangementMuteMapFocusId,
+  ArrangementMuteMapLane,
+  ArrangementMuteMapSegment,
+  ArrangementMuteMapSummary,
+  ArrangementMuteMapFocusSummary,
   SectionLocatorPad,
   ArrangementBlockRoleSummary,
   MixerChannelRoleSummary,
@@ -928,6 +933,7 @@ export function App(): ReactElement {
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
   const [hookReadinessFocusId, setHookReadinessFocusId] = useState<HookReadinessFocusId | null>(null);
   const [toplineSpaceFocusId, setToplineSpaceFocusId] = useState<ToplineSpaceFocusId | null>(null);
+  const [arrangementMuteMapFocusId, setArrangementMuteMapFocusId] = useState<ArrangementMuteMapFocusId | null>(null);
   const [keyCompassFocusId, setKeyCompassFocusId] = useState<KeyCompassFocusId | null>(null);
   const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
@@ -996,6 +1002,7 @@ export function App(): ReactElement {
     () => createSongFormOverviewSummary(project, selectedArrangementIndex),
     [project, selectedArrangementIndex]
   );
+  const arrangementMuteMapSummary = useMemo(() => createArrangementMuteMapSummary(project), [project]);
   const productionSnapshotSummary = useMemo(
     () => createProductionSnapshotSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
@@ -4964,6 +4971,12 @@ export function App(): ReactElement {
     setProjectStatus(`Topline ${card.label}: ${card.value}`);
   }
 
+  function focusArrangementMuteMapLane(lane: ArrangementMuteMapLane): void {
+    setArrangementMuteMapFocusId(lane.id);
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Mute Map ${lane.label}: ${lane.value}`);
+  }
+
   function focusModeFocusCard(card: ModeFocusCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5167,6 +5180,7 @@ export function App(): ReactElement {
   const quickActions = createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
+    arrangementMuteMapSummary,
     arrangementTemplatePreviewSummary,
     bassMovePreviewSummary,
     canRedo,
@@ -5235,6 +5249,7 @@ export function App(): ReactElement {
     onApplyArrangementArc: applyArrangementArcPad,
     onApplyArrangementFocus: applyArrangementFocusPreset,
     onApplyArrangementTemplate: applyArrangementTemplate,
+    onFocusArrangementMuteMap: focusArrangementMuteMapLane,
     onApplyBasslinePad: applyBasslinePad,
     onApplyBassGlidePad: applyBassGlidePad,
     onApplyBassContour: applyBassContour,
@@ -6246,6 +6261,12 @@ export function App(): ReactElement {
             result={arrangementFocusResult}
             summary={selectedArrangementFocus}
             onApply={applyArrangementFocusPreset}
+          />
+          <ArrangementMuteMap
+            focusedLaneId={arrangementMuteMapFocusId}
+            onFocus={focusArrangementMuteMapLane}
+            playingArrangementIndex={playingArrangementIndex}
+            summary={arrangementMuteMapSummary}
           />
           <div
             className={["arrangement-playback-readout", arrangementPlaybackReadout.tone].join(" ")}
@@ -10855,6 +10876,98 @@ function SongFormOverview({
   );
 }
 
+function ArrangementMuteMap({
+  focusedLaneId,
+  onFocus,
+  playingArrangementIndex,
+  summary
+}: {
+  focusedLaneId: ArrangementMuteMapFocusId | null;
+  onFocus: (lane: ArrangementMuteMapLane) => void;
+  playingArrangementIndex: number | null;
+  summary: ArrangementMuteMapSummary;
+}): ReactElement {
+  const focusSummary = createArrangementMuteMapFocusSummary(summary, focusedLaneId);
+
+  return (
+    <section className={`arrangement-mute-map ${summary.tone}`} data-testid="arrangement-mute-map" aria-label="Arrangement mute map">
+      <div className="arrangement-mute-map-heading">
+        <div>
+          <ListChecks size={17} aria-hidden="true" />
+          <span>Mute Map</span>
+        </div>
+        <strong data-testid="arrangement-mute-map-headline">{summary.headline}</strong>
+        <small data-testid="arrangement-mute-map-detail">{summary.detail}</small>
+      </div>
+      <div
+        className={`arrangement-mute-map-focus-readout ${focusSummary.tone}`}
+        data-testid="arrangement-mute-map-focus-readout"
+        title={focusSummary.detailTitle}
+      >
+        <span data-testid="arrangement-mute-map-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="arrangement-mute-map-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="arrangement-mute-map-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
+      <div className="arrangement-mute-map-lanes" data-testid="arrangement-mute-map-lanes">
+        {summary.lanes.map((lane) => {
+          const focused = focusedLaneId === lane.id;
+          return (
+            <div className={`arrangement-mute-map-lane ${lane.tone} ${focused ? "focused" : ""}`} data-testid={`arrangement-mute-map-lane-${lane.id}`} key={lane.id}>
+              <span>{lane.label}</span>
+              <strong>{lane.value}</strong>
+              <small>{lane.detail}</small>
+              <button
+                aria-pressed={focused}
+                className="arrangement-mute-map-focus-button"
+                onClick={() => onFocus(lane)}
+                title={`Focus ${lane.label}: ${lane.status}`}
+                type="button"
+              >
+                <span>{lane.focusLabel}</span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <div className="arrangement-mute-map-grid" data-testid="arrangement-mute-map-grid">
+        {summary.segments.map((segment) => {
+          const playing = segment.index === playingArrangementIndex;
+          return (
+            <div className={`arrangement-mute-map-segment ${segment.tone} ${playing ? "playing" : ""}`} data-testid={`arrangement-mute-map-segment-${segment.index}`} key={`${segment.section}-${segment.index}`}>
+              <div className="arrangement-mute-map-segment-label">
+                <span>
+                  {segment.index + 1}. {segment.section}
+                </span>
+                <small>
+                  Pattern {segment.pattern} / {segment.startBar}-{segment.endBar}
+                </small>
+              </div>
+              <div className="arrangement-mute-map-cells" aria-label={`Block ${segment.index + 1} layer mutes`}>
+                {arrangementMuteTrackIds.map((track) => {
+                  const muted = segment.mutedTracks.includes(track);
+                  const focused = focusedLaneId === track;
+                  return (
+                    <span
+                      className={["arrangement-mute-map-cell", muted ? "muted" : "live", focused ? "focused" : ""]
+                        .filter(Boolean)
+                        .join(" ")}
+                      data-testid={`arrangement-mute-map-cell-${segment.index}-${track}`}
+                      key={track}
+                      title={`${arrangementMuteTrackLabel(track)} ${muted ? "muted" : "live"} in ${segment.section}`}
+                    >
+                      {muted ? "Mute" : "Live"}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function NextMove({
   actions,
   result,
@@ -10963,6 +11076,7 @@ function isArrangementMovePresetApplied(block: ArrangementBlock, preset: Arrange
 function createQuickActions({
   arrangementArcPadOptions,
   arrangementArcPreviewSummary,
+  arrangementMuteMapSummary,
   arrangementTemplatePreviewSummary,
   bassMovePreviewSummary,
   beatPassportSummary,
@@ -11031,6 +11145,7 @@ function createQuickActions({
   onApplyArrangementArc,
   onApplyArrangementFocus,
   onApplyArrangementTemplate,
+  onFocusArrangementMuteMap,
   onApplyBasslinePad,
   onApplyBassGlidePad,
   onApplyBassContour,
@@ -11146,6 +11261,7 @@ function createQuickActions({
 }: {
   arrangementArcPadOptions: ArrangementArcPadOption[];
   arrangementArcPreviewSummary: ArrangementArcPreviewSummary;
+  arrangementMuteMapSummary: ArrangementMuteMapSummary;
   arrangementTemplatePreviewSummary: ArrangementTemplatePreviewSummary;
   bassMovePreviewSummary: BassMovePreviewSummary;
   beatPassportSummary: BeatPassportSummary;
@@ -11214,6 +11330,7 @@ function createQuickActions({
   onApplyArrangementArc: (pad: ArrangementArcPadId) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
+  onFocusArrangementMuteMap: (lane: ArrangementMuteMapLane) => void;
   onApplyBasslinePad: (pad: BasslinePadId) => void;
   onApplyBassGlidePad: (pad: BassGlidePadId) => void;
   onApplyBassContour: (contour: BassContourId) => void;
@@ -12335,6 +12452,15 @@ function createQuickActions({
     arrangementFocusSummary
   );
   const arrangementFocusReady = Boolean(arrangementFocusPreviewSummary && arrangementFocusPreviewSummary.statusLabel !== "Focus aligned");
+  const arrangementMuteMapLane = activeArrangementMuteMapQuickActionLane(arrangementMuteMapSummary);
+  const arrangementMuteMapActions: QuickAction[] = arrangementMuteMapSummary.lanes.map((lane) => ({
+    id: `arrangement-mute-map-lane-${lane.id}`,
+    title: `Focus Arrangement Mute Map: ${lane.label}`,
+    detail: `${lane.value} / ${lane.status} / ${lane.detail}`,
+    group: "Arrange",
+    keywords: `arrangement mute map lane focus layer section drop build space ${lane.id} ${lane.label} ${lane.status} ${lane.detail} beginner producer`,
+    run: () => onFocusArrangementMuteMap(lane)
+  }));
   const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
   const arrangementTemplateActions: QuickAction[] = arrangementTemplateIds.map((template) => {
     const targetArrangement = createArrangementTemplate(template);
@@ -13398,6 +13524,22 @@ function createQuickActions({
       }
     },
     ...arrangementFocusPresetActions,
+    {
+      id: "arrangement-mute-map-focus",
+      title: arrangementMuteMapLane ? `Focus Mute Map: ${arrangementMuteMapLane.label}` : "Focus Arrangement Mute Map",
+      detail: arrangementMuteMapLane
+        ? `${arrangementMuteMapLane.value} / ${arrangementMuteMapLane.status}`
+        : "No Arrangement Mute Map lane available.",
+      group: "Arrange",
+      keywords: `arrangement mute map focus layer mutes section drop build space ${arrangementMuteMapLane?.id ?? "none"} ${arrangementMuteMapLane?.label ?? "none"} beginner producer`,
+      disabled: !arrangementMuteMapLane,
+      run: () => {
+        if (arrangementMuteMapLane) {
+          onFocusArrangementMuteMap(arrangementMuteMapLane);
+        }
+      }
+    },
+    ...arrangementMuteMapActions,
     ...patternChainActions,
     {
       id: "chain-expand",
@@ -13846,6 +13988,8 @@ function createQuickActionResult(
     action.id.startsWith("production-snapshot-metric-") ||
     action.id === "topline-space-focus" ||
     action.id.startsWith("topline-space-card-") ||
+    action.id === "arrangement-mute-map-focus" ||
+    action.id.startsWith("arrangement-mute-map-lane-") ||
     action.id === "handoff-package-check-focus" ||
     action.id.startsWith("handoff-package-check-card-") ||
     action.id.startsWith("arrangement-block-cue-") ||
@@ -14599,6 +14743,23 @@ function quickActionResultMetricSnapshot(
     return {
       id: "topline-space",
       label: "Topline space",
+      value: action.detail
+    };
+  }
+
+  if (action.id === "arrangement-mute-map-focus") {
+    const summary = createArrangementMuteMapSummary(project);
+    return {
+      id: "arrangement-mute-map",
+      label: "Mute map",
+      value: `${summary.headline} / ${summary.detail}`
+    };
+  }
+
+  if (action.id.startsWith("arrangement-mute-map-lane-")) {
+    return {
+      id: "arrangement-mute-map",
+      label: "Mute map",
       value: action.detail
     };
   }
@@ -15466,6 +15627,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Topline Space card before trimming melody, arranging the hook, checking mix space, or filling brief context.",
       nextCheck: "Return to Topline Space when you need another direct vocal pocket, lead room, arrangement, mix, or brief focus."
+    };
+  }
+
+  if (action.id === "arrangement-mute-map-focus") {
+    return {
+      auditionCue: "Use the focused Arrangement Mute Map lane to hear where that layer drops out across Song playback.",
+      nextCheck: "Return to Mute Map, Song Form Overview, or Arrangement Focus before changing block mutes."
+    };
+  }
+
+  if (action.id.startsWith("arrangement-mute-map-lane-")) {
+    return {
+      auditionCue: "Play Song loop and follow the focused Mute Map lane through each section before editing block mutes.",
+      nextCheck: "Use the selected-block mute buttons only when the lane needs more drop, build, or hook contrast."
     };
   }
 
@@ -20326,6 +20501,147 @@ function createToplineSpaceFocusSummary(
 
 function activeToplineSpaceQuickActionCard(summary: ToplineSpaceSummary): ToplineSpaceCard | null {
   return summary.cards.find((card) => card.tone === "danger") ?? summary.cards.find((card) => card.tone === "warn") ?? summary.cards[0] ?? null;
+}
+
+function createArrangementMuteMapSummary(project: ProjectState): ArrangementMuteMapSummary {
+  const totalBlocks = project.arrangement.length;
+  const totalBars = arrangementTotalBars(project);
+  const normalizedBlocks = project.arrangement.map((block) => ({
+    ...block,
+    bars: normalizeArrangementBars(block.bars),
+    mutedTracks: normalizeArrangementMutedTracks(block.mutedTracks)
+  }));
+  const lanes: ArrangementMuteMapLane[] = arrangementMuteTrackIds.map((track) => {
+    const mutedBlocks = normalizedBlocks.filter((block) => block.mutedTracks.includes(track));
+    const mutedBars = mutedBlocks.reduce((total, block) => total + block.bars, 0);
+    const tone = arrangementMuteMapLaneTone(mutedBlocks.length, totalBlocks, mutedBars, totalBars);
+    const label = arrangementMuteTrackLabel(track);
+    const status =
+      totalBlocks === 0
+        ? "No blocks"
+        : mutedBlocks.length === 0
+          ? "Always live"
+          : mutedBlocks.length === totalBlocks
+            ? "Muted all song"
+            : "Contrast set";
+
+    return {
+      id: track,
+      label,
+      value: mutedBlocks.length === 0 ? "0 blocks" : `${barCountLabel(mutedBars)} muted`,
+      status,
+      detail: `${mutedBlocks.length}/${totalBlocks} blocks / ${barCountLabel(totalBars)} song`,
+      focusLabel: "Arrange",
+      mutedBlocks: mutedBlocks.length,
+      mutedBars,
+      tone
+    };
+  });
+  const segments = createArrangementMuteMapSegments(project);
+  const lanesWithMutes = lanes.filter((lane) => lane.mutedBlocks > 0).length;
+  const totalMuteMarks = normalizedBlocks.reduce((total, block) => total + block.mutedTracks.length, 0);
+  const allSongMuted = lanes.some((lane) => totalBlocks > 0 && lane.mutedBlocks === totalBlocks);
+  const tone: MixCoachTone =
+    totalBlocks === 0 || allSongMuted ? "danger" : totalMuteMarks === 0 || lanesWithMutes <= 1 ? "warn" : "good";
+  const headline =
+    tone === "good"
+      ? "Layer space is mapped"
+      : tone === "warn"
+        ? totalMuteMarks === 0
+          ? "No block mutes yet"
+          : "Mute map is light"
+        : "Mute map needs review";
+  const detail = `${totalMuteMarks} block mute${totalMuteMarks === 1 ? "" : "s"} / ${lanesWithMutes}/${arrangementMuteTrackIds.length} lanes / ${barCountLabel(totalBars)}`;
+
+  return {
+    headline,
+    detail,
+    tone,
+    lanes,
+    segments
+  };
+}
+
+function createArrangementMuteMapSegments(project: ProjectState): ArrangementMuteMapSegment[] {
+  let startBar = 1;
+  return project.arrangement.map((block, index) => {
+    const bars = normalizeArrangementBars(block.bars);
+    const endBar = startBar + bars - 1;
+    const mutedTracks = normalizeArrangementMutedTracks(block.mutedTracks);
+    const segment: ArrangementMuteMapSegment = {
+      index,
+      section: block.section,
+      pattern: block.pattern,
+      startBar,
+      endBar,
+      bars,
+      mutedTracks,
+      muteCount: mutedTracks.length,
+      tone: arrangementMuteMapSegmentTone(mutedTracks.length)
+    };
+    startBar = endBar + 1;
+    return segment;
+  });
+}
+
+function arrangementMuteMapLaneTone(
+  mutedBlocks: number,
+  totalBlocks: number,
+  mutedBars: number,
+  totalBars: number
+): MixCoachTone {
+  if (totalBlocks === 0 || mutedBlocks === totalBlocks) {
+    return "danger";
+  }
+  if (mutedBlocks === 0 || mutedBars > totalBars * 0.75) {
+    return "warn";
+  }
+  return "good";
+}
+
+function arrangementMuteMapSegmentTone(muteCount: number): MixCoachTone {
+  if (muteCount >= arrangementMuteTrackIds.length) {
+    return "danger";
+  }
+  if (muteCount >= 3) {
+    return "warn";
+  }
+  return "good";
+}
+
+function createArrangementMuteMapFocusSummary(
+  summary: ArrangementMuteMapSummary,
+  focusedLaneId: ArrangementMuteMapFocusId | null
+): ArrangementMuteMapFocusSummary {
+  const focusedLane = focusedLaneId ? summary.lanes.find((lane) => lane.id === focusedLaneId) ?? null : null;
+  const lane = focusedLane ?? activeArrangementMuteMapQuickActionLane(summary);
+
+  if (!lane) {
+    return {
+      focusId: null,
+      statusLabel: "No mute lane",
+      areaLabel: "No arrangement focus",
+      detailLabel: "Add arrangement blocks before scanning mutes",
+      detailTitle: "Arrangement Mute Map has no lanes to focus.",
+      tone: "danger"
+    };
+  }
+
+  const statusLabel = focusedLane ? "Focused Mute Map" : "Mute Map Focus";
+  const detailLabel = `${lane.status} / ${lane.detail}`;
+
+  return {
+    focusId: lane.id,
+    statusLabel,
+    areaLabel: `${lane.label}: ${lane.value}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${lane.label}: ${lane.value} / ${detailLabel}`,
+    tone: lane.tone
+  };
+}
+
+function activeArrangementMuteMapQuickActionLane(summary: ArrangementMuteMapSummary): ArrangementMuteMapLane | null {
+  return summary.lanes.find((lane) => lane.tone === "danger") ?? summary.lanes.find((lane) => lane.tone === "warn") ?? summary.lanes[0] ?? null;
 }
 
 function uniquePatternSlots(slots: PatternSlot[]): PatternSlot[] {
