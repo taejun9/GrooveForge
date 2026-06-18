@@ -7205,6 +7205,7 @@ export function App(): ReactElement {
     beatSpineSummary,
     chordMovePreviewSummary,
     composerGuideSummary,
+    composerActionsSummary,
     drumKitPreviewSummary,
     drumMovePreviewSummary,
     firstBeatPathSummary,
@@ -7338,6 +7339,7 @@ export function App(): ReactElement {
     onJumpBeatSpine: jumpToBeatSpineTarget,
     onFocusBeatPassport: focusBeatPassportMetric,
     onFocusComposerGuide: focusComposerGuideCard,
+    onRunComposerAction: runComposerAction,
     onFocusExportPreflight: focusExportPreflightCard,
     onFocusFinishChecklist: focusFinishChecklistCard,
     onFocusGrooveCompass: focusGrooveCompassItem,
@@ -12622,6 +12624,7 @@ function createQuickActions({
   canRedo,
   canUndo,
   composerGuideSummary,
+  composerActionsSummary,
   drumKitPreviewSummary,
   drumMovePreviewSummary,
   firstBeatPathSummary,
@@ -12755,6 +12758,7 @@ function createQuickActions({
   onJumpBeatSpine,
   onFocusBeatPassport,
   onFocusComposerGuide,
+  onRunComposerAction,
   onFocusExportPreflight,
   onFocusFinishChecklist,
   onFocusGrooveCompass,
@@ -12785,6 +12789,7 @@ function createQuickActions({
   canRedo: boolean;
   canUndo: boolean;
   composerGuideSummary: ComposerGuideSummary;
+  composerActionsSummary: ComposerActionsSummary;
   drumKitPreviewSummary: DrumKitPreviewSummary;
   drumMovePreviewSummary: DrumMovePreviewSummary;
   firstBeatPathSummary: FirstBeatPathSummary;
@@ -12918,6 +12923,7 @@ function createQuickActions({
   onJumpBeatSpine: (card: BeatSpineCard) => void;
   onFocusBeatPassport: (metric: BeatPassportFocusItem) => void;
   onFocusComposerGuide: (card: ComposerGuideCard) => void;
+  onRunComposerAction: (action: ComposerAction) => void;
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
   onFocusFinishChecklist: (card: FinishChecklistCard) => void;
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
@@ -13041,6 +13047,14 @@ function createQuickActions({
     group: "Create",
     keywords: `composer guide focus card writing lane ${card.id} ${card.label} ${card.status} ${card.focusLabel} ${card.detail} drums 808 bass harmony melody arrange finish beginner producer`,
     run: () => onFocusComposerGuide(card)
+  }));
+  const composerActionCommands: QuickAction[] = composerActionsSummary.actions.map((action) => ({
+    id: `composer-action-${action.id}`,
+    title: `Run Composer Action: ${action.buttonLabel}`,
+    detail: `${action.label} / ${action.scope} / ${action.impact} / ${action.safety}`,
+    group: composerActionQuickActionGroup(action),
+    keywords: `composer action direct writing move style aware ${action.id} ${action.area} ${action.label} ${action.buttonLabel} ${action.detail} ${action.scope} ${action.impact} ${action.safety} drums 808 bass harmony melody arrange finish sample free beginner producer`,
+    run: () => onRunComposerAction(action)
   }));
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
   const exportPreflightActions: QuickAction[] = exportPreflightSummary.cards.map((card) => ({
@@ -14226,6 +14240,7 @@ function createQuickActions({
       }
     },
     ...composerGuideActions,
+    ...composerActionCommands,
     {
       id: "style-inspector-focus",
       title: styleInspectorItem ? `Focus Style Inspector: ${styleInspectorItem.label}` : "Focus Style Inspector",
@@ -14854,6 +14869,44 @@ function createQuickActions({
   ];
 }
 
+function composerActionQuickActionGroup(action: ComposerAction): string {
+  if (action.area === "arrange") {
+    return "Arrange";
+  }
+  if (action.area === "finish") {
+    return "Mix";
+  }
+  return "Create";
+}
+
+function composerActionQuickActionArea(actionId: string): ComposerActionArea | null {
+  if (!actionId.startsWith("composer-action-")) {
+    return null;
+  }
+
+  const actionSlug = actionId.slice("composer-action-".length);
+  if (actionSlug.startsWith("drums-")) {
+    return "drums";
+  }
+  if (actionSlug === "bassline" || actionSlug.startsWith("bass-")) {
+    return "bass";
+  }
+  if (actionSlug.startsWith("chord-")) {
+    return "harmony";
+  }
+  if (actionSlug.startsWith("melody-")) {
+    return "melody";
+  }
+  if (actionSlug.startsWith("arrange-")) {
+    return "arrange";
+  }
+  if (actionSlug.startsWith("finish-")) {
+    return "finish";
+  }
+
+  return null;
+}
+
 const quickActionScopeDefinitions: Array<Omit<QuickActionScopeOption, "count">> = [
   { id: "all", label: "All" },
   { id: "transport", label: "Transport" },
@@ -14940,9 +14993,13 @@ function quickActionMatchesScope(action: QuickAction, scope: QuickActionScopeId)
     case "arrange":
       return action.group === "Arrange";
     case "mix":
-      return action.group === "Mix" && !action.id.startsWith("master-finish-");
+      return (
+        action.group === "Mix" &&
+        !action.id.startsWith("master-finish-") &&
+        composerActionQuickActionArea(action.id) !== "finish"
+      );
     case "master":
-      return action.id.startsWith("master-finish-");
+      return action.id.startsWith("master-finish-") || composerActionQuickActionArea(action.id) === "finish";
     case "project":
       return action.group === "Project" || action.group === "Edit";
     case "export":
@@ -15220,6 +15277,29 @@ function quickActionResultMetricSnapshot(
       label: "Composer guide",
       value: action.detail
     };
+  }
+
+  const composerQuickActionArea = composerActionQuickActionArea(action.id);
+  if (composerQuickActionArea) {
+    const pattern = activePattern(project);
+    switch (composerQuickActionArea) {
+      case "drums":
+        return { id: "composer-drums", label: "Composer drums", value: `${drumHitCount(pattern)} hits` };
+      case "bass":
+        return { id: "composer-808", label: "Composer 808", value: `${pattern.bassNotes.length} notes` };
+      case "harmony":
+        return { id: "composer-harmony", label: "Composer harmony", value: `${pattern.chordEvents.length} events` };
+      case "melody":
+        return { id: "composer-melody", label: "Composer melody", value: `${pattern.melodyNotes.length} notes` };
+      case "arrange":
+        return { id: "composer-arrange", label: "Composer arrange", value: barCountLabel(arrangementTotalBars(project)) };
+      case "finish":
+        return {
+          id: "composer-finish",
+          label: "Composer finish",
+          value: `${project.masterPreset} / ${formatDb(project.masterCeilingDb)}`
+        };
+    }
   }
 
   if (action.id === "key-compass-focus") {
@@ -15939,6 +16019,42 @@ function quickActionResultFollowup(
       auditionCue: "Use the focused Composer Guide lane to inspect that writing area before applying any move.",
       nextCheck: "Return to Composer Guide when you need another direct drums, 808, harmony, melody, arrangement, or finish focus."
     };
+  }
+
+  const composerQuickActionArea = composerActionQuickActionArea(action.id);
+  if (composerQuickActionArea) {
+    switch (composerQuickActionArea) {
+      case "drums":
+        return {
+          auditionCue: `Loop Pattern ${project.selectedPattern}; check the Composer Action drum foundation against 808 support.`,
+          nextCheck: `${drumHitCount(pattern)} drum hits now; use Composer Actions again when the pocket needs another writing pass.`
+        };
+      case "bass":
+        return {
+          auditionCue: `Loop Pattern ${project.selectedPattern}; hear the Composer Action 808 line against kick placement.`,
+          nextCheck: `${pattern.bassNotes.length} 808 notes now; check glide and root movement before adding more melody.`
+        };
+      case "harmony":
+        return {
+          auditionCue: `Loop Pattern ${project.selectedPattern}; hear the Composer Action chords under the 808 and Synth lanes.`,
+          nextCheck: `${chordMotionLabel(pattern.chordEvents)} chord motion now; confirm melody notes stay in key.`
+        };
+      case "melody":
+        return {
+          auditionCue: `Loop Pattern ${project.selectedPattern}; hear the Composer Action Synth motif against chords and 808.`,
+          nextCheck: `${pattern.melodyNotes.length} Synth notes now; check hook contrast before arranging.`
+        };
+      case "arrange":
+        return {
+          auditionCue: `Play Song loop; scan the Composer Action arrangement across ${barCountLabel(arrangementTotalBars(project))}.`,
+          nextCheck: `${project.arrangement.length} blocks now; compare the form against ${target.name}.`
+        };
+      case "finish":
+        return {
+          auditionCue: `Play full mix; watch ${formatDb(analysis.headroomDb)} headroom after the Composer Action finish move.`,
+          nextCheck: `${project.masterPreset} selected; run Export Preflight and Mix Coach before exporting.`
+        };
+    }
   }
 
   if (action.id === "key-compass-focus") {
