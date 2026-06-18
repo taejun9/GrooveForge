@@ -4742,6 +4742,19 @@ export function App(): ReactElement {
     );
   }
 
+  function updateSelectedChordStep(step: number): void {
+    if (selectedChordIndex === null || !selectedChord) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+
+    updateChordEvent(
+      selectedChordIndex,
+      { step: clampStepStart(step) },
+      "Reset chord step"
+    );
+  }
+
   function copySelectedChord(): void {
     if (selectedChordIndex === null) {
       setProjectStatus("Select a chord event");
@@ -6051,6 +6064,7 @@ export function App(): ReactElement {
     onDuplicateSelectedDrumHit: duplicateSelectedDrumHit,
     onDeleteSelectedDrumHit: clearSelectedDrumStep,
     onMoveSelectedChordStep: moveSelectedChordStep,
+    onUpdateSelectedChordStep: updateSelectedChordStep,
     onAuditionSelectedChord: auditionSelectedChord,
     onCopySelectedChord: copySelectedChord,
     onPasteCopiedChord: pasteCopiedChord,
@@ -11826,6 +11840,7 @@ function createQuickActions({
   onDuplicateSelectedDrumHit,
   onDeleteSelectedDrumHit,
   onMoveSelectedChordStep,
+  onUpdateSelectedChordStep,
   onAuditionSelectedChord,
   onCopySelectedChord,
   onPasteCopiedChord,
@@ -12044,6 +12059,7 @@ function createQuickActions({
   onDuplicateSelectedDrumHit: () => void;
   onDeleteSelectedDrumHit: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
+  onUpdateSelectedChordStep: (step: number) => void;
   onAuditionSelectedChord: () => void;
   onCopySelectedChord: () => void;
   onPasteCopiedChord: () => void;
@@ -12544,6 +12560,7 @@ function createQuickActions({
       onDeleteSelectedDrumHit,
       onAuditionSelectedChord,
       onMoveSelectedChordStep,
+      onUpdateSelectedChordStep,
       onMoveSelectedChordInversion,
       onResetSelectedChordInversion,
       onUpdateSelectedChordRoot,

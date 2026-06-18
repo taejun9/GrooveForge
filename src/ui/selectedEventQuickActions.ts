@@ -87,6 +87,7 @@ type SelectedEventQuickActionsParams = {
   onDeleteSelectedDrumHit: () => void;
   onAuditionSelectedChord: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
+  onUpdateSelectedChordStep: (step: number) => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
   onResetSelectedChordInversion: () => void;
   onUpdateSelectedChordRoot: (root: string) => void;
@@ -143,6 +144,7 @@ export function createSelectedEventQuickActions({
   onDeleteSelectedDrumHit,
   onAuditionSelectedChord,
   onMoveSelectedChordStep,
+  onUpdateSelectedChordStep,
   onMoveSelectedChordInversion,
   onResetSelectedChordInversion,
   onUpdateSelectedChordRoot,
@@ -299,6 +301,25 @@ export function createSelectedEventQuickActions({
     selectedChord && selectedChordActive ? Math.min(selectedChordDefaultLength, selectedChordMaxLength) : null;
   const selectedChordLength =
     selectedChord && selectedChordActive ? Math.min(clampStepLength(selectedChord.length), selectedChordMaxLength) : null;
+  const selectedChordStepResetTarget =
+    selectedChord && selectedChordActive && selectedChordLength !== null
+      ? steps
+          .filter((step) => step % 4 === 0 && step <= steps.length - selectedChordLength)
+          .reduce<number | null>((best, step) => {
+            if (best === null) {
+              return step;
+            }
+            const distance = Math.abs(step - selectedChord.step);
+            const bestDistance = Math.abs(best - selectedChord.step);
+            return distance < bestDistance || (distance === bestDistance && step < best) ? step : best;
+          }, null)
+      : null;
+  const selectedChordStepResetBlocked =
+    selectedChord && selectedChordStepResetTarget !== null
+      ? selectedPatternData.chordEvents.some(
+          (chord) => chord.step === selectedChordStepResetTarget && !sameChordEvent(chord, selectedChord)
+        )
+      : false;
   const selectedChordInversion = selectedChord ? normalizeChordInversion(selectedChord.inversion) : 0;
   const selectedChordInversionIndex = chordInversions.indexOf(selectedChordInversion);
   const selectedChordInversionDown = selectedChordInversionIndex > 0 ? chordInversions[selectedChordInversionIndex - 1] : null;
@@ -866,6 +887,30 @@ export function createSelectedEventQuickActions({
         selectedChord.step >= steps.length - 1 ||
         selectedPatternData.chordEvents.some((chord) => chord.step === selectedChord.step + 1),
       run: () => onMoveSelectedChordStep(1)
+    },
+    {
+      id: "selected-chord-step-reset",
+      title: "Reset selected chord step",
+      detail:
+        selectedChordActive && selectedChord && selectedChordStepResetTarget !== null
+          ? selectedChord.step === selectedChordStepResetTarget
+            ? `${selectedChordLabel} already starts on the 4-step chord grid.`
+            : selectedChordStepResetBlocked
+              ? `Step ${selectedChordStepResetTarget + 1} already has another chord.`
+              : `${selectedChordLabel} step ${selectedChord.step + 1} -> ${selectedChordStepResetTarget + 1} / 4-step grid`
+          : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord step reset snap grid timing quantize harmony progression edit beginner producer",
+      disabled:
+        !selectedChordActive ||
+        selectedChordStepResetTarget === null ||
+        selectedChord?.step === selectedChordStepResetTarget ||
+        selectedChordStepResetBlocked,
+      run: () => {
+        if (selectedChordStepResetTarget !== null) {
+          onUpdateSelectedChordStep(selectedChordStepResetTarget);
+        }
+      }
     },
     {
       id: "selected-chord-root-down",
