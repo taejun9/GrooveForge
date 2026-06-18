@@ -98,6 +98,8 @@ Latest brief architecture verdict: the core architecture must still make sense i
 
 Draft rewrite target: the accepted MVP architecture removes `AudioClipEvent` from `MusicalEvent`, excludes `audio` and `sampler` from `TrackType`, treats core clips as pattern/MIDI/automation containers, and keeps the default device palette to drum rack, synth 808/bass, simple synth, chord synth, built-in FX, mixer, and master devices. Optional sampling can add audio clips, audio tracks, sampler devices, sample import, chopping, pitch/stretch, and one-shot mapping later without changing the event-first core.
 
+Attached Korean brief rewrite: the accepted architecture uses the brief's direct-composition concept, not its combined optional-sampling unions. If a draft shows `MusicalEvent` with `AudioClipEvent`, `TrackType` with `audio` or `sampler`, `Clip` with `AudioClip`, an audio-engine list with `Sampler`, or a default Instrument Panel with `sampler`, split it into a core MVP architecture plus an optional sampling extension before code review.
+
 If an exploratory draft includes audio clip, sampler, or waveform examples, move them to an optional sampling section before they enter architecture diagrams, schema examples, default tracks, or MVP validation.
 
 Sampling is an extension model, not a core dependency. When it is added, it can introduce audio clips, sampler devices, audio tracks, and source/license metadata without changing the requirement that a valid beat can be made from generated and performed events alone. `AudioClipEvent` belongs in that extension layer, not in the core MVP `MusicalEvent` union.
