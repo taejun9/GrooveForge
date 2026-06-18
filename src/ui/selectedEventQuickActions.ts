@@ -24,6 +24,7 @@ import {
 } from "../domain/workstation";
 import {
   adjacentTrackPitch,
+  chordPadQualityFromDegree,
   matchesSelectedNote,
   keyboardCapturePitchLanes,
   nextEmptyChordStep,
@@ -288,6 +289,10 @@ export function createSelectedEventQuickActions({
     selectedChord && selectedChordQualityIndex >= 0
       ? chordQualities[(selectedChordQualityIndex + 1) % chordQualities.length]
       : chordQualities[0];
+  const selectedChordDefaultQuality =
+    selectedChord && selectedChordActive && selectedChordRootIndex >= 0
+      ? chordPadQualityFromDegree(project.key, selectedChordRootIndex)
+      : null;
   const selectedChordMaxLength = selectedChord ? Math.max(1, steps.length - selectedChord.step) : 1;
   const selectedChordLengthDefault =
     selectedChord && selectedChordActive ? Math.min(selectedChordDefaultLength, selectedChordMaxLength) : null;
@@ -903,6 +908,24 @@ export function createSelectedEventQuickActions({
       keywords: "selected chord quality cycle major minor seventh sus dim color harmony progression edit beginner producer",
       disabled: !selectedChordActive,
       run: () => onUpdateSelectedChordQuality(selectedChordNextQuality)
+    },
+    {
+      id: "selected-chord-quality-reset",
+      title: "Reset selected chord quality",
+      detail:
+        selectedChordActive && selectedChordDefaultQuality
+          ? `${selectedChordLabel} quality ${selectedChord?.quality ?? "maj"} -> ${selectedChordDefaultQuality} / ${project.key}`
+          : selectedChord && selectedChordRootIndex < 0
+            ? `${selectedChordLabel} is outside ${project.key} scale roots.`
+            : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord quality reset default diatonic key scale harmony progression edit beginner producer",
+      disabled: !selectedChordActive || !selectedChordDefaultQuality || selectedChord?.quality === selectedChordDefaultQuality,
+      run: () => {
+        if (selectedChordDefaultQuality) {
+          onUpdateSelectedChordQuality(selectedChordDefaultQuality);
+        }
+      }
     },
     {
       id: "selected-chord-inversion-down",
