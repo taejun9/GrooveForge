@@ -468,6 +468,7 @@ import type {
   HandoffManifestAuditSummary,
   SessionBriefRoleSummary,
   SessionBriefCompassCard,
+  SessionBriefCompassCardId,
   SessionBriefCompassSummary,
   SessionBriefStarterPadId,
   SessionBriefStarterPadDefinition,
@@ -856,6 +857,7 @@ export function App(): ReactElement {
   const [deliveryTargetAlignmentResult, setDeliveryTargetAlignmentResult] = useState<DeliveryTargetAlignmentResult | null>(null);
   const [sessionBriefStarterResult, setSessionBriefStarterResult] = useState<SessionBriefStarterResult | null>(null);
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
+  const [sessionBriefCompassFocusId, setSessionBriefCompassFocusId] = useState<SessionBriefCompassCardId | null>(null);
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
@@ -890,6 +892,10 @@ export function App(): ReactElement {
   const deliverPanelRef = useRef<HTMLElement | null>(null);
   const masterPanelRef = useRef<HTMLElement | null>(null);
   const beatBlueprintPanelRef = useRef<HTMLElement | null>(null);
+  const sessionBriefArtistRef = useRef<HTMLInputElement | null>(null);
+  const sessionBriefVibeRef = useRef<HTMLInputElement | null>(null);
+  const sessionBriefReferenceRef = useRef<HTMLInputElement | null>(null);
+  const sessionBriefNotesRef = useRef<HTMLTextAreaElement | null>(null);
   const style = getStyle(project);
   const deliveryTarget = activeDeliveryTarget(project);
   const currentPattern = activePattern(project);
@@ -4624,6 +4630,26 @@ export function App(): ReactElement {
     }, "Cleared session brief");
   }
 
+  function focusSessionBriefCompassCard(card: SessionBriefCompassCard): void {
+    const target = sessionBriefCompassFocusTarget(card, projectRef.current.sessionBrief);
+    const fieldRefs: Record<keyof SessionBrief, HTMLElement | null> = {
+      artist: sessionBriefArtistRef.current,
+      vibe: sessionBriefVibeRef.current,
+      reference: sessionBriefReferenceRef.current,
+      notes: sessionBriefNotesRef.current
+    };
+
+    setSessionBriefCompassFocusId(card.id);
+    if (target === "deliver") {
+      deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    } else {
+      const field = fieldRefs[target];
+      field?.scrollIntoView({ block: "center", behavior: "auto" });
+      field?.focus({ preventScroll: true });
+    }
+    setProjectStatus(`Brief ${card.label}: ${card.value}`);
+  }
+
   function focusMixCoachCheck(check: MixCoachCheck): void {
     setMixCoachFocusId(check.id);
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -5055,6 +5081,7 @@ export function App(): ReactElement {
     chordClipboard,
     sectionLocatorPads,
     sessionBriefStarterPads,
+    sessionBriefCompassSummary,
     sessionPassSummary,
     soundFocusPreviewSummary,
     soundPresetPreviewSummary,
@@ -5120,6 +5147,7 @@ export function App(): ReactElement {
     onUpdateKeyboardCaptureDefaults: updateKeyboardCaptureDefaults,
     onSetMidiCaptureArmed: setMidiCaptureArmed,
     onApplySessionBriefStarter: applySessionBriefStarterPad,
+    onFocusSessionBriefCompass: focusSessionBriefCompassCard,
     onCopySelectedArrangementBlock: copySelectedArrangementBlock,
     onPasteArrangementBlockAfterSelected: pasteArrangementBlockAfterSelected,
     onDuplicateArrangementBlock: duplicateArrangementBlock,
@@ -5527,11 +5555,19 @@ export function App(): ReactElement {
       <SessionBriefPanel
         brief={project.sessionBrief}
         compass={sessionBriefCompassSummary}
+        focusedCompassCardId={sessionBriefCompassFocusId}
         result={sessionBriefStarterResult}
         starterPads={sessionBriefStarterPads}
+        fieldRefs={{
+          artist: sessionBriefArtistRef,
+          vibe: sessionBriefVibeRef,
+          reference: sessionBriefReferenceRef,
+          notes: sessionBriefNotesRef
+        }}
         onApplyStarter={applySessionBriefStarterPad}
         onChange={updateSessionBrief}
         onClear={clearSessionBrief}
+        onFocusCompass={focusSessionBriefCompassCard}
       />
 
       <BeatPassport focusedMetricId={beatPassportFocusId} onFocus={focusBeatPassportMetric} summary={beatPassportSummary} />
@@ -7758,19 +7794,25 @@ function DeliveryTargetAlignmentResultStrip({ result }: { result: DeliveryTarget
 function SessionBriefPanel({
   brief,
   compass,
+  fieldRefs,
+  focusedCompassCardId,
   result,
   starterPads,
   onApplyStarter,
   onChange,
-  onClear
+  onClear,
+  onFocusCompass
 }: {
   brief: SessionBrief;
   compass: SessionBriefCompassSummary;
+  fieldRefs: SessionBriefFieldRefs;
+  focusedCompassCardId: SessionBriefCompassCardId | null;
   result: SessionBriefStarterResult | null;
   starterPads: SessionBriefStarterPadOption[];
   onApplyStarter: (pad: SessionBriefStarterPadId) => void;
   onChange: (field: keyof SessionBrief, value: string) => void;
   onClear: () => void;
+  onFocusCompass: (card: SessionBriefCompassCard) => void;
 }): ReactElement {
   const filledFields = sessionBriefFilledFields(brief);
   const roleSummary = createSessionBriefRoleSummary(brief);
@@ -7808,19 +7850,35 @@ function SessionBriefPanel({
             <small data-testid="session-brief-compass-detail">{compass.detail}</small>
           </div>
           <div className="session-brief-compass-grid" data-testid="session-brief-compass-grid">
-            {compass.cards.map((card) => (
-              <div
-                className={`session-brief-compass-card ${card.tone}`}
-                data-testid={`session-brief-compass-card-${card.id}`}
-                key={card.id}
-                title={`${card.label}: ${card.value}. ${card.nextCheck}`}
-              >
-                <span data-testid={`session-brief-compass-card-${card.id}-label`}>{card.label}</span>
-                <strong data-testid={`session-brief-compass-card-${card.id}-value`}>{card.value}</strong>
-                <small data-testid={`session-brief-compass-card-${card.id}-detail`}>{card.detail}</small>
-                <em data-testid={`session-brief-compass-card-${card.id}-next`}>{card.nextCheck}</em>
-              </div>
-            ))}
+            {compass.cards.map((card) => {
+              const focused = focusedCompassCardId !== null && card.id === focusedCompassCardId;
+              const focusLabel = sessionBriefCompassFocusLabel(card, brief);
+              return (
+                <div
+                  className={["session-brief-compass-card", card.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+                  data-focused={focused ? "true" : "false"}
+                  data-testid={`session-brief-compass-card-${card.id}`}
+                  key={card.id}
+                  title={`${card.label}: ${card.value}. ${card.nextCheck}`}
+                >
+                  <span data-testid={`session-brief-compass-card-${card.id}-label`}>{card.label}</span>
+                  <strong data-testid={`session-brief-compass-card-${card.id}-value`}>{card.value}</strong>
+                  <button
+                    aria-pressed={focused}
+                    className="session-brief-compass-focus-button"
+                    data-testid={`session-brief-compass-focus-${card.id}`}
+                    onClick={() => onFocusCompass(card)}
+                    title={`${focusLabel}: ${card.nextCheck}`}
+                    type="button"
+                  >
+                    <Target size={12} aria-hidden="true" />
+                    <span>{focusLabel}</span>
+                  </button>
+                  <small data-testid={`session-brief-compass-card-${card.id}-detail`}>{card.detail}</small>
+                  <em data-testid={`session-brief-compass-card-${card.id}-next`}>{card.nextCheck}</em>
+                </div>
+              );
+            })}
           </div>
         </div>
         <div className="session-brief-starters" aria-label="Session Brief Starter Pads">
@@ -7848,6 +7906,7 @@ function SessionBriefPanel({
               maxLength={maxSessionBriefFieldLength}
               onChange={(event) => onChange("artist", event.target.value)}
               placeholder="Artist or client"
+              ref={fieldRefs.artist}
               type="text"
               value={brief.artist}
             />
@@ -7859,6 +7918,7 @@ function SessionBriefPanel({
               maxLength={maxSessionBriefFieldLength}
               onChange={(event) => onChange("vibe", event.target.value)}
               placeholder="Mood or energy"
+              ref={fieldRefs.vibe}
               type="text"
               value={brief.vibe}
             />
@@ -7870,6 +7930,7 @@ function SessionBriefPanel({
               maxLength={maxSessionBriefFieldLength}
               onChange={(event) => onChange("reference", event.target.value)}
               placeholder="Track or scene"
+              ref={fieldRefs.reference}
               type="text"
               value={brief.reference}
             />
@@ -7881,6 +7942,7 @@ function SessionBriefPanel({
               maxLength={maxSessionBriefNotesLength}
               onChange={(event) => onChange("notes", event.target.value)}
               placeholder="Handoff notes"
+              ref={fieldRefs.notes}
               rows={2}
               value={brief.notes}
             />
@@ -7901,6 +7963,13 @@ function SessionBriefPanel({
     </section>
   );
 }
+
+type SessionBriefFieldRefs = {
+  artist: Ref<HTMLInputElement>;
+  vibe: Ref<HTMLInputElement>;
+  reference: Ref<HTMLInputElement>;
+  notes: Ref<HTMLTextAreaElement>;
+};
 
 function SessionBriefStarterResultStrip({ result }: { result: SessionBriefStarterResult }): ReactElement {
   return (
@@ -10605,6 +10674,7 @@ function createQuickActions({
   chordClipboard,
   sectionLocatorPads,
   sessionBriefStarterPads,
+  sessionBriefCompassSummary,
   sessionPassSummary,
   soundFocusPreviewSummary,
   soundPresetPreviewSummary,
@@ -10670,6 +10740,7 @@ function createQuickActions({
   onUpdateKeyboardCaptureDefaults,
   onSetMidiCaptureArmed,
   onApplySessionBriefStarter,
+  onFocusSessionBriefCompass,
   onCopySelectedArrangementBlock,
   onPasteArrangementBlockAfterSelected,
   onDuplicateArrangementBlock,
@@ -10778,6 +10849,7 @@ function createQuickActions({
   chordClipboard: ChordClipboard | null;
   sectionLocatorPads: SectionLocatorPad[];
   sessionBriefStarterPads: SessionBriefStarterPadOption[];
+  sessionBriefCompassSummary: SessionBriefCompassSummary;
   sessionPassSummary: SessionPassSummary;
   soundFocusPreviewSummary: SoundFocusPreviewSummary;
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
@@ -10843,6 +10915,7 @@ function createQuickActions({
   onUpdateKeyboardCaptureDefaults: (update: Partial<KeyboardCaptureDefaults>) => void;
   onSetMidiCaptureArmed: (armed: boolean) => void;
   onApplySessionBriefStarter: (pad: SessionBriefStarterPadId) => void;
+  onFocusSessionBriefCompass: (card: SessionBriefCompassCard) => void;
   onCopySelectedArrangementBlock: () => void;
   onPasteArrangementBlockAfterSelected: () => void;
   onDuplicateArrangementBlock: () => void;
@@ -11126,6 +11199,15 @@ function createQuickActions({
     group: "Project",
     keywords: `session pass focus card guided studio finish deliver delivery workflow ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
     run: () => onFocusSessionPass(card)
+  }));
+  const sessionBriefCompassCard = activeSessionBriefCompassQuickActionCard(sessionBriefCompassSummary);
+  const sessionBriefCompassActions: QuickAction[] = sessionBriefCompassSummary.cards.map((card) => ({
+    id: `session-brief-compass-card-${card.id}`,
+    title: `Focus Brief Compass: ${card.label}`,
+    detail: `${card.value} / ${sessionBriefCompassFocusLabel(card, project.sessionBrief)} / ${card.detail}`,
+    group: "Project",
+    keywords: `session brief compass focus card handoff context direction reference artist notes ${card.id} ${card.label} ${card.value} ${card.detail} ${card.nextCheck} beginner producer`,
+    run: () => onFocusSessionBriefCompass(card)
   }));
   const sessionBriefStarterActions: QuickAction[] = sessionBriefStarterPads.map((pad) => ({
     id: `session-brief-starter-${pad.id}`,
@@ -12279,6 +12361,15 @@ function createQuickActions({
       run: () => onFocusSessionPass(sessionPassCard)
     },
     ...sessionPassActions,
+    {
+      id: "session-brief-compass-focus",
+      title: `Focus Brief Compass: ${sessionBriefCompassCard.label}`,
+      detail: `${sessionBriefCompassCard.value} / ${sessionBriefCompassFocusLabel(sessionBriefCompassCard, project.sessionBrief)}`,
+      group: "Project",
+      keywords: `session brief compass focus current handoff context direction reference artist notes ${sessionBriefCompassCard.id} ${sessionBriefCompassCard.label} ${sessionBriefCompassCard.value} beginner producer`,
+      run: () => onFocusSessionBriefCompass(sessionBriefCompassCard)
+    },
+    ...sessionBriefCompassActions,
     ...sessionBriefStarterActions,
     {
       id: "delivery-target-align",
@@ -13237,6 +13328,8 @@ function createQuickActionResult(
   const focusOnly =
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
+    action.id === "session-brief-compass-focus" ||
+    action.id.startsWith("session-brief-compass-card-") ||
     action.id === "first-beat-path-jump" ||
     action.id.startsWith("first-beat-path-step-") ||
     action.id === "composer-guide-focus" ||
@@ -13441,6 +13534,22 @@ function quickActionResultMetricSnapshot(
 
   if (action.id.startsWith("session-pass-card-")) {
     return { id: "session-pass", label: "Session pass", value: action.detail };
+  }
+
+  if (action.id === "session-brief-compass-focus") {
+    return {
+      id: "session-brief-compass",
+      label: "Brief compass",
+      value: `${sessionBriefFilledFields(project.sessionBrief)}/4 fields`
+    };
+  }
+
+  if (action.id.startsWith("session-brief-compass-card-")) {
+    return {
+      id: "session-brief-compass",
+      label: "Brief compass",
+      value: action.detail
+    };
   }
 
   if (action.id.startsWith("session-brief-starter-")) {
@@ -14234,6 +14343,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused workstation panel to inspect the selected Session Pass card before changing project data.",
       nextCheck: "Return to Session Pass when you need another direct Guided, Studio, Finish, or Delivery focus."
+    };
+  }
+
+  if (action.id === "session-brief-compass-focus") {
+    return {
+      auditionCue: "Use the focused Session Brief field or Handoff area to tighten written session context before changing the beat.",
+      nextCheck: "Return to Brief Compass after the focused context lane is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id.startsWith("session-brief-compass-card-")) {
+    return {
+      auditionCue: "Use the focused Brief Compass lane to inspect direction, reference, artist context, or handoff readiness.",
+      nextCheck: "Return to Brief Compass when you need another direct context or handoff focus."
     };
   }
 
@@ -15663,6 +15786,53 @@ function createSessionBriefCompassSummary(
     tone,
     cards
   };
+}
+
+function activeSessionBriefCompassQuickActionCard(summary: SessionBriefCompassSummary): SessionBriefCompassCard {
+  const focusCard =
+    summary.cards.find((card) => card.tone === "danger") ??
+    summary.cards.find((card) => card.tone === "warn") ??
+    summary.cards.find((card) => card.id === "handoff") ??
+    summary.cards[0];
+
+  if (!focusCard) {
+    throw new Error("Session Brief Compass requires at least one card");
+  }
+  return focusCard;
+}
+
+type SessionBriefCompassFocusTarget = keyof SessionBrief | "deliver";
+
+function sessionBriefCompassFocusTarget(
+  card: SessionBriefCompassCard,
+  brief: SessionBrief
+): SessionBriefCompassFocusTarget {
+  switch (card.id) {
+    case "direction":
+      return "vibe";
+    case "reference":
+      return "reference";
+    case "artist":
+      return brief.artist.trim().length > 0 && brief.notes.trim().length === 0 ? "notes" : "artist";
+    case "handoff":
+      return "deliver";
+  }
+}
+
+function sessionBriefCompassFocusLabel(card: SessionBriefCompassCard, brief: SessionBrief): string {
+  const target = sessionBriefCompassFocusTarget(card, brief);
+  switch (target) {
+    case "artist":
+      return "Focus Artist";
+    case "vibe":
+      return "Focus Vibe";
+    case "reference":
+      return "Focus Reference";
+    case "notes":
+      return "Focus Notes";
+    case "deliver":
+      return "Focus Handoff";
+  }
 }
 
 function sessionBriefFilledFields(brief: SessionBrief): number {
