@@ -284,6 +284,7 @@ export function createSelectedEventQuickActions({
     selectedChord && selectedChordRootIndex >= 0 && selectedChordRootIndex < selectedChordScaleRoots.length - 1
       ? selectedChordScaleRoots[selectedChordRootIndex + 1]
       : null;
+  const selectedChordTonicRoot = selectedChordScaleRoots[0] ?? null;
   const selectedChordQualityIndex = selectedChord ? chordQualities.indexOf(selectedChord.quality) : -1;
   const selectedChordNextQuality =
     selectedChord && selectedChordQualityIndex >= 0
@@ -897,6 +898,24 @@ export function createSelectedEventQuickActions({
       keywords: "selected chord root up higher scale harmony progression edit beginner producer",
       disabled: !selectedChordActive || selectedChordRootUp === null,
       run: () => selectedChordRootUp !== null && onUpdateSelectedChordRoot(selectedChordRootUp)
+    },
+    {
+      id: "selected-chord-root-reset",
+      title: "Reset selected chord root",
+      detail:
+        selectedChordActive && selectedChordTonicRoot
+          ? selectedChord?.root === selectedChordTonicRoot
+            ? `${selectedChordLabel} already uses ${project.key} tonic root.`
+            : `${selectedChordLabel} root ${selectedChord?.root ?? "-"} -> ${selectedChordTonicRoot} / ${project.key}`
+          : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord root reset tonic key scale home harmony progression edit beginner producer",
+      disabled: !selectedChordActive || !selectedChordTonicRoot || selectedChord?.root === selectedChordTonicRoot,
+      run: () => {
+        if (selectedChordTonicRoot) {
+          onUpdateSelectedChordRoot(selectedChordTonicRoot);
+        }
+      }
     },
     {
       id: "selected-chord-quality-cycle",
