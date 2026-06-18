@@ -13061,6 +13061,14 @@ function createQuickActions({
   const drumMoveTarget = activeDrumMoveQuickActionTarget(project, drumMovePreviewSummary);
   const melodyMoveTarget = activeMelodyMoveQuickActionTarget(project, melodyMovePreviewSummary);
   const modeFocusCard = activeModeFocusQuickActionCard(modeFocusSummary);
+  const modeFocusActions: QuickAction[] = modeFocusSummary.cards.map((card) => ({
+    id: `mode-focus-card-${card.id}`,
+    title: `Jump Mode Focus: ${card.label}`,
+    detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
+    group: "Project",
+    keywords: `mode focus jump card guided studio orientation stage writing check scan issue handoff ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
+    run: () => onFocusModeFocus(card)
+  }));
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
   const patternDnaActions: QuickAction[] = patternDnaSummary.cards.map((card) => ({
     id: `pattern-dna-card-${card.id}`,
@@ -14095,6 +14103,7 @@ function createQuickActions({
         }
       }
     },
+    ...modeFocusActions,
     {
       id: "first-beat-path-jump",
       title: firstBeatPathStep ? `Jump First Beat Path: ${firstBeatPathStep.label}` : "Jump First Beat Path",
@@ -14929,6 +14938,7 @@ function createQuickActionResult(
     action.id.startsWith("groove-compass-card-") ||
     action.id === "pattern-dna-focus" ||
     action.id.startsWith("pattern-dna-card-") ||
+    action.id.startsWith("mode-focus-card-") ||
     action.id === "beat-passport-focus" ||
     action.id.startsWith("beat-passport-metric-") ||
     action.id === "production-snapshot-focus" ||
@@ -15093,6 +15103,10 @@ function quickActionResultMetricSnapshot(
       label: "Mode focus",
       value: `${project.mode} / ${project.selectedPattern}`
     };
+  }
+
+  if (action.id.startsWith("mode-focus-card-")) {
+    return { id: "mode-focus", label: "Mode focus", value: action.detail };
   }
 
   if (action.id === "beat-spine-jump" || action.id === "beat-spine-apply") {
@@ -15763,6 +15777,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the jumped Mode Focus panel to inspect the current Guided stage or Studio issue before running edits.",
       nextCheck: "Return to Mode Focus after the current orientation card is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id.startsWith("mode-focus-card-")) {
+    return {
+      auditionCue: "Use the jumped workstation panel to inspect the selected Mode Focus card before running edits.",
+      nextCheck: "Return to Mode Focus when you need another direct Guided or Studio orientation jump."
     };
   }
 
