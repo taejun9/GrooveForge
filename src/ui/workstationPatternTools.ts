@@ -216,6 +216,7 @@ import type {
   PatternClonePadOption,
   PatternCloneResultMetric,
   PatternCloneResult,
+  PatternFillPreviewSummary,
   PatternFillResultMetric,
   PatternFillResult,
   PatternVariationPreviewSummary,
@@ -1217,6 +1218,42 @@ function layerStarterNextCheck(starterId: LayerStarterId, pattern: PatternData):
   }
 }
 
+export function createPatternFillPreviewSummary(
+  patternSlot: PatternSlot,
+  pattern: PatternData,
+  preset: PatternFillPreset,
+  key: string
+): PatternFillPreviewSummary {
+  const previewPattern = applyPatternFillPreset(pattern, preset, key);
+  const presetLabel = patternFillPresetLabel(preset);
+  const changes = patternFillLayerChanges(pattern, previewPattern);
+  const beforeEvents = patternEventTotal(pattern);
+  const afterEvents = patternEventTotal(previewPattern);
+  const statusLabel = changes.total > 0 ? "Preview fill" : "Fill aligned";
+  const patternLabel = `Pattern ${patternSlot} / ${beforeEvents} -> ${afterEvents} events`;
+  const presetLabelText = `${presetLabel} target`;
+  const drumsLabel = `Drums ${changes.drums}`;
+  const bassLabel = `808 ${changes.bass}`;
+  const chordLabel = `Chords ${changes.chords}`;
+  const melodyLabel = `Synth ${changes.melody}`;
+  const moveLabel = `${changes.total} tail change${changes.total === 1 ? "" : "s"}`;
+
+  return {
+    preset,
+    pattern: patternSlot,
+    statusLabel,
+    patternLabel,
+    presetLabel: presetLabelText,
+    drumsLabel,
+    bassLabel,
+    chordLabel,
+    melodyLabel,
+    moveLabel,
+    detailTitle: `${statusLabel}: ${patternLabel}; ${presetLabelText}; ${drumsLabel}; ${bassLabel}; ${chordLabel}; ${melodyLabel}; ${moveLabel}.`,
+    tone: changes.total > 0 ? "warn" : "good"
+  };
+}
+
 export function createPatternFillResult(
   preset: PatternFillPreset,
   beforeProject: ProjectState,
@@ -1312,12 +1349,18 @@ export function createPatternFillResultMetric(
 }
 
 function patternFillChangedCount(beforePattern: PatternData, afterPattern: PatternData): number {
-  return (
-    drumPatternMoveCount(beforePattern, afterPattern) +
-    bassNotesChangedCount(beforePattern.bassNotes, afterPattern.bassNotes) +
-    chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents) +
-    melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes)
-  );
+  return patternFillLayerChanges(beforePattern, afterPattern).total;
+}
+
+function patternFillLayerChanges(
+  beforePattern: PatternData,
+  afterPattern: PatternData
+): { drums: number; bass: number; chords: number; melody: number; total: number } {
+  const drums = drumPatternMoveCount(beforePattern, afterPattern);
+  const bass = bassNotesChangedCount(beforePattern.bassNotes, afterPattern.bassNotes);
+  const chords = chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents);
+  const melody = melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes);
+  return { drums, bass, chords, melody, total: drums + bass + chords + melody };
 }
 
 function patternFillAffectedMetrics(preset: PatternFillPreset): Set<PatternFillResultMetric["id"]> {

@@ -923,6 +923,21 @@ export type PatternFillResultMetric = {
   tone: MixCoachTone;
 };
 
+export type PatternFillPreviewSummary = {
+  preset: PatternFillPreset;
+  pattern: PatternSlot;
+  statusLabel: string;
+  patternLabel: string;
+  presetLabel: string;
+  drumsLabel: string;
+  bassLabel: string;
+  chordLabel: string;
+  melodyLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type PatternFillResult = {
   preset: PatternFillPreset;
   pattern: PatternSlot;

@@ -260,6 +260,7 @@ import type {
   PatternCompareSummary,
   PatternClonePadOption,
   PatternCloneResult,
+  PatternFillPreviewSummary,
   PatternFillResult,
   PatternVariationPreviewSummary,
   PatternVariationResult,
@@ -592,6 +593,7 @@ import {
   createLayerStarterResult,
   createPatternClonePadOptions,
   createPatternCloneResult,
+  createPatternFillPreviewSummary,
   createPatternFillResult,
   createPatternVariationPreviewSummary,
   createPatternVariationResult,
@@ -817,6 +819,7 @@ export function App(): ReactElement {
   const [beatSpineResult, setBeatSpineResult] = useState<BeatSpineApplyResult | null>(null);
   const [layerStarterResult, setLayerStarterResult] = useState<LayerStarterResult | null>(null);
   const [patternCloneResult, setPatternCloneResult] = useState<PatternCloneResult | null>(null);
+  const [patternFillPreviewPreset, setPatternFillPreviewPreset] = useState<PatternFillPreset>("drum_fill");
   const [patternFillResult, setPatternFillResult] = useState<PatternFillResult | null>(null);
   const [patternVariationPreviewPreset, setPatternVariationPreviewPreset] = useState<PatternVariationPreset>("hook");
   const [patternVariationResult, setPatternVariationResult] = useState<PatternVariationResult | null>(null);
@@ -1142,6 +1145,10 @@ export function App(): ReactElement {
   const patternVariationPreviewSummary = useMemo(
     () => createPatternVariationPreviewSummary(project.selectedPattern, currentPattern, patternVariationPreviewPreset),
     [project.selectedPattern, currentPattern, patternVariationPreviewPreset]
+  );
+  const patternFillPreviewSummary = useMemo(
+    () => createPatternFillPreviewSummary(project.selectedPattern, currentPattern, patternFillPreviewPreset, project.key),
+    [project.selectedPattern, currentPattern, patternFillPreviewPreset, project.key]
   );
   const patternCloneOptions = useMemo(() => createPatternClonePadOptions(project.selectedPattern), [project.selectedPattern]);
   const drumFoundationOptions = useMemo(() => createDrumFoundationOptions(), []);
@@ -5610,6 +5617,7 @@ export function App(): ReactElement {
             </button>
           </div>
           {patternVariationResult && <PatternVariationResultStrip result={patternVariationResult} />}
+          <PatternFillPreview preview={patternFillPreviewSummary} />
           <div className="pattern-fill-row" aria-label="Pattern fills">
             {patternFillPresetIds.map((preset) => {
               const isClear = preset === "clear_tail";
@@ -5618,9 +5626,15 @@ export function App(): ReactElement {
                   className={isClear ? "danger" : ""}
                   key={preset}
                   data-testid={`pattern-fill-${preset}`}
+                  data-previewed={patternFillPreviewPreset === preset ? "true" : "false"}
                   type="button"
                   title={`Apply ${patternFillPresetLabel(preset)} to Pattern ${project.selectedPattern}`}
-                  onClick={() => applyPatternFill(preset)}
+                  onFocus={() => setPatternFillPreviewPreset(preset)}
+                  onMouseEnter={() => setPatternFillPreviewPreset(preset)}
+                  onClick={() => {
+                    setPatternFillPreviewPreset(preset);
+                    applyPatternFill(preset);
+                  }}
                 >
                   {isClear ? <Scissors size={14} aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />}
                   <span>{patternFillPresetLabel(preset)}</span>
@@ -23480,6 +23494,26 @@ function PatternVariationPreview({ preview }: { preview: PatternVariationPreview
       <small data-testid="pattern-variation-preview-chord">{preview.chordLabel}</small>
       <small data-testid="pattern-variation-preview-melody">{preview.melodyLabel}</small>
       <small data-testid="pattern-variation-preview-moves">{preview.moveLabel}</small>
+    </div>
+  );
+}
+
+function PatternFillPreview({ preview }: { preview: PatternFillPreviewSummary }): ReactElement {
+  return (
+    <div
+      className={`pattern-stack-preview pattern-fill-preview ${preview.tone}`}
+      data-preview-pattern-fill={`${preview.pattern}-${preview.preset}`}
+      data-testid="pattern-fill-preview"
+      title={preview.detailTitle}
+    >
+      <span data-testid="pattern-fill-preview-status">{preview.statusLabel}</span>
+      <strong data-testid="pattern-fill-preview-pattern">{preview.patternLabel}</strong>
+      <small data-testid="pattern-fill-preview-preset">{preview.presetLabel}</small>
+      <small data-testid="pattern-fill-preview-drums">{preview.drumsLabel}</small>
+      <small data-testid="pattern-fill-preview-bass">{preview.bassLabel}</small>
+      <small data-testid="pattern-fill-preview-chord">{preview.chordLabel}</small>
+      <small data-testid="pattern-fill-preview-melody">{preview.melodyLabel}</small>
+      <small data-testid="pattern-fill-preview-moves">{preview.moveLabel}</small>
     </div>
   );
 }
