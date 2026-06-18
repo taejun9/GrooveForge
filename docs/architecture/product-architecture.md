@@ -90,6 +90,8 @@ Sound-source nuance: a built-in drum rack may use internal one-shot sounds, and 
 
 MVP type examples must not place `AudioClipEvent`, `audio`, or `sampler` beside the core event, clip, or track unions. Those names are reserved for the optional sampling extension section unless the user explicitly starts sampling-phase work. External examples that include `AudioClipEvent` in `MusicalEvent` or include `audio`/`sampler` in `TrackType` must be split into a core MVP union plus a clearly labeled optional sampling extension.
 
+Attached-brief architecture rule: when a brief presents a single combined track, clip, or audio-engine list, split it before implementation. The MVP list is `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master` plus pattern/MIDI/automation clips; `audio`, `sampler`, `AudioClip`, `Sampler`, waveform editing, chop pads, and imported audio assets belong only to the optional sampling extension.
+
 Draft rewrite target: the accepted MVP architecture removes `AudioClipEvent` from `MusicalEvent`, excludes `audio` and `sampler` from `TrackType`, treats core clips as pattern/MIDI/automation containers, and keeps the default device palette to drum rack, synth 808/bass, simple synth, chord synth, built-in FX, mixer, and master devices. Optional sampling can add audio clips, audio tracks, sampler devices, sample import, chopping, pitch/stretch, and one-shot mapping later without changing the event-first core.
 
 If an exploratory draft includes audio clip, sampler, or waveform examples, move them to an optional sampling section before they enter architecture diagrams, schema examples, default tracks, or MVP validation.
