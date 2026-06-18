@@ -4824,6 +4824,18 @@ export function App(): ReactElement {
     );
   }
 
+  function resetSelectedChordInversion(): void {
+    if (selectedChordIndex === null || !selectedChord) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+    if (normalizeChordInversion(selectedChord.inversion) === 0) {
+      setProjectStatus("Chord is already root voicing");
+      return;
+    }
+    updateChordEvent(selectedChordIndex, { inversion: 0 }, "Reset chord voicing");
+  }
+
   function updateSelectedChordRoot(root: string): void {
     if (selectedChordIndex === null || !selectedChord) {
       setProjectStatus("Select a chord event");
@@ -6025,6 +6037,7 @@ export function App(): ReactElement {
     onDuplicateSelectedChord: duplicateSelectedChord,
     onDeleteSelectedChord: deleteSelectedChordEvent,
     onMoveSelectedChordInversion: moveSelectedChordInversion,
+    onResetSelectedChordInversion: resetSelectedChordInversion,
     onUpdateSelectedChordRoot: updateSelectedChordRoot,
     onUpdateSelectedChordQuality: updateSelectedChordQuality,
     onUpdateSelectedChordLength: updateSelectedChordLength,
@@ -11798,6 +11811,7 @@ function createQuickActions({
   onDuplicateSelectedChord,
   onDeleteSelectedChord,
   onMoveSelectedChordInversion,
+  onResetSelectedChordInversion,
   onUpdateSelectedChordRoot,
   onUpdateSelectedChordQuality,
   onUpdateSelectedChordLength,
@@ -12014,6 +12028,7 @@ function createQuickActions({
   onDuplicateSelectedChord: () => void;
   onDeleteSelectedChord: () => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
+  onResetSelectedChordInversion: () => void;
   onUpdateSelectedChordRoot: (root: string) => void;
   onUpdateSelectedChordQuality: (quality: ChordQuality) => void;
   onUpdateSelectedChordLength: (length: number) => void;
@@ -12507,6 +12522,7 @@ function createQuickActions({
       onAuditionSelectedChord,
       onMoveSelectedChordStep,
       onMoveSelectedChordInversion,
+      onResetSelectedChordInversion,
       onUpdateSelectedChordRoot,
       onUpdateSelectedChordQuality,
       onUpdateSelectedChordLength,

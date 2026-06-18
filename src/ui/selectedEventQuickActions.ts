@@ -84,6 +84,7 @@ type SelectedEventQuickActionsParams = {
   onAuditionSelectedChord: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
+  onResetSelectedChordInversion: () => void;
   onUpdateSelectedChordRoot: (root: string) => void;
   onUpdateSelectedChordQuality: (quality: ChordQuality) => void;
   onUpdateSelectedChordLength: (length: number) => void;
@@ -138,6 +139,7 @@ export function createSelectedEventQuickActions({
   onAuditionSelectedChord,
   onMoveSelectedChordStep,
   onMoveSelectedChordInversion,
+  onResetSelectedChordInversion,
   onUpdateSelectedChordRoot,
   onUpdateSelectedChordQuality,
   onUpdateSelectedChordLength,
@@ -864,6 +866,17 @@ export function createSelectedEventQuickActions({
       keywords: "selected chord inversion voicing up higher harmony progression edit beginner producer",
       disabled: !selectedChordActive || selectedChordInversionUp === null,
       run: () => onMoveSelectedChordInversion(1)
+    },
+    {
+      id: "selected-chord-inversion-reset",
+      title: "Reset selected chord voicing",
+      detail: selectedChordActive
+        ? `${selectedChordLabel} / ${chordInversionLabel(selectedChordInversion)} -> ${chordInversionLabel(0)}`
+        : "Select a chord first.",
+      group: "Create",
+      keywords: "selected chord inversion reset root position voicing harmony progression edit beginner producer",
+      disabled: !selectedChordActive || selectedChordInversion === 0,
+      run: onResetSelectedChordInversion
     },
     {
       id: "selected-chord-length-short",
