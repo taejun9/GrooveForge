@@ -48,6 +48,7 @@ import {
 } from "./workstationUiModel";
 
 const selectedChordDefaultVelocity = 0.5;
+const selectedChordDefaultLength = 4;
 const velocityResetThreshold = 0.005;
 
 type SelectedEventQuickActionsParams = {
@@ -288,6 +289,8 @@ export function createSelectedEventQuickActions({
       ? chordQualities[(selectedChordQualityIndex + 1) % chordQualities.length]
       : chordQualities[0];
   const selectedChordMaxLength = selectedChord ? Math.max(1, steps.length - selectedChord.step) : 1;
+  const selectedChordLengthDefault =
+    selectedChord && selectedChordActive ? Math.min(selectedChordDefaultLength, selectedChordMaxLength) : null;
   const selectedChordLength =
     selectedChord && selectedChordActive ? Math.min(clampStepLength(selectedChord.length), selectedChordMaxLength) : null;
   const selectedChordInversion = selectedChord ? normalizeChordInversion(selectedChord.inversion) : 0;
@@ -964,6 +967,19 @@ export function createSelectedEventQuickActions({
       keywords: "selected chord length lengthen duration rhythm sustain harmony progression edit beginner producer",
       disabled: selectedChordLength === null || selectedChordLength >= selectedChordMaxLength,
       run: () => selectedChordLength !== null && onUpdateSelectedChordLength(selectedChordLength + 1)
+    },
+    {
+      id: "selected-chord-length-reset",
+      title: "Reset selected chord length",
+      detail:
+        selectedChordLength !== null && selectedChordLengthDefault !== null
+          ? `${selectedChordLabel} length ${selectedChordLength} -> ${selectedChordLengthDefault}`
+          : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord length reset default duration rhythm harmony progression edit beginner producer",
+      disabled:
+        selectedChordLength === null || selectedChordLengthDefault === null || selectedChordLength === selectedChordLengthDefault,
+      run: () => selectedChordLengthDefault !== null && onUpdateSelectedChordLength(selectedChordLengthDefault)
     },
     {
       id: "selected-chord-velocity-down",
