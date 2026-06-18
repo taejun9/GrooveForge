@@ -15292,6 +15292,20 @@ function mixFixQuickActionPreset(actionId: string): MixFixPreset | null {
   }
 }
 
+function masterFinishQuickActionPad(actionId: string): MasterFinishPadDefinition | null {
+  if (!actionId.startsWith("master-finish-")) {
+    return null;
+  }
+  const padId = actionId.replace("master-finish-", "") as MasterFinishPadId;
+  return masterFinishPadDefinitions.find((pad) => pad.id === padId) ?? null;
+}
+
+function masterFinishQuickActionPosture(project: ProjectState): string {
+  return `${project.masterPreset} / ${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(
+    masterChannelVolumeDb(project.mixer)
+  )} output`;
+}
+
 function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -15959,6 +15973,15 @@ function quickActionResultMetricSnapshot(
           value: mixFixLowEndPosture(analyzeStemExports(project))
         };
     }
+  }
+
+  const masterFinishPad = masterFinishQuickActionPad(action.id);
+  if (masterFinishPad) {
+    return {
+      id: `master-finish-${masterFinishPad.id}`,
+      label: `${masterFinishPad.label} Master Finish`,
+      value: masterFinishQuickActionPosture(project)
+    };
   }
 
   if (action.id.startsWith("space-fx-")) {
@@ -16637,6 +16660,14 @@ function quickActionResultFollowup(
     return {
       auditionCue: mixFixAuditionCue(mixFixPreset),
       nextCheck: mixFixNextCheck(mixFixPreset)
+    };
+  }
+
+  const masterFinishPad = masterFinishQuickActionPad(action.id);
+  if (masterFinishPad) {
+    return {
+      auditionCue: "Play Full Mix; watch Export meter headroom and limiter.",
+      nextCheck: "Use Ceiling and master output controls for manual trim before WAV/stem export."
     };
   }
 
