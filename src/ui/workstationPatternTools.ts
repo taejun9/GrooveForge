@@ -216,6 +216,8 @@ import type {
   PatternClonePadOption,
   PatternCloneResultMetric,
   PatternCloneResult,
+  PatternFillResultMetric,
+  PatternFillResult,
   PatternDnaCardId,
   PatternDnaFocusTarget,
   PatternDnaCard,
@@ -1209,6 +1211,148 @@ function layerStarterNextCheck(starterId: LayerStarterId, pattern: PatternData):
       return `${pattern.chordEvents.length} chord events now; use Key Compass and selected-chord tools to refine harmony.`;
     case "melody":
       return `${pattern.melodyNotes.length} Synth notes now; use Melody Move or selected-note tools to shape the hook.`;
+  }
+}
+
+export function createPatternFillResult(
+  preset: PatternFillPreset,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): PatternFillResult {
+  const pattern = afterProject.selectedPattern;
+  const beforePattern = beforeProject.patterns[beforeProject.selectedPattern];
+  const afterPattern = afterProject.patterns[pattern];
+  const presetLabel = patternFillPresetLabel(preset);
+  const changedCount = patternFillChangedCount(beforePattern, afterPattern);
+
+  return {
+    preset,
+    pattern,
+    title: `${presetLabel} ready`,
+    status: preset === "clear_tail" ? "Cleared" : "Applied",
+    detail: `Pattern ${pattern} / ${presetLabel}`,
+    scope: `Pattern ${pattern} tail events`,
+    impact: `${changedCount} tail change${changedCount === 1 ? "" : "s"}`,
+    metrics: createPatternFillResultMetrics(preset, beforePattern, afterPattern),
+    auditionCue: patternFillAuditionCue(preset, pattern),
+    nextCheck: patternFillNextCheck(preset, afterPattern),
+    tone: changedCount > 0 ? "good" : "warn"
+  };
+}
+
+export function createPatternFillResultMetrics(
+  preset: PatternFillPreset,
+  beforePattern: PatternData,
+  afterPattern: PatternData
+): PatternFillResultMetric[] {
+  const affected = patternFillAffectedMetrics(preset);
+  return [
+    createPatternFillResultMetric(
+      "events",
+      "Events",
+      `${patternEventTotal(beforePattern)} total`,
+      `${patternEventTotal(afterPattern)} total`,
+      affected,
+      patternFillChangedCount(beforePattern, afterPattern)
+    ),
+    createPatternFillResultMetric(
+      "drums",
+      "Drums",
+      `${activeDrumHitCount(beforePattern)} hits`,
+      `${activeDrumHitCount(afterPattern)} hits`,
+      affected,
+      drumPatternMoveCount(beforePattern, afterPattern)
+    ),
+    createPatternFillResultMetric(
+      "bass",
+      "808",
+      `${beforePattern.bassNotes.length} notes`,
+      `${afterPattern.bassNotes.length} notes`,
+      affected,
+      bassNotesChangedCount(beforePattern.bassNotes, afterPattern.bassNotes)
+    ),
+    createPatternFillResultMetric(
+      "chords",
+      "Chords",
+      `${beforePattern.chordEvents.length} events`,
+      `${afterPattern.chordEvents.length} events`,
+      affected,
+      chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents)
+    ),
+    createPatternFillResultMetric(
+      "melody",
+      "Synth",
+      `${beforePattern.melodyNotes.length} notes`,
+      `${afterPattern.melodyNotes.length} notes`,
+      affected,
+      melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes)
+    )
+  ];
+}
+
+export function createPatternFillResultMetric(
+  id: PatternFillResultMetric["id"],
+  label: string,
+  before: string,
+  after: string,
+  affected: Set<PatternFillResultMetric["id"]>,
+  changedEvents: number
+): PatternFillResultMetric {
+  const preserved = !affected.has(id) && before === after;
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: changedEvents > 0 || preserved ? "good" : "warn"
+  };
+}
+
+function patternFillChangedCount(beforePattern: PatternData, afterPattern: PatternData): number {
+  return (
+    drumPatternMoveCount(beforePattern, afterPattern) +
+    bassNotesChangedCount(beforePattern.bassNotes, afterPattern.bassNotes) +
+    chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents) +
+    melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes)
+  );
+}
+
+function patternFillAffectedMetrics(preset: PatternFillPreset): Set<PatternFillResultMetric["id"]> {
+  if (preset === "drum_fill") {
+    return new Set(["events", "drums"]);
+  }
+  if (preset === "bass_pickup") {
+    return new Set(["events", "bass"]);
+  }
+  if (preset === "melody_turn") {
+    return new Set(["events", "melody"]);
+  }
+  return new Set(["events", "drums", "bass", "chords", "melody"]);
+}
+
+function patternFillAuditionCue(preset: PatternFillPreset, pattern: PatternSlot): string {
+  switch (preset) {
+    case "drum_fill":
+      return `Loop Pattern ${pattern}; listen to the last bar for kick, clap, hat, and perc lift.`;
+    case "bass_pickup":
+      return `Loop Pattern ${pattern}; hear the 808 pickup into bar one and check kick overlap.`;
+    case "melody_turn":
+      return `Loop Pattern ${pattern}; hear the Synth turn into the next loop and check hook tension.`;
+    case "clear_tail":
+      return `Loop Pattern ${pattern}; confirm the tail is clean before adding a new transition.`;
+  }
+}
+
+function patternFillNextCheck(preset: PatternFillPreset, pattern: PatternData): string {
+  switch (preset) {
+    case "drum_fill":
+      return `${activeDrumHitCount(pattern)} drum hits now; use selected-drum tools if the fill is too busy.`;
+    case "bass_pickup":
+      return `${pattern.bassNotes.length} 808 notes now; use selected-note tools to trim length, glide, or pitch.`;
+    case "melody_turn":
+      return `${pattern.melodyNotes.length} Synth notes now; use Melody Move or selected-note tools to shape the turn.`;
+    case "clear_tail":
+      return `${patternEventTotal(pattern)} Pattern events remain; add a new fill only after the core loop feels stable.`;
   }
 }
 

@@ -1,6 +1,6 @@
-import { Layers, ListChecks } from "lucide-react";
+import { Layers, ListChecks, Sparkles } from "lucide-react";
 import type { ReactElement } from "react";
-import type { LayerStarterResult, PatternCloneResult } from "./workstationUiModel";
+import type { LayerStarterResult, PatternCloneResult, PatternFillResult } from "./workstationUiModel";
 
 export function LayerStarterResultStrip({ result }: { result: LayerStarterResult }): ReactElement {
   return (
@@ -38,6 +38,48 @@ export function LayerStarterResultStrip({ result }: { result: LayerStarterResult
         <span>
           <b>Next check</b>
           <em data-testid="layer-starter-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function PatternFillResultStrip({ result }: { result: PatternFillResult }): ReactElement {
+  return (
+    <div
+      className={`pattern-stack-result pattern-fill-result ${result.tone}`}
+      data-result-pattern-fill={`${result.pattern}-${result.preset}`}
+      data-testid="pattern-fill-result"
+      aria-live="polite"
+    >
+      <div className="pattern-stack-result-main">
+        <Sparkles size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="pattern-fill-result-title">{result.title}</strong>
+          <small data-testid="pattern-fill-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="pattern-stack-result-meta">
+        <span data-testid="pattern-fill-result-status">{result.status}</span>
+        <span data-testid="pattern-fill-result-scope">{result.scope}</span>
+        <span data-testid="pattern-fill-result-impact">{result.impact}</span>
+      </div>
+      <div className="pattern-stack-result-metrics" data-testid="pattern-fill-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`pattern-fill-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="pattern-stack-result-followup" data-testid="pattern-fill-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="pattern-fill-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="pattern-fill-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
     </div>

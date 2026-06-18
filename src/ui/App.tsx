@@ -260,6 +260,7 @@ import type {
   PatternCompareSummary,
   PatternClonePadOption,
   PatternCloneResult,
+  PatternFillResult,
   PatternDnaCardId,
   PatternDnaFocusTarget,
   PatternDnaCard,
@@ -543,7 +544,7 @@ import {
   drumAccentDefinitions,
   drumFoundationDefinitions
 } from "./workstationUiModel";
-import { LayerStarterResultStrip, PatternCloneResultStrip } from "./workstationPatternResults";
+import { LayerStarterResultStrip, PatternCloneResultStrip, PatternFillResultStrip } from "./workstationPatternResults";
 import {
   laneColor,
   mergePitchLanes,
@@ -584,6 +585,7 @@ import {
   createLayerStarterResult,
   createPatternClonePadOptions,
   createPatternCloneResult,
+  createPatternFillResult,
   createPatternStackEvents,
   samePatternStackEvents,
   createDrumFoundationOptions,
@@ -806,6 +808,7 @@ export function App(): ReactElement {
   const [beatSpineResult, setBeatSpineResult] = useState<BeatSpineApplyResult | null>(null);
   const [layerStarterResult, setLayerStarterResult] = useState<LayerStarterResult | null>(null);
   const [patternCloneResult, setPatternCloneResult] = useState<PatternCloneResult | null>(null);
+  const [patternFillResult, setPatternFillResult] = useState<PatternFillResult | null>(null);
   const [patternStackResult, setPatternStackResult] = useState<PatternStackResult | null>(null);
   const [drumMoveResult, setDrumMoveResult] = useState<DrumMoveResult | null>(null);
   const [bassMoveResult, setBassMoveResult] = useState<BassMoveResult | null>(null);
@@ -1500,6 +1503,7 @@ export function App(): ReactElement {
     setBeatSpineResult(null);
     setLayerStarterResult(null);
     setPatternCloneResult(null);
+    setPatternFillResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -1533,6 +1537,7 @@ export function App(): ReactElement {
       setBeatSpineResult(null);
       setLayerStarterResult(null);
       setPatternCloneResult(null);
+      setPatternFillResult(null);
       setPatternStackResult(null);
       setDrumMoveResult(null);
       setBassMoveResult(null);
@@ -1641,6 +1646,7 @@ export function App(): ReactElement {
     setBeatSpineResult(null);
     setLayerStarterResult(null);
     setPatternCloneResult(null);
+    setPatternFillResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -1681,6 +1687,7 @@ export function App(): ReactElement {
     setBeatSpineResult(null);
     setLayerStarterResult(null);
     setPatternCloneResult(null);
+    setPatternFillResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -2079,10 +2086,16 @@ export function App(): ReactElement {
 
   function applyPatternFill(preset: PatternFillPreset): void {
     const sourceSlot = projectRef.current.selectedPattern;
-    updateCurrentPattern(
+    const beforeProject = projectRef.current;
+    const changed = updateCurrentPattern(
       (pattern) => applyPatternFillPreset(pattern, preset, projectRef.current.key),
       `${patternFillPresetLabel(preset)} applied to Pattern ${sourceSlot}`
     );
+    if (changed) {
+      setPatternFillResult(createPatternFillResult(preset, beforeProject, projectRef.current));
+    } else {
+      setPatternFillResult(null);
+    }
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
@@ -5585,6 +5598,7 @@ export function App(): ReactElement {
               );
             })}
           </div>
+          {patternFillResult && <PatternFillResultStrip result={patternFillResult} />}
           <div className="step-grid">
             {(Object.keys(drumLabels) as DrumLane[]).map((lane) => (
               <div className="step-row" key={lane}>
