@@ -8,6 +8,7 @@ import {
   SlidersHorizontal
 } from "lucide-react";
 import type { ReactElement } from "react";
+import type { ProjectState } from "../domain/workstation";
 import type {
   FirstBeatPathStepId,
   FirstBeatPathSummary,
@@ -15,12 +16,133 @@ import type {
   MixCoachTone,
   ModeFocusCard,
   ModeFocusSummary,
+  ModeSwitchResult,
+  QuickAction,
   SessionPassCard,
   SessionPassSummary,
   WorkflowNavigatorItem,
   WorkflowSpotlightSummary,
   WorkflowZoneId
 } from "./workstationUiModel";
+
+export function modeLabel(mode: ProjectState["mode"]): string {
+  return mode === "guided" ? "Guided" : "Studio";
+}
+
+export function createModeSwitchResult(
+  mode: ProjectState["mode"],
+  beforeProject: ProjectState,
+  afterProject: ProjectState,
+  modeFocus: ModeFocusSummary,
+  sessionPass: SessionPassSummary,
+  firstBeatPath: FirstBeatPathSummary,
+  changed: boolean
+): ModeSwitchResult {
+  const label = modeLabel(mode);
+  const activePass = sessionPass.cards.find((card) => card.id === mode) ?? sessionPass.cards[0] ?? null;
+  const focusLine = modeFocus.cards
+    .slice(0, 2)
+    .map((card) => `${card.label}: ${card.value}`)
+    .join(" / ");
+  const resultTone = changed
+    ? modeSwitchWeakestTone([modeFocus.tone, sessionPass.tone, firstBeatPath.tone, activePass?.tone ?? "good"])
+    : "warn";
+
+  return {
+    mode,
+    title: `${label} mode ${changed ? "active" : "already active"}`,
+    status: changed ? "Switched" : "Held",
+    detail:
+      mode === "guided"
+        ? `${firstBeatPath.headline} / ${activePass?.detail ?? sessionPass.detail}`
+        : `${modeFocus.headline} / ${activePass?.detail ?? sessionPass.detail}`,
+    metric: {
+      id: "mode-switch",
+      label: "Mode",
+      before: modeLabel(beforeProject.mode),
+      after: modeLabel(afterProject.mode),
+      tone: changed ? "good" : "warn"
+    },
+    auditionCue:
+      mode === "guided"
+        ? "Use First Beat Path to move through setup, compose, arrange, mix, and deliver."
+        : "Use Mode Focus, Review Queue, and Export Preflight for faster producer-level scans.",
+    nextCheck: `${mode === "guided" ? firstBeatPath.countLabel : modeFocus.detail} / ${focusLine || sessionPass.headline}`,
+    tone: resultTone
+  };
+}
+
+export function ModeSwitchResultStrip({ result }: { result: ModeSwitchResult }): ReactElement {
+  return (
+    <div
+      className={`mode-switch-result ${result.tone}`}
+      data-mode-switch-result={result.mode}
+      data-testid="mode-switch-result"
+      aria-live="polite"
+    >
+      <div className="mode-switch-result-main">
+        <SlidersHorizontal size={15} aria-hidden="true" />
+        <span>
+          <strong data-testid="mode-switch-result-title">{result.title}</strong>
+          <small data-testid="mode-switch-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className={`mode-switch-result-metric ${result.metric.tone}`} data-testid="mode-switch-result-metric">
+        <span data-testid="mode-switch-result-status">{result.status}</span>
+        <strong data-testid="mode-switch-result-metric-value">
+          {result.metric.before} -&gt; {result.metric.after}
+        </strong>
+      </div>
+      <div className="mode-switch-result-followup" data-testid="mode-switch-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
+  );
+}
+
+export function createModeSwitchQuickActions({
+  firstBeatPathSummary,
+  modeFocusSummary,
+  onSwitchMode,
+  projectMode,
+  sessionPassSummary
+}: {
+  firstBeatPathSummary: FirstBeatPathSummary;
+  modeFocusSummary: ModeFocusSummary;
+  onSwitchMode: (mode: ProjectState["mode"]) => void;
+  projectMode: ProjectState["mode"];
+  sessionPassSummary: SessionPassSummary;
+}): QuickAction[] {
+  const modeSwitchDefinitions: Array<{ mode: ProjectState["mode"]; id: string }> = [
+    { mode: "guided", id: "mode-switch-guided" },
+    { mode: "studio", id: "mode-switch-studio" }
+  ];
+
+  return modeSwitchDefinitions.map(({ mode, id }) => {
+    const label = modeLabel(mode);
+    const active = projectMode === mode;
+    const passCard = sessionPassSummary.cards.find((card) => card.id === mode);
+    const detail =
+      mode === "guided"
+        ? `${firstBeatPathSummary.headline} / ${passCard?.value ?? sessionPassSummary.headline} / ${
+            passCard?.detail ?? sessionPassSummary.detail
+          }`
+        : `${modeFocusSummary.headline} / ${passCard?.value ?? sessionPassSummary.headline} / ${
+            passCard?.detail ?? sessionPassSummary.detail
+          }`;
+
+    return {
+      id,
+      title: active ? `${label} mode already active` : `Switch to ${label} mode`,
+      detail,
+      group: "Project",
+      keywords: `mode switch ${mode} ${label} guided studio orientation first beat path mode focus session pass command palette beginner producer`,
+      disabled: active,
+      run: () => onSwitchMode(mode)
+    };
+  });
+}
 
 export function ModeFocus({ onFocus, summary }: { summary: ModeFocusSummary; onFocus: (card: ModeFocusCard) => void }): ReactElement {
   return (
@@ -275,4 +397,14 @@ function workflowNavigatorIcon(zone: WorkflowZoneId): ReactElement {
 
 function workflowCountLabel(count: number, label: string): string {
   return `${count} ${label}${count === 1 ? "" : "s"}`;
+}
+
+function modeSwitchWeakestTone(tones: MixCoachTone[]): MixCoachTone {
+  if (tones.includes("danger")) {
+    return "danger";
+  }
+  if (tones.includes("warn")) {
+    return "warn";
+  }
+  return "good";
 }

@@ -471,6 +471,7 @@ import type {
   ReviewQueueSummary,
   ModeFocusCard,
   ModeFocusSummary,
+  ModeSwitchResult,
   SessionPassTarget,
   SessionPassCardId,
   SessionPassCard,
@@ -589,9 +590,13 @@ import {
 import {
   FirstBeatPath,
   ModeFocus,
+  ModeSwitchResultStrip,
   SessionPass,
   WorkflowNavigator,
-  createWorkflowSpotlightSummary
+  createModeSwitchQuickActions,
+  createModeSwitchResult,
+  createWorkflowSpotlightSummary,
+  modeLabel
 } from "./workstationGuidancePanels";
 import {
   LayerStarterResultStrip,
@@ -972,6 +977,7 @@ export function App(): ReactElement {
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
+  const [modeSwitchResult, setModeSwitchResult] = useState<ModeSwitchResult | null>(null);
   const [swingFeelResult, setSwingFeelResult] = useState<SwingFeelResult | null>(null);
   const [beatBlueprintResult, setBeatBlueprintResult] = useState<BeatBlueprintResult | null>(null);
   const [beatSpineResult, setBeatSpineResult] = useState<BeatSpineApplyResult | null>(null);
@@ -1867,6 +1873,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setModeSwitchResult(null);
     setSwingFeelResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
@@ -1908,6 +1915,7 @@ export function App(): ReactElement {
       projectRef.current = nextProject;
       setProject(nextProject);
       setQuickActionResult(null);
+      setModeSwitchResult(null);
       setSwingFeelResult(null);
       setBeatBlueprintResult(null);
       setBeatSpineResult(null);
@@ -5498,6 +5506,73 @@ export function App(): ReactElement {
     );
   }
 
+  function switchProjectMode(mode: ProjectState["mode"]): void {
+    const beforeProject = projectRef.current;
+    const changed = updateProject(
+      (current) => (current.mode === mode ? current : { ...current, mode }),
+      `Switched to ${modeLabel(mode)} mode`
+    );
+    const afterProject = projectRef.current;
+    const afterExportAnalysis = analyzeExport(afterProject);
+    const afterStemAnalyses = analyzeStemExports(afterProject);
+    const afterBeatReadinessChecks = createBeatReadinessChecks(afterProject, afterExportAnalysis);
+    const afterBeatMap = createBeatMapSummary(afterProject, afterBeatReadinessChecks, afterExportAnalysis, afterStemAnalyses);
+    const afterReviewQueue = createReviewQueueSummary(
+      afterProject,
+      afterBeatReadinessChecks,
+      afterExportAnalysis,
+      afterStemAnalyses
+    );
+    const afterFinishChecklist = createFinishChecklistSummary(
+      afterProject,
+      afterBeatReadinessChecks,
+      afterExportAnalysis,
+      afterStemAnalyses
+    );
+    const afterExportPreflight = createExportPreflightSummary(
+      afterProject,
+      afterBeatReadinessChecks,
+      afterExportAnalysis,
+      afterStemAnalyses
+    );
+    const afterWorkflowItems = createWorkflowNavigatorItems(afterProject, afterBeatMap, afterExportPreflight, afterExportAnalysis);
+    const afterFirstBeatPath = createFirstBeatPathSummary(
+      afterProject,
+      getStyle(afterProject),
+      afterWorkflowItems,
+      afterBeatMap,
+      afterExportPreflight,
+      afterExportAnalysis
+    );
+    const afterComposerGuide = createComposerGuideSummary(
+      afterProject,
+      afterBeatReadinessChecks,
+      afterExportAnalysis,
+      afterStemAnalyses
+    );
+    const afterModeFocus = createModeFocusSummary(
+      afterProject,
+      afterComposerGuide,
+      afterBeatMap,
+      afterReviewQueue,
+      afterFinishChecklist
+    );
+    const afterSessionPass = createSessionPassSummary(
+      afterProject,
+      afterFirstBeatPath,
+      afterReviewQueue,
+      afterFinishChecklist,
+      afterExportPreflight
+    );
+
+    setModeSwitchResult(
+      createModeSwitchResult(mode, beforeProject, afterProject, afterModeFocus, afterSessionPass, afterFirstBeatPath, changed)
+    );
+    if (!changed) {
+      setProjectStatus(`${modeLabel(mode)} mode already active`);
+    }
+  }
+
   function applyProjectKey(key: string): void {
     const changed = updateProject((current) => retargetProjectKey(current, key), `Retargeted project to ${key}`);
     if (changed) {
@@ -6349,6 +6424,7 @@ export function App(): ReactElement {
     onSelectArrangementBlock: selectArrangementBlock,
     onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
+    onSwitchMode: switchProjectMode,
     onUsePatternInSelectedBlock: usePatternInSelectedBlock,
     onSetKeyboardCaptureEnabled: setKeyboardCaptureEnabled,
     onSetKeyboardCaptureStepMode: setKeyboardCaptureStepMode,
@@ -6738,7 +6814,7 @@ export function App(): ReactElement {
             className={project.mode === "guided" ? "selected" : ""}
             data-testid="mode-guided"
             type="button"
-            onClick={() => updateProject((current) => ({ ...current, mode: "guided" }))}
+            onClick={() => switchProjectMode("guided")}
           >
             Guided
           </button>
@@ -6746,7 +6822,7 @@ export function App(): ReactElement {
             className={project.mode === "studio" ? "selected" : ""}
             data-testid="mode-studio"
             type="button"
-            onClick={() => updateProject((current) => ({ ...current, mode: "studio" }))}
+            onClick={() => switchProjectMode("studio")}
           >
             Studio
           </button>
@@ -6769,6 +6845,7 @@ export function App(): ReactElement {
           </div>
           <span data-testid="project-status">{projectStatus}</span>
         </div>
+        {modeSwitchResult && <ModeSwitchResultStrip result={modeSwitchResult} />}
       </section>
 
       <ModeFocus summary={modeFocusSummary} onFocus={focusModeFocusCard} />
@@ -11954,6 +12031,7 @@ function createQuickActions({
   onSelectArrangementBlock,
   onSelectPattern,
   onSelectStyle,
+  onSwitchMode,
   onUsePatternInSelectedBlock,
   onSetKeyboardCaptureEnabled,
   onSetKeyboardCaptureStepMode,
@@ -12178,6 +12256,7 @@ function createQuickActions({
   onSelectArrangementBlock: (index: number) => void;
   onSelectPattern: (pattern: PatternSlot) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
+  onSwitchMode: (mode: ProjectState["mode"]) => void;
   onUsePatternInSelectedBlock: (pattern: PatternSlot) => void;
   onSetKeyboardCaptureEnabled: (enabled: boolean) => void;
   onSetKeyboardCaptureStepMode: (mode: KeyboardCaptureStepMode) => void;
@@ -12490,6 +12569,13 @@ function createQuickActions({
     keywords: `mode focus jump card guided studio orientation stage writing check scan issue handoff ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
     run: () => onFocusModeFocus(card)
   }));
+  const modeSwitchActions = createModeSwitchQuickActions({
+    firstBeatPathSummary,
+    modeFocusSummary,
+    onSwitchMode,
+    projectMode: project.mode,
+    sessionPassSummary
+  });
   const patternDnaCard = activePatternDnaQuickActionCard(patternDnaSummary);
   const patternDnaActions: QuickAction[] = patternDnaSummary.cards.map((card) => ({
     id: `pattern-dna-card-${card.id}`,
@@ -13546,6 +13632,7 @@ function createQuickActions({
       run: () => onFocusSessionPass(sessionPassCard)
     },
     ...sessionPassActions,
+    ...modeSwitchActions,
     {
       id: "session-brief-compass-focus",
       title: `Focus Brief Compass: ${sessionBriefCompassCard.label}`,
@@ -14854,6 +14941,10 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("mode-switch-")) {
+    return { id: "mode-switch", label: "Mode", value: modeLabel(project.mode) };
+  }
+
   if (action.id === "session-pass-focus") {
     return { id: "session-pass", label: "Session pass", value: `${project.mode} mode` };
   }
@@ -15847,6 +15938,18 @@ function quickActionResultFollowup(
       auditionCue: "Use the reference only to choose the next explicit local command.",
       nextCheck: "Open Quick Actions when you are ready to run one command."
     };
+  }
+
+  if (action.id.startsWith("mode-switch-")) {
+    return project.mode === "guided"
+      ? {
+          auditionCue: "Use First Beat Path to make the next direct drums, 808, harmony, melody, arrangement, mix, or delivery move.",
+          nextCheck: "Switch back to Studio only when you want faster issue scanning instead of step-by-step guidance."
+        }
+      : {
+          auditionCue: "Use Mode Focus, Review Queue, and Export Preflight to scan the current beat without changing the music.",
+          nextCheck: "Switch back to Guided when the next beat-making step should be explicit again."
+        };
   }
 
   if (action.id === "session-pass-focus") {

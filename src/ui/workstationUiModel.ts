@@ -2576,6 +2576,25 @@ export type ModeFocusSummary = {
   cards: ModeFocusCard[];
 };
 
+export type ModeSwitchResultMetric = {
+  id: "mode-switch";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+export type ModeSwitchResult = {
+  mode: ProjectState["mode"];
+  title: string;
+  status: string;
+  detail: string;
+  metric: ModeSwitchResultMetric;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type SessionPassTarget = "transport" | ReviewQueueFocusTarget;
 
 export type SessionPassCardId = "guided" | "studio" | "finish" | "deliver";

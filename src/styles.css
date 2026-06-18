@@ -537,6 +537,103 @@ h2 {
   border-radius: 8px;
 }
 
+.mode-switch-result {
+  display: grid;
+  flex: 1 1 100%;
+  grid-template-columns: minmax(220px, 1fr) minmax(132px, 0.45fr) minmax(260px, 1.35fr);
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(244, 239, 231, 0.11);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.04);
+}
+
+.mode-switch-result.good {
+  border-color: rgba(120, 240, 200, 0.28);
+}
+
+.mode-switch-result.warn {
+  border-color: rgba(240, 195, 106, 0.32);
+}
+
+.mode-switch-result.danger {
+  border-color: rgba(255, 128, 128, 0.32);
+}
+
+.mode-switch-result-main,
+.mode-switch-result-metric,
+.mode-switch-result-followup {
+  min-width: 0;
+}
+
+.mode-switch-result-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mode-switch-result-main svg {
+  flex: 0 0 auto;
+  color: #78f0c8;
+}
+
+.mode-switch-result-main span,
+.mode-switch-result-followup {
+  display: grid;
+  gap: 2px;
+}
+
+.mode-switch-result-main strong,
+.mode-switch-result-main small,
+.mode-switch-result-metric span,
+.mode-switch-result-metric strong,
+.mode-switch-result-followup span,
+.mode-switch-result-followup small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mode-switch-result-main strong,
+.mode-switch-result-metric strong,
+.mode-switch-result-followup span {
+  font-size: 12px;
+}
+
+.mode-switch-result-main small,
+.mode-switch-result-metric span,
+.mode-switch-result-followup small {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 11px;
+}
+
+.mode-switch-result-metric {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 5px 8px;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 6px;
+  background: rgba(17, 16, 15, 0.42);
+}
+
+.mode-switch-result-metric.good {
+  border-color: rgba(120, 240, 200, 0.28);
+}
+
+.mode-switch-result-metric.warn {
+  border-color: rgba(240, 195, 106, 0.28);
+}
+
+.mode-switch-result-metric.danger {
+  border-color: rgba(255, 128, 128, 0.28);
+}
+
+.mode-switch-result-followup {
+  align-content: center;
+}
+
 .file-input {
   display: none;
 }
