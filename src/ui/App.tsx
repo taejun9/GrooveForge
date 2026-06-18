@@ -409,6 +409,10 @@ import type {
   ArrangementMuteMapSegment,
   ArrangementMuteMapSummary,
   ArrangementMuteMapFocusSummary,
+  ArrangementTransitionMapFocusId,
+  ArrangementTransitionMapTransition,
+  ArrangementTransitionMapSummary,
+  ArrangementTransitionMapFocusSummary,
   SectionLocatorPad,
   ArrangementBlockRoleSummary,
   MixerChannelRoleSummary,
@@ -934,6 +938,8 @@ export function App(): ReactElement {
   const [hookReadinessFocusId, setHookReadinessFocusId] = useState<HookReadinessFocusId | null>(null);
   const [toplineSpaceFocusId, setToplineSpaceFocusId] = useState<ToplineSpaceFocusId | null>(null);
   const [arrangementMuteMapFocusId, setArrangementMuteMapFocusId] = useState<ArrangementMuteMapFocusId | null>(null);
+  const [arrangementTransitionMapFocusId, setArrangementTransitionMapFocusId] =
+    useState<ArrangementTransitionMapFocusId | null>(null);
   const [keyCompassFocusId, setKeyCompassFocusId] = useState<KeyCompassFocusId | null>(null);
   const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
@@ -1003,6 +1009,7 @@ export function App(): ReactElement {
     [project, selectedArrangementIndex]
   );
   const arrangementMuteMapSummary = useMemo(() => createArrangementMuteMapSummary(project), [project]);
+  const arrangementTransitionMapSummary = useMemo(() => createArrangementTransitionMapSummary(project), [project]);
   const productionSnapshotSummary = useMemo(
     () => createProductionSnapshotSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
@@ -4977,6 +4984,12 @@ export function App(): ReactElement {
     setProjectStatus(`Mute Map ${lane.label}: ${lane.value}`);
   }
 
+  function focusArrangementTransitionMapTransition(transition: ArrangementTransitionMapTransition): void {
+    setArrangementTransitionMapFocusId(transition.id);
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Transition ${transition.fromIndex + 1}->${transition.toIndex + 1}: ${transition.status}`);
+  }
+
   function focusModeFocusCard(card: ModeFocusCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5181,6 +5194,7 @@ export function App(): ReactElement {
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
     arrangementMuteMapSummary,
+    arrangementTransitionMapSummary,
     arrangementTemplatePreviewSummary,
     bassMovePreviewSummary,
     canRedo,
@@ -5250,6 +5264,7 @@ export function App(): ReactElement {
     onApplyArrangementFocus: applyArrangementFocusPreset,
     onApplyArrangementTemplate: applyArrangementTemplate,
     onFocusArrangementMuteMap: focusArrangementMuteMapLane,
+    onFocusArrangementTransitionMap: focusArrangementTransitionMapTransition,
     onApplyBasslinePad: applyBasslinePad,
     onApplyBassGlidePad: applyBassGlidePad,
     onApplyBassContour: applyBassContour,
@@ -6267,6 +6282,12 @@ export function App(): ReactElement {
             onFocus={focusArrangementMuteMapLane}
             playingArrangementIndex={playingArrangementIndex}
             summary={arrangementMuteMapSummary}
+          />
+          <ArrangementTransitionMap
+            focusedTransitionId={arrangementTransitionMapFocusId}
+            onFocus={focusArrangementTransitionMapTransition}
+            playingArrangementIndex={playingArrangementIndex}
+            summary={arrangementTransitionMapSummary}
           />
           <div
             className={["arrangement-playback-readout", arrangementPlaybackReadout.tone].join(" ")}
@@ -10968,6 +10989,81 @@ function ArrangementMuteMap({
   );
 }
 
+function ArrangementTransitionMap({
+  focusedTransitionId,
+  onFocus,
+  playingArrangementIndex,
+  summary
+}: {
+  focusedTransitionId: ArrangementTransitionMapFocusId | null;
+  onFocus: (transition: ArrangementTransitionMapTransition) => void;
+  playingArrangementIndex: number | null;
+  summary: ArrangementTransitionMapSummary;
+}): ReactElement {
+  const focusSummary = createArrangementTransitionMapFocusSummary(summary, focusedTransitionId);
+
+  return (
+    <section
+      className={`arrangement-transition-map ${summary.tone}`}
+      data-testid="arrangement-transition-map"
+      aria-label="Arrangement transition map"
+    >
+      <div className="arrangement-transition-map-heading">
+        <div>
+          <ArrowRight size={17} aria-hidden="true" />
+          <span>Transition Map</span>
+        </div>
+        <strong data-testid="arrangement-transition-map-headline">{summary.headline}</strong>
+        <small data-testid="arrangement-transition-map-detail">{summary.detail}</small>
+      </div>
+      <div
+        className={`arrangement-transition-map-focus-readout ${focusSummary.tone}`}
+        data-testid="arrangement-transition-map-focus-readout"
+        title={focusSummary.detailTitle}
+      >
+        <span data-testid="arrangement-transition-map-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="arrangement-transition-map-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="arrangement-transition-map-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
+      <div className="arrangement-transition-map-grid" data-testid="arrangement-transition-map-grid">
+        {summary.transitions.map((transition) => {
+          const focused = focusedTransitionId === transition.id;
+          const playing = playingArrangementIndex === transition.fromIndex || playingArrangementIndex === transition.toIndex;
+          return (
+            <div
+              className={["arrangement-transition-map-card", transition.tone, focused ? "focused" : "", playing ? "playing" : ""]
+                .filter(Boolean)
+                .join(" ")}
+              data-testid={`arrangement-transition-map-card-${transition.id}`}
+              key={transition.id}
+            >
+              <div className="arrangement-transition-map-card-main">
+                <span>{transition.value}</span>
+                <strong>{transition.status}</strong>
+                <small>{transition.detail}</small>
+              </div>
+              <div className="arrangement-transition-map-card-metrics">
+                <span data-testid={`arrangement-transition-map-energy-${transition.id}`}>{transition.energyLabel}</span>
+                <span data-testid={`arrangement-transition-map-pattern-${transition.id}`}>{transition.patternLabel}</span>
+                <span data-testid={`arrangement-transition-map-mutes-${transition.id}`}>{transition.muteLabel}</span>
+              </div>
+              <button
+                aria-pressed={focused}
+                className="arrangement-transition-map-focus-button"
+                onClick={() => onFocus(transition)}
+                title={`Focus transition ${transition.fromIndex + 1} to ${transition.toIndex + 1}: ${transition.status}`}
+                type="button"
+              >
+                <span>{transition.focusLabel}</span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function NextMove({
   actions,
   result,
@@ -11077,6 +11173,7 @@ function createQuickActions({
   arrangementArcPadOptions,
   arrangementArcPreviewSummary,
   arrangementMuteMapSummary,
+  arrangementTransitionMapSummary,
   arrangementTemplatePreviewSummary,
   bassMovePreviewSummary,
   beatPassportSummary,
@@ -11146,6 +11243,7 @@ function createQuickActions({
   onApplyArrangementFocus,
   onApplyArrangementTemplate,
   onFocusArrangementMuteMap,
+  onFocusArrangementTransitionMap,
   onApplyBasslinePad,
   onApplyBassGlidePad,
   onApplyBassContour,
@@ -11262,6 +11360,7 @@ function createQuickActions({
   arrangementArcPadOptions: ArrangementArcPadOption[];
   arrangementArcPreviewSummary: ArrangementArcPreviewSummary;
   arrangementMuteMapSummary: ArrangementMuteMapSummary;
+  arrangementTransitionMapSummary: ArrangementTransitionMapSummary;
   arrangementTemplatePreviewSummary: ArrangementTemplatePreviewSummary;
   bassMovePreviewSummary: BassMovePreviewSummary;
   beatPassportSummary: BeatPassportSummary;
@@ -11331,6 +11430,7 @@ function createQuickActions({
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
   onFocusArrangementMuteMap: (lane: ArrangementMuteMapLane) => void;
+  onFocusArrangementTransitionMap: (transition: ArrangementTransitionMapTransition) => void;
   onApplyBasslinePad: (pad: BasslinePadId) => void;
   onApplyBassGlidePad: (pad: BassGlidePadId) => void;
   onApplyBassContour: (contour: BassContourId) => void;
@@ -12461,6 +12561,15 @@ function createQuickActions({
     keywords: `arrangement mute map lane focus layer section drop build space ${lane.id} ${lane.label} ${lane.status} ${lane.detail} beginner producer`,
     run: () => onFocusArrangementMuteMap(lane)
   }));
+  const arrangementTransition = activeArrangementTransitionMapQuickActionTransition(arrangementTransitionMapSummary);
+  const arrangementTransitionMapActions: QuickAction[] = arrangementTransitionMapSummary.transitions.map((transition) => ({
+    id: `arrangement-transition-map-transition-${transition.id}`,
+    title: `Focus Arrangement Transition: ${transition.value}`,
+    detail: `${transition.status} / ${transition.energyLabel} / ${transition.patternLabel} / ${transition.muteLabel}`,
+    group: "Arrange",
+    keywords: `arrangement transition map focus handoff section pattern energy mute drop build turn ${transition.fromSection} ${transition.toSection} ${transition.fromPattern} ${transition.toPattern} ${transition.status} beginner producer`,
+    run: () => onFocusArrangementTransitionMap(transition)
+  }));
   const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
   const arrangementTemplateActions: QuickAction[] = arrangementTemplateIds.map((template) => {
     const targetArrangement = createArrangementTemplate(template);
@@ -13540,6 +13649,26 @@ function createQuickActions({
       }
     },
     ...arrangementMuteMapActions,
+    {
+      id: "arrangement-transition-map-focus",
+      title: arrangementTransition
+        ? `Focus Transition: ${arrangementTransition.value}`
+        : "Focus Arrangement Transition Map",
+      detail: arrangementTransition
+        ? `${arrangementTransition.status} / ${arrangementTransition.energyLabel} / ${arrangementTransition.patternLabel}`
+        : "No Arrangement Transition Map transition available.",
+      group: "Arrange",
+      keywords: `arrangement transition map focus handoff section pattern energy mute drop build turn ${
+        arrangementTransition?.fromSection ?? "none"
+      } ${arrangementTransition?.toSection ?? "none"} beginner producer`,
+      disabled: !arrangementTransition,
+      run: () => {
+        if (arrangementTransition) {
+          onFocusArrangementTransitionMap(arrangementTransition);
+        }
+      }
+    },
+    ...arrangementTransitionMapActions,
     ...patternChainActions,
     {
       id: "chain-expand",
@@ -13990,6 +14119,8 @@ function createQuickActionResult(
     action.id.startsWith("topline-space-card-") ||
     action.id === "arrangement-mute-map-focus" ||
     action.id.startsWith("arrangement-mute-map-lane-") ||
+    action.id === "arrangement-transition-map-focus" ||
+    action.id.startsWith("arrangement-transition-map-transition-") ||
     action.id === "handoff-package-check-focus" ||
     action.id.startsWith("handoff-package-check-card-") ||
     action.id.startsWith("arrangement-block-cue-") ||
@@ -14760,6 +14891,23 @@ function quickActionResultMetricSnapshot(
     return {
       id: "arrangement-mute-map",
       label: "Mute map",
+      value: action.detail
+    };
+  }
+
+  if (action.id === "arrangement-transition-map-focus") {
+    const summary = createArrangementTransitionMapSummary(project);
+    return {
+      id: "arrangement-transition-map",
+      label: "Transition map",
+      value: `${summary.headline} / ${summary.detail}`
+    };
+  }
+
+  if (action.id.startsWith("arrangement-transition-map-transition-")) {
+    return {
+      id: "arrangement-transition-map",
+      label: "Transition map",
       value: action.detail
     };
   }
@@ -15641,6 +15789,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Song loop and follow the focused Mute Map lane through each section before editing block mutes.",
       nextCheck: "Use the selected-block mute buttons only when the lane needs more drop, build, or hook contrast."
+    };
+  }
+
+  if (action.id === "arrangement-transition-map-focus") {
+    return {
+      auditionCue: "Play Song loop around the focused transition and listen for the section handoff, energy movement, and layer contrast.",
+      nextCheck: "Return to Transition Map, Song Form Overview, or Arrangement Focus before changing the adjacent blocks."
+    };
+  }
+
+  if (action.id.startsWith("arrangement-transition-map-transition-")) {
+    return {
+      auditionCue: "Use the focused transition card to check whether the handoff needs a fill, drop, build, pattern change, or layer change.",
+      nextCheck: "Edit only the adjacent arrangement blocks or Pattern tail if the transition still feels flat."
     };
   }
 
@@ -20642,6 +20804,174 @@ function createArrangementMuteMapFocusSummary(
 
 function activeArrangementMuteMapQuickActionLane(summary: ArrangementMuteMapSummary): ArrangementMuteMapLane | null {
   return summary.lanes.find((lane) => lane.tone === "danger") ?? summary.lanes.find((lane) => lane.tone === "warn") ?? summary.lanes[0] ?? null;
+}
+
+function createArrangementTransitionMapSummary(project: ProjectState): ArrangementTransitionMapSummary {
+  const blocks = createArrangementTransitionBlocks(project);
+  const transitions: ArrangementTransitionMapTransition[] = [];
+
+  for (let index = 0; index < blocks.length - 1; index += 1) {
+    const from = blocks[index];
+    const to = blocks[index + 1];
+    const energyDelta = to.energy - from.energy;
+    const eventDelta = to.eventCount - from.eventCount;
+    const patternChanged = from.pattern !== to.pattern;
+    const sectionChanged = from.section !== to.section;
+    const mutedAdded = to.mutedTracks.filter((track) => !from.mutedTracks.includes(track));
+    const mutedRemoved = from.mutedTracks.filter((track) => !to.mutedTracks.includes(track));
+    const muteChangeCount = mutedAdded.length + mutedRemoved.length;
+    const strongEnergyMove = Math.abs(energyDelta) >= 0.18;
+    const modestEnergyMove = Math.abs(energyDelta) >= 0.1;
+    const eventShift = Math.abs(eventDelta) >= 4;
+    const contrastScore = [patternChanged, strongEnergyMove, muteChangeCount > 0, eventShift].filter(Boolean).length;
+    const tone: MixCoachTone =
+      !patternChanged && !modestEnergyMove && muteChangeCount === 0 && !eventShift
+        ? "danger"
+        : contrastScore <= 1 && !strongEnergyMove
+          ? "warn"
+          : "good";
+    const status =
+      tone === "danger"
+        ? "Flat handoff"
+        : energyDelta >= 0.18
+          ? "Build turn"
+          : energyDelta <= -0.18
+            ? "Drop turn"
+            : patternChanged
+              ? "Pattern turn"
+              : muteChangeCount > 0
+                ? "Layer turn"
+                : sectionChanged
+                  ? "Section turn"
+                  : "Subtle turn";
+    const energyLabel = `Energy ${signedPercentLabel(energyDelta)}`;
+    const patternLabel = patternChanged ? `Pattern ${from.pattern}->${to.pattern}` : `Pattern ${to.pattern} held`;
+    const muteLabel = arrangementTransitionMuteLabel(mutedAdded, mutedRemoved);
+
+    transitions.push({
+      id: index,
+      fromIndex: from.index,
+      toIndex: to.index,
+      fromSection: from.section,
+      toSection: to.section,
+      fromPattern: from.pattern,
+      toPattern: to.pattern,
+      boundaryBar: to.startBar,
+      value: `${from.section} -> ${to.section}`,
+      status,
+      detail: `Bar ${to.startBar} / ${from.eventCount}->${to.eventCount} events / ${sectionChanged ? "section change" : "same section"}`,
+      energyLabel,
+      patternLabel,
+      muteLabel,
+      focusLabel: "Arrange",
+      tone
+    });
+  }
+
+  const dangerCount = transitions.filter((transition) => transition.tone === "danger").length;
+  const warnCount = transitions.filter((transition) => transition.tone === "warn").length;
+  const goodCount = transitions.filter((transition) => transition.tone === "good").length;
+  const tone: MixCoachTone =
+    transitions.length === 0 ? "danger" : dangerCount > 0 ? "danger" : warnCount > 0 ? "warn" : "good";
+  const headline =
+    transitions.length === 0
+      ? "No transitions yet"
+      : dangerCount > 0
+        ? `${dangerCount} transition${dangerCount === 1 ? "" : "s"} need contrast`
+        : warnCount > 0
+          ? "Transition contrast is light"
+          : "Transitions show contrast";
+  const detail =
+    transitions.length === 0
+      ? "Add at least two arrangement blocks to scan handoffs"
+      : `${transitions.length} handoff${transitions.length === 1 ? "" : "s"} / ${goodCount} ready / ${
+          warnCount + dangerCount
+        } review`;
+
+  return {
+    headline,
+    detail,
+    tone,
+    transitions
+  };
+}
+
+function createArrangementTransitionBlocks(project: ProjectState): Array<{
+  index: number;
+  section: ArrangementSection;
+  pattern: PatternSlot;
+  startBar: number;
+  endBar: number;
+  energy: number;
+  mutedTracks: ArrangementMuteTrack[];
+  eventCount: number;
+}> {
+  let startBar = 1;
+  return project.arrangement.map((block, index) => {
+    const bars = normalizeArrangementBars(block.bars);
+    const endBar = startBar + bars - 1;
+    const result = {
+      index,
+      section: block.section,
+      pattern: block.pattern,
+      startBar,
+      endBar,
+      energy: normalizeArrangementEnergy(block.energy),
+      mutedTracks: normalizeArrangementMutedTracks(block.mutedTracks),
+      eventCount: patternEventTotal(project.patterns[block.pattern])
+    };
+    startBar = endBar + 1;
+    return result;
+  });
+}
+
+function arrangementTransitionMuteLabel(added: ArrangementMuteTrack[], removed: ArrangementMuteTrack[]): string {
+  const addedLabel = added.length > 0 ? `Mute +${added.map(arrangementMuteTrackLabel).join("/")}` : "";
+  const removedLabel = removed.length > 0 ? `Live +${removed.map(arrangementMuteTrackLabel).join("/")}` : "";
+  return [addedLabel, removedLabel].filter(Boolean).join(" / ") || "Mutes held";
+}
+
+function createArrangementTransitionMapFocusSummary(
+  summary: ArrangementTransitionMapSummary,
+  focusedTransitionId: ArrangementTransitionMapFocusId | null
+): ArrangementTransitionMapFocusSummary {
+  const focusedTransition =
+    focusedTransitionId === null ? null : summary.transitions.find((transition) => transition.id === focusedTransitionId) ?? null;
+  const transition = focusedTransition ?? activeArrangementTransitionMapQuickActionTransition(summary);
+
+  if (!transition) {
+    return {
+      focusId: null,
+      statusLabel: "No transition",
+      areaLabel: "No handoff focus",
+      detailLabel: "Add arrangement blocks before scanning transitions",
+      detailTitle: "Arrangement Transition Map has no transitions to focus.",
+      tone: "danger"
+    };
+  }
+
+  const statusLabel = focusedTransition ? "Focused Transition" : "Transition Focus";
+  const detailLabel = `${transition.energyLabel} / ${transition.patternLabel} / ${transition.muteLabel}`;
+
+  return {
+    focusId: transition.id,
+    statusLabel,
+    areaLabel: `${transition.value}: ${transition.status}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${transition.value}: ${transition.status} / ${detailLabel}`,
+    tone: transition.tone
+  };
+}
+
+function activeArrangementTransitionMapQuickActionTransition(
+  summary: ArrangementTransitionMapSummary
+): ArrangementTransitionMapTransition | null {
+  return (
+    summary.transitions.find((transition) => transition.tone === "danger") ??
+    summary.transitions.find((transition) => transition.tone === "warn") ??
+    summary.transitions[0] ??
+    null
+  );
 }
 
 function uniquePatternSlots(slots: PatternSlot[]): PatternSlot[] {

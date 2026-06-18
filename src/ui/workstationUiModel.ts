@@ -2049,6 +2049,43 @@ export type ArrangementMuteMapFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type ArrangementTransitionMapFocusId = number;
+
+export type ArrangementTransitionMapTransition = {
+  id: ArrangementTransitionMapFocusId;
+  fromIndex: number;
+  toIndex: number;
+  fromSection: ArrangementSection;
+  toSection: ArrangementSection;
+  fromPattern: PatternSlot;
+  toPattern: PatternSlot;
+  boundaryBar: number;
+  value: string;
+  status: string;
+  detail: string;
+  energyLabel: string;
+  patternLabel: string;
+  muteLabel: string;
+  focusLabel: string;
+  tone: MixCoachTone;
+};
+
+export type ArrangementTransitionMapSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  transitions: ArrangementTransitionMapTransition[];
+};
+
+export type ArrangementTransitionMapFocusSummary = {
+  focusId: ArrangementTransitionMapFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type SectionLocatorPad = {
   section: ArrangementSection;
   index: number | null;

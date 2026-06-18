@@ -69,6 +69,7 @@ button {
 .topline-space,
 .song-form-overview,
 .arrangement-mute-map,
+.arrangement-transition-map,
 .next-move,
 .snapshot-row,
 .snapshot-compare,
@@ -151,6 +152,7 @@ button {
 .hook-readiness-heading > div,
 .topline-space-heading > div,
 .arrangement-mute-map-heading > div,
+.arrangement-transition-map-heading > div,
 .song-form-heading > div,
 .next-move-heading > div,
 .snapshot-heading > div,
@@ -7582,6 +7584,216 @@ h2 {
 .arrangement-mute-map-cell.focused {
   border-color: rgba(120, 240, 200, 0.44);
   box-shadow: inset 0 0 0 1px rgba(120, 240, 200, 0.2);
+}
+
+.arrangement-transition-map {
+  display: grid;
+  grid-template-columns: 170px minmax(240px, 0.75fr) minmax(0, 1.75fr);
+  gap: 10px;
+  align-items: stretch;
+  min-height: 112px;
+  border-color: rgba(158, 231, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(158, 231, 255, 0.04);
+  padding: 10px;
+}
+
+.arrangement-transition-map.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.arrangement-transition-map.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.arrangement-transition-map-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.arrangement-transition-map-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.arrangement-transition-map-heading svg {
+  color: #9ee7ff;
+}
+
+.arrangement-transition-map.warn .arrangement-transition-map-heading svg {
+  color: #f0c36a;
+}
+
+.arrangement-transition-map.danger .arrangement-transition-map-heading svg {
+  color: #ff7a4f;
+}
+
+.arrangement-transition-map-heading strong,
+.arrangement-transition-map-heading small,
+.arrangement-transition-map-focus-readout span,
+.arrangement-transition-map-focus-readout strong,
+.arrangement-transition-map-focus-readout small,
+.arrangement-transition-map-card-main span,
+.arrangement-transition-map-card-main strong,
+.arrangement-transition-map-card-main small,
+.arrangement-transition-map-card-metrics span,
+.arrangement-transition-map-focus-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrangement-transition-map-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.arrangement-transition-map-heading small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.arrangement-transition-map-focus-readout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.74fr) minmax(0, 1fr) minmax(0, 1.42fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(158, 231, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(158, 231, 255, 0.045);
+  padding: 8px 9px;
+}
+
+.arrangement-transition-map-focus-readout.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.arrangement-transition-map-focus-readout.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.arrangement-transition-map-focus-readout span,
+.arrangement-transition-map-focus-readout small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+}
+
+.arrangement-transition-map-focus-readout strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.arrangement-transition-map-grid {
+  display: grid;
+  grid-auto-rows: minmax(56px, auto);
+  gap: 7px;
+  min-width: 0;
+}
+
+.arrangement-transition-map-card {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) minmax(0, 1.2fr) auto;
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(158, 231, 255, 0.18);
+  border-inline-start: 3px solid #9ee7ff;
+  border-radius: 7px;
+  background: rgba(18, 24, 25, 0.6);
+  padding: 7px 8px;
+}
+
+.arrangement-transition-map-card.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  border-inline-start-color: #f0c36a;
+  background: rgba(240, 195, 106, 0.05);
+}
+
+.arrangement-transition-map-card.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  border-inline-start-color: #ff7a4f;
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.arrangement-transition-map-card.focused {
+  box-shadow:
+    inset 0 0 0 1px rgba(158, 231, 255, 0.32),
+    0 0 16px rgba(158, 231, 255, 0.12);
+}
+
+.arrangement-transition-map-card.playing {
+  outline: 2px solid rgba(240, 195, 106, 0.38);
+  outline-offset: 1px;
+}
+
+.arrangement-transition-map-card-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.arrangement-transition-map-card-main span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
+.arrangement-transition-map-card-main strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.arrangement-transition-map-card-main small {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
+}
+
+.arrangement-transition-map-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  min-width: 0;
+}
+
+.arrangement-transition-map-card-metrics span {
+  min-height: 24px;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 5px;
+  background: rgba(244, 239, 231, 0.045);
+  color: rgba(244, 239, 231, 0.68);
+  padding: 5px 6px;
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.arrangement-transition-map-focus-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 58px;
+  border: 1px solid rgba(158, 231, 255, 0.24);
+  border-radius: 5px;
+  background: rgba(158, 231, 255, 0.06);
+  color: #f4efe7;
+  padding: 4px 5px;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.arrangement-transition-map-focus-button:hover,
+.arrangement-transition-map-focus-button[aria-pressed="true"] {
+  border-color: rgba(158, 231, 255, 0.5);
+  background: rgba(158, 231, 255, 0.11);
 }
 
 .next-move {
@@ -16325,8 +16537,13 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .arrangement-transition-map {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
   .arrangement-mute-map-lanes,
-  .arrangement-mute-map-grid {
+  .arrangement-mute-map-grid,
+  .arrangement-transition-map-grid {
     grid-column: 1 / -1;
   }
 
@@ -16550,6 +16767,10 @@ input[type="range"] {
   }
 
   .arrangement-mute-map-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .arrangement-transition-map-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -17119,9 +17340,14 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 
+  .arrangement-transition-map {
+    grid-template-columns: 1fr;
+  }
+
   .hook-readiness-heading,
   .topline-space-heading,
-  .arrangement-mute-map-heading {
+  .arrangement-mute-map-heading,
+  .arrangement-transition-map-heading {
     border-inline-end: 0;
     border-block-end: 1px solid rgba(244, 239, 231, 0.1);
     padding-inline-end: 0;
@@ -17134,7 +17360,9 @@ input[type="range"] {
   .topline-space-grid,
   .arrangement-mute-map-focus-readout,
   .arrangement-mute-map-lanes,
-  .arrangement-mute-map-grid {
+  .arrangement-mute-map-grid,
+  .arrangement-transition-map-focus-readout,
+  .arrangement-transition-map-grid {
     grid-column: 1;
   }
 
@@ -17143,7 +17371,11 @@ input[type="range"] {
   .arrangement-mute-map-focus-readout,
   .arrangement-mute-map-lanes,
   .arrangement-mute-map-grid,
-  .arrangement-mute-map-segment {
+  .arrangement-mute-map-segment,
+  .arrangement-transition-map-focus-readout,
+  .arrangement-transition-map-grid,
+  .arrangement-transition-map-card,
+  .arrangement-transition-map-card-metrics {
     grid-template-columns: 1fr;
   }
 
