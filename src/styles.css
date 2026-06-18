@@ -11535,7 +11535,7 @@ input[type="range"] {
   background: color-mix(in srgb, var(--note) 24%, rgba(244, 239, 231, 0.035));
 }
 
-.note.active span {
+.note.active .note-length-fill {
   position: absolute;
   inset-block: 0;
   inset-inline-start: 0;
@@ -11543,8 +11543,36 @@ input[type="range"] {
   background: var(--note);
 }
 
+.note-velocity-meter {
+  position: absolute;
+  z-index: 2;
+  inset-block-end: 0;
+  inset-inline-start: 0;
+  block-size: 4px;
+  background: color-mix(in srgb, #f4efe7 82%, var(--note));
+}
+
+.note-velocity-label {
+  position: absolute;
+  z-index: 3;
+  inset-block-end: 4px;
+  inset-inline-end: 4px;
+  max-inline-size: calc(100% - 8px);
+  overflow: hidden;
+  color: #11100f;
+  background: color-mix(in srgb, #f4efe7 82%, var(--note));
+  border-radius: 3px;
+  padding: 1px 2px;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .note em {
   position: absolute;
+  z-index: 3;
   inset-block-start: 4px;
   inset-inline-end: 5px;
   color: #11100f;

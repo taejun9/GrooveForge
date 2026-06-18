@@ -1194,11 +1194,12 @@ export function NoteEditor({
                 const note = notes.find((candidate) => candidate.step === step && candidate.pitch === pitch);
                 const selected =
                   selectedNote?.track === track && selectedNote.step === step && selectedNote.pitch === pitch;
+                const velocityPercent = Math.min(100, Math.max(0, Math.round((note?.velocity ?? 0.82) * 100)));
                 return (
                   <button
                     aria-label={`${title} ${pitch} step ${step + 1}${
                       note && note.probability !== undefined && note.probability < 1 ? ` ${chanceBadgeLabel(note.probability)} chance` : ""
-                    }`}
+                    }${note ? ` ${velocityPercent}% velocity` : ""}`}
                     aria-pressed={Boolean(note)}
                     className={["note", note ? "active" : "", currentStep === step ? "playhead" : "", selected ? "selected" : ""]
                       .filter(Boolean)
@@ -1207,7 +1208,15 @@ export function NoteEditor({
                     onClick={() => onToggle(step, pitch)}
                     type="button"
                   >
-                    {note && <span style={{ inlineSize: `${Math.min(100, note.length * 25)}%` }} />}
+                    {note && <span className="note-length-fill" style={{ inlineSize: `${Math.min(100, note.length * 25)}%` }} />}
+                    {note && (
+                      <>
+                        <span className="note-velocity-meter" style={{ inlineSize: `${velocityPercent}%` }} />
+                        <strong className="note-velocity-label" data-testid={`note-velocity-label-${track}-${step}-${pitch}`}>
+                          {velocityPercent}
+                        </strong>
+                      </>
+                    )}
                     {note?.glide && <em>G</em>}
                     {note && note.probability !== undefined && note.probability < 1 && (
                       <small className="chance-badge" data-testid={`note-chance-badge-${track}-${step}-${pitch}`}>
