@@ -7224,6 +7224,7 @@ export function App(): ReactElement {
     midiCaptureStatus,
     midiCaptureSummary,
     midiInputOptions,
+    mixBalancePadOptions,
     mixBalancePreviewSummary,
     mixSnapshots,
     modeFocusSummary,
@@ -12644,6 +12645,7 @@ function createQuickActions({
   midiCaptureStatus,
   midiCaptureSummary,
   midiInputOptions,
+  mixBalancePadOptions,
   mixBalancePreviewSummary,
   mixSnapshots,
   modeFocusSummary,
@@ -12810,6 +12812,7 @@ function createQuickActions({
   midiCaptureStatus: MidiCaptureStatus;
   midiCaptureSummary: MidiCaptureSummary;
   midiInputOptions: MidiInputOption[];
+  mixBalancePadOptions: MixBalancePadOption[];
   mixBalancePreviewSummary: MixBalancePreviewSummary;
   mixSnapshots: MixSnapshotSlotMap;
   modeFocusSummary: ModeFocusSummary;
@@ -13932,6 +13935,24 @@ function createQuickActions({
   });
   const drumKitReady = drumKitPreviewSummary.statusLabel !== "Kit aligned";
   const mixBalanceReady = mixBalancePreviewSummary.statusLabel !== "Balance aligned";
+  const mixBalancePadActions: QuickAction[] = mixBalancePadOptions.map((pad) => ({
+    id: `mix-balance-pad-${pad.id}`,
+    title: pad.changedCount > 0 ? `Apply ${pad.label} Mix Balance` : `${pad.label} Mix Balance already applied`,
+    detail:
+      pad.changedCount > 0
+        ? `${pad.preview} / ${mixBalancePreviewChannelLabel(pad)} / ${pad.changedCount} channel${
+            pad.changedCount === 1 ? "" : "s"
+          }`
+        : `${pad.label} already matches the current mixer posture.`,
+    group: "Mix",
+    keywords: `mix balance direct pad rough levels drums 808 bass synth chords stem audition ${pad.id} ${pad.label} ${pad.detail} ${pad.preview} beginner producer`,
+    disabled: pad.changedCount === 0,
+    run: () => {
+      if (pad.changedCount > 0) {
+        onApplyMixBalance(pad.id);
+      }
+    }
+  }));
   const patternStackId =
     patternStackPreviewSummary.stackId === "none" || patternStackPreviewSummary.statusLabel === "Stack aligned"
       ? null
@@ -14892,6 +14913,7 @@ function createQuickActions({
         }
       }
     },
+    ...mixBalancePadActions,
     ...spaceFxPadOptions.map((pad): QuickAction => ({
       id: `space-fx-${pad.id}`,
       title: `Apply ${pad.label} Space FX`,
@@ -15871,7 +15893,7 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "mix-balance") {
+  if (action.id === "mix-balance" || action.id.startsWith("mix-balance-pad-")) {
     return {
       id: "mix-balance",
       label: "Mix balance",
@@ -16544,7 +16566,7 @@ function quickActionResultFollowup(
     };
   }
 
-  if (action.id === "mix-balance") {
+  if (action.id === "mix-balance" || action.id.startsWith("mix-balance-pad-")) {
     return {
       auditionCue: "Play Full Mix, then solo Drums and 808 to confirm the rough balance supports the beat.",
       nextCheck: "Use the Mix Balance Result, Stem Audition Pads, and manual mixer controls for final level, pan, EQ, and send trim."
