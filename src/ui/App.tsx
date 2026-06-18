@@ -5104,6 +5104,7 @@ export function App(): ReactElement {
     onApplyChordRhythm: applyChordRhythm,
     onApplyChordVoicing: applyChordVoicingPad,
     onAlignDeliveryTarget: alignDeliveryTarget,
+    onSelectDeliveryTarget: selectDeliveryTarget,
     onApplyDrumAccent: applyDrumAccent,
     onApplyDrumFoundation: applyDrumFoundation,
     onApplyDrumKit: applyDrumKitPad,
@@ -10697,6 +10698,7 @@ function createQuickActions({
   onApplyChordRhythm,
   onApplyChordVoicing,
   onAlignDeliveryTarget,
+  onSelectDeliveryTarget,
   onApplyDrumAccent,
   onApplyDrumFoundation,
   onApplyDrumKit,
@@ -10872,6 +10874,7 @@ function createQuickActions({
   onApplyChordRhythm: (rhythm: ChordRhythmId) => void;
   onApplyChordVoicing: (voicing: ChordVoicingId) => void;
   onAlignDeliveryTarget: (target: DeliveryTargetId) => void;
+  onSelectDeliveryTarget: (target: DeliveryTargetId) => void;
   onApplyDrumAccent: (accent: DrumAccentId) => void;
   onApplyDrumFoundation: (foundation: DrumFoundationId) => void;
   onApplyDrumKit: (pad: DrumKitPadId) => void;
@@ -11267,6 +11270,21 @@ function createQuickActions({
   const deliveryTarget = activeDeliveryTarget(project);
   const deliveryTargetAlignmentPreview = createDeliveryTargetAlignmentPreview(project, deliveryTarget);
   const deliveryTargetAlignReady = !isDeliveryTargetAligned(project, deliveryTarget);
+  const deliveryTargetOptions = [...deliveryTargets, deliveryTargetForId("custom", project.customDeliveryTarget)];
+  const deliveryTargetActions: QuickAction[] = deliveryTargetOptions.map((target) => {
+    const selected = project.deliveryTarget === target.id;
+    return {
+      id: `delivery-target-set-${target.id}`,
+      title: selected ? `${target.name} target selected` : `Set Delivery Target: ${target.name}`,
+      detail: `${target.focus} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems / ${arrangementTemplateLabel(
+        target.preferredTemplate
+      )} / ${target.preferredMasterPreset}`,
+      group: "Project",
+      keywords: `delivery target set select session goal handoff export ${target.id} ${target.name} ${target.focus} ${target.mixPosture} ${target.preferredTemplate} ${target.preferredMasterPreset} stems beginner producer`,
+      disabled: selected,
+      run: () => onSelectDeliveryTarget(target.id)
+    };
+  });
   const midiInputConnectReady = midiCaptureStatus !== "unsupported" && midiCaptureStatus !== "requesting";
   const midiInputConnectTitle =
     midiCaptureStatus === "ready" || midiCaptureStatus === "listening" ? "Refresh MIDI input" : "Connect MIDI input";
@@ -12397,6 +12415,7 @@ function createQuickActions({
     },
     ...sessionBriefCompassActions,
     ...sessionBriefStarterActions,
+    ...deliveryTargetActions,
     {
       id: "delivery-target-align",
       title: deliveryTargetAlignReady ? `Align ${deliveryTarget.name} target` : "Align Delivery Target",
@@ -13560,6 +13579,15 @@ function quickActionResultMetricSnapshot(
     return { id: "project-events", label: "Project events", value: `${projectEventTotal(project)} events` };
   }
 
+  if (action.id.startsWith("delivery-target-set-")) {
+    const target = activeDeliveryTarget(project);
+    return {
+      id: "delivery-target",
+      label: "Delivery target",
+      value: `${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`
+    };
+  }
+
   if (action.id === "session-pass-focus") {
     return { id: "session-pass", label: "Session pass", value: `${project.mode} mode` };
   }
@@ -14368,6 +14396,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Loop the new starter beat; hear drums, 808, chords, Synth, arrangement, sound, and master together.",
       nextCheck: "Use Beat Spine, Pattern DNA, and First Beat Path to edit the sample-free starter instead of treating it as fixed audio."
+    };
+  }
+
+  if (action.id.startsWith("delivery-target-set-")) {
+    return {
+      auditionCue: "Keep the beat playing only if you are comparing the same music against the new session goal.",
+      nextCheck: "Run Delivery Target Align only when arrangement length, master, mix posture, and stem expectation should change."
     };
   }
 
