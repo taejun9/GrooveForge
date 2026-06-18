@@ -31,6 +31,8 @@ Brief correction target: a sampling-heavy concept note is accepted only after it
 
 Korean concept-brief rule: if the user says the concept is "비트(모든 장르)를 만드는" product and sampling is "부가 기능", that statement overrides sampling-heavy draft examples. Keep `sample import -> chop -> arrange` sequences out of the MVP path and rewrite the accepted first path as `BPM/key/style -> drums -> 808/bass -> melody/chords -> sound design -> arrangement -> mixer/master -> export`.
 
+Latest concept verdict: GrooveForge should be evaluated as a direct beat-production workstation, not as a sampling app with extra composition features. A draft is aligned only when direct beat composition, sound design, arrangement, mixing/mastering, and export are the spine, and sample import, chopping, loop stretch, one-shot mapping, and sampler setup are clearly labeled optional extension work.
+
 Trap, drill, boom bap, house, lofi, jersey, phonk, R&B, garage, and experimental workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
 
 When there is ambiguity, read the product draft in this order: all-genre beat creation first, direct composition and sound design second, arrangement/mixing/mastering/export third, optional sampling extensions last.
@@ -87,6 +89,8 @@ BPM/key/style -> pattern programming -> drum pattern -> 808/bass line -> melody/
 This loop is the product spine for all supported genres. Style presets may change BPM, swing, density, sound posture, and event blueprints, but they should still produce editable drums, 808/bass, melody/chords, arrangement, mixer/master, and export state without requiring samples.
 
 Optional sampling remains a later extension after the direct beat workstation is useful. Future scope may include audio import, chopping/slicing, pitch/stretch, one-shot mapping, and sampler instruments, but product drafts should keep that list under extension planning.
+
+Current brief acceptance test: the user should be able to explain the app without mentioning sample import. The short explanation is "make a beat across genres by programming drums, 808/bass, melody/chords, shaping sounds, arranging, mixing/mastering, and exporting." Sampling can be mentioned only after that explanation as an optional add-on.
 
 Primary feature areas:
 

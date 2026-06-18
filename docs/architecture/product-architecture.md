@@ -94,6 +94,8 @@ Attached-brief architecture rule: when a brief presents a single combined track,
 
 Korean concept-brief architecture rule: if a brief says GrooveForge is for "비트(모든 장르)를 만드는" work and sampling is "부가 기능", architecture must not promote sample import, chopping, loop stretching, sampler setup, `AudioClipEvent`, `audio`, or `sampler` into the core layer map, MVP track union, first-run project, or default device palette.
 
+Latest brief architecture verdict: the core architecture must still make sense if every imported-audio and sampler concept is deleted. If removing sample import, chopping, loop stretching, audio clips, and sampler devices breaks the proposed MVP, the proposal is sampling-first and must be rewritten around musical events, built-in instruments, arrangement, mixer/master, and export before implementation.
+
 Draft rewrite target: the accepted MVP architecture removes `AudioClipEvent` from `MusicalEvent`, excludes `audio` and `sampler` from `TrackType`, treats core clips as pattern/MIDI/automation containers, and keeps the default device palette to drum rack, synth 808/bass, simple synth, chord synth, built-in FX, mixer, and master devices. Optional sampling can add audio clips, audio tracks, sampler devices, sample import, chopping, pitch/stretch, and one-shot mapping later without changing the event-first core.
 
 If an exploratory draft includes audio clip, sampler, or waveform examples, move them to an optional sampling section before they enter architecture diagrams, schema examples, default tracks, or MVP validation.

@@ -41,6 +41,8 @@ Brief correction rule: if a pasted brief or external draft names `AudioClipEvent
 
 Korean concept-brief rule: when a brief says the concept is "비트(모든 장르)를 만드는" work and sampling is "부가 기능", treat every sample import, chopping, sampler, audio clip, and loop-stretching example as optional v2/v3 scope unless the user explicitly starts a sampling-phase plan. The accepted first-screen path is BPM/key/style, drum rack, synth 808/bass, melody/chords, sound design, arrangement, mixer/master, and export.
 
+Latest brief verdict: if a draft can be described as "bring in a sample, chop it, arrange it, then mix/master," reject that as the product spine. The accepted GrooveForge spine is "compose/program the beat, design the sound, arrange it, mix/master it, then export"; sampling is only a later opt-in module that can supply material inside that workstation.
+
 ## MVP Target
 
 The first usable result is an Electron desktop workstation that can create a sample-free 8-bar beat in any supported style profile and export it as WAV:
@@ -210,6 +212,7 @@ Quick Actions selected-chord length reset commands return the active selected ch
 - Keep default screens, plan titles, and roadmap ordering anchored to editable musical events and beat-making controls.
 - Keep external brief examples that include `AudioClipEvent`, `audio`, or `sampler` out of the core MVP unions unless the plan is explicitly optional sampling-phase work.
 - Treat Korean or English concept briefs that say sampling is secondary as binding: split any sample/chop/sampler examples into optional extension notes before updating code, docs, roadmap, UI plans, or QA gates.
+- Treat "directly compose beats, design sounds, mix/master, and export" as the current concept verdict; do not soften it into a sampler or audio-chopping product summary.
 - Lead summaries with what users create directly: drums, 808/bass, melody/chords, sound design, arrangement, mix/master, and export. Mention sampling only as an explicitly optional extension boundary or sampling-phase plan.
 - Treat built-in one-shot drum sounds and any later sample 808 source as internal sound-source choices, not as the main workflow. Drum sequencing and 808/Bass synthesis stay first.
 - Keep mixing and mastering as distinct stages in docs and UI plans; mastering is a final output posture after a usable mix, not a substitute for the mixer.
