@@ -218,6 +218,8 @@ import type {
   PatternCloneResult,
   PatternFillResultMetric,
   PatternFillResult,
+  PatternVariationResultMetric,
+  PatternVariationResult,
   PatternDnaCardId,
   PatternDnaFocusTarget,
   PatternDnaCard,
@@ -1353,6 +1355,123 @@ function patternFillNextCheck(preset: PatternFillPreset, pattern: PatternData): 
       return `${pattern.melodyNotes.length} Synth notes now; use Melody Move or selected-note tools to shape the turn.`;
     case "clear_tail":
       return `${patternEventTotal(pattern)} Pattern events remain; add a new fill only after the core loop feels stable.`;
+  }
+}
+
+export function createPatternVariationResult(
+  preset: PatternVariationPreset,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): PatternVariationResult {
+  const pattern = afterProject.selectedPattern;
+  const beforePattern = beforeProject.patterns[beforeProject.selectedPattern];
+  const afterPattern = afterProject.patterns[pattern];
+  const presetLabel = patternVariationPresetLabel(preset);
+  const changedCount = patternVariationChangedCount(beforePattern, afterPattern);
+
+  return {
+    preset,
+    pattern,
+    title: `${presetLabel} variation ready`,
+    status: "Applied",
+    detail: `Pattern ${pattern} / ${presetLabel}`,
+    scope: `Pattern ${pattern} drums, 808, chords, and Synth`,
+    impact: `${changedCount} event change${changedCount === 1 ? "" : "s"}`,
+    metrics: createPatternVariationResultMetrics(beforePattern, afterPattern),
+    auditionCue: patternVariationAuditionCue(preset, pattern),
+    nextCheck: patternVariationNextCheck(preset, afterPattern),
+    tone: changedCount > 0 ? "good" : "warn"
+  };
+}
+
+export function createPatternVariationResultMetrics(
+  beforePattern: PatternData,
+  afterPattern: PatternData
+): PatternVariationResultMetric[] {
+  const changedCount = patternVariationChangedCount(beforePattern, afterPattern);
+  return [
+    createPatternVariationResultMetric(
+      "events",
+      "Events",
+      `${patternEventTotal(beforePattern)} total`,
+      `${patternEventTotal(afterPattern)} total`,
+      changedCount
+    ),
+    createPatternVariationResultMetric(
+      "drums",
+      "Drums",
+      `${activeDrumHitCount(beforePattern)} hits`,
+      `${activeDrumHitCount(afterPattern)} hits`,
+      drumPatternMoveCount(beforePattern, afterPattern)
+    ),
+    createPatternVariationResultMetric(
+      "bass",
+      "808",
+      `${beforePattern.bassNotes.length} notes`,
+      `${afterPattern.bassNotes.length} notes`,
+      bassNotesChangedCount(beforePattern.bassNotes, afterPattern.bassNotes)
+    ),
+    createPatternVariationResultMetric(
+      "chords",
+      "Chords",
+      `${beforePattern.chordEvents.length} events`,
+      `${afterPattern.chordEvents.length} events`,
+      chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents)
+    ),
+    createPatternVariationResultMetric(
+      "melody",
+      "Synth",
+      `${beforePattern.melodyNotes.length} notes`,
+      `${afterPattern.melodyNotes.length} notes`,
+      melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes)
+    )
+  ];
+}
+
+export function createPatternVariationResultMetric(
+  id: PatternVariationResultMetric["id"],
+  label: string,
+  before: string,
+  after: string,
+  changedEvents: number
+): PatternVariationResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: changedEvents > 0 ? "good" : "warn"
+  };
+}
+
+function patternVariationChangedCount(beforePattern: PatternData, afterPattern: PatternData): number {
+  return (
+    drumPatternMoveCount(beforePattern, afterPattern) +
+    bassNotesChangedCount(beforePattern.bassNotes, afterPattern.bassNotes) +
+    chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents) +
+    melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes)
+  );
+}
+
+function patternVariationAuditionCue(preset: PatternVariationPreset, pattern: PatternSlot): string {
+  switch (preset) {
+    case "subtle":
+      return `Loop Pattern ${pattern}; listen for pocket, probability, and velocity movement before arranging.`;
+    case "hook":
+      return `Loop Pattern ${pattern}; confirm the hook lift across drums, 808, chords, and Synth.`;
+    case "breakdown":
+      return `Loop Pattern ${pattern}; check the breakdown space before placing it in a section change.`;
+  }
+}
+
+function patternVariationNextCheck(preset: PatternVariationPreset, pattern: PatternData): string {
+  switch (preset) {
+    case "subtle":
+      return `${patternEventTotal(pattern)} Pattern events now; use Groove Compass or selected-event tools if the pocket needs cleanup.`;
+    case "hook":
+      return `${activeDrumHitCount(pattern)} drum hits and ${patternMusicEventCount(pattern)} music events now; compare Pattern A/B/C before making it the hook.`;
+    case "breakdown":
+      return `${patternEventTotal(pattern)} Pattern events now; use Pattern Chain or Arrangement Focus to place the break intentionally.`;
   }
 }
 

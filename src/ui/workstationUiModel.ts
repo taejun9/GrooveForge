@@ -937,6 +937,28 @@ export type PatternFillResult = {
   tone: MixCoachTone;
 };
 
+export type PatternVariationResultMetric = {
+  id: "events" | "drums" | "bass" | "chords" | "melody";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+export type PatternVariationResult = {
+  preset: PatternVariationPreset;
+  pattern: PatternSlot;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: PatternVariationResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type PatternDnaCardId = "layers" | "density" | "variation" | "arrangement";
 export type PatternDnaFocusTarget = "compose" | "arrange";
 

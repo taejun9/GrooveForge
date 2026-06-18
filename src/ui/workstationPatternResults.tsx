@@ -1,6 +1,11 @@
 import { Layers, ListChecks, Sparkles } from "lucide-react";
 import type { ReactElement } from "react";
-import type { LayerStarterResult, PatternCloneResult, PatternFillResult } from "./workstationUiModel";
+import type {
+  LayerStarterResult,
+  PatternCloneResult,
+  PatternFillResult,
+  PatternVariationResult
+} from "./workstationUiModel";
 
 export function LayerStarterResultStrip({ result }: { result: LayerStarterResult }): ReactElement {
   return (
@@ -80,6 +85,48 @@ export function PatternFillResultStrip({ result }: { result: PatternFillResult }
         <span>
           <b>Next check</b>
           <em data-testid="pattern-fill-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function PatternVariationResultStrip({ result }: { result: PatternVariationResult }): ReactElement {
+  return (
+    <div
+      className={`pattern-stack-result pattern-variation-result ${result.tone}`}
+      data-result-pattern-variation={`${result.pattern}-${result.preset}`}
+      data-testid="pattern-variation-result"
+      aria-live="polite"
+    >
+      <div className="pattern-stack-result-main">
+        <Sparkles size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="pattern-variation-result-title">{result.title}</strong>
+          <small data-testid="pattern-variation-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="pattern-stack-result-meta">
+        <span data-testid="pattern-variation-result-status">{result.status}</span>
+        <span data-testid="pattern-variation-result-scope">{result.scope}</span>
+        <span data-testid="pattern-variation-result-impact">{result.impact}</span>
+      </div>
+      <div className="pattern-stack-result-metrics" data-testid="pattern-variation-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`pattern-variation-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="pattern-stack-result-followup" data-testid="pattern-variation-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="pattern-variation-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="pattern-variation-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
     </div>

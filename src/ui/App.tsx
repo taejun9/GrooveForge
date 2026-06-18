@@ -261,6 +261,7 @@ import type {
   PatternClonePadOption,
   PatternCloneResult,
   PatternFillResult,
+  PatternVariationResult,
   PatternDnaCardId,
   PatternDnaFocusTarget,
   PatternDnaCard,
@@ -544,7 +545,12 @@ import {
   drumAccentDefinitions,
   drumFoundationDefinitions
 } from "./workstationUiModel";
-import { LayerStarterResultStrip, PatternCloneResultStrip, PatternFillResultStrip } from "./workstationPatternResults";
+import {
+  LayerStarterResultStrip,
+  PatternCloneResultStrip,
+  PatternFillResultStrip,
+  PatternVariationResultStrip
+} from "./workstationPatternResults";
 import {
   laneColor,
   mergePitchLanes,
@@ -586,6 +592,7 @@ import {
   createPatternClonePadOptions,
   createPatternCloneResult,
   createPatternFillResult,
+  createPatternVariationResult,
   createPatternStackEvents,
   samePatternStackEvents,
   createDrumFoundationOptions,
@@ -809,6 +816,7 @@ export function App(): ReactElement {
   const [layerStarterResult, setLayerStarterResult] = useState<LayerStarterResult | null>(null);
   const [patternCloneResult, setPatternCloneResult] = useState<PatternCloneResult | null>(null);
   const [patternFillResult, setPatternFillResult] = useState<PatternFillResult | null>(null);
+  const [patternVariationResult, setPatternVariationResult] = useState<PatternVariationResult | null>(null);
   const [patternStackResult, setPatternStackResult] = useState<PatternStackResult | null>(null);
   const [drumMoveResult, setDrumMoveResult] = useState<DrumMoveResult | null>(null);
   const [bassMoveResult, setBassMoveResult] = useState<BassMoveResult | null>(null);
@@ -2075,10 +2083,16 @@ export function App(): ReactElement {
 
   function applyPatternVariation(preset: PatternVariationPreset): void {
     const sourceSlot = projectRef.current.selectedPattern;
-    updateCurrentPattern(
+    const beforeProject = projectRef.current;
+    const changed = updateCurrentPattern(
       (pattern) => createPatternVariation(pattern, preset),
       `${patternVariationPresetLabel(preset)} variation applied to Pattern ${sourceSlot}`
     );
+    if (changed) {
+      setPatternVariationResult(createPatternVariationResult(preset, beforeProject, projectRef.current));
+    } else {
+      setPatternVariationResult(null);
+    }
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
@@ -5581,6 +5595,7 @@ export function App(): ReactElement {
               <span>Clear {project.selectedPattern}</span>
             </button>
           </div>
+          {patternVariationResult && <PatternVariationResultStrip result={patternVariationResult} />}
           <div className="pattern-fill-row" aria-label="Pattern fills">
             {patternFillPresetIds.map((preset) => {
               const isClear = preset === "clear_tail";
