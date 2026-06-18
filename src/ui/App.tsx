@@ -4516,6 +4516,77 @@ export function App(): ReactElement {
     }
   }
 
+  function duplicateSelectedNoteToStep(step: number): void {
+    const target = selectedNote;
+    if (!target) {
+      setProjectStatus("Select an 808 or Synth note");
+      return;
+    }
+
+    const nextStep = clampStepStart(step);
+    const pattern = activePattern(projectRef.current);
+    if (target.track === "bass") {
+      const source = pattern.bassNotes.find((note) => matchesSelectedNote(note, target));
+      if (!source) {
+        setProjectStatus("Select an active note");
+        return;
+      }
+      if (nextStep <= source.step || nextStep > steps.length - clampStepLength(source.length)) {
+        setProjectStatus("No beat-grid duplicate step");
+        return;
+      }
+      const occupied = pattern.bassNotes.some(
+        (note) => !matchesSelectedNote(note, target) && note.step === nextStep && note.pitch === source.pitch
+      );
+      if (occupied) {
+        setProjectStatus("Target note already exists");
+        return;
+      }
+      const changed = updateCurrentPattern(
+        (currentPatternData) => ({
+          ...currentPatternData,
+          bassNotes: sortBassNotes([...currentPatternData.bassNotes, { ...source, step: nextStep }])
+        }),
+        "Duplicated 808 note on beat"
+      );
+      if (changed) {
+        setSelectedNote({ track: "bass", step: nextStep, pitch: source.pitch });
+        setSelectedDrumStep(null);
+        setSelectedChordIndex(null);
+      }
+      return;
+    }
+
+    const source = pattern.melodyNotes.find((note) => matchesSelectedNote(note, target));
+    if (!source) {
+      setProjectStatus("Select an active note");
+      return;
+    }
+    if (nextStep <= source.step || nextStep > steps.length - clampStepLength(source.length)) {
+      setProjectStatus("No beat-grid duplicate step");
+      return;
+    }
+    const occupied = pattern.melodyNotes.some(
+      (note) => !matchesSelectedNote(note, target) && note.step === nextStep && note.pitch === source.pitch
+    );
+    if (occupied) {
+      setProjectStatus("Target note already exists");
+      return;
+    }
+    const changed = updateCurrentPattern(
+      (currentPatternData) => ({
+        ...currentPatternData,
+        melodyNotes: sortMelodyNotes([...currentPatternData.melodyNotes, { ...source, step: nextStep }])
+      }),
+      "Duplicated Synth note on beat"
+    );
+    if (changed) {
+      setSelectedNote({ track: "melody", step: nextStep, pitch: source.pitch });
+      setSelectedDrumStep(null);
+      setSelectedChordIndex(null);
+    }
+  }
+
   function selectChordEvent(index: number): void {
     if (!currentPattern.chordEvents[index]) {
       return;
@@ -6062,6 +6133,7 @@ export function App(): ReactElement {
     onCopySelectedNote: copySelectedNote,
     onPasteCopiedNote: pasteCopiedNote,
     onDuplicateSelectedNote: duplicateSelectedNote,
+    onDuplicateSelectedNoteToStep: duplicateSelectedNoteToStep,
     onDeleteSelectedNote: deleteSelectedNote,
     onMoveSelectedDrumStep: moveSelectedDrumStep,
     onUpdateSelectedDrumVelocity: updateSelectedDrumVelocity,
@@ -11839,6 +11911,7 @@ function createQuickActions({
   onCopySelectedNote,
   onPasteCopiedNote,
   onDuplicateSelectedNote,
+  onDuplicateSelectedNoteToStep,
   onDeleteSelectedNote,
   onMoveSelectedDrumStep,
   onUpdateSelectedDrumVelocity,
@@ -12059,6 +12132,7 @@ function createQuickActions({
   onCopySelectedNote: () => void;
   onPasteCopiedNote: () => void;
   onDuplicateSelectedNote: () => void;
+  onDuplicateSelectedNoteToStep: (step: number) => void;
   onDeleteSelectedNote: () => void;
   onMoveSelectedDrumStep: (direction: -1 | 1) => void;
   onUpdateSelectedDrumVelocity: (velocity: number) => void;
@@ -12560,6 +12634,7 @@ function createQuickActions({
       onCopySelectedNote,
       onPasteCopiedNote,
       onDuplicateSelectedNote,
+      onDuplicateSelectedNoteToStep,
       onDeleteSelectedNote,
       onMoveSelectedDrumStep,
       onAuditionSelectedDrumHit,

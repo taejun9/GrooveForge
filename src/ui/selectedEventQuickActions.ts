@@ -75,6 +75,7 @@ type SelectedEventQuickActionsParams = {
   onCopySelectedNote: () => void;
   onPasteCopiedNote: () => void;
   onDuplicateSelectedNote: () => void;
+  onDuplicateSelectedNoteToStep: (step: number) => void;
   onDeleteSelectedNote: () => void;
   onAuditionSelectedDrumHit: () => void;
   onMoveSelectedDrumStep: (direction: -1 | 1) => void;
@@ -133,6 +134,7 @@ export function createSelectedEventQuickActions({
   onCopySelectedNote,
   onPasteCopiedNote,
   onDuplicateSelectedNote,
+  onDuplicateSelectedNoteToStep,
   onDeleteSelectedNote,
   onAuditionSelectedDrumHit,
   onMoveSelectedDrumStep,
@@ -242,6 +244,18 @@ export function createSelectedEventQuickActions({
           selectedNote.pitch,
           selectedNote.step
         )
+      : null;
+  const selectedNoteBeatDuplicateStep =
+    selectedNote && selectedNoteActive && selectedNoteLength !== null
+      ? steps.find(
+          (step) =>
+            step > selectedNote.step &&
+            step % 4 === 0 &&
+            step <= steps.length - selectedNoteLength &&
+            !(selectedNote.track === "bass" ? selectedPatternData.bassNotes : selectedPatternData.melodyNotes).some(
+              (note) => note.step === step && note.pitch === selectedNote.pitch
+            )
+        ) ?? null
       : null;
   const noteClipboardLabel = noteClipboard
     ? `${noteClipboard.track === "bass" ? "808" : "Synth"} ${noteClipboard.note.pitch}.${noteClipboard.note.step + 1}`
@@ -654,6 +668,24 @@ export function createSelectedEventQuickActions({
       keywords: "selected note duplicate copy next empty step 808 synth edit keyboard capture midi beginner producer",
       disabled: !selectedNoteActive || selectedNoteDuplicateStep === null,
       run: onDuplicateSelectedNote
+    },
+    {
+      id: "selected-note-duplicate-beat",
+      title: "Duplicate selected note to beat",
+      detail:
+        selectedNoteActive && selectedNoteBeatDuplicateStep !== null
+          ? `${selectedNoteLabel} -> beat step ${selectedNoteBeatDuplicateStep + 1} / Pattern ${project.selectedPattern}`
+          : selectedNoteActive && selectedNote
+            ? `${selectedNoteLabel} has no later empty 4-step beat slot.`
+            : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note duplicate beat grid copy repeat 4-step anchor 808 synth edit beginner producer",
+      disabled: !selectedNoteActive || selectedNoteBeatDuplicateStep === null,
+      run: () => {
+        if (selectedNoteBeatDuplicateStep !== null) {
+          onDuplicateSelectedNoteToStep(selectedNoteBeatDuplicateStep);
+        }
+      }
     },
     {
       id: "selected-note-delete",
