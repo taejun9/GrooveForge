@@ -949,6 +949,7 @@ export function App(): ReactElement {
   const [styleInspectorFocusId, setStyleInspectorFocusId] = useState<StyleInspectorFocusId | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
+  const [reviewFixResult, setReviewFixResult] = useState<ReviewFixResult | null>(null);
   const [finishChecklistFocusId, setFinishChecklistFocusId] = useState<FinishChecklistCardId | null>(null);
   const [exportPreflightFocusId, setExportPreflightFocusId] = useState<ExportPreflightFocusId | null>(null);
   const [handoffPackageCheckFocusId, setHandoffPackageCheckFocusId] = useState<HandoffPackageCheckFocusId | null>(null);
@@ -1694,6 +1695,7 @@ export function App(): ReactElement {
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
+    setReviewFixResult(null);
     setHookFixResult(null);
     setToplineFixResult(null);
     setProjectStatus(status);
@@ -1734,6 +1736,7 @@ export function App(): ReactElement {
       setMixFixResult(null);
       setDeliveryTargetAlignmentResult(null);
       setSessionBriefStarterResult(null);
+      setReviewFixResult(null);
       setHookFixResult(null);
       setToplineFixResult(null);
     }
@@ -1869,6 +1872,7 @@ export function App(): ReactElement {
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
+    setReviewFixResult(null);
     setHookFixResult(null);
     setToplineFixResult(null);
     clearLocalDraftState();
@@ -1914,6 +1918,7 @@ export function App(): ReactElement {
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
+    setReviewFixResult(null);
     setHookFixResult(null);
     setToplineFixResult(null);
     setProjectStatus(status);
@@ -5362,6 +5367,87 @@ export function App(): ReactElement {
     setProjectStatus(`Review ${item.area}: ${item.status}`);
   }
 
+  function applyReviewFix(item?: ReviewQueueItem): void {
+    const beforeProject = projectRef.current;
+    const beforeAnalysis = analyzeExport(beforeProject);
+    const beforeStemAnalyses = analyzeStemExports(beforeProject);
+    const beforeSummary = createReviewQueueSummary(
+      beforeProject,
+      createBeatReadinessChecks(beforeProject, beforeAnalysis),
+      beforeAnalysis,
+      beforeStemAnalyses
+    );
+    const targetItem = item ?? activeReviewFixItem(beforeSummary);
+
+    if (!targetItem) {
+      setReviewFixResult(null);
+      setProjectStatus("Review Queue has no fix target");
+      return;
+    }
+
+    const fix = createReviewFixOption(targetItem, beforeProject, beforeAnalysis);
+    if (!fix) {
+      setReviewFixResult(null);
+      setProjectStatus("Review Queue item has no fix action");
+      return;
+    }
+
+    setReviewQueueFocusId(targetItem.id);
+    if (targetItem.id.startsWith("mix-")) {
+      setMixCoachFocusId(targetItem.id.slice(4));
+    }
+
+    switch (fix.action.kind) {
+      case "blueprint":
+        applyQuickActionBeatBlueprint(fix.action.blueprintId);
+        break;
+      case "layerStarter":
+        applyLayerStarter(fix.action.starter);
+        break;
+      case "patternChain":
+        applyPatternChain(fix.action.chain);
+        break;
+      case "chainExpand":
+        expandPatternChain();
+        break;
+      case "arrangementTemplate":
+        applyArrangementTemplate(fix.action.template);
+        break;
+      case "arrangementMove": {
+        const targetIndex =
+          targetItem.id === "structure-hook" || targetItem.id === "structure-arc"
+            ? projectRef.current.arrangement.findIndex((block) => block.section === "Hook")
+            : selectedArrangementIndex;
+        const moveIndex = targetIndex >= 0 ? targetIndex : selectedArrangementIndex;
+        const block = projectRef.current.arrangement[moveIndex];
+        if (block) {
+          const nextBlock = applyArrangementMovePreset(block, fix.action.preset);
+          updateArrangementBlock(
+            moveIndex,
+            { energy: nextBlock.energy, mutedTracks: nextBlock.mutedTracks },
+            `${fix.label} Review Fix applied to Block ${moveIndex + 1}`
+          );
+          setSelectedArrangementIndex(moveIndex);
+        }
+        break;
+      }
+      case "deliveryTarget":
+        alignDeliveryTarget(fix.action.target);
+        break;
+      case "mixFix":
+        applyMixFixPreset(fix.action.preset);
+        break;
+      case "masterFinish":
+        applyMasterFinishPad(fix.action.pad);
+        break;
+      case "sessionBriefStarter":
+        applySessionBriefStarterPad(fix.action.pad);
+        break;
+    }
+
+    setReviewFixResult(createReviewFixResult(fix, targetItem.id, beforeProject, projectRef.current));
+  }
+
   function openQuickActions(): void {
     setQuickActionQuery("");
     setQuickActionScope("all");
@@ -5494,6 +5580,7 @@ export function App(): ReactElement {
     onCueToplineLoop: cueToplineLoop,
     onApplyHookFix: applyHookFix,
     onApplyToplineFix: applyToplineFix,
+    onApplyReviewFix: applyReviewFix,
     onFocusArrangementMuteMap: focusArrangementMuteMapLane,
     onFocusArrangementTransitionMap: focusArrangementTransitionMapTransition,
     onApplyBasslinePad: applyBasslinePad,
@@ -7100,6 +7187,9 @@ export function App(): ReactElement {
           <ReviewQueue
             summary={reviewQueueSummary}
             focusedItemId={reviewQueueFocusId}
+            fixResult={reviewFixResult}
+            project={project}
+            onFix={applyReviewFix}
             onFocus={focusReviewQueueItem}
           />
           <ExportMeter analysis={exportAnalysis} />
@@ -9466,11 +9556,17 @@ function FinishChecklist({
 
 function ReviewQueue({
   summary,
+  fixResult,
   focusedItemId,
+  project,
+  onFix,
   onFocus
 }: {
   summary: ReviewQueueSummary;
+  fixResult: ReviewFixResult | null;
   focusedItemId: string | null;
+  project: ProjectState;
+  onFix: (item?: ReviewQueueItem) => void;
   onFocus: (item: ReviewQueueItem) => void;
 }): ReactElement {
   const focusSummary = createReviewQueueFocusSummary(summary, focusedItemId);
@@ -9485,18 +9581,23 @@ function ReviewQueue({
         <strong data-testid="review-queue-headline">{summary.headline}</strong>
         <small data-testid="review-queue-detail">{summary.detail}</small>
       </div>
-      <div
-        className={`review-queue-focus-readout ${focusSummary.tone}`}
-        data-testid="review-queue-focus-readout"
-        title={focusSummary.detailTitle}
-      >
-        <span data-testid="review-queue-focus-status">{focusSummary.statusLabel}</span>
-        <strong data-testid="review-queue-focus-label">{focusSummary.areaLabel}</strong>
-        <small data-testid="review-queue-focus-detail">{focusSummary.detailLabel}</small>
+      <div className="review-queue-stack">
+        <div
+          className={`review-queue-focus-readout ${focusSummary.tone}`}
+          data-testid="review-queue-focus-readout"
+          title={focusSummary.detailTitle}
+        >
+          <span data-testid="review-queue-focus-status">{focusSummary.statusLabel}</span>
+          <strong data-testid="review-queue-focus-label">{focusSummary.areaLabel}</strong>
+          <small data-testid="review-queue-focus-detail">{focusSummary.detailLabel}</small>
+        </div>
+        {fixResult && <ReviewFixResultStrip result={fixResult} />}
       </div>
       <div className="review-queue-list" data-testid="review-queue-list">
         {summary.items.map((item) => {
           const focused = focusedItemId !== null && item.id === focusedItemId;
+          const fix = createReviewFixOption(item, project, analyzeExport(project));
+          const fixDisabled = item.tone === "good" || fix === null;
           return (
             <div
               className={["review-queue-item", item.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
@@ -9506,23 +9607,78 @@ function ReviewQueue({
             >
               <span>{item.area}</span>
               <strong>{item.status}</strong>
-              <button
-                aria-pressed={focused}
-                className="review-queue-focus-button"
-                data-testid={`review-queue-focus-${item.id}`}
-                onClick={() => onFocus(item)}
-                title={`Focus ${item.focusLabel}: ${item.status}`}
-                type="button"
-              >
-                <ArrowRight size={13} aria-hidden="true" />
-                <span>{item.focusLabel}</span>
-              </button>
+              <div className="review-queue-item-actions">
+                <button
+                  aria-pressed={focused}
+                  className="review-queue-focus-button"
+                  data-testid={`review-queue-focus-${item.id}`}
+                  onClick={() => onFocus(item)}
+                  title={`Focus ${item.focusLabel}: ${item.status}`}
+                  type="button"
+                >
+                  <ArrowRight size={13} aria-hidden="true" />
+                  <span>{item.focusLabel}</span>
+                </button>
+                <button
+                  className="review-queue-fix-button"
+                  data-testid={`review-queue-fix-${item.id}`}
+                  disabled={fixDisabled}
+                  onClick={() => onFix(item)}
+                  title={fix ? `Apply ${fix.label}: ${fix.detail}` : "No Review Fix for this item"}
+                  type="button"
+                >
+                  <SlidersHorizontal size={13} aria-hidden="true" />
+                  <span>Fix</span>
+                </button>
+              </div>
               <small>{item.detail}</small>
             </div>
           );
         })}
       </div>
     </section>
+  );
+}
+
+function ReviewFixResultStrip({ result }: { result: ReviewFixResult }): ReactElement {
+  return (
+    <div
+      className={`review-fix-result ${result.tone}`}
+      data-result-review-fix={result.fixId}
+      data-testid="review-fix-result"
+      aria-live="polite"
+    >
+      <div className="review-fix-result-main">
+        <SlidersHorizontal size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="review-fix-result-title">{result.title}</strong>
+          <small data-testid="review-fix-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="review-fix-result-meta">
+        <span data-testid="review-fix-result-status">{result.status}</span>
+        <span data-testid="review-fix-result-scope">{result.scope}</span>
+        <span data-testid="review-fix-result-impact">{result.impact}</span>
+      </div>
+      <div className="review-fix-result-metrics" data-testid="review-fix-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`review-fix-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="review-fix-result-followup" data-testid="review-fix-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="review-fix-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="review-fix-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -11812,6 +11968,7 @@ function createQuickActions({
   onFocusPatternDna,
   onFocusProductionSnapshot,
   onFocusReviewQueue,
+  onApplyReviewFix,
   onFocusSessionPass,
   onFocusStyleInspector,
   onFocusToplineSpace,
@@ -12007,6 +12164,7 @@ function createQuickActions({
   onFocusPatternDna: (card: PatternDnaCard) => void;
   onFocusProductionSnapshot: (metric: ProductionSnapshotFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
+  onApplyReviewFix: (item?: ReviewQueueItem) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
   onFocusStyleInspector: (item: StyleInspectorFocusItem) => void;
   onFocusToplineSpace: (card: ToplineSpaceFocusItem) => void;
@@ -12320,6 +12478,8 @@ function createQuickActions({
     };
   });
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
+  const reviewFixItem = activeReviewFixItem(reviewQueueSummary);
+  const reviewFixOption = reviewFixItem ? createReviewFixOption(reviewFixItem, project, exportAnalysis) : null;
   const reviewQueueActions: QuickAction[] = reviewQueueSummary.items.map((item) => ({
     id: `review-queue-item-${item.id}`,
     title: `Focus Review Queue: ${item.area}`,
@@ -12328,6 +12488,20 @@ function createQuickActions({
     keywords: `review queue focus issue triage ${item.id} ${item.area} ${item.status} ${item.focusLabel} ${item.detail} compose arrange mix master deliver beginner producer`,
     run: () => onFocusReviewQueue(item)
   }));
+  const reviewQueueFixActions: QuickAction[] = reviewQueueSummary.items.map((item) => {
+    const fix = createReviewFixOption(item, project, exportAnalysis);
+    return {
+      id: `review-queue-fix-${item.id}`,
+      title: `Apply Review Fix: ${item.area}`,
+      detail: fix ? `${fix.label} / ${fix.detail} / ${item.status}` : `${item.status} / No fix needed`,
+      group: fix?.group ?? "Project",
+      keywords: `review fix action issue triage ${item.id} ${item.area} ${item.status} ${item.detail} ${fix?.label ?? "ready"} ${
+        fix?.detail ?? ""
+      } compose arrange mix master deliver beginner producer`,
+      disabled: item.tone === "good" || !fix,
+      run: () => onApplyReviewFix(item)
+    };
+  });
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
   const sessionPassActions: QuickAction[] = sessionPassSummary.cards.map((card) => ({
     id: `session-pass-card-${card.id}`,
@@ -14083,7 +14257,19 @@ function createQuickActions({
         }
       }
     },
+    {
+      id: "review-fix",
+      title: reviewFixItem ? `Apply Review Fix: ${reviewFixItem.area}` : "Apply Review Fix",
+      detail: reviewFixOption ? `${reviewFixOption.label} / ${reviewFixOption.detail}` : "No Review Queue fix target.",
+      group: reviewFixOption?.group ?? "Project",
+      keywords: `review fix action top issue triage ${reviewFixItem?.id ?? "none"} ${reviewFixItem?.area ?? "none"} ${
+        reviewFixOption?.label ?? "none"
+      } beginner producer`,
+      disabled: !reviewFixItem || !reviewFixOption,
+      run: () => onApplyReviewFix(reviewFixItem ?? undefined)
+    },
     ...reviewQueueActions,
+    ...reviewQueueFixActions,
     {
       id: "export-preflight-focus",
       title: exportPreflightCard ? `Focus Export Preflight: ${exportPreflightCard.label}` : "Focus Export Preflight",
@@ -15628,6 +15814,16 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "review-fix" || action.id.startsWith("review-queue-fix-")) {
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const summary = createReviewQueueSummary(project, createBeatReadinessChecks(project, exportAnalysis), exportAnalysis, analyzeStemExports(project));
+    return {
+      id: "review-fix",
+      label: "Review fix",
+      value: `${summary.headline} / ${summary.detail}`
+    };
+  }
+
   if (action.id === "export-preflight-focus") {
     const exportAnalysis = analysis ?? analyzeExport(project);
     return {
@@ -16548,6 +16744,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Review Queue item to inspect that production issue before applying any fix.",
       nextCheck: "Return to Review Queue when you need another direct issue triage focus."
+    };
+  }
+
+  if (action.id === "review-fix" || action.id.startsWith("review-queue-fix-")) {
+    return {
+      auditionCue: "Play the relevant Pattern, Song, Full Mix, or Handoff check after the fix, based on the Review Queue area.",
+      nextCheck: "Return to Review Queue and confirm the fixed issue moved down or cleared before applying another one-step fix."
     };
   }
 
@@ -19073,6 +19276,416 @@ function createReviewQueueFocusSummary(
     detailTitle: `${statusLabel} / ${item.area}: ${item.status} / ${detailLabel}`,
     tone: item.tone
   };
+}
+
+type ReviewFixAction =
+  | {
+      kind: "blueprint";
+      blueprintId: BeatBlueprintId;
+    }
+  | {
+      kind: "layerStarter";
+      starter: LayerStarterId;
+    }
+  | {
+      kind: "patternChain";
+      chain: PatternChainId;
+    }
+  | {
+      kind: "chainExpand";
+    }
+  | {
+      kind: "arrangementTemplate";
+      template: ArrangementTemplateId;
+    }
+  | {
+      kind: "arrangementMove";
+      preset: ArrangementMovePreset;
+    }
+  | {
+      kind: "deliveryTarget";
+      target: DeliveryTargetId;
+    }
+  | {
+      kind: "mixFix";
+      preset: MixFixPreset;
+    }
+  | {
+      kind: "masterFinish";
+      pad: MasterFinishPadId;
+    }
+  | {
+      kind: "sessionBriefStarter";
+      pad: SessionBriefStarterPadId;
+    };
+
+type ReviewFixOption = {
+  itemId: string;
+  fixId: string;
+  label: string;
+  detail: string;
+  group: string;
+  action: ReviewFixAction;
+  auditionCue: string;
+  nextCheck: string;
+};
+
+type ReviewFixResultMetric = {
+  id: "item" | "queue" | "project";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type ReviewFixResult = {
+  fixId: string;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: ReviewFixResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
+function activeReviewFixItem(summary: ReviewQueueSummary): ReviewQueueItem | null {
+  return summary.items.find((item) => item.tone !== "good") ?? null;
+}
+
+function createReviewFixOption(
+  item: ReviewQueueItem,
+  project: ProjectState,
+  analysis: ExportAnalysis
+): ReviewFixOption | null {
+  if (item.tone === "good") {
+    return null;
+  }
+
+  const target = activeDeliveryTarget(project);
+  const layerStarter = activeLayerStarterQuickActionOption(createLayerStarterOptions(project));
+  const layerStarterId = layerStarter?.id ?? "melody";
+
+  if (item.id === "target-alignment") {
+    return {
+      itemId: item.id,
+      fixId: "target-align",
+      label: "Align Target",
+      detail: `Use the existing Delivery Target Alignment for ${target.name}.`,
+      group: "Project",
+      action: { kind: "deliveryTarget", target: target.id },
+      auditionCue: "Play Song loop and judge length, master posture, and mix target after alignment.",
+      nextCheck: "Return to Review Queue and Export Preflight before running delivery exports."
+    };
+  }
+
+  if (item.id === "master-preset") {
+    const padId = suggestedMasterFinishPad(project);
+    return {
+      itemId: item.id,
+      fixId: `master-${padId}`,
+      label: "Master Finish",
+      detail: "Use the existing Master Finish pad that matches the active delivery target.",
+      group: "Master",
+      action: { kind: "masterFinish", pad: padId },
+      auditionCue: "Play Full Mix and watch the export meter after the master posture changes.",
+      nextCheck: "Return to Finish Checklist and Export Preflight before exporting WAV or stems."
+    };
+  }
+
+  if (item.id === "stem-coverage") {
+    return {
+      itemId: item.id,
+      fixId: "stem-balance",
+      label: "Stem Balance Mix Fix",
+      detail: "Use the existing Stem Balance Mix Fix to bring audible stems forward.",
+      group: "Mix",
+      action: { kind: "mixFix", preset: "stem_balance" },
+      auditionCue: "Play Full Mix, then compare Drums, 808, Synth, and Chords stem audition pads.",
+      nextCheck: "Return to Handoff Package Check and Review Queue to confirm target stem coverage."
+    };
+  }
+
+  if (item.id === "session-brief") {
+    return {
+      itemId: item.id,
+      fixId: "brief-vocal",
+      label: "Vocal Brief Starter",
+      detail: "Use the existing Vocal Session Brief Starter to fill blank handoff context.",
+      group: "Project",
+      action: { kind: "sessionBriefStarter", pad: "vocal" },
+      auditionCue: "Read the Session Brief against the current song loop before exporting handoff notes.",
+      nextCheck: "Return to Handoff Package Check after the collaborator context is specific enough."
+    };
+  }
+
+  if (item.id.startsWith("readiness-")) {
+    const readinessId = item.id.replace("readiness-", "");
+    switch (readinessId) {
+      case "drums":
+        return reviewLayerStarterFix(item, "drums", "Drums Layer Starter");
+      case "bass":
+        return reviewLayerStarterFix(item, "bass", "808 Layer Starter");
+      case "harmony": {
+        const starter: LayerStarterId = activePattern(project).chordEvents.length === 0 ? "chords" : "melody";
+        return reviewLayerStarterFix(item, starter, starter === "chords" ? "Chord Layer Starter" : "Melody Layer Starter");
+      }
+      case "arrangement":
+        return {
+          itemId: item.id,
+          fixId: "arrangement-chain",
+          label: "8 Bar Chain",
+          detail: "Use the existing 8 Bar Pattern Chain to create an editable song outline.",
+          group: "Arrange",
+          action: { kind: "patternChain", chain: "eight_bar" },
+          auditionCue: "Play Song loop and hear Pattern A/B/C contrast across the new outline.",
+          nextCheck: "Return to Song Form Overview before expanding into a longer form."
+        };
+      case "export":
+        if (analysis.status === "Silent") {
+          const blueprintId = suggestedBlueprintId(project);
+          return {
+            itemId: item.id,
+            fixId: `blueprint-${blueprintId}`,
+            label: "Current Style Starter",
+            detail: "Use the existing current-style Beat Blueprint to create sample-free signal.",
+            group: "Create",
+            action: { kind: "blueprint", blueprintId },
+            auditionCue: "Loop Pattern A and confirm drums, 808, chords, and Synth have audible signal.",
+            nextCheck: "Return to Review Queue after the starter is editable and non-silent."
+          };
+        }
+        return reviewMixFix(item, "headroom", "Headroom Mix Fix");
+    }
+  }
+
+  if (item.id.startsWith("structure-")) {
+    const signalId = item.id.replace("structure-", "");
+    switch (signalId) {
+      case "target":
+        return arrangementTotalBars(project) < 8
+          ? {
+              itemId: item.id,
+              fixId: "structure-chain",
+              label: "8 Bar Chain",
+              detail: "Use the existing 8 Bar Pattern Chain before expanding toward the target length.",
+              group: "Arrange",
+              action: { kind: "patternChain", chain: "eight_bar" },
+              auditionCue: "Play Song loop and check whether the 8-bar outline is musical before expanding.",
+              nextCheck: "Return to Structure Lens and target alignment after the outline is in place."
+            }
+          : {
+              itemId: item.id,
+              fixId: "structure-expand",
+              label: "Chain Expand",
+              detail: "Use the existing Chain Expand command to stretch the current outline into song form.",
+              group: "Arrange",
+              action: { kind: "chainExpand" },
+              auditionCue: "Play Song loop and check intro, verse, hook, bridge, and outro flow.",
+              nextCheck: "Return to Structure Lens and Song Form Overview after expansion."
+            };
+      case "sections":
+        return {
+          itemId: item.id,
+          fixId: "sections-full",
+          label: "Full Beat Template",
+          detail: "Use the existing Full Beat Arrangement Template to add section coverage.",
+          group: "Arrange",
+          action: { kind: "arrangementTemplate", template: "full" },
+          auditionCue: "Play Song loop and scan section order before editing block energy.",
+          nextCheck: "Return to Song Form Overview and Arrangement Mute Map for section polish."
+        };
+      case "hook":
+        return project.arrangement.some((block) => block.section === "Hook")
+          ? {
+              itemId: item.id,
+              fixId: "hook-lift",
+              label: "Hook Lift",
+              detail: "Use the existing Hook Lift Arrangement Move on the selected block.",
+              group: "Arrange",
+              action: { kind: "arrangementMove", preset: "hook_lift" },
+              auditionCue: "Loop the selected block and listen for hook energy contrast.",
+              nextCheck: "Return to Hook Readiness and Structure Lens after the lift."
+            }
+          : {
+              itemId: item.id,
+              fixId: "hook-template",
+              label: "Hook First Template",
+              detail: "Use the existing Hook First Arrangement Template to create a clear hook section.",
+              group: "Arrange",
+              action: { kind: "arrangementTemplate", template: "hook_first" },
+              auditionCue: "Play Song loop and confirm the Hook section is easy to locate.",
+              nextCheck: "Return to Hook Readiness before adding another arrangement move."
+            };
+      case "arc":
+        return {
+          itemId: item.id,
+          fixId: "arc-lift",
+          label: "Hook Lift",
+          detail: "Use the existing Hook Lift Arrangement Move to add energy contrast.",
+          group: "Arrange",
+          action: { kind: "arrangementMove", preset: "hook_lift" },
+          auditionCue: "Play Song loop and listen for a clearer high-energy point.",
+          nextCheck: "Return to Structure Lens after checking low/high energy spread."
+        };
+    }
+  }
+
+  if (item.id.startsWith("mix-")) {
+    const mixId = item.id.replace("mix-", "");
+    if (mixId === "headroom" || mixId === "limiter") {
+      return reviewMixFix(item, "headroom", "Headroom Mix Fix");
+    }
+    if (mixId === "low-end") {
+      return reviewMixFix(item, "low_end", "Low End Mix Fix");
+    }
+    return reviewMixFix(item, "stem_balance", "Stem Balance Mix Fix");
+  }
+
+  switch (item.focusTarget) {
+    case "compose":
+      return reviewLayerStarterFix(item, layerStarterId, "Layer Starter");
+    case "arrange":
+      return {
+        itemId: item.id,
+        fixId: "review-template",
+        label: "Full Beat Template",
+        detail: "Use the existing Full Beat Arrangement Template for the review issue.",
+        group: "Arrange",
+        action: { kind: "arrangementTemplate", template: "full" },
+        auditionCue: "Play Song loop and check the arrangement issue after the template applies.",
+        nextCheck: "Return to Review Queue before applying another arrangement fix."
+      };
+    case "mix":
+      return reviewMixFix(item, "stem_balance", "Stem Balance Mix Fix");
+    case "master":
+      return reviewMixFix(item, "headroom", "Headroom Mix Fix");
+    case "deliver":
+      return {
+        itemId: item.id,
+        fixId: "deliver-brief",
+        label: "Vocal Brief Starter",
+        detail: "Use the existing Vocal Session Brief Starter for delivery context.",
+        group: "Project",
+        action: { kind: "sessionBriefStarter", pad: "vocal" },
+        auditionCue: "Read the Handoff context against the current full song.",
+        nextCheck: "Return to Handoff Package Check after the review issue changes."
+      };
+  }
+}
+
+function reviewLayerStarterFix(item: ReviewQueueItem, starter: LayerStarterId, label: string): ReviewFixOption {
+  return {
+    itemId: item.id,
+    fixId: `layer-${starter}`,
+    label,
+    detail: `Use the existing ${label} path on the selected Pattern.`,
+    group: "Create",
+    action: { kind: "layerStarter", starter },
+    auditionCue: `Loop Pattern ${starter === "drums" ? "A/B/C" : "selected"} and confirm the new layer supports the beat.`,
+    nextCheck: "Return to Review Queue and Pattern DNA before adding another layer."
+  };
+}
+
+function reviewMixFix(item: ReviewQueueItem, preset: MixFixPreset, label: string): ReviewFixOption {
+  return {
+    itemId: item.id,
+    fixId: `mix-${preset}`,
+    label,
+    detail: `Use the existing ${label} for this review issue.`,
+    group: "Mix",
+    action: { kind: "mixFix", preset },
+    auditionCue: "Play Full Mix and compare export headroom plus stem posture after the fix.",
+    nextCheck: "Return to Mix Coach and Review Queue before applying another mix fix."
+  };
+}
+
+function createReviewFixResult(
+  fix: ReviewFixOption,
+  itemId: string,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): ReviewFixResult {
+  const beforeSummary = createReviewQueueSummaryForProject(beforeProject);
+  const afterSummary = createReviewQueueSummaryForProject(afterProject);
+  const beforeItem = beforeSummary.items.find((item) => item.id === itemId) ?? null;
+  const afterItem = afterSummary.items.find((item) => item.id === itemId) ?? null;
+  const metrics: ReviewFixResultMetric[] = [
+    createReviewFixResultMetric("item", beforeItem?.area ?? "Issue", reviewFixItemLabel(beforeItem), reviewFixItemLabel(afterItem)),
+    createReviewFixResultMetric("queue", "Queue", beforeSummary.headline, afterSummary.headline),
+    createReviewFixResultMetric("project", "Project", reviewFixProjectLabel(beforeProject), reviewFixProjectLabel(afterProject))
+  ];
+  const changedCount = metrics.filter((metric) => metric.tone === "good").length;
+  const itemLabel = afterItem?.area ?? beforeItem?.area ?? "Review";
+
+  return {
+    fixId: fix.fixId,
+    title: `${fix.label} Review Fix applied`,
+    status: changedCount > 0 ? "Applied" : "Already covered",
+    detail: `${itemLabel} / ${fix.detail}`,
+    scope: reviewFixScopeLabel(fix),
+    impact: `${changedCount}/${metrics.length} Review metrics changed`,
+    metrics,
+    auditionCue: fix.auditionCue,
+    nextCheck: fix.nextCheck,
+    tone: changedCount > 0 ? "good" : "warn"
+  };
+}
+
+function createReviewQueueSummaryForProject(project: ProjectState): ReviewQueueSummary {
+  const analysis = analyzeExport(project);
+  return createReviewQueueSummary(project, createBeatReadinessChecks(project, analysis), analysis, analyzeStemExports(project));
+}
+
+function createReviewFixResultMetric(
+  id: ReviewFixResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): ReviewFixResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: before === after ? "warn" : "good"
+  };
+}
+
+function reviewFixItemLabel(item: ReviewQueueItem | null): string {
+  return item ? `${item.status} / ${item.detail}` : "cleared";
+}
+
+function reviewFixProjectLabel(project: ProjectState): string {
+  const analysis = analyzeExport(project);
+  return `${barCountLabel(arrangementTotalBars(project))} / ${analysis.status} / ${activeDeliveryTarget(project).name}`;
+}
+
+function reviewFixScopeLabel(fix: ReviewFixOption): string {
+  switch (fix.action.kind) {
+    case "blueprint":
+      return "Beat Blueprint / Current Style";
+    case "layerStarter":
+      return `Layer Starter / ${fix.action.starter}`;
+    case "patternChain":
+      return `Arrangement / ${patternChainLabel(fix.action.chain)}`;
+    case "chainExpand":
+      return "Arrangement / Chain Expand";
+    case "arrangementTemplate":
+      return `Arrangement Template / ${arrangementTemplateLabel(fix.action.template)}`;
+    case "arrangementMove":
+      return `Arrangement Move / ${arrangementMovePresetLabel(fix.action.preset)}`;
+    case "deliveryTarget":
+      return "Delivery Target / Align";
+    case "mixFix":
+      return `Mix Fix / ${mixFixPresetLabel(fix.action.preset)}`;
+    case "masterFinish":
+      return "Master Finish / Target";
+    case "sessionBriefStarter":
+      return "Session Brief / Vocal";
+  }
 }
 
 function reviewToneRank(tone: MixCoachTone): number {
