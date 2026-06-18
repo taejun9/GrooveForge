@@ -216,6 +216,8 @@ import type {
   PatternClonePadOption,
   PatternCloneResultMetric,
   PatternCloneResult,
+  PatternEditResultMetric,
+  PatternEditResult,
   PatternFillPreviewSummary,
   PatternFillResultMetric,
   PatternFillResult,
@@ -1642,6 +1644,129 @@ function patternCloneChangedCount(beforePattern: PatternData, afterPattern: Patt
     chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents) +
     melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes)
   );
+}
+
+export function createPatternEditResult(
+  action: PatternEditResult["action"],
+  source: PatternSlot,
+  target: PatternSlot,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): PatternEditResult {
+  const beforeSource = beforeProject.patterns[source];
+  const beforeTarget = beforeProject.patterns[target];
+  const afterTarget = afterProject.patterns[target];
+  const changedCount = patternEditChangedCount(beforeTarget, afterTarget);
+  const targetEventCount = patternEventTotal(afterTarget);
+
+  return {
+    action,
+    source,
+    target,
+    title: action === "copy" ? `Pattern ${target} copy ready` : `Pattern ${target} cleared`,
+    status: action === "copy" ? "Copied" : "Cleared",
+    detail: action === "copy" ? `Pattern ${source} -> ${target}` : `Pattern ${target} reset to empty`,
+    scope: action === "copy" ? `Pattern ${target} edit focus` : `Pattern ${target} drums, 808, chords, and Synth`,
+    impact: `${changedCount} event change${changedCount === 1 ? "" : "s"}`,
+    metrics: createPatternEditResultMetrics(action, source, target, beforeSource, beforeTarget, afterTarget),
+    auditionCue: patternEditAuditionCue(action, source, target),
+    nextCheck: patternEditNextCheck(action, target, targetEventCount),
+    tone: changedCount > 0 || action === "clear" ? "good" : "warn"
+  };
+}
+
+export function createPatternEditResultMetrics(
+  action: PatternEditResult["action"],
+  source: PatternSlot,
+  target: PatternSlot,
+  beforeSource: PatternData,
+  beforeTarget: PatternData,
+  afterTarget: PatternData
+): PatternEditResultMetric[] {
+  const sourceEvents = patternEventTotal(beforeSource);
+  const beforeTargetEvents = patternEventTotal(beforeTarget);
+  const afterTargetEvents = patternEventTotal(afterTarget);
+  return [
+    createPatternEditResultMetric(
+      "source",
+      "Source",
+      `Pattern ${source} / ${sourceEvents} events`,
+      action === "copy" ? `Pattern ${source} preserved` : "Not edited",
+      0,
+      "good"
+    ),
+    createPatternEditResultMetric(
+      "target",
+      "Target",
+      `Pattern ${target} / ${beforeTargetEvents} events`,
+      `Pattern ${target} / ${afterTargetEvents} events`,
+      patternEditChangedCount(beforeTarget, afterTarget)
+    ),
+    createPatternEditResultMetric(
+      "events",
+      "Events",
+      `${beforeTargetEvents} total`,
+      `${afterTargetEvents} total`,
+      Math.abs(beforeTargetEvents - afterTargetEvents)
+    ),
+    createPatternEditResultMetric(
+      "drums",
+      "Drums",
+      `${activeDrumHitCount(beforeTarget)} hits`,
+      `${activeDrumHitCount(afterTarget)} hits`,
+      drumPatternMoveCount(beforeTarget, afterTarget)
+    ),
+    createPatternEditResultMetric(
+      "music",
+      "Music",
+      `${patternMusicEventCount(beforeTarget)} events`,
+      `${patternMusicEventCount(afterTarget)} events`,
+      patternMusicChangedCount(beforeTarget, afterTarget)
+    )
+  ];
+}
+
+export function createPatternEditResultMetric(
+  id: PatternEditResultMetric["id"],
+  label: string,
+  before: string,
+  after: string,
+  changedEvents: number,
+  tone?: PatternEditResultMetric["tone"]
+): PatternEditResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: tone ?? (changedEvents > 0 ? "good" : "warn")
+  };
+}
+
+function patternEditChangedCount(beforePattern: PatternData, afterPattern: PatternData): number {
+  return drumPatternMoveCount(beforePattern, afterPattern) + patternMusicChangedCount(beforePattern, afterPattern);
+}
+
+function patternMusicChangedCount(beforePattern: PatternData, afterPattern: PatternData): number {
+  return (
+    bassNotesChangedCount(beforePattern.bassNotes, afterPattern.bassNotes) +
+    chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents) +
+    melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes)
+  );
+}
+
+function patternEditAuditionCue(action: PatternEditResult["action"], source: PatternSlot, target: PatternSlot): string {
+  if (action === "copy") {
+    return `Loop Pattern ${target}; compare it against Pattern ${source} before assigning it to a section.`;
+  }
+  return `Loop Pattern ${target}; confirm the cleared pattern is silent before rebuilding layers.`;
+}
+
+function patternEditNextCheck(action: PatternEditResult["action"], target: PatternSlot, targetEventCount: number): string {
+  if (action === "copy") {
+    return `${targetEventCount} Pattern ${target} events now; use Pattern Compare, Pattern DNA, or selected-event tools before arranging.`;
+  }
+  return `${targetEventCount} Pattern ${target} events now; use Layer Starter, Drum Foundation, 808 Bassline, Chord Pads, or Melody Motif to rebuild.`;
 }
 
 function patternMusicEventCount(pattern: PatternData): number {

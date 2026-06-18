@@ -261,6 +261,7 @@ import type {
   PatternCompareSummary,
   PatternClonePadOption,
   PatternCloneResult,
+  PatternEditResult,
   PatternFillPreviewSummary,
   PatternFillResult,
   PatternVariationPreviewSummary,
@@ -552,6 +553,7 @@ import {
   LayerStarterResultStrip,
   PatternCompareResultStrip,
   PatternCloneResultStrip,
+  PatternEditResultStrip,
   PatternFillResultStrip,
   PatternVariationResultStrip
 } from "./workstationPatternResults";
@@ -595,6 +597,7 @@ import {
   createLayerStarterResult,
   createPatternClonePadOptions,
   createPatternCloneResult,
+  createPatternEditResult,
   createPatternFillPreviewSummary,
   createPatternFillResult,
   createPatternVariationPreviewSummary,
@@ -822,6 +825,7 @@ export function App(): ReactElement {
   const [layerStarterResult, setLayerStarterResult] = useState<LayerStarterResult | null>(null);
   const [patternCompareResult, setPatternCompareResult] = useState<PatternCompareResult | null>(null);
   const [patternCloneResult, setPatternCloneResult] = useState<PatternCloneResult | null>(null);
+  const [patternEditResult, setPatternEditResult] = useState<PatternEditResult | null>(null);
   const [patternFillPreviewPreset, setPatternFillPreviewPreset] = useState<PatternFillPreset>("drum_fill");
   const [patternFillResult, setPatternFillResult] = useState<PatternFillResult | null>(null);
   const [patternVariationPreviewPreset, setPatternVariationPreviewPreset] = useState<PatternVariationPreset>("hook");
@@ -1529,7 +1533,9 @@ export function App(): ReactElement {
     setLayerStarterResult(null);
     setPatternCompareResult(null);
     setPatternCloneResult(null);
+    setPatternEditResult(null);
     setPatternFillResult(null);
+    setPatternVariationResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -1564,7 +1570,9 @@ export function App(): ReactElement {
       setLayerStarterResult(null);
       setPatternCompareResult(null);
       setPatternCloneResult(null);
+      setPatternEditResult(null);
       setPatternFillResult(null);
+      setPatternVariationResult(null);
       setPatternStackResult(null);
       setDrumMoveResult(null);
       setBassMoveResult(null);
@@ -1673,7 +1681,9 @@ export function App(): ReactElement {
     setBeatSpineResult(null);
     setLayerStarterResult(null);
     setPatternCloneResult(null);
+    setPatternEditResult(null);
     setPatternFillResult(null);
+    setPatternVariationResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -1714,7 +1724,9 @@ export function App(): ReactElement {
     setBeatSpineResult(null);
     setLayerStarterResult(null);
     setPatternCloneResult(null);
+    setPatternEditResult(null);
     setPatternFillResult(null);
+    setPatternVariationResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
     setBassMoveResult(null);
@@ -2063,7 +2075,8 @@ export function App(): ReactElement {
 
   function copySelectedPattern(target: PatternSlot): void {
     const sourceSlot = projectRef.current.selectedPattern;
-    updateProject(
+    const beforeProject = projectRef.current;
+    const changed = updateProject(
       (current) => ({
         ...current,
         selectedPattern: target,
@@ -2074,6 +2087,9 @@ export function App(): ReactElement {
       }),
       `Copied Pattern ${sourceSlot} to ${target}`
     );
+    if (changed) {
+      setPatternEditResult(createPatternEditResult("copy", sourceSlot, target, beforeProject, projectRef.current));
+    }
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(0);
@@ -2104,7 +2120,8 @@ export function App(): ReactElement {
 
   function clearSelectedPattern(): void {
     const sourceSlot = projectRef.current.selectedPattern;
-    updateProject(
+    const beforeProject = projectRef.current;
+    const changed = updateProject(
       (current) => ({
         ...current,
         patterns: {
@@ -2114,6 +2131,9 @@ export function App(): ReactElement {
       }),
       `Cleared Pattern ${sourceSlot}`
     );
+    if (changed) {
+      setPatternEditResult(createPatternEditResult("clear", sourceSlot, sourceSlot, beforeProject, projectRef.current));
+    }
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
@@ -5588,6 +5608,7 @@ export function App(): ReactElement {
           {layerStarterResult && <LayerStarterResultStrip result={layerStarterResult} />}
           <PatternClonePads clones={patternCloneOptions} onApply={cloneSelectedPatternVariation} />
           {patternCloneResult && <PatternCloneResultStrip result={patternCloneResult} />}
+          {patternEditResult && <PatternEditResultStrip result={patternEditResult} />}
           <PatternStackPreview preview={patternStackPreviewSummary} />
           {patternStackResult && <PatternStackResultStrip result={patternStackResult} />}
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />

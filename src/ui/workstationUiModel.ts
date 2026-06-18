@@ -937,6 +937,29 @@ export type PatternCloneResult = {
   tone: MixCoachTone;
 };
 
+export type PatternEditResultMetric = {
+  id: "source" | "target" | "events" | "drums" | "music";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+export type PatternEditResult = {
+  action: "copy" | "clear";
+  source: PatternSlot;
+  target: PatternSlot;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: PatternEditResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type PatternFillResultMetric = {
   id: "events" | "drums" | "bass" | "chords" | "melody";
   label: string;

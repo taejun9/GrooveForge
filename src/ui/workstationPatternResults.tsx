@@ -4,6 +4,7 @@ import type {
   LayerStarterResult,
   PatternCloneResult,
   PatternCompareResult,
+  PatternEditResult,
   PatternFillResult,
   PatternVariationResult
 } from "./workstationUiModel";
@@ -170,6 +171,48 @@ export function PatternCloneResultStrip({ result }: { result: PatternCloneResult
         <span>
           <b>Next check</b>
           <em data-testid="pattern-clone-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function PatternEditResultStrip({ result }: { result: PatternEditResult }): ReactElement {
+  return (
+    <div
+      className={`pattern-stack-result pattern-edit-result ${result.tone}`}
+      data-result-pattern-edit={`${result.action}-${result.source}-${result.target}`}
+      data-testid="pattern-edit-result"
+      aria-live="polite"
+    >
+      <div className="pattern-stack-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="pattern-edit-result-title">{result.title}</strong>
+          <small data-testid="pattern-edit-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="pattern-stack-result-meta">
+        <span data-testid="pattern-edit-result-status">{result.status}</span>
+        <span data-testid="pattern-edit-result-scope">{result.scope}</span>
+        <span data-testid="pattern-edit-result-impact">{result.impact}</span>
+      </div>
+      <div className="pattern-stack-result-metrics" data-testid="pattern-edit-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`pattern-edit-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="pattern-stack-result-followup" data-testid="pattern-edit-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="pattern-edit-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="pattern-edit-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
     </div>
