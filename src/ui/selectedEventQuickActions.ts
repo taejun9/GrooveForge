@@ -1,9 +1,11 @@
 import {
   ChordEvent,
+  ChordQuality,
   PatternData,
   ProjectState,
   chordInversionLabel,
   chordInversions,
+  chordQualities,
   defaultDrumVelocity,
   drumStepProbability,
   drumStepTimingMs,
@@ -17,6 +19,7 @@ import {
   normalizeDrumVelocity,
   normalizeEventProbability,
   normalizeHatRepeat,
+  scalePitchNames,
   steps
 } from "../domain/workstation";
 import {
@@ -79,6 +82,8 @@ type SelectedEventQuickActionsParams = {
   onAuditionSelectedChord: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
+  onUpdateSelectedChordRoot: (root: string) => void;
+  onUpdateSelectedChordQuality: (quality: ChordQuality) => void;
   onUpdateSelectedChordLength: (length: number) => void;
   onUpdateSelectedChordVelocity: (velocity: number) => void;
   onUpdateSelectedChordProbability: (probability: number) => void;
@@ -129,6 +134,8 @@ export function createSelectedEventQuickActions({
   onAuditionSelectedChord,
   onMoveSelectedChordStep,
   onMoveSelectedChordInversion,
+  onUpdateSelectedChordRoot,
+  onUpdateSelectedChordQuality,
   onUpdateSelectedChordLength,
   onUpdateSelectedChordVelocity,
   onUpdateSelectedChordProbability,
@@ -224,6 +231,19 @@ export function createSelectedEventQuickActions({
   const selectedChordVelocityDefault = selectedChord && selectedChordActive ? clampVelocity(selectedChordDefaultVelocity) : null;
   const selectedChordProbability =
     selectedChord && selectedChordActive ? normalizeEventProbability(selectedChord.probability) : null;
+  const selectedChordScaleRoots = scalePitchNames(project.key);
+  const selectedChordRootIndex = selectedChord ? selectedChordScaleRoots.indexOf(selectedChord.root) : -1;
+  const selectedChordRootDown =
+    selectedChord && selectedChordRootIndex > 0 ? selectedChordScaleRoots[selectedChordRootIndex - 1] : null;
+  const selectedChordRootUp =
+    selectedChord && selectedChordRootIndex >= 0 && selectedChordRootIndex < selectedChordScaleRoots.length - 1
+      ? selectedChordScaleRoots[selectedChordRootIndex + 1]
+      : null;
+  const selectedChordQualityIndex = selectedChord ? chordQualities.indexOf(selectedChord.quality) : -1;
+  const selectedChordNextQuality =
+    selectedChord && selectedChordQualityIndex >= 0
+      ? chordQualities[(selectedChordQualityIndex + 1) % chordQualities.length]
+      : chordQualities[0];
   const selectedChordMaxLength = selectedChord ? Math.max(1, steps.length - selectedChord.step) : 1;
   const selectedChordLength =
     selectedChord && selectedChordActive ? Math.min(clampStepLength(selectedChord.length), selectedChordMaxLength) : null;
@@ -709,6 +729,49 @@ export function createSelectedEventQuickActions({
         selectedChord.step >= steps.length - 1 ||
         selectedPatternData.chordEvents.some((chord) => chord.step === selectedChord.step + 1),
       run: () => onMoveSelectedChordStep(1)
+    },
+    {
+      id: "selected-chord-root-down",
+      title: "Move selected chord root down",
+      detail:
+        selectedChordRootDown !== null
+          ? `${selectedChordLabel} root ${selectedChord?.root ?? "-"} -> ${selectedChordRootDown} / ${project.key}`
+          : selectedChord && selectedChordRootIndex < 0
+            ? `${selectedChordLabel} is outside ${project.key} scale roots.`
+            : selectedChord
+            ? `${selectedChordLabel} has no lower ${project.key} scale root.`
+            : "Select a chord first.",
+      group: "Create",
+      keywords: "selected chord root down lower scale harmony progression edit beginner producer",
+      disabled: !selectedChordActive || selectedChordRootDown === null,
+      run: () => selectedChordRootDown !== null && onUpdateSelectedChordRoot(selectedChordRootDown)
+    },
+    {
+      id: "selected-chord-root-up",
+      title: "Move selected chord root up",
+      detail:
+        selectedChordRootUp !== null
+          ? `${selectedChordLabel} root ${selectedChord?.root ?? "-"} -> ${selectedChordRootUp} / ${project.key}`
+          : selectedChord && selectedChordRootIndex < 0
+            ? `${selectedChordLabel} is outside ${project.key} scale roots.`
+            : selectedChord
+            ? `${selectedChordLabel} has no higher ${project.key} scale root.`
+            : "Select a chord first.",
+      group: "Create",
+      keywords: "selected chord root up higher scale harmony progression edit beginner producer",
+      disabled: !selectedChordActive || selectedChordRootUp === null,
+      run: () => selectedChordRootUp !== null && onUpdateSelectedChordRoot(selectedChordRootUp)
+    },
+    {
+      id: "selected-chord-quality-cycle",
+      title: "Cycle selected chord quality",
+      detail: selectedChordActive
+        ? `${selectedChordLabel} quality ${selectedChord?.quality ?? "maj"} -> ${selectedChordNextQuality}`
+        : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord quality cycle major minor seventh sus dim color harmony progression edit beginner producer",
+      disabled: !selectedChordActive,
+      run: () => onUpdateSelectedChordQuality(selectedChordNextQuality)
     },
     {
       id: "selected-chord-inversion-down",

@@ -160,6 +160,8 @@ Quick Actions selected-event reset commands restore selected 808/Synth note chan
 
 Quick Actions selected-event velocity reset commands restore selected 808/Synth note velocity to the current Keyboard Capture default, selected drum velocity to its lane/step default, and selected chord velocity to 50% through the existing undoable selected-event velocity handlers.
 
+Quick Actions selected-chord harmony commands move the selected chord root down/up through the current key's scale roots and cycle the selected chord quality through the existing chord quality palette using the same undoable selected-chord edit path as visible chord controls.
+
 ## Core Direction
 
 - Keep product behavior grounded in the project brief and official sources where applicable.

@@ -4708,6 +4708,32 @@ export function App(): ReactElement {
     );
   }
 
+  function updateSelectedChordRoot(root: string): void {
+    if (selectedChordIndex === null || !selectedChord) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+
+    updateChordEvent(
+      selectedChordIndex,
+      { root },
+      "Edited chord root"
+    );
+  }
+
+  function updateSelectedChordQuality(quality: ChordQuality): void {
+    if (selectedChordIndex === null || !selectedChord) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+
+    updateChordEvent(
+      selectedChordIndex,
+      { quality },
+      "Edited chord quality"
+    );
+  }
+
   function updateSelectedChordLength(length: number): void {
     if (selectedChordIndex === null || !selectedChord) {
       setProjectStatus("Select a chord event");
@@ -5881,6 +5907,8 @@ export function App(): ReactElement {
     onDuplicateSelectedChord: duplicateSelectedChord,
     onDeleteSelectedChord: deleteSelectedChordEvent,
     onMoveSelectedChordInversion: moveSelectedChordInversion,
+    onUpdateSelectedChordRoot: updateSelectedChordRoot,
+    onUpdateSelectedChordQuality: updateSelectedChordQuality,
     onUpdateSelectedChordLength: updateSelectedChordLength,
     onUpdateSelectedChordVelocity: updateSelectedChordVelocity,
     onUpdateSelectedChordProbability: updateSelectedChordProbability,
@@ -11650,6 +11678,8 @@ function createQuickActions({
   onDuplicateSelectedChord,
   onDeleteSelectedChord,
   onMoveSelectedChordInversion,
+  onUpdateSelectedChordRoot,
+  onUpdateSelectedChordQuality,
   onUpdateSelectedChordLength,
   onUpdateSelectedChordVelocity,
   onUpdateSelectedChordProbability,
@@ -11862,6 +11892,8 @@ function createQuickActions({
   onDuplicateSelectedChord: () => void;
   onDeleteSelectedChord: () => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
+  onUpdateSelectedChordRoot: (root: string) => void;
+  onUpdateSelectedChordQuality: (quality: ChordQuality) => void;
   onUpdateSelectedChordLength: (length: number) => void;
   onUpdateSelectedChordVelocity: (velocity: number) => void;
   onUpdateSelectedChordProbability: (probability: number) => void;
@@ -12351,6 +12383,8 @@ function createQuickActions({
       onAuditionSelectedChord,
       onMoveSelectedChordStep,
       onMoveSelectedChordInversion,
+      onUpdateSelectedChordRoot,
+      onUpdateSelectedChordQuality,
       onUpdateSelectedChordLength,
       onUpdateSelectedChordVelocity,
       onUpdateSelectedChordProbability,
