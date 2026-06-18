@@ -7226,6 +7226,7 @@ export function App(): ReactElement {
     mixSnapshots,
     modeFocusSummary,
     patternCloneOptions,
+    patternStackOptions,
     patternStackPreviewSummary,
     patternDnaSummary,
     playbackMode,
@@ -12642,6 +12643,7 @@ function createQuickActions({
   mixSnapshots,
   modeFocusSummary,
   patternCloneOptions,
+  patternStackOptions,
   patternStackPreviewSummary,
   patternDnaSummary,
   playbackMode,
@@ -12804,6 +12806,7 @@ function createQuickActions({
   mixSnapshots: MixSnapshotSlotMap;
   modeFocusSummary: ModeFocusSummary;
   patternCloneOptions: PatternClonePadOption[];
+  patternStackOptions: PatternStackOption[];
   patternStackPreviewSummary: PatternStackPreviewSummary;
   patternDnaSummary: PatternDnaSummary;
   playbackMode: PlaybackMode;
@@ -13825,6 +13828,23 @@ function createQuickActions({
     patternStackPreviewSummary.stackId === "none" || patternStackPreviewSummary.statusLabel === "Stack aligned"
       ? null
       : patternStackPreviewSummary.stackId;
+  const patternStackActions: QuickAction[] = patternStackOptions.map((stack) => {
+    const moves = patternStackMoveCount(project.key, selectedPatternData, stack);
+    const aligned = moves.total === 0;
+    return {
+      id: `pattern-stack-pad-${stack.id}`,
+      title: aligned ? `${stack.label} stack already applied` : `Apply ${stack.label} stack`,
+      detail: `${stack.preview} / ${stack.bassCount} 808 / ${stack.chordCount} chords / ${stack.melodyCount} synth / B ${moves.bass} / C ${moves.chord} / S ${moves.melody}`,
+      group: "Create",
+      keywords: `pattern stack direct pad 808 bass chords synth melody sketch harmony ${stack.id} ${stack.label} ${stack.detail} ${stack.preview} beginner producer`,
+      disabled: aligned,
+      run: () => {
+        if (!aligned) {
+          onApplyPatternStack(stack.id);
+        }
+      }
+    };
+  });
   const soundFocusReady = soundFocusPreviewSummary.statusLabel !== "Sound aligned";
   const soundPresetReady = soundPresetPreviewSummary.statusLabel !== "Preset aligned";
   const handoffPackItems = createHandoffPackItems({
@@ -14262,6 +14282,7 @@ function createQuickActions({
         }
       }
     },
+    ...patternStackActions,
     {
       id: "drum-move",
       title: drumMoveTarget ? `Apply ${drumMoveTarget.label} Drum ${drumMoveTarget.kind}` : "Apply Drum Move",
@@ -15360,6 +15381,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("pattern-stack-pad-")) {
+    return {
+      id: "pattern-stack",
+      label: "Pattern stack",
+      value: action.detail
+    };
+  }
+
   if (action.id === "drum-move") {
     const pattern = activePattern(project);
     return {
@@ -15996,6 +16025,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear 808, Chords, and Synth against the drums before arranging.`,
       nextCheck: "Use the Pattern Stack Result, selected-note tools, and selected-chord tools for manual edits."
+    };
+  }
+
+  if (action.id.startsWith("pattern-stack-pad-")) {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; hear the chosen 808, chord, and Synth stack against the drums before arranging.`,
+      nextCheck: "Use Pattern Stack Result plus selected-note and selected-chord tools for manual edits."
     };
   }
 
