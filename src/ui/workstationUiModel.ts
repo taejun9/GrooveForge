@@ -2755,6 +2755,24 @@ export type HandoffManifestAuditSummary = {
   checks: HandoffManifestAuditCheck[];
 };
 
+export type HandoffExportFormatMetric = {
+  id: HandoffPackItem["id"];
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+export type HandoffExportFormatSummary = {
+  statusLabel: string;
+  titleLabel: string;
+  detailLabel: string;
+  durationLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+  metrics: HandoffExportFormatMetric[];
+};
+
 export type HandoffPackageCheckCardId = "files" | "order" | "receipt" | "context";
 export type HandoffPackageCheckFocusId = HandoffPackageCheckCardId;
 

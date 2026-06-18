@@ -9,6 +9,7 @@ import {
   Disc3,
   Download,
   Drum,
+  FileAudio,
   FolderOpen,
   Gauge,
   KeyboardMusic,
@@ -491,6 +492,7 @@ import type {
   HandoffPackSendOrderSummary,
   HandoffExportReceipt,
   HandoffFileManifestItem,
+  HandoffExportFormatSummary,
   HandoffManifestAuditCheck,
   HandoffManifestAuditSummary,
   HandoffPackageCheckCard,
@@ -11116,6 +11118,7 @@ function HandoffPack({
   const receiptSummary = exportReceipt ?? emptyHandoffExportReceipt();
   const fileManifest = createHandoffFileManifest(project, stemAnalyses, items);
   const manifestAudit = createHandoffManifestAudit(project, items, fileManifest, receiptSummary, sendOrderSummary);
+  const formatSummary = createHandoffExportFormatSummary(project, analysis, stemAnalyses, items);
   const packageFocusSummary = createHandoffPackageCheckFocusSummary(packageCheckSummary, focusedPackageCheckId);
 
   return (
@@ -11197,6 +11200,31 @@ function HandoffPack({
               <b>{check.label}</b>
               <strong>{check.statusLabel}</strong>
               <small>{check.fileLabel}</small>
+            </span>
+          ))}
+        </div>
+      </div>
+      <div
+        aria-label={formatSummary.detailTitle}
+        className={`handoff-export-format ${formatSummary.tone}`}
+        data-testid="handoff-export-format"
+        title={formatSummary.detailTitle}
+      >
+        <div className="handoff-export-format-main">
+          <FileAudio size={14} aria-hidden="true" />
+          <span>
+            <b data-testid="handoff-export-format-status">{formatSummary.statusLabel}</b>
+            <strong data-testid="handoff-export-format-title">{formatSummary.titleLabel}</strong>
+            <small data-testid="handoff-export-format-detail">{formatSummary.detailLabel}</small>
+          </span>
+          <em data-testid="handoff-export-format-duration">{formatSummary.durationLabel}</em>
+        </div>
+        <div className="handoff-export-format-metrics" data-testid="handoff-export-format-metrics">
+          {formatSummary.metrics.map((metric) => (
+            <span className={metric.tone} data-testid={`handoff-export-format-${metric.id}`} key={metric.id} title={metric.detail}>
+              <b>{metric.label}</b>
+              <strong>{metric.value}</strong>
+              <small>{metric.detail}</small>
             </span>
           ))}
         </div>
@@ -19919,6 +19947,82 @@ function createHandoffManifestAudit(
     tone,
     checks
   };
+}
+
+function createHandoffExportFormatSummary(
+  project: ProjectState,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses,
+  items: HandoffPackItem[]
+): HandoffExportFormatSummary {
+  const bars = arrangementTotalBars(project);
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const stemFiles = stemWavFileNames(project);
+  const target = activeDeliveryTarget(project);
+  const briefFields = sessionBriefFilledFields(project.sessionBrief);
+  const formatLabel = `${sampleRateLabel(analysis.sampleRate)} ${channelCountLabel(analysis.channels)} WAV`;
+  const durationLabel = `${formatExportDuration(analysis.durationSeconds)} / ${barCountLabel(bars)}`;
+  const exportTone = analysis.status === "Silent" ? "danger" : analysis.status === "Ready" ? "good" : "warn";
+  const stemTone = audibleStems.length === stemTrackIds.length ? "good" : audibleStems.length > 0 ? "warn" : "danger";
+  const midiTone: MixCoachTone = bars >= 8 ? "good" : bars >= 4 ? "warn" : "danger";
+  const sheetTone: MixCoachTone = briefFields >= 2 ? "good" : briefFields >= 1 ? "warn" : "danger";
+  const tone = weakestTone([exportTone, stemTone, midiTone, sheetTone, ...items.map((item) => item.tone)]);
+  const statusLabel = tone === "good" ? "Format ready" : tone === "warn" ? "Format review" : "Format blocker";
+  const stemDetail = audibleStems.length > 0 ? audibleStems.map(stemTrackLabel).join("/") : "No audible stems";
+
+  return {
+    statusLabel,
+    titleLabel: formatLabel,
+    detailLabel: `${mixWavFileName(project)} / ${stemFiles.length} stems / ${midiFileName(project)}`,
+    durationLabel,
+    detailTitle: `${statusLabel} / ${formatLabel} / ${durationLabel} / ${mixWavFileName(project)} / ${stemFiles.length} stem WAVs / ${midiFileName(project)} / ${handoffSheetFileName(project)}`,
+    tone,
+    metrics: [
+      {
+        id: "wav",
+        label: "Mix WAV",
+        value: analysis.status,
+        detail: `${formatLabel} / ${mixWavFileName(project)}`,
+        tone: exportTone
+      },
+      {
+        id: "stems",
+        label: "Stem WAVs",
+        value: `${audibleStems.length}/${stemTrackIds.length} audible`,
+        detail: `${stemFiles.length} files / ${stemDetail}`,
+        tone: stemTone
+      },
+      {
+        id: "midi",
+        label: "MIDI",
+        value: barCountLabel(bars),
+        detail: midiFileName(project),
+        tone: midiTone
+      },
+      {
+        id: "sheet",
+        label: "Sheet",
+        value: `${briefFields}/4 brief`,
+        detail: `${target.name} / ${handoffSheetFileName(project)}`,
+        tone: sheetTone
+      }
+    ]
+  };
+}
+
+function sampleRateLabel(sampleRate: number): string {
+  return sampleRate % 1000 === 0 ? `${sampleRate / 1000} kHz` : `${(sampleRate / 1000).toFixed(1)} kHz`;
+}
+
+function channelCountLabel(channels: number): string {
+  return channels === 1 ? "mono" : channels === 2 ? "stereo" : `${channels}ch`;
+}
+
+function formatExportDuration(durationSeconds: number): string {
+  const boundedSeconds = Math.max(0, Math.round(durationSeconds));
+  const minutes = Math.floor(boundedSeconds / 60);
+  const seconds = boundedSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function createHandoffManifestAuditCheck(
