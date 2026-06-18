@@ -25,6 +25,7 @@ import {
 import {
   adjacentTrackPitch,
   matchesSelectedNote,
+  keyboardCapturePitchLanes,
   nextEmptyChordStep,
   nextEmptyDrumStep,
   nextEmptyStepForPitch,
@@ -62,6 +63,7 @@ type SelectedEventQuickActionsParams = {
   onAuditionSelectedNote: () => void;
   onMoveSelectedNoteStep: (direction: -1 | 1) => void;
   onMoveSelectedNotePitch: (direction: -1 | 1) => void;
+  onResetSelectedNotePitch: () => void;
   onMoveSelectedNoteOctave: (direction: -1 | 1) => void;
   onUpdateSelectedNoteLength: (length: number) => void;
   onUpdateSelectedNoteGlide: (glide: boolean) => void;
@@ -117,6 +119,7 @@ export function createSelectedEventQuickActions({
   onAuditionSelectedNote,
   onMoveSelectedNoteStep,
   onMoveSelectedNotePitch,
+  onResetSelectedNotePitch,
   onMoveSelectedNoteOctave,
   onUpdateSelectedNoteLength,
   onUpdateSelectedNoteGlide,
@@ -185,6 +188,17 @@ export function createSelectedEventQuickActions({
     selectedNote && selectedNoteActive
       ? adjacentTrackPitch(selectedNote.track, project.key, selectedNote.pitch, 1, selectedNoteUsedPitches)
       : null;
+  const selectedNoteDefaultPitch =
+    selectedNote && selectedNoteActive
+      ? keyboardCapturePitchLanes(project.key, selectedNote.track, keyboardCaptureDefaults[selectedNote.track])[0] ?? null
+      : null;
+  const selectedNoteDefaultPitchOccupied = Boolean(
+    selectedNote &&
+      selectedNoteDefaultPitch &&
+      (selectedNote.track === "bass" ? selectedPatternData.bassNotes : selectedPatternData.melodyNotes).some(
+        (note) => !matchesSelectedNote(note, selectedNote) && note.step === selectedNote.step && note.pitch === selectedNoteDefaultPitch
+      )
+  );
   const selectedNoteOctaveDown =
     selectedNote && selectedNoteActive ? octaveShiftPitch(selectedNote.track, selectedNote.pitch, -1) : null;
   const selectedNoteOctaveUp =
@@ -338,6 +352,24 @@ export function createSelectedEventQuickActions({
       keywords: "selected note pitch up higher scale 808 synth edit keyboard capture midi beginner producer",
       disabled: !selectedNoteActive || !selectedNotePitchUp,
       run: () => onMoveSelectedNotePitch(1)
+    },
+    {
+      id: "selected-note-pitch-reset",
+      title: "Reset selected note pitch",
+      detail:
+        selectedNoteActive && selectedNoteDefaultPitch
+          ? selectedNoteDefaultPitchOccupied
+            ? `${selectedNoteDefaultPitch}.${(selectedNote?.step ?? 0) + 1} already exists.`
+            : `${selectedNoteLabel} -> ${selectedNoteDefaultPitch} / ${project.key} default`
+          : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note pitch reset default tonic root keyboard capture scale 808 synth edit beginner producer",
+      disabled:
+        !selectedNoteActive ||
+        !selectedNoteDefaultPitch ||
+        selectedNote?.pitch === selectedNoteDefaultPitch ||
+        selectedNoteDefaultPitchOccupied,
+      run: onResetSelectedNotePitch
     },
     {
       id: "selected-note-octave-down",

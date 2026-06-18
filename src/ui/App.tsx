@@ -4277,6 +4277,25 @@ export function App(): ReactElement {
     moveSelectedNoteTo(selectedNote.step, nextPitch, direction < 0 ? "Moved note down" : "Moved note up");
   }
 
+  function resetSelectedNotePitch(): void {
+    if (!selectedNote) {
+      setProjectStatus("Select an 808 or Synth note");
+      return;
+    }
+
+    const defaultPitch = keyboardCapturePitchLanes(
+      projectRef.current.key,
+      selectedNote.track,
+      keyboardCaptureDefaults[selectedNote.track]
+    )[0];
+    if (!defaultPitch) {
+      setProjectStatus("No default pitch available");
+      return;
+    }
+
+    moveSelectedNoteTo(selectedNote.step, defaultPitch, "Reset note pitch");
+  }
+
   function moveSelectedNoteOctave(direction: -1 | 1): void {
     if (!selectedNote) {
       setProjectStatus("Select an 808 or Synth note");
@@ -6010,6 +6029,7 @@ export function App(): ReactElement {
     onDeleteArrangementBlock: deleteArrangementBlock,
     onMoveSelectedNoteStep: moveSelectedNoteStep,
     onMoveSelectedNotePitch: moveSelectedNotePitch,
+    onResetSelectedNotePitch: resetSelectedNotePitch,
     onMoveSelectedNoteOctave: moveSelectedNoteOctave,
     onUpdateSelectedNoteLength: updateSelectedLength,
     onUpdateSelectedNoteGlide: updateSelectedGlide,
@@ -11784,6 +11804,7 @@ function createQuickActions({
   onDeleteArrangementBlock,
   onMoveSelectedNoteStep,
   onMoveSelectedNotePitch,
+  onResetSelectedNotePitch,
   onMoveSelectedNoteOctave,
   onUpdateSelectedNoteLength,
   onUpdateSelectedNoteGlide,
@@ -12001,6 +12022,7 @@ function createQuickActions({
   onDeleteArrangementBlock: () => void;
   onMoveSelectedNoteStep: (direction: -1 | 1) => void;
   onMoveSelectedNotePitch: (direction: -1 | 1) => void;
+  onResetSelectedNotePitch: () => void;
   onMoveSelectedNoteOctave: (direction: -1 | 1) => void;
   onUpdateSelectedNoteLength: (length: number) => void;
   onUpdateSelectedNoteGlide: (glide: boolean) => void;
@@ -12500,6 +12522,7 @@ function createQuickActions({
       onAuditionSelectedNote,
       onMoveSelectedNoteStep,
       onMoveSelectedNotePitch,
+      onResetSelectedNotePitch,
       onMoveSelectedNoteOctave,
       onUpdateSelectedNoteLength,
       onUpdateSelectedNoteGlide,
