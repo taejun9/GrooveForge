@@ -13002,6 +13002,14 @@ function createQuickActions({
     run: () => onFocusBeatPassport(metric)
   }));
   const firstBeatPathStep = activeFirstBeatPathQuickActionStep(firstBeatPathSummary);
+  const firstBeatPathActions: QuickAction[] = firstBeatPathSummary.steps.map((step) => ({
+    id: `first-beat-path-step-${step.id}`,
+    title: `Jump First Beat Path: ${step.label}`,
+    detail: `${step.value} / ${step.detail} / ${firstBeatPathSummary.countLabel}`,
+    group: "Project",
+    keywords: `first beat path direct step jump setup compose arrange mix deliver ${step.id} ${step.label} ${step.value} ${step.jumpLabel} ${step.detail} beginner producer`,
+    run: () => onJumpFirstBeatPath(step.target)
+  }));
   const beatSpineCard = activeBeatSpineQuickActionCard(beatSpineSummary);
   const beatSpineApplyCard = activeBeatSpineQuickActionApplyCard(beatSpineSummary);
   const composerGuideCard = activeComposerGuideQuickActionCard(composerGuideSummary);
@@ -14152,6 +14160,7 @@ function createQuickActions({
         }
       }
     },
+    ...firstBeatPathActions,
     {
       id: "beat-spine-jump",
       title: beatSpineCard ? `Jump Beat Spine: ${beatSpineCard.label}` : "Jump Beat Spine",
@@ -14961,6 +14970,7 @@ function createQuickActionResult(
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
     action.id === "first-beat-path-jump" ||
+    action.id.startsWith("first-beat-path-step-") ||
     action.id === "composer-guide-focus" ||
     action.id.startsWith("composer-guide-card-") ||
     action.id === "style-inspector-focus" ||
@@ -15072,6 +15082,14 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "first-beat-path-jump") {
+    return {
+      id: "first-beat-path",
+      label: "First Beat Path",
+      value: action.detail
+    };
+  }
+
+  if (action.id.startsWith("first-beat-path-step-")) {
     return {
       id: "first-beat-path",
       label: "First Beat Path",
@@ -15737,6 +15755,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the jumped First Beat Path panel area to handle the highlighted setup, compose, arrange, mix, or deliver step.",
       nextCheck: "Return to First Beat Path after the highlighted step looks ready, then run the command again for the next beat-making step."
+    };
+  }
+
+  if (action.id.startsWith("first-beat-path-step-")) {
+    return {
+      auditionCue: "Use the selected First Beat Path stage to handle setup, compose, arrange, mix, or deliver work without changing project data.",
+      nextCheck: "Return to First Beat Path when you need another direct stage jump or the next highlighted beat-making step."
     };
   }
 
