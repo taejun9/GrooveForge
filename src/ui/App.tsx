@@ -3730,6 +3730,49 @@ export function App(): ReactElement {
     }
   }
 
+  function duplicateSelectedDrumHitToStep(step: number): void {
+    const target = selectedDrumStep;
+    if (!target || !selectedDrumActive) {
+      setProjectStatus("Select an active drum step");
+      return;
+    }
+
+    const nextStep = clampStepStart(step);
+    const pattern = activePattern(projectRef.current);
+    if (!pattern.drumPattern[target.lane][target.step]) {
+      setProjectStatus("Select an active drum step");
+      return;
+    }
+    if (nextStep <= target.step || nextStep >= steps.length || nextStep % 4 !== 0) {
+      setProjectStatus("No beat-grid duplicate step");
+      return;
+    }
+    if (pattern.drumPattern[target.lane][nextStep]) {
+      setProjectStatus(`${drumLabels[target.lane]} step ${nextStep + 1} already has a hit`);
+      return;
+    }
+
+    const hit: DrumClipboard = {
+      lane: target.lane,
+      step: target.step,
+      velocity: drumStepVelocity(pattern, target.lane, target.step),
+      probability: drumStepProbability(pattern, target.lane, target.step),
+      timingMs: drumStepTimingMs(pattern, target.lane, target.step),
+      hatRepeat: target.lane === "hat" ? hatRepeatCount(pattern, target.step) : 1
+    };
+
+    const changed = updateCurrentPattern(
+      (currentPatternData) => writeDrumHitAtStep(currentPatternData, hit, nextStep),
+      `Duplicated ${drumLabels[target.lane]} hit on beat`
+    );
+
+    if (changed) {
+      setSelectedDrumStep({ lane: target.lane, step: nextStep });
+      setSelectedNote(null);
+      setSelectedChordIndex(null);
+    }
+  }
+
   function pasteCopiedDrumHit(): void {
     const clipboard = drumClipboard;
     if (!clipboard) {
@@ -6184,6 +6227,7 @@ export function App(): ReactElement {
     onCopySelectedDrumHit: copySelectedDrumHit,
     onPasteCopiedDrumHit: pasteCopiedDrumHit,
     onDuplicateSelectedDrumHit: duplicateSelectedDrumHit,
+    onDuplicateSelectedDrumHitToStep: duplicateSelectedDrumHitToStep,
     onDeleteSelectedDrumHit: clearSelectedDrumStep,
     onMoveSelectedChordStep: moveSelectedChordStep,
     onUpdateSelectedChordStep: updateSelectedChordStep,
@@ -11963,6 +12007,7 @@ function createQuickActions({
   onCopySelectedDrumHit,
   onPasteCopiedDrumHit,
   onDuplicateSelectedDrumHit,
+  onDuplicateSelectedDrumHitToStep,
   onDeleteSelectedDrumHit,
   onMoveSelectedChordStep,
   onUpdateSelectedChordStep,
@@ -12185,6 +12230,7 @@ function createQuickActions({
   onCopySelectedDrumHit: () => void;
   onPasteCopiedDrumHit: () => void;
   onDuplicateSelectedDrumHit: () => void;
+  onDuplicateSelectedDrumHitToStep: (step: number) => void;
   onDeleteSelectedDrumHit: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
   onUpdateSelectedChordStep: (step: number) => void;
@@ -12688,6 +12734,7 @@ function createQuickActions({
       onCopySelectedDrumHit,
       onPasteCopiedDrumHit,
       onDuplicateSelectedDrumHit,
+      onDuplicateSelectedDrumHitToStep,
       onDeleteSelectedDrumHit,
       onAuditionSelectedChord,
       onMoveSelectedChordStep,

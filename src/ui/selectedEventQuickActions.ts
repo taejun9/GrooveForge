@@ -86,6 +86,7 @@ type SelectedEventQuickActionsParams = {
   onCopySelectedDrumHit: () => void;
   onPasteCopiedDrumHit: () => void;
   onDuplicateSelectedDrumHit: () => void;
+  onDuplicateSelectedDrumHitToStep: (step: number) => void;
   onDeleteSelectedDrumHit: () => void;
   onAuditionSelectedChord: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
@@ -146,6 +147,7 @@ export function createSelectedEventQuickActions({
   onCopySelectedDrumHit,
   onPasteCopiedDrumHit,
   onDuplicateSelectedDrumHit,
+  onDuplicateSelectedDrumHitToStep,
   onDeleteSelectedDrumHit,
   onAuditionSelectedChord,
   onMoveSelectedChordStep,
@@ -304,9 +306,22 @@ export function createSelectedEventQuickActions({
   const drumClipboardPasteStep = drumClipboard ? nextEmptyDrumStep(selectedPatternData, drumClipboard.lane, drumClipboard.step) : null;
   const selectedDrumDuplicateStep =
     selectedDrumStep && selectedDrumActive ? nextEmptyDrumStep(selectedPatternData, selectedDrumStep.lane, selectedDrumStep.step) : null;
+  const selectedDrumBeatDuplicateStep =
+    selectedDrumStep && selectedDrumActive
+      ? steps.find(
+          (step) =>
+            step > selectedDrumStep.step &&
+            step % 4 === 0 &&
+            !selectedPatternData.drumPattern[selectedDrumStep.lane][step]
+        ) ?? null
+      : null;
   const selectedDrumDuplicateLabel =
     selectedDrumStep && selectedDrumDuplicateStep !== null
       ? `${drumLabels[selectedDrumStep.lane]} ${selectedDrumDuplicateStep + 1}`
+      : "";
+  const selectedDrumBeatDuplicateLabel =
+    selectedDrumStep && selectedDrumBeatDuplicateStep !== null
+      ? `${drumLabels[selectedDrumStep.lane]} ${selectedDrumBeatDuplicateStep + 1}`
       : "";
   const selectedChordActive = Boolean(
     selectedChord && selectedPatternData.chordEvents.some((chord) => sameChordEvent(chord, selectedChord))
@@ -932,6 +947,23 @@ export function createSelectedEventQuickActions({
       keywords: "selected drum duplicate repeat clone hit next empty dynamics timing chance repeat pocket edit beginner producer",
       disabled: !selectedDrumActive || selectedDrumDuplicateStep === null,
       run: onDuplicateSelectedDrumHit
+    },
+    {
+      id: "selected-drum-duplicate-beat",
+      title: "Duplicate selected drum hit to beat",
+      detail: !selectedDrumActive
+        ? "Select an active drum hit first."
+        : selectedDrumBeatDuplicateStep === null
+          ? `${selectedDrumLabel} has no later empty 4-step beat slot.`
+          : `${selectedDrumLabel} -> ${selectedDrumBeatDuplicateLabel} / Pattern ${project.selectedPattern}`,
+      group: "Create",
+      keywords: "selected drum duplicate beat grid repeat clone 4-step anchor hit dynamics timing chance pocket edit beginner producer",
+      disabled: !selectedDrumActive || selectedDrumBeatDuplicateStep === null,
+      run: () => {
+        if (selectedDrumBeatDuplicateStep !== null) {
+          onDuplicateSelectedDrumHitToStep(selectedDrumBeatDuplicateStep);
+        }
+      }
     },
     {
       id: "selected-drum-delete",
