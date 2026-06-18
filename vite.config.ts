@@ -34,6 +34,16 @@ export default defineConfig({
               name: "workstation-core",
               test: /src[\\/]domain[\\/]/,
               priority: 2
+            },
+            {
+              name: "workstation-ui-model",
+              test: /src[\\/]ui[\\/]workstationUiModel\.ts$/,
+              priority: 2
+            },
+            {
+              name: "workstation-pattern-tools",
+              test: /src[\\/]ui[\\/]workstationPatternTools\.ts$/,
+              priority: 2
             }
           ]
         }
