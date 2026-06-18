@@ -218,6 +218,7 @@ export function LocalDraftRecoveryBanner({
 
 export function QuickActions({
   actions,
+  inspectedPinnedActionId,
   open,
   pinnedActionIds,
   query,
@@ -226,12 +227,14 @@ export function QuickActions({
   scope,
   scopeOptions,
   onClose,
+  onInspectPinnedAction,
   onQueryChange,
   onRun,
   onScopeChange,
   onTogglePin
 }: {
   actions: QuickAction[];
+  inspectedPinnedActionId: string | null;
   open: boolean;
   pinnedActionIds: string[];
   query: string;
@@ -240,6 +243,7 @@ export function QuickActions({
   scope: QuickActionScopeId;
   scopeOptions: QuickActionScopeOption[];
   onClose: () => void;
+  onInspectPinnedAction: (actionId: string | null) => void;
   onQueryChange: (query: string) => void;
   onRun: (action: QuickAction) => void;
   onScopeChange: (scope: QuickActionScopeId) => void;
@@ -253,6 +257,7 @@ export function QuickActions({
   const spotlight = createQuickActionSpotlightSummary(actions, firstRunnableAction, scope, scopeOptions, query);
   const pinnedActions = createQuickActionPinnedOptions(pinnedActionIds, recentActionSource);
   const recentActions = createQuickActionRecentOptions(recents, recentActionSource);
+  const inspectedPinnedAction = pinnedActions.find((action) => action.id === inspectedPinnedActionId) ?? null;
 
   return (
     <div
@@ -353,6 +358,18 @@ export function QuickActions({
                     <small>{action.disabled ? "Unavailable now" : "Pinned"}</small>
                   </button>
                   <button
+                    aria-label={`Inspect ${action.title}`}
+                    aria-pressed={inspectedPinnedAction?.id === action.id}
+                    className={`quick-action-pin-toggle ${inspectedPinnedAction?.id === action.id ? "selected" : ""}`}
+                    data-testid={`quick-actions-pinned-inspect-${action.id}`}
+                    onClick={() => onInspectPinnedAction(inspectedPinnedAction?.id === action.id ? null : action.id)}
+                    title={`Inspect ${action.title}`}
+                    type="button"
+                  >
+                    <CircleHelp size={14} aria-hidden="true" />
+                    <span>Info</span>
+                  </button>
+                  <button
                     aria-label={`Unpin ${action.title}`}
                     className="quick-action-pin-toggle selected"
                     data-testid={`quick-actions-pinned-unpin-${action.id}`}
@@ -367,6 +384,33 @@ export function QuickActions({
               ))
             )}
           </div>
+          {inspectedPinnedAction && (
+            <div
+              className={`quick-actions-pinned-inspector ${inspectedPinnedAction.disabled ? "warn" : "good"}`}
+              data-inspected-action={inspectedPinnedAction.id}
+              data-testid="quick-actions-pinned-inspector"
+            >
+              <div>
+                <span data-testid="quick-actions-pinned-inspector-status">
+                  {inspectedPinnedAction.disabled ? "Unavailable pinned command" : "Pinned command ready"}
+                </span>
+                <strong data-testid="quick-actions-pinned-inspector-title">{inspectedPinnedAction.title}</strong>
+                <small data-testid="quick-actions-pinned-inspector-detail">
+                  {inspectedPinnedAction.group} / {inspectedPinnedAction.detail}
+                </small>
+              </div>
+              <button
+                data-testid="quick-actions-pinned-inspector-run"
+                disabled={inspectedPinnedAction.disabled}
+                onClick={() => onRun(inspectedPinnedAction)}
+                title={`Run inspected pinned command: ${inspectedPinnedAction.detail}`}
+                type="button"
+              >
+                <Play size={14} aria-hidden="true" />
+                <span>Run</span>
+              </button>
+            </div>
+          )}
         </div>
         <div className="quick-actions-recents" data-testid="quick-actions-recents" aria-label="Recent Quick Actions">
           <div className="quick-actions-recents-head">

@@ -961,6 +961,7 @@ export function App(): ReactElement {
   const [quickActionScope, setQuickActionScope] = useState<QuickActionScopeId>("all");
   const [quickActionRecents, setQuickActionRecents] = useState<QuickActionRecent[]>([]);
   const [quickActionPinnedIds, setQuickActionPinnedIds] = useState<string[]>([]);
+  const [inspectedQuickActionPinnedId, setInspectedQuickActionPinnedId] = useState<string | null>(null);
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
@@ -5635,6 +5636,9 @@ export function App(): ReactElement {
       }
       return [action.id, ...normalizedIds].slice(0, maxQuickActionPins);
     });
+    if (quickActionPinnedIds.includes(action.id)) {
+      setInspectedQuickActionPinnedId((inspectedId) => (inspectedId === action.id ? null : inspectedId));
+    }
     setProjectStatus(`Quick Action ${quickActionPinnedIds.includes(action.id) ? "unpinned" : "pinned"}: ${action.title}`);
   }
 
@@ -5843,7 +5847,15 @@ export function App(): ReactElement {
   });
   useEffect(() => {
     setQuickActionPinnedIds((pinnedIds) => normalizeQuickActionPinnedIds(pinnedIds, quickActions));
+    setInspectedQuickActionPinnedId((inspectedId) =>
+      inspectedId && quickActions.some((action) => action.id === inspectedId) ? inspectedId : null
+    );
   }, [quickActions]);
+  useEffect(() => {
+    setInspectedQuickActionPinnedId((inspectedId) =>
+      inspectedId && quickActionPinnedIds.includes(inspectedId) ? inspectedId : null
+    );
+  }, [quickActionPinnedIds]);
   const quickActionScopeOptions = createQuickActionScopeOptions(quickActions, quickActionQuery);
   const filteredQuickActions = filterQuickActions(quickActions, quickActionQuery, quickActionScope);
 
@@ -6093,6 +6105,7 @@ export function App(): ReactElement {
       <QuickActions
         actions={filteredQuickActions}
         open={quickActionsOpen}
+        inspectedPinnedActionId={inspectedQuickActionPinnedId}
         pinnedActionIds={quickActionPinnedIds}
         query={quickActionQuery}
         recentActionSource={quickActions}
@@ -6102,6 +6115,7 @@ export function App(): ReactElement {
         onClose={closeQuickActions}
         onQueryChange={setQuickActionQuery}
         onRun={runQuickAction}
+        onInspectPinnedAction={setInspectedQuickActionPinnedId}
         onScopeChange={setQuickActionScope}
         onTogglePin={toggleQuickActionPin}
       />

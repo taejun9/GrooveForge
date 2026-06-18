@@ -3253,7 +3253,7 @@ h2 {
 
 .quick-actions-pinned-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-columns: minmax(0, 1fr) 34px 34px;
   gap: 6px;
   min-width: 0;
 }
@@ -3285,6 +3285,64 @@ h2 {
 .quick-actions-pinned-card > button:first-child strong {
   color: #f4efe7;
   font-size: 10px;
+}
+
+.quick-actions-pinned-inspector {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(240, 195, 106, 0.24);
+  border-radius: 7px;
+  background: rgba(240, 195, 106, 0.055);
+  padding: 8px;
+}
+
+.quick-actions-pinned-inspector.warn {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.055);
+}
+
+.quick-actions-pinned-inspector > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.quick-actions-pinned-inspector span,
+.quick-actions-pinned-inspector small {
+  overflow: hidden;
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-pinned-inspector strong {
+  overflow: hidden;
+  color: #f4efe7;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-pinned-inspector > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid rgba(240, 195, 106, 0.24);
+  border-radius: 6px;
+  background: rgba(17, 16, 15, 0.2);
+  color: #f4efe7;
+  font-size: 10px;
+}
+
+.quick-actions-pinned-inspector > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .quick-actions-recents-list button {
