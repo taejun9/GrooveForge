@@ -24,6 +24,7 @@ import {
   nextEmptyDrumStep,
   nextEmptyStepForPitch,
   octaveShiftPitch,
+  clampVelocity,
   percentLabel,
   sameChordEvent,
   timingLabel
@@ -51,6 +52,7 @@ type SelectedEventQuickActionsParams = {
   onMoveSelectedNoteStep: (direction: -1 | 1) => void;
   onMoveSelectedNotePitch: (direction: -1 | 1) => void;
   onMoveSelectedNoteOctave: (direction: -1 | 1) => void;
+  onUpdateSelectedNoteVelocity: (velocity: number) => void;
   onCopySelectedNote: () => void;
   onPasteCopiedNote: () => void;
   onDuplicateSelectedNote: () => void;
@@ -64,6 +66,7 @@ type SelectedEventQuickActionsParams = {
   onAuditionSelectedChord: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
+  onUpdateSelectedChordVelocity: (velocity: number) => void;
   onCopySelectedChord: () => void;
   onPasteCopiedChord: () => void;
   onDuplicateSelectedChord: () => void;
@@ -90,6 +93,7 @@ export function createSelectedEventQuickActions({
   onMoveSelectedNoteStep,
   onMoveSelectedNotePitch,
   onMoveSelectedNoteOctave,
+  onUpdateSelectedNoteVelocity,
   onCopySelectedNote,
   onPasteCopiedNote,
   onDuplicateSelectedNote,
@@ -103,6 +107,7 @@ export function createSelectedEventQuickActions({
   onAuditionSelectedChord,
   onMoveSelectedChordStep,
   onMoveSelectedChordInversion,
+  onUpdateSelectedChordVelocity,
   onCopySelectedChord,
   onPasteCopiedChord,
   onDuplicateSelectedChord
@@ -115,6 +120,13 @@ export function createSelectedEventQuickActions({
         ? selectedPatternData.bassNotes.some((note) => matchesSelectedNote(note, selectedNote))
         : selectedPatternData.melodyNotes.some((note) => matchesSelectedNote(note, selectedNote)))
   );
+  const selectedNoteEvent =
+    selectedNote && selectedNoteActive
+      ? selectedNote.track === "bass"
+        ? selectedPatternData.bassNotes.find((note) => matchesSelectedNote(note, selectedNote))
+        : selectedPatternData.melodyNotes.find((note) => matchesSelectedNote(note, selectedNote))
+      : undefined;
+  const selectedNoteVelocity = selectedNoteEvent ? clampVelocity(selectedNoteEvent.velocity) : null;
   const selectedNoteUsedPitches =
     selectedNote?.track === "bass"
       ? selectedPatternData.bassNotes.map((note) => note.pitch)
@@ -173,6 +185,7 @@ export function createSelectedEventQuickActions({
   const selectedChordLabel = selectedChord
     ? `${selectedChord.root}${selectedChord.quality}.${selectedChord.step + 1}`
     : "No selected chord";
+  const selectedChordVelocity = selectedChord && selectedChordActive ? clampVelocity(selectedChord.velocity) : null;
   const selectedChordInversion = selectedChord ? normalizeChordInversion(selectedChord.inversion) : 0;
   const selectedChordInversionIndex = chordInversions.indexOf(selectedChordInversion);
   const selectedChordInversionDown = selectedChordInversionIndex > 0 ? chordInversions[selectedChordInversionIndex - 1] : null;
@@ -264,6 +277,30 @@ export function createSelectedEventQuickActions({
       keywords: "selected note octave up higher 808 synth edit keyboard capture midi beginner producer",
       disabled: !selectedNoteActive || !selectedNoteOctaveUp,
       run: () => onMoveSelectedNoteOctave(1)
+    },
+    {
+      id: "selected-note-velocity-down",
+      title: "Soften selected note",
+      detail:
+        selectedNoteVelocity !== null
+          ? `${selectedNoteLabel} velocity ${percentLabel(selectedNoteVelocity)} -> ${percentLabel(clampVelocity(selectedNoteVelocity - 0.05))}`
+          : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note velocity down softer dynamics 808 synth edit keyboard capture midi beginner producer",
+      disabled: selectedNoteVelocity === null || selectedNoteVelocity <= 0,
+      run: () => selectedNoteVelocity !== null && onUpdateSelectedNoteVelocity(selectedNoteVelocity - 0.05)
+    },
+    {
+      id: "selected-note-velocity-up",
+      title: "Punch selected note",
+      detail:
+        selectedNoteVelocity !== null
+          ? `${selectedNoteLabel} velocity ${percentLabel(selectedNoteVelocity)} -> ${percentLabel(clampVelocity(selectedNoteVelocity + 0.05))}`
+          : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note velocity up louder punch dynamics 808 synth edit keyboard capture midi beginner producer",
+      disabled: selectedNoteVelocity === null || selectedNoteVelocity >= 1,
+      run: () => selectedNoteVelocity !== null && onUpdateSelectedNoteVelocity(selectedNoteVelocity + 0.05)
     },
     {
       id: "selected-note-copy",
@@ -496,6 +533,34 @@ export function createSelectedEventQuickActions({
       keywords: "selected chord inversion voicing up higher harmony progression edit beginner producer",
       disabled: !selectedChordActive || selectedChordInversionUp === null,
       run: () => onMoveSelectedChordInversion(1)
+    },
+    {
+      id: "selected-chord-velocity-down",
+      title: "Soften selected chord",
+      detail:
+        selectedChordVelocity !== null
+          ? `${selectedChordLabel} velocity ${percentLabel(selectedChordVelocity)} -> ${percentLabel(
+              clampVelocity(selectedChordVelocity - 0.05)
+            )}`
+          : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord velocity down softer dynamics harmony progression edit beginner producer",
+      disabled: selectedChordVelocity === null || selectedChordVelocity <= 0,
+      run: () => selectedChordVelocity !== null && onUpdateSelectedChordVelocity(selectedChordVelocity - 0.05)
+    },
+    {
+      id: "selected-chord-velocity-up",
+      title: "Lift selected chord",
+      detail:
+        selectedChordVelocity !== null
+          ? `${selectedChordLabel} velocity ${percentLabel(selectedChordVelocity)} -> ${percentLabel(
+              clampVelocity(selectedChordVelocity + 0.05)
+            )}`
+          : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord velocity up louder lift dynamics harmony progression edit beginner producer",
+      disabled: selectedChordVelocity === null || selectedChordVelocity >= 1,
+      run: () => selectedChordVelocity !== null && onUpdateSelectedChordVelocity(selectedChordVelocity + 0.05)
     },
     {
       id: "selected-chord-copy",
