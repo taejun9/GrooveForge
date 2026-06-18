@@ -29,6 +29,8 @@ Attached-brief intake rule: accept the brief's direction only after separating b
 
 Brief correction target: a sampling-heavy concept note is accepted only after it is rewritten around direct beat creation. The MVP event union is `NoteEvent | DrumHitEvent | AutomationEvent`; core clips are pattern, MIDI, or automation containers; MVP tracks are built-in beat-production tracks; and the default Instrument Panel is drum rack, synth 808/bass, simple synth, chord synth, effects, sound-design controls, mixer, and master. `AudioClipEvent`, audio tracks, sampler devices, sample import, chopping, pitch/stretch, and one-shot mapping move to an optional sampling extension, not the core product definition.
 
+Korean concept-brief rule: if the user says the concept is "비트(모든 장르)를 만드는" product and sampling is "부가 기능", that statement overrides sampling-heavy draft examples. Keep `sample import -> chop -> arrange` sequences out of the MVP path and rewrite the accepted first path as `BPM/key/style -> drums -> 808/bass -> melody/chords -> sound design -> arrangement -> mixer/master -> export`.
+
 Trap, drill, boom bap, house, lofi, jersey, phonk, R&B, garage, and experimental workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
 
 When there is ambiguity, read the product draft in this order: all-genre beat creation first, direct composition and sound design second, arrangement/mixing/mastering/export third, optional sampling extensions last.
@@ -60,6 +62,8 @@ Default instrument-panel rule: the base instrument panel is built-in drum rack, 
 Accessory rule: sampling can expand available source material, but it is not the product category, the first proof of value, or the main creative loop. A feature draft should first explain which beat event, instrument, arrangement, mix/master, or export outcome it improves; if the answer is sample import, chopping, loop stretch, one-shot mapping, or sampler setup, the draft belongs in an optional sampling phase.
 
 Placement rule: the default empty project, first visible actions, MVP proof, primary navigation, onboarding language, and plan titles must start from editable musical events and beat-making controls. Optional sampling can add sound sources later, but it must not become the first required action, first proof of value, default explanation of GrooveForge, or a co-equal product spine beside direct composition. A five-area starter UI can include Transport, Pattern Editor, Instrument Panel, Arrangement View, and Mixer/Master, but the Instrument Panel defaults are drum kit, synth 808/bass, simple synth, chord synth, effects, and sound-design controls, with sampler entry points deferred.
+
+External-draft split rule: when a draft combines `AudioClip`, `Sampler`, sample 808, audio tracks, or waveform editing with core beat-making types, split the result into two sections before implementation: core MVP direct-composition data first, optional sampling extension second. Do not copy combined examples into roadmap priority tables, default track lists, architecture diagrams, or first-run UI copy.
 
 Sound-source wording rule: built-in drum kits, internal one-shot sounds, and any future sample 808 source are implementation details inside direct drum sequencing or the 808/Bass engine. They do not make the product a sample-pack workflow, sample browser, chop surface, or sampler-first app. The default user path remains built-in drum rack, synth 808/bass, melody/chord instruments, sound design, arrangement, mix/master, and export.
 

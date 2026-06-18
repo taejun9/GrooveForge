@@ -92,6 +92,8 @@ MVP type examples must not place `AudioClipEvent`, `audio`, or `sampler` beside 
 
 Attached-brief architecture rule: when a brief presents a single combined track, clip, or audio-engine list, split it before implementation. The MVP list is `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master` plus pattern/MIDI/automation clips; `audio`, `sampler`, `AudioClip`, `Sampler`, waveform editing, chop pads, and imported audio assets belong only to the optional sampling extension.
 
+Korean concept-brief architecture rule: if a brief says GrooveForge is for "비트(모든 장르)를 만드는" work and sampling is "부가 기능", architecture must not promote sample import, chopping, loop stretching, sampler setup, `AudioClipEvent`, `audio`, or `sampler` into the core layer map, MVP track union, first-run project, or default device palette.
+
 Draft rewrite target: the accepted MVP architecture removes `AudioClipEvent` from `MusicalEvent`, excludes `audio` and `sampler` from `TrackType`, treats core clips as pattern/MIDI/automation containers, and keeps the default device palette to drum rack, synth 808/bass, simple synth, chord synth, built-in FX, mixer, and master devices. Optional sampling can add audio clips, audio tracks, sampler devices, sample import, chopping, pitch/stretch, and one-shot mapping later without changing the event-first core.
 
 If an exploratory draft includes audio clip, sampler, or waveform examples, move them to an optional sampling section before they enter architecture diagrams, schema examples, default tracks, or MVP validation.
@@ -126,6 +128,8 @@ The MVP `fx_return` is a built-in Space send/return path for shared ambience. It
 If a draft proposes a default Instrument Panel with `drum kit`, `808`, `synth`, `sampler`, and `FX`, rewrite the default list to `drum rack`, `synth 808/bass`, `simple synth`, `chord synth`, built-in FX, mixer, and master devices. Put `sampler` only under the optional sampling extension.
 
 If a draft proposes `Sample 808` beside `Synth 808`, keep Synth 808 as the MVP default and document Sample 808 only as a future optional source mode inside the 808/Bass engine.
+
+If a draft proposes `sample import -> chop -> pitch/stretch -> sampler instrument` as the first creative flow, rewrite that flow as optional sampling extension work and keep the core architecture flow as `BPM/key/style -> drum rack -> synth 808/bass -> melody/chords -> sound design -> arrangement -> mixer/master -> export`.
 
 Extension track types for optional sampling, later:
 
