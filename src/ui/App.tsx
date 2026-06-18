@@ -3634,6 +3634,38 @@ export function App(): ReactElement {
     auditionSelectedChordEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedChord);
   }
 
+  function writeDrumHitAtStep(pattern: PatternData, hit: DrumClipboard, step: number): PatternData {
+    return {
+      ...pattern,
+      drumPattern: {
+        ...pattern.drumPattern,
+        [hit.lane]: pattern.drumPattern[hit.lane].map((enabled, index) => (index === step ? true : enabled))
+      },
+      drumVelocities: {
+        ...pattern.drumVelocities,
+        [hit.lane]: pattern.drumVelocities[hit.lane].map((velocity, index) =>
+          index === step ? normalizeDrumVelocity(hit.velocity) : velocity
+        )
+      },
+      drumTimings: {
+        ...pattern.drumTimings,
+        [hit.lane]: pattern.drumTimings[hit.lane].map((timing, index) =>
+          index === step ? normalizeDrumTimingMs(hit.timingMs) : timing
+        )
+      },
+      drumProbabilities: {
+        ...pattern.drumProbabilities,
+        [hit.lane]: pattern.drumProbabilities[hit.lane].map((probability, index) =>
+          index === step ? normalizeDrumProbability(hit.probability) : probability
+        )
+      },
+      hatRepeats:
+        hit.lane === "hat"
+          ? pattern.hatRepeats.map((repeat, index) => (index === step ? normalizeHatRepeat(hit.hatRepeat) : repeat))
+          : pattern.hatRepeats
+    };
+  }
+
   function copySelectedDrumHit(): void {
     const target = selectedDrumStep;
     if (!target) {
@@ -3658,6 +3690,46 @@ export function App(): ReactElement {
     setProjectStatus(`Copied ${drumLabels[target.lane]} step ${target.step + 1}`);
   }
 
+  function duplicateSelectedDrumHit(): void {
+    const target = selectedDrumStep;
+    if (!target || !selectedDrumActive) {
+      setProjectStatus("Select an active drum step");
+      return;
+    }
+
+    const pattern = activePattern(projectRef.current);
+    if (!pattern.drumPattern[target.lane][target.step]) {
+      setProjectStatus("Select an active drum step");
+      return;
+    }
+
+    const nextStep = nextEmptyDrumStep(pattern, target.lane, target.step);
+    if (nextStep === null) {
+      setProjectStatus(`No empty ${drumLabels[target.lane]} step for duplicate`);
+      return;
+    }
+
+    const hit: DrumClipboard = {
+      lane: target.lane,
+      step: target.step,
+      velocity: drumStepVelocity(pattern, target.lane, target.step),
+      probability: drumStepProbability(pattern, target.lane, target.step),
+      timingMs: drumStepTimingMs(pattern, target.lane, target.step),
+      hatRepeat: target.lane === "hat" ? hatRepeatCount(pattern, target.step) : 1
+    };
+
+    const changed = updateCurrentPattern(
+      (currentPatternData) => writeDrumHitAtStep(currentPatternData, hit, nextStep),
+      `Duplicated ${drumLabels[target.lane]} hit`
+    );
+
+    if (changed) {
+      setSelectedDrumStep({ lane: target.lane, step: nextStep });
+      setSelectedNote(null);
+      setSelectedChordIndex(null);
+    }
+  }
+
   function pasteCopiedDrumHit(): void {
     const clipboard = drumClipboard;
     if (!clipboard) {
@@ -3673,39 +3745,7 @@ export function App(): ReactElement {
     }
 
     const changed = updateCurrentPattern(
-      (currentPatternData) => ({
-        ...currentPatternData,
-        drumPattern: {
-          ...currentPatternData.drumPattern,
-          [clipboard.lane]: currentPatternData.drumPattern[clipboard.lane].map((enabled, index) =>
-            index === nextStep ? true : enabled
-          )
-        },
-        drumVelocities: {
-          ...currentPatternData.drumVelocities,
-          [clipboard.lane]: currentPatternData.drumVelocities[clipboard.lane].map((velocity, index) =>
-            index === nextStep ? normalizeDrumVelocity(clipboard.velocity) : velocity
-          )
-        },
-        drumTimings: {
-          ...currentPatternData.drumTimings,
-          [clipboard.lane]: currentPatternData.drumTimings[clipboard.lane].map((timing, index) =>
-            index === nextStep ? normalizeDrumTimingMs(clipboard.timingMs) : timing
-          )
-        },
-        drumProbabilities: {
-          ...currentPatternData.drumProbabilities,
-          [clipboard.lane]: currentPatternData.drumProbabilities[clipboard.lane].map((probability, index) =>
-            index === nextStep ? normalizeDrumProbability(clipboard.probability) : probability
-          )
-        },
-        hatRepeats:
-          clipboard.lane === "hat"
-            ? currentPatternData.hatRepeats.map((repeat, index) =>
-                index === nextStep ? normalizeHatRepeat(clipboard.hatRepeat) : repeat
-              )
-            : currentPatternData.hatRepeats
-      }),
+      (currentPatternData) => writeDrumHitAtStep(currentPatternData, clipboard, nextStep),
       `Pasted ${drumLabels[clipboard.lane]} hit`
     );
 
@@ -5976,6 +6016,7 @@ export function App(): ReactElement {
     onAuditionSelectedDrumHit: auditionSelectedDrumHit,
     onCopySelectedDrumHit: copySelectedDrumHit,
     onPasteCopiedDrumHit: pasteCopiedDrumHit,
+    onDuplicateSelectedDrumHit: duplicateSelectedDrumHit,
     onDeleteSelectedDrumHit: clearSelectedDrumStep,
     onMoveSelectedChordStep: moveSelectedChordStep,
     onAuditionSelectedChord: auditionSelectedChord,
@@ -11748,6 +11789,7 @@ function createQuickActions({
   onAuditionSelectedDrumHit,
   onCopySelectedDrumHit,
   onPasteCopiedDrumHit,
+  onDuplicateSelectedDrumHit,
   onDeleteSelectedDrumHit,
   onMoveSelectedChordStep,
   onAuditionSelectedChord,
@@ -11963,6 +12005,7 @@ function createQuickActions({
   onAuditionSelectedDrumHit: () => void;
   onCopySelectedDrumHit: () => void;
   onPasteCopiedDrumHit: () => void;
+  onDuplicateSelectedDrumHit: () => void;
   onDeleteSelectedDrumHit: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
   onAuditionSelectedChord: () => void;
@@ -12459,6 +12502,7 @@ function createQuickActions({
       onUpdateSelectedHatRepeat,
       onCopySelectedDrumHit,
       onPasteCopiedDrumHit,
+      onDuplicateSelectedDrumHit,
       onDeleteSelectedDrumHit,
       onAuditionSelectedChord,
       onMoveSelectedChordStep,
