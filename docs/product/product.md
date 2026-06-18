@@ -87,6 +87,7 @@ Optional sampling remains a later extension after the direct beat workstation is
 Primary feature areas:
 
 - Transport: BPM, Tap Tempo, Tempo Nudge Pads, key, play, stop, Song/Block/Pattern loop audition, Transport Position Readout, metronome.
+- Swing Feel Pads: Straight, Tight, Laid, Loose, and current-style default swing controls that change only the existing project swing value through explicit visible clicks or Quick Actions Swing Feel commands, then show a UI-local Swing Feel Result for before/after groove timing.
 - Beat blueprints: sample-free editable project starts that combine style, key, BPM, Pattern A/B/C events, arrangement template, sound preset, mixer balance, and master preset, with UI-local preview/readout before explicit Apply and UI-local result feedback after Apply.
 - Delivery Targets: local starter sketch, vocal session, beat-store demo, club demo, and editable custom targets that can be set without changing the beat through visible controls or direct Quick Actions target-select commands, then explicitly aligned to arrangement length, master preset, and mix posture.
 - Delivery Target Alignment Preview and Result: UI-local readouts plus a Quick Actions Delivery Target Align command for the selected target's pre-click Align outcome and post-click applied alignment across target fit, arrangement length, master preset, mix posture, and stem expectation without storing UI feedback in project data.
@@ -225,6 +226,7 @@ MVP capabilities:
 - Runtime smoke validation that executes the real local TypeScript domain, render, and MIDI modules to build sample-free 8-bar beats from every supported style profile and every Beat Blueprint, verify non-silent full-mix and drum/808/synth/chord stem analysis, verify WAV RIFF/WAVE headers and file names, and verify deterministic arrangement MIDI bytes without writing export artifacts.
 - BPM/key setup, including Tap Tempo and Tempo Nudge Pads for explicit click-to-set, half-time, double-time, and +/-1 BPM changes.
 - Quick Actions Tempo Nudge commands expose the existing -1, +1, half-time, and double-time BPM pads from command search, derive command targets from the current local project BPM, and route explicit tempo changes through the same undoable Tempo Nudge Pad path.
+- Swing Feel Pads expose Straight, Tight, Laid, Loose, and current-style default swing starts beside the manual Swing slider, with direct Quick Actions Swing Feel commands routed through the same explicit project swing update path and UI-local before/after result feedback.
 - Key changes retarget Pattern A/B/C 808/bass, melody, and chord-root musical events so existing beats stay in the selected key.
 - Quick Actions Key Retarget commands expose every supported project key from command search, derive command labels from the existing key options, and route explicit key changes through the same undoable `retargetProjectKey` path as the Key dropdown.
 - Style selector that applies key-aware editable groove templates for Trap, Drill, Boom Bap, Lo-fi, House, R&B, Jersey Club, Phonk, Garage, and Experimental Pattern A/B/C, BPM, swing, and sound preset.

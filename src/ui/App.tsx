@@ -341,6 +341,9 @@ import type {
   TapTempoState,
   TempoNudgePadId,
   TempoNudgePadDefinition,
+  SwingFeelPadId,
+  SwingFeelPadDefinition,
+  SwingFeelResult,
   ChordPadId,
   ChordPadDefinition,
   ChordPadOption,
@@ -521,6 +524,7 @@ import {
   tapTempoMaxTaps,
   tapTempoCommitDelayMs,
   tempoNudgePads,
+  swingFeelPads,
   mixPostureOptions,
   mixBalancePadDefinitions,
   spaceFxPadDefinitions,
@@ -782,7 +786,50 @@ import {
   fileDisplayName
 } from "./workstationPatternTools";
 
+const minProjectSwing = 0;
+const maxProjectSwing = 0.24;
 
+function normalizeSwingFeelValue(value: number): number {
+  return Math.min(maxProjectSwing, Math.max(minProjectSwing, Math.round(value * 100) / 100));
+}
+
+function swingFeelPadSwing(pad: SwingFeelPadDefinition, project: ProjectState): number {
+  return normalizeSwingFeelValue(pad.value === "style" ? getStyle(project).defaultSwing : pad.value);
+}
+
+function swingFeelPadDetail(pad: SwingFeelPadDefinition, project: ProjectState): string {
+  return pad.id === "style" ? `${getStyle(project).name} default` : pad.detail;
+}
+
+function createSwingFeelResult(
+  pad: SwingFeelPadDefinition,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): SwingFeelResult {
+  const beforeSwing = normalizeSwingFeelValue(beforeProject.swing);
+  const afterSwing = normalizeSwingFeelValue(afterProject.swing);
+  const changed = beforeSwing !== afterSwing;
+
+  return {
+    padId: pad.id,
+    title: `${pad.label} Swing Feel`,
+    status: changed ? "Applied" : "Held",
+    detail: `${swingFeelPadDetail(pad, afterProject)} / Pattern ${afterProject.selectedPattern}`,
+    scope: "Global swing timing",
+    metric: {
+      id: "swing-feel",
+      label: "Swing",
+      before: percentLabel(beforeSwing),
+      after: percentLabel(afterSwing),
+      tone: changed ? "good" : "warn"
+    },
+    auditionCue: `Loop Pattern ${afterProject.selectedPattern}; listen for hat pocket, clap placement, and 808 timing against ${percentLabel(
+      afterSwing
+    )} swing.`,
+    nextCheck: "Use Groove Compass, Style Inspector swing, or the manual Swing slider if the pocket needs finer adjustment.",
+    tone: changed ? "good" : "warn"
+  };
+}
 
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
@@ -824,6 +871,7 @@ export function App(): ReactElement {
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
+  const [swingFeelResult, setSwingFeelResult] = useState<SwingFeelResult | null>(null);
   const [beatBlueprintResult, setBeatBlueprintResult] = useState<BeatBlueprintResult | null>(null);
   const [beatSpineResult, setBeatSpineResult] = useState<BeatSpineApplyResult | null>(null);
   const [layerStarterResult, setLayerStarterResult] = useState<LayerStarterResult | null>(null);
@@ -1541,6 +1589,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setSwingFeelResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
     setLayerStarterResult(null);
@@ -1578,6 +1627,7 @@ export function App(): ReactElement {
       projectRef.current = nextProject;
       setProject(nextProject);
       setQuickActionResult(null);
+      setSwingFeelResult(null);
       setBeatBlueprintResult(null);
       setBeatSpineResult(null);
       setLayerStarterResult(null);
@@ -1632,6 +1682,25 @@ export function App(): ReactElement {
     );
     if (!changed) {
       setProjectStatus(`${pad.label} tempo held at ${nextBpm} BPM`);
+    }
+  }
+
+  function applySwingFeelPad(padId: SwingFeelPadId): void {
+    const pad = swingFeelPads.find((candidate) => candidate.id === padId);
+    if (!pad) {
+      return;
+    }
+
+    const beforeProject = projectRef.current;
+    const nextSwing = swingFeelPadSwing(pad, beforeProject);
+    const changed = updateProject(
+      (current) => (normalizeSwingFeelValue(current.swing) === nextSwing ? current : { ...current, swing: nextSwing }),
+      `${pad.label} swing ${percentLabel(nextSwing)}`
+    );
+    const afterProject = projectRef.current;
+    setSwingFeelResult(createSwingFeelResult(pad, beforeProject, afterProject));
+    if (!changed) {
+      setProjectStatus(`${pad.label} swing held at ${percentLabel(nextSwing)}`);
     }
   }
 
@@ -1690,6 +1759,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setSwingFeelResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
     setLayerStarterResult(null);
@@ -1733,6 +1803,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setSwingFeelResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
     setLayerStarterResult(null);
@@ -5132,6 +5203,7 @@ export function App(): ReactElement {
     onExpandPatternChain: expandPatternChain,
     onApplyProjectKey: applyProjectKey,
     onApplyTempoNudge: applyTempoNudgePad,
+    onApplySwingFeel: applySwingFeelPad,
     onToggleMetronome: toggleMetronome,
     onTapTempo: tapProjectTempo,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
@@ -5816,6 +5888,27 @@ export function App(): ReactElement {
                 onChange={(event) => updateProject((current) => ({ ...current, swing: Number(event.target.value) }))}
               />
             </label>
+            <div className="swing-feel-row" aria-label="Swing Feel Pads" data-testid="swing-feel-pads">
+              {swingFeelPads.map((pad) => {
+                const targetSwing = swingFeelPadSwing(pad, project);
+                const selected = normalizeSwingFeelValue(project.swing) === targetSwing;
+                return (
+                  <button
+                    className={selected ? "selected" : ""}
+                    data-testid={`swing-feel-${pad.id}`}
+                    key={pad.id}
+                    onClick={() => applySwingFeelPad(pad.id)}
+                    title={`${pad.label} swing feel: ${swingFeelPadDetail(pad, project)} at ${percentLabel(targetSwing)}`}
+                    type="button"
+                  >
+                    <span>{pad.label}</span>
+                    <strong>{percentLabel(targetSwing)}</strong>
+                    <small>{swingFeelPadDetail(pad, project)}</small>
+                  </button>
+                );
+              })}
+            </div>
+            {swingFeelResult && <SwingFeelResultStrip result={swingFeelResult} />}
             <div className="groove-row" aria-label="Groove humanize">
               <span>Groove</span>
               <div>
@@ -10726,6 +10819,7 @@ function createQuickActions({
   onExpandPatternChain,
   onApplyProjectKey,
   onApplyTempoNudge,
+  onApplySwingFeel,
   onToggleMetronome,
   onTapTempo,
   onPreviewBlueprint,
@@ -10902,6 +10996,7 @@ function createQuickActions({
   onExpandPatternChain: () => void;
   onApplyProjectKey: (key: string) => void;
   onApplyTempoNudge: (pad: TempoNudgePadDefinition) => void;
+  onApplySwingFeel: (pad: SwingFeelPadId) => void;
   onToggleMetronome: () => void;
   onTapTempo: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
@@ -12140,6 +12235,23 @@ function createQuickActions({
       run: () => onApplyTempoNudge(pad)
     };
   });
+  const swingFeelActions: QuickAction[] = swingFeelPads.map((pad) => {
+    const targetSwing = swingFeelPadSwing(pad, project);
+    const currentSwing = normalizeSwingFeelValue(project.swing);
+    const selected = currentSwing === targetSwing;
+    const detail = `${percentLabel(currentSwing)} -> ${percentLabel(targetSwing)} / ${swingFeelPadDetail(pad, project)}`;
+    return {
+      id: `swing-feel-${pad.id}`,
+      title: selected ? `${pad.label} Swing Feel selected` : `Apply ${pad.label} Swing Feel`,
+      detail,
+      group: "Transport",
+      keywords: `swing feel groove timing shuffle pocket ${pad.id} ${pad.label} ${pad.detail} ${percentLabel(
+        targetSwing
+      )} style beginner producer`,
+      disabled: selected,
+      run: () => onApplySwingFeel(pad.id)
+    };
+  });
   const sectionLocatorActions: QuickAction[] = sectionLocatorPads.map((pad) => {
     const selected = pad.selected && transportLoopScope === "block";
     const missing = pad.index === null;
@@ -12337,6 +12449,7 @@ function createQuickActions({
       run: onTapTempo
     },
     ...tempoNudgeActions,
+    ...swingFeelActions,
     ...patternCueActions,
     ...patternSwitchActions,
     {
@@ -13784,6 +13897,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("swing-feel-")) {
+    return {
+      id: "swing-feel",
+      label: "Swing feel",
+      value: percentLabel(normalizeSwingFeelValue(project.swing))
+    };
+  }
+
   if (action.id === "metronome-toggle") {
     return {
       id: "metronome",
@@ -14649,6 +14770,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the tempo supports the groove pocket, 808 movement, and melody timing.`,
       nextCheck: "Use Tap Tempo, Tempo Nudge Pads, Style Inspector BPM range, and transport playback to refine the final BPM."
+    };
+  }
+
+  if (action.id.startsWith("swing-feel-")) {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; listen to hats, clap placement, and 808 timing against the new swing feel.`,
+      nextCheck: "Use Groove Compass, Style Inspector swing, and the manual Swing slider if the pocket needs finer adjustment."
     };
   }
 
@@ -23980,6 +24108,34 @@ function DrumMovePreview({ preview }: { preview: DrumMovePreviewSummary }): Reac
       <small data-testid="drum-move-preview-feel">{preview.feelLabel}</small>
       <small data-testid="drum-move-preview-accent">{preview.accentLabel}</small>
       <small data-testid="drum-move-preview-moves">{preview.moveLabel}</small>
+    </div>
+  );
+}
+
+function SwingFeelResultStrip({ result }: { result: SwingFeelResult }): ReactElement {
+  return (
+    <div className={`quick-action-result ${result.tone}`} data-result-swing-feel={result.padId} data-testid="swing-feel-result" aria-live="polite">
+      <div className="quick-action-result-main">
+        <span data-testid="swing-feel-result-status">{result.status}</span>
+        <strong data-testid="swing-feel-result-title">{result.title}</strong>
+        <small data-testid="swing-feel-result-detail">{result.detail}</small>
+      </div>
+      <div className={`quick-action-result-metric ${result.metric.tone}`} data-testid="swing-feel-result-metric">
+        <span>{result.metric.label}</span>
+        <strong data-testid="swing-feel-result-metric-value">
+          {result.metric.before} -&gt; {result.metric.after}
+        </strong>
+      </div>
+      <div className="quick-action-result-followup" data-testid="swing-feel-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="swing-feel-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="swing-feel-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
     </div>
   );
 }

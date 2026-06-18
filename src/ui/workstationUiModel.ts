@@ -58,6 +58,14 @@ export const tempoNudgePads: TempoNudgePadDefinition[] = [
   { id: "double", label: "x2", title: "Set double-time BPM" }
 ];
 
+export const swingFeelPads: SwingFeelPadDefinition[] = [
+  { id: "straight", label: "Straight", detail: "grid feel", value: 0 },
+  { id: "tight", label: "Tight", detail: "small push", value: 0.06 },
+  { id: "laid", label: "Laid", detail: "back pocket", value: 0.12 },
+  { id: "loose", label: "Loose", detail: "wide shuffle", value: 0.18 },
+  { id: "style", label: "Style", detail: "profile default", value: "style" }
+];
+
 export const mixPostureOptions: { id: MixPosture; label: string }[] = [
   { id: "loose", label: "Loose sketch" },
   { id: "vocal_headroom", label: "Vocal headroom" },
@@ -1509,6 +1517,27 @@ export type TempoNudgePadDefinition = {
   id: TempoNudgePadId;
   label: string;
   title: string;
+};
+
+export type SwingFeelPadId = "straight" | "tight" | "laid" | "loose" | "style";
+
+export type SwingFeelPadDefinition = {
+  id: SwingFeelPadId;
+  label: string;
+  detail: string;
+  value: number | "style";
+};
+
+export type SwingFeelResult = {
+  padId: SwingFeelPadId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  metric: QuickActionResultMetric;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
 };
 
 export type ChordPadId = "home" | "lift" | "tension" | "color";
