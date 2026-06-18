@@ -622,6 +622,12 @@ type MixSnapshotQuickActionTarget = {
   metricId: string;
 };
 
+type DirectExportQuickActionTarget = {
+  id: "wav" | "stems" | "midi" | "sheet";
+  label: string;
+  metricId: string;
+};
+
 type MixSnapshotSlotMap = Record<MixSnapshotSlotId, MixSnapshot | null>;
 
 type MixSnapshot = {
@@ -15237,6 +15243,7 @@ function createQuickActionResult(
   const drumClipboardOnly = action.id === "selected-drum-copy";
   const chordClipboardOnly = action.id === "selected-chord-copy";
   const tapTempoPulseOnly = action.id === "tap-tempo";
+  const exportOnly = directExportQuickActionTarget(action.id) !== null || action.id === "handoff-next-export";
   const uiLocal =
     action.id.startsWith("mix-snapshot-") ||
     inputSetupOnly ||
@@ -15251,7 +15258,7 @@ function createQuickActionResult(
     label: afterMetric.label,
     before: beforeMetric.value,
     after: afterMetric.value,
-    tone: outcome === "failed" ? "danger" : previewOnly || focusOnly || uiLocal ? "good" : changed ? "good" : "warn"
+    tone: outcome === "failed" ? "danger" : previewOnly || focusOnly || uiLocal || exportOnly ? "good" : changed ? "good" : "warn"
   };
   const followup = quickActionResultFollowup(action, afterProject, outcome);
 
@@ -15273,6 +15280,8 @@ function createQuickActionResult(
                   ? inputSetupOnly
                     ? "Checked"
                     : "Captured"
+                  : exportOnly
+                    ? "Exported"
                   : changed
                     ? "Applied"
                     : "Ran",
@@ -15281,7 +15290,7 @@ function createQuickActionResult(
     metric,
     auditionCue: followup.auditionCue,
     nextCheck: followup.nextCheck,
-    tone: outcome === "failed" ? "danger" : previewOnly || focusOnly || uiLocal ? "good" : changed ? "good" : "warn"
+    tone: outcome === "failed" ? "danger" : previewOnly || focusOnly || uiLocal || exportOnly ? "good" : changed ? "good" : "warn"
   };
 }
 
@@ -15333,6 +15342,46 @@ function mixSnapshotQuickActionPosture(project: ProjectState, exportAnalysis: Ex
       ? `${audibleStemTracks(stemAnalyses).length}/${stemTrackIds.length} stems`
       : `${stemSpread.toFixed(1)} dB spread`;
   return `${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)} / ${project.masterPreset} / ${stemLabel}`;
+}
+
+function directExportQuickActionTarget(actionId: string): DirectExportQuickActionTarget | null {
+  switch (actionId) {
+    case "export-wav":
+      return { id: "wav", label: "WAV Export", metricId: "export-wav" };
+    case "export-stems":
+      return { id: "stems", label: "Stem Export", metricId: "export-stems" };
+    case "export-midi":
+      return { id: "midi", label: "MIDI Export", metricId: "export-midi" };
+    case "export-handoff-sheet":
+      return { id: "sheet", label: "Handoff Sheet", metricId: "export-handoff-sheet" };
+    default:
+      return null;
+  }
+}
+
+function directExportQuickActionPosture(
+  project: ProjectState,
+  target: DirectExportQuickActionTarget,
+  exportAnalysis: ExportAnalysis
+): string {
+  switch (target.id) {
+    case "wav":
+      return `${mixWavFileName(project)} / ${exportAnalysis.status} / ${barCountLabel(arrangementTotalBars(project))}`;
+    case "stems": {
+      const stemAnalyses = analyzeStemExports(project);
+      const stemSpread = stemSpreadDb(stemAnalyses);
+      const spreadLabel = stemSpread === null ? "spread n/a" : `${stemSpread.toFixed(1)} dB spread`;
+      return `${stemWavFileNames(project).length} files / ${audibleStemTracks(stemAnalyses).length}/${stemTrackIds.length} audible / ${spreadLabel}`;
+    }
+    case "midi":
+      return `${midiFileName(project)} / ${barCountLabel(arrangementTotalBars(project))} / Pattern ${
+        usedPatternSlots(project).join("/") || project.selectedPattern
+      }`;
+    case "sheet":
+      return `${handoffSheetFileName(project)} / ${sessionBriefFilledFields(project.sessionBrief)}/4 brief / ${
+        activeDeliveryTarget(project).name
+      }`;
+  }
 }
 
 function quickActionResultMetricSnapshot(
@@ -15872,6 +15921,16 @@ function quickActionResultMetricSnapshot(
       id: "export-preflight",
       label: "Export preflight",
       value: action.detail
+    };
+  }
+
+  const directExportTarget = directExportQuickActionTarget(action.id);
+  if (directExportTarget) {
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    return {
+      id: directExportTarget.metricId,
+      label: directExportTarget.label,
+      value: directExportQuickActionPosture(project, directExportTarget, exportAnalysis)
     };
   }
 
@@ -16703,6 +16762,32 @@ function quickActionResultFollowup(
       auditionCue: "Play Full Mix; watch Export meter headroom and limiter.",
       nextCheck: "Use Ceiling and master output controls for manual trim before WAV/stem export."
     };
+  }
+
+  const directExportTarget = directExportQuickActionTarget(action.id);
+  if (directExportTarget) {
+    switch (directExportTarget.id) {
+      case "wav":
+        return {
+          auditionCue: "Open the downloaded WAV outside the app and confirm the full arrangement plays from start to finish.",
+          nextCheck: "Use Handoff Export Receipt, Export Preflight, and Stem Export before sending the beat package."
+        };
+      case "stems":
+        return {
+          auditionCue: "Import or solo the downloaded stem WAVs outside the app and confirm Drums, 808, Synth, and Chords line up.",
+          nextCheck: "Use Handoff Export Receipt and Manifest Audit before exporting MIDI or the Handoff Sheet."
+        };
+      case "midi":
+        return {
+          auditionCue: "Open the downloaded MIDI in a DAW and confirm the arrangement bars and Pattern A/B/C sections are usable.",
+          nextCheck: "Use Handoff Export Receipt and the Handoff Sheet to keep the DAW handoff understandable."
+        };
+      case "sheet":
+        return {
+          auditionCue: "Open the Handoff Sheet text file and compare title, target, arrangement, export meter, stems, and Session Brief.",
+          nextCheck: "Use Manifest Audit to confirm the WAV, stems, MIDI, and sheet are ready before sending."
+        };
+    }
   }
 
   if (action.id === "handoff-next-export") {
