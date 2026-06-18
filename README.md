@@ -158,6 +158,8 @@ Runtime arrangement editing also exposes Quick Actions selected-block edit comma
 
 Quick Actions selected-event reset commands restore selected 808/Synth note chance, selected drum chance, selected drum timing, selected hat repeat, and selected chord chance to reliable defaults through the existing undoable selected-event edit handlers.
 
+Quick Actions selected-event velocity reset commands restore selected 808/Synth note velocity to the current Keyboard Capture default, selected drum velocity to its lane/step default, and selected chord velocity to 50% through the existing undoable selected-event velocity handlers.
+
 ## Core Direction
 
 - Keep product behavior grounded in the project brief and official sources where applicable.

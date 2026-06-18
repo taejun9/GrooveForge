@@ -4,6 +4,7 @@ import {
   ProjectState,
   chordInversionLabel,
   chordInversions,
+  defaultDrumVelocity,
   drumStepProbability,
   drumStepTimingMs,
   drumStepVelocity,
@@ -34,6 +35,7 @@ import {
 import {
   ChordClipboard,
   DrumClipboard,
+  KeyboardCaptureDefaults,
   NoteClipboard,
   QuickAction,
   SelectedDrumStep,
@@ -41,9 +43,13 @@ import {
   drumLabels
 } from "./workstationUiModel";
 
+const selectedChordDefaultVelocity = 0.5;
+const velocityResetThreshold = 0.005;
+
 type SelectedEventQuickActionsParams = {
   project: ProjectState;
   selectedPatternData: PatternData;
+  keyboardCaptureDefaults: Record<SelectedNote["track"], KeyboardCaptureDefaults>;
   selectedNote: SelectedNote | null;
   noteClipboard: NoteClipboard | null;
   selectedDrumStep: SelectedDrumStep | null;
@@ -93,6 +99,7 @@ export type SelectedEventQuickActions = {
 export function createSelectedEventQuickActions({
   project,
   selectedPatternData,
+  keyboardCaptureDefaults,
   selectedNote,
   noteClipboard,
   selectedDrumStep,
@@ -145,6 +152,8 @@ export function createSelectedEventQuickActions({
         : selectedPatternData.melodyNotes.find((note) => matchesSelectedNote(note, selectedNote))
       : undefined;
   const selectedNoteVelocity = selectedNoteEvent ? clampVelocity(selectedNoteEvent.velocity) : null;
+  const selectedNoteVelocityDefault =
+    selectedNote && selectedNoteActive ? clampVelocity(keyboardCaptureDefaults[selectedNote.track].velocity) : null;
   const selectedNoteProbability = selectedNoteEvent ? normalizeEventProbability(selectedNoteEvent.probability) : null;
   const selectedNoteLength = selectedNoteEvent ? clampStepLength(selectedNoteEvent.length) : null;
   const selectedNoteGlide =
@@ -191,6 +200,10 @@ export function createSelectedEventQuickActions({
     : "No selected drum hit";
   const selectedDrumVelocity =
     selectedDrumStep && selectedDrumActive ? drumStepVelocity(selectedPatternData, selectedDrumStep.lane, selectedDrumStep.step) : null;
+  const selectedDrumVelocityDefault =
+    selectedDrumStep && selectedDrumActive
+      ? normalizeDrumVelocity(defaultDrumVelocity(selectedDrumStep.lane, selectedDrumStep.step))
+      : null;
   const selectedDrumProbability =
     selectedDrumStep && selectedDrumActive
       ? drumStepProbability(selectedPatternData, selectedDrumStep.lane, selectedDrumStep.step)
@@ -208,6 +221,7 @@ export function createSelectedEventQuickActions({
     ? `${selectedChord.root}${selectedChord.quality}.${selectedChord.step + 1}`
     : "No selected chord";
   const selectedChordVelocity = selectedChord && selectedChordActive ? clampVelocity(selectedChord.velocity) : null;
+  const selectedChordVelocityDefault = selectedChord && selectedChordActive ? clampVelocity(selectedChordDefaultVelocity) : null;
   const selectedChordProbability =
     selectedChord && selectedChordActive ? normalizeEventProbability(selectedChord.probability) : null;
   const selectedChordMaxLength = selectedChord ? Math.max(1, steps.length - selectedChord.step) : 1;
@@ -367,6 +381,21 @@ export function createSelectedEventQuickActions({
       run: () => selectedNoteVelocity !== null && onUpdateSelectedNoteVelocity(selectedNoteVelocity + 0.05)
     },
     {
+      id: "selected-note-velocity-reset",
+      title: "Reset selected note velocity",
+      detail:
+        selectedNoteVelocity !== null && selectedNoteVelocityDefault !== null
+          ? `${selectedNoteLabel} velocity ${percentLabel(selectedNoteVelocity)} -> ${percentLabel(selectedNoteVelocityDefault)}`
+          : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note velocity reset default capture dynamics 808 synth edit keyboard capture midi beginner producer",
+      disabled:
+        selectedNoteVelocity === null ||
+        selectedNoteVelocityDefault === null ||
+        Math.abs(selectedNoteVelocity - selectedNoteVelocityDefault) < velocityResetThreshold,
+      run: () => selectedNoteVelocityDefault !== null && onUpdateSelectedNoteVelocity(selectedNoteVelocityDefault)
+    },
+    {
       id: "selected-note-chance-down",
       title: "Lower selected note chance",
       detail:
@@ -487,6 +516,21 @@ export function createSelectedEventQuickActions({
       keywords: "selected drum velocity up louder punch dynamics pocket hit edit beginner producer",
       disabled: selectedDrumVelocity === null || selectedDrumVelocity >= 1,
       run: () => selectedDrumVelocity !== null && onUpdateSelectedDrumVelocity(selectedDrumVelocity + 0.05)
+    },
+    {
+      id: "selected-drum-velocity-reset",
+      title: "Reset selected drum velocity",
+      detail:
+        selectedDrumVelocity !== null && selectedDrumVelocityDefault !== null
+          ? `${selectedDrumLabel} velocity ${percentLabel(selectedDrumVelocity)} -> ${percentLabel(selectedDrumVelocityDefault)}`
+          : "Select an active drum hit first.",
+      group: "Create",
+      keywords: "selected drum velocity reset default lane step dynamics pocket hit edit beginner producer",
+      disabled:
+        selectedDrumVelocity === null ||
+        selectedDrumVelocityDefault === null ||
+        Math.abs(selectedDrumVelocity - selectedDrumVelocityDefault) < velocityResetThreshold,
+      run: () => selectedDrumVelocityDefault !== null && onUpdateSelectedDrumVelocity(selectedDrumVelocityDefault)
     },
     {
       id: "selected-drum-chance-down",
@@ -746,6 +790,21 @@ export function createSelectedEventQuickActions({
       keywords: "selected chord velocity up louder lift dynamics harmony progression edit beginner producer",
       disabled: selectedChordVelocity === null || selectedChordVelocity >= 1,
       run: () => selectedChordVelocity !== null && onUpdateSelectedChordVelocity(selectedChordVelocity + 0.05)
+    },
+    {
+      id: "selected-chord-velocity-reset",
+      title: "Reset selected chord velocity",
+      detail:
+        selectedChordVelocity !== null && selectedChordVelocityDefault !== null
+          ? `${selectedChordLabel} velocity ${percentLabel(selectedChordVelocity)} -> ${percentLabel(selectedChordVelocityDefault)}`
+          : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord velocity reset default dynamics harmony progression edit beginner producer",
+      disabled:
+        selectedChordVelocity === null ||
+        selectedChordVelocityDefault === null ||
+        Math.abs(selectedChordVelocity - selectedChordVelocityDefault) < velocityResetThreshold,
+      run: () => selectedChordVelocityDefault !== null && onUpdateSelectedChordVelocity(selectedChordVelocityDefault)
     },
     {
       id: "selected-chord-chance-down",

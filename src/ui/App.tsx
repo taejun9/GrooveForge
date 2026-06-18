@@ -12321,6 +12321,7 @@ function createQuickActions({
     createSelectedEventQuickActions({
       project,
       selectedPatternData,
+      keyboardCaptureDefaults,
       selectedNote,
       noteClipboard,
       selectedDrumStep,
