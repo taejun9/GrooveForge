@@ -2672,6 +2672,37 @@ export type HandoffManifestAuditSummary = {
   checks: HandoffManifestAuditCheck[];
 };
 
+export type HandoffPackageCheckCardId = "files" | "order" | "receipt" | "context";
+export type HandoffPackageCheckFocusId = HandoffPackageCheckCardId;
+
+export type HandoffPackageCheckCard = {
+  id: HandoffPackageCheckCardId;
+  focusId: HandoffPackageCheckFocusId;
+  label: string;
+  value: string;
+  status: string;
+  detail: string;
+  focusTarget: "deliver";
+  focusLabel: "Deliver";
+  tone: MixCoachTone;
+};
+
+export type HandoffPackageCheckSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: HandoffPackageCheckCard[];
+};
+
+export type HandoffPackageCheckFocusSummary = {
+  focusId: HandoffPackageCheckFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type SessionBriefRoleSummary = {
   roleLabel: string;
   statusLabel: string;

@@ -5522,7 +5522,7 @@ h2 {
 .handoff-pack {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
-  grid-template-rows: auto auto auto auto auto;
+  grid-template-rows: auto auto auto auto auto auto;
   gap: 10px;
   align-items: stretch;
   min-height: 156px;
@@ -5544,7 +5544,7 @@ h2 {
 
 .handoff-pack-heading {
   display: grid;
-  grid-row: 1 / 6;
+  grid-row: 1 / 7;
   gap: 4px;
   align-content: center;
   min-width: 0;
@@ -5588,6 +5588,16 @@ h2 {
 .handoff-manifest-audit-checks b,
 .handoff-manifest-audit-checks strong,
 .handoff-manifest-audit-checks small,
+.handoff-package-check-heading span,
+.handoff-package-check-heading strong,
+.handoff-package-check-heading small,
+.handoff-package-check-focus-readout span,
+.handoff-package-check-focus-readout strong,
+.handoff-package-check-focus-readout small,
+.handoff-package-check-card span,
+.handoff-package-check-card strong,
+.handoff-package-check-card small,
+.handoff-package-check-card button span,
 .handoff-pack-card span,
 .handoff-pack-card strong,
 .handoff-pack-card small,
@@ -5862,10 +5872,168 @@ h2 {
   font-size: 9px;
 }
 
-.handoff-pack-grid {
+.handoff-package-check {
   display: grid;
   grid-column: 2;
   grid-row: 4;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(130, 215, 255, 0.045);
+  padding: 8px;
+}
+
+.handoff-package-check.warn {
+  border-color: rgba(240, 195, 106, 0.25);
+  background: rgba(240, 195, 106, 0.05);
+}
+
+.handoff-package-check.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.055);
+}
+
+.handoff-package-check-heading {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.08);
+  padding-inline-end: 8px;
+}
+
+.handoff-package-check-heading > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.handoff-package-check-heading svg {
+  color: #82d7ff;
+}
+
+.handoff-package-check.warn .handoff-package-check-heading svg {
+  color: #f0c36a;
+}
+
+.handoff-package-check.danger .handoff-package-check-heading svg {
+  color: #ffb199;
+}
+
+.handoff-package-check-heading span,
+.handoff-package-check-heading small,
+.handoff-package-check-focus-readout span,
+.handoff-package-check-focus-readout small,
+.handoff-package-check-card span,
+.handoff-package-check-card small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+}
+
+.handoff-package-check-heading strong,
+.handoff-package-check-focus-readout strong,
+.handoff-package-check-card strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.handoff-package-check-focus-readout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(17, 16, 15, 0.18);
+  padding: 7px;
+}
+
+.handoff-package-check-focus-readout.warn {
+  border-color: rgba(240, 195, 106, 0.28);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.handoff-package-check-focus-readout.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.handoff-package-check-grid {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.handoff-package-check-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 7px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.18);
+  border-inline-start: 3px solid #82d7ff;
+  border-radius: 6px;
+  background: rgba(17, 16, 15, 0.18);
+  padding: 7px;
+}
+
+.handoff-package-check-card.warn {
+  border-color: rgba(240, 195, 106, 0.25);
+  border-inline-start-color: #f0c36a;
+}
+
+.handoff-package-check-card.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  border-inline-start-color: #ff7a4f;
+}
+
+.handoff-package-check-card.focused {
+  box-shadow:
+    inset 0 0 0 1px rgba(130, 215, 255, 0.34),
+    0 0 16px rgba(130, 215, 255, 0.1);
+}
+
+.handoff-package-check-card > span,
+.handoff-package-check-card > strong {
+  grid-column: 1 / 2;
+}
+
+.handoff-package-check-card small {
+  grid-column: 1 / -1;
+}
+
+.handoff-package-check-focus-button {
+  display: inline-flex;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 68px;
+  min-height: 30px;
+  border-color: rgba(130, 215, 255, 0.24);
+  background: rgba(130, 215, 255, 0.07);
+  padding: 0 7px;
+  font-size: 10px;
+}
+
+.handoff-package-check-focus-button[aria-pressed="true"] {
+  border-color: rgba(130, 215, 255, 0.5);
+  color: #f4efe7;
+  background: rgba(130, 215, 255, 0.14);
+}
+
+.handoff-pack-grid {
+  display: grid;
+  grid-column: 2;
+  grid-row: 5;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
   min-width: 0;
@@ -5874,7 +6042,7 @@ h2 {
 .handoff-pack-file-manifest {
   display: grid;
   grid-column: 2;
-  grid-row: 5;
+  grid-row: 6;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
   min-width: 0;
@@ -15921,6 +16089,22 @@ input[type="range"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .handoff-package-check {
+    grid-template-columns: 1fr;
+  }
+
+  .handoff-package-check-heading {
+    border-inline-end: 0;
+    border-block-end: 1px solid rgba(244, 239, 231, 0.08);
+    padding-inline-end: 0;
+    padding-block-end: 7px;
+  }
+
+  .handoff-package-check-focus-readout,
+  .handoff-package-check-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .listening-pass {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -16475,6 +16659,11 @@ input[type="range"] {
 
   .quick-actions-recents-list,
   .quick-actions-pinned-list {
+    grid-template-columns: 1fr;
+  }
+
+  .handoff-package-check-focus-readout,
+  .handoff-package-check-grid {
     grid-template-columns: 1fr;
   }
 
