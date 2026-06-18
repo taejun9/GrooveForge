@@ -13012,6 +13012,27 @@ function createQuickActions({
   }));
   const beatSpineCard = activeBeatSpineQuickActionCard(beatSpineSummary);
   const beatSpineApplyCard = activeBeatSpineQuickActionApplyCard(beatSpineSummary);
+  const beatSpineCardJumpActions: QuickAction[] = beatSpineSummary.cards.map((card) => ({
+    id: `beat-spine-card-jump-${card.id}`,
+    title: `Jump Beat Spine: ${card.label}`,
+    detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
+    group: "Project",
+    keywords: `beat spine direct card jump core setup drums 808 bass harmony melody sound arrange finish ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
+    run: () => onJumpBeatSpine(card)
+  }));
+  const beatSpineCardApplyActions: QuickAction[] = beatSpineSummary.cards.map((card) => ({
+    id: `beat-spine-card-apply-${card.id}`,
+    title: card.action ? `Apply Beat Spine: ${card.label}` : `${card.label} Beat Spine apply unavailable`,
+    detail: card.action ? `${card.action.label} / ${card.action.detail}` : `${card.label} has no direct Beat Spine apply action.`,
+    group: "Create",
+    keywords: `beat spine direct card apply core setup drums 808 bass harmony melody sound arrange finish ${card.id} ${card.label} ${card.action?.label ?? "none"} sample free beginner producer`,
+    disabled: !card.action,
+    run: () => {
+      if (card.action) {
+        onApplyBeatSpine(card.action);
+      }
+    }
+  }));
   const composerGuideCard = activeComposerGuideQuickActionCard(composerGuideSummary);
   const composerGuideActions: QuickAction[] = composerGuideSummary.cards.map((card) => ({
     id: `composer-guide-card-${card.id}`,
@@ -14174,6 +14195,7 @@ function createQuickActions({
         }
       }
     },
+    ...beatSpineCardJumpActions,
     {
       id: "beat-spine-apply",
       title: beatSpineApplyCard?.action ? `Apply Beat Spine: ${beatSpineApplyCard.label}` : "Apply Beat Spine",
@@ -14189,6 +14211,7 @@ function createQuickActions({
         }
       }
     },
+    ...beatSpineCardApplyActions,
     {
       id: "composer-guide-focus",
       title: composerGuideCard ? `Focus Composer Guide: ${composerGuideCard.label}` : "Focus Composer Guide",
@@ -14973,6 +14996,7 @@ function createQuickActionResult(
     action.id.startsWith("first-beat-path-step-") ||
     action.id === "composer-guide-focus" ||
     action.id.startsWith("composer-guide-card-") ||
+    action.id.startsWith("beat-spine-card-jump-") ||
     action.id === "style-inspector-focus" ||
     action.id.startsWith("style-inspector-item-") ||
     action.id === "listening-pass-focus" ||
@@ -15163,6 +15187,18 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "beat-spine-jump" || action.id === "beat-spine-apply") {
+    return {
+      id: "beat-spine",
+      label: "Beat spine",
+      value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
+    };
+  }
+
+  if (action.id.startsWith("beat-spine-card-jump-")) {
+    return { id: "beat-spine", label: "Beat spine", value: action.detail };
+  }
+
+  if (action.id.startsWith("beat-spine-card-apply-")) {
     return {
       id: "beat-spine",
       label: "Beat spine",
@@ -15870,10 +15906,24 @@ function quickActionResultFollowup(
     };
   }
 
+  if (action.id.startsWith("beat-spine-card-jump-")) {
+    return {
+      auditionCue: "Use the selected Beat Spine card to inspect that setup, writing, sound, arrangement, or finish axis before changing project data.",
+      nextCheck: "Return to Beat Spine when you need another direct core-axis jump or the next highlighted card."
+    };
+  }
+
   if (action.id === "beat-spine-apply") {
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern} or the full Song to confirm the applied Beat Spine move supports the beat.`,
       nextCheck: "Read the Beat Spine Apply Result, then continue with the next highlighted core card."
+    };
+  }
+
+  if (action.id.startsWith("beat-spine-card-apply-")) {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern} or the full Song to confirm the selected Beat Spine apply move supports the beat.`,
+      nextCheck: "Read the Beat Spine Apply Result, then continue with the next core card."
     };
   }
 
