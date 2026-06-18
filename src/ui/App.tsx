@@ -5043,6 +5043,7 @@ export function App(): ReactElement {
     selectedChord,
     chordClipboard,
     sectionLocatorPads,
+    sessionBriefStarterPads,
     sessionPassSummary,
     soundFocusPreviewSummary,
     soundPresetPreviewSummary,
@@ -5107,6 +5108,7 @@ export function App(): ReactElement {
     onSetKeyboardCaptureTarget: setKeyboardCaptureTarget,
     onUpdateKeyboardCaptureDefaults: updateKeyboardCaptureDefaults,
     onSetMidiCaptureArmed: setMidiCaptureArmed,
+    onApplySessionBriefStarter: applySessionBriefStarterPad,
     onCopySelectedArrangementBlock: copySelectedArrangementBlock,
     onPasteArrangementBlockAfterSelected: pasteArrangementBlockAfterSelected,
     onDuplicateArrangementBlock: duplicateArrangementBlock,
@@ -10589,6 +10591,7 @@ function createQuickActions({
   selectedChord,
   chordClipboard,
   sectionLocatorPads,
+  sessionBriefStarterPads,
   sessionPassSummary,
   soundFocusPreviewSummary,
   soundPresetPreviewSummary,
@@ -10653,6 +10656,7 @@ function createQuickActions({
   onSetKeyboardCaptureTarget,
   onUpdateKeyboardCaptureDefaults,
   onSetMidiCaptureArmed,
+  onApplySessionBriefStarter,
   onCopySelectedArrangementBlock,
   onPasteArrangementBlockAfterSelected,
   onDuplicateArrangementBlock,
@@ -10759,6 +10763,7 @@ function createQuickActions({
   selectedChord: ChordEvent | undefined;
   chordClipboard: ChordClipboard | null;
   sectionLocatorPads: SectionLocatorPad[];
+  sessionBriefStarterPads: SessionBriefStarterPadOption[];
   sessionPassSummary: SessionPassSummary;
   soundFocusPreviewSummary: SoundFocusPreviewSummary;
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
@@ -10823,6 +10828,7 @@ function createQuickActions({
   onSetKeyboardCaptureTarget: (target: NoteTrack) => void;
   onUpdateKeyboardCaptureDefaults: (update: Partial<KeyboardCaptureDefaults>) => void;
   onSetMidiCaptureArmed: (armed: boolean) => void;
+  onApplySessionBriefStarter: (pad: SessionBriefStarterPadId) => void;
   onCopySelectedArrangementBlock: () => void;
   onPasteArrangementBlockAfterSelected: () => void;
   onDuplicateArrangementBlock: () => void;
@@ -11095,6 +11101,17 @@ function createQuickActions({
     group: "Project",
     keywords: `session pass focus card guided studio finish deliver delivery workflow ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
     run: () => onFocusSessionPass(card)
+  }));
+  const sessionBriefStarterActions: QuickAction[] = sessionBriefStarterPads.map((pad) => ({
+    id: `session-brief-starter-${pad.id}`,
+    title:
+      pad.changedCount > 0
+        ? `Apply Session Brief Starter: ${pad.label}`
+        : `${pad.label} Session Brief Starter already covered`,
+    detail: `${pad.preview} / ${pad.changedCount} blank field${pad.changedCount === 1 ? "" : "s"} / ${pad.detail}`,
+    group: "Project",
+    keywords: `session brief starter direct handoff context notes artist vibe reference ${pad.id} ${pad.label} ${pad.detail} ${pad.preview} beginner producer`,
+    run: () => onApplySessionBriefStarter(pad.id)
   }));
   const styleInspectorItem = activeStyleInspectorQuickActionItem(styleInspectorSummary, project);
   const styleInspectorActions: QuickAction[] = [...styleInspectorSummary.metrics, ...styleInspectorSummary.patterns].map((item) => ({
@@ -12237,6 +12254,7 @@ function createQuickActions({
       run: () => onFocusSessionPass(sessionPassCard)
     },
     ...sessionPassActions,
+    ...sessionBriefStarterActions,
     {
       id: "delivery-target-align",
       title: deliveryTargetAlignReady ? `Align ${deliveryTarget.name} target` : "Align Delivery Target",
@@ -13386,6 +13404,14 @@ function quickActionResultMetricSnapshot(
     return { id: "session-pass", label: "Session pass", value: action.detail };
   }
 
+  if (action.id.startsWith("session-brief-starter-")) {
+    return {
+      id: "session-brief",
+      label: "Brief fields",
+      value: `${sessionBriefFilledFields(project.sessionBrief)}/4 fields`
+    };
+  }
+
   if (action.id === "first-beat-path-jump") {
     return {
       id: "first-beat-path",
@@ -14159,6 +14185,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused workstation panel to inspect the selected Session Pass card before changing project data.",
       nextCheck: "Return to Session Pass when you need another direct Guided, Studio, Finish, or Delivery focus."
+    };
+  }
+
+  if (action.id.startsWith("session-brief-starter-")) {
+    return {
+      auditionCue: "Read Brief Compass, then use Listening Pass to compare the beat against the written context.",
+      nextCheck: `${sessionBriefFilledFields(project.sessionBrief)}/4 brief fields; review Handoff Pack before export.`
     };
   }
 
