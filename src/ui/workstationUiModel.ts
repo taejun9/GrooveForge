@@ -2581,6 +2581,24 @@ export type SessionBriefRoleSummary = {
   tone: MixCoachTone;
 };
 
+export type SessionBriefCompassCardId = "direction" | "reference" | "artist" | "handoff";
+
+export type SessionBriefCompassCard = {
+  id: SessionBriefCompassCardId;
+  label: string;
+  value: string;
+  detail: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
+export type SessionBriefCompassSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: SessionBriefCompassCard[];
+};
+
 export type SessionBriefStarterPadId = "starter" | "vocal" | "store" | "club";
 
 export type SessionBriefStarterPadDefinition = {

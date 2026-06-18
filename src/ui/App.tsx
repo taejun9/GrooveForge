@@ -466,6 +466,8 @@ import type {
   HandoffManifestAuditCheck,
   HandoffManifestAuditSummary,
   SessionBriefRoleSummary,
+  SessionBriefCompassCard,
+  SessionBriefCompassSummary,
   SessionBriefStarterPadId,
   SessionBriefStarterPadDefinition,
   SessionBriefStarterPadOption,
@@ -955,6 +957,10 @@ export function App(): ReactElement {
     [project, firstBeatPathSummary, reviewQueueSummary, finishChecklistSummary, exportPreflightSummary]
   );
   const sessionBriefStarterPads = useMemo(() => createSessionBriefStarterPadOptions(project), [project]);
+  const sessionBriefCompassSummary = useMemo(
+    () => createSessionBriefCompassSummary(project, exportAnalysis, stemAnalyses),
+    [project, exportAnalysis, stemAnalyses]
+  );
   const snapshotCompareSummary = useMemo(() => createSnapshotCompareSummary(project), [project]);
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
   const patternDnaSummary = useMemo(() => createPatternDnaSummary(project), [project]);
@@ -5506,6 +5512,7 @@ export function App(): ReactElement {
 
       <SessionBriefPanel
         brief={project.sessionBrief}
+        compass={sessionBriefCompassSummary}
         result={sessionBriefStarterResult}
         starterPads={sessionBriefStarterPads}
         onApplyStarter={applySessionBriefStarterPad}
@@ -7735,6 +7742,7 @@ function DeliveryTargetAlignmentResultStrip({ result }: { result: DeliveryTarget
 
 function SessionBriefPanel({
   brief,
+  compass,
   result,
   starterPads,
   onApplyStarter,
@@ -7742,6 +7750,7 @@ function SessionBriefPanel({
   onClear
 }: {
   brief: SessionBrief;
+  compass: SessionBriefCompassSummary;
   result: SessionBriefStarterResult | null;
   starterPads: SessionBriefStarterPadOption[];
   onApplyStarter: (pad: SessionBriefStarterPadId) => void;
@@ -7772,6 +7781,33 @@ function SessionBriefPanel({
         </div>
       </div>
       <div className="session-brief-body">
+        <div
+          aria-label={`${compass.headline}: ${compass.detail}`}
+          className={`session-brief-compass ${compass.tone}`}
+          data-testid="session-brief-compass"
+          title={`${compass.headline}: ${compass.detail}`}
+        >
+          <div className="session-brief-compass-heading">
+            <span>Brief Compass</span>
+            <strong data-testid="session-brief-compass-headline">{compass.headline}</strong>
+            <small data-testid="session-brief-compass-detail">{compass.detail}</small>
+          </div>
+          <div className="session-brief-compass-grid" data-testid="session-brief-compass-grid">
+            {compass.cards.map((card) => (
+              <div
+                className={`session-brief-compass-card ${card.tone}`}
+                data-testid={`session-brief-compass-card-${card.id}`}
+                key={card.id}
+                title={`${card.label}: ${card.value}. ${card.nextCheck}`}
+              >
+                <span data-testid={`session-brief-compass-card-${card.id}-label`}>{card.label}</span>
+                <strong data-testid={`session-brief-compass-card-${card.id}-value`}>{card.value}</strong>
+                <small data-testid={`session-brief-compass-card-${card.id}-detail`}>{card.detail}</small>
+                <em data-testid={`session-brief-compass-card-${card.id}-next`}>{card.nextCheck}</em>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="session-brief-starters" aria-label="Session Brief Starter Pads">
           {starterPads.map((pad) => (
             <button
@@ -15463,6 +15499,80 @@ function createSessionBriefRoleSummary(brief: SessionBrief): SessionBriefRoleSum
     detailLabel,
     detailTitle: `${filledFields}/4 fields / ${status.detail} / ${detailLabel}`,
     tone: status.tone
+  };
+}
+
+function createSessionBriefCompassSummary(
+  project: ProjectState,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): SessionBriefCompassSummary {
+  const brief = project.sessionBrief;
+  const target = activeDeliveryTarget(project);
+  const style = getStyle(project);
+  const bars = arrangementTotalBars(project);
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const hasArtist = brief.artist.trim().length > 0;
+  const hasVibe = brief.vibe.trim().length > 0;
+  const hasReference = brief.reference.trim().length > 0;
+  const hasNotes = brief.notes.trim().length > 0;
+  const filledFields = sessionBriefFilledFields(brief);
+  const contextTone: MixCoachTone = filledFields >= 3 ? "good" : filledFields >= 1 ? "warn" : "danger";
+  const requiredStems = Math.min(target.stemGoal, stemTrackIds.length);
+  const handoffTone: MixCoachTone =
+    filledFields >= 3 && analysis.status !== "Silent" && audibleStems.length >= requiredStems
+      ? "good"
+      : filledFields >= 2 && analysis.status !== "Silent" && audibleStems.length >= 2
+        ? "warn"
+        : "danger";
+  const cards: SessionBriefCompassCard[] = [
+    {
+      id: "direction",
+      label: "Direction",
+      value: hasVibe ? compactSessionBriefValue(brief.vibe) : "No vibe",
+      detail: hasVibe
+        ? `${style.name} / ${project.key} / ${project.bpm} BPM`
+        : `Add a mood or energy cue for ${style.name}.`,
+      nextCheck: hasVibe ? "Match Beat Spine and Composer Guide moves to this vibe." : "Fill Vibe before choosing more writing moves.",
+      tone: hasVibe ? "good" : "warn"
+    },
+    {
+      id: "reference",
+      label: "Reference",
+      value: hasReference ? compactSessionBriefValue(brief.reference) : "No reference",
+      detail: hasReference
+        ? "Use by ear; no track import needed."
+        : "Add a track, scene, or sound cue as text.",
+      nextCheck: hasReference ? "Use Listening Pass to compare feel by ear." : "Write a text reference before mix decisions.",
+      tone: hasReference ? "good" : "warn"
+    },
+    {
+      id: "artist",
+      label: target.id === "vocal_session" ? "Vocal Context" : "Artist Context",
+      value: hasArtist ? compactSessionBriefValue(brief.artist) : "Open artist",
+      detail: hasNotes ? compactSessionBriefValue(brief.notes) : `${target.name} / ${mixPostureLabel(target.mixPosture)}`,
+      nextCheck: hasArtist || hasNotes ? "Keep arrangement space aligned with this context." : "Add artist or notes before handoff.",
+      tone: hasArtist || hasNotes ? "good" : "warn"
+    },
+    {
+      id: "handoff",
+      label: "Handoff",
+      value: `${filledFields}/4 fields`,
+      detail: `${barCountLabel(bars)} / ${analysis.status} / ${audibleStems.length}/${target.stemGoal} stems`,
+      nextCheck: handoffTone === "good" ? "Review Handoff Pack before export." : "Fill brief, confirm stems, then export explicitly.",
+      tone: handoffTone
+    }
+  ];
+  const tone = weakestTone([...cards.map((card) => card.tone), contextTone]);
+  const readyCount = cards.filter((card) => card.tone === "good").length;
+  const headline =
+    tone === "good" ? "Brief ready for session decisions" : tone === "warn" ? "Brief needs one more cue" : "Brief blocks handoff";
+
+  return {
+    headline,
+    detail: `${readyCount}/${cards.length} ready / ${target.name} / local notes only`,
+    tone,
+    cards
   };
 }
 
