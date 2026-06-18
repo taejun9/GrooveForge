@@ -477,9 +477,13 @@ import type {
   SessionPassCard,
   SessionPassSummary,
   SnapshotCompareMetricId,
+  SnapshotCompareFocusId,
+  SnapshotCompareFocusTarget,
+  SnapshotCompareFocusItem,
   SnapshotCompareMetric,
   SnapshotCompareCard,
   SnapshotCompareSummary,
+  SnapshotCompareFocusSummary,
   SnapshotSlotRoleSummary,
   EditHistoryReadoutSummary,
   TapTempoReadoutSummary,
@@ -585,7 +589,8 @@ import {
   patternCloneVariationPresets,
   grooveFeelDefinitions,
   drumAccentDefinitions,
-  drumFoundationDefinitions
+  drumFoundationDefinitions,
+  snapshotCompareFocusItems
 } from "./workstationUiModel";
 import {
   FirstBeatPath,
@@ -1016,6 +1021,7 @@ export function App(): ReactElement {
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
+  const [snapshotCompareFocusId, setSnapshotCompareFocusId] = useState<SnapshotCompareFocusId | null>(null);
   const [hookReadinessFocusId, setHookReadinessFocusId] = useState<HookReadinessFocusId | null>(null);
   const [hookFixResult, setHookFixResult] = useState<HookFixResult | null>(null);
   const [toplineSpaceFocusId, setToplineSpaceFocusId] = useState<ToplineSpaceFocusId | null>(null);
@@ -5956,6 +5962,20 @@ export function App(): ReactElement {
     setProjectStatus(`Snapshot ${metric.label}: ${metric.value}`);
   }
 
+  function focusSnapshotCompareMetric(item: SnapshotCompareFocusItem): void {
+    const targetRefs: Record<SnapshotCompareFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    setSnapshotCompareFocusId(item.focusId);
+    targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Snapshot Compare ${item.cardName} ${item.label}: ${item.value}`);
+  }
+
   function focusHookReadinessCard(card: HookReadinessFocusItem): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -6338,6 +6358,7 @@ export function App(): ReactElement {
     playbackMode,
     project,
     productionSnapshotSummary,
+    snapshotCompareSummary,
     exportAnalysis,
     exportPreflightSummary,
     reviewQueueSummary,
@@ -6502,6 +6523,7 @@ export function App(): ReactElement {
     onFocusModeFocus: focusModeFocusCard,
     onFocusPatternDna: focusPatternDnaCard,
     onFocusProductionSnapshot: focusProductionSnapshotMetric,
+    onFocusSnapshotCompare: focusSnapshotCompareMetric,
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusSessionPass: focusSessionPassCard,
     onFocusStyleInspector: focusStyleInspectorItem,
@@ -7000,7 +7022,12 @@ export function App(): ReactElement {
         onSave={saveCurrentSnapshot}
       />
 
-      <SnapshotCompare summary={snapshotCompareSummary} />
+      <SnapshotCompare
+        focusedMetricId={snapshotCompareFocusId}
+        focusSummary={createSnapshotCompareFocusSummary(snapshotCompareSummary, snapshotCompareFocusId)}
+        onFocus={focusSnapshotCompareMetric}
+        summary={snapshotCompareSummary}
+      />
 
       <section className="workspace-grid">
         <section className="panel pattern-panel" data-testid="workflow-target-compose" aria-label="Pattern editor" ref={composePanelRef}>
@@ -10813,6 +10840,23 @@ function activeProductionSnapshotQuickActionMetric(summary: ProductionSnapshotSu
   return summary.metrics.find((metric) => metric.tone !== "good") ?? summary.metrics[0] ?? null;
 }
 
+function activeSnapshotCompareQuickActionItem(summary: SnapshotCompareSummary): SnapshotCompareFocusItem | null {
+  const items = snapshotCompareFocusItems(summary);
+  return items.find((item) => item.tone !== "good") ?? items[0] ?? null;
+}
+
+const snapshotCompareMetricOrder: SnapshotCompareMetricId[] = ["setup", "length", "readiness", "export", "stems", "master"];
+
+function snapshotCompareDirectMetricItems(summary: SnapshotCompareSummary): SnapshotCompareFocusItem[] {
+  const items = snapshotCompareFocusItems(summary);
+
+  return snapshotCompareMetricOrder.flatMap((metricId) => {
+    const matchingItems = items.filter((item) => item.metricId === metricId);
+    const item = matchingItems.find((candidate) => candidate.tone !== "good") ?? matchingItems[0] ?? null;
+    return item ? [item] : [];
+  });
+}
+
 function activeFinishChecklistQuickActionCard(summary: FinishChecklistSummary): FinishChecklistCard | null {
   return summary.cards.find((card) => card.tone !== "good") ?? summary.cards[0] ?? null;
 }
@@ -11946,6 +11990,7 @@ function createQuickActions({
   playbackMode,
   project,
   productionSnapshotSummary,
+  snapshotCompareSummary,
   exportAnalysis,
   exportPreflightSummary,
   reviewQueueSummary,
@@ -12109,6 +12154,7 @@ function createQuickActions({
   onFocusModeFocus,
   onFocusPatternDna,
   onFocusProductionSnapshot,
+  onFocusSnapshotCompare,
   onFocusReviewQueue,
   onApplyReviewFix,
   onFocusSessionPass,
@@ -12171,6 +12217,7 @@ function createQuickActions({
   playbackMode: PlaybackMode;
   project: ProjectState;
   productionSnapshotSummary: ProductionSnapshotSummary;
+  snapshotCompareSummary: SnapshotCompareSummary;
   exportAnalysis: ExportAnalysis;
   exportPreflightSummary: ExportPreflightSummary;
   reviewQueueSummary: ReviewQueueSummary;
@@ -12334,6 +12381,7 @@ function createQuickActions({
   onFocusModeFocus: (card: ModeFocusCard) => void;
   onFocusPatternDna: (card: PatternDnaCard) => void;
   onFocusProductionSnapshot: (metric: ProductionSnapshotFocusItem) => void;
+  onFocusSnapshotCompare: (item: SnapshotCompareFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
   onApplyReviewFix: (item?: ReviewQueueItem) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
@@ -12593,6 +12641,15 @@ function createQuickActions({
     group: "Project",
     keywords: `production snapshot focus metric session scan ${metric.id} ${metric.label} ${metric.value} ${metric.focusLabel} ${metric.detail} target form patterns mix handoff beginner producer`,
     run: () => onFocusProductionSnapshot(metric)
+  }));
+  const snapshotCompareItem = activeSnapshotCompareQuickActionItem(snapshotCompareSummary);
+  const snapshotCompareActions: QuickAction[] = snapshotCompareDirectMetricItems(snapshotCompareSummary).map((item) => ({
+    id: `snapshot-compare-metric-${item.metricId}`,
+    title: `Focus Snapshot Compare: ${item.label}`,
+    detail: `${item.cardName} / ${item.value} / ${item.focusLabel} / ${item.detail}`,
+    group: "Project",
+    keywords: `snapshot compare focus metric saved take version ${item.metricId} ${item.label} ${item.value} ${item.focusLabel} ${item.cardName} ${item.detail} setup length readiness export stems master beginner producer`,
+    run: () => onFocusSnapshotCompare(item)
   }));
   const hookReadinessCard = activeHookReadinessQuickActionCard(hookReadinessSummary);
   const hookFixOption = hookReadinessCard ? createHookFixOption(hookReadinessCard) : null;
@@ -14013,6 +14070,22 @@ function createQuickActions({
     },
     ...productionSnapshotActions,
     {
+      id: "snapshot-compare-focus",
+      title: snapshotCompareItem ? `Focus Snapshot Compare: ${snapshotCompareItem.label}` : "Focus Snapshot Compare",
+      detail: snapshotCompareItem
+        ? `${snapshotCompareItem.cardName} / ${snapshotCompareItem.value} / ${snapshotCompareItem.focusLabel}`
+        : "Save a Project Snapshot before comparing takes.",
+      group: "Project",
+      keywords: `snapshot compare focus saved take version setup length readiness export stems master inspect ${snapshotCompareItem?.metricId ?? "none"} ${snapshotCompareItem?.focusLabel ?? "none"} beginner producer`,
+      disabled: !snapshotCompareItem,
+      run: () => {
+        if (snapshotCompareItem) {
+          onFocusSnapshotCompare(snapshotCompareItem);
+        }
+      }
+    },
+    ...snapshotCompareActions,
+    {
       id: "hook-readiness-focus",
       title: hookReadinessCard ? `Focus Hook Readiness: ${hookReadinessCard.label}` : "Focus Hook Readiness",
       detail: hookReadinessCard
@@ -14723,6 +14796,8 @@ function createQuickActionResult(
     action.id.startsWith("beat-passport-metric-") ||
     action.id === "production-snapshot-focus" ||
     action.id.startsWith("production-snapshot-metric-") ||
+    action.id === "snapshot-compare-focus" ||
+    action.id.startsWith("snapshot-compare-metric-") ||
     action.id === "topline-space-focus" ||
     action.id.startsWith("topline-space-card-") ||
     action.id === "arrangement-mute-map-focus" ||
@@ -15459,6 +15534,22 @@ function quickActionResultMetricSnapshot(
     return {
       id: "production-snapshot",
       label: "Production snapshot",
+      value: action.detail
+    };
+  }
+
+  if (action.id === "snapshot-compare-focus") {
+    return {
+      id: "snapshot-compare",
+      label: "Snapshot compare",
+      value: `${project.snapshots.length}/${maxProjectSnapshots} saved takes`
+    };
+  }
+
+  if (action.id.startsWith("snapshot-compare-metric-")) {
+    return {
+      id: "snapshot-compare",
+      label: "Snapshot compare",
       value: action.detail
     };
   }
@@ -16490,6 +16581,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Production Snapshot metric to inspect that session-scan lane before changing the beat.",
       nextCheck: "Return to Production Snapshot when you need another direct target, form, pattern, mix, or handoff focus."
+    };
+  }
+
+  if (action.id === "snapshot-compare-focus") {
+    return {
+      auditionCue: "Use the focused Snapshot Compare metric to inspect the saved take against the current beat before restoring, deleting, or making major edits.",
+      nextCheck: "Return to Snapshot Compare after the focused saved-take lane is understood or intentionally deferred."
+    };
+  }
+
+  if (action.id.startsWith("snapshot-compare-metric-")) {
+    return {
+      auditionCue: "Use the focused Snapshot Compare metric to inspect that saved-take lane before changing project data.",
+      nextCheck: "Return to Snapshot Compare when you need another direct setup, length, readiness, export, stems, or master comparison."
     };
   }
 
@@ -18418,7 +18523,9 @@ function createSnapshotCompareCard(
       current: current.setup,
       snapshot: saved.setup,
       detail: saved.setup === current.setup ? "Matches current setup" : `Current ${current.setup}`,
-      tone: saved.setup === current.setup ? "good" : "warn"
+      tone: saved.setup === current.setup ? "good" : "warn",
+      focusTarget: "compose",
+      focusLabel: "Compose"
     },
     {
       id: "length",
@@ -18426,7 +18533,9 @@ function createSnapshotCompareCard(
       current: current.length,
       snapshot: saved.length,
       detail: saved.length === current.length ? "Same arrangement length" : `Current ${current.length}`,
-      tone: saved.bars < 8 ? "danger" : saved.length === current.length ? "good" : "warn"
+      tone: saved.bars < 8 ? "danger" : saved.length === current.length ? "good" : "warn",
+      focusTarget: "arrange",
+      focusLabel: "Arrange"
     },
     {
       id: "readiness",
@@ -18439,7 +18548,9 @@ function createSnapshotCompareCard(
           ? "danger"
           : saved.readyCount >= current.readyCount && saved.readinessTone === "good"
             ? "good"
-            : "warn"
+            : "warn",
+      focusTarget: "compose",
+      focusLabel: "Compose"
     },
     {
       id: "export",
@@ -18447,7 +18558,9 @@ function createSnapshotCompareCard(
       current: current.exportStatus,
       snapshot: saved.exportStatus,
       detail: `Current ${current.exportStatus} / ${saved.exportDetail}`,
-      tone: saved.exportTone === "danger" ? "danger" : saved.exportStatus === current.exportStatus ? saved.exportTone : "warn"
+      tone: saved.exportTone === "danger" ? "danger" : saved.exportStatus === current.exportStatus ? saved.exportTone : "warn",
+      focusTarget: "deliver",
+      focusLabel: "Deliver"
     },
     {
       id: "stems",
@@ -18455,7 +18568,9 @@ function createSnapshotCompareCard(
       current: current.stems,
       snapshot: saved.stems,
       detail: `Current ${current.stems} / ${saved.stemCount}/${saved.stemGoal} target`,
-      tone: saved.stemTone
+      tone: saved.stemTone,
+      focusTarget: "deliver",
+      focusLabel: "Deliver"
     },
     {
       id: "master",
@@ -18463,7 +18578,9 @@ function createSnapshotCompareCard(
       current: current.master,
       snapshot: saved.master,
       detail: saved.masterDetail === current.masterDetail ? "Same master posture" : `Current ${current.master} / ${saved.masterDetail}`,
-      tone: saved.master === current.master && saved.masterDetail === current.masterDetail ? "good" : "warn"
+      tone: saved.master === current.master && saved.masterDetail === current.masterDetail ? "good" : "warn",
+      focusTarget: "master",
+      focusLabel: "Master"
     }
   ];
 
@@ -18473,6 +18590,38 @@ function createSnapshotCompareCard(
     detail: `${snapshotSavedDateLabel(snapshot.createdAt)} / ${saved.targetName} / ${saved.length}`,
     tone: weakestTone(metrics.map((metric) => metric.tone)),
     metrics
+  };
+}
+
+function createSnapshotCompareFocusSummary(
+  summary: SnapshotCompareSummary,
+  focusedMetricId: SnapshotCompareFocusId | null
+): SnapshotCompareFocusSummary {
+  const items = snapshotCompareFocusItems(summary);
+  const focusedItem = focusedMetricId ? items.find((item) => item.focusId === focusedMetricId) ?? null : null;
+  const item = focusedItem ?? items.find((candidate) => candidate.tone !== "good") ?? items[0] ?? null;
+
+  if (!item) {
+    return {
+      focusId: null,
+      statusLabel: "Compare empty",
+      areaLabel: "No saved take focus",
+      detailLabel: "Save a Project Snapshot before comparing versions",
+      detailTitle: "Snapshot Compare has no focusable saved takes yet.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel = focusedItem ? "Focused Compare" : "Compare Focus";
+  const detailLabel = `${item.focusLabel} panel / ${item.detail}`;
+
+  return {
+    focusId: item.focusId,
+    statusLabel,
+    areaLabel: `${item.cardName} ${item.label}: ${item.value}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${item.cardName} / ${item.label}: ${item.value} / ${detailLabel}`,
+    tone: item.tone
   };
 }
 

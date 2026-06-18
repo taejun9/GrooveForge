@@ -2632,6 +2632,22 @@ export type SessionPassSummary = {
 
 export type SnapshotCompareMetricId = "setup" | "length" | "readiness" | "export" | "stems" | "master";
 
+export type SnapshotCompareFocusId = `${string}:${SnapshotCompareMetricId}`;
+export type SnapshotCompareFocusTarget = ReviewQueueFocusTarget;
+
+export type SnapshotCompareFocusItem = {
+  focusId: SnapshotCompareFocusId;
+  metricId: SnapshotCompareMetricId;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+  focusTarget: SnapshotCompareFocusTarget;
+  focusLabel: string;
+  cardId: string;
+  cardName: string;
+};
+
 export type SnapshotCompareMetric = {
   id: SnapshotCompareMetricId;
   label: string;
@@ -2639,6 +2655,8 @@ export type SnapshotCompareMetric = {
   snapshot: string;
   detail: string;
   tone: MixCoachTone;
+  focusTarget: SnapshotCompareFocusTarget;
+  focusLabel: string;
 };
 
 export type SnapshotCompareCard = {
@@ -2655,6 +2673,41 @@ export type SnapshotCompareSummary = {
   tone: MixCoachTone;
   cards: SnapshotCompareCard[];
 };
+
+export type SnapshotCompareFocusSummary = {
+  focusId: SnapshotCompareFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export function snapshotCompareFocusId(cardId: string, metricId: SnapshotCompareMetricId): SnapshotCompareFocusId {
+  return `${cardId}:${metricId}` as SnapshotCompareFocusId;
+}
+
+export function snapshotCompareFocusItem(
+  card: SnapshotCompareCard,
+  metric: SnapshotCompareMetric
+): SnapshotCompareFocusItem {
+  return {
+    focusId: snapshotCompareFocusId(card.id, metric.id),
+    metricId: metric.id,
+    label: metric.label,
+    value: metric.snapshot,
+    detail: `${metric.detail} / current ${metric.current}`,
+    tone: metric.tone,
+    focusTarget: metric.focusTarget,
+    focusLabel: metric.focusLabel,
+    cardId: card.id,
+    cardName: card.name
+  };
+}
+
+export function snapshotCompareFocusItems(summary: SnapshotCompareSummary): SnapshotCompareFocusItem[] {
+  return summary.cards.flatMap((card) => card.metrics.map((metric) => snapshotCompareFocusItem(card, metric)));
+}
 
 export type SnapshotSlotRoleSummary = {
   roleLabel: string;

@@ -3,8 +3,8 @@ import type { ReactElement, ReactNode } from "react";
 import type { PatternSlot, ProjectState } from "../domain/workstation";
 import { arrangementTotalBars, maxProjectSnapshotNameLength, maxProjectSnapshots, projectSnapshotSummary } from "../domain/workstation";
 import type { PlaybackMode } from "../audio/scheduler";
-import type { BeatReadinessCheck, LayerStarterId, LayerStarterOption, LocalDraftRecovery, PatternCompareSummary, QuickAction, QuickActionRecent, QuickActionResult, QuickActionScopeId, QuickActionScopeOption, QuickActionSpotlightSummary, SnapshotCompareSummary, SnapshotSlotRoleSummary } from "./workstationUiModel";
-import { maxQuickActionPins } from "./workstationUiModel";
+import type { BeatReadinessCheck, LayerStarterId, LayerStarterOption, LocalDraftRecovery, PatternCompareSummary, QuickAction, QuickActionRecent, QuickActionResult, QuickActionScopeId, QuickActionScopeOption, QuickActionSpotlightSummary, SnapshotCompareFocusId, SnapshotCompareFocusItem, SnapshotCompareFocusSummary, SnapshotCompareSummary, SnapshotSlotRoleSummary } from "./workstationUiModel";
+import { maxQuickActionPins, snapshotCompareFocusItem } from "./workstationUiModel";
 import { barCountLabel, formatLocalDraftSavedAt } from "./workstationPatternTools";
 
 type CommandReferenceItem = {
@@ -670,7 +670,17 @@ export function ProjectSnapshots({
   );
 }
 
-export function SnapshotCompare({ summary }: { summary: SnapshotCompareSummary }): ReactElement {
+export function SnapshotCompare({
+  focusedMetricId,
+  focusSummary,
+  onFocus,
+  summary
+}: {
+  focusedMetricId: SnapshotCompareFocusId | null;
+  focusSummary: SnapshotCompareFocusSummary;
+  onFocus: (item: SnapshotCompareFocusItem) => void;
+  summary: SnapshotCompareSummary;
+}): ReactElement {
   return (
     <section className={`snapshot-compare ${summary.tone}`} data-testid="snapshot-compare" aria-label="Snapshot compare">
       <div className="snapshot-compare-heading">
@@ -680,6 +690,11 @@ export function SnapshotCompare({ summary }: { summary: SnapshotCompareSummary }
         </div>
         <strong data-testid="snapshot-compare-headline">{summary.headline}</strong>
         <small data-testid="snapshot-compare-detail">{summary.detail}</small>
+      </div>
+      <div className={`snapshot-compare-focus-readout ${focusSummary.tone}`} data-testid="snapshot-compare-focus-readout" title={focusSummary.detailTitle}>
+        <span data-testid="snapshot-compare-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="snapshot-compare-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="snapshot-compare-focus-detail">{focusSummary.detailLabel}</small>
       </div>
       {summary.cards.length === 0 ? (
         <div className="snapshot-compare-empty" data-testid="snapshot-compare-empty">
@@ -694,17 +709,34 @@ export function SnapshotCompare({ summary }: { summary: SnapshotCompareSummary }
                 <small>{card.detail}</small>
               </div>
               <div className="snapshot-compare-metrics">
-                {card.metrics.map((metric) => (
-                  <div
-                    className={`snapshot-compare-metric ${metric.tone}`}
-                    data-testid={`snapshot-compare-${card.id}-${metric.id}`}
-                    key={metric.id}
-                  >
-                    <span>{metric.label}</span>
-                    <strong>{metric.snapshot}</strong>
-                    <small>{metric.detail}</small>
-                  </div>
-                ))}
+                {card.metrics.map((metric) => {
+                  const focusItem = snapshotCompareFocusItem(card, metric);
+                  const focused = focusedMetricId === focusItem.focusId;
+
+                  return (
+                    <div
+                      className={["snapshot-compare-metric", metric.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+                      data-focused={focused ? "true" : "false"}
+                      data-testid={`snapshot-compare-${card.id}-${metric.id}`}
+                      key={metric.id}
+                    >
+                      <span>{metric.label}</span>
+                      <strong>{metric.snapshot}</strong>
+                      <button
+                        aria-pressed={focused}
+                        className="snapshot-compare-focus-button"
+                        data-testid={`snapshot-compare-focus-${card.id}-${metric.id}`}
+                        onClick={() => onFocus(focusItem)}
+                        title={`Focus ${metric.focusLabel}: ${metric.snapshot}`}
+                        type="button"
+                      >
+                        <ArrowRight size={13} aria-hidden="true" />
+                        <span>{metric.focusLabel}</span>
+                      </button>
+                      <small>{metric.detail}</small>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
