@@ -273,7 +273,7 @@ npm run verify
 
 `npm run verify` includes the runtime smoke harness, typecheck, and production build. `npm run desktop` performs a production build and launches Electron from the built files.
 
-Production builds use Vite 8 / Rolldown code splitting groups for `react-vendor`, `icons-vendor`, `vendor`, `audio-engine`, `workstation-core`, `workstation-ui-model`, `workstation-editor-audition`, `workstation-selected-actions`, `workstation-pattern-tools`, `workstation-mix-panels`, `workstation-compose-panels`, `workstation-guidance-panels`, and `workstation-shell-panels` while preserving `dist` output and sourcemaps; build hygiene should remove large-chunk warnings through real chunk separation, not by raising `chunkSizeWarningLimit`.
+Production builds use Vite 8 / Rolldown code splitting groups for `react-vendor`, `icons-vendor`, `vendor`, `audio-engine`, `workstation-core`, `workstation-ui-model`, `workstation-editor-audition`, `workstation-selected-actions`, `workstation-pattern-tools`, `workstation-mix-panels`, `workstation-compose-panels`, `workstation-guidance-panels`, `workstation-shell-panels`, `workstation-snapshot-compare`, and `workstation-analysis` while preserving `dist` output and sourcemaps; build hygiene should remove large-chunk warnings through real chunk separation, not by raising `chunkSizeWarningLimit`.
 
 ## Layout
 

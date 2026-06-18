@@ -74,6 +74,16 @@ export default defineConfig({
               name: "workstation-shell-panels",
               test: /src[\\/]ui[\\/]workstationShellPanels\.tsx$/,
               priority: 2
+            },
+            {
+              name: "workstation-snapshot-compare",
+              test: /src[\\/]ui[\\/]workstationSnapshotCompare\.ts$/,
+              priority: 2
+            },
+            {
+              name: "workstation-analysis",
+              test: /src[\\/]ui[\\/]workstationAnalysis\.ts$/,
+              priority: 2
             }
           ]
         }

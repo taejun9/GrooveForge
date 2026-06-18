@@ -80,7 +80,6 @@ import {
   PatternFillPreset,
   PatternChainId,
   PatternSlot,
-  ProjectSnapshot,
   PatternVariationPreset,
   ProjectState,
   SoundDesign,
@@ -476,14 +475,10 @@ import type {
   SessionPassCardId,
   SessionPassCard,
   SessionPassSummary,
-  SnapshotCompareMetricId,
   SnapshotCompareFocusId,
   SnapshotCompareFocusTarget,
   SnapshotCompareFocusItem,
-  SnapshotCompareMetric,
-  SnapshotCompareCard,
   SnapshotCompareSummary,
-  SnapshotCompareFocusSummary,
   SnapshotSlotRoleSummary,
   EditHistoryReadoutSummary,
   TapTempoReadoutSummary,
@@ -589,9 +584,15 @@ import {
   patternCloneVariationPresets,
   grooveFeelDefinitions,
   drumAccentDefinitions,
-  drumFoundationDefinitions,
-  snapshotCompareFocusItems
+  drumFoundationDefinitions
 } from "./workstationUiModel";
+import type { SnapshotCompareProjectProfile } from "./workstationSnapshotCompare";
+import {
+  activeSnapshotCompareQuickActionItem,
+  createSnapshotCompareFocusSummary,
+  createSnapshotCompareSummary,
+  snapshotCompareDirectMetricItems
+} from "./workstationSnapshotCompare";
 import {
   FirstBeatPath,
   ModeFocus,
@@ -893,6 +894,7 @@ import {
   downloadTextFile,
   fileDisplayName
 } from "./workstationPatternTools";
+import { audibleStemTracks, masterChannelVolumeDb, stemSpreadDb, weakestTone } from "./workstationAnalysis";
 
 const minProjectSwing = 0;
 const maxProjectSwing = 0.24;
@@ -1165,7 +1167,7 @@ export function App(): ReactElement {
     () => createSessionBriefCompassSummary(project, exportAnalysis, stemAnalyses),
     [project, exportAnalysis, stemAnalyses]
   );
-  const snapshotCompareSummary = useMemo(() => createSnapshotCompareSummary(project), [project]);
+  const snapshotCompareSummary = useMemo(() => createSnapshotCompareSummary(project, createSnapshotCompareProjectProfile), [project]);
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
   const patternDnaSummary = useMemo(() => createPatternDnaSummary(project), [project]);
   const layerStarterOptions = useMemo(() => createLayerStarterOptions(project), [project]);
@@ -10840,23 +10842,6 @@ function activeProductionSnapshotQuickActionMetric(summary: ProductionSnapshotSu
   return summary.metrics.find((metric) => metric.tone !== "good") ?? summary.metrics[0] ?? null;
 }
 
-function activeSnapshotCompareQuickActionItem(summary: SnapshotCompareSummary): SnapshotCompareFocusItem | null {
-  const items = snapshotCompareFocusItems(summary);
-  return items.find((item) => item.tone !== "good") ?? items[0] ?? null;
-}
-
-const snapshotCompareMetricOrder: SnapshotCompareMetricId[] = ["setup", "length", "readiness", "export", "stems", "master"];
-
-function snapshotCompareDirectMetricItems(summary: SnapshotCompareSummary): SnapshotCompareFocusItem[] {
-  const items = snapshotCompareFocusItems(summary);
-
-  return snapshotCompareMetricOrder.flatMap((metricId) => {
-    const matchingItems = items.filter((item) => item.metricId === metricId);
-    const item = matchingItems.find((candidate) => candidate.tone !== "good") ?? matchingItems[0] ?? null;
-    return item ? [item] : [];
-  });
-}
-
 function activeFinishChecklistQuickActionCard(summary: FinishChecklistSummary): FinishChecklistCard | null {
   return summary.cards.find((card) => card.tone !== "good") ?? summary.cards[0] ?? null;
 }
@@ -18465,166 +18450,6 @@ function createBeatPassportFocusSummary(summary: BeatPassportSummary, focusedMet
   };
 }
 
-type SnapshotCompareProjectProfile = {
-  setup: string;
-  targetName: string;
-  bars: number;
-  length: string;
-  readyCount: number;
-  readiness: string;
-  readinessTone: MixCoachTone;
-  exportStatus: string;
-  exportDetail: string;
-  exportTone: MixCoachTone;
-  stemCount: number;
-  stemGoal: number;
-  stems: string;
-  stemTone: MixCoachTone;
-  master: string;
-  masterDetail: string;
-};
-
-function createSnapshotCompareSummary(project: ProjectState): SnapshotCompareSummary {
-  const current = createSnapshotCompareProjectProfile(project);
-
-  if (project.snapshots.length === 0) {
-    return {
-      headline: "No saved takes yet",
-      detail: `${current.setup} / ${current.length} / ${current.targetName}`,
-      tone: "warn",
-      cards: []
-    };
-  }
-
-  const cards = project.snapshots.map((snapshot) => createSnapshotCompareCard(current, snapshot));
-  const tone = weakestTone(cards.map((card) => card.tone));
-
-  return {
-    headline: `${project.snapshots.length} saved take${project.snapshots.length === 1 ? "" : "s"} to compare`,
-    detail: `${project.snapshots.length}/${maxProjectSnapshots} slots / current ${current.length} / ${current.targetName}`,
-    tone,
-    cards
-  };
-}
-
-function createSnapshotCompareCard(
-  current: SnapshotCompareProjectProfile,
-  snapshot: ProjectSnapshot
-): SnapshotCompareCard {
-  const snapshotProject: ProjectState = {
-    ...snapshot.project,
-    snapshots: []
-  };
-  const saved = createSnapshotCompareProjectProfile(snapshotProject);
-  const metrics: SnapshotCompareMetric[] = [
-    {
-      id: "setup",
-      label: "Setup",
-      current: current.setup,
-      snapshot: saved.setup,
-      detail: saved.setup === current.setup ? "Matches current setup" : `Current ${current.setup}`,
-      tone: saved.setup === current.setup ? "good" : "warn",
-      focusTarget: "compose",
-      focusLabel: "Compose"
-    },
-    {
-      id: "length",
-      label: "Length",
-      current: current.length,
-      snapshot: saved.length,
-      detail: saved.length === current.length ? "Same arrangement length" : `Current ${current.length}`,
-      tone: saved.bars < 8 ? "danger" : saved.length === current.length ? "good" : "warn",
-      focusTarget: "arrange",
-      focusLabel: "Arrange"
-    },
-    {
-      id: "readiness",
-      label: "Ready",
-      current: current.readiness,
-      snapshot: saved.readiness,
-      detail: `Current ${current.readiness} / ${saved.readyCount - current.readyCount >= 0 ? "+" : ""}${saved.readyCount - current.readyCount}`,
-      tone:
-        saved.readinessTone === "danger"
-          ? "danger"
-          : saved.readyCount >= current.readyCount && saved.readinessTone === "good"
-            ? "good"
-            : "warn",
-      focusTarget: "compose",
-      focusLabel: "Compose"
-    },
-    {
-      id: "export",
-      label: "Export",
-      current: current.exportStatus,
-      snapshot: saved.exportStatus,
-      detail: `Current ${current.exportStatus} / ${saved.exportDetail}`,
-      tone: saved.exportTone === "danger" ? "danger" : saved.exportStatus === current.exportStatus ? saved.exportTone : "warn",
-      focusTarget: "deliver",
-      focusLabel: "Deliver"
-    },
-    {
-      id: "stems",
-      label: "Stems",
-      current: current.stems,
-      snapshot: saved.stems,
-      detail: `Current ${current.stems} / ${saved.stemCount}/${saved.stemGoal} target`,
-      tone: saved.stemTone,
-      focusTarget: "deliver",
-      focusLabel: "Deliver"
-    },
-    {
-      id: "master",
-      label: "Master",
-      current: current.master,
-      snapshot: saved.master,
-      detail: saved.masterDetail === current.masterDetail ? "Same master posture" : `Current ${current.master} / ${saved.masterDetail}`,
-      tone: saved.master === current.master && saved.masterDetail === current.masterDetail ? "good" : "warn",
-      focusTarget: "master",
-      focusLabel: "Master"
-    }
-  ];
-
-  return {
-    id: snapshot.id,
-    name: snapshot.name,
-    detail: `${snapshotSavedDateLabel(snapshot.createdAt)} / ${saved.targetName} / ${saved.length}`,
-    tone: weakestTone(metrics.map((metric) => metric.tone)),
-    metrics
-  };
-}
-
-function createSnapshotCompareFocusSummary(
-  summary: SnapshotCompareSummary,
-  focusedMetricId: SnapshotCompareFocusId | null
-): SnapshotCompareFocusSummary {
-  const items = snapshotCompareFocusItems(summary);
-  const focusedItem = focusedMetricId ? items.find((item) => item.focusId === focusedMetricId) ?? null : null;
-  const item = focusedItem ?? items.find((candidate) => candidate.tone !== "good") ?? items[0] ?? null;
-
-  if (!item) {
-    return {
-      focusId: null,
-      statusLabel: "Compare empty",
-      areaLabel: "No saved take focus",
-      detailLabel: "Save a Project Snapshot before comparing versions",
-      detailTitle: "Snapshot Compare has no focusable saved takes yet.",
-      tone: "warn"
-    };
-  }
-
-  const statusLabel = focusedItem ? "Focused Compare" : "Compare Focus";
-  const detailLabel = `${item.focusLabel} panel / ${item.detail}`;
-
-  return {
-    focusId: item.focusId,
-    statusLabel,
-    areaLabel: `${item.cardName} ${item.label}: ${item.value}`,
-    detailLabel,
-    detailTitle: `${statusLabel} / ${item.cardName} / ${item.label}: ${item.value} / ${detailLabel}`,
-    tone: item.tone
-  };
-}
-
 function createSnapshotCompareProjectProfile(project: ProjectState): SnapshotCompareProjectProfile {
   const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const target = activeDeliveryTarget(project);
@@ -18657,11 +18482,6 @@ function createSnapshotCompareProjectProfile(project: ProjectState): SnapshotCom
     master: project.masterPreset,
     masterDetail: `${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(masterChannelVolumeDb(project.mixer))} output`
   };
-}
-
-function snapshotSavedDateLabel(createdAt: string): string {
-  const datePart = createdAt.trim().slice(0, 10);
-  return datePart.length === 10 ? datePart : "saved slot";
 }
 
 function createFinishChecklistSummary(
@@ -24730,20 +24550,6 @@ function melodyStyleRoleLabel(style: StyleProfile["melodyStyle"]): string {
   }
 }
 
-function audibleStemTracks(stemAnalyses: StemExportAnalyses): StemTrackId[] {
-  return stemTrackIds.filter((track) => Number.isFinite(stemAnalyses[track].rmsDb));
-}
-
-function weakestTone(tones: MixCoachTone[]): MixCoachTone {
-  if (tones.includes("danger")) {
-    return "danger";
-  }
-  if (tones.includes("warn")) {
-    return "warn";
-  }
-  return "good";
-}
-
 function createBeatReadinessChecks(project: ProjectState, analysis: ExportAnalysis): BeatReadinessCheck[] {
   const arrangedPatterns = arrangedPatternData(project);
   const drumHits = arrangedPatterns.reduce((total, pattern) => total + drumHitCount(pattern), 0);
@@ -25978,10 +25784,6 @@ function masterOutputRoleLabel(preset: MasterPreset, analysis: ExportAnalysis): 
   }
 }
 
-function masterChannelVolumeDb(mixer: MixerChannel[]): number {
-  return mixer.find((channel) => channel.id === "master")?.volumeDb ?? -1;
-}
-
 function applyMixBalancePadToMixer(mixer: MixerChannel[], pad: MixBalancePadDefinition): MixerChannel[] {
   return mixer.map((channel) => {
     const update = pad.channels[channel.id];
@@ -26678,17 +26480,6 @@ function lowEndDeltaDb(stemAnalyses: StemExportAnalyses): number | null {
   const drums = stemAnalyses.drum_rack;
   const bass = stemAnalyses.bass_808;
   return Number.isFinite(drums.rmsDb) && Number.isFinite(bass.rmsDb) ? bass.rmsDb - drums.rmsDb : null;
-}
-
-function stemSpreadDb(stemAnalyses: StemExportAnalyses): number | null {
-  const audibleStems = stemTrackIds
-    .map((track) => stemAnalyses[track])
-    .filter((analysis) => Number.isFinite(analysis.rmsDb));
-  if (audibleStems.length < 2) {
-    return null;
-  }
-  const levels = audibleStems.map((analysis) => analysis.rmsDb);
-  return Math.max(...levels) - Math.min(...levels);
 }
 
 function masterHeadroomCheck(analysis: ExportAnalysis): MixCoachCheck {
