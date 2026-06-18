@@ -12556,6 +12556,14 @@ function createQuickActions({
       keywords: "melody turn fill pattern synth",
       run: () => onApplyPatternFill("melody_turn")
     },
+    {
+      id: "fill-clear-tail",
+      title: "Clear Pattern Tail",
+      detail: `Clear tail events from Pattern ${project.selectedPattern}.`,
+      group: "Create",
+      keywords: "clear tail pattern fill cleanup transition reset drums 808 melody chords",
+      run: () => onApplyPatternFill("clear_tail")
+    },
     ...arrangementBlockJumpActions,
     ...selectedBlockActions,
     ...patternUseActions,
