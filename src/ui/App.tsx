@@ -387,6 +387,12 @@ import type {
   BeatMapSummary,
   StructureLensSignal,
   StructureLensSummary,
+  HookReadinessCardId,
+  HookReadinessFocusId,
+  HookReadinessFocusItem,
+  HookReadinessCard,
+  HookReadinessSummary,
+  HookReadinessFocusSummary,
   SongFormMetricId,
   SongFormMetric,
   SongFormSegment,
@@ -909,6 +915,7 @@ export function App(): ReactElement {
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
+  const [hookReadinessFocusId, setHookReadinessFocusId] = useState<HookReadinessFocusId | null>(null);
   const [keyCompassFocusId, setKeyCompassFocusId] = useState<KeyCompassFocusId | null>(null);
   const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
@@ -964,6 +971,10 @@ export function App(): ReactElement {
   );
   const structureLensSummary = useMemo(() => createStructureLensSummary(project), [project]);
   const structureLensActions = useMemo(() => createStructureLensActions(project), [project]);
+  const hookReadinessSummary = useMemo(
+    () => createHookReadinessSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
+  );
   const songFormOverviewSummary = useMemo(
     () => createSongFormOverviewSummary(project, selectedArrangementIndex),
     [project, selectedArrangementIndex]
@@ -4904,6 +4915,20 @@ export function App(): ReactElement {
     setProjectStatus(`Snapshot ${metric.label}: ${metric.value}`);
   }
 
+  function focusHookReadinessCard(card: HookReadinessFocusItem): void {
+    const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    setHookReadinessFocusId(card.focusId);
+    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Hook ${card.label}: ${card.value}`);
+  }
+
   function focusModeFocusCard(card: ModeFocusCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5115,6 +5140,7 @@ export function App(): ReactElement {
     firstBeatPathSummary,
     finishChecklistSummary,
     grooveCompassSummary,
+    hookReadinessSummary,
     isPlaying,
     keyCompassSummary,
     keyboardCaptureEnabled,
@@ -5257,6 +5283,7 @@ export function App(): ReactElement {
     onFocusExportPreflight: focusExportPreflightCard,
     onFocusFinishChecklist: focusFinishChecklistCard,
     onFocusGrooveCompass: focusGrooveCompassItem,
+    onFocusHookReadiness: focusHookReadinessCard,
     onFocusKeyCompass: focusKeyCompassItem,
     onFocusListeningPass: focusListeningPassItem,
     onFocusMixCoach: focusMixCoachCheck,
@@ -5672,6 +5699,12 @@ export function App(): ReactElement {
       <BeatMap summary={beatMapSummary} actions={beatMapActions} onRun={runNextMove} />
 
       <StructureLens summary={structureLensSummary} actions={structureLensActions} onRun={runNextMove} />
+
+      <HookReadiness
+        focusedCardId={hookReadinessFocusId}
+        onFocus={focusHookReadinessCard}
+        summary={hookReadinessSummary}
+      />
 
       <SongFormOverview
         playingArrangementIndex={playingArrangementIndex}
@@ -10540,6 +10573,61 @@ function StructureLens({
   );
 }
 
+function HookReadiness({
+  focusedCardId,
+  onFocus,
+  summary
+}: {
+  focusedCardId: HookReadinessFocusId | null;
+  onFocus: (card: HookReadinessFocusItem) => void;
+  summary: HookReadinessSummary;
+}): ReactElement {
+  const focusSummary = createHookReadinessFocusSummary(summary, focusedCardId);
+
+  return (
+    <section className={`hook-readiness ${summary.tone}`} data-testid="hook-readiness" aria-label="Hook readiness">
+      <div className="hook-readiness-heading">
+        <div>
+          <Target size={17} aria-hidden="true" />
+          <span>Hook Readiness</span>
+        </div>
+        <strong data-testid="hook-readiness-headline">{summary.headline}</strong>
+        <small data-testid="hook-readiness-detail">{summary.detail}</small>
+      </div>
+      <div
+        className={`hook-readiness-focus-readout ${focusSummary.tone}`}
+        data-testid="hook-readiness-focus-readout"
+        title={focusSummary.detailTitle}
+      >
+        <span data-testid="hook-readiness-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="hook-readiness-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="hook-readiness-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
+      <div className="hook-readiness-grid" data-testid="hook-readiness-cards">
+        {summary.cards.map((card) => {
+          const focused = focusedCardId === card.id;
+          return (
+            <div className={`hook-readiness-card ${card.tone} ${focused ? "focused" : ""}`} data-testid={`hook-readiness-card-${card.id}`} key={card.id}>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <small>{card.detail}</small>
+              <button
+                aria-pressed={focused}
+                className="hook-readiness-focus-button"
+                onClick={() => onFocus(card)}
+                title={`Focus ${card.focusLabel}: ${card.status}`}
+                type="button"
+              >
+                <span>{card.focusLabel}</span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function SongFormOverview({
   onSelectBlock,
   playingArrangementIndex,
@@ -10731,6 +10819,7 @@ function createQuickActions({
   firstBeatPathSummary,
   finishChecklistSummary,
   grooveCompassSummary,
+  hookReadinessSummary,
   isPlaying,
   keyCompassSummary,
   keyboardCaptureEnabled,
@@ -10873,6 +10962,7 @@ function createQuickActions({
   onFocusExportPreflight,
   onFocusFinishChecklist,
   onFocusGrooveCompass,
+  onFocusHookReadiness,
   onFocusKeyCompass,
   onFocusListeningPass,
   onFocusMixCoach,
@@ -10908,6 +10998,7 @@ function createQuickActions({
   firstBeatPathSummary: FirstBeatPathSummary;
   finishChecklistSummary: FinishChecklistSummary;
   grooveCompassSummary: GrooveCompassSummary;
+  hookReadinessSummary: HookReadinessSummary;
   isPlaying: boolean;
   keyCompassSummary: KeyCompassSummary;
   keyboardCaptureEnabled: boolean;
@@ -11050,6 +11141,7 @@ function createQuickActions({
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
   onFocusFinishChecklist: (card: FinishChecklistCard) => void;
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
+  onFocusHookReadiness: (card: HookReadinessFocusItem) => void;
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
   onFocusListeningPass: (item: ListeningPassItem) => void;
   onFocusMixCoach: (check: MixCoachCheck) => void;
@@ -11305,6 +11397,15 @@ function createQuickActions({
     group: "Project",
     keywords: `production snapshot focus metric session scan ${metric.id} ${metric.label} ${metric.value} ${metric.focusLabel} ${metric.detail} target form patterns mix handoff beginner producer`,
     run: () => onFocusProductionSnapshot(metric)
+  }));
+  const hookReadinessCard = activeHookReadinessQuickActionCard(hookReadinessSummary);
+  const hookReadinessActions: QuickAction[] = hookReadinessSummary.cards.map((card) => ({
+    id: `hook-readiness-card-${card.id}`,
+    title: `Focus Hook Readiness: ${card.label}`,
+    detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
+    group: card.focusTarget === "mix" || card.focusTarget === "master" ? "Mix" : "Arrange",
+    keywords: `hook readiness focus card hook meter arrangement motif contrast mix handoff ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
+    run: () => onFocusHookReadiness(card)
   }));
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const reviewQueueActions: QuickAction[] = reviewQueueSummary.items.map((item) => ({
@@ -12898,6 +12999,22 @@ function createQuickActions({
     },
     ...productionSnapshotActions,
     {
+      id: "hook-readiness-focus",
+      title: hookReadinessCard ? `Focus Hook Readiness: ${hookReadinessCard.label}` : "Focus Hook Readiness",
+      detail: hookReadinessCard
+        ? `${hookReadinessCard.value} / ${hookReadinessCard.focusLabel}`
+        : "No Hook Readiness card available.",
+      group: "Arrange",
+      keywords: `hook readiness focus meter current hook contrast motif mix handoff inspect ${hookReadinessCard?.id ?? "none"} ${hookReadinessCard?.focusLabel ?? "none"} beginner producer`,
+      disabled: !hookReadinessCard,
+      run: () => {
+        if (hookReadinessCard) {
+          onFocusHookReadiness(hookReadinessCard);
+        }
+      }
+    },
+    ...hookReadinessActions,
+    {
       id: "finish-checklist-focus",
       title: finishChecklistCard ? `Focus Finish Checklist: ${finishChecklistCard.label}` : "Focus Finish Checklist",
       detail: finishChecklistCard ? `${finishChecklistCard.status} / ${finishChecklistCard.focusLabel}` : "No Finish Checklist card available.",
@@ -14218,6 +14335,29 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "hook-readiness-focus") {
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const hookSummary = createHookReadinessSummary(
+      project,
+      createBeatReadinessChecks(project, exportAnalysis),
+      exportAnalysis,
+      analyzeStemExports(project)
+    );
+    return {
+      id: "hook-readiness",
+      label: "Hook readiness",
+      value: `${hookSummary.headline} / ${hookSummary.detail}`
+    };
+  }
+
+  if (action.id.startsWith("hook-readiness-card-")) {
+    return {
+      id: "hook-readiness",
+      label: "Hook readiness",
+      value: action.detail
+    };
+  }
+
   if (action.id === "finish-checklist-focus") {
     return {
       id: "finish-checklist",
@@ -15037,6 +15177,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Production Snapshot metric to inspect that session-scan lane before changing the beat.",
       nextCheck: "Return to Production Snapshot when you need another direct target, form, pattern, mix, or handoff focus."
+    };
+  }
+
+  if (action.id === "hook-readiness-focus") {
+    return {
+      auditionCue: "Use the focused Hook Readiness card to inspect hook section, motif, contrast, mix support, or handoff posture.",
+      nextCheck: "Return to Hook Readiness after the focused hook lane is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id.startsWith("hook-readiness-card-")) {
+    return {
+      auditionCue: "Use the focused Hook Readiness card before changing arrangement, motif, mix, or handoff details.",
+      nextCheck: "Return to Hook Readiness when you need another direct hook section, motif, contrast, mix, or delivery focus."
     };
   }
 
@@ -19457,6 +19611,159 @@ function createStructureLensActions(project: ProjectState): NextMoveAction[] {
   }
 
   return [...uniqueActions.values()].slice(0, 4);
+}
+
+function createHookReadinessSummary(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): HookReadinessSummary {
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const hookBlocks = project.arrangement.filter((block) => block.section === "Hook");
+  const hookBars = hookBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  const hookPatternSlots = uniquePatternSlots(hookBlocks.map((block) => block.pattern));
+  const focusPatternSlots = hookPatternSlots.length > 0 ? hookPatternSlots : [project.selectedPattern];
+  const hookPatterns = focusPatternSlots.map((slot) => project.patterns[slot]);
+  const readinessReadyCount = checks.filter((check) => check.tone === "good").length;
+  const melodyCount = hookPatterns.reduce((total, pattern) => total + pattern.melodyNotes.length, 0);
+  const bassCount = hookPatterns.reduce((total, pattern) => total + pattern.bassNotes.length, 0);
+  const chordCount = hookPatterns.reduce((total, pattern) => total + pattern.chordEvents.length, 0);
+  const drumCount = hookPatterns.reduce((total, pattern) => total + drumHitCount(pattern), 0);
+  const eventCount = melodyCount + bassCount + chordCount + drumCount;
+  const contrastSignal = structureHookSignal(project);
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const briefFields = sessionBriefFilledFields(project.sessionBrief);
+  const stemSpread = stemSpreadDb(stemAnalyses);
+  const hookSectionTone: MixCoachTone = hookBars >= 4 ? "good" : hookBlocks.length > 0 ? "warn" : "danger";
+  const motifTone: MixCoachTone =
+    melodyCount >= 4 && bassCount >= 3 && chordCount >= 1 && drumCount >= 8
+      ? "good"
+      : eventCount >= 10 && (melodyCount > 0 || chordCount > 0)
+        ? "warn"
+        : "danger";
+  const mixTone: MixCoachTone =
+    analysis.status === "Silent"
+      ? "danger"
+      : analysis.status === "Ready" && audibleStems.length >= 3 && (stemSpread === null || stemSpread <= 18)
+        ? "good"
+        : "warn";
+  const handoffTone: MixCoachTone =
+    analysis.status === "Ready" && briefFields >= 3 && audibleStems.length >= Math.min(target.stemGoal, stemTrackIds.length)
+      ? "good"
+      : analysis.status !== "Silent" && briefFields >= 1
+        ? "warn"
+        : "danger";
+  const hookPatternLabel = focusPatternSlots.join("/");
+  const cards: HookReadinessCard[] = [
+    {
+      id: "section",
+      focusId: "section",
+      label: "Hook Section",
+      value: hookBlocks.length > 0 ? `${hookBlocks.length} block${hookBlocks.length === 1 ? "" : "s"}` : "Missing",
+      status: hookBlocks.length > 0 ? "Hook section found" : "Hook section missing",
+      detail: `${barCountLabel(hookBars)} hook / ${barCountLabel(bars)} song`,
+      focusTarget: "arrange",
+      focusLabel: "Arrange",
+      tone: hookSectionTone
+    },
+    {
+      id: "motif",
+      focusId: "motif",
+      label: "Motif",
+      value: `${melodyCount} Synth / ${bassCount} 808`,
+      status: motifTone === "good" ? "Motif carries" : motifTone === "warn" ? "Motif sketched" : "Motif thin",
+      detail: `Pattern ${hookPatternLabel} / ${chordCount} chords / ${drumCount} drums`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
+      tone: motifTone
+    },
+    {
+      id: "contrast",
+      focusId: "contrast",
+      label: "Contrast",
+      value: contrastSignal.value,
+      status: contrastSignal.tone === "good" ? "Lift clear" : contrastSignal.tone === "warn" ? "Lift modest" : "Lift weak",
+      detail: contrastSignal.detail,
+      focusTarget: "arrange",
+      focusLabel: "Arrange",
+      tone: contrastSignal.tone
+    },
+    {
+      id: "mix",
+      focusId: "mix",
+      label: "Mix Support",
+      value: analysis.status,
+      status: mixTone === "good" ? "Mix supports hook" : mixTone === "warn" ? "Mix needs check" : "No hook signal",
+      detail: `${formatDb(analysis.headroomDb)} headroom / ${audibleStems.length}/${stemTrackIds.length} stems`,
+      focusTarget: mixTone === "danger" ? "master" : "mix",
+      focusLabel: mixTone === "danger" ? "Master" : "Mix",
+      tone: mixTone
+    },
+    {
+      id: "handoff",
+      focusId: "handoff",
+      label: "Handoff",
+      value: `${briefFields}/4 brief`,
+      status: handoffTone === "good" ? "Hook context ready" : handoffTone === "warn" ? "Context partial" : "Context missing",
+      detail: `${target.name} / ${audibleStems.length}/${target.stemGoal} target stems`,
+      focusTarget: "deliver",
+      focusLabel: "Deliver",
+      tone: handoffTone
+    }
+  ];
+  const tone = weakestTone(cards.map((card) => card.tone));
+  const readyCount = cards.filter((card) => card.tone === "good").length;
+  const headline =
+    tone === "good" ? "Hook reads ready" : tone === "warn" ? "Hook needs one pass" : "Hook is not clear yet";
+  const detail = `${readyCount}/${cards.length} hook / ${readinessReadyCount}/${checks.length} readiness / Pattern ${hookPatternLabel} / ${target.name}`;
+
+  return {
+    headline,
+    detail,
+    tone,
+    cards
+  };
+}
+
+function createHookReadinessFocusSummary(
+  summary: HookReadinessSummary,
+  focusedCardId: HookReadinessFocusId | null
+): HookReadinessFocusSummary {
+  const focusedCard = focusedCardId ? summary.cards.find((card) => card.id === focusedCardId) ?? null : null;
+  const card = focusedCard ?? activeHookReadinessQuickActionCard(summary);
+
+  if (!card) {
+    return {
+      focusId: null,
+      statusLabel: "Hook clear",
+      areaLabel: "No hook focus",
+      detailLabel: "No Hook Readiness cards available",
+      detailTitle: "Hook Readiness has no cards to focus.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel = focusedCard ? "Focused Hook" : "Hook Focus";
+  const detailLabel = `${card.focusLabel} panel / ${card.detail}`;
+
+  return {
+    focusId: card.focusId,
+    statusLabel,
+    areaLabel: `${card.label}: ${card.value}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
+    tone: card.tone
+  };
+}
+
+function activeHookReadinessQuickActionCard(summary: HookReadinessSummary): HookReadinessCard | null {
+  return summary.cards.find((card) => card.tone === "danger") ?? summary.cards.find((card) => card.tone === "warn") ?? summary.cards[0] ?? null;
+}
+
+function uniquePatternSlots(slots: PatternSlot[]): PatternSlot[] {
+  return patternSlots.filter((slot) => slots.includes(slot));
 }
 
 function createSongFormOverviewSummary(project: ProjectState, selectedIndex: number): SongFormOverviewSummary {

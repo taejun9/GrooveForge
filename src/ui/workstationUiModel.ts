@@ -1903,6 +1903,41 @@ export type StructureLensSummary = {
   signals: StructureLensSignal[];
 };
 
+export type HookReadinessCardId = "section" | "motif" | "contrast" | "mix" | "handoff";
+export type HookReadinessFocusId = HookReadinessCardId;
+export type HookReadinessFocusTarget = ReviewQueueFocusTarget;
+
+export type HookReadinessFocusItem = {
+  focusId: HookReadinessFocusId;
+  label: string;
+  value: string;
+  detail: string;
+  focusTarget: HookReadinessFocusTarget;
+  focusLabel: string;
+};
+
+export type HookReadinessCard = HookReadinessFocusItem & {
+  id: HookReadinessCardId;
+  status: string;
+  tone: MixCoachTone;
+};
+
+export type HookReadinessSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: HookReadinessCard[];
+};
+
+export type HookReadinessFocusSummary = {
+  focusId: HookReadinessFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type SongFormMetricId = "flow" | "patterns" | "selected" | "energy";
 
 export type SongFormMetric = {
