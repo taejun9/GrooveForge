@@ -72,6 +72,7 @@ type SelectedEventQuickActionsParams = {
   onDuplicateSelectedNote: () => void;
   onDeleteSelectedNote: () => void;
   onAuditionSelectedDrumHit: () => void;
+  onMoveSelectedDrumStep: (direction: -1 | 1) => void;
   onUpdateSelectedDrumVelocity: (velocity: number) => void;
   onUpdateSelectedDrumProbability: (probability: number) => void;
   onUpdateSelectedDrumTiming: (timingMs: number) => void;
@@ -124,6 +125,7 @@ export function createSelectedEventQuickActions({
   onDuplicateSelectedNote,
   onDeleteSelectedNote,
   onAuditionSelectedDrumHit,
+  onMoveSelectedDrumStep,
   onUpdateSelectedDrumVelocity,
   onUpdateSelectedDrumProbability,
   onUpdateSelectedDrumTiming,
@@ -205,6 +207,19 @@ export function createSelectedEventQuickActions({
   const selectedDrumLabel = selectedDrumStep
     ? `${drumLabels[selectedDrumStep.lane]} ${selectedDrumStep.step + 1}`
     : "No selected drum hit";
+  const selectedDrumStepLeft = selectedDrumStep && selectedDrumStep.step > 0 ? selectedDrumStep.step - 1 : null;
+  const selectedDrumStepRight =
+    selectedDrumStep && selectedDrumStep.step < steps.length - 1 ? selectedDrumStep.step + 1 : null;
+  const selectedDrumStepLeftLabel =
+    selectedDrumStep && selectedDrumStepLeft !== null ? `${drumLabels[selectedDrumStep.lane]} ${selectedDrumStepLeft + 1}` : "";
+  const selectedDrumStepRightLabel =
+    selectedDrumStep && selectedDrumStepRight !== null ? `${drumLabels[selectedDrumStep.lane]} ${selectedDrumStepRight + 1}` : "";
+  const selectedDrumStepLeftOccupied = Boolean(
+    selectedDrumStep && selectedDrumStepLeft !== null && selectedPatternData.drumPattern[selectedDrumStep.lane][selectedDrumStepLeft]
+  );
+  const selectedDrumStepRightOccupied = Boolean(
+    selectedDrumStep && selectedDrumStepRight !== null && selectedPatternData.drumPattern[selectedDrumStep.lane][selectedDrumStepRight]
+  );
   const selectedDrumVelocity =
     selectedDrumStep && selectedDrumActive ? drumStepVelocity(selectedPatternData, selectedDrumStep.lane, selectedDrumStep.step) : null;
   const selectedDrumVelocityDefault =
@@ -512,6 +527,36 @@ export function createSelectedEventQuickActions({
       keywords: "selected drum audition preview hear listen one shot hit dynamics pocket edit beginner producer",
       disabled: !selectedDrumActive,
       run: onAuditionSelectedDrumHit
+    },
+    {
+      id: "selected-drum-step-left",
+      title: "Move selected drum hit left",
+      detail: !selectedDrumActive
+        ? "Select an active drum hit first."
+        : selectedDrumStepLeft === null
+          ? `${selectedDrumLabel} is at the first step.`
+          : selectedDrumStepLeftOccupied
+            ? `${selectedDrumStepLeftLabel} already has a hit.`
+            : `${selectedDrumLabel} -> ${selectedDrumStepLeftLabel} / Pattern ${project.selectedPattern}`,
+      group: "Create",
+      keywords: "selected drum move left step earlier nudge grid pocket hit edit beginner producer",
+      disabled: !selectedDrumActive || selectedDrumStepLeft === null || selectedDrumStepLeftOccupied,
+      run: () => onMoveSelectedDrumStep(-1)
+    },
+    {
+      id: "selected-drum-step-right",
+      title: "Move selected drum hit right",
+      detail: !selectedDrumActive
+        ? "Select an active drum hit first."
+        : selectedDrumStepRight === null
+          ? `${selectedDrumLabel} is at the last step.`
+          : selectedDrumStepRightOccupied
+            ? `${selectedDrumStepRightLabel} already has a hit.`
+            : `${selectedDrumLabel} -> ${selectedDrumStepRightLabel} / Pattern ${project.selectedPattern}`,
+      group: "Create",
+      keywords: "selected drum move right step later nudge grid pocket hit edit beginner producer",
+      disabled: !selectedDrumActive || selectedDrumStepRight === null || selectedDrumStepRightOccupied,
+      run: () => onMoveSelectedDrumStep(1)
     },
     {
       id: "selected-drum-velocity-down",
