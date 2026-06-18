@@ -882,6 +882,28 @@ export type PatternCompareSummary = {
   arrangedBars: number;
 };
 
+export type PatternCompareResultMetric = {
+  id: "pattern" | "events" | "block";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+export type PatternCompareResult = {
+  action: "cue" | "use";
+  pattern: PatternSlot;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: PatternCompareResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type PatternClonePadOption = {
   id: string;
   source: PatternSlot;

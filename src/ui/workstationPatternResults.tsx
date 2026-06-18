@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import type {
   LayerStarterResult,
   PatternCloneResult,
+  PatternCompareResult,
   PatternFillResult,
   PatternVariationResult
 } from "./workstationUiModel";
@@ -169,6 +170,48 @@ export function PatternCloneResultStrip({ result }: { result: PatternCloneResult
         <span>
           <b>Next check</b>
           <em data-testid="pattern-clone-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function PatternCompareResultStrip({ result }: { result: PatternCompareResult }): ReactElement {
+  return (
+    <div
+      className={`pattern-stack-result pattern-compare-result ${result.tone}`}
+      data-result-pattern-compare={`${result.action}-${result.pattern}`}
+      data-testid="pattern-compare-result"
+      aria-live="polite"
+    >
+      <div className="pattern-stack-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="pattern-compare-result-title">{result.title}</strong>
+          <small data-testid="pattern-compare-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="pattern-stack-result-meta">
+        <span data-testid="pattern-compare-result-status">{result.status}</span>
+        <span data-testid="pattern-compare-result-scope">{result.scope}</span>
+        <span data-testid="pattern-compare-result-impact">{result.impact}</span>
+      </div>
+      <div className="pattern-stack-result-metrics" data-testid="pattern-compare-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`pattern-compare-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="pattern-stack-result-followup" data-testid="pattern-compare-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="pattern-compare-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="pattern-compare-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
     </div>

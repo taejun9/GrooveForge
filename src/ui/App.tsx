@@ -257,6 +257,7 @@ import type {
   QuickActionResultMetric,
   QuickActionResult,
   BeatReadinessCheck,
+  PatternCompareResult,
   PatternCompareSummary,
   PatternClonePadOption,
   PatternCloneResult,
@@ -549,6 +550,7 @@ import {
 } from "./workstationUiModel";
 import {
   LayerStarterResultStrip,
+  PatternCompareResultStrip,
   PatternCloneResultStrip,
   PatternFillResultStrip,
   PatternVariationResultStrip
@@ -818,6 +820,7 @@ export function App(): ReactElement {
   const [beatBlueprintResult, setBeatBlueprintResult] = useState<BeatBlueprintResult | null>(null);
   const [beatSpineResult, setBeatSpineResult] = useState<BeatSpineApplyResult | null>(null);
   const [layerStarterResult, setLayerStarterResult] = useState<LayerStarterResult | null>(null);
+  const [patternCompareResult, setPatternCompareResult] = useState<PatternCompareResult | null>(null);
   const [patternCloneResult, setPatternCloneResult] = useState<PatternCloneResult | null>(null);
   const [patternFillPreviewPreset, setPatternFillPreviewPreset] = useState<PatternFillPreset>("drum_fill");
   const [patternFillResult, setPatternFillResult] = useState<PatternFillResult | null>(null);
@@ -1524,6 +1527,7 @@ export function App(): ReactElement {
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
     setLayerStarterResult(null);
+    setPatternCompareResult(null);
     setPatternCloneResult(null);
     setPatternFillResult(null);
     setPatternStackResult(null);
@@ -1558,6 +1562,7 @@ export function App(): ReactElement {
       setBeatBlueprintResult(null);
       setBeatSpineResult(null);
       setLayerStarterResult(null);
+      setPatternCompareResult(null);
       setPatternCloneResult(null);
       setPatternFillResult(null);
       setPatternStackResult(null);
@@ -1994,6 +1999,12 @@ export function App(): ReactElement {
     setSelectedChordIndex(0);
   }
 
+  function cuePatternFromCompare(pattern: PatternSlot): void {
+    const beforeProject = projectRef.current;
+    cuePattern(pattern);
+    setPatternCompareResult(createPatternCompareResult("cue", pattern, beforeProject, projectRef.current, selectedArrangementIndex));
+  }
+
   function updateKeyboardCaptureDefaults(update: Partial<KeyboardCaptureDefaults>): void {
     setKeyboardCaptureDefaults((current) => {
       const targetDefaults = current[keyboardCaptureTarget];
@@ -2034,6 +2045,19 @@ export function App(): ReactElement {
     );
     if (changed) {
       selectTransportLoopScope("arrangement", false);
+    }
+  }
+
+  function usePatternInSelectedBlockFromCompare(pattern: PatternSlot): void {
+    const block = projectRef.current.arrangement[selectedArrangementIndex];
+    if (!block) {
+      usePatternInSelectedBlock(pattern);
+      return;
+    }
+    const beforeProject = projectRef.current;
+    usePatternInSelectedBlock(pattern);
+    if (beforeProject !== projectRef.current) {
+      setPatternCompareResult(createPatternCompareResult("use", pattern, beforeProject, projectRef.current, selectedArrangementIndex));
     }
   }
 
@@ -5555,9 +5579,10 @@ export function App(): ReactElement {
             selectedBlockPattern={selectedArrangementBlock?.pattern ?? project.selectedPattern}
             selectedPattern={project.selectedPattern}
             summaries={patternCompareSummaries}
-            onCue={cuePattern}
-            onUse={usePatternInSelectedBlock}
+            onCue={cuePatternFromCompare}
+            onUse={usePatternInSelectedBlockFromCompare}
           />
+          {patternCompareResult && <PatternCompareResultStrip result={patternCompareResult} />}
           <PatternDna summary={patternDnaSummary} focusedCardId={patternDnaFocusId} onFocus={focusPatternDnaCard} />
           <LayerStarterPads options={layerStarterOptions} onApply={applyLayerStarter} />
           {layerStarterResult && <LayerStarterResultStrip result={layerStarterResult} />}
@@ -20034,6 +20059,95 @@ function createPatternCompareSummaries(project: ProjectState): PatternCompareSum
       arrangedBars
     };
   });
+}
+
+function createPatternCompareResult(
+  action: PatternCompareResult["action"],
+  pattern: PatternSlot,
+  beforeProject: ProjectState,
+  afterProject: ProjectState,
+  selectedArrangementIndex: number
+): PatternCompareResult {
+  const beforePattern = beforeProject.patterns[beforeProject.selectedPattern];
+  const targetPattern = afterProject.patterns[pattern];
+  const beforeEvents = patternEventTotal(beforePattern);
+  const targetEvents = patternEventTotal(targetPattern);
+  const beforeBlock = beforeProject.arrangement[selectedArrangementIndex] ?? null;
+  const afterBlock = afterProject.arrangement[selectedArrangementIndex] ?? beforeBlock;
+  const beforeBlockPattern = beforeBlock?.pattern ?? beforeProject.selectedPattern;
+  const beforeBlockEvents = patternEventTotal(beforeProject.patterns[beforeBlockPattern]);
+  const arrangedBlocks = afterProject.arrangement.filter((block) => block.pattern === pattern);
+  const arrangedBars = arrangedBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  const tone: MixCoachTone = targetEvents > 0 ? "good" : "warn";
+
+  if (action === "cue") {
+    return {
+      action,
+      pattern,
+      title: `Pattern ${pattern} cued`,
+      status: "Cued",
+      detail: `Pattern loop / ${targetEvents} events`,
+      scope: "Pattern loop audition",
+      impact: beforeProject.selectedPattern === pattern ? "Loop scope refreshed" : `Pattern ${beforeProject.selectedPattern} -> ${pattern}`,
+      metrics: [
+        createPatternCompareResultMetric("pattern", "Pattern", `Pattern ${beforeProject.selectedPattern}`, `Pattern ${pattern}`, "good"),
+        createPatternCompareResultMetric("events", "Events", `${beforeEvents} events`, `${targetEvents} events`, tone),
+        createPatternCompareResultMetric(
+          "block",
+          "Block",
+          beforeBlock ? `Block ${selectedArrangementIndex + 1}` : "No block",
+          "Pattern loop",
+          "good"
+        )
+      ],
+      auditionCue: `Play Pattern loop; compare Pattern ${pattern}'s drums, 808, chords, and Synth before editing or arranging.`,
+      nextCheck: "Use Pattern Switch to edit the cued variation or Pattern Use to place it into the selected arrangement block.",
+      tone
+    };
+  }
+
+  return {
+    action,
+    pattern,
+    title: `Pattern ${pattern} placed`,
+    status: "Placed",
+    detail: afterBlock ? `Block ${selectedArrangementIndex + 1} ${afterBlock.section}` : "Selected block",
+    scope: afterBlock ? `${afterBlock.section} block` : "Selected block",
+    impact:
+      beforeBlock && afterBlock
+        ? `Pattern ${beforeBlock.pattern} -> ${afterBlock.pattern}`
+        : `Selected block uses Pattern ${pattern}`,
+    metrics: [
+      createPatternCompareResultMetric(
+        "pattern",
+        "Pattern",
+        beforeBlock ? `Pattern ${beforeBlock.pattern}` : `Pattern ${beforeProject.selectedPattern}`,
+        `Pattern ${pattern}`,
+        "good"
+      ),
+      createPatternCompareResultMetric("events", "Events", `${beforeBlockEvents} before`, `${targetEvents} placed`, tone),
+      createPatternCompareResultMetric(
+        "block",
+        "Block",
+        beforeBlock ? `Block ${selectedArrangementIndex + 1} / ${barCountLabel(normalizeArrangementBars(beforeBlock.bars))}` : "No block",
+        afterBlock ? `${afterBlock.section} / ${barCountLabel(normalizeArrangementBars(afterBlock.bars))}` : "No block",
+        arrangedBars > 0 ? "good" : "warn"
+      )
+    ],
+    auditionCue: `Play Block loop; confirm the selected arrangement block now works with Pattern ${pattern}.`,
+    nextCheck: "Scan Song Form Overview, Pattern Compare, and Arrangement Playback Readout before placing the next variation.",
+    tone
+  };
+}
+
+function createPatternCompareResultMetric(
+  id: PatternCompareResult["metrics"][number]["id"],
+  label: string,
+  before: string,
+  after: string,
+  tone: MixCoachTone
+): PatternCompareResult["metrics"][number] {
+  return { id, label, before, after, tone };
 }
 
 function createPatternDnaSummary(project: ProjectState): PatternDnaSummary {
