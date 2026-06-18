@@ -4918,6 +4918,46 @@ export function App(): ReactElement {
     }
   }
 
+  function duplicateSelectedChordToStep(step: number): void {
+    if (selectedChordIndex === null) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+
+    const nextStep = clampStepStart(step);
+    let nextSelectedIndex: number | null = null;
+    let rejectedStatus = "";
+    const changed = updateCurrentPattern((pattern) => {
+      const source = pattern.chordEvents[selectedChordIndex];
+      if (!source) {
+        rejectedStatus = "Select a chord event";
+        return pattern;
+      }
+      if (nextStep <= source.step || nextStep > steps.length - clampStepLength(source.length)) {
+        rejectedStatus = "No beat-grid duplicate step";
+        return pattern;
+      }
+      if (pattern.chordEvents.some((chord) => chord.step === nextStep)) {
+        rejectedStatus = "Target chord step already exists";
+        return pattern;
+      }
+      const duplicate: ChordEvent = { ...source, step: nextStep };
+      const chordEvents = sortChordEvents([...pattern.chordEvents, duplicate]);
+      nextSelectedIndex = findChordEventIndex(chordEvents, duplicate);
+      return {
+        ...pattern,
+        chordEvents
+      };
+    }, "Duplicated chord on beat");
+    if (changed) {
+      setSelectedChordIndex(nextSelectedIndex);
+      setSelectedNote(null);
+      setSelectedDrumStep(null);
+    } else if (rejectedStatus) {
+      setProjectStatus(rejectedStatus);
+    }
+  }
+
   function moveSelectedChordInversion(direction: -1 | 1): void {
     if (selectedChordIndex === null || !selectedChord) {
       setProjectStatus("Select a chord event");
@@ -6151,6 +6191,7 @@ export function App(): ReactElement {
     onCopySelectedChord: copySelectedChord,
     onPasteCopiedChord: pasteCopiedChord,
     onDuplicateSelectedChord: duplicateSelectedChord,
+    onDuplicateSelectedChordToStep: duplicateSelectedChordToStep,
     onDeleteSelectedChord: deleteSelectedChordEvent,
     onMoveSelectedChordInversion: moveSelectedChordInversion,
     onResetSelectedChordInversion: resetSelectedChordInversion,
@@ -11929,6 +11970,7 @@ function createQuickActions({
   onCopySelectedChord,
   onPasteCopiedChord,
   onDuplicateSelectedChord,
+  onDuplicateSelectedChordToStep,
   onDeleteSelectedChord,
   onMoveSelectedChordInversion,
   onResetSelectedChordInversion,
@@ -12150,6 +12192,7 @@ function createQuickActions({
   onCopySelectedChord: () => void;
   onPasteCopiedChord: () => void;
   onDuplicateSelectedChord: () => void;
+  onDuplicateSelectedChordToStep: (step: number) => void;
   onDeleteSelectedChord: () => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
   onResetSelectedChordInversion: () => void;
@@ -12659,6 +12702,7 @@ function createQuickActions({
       onCopySelectedChord,
       onPasteCopiedChord,
       onDuplicateSelectedChord,
+      onDuplicateSelectedChordToStep,
       onDeleteSelectedChord
     });
   const captureStepModeActions = createCaptureStepModeActions({

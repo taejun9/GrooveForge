@@ -100,6 +100,7 @@ type SelectedEventQuickActionsParams = {
   onCopySelectedChord: () => void;
   onPasteCopiedChord: () => void;
   onDuplicateSelectedChord: () => void;
+  onDuplicateSelectedChordToStep: (step: number) => void;
   onDeleteSelectedChord: () => void;
 };
 
@@ -159,6 +160,7 @@ export function createSelectedEventQuickActions({
   onCopySelectedChord,
   onPasteCopiedChord,
   onDuplicateSelectedChord,
+  onDuplicateSelectedChordToStep,
   onDeleteSelectedChord
 }: SelectedEventQuickActionsParams): SelectedEventQuickActions {
   const selectedNoteTrackLabel = selectedNote?.track === "bass" ? "808" : "Synth";
@@ -367,6 +369,16 @@ export function createSelectedEventQuickActions({
       : null;
   const selectedChordDuplicateStep =
     selectedChord && selectedChordActive ? nextEmptyChordStep(selectedPatternData.chordEvents, selectedChord.step) : null;
+  const selectedChordBeatDuplicateStep =
+    selectedChord && selectedChordActive && selectedChordLength !== null
+      ? steps.find(
+          (step) =>
+            step > selectedChord.step &&
+            step % 4 === 0 &&
+            step <= steps.length - selectedChordLength &&
+            !selectedPatternData.chordEvents.some((chord) => chord.step === step)
+        ) ?? null
+      : null;
   const selectedChordDeleteBlocked = selectedChordActive && selectedPatternData.chordEvents.length <= 1;
   const chordClipboardLabel = chordClipboard ? `${chordClipboard.root}${chordClipboard.quality}.${chordClipboard.step + 1}` : "Clipboard empty";
   const chordClipboardPasteStep = chordClipboard ? nextEmptyChordStep(selectedPatternData.chordEvents, chordClipboard.step) : null;
@@ -1267,6 +1279,24 @@ export function createSelectedEventQuickActions({
       keywords: "selected chord duplicate copy next empty step harmony progression edit beginner producer",
       disabled: !selectedChordActive || selectedChordDuplicateStep === null,
       run: onDuplicateSelectedChord
+    },
+    {
+      id: "selected-chord-duplicate-beat",
+      title: "Duplicate selected chord to beat",
+      detail:
+        selectedChordActive && selectedChordBeatDuplicateStep !== null
+          ? `${selectedChordLabel} -> beat step ${selectedChordBeatDuplicateStep + 1} / Pattern ${project.selectedPattern}`
+          : selectedChordActive && selectedChord
+            ? `${selectedChordLabel} has no later empty 4-step chord slot.`
+            : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord duplicate beat grid copy repeat 4-step anchor harmony progression edit beginner producer",
+      disabled: !selectedChordActive || selectedChordBeatDuplicateStep === null,
+      run: () => {
+        if (selectedChordBeatDuplicateStep !== null) {
+          onDuplicateSelectedChordToStep(selectedChordBeatDuplicateStep);
+        }
+      }
     },
     {
       id: "selected-chord-delete",
