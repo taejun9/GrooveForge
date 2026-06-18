@@ -176,6 +176,8 @@ export function createSelectedEventQuickActions({
     selectedNote && selectedNoteActive ? clampStepLength(keyboardCaptureDefaults[selectedNote.track].length) : null;
   const selectedNoteGlide =
     selectedNote?.track === "bass" && selectedNoteEvent ? Boolean((selectedNoteEvent as { glide?: boolean }).glide) : null;
+  const selectedNoteGlideDefault =
+    selectedNote?.track === "bass" && selectedNoteActive ? Boolean(keyboardCaptureDefaults.bass.glide) : null;
   const selectedNoteUsedPitches =
     selectedNote?.track === "bass"
       ? selectedPatternData.bassNotes.map((note) => note.pitch)
@@ -446,6 +448,18 @@ export function createSelectedEventQuickActions({
       keywords: "selected note glide slide toggle 808 bass articulation edit keyboard capture midi beginner producer",
       disabled: selectedNote?.track !== "bass" || selectedNoteGlide === null,
       run: () => selectedNoteGlide !== null && onUpdateSelectedNoteGlide(!selectedNoteGlide)
+    },
+    {
+      id: "selected-note-glide-reset",
+      title: "Reset selected 808 glide",
+      detail:
+        selectedNoteGlide !== null && selectedNoteGlideDefault !== null
+          ? `${selectedNoteLabel} glide ${selectedNoteGlide ? "On" : "Off"} -> ${selectedNoteGlideDefault ? "On" : "Off"}`
+          : "Select an active 808 note first.",
+      group: "Create",
+      keywords: "selected note glide reset default slide 808 bass articulation keyboard capture edit beginner producer",
+      disabled: selectedNoteGlide === null || selectedNoteGlideDefault === null || selectedNoteGlide === selectedNoteGlideDefault,
+      run: () => selectedNoteGlideDefault !== null && onUpdateSelectedNoteGlide(selectedNoteGlideDefault)
     },
     {
       id: "selected-note-velocity-down",
