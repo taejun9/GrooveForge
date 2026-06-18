@@ -4256,6 +4256,15 @@ export function App(): ReactElement {
     moveSelectedNoteTo(nextStep, selectedNote.pitch, direction < 0 ? "Moved note left" : "Moved note right");
   }
 
+  function resetSelectedNoteStep(step: number): void {
+    if (!selectedNote) {
+      setProjectStatus("Select an 808 or Synth note");
+      return;
+    }
+
+    moveSelectedNoteTo(clampStepStart(step), selectedNote.pitch, "Reset note step");
+  }
+
   function moveSelectedNotePitch(direction: -1 | 1): void {
     if (!selectedNote) {
       setProjectStatus("Select an 808 or Synth note");
@@ -6041,6 +6050,7 @@ export function App(): ReactElement {
     onMergeArrangementBlock: mergeArrangementBlock,
     onDeleteArrangementBlock: deleteArrangementBlock,
     onMoveSelectedNoteStep: moveSelectedNoteStep,
+    onResetSelectedNoteStep: resetSelectedNoteStep,
     onMoveSelectedNotePitch: moveSelectedNotePitch,
     onResetSelectedNotePitch: resetSelectedNotePitch,
     onMoveSelectedNoteOctave: moveSelectedNoteOctave,
@@ -11817,6 +11827,7 @@ function createQuickActions({
   onMergeArrangementBlock,
   onDeleteArrangementBlock,
   onMoveSelectedNoteStep,
+  onResetSelectedNoteStep,
   onMoveSelectedNotePitch,
   onResetSelectedNotePitch,
   onMoveSelectedNoteOctave,
@@ -12036,6 +12047,7 @@ function createQuickActions({
   onMergeArrangementBlock: () => void;
   onDeleteArrangementBlock: () => void;
   onMoveSelectedNoteStep: (direction: -1 | 1) => void;
+  onResetSelectedNoteStep: (step: number) => void;
   onMoveSelectedNotePitch: (direction: -1 | 1) => void;
   onResetSelectedNotePitch: () => void;
   onMoveSelectedNoteOctave: (direction: -1 | 1) => void;
@@ -12537,6 +12549,7 @@ function createQuickActions({
       chordClipboard,
       onAuditionSelectedNote,
       onMoveSelectedNoteStep,
+      onResetSelectedNoteStep,
       onMoveSelectedNotePitch,
       onResetSelectedNotePitch,
       onMoveSelectedNoteOctave,

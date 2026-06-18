@@ -64,6 +64,7 @@ type SelectedEventQuickActionsParams = {
   chordClipboard: ChordClipboard | null;
   onAuditionSelectedNote: () => void;
   onMoveSelectedNoteStep: (direction: -1 | 1) => void;
+  onResetSelectedNoteStep: (step: number) => void;
   onMoveSelectedNotePitch: (direction: -1 | 1) => void;
   onResetSelectedNotePitch: () => void;
   onMoveSelectedNoteOctave: (direction: -1 | 1) => void;
@@ -121,6 +122,7 @@ export function createSelectedEventQuickActions({
   chordClipboard,
   onAuditionSelectedNote,
   onMoveSelectedNoteStep,
+  onResetSelectedNoteStep,
   onMoveSelectedNotePitch,
   onResetSelectedNotePitch,
   onMoveSelectedNoteOctave,
@@ -178,6 +180,28 @@ export function createSelectedEventQuickActions({
   const selectedNoteLength = selectedNoteEvent ? clampStepLength(selectedNoteEvent.length) : null;
   const selectedNoteLengthDefault =
     selectedNote && selectedNoteActive ? clampStepLength(keyboardCaptureDefaults[selectedNote.track].length) : null;
+  const selectedNoteStepResetTarget =
+    selectedNote && selectedNoteActive && selectedNoteLength !== null
+      ? steps
+          .filter((step) => step % 4 === 0 && step <= steps.length - selectedNoteLength)
+          .reduce<number | null>((best, step) => {
+            if (best === null) {
+              return step;
+            }
+            const distance = Math.abs(step - selectedNote.step);
+            const bestDistance = Math.abs(best - selectedNote.step);
+            return distance < bestDistance || (distance === bestDistance && step < best) ? step : best;
+          }, null)
+      : null;
+  const selectedNoteStepResetBlocked =
+    selectedNote && selectedNoteStepResetTarget !== null
+      ? (selectedNote.track === "bass" ? selectedPatternData.bassNotes : selectedPatternData.melodyNotes).some(
+          (note) =>
+            !matchesSelectedNote(note, selectedNote) &&
+            note.step === selectedNoteStepResetTarget &&
+            note.pitch === selectedNote.pitch
+        )
+      : false;
   const selectedNoteGlide =
     selectedNote?.track === "bass" && selectedNoteEvent ? Boolean((selectedNoteEvent as { glide?: boolean }).glide) : null;
   const selectedNoteGlideDefault =
@@ -360,6 +384,30 @@ export function createSelectedEventQuickActions({
       keywords: "selected note move right step nudge 808 synth edit keyboard capture midi beginner producer",
       disabled: !selectedNoteActive || !selectedNote || selectedNote.step >= steps.length - 1,
       run: () => onMoveSelectedNoteStep(1)
+    },
+    {
+      id: "selected-note-step-reset",
+      title: "Reset selected note step",
+      detail:
+        selectedNoteActive && selectedNote && selectedNoteStepResetTarget !== null
+          ? selectedNote.step === selectedNoteStepResetTarget
+            ? `${selectedNoteLabel} already starts on the 4-step beat grid.`
+            : selectedNoteStepResetBlocked
+              ? `Step ${selectedNoteStepResetTarget + 1} already has ${selectedNote.pitch}.`
+              : `${selectedNoteLabel} step ${selectedNote.step + 1} -> ${selectedNoteStepResetTarget + 1} / 4-step beat grid`
+          : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note step reset snap beat grid timing quantize 808 synth edit beginner producer",
+      disabled:
+        !selectedNoteActive ||
+        selectedNoteStepResetTarget === null ||
+        selectedNote?.step === selectedNoteStepResetTarget ||
+        selectedNoteStepResetBlocked,
+      run: () => {
+        if (selectedNoteStepResetTarget !== null) {
+          onResetSelectedNoteStep(selectedNoteStepResetTarget);
+        }
+      }
     },
     {
       id: "selected-note-pitch-down",
