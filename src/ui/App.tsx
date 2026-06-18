@@ -5003,6 +5003,7 @@ export function App(): ReactElement {
     onApplyPatternChain: applyPatternChain,
     onApplyPatternClone: cloneSelectedPatternVariation,
     onApplyPatternFill: applyPatternFill,
+    onApplyPatternVariation: applyPatternVariation,
     onApplyPatternStack: applyPatternStack,
     onApplySpaceFx: applySpaceFxPad,
     onApplyStemAudition: applyStemAuditionPad,
@@ -10499,6 +10500,7 @@ function createQuickActions({
   onApplyPatternChain,
   onApplyPatternClone,
   onApplyPatternFill,
+  onApplyPatternVariation,
   onApplyPatternStack,
   onApplySpaceFx,
   onApplyStemAudition,
@@ -10666,6 +10668,7 @@ function createQuickActions({
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternClone: (target: PatternSlot, preset: PatternVariationPreset) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
+  onApplyPatternVariation: (preset: PatternVariationPreset) => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
   onApplySpaceFx: (pad: SpaceFxPadId) => void;
   onApplyStemAudition: (pad: StemAuditionPadId) => void;
@@ -12532,6 +12535,17 @@ function createQuickActions({
       keywords: `preview current style match blueprint starter ${currentStyleName} ${project.styleId} ${suggestedBlueprintName} beat drums 808 bass chords synth arrangement sound master sample free safe`,
       run: () => onPreviewBlueprint(suggestedBlueprint)
     },
+    ...patternVariationPresetIds.map((preset): QuickAction => {
+      const label = patternVariationPresetLabel(preset);
+      return {
+        id: `pattern-variation-${preset}`,
+        title: `Apply ${label} Variation`,
+        detail: `Apply ${label} variation to Pattern ${project.selectedPattern}.`,
+        group: "Create",
+        keywords: `pattern variation ${preset} ${label} subtle hook break drums 808 melody chords beginner producer`,
+        run: () => onApplyPatternVariation(preset)
+      };
+    }),
     {
       id: "fill-drums",
       title: "Apply Drum Fill",
@@ -13773,6 +13787,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("pattern-variation-")) {
+    return {
+      id: "pattern-variation",
+      label: `Pattern ${project.selectedPattern}`,
+      value: `${patternEventTotal(activePattern(project))} events`
+    };
+  }
+
   if (action.id.startsWith("fill-")) {
     return {
       id: "pattern-events",
@@ -14243,6 +14265,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the applied style's drums, 808, harmony, melody, and swing before arranging.`,
       nextCheck: "Use Style Inspector, current-style starter preview, and manual Pattern editors to refine the new style direction."
+    };
+  }
+
+  if (action.id.startsWith("pattern-variation-")) {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the applied variation's drums, 808, chords, and Synth before arranging.`,
+      nextCheck: "Use Pattern Compare, Pattern DNA, Pattern Clone, or Pattern Chain when the variation should feed the arrangement."
     };
   }
 
