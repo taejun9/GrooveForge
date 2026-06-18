@@ -5077,6 +5077,8 @@ export function App(): ReactElement {
     onApplyPatternFill: applyPatternFill,
     onApplyPatternVariation: applyPatternVariation,
     onApplyPatternStack: applyPatternStack,
+    onCopySelectedPattern: copySelectedPattern,
+    onClearSelectedPattern: clearSelectedPattern,
     onApplySpaceFx: applySpaceFxPad,
     onApplyStemAudition: applyStemAuditionPad,
     onApplySoundFocus: applySoundFocusPad,
@@ -10591,6 +10593,8 @@ function createQuickActions({
   onApplyPatternFill,
   onApplyPatternVariation,
   onApplyPatternStack,
+  onCopySelectedPattern,
+  onClearSelectedPattern,
   onApplySpaceFx,
   onApplyStemAudition,
   onApplySoundFocus,
@@ -10759,6 +10763,8 @@ function createQuickActions({
   onApplyPatternFill: (preset: PatternFillPreset) => void;
   onApplyPatternVariation: (preset: PatternVariationPreset) => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
+  onCopySelectedPattern: (target: PatternSlot) => void;
+  onClearSelectedPattern: () => void;
   onApplySpaceFx: (pad: SpaceFxPadId) => void;
   onApplyStemAudition: (pad: StemAuditionPadId) => void;
   onApplySoundFocus: (pad: SoundFocusPadId) => void;
@@ -12041,6 +12047,21 @@ function createQuickActions({
     keywords: `pattern clone variation copy ${clone.source} ${clone.target} ${clone.preset} ${clone.preview} a b c hook breakdown beginner producer`,
     run: () => onApplyPatternClone(clone.target, clone.preset)
   }));
+  const patternCopyActions: QuickAction[] = patternSlots
+    .filter((target) => target !== project.selectedPattern)
+    .map((target) => {
+      const source = project.selectedPattern;
+      const sourceCount = patternEventTotal(project.patterns[source]);
+      const targetCount = patternEventTotal(project.patterns[target]);
+      return {
+        id: `pattern-copy-${target.toLowerCase()}`,
+        title: `Copy Pattern ${source} to ${target}`,
+        detail: `${sourceCount} source events -> Pattern ${target} (${targetCount} events now) / shows Pattern Edit Result`,
+        group: "Create",
+        keywords: `pattern copy duplicate edit result source ${source} target ${target} a b c loop variation beginner producer`,
+        run: () => onCopySelectedPattern(target)
+      };
+    });
 
   return [
     {
@@ -12330,6 +12351,15 @@ function createQuickActions({
     },
     ...layerStarterActions,
     ...patternCloneActions,
+    ...patternCopyActions,
+    {
+      id: "pattern-clear",
+      title: `Clear Pattern ${project.selectedPattern}`,
+      detail: `${patternEventTotal(activePattern(project))} events now / shows Pattern Edit Result`,
+      group: "Create",
+      keywords: `pattern clear reset empty edit result ${project.selectedPattern} a b c loop variation beginner producer`,
+      run: onClearSelectedPattern
+    },
     {
       id: "pattern-stack",
       title: patternStackId ? `Apply ${patternStackPreviewSummary.stackLabel}` : "Apply Pattern Stack",
@@ -13610,6 +13640,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("pattern-copy-") || action.id === "pattern-clear") {
+    return {
+      id: "pattern-edit",
+      label: `Pattern ${project.selectedPattern}`,
+      value: `${patternEventTotal(activePattern(project))} events`
+    };
+  }
+
   if (action.id === "groove-compass-focus") {
     return {
       id: "groove-compass",
@@ -14382,6 +14420,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Play Block loop; confirm the selected arrangement block now works with Pattern ${project.selectedPattern}.`,
       nextCheck: "Scan Song Form Overview, Pattern Compare, and Arrangement Playback Readout before placing the next variation."
+    };
+  }
+
+  if (action.id.startsWith("pattern-copy-")) {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the copied drums, 808, chords, and Synth before arranging it.`,
+      nextCheck: "Use Pattern Edit Result, Pattern Compare, Pattern DNA, and manual editors to refine the copied loop."
+    };
+  }
+
+  if (action.id === "pattern-clear") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the cleared slot is silent before writing a new loop.`,
+      nextCheck: "Use Layer Starter, Drum Foundation, Keyboard Capture, or manual editors to rebuild the cleared Pattern."
     };
   }
 
