@@ -13890,6 +13890,52 @@ function createQuickActions({
   });
   const soundFocusReady = soundFocusPreviewSummary.statusLabel !== "Sound aligned";
   const soundPresetReady = soundPresetPreviewSummary.statusLabel !== "Preset aligned";
+  const directDrumKitPadOptions = createDrumKitPadOptions(project);
+  const directSoundFocusPadOptions = createSoundFocusPadOptions(project.sound);
+  const soundPresetActions: QuickAction[] = soundPresetIds.map((preset) => {
+    const targetSound = soundPresetDesign(preset);
+    const moveCount = soundPresetChangedMoveCount(project.sound, targetSound);
+    const presetLabel = soundPresetLabel(preset);
+    return {
+      id: `sound-preset-pad-${preset}`,
+      title: moveCount > 0 ? `Apply ${presetLabel} Sound Preset` : `${presetLabel} Sound Preset already applied`,
+      detail: `${soundPresetToneLabel(targetSound)} / ${moveCount} tone move${moveCount === 1 ? "" : "s"}`,
+      group: "Create",
+      keywords: `sound preset direct pad full tone design ${preset} ${presetLabel} drums 808 bass duck synth chords sample free beginner producer`,
+      disabled: moveCount === 0,
+      run: () => {
+        if (moveCount > 0) {
+          onApplySoundPreset(preset);
+        }
+      }
+    };
+  });
+  const drumKitPadActions: QuickAction[] = directDrumKitPadOptions.map((pad) => ({
+    id: `drum-kit-pad-${pad.id}`,
+    title: pad.changedCount > 0 ? `Apply ${pad.label} Drum Kit` : `${pad.label} Drum Kit already applied`,
+    detail: `${pad.preview} / ${pad.changedCount} kit move${pad.changedCount === 1 ? "" : "s"}`,
+    group: "Create",
+    keywords: `drum kit direct pad tone kick clap snare hat rack ${pad.id} ${pad.label} ${pad.detail} ${pad.preview} beginner producer`,
+    disabled: pad.changedCount === 0,
+    run: () => {
+      if (pad.changedCount > 0) {
+        onApplyDrumKit(pad.id);
+      }
+    }
+  }));
+  const soundFocusPadActions: QuickAction[] = directSoundFocusPadOptions.map((pad) => ({
+    id: `sound-focus-pad-${pad.id}`,
+    title: pad.changedCount > 0 ? `Apply ${pad.label} Sound Focus` : `${pad.label} Sound Focus already applied`,
+    detail: `${pad.preview} / ${pad.changedCount} tone move${pad.changedCount === 1 ? "" : "s"}`,
+    group: "Create",
+    keywords: `sound focus direct pad tone design kick drums 808 bass duck sidechain synth chords ${pad.id} ${pad.label} ${pad.detail} ${pad.preview} beginner producer`,
+    disabled: pad.changedCount === 0,
+    run: () => {
+      if (pad.changedCount > 0) {
+        onApplySoundFocus(pad.id);
+      }
+    }
+  }));
   const handoffPackItems = createHandoffPackItems({
     analysis: exportAnalysis,
     project,
@@ -14433,6 +14479,7 @@ function createQuickActions({
         }
       }
     },
+    ...drumKitPadActions,
     {
       id: "sound-focus",
       title: soundFocusReady ? `Apply ${soundFocusPreviewSummary.padLabel}` : "Apply Sound Focus",
@@ -14448,6 +14495,7 @@ function createQuickActions({
         }
       }
     },
+    ...soundFocusPadActions,
     {
       id: "sound-preset",
       title: soundPresetReady ? `Apply ${soundPresetPreviewSummary.presetLabel}` : "Apply Sound Preset",
@@ -14463,6 +14511,7 @@ function createQuickActions({
         }
       }
     },
+    ...soundPresetActions,
     {
       id: "listening-pass-focus",
       title: listeningPassItem ? `Focus Listening Pass: ${listeningPassItem.label}` : "Focus Listening Pass",
@@ -15559,7 +15608,7 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "sound-focus") {
+  if (action.id === "sound-focus" || action.id.startsWith("sound-focus-pad-")) {
     return {
       id: "sound-focus",
       label: "Sound focus",
@@ -15567,7 +15616,7 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "sound-preset") {
+  if (action.id === "sound-preset" || action.id.startsWith("sound-preset-pad-")) {
     return {
       id: "sound-preset",
       label: "Sound preset",
@@ -15575,7 +15624,7 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "drum-kit") {
+  if (action.id === "drum-kit" || action.id.startsWith("drum-kit-pad-")) {
     return {
       id: "drum-kit",
       label: "Drum kit",
@@ -16254,21 +16303,21 @@ function quickActionResultFollowup(
     };
   }
 
-  if (action.id === "sound-focus") {
+  if (action.id === "sound-focus" || action.id.startsWith("sound-focus-pad-")) {
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, Synth, and Chords with the new tone posture.`,
       nextCheck: "Use the Sound Focus Result and Studio tone controls for manual kick, 808, Synth, and Chord corrections."
     };
   }
 
-  if (action.id === "sound-preset") {
+  if (action.id === "sound-preset" || action.id.startsWith("sound-preset-pad-")) {
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, Synth, and Chords under the applied full-tone preset.`,
       nextCheck: "Use the Sound Preset Result, then trim with Drum Kit, Sound Focus, or Studio tone controls."
     };
   }
 
-  if (action.id === "drum-kit") {
+  if (action.id === "drum-kit" || action.id.startsWith("drum-kit-pad-")) {
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear kick, clap, hat, and 808 balance after the kit change.`,
       nextCheck: "Use the Drum Kit Result plus Studio tone and drum rack mixer controls for manual trim."
