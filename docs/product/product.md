@@ -25,6 +25,8 @@ The product should make a blank beat feel playable without imported audio: set B
 
 Core schema examples must reflect that order. Do not place `AudioClipEvent`, `audio`, or `sampler` beside core MVP event, clip, or track unions unless the user has explicitly started optional sampling-phase work. If an incoming brief includes `type MusicalEvent = ... | AudioClipEvent` or `type TrackType = ... | "audio" | "sampler"`, treat those lines as optional extension examples and rewrite the MVP union around direct musical events and built-in instrument tracks.
 
+Brief correction target: a sampling-heavy concept note is accepted only after it is rewritten around direct beat creation. The MVP event union is `NoteEvent | DrumHitEvent | AutomationEvent`; core clips are pattern, MIDI, or automation containers; MVP tracks are built-in beat-production tracks; and the default Instrument Panel is drum rack, synth 808/bass, simple synth, chord synth, effects, sound-design controls, mixer, and master. `AudioClipEvent`, audio tracks, sampler devices, sample import, chopping, pitch/stretch, and one-shot mapping move to an optional sampling extension, not the core product definition.
+
 Trap, drill, boom bap, house, lofi, jersey, phonk, R&B, garage, and experimental workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
 
 When there is ambiguity, read the product draft in this order: all-genre beat creation first, direct composition and sound design second, arrangement/mixing/mastering/export third, optional sampling extensions last.

@@ -35,6 +35,8 @@ Source wording rule: built-in drum kits, internal one-shots, and any future samp
 
 Drafting rule: the default empty project, first visible actions, MVP proof, primary navigation, default instrument panel, and new plan titles should lead with editable musical events, built-in drum rack, synth 808/bass, synth/chord instruments, FX, and beat-making controls. Do not present optional sampling as a co-equal product spine. If a suggested basic-screen layout includes `sampler` in the default Instrument Panel, move it to a later optional-sampling section and keep the first screen focused on direct beat composition.
 
+Brief correction rule: if a pasted brief or external draft names `AudioClipEvent`, `audio`, or `sampler` in the core event, clip, track, device, or Instrument Panel examples, rewrite the MVP target before implementation. The accepted MVP rewrite is `NoteEvent | DrumHitEvent | AutomationEvent`, core clips as pattern/MIDI/automation containers, and a default device palette of drum rack, synth 808/bass, simple synth, chord synth, built-in FX, mixer, and master devices. Put `AudioClipEvent`, audio tracks, sampler devices, sample import, chopping, and pitch/stretch only in a clearly marked optional sampling extension.
+
 ## MVP Target
 
 The first usable result is an Electron desktop workstation that can create a sample-free 8-bar beat in any supported style profile and export it as WAV:
