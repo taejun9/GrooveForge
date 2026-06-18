@@ -4623,10 +4623,20 @@ export function App(): ReactElement {
     }, "Cleared session brief");
   }
 
+  function focusMixCoachCheck(check: MixCoachCheck): void {
+    setMixCoachFocusId(check.id);
+    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    setProjectStatus(`Review ${check.label}: ${check.status}`);
+  }
+
   function focusMixCoach(): MixCoachCheck | null {
     const check = mixCoachFocusCheck(createMixCoachChecks(exportAnalysis, stemAnalyses));
-    setMixCoachFocusId(check?.id ?? null);
-    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    if (check) {
+      focusMixCoachCheck(check);
+    } else {
+      setMixCoachFocusId(null);
+      masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    }
     return check;
   }
 
@@ -5147,6 +5157,7 @@ export function App(): ReactElement {
     onFocusGrooveCompass: focusGrooveCompassItem,
     onFocusKeyCompass: focusKeyCompassItem,
     onFocusListeningPass: focusListeningPassItem,
+    onFocusMixCoach: focusMixCoachCheck,
     onFocusModeFocus: focusModeFocusCard,
     onFocusPatternDna: focusPatternDnaCard,
     onFocusProductionSnapshot: focusProductionSnapshotMetric,
@@ -10695,6 +10706,7 @@ function createQuickActions({
   onFocusGrooveCompass,
   onFocusKeyCompass,
   onFocusListeningPass,
+  onFocusMixCoach,
   onFocusModeFocus,
   onFocusPatternDna,
   onFocusProductionSnapshot,
@@ -10867,6 +10879,7 @@ function createQuickActions({
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
   onFocusListeningPass: (item: ListeningPassItem) => void;
+  onFocusMixCoach: (check: MixCoachCheck) => void;
   onFocusModeFocus: (card: ModeFocusCard) => void;
   onFocusPatternDna: (card: PatternDnaCard) => void;
   onFocusProductionSnapshot: (metric: ProductionSnapshotFocusItem) => void;
@@ -11052,6 +11065,16 @@ function createQuickActions({
     group: "Project",
     keywords: `listening pass focus checkpoint audition ${item.id} ${item.label} ${item.status} ${item.focusLabel} ${item.cue} composition arrangement mix delivery beginner producer`,
     run: () => onFocusListeningPass(item)
+  }));
+  const mixCoachChecks = createMixCoachChecks(exportAnalysis, stemAnalyses);
+  const mixCoachCheck = mixCoachFocusCheck(mixCoachChecks);
+  const mixCoachActions: QuickAction[] = mixCoachChecks.map((check) => ({
+    id: `mix-coach-check-${check.id}`,
+    title: `Focus Mix Coach: ${check.label}`,
+    detail: `${check.status} / ${check.detail}`,
+    group: "Mix",
+    keywords: `mix coach focus check diagnostic headroom limiter stem balance low end ${check.id} ${check.label} ${check.status} ${check.detail} beginner producer`,
+    run: () => onFocusMixCoach(check)
   }));
   const bassMoveTarget = activeBassMoveQuickActionTarget(project, bassMovePreviewSummary);
   const chordMoveTarget = activeChordMoveQuickActionTarget(project, selectedChord, chordMovePreviewSummary);
@@ -12847,6 +12870,20 @@ function createQuickActions({
       }
     },
     ...arrangementArcPadActions,
+    {
+      id: "mix-coach-focus",
+      title: mixCoachCheck ? `Focus Mix Coach: ${mixCoachCheck.label}` : "Focus Mix Coach",
+      detail: mixCoachCheck ? `${mixCoachCheck.status} / ${mixCoachCheck.detail}` : "No Mix Coach check available.",
+      group: "Mix",
+      keywords: `mix coach focus current top check diagnostic headroom limiter stem balance low end ${mixCoachCheck?.id ?? "none"} ${mixCoachCheck?.label ?? "none"} beginner producer`,
+      disabled: !mixCoachCheck,
+      run: () => {
+        if (mixCoachCheck) {
+          onFocusMixCoach(mixCoachCheck);
+        }
+      }
+    },
+    ...mixCoachActions,
     ...stemAuditionPadOptions.map((pad): QuickAction => ({
       id: `stem-audition-${pad.id}`,
       title: pad.trackId === null ? "Audition Full Mix" : `Audition ${pad.label} Stem`,
@@ -14038,6 +14075,16 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "mix-coach-focus" || action.id.startsWith("mix-coach-check-")) {
+    const checks = createMixCoachChecks(analysis ?? analyzeExport(project), analyzeStemExports(project));
+    const reviewCount = checks.filter((check) => check.tone !== "good").length;
+    return {
+      id: "mix-coach",
+      label: "Mix Coach",
+      value: reviewCount === 0 ? "Clear" : `${reviewCount} check${reviewCount === 1 ? "" : "s"}`
+    };
+  }
+
   if (action.id.startsWith("stem-audition-")) {
     const readout = createStemAuditionReadoutSummary(project.mixer);
     return {
@@ -14782,6 +14829,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Full Mix, then solo Drums and 808 to confirm the rough balance supports the beat.",
       nextCheck: "Use the Mix Balance Result, Stem Audition Pads, and manual mixer controls for final level, pan, EQ, and send trim."
+    };
+  }
+
+  if (action.id === "mix-coach-focus" || action.id.startsWith("mix-coach-check-")) {
+    return {
+      auditionCue: "Read the focused Mix Coach card, then play Full Mix or the matching stem before applying a Mix Fix.",
+      nextCheck: "Use Headroom, Stem Balance, or Low End Mix Fix only after the focused check matches what you hear."
     };
   }
 
