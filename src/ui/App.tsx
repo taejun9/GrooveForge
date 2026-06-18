@@ -4655,7 +4655,7 @@ export function App(): ReactElement {
         setProjectStatus("Select an active note");
         return;
       }
-      if (nextStep <= source.step || nextStep > steps.length - clampStepLength(source.length)) {
+      if (nextStep <= source.step || nextStep % 4 !== 0 || nextStep > steps.length - clampStepLength(source.length)) {
         setProjectStatus("No beat-grid duplicate step");
         return;
       }
@@ -4686,7 +4686,7 @@ export function App(): ReactElement {
       setProjectStatus("Select an active note");
       return;
     }
-    if (nextStep <= source.step || nextStep > steps.length - clampStepLength(source.length)) {
+    if (nextStep <= source.step || nextStep % 4 !== 0 || nextStep > steps.length - clampStepLength(source.length)) {
       setProjectStatus("No beat-grid duplicate step");
       return;
     }
@@ -5057,7 +5057,7 @@ export function App(): ReactElement {
         rejectedStatus = "Select a chord event";
         return pattern;
       }
-      if (nextStep <= source.step || nextStep > steps.length - clampStepLength(source.length)) {
+      if (nextStep <= source.step || nextStep % 4 !== 0 || nextStep > steps.length - clampStepLength(source.length)) {
         rejectedStatus = "No beat-grid duplicate step";
         return pattern;
       }
