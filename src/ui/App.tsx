@@ -616,6 +616,12 @@ type MixFixResult = {
 
 type MixSnapshotSlotId = "A" | "B";
 
+type MixSnapshotQuickActionTarget = {
+  id: "capture-a" | "capture-b" | "clear";
+  label: string;
+  metricId: string;
+};
+
 type MixSnapshotSlotMap = Record<MixSnapshotSlotId, MixSnapshot | null>;
 
 type MixSnapshot = {
@@ -15306,6 +15312,29 @@ function masterFinishQuickActionPosture(project: ProjectState): string {
   )} output`;
 }
 
+function mixSnapshotQuickActionTarget(actionId: string): MixSnapshotQuickActionTarget | null {
+  switch (actionId) {
+    case "mix-snapshot-capture-a":
+      return { id: "capture-a", label: "Mix Snapshot A", metricId: "mix-snapshot-a" };
+    case "mix-snapshot-capture-b":
+      return { id: "capture-b", label: "Mix Snapshot B", metricId: "mix-snapshot-b" };
+    case "mix-snapshot-clear":
+      return { id: "clear", label: "Mix Snapshot A/B", metricId: "mix-snapshot-clear" };
+    default:
+      return null;
+  }
+}
+
+function mixSnapshotQuickActionPosture(project: ProjectState, exportAnalysis: ExportAnalysis): string {
+  const stemAnalyses = analyzeStemExports(project);
+  const stemSpread = stemSpreadDb(stemAnalyses);
+  const stemLabel =
+    stemSpread === null
+      ? `${audibleStemTracks(stemAnalyses).length}/${stemTrackIds.length} stems`
+      : `${stemSpread.toFixed(1)} dB spread`;
+  return `${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)} / ${project.masterPreset} / ${stemLabel}`;
+}
+
 function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -15937,15 +15966,20 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id.startsWith("mix-snapshot-")) {
+  const mixSnapshotTarget = mixSnapshotQuickActionTarget(action.id);
+  if (mixSnapshotTarget) {
+    if (mixSnapshotTarget.id === "clear") {
+      return {
+        id: mixSnapshotTarget.metricId,
+        label: mixSnapshotTarget.label,
+        value: "Slots cleared / ready to recapture"
+      };
+    }
     const exportAnalysis = analysis ?? analyzeExport(project);
-    const stemSpread = stemSpreadDb(analyzeStemExports(project));
     return {
-      id: "mix-snapshot",
-      label: "Mix snapshot",
-      value: `${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)} / ${
-        stemSpread === null ? "stems n/a" : `${stemSpread.toFixed(1)} dB spread`
-      }`
+      id: mixSnapshotTarget.metricId,
+      label: mixSnapshotTarget.label,
+      value: mixSnapshotQuickActionPosture(project, exportAnalysis)
     };
   }
 
