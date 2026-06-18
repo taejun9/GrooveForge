@@ -7195,6 +7195,66 @@ def check_domain_sampling_boundaries(errors: list[str]) -> None:
         errors.append("core domain model must not include AudioClipEvent before optional sampling-phase work")
 
 
+def check_first_read_framing(errors: list[str]) -> None:
+    readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
+    product_text = (ROOT / "docs/product/product.md").read_text(encoding="utf-8")
+    readme_spine = readme_text.split("## MVP Target", 1)[0]
+    product_definition = product_text.split("## Product Boundary", 1)[0]
+
+    direct_readme_markers = [
+        "directly composing beats",
+        "Pattern Programming",
+        "Drum Sequencing",
+        "808/Bass Synthesis",
+        "Melody/Chord Composition",
+        "Sound Design",
+        "Arrangement",
+        "Mixing",
+        "Mastering",
+        "Export",
+    ]
+    for marker in direct_readme_markers:
+        if marker not in readme_spine:
+            errors.append(f"README Product Spine must lead with direct beat production marker: {marker}")
+
+    misplaced_readme_guardrails = [
+        "Concept audit rule:",
+        "Core model rule:",
+        "Attached-brief intake rule:",
+        "Brief correction rule:",
+        "Attached Korean brief rewrite:",
+        "Korean concept-brief rule:",
+        "Latest brief verdict:",
+    ]
+    for marker in misplaced_readme_guardrails:
+        if marker in readme_spine:
+            errors.append(f"README Product Spine must move sampling guardrail out of first-read section: {marker}")
+
+    direct_product_markers = [
+        "directly composing beats across genres",
+        "designing sounds",
+        "arranging sections",
+        "mixing/mastering",
+        "exporting finished audio",
+        "The center is writing and shaping the beat directly.",
+    ]
+    for marker in direct_product_markers:
+        if marker not in product_definition:
+            errors.append(f"Product Definition must lead with direct beat production marker: {marker}")
+
+    misplaced_product_guardrails = [
+        "Core schema examples must reflect that order.",
+        "Attached-brief intake rule:",
+        "Brief correction target:",
+        "Attached Korean brief rewrite:",
+        "Korean concept-brief rule:",
+        "Latest concept verdict:",
+    ]
+    for marker in misplaced_product_guardrails:
+        if marker in product_definition:
+            errors.append(f"Product Definition must move sampling guardrail out of first-read section: {marker}")
+
+
 def run_checks(strict: bool = False) -> list[str]:
     errors: list[str] = []
     check_required_paths(errors)
@@ -7206,6 +7266,7 @@ def run_checks(strict: bool = False) -> list[str]:
     check_offline_render_determinism(errors)
     check_build_chunk_config(errors)
     check_domain_sampling_boundaries(errors)
+    check_first_read_framing(errors)
     if strict:
         check_strict_todos(errors)
     return errors

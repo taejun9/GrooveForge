@@ -23,17 +23,7 @@ The primary object is a beat project built from musical events, patterns, tracks
 
 The product should make a blank beat feel playable without imported audio: set BPM/key/style, write rhythm, compose 808/bass, melody, and chords, shape tone and FX, arrange sections, mix/master, and export. The product center is Pattern Programming, Drum Sequencing, 808/Bass Synthesis, Melody/Chord Composition, Sound Design, Arrangement, Mixing, Mastering, and Export.
 
-Core schema examples must reflect that order. Do not place `AudioClipEvent`, `audio`, or `sampler` beside core MVP event, clip, or track unions unless the user has explicitly started optional sampling-phase work. If an incoming brief includes `type MusicalEvent = ... | AudioClipEvent` or `type TrackType = ... | "audio" | "sampler"`, treat those lines as optional extension examples and rewrite the MVP union around direct musical events and built-in instrument tracks.
-
-Attached-brief intake rule: accept the brief's direction only after separating beat-workstation core examples from optional sampling examples. `TrackType` examples that include `"audio"` or `"sampler"`, `Clip` examples that include `AudioClip`, and architecture layer examples that list `Sampler` must be rewritten so the MVP remains sample-free event creation and optional sampling stays a later module.
-
-Brief correction target: a sampling-heavy concept note is accepted only after it is rewritten around direct beat creation. The MVP event union is `NoteEvent | DrumHitEvent | AutomationEvent`; core clips are pattern, MIDI, or automation containers; MVP tracks are built-in beat-production tracks; and the default Instrument Panel is drum rack, synth 808/bass, simple synth, chord synth, effects, sound-design controls, mixer, and master. `AudioClipEvent`, audio tracks, sampler devices, sample import, chopping, pitch/stretch, and one-shot mapping move to an optional sampling extension, not the core product definition.
-
-Attached Korean brief rewrite: accept the corrected sentence that GrooveForge is a direct beat-production mini DAW, then split its mixed examples before any plan uses them. `AudioClipEvent`, `AudioClip`, `audio`, `sampler`, waveform editing, sample import, chop/slice, loop stretch, pitch/stretch, one-shot mapping, and sampler tracks are optional extension material. The core MVP path remains BPM/key/style, drum rack, synth 808/bass, melody/chords, sound design, arrangement, mixer/master, and export.
-
-Korean concept-brief rule: if the user says the concept is "비트(모든 장르)를 만드는" product and sampling is "부가 기능", that statement overrides sampling-heavy draft examples. Keep `sample import -> chop -> arrange` sequences out of the MVP path and rewrite the accepted first path as `BPM/key/style -> drums -> 808/bass -> melody/chords -> sound design -> arrangement -> mixer/master -> export`.
-
-Latest concept verdict: GrooveForge should be evaluated as a direct beat-production workstation, not as a sampling app with extra composition features. A draft is aligned only when direct beat composition, sound design, arrangement, mixing/mastering, and export are the spine, and sample import, chopping, loop stretch, one-shot mapping, and sampler setup are clearly labeled optional extension work.
+Draft correction rules belong in the guardrail section below. The first-read definition should make the beat-making path obvious before it mentions any optional sampling vocabulary.
 
 Trap, drill, boom bap, house, lofi, jersey, phonk, R&B, K-hip-hop/R&B, garage, and experimental workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
 
@@ -72,6 +62,20 @@ External-draft split rule: when a draft combines `AudioClip`, `Sampler`, sample 
 Sound-source wording rule: built-in drum kits, internal one-shot sounds, and any future sample 808 source are implementation details inside direct drum sequencing or the 808/Bass engine. They do not make the product a sample-pack workflow, sample browser, chop surface, or sampler-first app. The default user path remains built-in drum rack, synth 808/bass, melody/chord instruments, sound design, arrangement, mix/master, and export.
 
 Mix/master boundary: mixing and mastering are separate product stages. Mixer work sets balance, panning, EQ, dynamics, send FX, and stem posture; mastering work sets final output posture, limiter ceiling, and export checks after the mix is usable. Product drafts must not present mastering as an automatic fix for an unfinished mix.
+
+## Draft Intake Guardrails
+
+Core schema examples must reflect that order. Do not place `AudioClipEvent`, `audio`, or `sampler` beside core MVP event, clip, or track unions unless the user has explicitly started optional sampling-phase work. If an incoming brief includes `type MusicalEvent = ... | AudioClipEvent` or `type TrackType = ... | "audio" | "sampler"`, treat those lines as optional extension examples and rewrite the MVP union around direct musical events and built-in instrument tracks.
+
+Attached-brief intake rule: accept the brief's direction only after separating beat-workstation core examples from optional sampling examples. `TrackType` examples that include `"audio"` or `"sampler"`, `Clip` examples that include `AudioClip`, and architecture layer examples that list `Sampler` must be rewritten so the MVP remains sample-free event creation and optional sampling stays a later module.
+
+Brief correction target: a sampling-heavy concept note is accepted only after it is rewritten around direct beat creation. The MVP event union is `NoteEvent | DrumHitEvent | AutomationEvent`; core clips are pattern, MIDI, or automation containers; MVP tracks are built-in beat-production tracks; and the default Instrument Panel is drum rack, synth 808/bass, simple synth, chord synth, effects, sound-design controls, mixer, and master. `AudioClipEvent`, audio tracks, sampler devices, sample import, chopping, pitch/stretch, and one-shot mapping move to an optional sampling extension, not the core product definition.
+
+Attached Korean brief rewrite: accept the corrected sentence that GrooveForge is a direct beat-production mini DAW, then split its mixed examples before any plan uses them. `AudioClipEvent`, `AudioClip`, `audio`, `sampler`, waveform editing, sample import, chop/slice, loop stretch, pitch/stretch, one-shot mapping, and sampler tracks are optional extension material. The core MVP path remains BPM/key/style, drum rack, synth 808/bass, melody/chords, sound design, arrangement, mixer/master, and export.
+
+Korean concept-brief rule: if the user says the concept is "비트(모든 장르)를 만드는" product and sampling is "부가 기능", that statement overrides sampling-heavy draft examples. Keep `sample import -> chop -> arrange` sequences out of the MVP path and rewrite the accepted first path as `BPM/key/style -> drums -> 808/bass -> melody/chords -> sound design -> arrangement -> mixer/master -> export`.
+
+Latest concept verdict: GrooveForge should be evaluated as a direct beat-production workstation, not as a sampling app with extra composition features. A draft is aligned only when direct beat composition, sound design, arrangement, mixing/mastering, and export are the spine, and sample import, chopping, loop stretch, one-shot mapping, and sampler setup are clearly labeled optional extension work.
 
 ## Users
 

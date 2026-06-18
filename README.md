@@ -25,25 +25,7 @@ The core flow is:
 BPM/key/style -> pattern programming -> drums -> 808/bass -> melody/chords -> sound design -> arrangement -> mixing -> mastering -> export
 ```
 
-Extension boundary: Sampling is subordinate and opt-in. After the core beat-making loop works, a future module may add audio import, chopping/slicing, pitch/stretch, one-shot mapping, or sampler instruments. It must attach as an optional sound source inside the workstation. A complete GrooveForge beat must still be possible with no imported audio.
-
-Concept audit rule: do not read any sampling reference as the main workflow. Sampling is an accessory module, not the app category. If a draft starts from sample import, sample browsing, chopping, loop stretching, one-shot mapping, sampler setup, or lists a sampler as a default instrument-panel item, it is out of alignment until it is explicitly labeled optional sampling-phase work.
-
-Core model rule: do not copy optional sampling examples into the MVP data model. The core project starts from editable notes, drum hits, automation, pattern/MIDI clips, built-in instruments, arrangement, mixer/master, and export; `AudioClipEvent`, `audio`, and `sampler` belong only to an explicitly approved optional sampling phase. If an incoming draft defines `MusicalEvent` with `AudioClipEvent` or a core `TrackType` with `audio`/`sampler`, rewrite those entries into an optional-sampling extension section before they reach the MVP model.
-
-Attached-brief intake rule: a concept brief may mention sample import, one-shot mapping, chop pads, audio clips, or sampler tracks as future scope, but the accepted MVP intake always starts from sample-free event creation. Combined examples such as `TrackType = "drum_rack" | "bass_808" | "synth" | "chord" | "audio" | "sampler"` or `Clip = PatternClip | MidiClip | AudioClip | AutomationClip` must be split into a core MVP set and a clearly labeled optional sampling extension before any code, docs, roadmap, or UI plan uses them.
-
-Source wording rule: built-in drum kits, internal one-shots, and any future sample 808 option are sound-source details inside drum sequencing or the 808/Bass engine. They must not be used to reframe the app as sample import, sample-pack browsing, chopping, or sampler setup. The default path is built-in drum rack plus synth 808/bass before any user-file source is introduced.
-
-Drafting rule: the default empty project, first visible actions, MVP proof, primary navigation, default instrument panel, and new plan titles should lead with editable musical events, built-in drum rack, synth 808/bass, synth/chord instruments, FX, and beat-making controls. Do not present optional sampling as a co-equal product spine. If a suggested basic-screen layout includes `sampler` in the default Instrument Panel, move it to a later optional-sampling section and keep the first screen focused on direct beat composition.
-
-Brief correction rule: if a pasted brief or external draft names `AudioClipEvent`, `audio`, or `sampler` in the core event, clip, track, device, or Instrument Panel examples, rewrite the MVP target before implementation. The accepted MVP rewrite is `NoteEvent | DrumHitEvent | AutomationEvent`, core clips as pattern/MIDI/automation containers, and a default device palette of drum rack, synth 808/bass, simple synth, chord synth, built-in FX, mixer, and master devices. Put `AudioClipEvent`, audio tracks, sampler devices, sample import, chopping, and pitch/stretch only in a clearly marked optional sampling extension.
-
-Attached Korean brief rewrite: accept the brief's corrected product definition, but do not copy its combined code examples verbatim. Rewrite `MusicalEvent = NoteEvent | DrumHitEvent | AutomationEvent | AudioClipEvent` to the MVP union `NoteEvent | DrumHitEvent | AutomationEvent`; rewrite `TrackType` so MVP tracks are `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master`; rewrite `Clip` so MVP clips are pattern/MIDI/automation containers; and rewrite any default Instrument Panel list containing `sampler` so sampler appears only in optional sampling extension scope.
-
-Korean concept-brief rule: when a brief says the concept is "비트(모든 장르)를 만드는" work and sampling is "부가 기능", treat every sample import, chopping, sampler, audio clip, and loop-stretching example as optional v2/v3 scope unless the user explicitly starts a sampling-phase plan. The accepted first-screen path is BPM/key/style, drum rack, synth 808/bass, melody/chords, sound design, arrangement, mixer/master, and export.
-
-Latest brief verdict: if a draft can be described as "bring in a sample, chop it, arrange it, then mix/master," reject that as the product spine. The accepted GrooveForge spine is "compose/program the beat, design the sound, arrange it, mix/master it, then export"; sampling is only a later opt-in module that can supply material inside that workstation.
+Sampling stays a later optional sound-source module, not the product spine. The first proof of GrooveForge is still a complete beat made from editable events, built-in instruments, arrangement, mixer/master, and export without imported audio.
 
 ## MVP Target
 
@@ -222,6 +204,28 @@ Quick Actions selected-chord length reset commands return the active selected ch
 - Keep mixing and mastering as distinct stages in docs and UI plans; mastering is a final output posture after a usable mix, not a substitute for the mixer.
 - Keep sensitive real user, customer, credential, and production data out of samples, tests, docs, and screenshots.
 - Keep validation commands current as the stack becomes concrete.
+
+## Draft Intake Guardrails
+
+Extension boundary: Sampling is subordinate and opt-in. After the core beat-making loop works, a future module may add audio import, chopping/slicing, pitch/stretch, one-shot mapping, or sampler instruments. It must attach as an optional sound source inside the workstation. A complete GrooveForge beat must still be possible with no imported audio.
+
+Concept audit rule: do not read any sampling reference as the main workflow. Sampling is an accessory module, not the app category. If a draft starts from sample import, sample browsing, chopping, loop stretching, one-shot mapping, sampler setup, or lists a sampler as a default instrument-panel item, it is out of alignment until it is explicitly labeled optional sampling-phase work.
+
+Core model rule: do not copy optional sampling examples into the MVP data model. The core project starts from editable notes, drum hits, automation, pattern/MIDI clips, built-in instruments, arrangement, mixer/master, and export; `AudioClipEvent`, `audio`, and `sampler` belong only to an explicitly approved optional sampling phase. If an incoming draft defines `MusicalEvent` with `AudioClipEvent` or a core `TrackType` with `audio`/`sampler`, rewrite those entries into an optional-sampling extension section before they reach the MVP model.
+
+Attached-brief intake rule: a concept brief may mention sample import, one-shot mapping, chop pads, audio clips, or sampler tracks as future scope, but the accepted MVP intake always starts from sample-free event creation. Combined examples such as `TrackType = "drum_rack" | "bass_808" | "synth" | "chord" | "audio" | "sampler"` or `Clip = PatternClip | MidiClip | AudioClip | AutomationClip` must be split into a core MVP set and a clearly labeled optional sampling extension before any code, docs, roadmap, or UI plan uses them.
+
+Source wording rule: built-in drum kits, internal one-shots, and any future sample 808 option are sound-source details inside drum sequencing or the 808/Bass engine. They must not be used to reframe the app as sample import, sample-pack browsing, chopping, or sampler setup. The default path is built-in drum rack plus synth 808/bass before any user-file source is introduced.
+
+Drafting rule: the default empty project, first visible actions, MVP proof, primary navigation, default instrument panel, and new plan titles should lead with editable musical events, built-in drum rack, synth 808/bass, synth/chord instruments, FX, and beat-making controls. Do not present optional sampling as a co-equal product spine. If a suggested basic-screen layout includes `sampler` in the default Instrument Panel, move it to a later optional-sampling section and keep the first screen focused on direct beat composition.
+
+Brief correction rule: if a pasted brief or external draft names `AudioClipEvent`, `audio`, or `sampler` in the core event, clip, track, device, or Instrument Panel examples, rewrite the MVP target before implementation. The accepted MVP rewrite is `NoteEvent | DrumHitEvent | AutomationEvent`, core clips as pattern/MIDI/automation containers, and a default device palette of drum rack, synth 808/bass, simple synth, chord synth, built-in FX, mixer, and master devices. Put `AudioClipEvent`, audio tracks, sampler devices, sample import, chopping, and pitch/stretch only in a clearly marked optional sampling extension.
+
+Attached Korean brief rewrite: accept the brief's corrected product definition, but do not copy its combined code examples verbatim. Rewrite `MusicalEvent = NoteEvent | DrumHitEvent | AutomationEvent | AudioClipEvent` to the MVP union `NoteEvent | DrumHitEvent | AutomationEvent`; rewrite `TrackType` so MVP tracks are `drum_rack`, `bass_808`, `synth`, `chord`, `fx_return`, and `master`; rewrite `Clip` so MVP clips are pattern/MIDI/automation containers; and rewrite any default Instrument Panel list containing `sampler` so sampler appears only in optional sampling extension scope.
+
+Korean concept-brief rule: when a brief says the concept is "비트(모든 장르)를 만드는" work and sampling is "부가 기능", treat every sample import, chopping, sampler, audio clip, and loop-stretching example as optional v2/v3 scope unless the user explicitly starts a sampling-phase plan. The accepted first-screen path is BPM/key/style, drum rack, synth 808/bass, melody/chords, sound design, arrangement, mixer/master, and export.
+
+Latest brief verdict: if a draft can be described as "bring in a sample, chop it, arrange it, then mix/master," reject that as the product spine. The accepted GrooveForge spine is "compose/program the beat, design the sound, arrange it, mix/master it, then export"; sampling is only a later opt-in module that can supply material inside that workstation.
 
 ## Agent Harness
 
