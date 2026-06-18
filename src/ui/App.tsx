@@ -13,6 +13,8 @@ import {
   KeyboardMusic,
   ListChecks,
   Music2,
+  Pin,
+  PinOff,
   Play,
   Plus,
   Redo2,
@@ -964,6 +966,8 @@ type QuickActionRecent = {
   status: QuickActionResult["status"];
   tone: MixCoachTone;
 };
+
+const maxQuickActionPins = 4;
 
 type QuickActionScopeId = "all" | "transport" | "compose" | "arrange" | "mix" | "master" | "project" | "export";
 
@@ -3141,6 +3145,7 @@ export function App(): ReactElement {
   const [quickActionQuery, setQuickActionQuery] = useState("");
   const [quickActionScope, setQuickActionScope] = useState<QuickActionScopeId>("all");
   const [quickActionRecents, setQuickActionRecents] = useState<QuickActionRecent[]>([]);
+  const [quickActionPinnedIds, setQuickActionPinnedIds] = useState<string[]>([]);
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
@@ -7207,6 +7212,17 @@ export function App(): ReactElement {
     }
   }
 
+  function toggleQuickActionPin(action: QuickAction): void {
+    setQuickActionPinnedIds((pinnedIds) => {
+      const normalizedIds = normalizeQuickActionPinnedIds(pinnedIds, quickActions);
+      if (normalizedIds.includes(action.id)) {
+        return normalizedIds.filter((id) => id !== action.id);
+      }
+      return [action.id, ...normalizedIds].slice(0, maxQuickActionPins);
+    });
+    setProjectStatus(`Quick Action ${quickActionPinnedIds.includes(action.id) ? "unpinned" : "pinned"}: ${action.title}`);
+  }
+
   const quickActions = createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
@@ -7375,6 +7391,9 @@ export function App(): ReactElement {
     onTogglePlayback: togglePlayback,
     onUndo: undoProject
   });
+  useEffect(() => {
+    setQuickActionPinnedIds((pinnedIds) => normalizeQuickActionPinnedIds(pinnedIds, quickActions));
+  }, [quickActions]);
   const quickActionScopeOptions = createQuickActionScopeOptions(quickActions, quickActionQuery);
   const filteredQuickActions = filterQuickActions(quickActions, quickActionQuery, quickActionScope);
 
@@ -7600,6 +7619,7 @@ export function App(): ReactElement {
       <QuickActions
         actions={filteredQuickActions}
         open={quickActionsOpen}
+        pinnedActionIds={quickActionPinnedIds}
         query={quickActionQuery}
         recentActionSource={quickActions}
         recents={quickActionRecents}
@@ -7609,6 +7629,7 @@ export function App(): ReactElement {
         onQueryChange={setQuickActionQuery}
         onRun={runQuickAction}
         onScopeChange={setQuickActionScope}
+        onTogglePin={toggleQuickActionPin}
       />
 
       {localDraftRecovery && (
@@ -10114,6 +10135,7 @@ function LocalDraftRecoveryBanner({
 function QuickActions({
   actions,
   open,
+  pinnedActionIds,
   query,
   recentActionSource,
   recents,
@@ -10122,10 +10144,12 @@ function QuickActions({
   onClose,
   onQueryChange,
   onRun,
-  onScopeChange
+  onScopeChange,
+  onTogglePin
 }: {
   actions: QuickAction[];
   open: boolean;
+  pinnedActionIds: string[];
   query: string;
   recentActionSource: QuickAction[];
   recents: QuickActionRecent[];
@@ -10135,6 +10159,7 @@ function QuickActions({
   onQueryChange: (query: string) => void;
   onRun: (action: QuickAction) => void;
   onScopeChange: (scope: QuickActionScopeId) => void;
+  onTogglePin: (action: QuickAction) => void;
 }): ReactElement | null {
   if (!open) {
     return null;
@@ -10142,6 +10167,7 @@ function QuickActions({
 
   const firstRunnableAction = actions.find((action) => !action.disabled);
   const spotlight = createQuickActionSpotlightSummary(actions, firstRunnableAction, scope, scopeOptions, query);
+  const pinnedActions = createQuickActionPinnedOptions(pinnedActionIds, recentActionSource);
   const recentActions = createQuickActionRecentOptions(recents, recentActionSource);
 
   return (
@@ -10213,6 +10239,51 @@ function QuickActions({
           <small data-testid="quick-actions-spotlight-detail">{spotlight.detailLabel}</small>
           <small data-testid="quick-actions-spotlight-context">{spotlight.contextLabel}</small>
         </div>
+        <div className="quick-actions-pinned" data-testid="quick-actions-pinned" aria-label="Pinned Quick Actions">
+          <div className="quick-actions-pinned-head">
+            <span data-testid="quick-actions-pinned-status">
+              {pinnedActions.length}/{maxQuickActionPins} pinned
+            </span>
+            <strong data-testid="quick-actions-pinned-title">Pinned commands</strong>
+            <small data-testid="quick-actions-pinned-detail">
+              {pinnedActions.length > 0 ? "Explicit run only" : "Pin visible commands for reuse"}
+            </small>
+          </div>
+          <div className="quick-actions-pinned-list" data-testid="quick-actions-pinned-list">
+            {pinnedActions.length === 0 ? (
+              <span className="quick-actions-pinned-empty" data-testid="quick-actions-pinned-empty">
+                No pinned commands in this session
+              </span>
+            ) : (
+              pinnedActions.map((action) => (
+                <div className="quick-actions-pinned-card" data-testid={`quick-actions-pinned-card-${action.id}`} key={action.id}>
+                  <button
+                    data-testid={`quick-actions-pinned-${action.id}`}
+                    disabled={action.disabled}
+                    onClick={() => onRun(action)}
+                    title={`Run pinned: ${action.detail}`}
+                    type="button"
+                  >
+                    <span>{action.group}</span>
+                    <strong>{action.title}</strong>
+                    <small>{action.disabled ? "Unavailable now" : "Pinned"}</small>
+                  </button>
+                  <button
+                    aria-label={`Unpin ${action.title}`}
+                    className="quick-action-pin-toggle selected"
+                    data-testid={`quick-actions-pinned-unpin-${action.id}`}
+                    onClick={() => onTogglePin(action)}
+                    title={`Unpin ${action.title}`}
+                    type="button"
+                  >
+                    <PinOff size={14} aria-hidden="true" />
+                    <span>Unpin</span>
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
         <div className="quick-actions-recents" data-testid="quick-actions-recents" aria-label="Recent Quick Actions">
           <div className="quick-actions-recents-head">
             <span data-testid="quick-actions-recents-status">
@@ -10253,20 +10324,37 @@ function QuickActions({
               No matching actions
             </div>
           ) : (
-            actions.map((action) => (
-              <button
-                data-testid={`quick-action-${action.id}`}
-                disabled={action.disabled}
-                key={action.id}
-                onClick={() => onRun(action)}
-                title={action.detail}
-                type="button"
-              >
-                <span>{action.group}</span>
-                <strong>{action.title}</strong>
-                <small>{action.detail}</small>
-              </button>
-            ))
+            actions.map((action) => {
+              const pinned = pinnedActionIds.includes(action.id);
+              return (
+                <div className={`quick-action-row ${pinned ? "pinned" : ""}`} key={action.id}>
+                  <button
+                    className="quick-action-run"
+                    data-testid={`quick-action-${action.id}`}
+                    disabled={action.disabled}
+                    onClick={() => onRun(action)}
+                    title={action.detail}
+                    type="button"
+                  >
+                    <span>{action.group}</span>
+                    <strong>{action.title}</strong>
+                    <small>{action.detail}</small>
+                  </button>
+                  <button
+                    aria-label={`${pinned ? "Unpin" : "Pin"} ${action.title}`}
+                    aria-pressed={pinned}
+                    className={`quick-action-pin-toggle ${pinned ? "selected" : ""}`}
+                    data-testid={`quick-action-${pinned ? "unpin" : "pin"}-${action.id}`}
+                    onClick={() => onTogglePin(action)}
+                    title={`${pinned ? "Unpin" : "Pin"} ${action.title}`}
+                    type="button"
+                  >
+                    {pinned ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}
+                    <span>{pinned ? "Unpin" : "Pin"}</span>
+                  </button>
+                </div>
+              );
+            })
           )}
         </div>
       </section>
@@ -15185,6 +15273,23 @@ function createQuickActionRecentOptions(
   return recents.flatMap((recent) => {
     const action = actions.find((candidate) => candidate.id === recent.actionId);
     return action ? [{ recent, action }] : [];
+  });
+}
+
+function normalizeQuickActionPinnedIds(pinnedIds: string[], actions: QuickAction[]): string[] {
+  const actionIds = new Set(actions.map((action) => action.id));
+  const normalizedIds = pinnedIds.filter((id, index) => actionIds.has(id) && pinnedIds.indexOf(id) === index);
+  const boundedIds = normalizedIds.slice(0, maxQuickActionPins);
+  return pinnedIds.length === boundedIds.length && pinnedIds.every((id, index) => id === boundedIds[index])
+    ? pinnedIds
+    : boundedIds;
+}
+
+function createQuickActionPinnedOptions(pinnedIds: string[], actions: QuickAction[]): QuickAction[] {
+  const normalizedIds = normalizeQuickActionPinnedIds(pinnedIds, actions);
+  return normalizedIds.flatMap((id) => {
+    const action = actions.find((candidate) => candidate.id === id);
+    return action ? [action] : [];
   });
 }
 
