@@ -4036,39 +4036,46 @@ export function App(): ReactElement {
     setSelectedChordIndex(null);
   }
 
-  function updateSelectedLength(length: number): void {
+  function updateSelectedLength(length: number, status = "Edited note length"): void {
     if (!selectedNote) {
       return;
     }
 
-    updateCurrentPattern((pattern) => ({
-      ...pattern,
-      bassNotes:
-        selectedNote.track === "bass"
-          ? pattern.bassNotes.map((note) =>
-              note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, length } : note
-            )
-          : pattern.bassNotes,
-      melodyNotes:
-        selectedNote.track === "melody"
-          ? pattern.melodyNotes.map((note) =>
-              note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, length } : note
-            )
-          : pattern.melodyNotes
-    }));
+    const nextLength = clampStepLength(length);
+    updateCurrentPattern(
+      (pattern) => ({
+        ...pattern,
+        bassNotes:
+          selectedNote.track === "bass"
+            ? pattern.bassNotes.map((note) =>
+                note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, length: nextLength } : note
+              )
+            : pattern.bassNotes,
+        melodyNotes:
+          selectedNote.track === "melody"
+            ? pattern.melodyNotes.map((note) =>
+                note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, length: nextLength } : note
+              )
+            : pattern.melodyNotes
+      }),
+      status
+    );
   }
 
-  function updateSelectedGlide(glide: boolean): void {
+  function updateSelectedGlide(glide: boolean, status = "Edited 808 glide"): void {
     if (!selectedNote || selectedNote.track !== "bass") {
       return;
     }
 
-    updateCurrentPattern((pattern) => ({
-      ...pattern,
-      bassNotes: pattern.bassNotes.map((note) =>
-        note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, glide } : note
-      )
-    }));
+    updateCurrentPattern(
+      (pattern) => ({
+        ...pattern,
+        bassNotes: pattern.bassNotes.map((note) =>
+          note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, glide } : note
+        )
+      }),
+      status
+    );
   }
 
   function updateSelectedVelocity(velocity: number, status = "Edited note velocity"): void {
@@ -4698,6 +4705,19 @@ export function App(): ReactElement {
       selectedChordIndex,
       { inversion: nextInversion },
       direction < 0 ? "Moved chord voicing down" : "Moved chord voicing up"
+    );
+  }
+
+  function updateSelectedChordLength(length: number): void {
+    if (selectedChordIndex === null || !selectedChord) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+
+    updateChordEvent(
+      selectedChordIndex,
+      { length: clampStepLength(length) },
+      "Edited chord length"
     );
   }
 
@@ -5837,6 +5857,8 @@ export function App(): ReactElement {
     onMoveSelectedNoteStep: moveSelectedNoteStep,
     onMoveSelectedNotePitch: moveSelectedNotePitch,
     onMoveSelectedNoteOctave: moveSelectedNoteOctave,
+    onUpdateSelectedNoteLength: updateSelectedLength,
+    onUpdateSelectedNoteGlide: updateSelectedGlide,
     onUpdateSelectedNoteVelocity: updateSelectedVelocity,
     onUpdateSelectedNoteProbability: updateSelectedNoteProbability,
     onAuditionSelectedNote: auditionSelectedNote,
@@ -5856,6 +5878,7 @@ export function App(): ReactElement {
     onPasteCopiedChord: pasteCopiedChord,
     onDuplicateSelectedChord: duplicateSelectedChord,
     onMoveSelectedChordInversion: moveSelectedChordInversion,
+    onUpdateSelectedChordLength: updateSelectedChordLength,
     onUpdateSelectedChordVelocity: updateSelectedChordVelocity,
     onUpdateSelectedChordProbability: updateSelectedChordProbability,
     onExportHandoffSheet: handleExportHandoffSheet,
@@ -11600,6 +11623,8 @@ function createQuickActions({
   onMoveSelectedNoteStep,
   onMoveSelectedNotePitch,
   onMoveSelectedNoteOctave,
+  onUpdateSelectedNoteLength,
+  onUpdateSelectedNoteGlide,
   onUpdateSelectedNoteVelocity,
   onUpdateSelectedNoteProbability,
   onAuditionSelectedNote,
@@ -11619,6 +11644,7 @@ function createQuickActions({
   onPasteCopiedChord,
   onDuplicateSelectedChord,
   onMoveSelectedChordInversion,
+  onUpdateSelectedChordLength,
   onUpdateSelectedChordVelocity,
   onUpdateSelectedChordProbability,
   onExportHandoffSheet,
@@ -11806,6 +11832,8 @@ function createQuickActions({
   onMoveSelectedNoteStep: (direction: -1 | 1) => void;
   onMoveSelectedNotePitch: (direction: -1 | 1) => void;
   onMoveSelectedNoteOctave: (direction: -1 | 1) => void;
+  onUpdateSelectedNoteLength: (length: number) => void;
+  onUpdateSelectedNoteGlide: (glide: boolean) => void;
   onUpdateSelectedNoteVelocity: (velocity: number) => void;
   onUpdateSelectedNoteProbability: (probability: number) => void;
   onAuditionSelectedNote: () => void;
@@ -11825,6 +11853,7 @@ function createQuickActions({
   onPasteCopiedChord: () => void;
   onDuplicateSelectedChord: () => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
+  onUpdateSelectedChordLength: (length: number) => void;
   onUpdateSelectedChordVelocity: (velocity: number) => void;
   onUpdateSelectedChordProbability: (probability: number) => void;
   onExportHandoffSheet: () => void;
@@ -12293,6 +12322,8 @@ function createQuickActions({
       onMoveSelectedNoteStep,
       onMoveSelectedNotePitch,
       onMoveSelectedNoteOctave,
+      onUpdateSelectedNoteLength,
+      onUpdateSelectedNoteGlide,
       onUpdateSelectedNoteVelocity,
       onUpdateSelectedNoteProbability,
       onCopySelectedNote,
@@ -12308,6 +12339,7 @@ function createQuickActions({
       onAuditionSelectedChord,
       onMoveSelectedChordStep,
       onMoveSelectedChordInversion,
+      onUpdateSelectedChordLength,
       onUpdateSelectedChordVelocity,
       onUpdateSelectedChordProbability,
       onCopySelectedChord,

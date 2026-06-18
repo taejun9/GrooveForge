@@ -25,6 +25,7 @@ import {
   nextEmptyDrumStep,
   nextEmptyStepForPitch,
   octaveShiftPitch,
+  clampStepLength,
   clampVelocity,
   percentLabel,
   sameChordEvent,
@@ -53,6 +54,8 @@ type SelectedEventQuickActionsParams = {
   onMoveSelectedNoteStep: (direction: -1 | 1) => void;
   onMoveSelectedNotePitch: (direction: -1 | 1) => void;
   onMoveSelectedNoteOctave: (direction: -1 | 1) => void;
+  onUpdateSelectedNoteLength: (length: number) => void;
+  onUpdateSelectedNoteGlide: (glide: boolean) => void;
   onUpdateSelectedNoteVelocity: (velocity: number) => void;
   onUpdateSelectedNoteProbability: (probability: number) => void;
   onCopySelectedNote: () => void;
@@ -68,6 +71,7 @@ type SelectedEventQuickActionsParams = {
   onAuditionSelectedChord: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
+  onUpdateSelectedChordLength: (length: number) => void;
   onUpdateSelectedChordVelocity: (velocity: number) => void;
   onUpdateSelectedChordProbability: (probability: number) => void;
   onCopySelectedChord: () => void;
@@ -96,6 +100,8 @@ export function createSelectedEventQuickActions({
   onMoveSelectedNoteStep,
   onMoveSelectedNotePitch,
   onMoveSelectedNoteOctave,
+  onUpdateSelectedNoteLength,
+  onUpdateSelectedNoteGlide,
   onUpdateSelectedNoteVelocity,
   onUpdateSelectedNoteProbability,
   onCopySelectedNote,
@@ -111,6 +117,7 @@ export function createSelectedEventQuickActions({
   onAuditionSelectedChord,
   onMoveSelectedChordStep,
   onMoveSelectedChordInversion,
+  onUpdateSelectedChordLength,
   onUpdateSelectedChordVelocity,
   onUpdateSelectedChordProbability,
   onCopySelectedChord,
@@ -133,6 +140,9 @@ export function createSelectedEventQuickActions({
       : undefined;
   const selectedNoteVelocity = selectedNoteEvent ? clampVelocity(selectedNoteEvent.velocity) : null;
   const selectedNoteProbability = selectedNoteEvent ? normalizeEventProbability(selectedNoteEvent.probability) : null;
+  const selectedNoteLength = selectedNoteEvent ? clampStepLength(selectedNoteEvent.length) : null;
+  const selectedNoteGlide =
+    selectedNote?.track === "bass" && selectedNoteEvent ? Boolean((selectedNoteEvent as { glide?: boolean }).glide) : null;
   const selectedNoteUsedPitches =
     selectedNote?.track === "bass"
       ? selectedPatternData.bassNotes.map((note) => note.pitch)
@@ -194,6 +204,9 @@ export function createSelectedEventQuickActions({
   const selectedChordVelocity = selectedChord && selectedChordActive ? clampVelocity(selectedChord.velocity) : null;
   const selectedChordProbability =
     selectedChord && selectedChordActive ? normalizeEventProbability(selectedChord.probability) : null;
+  const selectedChordMaxLength = selectedChord ? Math.max(1, steps.length - selectedChord.step) : 1;
+  const selectedChordLength =
+    selectedChord && selectedChordActive ? Math.min(clampStepLength(selectedChord.length), selectedChordMaxLength) : null;
   const selectedChordInversion = selectedChord ? normalizeChordInversion(selectedChord.inversion) : 0;
   const selectedChordInversionIndex = chordInversions.indexOf(selectedChordInversion);
   const selectedChordInversionDown = selectedChordInversionIndex > 0 ? chordInversions[selectedChordInversionIndex - 1] : null;
@@ -285,6 +298,42 @@ export function createSelectedEventQuickActions({
       keywords: "selected note octave up higher 808 synth edit keyboard capture midi beginner producer",
       disabled: !selectedNoteActive || !selectedNoteOctaveUp,
       run: () => onMoveSelectedNoteOctave(1)
+    },
+    {
+      id: "selected-note-length-short",
+      title: "Shorten selected note",
+      detail:
+        selectedNoteLength !== null
+          ? `${selectedNoteLabel} length ${selectedNoteLength} -> ${clampStepLength(selectedNoteLength - 1)}`
+          : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note length shorten duration articulation shorter 808 synth edit keyboard capture midi beginner producer",
+      disabled: selectedNoteLength === null || selectedNoteLength <= 1,
+      run: () => selectedNoteLength !== null && onUpdateSelectedNoteLength(selectedNoteLength - 1)
+    },
+    {
+      id: "selected-note-length-long",
+      title: "Lengthen selected note",
+      detail:
+        selectedNoteLength !== null
+          ? `${selectedNoteLabel} length ${selectedNoteLength} -> ${clampStepLength(selectedNoteLength + 1)}`
+          : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note length lengthen duration articulation longer sustain 808 synth edit keyboard capture midi beginner producer",
+      disabled: selectedNoteLength === null || selectedNoteLength >= steps.length,
+      run: () => selectedNoteLength !== null && onUpdateSelectedNoteLength(selectedNoteLength + 1)
+    },
+    {
+      id: "selected-note-glide-toggle",
+      title: selectedNoteGlide ? "Turn selected 808 glide off" : "Turn selected 808 glide on",
+      detail:
+        selectedNote?.track === "bass" && selectedNoteGlide !== null
+          ? `${selectedNoteLabel} glide -> ${selectedNoteGlide ? "Off" : "On"}`
+          : "Select an active 808 note first.",
+      group: "Create",
+      keywords: "selected note glide slide toggle 808 bass articulation edit keyboard capture midi beginner producer",
+      disabled: selectedNote?.track !== "bass" || selectedNoteGlide === null,
+      run: () => selectedNoteGlide !== null && onUpdateSelectedNoteGlide(!selectedNoteGlide)
     },
     {
       id: "selected-note-velocity-down",
@@ -569,6 +618,33 @@ export function createSelectedEventQuickActions({
       keywords: "selected chord inversion voicing up higher harmony progression edit beginner producer",
       disabled: !selectedChordActive || selectedChordInversionUp === null,
       run: () => onMoveSelectedChordInversion(1)
+    },
+    {
+      id: "selected-chord-length-short",
+      title: "Shorten selected chord",
+      detail:
+        selectedChordLength !== null
+          ? `${selectedChordLabel} length ${selectedChordLength} -> ${clampStepLength(selectedChordLength - 1)}`
+          : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord length shorten duration rhythm harmony progression edit beginner producer",
+      disabled: selectedChordLength === null || selectedChordLength <= 1,
+      run: () => selectedChordLength !== null && onUpdateSelectedChordLength(selectedChordLength - 1)
+    },
+    {
+      id: "selected-chord-length-long",
+      title: "Lengthen selected chord",
+      detail:
+        selectedChordLength !== null
+          ? `${selectedChordLabel} length ${selectedChordLength} -> ${Math.min(
+              selectedChordMaxLength,
+              clampStepLength(selectedChordLength + 1)
+            )}`
+          : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord length lengthen duration rhythm sustain harmony progression edit beginner producer",
+      disabled: selectedChordLength === null || selectedChordLength >= selectedChordMaxLength,
+      run: () => selectedChordLength !== null && onUpdateSelectedChordLength(selectedChordLength + 1)
     },
     {
       id: "selected-chord-velocity-down",
