@@ -937,6 +937,7 @@ export function App(): ReactElement {
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
   const [hookReadinessFocusId, setHookReadinessFocusId] = useState<HookReadinessFocusId | null>(null);
+  const [hookFixResult, setHookFixResult] = useState<HookFixResult | null>(null);
   const [toplineSpaceFocusId, setToplineSpaceFocusId] = useState<ToplineSpaceFocusId | null>(null);
   const [toplineFixResult, setToplineFixResult] = useState<ToplineFixResult | null>(null);
   const [arrangementMuteMapFocusId, setArrangementMuteMapFocusId] = useState<ArrangementMuteMapFocusId | null>(null);
@@ -1693,6 +1694,7 @@ export function App(): ReactElement {
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
+    setHookFixResult(null);
     setToplineFixResult(null);
     setProjectStatus(status);
     return true;
@@ -1732,6 +1734,7 @@ export function App(): ReactElement {
       setMixFixResult(null);
       setDeliveryTargetAlignmentResult(null);
       setSessionBriefStarterResult(null);
+      setHookFixResult(null);
       setToplineFixResult(null);
     }
     setProjectStatus(status);
@@ -1866,6 +1869,7 @@ export function App(): ReactElement {
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
+    setHookFixResult(null);
     setToplineFixResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
@@ -1910,6 +1914,7 @@ export function App(): ReactElement {
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
+    setHookFixResult(null);
     setToplineFixResult(null);
     setProjectStatus(status);
   }
@@ -2502,6 +2507,69 @@ export function App(): ReactElement {
     selectArrangementBlock(target.index);
     selectTransportLoopScope("block", false);
     setProjectStatus(`Hook Block ${target.index + 1} cued as Hook loop`);
+  }
+
+  function applyHookFix(card?: HookReadinessCard): void {
+    const beforeProject = projectRef.current;
+    const beforeAnalysis = analyzeExport(beforeProject);
+    const beforeStemAnalyses = analyzeStemExports(beforeProject);
+    const beforeSummary = createHookReadinessSummary(
+      beforeProject,
+      createBeatReadinessChecks(beforeProject, beforeAnalysis),
+      beforeAnalysis,
+      beforeStemAnalyses
+    );
+    const targetCard = card ?? activeHookReadinessQuickActionCard(beforeSummary);
+
+    if (!targetCard) {
+      setHookFixResult(null);
+      setProjectStatus("Hook Readiness has no fix target");
+      return;
+    }
+
+    const fix = createHookFixOption(targetCard);
+    const cueTarget = createHookLoopCueTarget(beforeProject);
+    setHookReadinessFocusId(targetCard.focusId);
+
+    if (cueTarget && (fix.action.kind === "patternVariation" || fix.action.kind === "arrangementMove")) {
+      selectArrangementBlock(cueTarget.index);
+    }
+
+    switch (fix.action.kind) {
+      case "patternChain":
+        applyPatternChain(fix.action.chain);
+        break;
+      case "patternVariation":
+        setPatternVariationPreviewPreset(fix.action.preset);
+        applyPatternVariation(fix.action.preset);
+        break;
+      case "arrangementMove": {
+        const moveIndex = cueTarget?.index ?? selectedArrangementIndex;
+        const block = projectRef.current.arrangement[moveIndex];
+        if (!block) {
+          setProjectStatus("Select an arrangement block");
+          break;
+        }
+        const nextBlock = applyArrangementMovePreset(block, fix.action.preset);
+        updateArrangementBlock(
+          moveIndex,
+          {
+            energy: nextBlock.energy,
+            mutedTracks: nextBlock.mutedTracks
+          },
+          `Applied ${arrangementMovePresetLabel(fix.action.preset)} move`
+        );
+        break;
+      }
+      case "mixFix":
+        applyMixFixPreset(fix.action.preset);
+        break;
+      case "sessionBriefStarter":
+        applySessionBriefStarterPad(fix.action.pad);
+        break;
+    }
+
+    setHookFixResult(createHookFixResult(fix, targetCard.id, beforeProject, projectRef.current));
   }
 
   function cueToplineLoop(card?: ToplineSpaceFocusItem): void {
@@ -5424,6 +5492,7 @@ export function App(): ReactElement {
     onCueArrangementTransition: cueArrangementTransition,
     onCueHookLoop: cueHookLoop,
     onCueToplineLoop: cueToplineLoop,
+    onApplyHookFix: applyHookFix,
     onApplyToplineFix: applyToplineFix,
     onFocusArrangementMuteMap: focusArrangementMuteMapLane,
     onFocusArrangementTransitionMap: focusArrangementTransitionMapTransition,
@@ -5957,9 +6026,11 @@ export function App(): ReactElement {
       <HookReadiness
         cueTarget={hookLoopCueTarget}
         cued={transportLoopScope === "block" && hookLoopCueTarget?.index === selectedArrangementIndex}
+        fixResult={hookFixResult}
         focusedCardId={hookReadinessFocusId}
         isPlaying={isPlaying}
         onCue={cueHookLoop}
+        onFix={applyHookFix}
         onFocus={focusHookReadinessCard}
         summary={hookReadinessSummary}
       />
@@ -10914,17 +10985,21 @@ function StructureLens({
 function HookReadiness({
   cueTarget,
   cued,
+  fixResult,
   focusedCardId,
   isPlaying,
   onCue,
+  onFix,
   onFocus,
   summary
 }: {
   cueTarget: HookLoopCueTarget | null;
   cued: boolean;
+  fixResult: HookFixResult | null;
   focusedCardId: HookReadinessFocusId | null;
   isPlaying: boolean;
   onCue: (card?: HookReadinessFocusItem) => void;
+  onFix: (card?: HookReadinessCard) => void;
   onFocus: (card: HookReadinessFocusItem) => void;
   summary: HookReadinessSummary;
 }): ReactElement {
@@ -10940,18 +11015,22 @@ function HookReadiness({
         <strong data-testid="hook-readiness-headline">{summary.headline}</strong>
         <small data-testid="hook-readiness-detail">{summary.detail}</small>
       </div>
-      <div
-        className={`hook-readiness-focus-readout ${focusSummary.tone}`}
-        data-testid="hook-readiness-focus-readout"
-        title={focusSummary.detailTitle}
-      >
-        <span data-testid="hook-readiness-focus-status">{focusSummary.statusLabel}</span>
-        <strong data-testid="hook-readiness-focus-label">{focusSummary.areaLabel}</strong>
-        <small data-testid="hook-readiness-focus-detail">{focusSummary.detailLabel}</small>
+      <div className="hook-readiness-stack">
+        <div
+          className={`hook-readiness-focus-readout ${focusSummary.tone}`}
+          data-testid="hook-readiness-focus-readout"
+          title={focusSummary.detailTitle}
+        >
+          <span data-testid="hook-readiness-focus-status">{focusSummary.statusLabel}</span>
+          <strong data-testid="hook-readiness-focus-label">{focusSummary.areaLabel}</strong>
+          <small data-testid="hook-readiness-focus-detail">{focusSummary.detailLabel}</small>
+        </div>
+        {fixResult && <HookFixResultStrip result={fixResult} />}
       </div>
       <div className="hook-readiness-grid" data-testid="hook-readiness-cards">
         {summary.cards.map((card) => {
           const focused = focusedCardId === card.id;
+          const fix = createHookFixOption(card);
           return (
             <div className={`hook-readiness-card ${card.tone} ${focused ? "focused" : ""}`} data-testid={`hook-readiness-card-${card.id}`} key={card.id}>
               <span>{card.label}</span>
@@ -10984,12 +11063,64 @@ function HookReadiness({
                 >
                   <span>Cue</span>
                 </button>
+                <button
+                  className="hook-readiness-fix-button"
+                  data-testid={`hook-readiness-fix-${card.id}`}
+                  onClick={() => onFix(card)}
+                  title={`Apply ${fix.label}: ${fix.detail}`}
+                  type="button"
+                >
+                  <SlidersHorizontal size={13} aria-hidden="true" />
+                  <span>Fix</span>
+                </button>
               </div>
             </div>
           );
         })}
       </div>
     </section>
+  );
+}
+
+function HookFixResultStrip({ result }: { result: HookFixResult }): ReactElement {
+  return (
+    <div
+      className={`hook-fix-result ${result.tone}`}
+      data-result-hook-fix={result.fixId}
+      data-testid="hook-fix-result"
+      aria-live="polite"
+    >
+      <div className="hook-fix-result-main">
+        <SlidersHorizontal size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="hook-fix-result-title">{result.title}</strong>
+          <small data-testid="hook-fix-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="hook-fix-result-meta">
+        <span data-testid="hook-fix-result-status">{result.status}</span>
+        <span data-testid="hook-fix-result-scope">{result.scope}</span>
+        <span data-testid="hook-fix-result-impact">{result.impact}</span>
+      </div>
+      <div className="hook-fix-result-metrics" data-testid="hook-fix-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`hook-fix-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="hook-fix-result-followup" data-testid="hook-fix-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="hook-fix-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="hook-fix-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -11577,6 +11708,7 @@ function createQuickActions({
   onCueArrangementTransition,
   onCueHookLoop,
   onCueToplineLoop,
+  onApplyHookFix,
   onApplyToplineFix,
   onFocusArrangementMuteMap,
   onFocusArrangementTransitionMap,
@@ -11771,6 +11903,7 @@ function createQuickActions({
   onCueArrangementTransition: (transition: ArrangementTransitionMapTransition) => void;
   onCueHookLoop: (card?: HookReadinessFocusItem) => void;
   onCueToplineLoop: (card?: ToplineSpaceFocusItem) => void;
+  onApplyHookFix: (card?: HookReadinessCard) => void;
   onApplyToplineFix: (card?: ToplineSpaceCard) => void;
   onFocusArrangementMuteMap: (lane: ArrangementMuteMapLane) => void;
   onFocusArrangementTransitionMap: (transition: ArrangementTransitionMapTransition) => void;
@@ -12125,6 +12258,7 @@ function createQuickActions({
     run: () => onFocusProductionSnapshot(metric)
   }));
   const hookReadinessCard = activeHookReadinessQuickActionCard(hookReadinessSummary);
+  const hookFixOption = hookReadinessCard ? createHookFixOption(hookReadinessCard) : null;
   const hookReadinessActions: QuickAction[] = hookReadinessSummary.cards.map((card) => ({
     id: `hook-readiness-card-${card.id}`,
     title: `Focus Hook Readiness: ${card.label}`,
@@ -12144,6 +12278,17 @@ function createQuickActions({
     disabled: isPlaying || !hookLoopCueTarget,
     run: () => onCueHookLoop(card)
   }));
+  const hookReadinessFixActions: QuickAction[] = hookReadinessSummary.cards.map((card) => {
+    const fix = createHookFixOption(card);
+    return {
+      id: `hook-readiness-fix-${card.id}`,
+      title: `Apply Hook Fix: ${card.label}`,
+      detail: `${fix.label} / ${fix.detail} / ${card.value} / ${card.status}`,
+      group: fix.group,
+      keywords: `hook fix action section motif contrast mix handoff arrangement variation lift headroom brief ${card.id} ${card.label} ${card.value} ${card.status} ${fix.label} ${fix.detail} beginner producer`,
+      run: () => onApplyHookFix(card)
+    };
+  });
   const toplineSpaceCard = activeToplineSpaceQuickActionCard(toplineSpaceSummary);
   const toplineFixOption = toplineSpaceCard ? createToplineFixOption(toplineSpaceCard) : null;
   const toplineSpaceActions: QuickAction[] = toplineSpaceSummary.cards.map((card) => ({
@@ -13361,6 +13506,17 @@ function createQuickActions({
       run: () => onCueHookLoop(hookReadinessCard ?? undefined)
     },
     {
+      id: "hook-fix",
+      title: hookReadinessCard ? `Apply Hook Fix: ${hookReadinessCard.label}` : "Apply Hook Fix",
+      detail: hookFixOption ? `${hookFixOption.label} / ${hookFixOption.detail}` : "No Hook Readiness fix target.",
+      group: hookFixOption?.group ?? "Project",
+      keywords: `hook fix action section motif contrast mix handoff ${
+        hookReadinessCard?.id ?? "none"
+      } ${hookReadinessCard?.label ?? "none"} ${hookFixOption?.label ?? "none"} beginner producer`,
+      disabled: !hookReadinessCard,
+      run: () => onApplyHookFix(hookReadinessCard ?? undefined)
+    },
+    {
       id: "topline-loop-cue",
       title:
         toplineLoopCueTarget.mode === "block"
@@ -13398,6 +13554,7 @@ function createQuickActions({
     },
     ...arrangementTransitionLoopActions,
     ...hookReadinessCueActions,
+    ...hookReadinessFixActions,
     ...toplineSpaceCueActions,
     ...toplineSpaceFixActions,
     ...sectionLocatorActions,
@@ -15312,6 +15469,21 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "hook-fix" || action.id.startsWith("hook-readiness-fix-")) {
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const hookSummary = createHookReadinessSummary(
+      project,
+      createBeatReadinessChecks(project, exportAnalysis),
+      exportAnalysis,
+      analyzeStemExports(project)
+    );
+    return {
+      id: "hook-fix",
+      label: "Hook fix",
+      value: `${hookSummary.headline} / ${hookSummary.detail}`
+    };
+  }
+
   if (action.id === "topline-loop-cue" || action.id.startsWith("topline-space-cue-")) {
     return {
       id: "topline-loop",
@@ -16257,6 +16429,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Hook Block loop and judge the hook section only before changing motif density, contrast, mix support, or handoff context.",
       nextCheck: "Return to Hook Readiness after the loop to decide whether the section, motif, contrast, mix, or handoff lane needs the next edit."
+    };
+  }
+
+  if (action.id === "hook-fix" || action.id.startsWith("hook-readiness-fix-")) {
+    return {
+      auditionCue: "Cue and play the Hook loop after the fix, then judge section, motif, contrast, mix support, and handoff context.",
+      nextCheck: "Return to Hook Readiness and check whether the fixed card moved toward ready before applying another one-step fix."
     };
   }
 
@@ -21033,6 +21212,196 @@ function createHookReadinessFocusSummary(
 
 function activeHookReadinessQuickActionCard(summary: HookReadinessSummary): HookReadinessCard | null {
   return summary.cards.find((card) => card.tone === "danger") ?? summary.cards.find((card) => card.tone === "warn") ?? summary.cards[0] ?? null;
+}
+
+type HookFixAction =
+  | {
+      kind: "patternChain";
+      chain: PatternChainId;
+    }
+  | {
+      kind: "patternVariation";
+      preset: PatternVariationPreset;
+    }
+  | {
+      kind: "arrangementMove";
+      preset: ArrangementMovePreset;
+    }
+  | {
+      kind: "mixFix";
+      preset: MixFixPreset;
+    }
+  | {
+      kind: "sessionBriefStarter";
+      pad: SessionBriefStarterPadId;
+    };
+
+type HookFixOption = {
+  cardId: HookReadinessCardId;
+  fixId: string;
+  label: string;
+  detail: string;
+  group: string;
+  action: HookFixAction;
+  auditionCue: string;
+  nextCheck: string;
+};
+
+type HookFixResultMetric = {
+  id: "card" | "summary" | "target";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type HookFixResult = {
+  fixId: string;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: HookFixResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
+function createHookFixOption(card: HookReadinessCard): HookFixOption {
+  switch (card.id) {
+    case "section":
+      return {
+        cardId: card.id,
+        fixId: "section-chain",
+        label: "8 Bar Chain",
+        detail: "Use the existing 8 Bar Pattern Chain to make a sample-free Hook section.",
+        group: "Arrange",
+        action: { kind: "patternChain", chain: "eight_bar" },
+        auditionCue: "Play the Hook loop and confirm the section is easy to find before adding more blocks.",
+        nextCheck: "Return to Hook Readiness and confirm Hook Section is no longer the weakest lane."
+      };
+    case "motif":
+      return {
+        cardId: card.id,
+        fixId: "motif-variation",
+        label: "Hook Variation",
+        detail: "Use the existing Hook Pattern Variation to strengthen the selected hook motif.",
+        group: "Create",
+        action: { kind: "patternVariation", preset: "hook" },
+        auditionCue: "Loop the Hook Pattern and confirm drums, 808, chords, and Synth form a clear motif.",
+        nextCheck: "Return to Pattern DNA or Hook Readiness before adding another melody move."
+      };
+    case "contrast":
+      return {
+        cardId: card.id,
+        fixId: "contrast-lift",
+        label: "Hook Lift",
+        detail: "Use the existing Hook Lift Arrangement Move on the Hook block.",
+        group: "Arrange",
+        action: { kind: "arrangementMove", preset: "hook_lift" },
+        auditionCue: "Play the section before and after the Hook block and listen for lift.",
+        nextCheck: "Return to Structure Lens or Hook Readiness before adding another arrangement move."
+      };
+    case "mix":
+      return {
+        cardId: card.id,
+        fixId: "mix-headroom",
+        label: "Headroom Mix Fix",
+        detail: "Use the existing Headroom Mix Fix so the hook has safer master space.",
+        group: "Mix",
+        action: { kind: "mixFix", preset: "headroom" },
+        auditionCue: "Play Full Mix and watch headroom while the Hook hits.",
+        nextCheck: "Return to Mix Coach if the limiter, low end, or stem spread still needs manual trim."
+      };
+    case "handoff":
+      return {
+        cardId: card.id,
+        fixId: "handoff-vocal",
+        label: "Vocal Brief Starter",
+        detail: "Use the existing Vocal Session Brief Starter to fill hook handoff context.",
+        group: "Project",
+        action: { kind: "sessionBriefStarter", pad: "vocal" },
+        auditionCue: "Read the Session Brief against the Hook loop before exporting handoff notes.",
+        nextCheck: "Return to Handoff Package Check after the hook context feels specific enough."
+      };
+  }
+}
+
+function createHookFixResult(
+  fix: HookFixOption,
+  cardId: HookReadinessCardId,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): HookFixResult {
+  const beforeSummary = createHookReadinessSummaryForProject(beforeProject);
+  const afterSummary = createHookReadinessSummaryForProject(afterProject);
+  const beforeCard = beforeSummary.cards.find((card) => card.id === cardId) ?? null;
+  const afterCard = afterSummary.cards.find((card) => card.id === cardId) ?? null;
+  const metrics: HookFixResultMetric[] = [
+    createHookFixResultMetric("card", beforeCard?.label ?? "Card", hookFixCardLabel(beforeCard), hookFixCardLabel(afterCard)),
+    createHookFixResultMetric("summary", "Hook", beforeSummary.headline, afterSummary.headline),
+    createHookFixResultMetric("target", "Target", hookFixTargetLabel(beforeProject), hookFixTargetLabel(afterProject))
+  ];
+  const changedCount = metrics.filter((metric) => metric.tone === "good").length;
+  const cardLabel = afterCard?.label ?? beforeCard?.label ?? "Hook";
+
+  return {
+    fixId: fix.fixId,
+    title: `${fix.label} Hook Fix applied`,
+    status: changedCount > 0 ? "Applied" : "Already covered",
+    detail: `${cardLabel} / ${fix.detail}`,
+    scope: hookFixScopeLabel(fix),
+    impact: `${changedCount}/${metrics.length} Hook metrics changed`,
+    metrics,
+    auditionCue: fix.auditionCue,
+    nextCheck: fix.nextCheck,
+    tone: changedCount > 0 ? "good" : "warn"
+  };
+}
+
+function createHookReadinessSummaryForProject(project: ProjectState): HookReadinessSummary {
+  const analysis = analyzeExport(project);
+  return createHookReadinessSummary(project, createBeatReadinessChecks(project, analysis), analysis, analyzeStemExports(project));
+}
+
+function createHookFixResultMetric(
+  id: HookFixResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): HookFixResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: before === after ? "warn" : "good"
+  };
+}
+
+function hookFixCardLabel(card: HookReadinessCard | null): string {
+  return card ? `${card.value} / ${card.status}` : "missing";
+}
+
+function hookFixTargetLabel(project: ProjectState): string {
+  const target = createHookLoopCueTarget(project);
+  return target ? hookLoopCueDetail(target) : `No Hook section / Pattern ${project.selectedPattern}`;
+}
+
+function hookFixScopeLabel(fix: HookFixOption): string {
+  switch (fix.action.kind) {
+    case "patternChain":
+      return `Arrangement / ${patternChainLabel(fix.action.chain)}`;
+    case "patternVariation":
+      return `Pattern Variation / ${patternVariationPresetLabel(fix.action.preset)}`;
+    case "arrangementMove":
+      return `Arrangement Move / ${arrangementMovePresetLabel(fix.action.preset)}`;
+    case "mixFix":
+      return `Mix Fix / ${mixFixPresetLabel(fix.action.preset)}`;
+    case "sessionBriefStarter":
+      return "Session Brief / Vocal";
+  }
 }
 
 type HookLoopCueTarget = {

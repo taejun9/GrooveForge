@@ -6736,7 +6736,7 @@ h2 {
 
 .hook-readiness {
   display: grid;
-  grid-template-columns: 170px 170px minmax(0, 1fr);
+  grid-template-columns: 170px 240px minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
   min-height: 92px;
@@ -6788,11 +6788,19 @@ h2 {
 .hook-readiness-focus-readout span,
 .hook-readiness-focus-readout strong,
 .hook-readiness-focus-readout small,
+.hook-fix-result-main strong,
+.hook-fix-result-main small,
+.hook-fix-result-meta span,
+.hook-fix-result-metrics b,
+.hook-fix-result-metrics em,
+.hook-fix-result-followup b,
+.hook-fix-result-followup em,
 .hook-readiness-card span,
 .hook-readiness-card strong,
 .hook-readiness-card small,
 .hook-readiness-focus-button span,
-.hook-readiness-cue-button span {
+.hook-readiness-cue-button span,
+.hook-readiness-fix-button span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6842,6 +6850,115 @@ h2 {
 .hook-readiness-focus-readout strong {
   color: #f4efe7;
   font-size: 12px;
+}
+
+.hook-readiness-stack {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.hook-fix-result {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.24);
+  border-inline-start: 3px solid #78f0c8;
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px 9px;
+}
+
+.hook-fix-result.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  border-inline-start-color: #f0c36a;
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.hook-fix-result-main,
+.hook-fix-result-meta,
+.hook-fix-result-metrics,
+.hook-fix-result-followup,
+.hook-fix-result-main span,
+.hook-fix-result-metrics span,
+.hook-fix-result-followup span {
+  min-width: 0;
+}
+
+.hook-fix-result-main {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+}
+
+.hook-fix-result-main svg {
+  color: #78f0c8;
+}
+
+.hook-fix-result.warn .hook-fix-result-main svg {
+  color: #f0c36a;
+}
+
+.hook-fix-result-main span,
+.hook-fix-result-metrics span,
+.hook-fix-result-followup span {
+  display: grid;
+  gap: 2px;
+}
+
+.hook-fix-result-main strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.hook-fix-result-main small,
+.hook-fix-result-meta span,
+.hook-fix-result-metrics em,
+.hook-fix-result-followup em {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.hook-fix-result-meta,
+.hook-fix-result-metrics,
+.hook-fix-result-followup {
+  display: grid;
+  gap: 4px;
+}
+
+.hook-fix-result-meta {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hook-fix-result-meta span:first-child {
+  color: #78f0c8;
+}
+
+.hook-fix-result.warn .hook-fix-result-meta span:first-child {
+  color: #f0c36a;
+}
+
+.hook-fix-result-metrics span {
+  border: 1px solid rgba(120, 240, 200, 0.16);
+  border-radius: 6px;
+  padding: 5px 6px;
+}
+
+.hook-fix-result-metrics span.warn {
+  border-color: rgba(240, 195, 106, 0.2);
+}
+
+.hook-fix-result-metrics b,
+.hook-fix-result-followup b {
+  color: rgba(244, 239, 231, 0.82);
+  font-size: 9px;
+}
+
+.hook-fix-result-followup {
+  border-block-start: 1px solid rgba(244, 239, 231, 0.08);
+  padding-block-start: 5px;
 }
 
 .hook-readiness-grid {
@@ -6906,20 +7023,22 @@ h2 {
 
 .hook-readiness-card-actions {
   display: inline-grid;
-  grid-template-columns: repeat(2, minmax(48px, 1fr));
+  grid-template-columns: repeat(3, minmax(42px, 1fr));
   gap: 5px;
   min-width: 0;
 }
 
 .hook-readiness-focus-button,
-.hook-readiness-cue-button {
+.hook-readiness-cue-button,
+.hook-readiness-fix-button {
   display: inline-flex;
   min-width: 0;
   min-height: 28px;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   border-color: rgba(244, 239, 231, 0.14);
-  padding: 0 8px;
+  padding: 0 6px;
   font-size: 10px;
   white-space: nowrap;
 }
@@ -6927,7 +7046,8 @@ h2 {
 .hook-readiness-focus-button:hover,
 .hook-readiness-focus-button[aria-pressed="true"],
 .hook-readiness-cue-button:hover,
-.hook-readiness-cue-button[aria-pressed="true"] {
+.hook-readiness-cue-button[aria-pressed="true"],
+.hook-readiness-fix-button:hover {
   border-color: rgba(120, 240, 200, 0.38);
   background: rgba(120, 240, 200, 0.08);
 }
@@ -17523,6 +17643,7 @@ input[type="range"] {
   }
 
   .hook-readiness-focus-readout,
+  .hook-readiness-stack,
   .hook-readiness-grid,
   .topline-space-stack,
   .topline-space-focus-readout,
@@ -17612,6 +17733,9 @@ input[type="range"] {
 
   .topline-fix-result-meta,
   .topline-fix-result-metrics,
+  .hook-fix-result-meta,
+  .hook-fix-result-metrics,
+  .hook-fix-result-followup,
   .topline-fix-result-followup {
     grid-template-columns: 1fr;
   }
