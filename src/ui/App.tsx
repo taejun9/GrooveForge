@@ -13089,6 +13089,14 @@ function createQuickActions({
     run: () => onFocusReviewQueue(item)
   }));
   const sessionPassCard = activeSessionPassQuickActionCard(sessionPassSummary);
+  const sessionPassActions: QuickAction[] = sessionPassSummary.cards.map((card) => ({
+    id: `session-pass-card-${card.id}`,
+    title: `Focus Session Pass: ${card.label}`,
+    detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
+    group: "Project",
+    keywords: `session pass focus card guided studio finish deliver delivery workflow ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
+    run: () => onFocusSessionPass(card)
+  }));
   const styleInspectorItem = activeStyleInspectorQuickActionItem(styleInspectorSummary, project);
   const styleInspectorActions: QuickAction[] = [...styleInspectorSummary.metrics, ...styleInspectorSummary.patterns].map((item) => ({
     id: `style-inspector-item-${item.focusId}`,
@@ -14058,6 +14066,7 @@ function createQuickActions({
       keywords: `session pass focus guided studio next workflow ${sessionPassCard.id} ${sessionPassCard.focusLabel} beginner producer`,
       run: () => onFocusSessionPass(sessionPassCard)
     },
+    ...sessionPassActions,
     {
       id: "delivery-target-align",
       title: deliveryTargetAlignReady ? `Align ${deliveryTarget.name} target` : "Align Delivery Target",
@@ -14906,6 +14915,7 @@ function createQuickActionResult(
   const previewOnly = action.id === "blueprint-preview-style-match";
   const focusOnly =
     action.id === "session-pass-focus" ||
+    action.id.startsWith("session-pass-card-") ||
     action.id === "first-beat-path-jump" ||
     action.id === "composer-guide-focus" ||
     action.id.startsWith("composer-guide-card-") ||
@@ -15010,6 +15020,10 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "session-pass-focus") {
     return { id: "session-pass", label: "Session pass", value: `${project.mode} mode` };
+  }
+
+  if (action.id.startsWith("session-pass-card-")) {
+    return { id: "session-pass", label: "Session pass", value: action.detail };
   }
 
   if (action.id === "first-beat-path-jump") {
@@ -15644,6 +15658,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused workstation panel to inspect the highlighted Session Pass target.",
       nextCheck: "Run the visible Session Pass Focus cards when you want another guided, studio, finish, or delivery jump."
+    };
+  }
+
+  if (action.id.startsWith("session-pass-card-")) {
+    return {
+      auditionCue: "Use the focused workstation panel to inspect the selected Session Pass card before changing project data.",
+      nextCheck: "Return to Session Pass when you need another direct Guided, Studio, Finish, or Delivery focus."
     };
   }
 
