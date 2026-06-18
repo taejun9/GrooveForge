@@ -15,6 +15,11 @@ import {
   normalizeArrangementBars,
   noteEventShouldPlay,
   noteToFrequency,
+  BassNote,
+  ChordEvent,
+  DrumLane,
+  MelodyNote,
+  NoteTrack,
   PatternData,
   PatternSlot,
   patternForSlot,
@@ -44,6 +49,11 @@ export type PlaybackSnapshot = {
 export type PlaybackController = {
   stop: () => void;
 };
+
+export type EditorAuditionTarget =
+  | { kind: "drum"; lane: DrumLane; step: number }
+  | { kind: "note"; track: NoteTrack; note: BassNote | MelodyNote }
+  | { kind: "chord"; chord: ChordEvent };
 
 type SchedulerOptions = {
   bars?: number;
@@ -563,6 +573,174 @@ function scheduleStep(
       }
     }
   }
+}
+
+export function playEditorAudition(project: ProjectState, target: EditorAuditionTarget): PlaybackController {
+  const context = createAudioContext();
+  void context.resume();
+  const masterGain = context.createGain();
+  const ceiling = dbToGain(project.masterCeilingDb);
+  masterGain.gain.setValueAtTime(masterOutputGain(project) * Math.min(1, ceiling), context.currentTime);
+  masterGain.connect(context.destination);
+  const spaceInput = createSpaceBus(context, masterGain);
+  const destination: PlaybackDestination = { dry: masterGain, send: spaceInput };
+  const pattern = activePattern(project);
+  const sound = project.sound;
+  const stepDuration = projectStepDurationSeconds(project);
+  const time = context.currentTime + 0.025;
+  let stopAt = time + 0.42;
+
+  const extendStop = (durationSeconds: number): void => {
+    stopAt = Math.max(stopAt, time + Math.max(0.08, durationSeconds) + 0.28);
+  };
+
+  if (target.kind === "drum") {
+    const drumMix = channelMix(project, "drum_rack");
+    const velocity = drumStepVelocity(pattern, target.lane, target.step);
+    const drumTime = time + Math.max(0, drumStepTimingMs(pattern, target.lane, target.step) / 1000);
+
+    if (target.lane === "kick") {
+      scheduleKick(context, destination, drumTime, drumMix.gain * velocity, drumMix, sound);
+      extendStop(0.32);
+    } else if (target.lane === "clap") {
+      const duration = 0.11 + (1 - sound.snareSnap) * 0.08;
+      scheduleNoise(
+        context,
+        destination,
+        drumTime,
+        duration,
+        (0.2 + sound.snareSnap * 0.14) * drumMix.gain * velocity,
+        780 + sound.snareSnap * 1800,
+        drumMix
+      );
+      extendStop(duration);
+    } else if (target.lane === "hat") {
+      const repeatCount = hatRepeatCount(pattern, target.step);
+      const duration = 0.035 + (1 - sound.hatBrightness) * 0.025;
+      for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
+        scheduleNoise(
+          context,
+          destination,
+          drumTime + (repeatIndex * stepDuration) / repeatCount,
+          duration,
+          (0.08 + sound.hatBrightness * 0.08) * drumMix.gain * velocity * (repeatIndex === 0 ? 1 : 0.72),
+          4300 + sound.hatBrightness * 4200,
+          drumMix
+        );
+      }
+      extendStop(stepDuration + duration);
+    } else {
+      scheduleTone(
+        context,
+        destination,
+        drumTime,
+        0.07,
+        260 + sound.snareSnap * 190,
+        0.12 * drumMix.gain * velocity,
+        "triangle",
+        drumMix,
+        drumMix.pan,
+        {
+          filterHz: channelAirFilterHz(1800 + sound.hatBrightness * 4200, drumMix),
+          highpassHz: channelHighpassHz(drumMix),
+          air: drumMix.air
+        }
+      );
+      extendStop(0.24);
+    }
+  } else if (target.kind === "note" && target.track === "bass") {
+    const note = target.note as BassNote;
+    const bassMix = channelMix(project, "bass_808");
+    const duration = note.length * stepDuration * (0.74 + sound.bassDecay * 0.52);
+    scheduleTone(
+      context,
+      destination,
+      time,
+      duration,
+      noteToFrequency(note.pitch),
+      (0.42 + sound.bassDrive * 0.22) * bassMix.gain,
+      bassOscillator(sound),
+      bassMix,
+      bassMix.pan,
+      {
+        drive: sound.bassDrive,
+        filterHz: channelAirFilterHz(260 + sound.bassDrive * 1500, bassMix),
+        highpassHz: channelHighpassHz(bassMix),
+        air: bassMix.air,
+        release: sound.bassDecay
+      }
+    );
+    extendStop(duration + sound.bassDecay * 0.16);
+  } else if (target.kind === "note") {
+    const note = target.note as MelodyNote;
+    const synthMix = channelMix(project, "synth");
+    const duration = note.length * stepDuration * (0.8 + sound.synthRelease * 0.42);
+    scheduleTone(
+      context,
+      destination,
+      time,
+      duration,
+      noteToFrequency(note.pitch),
+      note.velocity * 0.12 * synthMix.gain,
+      synthOscillator(sound),
+      synthMix,
+      synthMix.pan,
+      {
+        drive: sound.synthBrightness * 0.08,
+        filterHz: channelAirFilterHz(1200 + sound.synthBrightness * 7600, synthMix),
+        highpassHz: channelHighpassHz(synthMix),
+        air: synthMix.air,
+        release: sound.synthRelease
+      }
+    );
+    extendStop(duration + sound.synthRelease * 0.16);
+  } else {
+    const chordMix = channelMix(project, "chord");
+    const pitches = chordPitches(target.chord);
+    const duration = target.chord.length * stepDuration * (0.9 + sound.synthRelease * 0.24);
+    for (const [voiceIndex, pitch] of pitches.entries()) {
+      const spread = pitches.length <= 1 ? 0 : (voiceIndex / (pitches.length - 1)) * 2 - 1;
+      scheduleTone(
+        context,
+        destination,
+        time,
+        duration,
+        noteToFrequency(pitch),
+        target.chord.velocity * 0.08 * chordMix.gain,
+        "triangle",
+        chordMix,
+        Math.max(-1, Math.min(1, chordMix.pan + spread * sound.chordWidth * 0.34)),
+        {
+          drive: (1 - sound.chordWarmth) * 0.08,
+          filterHz: channelAirFilterHz(900 + (1 - sound.chordWarmth) * 6200, chordMix),
+          highpassHz: channelHighpassHz(chordMix),
+          air: chordMix.air,
+          release: sound.synthRelease
+        }
+      );
+    }
+    extendStop(duration + sound.synthRelease * 0.16);
+  }
+
+  let stopped = false;
+  const closeTimeout = window.setTimeout(() => {
+    stop();
+  }, Math.max(160, Math.ceil((stopAt - context.currentTime) * 1000)));
+
+  function stop(): void {
+    if (stopped) {
+      return;
+    }
+    stopped = true;
+    window.clearTimeout(closeTimeout);
+    masterGain.gain.cancelScheduledValues(context.currentTime);
+    masterGain.gain.setTargetAtTime(0.0001, context.currentTime, 0.015);
+    window.setTimeout(() => {
+      void context.close();
+    }, 80);
+  }
+
+  return { stop };
 }
 
 export function startRealtimePlayback(project: ProjectState, options: SchedulerOptions = {}): PlaybackController {

@@ -649,6 +649,12 @@ import {
   SnapshotCompare
 } from "./workstationShellPanels";
 import {
+  auditionSelectedChord as auditionSelectedChordEvent,
+  auditionSelectedDrumHit as auditionSelectedDrumHitEvent,
+  auditionSelectedNote as auditionSelectedNoteEvent
+} from "./editorAudition";
+import { createSelectedEventQuickActions } from "./selectedEventQuickActions";
+import {
   laneColor,
   mergePitchLanes,
   createKeyboardCaptureKeyMap,
@@ -1027,6 +1033,7 @@ export function App(): ReactElement {
   const localDraftReadyRef = useRef(false);
   const localDraftSkipNextWriteRef = useRef(false);
   const controllerRef = useRef<PlaybackController | null>(null);
+  const auditionControllerRef = useRef<PlaybackController | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
   const composePanelRef = useRef<HTMLElement | null>(null);
@@ -1483,6 +1490,8 @@ export function App(): ReactElement {
     return () => {
       controllerRef.current?.stop();
       controllerRef.current = null;
+      auditionControllerRef.current?.stop();
+      auditionControllerRef.current = null;
       if (tapTempoCommitTimerRef.current !== null) {
         window.clearTimeout(tapTempoCommitTimerRef.current);
         tapTempoCommitTimerRef.current = null;
@@ -3535,6 +3544,18 @@ export function App(): ReactElement {
         )
       }
     }));
+  }
+
+  function auditionSelectedDrumHit(): void {
+    auditionSelectedDrumHitEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedDrumStep);
+  }
+
+  function auditionSelectedNote(): void {
+    auditionSelectedNoteEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedNote);
+  }
+
+  function auditionSelectedChord(): void {
+    auditionSelectedChordEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedChord);
   }
 
   function copySelectedDrumHit(): void {
@@ -5768,6 +5789,7 @@ export function App(): ReactElement {
     onMoveSelectedNoteStep: moveSelectedNoteStep,
     onMoveSelectedNotePitch: moveSelectedNotePitch,
     onMoveSelectedNoteOctave: moveSelectedNoteOctave,
+    onAuditionSelectedNote: auditionSelectedNote,
     onCopySelectedNote: copySelectedNote,
     onPasteCopiedNote: pasteCopiedNote,
     onDuplicateSelectedNote: duplicateSelectedNote,
@@ -5775,9 +5797,11 @@ export function App(): ReactElement {
     onUpdateSelectedDrumProbability: updateSelectedDrumProbability,
     onUpdateSelectedDrumTiming: updateSelectedDrumTiming,
     onUpdateSelectedHatRepeat: updateSelectedHatRepeat,
+    onAuditionSelectedDrumHit: auditionSelectedDrumHit,
     onCopySelectedDrumHit: copySelectedDrumHit,
     onPasteCopiedDrumHit: pasteCopiedDrumHit,
     onMoveSelectedChordStep: moveSelectedChordStep,
+    onAuditionSelectedChord: auditionSelectedChord,
     onCopySelectedChord: copySelectedChord,
     onPasteCopiedChord: pasteCopiedChord,
     onDuplicateSelectedChord: duplicateSelectedChord,
@@ -6533,6 +6557,7 @@ export function App(): ReactElement {
               onProbabilityChange={updateSelectedDrumProbability}
               onTimingChange={updateSelectedDrumTiming}
               onHatRepeatChange={updateSelectedHatRepeat}
+              onAudition={auditionSelectedDrumHit}
               onCopy={copySelectedDrumHit}
               onPaste={pasteCopiedDrumHit}
             />
@@ -6613,6 +6638,7 @@ export function App(): ReactElement {
               onStepMove={moveSelectedNoteStep}
               onPitchMove={moveSelectedNotePitch}
               onOctaveMove={moveSelectedNoteOctave}
+              onAudition={auditionSelectedNote}
               onCopy={copySelectedNote}
               onPaste={pasteCopiedNote}
               onDuplicate={duplicateSelectedNote}
@@ -6670,6 +6696,7 @@ export function App(): ReactElement {
             onDuplicate={duplicateSelectedChord}
             onInvert={moveSelectedChordInversion}
             onMoveStep={moveSelectedChordStep}
+            onAudition={auditionSelectedChord}
             onPad={applyChordPad}
             onPaste={pasteCopiedChord}
             onPreset={applyChordProgressionPreset}
@@ -11495,6 +11522,7 @@ function createQuickActions({
   onMoveSelectedNoteStep,
   onMoveSelectedNotePitch,
   onMoveSelectedNoteOctave,
+  onAuditionSelectedNote,
   onCopySelectedNote,
   onPasteCopiedNote,
   onDuplicateSelectedNote,
@@ -11502,9 +11530,11 @@ function createQuickActions({
   onUpdateSelectedDrumProbability,
   onUpdateSelectedDrumTiming,
   onUpdateSelectedHatRepeat,
+  onAuditionSelectedDrumHit,
   onCopySelectedDrumHit,
   onPasteCopiedDrumHit,
   onMoveSelectedChordStep,
+  onAuditionSelectedChord,
   onCopySelectedChord,
   onPasteCopiedChord,
   onDuplicateSelectedChord,
@@ -11694,6 +11724,7 @@ function createQuickActions({
   onMoveSelectedNoteStep: (direction: -1 | 1) => void;
   onMoveSelectedNotePitch: (direction: -1 | 1) => void;
   onMoveSelectedNoteOctave: (direction: -1 | 1) => void;
+  onAuditionSelectedNote: () => void;
   onCopySelectedNote: () => void;
   onPasteCopiedNote: () => void;
   onDuplicateSelectedNote: () => void;
@@ -11701,9 +11732,11 @@ function createQuickActions({
   onUpdateSelectedDrumProbability: (probability: number) => void;
   onUpdateSelectedDrumTiming: (timingMs: number) => void;
   onUpdateSelectedHatRepeat: (repeat: number) => void;
+  onAuditionSelectedDrumHit: () => void;
   onCopySelectedDrumHit: () => void;
   onPasteCopiedDrumHit: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
+  onAuditionSelectedChord: () => void;
   onCopySelectedChord: () => void;
   onPasteCopiedChord: () => void;
   onDuplicateSelectedChord: () => void;
@@ -12158,84 +12191,37 @@ function createQuickActions({
           activeCaptureDefaults.glide ? "On" : "Off"
         }`;
   const selectedPatternData = activePattern(project);
-  const selectedNoteTrackLabel = selectedNote?.track === "bass" ? "808" : "Synth";
-  const selectedNoteLabel = selectedNote
-    ? `${selectedNoteTrackLabel} ${selectedNote.pitch}.${selectedNote.step + 1}`
-    : "No selected note";
-  const selectedNoteActive = Boolean(
-    selectedNote &&
-      (selectedNote.track === "bass"
-        ? selectedPatternData.bassNotes.some((note) => matchesSelectedNote(note, selectedNote))
-        : selectedPatternData.melodyNotes.some((note) => matchesSelectedNote(note, selectedNote)))
-  );
-  const selectedNoteUsedPitches =
-    selectedNote?.track === "bass"
-      ? selectedPatternData.bassNotes.map((note) => note.pitch)
-      : selectedNote?.track === "melody"
-        ? selectedPatternData.melodyNotes.map((note) => note.pitch)
-        : [];
-  const selectedNotePitchDown =
-    selectedNote && selectedNoteActive
-      ? adjacentTrackPitch(selectedNote.track, project.key, selectedNote.pitch, -1, selectedNoteUsedPitches)
-      : null;
-  const selectedNotePitchUp =
-    selectedNote && selectedNoteActive
-      ? adjacentTrackPitch(selectedNote.track, project.key, selectedNote.pitch, 1, selectedNoteUsedPitches)
-      : null;
-  const selectedNoteOctaveDown =
-    selectedNote && selectedNoteActive ? octaveShiftPitch(selectedNote.track, selectedNote.pitch, -1) : null;
-  const selectedNoteOctaveUp =
-    selectedNote && selectedNoteActive ? octaveShiftPitch(selectedNote.track, selectedNote.pitch, 1) : null;
-  const selectedNoteDuplicateStep =
-    selectedNote && selectedNoteActive
-      ? nextEmptyStepForPitch(
-          selectedNote.track === "bass" ? selectedPatternData.bassNotes : selectedPatternData.melodyNotes,
-          selectedNote.pitch,
-          selectedNote.step
-        )
-      : null;
-  const noteClipboardLabel = noteClipboard
-    ? `${noteClipboard.track === "bass" ? "808" : "Synth"} ${noteClipboard.note.pitch}.${noteClipboard.note.step + 1}`
-    : "Clipboard empty";
-  const noteClipboardPatternNotes =
-    noteClipboard?.track === "bass" ? selectedPatternData.bassNotes : selectedPatternData.melodyNotes;
-  const noteClipboardPasteStep = noteClipboard
-    ? nextEmptyStepForPitch(noteClipboardPatternNotes, noteClipboard.note.pitch, noteClipboard.note.step)
-    : null;
-  const selectedDrumActive = Boolean(selectedDrumStep && selectedPatternData.drumPattern[selectedDrumStep.lane][selectedDrumStep.step]);
-  const selectedDrumLabel = selectedDrumStep ? `${drumLabels[selectedDrumStep.lane]} ${selectedDrumStep.step + 1}` : "No selected drum hit";
-  const selectedDrumVelocity =
-    selectedDrumStep && selectedDrumActive ? drumStepVelocity(selectedPatternData, selectedDrumStep.lane, selectedDrumStep.step) : null;
-  const selectedDrumProbability =
-    selectedDrumStep && selectedDrumActive ? drumStepProbability(selectedPatternData, selectedDrumStep.lane, selectedDrumStep.step) : null;
-  const selectedDrumTiming =
-    selectedDrumStep && selectedDrumActive ? drumStepTimingMs(selectedPatternData, selectedDrumStep.lane, selectedDrumStep.step) : null;
-  const selectedHatRepeat =
-    selectedDrumStep?.lane === "hat" && selectedDrumActive ? hatRepeatCount(selectedPatternData, selectedDrumStep.step) : null;
-  const drumClipboardLabel = drumClipboard ? `${drumLabels[drumClipboard.lane]} ${drumClipboard.step + 1}` : "Clipboard empty";
-  const drumClipboardPasteStep = drumClipboard ? nextEmptyDrumStep(selectedPatternData, drumClipboard.lane, drumClipboard.step) : null;
-  const selectedChordActive = Boolean(
-    selectedChord && selectedPatternData.chordEvents.some((chord) => sameChordEvent(chord, selectedChord))
-  );
-  const selectedChordLabel = selectedChord
-    ? `${selectedChord.root}${selectedChord.quality}.${selectedChord.step + 1}`
-    : "No selected chord";
-  const selectedChordInversion = selectedChord ? normalizeChordInversion(selectedChord.inversion) : 0;
-  const selectedChordInversionIndex = chordInversions.indexOf(selectedChordInversion);
-  const selectedChordInversionDown =
-    selectedChordInversionIndex > 0 ? chordInversions[selectedChordInversionIndex - 1] : null;
-  const selectedChordInversionUp =
-    selectedChordInversionIndex >= 0 && selectedChordInversionIndex < chordInversions.length - 1
-      ? chordInversions[selectedChordInversionIndex + 1]
-      : null;
-  const selectedChordDuplicateStep =
-    selectedChord && selectedChordActive ? nextEmptyChordStep(selectedPatternData.chordEvents, selectedChord.step) : null;
-  const chordClipboardLabel = chordClipboard
-    ? `${chordClipboard.root}${chordClipboard.quality}.${chordClipboard.step + 1}`
-    : "Clipboard empty";
-  const chordClipboardPasteStep = chordClipboard
-    ? nextEmptyChordStep(selectedPatternData.chordEvents, chordClipboard.step)
-    : null;
+  const { selectedNoteActive, selectedNoteLabel, selectedNoteActions, selectedDrumActions, selectedChordActions } =
+    createSelectedEventQuickActions({
+      project,
+      selectedPatternData,
+      selectedNote,
+      noteClipboard,
+      selectedDrumStep,
+      drumClipboard,
+      selectedChord,
+      chordClipboard,
+      onAuditionSelectedNote,
+      onMoveSelectedNoteStep,
+      onMoveSelectedNotePitch,
+      onMoveSelectedNoteOctave,
+      onCopySelectedNote,
+      onPasteCopiedNote,
+      onDuplicateSelectedNote,
+      onAuditionSelectedDrumHit,
+      onUpdateSelectedDrumVelocity,
+      onUpdateSelectedDrumProbability,
+      onUpdateSelectedDrumTiming,
+      onUpdateSelectedHatRepeat,
+      onCopySelectedDrumHit,
+      onPasteCopiedDrumHit,
+      onAuditionSelectedChord,
+      onMoveSelectedChordStep,
+      onMoveSelectedChordInversion,
+      onCopySelectedChord,
+      onPasteCopiedChord,
+      onDuplicateSelectedChord
+    });
   const captureStepModeActions = createCaptureStepModeActions({
     keyboardCaptureStepMode,
     keyboardCaptureTarget,
@@ -12338,367 +12324,6 @@ function createQuickActions({
       keywords: "capture default 808 bass glide toggle slide keyboard midi input notes beginner producer",
       disabled: keyboardCaptureTarget !== "bass",
       run: () => onUpdateKeyboardCaptureDefaults({ glide: !activeCaptureDefaults.glide })
-    }
-  ];
-  const selectedNoteActions: QuickAction[] = [
-    {
-      id: "selected-note-step-left",
-      title: "Move selected note left",
-      detail: selectedNote
-        ? `${selectedNoteLabel} / Pattern ${project.selectedPattern} / one step earlier`
-        : "Select an 808 or Synth note first.",
-      group: "Create",
-      keywords: "selected note move left step nudge 808 synth edit keyboard capture midi beginner producer",
-      disabled: !selectedNoteActive || !selectedNote || selectedNote.step <= 0,
-      run: () => onMoveSelectedNoteStep(-1)
-    },
-    {
-      id: "selected-note-step-right",
-      title: "Move selected note right",
-      detail: selectedNote
-        ? `${selectedNoteLabel} / Pattern ${project.selectedPattern} / one step later`
-        : "Select an 808 or Synth note first.",
-      group: "Create",
-      keywords: "selected note move right step nudge 808 synth edit keyboard capture midi beginner producer",
-      disabled: !selectedNoteActive || !selectedNote || selectedNote.step >= steps.length - 1,
-      run: () => onMoveSelectedNoteStep(1)
-    },
-    {
-      id: "selected-note-pitch-down",
-      title: "Move selected note down",
-      detail: selectedNotePitchDown
-        ? `${selectedNoteLabel} -> ${selectedNotePitchDown} / Pattern ${project.selectedPattern}`
-        : selectedNote
-          ? `${selectedNoteLabel} is at the low pitch edge.`
-          : "Select an 808 or Synth note first.",
-      group: "Create",
-      keywords: "selected note pitch down lower scale 808 synth edit keyboard capture midi beginner producer",
-      disabled: !selectedNoteActive || !selectedNotePitchDown,
-      run: () => onMoveSelectedNotePitch(-1)
-    },
-    {
-      id: "selected-note-pitch-up",
-      title: "Move selected note up",
-      detail: selectedNotePitchUp
-        ? `${selectedNoteLabel} -> ${selectedNotePitchUp} / Pattern ${project.selectedPattern}`
-        : selectedNote
-          ? `${selectedNoteLabel} is at the high pitch edge.`
-          : "Select an 808 or Synth note first.",
-      group: "Create",
-      keywords: "selected note pitch up higher scale 808 synth edit keyboard capture midi beginner producer",
-      disabled: !selectedNoteActive || !selectedNotePitchUp,
-      run: () => onMoveSelectedNotePitch(1)
-    },
-    {
-      id: "selected-note-octave-down",
-      title: "Move selected note down octave",
-      detail: selectedNoteOctaveDown
-        ? `${selectedNoteLabel} -> ${selectedNoteOctaveDown} / Pattern ${project.selectedPattern}`
-        : selectedNote
-          ? `${selectedNoteLabel} is at the low octave edge.`
-          : "Select an 808 or Synth note first.",
-      group: "Create",
-      keywords: "selected note octave down lower 808 synth edit keyboard capture midi beginner producer",
-      disabled: !selectedNoteActive || !selectedNoteOctaveDown,
-      run: () => onMoveSelectedNoteOctave(-1)
-    },
-    {
-      id: "selected-note-octave-up",
-      title: "Move selected note up octave",
-      detail: selectedNoteOctaveUp
-        ? `${selectedNoteLabel} -> ${selectedNoteOctaveUp} / Pattern ${project.selectedPattern}`
-        : selectedNote
-          ? `${selectedNoteLabel} is at the high octave edge.`
-          : "Select an 808 or Synth note first.",
-      group: "Create",
-      keywords: "selected note octave up higher 808 synth edit keyboard capture midi beginner producer",
-      disabled: !selectedNoteActive || !selectedNoteOctaveUp,
-      run: () => onMoveSelectedNoteOctave(1)
-    },
-    {
-      id: "selected-note-copy",
-      title: "Copy selected note",
-      detail: selectedNoteActive ? `${selectedNoteLabel} -> local note clipboard` : "Select an active 808 or Synth note first.",
-      group: "Create",
-      keywords: "selected note copy clipboard 808 synth edit keyboard capture midi beginner producer",
-      disabled: !selectedNoteActive,
-      run: onCopySelectedNote
-    },
-    {
-      id: "selected-note-paste",
-      title: "Paste copied note",
-      detail:
-        noteClipboard && noteClipboardPasteStep !== null
-          ? `${noteClipboardLabel} -> step ${noteClipboardPasteStep + 1} / Pattern ${project.selectedPattern}`
-          : noteClipboard
-            ? `${noteClipboardLabel} has no empty paste step.`
-            : "Copy an 808 or Synth note first.",
-      group: "Create",
-      keywords: "selected note paste clipboard 808 synth edit keyboard capture midi beginner producer",
-      disabled: !noteClipboard || noteClipboardPasteStep === null,
-      run: onPasteCopiedNote
-    },
-    {
-      id: "selected-note-duplicate",
-      title: "Duplicate selected note",
-      detail:
-        selectedNoteActive && selectedNoteDuplicateStep !== null
-          ? `${selectedNoteLabel} -> step ${selectedNoteDuplicateStep + 1} / Pattern ${project.selectedPattern}`
-          : selectedNote
-            ? `${selectedNoteLabel} has no empty duplicate step.`
-            : "Select an 808 or Synth note first.",
-      group: "Create",
-      keywords: "selected note duplicate copy next empty step 808 synth edit keyboard capture midi beginner producer",
-      disabled: !selectedNoteActive || selectedNoteDuplicateStep === null,
-      run: onDuplicateSelectedNote
-    }
-  ];
-  const selectedDrumActions: QuickAction[] = [
-    {
-      id: "selected-drum-velocity-down",
-      title: "Soften selected drum hit",
-      detail:
-        selectedDrumVelocity !== null
-          ? `${selectedDrumLabel} velocity ${percentLabel(selectedDrumVelocity)} -> ${percentLabel(normalizeDrumVelocity(selectedDrumVelocity - 0.05))}`
-          : "Select an active drum hit first.",
-      group: "Create",
-      keywords: "selected drum velocity down softer dynamics pocket hit edit beginner producer",
-      disabled: selectedDrumVelocity === null || selectedDrumVelocity <= 0.15,
-      run: () => {
-        if (selectedDrumVelocity !== null) {
-          onUpdateSelectedDrumVelocity(selectedDrumVelocity - 0.05);
-        }
-      }
-    },
-    {
-      id: "selected-drum-velocity-up",
-      title: "Punch selected drum hit",
-      detail:
-        selectedDrumVelocity !== null
-          ? `${selectedDrumLabel} velocity ${percentLabel(selectedDrumVelocity)} -> ${percentLabel(normalizeDrumVelocity(selectedDrumVelocity + 0.05))}`
-          : "Select an active drum hit first.",
-      group: "Create",
-      keywords: "selected drum velocity up louder punch dynamics pocket hit edit beginner producer",
-      disabled: selectedDrumVelocity === null || selectedDrumVelocity >= 1,
-      run: () => {
-        if (selectedDrumVelocity !== null) {
-          onUpdateSelectedDrumVelocity(selectedDrumVelocity + 0.05);
-        }
-      }
-    },
-    {
-      id: "selected-drum-chance-down",
-      title: "Lower selected drum chance",
-      detail:
-        selectedDrumProbability !== null
-          ? `${selectedDrumLabel} chance ${percentLabel(selectedDrumProbability)} -> ${percentLabel(normalizeDrumProbability(selectedDrumProbability - 0.05))}`
-          : "Select an active drum hit first.",
-      group: "Create",
-      keywords: "selected drum chance probability down ghost variation pocket hit edit beginner producer",
-      disabled: selectedDrumProbability === null || selectedDrumProbability <= 0,
-      run: () => {
-        if (selectedDrumProbability !== null) {
-          onUpdateSelectedDrumProbability(selectedDrumProbability - 0.05);
-        }
-      }
-    },
-    {
-      id: "selected-drum-chance-up",
-      title: "Raise selected drum chance",
-      detail:
-        selectedDrumProbability !== null
-          ? `${selectedDrumLabel} chance ${percentLabel(selectedDrumProbability)} -> ${percentLabel(normalizeDrumProbability(selectedDrumProbability + 0.05))}`
-          : "Select an active drum hit first.",
-      group: "Create",
-      keywords: "selected drum chance probability up reliable variation pocket hit edit beginner producer",
-      disabled: selectedDrumProbability === null || selectedDrumProbability >= 1,
-      run: () => {
-        if (selectedDrumProbability !== null) {
-          onUpdateSelectedDrumProbability(selectedDrumProbability + 0.05);
-        }
-      }
-    },
-    {
-      id: "selected-drum-timing-earlier",
-      title: "Push selected drum earlier",
-      detail:
-        selectedDrumTiming !== null
-          ? `${selectedDrumLabel} timing ${timingLabel(selectedDrumTiming)} -> ${timingLabel(normalizeDrumTimingMs(selectedDrumTiming - 5))}`
-          : "Select an active drum hit first.",
-      group: "Create",
-      keywords: "selected drum timing earlier ahead microtiming pocket hit edit beginner producer",
-      disabled: selectedDrumTiming === null || selectedDrumTiming <= minDrumTimingMs,
-      run: () => {
-        if (selectedDrumTiming !== null) {
-          onUpdateSelectedDrumTiming(selectedDrumTiming - 5);
-        }
-      }
-    },
-    {
-      id: "selected-drum-timing-later",
-      title: "Lay selected drum later",
-      detail:
-        selectedDrumTiming !== null
-          ? `${selectedDrumLabel} timing ${timingLabel(selectedDrumTiming)} -> ${timingLabel(normalizeDrumTimingMs(selectedDrumTiming + 5))}`
-          : "Select an active drum hit first.",
-      group: "Create",
-      keywords: "selected drum timing later behind microtiming pocket hit edit beginner producer",
-      disabled: selectedDrumTiming === null || selectedDrumTiming >= maxDrumTimingMs,
-      run: () => {
-        if (selectedDrumTiming !== null) {
-          onUpdateSelectedDrumTiming(selectedDrumTiming + 5);
-        }
-      }
-    },
-    {
-      id: "selected-drum-hat-repeat-down",
-      title: "Reduce selected hat repeat",
-      detail:
-        selectedDrumStep?.lane === "hat" && selectedHatRepeat !== null
-          ? `${selectedDrumLabel} repeat ${selectedHatRepeat}x -> ${normalizeHatRepeat(selectedHatRepeat - 1)}x`
-          : "Select an active hat hit first.",
-      group: "Create",
-      keywords: "selected drum hat repeat roll reduce dynamics pocket hit edit beginner producer",
-      disabled: selectedDrumStep?.lane !== "hat" || selectedHatRepeat === null || selectedHatRepeat <= 1,
-      run: () => {
-        if (selectedHatRepeat !== null) {
-          onUpdateSelectedHatRepeat(selectedHatRepeat - 1);
-        }
-      }
-    },
-    {
-      id: "selected-drum-hat-repeat-up",
-      title: "Increase selected hat repeat",
-      detail:
-        selectedDrumStep?.lane === "hat" && selectedHatRepeat !== null
-          ? `${selectedDrumLabel} repeat ${selectedHatRepeat}x -> ${normalizeHatRepeat(selectedHatRepeat + 1)}x`
-          : "Select an active hat hit first.",
-      group: "Create",
-      keywords: "selected drum hat repeat roll increase dynamics pocket hit edit beginner producer",
-      disabled: selectedDrumStep?.lane !== "hat" || selectedHatRepeat === null || selectedHatRepeat >= 4,
-      run: () => {
-        if (selectedHatRepeat !== null) {
-          onUpdateSelectedHatRepeat(selectedHatRepeat + 1);
-        }
-      }
-    },
-    {
-      id: "selected-drum-copy",
-      title: "Copy selected drum hit",
-      detail: selectedDrumActive ? `${selectedDrumLabel} -> local drum clipboard` : "Select an active drum hit first.",
-      group: "Create",
-      keywords: "selected drum copy clipboard hit dynamics timing chance repeat pocket edit beginner producer",
-      disabled: !selectedDrumActive,
-      run: onCopySelectedDrumHit
-    },
-    {
-      id: "selected-drum-paste",
-      title: "Paste copied drum hit",
-      detail:
-        drumClipboard && drumClipboardPasteStep !== null
-          ? `${drumClipboardLabel} -> ${drumLabels[drumClipboard.lane]} ${drumClipboardPasteStep + 1} / Pattern ${project.selectedPattern}`
-          : drumClipboard
-            ? `${drumClipboardLabel} has no empty paste step.`
-            : "Copy a drum hit first.",
-      group: "Create",
-      keywords: "selected drum paste clipboard hit next empty dynamics timing chance repeat pocket edit beginner producer",
-      disabled: !drumClipboard || drumClipboardPasteStep === null,
-      run: onPasteCopiedDrumHit
-    }
-  ];
-  const selectedChordActions: QuickAction[] = [
-    {
-      id: "selected-chord-step-left",
-      title: "Move selected chord left",
-      detail: selectedChord
-        ? `${selectedChordLabel} / Pattern ${project.selectedPattern} / one step earlier`
-        : "Select a chord first.",
-      group: "Create",
-      keywords: "selected chord move left step nudge harmony progression edit beginner producer",
-      disabled:
-        !selectedChordActive ||
-        !selectedChord ||
-        selectedChord.step <= 0 ||
-        selectedPatternData.chordEvents.some((chord) => chord.step === selectedChord.step - 1),
-      run: () => onMoveSelectedChordStep(-1)
-    },
-    {
-      id: "selected-chord-step-right",
-      title: "Move selected chord right",
-      detail: selectedChord
-        ? `${selectedChordLabel} / Pattern ${project.selectedPattern} / one step later`
-        : "Select a chord first.",
-      group: "Create",
-      keywords: "selected chord move right step nudge harmony progression edit beginner producer",
-      disabled:
-        !selectedChordActive ||
-        !selectedChord ||
-        selectedChord.step >= steps.length - 1 ||
-        selectedPatternData.chordEvents.some((chord) => chord.step === selectedChord.step + 1),
-      run: () => onMoveSelectedChordStep(1)
-    },
-    {
-      id: "selected-chord-inversion-down",
-      title: "Move selected chord voicing down",
-      detail: selectedChordActive
-        ? `${selectedChordLabel} / ${chordInversionLabel(selectedChordInversion)} -> ${
-            selectedChordInversionDown === null ? "root" : chordInversionLabel(selectedChordInversionDown)
-          }`
-        : "Select a chord first.",
-      group: "Create",
-      keywords: "selected chord inversion voicing down lower harmony progression edit beginner producer",
-      disabled: !selectedChordActive || selectedChordInversionDown === null,
-      run: () => onMoveSelectedChordInversion(-1)
-    },
-    {
-      id: "selected-chord-inversion-up",
-      title: "Move selected chord voicing up",
-      detail: selectedChordActive
-        ? `${selectedChordLabel} / ${chordInversionLabel(selectedChordInversion)} -> ${
-            selectedChordInversionUp === null ? "top" : chordInversionLabel(selectedChordInversionUp)
-          }`
-        : "Select a chord first.",
-      group: "Create",
-      keywords: "selected chord inversion voicing up higher harmony progression edit beginner producer",
-      disabled: !selectedChordActive || selectedChordInversionUp === null,
-      run: () => onMoveSelectedChordInversion(1)
-    },
-    {
-      id: "selected-chord-copy",
-      title: "Copy selected chord",
-      detail: selectedChordActive ? `${selectedChordLabel} -> local chord clipboard` : "Select an active chord first.",
-      group: "Create",
-      keywords: "selected chord copy clipboard harmony progression edit beginner producer",
-      disabled: !selectedChordActive,
-      run: onCopySelectedChord
-    },
-    {
-      id: "selected-chord-paste",
-      title: "Paste copied chord",
-      detail:
-        chordClipboard && chordClipboardPasteStep !== null
-          ? `${chordClipboardLabel} -> step ${chordClipboardPasteStep + 1} / Pattern ${project.selectedPattern}`
-          : chordClipboard
-            ? `${chordClipboardLabel} has no empty paste step.`
-            : "Copy a chord first.",
-      group: "Create",
-      keywords: "selected chord paste clipboard harmony progression edit beginner producer",
-      disabled: !chordClipboard || chordClipboardPasteStep === null,
-      run: onPasteCopiedChord
-    },
-    {
-      id: "selected-chord-duplicate",
-      title: "Duplicate selected chord",
-      detail:
-        selectedChordActive && selectedChordDuplicateStep !== null
-          ? `${selectedChordLabel} -> step ${selectedChordDuplicateStep + 1} / Pattern ${project.selectedPattern}`
-          : selectedChord
-            ? `${selectedChordLabel} has no empty duplicate step.`
-            : "Select a chord first.",
-      group: "Create",
-      keywords: "selected chord duplicate copy next empty step harmony progression edit beginner producer",
-      disabled: !selectedChordActive || selectedChordDuplicateStep === null,
-      run: onDuplicateSelectedChord
     }
   ];
   const selectedBlockActions: QuickAction[] = [
@@ -14531,11 +14156,16 @@ function createQuickActionResult(
   const noteClipboardOnly = action.id === "selected-note-copy";
   const drumClipboardOnly = action.id === "selected-drum-copy";
   const chordClipboardOnly = action.id === "selected-chord-copy";
+  const auditionOnly =
+    action.id === "selected-note-audition" ||
+    action.id === "selected-drum-audition" ||
+    action.id === "selected-chord-audition";
   const tapTempoPulseOnly = action.id === "tap-tempo";
   const exportOnly = directExportQuickActionTarget(action.id) !== null || action.id === "handoff-next-export";
   const uiLocal =
     action.id.startsWith("mix-snapshot-") ||
     inputSetupOnly ||
+    auditionOnly ||
     tapTempoPulseOnly ||
     blockClipboardOnly ||
     noteClipboardOnly ||
@@ -14561,6 +14191,8 @@ function createQuickActionResult(
           ? "Previewed"
           : focusOnly
             ? "Focused"
+            : auditionOnly
+              ? "Auditioned"
             : blockClipboardOnly || noteClipboardOnly || drumClipboardOnly || chordClipboardOnly
               ? "Copied"
               : uiLocal && action.id === "mix-snapshot-clear"
@@ -15784,6 +15416,13 @@ function quickActionResultFollowup(
     };
   }
 
+  if (action.id === "selected-note-audition") {
+    return {
+      auditionCue: "Use the one-shot note sound to check pitch, length, velocity, and current mixer posture before changing the phrase.",
+      nextCheck: "Loop the selected Pattern only when the note needs to be judged against drums, chords, and arrangement context."
+    };
+  }
+
   if (action.id === "selected-note-copy") {
     return {
       auditionCue: "Use Paste copied note when the copied 808 or Synth shape should repeat in the current Pattern.",
@@ -15798,6 +15437,13 @@ function quickActionResultFollowup(
     };
   }
 
+  if (action.id === "selected-drum-audition") {
+    return {
+      auditionCue: "Use the one-shot drum hit to check velocity, timing feel, repeat shape, and current drum rack posture.",
+      nextCheck: "Loop the selected Pattern only when the hit needs to be judged against the full groove."
+    };
+  }
+
   if (action.id === "selected-drum-copy") {
     return {
       auditionCue: "Use Paste copied drum hit when the copied groove shape should repeat in the current Pattern.",
@@ -15809,6 +15455,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Loop the selected Pattern to hear the corrected drum pocket against the 808, chords, and Synth.",
       nextCheck: "Use selected-drum tools again for another small correction, or move to Drum Move when the rhythm needs a broader change."
+    };
+  }
+
+  if (action.id === "selected-chord-audition") {
+    return {
+      auditionCue: "Use the one-shot chord sound to check root, quality, voicing, length, and current chord tone posture.",
+      nextCheck: "Loop the selected Pattern only when the chord needs to be judged against 808 and melody movement."
     };
   }
 

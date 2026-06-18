@@ -41,6 +41,16 @@ export default defineConfig({
               priority: 2
             },
             {
+              name: "workstation-editor-audition",
+              test: /src[\\/]ui[\\/]editorAudition\.ts$/,
+              priority: 2
+            },
+            {
+              name: "workstation-selected-actions",
+              test: /src[\\/]ui[\\/]selectedEventQuickActions\.ts$/,
+              priority: 2
+            },
+            {
               name: "workstation-pattern-tools",
               test: /src[\\/]ui[\\/](workstationPatternTools\.ts|workstationPatternResults\.tsx)$/,
               priority: 2

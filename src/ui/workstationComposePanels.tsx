@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Drum, ListChecks, Music2, Plus, SlidersHorizontal, Trash2, Waves } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Drum, ListChecks, Music2, Play, Plus, SlidersHorizontal, Trash2, Waves } from "lucide-react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { BassNote, ChordEvent, ChordProgressionPreset, ChordQuality, DrumLane, MelodyNote, NoteTrack, PatternSlot, PatternVariationPreset, ProjectState, SoundDesign } from "../domain/workstation";
@@ -19,6 +19,7 @@ export function DrumStepInspector({
   onProbabilityChange,
   onTimingChange,
   onHatRepeatChange,
+  onAudition,
   onCopy,
   onPaste
 }: {
@@ -33,6 +34,7 @@ export function DrumStepInspector({
   onProbabilityChange: (probability: number) => void;
   onTimingChange: (timingMs: number) => void;
   onHatRepeatChange: (repeat: number) => void;
+  onAudition: () => void;
   onCopy: () => void;
   onPaste: () => void;
 }): ReactElement {
@@ -213,6 +215,10 @@ export function DrumStepInspector({
         </div>
       )}
       <div className="drum-clipboard-row" aria-label="Drum hit clipboard">
+        <button data-testid="drum-audition" disabled={!selectedStep || !active} onClick={onAudition} title="Audition selected drum hit" type="button">
+          <Play size={14} aria-hidden="true" />
+          <span>Audition</span>
+        </button>
         <button data-testid="drum-copy" disabled={!selectedStep || !active} onClick={onCopy} title="Copy selected drum hit shape" type="button">
           <Copy size={14} aria-hidden="true" />
           <span>Copy</span>
@@ -1233,6 +1239,7 @@ export function NoteInspector({
   onStepMove,
   onPitchMove,
   onOctaveMove,
+  onAudition,
   onCopy,
   onPaste,
   onDuplicate
@@ -1249,6 +1256,7 @@ export function NoteInspector({
   onStepMove: (direction: -1 | 1) => void;
   onPitchMove: (direction: -1 | 1) => void;
   onOctaveMove: (direction: -1 | 1) => void;
+  onAudition: () => void;
   onCopy: () => void;
   onPaste: () => void;
   onDuplicate: () => void;
@@ -1305,6 +1313,10 @@ export function NoteInspector({
             <button data-testid="note-duplicate" onClick={onDuplicate} title="Duplicate selected note to the next empty step" type="button">
               <Copy size={14} aria-hidden="true" />
               <span>Dup</span>
+            </button>
+            <button data-testid="note-audition" onClick={onAudition} title="Audition selected 808 or Synth note" type="button">
+              <Play size={14} aria-hidden="true" />
+              <span>Aud</span>
             </button>
           </div>
           <div className="inspector-grid">
@@ -1902,6 +1914,7 @@ export function ChordEditor({
   onDuplicate,
   onInvert,
   onMoveStep,
+  onAudition,
   onPad,
   onPaste,
   onPreset,
@@ -1927,6 +1940,7 @@ export function ChordEditor({
   onDuplicate: () => void;
   onInvert: (direction: -1 | 1) => void;
   onMoveStep: (direction: -1 | 1) => void;
+  onAudition: () => void;
   onPad: (pad: ChordPadId) => void;
   onPaste: () => void;
   onPreset: (preset: ChordProgressionPreset) => void;
@@ -2066,6 +2080,16 @@ export function ChordEditor({
         </div>
       )}
       <div className="chord-edit-row" aria-label="Selected chord edit tools">
+        <button
+          data-testid="chord-audition"
+          disabled={!selectedChord}
+          onClick={onAudition}
+          title="Audition selected chord"
+          type="button"
+        >
+          <Play size={13} aria-hidden="true" />
+          <span>Aud</span>
+        </button>
         <button
           data-testid="chord-move-left"
           disabled={!canMoveLeft}
