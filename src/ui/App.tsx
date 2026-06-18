@@ -15279,6 +15279,19 @@ function createQuickActionResult(
   };
 }
 
+function mixFixQuickActionPreset(actionId: string): MixFixPreset | null {
+  switch (actionId) {
+    case "mix-headroom":
+      return "headroom";
+    case "mix-stem-balance":
+      return "stem_balance";
+    case "mix-low-end":
+      return "low_end";
+    default:
+      return null;
+  }
+}
+
 function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -15920,6 +15933,32 @@ function quickActionResultMetricSnapshot(
         stemSpread === null ? "stems n/a" : `${stemSpread.toFixed(1)} dB spread`
       }`
     };
+  }
+
+  const mixFixPreset = mixFixQuickActionPreset(action.id);
+  if (mixFixPreset) {
+    switch (mixFixPreset) {
+      case "headroom": {
+        const exportAnalysis = analysis ?? analyzeExport(project);
+        return {
+          id: "mix-fix-headroom",
+          label: "Mix Fix Headroom",
+          value: mixFixHeadroomPosture(exportAnalysis)
+        };
+      }
+      case "stem_balance":
+        return {
+          id: "mix-fix-stem-balance",
+          label: "Mix Fix Stem Balance",
+          value: mixFixStemPosture(analyzeStemExports(project))
+        };
+      case "low_end":
+        return {
+          id: "mix-fix-low-end",
+          label: "Mix Fix Low End",
+          value: mixFixLowEndPosture(analyzeStemExports(project))
+        };
+    }
   }
 
   if (action.id.startsWith("space-fx-")) {
@@ -16590,6 +16629,14 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Full Mix and compare the held snapshot against the alternate slot after a concrete mix change.",
       nextCheck: "Use Mix Snapshot A/B metrics for headroom, balance, master, and stem posture before Mix Fix or Master Finish."
+    };
+  }
+
+  const mixFixPreset = mixFixQuickActionPreset(action.id);
+  if (mixFixPreset) {
+    return {
+      auditionCue: mixFixAuditionCue(mixFixPreset),
+      nextCheck: mixFixNextCheck(mixFixPreset)
     };
   }
 
