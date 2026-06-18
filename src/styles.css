@@ -10386,7 +10386,7 @@ input[type="range"] {
 
 .drum-clipboard-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
   align-items: center;
 }
@@ -11683,7 +11683,7 @@ input[type="range"] {
 
 .note-action-row {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 5px;
 }
 
@@ -12627,7 +12627,7 @@ input[type="range"] {
 
 .chord-edit-row {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
 }
 

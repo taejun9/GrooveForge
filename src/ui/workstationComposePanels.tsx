@@ -15,13 +15,15 @@ export function DrumStepInspector({
   timingMs,
   probability,
   hatRepeat,
+  previousBeatDuplicateStep,
   onVelocityChange,
   onProbabilityChange,
   onTimingChange,
   onHatRepeatChange,
   onAudition,
   onCopy,
-  onPaste
+  onPaste,
+  onDuplicatePreviousBeat
 }: {
   selectedStep: SelectedDrumStep | null;
   drumClipboard: DrumClipboard | null;
@@ -30,6 +32,7 @@ export function DrumStepInspector({
   timingMs: number;
   probability?: number;
   hatRepeat: number;
+  previousBeatDuplicateStep: number | null;
   onVelocityChange: (velocity: number) => void;
   onProbabilityChange: (probability: number) => void;
   onTimingChange: (timingMs: number) => void;
@@ -37,6 +40,7 @@ export function DrumStepInspector({
   onAudition: () => void;
   onCopy: () => void;
   onPaste: () => void;
+  onDuplicatePreviousBeat: () => void;
 }): ReactElement {
   const velocityValue = velocity ?? 0.75;
   const probabilityValue = probability ?? 1;
@@ -226,6 +230,20 @@ export function DrumStepInspector({
         <button data-testid="drum-paste" disabled={!drumClipboard} onClick={onPaste} title="Paste copied hit to the next empty step" type="button">
           <Plus size={14} aria-hidden="true" />
           <span>Paste</span>
+        </button>
+        <button
+          data-testid="drum-duplicate-previous-beat"
+          disabled={!selectedStep || !active || previousBeatDuplicateStep === null}
+          onClick={onDuplicatePreviousBeat}
+          title={
+            previousBeatDuplicateStep === null
+              ? "No earlier empty beat-grid hit slot"
+              : `Duplicate selected drum hit to beat step ${previousBeatDuplicateStep + 1}`
+          }
+          type="button"
+        >
+          <ArrowLeft size={14} aria-hidden="true" />
+          <span>Beat</span>
         </button>
         <small data-testid="drum-clipboard-detail">{drumClipboard ? `Clipboard ${clipboardLabel}` : "Clipboard empty"}</small>
       </div>
@@ -1240,6 +1258,7 @@ export function NoteInspector({
   noteClipboard,
   bassNote,
   melodyNote,
+  previousBeatDuplicateStep,
   onLengthChange,
   onGlideChange,
   onVelocityChange,
@@ -1250,13 +1269,15 @@ export function NoteInspector({
   onAudition,
   onCopy,
   onPaste,
-  onDuplicate
+  onDuplicate,
+  onDuplicatePreviousBeat
 }: {
   currentKey: string;
   selectedNote: SelectedNote | null;
   noteClipboard: NoteClipboard | null;
   bassNote?: BassNote;
   melodyNote?: MelodyNote;
+  previousBeatDuplicateStep: number | null;
   onLengthChange: (length: number) => void;
   onGlideChange: (glide: boolean) => void;
   onVelocityChange: (velocity: number) => void;
@@ -1268,6 +1289,7 @@ export function NoteInspector({
   onCopy: () => void;
   onPaste: () => void;
   onDuplicate: () => void;
+  onDuplicatePreviousBeat: () => void;
 }): ReactElement {
   const activeNote = bassNote ?? melodyNote;
   const label = selectedNote ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}` : "None";
@@ -1322,6 +1344,20 @@ export function NoteInspector({
             <button data-testid="note-duplicate" onClick={onDuplicate} title="Duplicate selected note to the next empty step" type="button">
               <Copy size={14} aria-hidden="true" />
               <span>Dup</span>
+            </button>
+            <button
+              data-testid="note-duplicate-previous-beat"
+              disabled={previousBeatDuplicateStep === null}
+              onClick={onDuplicatePreviousBeat}
+              title={
+                previousBeatDuplicateStep === null
+                  ? "No earlier empty beat-grid note slot"
+                  : `Duplicate selected note to beat step ${previousBeatDuplicateStep + 1}`
+              }
+              type="button"
+            >
+              <ArrowLeft size={14} aria-hidden="true" />
+              <span>Beat</span>
             </button>
             <button data-testid="note-audition" onClick={onAudition} title="Audition selected 808 or Synth note" type="button">
               <Play size={14} aria-hidden="true" />
@@ -1916,11 +1952,13 @@ export function ChordEditor({
   currentStep,
   rootOptions,
   selectedIndex,
+  previousBeatDuplicateStep,
   onAdd,
   onChange,
   onCopy,
   onDelete,
   onDuplicate,
+  onDuplicatePreviousBeat,
   onInvert,
   onMoveStep,
   onAudition,
@@ -1942,11 +1980,13 @@ export function ChordEditor({
   currentStep: number | null;
   rootOptions: string[];
   selectedIndex: number | null;
+  previousBeatDuplicateStep: number | null;
   onAdd: () => void;
   onChange: (index: number, update: Partial<ChordEvent>) => boolean;
   onCopy: () => void;
   onDelete: (index: number) => boolean;
   onDuplicate: () => void;
+  onDuplicatePreviousBeat: () => void;
   onInvert: (direction: -1 | 1) => void;
   onMoveStep: (direction: -1 | 1) => void;
   onAudition: () => void;
@@ -2128,6 +2168,20 @@ export function ChordEditor({
         >
           <Copy size={13} aria-hidden="true" />
           <span>Dup</span>
+        </button>
+        <button
+          data-testid="chord-duplicate-previous-beat"
+          disabled={previousBeatDuplicateStep === null}
+          onClick={onDuplicatePreviousBeat}
+          title={
+            previousBeatDuplicateStep === null
+              ? "No earlier empty beat-grid chord slot"
+              : `Duplicate selected chord to beat step ${previousBeatDuplicateStep + 1}`
+          }
+          type="button"
+        >
+          <ArrowLeft size={13} aria-hidden="true" />
+          <span>Beat</span>
         </button>
         <button
           data-testid="chord-invert-down"

@@ -1426,6 +1426,42 @@ export function App(): ReactElement {
     : false;
   const selectedChord =
     selectedChordIndex === null ? undefined : currentPattern.chordEvents[selectedChordIndex];
+  const selectedNotePreviousBeatDuplicateStep = (() => {
+    if (!selectedNote) {
+      return null;
+    }
+    const source = selectedNote.track === "bass" ? selectedBassNote : selectedMelodyNote;
+    if (!source) {
+      return null;
+    }
+    const noteLane = selectedNote.track === "bass" ? currentPattern.bassNotes : currentPattern.melodyNotes;
+    const latestStartStep = steps.length - clampStepLength(source.length);
+
+    return steps.reduce<number | null>((targetStep, candidateStep) => {
+      if (candidateStep >= source.step || candidateStep % 4 !== 0 || candidateStep > latestStartStep) {
+        return targetStep;
+      }
+      const occupied = noteLane.some((note) => note.step === candidateStep && note.pitch === source.pitch);
+      return occupied ? targetStep : candidateStep;
+    }, null);
+  })();
+  const selectedDrumPreviousBeatDuplicateStep =
+    selectedDrumStep && selectedDrumActive
+      ? steps.reduce<number | null>((targetStep, candidateStep) => {
+          if (candidateStep >= selectedDrumStep.step || candidateStep % 4 !== 0) {
+            return targetStep;
+          }
+          return currentPattern.drumPattern[selectedDrumStep.lane][candidateStep] ? targetStep : candidateStep;
+        }, null)
+      : null;
+  const selectedChordPreviousBeatDuplicateStep = selectedChord
+    ? steps.reduce<number | null>((targetStep, candidateStep) => {
+        if (candidateStep >= selectedChord.step || candidateStep % 4 !== 0 || candidateStep > steps.length - clampStepLength(selectedChord.length)) {
+          return targetStep;
+        }
+        return currentPattern.chordEvents.some((chord) => chord.step === candidateStep) ? targetStep : candidateStep;
+      }, null)
+    : null;
   const keyCompassSummary = useMemo(
     () => createKeyCompassSummary(project, selectedNote, selectedChord, selectedDrumStep),
     [project, selectedNote, selectedChord, selectedDrumStep]
@@ -7099,6 +7135,7 @@ export function App(): ReactElement {
               timingMs={selectedDrumTiming}
               probability={selectedDrumProbability}
               hatRepeat={selectedHatRepeat}
+              previousBeatDuplicateStep={selectedDrumPreviousBeatDuplicateStep}
               onVelocityChange={updateSelectedDrumVelocity}
               onProbabilityChange={updateSelectedDrumProbability}
               onTimingChange={updateSelectedDrumTiming}
@@ -7106,6 +7143,11 @@ export function App(): ReactElement {
               onAudition={auditionSelectedDrumHit}
               onCopy={copySelectedDrumHit}
               onPaste={pasteCopiedDrumHit}
+              onDuplicatePreviousBeat={() => {
+                if (selectedDrumPreviousBeatDuplicateStep !== null) {
+                  duplicateSelectedDrumHitToStep(selectedDrumPreviousBeatDuplicateStep);
+                }
+              }}
             />
           </div>
         </section>
@@ -7177,6 +7219,7 @@ export function App(): ReactElement {
               noteClipboard={noteClipboard}
               bassNote={selectedBassNote}
               melodyNote={selectedMelodyNote}
+              previousBeatDuplicateStep={selectedNotePreviousBeatDuplicateStep}
               onLengthChange={updateSelectedLength}
               onGlideChange={updateSelectedGlide}
               onVelocityChange={updateSelectedVelocity}
@@ -7188,6 +7231,11 @@ export function App(): ReactElement {
               onCopy={copySelectedNote}
               onPaste={pasteCopiedNote}
               onDuplicate={duplicateSelectedNote}
+              onDuplicatePreviousBeat={() => {
+                if (selectedNotePreviousBeatDuplicateStep !== null) {
+                  duplicateSelectedNoteToStep(selectedNotePreviousBeatDuplicateStep);
+                }
+              }}
             />
           )}
         </section>
@@ -7235,11 +7283,17 @@ export function App(): ReactElement {
             currentKey={project.key}
             rootOptions={chordRootOptions}
             selectedIndex={selectedChordIndex}
+            previousBeatDuplicateStep={selectedChordPreviousBeatDuplicateStep}
             onAdd={addChordEvent}
             onChange={updateChordEvent}
             onCopy={copySelectedChord}
             onDelete={deleteChordEvent}
             onDuplicate={duplicateSelectedChord}
+            onDuplicatePreviousBeat={() => {
+              if (selectedChordPreviousBeatDuplicateStep !== null) {
+                duplicateSelectedChordToStep(selectedChordPreviousBeatDuplicateStep);
+              }
+            }}
             onInvert={moveSelectedChordInversion}
             onMoveStep={moveSelectedChordStep}
             onAudition={auditionSelectedChord}
