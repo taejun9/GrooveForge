@@ -44,6 +44,21 @@ export default defineConfig({
               name: "workstation-pattern-tools",
               test: /src[\\/]ui[\\/](workstationPatternTools\.ts|workstationPatternResults\.tsx)$/,
               priority: 2
+            },
+            {
+              name: "workstation-mix-panels",
+              test: /src[\\/]ui[\\/]workstationMixPanels\.tsx$/,
+              priority: 2
+            },
+            {
+              name: "workstation-compose-panels",
+              test: /src[\\/]ui[\\/]workstationComposePanels\.tsx$/,
+              priority: 2
+            },
+            {
+              name: "workstation-shell-panels",
+              test: /src[\\/]ui[\\/]workstationShellPanels\.tsx$/,
+              priority: 2
             }
           ]
         }
