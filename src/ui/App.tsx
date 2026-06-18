@@ -5865,6 +5865,7 @@ export function App(): ReactElement {
     onCopySelectedNote: copySelectedNote,
     onPasteCopiedNote: pasteCopiedNote,
     onDuplicateSelectedNote: duplicateSelectedNote,
+    onDeleteSelectedNote: deleteSelectedNote,
     onUpdateSelectedDrumVelocity: updateSelectedDrumVelocity,
     onUpdateSelectedDrumProbability: updateSelectedDrumProbability,
     onUpdateSelectedDrumTiming: updateSelectedDrumTiming,
@@ -5872,11 +5873,13 @@ export function App(): ReactElement {
     onAuditionSelectedDrumHit: auditionSelectedDrumHit,
     onCopySelectedDrumHit: copySelectedDrumHit,
     onPasteCopiedDrumHit: pasteCopiedDrumHit,
+    onDeleteSelectedDrumHit: clearSelectedDrumStep,
     onMoveSelectedChordStep: moveSelectedChordStep,
     onAuditionSelectedChord: auditionSelectedChord,
     onCopySelectedChord: copySelectedChord,
     onPasteCopiedChord: pasteCopiedChord,
     onDuplicateSelectedChord: duplicateSelectedChord,
+    onDeleteSelectedChord: deleteSelectedChordEvent,
     onMoveSelectedChordInversion: moveSelectedChordInversion,
     onUpdateSelectedChordLength: updateSelectedChordLength,
     onUpdateSelectedChordVelocity: updateSelectedChordVelocity,
@@ -11631,6 +11634,7 @@ function createQuickActions({
   onCopySelectedNote,
   onPasteCopiedNote,
   onDuplicateSelectedNote,
+  onDeleteSelectedNote,
   onUpdateSelectedDrumVelocity,
   onUpdateSelectedDrumProbability,
   onUpdateSelectedDrumTiming,
@@ -11638,11 +11642,13 @@ function createQuickActions({
   onAuditionSelectedDrumHit,
   onCopySelectedDrumHit,
   onPasteCopiedDrumHit,
+  onDeleteSelectedDrumHit,
   onMoveSelectedChordStep,
   onAuditionSelectedChord,
   onCopySelectedChord,
   onPasteCopiedChord,
   onDuplicateSelectedChord,
+  onDeleteSelectedChord,
   onMoveSelectedChordInversion,
   onUpdateSelectedChordLength,
   onUpdateSelectedChordVelocity,
@@ -11840,6 +11846,7 @@ function createQuickActions({
   onCopySelectedNote: () => void;
   onPasteCopiedNote: () => void;
   onDuplicateSelectedNote: () => void;
+  onDeleteSelectedNote: () => void;
   onUpdateSelectedDrumVelocity: (velocity: number) => void;
   onUpdateSelectedDrumProbability: (probability: number) => void;
   onUpdateSelectedDrumTiming: (timingMs: number) => void;
@@ -11847,11 +11854,13 @@ function createQuickActions({
   onAuditionSelectedDrumHit: () => void;
   onCopySelectedDrumHit: () => void;
   onPasteCopiedDrumHit: () => void;
+  onDeleteSelectedDrumHit: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
   onAuditionSelectedChord: () => void;
   onCopySelectedChord: () => void;
   onPasteCopiedChord: () => void;
   onDuplicateSelectedChord: () => void;
+  onDeleteSelectedChord: () => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
   onUpdateSelectedChordLength: (length: number) => void;
   onUpdateSelectedChordVelocity: (velocity: number) => void;
@@ -12329,6 +12338,7 @@ function createQuickActions({
       onCopySelectedNote,
       onPasteCopiedNote,
       onDuplicateSelectedNote,
+      onDeleteSelectedNote,
       onAuditionSelectedDrumHit,
       onUpdateSelectedDrumVelocity,
       onUpdateSelectedDrumProbability,
@@ -12336,6 +12346,7 @@ function createQuickActions({
       onUpdateSelectedHatRepeat,
       onCopySelectedDrumHit,
       onPasteCopiedDrumHit,
+      onDeleteSelectedDrumHit,
       onAuditionSelectedChord,
       onMoveSelectedChordStep,
       onMoveSelectedChordInversion,
@@ -12344,7 +12355,8 @@ function createQuickActions({
       onUpdateSelectedChordProbability,
       onCopySelectedChord,
       onPasteCopiedChord,
-      onDuplicateSelectedChord
+      onDuplicateSelectedChord,
+      onDeleteSelectedChord
     });
   const captureStepModeActions = createCaptureStepModeActions({
     keyboardCaptureStepMode,

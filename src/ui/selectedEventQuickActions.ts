@@ -61,6 +61,7 @@ type SelectedEventQuickActionsParams = {
   onCopySelectedNote: () => void;
   onPasteCopiedNote: () => void;
   onDuplicateSelectedNote: () => void;
+  onDeleteSelectedNote: () => void;
   onAuditionSelectedDrumHit: () => void;
   onUpdateSelectedDrumVelocity: (velocity: number) => void;
   onUpdateSelectedDrumProbability: (probability: number) => void;
@@ -68,6 +69,7 @@ type SelectedEventQuickActionsParams = {
   onUpdateSelectedHatRepeat: (repeat: number) => void;
   onCopySelectedDrumHit: () => void;
   onPasteCopiedDrumHit: () => void;
+  onDeleteSelectedDrumHit: () => void;
   onAuditionSelectedChord: () => void;
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
@@ -77,6 +79,7 @@ type SelectedEventQuickActionsParams = {
   onCopySelectedChord: () => void;
   onPasteCopiedChord: () => void;
   onDuplicateSelectedChord: () => void;
+  onDeleteSelectedChord: () => void;
 };
 
 export type SelectedEventQuickActions = {
@@ -107,6 +110,7 @@ export function createSelectedEventQuickActions({
   onCopySelectedNote,
   onPasteCopiedNote,
   onDuplicateSelectedNote,
+  onDeleteSelectedNote,
   onAuditionSelectedDrumHit,
   onUpdateSelectedDrumVelocity,
   onUpdateSelectedDrumProbability,
@@ -114,6 +118,7 @@ export function createSelectedEventQuickActions({
   onUpdateSelectedHatRepeat,
   onCopySelectedDrumHit,
   onPasteCopiedDrumHit,
+  onDeleteSelectedDrumHit,
   onAuditionSelectedChord,
   onMoveSelectedChordStep,
   onMoveSelectedChordInversion,
@@ -122,7 +127,8 @@ export function createSelectedEventQuickActions({
   onUpdateSelectedChordProbability,
   onCopySelectedChord,
   onPasteCopiedChord,
-  onDuplicateSelectedChord
+  onDuplicateSelectedChord,
+  onDeleteSelectedChord
 }: SelectedEventQuickActionsParams): SelectedEventQuickActions {
   const selectedNoteTrackLabel = selectedNote?.track === "bass" ? "808" : "Synth";
   const selectedNoteLabel = selectedNote ? `${selectedNoteTrackLabel} ${selectedNote.pitch}.${selectedNote.step + 1}` : "No selected note";
@@ -216,6 +222,7 @@ export function createSelectedEventQuickActions({
       : null;
   const selectedChordDuplicateStep =
     selectedChord && selectedChordActive ? nextEmptyChordStep(selectedPatternData.chordEvents, selectedChord.step) : null;
+  const selectedChordDeleteBlocked = selectedChordActive && selectedPatternData.chordEvents.length <= 1;
   const chordClipboardLabel = chordClipboard ? `${chordClipboard.root}${chordClipboard.quality}.${chordClipboard.step + 1}` : "Clipboard empty";
   const chordClipboardPasteStep = chordClipboard ? nextEmptyChordStep(selectedPatternData.chordEvents, chordClipboard.step) : null;
 
@@ -423,6 +430,15 @@ export function createSelectedEventQuickActions({
       keywords: "selected note duplicate copy next empty step 808 synth edit keyboard capture midi beginner producer",
       disabled: !selectedNoteActive || selectedNoteDuplicateStep === null,
       run: onDuplicateSelectedNote
+    },
+    {
+      id: "selected-note-delete",
+      title: "Delete selected note",
+      detail: selectedNoteActive ? `${selectedNoteLabel} / undoable Pattern ${project.selectedPattern} edit` : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note delete remove clear 808 synth edit keyboard capture midi beginner producer undo",
+      disabled: !selectedNoteActive,
+      run: onDeleteSelectedNote
     }
   ];
 
@@ -554,6 +570,15 @@ export function createSelectedEventQuickActions({
       keywords: "selected drum paste clipboard hit next empty dynamics timing chance repeat pocket edit beginner producer",
       disabled: !drumClipboard || drumClipboardPasteStep === null,
       run: onPasteCopiedDrumHit
+    },
+    {
+      id: "selected-drum-delete",
+      title: "Delete selected drum hit",
+      detail: selectedDrumActive ? `${selectedDrumLabel} / undoable Pattern ${project.selectedPattern} edit` : "Select an active drum hit first.",
+      group: "Create",
+      keywords: "selected drum delete remove clear hit dynamics timing chance repeat pocket edit beginner producer undo",
+      disabled: !selectedDrumActive,
+      run: onDeleteSelectedDrumHit
     }
   ];
 
@@ -738,6 +763,19 @@ export function createSelectedEventQuickActions({
       keywords: "selected chord duplicate copy next empty step harmony progression edit beginner producer",
       disabled: !selectedChordActive || selectedChordDuplicateStep === null,
       run: onDuplicateSelectedChord
+    },
+    {
+      id: "selected-chord-delete",
+      title: "Delete selected chord",
+      detail: selectedChordDeleteBlocked
+        ? "Keep at least one chord in the selected progression."
+        : selectedChordActive
+          ? `${selectedChordLabel} / undoable Pattern ${project.selectedPattern} edit`
+          : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord delete remove clear harmony progression edit beginner producer undo",
+      disabled: !selectedChordActive || selectedChordDeleteBlocked,
+      run: onDeleteSelectedChord
     }
   ];
 
