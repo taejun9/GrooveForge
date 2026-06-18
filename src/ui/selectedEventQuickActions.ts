@@ -263,6 +263,19 @@ export function createSelectedEventQuickActions({
             )
         ) ?? null
       : null;
+  const selectedNotePreviousBeatDuplicateStep =
+    selectedNote && selectedNoteActive && selectedNoteLength !== null
+      ? steps.reduce<number | null>((targetStep, step) => {
+          const canUseStep =
+            step < selectedNote.step &&
+            step % 4 === 0 &&
+            step <= steps.length - selectedNoteLength &&
+            !(selectedNote.track === "bass" ? selectedPatternData.bassNotes : selectedPatternData.melodyNotes).some(
+              (note) => note.step === step && note.pitch === selectedNote.pitch
+            );
+          return canUseStep ? step : targetStep;
+        }, null)
+      : null;
   const noteClipboardLabel = noteClipboard
     ? `${noteClipboard.track === "bass" ? "808" : "Synth"} ${noteClipboard.note.pitch}.${noteClipboard.note.step + 1}`
     : "Clipboard empty";
@@ -336,6 +349,18 @@ export function createSelectedEventQuickActions({
             !selectedPatternData.drumPattern[selectedDrumStep.lane][step]
         ) ?? null
       : null;
+  const selectedDrumPreviousBeatDuplicateStep =
+    selectedDrumStep && selectedDrumActive
+      ? steps.reduce<number | null>(
+          (targetStep, step) =>
+            step < selectedDrumStep.step &&
+            step % 4 === 0 &&
+            !selectedPatternData.drumPattern[selectedDrumStep.lane][step]
+              ? step
+              : targetStep,
+          null
+        )
+      : null;
   const selectedDrumDuplicateLabel =
     selectedDrumStep && selectedDrumDuplicateStep !== null
       ? `${drumLabels[selectedDrumStep.lane]} ${selectedDrumDuplicateStep + 1}`
@@ -343,6 +368,10 @@ export function createSelectedEventQuickActions({
   const selectedDrumBeatDuplicateLabel =
     selectedDrumStep && selectedDrumBeatDuplicateStep !== null
       ? `${drumLabels[selectedDrumStep.lane]} ${selectedDrumBeatDuplicateStep + 1}`
+      : "";
+  const selectedDrumPreviousBeatDuplicateLabel =
+    selectedDrumStep && selectedDrumPreviousBeatDuplicateStep !== null
+      ? `${drumLabels[selectedDrumStep.lane]} ${selectedDrumPreviousBeatDuplicateStep + 1}`
       : "";
   const selectedChordActive = Boolean(
     selectedChord && selectedPatternData.chordEvents.some((chord) => sameChordEvent(chord, selectedChord))
@@ -414,6 +443,17 @@ export function createSelectedEventQuickActions({
             step <= steps.length - selectedChordLength &&
             !selectedPatternData.chordEvents.some((chord) => chord.step === step)
         ) ?? null
+      : null;
+  const selectedChordPreviousBeatDuplicateStep =
+    selectedChord && selectedChordActive && selectedChordLength !== null
+      ? steps.reduce<number | null>((targetStep, step) => {
+          const canUseStep =
+            step < selectedChord.step &&
+            step % 4 === 0 &&
+            step <= steps.length - selectedChordLength &&
+            !selectedPatternData.chordEvents.some((chord) => chord.step === step);
+          return canUseStep ? step : targetStep;
+        }, null)
       : null;
   const selectedChordDeleteBlocked = selectedChordActive && selectedPatternData.chordEvents.length <= 1;
   const chordClipboardLabel = chordClipboard ? `${chordClipboard.root}${chordClipboard.quality}.${chordClipboard.step + 1}` : "Clipboard empty";
@@ -736,6 +776,24 @@ export function createSelectedEventQuickActions({
       }
     },
     {
+      id: "selected-note-duplicate-previous-beat",
+      title: "Duplicate selected note to previous beat",
+      detail:
+        selectedNoteActive && selectedNotePreviousBeatDuplicateStep !== null
+          ? `${selectedNoteLabel} -> previous beat step ${selectedNotePreviousBeatDuplicateStep + 1} / Pattern ${project.selectedPattern}`
+          : selectedNoteActive && selectedNote
+            ? `${selectedNoteLabel} has no earlier empty 4-step beat slot.`
+            : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note duplicate previous beat grid copy repeat earlier 4-step anchor 808 synth edit beginner producer",
+      disabled: !selectedNoteActive || selectedNotePreviousBeatDuplicateStep === null,
+      run: () => {
+        if (selectedNotePreviousBeatDuplicateStep !== null) {
+          onDuplicateSelectedNoteToStep(selectedNotePreviousBeatDuplicateStep);
+        }
+      }
+    },
+    {
       id: "selected-note-delete",
       title: "Delete selected note",
       detail: selectedNoteActive ? `${selectedNoteLabel} / undoable Pattern ${project.selectedPattern} edit` : "Select an active 808 or Synth note first.",
@@ -1007,6 +1065,23 @@ export function createSelectedEventQuickActions({
       run: () => {
         if (selectedDrumBeatDuplicateStep !== null) {
           onDuplicateSelectedDrumHitToStep(selectedDrumBeatDuplicateStep);
+        }
+      }
+    },
+    {
+      id: "selected-drum-duplicate-previous-beat",
+      title: "Duplicate selected drum hit to previous beat",
+      detail: !selectedDrumActive
+        ? "Select an active drum hit first."
+        : selectedDrumPreviousBeatDuplicateStep === null
+          ? `${selectedDrumLabel} has no earlier empty 4-step beat slot.`
+          : `${selectedDrumLabel} -> ${selectedDrumPreviousBeatDuplicateLabel} / Pattern ${project.selectedPattern}`,
+      group: "Create",
+      keywords: "selected drum duplicate previous beat grid repeat clone earlier 4-step anchor hit dynamics timing chance pocket edit beginner producer",
+      disabled: !selectedDrumActive || selectedDrumPreviousBeatDuplicateStep === null,
+      run: () => {
+        if (selectedDrumPreviousBeatDuplicateStep !== null) {
+          onDuplicateSelectedDrumHitToStep(selectedDrumPreviousBeatDuplicateStep);
         }
       }
     },
@@ -1372,6 +1447,24 @@ export function createSelectedEventQuickActions({
       run: () => {
         if (selectedChordBeatDuplicateStep !== null) {
           onDuplicateSelectedChordToStep(selectedChordBeatDuplicateStep);
+        }
+      }
+    },
+    {
+      id: "selected-chord-duplicate-previous-beat",
+      title: "Duplicate selected chord to previous beat",
+      detail:
+        selectedChordActive && selectedChordPreviousBeatDuplicateStep !== null
+          ? `${selectedChordLabel} -> previous beat step ${selectedChordPreviousBeatDuplicateStep + 1} / Pattern ${project.selectedPattern}`
+          : selectedChordActive && selectedChord
+            ? `${selectedChordLabel} has no earlier empty 4-step chord slot.`
+            : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord duplicate previous beat grid copy repeat earlier 4-step anchor harmony progression edit beginner producer",
+      disabled: !selectedChordActive || selectedChordPreviousBeatDuplicateStep === null,
+      run: () => {
+        if (selectedChordPreviousBeatDuplicateStep !== null) {
+          onDuplicateSelectedChordToStep(selectedChordPreviousBeatDuplicateStep);
         }
       }
     },
