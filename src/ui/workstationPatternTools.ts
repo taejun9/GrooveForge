@@ -222,6 +222,8 @@ import type {
   PatternDnaSummary,
   LayerStarterId,
   LayerStarterOption,
+  LayerStarterResultMetric,
+  LayerStarterResult,
   ListeningPassId,
   ListeningPassTarget,
   ListeningPassItem,
@@ -1069,6 +1071,145 @@ export function chordEventsChangedCount(current: ChordEvent[], transformed: Chor
     }
   }
   return changed;
+}
+
+export function createLayerStarterResult(
+  starterId: LayerStarterId,
+  beforeProject: ProjectState,
+  afterProject: ProjectState,
+  beforeOption?: LayerStarterOption,
+  afterOption?: LayerStarterOption
+): LayerStarterResult {
+  const beforePattern = beforeProject.patterns[beforeProject.selectedPattern];
+  const afterPattern = afterProject.patterns[afterProject.selectedPattern];
+  const layerLabel = afterOption?.label ?? beforeOption?.label ?? layerStarterLabel(starterId);
+  const actionLabel = beforeOption?.actionLabel ?? afterOption?.actionLabel ?? layerLabel;
+  const targetLabel = afterOption?.targetLabel ?? beforeOption?.targetLabel ?? "starter layer";
+  const changedCount = layerStarterChangedCount(starterId, beforePattern, afterPattern);
+
+  return {
+    starterId,
+    title: `${layerLabel} layer started`,
+    status: "Started",
+    detail: `Pattern ${afterProject.selectedPattern} / ${actionLabel}`,
+    scope: `Pattern ${afterProject.selectedPattern} ${layerLabel}`,
+    impact: `${changedCount} layer change${changedCount === 1 ? "" : "s"}`,
+    metrics: createLayerStarterResultMetrics(starterId, beforePattern, afterPattern),
+    auditionCue: layerStarterAuditionCue(starterId, afterProject.selectedPattern, targetLabel),
+    nextCheck: layerStarterNextCheck(starterId, afterPattern),
+    tone: changedCount > 0 ? "good" : "warn"
+  };
+}
+
+export function createLayerStarterResultMetrics(
+  starterId: LayerStarterId,
+  beforePattern: PatternData,
+  afterPattern: PatternData
+): LayerStarterResultMetric[] {
+  return [
+    createLayerStarterResultMetric(
+      "drums",
+      "Drums",
+      `${activeDrumHitCount(beforePattern)} hits`,
+      `${activeDrumHitCount(afterPattern)} hits`,
+      starterId,
+      drumPatternMoveCount(beforePattern, afterPattern)
+    ),
+    createLayerStarterResultMetric(
+      "bass",
+      "808",
+      `${beforePattern.bassNotes.length} notes`,
+      `${afterPattern.bassNotes.length} notes`,
+      starterId,
+      bassNotesChangedCount(beforePattern.bassNotes, afterPattern.bassNotes)
+    ),
+    createLayerStarterResultMetric(
+      "chords",
+      "Chords",
+      `${beforePattern.chordEvents.length} events`,
+      `${afterPattern.chordEvents.length} events`,
+      starterId,
+      chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents)
+    ),
+    createLayerStarterResultMetric(
+      "melody",
+      "Synth",
+      `${beforePattern.melodyNotes.length} notes`,
+      `${afterPattern.melodyNotes.length} notes`,
+      starterId,
+      melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes)
+    )
+  ];
+}
+
+export function createLayerStarterResultMetric(
+  id: LayerStarterId,
+  label: string,
+  before: string,
+  after: string,
+  starterId: LayerStarterId,
+  changedEvents: number
+): LayerStarterResultMetric {
+  const preserved = id !== starterId && before === after;
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: changedEvents > 0 || preserved ? "good" : "warn"
+  };
+}
+
+function layerStarterChangedCount(starterId: LayerStarterId, beforePattern: PatternData, afterPattern: PatternData): number {
+  switch (starterId) {
+    case "drums":
+      return drumPatternMoveCount(beforePattern, afterPattern);
+    case "bass":
+      return bassNotesChangedCount(beforePattern.bassNotes, afterPattern.bassNotes);
+    case "chords":
+      return chordEventsChangedCount(beforePattern.chordEvents, afterPattern.chordEvents);
+    case "melody":
+      return melodyNotesChangedCount(beforePattern.melodyNotes, afterPattern.melodyNotes);
+  }
+}
+
+function layerStarterLabel(starterId: LayerStarterId): string {
+  switch (starterId) {
+    case "drums":
+      return "Drums";
+    case "bass":
+      return "808";
+    case "chords":
+      return "Chords";
+    case "melody":
+      return "Synth";
+  }
+}
+
+function layerStarterAuditionCue(starterId: LayerStarterId, pattern: PatternSlot, targetLabel: string): string {
+  switch (starterId) {
+    case "drums":
+      return `Loop Pattern ${pattern}; check ${targetLabel} against the metronome and hat motion.`;
+    case "bass":
+      return `Loop Pattern ${pattern}; hear ${targetLabel} against the kick and low-end pocket.`;
+    case "chords":
+      return `Loop Pattern ${pattern}; hear ${targetLabel} under the 808 before writing the hook.`;
+    case "melody":
+      return `Loop Pattern ${pattern}; hear ${targetLabel} over drums, 808, and chords.`;
+  }
+}
+
+function layerStarterNextCheck(starterId: LayerStarterId, pattern: PatternData): string {
+  switch (starterId) {
+    case "drums":
+      return `${activeDrumHitCount(pattern)} drum hits now; use Groove Compass or selected-drum tools before adding 808.`;
+    case "bass":
+      return `${pattern.bassNotes.length} 808 notes now; use selected-note degree/role and kick-to-808 balance next.`;
+    case "chords":
+      return `${pattern.chordEvents.length} chord events now; use Key Compass and selected-chord tools to refine harmony.`;
+    case "melody":
+      return `${pattern.melodyNotes.length} Synth notes now; use Melody Move or selected-note tools to shape the hook.`;
+  }
 }
 
 export function createPatternClonePadOptions(source: PatternSlot): PatternClonePadOption[] {

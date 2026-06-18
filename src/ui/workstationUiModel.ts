@@ -949,6 +949,27 @@ export type LayerStarterOption = {
   tone: MixCoachTone;
 };
 
+export type LayerStarterResultMetric = {
+  id: LayerStarterId;
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+export type LayerStarterResult = {
+  starterId: LayerStarterId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: LayerStarterResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type ListeningPassId = "composition" | "arrangement" | "mix" | "delivery";
 export type ListeningPassTarget = "compose" | "arrange" | "mix" | "master" | "deliver";
 

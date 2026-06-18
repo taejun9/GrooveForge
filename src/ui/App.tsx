@@ -266,6 +266,7 @@ import type {
   PatternDnaSummary,
   LayerStarterId,
   LayerStarterOption,
+  LayerStarterResult,
   ListeningPassId,
   ListeningPassTarget,
   ListeningPassItem,
@@ -542,7 +543,7 @@ import {
   drumAccentDefinitions,
   drumFoundationDefinitions
 } from "./workstationUiModel";
-import { PatternCloneResultStrip } from "./workstationPatternResults";
+import { LayerStarterResultStrip, PatternCloneResultStrip } from "./workstationPatternResults";
 import {
   laneColor,
   mergePitchLanes,
@@ -580,6 +581,7 @@ import {
   createPatternStackResultMetric,
   patternStackMoveCount,
   chordEventsChangedCount,
+  createLayerStarterResult,
   createPatternClonePadOptions,
   createPatternCloneResult,
   createPatternStackEvents,
@@ -802,6 +804,7 @@ export function App(): ReactElement {
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [beatBlueprintResult, setBeatBlueprintResult] = useState<BeatBlueprintResult | null>(null);
   const [beatSpineResult, setBeatSpineResult] = useState<BeatSpineApplyResult | null>(null);
+  const [layerStarterResult, setLayerStarterResult] = useState<LayerStarterResult | null>(null);
   const [patternCloneResult, setPatternCloneResult] = useState<PatternCloneResult | null>(null);
   const [patternStackResult, setPatternStackResult] = useState<PatternStackResult | null>(null);
   const [drumMoveResult, setDrumMoveResult] = useState<DrumMoveResult | null>(null);
@@ -1495,6 +1498,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
+    setLayerStarterResult(null);
     setPatternCloneResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
@@ -1527,6 +1531,7 @@ export function App(): ReactElement {
       setQuickActionResult(null);
       setBeatBlueprintResult(null);
       setBeatSpineResult(null);
+      setLayerStarterResult(null);
       setPatternCloneResult(null);
       setPatternStackResult(null);
       setDrumMoveResult(null);
@@ -1634,6 +1639,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
+    setLayerStarterResult(null);
     setPatternCloneResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
@@ -1673,6 +1679,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
+    setLayerStarterResult(null);
     setPatternCloneResult(null);
     setPatternStackResult(null);
     setDrumMoveResult(null);
@@ -3171,19 +3178,28 @@ export function App(): ReactElement {
   }
 
   function applyLayerStarter(starterId: LayerStarterId): void {
+    const beforeProject = projectRef.current;
+    const beforeOption = createLayerStarterOptions(beforeProject).find((option) => option.id === starterId);
     switch (starterId) {
       case "drums":
         applyDrumFoundation(composerDrumFoundation(projectRef.current));
-        return;
+        break;
       case "bass":
         applyBasslinePad(composerBasslinePad(projectRef.current));
-        return;
+        break;
       case "chords":
         applyChordProgressionPreset(composerChordPreset(projectRef.current));
-        return;
+        break;
       case "melody":
         applyMelodyMotif(composerMelodyMotif(projectRef.current));
-        return;
+        break;
+    }
+
+    if (projectRef.current !== beforeProject) {
+      const afterOption = createLayerStarterOptions(projectRef.current).find((option) => option.id === starterId);
+      setLayerStarterResult(createLayerStarterResult(starterId, beforeProject, projectRef.current, beforeOption, afterOption));
+    } else {
+      setLayerStarterResult(null);
     }
   }
 
@@ -5502,6 +5518,7 @@ export function App(): ReactElement {
           />
           <PatternDna summary={patternDnaSummary} focusedCardId={patternDnaFocusId} onFocus={focusPatternDnaCard} />
           <LayerStarterPads options={layerStarterOptions} onApply={applyLayerStarter} />
+          {layerStarterResult && <LayerStarterResultStrip result={layerStarterResult} />}
           <PatternClonePads clones={patternCloneOptions} onApply={cloneSelectedPatternVariation} />
           {patternCloneResult && <PatternCloneResultStrip result={patternCloneResult} />}
           <PatternStackPreview preview={patternStackPreviewSummary} />
