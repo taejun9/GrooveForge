@@ -14,6 +14,7 @@ type NativeMenuCommand =
   | "undo"
   | "redo"
   | "quick-actions"
+  | "command-reference"
   | "toggle-playback"
   | "delete-selected-event";
 
@@ -133,6 +134,8 @@ function createNativeCommandMenu(): Menu {
     {
       label: "Help",
       submenu: [
+        createRendererCommandMenuItem("Command Reference", "CmdOrCtrl+/", "command-reference"),
+        { type: "separator" },
         {
           label: "GrooveForge Local Workstation",
           click: () => {

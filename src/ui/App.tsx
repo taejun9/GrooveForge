@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  CircleHelp,
   CircleStop,
   Copy,
   Disc3,
@@ -636,6 +637,7 @@ import {
 } from "./workstationComposePanels";
 import {
   BeatReadiness,
+  CommandReferenceDialog,
   LayerStarterPads,
   LocalDraftRecoveryBanner,
   PanelTitle,
@@ -944,6 +946,7 @@ export function App(): ReactElement {
   const [splitAfterBars, setSplitAfterBars] = useState(1);
   const [snapshotNameDrafts, setSnapshotNameDrafts] = useState<Record<string, string>>({});
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [commandReferenceOpen, setCommandReferenceOpen] = useState(false);
   const [quickActionQuery, setQuickActionQuery] = useState("");
   const [quickActionScope, setQuickActionScope] = useState<QuickActionScopeId>("all");
   const [quickActionRecents, setQuickActionRecents] = useState<QuickActionRecent[]>([]);
@@ -1589,6 +1592,7 @@ export function App(): ReactElement {
     selectedDrumActive,
     selectedChordIndex,
     quickActionsOpen,
+    commandReferenceOpen,
     keyboardCaptureEnabled,
     keyboardCaptureTarget,
     keyboardCaptureDefaults
@@ -1609,6 +1613,7 @@ export function App(): ReactElement {
     selectedDrumActive,
     selectedChordIndex,
     quickActionsOpen,
+    commandReferenceOpen,
     keyboardCaptureEnabled,
     keyboardCaptureTarget,
     keyboardCaptureDefaults
@@ -1622,14 +1627,29 @@ export function App(): ReactElement {
     const key = event.key.toLowerCase();
     const withCommandModifier = event.metaKey || event.ctrlKey;
     const wantsQuickActions = withCommandModifier && !event.shiftKey && key === "k";
+    const wantsCommandReference = key === "?" || (withCommandModifier && !event.shiftKey && key === "/");
     const wantsUndo = withCommandModifier && !event.shiftKey && key === "z";
     const wantsRedo = withCommandModifier && ((event.shiftKey && key === "z") || key === "y");
     const wantsSave = withCommandModifier && !event.shiftKey && key === "s";
     const wantsOpen = withCommandModifier && !event.shiftKey && key === "o";
 
+    if (wantsCommandReference) {
+      event.preventDefault();
+      openCommandReference();
+      return;
+    }
+
     if (wantsQuickActions) {
       event.preventDefault();
       openQuickActions();
+      return;
+    }
+
+    if (commandReferenceOpen) {
+      if (key === "escape") {
+        event.preventDefault();
+        closeCommandReference();
+      }
       return;
     }
 
@@ -1711,6 +1731,9 @@ export function App(): ReactElement {
         return;
       case "quick-actions":
         openQuickActions();
+        return;
+      case "command-reference":
+        openCommandReference();
         return;
       case "toggle-playback":
         togglePlayback();
@@ -5518,6 +5541,7 @@ export function App(): ReactElement {
   }
 
   function openQuickActions(): void {
+    setCommandReferenceOpen(false);
     setQuickActionQuery("");
     setQuickActionScope("all");
     setQuickActionsOpen(true);
@@ -5526,6 +5550,16 @@ export function App(): ReactElement {
   function closeQuickActions(): void {
     setQuickActionsOpen(false);
     setQuickActionQuery("");
+  }
+
+  function openCommandReference(): void {
+    setQuickActionsOpen(false);
+    setQuickActionQuery("");
+    setCommandReferenceOpen(true);
+  }
+
+  function closeCommandReference(): void {
+    setCommandReferenceOpen(false);
   }
 
   function runQuickAction(action: QuickAction): void {
@@ -5757,6 +5791,7 @@ export function App(): ReactElement {
     onFocusToplineSpace: focusToplineSpaceCard,
     onFocusWorkflowSpotlight: jumpToWorkflowZone,
     onJumpWorkflowZone: jumpToWorkflowZone,
+    onOpenCommandReference: openCommandReference,
     onOpenProject: handleOpenProject,
     onRedo: redoProject,
     onSaveProject: handleSaveProject,
@@ -5951,6 +5986,16 @@ export function App(): ReactElement {
             <KeyboardMusic size={18} aria-hidden="true" />
             <span>Actions</span>
           </button>
+          <button
+            className="icon-button"
+            data-testid="command-reference-open"
+            type="button"
+            title="Open Command Reference"
+            onClick={openCommandReference}
+          >
+            <CircleHelp size={18} aria-hidden="true" />
+            <span>Help</span>
+          </button>
           <button className="icon-button primary" type="button" title={`Play ${transportLoopLabel(transportLoopScope).toLowerCase()} loop`} onClick={togglePlayback}>
             {isPlaying ? <CircleStop size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
             <span>{isPlaying ? "Stop" : "Play"}</span>
@@ -6019,6 +6064,7 @@ export function App(): ReactElement {
         onScopeChange={setQuickActionScope}
         onTogglePin={toggleQuickActionPin}
       />
+      <CommandReferenceDialog open={commandReferenceOpen} onClose={closeCommandReference} />
 
       {localDraftRecovery && (
         <LocalDraftRecoveryBanner
@@ -11469,6 +11515,7 @@ function createQuickActions({
   onFocusToplineSpace,
   onFocusWorkflowSpotlight,
   onJumpWorkflowZone,
+  onOpenCommandReference,
   onOpenProject,
   onRedo,
   onSaveProject,
@@ -11665,6 +11712,7 @@ function createQuickActions({
   onFocusToplineSpace: (card: ToplineSpaceFocusItem) => void;
   onFocusWorkflowSpotlight: (zone: WorkflowZoneId) => void;
   onJumpWorkflowZone: (zone: WorkflowZoneId) => void;
+  onOpenCommandReference: () => void;
   onOpenProject: () => Promise<void>;
   onRedo: () => void;
   onSaveProject: () => Promise<void>;
@@ -13298,6 +13346,14 @@ function createQuickActions({
       run: onOpenProject
     },
     {
+      id: "command-reference",
+      title: "Command Reference",
+      detail: "Desktop shortcuts, Quick Actions, Keyboard Capture, and finish commands.",
+      group: "Project",
+      keywords: "command reference shortcuts keyboard help quick actions desktop capture producer beginner",
+      run: onOpenCommandReference
+    },
+    {
       id: "save-snapshot",
       title: "Save snapshot",
       detail: `${project.snapshots.length}/${maxProjectSnapshots} local idea slots saved.`,
@@ -14379,6 +14435,7 @@ function createQuickActionResult(
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
   const previewOnly = action.id.startsWith("blueprint-preview-");
   const focusOnly =
+    action.id === "command-reference" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
     action.id === "session-brief-compass-focus" ||
@@ -14589,6 +14646,10 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "save-snapshot") {
     return { id: "snapshots", label: "Snapshots", value: `${project.snapshots.length} slots` };
+  }
+
+  if (action.id === "command-reference") {
+    return { id: "command-reference", label: "Reference", value: "Desktop / Create / Finish" };
   }
 
   if (
@@ -15593,6 +15654,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Keep the beat playing only if you are comparing the same music against the new session goal.",
       nextCheck: "Run Delivery Target Align only when arrangement length, master, mix posture, and stem expectation should change."
+    };
+  }
+
+  if (action.id === "command-reference") {
+    return {
+      auditionCue: "Use the reference only to choose the next explicit local command.",
+      nextCheck: "Open Quick Actions when you are ready to run one command."
     };
   }
 

@@ -6,6 +6,7 @@ type NativeMenuCommand =
   | "undo"
   | "redo"
   | "quick-actions"
+  | "command-reference"
   | "toggle-playback"
   | "delete-selected-event";
 

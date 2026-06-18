@@ -1,4 +1,4 @@
-import { ArrowRight, Copy, KeyboardMusic, Pin, PinOff, Play, Save, Trash2, Undo2, X } from "lucide-react";
+import { ArrowRight, CircleHelp, Copy, KeyboardMusic, Pin, PinOff, Play, Save, Trash2, Undo2, X } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 import type { PatternSlot, ProjectState } from "../domain/workstation";
 import { arrangementTotalBars, maxProjectSnapshotNameLength, maxProjectSnapshots, projectSnapshotSummary } from "../domain/workstation";
@@ -6,6 +6,63 @@ import type { PlaybackMode } from "../audio/scheduler";
 import type { BeatReadinessCheck, LayerStarterId, LayerStarterOption, LocalDraftRecovery, PatternCompareSummary, QuickAction, QuickActionRecent, QuickActionResult, QuickActionScopeId, QuickActionScopeOption, QuickActionSpotlightSummary, SnapshotCompareSummary, SnapshotSlotRoleSummary } from "./workstationUiModel";
 import { maxQuickActionPins } from "./workstationUiModel";
 import { barCountLabel, formatLocalDraftSavedAt } from "./workstationPatternTools";
+
+type CommandReferenceItem = {
+  id: string;
+  command: string;
+  shortcut: string;
+  target: string;
+};
+
+type CommandReferenceSection = {
+  id: string;
+  title: string;
+  items: CommandReferenceItem[];
+};
+
+const commandReferenceSections: CommandReferenceSection[] = [
+  {
+    id: "desktop-shortcuts",
+    title: "Desktop",
+    items: [
+      { id: "reference", command: "Command Reference", shortcut: "? / CmdOrCtrl+/", target: "Help" },
+      { id: "actions", command: "Quick Actions", shortcut: "CmdOrCtrl+K", target: "Command palette" },
+      { id: "playback", command: "Play / Stop", shortcut: "Space", target: "Selected loop" },
+      { id: "patterns", command: "Pattern A/B/C", shortcut: "1 / 2 / 3", target: "Edit focus" },
+      { id: "delete", command: "Delete selected event", shortcut: "Backspace / Delete", target: "Selected event" }
+    ]
+  },
+  {
+    id: "project-edit",
+    title: "Project",
+    items: [
+      { id: "save", command: "Save project", shortcut: "CmdOrCtrl+S", target: ".grooveforge.json" },
+      { id: "open", command: "Open project", shortcut: "CmdOrCtrl+O", target: "Project file" },
+      { id: "undo", command: "Undo", shortcut: "CmdOrCtrl+Z", target: "Edit history" },
+      { id: "redo", command: "Redo", shortcut: "Shift+CmdOrCtrl+Z / CmdOrCtrl+Y", target: "Edit history" }
+    ]
+  },
+  {
+    id: "compose-fast-path",
+    title: "Create",
+    items: [
+      { id: "keyboard-capture", command: "Keyboard Capture", shortcut: "Quick Actions", target: "808 / Synth notes" },
+      { id: "midi-input", command: "MIDI Input", shortcut: "Quick Actions", target: "Controller notes" },
+      { id: "blueprints", command: "Beat Blueprints", shortcut: "Quick Actions", target: "Sample-free starts" },
+      { id: "layer-starter", command: "Layer Starter", shortcut: "Quick Actions", target: "Drums / 808 / Chords / Synth" }
+    ]
+  },
+  {
+    id: "finish-fast-path",
+    title: "Finish",
+    items: [
+      { id: "pattern-chain", command: "Pattern Chain", shortcut: "Quick Actions", target: "Arrangement sketch" },
+      { id: "mix-coach", command: "Mix Coach", shortcut: "Quick Actions", target: "Headroom / balance" },
+      { id: "master-finish", command: "Master Finish", shortcut: "Quick Actions", target: "Output posture" },
+      { id: "handoff-pack", command: "Handoff Pack", shortcut: "Quick Actions", target: "WAV / stems / MIDI / sheet" }
+    ]
+  }
+];
 
 export function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; meta: string }): ReactElement {
   return (
@@ -381,6 +438,59 @@ export function QuickActions({
               );
             })
           )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClose: () => void }): ReactElement | null {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div
+      className="quick-actions-overlay command-reference-overlay"
+      data-testid="command-reference"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <section className="command-reference-panel" role="dialog" aria-modal="true" aria-label="Command Reference">
+        <div className="quick-actions-heading command-reference-heading">
+          <div>
+            <CircleHelp size={18} aria-hidden="true" />
+            <span>Command Reference</span>
+          </div>
+          <button data-testid="command-reference-close" onClick={onClose} title="Close Command Reference" type="button">
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="command-reference-grid" data-testid="command-reference-grid">
+          {commandReferenceSections.map((section) => (
+            <div
+              className="command-reference-section"
+              data-testid={`command-reference-section-${section.id}`}
+              key={section.id}
+            >
+              <div className="command-reference-section-title">
+                <span>{section.title}</span>
+                <strong>{section.items.length}</strong>
+              </div>
+              <div className="command-reference-items">
+                {section.items.map((item) => (
+                  <div className="command-reference-item" data-testid={`command-reference-item-${item.id}`} key={item.id}>
+                    <kbd>{item.shortcut}</kbd>
+                    <strong>{item.command}</strong>
+                    <small>{item.target}</small>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
     </div>
