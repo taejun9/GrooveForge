@@ -1938,6 +1938,41 @@ export type HookReadinessFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type ToplineSpaceCardId = "pocket" | "lead" | "arrangement" | "mix" | "brief";
+export type ToplineSpaceFocusId = ToplineSpaceCardId;
+export type ToplineSpaceFocusTarget = ReviewQueueFocusTarget;
+
+export type ToplineSpaceFocusItem = {
+  focusId: ToplineSpaceFocusId;
+  label: string;
+  value: string;
+  detail: string;
+  focusTarget: ToplineSpaceFocusTarget;
+  focusLabel: string;
+};
+
+export type ToplineSpaceCard = ToplineSpaceFocusItem & {
+  id: ToplineSpaceCardId;
+  status: string;
+  tone: MixCoachTone;
+};
+
+export type ToplineSpaceSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: ToplineSpaceCard[];
+};
+
+export type ToplineSpaceFocusSummary = {
+  focusId: ToplineSpaceFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type SongFormMetricId = "flow" | "patterns" | "selected" | "energy";
 
 export type SongFormMetric = {

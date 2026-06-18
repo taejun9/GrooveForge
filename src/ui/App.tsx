@@ -12,6 +12,7 @@ import {
   Gauge,
   KeyboardMusic,
   ListChecks,
+  Mic2,
   Music2,
   Pin,
   PinOff,
@@ -393,6 +394,11 @@ import type {
   HookReadinessCard,
   HookReadinessSummary,
   HookReadinessFocusSummary,
+  ToplineSpaceFocusId,
+  ToplineSpaceFocusItem,
+  ToplineSpaceCard,
+  ToplineSpaceSummary,
+  ToplineSpaceFocusSummary,
   SongFormMetricId,
   SongFormMetric,
   SongFormSegment,
@@ -916,6 +922,7 @@ export function App(): ReactElement {
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
   const [hookReadinessFocusId, setHookReadinessFocusId] = useState<HookReadinessFocusId | null>(null);
+  const [toplineSpaceFocusId, setToplineSpaceFocusId] = useState<ToplineSpaceFocusId | null>(null);
   const [keyCompassFocusId, setKeyCompassFocusId] = useState<KeyCompassFocusId | null>(null);
   const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
@@ -973,6 +980,10 @@ export function App(): ReactElement {
   const structureLensActions = useMemo(() => createStructureLensActions(project), [project]);
   const hookReadinessSummary = useMemo(
     () => createHookReadinessSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
+  );
+  const toplineSpaceSummary = useMemo(
+    () => createToplineSpaceSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
   const songFormOverviewSummary = useMemo(
@@ -4929,6 +4940,20 @@ export function App(): ReactElement {
     setProjectStatus(`Hook ${card.label}: ${card.value}`);
   }
 
+  function focusToplineSpaceCard(card: ToplineSpaceFocusItem): void {
+    const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      mix: mixPanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    setToplineSpaceFocusId(card.focusId);
+    targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Topline ${card.label}: ${card.value}`);
+  }
+
   function focusModeFocusCard(card: ModeFocusCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -5187,6 +5212,7 @@ export function App(): ReactElement {
     stemAuditionPadOptions,
     styleInspectorSummary,
     transportLoopScope,
+    toplineSpaceSummary,
     workflowNavigatorItems,
     onApplyArrangementMove: applyArrangementMoveToSelected,
     onApplyArrangementArc: applyArrangementArcPad,
@@ -5293,6 +5319,7 @@ export function App(): ReactElement {
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusSessionPass: focusSessionPassCard,
     onFocusStyleInspector: focusStyleInspectorItem,
+    onFocusToplineSpace: focusToplineSpaceCard,
     onFocusWorkflowSpotlight: jumpToWorkflowZone,
     onJumpWorkflowZone: jumpToWorkflowZone,
     onOpenProject: handleOpenProject,
@@ -5704,6 +5731,12 @@ export function App(): ReactElement {
         focusedCardId={hookReadinessFocusId}
         onFocus={focusHookReadinessCard}
         summary={hookReadinessSummary}
+      />
+
+      <ToplineSpace
+        focusedCardId={toplineSpaceFocusId}
+        onFocus={focusToplineSpaceCard}
+        summary={toplineSpaceSummary}
       />
 
       <SongFormOverview
@@ -10628,6 +10661,61 @@ function HookReadiness({
   );
 }
 
+function ToplineSpace({
+  focusedCardId,
+  onFocus,
+  summary
+}: {
+  focusedCardId: ToplineSpaceFocusId | null;
+  onFocus: (card: ToplineSpaceFocusItem) => void;
+  summary: ToplineSpaceSummary;
+}): ReactElement {
+  const focusSummary = createToplineSpaceFocusSummary(summary, focusedCardId);
+
+  return (
+    <section className={`topline-space ${summary.tone}`} data-testid="topline-space" aria-label="Topline space">
+      <div className="topline-space-heading">
+        <div>
+          <Mic2 size={17} aria-hidden="true" />
+          <span>Topline Space</span>
+        </div>
+        <strong data-testid="topline-space-headline">{summary.headline}</strong>
+        <small data-testid="topline-space-detail">{summary.detail}</small>
+      </div>
+      <div
+        className={`topline-space-focus-readout ${focusSummary.tone}`}
+        data-testid="topline-space-focus-readout"
+        title={focusSummary.detailTitle}
+      >
+        <span data-testid="topline-space-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="topline-space-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="topline-space-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
+      <div className="topline-space-grid" data-testid="topline-space-cards">
+        {summary.cards.map((card) => {
+          const focused = focusedCardId === card.id;
+          return (
+            <div className={`topline-space-card ${card.tone} ${focused ? "focused" : ""}`} data-testid={`topline-space-card-${card.id}`} key={card.id}>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <small>{card.detail}</small>
+              <button
+                aria-pressed={focused}
+                className="topline-space-focus-button"
+                onClick={() => onFocus(card)}
+                title={`Focus ${card.focusLabel}: ${card.status}`}
+                type="button"
+              >
+                <span>{card.focusLabel}</span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function SongFormOverview({
   onSelectBlock,
   playingArrangementIndex,
@@ -10866,6 +10954,7 @@ function createQuickActions({
   stemAuditionPadOptions,
   styleInspectorSummary,
   transportLoopScope,
+  toplineSpaceSummary,
   workflowNavigatorItems,
   onApplyArrangementMove,
   onApplyArrangementArc,
@@ -10972,6 +11061,7 @@ function createQuickActions({
   onFocusReviewQueue,
   onFocusSessionPass,
   onFocusStyleInspector,
+  onFocusToplineSpace,
   onFocusWorkflowSpotlight,
   onJumpWorkflowZone,
   onOpenProject,
@@ -11045,6 +11135,7 @@ function createQuickActions({
   stemAuditionPadOptions: StemAuditionPadOption[];
   styleInspectorSummary: StyleInspectorSummary;
   transportLoopScope: TransportLoopScope;
+  toplineSpaceSummary: ToplineSpaceSummary;
   workflowNavigatorItems: WorkflowNavigatorItem[];
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
   onApplyArrangementArc: (pad: ArrangementArcPadId) => void;
@@ -11151,6 +11242,7 @@ function createQuickActions({
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
   onFocusStyleInspector: (item: StyleInspectorFocusItem) => void;
+  onFocusToplineSpace: (card: ToplineSpaceFocusItem) => void;
   onFocusWorkflowSpotlight: (zone: WorkflowZoneId) => void;
   onJumpWorkflowZone: (zone: WorkflowZoneId) => void;
   onOpenProject: () => Promise<void>;
@@ -11406,6 +11498,15 @@ function createQuickActions({
     group: card.focusTarget === "mix" || card.focusTarget === "master" ? "Mix" : "Arrange",
     keywords: `hook readiness focus card hook meter arrangement motif contrast mix handoff ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
     run: () => onFocusHookReadiness(card)
+  }));
+  const toplineSpaceCard = activeToplineSpaceQuickActionCard(toplineSpaceSummary);
+  const toplineSpaceActions: QuickAction[] = toplineSpaceSummary.cards.map((card) => ({
+    id: `topline-space-card-${card.id}`,
+    title: `Focus Topline Space: ${card.label}`,
+    detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
+    group: card.focusTarget === "mix" || card.focusTarget === "master" ? "Mix" : "Project",
+    keywords: `topline space vocal pocket focus card singer rapper lead hook ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
+    run: () => onFocusToplineSpace(card)
   }));
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const reviewQueueActions: QuickAction[] = reviewQueueSummary.items.map((item) => ({
@@ -13015,6 +13116,22 @@ function createQuickActions({
     },
     ...hookReadinessActions,
     {
+      id: "topline-space-focus",
+      title: toplineSpaceCard ? `Focus Topline Space: ${toplineSpaceCard.label}` : "Focus Topline Space",
+      detail: toplineSpaceCard
+        ? `${toplineSpaceCard.value} / ${toplineSpaceCard.focusLabel}`
+        : "No Topline Space card available.",
+      group: "Project",
+      keywords: `topline space vocal pocket focus singer rapper lead hook room inspect ${toplineSpaceCard?.id ?? "none"} ${toplineSpaceCard?.focusLabel ?? "none"} beginner producer`,
+      disabled: !toplineSpaceCard,
+      run: () => {
+        if (toplineSpaceCard) {
+          onFocusToplineSpace(toplineSpaceCard);
+        }
+      }
+    },
+    ...toplineSpaceActions,
+    {
       id: "finish-checklist-focus",
       title: finishChecklistCard ? `Focus Finish Checklist: ${finishChecklistCard.label}` : "Focus Finish Checklist",
       detail: finishChecklistCard ? `${finishChecklistCard.status} / ${finishChecklistCard.focusLabel}` : "No Finish Checklist card available.",
@@ -13626,6 +13743,8 @@ function createQuickActionResult(
     action.id.startsWith("beat-passport-metric-") ||
     action.id === "production-snapshot-focus" ||
     action.id.startsWith("production-snapshot-metric-") ||
+    action.id === "topline-space-focus" ||
+    action.id.startsWith("topline-space-card-") ||
     action.id.startsWith("arrangement-block-cue-") ||
     action.id.startsWith("arrangement-block-jump-") ||
     action.id.startsWith("section-locator-") ||
@@ -14354,6 +14473,29 @@ function quickActionResultMetricSnapshot(
     return {
       id: "hook-readiness",
       label: "Hook readiness",
+      value: action.detail
+    };
+  }
+
+  if (action.id === "topline-space-focus") {
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const toplineSummary = createToplineSpaceSummary(
+      project,
+      createBeatReadinessChecks(project, exportAnalysis),
+      exportAnalysis,
+      analyzeStemExports(project)
+    );
+    return {
+      id: "topline-space",
+      label: "Topline space",
+      value: `${toplineSummary.headline} / ${toplineSummary.detail}`
+    };
+  }
+
+  if (action.id.startsWith("topline-space-card-")) {
+    return {
+      id: "topline-space",
+      label: "Topline space",
       value: action.detail
     };
   }
@@ -15191,6 +15333,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Hook Readiness card before changing arrangement, motif, mix, or handoff details.",
       nextCheck: "Return to Hook Readiness when you need another direct hook section, motif, contrast, mix, or delivery focus."
+    };
+  }
+
+  if (action.id === "topline-space-focus") {
+    return {
+      auditionCue: "Use the focused Topline Space card to inspect pocket, lead density, vocal window, headroom, or artist context.",
+      nextCheck: "Return to Topline Space after the focused vocal pocket lane is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id.startsWith("topline-space-card-")) {
+    return {
+      auditionCue: "Use the focused Topline Space card before trimming melody, arranging the hook, checking mix space, or filling brief context.",
+      nextCheck: "Return to Topline Space when you need another direct vocal pocket, lead room, arrangement, mix, or brief focus."
     };
   }
 
@@ -19759,6 +19915,160 @@ function createHookReadinessFocusSummary(
 }
 
 function activeHookReadinessQuickActionCard(summary: HookReadinessSummary): HookReadinessCard | null {
+  return summary.cards.find((card) => card.tone === "danger") ?? summary.cards.find((card) => card.tone === "warn") ?? summary.cards[0] ?? null;
+}
+
+function createToplineSpaceSummary(
+  project: ProjectState,
+  checks: BeatReadinessCheck[],
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): ToplineSpaceSummary {
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const hookBlocks = project.arrangement.filter((block) => block.section === "Hook");
+  const hookBars = hookBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  const hookPatternSlots = uniquePatternSlots(hookBlocks.map((block) => block.pattern));
+  const focusPatternSlots = hookPatternSlots.length > 0 ? hookPatternSlots : [project.selectedPattern];
+  const focusPatterns = focusPatternSlots.map((slot) => project.patterns[slot]);
+  const patternCount = Math.max(1, focusPatterns.length);
+  const melodyCount = focusPatterns.reduce((total, pattern) => total + pattern.melodyNotes.length, 0);
+  const bassCount = focusPatterns.reduce((total, pattern) => total + pattern.bassNotes.length, 0);
+  const chordCount = focusPatterns.reduce((total, pattern) => total + pattern.chordEvents.length, 0);
+  const drumCount = focusPatterns.reduce((total, pattern) => total + drumHitCount(pattern), 0);
+  const averageMelody = melodyCount / patternCount;
+  const averageBass = bassCount / patternCount;
+  const averageChords = chordCount / patternCount;
+  const averageDrums = drumCount / patternCount;
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const stemSpread = stemSpreadDb(stemAnalyses);
+  const briefFields = sessionBriefFilledFields(project.sessionBrief);
+  const readinessReadyCount = checks.filter((check) => check.tone === "good").length;
+  const hasVocalTarget = target.id === "vocal_session" || target.mixPosture === "vocal_headroom";
+  const hookPatternLabel = focusPatternSlots.join("/");
+  const rhythmTone: MixCoachTone =
+    averageDrums >= 8 && averageDrums <= 26 && averageBass >= 2 && averageBass <= 8
+      ? "good"
+      : averageDrums >= 6 && averageBass >= 1 && averageBass <= 11
+        ? "warn"
+        : "danger";
+  const leadTone: MixCoachTone =
+    averageMelody <= 5 && averageChords <= 5 ? "good" : averageMelody <= 9 && averageChords <= 8 ? "warn" : "danger";
+  const arrangementTone: MixCoachTone =
+    hookBars >= 4 && bars >= 8 ? "good" : hookBlocks.length > 0 && hookBars >= 2 ? "warn" : "danger";
+  const mixTone: MixCoachTone =
+    analysis.status === "Silent"
+      ? "danger"
+      : analysis.headroomDb >= 3 && audibleStems.length >= 3 && (stemSpread === null || stemSpread <= 16)
+        ? "good"
+        : analysis.headroomDb >= 1.5 && audibleStems.length >= 2
+          ? "warn"
+          : "danger";
+  const briefTone: MixCoachTone =
+    briefFields >= (hasVocalTarget ? 3 : 2) ? "good" : briefFields >= 1 || !hasVocalTarget ? "warn" : "danger";
+  const cards: ToplineSpaceCard[] = [
+    {
+      id: "pocket",
+      focusId: "pocket",
+      label: "Pocket",
+      value: `${Math.round(averageDrums)} drum / ${Math.round(averageBass)} 808`,
+      status: rhythmTone === "good" ? "Pocket leaves room" : rhythmTone === "warn" ? "Pocket needs trim" : "Pocket unclear",
+      detail: `Pattern ${hookPatternLabel} / average per pattern`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
+      tone: rhythmTone
+    },
+    {
+      id: "lead",
+      focusId: "lead",
+      label: "Lead Room",
+      value: `${Math.round(averageMelody)} Synth / ${Math.round(averageChords)} chords`,
+      status: leadTone === "good" ? "Lead lane open" : leadTone === "warn" ? "Lead lane busy" : "Lead lane crowded",
+      detail: `${melodyCount} Synth notes / ${chordCount} chords across focus patterns`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
+      tone: leadTone
+    },
+    {
+      id: "arrangement",
+      focusId: "arrangement",
+      label: "Vocal Window",
+      value: hookBlocks.length > 0 ? barCountLabel(hookBars) : "Missing",
+      status: arrangementTone === "good" ? "Window clear" : arrangementTone === "warn" ? "Window short" : "Window missing",
+      detail: `${hookBlocks.length} hook block${hookBlocks.length === 1 ? "" : "s"} / ${barCountLabel(bars)} song`,
+      focusTarget: "arrange",
+      focusLabel: "Arrange",
+      tone: arrangementTone
+    },
+    {
+      id: "mix",
+      focusId: "mix",
+      label: "Headroom",
+      value: formatDb(analysis.headroomDb),
+      status: mixTone === "good" ? "Vocal headroom" : mixTone === "warn" ? "Check headroom" : "No safe space",
+      detail: `${analysis.status} / ${audibleStems.length}/${stemTrackIds.length} stems / spread ${stemSpread === null ? "n/a" : formatDb(stemSpread)}`,
+      focusTarget: mixTone === "danger" ? "master" : "mix",
+      focusLabel: mixTone === "danger" ? "Master" : "Mix",
+      tone: mixTone
+    },
+    {
+      id: "brief",
+      focusId: "brief",
+      label: "Artist Cue",
+      value: `${briefFields}/4 brief`,
+      status: briefTone === "good" ? "Topline context set" : briefTone === "warn" ? "Context partial" : "Context missing",
+      detail: `${target.name} / ${hasVocalTarget ? "vocal target" : "general target"}`,
+      focusTarget: "deliver",
+      focusLabel: "Deliver",
+      tone: briefTone
+    }
+  ];
+  const tone = weakestTone(cards.map((card) => card.tone));
+  const readyCount = cards.filter((card) => card.tone === "good").length;
+  const headline =
+    tone === "good" ? "Topline has room" : tone === "warn" ? "Topline needs one pass" : "Topline feels crowded";
+  const detail = `${readyCount}/${cards.length} space / ${readinessReadyCount}/${checks.length} readiness / Pattern ${hookPatternLabel} / ${target.name}`;
+
+  return {
+    headline,
+    detail,
+    tone,
+    cards
+  };
+}
+
+function createToplineSpaceFocusSummary(
+  summary: ToplineSpaceSummary,
+  focusedCardId: ToplineSpaceFocusId | null
+): ToplineSpaceFocusSummary {
+  const focusedCard = focusedCardId ? summary.cards.find((card) => card.id === focusedCardId) ?? null : null;
+  const card = focusedCard ?? activeToplineSpaceQuickActionCard(summary);
+
+  if (!card) {
+    return {
+      focusId: null,
+      statusLabel: "Topline clear",
+      areaLabel: "No topline focus",
+      detailLabel: "No Topline Space cards available",
+      detailTitle: "Topline Space has no cards to focus.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel = focusedCard ? "Focused Topline" : "Topline Focus";
+  const detailLabel = `${card.focusLabel} panel / ${card.detail}`;
+
+  return {
+    focusId: card.focusId,
+    statusLabel,
+    areaLabel: `${card.label}: ${card.value}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
+    tone: card.tone
+  };
+}
+
+function activeToplineSpaceQuickActionCard(summary: ToplineSpaceSummary): ToplineSpaceCard | null {
   return summary.cards.find((card) => card.tone === "danger") ?? summary.cards.find((card) => card.tone === "warn") ?? summary.cards[0] ?? null;
 }
 
