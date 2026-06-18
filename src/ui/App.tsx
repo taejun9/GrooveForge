@@ -396,6 +396,7 @@ import type {
   HookReadinessSummary,
   HookReadinessFocusSummary,
   ToplineSpaceFocusId,
+  ToplineSpaceCardId,
   ToplineSpaceFocusItem,
   ToplineSpaceCard,
   ToplineSpaceSummary,
@@ -937,6 +938,7 @@ export function App(): ReactElement {
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
   const [hookReadinessFocusId, setHookReadinessFocusId] = useState<HookReadinessFocusId | null>(null);
   const [toplineSpaceFocusId, setToplineSpaceFocusId] = useState<ToplineSpaceFocusId | null>(null);
+  const [toplineFixResult, setToplineFixResult] = useState<ToplineFixResult | null>(null);
   const [arrangementMuteMapFocusId, setArrangementMuteMapFocusId] = useState<ArrangementMuteMapFocusId | null>(null);
   const [arrangementTransitionMapFocusId, setArrangementTransitionMapFocusId] =
     useState<ArrangementTransitionMapFocusId | null>(null);
@@ -1691,6 +1693,7 @@ export function App(): ReactElement {
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
+    setToplineFixResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -1729,6 +1732,7 @@ export function App(): ReactElement {
       setMixFixResult(null);
       setDeliveryTargetAlignmentResult(null);
       setSessionBriefStarterResult(null);
+      setToplineFixResult(null);
     }
     setProjectStatus(status);
   }
@@ -1862,6 +1866,7 @@ export function App(): ReactElement {
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
+    setToplineFixResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
   }
@@ -1905,6 +1910,7 @@ export function App(): ReactElement {
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
+    setToplineFixResult(null);
     setProjectStatus(status);
   }
 
@@ -2518,6 +2524,54 @@ export function App(): ReactElement {
 
     cuePattern(target.pattern);
     setProjectStatus(`Pattern ${target.pattern} cued as Topline loop`);
+  }
+
+  function applyToplineFix(card?: ToplineSpaceCard): void {
+    const beforeProject = projectRef.current;
+    const beforeAnalysis = analyzeExport(beforeProject);
+    const beforeStemAnalyses = analyzeStemExports(beforeProject);
+    const beforeSummary = createToplineSpaceSummary(
+      beforeProject,
+      createBeatReadinessChecks(beforeProject, beforeAnalysis),
+      beforeAnalysis,
+      beforeStemAnalyses
+    );
+    const targetCard = card ?? activeToplineSpaceQuickActionCard(beforeSummary);
+
+    if (!targetCard) {
+      setToplineFixResult(null);
+      setProjectStatus("Topline Space has no fix target");
+      return;
+    }
+
+    const fix = createToplineFixOption(targetCard);
+    const cueTarget = createToplineLoopCueTarget(beforeProject);
+    setToplineSpaceFocusId(targetCard.focusId);
+
+    if (cueTarget.mode === "block") {
+      selectArrangementBlock(cueTarget.index);
+    }
+
+    switch (fix.action.kind) {
+      case "grooveFeel":
+        applyGrooveFeel(fix.action.feel);
+        break;
+      case "patternFill":
+        setPatternFillPreviewPreset(fix.action.preset);
+        applyPatternFill(fix.action.preset);
+        break;
+      case "patternChain":
+        applyPatternChain(fix.action.chain);
+        break;
+      case "mixFix":
+        applyMixFixPreset(fix.action.preset);
+        break;
+      case "sessionBriefStarter":
+        applySessionBriefStarterPad(fix.action.pad);
+        break;
+    }
+
+    setToplineFixResult(createToplineFixResult(fix, targetCard.id, beforeProject, projectRef.current));
   }
 
   function cueSectionLocator(section: ArrangementSection): void {
@@ -5370,6 +5424,7 @@ export function App(): ReactElement {
     onCueArrangementTransition: cueArrangementTransition,
     onCueHookLoop: cueHookLoop,
     onCueToplineLoop: cueToplineLoop,
+    onApplyToplineFix: applyToplineFix,
     onFocusArrangementMuteMap: focusArrangementMuteMapLane,
     onFocusArrangementTransitionMap: focusArrangementTransitionMapTransition,
     onApplyBasslinePad: applyBasslinePad,
@@ -5917,8 +5972,10 @@ export function App(): ReactElement {
             : transportLoopScope === "pattern" && project.selectedPattern === toplineLoopCueTarget.pattern
         }
         focusedCardId={toplineSpaceFocusId}
+        fixResult={toplineFixResult}
         isPlaying={isPlaying}
         onCue={cueToplineLoop}
+        onFix={applyToplineFix}
         onFocus={focusToplineSpaceCard}
         summary={toplineSpaceSummary}
       />
@@ -10939,17 +10996,21 @@ function HookReadiness({
 function ToplineSpace({
   cueTarget,
   cued,
+  fixResult,
   focusedCardId,
   isPlaying,
   onCue,
+  onFix,
   onFocus,
   summary
 }: {
   cueTarget: ToplineLoopCueTarget;
   cued: boolean;
+  fixResult: ToplineFixResult | null;
   focusedCardId: ToplineSpaceFocusId | null;
   isPlaying: boolean;
   onCue: (card?: ToplineSpaceFocusItem) => void;
+  onFix: (card?: ToplineSpaceCard) => void;
   onFocus: (card: ToplineSpaceFocusItem) => void;
   summary: ToplineSpaceSummary;
 }): ReactElement {
@@ -10965,18 +11026,22 @@ function ToplineSpace({
         <strong data-testid="topline-space-headline">{summary.headline}</strong>
         <small data-testid="topline-space-detail">{summary.detail}</small>
       </div>
-      <div
-        className={`topline-space-focus-readout ${focusSummary.tone}`}
-        data-testid="topline-space-focus-readout"
-        title={focusSummary.detailTitle}
-      >
-        <span data-testid="topline-space-focus-status">{focusSummary.statusLabel}</span>
-        <strong data-testid="topline-space-focus-label">{focusSummary.areaLabel}</strong>
-        <small data-testid="topline-space-focus-detail">{focusSummary.detailLabel}</small>
+      <div className="topline-space-stack">
+        <div
+          className={`topline-space-focus-readout ${focusSummary.tone}`}
+          data-testid="topline-space-focus-readout"
+          title={focusSummary.detailTitle}
+        >
+          <span data-testid="topline-space-focus-status">{focusSummary.statusLabel}</span>
+          <strong data-testid="topline-space-focus-label">{focusSummary.areaLabel}</strong>
+          <small data-testid="topline-space-focus-detail">{focusSummary.detailLabel}</small>
+        </div>
+        {fixResult && <ToplineFixResultStrip result={fixResult} />}
       </div>
       <div className="topline-space-grid" data-testid="topline-space-cards">
         {summary.cards.map((card) => {
           const focused = focusedCardId === card.id;
+          const fix = createToplineFixOption(card);
           return (
             <div className={`topline-space-card ${card.tone} ${focused ? "focused" : ""}`} data-testid={`topline-space-card-${card.id}`} key={card.id}>
               <span>{card.label}</span>
@@ -11007,12 +11072,64 @@ function ToplineSpace({
                 >
                   <span>Cue</span>
                 </button>
+                <button
+                  className="topline-space-fix-button"
+                  data-testid={`topline-space-fix-${card.id}`}
+                  onClick={() => onFix(card)}
+                  title={`Apply ${fix.label}: ${fix.detail}`}
+                  type="button"
+                >
+                  <SlidersHorizontal size={13} aria-hidden="true" />
+                  <span>Fix</span>
+                </button>
               </div>
             </div>
           );
         })}
       </div>
     </section>
+  );
+}
+
+function ToplineFixResultStrip({ result }: { result: ToplineFixResult }): ReactElement {
+  return (
+    <div
+      className={`topline-fix-result ${result.tone}`}
+      data-result-topline-fix={result.fixId}
+      data-testid="topline-fix-result"
+      aria-live="polite"
+    >
+      <div className="topline-fix-result-main">
+        <SlidersHorizontal size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="topline-fix-result-title">{result.title}</strong>
+          <small data-testid="topline-fix-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="topline-fix-result-meta">
+        <span data-testid="topline-fix-result-status">{result.status}</span>
+        <span data-testid="topline-fix-result-scope">{result.scope}</span>
+        <span data-testid="topline-fix-result-impact">{result.impact}</span>
+      </div>
+      <div className="topline-fix-result-metrics" data-testid="topline-fix-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`topline-fix-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="topline-fix-result-followup" data-testid="topline-fix-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="topline-fix-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="topline-fix-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -11460,6 +11577,7 @@ function createQuickActions({
   onCueArrangementTransition,
   onCueHookLoop,
   onCueToplineLoop,
+  onApplyToplineFix,
   onFocusArrangementMuteMap,
   onFocusArrangementTransitionMap,
   onApplyBasslinePad,
@@ -11653,6 +11771,7 @@ function createQuickActions({
   onCueArrangementTransition: (transition: ArrangementTransitionMapTransition) => void;
   onCueHookLoop: (card?: HookReadinessFocusItem) => void;
   onCueToplineLoop: (card?: ToplineSpaceFocusItem) => void;
+  onApplyToplineFix: (card?: ToplineSpaceCard) => void;
   onFocusArrangementMuteMap: (lane: ArrangementMuteMapLane) => void;
   onFocusArrangementTransitionMap: (transition: ArrangementTransitionMapTransition) => void;
   onApplyBasslinePad: (pad: BasslinePadId) => void;
@@ -12026,6 +12145,7 @@ function createQuickActions({
     run: () => onCueHookLoop(card)
   }));
   const toplineSpaceCard = activeToplineSpaceQuickActionCard(toplineSpaceSummary);
+  const toplineFixOption = toplineSpaceCard ? createToplineFixOption(toplineSpaceCard) : null;
   const toplineSpaceActions: QuickAction[] = toplineSpaceSummary.cards.map((card) => ({
     id: `topline-space-card-${card.id}`,
     title: `Focus Topline Space: ${card.label}`,
@@ -12043,6 +12163,17 @@ function createQuickActions({
     disabled: isPlaying,
     run: () => onCueToplineLoop(card)
   }));
+  const toplineSpaceFixActions: QuickAction[] = toplineSpaceSummary.cards.map((card) => {
+    const fix = createToplineFixOption(card);
+    return {
+      id: `topline-space-fix-${card.id}`,
+      title: `Apply Topline Fix: ${card.label}`,
+      detail: `${fix.label} / ${fix.detail} / ${card.value} / ${card.status}`,
+      group: fix.group,
+      keywords: `topline fix vocal room pocket lead headroom brief action ${card.id} ${card.label} ${card.value} ${card.status} ${fix.label} ${fix.detail} beginner producer`,
+      run: () => onApplyToplineFix(card)
+    };
+  });
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const reviewQueueActions: QuickAction[] = reviewQueueSummary.items.map((item) => ({
     id: `review-queue-item-${item.id}`,
@@ -13244,6 +13375,19 @@ function createQuickActions({
       run: () => onCueToplineLoop(toplineSpaceCard ?? undefined)
     },
     {
+      id: "topline-fix",
+      title: toplineSpaceCard ? `Apply Topline Fix: ${toplineSpaceCard.label}` : "Apply Topline Fix",
+      detail: toplineFixOption
+        ? `${toplineFixOption.label} / ${toplineFixOption.detail}`
+        : "No Topline Space fix target.",
+      group: toplineFixOption?.group ?? "Project",
+      keywords: `topline fix action vocal pocket lead window headroom brief ${
+        toplineSpaceCard?.id ?? "none"
+      } ${toplineSpaceCard?.label ?? "none"} ${toplineFixOption?.label ?? "none"} beginner producer`,
+      disabled: !toplineSpaceCard,
+      run: () => onApplyToplineFix(toplineSpaceCard ?? undefined)
+    },
+    {
       id: "loop-pattern",
       title: "Loop selected pattern",
       detail: `Pattern ${project.selectedPattern} two-bar preview.`,
@@ -13255,6 +13399,7 @@ function createQuickActions({
     ...arrangementTransitionLoopActions,
     ...hookReadinessCueActions,
     ...toplineSpaceCueActions,
+    ...toplineSpaceFixActions,
     ...sectionLocatorActions,
     ...arrangementBlockCueActions,
     {
@@ -15175,6 +15320,21 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "topline-fix" || action.id.startsWith("topline-space-fix-")) {
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const toplineSummary = createToplineSpaceSummary(
+      project,
+      createBeatReadinessChecks(project, exportAnalysis),
+      exportAnalysis,
+      analyzeStemExports(project)
+    );
+    return {
+      id: "topline-fix",
+      label: "Topline fix",
+      value: `${toplineSummary.headline} / ${toplineSummary.detail}`
+    };
+  }
+
   if (action.id.startsWith("hook-readiness-card-")) {
     return {
       id: "hook-readiness",
@@ -16104,6 +16264,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Topline loop and listen only for vocal/lead room before trimming melody density, pocket, hook window, or headroom.",
       nextCheck: "Return to Topline Space after the loop to decide whether the pocket, lead density, window, mix, or artist cue lane needs the next edit."
+    };
+  }
+
+  if (action.id === "topline-fix" || action.id.startsWith("topline-space-fix-")) {
+    return {
+      auditionCue: "Cue and play the Topline loop after the fix, then listen only for vocal/lead room.",
+      nextCheck: "Return to Topline Space and check whether the fixed card moved toward ready before applying another one-step fix."
     };
   }
 
@@ -21106,6 +21273,200 @@ function toplineLoopCueDetail(target: ToplineLoopCueTarget): string {
   }
 
   return `Pattern ${target.pattern} / ${barCountLabel(target.bars)} pocket`;
+}
+
+type ToplineFixAction =
+  | {
+      kind: "grooveFeel";
+      feel: GrooveFeelId;
+    }
+  | {
+      kind: "patternFill";
+      preset: PatternFillPreset;
+    }
+  | {
+      kind: "patternChain";
+      chain: PatternChainId;
+    }
+  | {
+      kind: "mixFix";
+      preset: MixFixPreset;
+    }
+  | {
+      kind: "sessionBriefStarter";
+      pad: SessionBriefStarterPadId;
+    };
+
+type ToplineFixOption = {
+  cardId: ToplineSpaceCardId;
+  fixId: string;
+  label: string;
+  detail: string;
+  group: string;
+  action: ToplineFixAction;
+  auditionCue: string;
+  nextCheck: string;
+};
+
+type ToplineFixResultMetric = {
+  id: "card" | "summary" | "target";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+type ToplineFixResult = {
+  fixId: string;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: ToplineFixResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
+function createToplineFixOption(card: ToplineSpaceCard): ToplineFixOption {
+  switch (card.id) {
+    case "pocket":
+      return {
+        cardId: card.id,
+        fixId: "pocket-feel",
+        label: "Pocket Feel",
+        detail: "Apply the existing Pocket Groove Feel to the Topline Pattern.",
+        group: "Create",
+        action: { kind: "grooveFeel", feel: "pocket" },
+        auditionCue: "Loop the Topline Pattern and listen for drum/808 space before changing notes.",
+        nextCheck: "Return to Topline Space and confirm Pocket is no longer the weakest lane."
+      };
+    case "lead":
+      return {
+        cardId: card.id,
+        fixId: "lead-clear-tail",
+        label: "Clear Tail",
+        detail: "Use the existing Clear Tail Pattern Fill to trim end-of-loop lead density.",
+        group: "Create",
+        action: { kind: "patternFill", preset: "clear_tail" },
+        auditionCue: "Loop the Topline Pattern and listen for a cleaner reply space after bar turns.",
+        nextCheck: "Return to Lead Room before adding another melody, chord, or contour move."
+      };
+    case "arrangement":
+      return {
+        cardId: card.id,
+        fixId: "window-chain",
+        label: "8 Bar Chain",
+        detail: "Use the existing 8 Bar Pattern Chain to create a Hook window.",
+        group: "Arrange",
+        action: { kind: "patternChain", chain: "eight_bar" },
+        auditionCue: "Play the Hook block loop and check whether the vocal window is easy to locate.",
+        nextCheck: "Return to Song Form or Topline Space before expanding the chain into a full form."
+      };
+    case "mix":
+      return {
+        cardId: card.id,
+        fixId: "headroom-mix",
+        label: "Headroom Mix Fix",
+        detail: "Use the existing Headroom Mix Fix for vocal-safe master space.",
+        group: "Mix",
+        action: { kind: "mixFix", preset: "headroom" },
+        auditionCue: "Play Full Mix and watch the Export meter headroom after the fix.",
+        nextCheck: "Return to Mix Coach if the limiter or stem spread still needs manual trim."
+      };
+    case "brief":
+      return {
+        cardId: card.id,
+        fixId: "brief-vocal",
+        label: "Vocal Brief Starter",
+        detail: "Use the existing Vocal Session Brief Starter to fill blank artist context fields.",
+        group: "Project",
+        action: { kind: "sessionBriefStarter", pad: "vocal" },
+        auditionCue: "Read the Session Brief aloud against the Topline loop before exporting handoff notes.",
+        nextCheck: "Return to Handoff Pack after the artist cue feels specific enough."
+      };
+  }
+}
+
+function createToplineFixResult(
+  fix: ToplineFixOption,
+  cardId: ToplineSpaceCardId,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): ToplineFixResult {
+  const beforeSummary = createToplineSpaceSummaryForProject(beforeProject);
+  const afterSummary = createToplineSpaceSummaryForProject(afterProject);
+  const beforeCard = beforeSummary.cards.find((card) => card.id === cardId) ?? null;
+  const afterCard = afterSummary.cards.find((card) => card.id === cardId) ?? null;
+  const metrics: ToplineFixResultMetric[] = [
+    createToplineFixResultMetric(
+      "card",
+      beforeCard?.label ?? "Card",
+      toplineFixCardLabel(beforeCard),
+      toplineFixCardLabel(afterCard)
+    ),
+    createToplineFixResultMetric("summary", "Topline", beforeSummary.headline, afterSummary.headline),
+    createToplineFixResultMetric("target", "Target", toplineFixTargetLabel(beforeProject), toplineFixTargetLabel(afterProject))
+  ];
+  const changedCount = metrics.filter((metric) => metric.tone === "good").length;
+  const cardLabel = afterCard?.label ?? beforeCard?.label ?? "Topline";
+
+  return {
+    fixId: fix.fixId,
+    title: `${fix.label} Topline Fix applied`,
+    status: changedCount > 0 ? "Applied" : "Already covered",
+    detail: `${cardLabel} / ${fix.detail}`,
+    scope: toplineFixScopeLabel(fix),
+    impact: `${changedCount}/${metrics.length} Topline metrics changed`,
+    metrics,
+    auditionCue: fix.auditionCue,
+    nextCheck: fix.nextCheck,
+    tone: changedCount > 0 ? "good" : "warn"
+  };
+}
+
+function createToplineSpaceSummaryForProject(project: ProjectState): ToplineSpaceSummary {
+  const analysis = analyzeExport(project);
+  return createToplineSpaceSummary(project, createBeatReadinessChecks(project, analysis), analysis, analyzeStemExports(project));
+}
+
+function createToplineFixResultMetric(
+  id: ToplineFixResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): ToplineFixResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: before === after ? "warn" : "good"
+  };
+}
+
+function toplineFixCardLabel(card: ToplineSpaceCard | null): string {
+  return card ? `${card.value} / ${card.status}` : "missing";
+}
+
+function toplineFixTargetLabel(project: ProjectState): string {
+  return toplineLoopCueDetail(createToplineLoopCueTarget(project));
+}
+
+function toplineFixScopeLabel(fix: ToplineFixOption): string {
+  switch (fix.action.kind) {
+    case "grooveFeel":
+      return `Pattern Groove / ${fix.action.feel}`;
+    case "patternFill":
+      return `Pattern Fill / ${patternFillPresetLabel(fix.action.preset)}`;
+    case "patternChain":
+      return `Arrangement / ${patternChainLabel(fix.action.chain)}`;
+    case "mixFix":
+      return `Mix Fix / ${mixFixPresetLabel(fix.action.preset)}`;
+    case "sessionBriefStarter":
+      return "Session Brief / Vocal";
+  }
 }
 
 function createArrangementMuteMapSummary(project: ProjectState): ArrangementMuteMapSummary {
