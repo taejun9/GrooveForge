@@ -296,6 +296,8 @@ export const keys = ["F minor", "A minor", "C minor", "D minor", "E minor", "G m
 export const historyLimit = 50;
 export const keyboardCaptureKeys = ["a", "s", "d", "f", "g", "h", "j", "k"] as const;
 export type KeyboardCaptureKey = (typeof keyboardCaptureKeys)[number];
+export const keyboardCaptureStepModes = ["next-free", "replace-selected"] as const;
+export type KeyboardCaptureStepMode = (typeof keyboardCaptureStepModes)[number];
 
 export const keyboardCaptureKeyLabels: Record<KeyboardCaptureKey, string> = {
   a: "A",

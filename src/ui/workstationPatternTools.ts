@@ -460,6 +460,7 @@ import type {
   NoteView,
   KeyboardCaptureKeyMapItem,
   KeyboardCaptureDefaults,
+  KeyboardCaptureStepMode,
   MidiCaptureStatus,
   MidiInputOption,
   MidiCaptureSummary,
@@ -617,14 +618,20 @@ export function createKeyboardCapturePostureSummary(
   enabled: boolean,
   target: NoteTrack,
   defaults: KeyboardCaptureDefaults,
-  nextStep: number
+  nextStep: number,
+  stepMode: KeyboardCaptureStepMode
 ): KeyboardCapturePostureSummary {
   const targetLabel = target === "bass" ? "808" : "Synth";
   const statusLabel = enabled ? "Capture armed" : "Capture off";
+  const stepModeLabel = stepMode === "next-free" ? "Next" : "Replace";
   const detailLabel =
     target === "bass"
-      ? `Step ${nextStep + 1} / Oct ${defaults.octave} / Len ${defaults.length} / ${defaults.glide ? "Glide on" : "Glide off"}`
-      : `Step ${nextStep + 1} / Oct ${defaults.octave} / Len ${defaults.length} / Vel ${Math.round(defaults.velocity * 100)}%`;
+      ? `Step ${nextStep + 1} / ${stepModeLabel} / Oct ${defaults.octave} / Len ${defaults.length} / ${
+          defaults.glide ? "Glide on" : "Glide off"
+        }`
+      : `Step ${nextStep + 1} / ${stepModeLabel} / Oct ${defaults.octave} / Len ${defaults.length} / Vel ${Math.round(
+          defaults.velocity * 100
+        )}%`;
 
   return {
     roleLabel: `${targetLabel} keys`,
@@ -671,16 +678,86 @@ export function nextKeyboardCaptureStep(pattern: PatternData, track: NoteTrack, 
   return normalizedStart;
 }
 
+export function shouldReplaceKeyboardCaptureStep(
+  stepMode: KeyboardCaptureStepMode,
+  selectedNote: SelectedNote | null,
+  target: NoteTrack
+): boolean {
+  return stepMode === "replace-selected" && selectedNote?.track === target;
+}
+
+export function resolveKeyboardCaptureStep(
+  pattern: PatternData,
+  target: NoteTrack,
+  selectedNote: SelectedNote | null,
+  stepMode: KeyboardCaptureStepMode
+): number {
+  if (shouldReplaceKeyboardCaptureStep(stepMode, selectedNote, target) && selectedNote) {
+    return selectedNote.step;
+  }
+
+  return nextKeyboardCaptureStep(pattern, target, selectedNote?.track === target ? selectedNote.step + 1 : 0);
+}
+
+export function createCaptureStepModeActions({
+  keyboardCaptureStepMode,
+  keyboardCaptureTarget,
+  keyboardCaptureTargetLabel,
+  selectedPattern,
+  selectedNote,
+  selectedNoteActive,
+  selectedNoteLabel,
+  onSetKeyboardCaptureStepMode
+}: {
+  keyboardCaptureStepMode: KeyboardCaptureStepMode;
+  keyboardCaptureTarget: NoteTrack;
+  keyboardCaptureTargetLabel: string;
+  selectedPattern: PatternSlot;
+  selectedNote: SelectedNote | null;
+  selectedNoteActive: boolean;
+  selectedNoteLabel: string;
+  onSetKeyboardCaptureStepMode: (mode: KeyboardCaptureStepMode) => void;
+}): QuickAction[] {
+  return [
+    {
+      id: "capture-step-mode-next",
+      mode: "next-free" as KeyboardCaptureStepMode,
+      title: "Capture step mode: Next empty",
+      detail: `Desktop keys and MIDI notes fill the next empty ${keyboardCaptureTargetLabel} step / Pattern ${selectedPattern}`,
+      keywords: `capture step mode next empty keyboard midi input ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} sequence beginner producer`
+    },
+    {
+      id: "capture-step-mode-replace",
+      mode: "replace-selected" as KeyboardCaptureStepMode,
+      title: "Capture step mode: Replace selected",
+      detail:
+        selectedNoteActive && selectedNote?.track === keyboardCaptureTarget
+          ? `Desktop keys and MIDI notes replace ${selectedNoteLabel} / Pattern ${selectedPattern}`
+          : `Desktop keys and MIDI notes replace the selected ${keyboardCaptureTargetLabel} step when available`,
+      keywords: `capture step mode replace selected overwrite correction keyboard midi input ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} producer beginner`
+    }
+  ].map(({ id, mode, title, detail, keywords }) => ({
+    id,
+    title,
+    detail,
+    group: "Create",
+    keywords,
+    disabled: keyboardCaptureStepMode === mode,
+    run: () => onSetKeyboardCaptureStepMode(mode)
+  }));
+}
+
 export function addKeyboardCaptureNote(
   pattern: PatternData,
   track: NoteTrack,
   step: number,
   pitch: string,
-  defaults: KeyboardCaptureDefaults
+  defaults: KeyboardCaptureDefaults,
+  replaceStep = false
 ): PatternData {
   const length = clampStepLength(defaults.length);
   if (track === "bass") {
-    if (pattern.bassNotes.some((note) => note.step === step && note.pitch === pitch)) {
+    if (!replaceStep && pattern.bassNotes.some((note) => note.step === step && note.pitch === pitch)) {
       return pattern;
     }
     return {
@@ -692,13 +769,13 @@ export function addKeyboardCaptureNote(
     };
   }
 
-  if (pattern.melodyNotes.some((note) => note.step === step && note.pitch === pitch)) {
+  if (!replaceStep && pattern.melodyNotes.some((note) => note.step === step && note.pitch === pitch)) {
     return pattern;
   }
   return {
     ...pattern,
     melodyNotes: sortMelodyNotes([
-      ...pattern.melodyNotes,
+      ...(replaceStep ? pattern.melodyNotes.filter((note) => note.step !== step) : pattern.melodyNotes),
       { step, pitch, length, velocity: clampVelocity(defaults.velocity), probability: 1 }
     ])
   };

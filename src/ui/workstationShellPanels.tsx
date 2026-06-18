@@ -47,6 +47,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
     title: "Create",
     items: [
       { id: "keyboard-capture", command: "Keyboard Capture", shortcut: "Quick Actions", target: "808 / Synth notes" },
+      { id: "capture-step-mode", command: "Capture Step Mode", shortcut: "Quick Actions", target: "Next / Replace" },
       { id: "midi-input", command: "MIDI Input", shortcut: "Quick Actions", target: "Controller notes" },
       { id: "blueprints", command: "Beat Blueprints", shortcut: "Quick Actions", target: "Sample-free starts" },
       { id: "layer-starter", command: "Layer Starter", shortcut: "Quick Actions", target: "Drums / 808 / Chords / Synth" }

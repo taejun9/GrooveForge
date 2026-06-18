@@ -220,6 +220,7 @@ h2 {
 .drum-foundation-row button span,
 .keyboard-capture-heading span,
 .capture-readout span,
+.capture-step-mode-row button small,
 .capture-key-map kbd span,
 .bass-move-preview span,
 .bassline-pad-heading span,
@@ -430,6 +431,7 @@ h2 {
 .pattern-tools button,
 .pattern-fill-row button,
 .capture-target-row button,
+.capture-step-mode-row button,
 .delivery-target-align,
 .session-brief-clear,
 .snapshot-heading button,
@@ -569,6 +571,7 @@ h2 {
 .pattern-tools button,
 .pattern-fill-row button,
 .capture-target-row button,
+.capture-step-mode-row button,
 .snapshot-heading button,
 .snapshot-actions button,
 .arrangement-template-row button,
@@ -603,6 +606,7 @@ h2 {
 .style-quick-picks button.selected,
 .pattern-tabs button.selected,
 .capture-target-row button.selected,
+.capture-step-mode-row button.selected,
 .arrangement-template-row button.selected,
 .section-locator-row button.selected,
 .arrangement-focus-actions button.suggested,
@@ -10390,25 +10394,47 @@ input[type="range"] {
 
 .keyboard-capture-controls {
   display: grid;
-  grid-template-columns: minmax(144px, 1fr) 76px minmax(130px, 0.8fr);
+  grid-template-columns: minmax(144px, 1fr) 72px 92px minmax(130px, 0.8fr);
   gap: 8px;
   align-items: stretch;
 }
 
-.capture-target-row {
+.capture-target-row,
+.capture-step-mode-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
 }
 
 .capture-target-row button,
+.capture-step-mode-row button,
 .capture-readout {
   min-width: 0;
   min-height: 34px;
 }
 
-.capture-target-row button {
+.capture-target-row button,
+.capture-step-mode-row button {
   padding: 0 8px;
+}
+
+.capture-step-mode-row button {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+}
+
+.capture-step-mode-row button span,
+.capture-step-mode-row button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capture-step-mode-row button small {
+  font-size: 9px;
+  line-height: 1;
 }
 
 .capture-readout {
@@ -17635,6 +17661,10 @@ input[type="range"] {
 }
 
 @media (max-width: 620px) {
+  .keyboard-capture-controls {
+    grid-template-columns: 1fr;
+  }
+
   .swing-feel-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

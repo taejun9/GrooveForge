@@ -3,7 +3,7 @@ import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { BassNote, ChordEvent, ChordProgressionPreset, ChordQuality, DrumLane, MelodyNote, NoteTrack, PatternSlot, PatternVariationPreset, ProjectState, SoundDesign } from "../domain/workstation";
 import { chordInversions, chordInversionLabel, chordProgressionPresetIds, chordProgressionPresetLabel, chordQualities, drumStepProbability, drumStepTimingMs, drumStepVelocity, hatRepeatCount, maxDrumTimingMs, minDrumTimingMs, normalizeChordInversion, normalizeDrumProbability, normalizeDrumTimingMs, normalizeDrumVelocity, normalizeEventProbability, normalizeHatRepeat, scalePitchNames, soundPresetIds, soundPresetLabel, steps } from "../domain/workstation";
-import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneResult, PatternFillPreviewSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SwingFeelResult } from "./workstationUiModel";
+import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneResult, PatternFillPreviewSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SwingFeelResult } from "./workstationUiModel";
 import { drumLabels, keyboardCaptureKeyLabels } from "./workstationUiModel";
 import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyChordStep, percentLabel, pitchParts, timingLabel, trackOctaveRange } from "./workstationPatternTools";
 
@@ -893,21 +893,25 @@ export function KeyboardCapturePanel({
   defaults,
   enabled,
   target,
+  stepMode,
   nextStep,
   keyMap,
   selectedNote,
   onDefaultsChange,
   onEnabledChange,
+  onStepModeChange,
   onTargetChange
 }: {
   defaults: KeyboardCaptureDefaults;
   enabled: boolean;
   target: NoteTrack;
+  stepMode: KeyboardCaptureStepMode;
   nextStep: number;
   keyMap: KeyboardCaptureKeyMapItem[];
   selectedNote: SelectedNote | null;
   onDefaultsChange: (update: Partial<KeyboardCaptureDefaults>) => void;
   onEnabledChange: (enabled: boolean) => void;
+  onStepModeChange: (mode: KeyboardCaptureStepMode) => void;
   onTargetChange: (target: NoteTrack) => void;
 }): ReactElement {
   const selectedLabel = selectedNote
@@ -957,9 +961,35 @@ export function KeyboardCapturePanel({
           <strong>{nextStep + 1}</strong>
         </div>
         <div className="capture-readout">
+          <span>Step Mode</span>
+          <strong>{stepMode === "next-free" ? "Next" : "Replace"}</strong>
+        </div>
+        <div className="capture-readout">
           <span>Selected</span>
           <strong>{selectedLabel}</strong>
         </div>
+      </div>
+      <div className="capture-step-mode-row" aria-label="Keyboard Capture step mode">
+        <button
+          aria-pressed={stepMode === "next-free"}
+          className={stepMode === "next-free" ? "selected" : ""}
+          data-testid="keyboard-capture-step-mode-next"
+          onClick={() => onStepModeChange("next-free")}
+          type="button"
+        >
+          <span>Next</span>
+          <small>empty step</small>
+        </button>
+        <button
+          aria-pressed={stepMode === "replace-selected"}
+          className={stepMode === "replace-selected" ? "selected" : ""}
+          data-testid="keyboard-capture-step-mode-replace"
+          onClick={() => onStepModeChange("replace-selected")}
+          type="button"
+        >
+          <span>Replace</span>
+          <small>selected step</small>
+        </button>
       </div>
       <div className="capture-defaults" aria-label="Keyboard Capture defaults">
         <label className="capture-default-field">

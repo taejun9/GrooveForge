@@ -536,6 +536,7 @@ import type {
   NoteView,
   KeyboardCaptureKeyMapItem,
   KeyboardCaptureDefaults,
+  KeyboardCaptureStepMode,
   MidiCaptureStatus,
   MidiInputOption,
   MidiCaptureSummary,
@@ -657,7 +658,9 @@ import {
   keyboardCapturePitchLanes,
   clampKeyboardCaptureOctave,
   isKeyboardCaptureKey,
-  nextKeyboardCaptureStep,
+  shouldReplaceKeyboardCaptureStep,
+  resolveKeyboardCaptureStep,
+  createCaptureStepModeActions,
   addKeyboardCaptureNote,
   isMidiInputSupported,
   createMidiInputOptions,
@@ -929,6 +932,7 @@ export function App(): ReactElement {
     bass: { octave: 1, length: 2, velocity: 0.68, glide: false },
     melody: { octave: 4, length: 1, velocity: 0.68, glide: false }
   });
+  const [keyboardCaptureStepMode, setKeyboardCaptureStepMode] = useState<KeyboardCaptureStepMode>("next-free");
   const [midiAccess, setMidiAccess] = useState<MIDIAccess | null>(null);
   const [midiPortRevision, setMidiPortRevision] = useState(0);
   const [midiCaptureStatus, setMidiCaptureStatus] = useState<MidiCaptureStatus>(() =>
@@ -1377,16 +1381,18 @@ export function App(): ReactElement {
     () => createDrumMovePreviewSummary(currentPattern, drumFoundationOptions, grooveFeelOptions, drumAccentOptions),
     [currentPattern, drumFoundationOptions, grooveFeelOptions, drumAccentOptions]
   );
-  const keyboardCaptureNextStep = nextKeyboardCaptureStep(
+  const keyboardCaptureNextStep = resolveKeyboardCaptureStep(
     currentPattern,
     keyboardCaptureTarget,
-    selectedNote?.track === keyboardCaptureTarget ? selectedNote.step + 1 : 0
+    selectedNote,
+    keyboardCaptureStepMode
   );
   const keyboardCapturePosture = createKeyboardCapturePostureSummary(
     keyboardCaptureEnabled,
     keyboardCaptureTarget,
     activeKeyboardCaptureDefaults,
-    keyboardCaptureNextStep
+    keyboardCaptureNextStep,
+    keyboardCaptureStepMode
   );
   const midiInputOptions = useMemo(() => createMidiInputOptions(midiAccess), [midiAccess, midiPortRevision]);
   const midiCaptureSummary = createMidiCaptureSummary(
@@ -1570,7 +1576,16 @@ export function App(): ReactElement {
         }
       }
     };
-  }, [midiAccess, midiPortRevision, midiCaptureArmed, midiSelectedInputId, keyboardCaptureTarget, keyboardCaptureDefaults, selectedNote]);
+  }, [
+    midiAccess,
+    midiPortRevision,
+    midiCaptureArmed,
+    midiSelectedInputId,
+    keyboardCaptureTarget,
+    keyboardCaptureDefaults,
+    keyboardCaptureStepMode,
+    selectedNote
+  ]);
 
   useEffect(() => {
     if (midiSelectedInputId !== "all" && !midiInputOptions.some((input) => input.id === midiSelectedInputId)) {
@@ -1595,7 +1610,8 @@ export function App(): ReactElement {
     commandReferenceOpen,
     keyboardCaptureEnabled,
     keyboardCaptureTarget,
-    keyboardCaptureDefaults
+    keyboardCaptureDefaults,
+    keyboardCaptureStepMode
   ]);
 
   useEffect(() => {
@@ -1616,7 +1632,8 @@ export function App(): ReactElement {
     commandReferenceOpen,
     keyboardCaptureEnabled,
     keyboardCaptureTarget,
-    keyboardCaptureDefaults
+    keyboardCaptureDefaults,
+    keyboardCaptureStepMode
   ]);
 
   function handleDesktopShortcut(event: KeyboardEvent): void {
@@ -2233,16 +2250,15 @@ export function App(): ReactElement {
       return;
     }
 
-    const step = nextKeyboardCaptureStep(
-      pattern,
-      target,
-      selectedNote?.track === target ? selectedNote.step + 1 : 0
-    );
+    const step = resolveKeyboardCaptureStep(pattern, target, selectedNote, keyboardCaptureStepMode);
+    const replaceStep = shouldReplaceKeyboardCaptureStep(keyboardCaptureStepMode, selectedNote, target);
     const midiDefaults: KeyboardCaptureDefaults =
       target === "melody" ? { ...captureDefaults, velocity: note.velocity } : captureDefaults;
     const changed = updateCurrentPattern(
-      (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch, midiDefaults),
-      `MIDI captured ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} on Pattern ${current.selectedPattern}`
+      (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch, midiDefaults, replaceStep),
+      `MIDI ${replaceStep ? "replaced" : "captured"} ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} on Pattern ${
+        current.selectedPattern
+      }`
     );
     const noteLabel = `${midiNoteLabel(note.noteNumber)} -> ${pitch}.${step + 1} / ${Math.round(note.velocity * 100)}%`;
 
@@ -3662,14 +3678,13 @@ export function App(): ReactElement {
       return;
     }
 
-    const step = nextKeyboardCaptureStep(
-      pattern,
-      target,
-      selectedNote?.track === target ? selectedNote.step + 1 : 0
-    );
+    const step = resolveKeyboardCaptureStep(pattern, target, selectedNote, keyboardCaptureStepMode);
+    const replaceStep = shouldReplaceKeyboardCaptureStep(keyboardCaptureStepMode, selectedNote, target);
     const changed = updateCurrentPattern(
-      (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch, captureDefaults),
-      `Captured ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} length ${captureDefaults.length} on Pattern ${current.selectedPattern}`
+      (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch, captureDefaults, replaceStep),
+      `${replaceStep ? "Replaced" : "Captured"} ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} length ${
+        captureDefaults.length
+      } on Pattern ${current.selectedPattern}`
     );
 
     if (!changed) {
@@ -5629,6 +5644,7 @@ export function App(): ReactElement {
     keyCompassSummary,
     keyboardCaptureEnabled,
     keyboardCaptureDefaults,
+    keyboardCaptureStepMode,
     keyboardCaptureTarget,
     layerStarterOptions,
     listeningPassSummary,
@@ -5736,6 +5752,7 @@ export function App(): ReactElement {
     onSelectStyle: selectStyle,
     onUsePatternInSelectedBlock: usePatternInSelectedBlock,
     onSetKeyboardCaptureEnabled: setKeyboardCaptureEnabled,
+    onSetKeyboardCaptureStepMode: setKeyboardCaptureStepMode,
     onSetKeyboardCaptureTarget: setKeyboardCaptureTarget,
     onUpdateKeyboardCaptureDefaults: updateKeyboardCaptureDefaults,
     onSetMidiCaptureArmed: setMidiCaptureArmed,
@@ -6531,8 +6548,10 @@ export function App(): ReactElement {
             nextStep={keyboardCaptureNextStep}
             onDefaultsChange={updateKeyboardCaptureDefaults}
             onEnabledChange={setKeyboardCaptureEnabled}
+            onStepModeChange={setKeyboardCaptureStepMode}
             onTargetChange={setKeyboardCaptureTarget}
             selectedNote={selectedNote}
+            stepMode={keyboardCaptureStepMode}
             target={keyboardCaptureTarget}
           />
           <MidiCapturePanel
@@ -11353,6 +11372,7 @@ function createQuickActions({
   keyCompassSummary,
   keyboardCaptureEnabled,
   keyboardCaptureDefaults,
+  keyboardCaptureStepMode,
   keyboardCaptureTarget,
   layerStarterOptions,
   listeningPassSummary,
@@ -11459,6 +11479,7 @@ function createQuickActions({
   onSelectStyle,
   onUsePatternInSelectedBlock,
   onSetKeyboardCaptureEnabled,
+  onSetKeyboardCaptureStepMode,
   onSetKeyboardCaptureTarget,
   onUpdateKeyboardCaptureDefaults,
   onSetMidiCaptureArmed,
@@ -11550,6 +11571,7 @@ function createQuickActions({
   keyCompassSummary: KeyCompassSummary;
   keyboardCaptureEnabled: boolean;
   keyboardCaptureDefaults: Record<NoteTrack, KeyboardCaptureDefaults>;
+  keyboardCaptureStepMode: KeyboardCaptureStepMode;
   keyboardCaptureTarget: NoteTrack;
   layerStarterOptions: LayerStarterOption[];
   listeningPassSummary: ListeningPassSummary;
@@ -11656,6 +11678,7 @@ function createQuickActions({
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
   onUsePatternInSelectedBlock: (pattern: PatternSlot) => void;
   onSetKeyboardCaptureEnabled: (enabled: boolean) => void;
+  onSetKeyboardCaptureStepMode: (mode: KeyboardCaptureStepMode) => void;
   onSetKeyboardCaptureTarget: (target: NoteTrack) => void;
   onUpdateKeyboardCaptureDefaults: (update: Partial<KeyboardCaptureDefaults>) => void;
   onSetMidiCaptureArmed: (armed: boolean) => void;
@@ -12213,6 +12236,16 @@ function createQuickActions({
   const chordClipboardPasteStep = chordClipboard
     ? nextEmptyChordStep(selectedPatternData.chordEvents, chordClipboard.step)
     : null;
+  const captureStepModeActions = createCaptureStepModeActions({
+    keyboardCaptureStepMode,
+    keyboardCaptureTarget,
+    keyboardCaptureTargetLabel,
+    selectedPattern: project.selectedPattern,
+    selectedNote,
+    selectedNoteActive,
+    selectedNoteLabel,
+    onSetKeyboardCaptureStepMode
+  });
   const captureTargetActions: QuickAction[] = [
     { id: "capture-target-bass", target: "bass" as NoteTrack, targetLabel: "808" },
     { id: "capture-target-melody", target: "melody" as NoteTrack, targetLabel: "Synth" }
@@ -13316,6 +13349,7 @@ function createQuickActions({
       run: () => onSetKeyboardCaptureEnabled(!keyboardCaptureEnabled)
     },
     ...captureTargetActions,
+    ...captureStepModeActions,
     ...captureDefaultActions,
     ...selectedDrumActions,
     ...selectedNoteActions,
@@ -14491,6 +14525,7 @@ function createQuickActionResult(
     action.id === "midi-input-connect" ||
     action.id === "midi-input-arm" ||
     action.id.startsWith("capture-target-") ||
+    action.id.startsWith("capture-step-mode-") ||
     action.id.startsWith("capture-default-");
   const blockClipboardOnly = action.id === "selected-block-copy";
   const noteClipboardOnly = action.id === "selected-note-copy";
@@ -14730,6 +14765,7 @@ function quickActionResultMetricSnapshot(
     action.id === "keyboard-capture-toggle" ||
     action.id === "midi-input-arm" ||
     action.id.startsWith("capture-target-") ||
+    action.id.startsWith("capture-step-mode-") ||
     action.id.startsWith("capture-default-")
   ) {
     return {
@@ -15731,6 +15767,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play desktop keys or a MIDI controller only after confirming the intended 808 or Synth target is selected.",
       nextCheck: "Check the Keyboard Capture target, octave/length defaults, and Web MIDI target before entering the next phrase."
+    };
+  }
+
+  if (action.id.startsWith("capture-step-mode-")) {
+    return {
+      auditionCue: "Use Next for sequence entry or Replace after selecting the 808/Synth step that needs correction.",
+      nextCheck: "Capture Step Mode changes only where the next explicit Keyboard Capture or MIDI note lands."
     };
   }
 
