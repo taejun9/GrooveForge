@@ -2165,10 +2165,14 @@ export function ChordEditor({
         {chords.map((chord, index) => {
           const selected = selectedIndex === index;
           const playing = currentStep !== null && currentStep >= chord.step && currentStep < chord.step + chord.length;
+          const chordVelocityPercent = Math.min(100, Math.max(0, Math.round(chord.velocity * 100)));
+          const chordProbability = normalizeEventProbability(chord.probability);
           return (
             <div
               aria-current={playing ? "step" : undefined}
-              aria-label={`Chord ${index + 1} ${chord.root}${chord.quality} step ${chord.step + 1}`}
+              aria-label={`Chord ${index + 1} ${chord.root}${chord.quality} step ${chord.step + 1} ${chordVelocityPercent}% velocity length ${
+                chord.length
+              }${chordProbability < 1 ? ` ${chanceBadgeLabel(chordProbability)} chance` : ""}`}
               className={["chord-slot", selected ? "selected" : "", playing ? "playing" : ""].filter(Boolean).join(" ")}
               data-playing={playing ? "true" : "false"}
               data-testid={`chord-slot-${index}`}
@@ -2200,6 +2204,14 @@ export function ChordEditor({
                 >
                   <Trash2 size={13} aria-hidden="true" />
                 </button>
+              </div>
+              <div className="chord-velocity-readout" aria-hidden="true">
+                <span className="chord-velocity-meter">
+                  <span style={{ inlineSize: `${chordVelocityPercent}%` }} />
+                </span>
+                <strong className="chord-velocity-label" data-testid={`chord-velocity-label-${index}`}>
+                  {chordVelocityPercent}
+                </strong>
               </div>
               <label>
                 <span>Step</span>

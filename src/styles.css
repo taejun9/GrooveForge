@@ -13138,6 +13138,46 @@ input[type="range"] {
   opacity: 0.42;
 }
 
+.chord-velocity-readout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.chord-velocity-meter {
+  position: relative;
+  display: block;
+  min-width: 0;
+  block-size: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(244, 239, 231, 0.1);
+}
+
+.chord-velocity-meter span {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #78f0c8, #f0c36a);
+}
+
+.chord-velocity-label {
+  max-inline-size: 38px;
+  overflow: hidden;
+  color: #11100f;
+  background: #f0c36a;
+  border-radius: 3px;
+  padding: 2px 3px;
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chord-slot label {
   display: grid;
   gap: 5px;
