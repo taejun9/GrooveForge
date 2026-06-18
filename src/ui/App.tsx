@@ -12062,6 +12062,19 @@ function createQuickActions({
         run: () => onCopySelectedPattern(target)
       };
     });
+  const patternChainActions: QuickAction[] = patternChainIds.map((chain) => {
+    const arrangement = createPatternChain(chain);
+    const chainLabel = patternChainLabel(chain);
+    const chainBars = arrangement.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+    return {
+      id: `pattern-chain-${chain}`,
+      title: `Apply ${chainLabel}`,
+      detail: `${patternChainReadout(arrangement)} / ${barCountLabel(chainBars)} / ${arrangement.length} blocks`,
+      group: "Arrange",
+      keywords: `pattern chain direct arrangement structure sketch song ${chain} ${chainLabel} ${patternChainReadout(arrangement)} a b c hook switch break turn beginner producer`,
+      run: () => onApplyPatternChain(chain)
+    };
+  });
 
   return [
     {
@@ -12739,14 +12752,7 @@ function createQuickActions({
       }
     },
     ...arrangementFocusPresetActions,
-    {
-      id: "pattern-chain",
-      title: "Apply 8 Bar Chain",
-      detail: "Turn Pattern A/B/C variations into an editable 8-bar arrangement.",
-      group: "Arrange",
-      keywords: "pattern chain arrangement structure sketch a b c song",
-      run: () => onApplyPatternChain("eight_bar")
-    },
+    ...patternChainActions,
     {
       id: "chain-expand",
       title: "Expand Pattern Chain",
@@ -14040,7 +14046,7 @@ function quickActionResultMetricSnapshot(
   }
 
   if (
-    action.id === "pattern-chain" ||
+    action.id.startsWith("pattern-chain-") ||
     action.id === "chain-expand" ||
     action.id === "arrangement-template" ||
     action.id.startsWith("arrangement-template-direct-")
@@ -14651,6 +14657,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Song loop; scan intro, verse, hook, bridge, hook, and outro flow.",
       nextCheck: `${barCountLabel(arrangementTotalBars(project))} now; compare the song form against ${target.name}.`
+    };
+  }
+
+  if (action.id.startsWith("pattern-chain-")) {
+    return {
+      auditionCue: "Play Song loop; check Pattern A/B/C contrast, section energy, and hook placement.",
+      nextCheck: `${barCountLabel(arrangementTotalBars(project))} arranged; use the Pattern Chain Result and Song Form Overview before mix decisions.`
     };
   }
 
