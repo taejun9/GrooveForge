@@ -4097,27 +4097,30 @@ export function App(): ReactElement {
     );
   }
 
-  function updateSelectedNoteProbability(probability: number): void {
+  function updateSelectedNoteProbability(probability: number, status = "Edited note chance"): void {
     if (!selectedNote) {
       return;
     }
 
     const nextProbability = normalizeEventProbability(probability);
-    updateCurrentPattern((pattern) => ({
-      ...pattern,
-      bassNotes:
-        selectedNote.track === "bass"
-          ? pattern.bassNotes.map((note) =>
-              note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, probability: nextProbability } : note
-            )
-          : pattern.bassNotes,
-      melodyNotes:
-        selectedNote.track === "melody"
-          ? pattern.melodyNotes.map((note) =>
-              note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, probability: nextProbability } : note
-            )
-          : pattern.melodyNotes
-    }));
+    updateCurrentPattern(
+      (pattern) => ({
+        ...pattern,
+        bassNotes:
+          selectedNote.track === "bass"
+            ? pattern.bassNotes.map((note) =>
+                note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, probability: nextProbability } : note
+              )
+            : pattern.bassNotes,
+        melodyNotes:
+          selectedNote.track === "melody"
+            ? pattern.melodyNotes.map((note) =>
+                note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, probability: nextProbability } : note
+              )
+            : pattern.melodyNotes
+      }),
+      status
+    );
   }
 
   function moveSelectedNoteStep(direction: -1 | 1): void {
@@ -4708,6 +4711,19 @@ export function App(): ReactElement {
       selectedChordIndex,
       { velocity: clampVelocity(velocity) },
       "Edited chord velocity"
+    );
+  }
+
+  function updateSelectedChordProbability(probability: number): void {
+    if (selectedChordIndex === null || !selectedChord) {
+      setProjectStatus("Select a chord event");
+      return;
+    }
+
+    updateChordEvent(
+      selectedChordIndex,
+      { probability: normalizeEventProbability(probability) },
+      "Edited chord chance"
     );
   }
 
@@ -5822,6 +5838,7 @@ export function App(): ReactElement {
     onMoveSelectedNotePitch: moveSelectedNotePitch,
     onMoveSelectedNoteOctave: moveSelectedNoteOctave,
     onUpdateSelectedNoteVelocity: updateSelectedVelocity,
+    onUpdateSelectedNoteProbability: updateSelectedNoteProbability,
     onAuditionSelectedNote: auditionSelectedNote,
     onCopySelectedNote: copySelectedNote,
     onPasteCopiedNote: pasteCopiedNote,
@@ -5840,6 +5857,7 @@ export function App(): ReactElement {
     onDuplicateSelectedChord: duplicateSelectedChord,
     onMoveSelectedChordInversion: moveSelectedChordInversion,
     onUpdateSelectedChordVelocity: updateSelectedChordVelocity,
+    onUpdateSelectedChordProbability: updateSelectedChordProbability,
     onExportHandoffSheet: handleExportHandoffSheet,
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
@@ -11583,6 +11601,7 @@ function createQuickActions({
   onMoveSelectedNotePitch,
   onMoveSelectedNoteOctave,
   onUpdateSelectedNoteVelocity,
+  onUpdateSelectedNoteProbability,
   onAuditionSelectedNote,
   onCopySelectedNote,
   onPasteCopiedNote,
@@ -11601,6 +11620,7 @@ function createQuickActions({
   onDuplicateSelectedChord,
   onMoveSelectedChordInversion,
   onUpdateSelectedChordVelocity,
+  onUpdateSelectedChordProbability,
   onExportHandoffSheet,
   onExportMidi,
   onExportStems,
@@ -11787,6 +11807,7 @@ function createQuickActions({
   onMoveSelectedNotePitch: (direction: -1 | 1) => void;
   onMoveSelectedNoteOctave: (direction: -1 | 1) => void;
   onUpdateSelectedNoteVelocity: (velocity: number) => void;
+  onUpdateSelectedNoteProbability: (probability: number) => void;
   onAuditionSelectedNote: () => void;
   onCopySelectedNote: () => void;
   onPasteCopiedNote: () => void;
@@ -11805,6 +11826,7 @@ function createQuickActions({
   onDuplicateSelectedChord: () => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
   onUpdateSelectedChordVelocity: (velocity: number) => void;
+  onUpdateSelectedChordProbability: (probability: number) => void;
   onExportHandoffSheet: () => void;
   onExportMidi: () => void;
   onExportStems: () => void;
@@ -12272,6 +12294,7 @@ function createQuickActions({
       onMoveSelectedNotePitch,
       onMoveSelectedNoteOctave,
       onUpdateSelectedNoteVelocity,
+      onUpdateSelectedNoteProbability,
       onCopySelectedNote,
       onPasteCopiedNote,
       onDuplicateSelectedNote,
@@ -12286,6 +12309,7 @@ function createQuickActions({
       onMoveSelectedChordStep,
       onMoveSelectedChordInversion,
       onUpdateSelectedChordVelocity,
+      onUpdateSelectedChordProbability,
       onCopySelectedChord,
       onPasteCopiedChord,
       onDuplicateSelectedChord

@@ -14,6 +14,7 @@ import {
   normalizeDrumProbability,
   normalizeDrumTimingMs,
   normalizeDrumVelocity,
+  normalizeEventProbability,
   normalizeHatRepeat,
   steps
 } from "../domain/workstation";
@@ -53,6 +54,7 @@ type SelectedEventQuickActionsParams = {
   onMoveSelectedNotePitch: (direction: -1 | 1) => void;
   onMoveSelectedNoteOctave: (direction: -1 | 1) => void;
   onUpdateSelectedNoteVelocity: (velocity: number) => void;
+  onUpdateSelectedNoteProbability: (probability: number) => void;
   onCopySelectedNote: () => void;
   onPasteCopiedNote: () => void;
   onDuplicateSelectedNote: () => void;
@@ -67,6 +69,7 @@ type SelectedEventQuickActionsParams = {
   onMoveSelectedChordStep: (direction: -1 | 1) => void;
   onMoveSelectedChordInversion: (direction: -1 | 1) => void;
   onUpdateSelectedChordVelocity: (velocity: number) => void;
+  onUpdateSelectedChordProbability: (probability: number) => void;
   onCopySelectedChord: () => void;
   onPasteCopiedChord: () => void;
   onDuplicateSelectedChord: () => void;
@@ -94,6 +97,7 @@ export function createSelectedEventQuickActions({
   onMoveSelectedNotePitch,
   onMoveSelectedNoteOctave,
   onUpdateSelectedNoteVelocity,
+  onUpdateSelectedNoteProbability,
   onCopySelectedNote,
   onPasteCopiedNote,
   onDuplicateSelectedNote,
@@ -108,6 +112,7 @@ export function createSelectedEventQuickActions({
   onMoveSelectedChordStep,
   onMoveSelectedChordInversion,
   onUpdateSelectedChordVelocity,
+  onUpdateSelectedChordProbability,
   onCopySelectedChord,
   onPasteCopiedChord,
   onDuplicateSelectedChord
@@ -127,6 +132,7 @@ export function createSelectedEventQuickActions({
         : selectedPatternData.melodyNotes.find((note) => matchesSelectedNote(note, selectedNote))
       : undefined;
   const selectedNoteVelocity = selectedNoteEvent ? clampVelocity(selectedNoteEvent.velocity) : null;
+  const selectedNoteProbability = selectedNoteEvent ? normalizeEventProbability(selectedNoteEvent.probability) : null;
   const selectedNoteUsedPitches =
     selectedNote?.track === "bass"
       ? selectedPatternData.bassNotes.map((note) => note.pitch)
@@ -186,6 +192,8 @@ export function createSelectedEventQuickActions({
     ? `${selectedChord.root}${selectedChord.quality}.${selectedChord.step + 1}`
     : "No selected chord";
   const selectedChordVelocity = selectedChord && selectedChordActive ? clampVelocity(selectedChord.velocity) : null;
+  const selectedChordProbability =
+    selectedChord && selectedChordActive ? normalizeEventProbability(selectedChord.probability) : null;
   const selectedChordInversion = selectedChord ? normalizeChordInversion(selectedChord.inversion) : 0;
   const selectedChordInversionIndex = chordInversions.indexOf(selectedChordInversion);
   const selectedChordInversionDown = selectedChordInversionIndex > 0 ? chordInversions[selectedChordInversionIndex - 1] : null;
@@ -301,6 +309,34 @@ export function createSelectedEventQuickActions({
       keywords: "selected note velocity up louder punch dynamics 808 synth edit keyboard capture midi beginner producer",
       disabled: selectedNoteVelocity === null || selectedNoteVelocity >= 1,
       run: () => selectedNoteVelocity !== null && onUpdateSelectedNoteVelocity(selectedNoteVelocity + 0.05)
+    },
+    {
+      id: "selected-note-chance-down",
+      title: "Lower selected note chance",
+      detail:
+        selectedNoteProbability !== null
+          ? `${selectedNoteLabel} chance ${percentLabel(selectedNoteProbability)} -> ${percentLabel(
+              normalizeEventProbability(selectedNoteProbability - 0.05)
+            )}`
+          : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note chance probability down ghost variation 808 synth edit keyboard capture midi beginner producer",
+      disabled: selectedNoteProbability === null || selectedNoteProbability <= 0,
+      run: () => selectedNoteProbability !== null && onUpdateSelectedNoteProbability(selectedNoteProbability - 0.05)
+    },
+    {
+      id: "selected-note-chance-up",
+      title: "Raise selected note chance",
+      detail:
+        selectedNoteProbability !== null
+          ? `${selectedNoteLabel} chance ${percentLabel(selectedNoteProbability)} -> ${percentLabel(
+              normalizeEventProbability(selectedNoteProbability + 0.05)
+            )}`
+          : "Select an active 808 or Synth note first.",
+      group: "Create",
+      keywords: "selected note chance probability up reliable variation 808 synth edit keyboard capture midi beginner producer",
+      disabled: selectedNoteProbability === null || selectedNoteProbability >= 1,
+      run: () => selectedNoteProbability !== null && onUpdateSelectedNoteProbability(selectedNoteProbability + 0.05)
     },
     {
       id: "selected-note-copy",
@@ -561,6 +597,34 @@ export function createSelectedEventQuickActions({
       keywords: "selected chord velocity up louder lift dynamics harmony progression edit beginner producer",
       disabled: selectedChordVelocity === null || selectedChordVelocity >= 1,
       run: () => selectedChordVelocity !== null && onUpdateSelectedChordVelocity(selectedChordVelocity + 0.05)
+    },
+    {
+      id: "selected-chord-chance-down",
+      title: "Lower selected chord chance",
+      detail:
+        selectedChordProbability !== null
+          ? `${selectedChordLabel} chance ${percentLabel(selectedChordProbability)} -> ${percentLabel(
+              normalizeEventProbability(selectedChordProbability - 0.05)
+            )}`
+          : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord chance probability down ghost variation harmony progression edit beginner producer",
+      disabled: selectedChordProbability === null || selectedChordProbability <= 0,
+      run: () => selectedChordProbability !== null && onUpdateSelectedChordProbability(selectedChordProbability - 0.05)
+    },
+    {
+      id: "selected-chord-chance-up",
+      title: "Raise selected chord chance",
+      detail:
+        selectedChordProbability !== null
+          ? `${selectedChordLabel} chance ${percentLabel(selectedChordProbability)} -> ${percentLabel(
+              normalizeEventProbability(selectedChordProbability + 0.05)
+            )}`
+          : "Select an active chord first.",
+      group: "Create",
+      keywords: "selected chord chance probability up reliable variation harmony progression edit beginner producer",
+      disabled: selectedChordProbability === null || selectedChordProbability >= 1,
+      run: () => selectedChordProbability !== null && onUpdateSelectedChordProbability(selectedChordProbability + 0.05)
     },
     {
       id: "selected-chord-copy",
