@@ -7196,6 +7196,7 @@ export function App(): ReactElement {
   }
 
   const quickActions = createQuickActions({
+    arrangementArcPadOptions,
     arrangementArcPreviewSummary,
     arrangementTemplatePreviewSummary,
     bassMovePreviewSummary,
@@ -12615,6 +12616,7 @@ function isArrangementMovePresetApplied(block: ArrangementBlock, preset: Arrange
 }
 
 function createQuickActions({
+  arrangementArcPadOptions,
   arrangementArcPreviewSummary,
   arrangementTemplatePreviewSummary,
   bassMovePreviewSummary,
@@ -12780,6 +12782,7 @@ function createQuickActions({
   onTogglePlayback,
   onUndo
 }: {
+  arrangementArcPadOptions: ArrangementArcPadOption[];
   arrangementArcPreviewSummary: ArrangementArcPreviewSummary;
   arrangementTemplatePreviewSummary: ArrangementTemplatePreviewSummary;
   bassMovePreviewSummary: BassMovePreviewSummary;
@@ -13865,6 +13868,68 @@ function createQuickActions({
   );
   const arrangementFocusReady = Boolean(arrangementFocusPreviewSummary && arrangementFocusPreviewSummary.statusLabel !== "Focus aligned");
   const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
+  const arrangementTemplateActions: QuickAction[] = arrangementTemplateIds.map((template) => {
+    const targetArrangement = createArrangementTemplate(template);
+    const changedBlocks = arrangementTemplateChangedBlockCount(project.arrangement, targetArrangement);
+    const changedFields = arrangementTemplateChangedFieldCount(project.arrangement, targetArrangement);
+    const aligned = changedFields === 0;
+    const templateLabel = arrangementTemplateLabel(template);
+    return {
+      id: `arrangement-template-direct-${template}`,
+      title: aligned ? `${templateLabel} Template already applied` : `Apply ${templateLabel} Template`,
+      detail: `${arrangementTemplatePreviewSectionLabel(targetArrangement)} / ${arrangementArcPreviewPatternLabel(
+        targetArrangement
+      )} / ${changedBlocks} block${changedBlocks === 1 ? "" : "s"} / ${changedFields} field${changedFields === 1 ? "" : "s"}`,
+      group: "Arrange",
+      keywords: `arrangement template direct song form 8 bar loop full beat hook first breakdown structure ${template} ${templateLabel} beginner producer`,
+      disabled: aligned,
+      run: () => {
+        if (!aligned) {
+          onApplyArrangementTemplate(template);
+        }
+      }
+    };
+  });
+  const arrangementArcPadActions: QuickAction[] = arrangementArcPadOptions.map((pad) => ({
+    id: `arrangement-arc-pad-${pad.id}`,
+    title: pad.changedCount > 0 ? `Apply ${pad.label} Arc` : `${pad.label} Arc already applied`,
+    detail: `${pad.preview} / ${pad.detail} / ${pad.changedCount} block move${pad.changedCount === 1 ? "" : "s"}`,
+    group: "Arrange",
+    keywords: `arrangement arc direct pad energy song form dynamics hook lift break rise sections mutes ${pad.id} ${pad.label} ${pad.detail} ${pad.preview} beginner producer`,
+    disabled: pad.changedCount === 0,
+    run: () => {
+      if (pad.changedCount > 0) {
+        onApplyArrangementArc(pad.id);
+      }
+    }
+  }));
+  const arrangementFocusPresetActions: QuickAction[] = arrangementFocusPresets.map((preset) => {
+    const changedFields = selectedBlock ? arrangementFocusChangedFieldCount(selectedBlock, preset) : 0;
+    const aligned = Boolean(selectedBlock) && changedFields === 0;
+    return {
+      id: `arrangement-focus-preset-${preset.id}`,
+      title: !selectedBlock
+        ? `Apply ${preset.label} Focus`
+        : aligned
+          ? `${preset.label} Focus already applied`
+          : `Apply ${preset.label} Focus`,
+      detail: selectedBlock
+        ? `${selectedBlockLabel} -> ${preset.section} / Pattern ${preset.pattern} / ${barCountLabel(preset.bars)} / ${percentLabel(
+            preset.energy
+          )} energy / ${arrangementFocusPreviewMuteLabel(preset.mutedTracks)} / ${changedFields} field${
+            changedFields === 1 ? "" : "s"
+          }`
+        : "Select an arrangement block first.",
+      group: "Arrange",
+      keywords: `arrangement focus direct preset selected block section pattern energy mutes intro verse hook bridge outro ${preset.id} ${preset.label} ${preset.detail} beginner producer`,
+      disabled: !selectedBlock || aligned,
+      run: () => {
+        if (selectedBlock && !aligned) {
+          onApplyArrangementFocus(preset.id);
+        }
+      }
+    };
+  });
   const drumKitReady = drumKitPreviewSummary.statusLabel !== "Kit aligned";
   const mixBalanceReady = mixBalancePreviewSummary.statusLabel !== "Balance aligned";
   const patternStackId =
@@ -14719,6 +14784,7 @@ function createQuickActions({
         }
       }
     },
+    ...arrangementFocusPresetActions,
     {
       id: "pattern-chain",
       title: "Apply 8 Bar Chain",
@@ -14750,6 +14816,7 @@ function createQuickActions({
         }
       }
     },
+    ...arrangementTemplateActions,
     {
       id: "arrangement-arc",
       title: arrangementArcReady ? `Apply ${arrangementArcPreviewSummary.padLabel} Arc` : "Apply Arrangement Arc",
@@ -14765,6 +14832,7 @@ function createQuickActions({
         }
       }
     },
+    ...arrangementArcPadActions,
     ...stemAuditionPadOptions.map((pad): QuickAction => ({
       id: `stem-audition-${pad.id}`,
       title: pad.trackId === null ? "Audition Full Mix" : `Audition ${pad.label} Stem`,
@@ -15787,7 +15855,7 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "arrangement-focus") {
+  if (action.id === "arrangement-focus" || action.id.startsWith("arrangement-focus-preset-")) {
     return {
       id: "arrangement-focus",
       label: "Arrangement focus",
@@ -15795,7 +15863,7 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "arrangement-arc") {
+  if (action.id === "arrangement-arc" || action.id.startsWith("arrangement-arc-pad-")) {
     return {
       id: "song-arc",
       label: "Song arc",
@@ -15840,7 +15908,12 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "pattern-chain" || action.id === "chain-expand" || action.id === "arrangement-template") {
+  if (
+    action.id === "pattern-chain" ||
+    action.id === "chain-expand" ||
+    action.id === "arrangement-template" ||
+    action.id.startsWith("arrangement-template-direct-")
+  ) {
     return { id: "song-length", label: "Song length", value: barCountLabel(arrangementTotalBars(project)) };
   }
 
@@ -16429,7 +16502,7 @@ function quickActionResultFollowup(
     };
   }
 
-  if (action.id === "arrangement-template") {
+  if (action.id === "arrangement-template" || action.id.startsWith("arrangement-template-direct-")) {
     return {
       auditionCue: "Play Song loop; check section order, Pattern A/B/C spread, and hook placement.",
       nextCheck: `${barCountLabel(arrangementTotalBars(project))} arranged; scan Song Form Overview before mix decisions.`
@@ -16457,14 +16530,14 @@ function quickActionResultFollowup(
     };
   }
 
-  if (action.id === "arrangement-focus") {
+  if (action.id === "arrangement-focus" || action.id.startsWith("arrangement-focus-preset-")) {
     return {
       auditionCue: "Play Block loop; hear the selected block's section role, Pattern assignment, energy, and mutes in context.",
       nextCheck: "Use the Arrangement Focus Result, Arrangement Playback Readout, and Song Form Overview before changing nearby blocks."
     };
   }
 
-  if (action.id === "arrangement-arc") {
+  if (action.id === "arrangement-arc" || action.id.startsWith("arrangement-arc-pad-")) {
     return {
       auditionCue: "Play Song loop; listen for intro, verse, hook, bridge, and outro energy movement.",
       nextCheck: `${Math.round(arrangementAverageEnergy(project) * 100)}% average energy; scan Song Form Overview before detailed block edits.`
