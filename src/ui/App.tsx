@@ -13047,6 +13047,19 @@ function createQuickActions({
     run: () => onFocusKeyCompass(item)
   }));
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
+  const layerStarterActions: QuickAction[] = layerStarterOptions.map((option) => ({
+    id: `layer-starter-${option.id}`,
+    title: option.tone === "good" ? `${option.label} layer ready` : `Start ${option.label} layer`,
+    detail: `${option.status} / ${option.detail}`,
+    group: "Create",
+    keywords: `layer starter direct start seed pad drums 808 bass chords synth ${option.id} ${option.label} ${option.status} ${option.actionLabel} ${option.targetLabel} beginner producer`,
+    disabled: option.tone === "good",
+    run: () => {
+      if (option.tone !== "good") {
+        onApplyLayerStarter(option.id);
+      }
+    }
+  }));
   const listeningPassItem = activeListeningPassQuickActionItem(listeningPassSummary);
   const listeningPassActions: QuickAction[] = listeningPassSummary.items.map((item) => ({
     id: `listening-pass-checkpoint-${item.id}`,
@@ -14232,6 +14245,7 @@ function createQuickActions({
         }
       }
     },
+    ...layerStarterActions,
     ...patternCloneActions,
     {
       id: "pattern-stack",
@@ -15329,6 +15343,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("layer-starter-")) {
+    return {
+      id: "layer-starter",
+      label: "Layer starter",
+      value: action.detail
+    };
+  }
+
   if (action.id === "pattern-stack") {
     const pattern = activePattern(project);
     return {
@@ -15953,6 +15975,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the starter layer supports the groove, 808, harmony, and melody balance.`,
       nextCheck: "Return to Layer Starter or Pattern DNA after the selected layer is no longer missing or thin."
+    };
+  }
+
+  if (action.id.startsWith("layer-starter-")) {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the chosen starter layer supports the groove, low end, harmony, and melody balance.`,
+      nextCheck: "Return to Layer Starter or Pattern DNA before starting another missing or thin layer."
     };
   }
 
