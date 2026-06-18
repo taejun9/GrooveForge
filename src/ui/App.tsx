@@ -17095,6 +17095,8 @@ function suggestedBlueprintId(project: ProjectState): BeatBlueprintId {
       return "club_bounce";
     case "rnb":
       return "rnb_pocket";
+    case "k_hiphop_rnb":
+      return "seoul_pocket";
     case "jersey":
       return "jersey_drive";
     case "phonk":
@@ -20973,6 +20975,7 @@ function composerDrumFoundation(project: ProjectState): DrumFoundationId {
     case "boom_bap":
     case "lofi":
     case "rnb":
+    case "k_hiphop_rnb":
     case "phonk":
       return "bounce";
   }
@@ -20991,6 +20994,7 @@ function composerBasslinePad(project: ProjectState): BasslinePadId {
     case "boom_bap":
     case "lofi":
     case "rnb":
+    case "k_hiphop_rnb":
       return "bounce";
     case "experimental":
       return "root";
@@ -21004,6 +21008,7 @@ function composerChordPreset(project: ProjectState): ChordProgressionPreset {
     case "garage":
       return "bounce";
     case "rnb":
+    case "k_hiphop_rnb":
       return "lift";
     case "boom_bap":
     case "lofi":
@@ -21026,6 +21031,7 @@ function composerMelodyMotif(project: ProjectState): MelodyMotifId {
     case "lofi":
       return "answer";
     case "rnb":
+    case "k_hiphop_rnb":
       return "pocket";
     case "trap":
     case "drill":

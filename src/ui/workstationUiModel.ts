@@ -2414,6 +2414,19 @@ export const composerStyleActionProfiles: Record<StyleId, ComposerStyleActionPro
       finish: "vocal headroom"
     }
   },
+  k_hiphop_rnb: {
+    focus: "pocket and vocal space",
+    priorities: { drums: 1, harmony: 2, bass: 3, melody: 4, arrange: 5, finish: 6 },
+    goals: { drumHits: 12, bassNotes: 4, chordEvents: 4, melodyNotes: 4, arrangementBars: 8 },
+    cues: {
+      drums: "midtempo pocket",
+      bass: "clean sub line",
+      harmony: "lush color",
+      melody: "topline room",
+      arrange: "hook space",
+      finish: "vocal headroom"
+    }
+  },
   jersey: {
     focus: "bounce and sections",
     priorities: { drums: 1, bass: 2, arrange: 3, melody: 4, harmony: 5, finish: 6 },
