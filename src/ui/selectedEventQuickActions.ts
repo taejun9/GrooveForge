@@ -79,6 +79,7 @@ type SelectedEventQuickActionsParams = {
   onDeleteSelectedNote: () => void;
   onAuditionSelectedDrumHit: () => void;
   onMoveSelectedDrumStep: (direction: -1 | 1) => void;
+  onResetSelectedDrumStep: (step: number) => void;
   onUpdateSelectedDrumVelocity: (velocity: number) => void;
   onUpdateSelectedDrumProbability: (probability: number) => void;
   onUpdateSelectedDrumTiming: (timingMs: number) => void;
@@ -140,6 +141,7 @@ export function createSelectedEventQuickActions({
   onDeleteSelectedNote,
   onAuditionSelectedDrumHit,
   onMoveSelectedDrumStep,
+  onResetSelectedDrumStep,
   onUpdateSelectedDrumVelocity,
   onUpdateSelectedDrumProbability,
   onUpdateSelectedDrumTiming,
@@ -302,6 +304,25 @@ export function createSelectedEventQuickActions({
     selectedDrumStep && selectedDrumActive ? drumStepTimingMs(selectedPatternData, selectedDrumStep.lane, selectedDrumStep.step) : null;
   const selectedHatRepeat =
     selectedDrumStep?.lane === "hat" && selectedDrumActive ? hatRepeatCount(selectedPatternData, selectedDrumStep.step) : null;
+  const selectedDrumStepResetTarget =
+    selectedDrumStep && selectedDrumActive
+      ? steps
+          .filter((step) => step % 4 === 0)
+          .reduce<number | null>((best, step) => {
+            if (best === null) {
+              return step;
+            }
+            const distance = Math.abs(step - selectedDrumStep.step);
+            const bestDistance = Math.abs(best - selectedDrumStep.step);
+            return distance < bestDistance || (distance === bestDistance && step < best) ? step : best;
+          }, null)
+      : null;
+  const selectedDrumStepResetBlocked =
+    selectedDrumStep &&
+    selectedDrumStepResetTarget !== null &&
+    selectedDrumStepResetTarget !== selectedDrumStep.step
+      ? selectedPatternData.drumPattern[selectedDrumStep.lane][selectedDrumStepResetTarget]
+      : false;
   const drumClipboardLabel = drumClipboard ? `${drumLabels[drumClipboard.lane]} ${drumClipboard.step + 1}` : "Clipboard empty";
   const drumClipboardPasteStep = drumClipboard ? nextEmptyDrumStep(selectedPatternData, drumClipboard.lane, drumClipboard.step) : null;
   const selectedDrumDuplicateStep =
@@ -764,6 +785,30 @@ export function createSelectedEventQuickActions({
       keywords: "selected drum move right step later nudge grid pocket hit edit beginner producer",
       disabled: !selectedDrumActive || selectedDrumStepRight === null || selectedDrumStepRightOccupied,
       run: () => onMoveSelectedDrumStep(1)
+    },
+    {
+      id: "selected-drum-step-reset",
+      title: "Reset selected drum hit step",
+      detail:
+        selectedDrumActive && selectedDrumStep && selectedDrumStepResetTarget !== null
+          ? selectedDrumStep.step === selectedDrumStepResetTarget
+            ? `${selectedDrumLabel} already sits on the 4-step beat grid.`
+            : selectedDrumStepResetBlocked
+              ? `${drumLabels[selectedDrumStep.lane]} step ${selectedDrumStepResetTarget + 1} already has a hit.`
+              : `${selectedDrumLabel} step ${selectedDrumStep.step + 1} -> ${selectedDrumStepResetTarget + 1} / 4-step beat grid`
+          : "Select an active drum hit first.",
+      group: "Create",
+      keywords: "selected drum step reset snap beat grid timing quantize hit pocket edit beginner producer",
+      disabled:
+        !selectedDrumActive ||
+        selectedDrumStepResetTarget === null ||
+        selectedDrumStep?.step === selectedDrumStepResetTarget ||
+        selectedDrumStepResetBlocked,
+      run: () => {
+        if (selectedDrumStepResetTarget !== null) {
+          onResetSelectedDrumStep(selectedDrumStepResetTarget);
+        }
+      }
     },
     {
       id: "selected-drum-velocity-down",

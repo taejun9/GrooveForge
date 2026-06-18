@@ -3622,6 +3622,87 @@ export function App(): ReactElement {
     }
   }
 
+  function resetSelectedDrumStep(step: number): void {
+    const target = selectedDrumStep;
+    if (!target || !selectedDrumActive) {
+      setProjectStatus("Select an active drum hit");
+      return;
+    }
+
+    const nextStep = clampStepStart(step);
+    if (nextStep === target.step) {
+      setProjectStatus("Drum hit is already on the beat grid");
+      return;
+    }
+    if (nextStep % 4 !== 0) {
+      setProjectStatus("No beat-grid reset step");
+      return;
+    }
+
+    let rejectedStatus = "";
+    const changed = updateCurrentPattern((pattern) => {
+      if (!pattern.drumPattern[target.lane][target.step]) {
+        rejectedStatus = "Select an active drum hit";
+        return pattern;
+      }
+      if (pattern.drumPattern[target.lane][nextStep]) {
+        rejectedStatus = `${drumLabels[target.lane]} step ${nextStep + 1} already has a hit`;
+        return pattern;
+      }
+
+      const velocity = drumStepVelocity(pattern, target.lane, target.step);
+      const probability = drumStepProbability(pattern, target.lane, target.step);
+      const timingMs = drumStepTimingMs(pattern, target.lane, target.step);
+      const repeat = target.lane === "hat" ? hatRepeatCount(pattern, target.step) : 1;
+
+      return {
+        ...pattern,
+        drumPattern: {
+          ...pattern.drumPattern,
+          [target.lane]: pattern.drumPattern[target.lane].map((enabled, index) =>
+            index === target.step ? false : index === nextStep ? true : enabled
+          )
+        },
+        drumVelocities: {
+          ...pattern.drumVelocities,
+          [target.lane]: pattern.drumVelocities[target.lane].map((currentVelocity, index) =>
+            index === target.step
+              ? defaultDrumVelocity(target.lane, target.step)
+              : index === nextStep
+                ? normalizeDrumVelocity(velocity)
+                : currentVelocity
+          )
+        },
+        drumProbabilities: {
+          ...pattern.drumProbabilities,
+          [target.lane]: pattern.drumProbabilities[target.lane].map((currentProbability, index) =>
+            index === target.step ? 1 : index === nextStep ? normalizeDrumProbability(probability) : currentProbability
+          )
+        },
+        drumTimings: {
+          ...pattern.drumTimings,
+          [target.lane]: pattern.drumTimings[target.lane].map((currentTiming, index) =>
+            index === target.step ? 0 : index === nextStep ? normalizeDrumTimingMs(timingMs) : currentTiming
+          )
+        },
+        hatRepeats:
+          target.lane === "hat"
+            ? pattern.hatRepeats.map((currentRepeat, index) =>
+                index === target.step ? 1 : index === nextStep ? normalizeHatRepeat(repeat) : currentRepeat
+              )
+            : pattern.hatRepeats
+      };
+    }, "Reset drum step");
+
+    if (changed) {
+      setSelectedDrumStep({ lane: target.lane, step: nextStep });
+      setSelectedNote(null);
+      setSelectedChordIndex(null);
+    } else if (rejectedStatus) {
+      setProjectStatus(rejectedStatus);
+    }
+  }
+
   function auditionSelectedDrumHit(): void {
     auditionSelectedDrumHitEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedDrumStep);
   }
@@ -6219,6 +6300,7 @@ export function App(): ReactElement {
     onDuplicateSelectedNoteToStep: duplicateSelectedNoteToStep,
     onDeleteSelectedNote: deleteSelectedNote,
     onMoveSelectedDrumStep: moveSelectedDrumStep,
+    onResetSelectedDrumStep: resetSelectedDrumStep,
     onUpdateSelectedDrumVelocity: updateSelectedDrumVelocity,
     onUpdateSelectedDrumProbability: updateSelectedDrumProbability,
     onUpdateSelectedDrumTiming: updateSelectedDrumTiming,
@@ -11999,6 +12081,7 @@ function createQuickActions({
   onDuplicateSelectedNoteToStep,
   onDeleteSelectedNote,
   onMoveSelectedDrumStep,
+  onResetSelectedDrumStep,
   onUpdateSelectedDrumVelocity,
   onUpdateSelectedDrumProbability,
   onUpdateSelectedDrumTiming,
@@ -12222,6 +12305,7 @@ function createQuickActions({
   onDuplicateSelectedNoteToStep: (step: number) => void;
   onDeleteSelectedNote: () => void;
   onMoveSelectedDrumStep: (direction: -1 | 1) => void;
+  onResetSelectedDrumStep: (step: number) => void;
   onUpdateSelectedDrumVelocity: (velocity: number) => void;
   onUpdateSelectedDrumProbability: (probability: number) => void;
   onUpdateSelectedDrumTiming: (timingMs: number) => void;
@@ -12726,6 +12810,7 @@ function createQuickActions({
       onDuplicateSelectedNoteToStep,
       onDeleteSelectedNote,
       onMoveSelectedDrumStep,
+      onResetSelectedDrumStep,
       onAuditionSelectedDrumHit,
       onUpdateSelectedDrumVelocity,
       onUpdateSelectedDrumProbability,
