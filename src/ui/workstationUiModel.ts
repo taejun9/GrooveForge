@@ -1044,7 +1044,7 @@ export type PatternVariationResult = {
   tone: MixCoachTone;
 };
 
-export type PatternDnaCardId = "layers" | "density" | "variation" | "arrangement";
+export type PatternDnaCardId = "layers" | "density" | "dynamics" | "variation" | "arrangement";
 export type PatternDnaFocusTarget = "compose" | "arrange";
 
 export type PatternDnaCard = {

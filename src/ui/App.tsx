@@ -15777,7 +15777,7 @@ function quickActionResultFollowup(
 
   if (action.id === "pattern-dna-focus") {
     return {
-      auditionCue: "Use the focused Pattern DNA card to inspect layers, density, variation, or arrangement use before changing the loop.",
+      auditionCue: "Use the focused Pattern DNA card to inspect layers, density, dynamics, variation, or arrangement use before changing the loop.",
       nextCheck: "Return to Pattern DNA after the focused loop or arrangement lane changes."
     };
   }
@@ -15785,7 +15785,7 @@ function quickActionResultFollowup(
   if (action.id.startsWith("pattern-dna-card-")) {
     return {
       auditionCue: "Use the focused Pattern DNA card to inspect that loop posture lane before changing events or arrangement.",
-      nextCheck: "Return to Pattern DNA when you need another direct layers, density, variation, or arrangement focus."
+      nextCheck: "Return to Pattern DNA when you need another direct layers, density, dynamics, variation, or arrangement focus."
     };
   }
 
@@ -23520,6 +23520,7 @@ function createPatternDnaSummary(project: ProjectState): PatternDnaSummary {
   const layerTone: MixCoachTone = readyLayers.length >= 4 ? "good" : readyLayers.length >= 2 ? "warn" : "danger";
   const densityLabel = styleDensityLabel(eventCount);
   const densityTone: MixCoachTone = eventCount >= 24 ? "good" : eventCount >= 12 ? "warn" : "danger";
+  const dynamicsCard = createPatternDynamicsCard(pattern);
   const variationSignals = patternVariationSignals(pattern);
   const variationTone: MixCoachTone =
     variationSignals.length >= 3 ? "good" : variationSignals.length >= 1 ? "warn" : "danger";
@@ -23547,6 +23548,7 @@ function createPatternDnaSummary(project: ProjectState): PatternDnaSummary {
       focusTarget: "compose",
       focusLabel: "Compose"
     },
+    dynamicsCard,
     {
       id: "variation",
       label: "Variation",
@@ -23583,10 +23585,68 @@ function createPatternDnaSummary(project: ProjectState): PatternDnaSummary {
   return {
     slot,
     headline,
-    detail: `${densityLabel} / ${readyLayers.length}/4 layers / ${arrangedBars > 0 ? barCountLabel(arrangedBars) : "not arranged"}`,
+    detail: `${densityLabel} / ${readyLayers.length}/4 layers / ${dynamicsCard.value} / ${
+      arrangedBars > 0 ? barCountLabel(arrangedBars) : "not arranged"
+    }`,
     tone,
     cards
   };
+}
+
+function createPatternDynamicsCard(pattern: PatternData): PatternDnaCard {
+  const drumVelocities = drumPatternVelocityValues(pattern);
+  const bassVelocities = pattern.bassNotes.map((note) => clampVelocity(note.velocity));
+  const chordVelocities = pattern.chordEvents.map((chord) => clampVelocity(chord.velocity));
+  const melodyVelocities = pattern.melodyNotes.map((note) => clampVelocity(note.velocity));
+  const layerVelocities = [
+    { label: "Dr", values: drumVelocities },
+    { label: "808", values: bassVelocities },
+    { label: "Ch", values: chordVelocities },
+    { label: "Sy", values: melodyVelocities }
+  ];
+  const values = layerVelocities.flatMap((layer) => layer.values);
+
+  if (values.length === 0) {
+    return {
+      id: "dynamics",
+      label: "Dynamics",
+      value: "No events",
+      detail: "Add events before shaping velocity",
+      tone: "danger",
+      focusTarget: "compose",
+      focusLabel: "Compose"
+    };
+  }
+
+  const average = averageUnitVelocity(values);
+  const spread = Math.round((Math.max(...values) - Math.min(...values)) * 100);
+  const tone: MixCoachTone = spread >= 18 ? "good" : spread >= 8 ? "warn" : "danger";
+
+  return {
+    id: "dynamics",
+    label: "Dynamics",
+    value: `${percentLabel(average)} avg`,
+    detail: `${spread}pt spread / ${layerVelocities.map((layer) => `${layer.label} ${velocityLayerLabel(layer.values)}`).join(" / ")}`,
+    tone,
+    focusTarget: "compose",
+    focusLabel: "Compose"
+  };
+}
+
+function drumPatternVelocityValues(pattern: PatternData): number[] {
+  return (Object.keys(drumLabels) as DrumLane[]).flatMap((lane) =>
+    pattern.drumPattern[lane]
+      .map((enabled, step) => (enabled ? normalizeDrumVelocity(drumStepVelocity(pattern, lane, step)) : null))
+      .filter((velocity): velocity is number => velocity !== null)
+  );
+}
+
+function averageUnitVelocity(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+function velocityLayerLabel(values: number[]): string {
+  return values.length > 0 ? percentLabel(averageUnitVelocity(values)) : "--";
 }
 
 function createLayerStarterOptions(project: ProjectState): LayerStarterOption[] {
