@@ -1000,6 +1000,7 @@ export function App(): ReactElement {
     () => createHookReadinessSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
+  const hookLoopCueTarget = useMemo(() => createHookLoopCueTarget(project), [project]);
   const toplineSpaceSummary = useMemo(
     () => createToplineSpaceSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
     [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
@@ -2474,6 +2475,26 @@ export function App(): ReactElement {
     setTransportLoopScope("transition");
     setPlaybackMode("arrangement");
     setProjectStatus(`Transition ${transition.fromIndex + 1}->${transition.toIndex + 1} cued as Transition loop`);
+  }
+
+  function cueHookLoop(card?: HookReadinessFocusItem): void {
+    if (isPlaying) {
+      setProjectStatus("Stop playback before cueing the hook");
+      return;
+    }
+
+    const target = createHookLoopCueTarget(projectRef.current);
+    if (card) {
+      setHookReadinessFocusId(card.focusId);
+    }
+    if (!target) {
+      setProjectStatus("Hook section not in arrangement");
+      return;
+    }
+
+    selectArrangementBlock(target.index);
+    selectTransportLoopScope("block", false);
+    setProjectStatus(`Hook Block ${target.index + 1} cued as Hook loop`);
   }
 
   function cueSectionLocator(section: ArrangementSection): void {
@@ -5268,6 +5289,7 @@ export function App(): ReactElement {
     finishChecklistSummary,
     grooveCompassSummary,
     handoffPackageCheckSummary,
+    hookLoopCueTarget,
     hookReadinessSummary,
     isPlaying,
     keyCompassSummary,
@@ -5322,6 +5344,7 @@ export function App(): ReactElement {
     onApplyArrangementFocus: applyArrangementFocusPreset,
     onApplyArrangementTemplate: applyArrangementTemplate,
     onCueArrangementTransition: cueArrangementTransition,
+    onCueHookLoop: cueHookLoop,
     onFocusArrangementMuteMap: focusArrangementMuteMapLane,
     onFocusArrangementTransitionMap: focusArrangementTransitionMapTransition,
     onApplyBasslinePad: applyBasslinePad,
@@ -5852,7 +5875,11 @@ export function App(): ReactElement {
       <StructureLens summary={structureLensSummary} actions={structureLensActions} onRun={runNextMove} />
 
       <HookReadiness
+        cueTarget={hookLoopCueTarget}
+        cued={transportLoopScope === "block" && hookLoopCueTarget?.index === selectedArrangementIndex}
         focusedCardId={hookReadinessFocusId}
+        isPlaying={isPlaying}
+        onCue={cueHookLoop}
         onFocus={focusHookReadinessCard}
         summary={hookReadinessSummary}
       />
@@ -10795,11 +10822,19 @@ function StructureLens({
 }
 
 function HookReadiness({
+  cueTarget,
+  cued,
   focusedCardId,
+  isPlaying,
+  onCue,
   onFocus,
   summary
 }: {
+  cueTarget: HookLoopCueTarget | null;
+  cued: boolean;
   focusedCardId: HookReadinessFocusId | null;
+  isPlaying: boolean;
+  onCue: (card?: HookReadinessFocusItem) => void;
   onFocus: (card: HookReadinessFocusItem) => void;
   summary: HookReadinessSummary;
 }): ReactElement {
@@ -10832,15 +10867,34 @@ function HookReadiness({
               <span>{card.label}</span>
               <strong>{card.value}</strong>
               <small>{card.detail}</small>
-              <button
-                aria-pressed={focused}
-                className="hook-readiness-focus-button"
-                onClick={() => onFocus(card)}
-                title={`Focus ${card.focusLabel}: ${card.status}`}
-                type="button"
-              >
-                <span>{card.focusLabel}</span>
-              </button>
+              <div className="hook-readiness-card-actions">
+                <button
+                  aria-pressed={focused}
+                  className="hook-readiness-focus-button"
+                  onClick={() => onFocus(card)}
+                  title={`Focus ${card.focusLabel}: ${card.status}`}
+                  type="button"
+                >
+                  <span>{card.focusLabel}</span>
+                </button>
+                <button
+                  aria-pressed={cued}
+                  className="hook-readiness-cue-button"
+                  data-testid={`hook-readiness-cue-${card.id}`}
+                  disabled={isPlaying || !cueTarget}
+                  onClick={() => onCue(card)}
+                  title={
+                    isPlaying
+                      ? "Stop playback before cueing the hook loop"
+                      : cueTarget
+                        ? `Cue Hook loop ${hookLoopCueDetail(cueTarget)}`
+                        : "Add or select a Hook section before cueing"
+                  }
+                  type="button"
+                >
+                  <span>Cue</span>
+                </button>
+              </div>
             </div>
           );
         })}
@@ -11290,6 +11344,7 @@ function createQuickActions({
   finishChecklistSummary,
   grooveCompassSummary,
   handoffPackageCheckSummary,
+  hookLoopCueTarget,
   hookReadinessSummary,
   isPlaying,
   keyCompassSummary,
@@ -11344,6 +11399,7 @@ function createQuickActions({
   onApplyArrangementFocus,
   onApplyArrangementTemplate,
   onCueArrangementTransition,
+  onCueHookLoop,
   onFocusArrangementMuteMap,
   onFocusArrangementTransitionMap,
   onApplyBasslinePad,
@@ -11479,6 +11535,7 @@ function createQuickActions({
   finishChecklistSummary: FinishChecklistSummary;
   grooveCompassSummary: GrooveCompassSummary;
   handoffPackageCheckSummary: HandoffPackageCheckSummary;
+  hookLoopCueTarget: HookLoopCueTarget | null;
   hookReadinessSummary: HookReadinessSummary;
   isPlaying: boolean;
   keyCompassSummary: KeyCompassSummary;
@@ -11533,6 +11590,7 @@ function createQuickActions({
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
   onCueArrangementTransition: (transition: ArrangementTransitionMapTransition) => void;
+  onCueHookLoop: (card?: HookReadinessFocusItem) => void;
   onFocusArrangementMuteMap: (lane: ArrangementMuteMapLane) => void;
   onFocusArrangementTransitionMap: (transition: ArrangementTransitionMapTransition) => void;
   onApplyBasslinePad: (pad: BasslinePadId) => void;
@@ -11893,6 +11951,17 @@ function createQuickActions({
     group: card.focusTarget === "mix" || card.focusTarget === "master" ? "Mix" : "Arrange",
     keywords: `hook readiness focus card hook meter arrangement motif contrast mix handoff ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
     run: () => onFocusHookReadiness(card)
+  }));
+  const hookReadinessCueActions: QuickAction[] = hookReadinessSummary.cards.map((card) => ({
+    id: `hook-readiness-cue-${card.id}`,
+    title: `Cue Hook Loop: ${card.label}`,
+    detail: hookLoopCueTarget
+      ? `${hookLoopCueDetail(hookLoopCueTarget)} / ${card.value} / ${card.status}`
+      : "Hook section not in arrangement.",
+    group: "Transport",
+    keywords: `hook loop cue readiness card audition block transport hook section motif contrast mix handoff ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
+    disabled: isPlaying || !hookLoopCueTarget,
+    run: () => onCueHookLoop(card)
   }));
   const toplineSpaceCard = activeToplineSpaceQuickActionCard(toplineSpaceSummary);
   const toplineSpaceActions: QuickAction[] = toplineSpaceSummary.cards.map((card) => ({
@@ -13077,6 +13146,19 @@ function createQuickActions({
       }
     },
     {
+      id: "hook-loop-cue",
+      title: hookLoopCueTarget ? `Cue Hook Loop: Block ${hookLoopCueTarget.index + 1}` : "Cue Hook Loop",
+      detail: hookLoopCueTarget
+        ? hookLoopCueDetail(hookLoopCueTarget)
+        : "Add a Hook section before cueing the hook loop.",
+      group: "Transport",
+      keywords: `hook loop cue audition readiness hook section block transport ${
+        hookReadinessCard?.id ?? "none"
+      } ${hookReadinessCard?.label ?? "none"} beginner producer`,
+      disabled: isPlaying || !hookLoopCueTarget,
+      run: () => onCueHookLoop(hookReadinessCard ?? undefined)
+    },
+    {
       id: "loop-pattern",
       title: "Loop selected pattern",
       detail: `Pattern ${project.selectedPattern} two-bar preview.`,
@@ -13086,6 +13168,7 @@ function createQuickActions({
       run: () => onSelectTransportLoopScope("pattern")
     },
     ...arrangementTransitionLoopActions,
+    ...hookReadinessCueActions,
     ...sectionLocatorActions,
     ...arrangementBlockCueActions,
     {
@@ -14259,6 +14342,8 @@ function createQuickActionResult(
     action.id.startsWith("arrangement-transition-map-transition-") ||
     action.id === "transition-loop-cue" ||
     action.id.startsWith("transition-loop-cue-") ||
+    action.id === "hook-loop-cue" ||
+    action.id.startsWith("hook-readiness-cue-") ||
     action.id === "handoff-package-check-focus" ||
     action.id.startsWith("handoff-package-check-card-") ||
     action.id.startsWith("arrangement-block-cue-") ||
@@ -14982,6 +15067,15 @@ function quickActionResultMetricSnapshot(
       id: "hook-readiness",
       label: "Hook readiness",
       value: `${hookSummary.headline} / ${hookSummary.detail}`
+    };
+  }
+
+  if (action.id === "hook-loop-cue" || action.id.startsWith("hook-readiness-cue-")) {
+    const target = createHookLoopCueTarget(project);
+    return {
+      id: "hook-loop",
+      label: "Hook loop",
+      value: target ? hookLoopCueDetail(target) : `No Hook section / Pattern ${project.selectedPattern}`
     };
   }
 
@@ -15900,6 +15994,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Hook Readiness card to inspect hook section, motif, contrast, mix support, or handoff posture.",
       nextCheck: "Return to Hook Readiness after the focused hook lane is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id === "hook-loop-cue" || action.id.startsWith("hook-readiness-cue-")) {
+    return {
+      auditionCue: "Play Hook Block loop and judge the hook section only before changing motif density, contrast, mix support, or handoff context.",
+      nextCheck: "Return to Hook Readiness after the loop to decide whether the section, motif, contrast, mix, or handoff lane needs the next edit."
     };
   }
 
@@ -20662,6 +20763,42 @@ function createHookReadinessFocusSummary(
 
 function activeHookReadinessQuickActionCard(summary: HookReadinessSummary): HookReadinessCard | null {
   return summary.cards.find((card) => card.tone === "danger") ?? summary.cards.find((card) => card.tone === "warn") ?? summary.cards[0] ?? null;
+}
+
+type HookLoopCueTarget = {
+  index: number;
+  startBar: number;
+  endBar: number;
+  bars: number;
+  pattern: PatternSlot;
+};
+
+function createHookLoopCueTarget(project: ProjectState): HookLoopCueTarget | null {
+  const index = firstArrangementSectionIndex(project, "Hook");
+  if (index === null) {
+    return null;
+  }
+
+  const block = project.arrangement[index];
+  if (!block) {
+    return null;
+  }
+
+  const startBar = arrangementStartBar(project, index);
+  const bars = normalizeArrangementBars(block.bars);
+  return {
+    index,
+    startBar,
+    endBar: startBar + bars,
+    bars,
+    pattern: block.pattern
+  };
+}
+
+function hookLoopCueDetail(target: HookLoopCueTarget): string {
+  return `Block ${target.index + 1} Hook / Bars ${target.startBar + 1}-${target.endBar} / Pattern ${
+    target.pattern
+  } / ${barCountLabel(target.bars)}`;
 }
 
 function createToplineSpaceSummary(
