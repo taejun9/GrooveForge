@@ -1022,21 +1022,20 @@ export function KeyboardCapturePanel({
             value={defaults.length}
           />
         </label>
-        {target === "melody" ? (
-          <label className="capture-default-field velocity">
-            <span>Velocity</span>
-            <input
-              data-testid="keyboard-capture-velocity"
-              max={100}
-              min={0}
-              onChange={(event) => onDefaultsChange({ velocity: Number(event.currentTarget.value) / 100 })}
-              step={1}
-              type="range"
-              value={velocityPercent}
-            />
-            <strong data-testid="keyboard-capture-velocity-value">{velocityPercent}%</strong>
-          </label>
-        ) : (
+        <label className="capture-default-field velocity">
+          <span>Velocity</span>
+          <input
+            data-testid="keyboard-capture-velocity"
+            max={100}
+            min={0}
+            onChange={(event) => onDefaultsChange({ velocity: Number(event.currentTarget.value) / 100 })}
+            step={1}
+            type="range"
+            value={velocityPercent}
+          />
+          <strong data-testid="keyboard-capture-velocity-value">{velocityPercent}%</strong>
+        </label>
+        {target === "bass" && (
           <button
             aria-pressed={defaults.glide}
             className={defaults.glide ? "mini-toggle selected" : "mini-toggle"}
@@ -1268,6 +1267,7 @@ export function NoteInspector({
     ? `${noteClipboard.track === "bass" ? "808" : "Synth"} ${noteClipboard.note.pitch}.${noteClipboard.note.step + 1}`
     : "Empty";
   const probabilityValue = activeNote ? normalizeEventProbability(activeNote.probability) : 1;
+  const velocityValue = activeNote?.velocity ?? 0.82;
   return (
     <div className="note-inspector">
       <div className="inspector-heading">
@@ -1337,19 +1337,19 @@ export function NoteInspector({
                 <input type="checkbox" checked={bassNote.glide} onChange={(event) => onGlideChange(event.target.checked)} />
               </label>
             )}
-            {melodyNote && (
-              <label>
-                <span>Velocity</span>
-                <input
-                  type="range"
-                  min={0.2}
-                  max={1}
-                  step={0.01}
-                  value={melodyNote.velocity}
-                  onChange={(event) => onVelocityChange(Number(event.target.value))}
-                />
-              </label>
-            )}
+            <label>
+              <span>Velocity {percentLabel(velocityValue)}</span>
+              <input
+                aria-label="Note velocity"
+                data-testid="note-velocity"
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={velocityValue}
+                onChange={(event) => onVelocityChange(Number(event.target.value))}
+              />
+            </label>
             <label>
               <span>Chance {percentLabel(probabilityValue)}</span>
               <input

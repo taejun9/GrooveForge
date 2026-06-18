@@ -509,7 +509,11 @@ function scheduleStep(
         time,
         note.length * stepDuration * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
-        energyGain * (0.42 + sound.bassDrive * 0.22) * bassMix.gain * sidechainGainForStep(pattern, patternStep, sound.sidechainDuck, absoluteStep),
+        energyGain *
+          note.velocity *
+          (0.42 + sound.bassDrive * 0.22) *
+          bassMix.gain *
+          sidechainGainForStep(pattern, patternStep, sound.sidechainDuck, absoluteStep),
         bassOscillator(sound),
         bassMix,
         bassMix.pan,
@@ -658,7 +662,7 @@ export function playEditorAudition(project: ProjectState, target: EditorAudition
       time,
       duration,
       noteToFrequency(note.pitch),
-      (0.42 + sound.bassDrive * 0.22) * bassMix.gain,
+      note.velocity * (0.42 + sound.bassDrive * 0.22) * bassMix.gain,
       bassOscillator(sound),
       bassMix,
       bassMix.pan,

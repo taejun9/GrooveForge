@@ -935,7 +935,7 @@ export function App(): ReactElement {
   const [keyboardCaptureEnabled, setKeyboardCaptureEnabled] = useState(false);
   const [keyboardCaptureTarget, setKeyboardCaptureTarget] = useState<NoteTrack>("bass");
   const [keyboardCaptureDefaults, setKeyboardCaptureDefaults] = useState<Record<NoteTrack, KeyboardCaptureDefaults>>({
-    bass: { octave: 1, length: 2, velocity: 0.68, glide: false },
+    bass: { octave: 1, length: 2, velocity: 0.82, glide: false },
     melody: { octave: 4, length: 1, velocity: 0.68, glide: false }
   });
   const [keyboardCaptureStepMode, setKeyboardCaptureStepMode] = useState<KeyboardCaptureStepMode>("next-free");
@@ -2262,8 +2262,7 @@ export function App(): ReactElement {
 
     const step = resolveKeyboardCaptureStep(pattern, target, selectedNote, keyboardCaptureStepMode);
     const replaceStep = shouldReplaceKeyboardCaptureStep(keyboardCaptureStepMode, selectedNote, target);
-    const midiDefaults: KeyboardCaptureDefaults =
-      target === "melody" ? { ...captureDefaults, velocity: note.velocity } : captureDefaults;
+    const midiDefaults: KeyboardCaptureDefaults = { ...captureDefaults, velocity: note.velocity };
     const changed = updateCurrentPattern(
       (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch, midiDefaults, replaceStep),
       `MIDI ${replaceStep ? "replaced" : "captured"} ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} on Pattern ${
@@ -3665,7 +3664,10 @@ export function App(): ReactElement {
       ...pattern,
       bassNotes: exists
         ? pattern.bassNotes.filter((note) => note.step !== step || note.pitch !== pitch)
-        : sortBassNotes([...pattern.bassNotes, { step, pitch, length: 2, glide: false, probability: 1 }])
+        : sortBassNotes([
+            ...pattern.bassNotes,
+            { step, pitch, length: 2, velocity: clampVelocity(keyboardCaptureDefaults.bass.velocity), glide: false, probability: 1 }
+          ])
     }));
     setSelectedNote(exists ? null : { track: "bass", step, pitch });
   }
@@ -4070,15 +4072,25 @@ export function App(): ReactElement {
   }
 
   function updateSelectedVelocity(velocity: number): void {
-    if (!selectedNote || selectedNote.track !== "melody") {
+    if (!selectedNote) {
       return;
     }
 
+    const nextVelocity = clampVelocity(velocity);
     updateCurrentPattern((pattern) => ({
       ...pattern,
-      melodyNotes: pattern.melodyNotes.map((note) =>
-        note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, velocity } : note
-      )
+      bassNotes:
+        selectedNote.track === "bass"
+          ? pattern.bassNotes.map((note) =>
+              note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, velocity: nextVelocity } : note
+            )
+          : pattern.bassNotes,
+      melodyNotes:
+        selectedNote.track === "melody"
+          ? pattern.melodyNotes.map((note) =>
+              note.step === selectedNote.step && note.pitch === selectedNote.pitch ? { ...note, velocity: nextVelocity } : note
+            )
+          : pattern.melodyNotes
     }));
   }
 
@@ -6620,7 +6632,7 @@ export function App(): ReactElement {
             <NoteEditor
               title="808"
               track="bass"
-              notes={currentPattern.bassNotes.map((note) => ({ ...note, velocity: note.glide ? 0.95 : 0.82 }))}
+              notes={currentPattern.bassNotes}
               pitches={bassPitches}
               color="#ff7a4f"
               currentStep={currentEditorStep}
@@ -12201,7 +12213,9 @@ function createQuickActions({
   const keyboardCaptureDefaultDetail =
     keyboardCaptureTarget === "melody"
       ? `oct ${activeCaptureDefaults.octave} / len ${activeCaptureDefaults.length} / vel ${percentLabel(activeCaptureDefaults.velocity)}`
-      : `oct ${activeCaptureDefaults.octave} / len ${activeCaptureDefaults.length} / glide ${
+      : `oct ${activeCaptureDefaults.octave} / len ${activeCaptureDefaults.length} / vel ${percentLabel(
+          activeCaptureDefaults.velocity
+        )} / glide ${
           activeCaptureDefaults.glide ? "On" : "Off"
         }`;
   const selectedPatternData = activePattern(project);
@@ -12305,26 +12319,24 @@ function createQuickActions({
     },
     {
       id: "capture-default-velocity-down",
-      title: "Lower Synth capture velocity",
-      detail:
-        keyboardCaptureTarget === "melody"
-          ? `Synth velocity ${percentLabel(activeCaptureDefaults.velocity)} -> ${percentLabel(softerSynthVelocity)}`
-          : "Switch capture target to Synth to edit velocity defaults.",
+      title: "Lower capture velocity",
+      detail: `${keyboardCaptureTargetLabel} velocity ${percentLabel(activeCaptureDefaults.velocity)} -> ${percentLabel(
+        softerSynthVelocity
+      )} / Pattern ${project.selectedPattern}`,
       group: "Create",
-      keywords: "capture default synth velocity lower softer keyboard midi input melody notes beginner producer",
-      disabled: keyboardCaptureTarget !== "melody" || activeCaptureDefaults.velocity <= 0,
+      keywords: `capture default velocity lower softer keyboard midi input notes ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} 808 synth beginner producer`,
+      disabled: activeCaptureDefaults.velocity <= 0,
       run: () => onUpdateKeyboardCaptureDefaults({ velocity: activeCaptureDefaults.velocity - 0.1 })
     },
     {
       id: "capture-default-velocity-up",
-      title: "Raise Synth capture velocity",
-      detail:
-        keyboardCaptureTarget === "melody"
-          ? `Synth velocity ${percentLabel(activeCaptureDefaults.velocity)} -> ${percentLabel(louderSynthVelocity)}`
-          : "Switch capture target to Synth to edit velocity defaults.",
+      title: "Raise capture velocity",
+      detail: `${keyboardCaptureTargetLabel} velocity ${percentLabel(activeCaptureDefaults.velocity)} -> ${percentLabel(
+        louderSynthVelocity
+      )} / Pattern ${project.selectedPattern}`,
       group: "Create",
-      keywords: "capture default synth velocity raise louder keyboard midi input melody notes beginner producer",
-      disabled: keyboardCaptureTarget !== "melody" || activeCaptureDefaults.velocity >= 1,
+      keywords: `capture default velocity raise louder keyboard midi input notes ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} 808 synth beginner producer`,
+      disabled: activeCaptureDefaults.velocity >= 1,
       run: () => onUpdateKeyboardCaptureDefaults({ velocity: activeCaptureDefaults.velocity + 0.1 })
     },
     {

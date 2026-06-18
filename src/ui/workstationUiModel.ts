@@ -1184,6 +1184,7 @@ export type BasslinePadStep = {
   step: number;
   degree: number;
   length: number;
+  velocity?: number;
   glide: boolean;
   probability?: number;
 };

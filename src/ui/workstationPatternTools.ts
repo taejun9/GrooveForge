@@ -764,7 +764,7 @@ export function addKeyboardCaptureNote(
       ...pattern,
       bassNotes: sortBassNotes([
         ...pattern.bassNotes.filter((note) => note.step !== step),
-        { step, pitch, length, glide: defaults.glide, probability: 1 }
+        { step, pitch, length, velocity: clampVelocity(defaults.velocity), glide: defaults.glide, probability: 1 }
       ])
     };
   }
@@ -2279,11 +2279,19 @@ export function createBasslinePadNotes(key: string, pad: BasslinePadDefinition):
         step,
         pitch: pitches[positiveIndex(padStep.degree, pitches.length)] ?? pitches[0] ?? "C1",
         length: Math.min(clampStepLength(padStep.length), 16 - step),
+        velocity: clampVelocity(padStep.velocity ?? basslinePadStepVelocity(padStep)),
         glide: padStep.glide,
         probability: normalizeEventProbability(padStep.probability ?? 1)
       };
     })
   );
+}
+
+function basslinePadStepVelocity(step: BasslinePadStep): number {
+  if (step.glide) {
+    return 0.92;
+  }
+  return step.step % 8 === 0 ? 0.88 : 0.78;
 }
 
 export function createBassGlidePadOptions(notes: BassNote[]): BassGlidePadOption[] {
@@ -2581,6 +2589,7 @@ export function sameBassNote(first: BassNote, second: BassNote): boolean {
     first.step === second.step &&
     first.pitch === second.pitch &&
     first.length === second.length &&
+    clampVelocity(first.velocity) === clampVelocity(second.velocity) &&
     first.glide === second.glide &&
     normalizeEventProbability(first.probability ?? 1) === normalizeEventProbability(second.probability ?? 1)
   );

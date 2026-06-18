@@ -459,7 +459,10 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
         note.length * step * (0.74 + sound.bassDecay * 0.52),
         noteToFrequency(note.pitch),
         bassMix,
-        energyGain * (0.52 + sound.bassDrive * 0.24) * sidechainGainForStep(pattern, note.step, sound.sidechainDuck, barOffset + note.step),
+        energyGain *
+          note.velocity *
+          (0.52 + sound.bassDrive * 0.24) *
+          sidechainGainForStep(pattern, note.step, sound.sidechainDuck, barOffset + note.step),
         bassShape(sound),
         { drive: sound.bassDrive, filter: 0.72 + sound.bassDrive * 0.28, decay: 3.8 - sound.bassDecay * 1.4 }
       );

@@ -44,6 +44,7 @@ export type BassNote = {
   step: number;
   pitch: string;
   length: number;
+  velocity: number;
   glide: boolean;
   probability: number;
 };
@@ -947,10 +948,10 @@ const starterPatternA: PatternData = withDrumDynamics({
     perc: [false, false, false, true, false, false, false, false, false, true, false, false, false, false, true, false]
   },
   bassNotes: [
-    { step: 0, pitch: "F1", length: 2, glide: false, probability: 1 },
-    { step: 6, pitch: "C2", length: 2, glide: true, probability: 1 },
-    { step: 10, pitch: "Eb2", length: 2, glide: false, probability: 1 },
-    { step: 12, pitch: "F1", length: 4, glide: false, probability: 1 }
+    { step: 0, pitch: "F1", length: 2, velocity: 0.88, glide: false, probability: 1 },
+    { step: 6, pitch: "C2", length: 2, velocity: 0.92, glide: true, probability: 1 },
+    { step: 10, pitch: "Eb2", length: 2, velocity: 0.8, glide: false, probability: 1 },
+    { step: 12, pitch: "F1", length: 4, velocity: 0.9, glide: false, probability: 1 }
   ],
   melodyNotes: [
     { step: 0, pitch: "F4", length: 2, velocity: 0.72, probability: 1 },
@@ -975,11 +976,11 @@ const starterPatternB: PatternData = withDrumDynamics({
     perc: [false, false, true, false, false, false, false, true, false, false, true, false, false, true, false, false]
   },
   bassNotes: [
-    { step: 0, pitch: "F1", length: 2, glide: false, probability: 1 },
-    { step: 5, pitch: "Ab1", length: 1, glide: true, probability: 1 },
-    { step: 8, pitch: "C2", length: 2, glide: false, probability: 1 },
-    { step: 12, pitch: "Eb2", length: 2, glide: true, probability: 1 },
-    { step: 14, pitch: "F1", length: 2, glide: false, probability: 1 }
+    { step: 0, pitch: "F1", length: 2, velocity: 0.88, glide: false, probability: 1 },
+    { step: 5, pitch: "Ab1", length: 1, velocity: 0.92, glide: true, probability: 1 },
+    { step: 8, pitch: "C2", length: 2, velocity: 0.8, glide: false, probability: 1 },
+    { step: 12, pitch: "Eb2", length: 2, velocity: 0.92, glide: true, probability: 1 },
+    { step: 14, pitch: "F1", length: 2, velocity: 0.82, glide: false, probability: 1 }
   ],
   melodyNotes: [
     { step: 0, pitch: "C5", length: 2, velocity: 0.7, probability: 1 },
@@ -1004,9 +1005,9 @@ const starterPatternC: PatternData = withDrumDynamics({
     perc: [false, false, false, false, false, false, true, false, false, false, false, true, false, false, false, true]
   },
   bassNotes: [
-    { step: 0, pitch: "F1", length: 4, glide: false, probability: 1 },
-    { step: 8, pitch: "Db2", length: 4, glide: false, probability: 1 },
-    { step: 14, pitch: "Eb2", length: 2, glide: true, probability: 1 }
+    { step: 0, pitch: "F1", length: 4, velocity: 0.86, glide: false, probability: 1 },
+    { step: 8, pitch: "Db2", length: 4, velocity: 0.8, glide: false, probability: 1 },
+    { step: 14, pitch: "Eb2", length: 2, velocity: 0.92, glide: true, probability: 1 }
   ],
   melodyNotes: [
     { step: 0, pitch: "Ab4", length: 3, velocity: 0.6, probability: 1 },
@@ -1362,6 +1363,13 @@ export function normalizeDrumVelocity(value: number): number {
   return Math.min(1, Math.max(0.15, value));
 }
 
+export function normalizeNoteVelocity(value: number | undefined, fallback = 0.82): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(1, Math.max(0, value));
+}
+
 export function normalizeDrumProbability(value: number): number {
   if (!Number.isFinite(value)) {
     return 1;
@@ -1616,9 +1624,9 @@ function applyDrumTailFill(pattern: PatternData): void {
 function applyBassPickup(pattern: PatternData, key: string): void {
   pattern.bassNotes = sortBassNotes([
     ...pattern.bassNotes.filter((note) => note.step < 12).map(trimEventBeforeTail),
-    { step: 12, pitch: pitchFromDegree(key, 4, 1), length: 1, glide: false, probability: 0.9 },
-    { step: 14, pitch: pitchFromDegree(key, 5, 1), length: 1, glide: true, probability: 1 },
-    { step: 15, pitch: pitchFromDegree(key, 6, 1), length: 1, glide: true, probability: 1 }
+    { step: 12, pitch: pitchFromDegree(key, 4, 1), length: 1, velocity: 0.78, glide: false, probability: 0.9 },
+    { step: 14, pitch: pitchFromDegree(key, 5, 1), length: 1, velocity: 0.9, glide: true, probability: 1 },
+    { step: 15, pitch: pitchFromDegree(key, 6, 1), length: 1, velocity: 0.92, glide: true, probability: 1 }
   ]);
 }
 
@@ -1880,6 +1888,7 @@ function blueprint(
       degree,
       octave: index > 3 ? 2 : 1,
       length: index === 0 ? 3 : 2,
+      velocity: index % 3 === 1 ? 0.92 : index % 2 === 0 ? 0.86 : 0.78,
       glide: index % 3 === 1
     })),
     melody: melodyDegrees.map((degree, index) => ({
@@ -1906,6 +1915,7 @@ function patternFromBlueprint(key: string, pattern: PatternBlueprint): PatternDa
       step: note.step,
       pitch: pitchFromDegree(key, note.degree, note.octave),
       length: note.length,
+      velocity: normalizeNoteVelocity(note.velocity),
       glide: note.glide ?? false,
       probability: 1
     })),
@@ -2538,6 +2548,7 @@ function normalizeDrumProbabilities(value: DrumProbabilities | undefined): DrumP
 function normalizeBassNotes(notes: BassNoteInput[]): BassNote[] {
   return notes.map((note) => ({
     ...note,
+    velocity: normalizeNoteVelocity(note.velocity),
     probability: normalizeEventProbability(note.probability ?? 1)
   }));
 }
@@ -2545,6 +2556,7 @@ function normalizeBassNotes(notes: BassNoteInput[]): BassNote[] {
 function normalizeMelodyNotes(notes: MelodyNoteInput[]): MelodyNote[] {
   return notes.map((note) => ({
     ...note,
+    velocity: normalizeNoteVelocity(note.velocity, 0.64),
     probability: normalizeEventProbability(note.probability ?? 1)
   }));
 }
@@ -2715,7 +2727,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
   return null;
 }
 
-type BassNoteInput = Omit<BassNote, "probability"> & { probability?: number };
+type BassNoteInput = Omit<BassNote, "probability" | "velocity"> & { probability?: number; velocity?: number };
 type MelodyNoteInput = Omit<MelodyNote, "probability"> & { probability?: number };
 type ChordEventInput = Omit<ChordEvent, "probability" | "inversion"> & { probability?: number; inversion?: unknown };
 type PatternDataInput = Omit<PatternData, "bassNotes" | "melodyNotes" | "chordEvents" | "drumVelocities" | "drumTimings" | "drumProbabilities" | "hatRepeats"> & {
@@ -2974,6 +2986,7 @@ function isBassNote(value: unknown): value is BassNoteInput {
     isFiniteNumber(value.length) &&
     value.length >= 1 &&
     value.length <= stepsPerBar &&
+    isOptionalUnit(value.velocity) &&
     typeof value.glide === "boolean" &&
     isOptionalUnit(value.probability)
   );

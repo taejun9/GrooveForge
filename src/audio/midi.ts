@@ -214,7 +214,7 @@ export function createMidiFile(project: ProjectState): Uint8Array {
         if (midiNote === null || !noteEventShouldPlay("bass", note, absoluteStep)) {
           continue;
         }
-        addNote(tracks.bass, barTick + note.step * ticksPerStep, note.length * ticksPerStep, midiNote, 0.82 * energy);
+        addNote(tracks.bass, barTick + note.step * ticksPerStep, note.length * ticksPerStep, midiNote, note.velocity * energy);
       }
     }
 
