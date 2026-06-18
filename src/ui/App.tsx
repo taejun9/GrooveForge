@@ -22,6 +22,7 @@ import {
   Scissors,
   SlidersHorizontal,
   Sparkles,
+  Target,
   Trash2,
   Undo2,
   Waves,
@@ -6586,6 +6587,7 @@ export function App(): ReactElement {
             result={mixFixResult}
             stemAnalyses={stemAnalyses}
             onApplyFix={applyMixFixPreset}
+            onFocusCheck={focusMixCoachCheck}
           />
           <MasterFinishPads
             pads={masterFinishPadOptions}
@@ -21542,7 +21544,8 @@ function MixCoach({
   project,
   result,
   stemAnalyses,
-  onApplyFix
+  onApplyFix,
+  onFocusCheck
 }: {
   analysis: ExportAnalysis;
   focusedCheckId: string | null;
@@ -21550,6 +21553,7 @@ function MixCoach({
   result: MixFixResult | null;
   stemAnalyses: StemExportAnalyses;
   onApplyFix: (preset: MixFixPreset) => void;
+  onFocusCheck: (check: MixCoachCheck) => void;
 }): ReactElement {
   const checks = createMixCoachChecks(analysis, stemAnalyses);
   const focusSummary = createMixCoachFocusSummary(checks, focusedCheckId);
@@ -21597,6 +21601,19 @@ function MixCoach({
               <span>{check.label}</span>
               <strong>{check.status}</strong>
               <p>{check.detail}</p>
+              <div className="mix-coach-card-actions">
+                <button
+                  aria-pressed={focused}
+                  className="mix-coach-focus-button"
+                  data-testid={`mix-coach-focus-${check.id}`}
+                  onClick={() => onFocusCheck(check)}
+                  title={`Focus ${check.label}: ${check.status}`}
+                  type="button"
+                >
+                  <Target size={13} aria-hidden="true" />
+                  <span>{focused ? "Focused" : "Focus"}</span>
+                </button>
+              </div>
             </div>
           );
         })}

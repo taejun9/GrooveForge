@@ -15214,6 +15214,37 @@ input[type="range"] {
   line-height: 1.35;
 }
 
+.mix-coach-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 28px;
+}
+
+.mix-coach-focus-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 6px;
+  background: rgba(244, 239, 231, 0.06);
+  color: rgba(244, 239, 231, 0.78);
+  font-size: 11px;
+}
+
+.mix-coach-focus-button:hover,
+.mix-coach-focus-button[aria-pressed="true"] {
+  border-color: rgba(120, 240, 200, 0.45);
+  background: rgba(120, 240, 200, 0.12);
+  color: #f4efe7;
+}
+
+.mix-coach-focus-button span {
+  color: inherit;
+  font-size: 11px;
+}
+
 .mix-fix-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
