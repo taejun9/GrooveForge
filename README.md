@@ -17,7 +17,7 @@ GrooveForge is a code-driven all-genre beat workstation with a programmable proj
 
 The first-run experience should feel like opening a compact beat-making DAW: choose BPM/key/style, write drums, build 808/bass, add melody/chords, shape sounds, arrange, mix, master, then export.
 
-Genre breadth is part of the core. Trap, drill, boom bap, lo-fi, house, R&B, K-hip-hop/R&B, jersey club, phonk, garage, and experimental starts should come from editable style profiles, built-in instruments, and musical events.
+Genre breadth is part of the core. Trap, drill, boom bap, lo-fi, house, R&B, K-hip-hop/R&B, Afrobeats, Amapiano, Reggaeton, jersey club, phonk, garage, experimental, and future style starts should come from editable style profiles, built-in instruments, and musical events.
 
 The core flow is:
 
@@ -211,6 +211,8 @@ Quick Actions selected-chord length reset commands return the active selected ch
 ## Draft Intake Guardrails
 
 Extension boundary: Sampling is subordinate and opt-in. After the core beat-making loop works, a future module may add audio import, chopping/slicing, pitch/stretch, one-shot mapping, or sampler instruments. It must attach as an optional sound source inside the workstation. A complete GrooveForge beat must still be possible with no imported audio.
+
+Current audit outcome: the corrected Korean concept brief is the source of truth for future drafts. GrooveForge is a direct beat-production mini DAW for all genres, not a sampling app with extra composition features. Accept the brief's direct-composition path, then move sample import, chop/slice, loop stretch, sample 808, `AudioClipEvent`, `audio`, and `sampler` examples into optional extension notes before implementation.
 
 Concept audit rule: do not read any sampling reference as the main workflow. Sampling is an accessory module, not the app category. If a draft starts from sample import, sample browsing, chopping, loop stretching, one-shot mapping, sampler setup, or lists a sampler as a default instrument-panel item, it is out of alignment until it is explicitly labeled optional sampling-phase work.
 

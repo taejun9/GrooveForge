@@ -590,6 +590,8 @@ Concept correction work must treat built-in drum kits, internal one-shots, and a
 
 Brief alignment work fails if the project can be summarized as a sampling app, sample-chopping tool, sample-pack workflow, or sampler setup surface. The expected summary is an all-genre beat-production mini DAW where sampling is an accessory module.
 
+Current concept-audit work must record the attached Korean correction as a direct-composition brief: the accepted MVP path is BPM/key/style, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Any sample import, chop/slice, loop stretch, sample 808, `AudioClipEvent`, `AudioClip`, `audio`, `sampler`, sampler device, sample browser, or waveform example in that brief is optional extension material until a user-approved sampling-phase plan exists.
+
 First-run UX, default navigation, and roadmap work must lead with direct beat composition: pattern programming, drums, 808/bass, melody/chords, sound design, arrangement, mixer/master, and export. Sample browsing, chopping, sampler setup, audio clips, and audio warping must stay opt-in optional-sampling paths unless the user explicitly changes the product direction.
 
 Sampling placement work fails if the default empty project, first visible action, MVP proof, primary navigation, onboarding language, priority table, or plan title makes sample browsing, sample import, chopping, sampler setup, or audio clips appear before editable musical events and beat-making controls.

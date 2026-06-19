@@ -21,6 +21,10 @@ Record official documentation, platform docs, standards, laws, policies, or vend
 | Steinberg VST 3 Developer Portal | https://steinbergmedia.github.io/vst3_dev_portal/ | VST3 plugin and host development references | 2026-06-15 | Later plugin-hosting research only |
 | ITU-R BS.1770 | https://www.itu.int/rec/R-REC-BS.1770 | Loudness and true-peak measurement standard reference | 2026-06-15 | Loudness meter and mastering target research |
 | Spotify for Artists Loudness Normalization | https://support.spotify.com/us/artists/article/loudness-normalization/ | Spotify-specific loudness normalization guidance | 2026-06-15 | Streaming preset research, not a universal mastering rule |
+| Ableton Live 12 Reference Manual: Clip View | https://www.ableton.com/en/live-manual/12/clip-view/ | Official clip model reference distinguishing MIDI note editing from audio sample/warp editing | 2026-06-19 | Benchmark context for event-first clip editing; not a sampling-first product decision |
+| Apple GarageBand for Mac User Guide | https://support.apple.com/guide/garageband/welcome/mac | Official beginner music-production user guide entry point | 2026-06-19 | Benchmark context for approachable desktop music-making workflows |
+| Bitwig Studio User Guide: Working with Audio Events | https://www.bitwig.com/userguide/latest/working_with_audio_events/ | Official audio-event, stretch, onset, and clip editing reference | 2026-06-19 | Optional sampling/clip-extension research only |
+| Image-Line FL Studio Manual: Levels, Mixing & Clipping | https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/mixer_levelsandmixing.htm | Official mixing, clipping, and mixing-before-mastering guidance | 2026-06-19 | Mixer/master stage separation and output-posture research |
 
 ## Rules
 

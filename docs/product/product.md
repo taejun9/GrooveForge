@@ -25,7 +25,7 @@ The product should make a blank beat feel playable without imported audio: set B
 
 Draft correction rules belong in the guardrail section below. The first-read definition should make the beat-making path obvious before it mentions any optional sampling vocabulary.
 
-Trap, drill, boom bap, house, lofi, jersey, phonk, R&B, K-hip-hop/R&B, garage, and experimental workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
+Trap, drill, boom bap, house, lofi, R&B, K-hip-hop/R&B, Afrobeats, Amapiano, Reggaeton, jersey, phonk, garage, experimental, and future workflows should be expressed as style profiles and editable generation rules, not as hard-coded product identity.
 
 When there is ambiguity, read the product draft in this order: all-genre beat creation first, direct composition and sound design second, arrangement/mixing/mastering/export third, optional sampling extensions last.
 
@@ -76,6 +76,8 @@ Attached Korean brief rewrite: accept the corrected sentence that GrooveForge is
 Korean concept-brief rule: if the user says the concept is "비트(모든 장르)를 만드는" product and sampling is "부가 기능", that statement overrides sampling-heavy draft examples. Keep `sample import -> chop -> arrange` sequences out of the MVP path and rewrite the accepted first path as `BPM/key/style -> drums -> 808/bass -> melody/chords -> sound design -> arrangement -> mixer/master -> export`.
 
 Latest concept verdict: GrooveForge should be evaluated as a direct beat-production workstation, not as a sampling app with extra composition features. A draft is aligned only when direct beat composition, sound design, arrangement, mixing/mastering, and export are the spine, and sample import, chopping, loop stretch, one-shot mapping, and sampler setup are clearly labeled optional extension work.
+
+Current audit outcome: the attached Korean correction is accepted as a direct-composition brief, not as a permission to import its mixed optional-sampling examples into core scope. The valid MVP rewrite keeps the first path as `BPM/key/style -> drums -> 808/bass -> melody/chords -> sound design -> arrangement -> mixer/master -> export`; moves `sample import -> chop/slice -> pitch/stretch -> sampler instrument` to optional extension planning; keeps `AudioClipEvent`, `AudioClip`, `audio`, `sampler`, sample 808, waveform editing, and user-file dependencies out of core event, clip, track, device, first-run, and roadmap examples.
 
 ## Users
 
