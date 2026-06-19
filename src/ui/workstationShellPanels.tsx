@@ -464,6 +464,7 @@ export function QuickActions({
     query.trim().length === 0 && (scope === "all" || scope === "project")
       ? recentActionSource.find((action) => action.id === "guide-quick-start") ?? null
       : null;
+  const guideSuggestionPinned = guideSuggestionAction ? pinnedActionIds.includes(guideSuggestionAction.id) : false;
 
   return (
     <div
@@ -557,6 +558,18 @@ export function QuickActions({
             >
               <Target size={14} aria-hidden="true" />
               <span>Run guide</span>
+            </button>
+            <button
+              aria-label={`${guideSuggestionPinned ? "Unpin" : "Pin"} ${guideSuggestionAction.title}`}
+              aria-pressed={guideSuggestionPinned}
+              className={guideSuggestionPinned ? "selected" : ""}
+              data-testid={`quick-actions-guide-suggestion-${guideSuggestionPinned ? "unpin" : "pin"}`}
+              onClick={() => onTogglePin(guideSuggestionAction)}
+              title={`${guideSuggestionPinned ? "Unpin" : "Pin"} ${guideSuggestionAction.title}`}
+              type="button"
+            >
+              {guideSuggestionPinned ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}
+              <span>{guideSuggestionPinned ? "Unpin" : "Pin"}</span>
             </button>
           </div>
         )}

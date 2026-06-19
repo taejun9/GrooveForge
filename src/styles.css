@@ -4614,7 +4614,7 @@ h2 {
 
 .quick-actions-guide-suggestion {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px;
+  grid-template-columns: minmax(0, 1fr) 96px 74px;
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -4667,6 +4667,12 @@ h2 {
   color: #f4efe7;
   background: rgba(17, 16, 15, 0.2);
   font-size: 10px;
+}
+
+.quick-actions-guide-suggestion > button.selected {
+  border-color: rgba(240, 195, 106, 0.38);
+  color: #f4efe7;
+  background: rgba(240, 195, 106, 0.12);
 }
 
 .quick-actions-guide-suggestion.warn > button {
@@ -21481,7 +21487,7 @@ input[type="range"] {
   }
 
   .quick-actions-guide-suggestion {
-    grid-template-columns: minmax(0, 1fr) 92px;
+    grid-template-columns: minmax(0, 1fr) 92px 70px;
   }
 
   .quick-actions-recents,
