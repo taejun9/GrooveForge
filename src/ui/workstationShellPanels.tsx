@@ -99,6 +99,19 @@ function quickActionPinnedInspectorTarget(action: QuickAction): string {
   return `Target: ${detailTarget ?? action.title}`;
 }
 
+function quickActionRecentInspectorTarget(action: QuickAction): string {
+  const detailTarget = action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean)[0];
+
+  return `Target: ${detailTarget ?? action.title}`;
+}
+
+function quickActionRecentInspectorResult(recent: QuickActionRecent): string {
+  return `Last result: ${recent.status}`;
+}
+
 type CommandReferenceItem = {
   id: string;
   command: string;
@@ -479,6 +492,7 @@ export function LocalDraftRecoveryBanner({
 export function QuickActions({
   actions,
   inspectedPinnedActionId,
+  inspectedRecentActionId,
   open,
   pinnedActionIds,
   query,
@@ -488,6 +502,7 @@ export function QuickActions({
   scopeOptions,
   onClose,
   onInspectPinnedAction,
+  onInspectRecentAction,
   onQueryChange,
   onRun,
   onScopeChange,
@@ -495,6 +510,7 @@ export function QuickActions({
 }: {
   actions: QuickAction[];
   inspectedPinnedActionId: string | null;
+  inspectedRecentActionId: string | null;
   open: boolean;
   pinnedActionIds: string[];
   query: string;
@@ -504,6 +520,7 @@ export function QuickActions({
   scopeOptions: QuickActionScopeOption[];
   onClose: () => void;
   onInspectPinnedAction: (actionId: string | null) => void;
+  onInspectRecentAction: (actionId: string | null) => void;
   onQueryChange: (query: string) => void;
   onRun: (action: QuickAction) => void;
   onScopeChange: (scope: QuickActionScopeId) => void;
@@ -518,6 +535,7 @@ export function QuickActions({
   const pinnedActions = createQuickActionPinnedOptions(pinnedActionIds, recentActionSource);
   const recentActions = createQuickActionRecentOptions(recents, recentActionSource);
   const inspectedPinnedAction = pinnedActions.find((action) => action.id === inspectedPinnedActionId) ?? null;
+  const inspectedRecentAction = recentActions.find(({ action }) => action.id === inspectedRecentActionId) ?? null;
   const guideSuggestionAction =
     query.trim().length === 0 && (scope === "all" || scope === "project")
       ? recentActionSource.find((action) => action.id === "guide-quick-start") ?? null
@@ -765,22 +783,71 @@ export function QuickActions({
               </span>
             ) : (
               recentActions.map(({ action, recent }) => (
-                <button
-                  className={recent.tone}
-                  data-testid={`quick-actions-recent-${action.id}`}
-                  disabled={action.disabled}
-                  key={action.id}
-                  onClick={() => onRun(action)}
-                  title={`${recent.status}: ${action.detail}`}
-                  type="button"
-                >
-                  <span>{action.group}</span>
-                  <strong>{action.title}</strong>
-                  <small>{recent.status}</small>
-                </button>
+                <div className="quick-actions-recent-card" data-testid={`quick-actions-recent-card-${action.id}`} key={action.id}>
+                  <button
+                    className={recent.tone}
+                    data-testid={`quick-actions-recent-${action.id}`}
+                    disabled={action.disabled}
+                    onClick={() => onRun(action)}
+                    title={`${recent.status}: ${action.detail}`}
+                    type="button"
+                  >
+                    <span>{action.group}</span>
+                    <strong>{action.title}</strong>
+                    <small>{recent.status}</small>
+                  </button>
+                  <button
+                    aria-label={`Inspect recent ${action.title}`}
+                    aria-pressed={inspectedRecentAction?.action.id === action.id}
+                    className={`quick-action-pin-toggle ${inspectedRecentAction?.action.id === action.id ? "selected" : ""}`}
+                    data-testid={`quick-actions-recent-inspect-${action.id}`}
+                    onClick={() => onInspectRecentAction(inspectedRecentAction?.action.id === action.id ? null : action.id)}
+                    title={`Inspect recent ${action.title}`}
+                    type="button"
+                  >
+                    <CircleHelp size={14} aria-hidden="true" />
+                    <span>Info</span>
+                  </button>
+                </div>
               ))
             )}
           </div>
+          {inspectedRecentAction && (
+            <div
+              className={`quick-actions-recent-inspector ${inspectedRecentAction.action.disabled ? "warn" : inspectedRecentAction.recent.tone}`}
+              data-inspected-action={inspectedRecentAction.action.id}
+              data-testid="quick-actions-recent-inspector"
+            >
+              <div>
+                <span data-testid="quick-actions-recent-inspector-status">
+                  {inspectedRecentAction.action.disabled ? "Unavailable recent command" : "Recent command ready"}
+                </span>
+                <strong data-testid="quick-actions-recent-inspector-title">{inspectedRecentAction.action.title}</strong>
+                <small data-testid="quick-actions-recent-inspector-detail">
+                  {inspectedRecentAction.action.group} / {inspectedRecentAction.action.detail}
+                </small>
+                <span className="quick-actions-recent-inspector-meta" data-testid="quick-actions-recent-inspector-meta">
+                  <span data-testid="quick-actions-recent-inspector-group">Group: {inspectedRecentAction.action.group}</span>
+                  <span data-testid="quick-actions-recent-inspector-target">
+                    {quickActionRecentInspectorTarget(inspectedRecentAction.action)}
+                  </span>
+                  <span data-testid="quick-actions-recent-inspector-result">
+                    {quickActionRecentInspectorResult(inspectedRecentAction.recent)}
+                  </span>
+                </span>
+              </div>
+              <button
+                data-testid="quick-actions-recent-inspector-run"
+                disabled={inspectedRecentAction.action.disabled}
+                onClick={() => onRun(inspectedRecentAction.action)}
+                title={`Rerun inspected recent command: ${inspectedRecentAction.action.detail}`}
+                type="button"
+              >
+                <Play size={14} aria-hidden="true" />
+                <span>Rerun</span>
+              </button>
+            </div>
+          )}
         </div>
         <div className="quick-actions-list" data-testid="quick-actions-list">
           {actions.length === 0 ? (

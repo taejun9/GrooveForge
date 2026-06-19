@@ -1296,6 +1296,7 @@ export function App(): ReactElement {
   const [quickActionRecents, setQuickActionRecents] = useState<QuickActionRecent[]>([]);
   const [quickActionPinnedIds, setQuickActionPinnedIds] = useState<string[]>([]);
   const [inspectedQuickActionPinnedId, setInspectedQuickActionPinnedId] = useState<string | null>(null);
+  const [inspectedQuickActionRecentId, setInspectedQuickActionRecentId] = useState<string | null>(null);
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
@@ -8073,6 +8074,7 @@ export function App(): ReactElement {
         actions={filteredQuickActions}
         open={quickActionsOpen}
         inspectedPinnedActionId={inspectedQuickActionPinnedId}
+        inspectedRecentActionId={inspectedQuickActionRecentId}
         pinnedActionIds={quickActionPinnedIds}
         query={quickActionQuery}
         recentActionSource={quickActions}
@@ -8083,6 +8085,7 @@ export function App(): ReactElement {
         onQueryChange={setQuickActionQuery}
         onRun={runQuickAction}
         onInspectPinnedAction={setInspectedQuickActionPinnedId}
+        onInspectRecentAction={setInspectedQuickActionRecentId}
         onScopeChange={setQuickActionScope}
         onTogglePin={toggleQuickActionPin}
       />

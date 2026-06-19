@@ -4800,12 +4800,16 @@ h2 {
 
 .quick-actions-recent-empty,
 .quick-actions-pinned-empty,
-.quick-actions-recents-list button {
+.quick-actions-recent-card > button:first-child {
   min-height: 48px;
   border: 1px solid rgba(130, 215, 255, 0.18);
   border-radius: 6px;
   background: rgba(17, 16, 15, 0.18);
   padding: 6px 7px;
+}
+
+.quick-actions-recents-list button {
+  min-width: 0;
 }
 
 .quick-actions-pinned-empty {
@@ -4823,6 +4827,13 @@ h2 {
 .quick-actions-pinned-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 34px 34px;
+  gap: 6px;
+  min-width: 0;
+}
+
+.quick-actions-recent-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
   gap: 6px;
   min-width: 0;
 }
@@ -4852,6 +4863,30 @@ h2 {
 }
 
 .quick-actions-pinned-card > button:first-child strong {
+  color: #f4efe7;
+  font-size: 10px;
+}
+
+.quick-actions-recent-card > button:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: #f4efe7;
+  text-align: start;
+}
+
+.quick-actions-recent-card > button:first-child:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.quick-actions-recent-card > button:first-child span,
+.quick-actions-recent-card > button:first-child small {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 9px;
+}
+
+.quick-actions-recent-card > button:first-child strong {
   color: #f4efe7;
   font-size: 10px;
 }
@@ -4940,12 +4975,93 @@ h2 {
   opacity: 0.48;
 }
 
-.quick-actions-recents-list button {
+.quick-actions-recent-inspector {
   display: grid;
-  gap: 2px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 8px;
   min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.24);
+  border-radius: 7px;
+  background: rgba(130, 215, 255, 0.055);
+  padding: 8px;
+}
+
+.quick-actions-recent-inspector.warn {
+  border-color: rgba(240, 195, 106, 0.3);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.quick-actions-recent-inspector.danger {
+  border-color: rgba(255, 122, 79, 0.32);
+  background: rgba(255, 122, 79, 0.055);
+}
+
+.quick-actions-recent-inspector > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.quick-actions-recent-inspector span,
+.quick-actions-recent-inspector small {
+  overflow: hidden;
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-recent-inspector strong {
+  overflow: hidden;
   color: #f4efe7;
-  text-align: start;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-recent-inspector-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.quick-actions-recent-inspector-meta span {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  border: 1px solid rgba(130, 215, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(17, 16, 15, 0.22);
+  color: rgba(244, 239, 231, 0.72);
+  overflow: hidden;
+  padding: 2px 6px;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-recent-inspector > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.24);
+  border-radius: 6px;
+  background: rgba(17, 16, 15, 0.2);
+  color: #f4efe7;
+  font-size: 10px;
+}
+
+.quick-actions-recent-inspector > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .quick-actions-recents-list button.good {
