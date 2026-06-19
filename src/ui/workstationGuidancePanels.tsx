@@ -17,6 +17,7 @@ import type {
   FirstBeatPathSummary,
   MixCoachTone,
   ModeFocusCard,
+  ModeFocusJumpResult,
   ModeFocusSummary,
   ModeSwitchResult,
   QuickAction,
@@ -206,7 +207,15 @@ export function createModeSwitchQuickActions({
   });
 }
 
-export function ModeFocus({ onFocus, summary }: { summary: ModeFocusSummary; onFocus: (card: ModeFocusCard) => void }): ReactElement {
+export function ModeFocus({
+  onFocus,
+  result,
+  summary
+}: {
+  summary: ModeFocusSummary;
+  result: ModeFocusJumpResult | null;
+  onFocus: (card: ModeFocusCard) => void;
+}): ReactElement {
   return (
     <section className={`mode-focus ${summary.tone}`} data-testid="mode-focus" aria-label="Mode focus">
       <div className="mode-focus-heading">
@@ -236,7 +245,38 @@ export function ModeFocus({ onFocus, summary }: { summary: ModeFocusSummary; onF
           </div>
         ))}
       </div>
+      {result && <ModeFocusJumpResultStrip result={result} />}
     </section>
+  );
+}
+
+function ModeFocusJumpResultStrip({ result }: { result: ModeFocusJumpResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`mode-focus-result ${result.tone}`}
+      data-result-mode-focus={result.cardId}
+      data-testid="mode-focus-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="mode-focus-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="mode-focus-result-title">{result.title}</strong>
+          <small data-testid="mode-focus-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="mode-focus-result-metric" data-testid="mode-focus-result-metric">
+        <span data-testid="mode-focus-result-status">{result.status}</span>
+        <strong data-testid="mode-focus-result-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="mode-focus-result-followup" data-testid="mode-focus-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 

@@ -485,6 +485,7 @@ import type {
   ReviewQueueFocusSummary,
   ReviewQueueSummary,
   ModeFocusCard,
+  ModeFocusJumpResult,
   ModeFocusSummary,
   ModeSwitchResult,
   SessionPassTarget,
@@ -1066,6 +1067,7 @@ export function App(): ReactElement {
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [modeSwitchResult, setModeSwitchResult] = useState<ModeSwitchResult | null>(null);
+  const [modeFocusResult, setModeFocusResult] = useState<ModeFocusJumpResult | null>(null);
   const [workflowNavigatorResult, setWorkflowNavigatorResult] = useState<WorkflowNavigatorJumpResult | null>(null);
   const [firstBeatPathResult, setFirstBeatPathResult] = useState<FirstBeatPathJumpResult | null>(null);
   const [sessionPassResult, setSessionPassResult] = useState<SessionPassFocusResult | null>(null);
@@ -1994,6 +1996,7 @@ export function App(): ReactElement {
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
+    setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
     setSessionPassResult(null);
@@ -2041,6 +2044,7 @@ export function App(): ReactElement {
       setProject(nextProject);
       setQuickActionResult(null);
       setModeSwitchResult(null);
+      setModeFocusResult(null);
       setWorkflowNavigatorResult(null);
       setFirstBeatPathResult(null);
       setSessionPassResult(null);
@@ -2181,6 +2185,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
     setSessionPassResult(null);
@@ -2232,6 +2237,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
     setSessionPassResult(null);
@@ -6371,6 +6377,7 @@ export function App(): ReactElement {
     };
 
     targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setModeFocusResult(createModeFocusJumpResult(card, modeFocusSummary));
     setProjectStatus(`Mode ${card.label}: ${card.value}`);
   }
 
@@ -7236,7 +7243,7 @@ export function App(): ReactElement {
         {modeSwitchResult && <ModeSwitchResultStrip result={modeSwitchResult} />}
       </section>
 
-      <ModeFocus summary={modeFocusSummary} onFocus={focusModeFocusCard} />
+      <ModeFocus result={modeFocusResult} summary={modeFocusSummary} onFocus={focusModeFocusCard} />
 
       <FirstBeatPath result={firstBeatPathResult} summary={firstBeatPathSummary} onJump={jumpToFirstBeatPathStep} />
 
@@ -11390,6 +11397,79 @@ function activeFirstBeatPathQuickActionStep(summary: FirstBeatPathSummary): Firs
 function activeModeFocusQuickActionCard(summary: ModeFocusSummary): ModeFocusCard | null {
   const preferredId = summary.mode === "guided" ? "stage" : "issue";
   return summary.cards.find((card) => card.id === preferredId) ?? summary.cards[0] ?? null;
+}
+
+function createModeFocusJumpResult(card: ModeFocusCard, summary: ModeFocusSummary): ModeFocusJumpResult {
+  return {
+    cardId: card.id,
+    status: "Jumped",
+    title: `${card.label} jump ready`,
+    detail: `${card.focusLabel}: ${card.value}`,
+    metricLabel: "Mode",
+    metricValue: modeFocusJumpResultMetric(summary),
+    auditionCue: modeFocusJumpResultAudition(card, summary),
+    nextCheck: modeFocusJumpResultNextCheck(card, summary),
+    tone: card.tone
+  };
+}
+
+function modeFocusJumpResultMetric(summary: ModeFocusSummary): string {
+  const readyCount = summary.cards.filter((card) => card.tone === "good").length;
+  const reviewCount = summary.cards.filter((card) => card.tone === "warn").length;
+  const blockerCount = summary.cards.filter((card) => card.tone === "danger").length;
+  return `${modeLabel(summary.mode)} / ${readyCount}/${summary.cards.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function modeFocusJumpResultAudition(card: ModeFocusCard, summary: ModeFocusSummary): string {
+  if (summary.mode === "guided") {
+    switch (card.id) {
+      case "stage":
+        return "Use the focused workstation panel to move the current beat-making stage forward.";
+      case "focus":
+        return "Use the focused writing lane for drums, 808/bass, harmony, melody, arrangement, or finish work.";
+      case "check":
+        return "Use the local check target before changing mix, master, handoff, or export decisions.";
+      default:
+        return "Use the Guided focus card as the next direct beat-making checkpoint.";
+    }
+  }
+
+  switch (card.id) {
+    case "session":
+      return "Use the focused studio pass to inspect mix, finish, and session readiness.";
+    case "issue":
+      return "Use the focused issue panel before choosing an explicit review fix.";
+    case "handoff":
+      return "Use the focused handoff target before WAV, stems, MIDI, or sheet export.";
+    default:
+      return "Use the Studio focus card as the next producer-level session checkpoint.";
+  }
+}
+
+function modeFocusJumpResultNextCheck(card: ModeFocusCard, summary: ModeFocusSummary): string {
+  if (summary.mode === "guided") {
+    switch (card.id) {
+      case "stage":
+        return "Return to Mode Focus after the current stage is ready or intentionally deferred.";
+      case "focus":
+        return "Return after the writing lane has a usable musical event or a clear reason to defer.";
+      case "check":
+        return "Return after the local check no longer blocks the first beat path.";
+      default:
+        return "Return to Mode Focus for the next Guided orientation card.";
+    }
+  }
+
+  switch (card.id) {
+    case "session":
+      return "Return after the session scan is ready for the selected delivery target.";
+    case "issue":
+      return "Return after the top studio issue is reviewed or fixed explicitly.";
+    case "handoff":
+      return "Return after handoff context and deliverables match the selected target.";
+    default:
+      return "Return to Mode Focus for the next Studio orientation card.";
+  }
 }
 
 function activeBeatSpineQuickActionCard(summary: BeatSpineSummary): BeatSpineCard | null {

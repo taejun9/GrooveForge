@@ -2885,6 +2885,18 @@ export type ModeFocusSummary = {
   cards: ModeFocusCard[];
 };
 
+export type ModeFocusJumpResult = {
+  cardId: string;
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type ModeSwitchResultMetric = {
   id: "mode-switch";
   label: string;
