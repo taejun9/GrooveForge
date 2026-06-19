@@ -879,6 +879,7 @@ import {
   compactChanceBadgeLabel,
   timingLabel,
   timingBadge,
+  exportDynamicsDb,
   formatPercent,
   formatDb,
   createHandoffSheet,
@@ -19178,6 +19179,7 @@ function mixReviewArea(id: string): string {
   switch (id) {
     case "headroom":
     case "limiter":
+    case "dynamics":
       return "Master";
     case "stem-balance":
     case "low-end":
@@ -25247,6 +25249,7 @@ function createMixCoachChecks(analysis: ExportAnalysis, stemAnalyses: StemExport
   return [
     masterHeadroomCheck(analysis),
     limiterCheck(analysis),
+    exportDynamicsCheck(analysis),
     stemBalanceCheck(loudestStem, quietestStem, stemSpread),
     lowEndBlendCheck(lowEndDelta)
   ];
@@ -26644,6 +26647,45 @@ function limiterCheck(analysis: ExportAnalysis): MixCoachCheck {
     label: "Limiter activity",
     status: "Clear",
     detail: "No rendered samples hit the ceiling.",
+    tone: "good"
+  };
+}
+
+function exportDynamicsCheck(analysis: ExportAnalysis): MixCoachCheck {
+  if (analysis.status === "Silent") {
+    return {
+      id: "dynamics",
+      label: "Export dynamics",
+      status: "No signal",
+      detail: "Add or unmute musical events before judging peak-to-RMS punch.",
+      tone: "danger"
+    };
+  }
+
+  const dynamicsDb = exportDynamicsDb(analysis);
+  if (dynamicsDb < 6) {
+    return {
+      id: "dynamics",
+      label: "Export dynamics",
+      status: "Too flat",
+      detail: `${formatDb(dynamicsDb)} peak-minus-RMS spacing; the render may feel over-compressed.`,
+      tone: "warn"
+    };
+  }
+  if (dynamicsDb > 22) {
+    return {
+      id: "dynamics",
+      label: "Export dynamics",
+      status: "Spiky",
+      detail: `${formatDb(dynamicsDb)} peak-minus-RMS spacing; peaks may jump ahead of body.`,
+      tone: "warn"
+    };
+  }
+  return {
+    id: "dynamics",
+    label: "Export dynamics",
+    status: "Punch clear",
+    detail: `${formatDb(dynamicsDb)} peak-minus-RMS spacing for local render punch.`,
     tone: "good"
   };
 }
