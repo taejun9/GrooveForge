@@ -5,7 +5,8 @@ import {
   Gauge,
   ListChecks,
   Music2,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Target
 } from "lucide-react";
 import type { ReactElement } from "react";
 import type { ProjectState } from "../domain/workstation";
@@ -18,6 +19,9 @@ import type {
   ModeFocusSummary,
   ModeSwitchResult,
   QuickAction,
+  ReferenceAlignmentCard,
+  ReferenceAlignmentCardId,
+  ReferenceAlignmentSummary,
   SessionPassCard,
   SessionPassSummary,
   WorkflowNavigatorItem,
@@ -96,6 +100,61 @@ export function ModeSwitchResultStrip({ result }: { result: ModeSwitchResult }):
       <div className="mode-switch-result-followup" data-testid="mode-switch-result-followup">
         <span>{result.auditionCue}</span>
         <small>{result.nextCheck}</small>
+      </div>
+    </div>
+  );
+}
+
+export function ReferenceAlignmentReadout({
+  focusedCardId,
+  onFocus,
+  summary
+}: {
+  focusedCardId: ReferenceAlignmentCardId | null;
+  onFocus: (card: ReferenceAlignmentCard) => void;
+  summary: ReferenceAlignmentSummary;
+}): ReactElement {
+  return (
+    <div
+      aria-label={`${summary.headline}: ${summary.detail}`}
+      className={`reference-alignment ${summary.tone}`}
+      data-testid="reference-alignment"
+      title={`${summary.headline}: ${summary.detail}`}
+    >
+      <div className="reference-alignment-heading">
+        <span>Reference Alignment</span>
+        <strong data-testid="reference-alignment-headline">{summary.headline}</strong>
+        <small data-testid="reference-alignment-detail">{summary.detail}</small>
+      </div>
+      <div className="reference-alignment-grid" data-testid="reference-alignment-grid">
+        {summary.cards.map((card) => {
+          const focused = focusedCardId === card.id;
+          return (
+            <div
+              className={["reference-alignment-card", card.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`reference-alignment-card-${card.id}`}
+              key={card.id}
+              title={`${card.label}: ${card.value}. ${card.nextCheck}`}
+            >
+              <span data-testid={`reference-alignment-card-${card.id}-label`}>{card.label}</span>
+              <strong data-testid={`reference-alignment-card-${card.id}-value`}>{card.value}</strong>
+              <button
+                aria-pressed={focused}
+                className="reference-alignment-focus-button"
+                data-testid={`reference-alignment-focus-${card.id}`}
+                onClick={() => onFocus(card)}
+                title={`${card.focusLabel}: ${card.nextCheck}`}
+                type="button"
+              >
+                <Target size={12} aria-hidden="true" />
+                <span>{card.focusLabel}</span>
+              </button>
+              <small data-testid={`reference-alignment-card-${card.id}-detail`}>{card.detail}</small>
+              <em data-testid={`reference-alignment-card-${card.id}-next`}>{card.nextCheck}</em>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

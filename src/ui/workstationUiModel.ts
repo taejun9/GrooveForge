@@ -2915,6 +2915,27 @@ export type SessionBriefCompassSummary = {
   cards: SessionBriefCompassCard[];
 };
 
+export type ReferenceAlignmentCardId = "reference" | "direction" | "arrangement" | "mix" | "handoff";
+export type ReferenceAlignmentFocusTarget = "artist" | "vibe" | "reference" | "notes" | "arrange" | "master" | "deliver";
+
+export type ReferenceAlignmentCard = {
+  id: ReferenceAlignmentCardId;
+  label: string;
+  value: string;
+  detail: string;
+  nextCheck: string;
+  focusTarget: ReferenceAlignmentFocusTarget;
+  focusLabel: string;
+  tone: MixCoachTone;
+};
+
+export type ReferenceAlignmentSummary = {
+  headline: string;
+  detail: string;
+  tone: MixCoachTone;
+  cards: ReferenceAlignmentCard[];
+};
+
 export type SessionBriefStarterPadId = "starter" | "vocal" | "store" | "club";
 
 export type SessionBriefStarterPadDefinition = {

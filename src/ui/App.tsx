@@ -503,6 +503,9 @@ import type {
   SessionBriefCompassCard,
   SessionBriefCompassCardId,
   SessionBriefCompassSummary,
+  ReferenceAlignmentCard,
+  ReferenceAlignmentCardId,
+  ReferenceAlignmentSummary,
   SessionBriefStarterPadId,
   SessionBriefStarterPadDefinition,
   SessionBriefStarterPadOption,
@@ -597,6 +600,7 @@ import {
   FirstBeatPath,
   ModeFocus,
   ModeSwitchResultStrip,
+  ReferenceAlignmentReadout,
   SessionPass,
   WorkflowNavigator,
   createModeSwitchQuickActions,
@@ -894,7 +898,17 @@ import {
   downloadTextFile,
   fileDisplayName
 } from "./workstationPatternTools";
-import { audibleStemTracks, masterChannelVolumeDb, stemSpreadDb, weakestTone } from "./workstationAnalysis";
+import {
+  activeReferenceAlignmentQuickActionCard,
+  activeSessionBriefCompassQuickActionCard,
+  audibleStemTracks,
+  createReferenceAlignmentSummary,
+  createSessionBriefCompassSummary,
+  createSessionBriefRoleSummary,
+  masterChannelVolumeDb,
+  stemSpreadDb,
+  weakestTone
+} from "./workstationAnalysis";
 
 const minProjectSwing = 0;
 const maxProjectSwing = 0.24;
@@ -1020,6 +1034,7 @@ export function App(): ReactElement {
   const [sessionBriefStarterResult, setSessionBriefStarterResult] = useState<SessionBriefStarterResult | null>(null);
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
   const [sessionBriefCompassFocusId, setSessionBriefCompassFocusId] = useState<SessionBriefCompassCardId | null>(null);
+  const [referenceAlignmentFocusId, setReferenceAlignmentFocusId] = useState<ReferenceAlignmentCardId | null>(null);
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
@@ -1166,6 +1181,10 @@ export function App(): ReactElement {
   const sessionBriefCompassSummary = useMemo(
     () => createSessionBriefCompassSummary(project, exportAnalysis, stemAnalyses),
     [project, exportAnalysis, stemAnalyses]
+  );
+  const referenceAlignmentSummary = useMemo(
+    () => createReferenceAlignmentSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses),
+    [project, beatReadinessChecks, exportAnalysis, stemAnalyses]
   );
   const snapshotCompareSummary = useMemo(() => createSnapshotCompareSummary(project, createSnapshotCompareProjectProfile), [project]);
   const patternCompareSummaries = useMemo(() => createPatternCompareSummaries(project), [project]);
@@ -5781,6 +5800,30 @@ export function App(): ReactElement {
     setProjectStatus(`Brief ${card.label}: ${card.value}`);
   }
 
+  function focusReferenceAlignmentCard(card: ReferenceAlignmentCard): void {
+    const fieldRefs: Record<keyof SessionBrief, HTMLElement | null> = {
+      artist: sessionBriefArtistRef.current,
+      vibe: sessionBriefVibeRef.current,
+      reference: sessionBriefReferenceRef.current,
+      notes: sessionBriefNotesRef.current
+    };
+    const panelRefs: Record<"arrange" | "master" | "deliver", HTMLElement | null> = {
+      arrange: arrangePanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    setReferenceAlignmentFocusId(card.id);
+    if (card.focusTarget === "arrange" || card.focusTarget === "master" || card.focusTarget === "deliver") {
+      panelRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    } else {
+      const field = fieldRefs[card.focusTarget];
+      field?.scrollIntoView({ block: "center", behavior: "auto" });
+      field?.focus({ preventScroll: true });
+    }
+    setProjectStatus(`Reference Alignment ${card.label}: ${card.value}`);
+  }
+
   function focusMixCoachCheck(check: MixCoachCheck): void {
     setMixCoachFocusId(check.id);
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -6360,6 +6403,7 @@ export function App(): ReactElement {
     playbackMode,
     project,
     productionSnapshotSummary,
+    referenceAlignmentSummary,
     snapshotCompareSummary,
     exportAnalysis,
     exportPreflightSummary,
@@ -6525,6 +6569,7 @@ export function App(): ReactElement {
     onFocusModeFocus: focusModeFocusCard,
     onFocusPatternDna: focusPatternDnaCard,
     onFocusProductionSnapshot: focusProductionSnapshotMetric,
+    onFocusReferenceAlignment: focusReferenceAlignmentCard,
     onFocusSnapshotCompare: focusSnapshotCompareMetric,
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusSessionPass: focusSessionPassCard,
@@ -6930,6 +6975,8 @@ export function App(): ReactElement {
         brief={project.sessionBrief}
         compass={sessionBriefCompassSummary}
         focusedCompassCardId={sessionBriefCompassFocusId}
+        focusedReferenceCardId={referenceAlignmentFocusId}
+        referenceAlignment={referenceAlignmentSummary}
         result={sessionBriefStarterResult}
         starterPads={sessionBriefStarterPads}
         fieldRefs={{
@@ -6942,6 +6989,7 @@ export function App(): ReactElement {
         onChange={updateSessionBrief}
         onClear={clearSessionBrief}
         onFocusCompass={focusSessionBriefCompassCard}
+        onFocusReferenceAlignment={focusReferenceAlignmentCard}
       />
 
       <BeatPassport focusedMetricId={beatPassportFocusId} onFocus={focusBeatPassportMetric} summary={beatPassportSummary} />
@@ -9186,23 +9234,29 @@ function SessionBriefPanel({
   compass,
   fieldRefs,
   focusedCompassCardId,
+  focusedReferenceCardId,
+  referenceAlignment,
   result,
   starterPads,
   onApplyStarter,
   onChange,
   onClear,
-  onFocusCompass
+  onFocusCompass,
+  onFocusReferenceAlignment
 }: {
   brief: SessionBrief;
   compass: SessionBriefCompassSummary;
   fieldRefs: SessionBriefFieldRefs;
   focusedCompassCardId: SessionBriefCompassCardId | null;
+  focusedReferenceCardId: ReferenceAlignmentCardId | null;
+  referenceAlignment: ReferenceAlignmentSummary;
   result: SessionBriefStarterResult | null;
   starterPads: SessionBriefStarterPadOption[];
   onApplyStarter: (pad: SessionBriefStarterPadId) => void;
   onChange: (field: keyof SessionBrief, value: string) => void;
   onClear: () => void;
   onFocusCompass: (card: SessionBriefCompassCard) => void;
+  onFocusReferenceAlignment: (card: ReferenceAlignmentCard) => void;
 }): ReactElement {
   const filledFields = sessionBriefFilledFields(brief);
   const roleSummary = createSessionBriefRoleSummary(brief);
@@ -9271,6 +9325,11 @@ function SessionBriefPanel({
             })}
           </div>
         </div>
+        <ReferenceAlignmentReadout
+          focusedCardId={focusedReferenceCardId}
+          onFocus={onFocusReferenceAlignment}
+          summary={referenceAlignment}
+        />
         <div className="session-brief-starters" aria-label="Session Brief Starter Pads">
           {starterPads.map((pad) => (
             <button
@@ -11975,6 +12034,7 @@ function createQuickActions({
   playbackMode,
   project,
   productionSnapshotSummary,
+  referenceAlignmentSummary,
   snapshotCompareSummary,
   exportAnalysis,
   exportPreflightSummary,
@@ -12139,6 +12199,7 @@ function createQuickActions({
   onFocusModeFocus,
   onFocusPatternDna,
   onFocusProductionSnapshot,
+  onFocusReferenceAlignment,
   onFocusSnapshotCompare,
   onFocusReviewQueue,
   onApplyReviewFix,
@@ -12202,6 +12263,7 @@ function createQuickActions({
   playbackMode: PlaybackMode;
   project: ProjectState;
   productionSnapshotSummary: ProductionSnapshotSummary;
+  referenceAlignmentSummary: ReferenceAlignmentSummary;
   snapshotCompareSummary: SnapshotCompareSummary;
   exportAnalysis: ExportAnalysis;
   exportPreflightSummary: ExportPreflightSummary;
@@ -12366,6 +12428,7 @@ function createQuickActions({
   onFocusModeFocus: (card: ModeFocusCard) => void;
   onFocusPatternDna: (card: PatternDnaCard) => void;
   onFocusProductionSnapshot: (metric: ProductionSnapshotFocusItem) => void;
+  onFocusReferenceAlignment: (card: ReferenceAlignmentCard) => void;
   onFocusSnapshotCompare: (item: SnapshotCompareFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
   onApplyReviewFix: (item?: ReviewQueueItem) => void;
@@ -12740,6 +12803,15 @@ function createQuickActions({
     group: "Project",
     keywords: `session brief compass focus card handoff context direction reference artist notes ${card.id} ${card.label} ${card.value} ${card.detail} ${card.nextCheck} beginner producer`,
     run: () => onFocusSessionBriefCompass(card)
+  }));
+  const referenceAlignmentCard = activeReferenceAlignmentQuickActionCard(referenceAlignmentSummary);
+  const referenceAlignmentActions: QuickAction[] = referenceAlignmentSummary.cards.map((card) => ({
+    id: `reference-alignment-card-${card.id}`,
+    title: `Focus Reference Alignment: ${card.label}`,
+    detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
+    group: "Project",
+    keywords: `reference alignment ${card.id} ${card.label} ${card.value} ${card.focusLabel} arrange mix master handoff`,
+    run: () => onFocusReferenceAlignment(card)
   }));
   const sessionBriefStarterActions: QuickAction[] = sessionBriefStarterPads.map((pad) => ({
     id: `session-brief-starter-${pad.id}`,
@@ -13684,6 +13756,15 @@ function createQuickActions({
       run: () => onFocusSessionBriefCompass(sessionBriefCompassCard)
     },
     ...sessionBriefCompassActions,
+    {
+      id: "reference-alignment-focus",
+      title: `Focus Reference Alignment: ${referenceAlignmentCard.label}`,
+      detail: `${referenceAlignmentCard.value} / ${referenceAlignmentCard.focusLabel} / ${referenceAlignmentCard.detail}`,
+      group: "Project",
+      keywords: `reference alignment focus ${referenceAlignmentCard.id} ${referenceAlignmentCard.label} ${referenceAlignmentCard.value} ${referenceAlignmentCard.focusLabel}`,
+      run: () => onFocusReferenceAlignment(referenceAlignmentCard)
+    },
+    ...referenceAlignmentActions,
     ...sessionBriefStarterActions,
     ...deliveryTargetActions,
     {
@@ -14761,6 +14842,8 @@ function createQuickActionResult(
     action.id.startsWith("session-pass-card-") ||
     action.id === "session-brief-compass-focus" ||
     action.id.startsWith("session-brief-compass-card-") ||
+    action.id === "reference-alignment-focus" ||
+    action.id.startsWith("reference-alignment-card-") ||
     action.id === "first-beat-path-jump" ||
     action.id.startsWith("first-beat-path-step-") ||
     action.id === "composer-guide-focus" ||
@@ -15025,6 +15108,22 @@ function quickActionResultMetricSnapshot(
     return {
       id: "session-brief-compass",
       label: "Brief compass",
+      value: action.detail
+    };
+  }
+
+  if (action.id === "reference-alignment-focus") {
+    return {
+      id: "reference-alignment",
+      label: "Reference alignment",
+      value: `${sessionBriefFilledFields(project.sessionBrief)}/4 brief fields`
+    };
+  }
+
+  if (action.id.startsWith("reference-alignment-card-")) {
+    return {
+      id: "reference-alignment",
+      label: "Reference alignment",
       value: action.detail
     };
   }
@@ -16053,6 +16152,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Brief Compass lane to inspect direction, reference, artist context, or handoff readiness.",
       nextCheck: "Return to Brief Compass when you need another direct context or handoff focus."
+    };
+  }
+
+  if (action.id === "reference-alignment-focus") {
+    return {
+      auditionCue: "Use the focused Reference Alignment lane to compare the written reference, arrangement, mix, and handoff posture by ear.",
+      nextCheck: "Return to Reference Alignment before export to confirm no audio import or matching step is required."
+    };
+  }
+
+  if (action.id.startsWith("reference-alignment-card-")) {
+    return {
+      auditionCue: "Use the selected Reference Alignment card to inspect reference fit through existing brief, arrangement, master, or delivery panels.",
+      nextCheck: "After the focused lane is ready, run Listening Pass and Handoff Pack checks before sending the beat."
     };
   }
 
@@ -17537,127 +17650,6 @@ function sessionBriefStatus(brief: SessionBrief): Pick<BeatMapMetric, "value" | 
     detail: "Add artist, vibe, reference, or notes",
     tone: "warn"
   };
-}
-
-function createSessionBriefRoleSummary(brief: SessionBrief): SessionBriefRoleSummary {
-  const filledFields = sessionBriefFilledFields(brief);
-  const status = sessionBriefStatus(brief);
-  const hasArtist = brief.artist.trim().length > 0;
-  const hasVibe = brief.vibe.trim().length > 0;
-  const hasReference = brief.reference.trim().length > 0;
-  const hasNotes = brief.notes.trim().length > 0;
-  const hasContext = hasArtist || hasReference || hasNotes;
-  const nextField = [
-    hasVibe ? null : "Vibe",
-    hasContext ? null : "Artist/ref/notes",
-    hasArtist ? null : "Artist",
-    hasReference ? null : "Reference",
-    hasNotes ? null : "Notes"
-  ].find(Boolean);
-
-  const roleLabel = hasVibe && hasContext
-    ? "Handoff context"
-    : hasVibe
-      ? "Direction seed"
-      : filledFields > 0
-        ? "Brief sketch"
-        : "Open brief";
-  const detailLabel = nextField ? `Next ${nextField}` : "Ready for sheet";
-
-  return {
-    roleLabel,
-    statusLabel: status.value,
-    detailLabel,
-    detailTitle: `${filledFields}/4 fields / ${status.detail} / ${detailLabel}`,
-    tone: status.tone
-  };
-}
-
-function createSessionBriefCompassSummary(
-  project: ProjectState,
-  analysis: ExportAnalysis,
-  stemAnalyses: StemExportAnalyses
-): SessionBriefCompassSummary {
-  const brief = project.sessionBrief;
-  const target = activeDeliveryTarget(project);
-  const style = getStyle(project);
-  const bars = arrangementTotalBars(project);
-  const audibleStems = audibleStemTracks(stemAnalyses);
-  const hasArtist = brief.artist.trim().length > 0;
-  const hasVibe = brief.vibe.trim().length > 0;
-  const hasReference = brief.reference.trim().length > 0;
-  const hasNotes = brief.notes.trim().length > 0;
-  const filledFields = sessionBriefFilledFields(brief);
-  const contextTone: MixCoachTone = filledFields >= 3 ? "good" : filledFields >= 1 ? "warn" : "danger";
-  const requiredStems = Math.min(target.stemGoal, stemTrackIds.length);
-  const handoffTone: MixCoachTone =
-    filledFields >= 3 && analysis.status !== "Silent" && audibleStems.length >= requiredStems
-      ? "good"
-      : filledFields >= 2 && analysis.status !== "Silent" && audibleStems.length >= 2
-        ? "warn"
-        : "danger";
-  const cards: SessionBriefCompassCard[] = [
-    {
-      id: "direction",
-      label: "Direction",
-      value: hasVibe ? compactSessionBriefValue(brief.vibe) : "No vibe",
-      detail: hasVibe
-        ? `${style.name} / ${project.key} / ${project.bpm} BPM`
-        : `Add a mood or energy cue for ${style.name}.`,
-      nextCheck: hasVibe ? "Match Beat Spine and Composer Guide moves to this vibe." : "Fill Vibe before choosing more writing moves.",
-      tone: hasVibe ? "good" : "warn"
-    },
-    {
-      id: "reference",
-      label: "Reference",
-      value: hasReference ? compactSessionBriefValue(brief.reference) : "No reference",
-      detail: hasReference
-        ? "Use by ear; no track import needed."
-        : "Add a track, scene, or sound cue as text.",
-      nextCheck: hasReference ? "Use Listening Pass to compare feel by ear." : "Write a text reference before mix decisions.",
-      tone: hasReference ? "good" : "warn"
-    },
-    {
-      id: "artist",
-      label: target.id === "vocal_session" ? "Vocal Context" : "Artist Context",
-      value: hasArtist ? compactSessionBriefValue(brief.artist) : "Open artist",
-      detail: hasNotes ? compactSessionBriefValue(brief.notes) : `${target.name} / ${mixPostureLabel(target.mixPosture)}`,
-      nextCheck: hasArtist || hasNotes ? "Keep arrangement space aligned with this context." : "Add artist or notes before handoff.",
-      tone: hasArtist || hasNotes ? "good" : "warn"
-    },
-    {
-      id: "handoff",
-      label: "Handoff",
-      value: `${filledFields}/4 fields`,
-      detail: `${barCountLabel(bars)} / ${analysis.status} / ${audibleStems.length}/${target.stemGoal} stems`,
-      nextCheck: handoffTone === "good" ? "Review Handoff Pack before export." : "Fill brief, confirm stems, then export explicitly.",
-      tone: handoffTone
-    }
-  ];
-  const tone = weakestTone([...cards.map((card) => card.tone), contextTone]);
-  const readyCount = cards.filter((card) => card.tone === "good").length;
-  const headline =
-    tone === "good" ? "Brief ready for session decisions" : tone === "warn" ? "Brief needs one more cue" : "Brief blocks handoff";
-
-  return {
-    headline,
-    detail: `${readyCount}/${cards.length} ready / ${target.name} / local notes only`,
-    tone,
-    cards
-  };
-}
-
-function activeSessionBriefCompassQuickActionCard(summary: SessionBriefCompassSummary): SessionBriefCompassCard {
-  const focusCard =
-    summary.cards.find((card) => card.tone === "danger") ??
-    summary.cards.find((card) => card.tone === "warn") ??
-    summary.cards.find((card) => card.id === "handoff") ??
-    summary.cards[0];
-
-  if (!focusCard) {
-    throw new Error("Session Brief Compass requires at least one card");
-  }
-  return focusCard;
 }
 
 type SessionBriefCompassFocusTarget = keyof SessionBrief | "deliver";
