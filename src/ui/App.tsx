@@ -9975,6 +9975,16 @@ function styleGoalForComposerActionResult(result: ComposerActionResult, goals: S
   return goals.find((goal) => goal.id === result.area) ?? null;
 }
 
+type BeatBlueprintPreviewDecision = {
+  statusLabel: string;
+  blueprintLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  actionLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 function BeatBlueprints({
   onApply,
   onPreview,
@@ -9997,6 +10007,7 @@ function BeatBlueprints({
   const styleMatchSummary = createBeatBlueprintPreviewSummary(project, styleMatchBlueprint);
   const styleMatchPreviewed = previewSummary.blueprintId === styleMatchSummary.blueprintId;
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const previewDecision = createBeatBlueprintPreviewDecision(previewSummary, styleMatchSummary, styleMatchPreviewed);
 
   return (
     <section className="blueprint-row" data-testid="beat-blueprints" aria-label="Beat blueprints" ref={sectionRef}>
@@ -10045,6 +10056,18 @@ function BeatBlueprints({
         </div>
       </div>
       <div className={`blueprint-preview ${previewSummary.tone}`} data-testid="beat-blueprint-preview">
+        <div
+          className={`blueprint-preview-decision ${previewDecision.tone}`}
+          data-blueprint-preview-decision={previewSummary.blueprintId}
+          data-testid="beat-blueprint-preview-decision"
+          title={previewDecision.title}
+        >
+          <span data-testid="beat-blueprint-preview-decision-status">{previewDecision.statusLabel}</span>
+          <strong data-testid="beat-blueprint-preview-decision-label">{previewDecision.blueprintLabel}</strong>
+          <small data-testid="beat-blueprint-preview-decision-metric">{previewDecision.metricLabel}</small>
+          <small data-testid="beat-blueprint-preview-decision-detail">{previewDecision.detailLabel}</small>
+          <small data-testid="beat-blueprint-preview-decision-action">{previewDecision.actionLabel}</small>
+        </div>
         <div className="blueprint-preview-head">
           <span>{previewSummary.focus}</span>
           <strong data-testid="beat-blueprint-preview-label">{previewSummary.name}</strong>
@@ -10117,6 +10140,39 @@ function BeatBlueprints({
       </div>
     </section>
   );
+}
+
+function createBeatBlueprintPreviewDecision(
+  previewSummary: BeatBlueprintPreviewSummary,
+  styleMatchSummary: BeatBlueprintPreviewSummary,
+  styleMatchPreviewed: boolean
+): BeatBlueprintPreviewDecision {
+  const changedMetrics = previewSummary.metrics.filter((metric) => metric.status === "Change");
+  const changedLabels = changedMetrics.map((metric) => metric.label);
+  const changedCount = changedMetrics.length;
+  const statusLabel =
+    changedCount === 0 ? "Blueprint aligned" : styleMatchPreviewed ? "Style match preview" : "Alternate preview";
+  const metricLabel =
+    changedCount === 0
+      ? "No posture changes"
+      : `${changedCount} change${changedCount === 1 ? "" : "s"} before Apply`;
+  const detailLabel =
+    changedCount === 0
+      ? "Project already matches this sample-free starter."
+      : `${changedLabels.join(" / ")} will update the beat starter.`;
+  const actionLabel = styleMatchPreviewed
+    ? previewSummary.applyLabel
+    : `Compare ${styleMatchSummary.name}`;
+
+  return {
+    statusLabel,
+    blueprintLabel: previewSummary.name,
+    metricLabel,
+    detailLabel,
+    actionLabel,
+    title: `${statusLabel}: ${previewSummary.name} / ${metricLabel} / ${detailLabel} / ${actionLabel}`,
+    tone: changedCount === 0 ? "good" : "warn"
+  };
 }
 
 function BeatBlueprintResultStrip({ result }: { result: BeatBlueprintResult }): ReactElement {
