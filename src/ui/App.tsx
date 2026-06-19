@@ -576,6 +576,7 @@ import type {
   BeatSpineApplyResultMetric,
   BeatSpineApplyResult,
   EditorAuditionResult,
+  InputCaptureResult,
   SelectedDrumStep,
   DrumPocketSummary,
   DrumClipboard,
@@ -1083,6 +1084,39 @@ function EditorAuditionResultStrip({ result }: { result: EditorAuditionResult })
   );
 }
 
+function InputCaptureResultStrip({ result }: { result: InputCaptureResult }): ReactElement {
+  return (
+    <div
+      className={`quick-action-result input-capture-result ${result.tone}`}
+      data-result-input-capture={result.targetId}
+      data-testid="input-capture-result"
+      aria-live="polite"
+    >
+      <div className="quick-action-result-main">
+        <span data-testid="input-capture-result-status">{result.status}</span>
+        <strong data-testid="input-capture-result-title">{result.title}</strong>
+        <small data-testid="input-capture-result-detail">{result.detail}</small>
+      </div>
+      <div className={`quick-action-result-metric ${result.tone}`} data-testid="input-capture-result-metric">
+        <span data-testid="input-capture-result-pattern">{result.patternLabel}</span>
+        <strong data-testid="input-capture-result-metric-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="quick-action-result-followup" data-testid="input-capture-result-followup">
+        <span>
+          <b>Listen</b>
+          <em data-testid="input-capture-result-cue">{result.captureCue}</em>
+        </span>
+        <span>
+          <b>Next</b>
+          <em data-testid="input-capture-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<EditHistoryEntry[]>([]);
@@ -1127,6 +1161,7 @@ export function App(): ReactElement {
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [editorAuditionResult, setEditorAuditionResult] = useState<EditorAuditionResult | null>(null);
+  const [inputCaptureResult, setInputCaptureResult] = useState<InputCaptureResult | null>(null);
   const [modeSwitchResult, setModeSwitchResult] = useState<ModeSwitchResult | null>(null);
   const [modeFocusResult, setModeFocusResult] = useState<ModeFocusJumpResult | null>(null);
   const [workflowNavigatorResult, setWorkflowNavigatorResult] = useState<WorkflowNavigatorJumpResult | null>(null);
@@ -1794,6 +1829,18 @@ export function App(): ReactElement {
   ]);
 
   useEffect(() => {
+    setInputCaptureResult(null);
+  }, [
+    project.selectedPattern,
+    keyboardCaptureTarget,
+    keyboardCaptureStepMode,
+    activeKeyboardCaptureDefaults.octave,
+    activeKeyboardCaptureDefaults.length,
+    activeKeyboardCaptureDefaults.velocity,
+    activeKeyboardCaptureDefaults.glide
+  ]);
+
+  useEffect(() => {
     return () => {
       controllerRef.current?.stop();
       controllerRef.current = null;
@@ -2109,6 +2156,7 @@ export function App(): ReactElement {
     setNextMoveResult(null);
     setQuickActionResult(null);
     setEditorAuditionResult(null);
+    setInputCaptureResult(null);
     setModeSwitchResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
@@ -2180,6 +2228,7 @@ export function App(): ReactElement {
       setHandoffPackageCheckResult(null);
       setQuickActionResult(null);
       setEditorAuditionResult(null);
+      setInputCaptureResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
       setWorkflowNavigatorResult(null);
@@ -2345,6 +2394,7 @@ export function App(): ReactElement {
     setNextMoveResult(null);
     setQuickActionResult(null);
     setEditorAuditionResult(null);
+    setInputCaptureResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -2420,6 +2470,7 @@ export function App(): ReactElement {
     setNextMoveResult(null);
     setQuickActionResult(null);
     setEditorAuditionResult(null);
+    setInputCaptureResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -2661,6 +2712,56 @@ export function App(): ReactElement {
     setProjectStatus("MIDI inputs refreshed");
   }
 
+  function createInputCaptureResult({
+    source,
+    inputLabel,
+    patternSlot,
+    projectKey,
+    target,
+    step,
+    pitch,
+    defaults,
+    replaceStep
+  }: {
+    source: InputCaptureResult["source"];
+    inputLabel: string;
+    patternSlot: PatternSlot;
+    projectKey: string;
+    target: NoteTrack;
+    step: number;
+    pitch: string;
+    defaults: KeyboardCaptureDefaults;
+    replaceStep: boolean;
+  }): InputCaptureResult {
+    const targetLabel = target === "bass" ? "808" : "Synth";
+    const sourceLabel = source === "keyboard" ? "Keyboard" : "MIDI";
+    const length = clampStepLength(defaults.length);
+    const velocity = clampVelocity(defaults.velocity);
+    const degreeIndex = keyboardCapturePitchLanes(projectKey, target, defaults).indexOf(pitch);
+    const degreeLabel = degreeIndex >= 0 ? keyboardCaptureDegreeLabel(degreeIndex) : "Scale";
+    const articulation = target === "bass" ? (defaults.glide ? "glide" : "no glide") : "melody";
+    const status = replaceStep ? "Replaced" : "Captured";
+    const supportingLayers = target === "bass" ? "drums, chords, and Synth" : "drums, 808, and chords";
+
+    return {
+      source,
+      targetId: `${source}-${patternSlot}-${target}-${step}-${pitch}`,
+      status,
+      title: `${targetLabel} ${pitch} step ${step + 1}`,
+      detail: `${sourceLabel} ${inputLabel} / ${replaceStep ? "replaced selected step" : "next free step"} / ${percentLabel(
+        velocity
+      )} velocity`,
+      patternLabel: `Pattern ${patternSlot}`,
+      metricLabel: "Capture",
+      metricValue: `${degreeLabel} / length ${length} / ${articulation}`,
+      captureCue: `Loop Pattern ${patternSlot}; hear the captured ${targetLabel} against ${supportingLayers}.`,
+      nextCheck: replaceStep
+        ? "Undo if the replacement missed the phrase, or switch Capture Step Mode back to Next for additive writing."
+        : "Keep capturing while the idea is fresh, then audition the selected note before editing length, glide, or velocity.",
+      tone: "good"
+    };
+  }
+
   function captureMidiNoteEvent(event: MIDIMessageEvent): void {
     if (!event.data) {
       return;
@@ -2677,6 +2778,7 @@ export function App(): ReactElement {
     const captureDefaults = keyboardCaptureDefaults[target];
     const pitch = midiNoteToScalePitch(note.noteNumber, current.key, target);
     if (!pitch) {
+      setInputCaptureResult(null);
       setMidiLastNoteLabel(`Ignored ${midiNoteLabel(note.noteNumber)}`);
       setProjectStatus("MIDI note is out of range");
       return;
@@ -2685,6 +2787,17 @@ export function App(): ReactElement {
     const step = resolveKeyboardCaptureStep(pattern, target, selectedNote, keyboardCaptureStepMode);
     const replaceStep = shouldReplaceKeyboardCaptureStep(keyboardCaptureStepMode, selectedNote, target);
     const midiDefaults: KeyboardCaptureDefaults = { ...captureDefaults, velocity: note.velocity };
+    const result = createInputCaptureResult({
+      source: "midi",
+      inputLabel: midiNoteLabel(note.noteNumber),
+      patternSlot: current.selectedPattern,
+      projectKey: current.key,
+      target,
+      step,
+      pitch,
+      defaults: midiDefaults,
+      replaceStep
+    });
     const changed = updateCurrentPattern(
       (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch, midiDefaults, replaceStep),
       `MIDI ${replaceStep ? "replaced" : "captured"} ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} on Pattern ${
@@ -2695,10 +2808,12 @@ export function App(): ReactElement {
 
     setMidiLastNoteLabel(noteLabel);
     if (!changed) {
+      setInputCaptureResult(null);
       setProjectStatus("MIDI note already exists");
       return;
     }
 
+    setInputCaptureResult(result);
     setSelectedNote({ track: target, step, pitch });
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
@@ -4622,12 +4737,24 @@ export function App(): ReactElement {
     const captureDefaults = keyboardCaptureDefaults[target];
     const pitch = keyboardCapturePitchForKey(key, keyboardCapturePitchLanes(current.key, target, captureDefaults));
     if (!pitch) {
+      setInputCaptureResult(null);
       setProjectStatus("Keyboard Capture key is out of range");
       return;
     }
 
     const step = resolveKeyboardCaptureStep(pattern, target, selectedNote, keyboardCaptureStepMode);
     const replaceStep = shouldReplaceKeyboardCaptureStep(keyboardCaptureStepMode, selectedNote, target);
+    const result = createInputCaptureResult({
+      source: "keyboard",
+      inputLabel: keyboardCaptureKeyLabels[key],
+      patternSlot: current.selectedPattern,
+      projectKey: current.key,
+      target,
+      step,
+      pitch,
+      defaults: captureDefaults,
+      replaceStep
+    });
     const changed = updateCurrentPattern(
       (currentPatternData) => addKeyboardCaptureNote(currentPatternData, target, step, pitch, captureDefaults, replaceStep),
       `${replaceStep ? "Replaced" : "Captured"} ${target === "bass" ? "808" : "Synth"} ${pitch}.${step + 1} length ${
@@ -4636,10 +4763,12 @@ export function App(): ReactElement {
     );
 
     if (!changed) {
+      setInputCaptureResult(null);
       setProjectStatus("Keyboard Capture note already exists");
       return;
     }
 
+    setInputCaptureResult(result);
     setSelectedNote({ track: target, step, pitch });
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
@@ -8133,6 +8262,7 @@ export function App(): ReactElement {
             onRefresh={refreshMidiInputPorts}
             onRequestAccess={() => void requestMidiInputAccess()}
           />
+          {inputCaptureResult && <InputCaptureResultStrip result={inputCaptureResult} />}
           <BassMovePreview preview={bassMovePreviewSummary} />
           {bassMoveResult && <BassMoveResultStrip result={bassMoveResult} />}
           <BasslinePads pads={basslinePadOptions} onApply={applyBasslinePad} />

@@ -1029,6 +1029,22 @@ export type EditorAuditionResult = {
   tone: MixCoachTone;
 };
 
+export type InputCaptureResultSource = "keyboard" | "midi";
+
+export type InputCaptureResult = {
+  source: InputCaptureResultSource;
+  targetId: string;
+  status: "Captured" | "Replaced";
+  title: string;
+  detail: string;
+  patternLabel: string;
+  metricLabel: string;
+  metricValue: string;
+  captureCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type BeatReadinessCheckId = "drums" | "bass" | "harmony" | "arrangement" | "export";
 export type BeatReadinessFocusTarget = "compose" | "arrange" | "master" | "deliver";
 
