@@ -16045,7 +16045,9 @@ input[type="range"] {
 .sound-timbre-heading,
 .sound-timbre-summary,
 .sound-timbre-metrics,
-.sound-timbre-metrics span {
+.sound-timbre-metrics span,
+.sound-timbre-focus-suggestion,
+.sound-timbre-focus-suggestion > div {
   min-width: 0;
 }
 
@@ -16096,6 +16098,9 @@ input[type="range"] {
 .sound-timbre-metrics b,
 .sound-timbre-metrics strong,
 .sound-timbre-metrics em,
+.sound-timbre-focus-suggestion span,
+.sound-timbre-focus-suggestion strong,
+.sound-timbre-focus-suggestion small,
 .sound-timbre-check > small {
   min-width: 0;
   overflow: hidden;
@@ -16163,6 +16168,67 @@ input[type="range"] {
   color: rgba(244, 239, 231, 0.54);
   font-size: 9px;
   font-style: normal;
+}
+
+.sound-timbre-focus-suggestion {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 102px;
+  gap: 8px;
+  align-items: stretch;
+  border: 1px solid rgba(130, 215, 255, 0.18);
+  border-radius: 7px;
+  background: rgba(130, 215, 255, 0.045);
+  padding: 7px;
+}
+
+.sound-timbre-focus-suggestion.warn {
+  border-color: rgba(255, 209, 102, 0.28);
+  background: rgba(255, 209, 102, 0.055);
+}
+
+.sound-timbre-focus-suggestion.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.055);
+}
+
+.sound-timbre-focus-suggestion > div {
+  display: grid;
+  gap: 2px;
+}
+
+.sound-timbre-focus-suggestion span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 9px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.sound-timbre-focus-suggestion strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.sound-timbre-focus-suggestion small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 9px;
+}
+
+.sound-timbre-focus-suggestion button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.24);
+  border-radius: 6px;
+  background: rgba(17, 16, 15, 0.2);
+  color: #f4efe7;
+  font-size: 10px;
+}
+
+.sound-timbre-focus-suggestion button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .sound-timbre-check > small {

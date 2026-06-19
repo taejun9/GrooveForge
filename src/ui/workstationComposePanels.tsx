@@ -1558,7 +1558,7 @@ export function SoundDesigner({
       {presetResult && <SoundPresetResultStrip result={presetResult} />}
       <DrumKitPads pads={drumKitPads} preview={drumKitPreview} result={drumKitResult} onApply={onDrumKitPad} />
       <SoundFocusPads pads={focusPads} preview={focusPreview} result={focusResult} onApply={onFocusPad} />
-      <SoundTimbreCheck summary={timbreCheck} />
+      <SoundTimbreCheck summary={timbreCheck} focusPreview={focusPreview} onApplyFocus={onFocusPad} />
       <SoundSnapshotAB
         snapshots={soundSnapshots}
         summary={soundSnapshotSummary}
@@ -1641,7 +1641,17 @@ export function SoundDesigner({
   );
 }
 
-export function SoundTimbreCheck({ summary }: { summary: SoundTimbreCheckSummary }): ReactElement {
+export function SoundTimbreCheck({
+  focusPreview,
+  summary,
+  onApplyFocus
+}: {
+  focusPreview: SoundFocusPreviewSummary;
+  summary: SoundTimbreCheckSummary;
+  onApplyFocus: (pad: SoundFocusPadId) => void;
+}): ReactElement {
+  const focusReady = focusPreview.tone !== "good";
+
   return (
     <div
       className={`sound-timbre-check ${summary.tone}`}
@@ -1667,6 +1677,30 @@ export function SoundTimbreCheck({ summary }: { summary: SoundTimbreCheckSummary
             <em>{metric.detail}</em>
           </span>
         ))}
+      </div>
+      <div
+        className={`sound-timbre-focus-suggestion ${focusPreview.tone}`}
+        data-focus-sound-focus={focusPreview.padId}
+        data-testid="sound-timbre-focus-suggestion"
+        title={focusPreview.detailTitle}
+      >
+        <div>
+          <span data-testid="sound-timbre-focus-status">{focusReady ? "Suggested focus" : "Focus already matched"}</span>
+          <strong data-testid="sound-timbre-focus-pad">{focusPreview.padLabel}</strong>
+          <small data-testid="sound-timbre-focus-target">{focusPreview.focusLabel}</small>
+          <small data-testid="sound-timbre-focus-parameters">{focusPreview.parameterLabel}</small>
+          <small data-testid="sound-timbre-focus-changes">{focusPreview.changeLabel}</small>
+        </div>
+        <button
+          data-testid="sound-timbre-focus-apply"
+          disabled={!focusReady}
+          onClick={() => onApplyFocus(focusPreview.padId)}
+          title={focusReady ? `Apply ${focusPreview.padLabel} Sound Focus` : "Current sound already matches this focus"}
+          type="button"
+        >
+          <SlidersHorizontal size={13} aria-hidden="true" />
+          <span>Apply Focus</span>
+        </button>
       </div>
       <small data-testid="sound-timbre-next-check">{summary.nextCheck}</small>
     </div>
