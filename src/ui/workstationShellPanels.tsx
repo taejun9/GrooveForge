@@ -460,6 +460,10 @@ export function QuickActions({
   const pinnedActions = createQuickActionPinnedOptions(pinnedActionIds, recentActionSource);
   const recentActions = createQuickActionRecentOptions(recents, recentActionSource);
   const inspectedPinnedAction = pinnedActions.find((action) => action.id === inspectedPinnedActionId) ?? null;
+  const guideSuggestionAction =
+    query.trim().length === 0 && (scope === "all" || scope === "project")
+      ? recentActionSource.find((action) => action.id === "guide-quick-start") ?? null
+      : null;
 
   return (
     <div
@@ -530,6 +534,32 @@ export function QuickActions({
           <small data-testid="quick-actions-spotlight-detail">{spotlight.detailLabel}</small>
           <small data-testid="quick-actions-spotlight-context">{spotlight.contextLabel}</small>
         </div>
+        {guideSuggestionAction && (
+          <div
+            className={`quick-actions-guide-suggestion ${guideSuggestionAction.disabled ? "warn" : "good"}`}
+            data-guide-action={guideSuggestionAction.id}
+            data-testid="quick-actions-guide-suggestion"
+            title={`${guideSuggestionAction.title}: ${guideSuggestionAction.detail}`}
+          >
+            <div>
+              <span data-testid="quick-actions-guide-suggestion-status">
+                {guideSuggestionAction.disabled ? "Guide unavailable" : "Guide ready"}
+              </span>
+              <strong data-testid="quick-actions-guide-suggestion-title">{guideSuggestionAction.title}</strong>
+              <small data-testid="quick-actions-guide-suggestion-detail">{guideSuggestionAction.detail}</small>
+            </div>
+            <button
+              data-testid="quick-actions-guide-suggestion-run"
+              disabled={guideSuggestionAction.disabled}
+              onClick={() => onRun(guideSuggestionAction)}
+              title={`Run ${guideSuggestionAction.title}: ${guideSuggestionAction.detail}`}
+              type="button"
+            >
+              <Target size={14} aria-hidden="true" />
+              <span>Run guide</span>
+            </button>
+          </div>
+        )}
         <div className="quick-actions-pinned" data-testid="quick-actions-pinned" aria-label="Pinned Quick Actions">
           <div className="quick-actions-pinned-head">
             <span data-testid="quick-actions-pinned-status">

@@ -4612,6 +4612,72 @@ h2 {
   font-size: 11px;
 }
 
+.quick-actions-guide-suggestion {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.22);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px;
+}
+
+.quick-actions-guide-suggestion.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.quick-actions-guide-suggestion > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.quick-actions-guide-suggestion span,
+.quick-actions-guide-suggestion strong,
+.quick-actions-guide-suggestion small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-guide-suggestion span,
+.quick-actions-guide-suggestion small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+}
+
+.quick-actions-guide-suggestion strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.quick-actions-guide-suggestion > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid rgba(120, 240, 200, 0.24);
+  border-radius: 6px;
+  color: #f4efe7;
+  background: rgba(17, 16, 15, 0.2);
+  font-size: 10px;
+}
+
+.quick-actions-guide-suggestion.warn > button {
+  border-color: rgba(240, 195, 106, 0.24);
+}
+
+.quick-actions-guide-suggestion > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .quick-actions-recents {
   display: grid;
   grid-template-columns: 150px minmax(0, 1fr);
@@ -21414,6 +21480,10 @@ input[type="range"] {
     gap: 4px 8px;
   }
 
+  .quick-actions-guide-suggestion {
+    grid-template-columns: minmax(0, 1fr) 92px;
+  }
+
   .quick-actions-recents,
   .quick-actions-pinned {
     grid-template-columns: 1fr;
@@ -22139,6 +22209,10 @@ input[type="range"] {
   .quick-actions-spotlight {
     grid-template-columns: 1fr;
     gap: 3px;
+  }
+
+  .quick-actions-guide-suggestion {
+    grid-template-columns: 1fr;
   }
 
   .quick-actions-recents-list,
