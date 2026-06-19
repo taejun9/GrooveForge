@@ -1061,6 +1061,21 @@ export type SelectedEventDeleteResult = {
   tone: MixCoachTone;
 };
 
+export type UndoRedoResultAction = "undo" | "redo";
+
+export type UndoRedoResult = {
+  action: UndoRedoResultAction;
+  targetId: string;
+  status: "Undone" | "Redone";
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  recoveryCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type BeatReadinessCheckId = "drums" | "bass" | "harmony" | "arrangement" | "export";
 export type BeatReadinessFocusTarget = "compose" | "arrange" | "master" | "deliver";
 

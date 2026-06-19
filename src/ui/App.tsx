@@ -578,6 +578,7 @@ import type {
   EditorAuditionResult,
   InputCaptureResult,
   SelectedEventDeleteResult,
+  UndoRedoResult,
   SelectedDrumStep,
   DrumPocketSummary,
   DrumClipboard,
@@ -1151,6 +1152,39 @@ function SelectedEventDeleteResultStrip({ result }: { result: SelectedEventDelet
   );
 }
 
+function UndoRedoResultStrip({ result }: { result: UndoRedoResult }): ReactElement {
+  return (
+    <div
+      className={`quick-action-result undo-redo-result ${result.tone}`}
+      data-result-undo-redo={result.targetId}
+      data-testid="undo-redo-result"
+      aria-live="polite"
+    >
+      <div className="quick-action-result-main">
+        <span data-testid="undo-redo-result-status">{result.status}</span>
+        <strong data-testid="undo-redo-result-title">{result.title}</strong>
+        <small data-testid="undo-redo-result-detail">{result.detail}</small>
+      </div>
+      <div className={`quick-action-result-metric ${result.tone}`} data-testid="undo-redo-result-metric">
+        <span data-testid="undo-redo-result-action">{result.action === "undo" ? "Undo" : "Redo"}</span>
+        <strong data-testid="undo-redo-result-metric-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="quick-action-result-followup" data-testid="undo-redo-result-followup">
+        <span>
+          <b>{result.action === "undo" ? "Redo" : "Undo"}</b>
+          <em data-testid="undo-redo-result-recovery">{result.recoveryCue}</em>
+        </span>
+        <span>
+          <b>Next</b>
+          <em data-testid="undo-redo-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<EditHistoryEntry[]>([]);
@@ -1197,6 +1231,7 @@ export function App(): ReactElement {
   const [editorAuditionResult, setEditorAuditionResult] = useState<EditorAuditionResult | null>(null);
   const [inputCaptureResult, setInputCaptureResult] = useState<InputCaptureResult | null>(null);
   const [selectedEventDeleteResult, setSelectedEventDeleteResult] = useState<SelectedEventDeleteResult | null>(null);
+  const [undoRedoResult, setUndoRedoResult] = useState<UndoRedoResult | null>(null);
   const [modeSwitchResult, setModeSwitchResult] = useState<ModeSwitchResult | null>(null);
   const [modeFocusResult, setModeFocusResult] = useState<ModeFocusJumpResult | null>(null);
   const [workflowNavigatorResult, setWorkflowNavigatorResult] = useState<WorkflowNavigatorJumpResult | null>(null);
@@ -2210,6 +2245,7 @@ export function App(): ReactElement {
     setEditorAuditionResult(null);
     setInputCaptureResult(null);
     setSelectedEventDeleteResult(null);
+    setUndoRedoResult(null);
     setModeSwitchResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
@@ -2283,6 +2319,7 @@ export function App(): ReactElement {
       setEditorAuditionResult(null);
       setInputCaptureResult(null);
       setSelectedEventDeleteResult(null);
+      setUndoRedoResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
       setWorkflowNavigatorResult(null);
@@ -2450,6 +2487,7 @@ export function App(): ReactElement {
     setEditorAuditionResult(null);
     setInputCaptureResult(null);
     setSelectedEventDeleteResult(null);
+    setUndoRedoResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -2527,6 +2565,7 @@ export function App(): ReactElement {
     setEditorAuditionResult(null);
     setInputCaptureResult(null);
     setSelectedEventDeleteResult(null);
+    setUndoRedoResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -2572,30 +2611,63 @@ export function App(): ReactElement {
     setProjectStatus(status);
   }
 
+  function createUndoRedoResult(
+    action: UndoRedoResult["action"],
+    label: string,
+    restoredProject: ProjectState,
+    remainingUndoDepth: number,
+    remainingRedoDepth: number
+  ): UndoRedoResult {
+    const actionLabel = action === "undo" ? "Undo" : "Redo";
+    return {
+      action,
+      targetId: `${action}-${remainingUndoDepth}-${remainingRedoDepth}`,
+      status: action === "undo" ? "Undone" : "Redone",
+      title: `${actionLabel}: ${label}`,
+      detail: `${projectEventTotal(restoredProject)} events active / Pattern ${restoredProject.selectedPattern}`,
+      metricLabel: "History",
+      metricValue: `${remainingUndoDepth} undo / ${remainingRedoDepth} redo`,
+      recoveryCue:
+        action === "undo"
+          ? "Use Redo immediately if the recovered beat went one edit too far."
+          : "Use Undo immediately if replaying this edit breaks the current pass.",
+      nextCheck: `Play Pattern ${restoredProject.selectedPattern}; confirm the restored edit still supports the beat before continuing.`,
+      tone: "good"
+    };
+  }
+
   function undoProject(): void {
     const previousEntry = undoStack[undoStack.length - 1];
     if (!previousEntry) {
+      setUndoRedoResult(null);
       setProjectStatus("Nothing to undo");
       return;
     }
 
     const current = projectRef.current;
+    const remainingUndoDepth = undoStack.length - 1;
+    const remainingRedoDepth = redoStack.length + 1;
     setUndoStack((history) => history.slice(0, -1));
     setRedoStack((history) => prependFuture(history, createEditHistoryEntry(current, previousEntry.label)));
     restoreProjectFromHistory(previousEntry.project, `Undo: ${previousEntry.label}`);
+    setUndoRedoResult(createUndoRedoResult("undo", previousEntry.label, previousEntry.project, remainingUndoDepth, remainingRedoDepth));
   }
 
   function redoProject(): void {
     const nextEntry = redoStack[0];
     if (!nextEntry) {
+      setUndoRedoResult(null);
       setProjectStatus("Nothing to redo");
       return;
     }
 
     const current = projectRef.current;
+    const remainingUndoDepth = undoStack.length + 1;
+    const remainingRedoDepth = redoStack.length - 1;
     setRedoStack((history) => history.slice(1));
     setUndoStack((history) => appendHistory(history, createEditHistoryEntry(current, nextEntry.label)));
     restoreProjectFromHistory(nextEntry.project, `Redo: ${nextEntry.label}`);
+    setUndoRedoResult(createUndoRedoResult("redo", nextEntry.label, nextEntry.project, remainingUndoDepth, remainingRedoDepth));
   }
 
   function clearLocalDraftState(): void {
@@ -7894,6 +7966,7 @@ export function App(): ReactElement {
 
       <WorkflowNavigator items={workflowNavigatorItems} result={workflowNavigatorResult} onJump={jumpToWorkflowNavigatorItem} />
 
+      {undoRedoResult && <UndoRedoResultStrip result={undoRedoResult} />}
       {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
 
       <StyleInspector
