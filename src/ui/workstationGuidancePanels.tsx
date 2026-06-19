@@ -8,7 +8,7 @@ import {
   SlidersHorizontal,
   Target
 } from "lucide-react";
-import type { ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import type { ProjectState } from "../domain/workstation";
 import type {
   FirstBeatPathStepId,
@@ -33,6 +33,19 @@ import type {
   WorkflowSpotlightSummary,
   WorkflowZoneId
 } from "./workstationUiModel";
+
+type GuideQuickStartResult = {
+  source: "path" | "session" | "workflow";
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
 
 export function modeLabel(mode: ProjectState["mode"]): string {
   return mode === "guided" ? "Guided" : "Studio";
@@ -320,6 +333,18 @@ export function GuideQuickStart({
     nextStep?.tone ?? "good",
     sessionCard?.tone ?? "good"
   ]);
+  const [result, setResult] = useState<GuideQuickStartResult | null>(null);
+
+  useEffect(() => {
+    setResult(null);
+  }, [
+    firstBeatPathSummary.countLabel,
+    firstBeatPathSummary.nextStepId,
+    sessionPassSummary.headline,
+    sessionPassSummary.mode,
+    workflowSpotlight.countLabel,
+    workflowSpotlight.zoneId
+  ]);
 
   return (
     <section
@@ -345,6 +370,7 @@ export function GuideQuickStart({
           disabled={!nextStep}
           onClick={() => {
             if (nextStep) {
+              setResult(createGuideQuickStartPathResult(nextStep, firstBeatPathSummary));
               onJumpFirstBeatPath(nextStep);
             }
           }}
@@ -362,6 +388,7 @@ export function GuideQuickStart({
           disabled={!sessionCard}
           onClick={() => {
             if (sessionCard) {
+              setResult(createGuideQuickStartSessionResult(sessionCard, sessionPassSummary));
               onFocusSessionPass(sessionCard);
             }
           }}
@@ -379,6 +406,7 @@ export function GuideQuickStart({
           disabled={!workflowSpotlightItem}
           onClick={() => {
             if (workflowSpotlightItem) {
+              setResult(createGuideQuickStartWorkflowResult(workflowSpotlight, workflowSpotlightItem));
               onJumpWorkflowSpotlight(workflowSpotlightItem);
             }
           }}
@@ -391,7 +419,88 @@ export function GuideQuickStart({
           <small>{workflowSpotlight.detailLabel}</small>
         </button>
       </div>
+      {result && <GuideQuickStartResultStrip result={result} />}
     </section>
+  );
+}
+
+function createGuideQuickStartPathResult(step: FirstBeatPathStep, summary: FirstBeatPathSummary): GuideQuickStartResult {
+  return {
+    source: "path",
+    status: "Jumped",
+    title: `Next path: ${step.label}`,
+    detail: step.detail,
+    destination: step.jumpLabel,
+    metricLabel: "Path",
+    metricValue: summary.countLabel,
+    auditionCue: "Use the focused workstation area to handle this direct beat-making step.",
+    nextCheck: "Return to Guide Quick Start after the step is ready or intentionally deferred.",
+    tone: step.tone
+  };
+}
+
+function createGuideQuickStartSessionResult(card: SessionPassCard, summary: SessionPassSummary): GuideQuickStartResult {
+  return {
+    source: "session",
+    status: "Focused",
+    title: `${modeLabel(summary.mode)} pass: ${card.label}`,
+    detail: card.detail,
+    destination: card.focusLabel,
+    metricLabel: "Session",
+    metricValue: card.value,
+    auditionCue: "Use the focused panel to inspect this session pass before changing the beat.",
+    nextCheck: "Return to Guide Quick Start for the next guided or studio pass target.",
+    tone: card.tone
+  };
+}
+
+function createGuideQuickStartWorkflowResult(
+  spotlight: WorkflowSpotlightSummary,
+  item: WorkflowNavigatorItem
+): GuideQuickStartResult {
+  return {
+    source: "workflow",
+    status: "Jumped",
+    title: spotlight.statusLabel,
+    detail: item.detail,
+    destination: item.label,
+    metricLabel: "Workflow",
+    metricValue: spotlight.countLabel,
+    auditionCue: "Use the highlighted workstation zone to resolve the current workflow target.",
+    nextCheck: "Return to Guide Quick Start after the zone looks ready or needs another pass.",
+    tone: spotlight.tone
+  };
+}
+
+function GuideQuickStartResultStrip({ result }: { result: GuideQuickStartResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`guide-quick-start-result ${result.tone}`}
+      data-result-guide-quick-start={result.source}
+      data-testid="guide-quick-start-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="guide-quick-start-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="guide-quick-start-result-title">{result.title}</strong>
+          <small data-testid="guide-quick-start-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="guide-quick-start-result-destination" data-testid="guide-quick-start-result-destination">
+        <span data-testid="guide-quick-start-result-status">{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="guide-quick-start-result-metric" data-testid="guide-quick-start-result-metric">
+        <span>{result.metricLabel}</span>
+        <strong data-testid="guide-quick-start-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="guide-quick-start-result-followup" data-testid="guide-quick-start-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
