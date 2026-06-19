@@ -712,6 +712,7 @@ import {
   NoteEditor,
   NoteInspector,
   PatternClonePads,
+  PatternCloneSuggestion,
   PatternFillSuggestion,
   PatternFillPreview,
   PatternStackPads,
@@ -781,6 +782,7 @@ import {
   chordEventsChangedCount,
   createLayerStarterResult,
   createPatternClonePadOptions,
+  createPatternCloneSuggestionSummary,
   createPatternCloneResult,
   createPatternEditResult,
   createPatternFillPreviewSummary,
@@ -1797,6 +1799,10 @@ export function App(): ReactElement {
   const patternFillSuggestionSummary = useMemo(
     () => createPatternFillSuggestionSummary(project.selectedPattern, currentPattern, project.key),
     [project.selectedPattern, currentPattern, project.key]
+  );
+  const patternCloneSuggestionSummary = useMemo(
+    () => createPatternCloneSuggestionSummary(project.selectedPattern, project.patterns),
+    [project.selectedPattern, project.patterns]
   );
   const patternCloneOptions = useMemo(() => createPatternClonePadOptions(project.selectedPattern), [project.selectedPattern]);
   const drumFoundationOptions = useMemo(() => createDrumFoundationOptions(), []);
@@ -8461,6 +8467,7 @@ export function App(): ReactElement {
           />
           <LayerStarterPads options={layerStarterOptions} onApply={applyLayerStarter} />
           {layerStarterResult && <LayerStarterResultStrip result={layerStarterResult} />}
+          <PatternCloneSuggestion summary={patternCloneSuggestionSummary} />
           <PatternClonePads clones={patternCloneOptions} onApply={cloneSelectedPatternVariation} />
           {patternCloneResult && <PatternCloneResultStrip result={patternCloneResult} />}
           {patternEditResult && <PatternEditResultStrip result={patternEditResult} />}

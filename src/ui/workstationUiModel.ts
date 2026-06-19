@@ -1177,6 +1177,19 @@ export type PatternClonePadOption = {
   detail: string;
 };
 
+export type PatternCloneSuggestionSummary = {
+  source: PatternSlot;
+  target: PatternSlot;
+  preset: PatternVariationPreset;
+  statusLabel: string;
+  routeLabel: string;
+  presetLabel: string;
+  detailLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type PatternCloneResultMetric = {
   id: "source" | "target" | "drums" | "music";
   label: string;

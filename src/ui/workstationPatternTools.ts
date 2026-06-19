@@ -214,6 +214,7 @@ import type {
   BeatReadinessCheck,
   PatternCompareSummary,
   PatternClonePadOption,
+  PatternCloneSuggestionSummary,
   PatternCloneResultMetric,
   PatternCloneResult,
   PatternEditResultMetric,
@@ -1718,6 +1719,48 @@ export function createPatternClonePadOptions(source: PatternSlot): PatternCloneP
         detail: `Clone ${source} -> ${target}`
       }))
     );
+}
+
+export function suggestedPatternCloneTarget(source: PatternSlot, patterns: ProjectState["patterns"]): PatternSlot {
+  return patternSlots
+    .filter((target) => target !== source)
+    .sort((first, second) => patternEventTotal(patterns[first]) - patternEventTotal(patterns[second]))[0];
+}
+
+export function suggestedPatternClonePreset(pattern: PatternData): PatternVariationPreset {
+  return patternEventTotal(pattern) > 40 || activeDrumHitCount(pattern) > 24 ? "breakdown" : "hook";
+}
+
+export function createPatternCloneSuggestionSummary(
+  source: PatternSlot,
+  patterns: ProjectState["patterns"]
+): PatternCloneSuggestionSummary {
+  const sourcePattern = patterns[source];
+  const target = suggestedPatternCloneTarget(source, patterns);
+  const beforeTarget = patterns[target];
+  const preset = suggestedPatternClonePreset(sourcePattern);
+  const afterTarget = createPatternVariation(sourcePattern, preset);
+  const changedCount = patternCloneChangedCount(beforeTarget, afterTarget);
+  const sourceEventCount = patternEventTotal(sourcePattern);
+  const targetEventCount = patternEventTotal(beforeTarget);
+  const presetLabel = patternVariationPresetLabel(preset);
+  const statusLabel = targetEventCount === 0 ? "Clone slot ready" : "Suggested clone";
+  const routeLabel = `Pattern ${source} -> ${target}`;
+  const detailLabel = `${sourceEventCount} source / ${targetEventCount} target`;
+  const moveLabel = `${changedCount} target change${changedCount === 1 ? "" : "s"}`;
+
+  return {
+    source,
+    target,
+    preset,
+    statusLabel,
+    routeLabel,
+    presetLabel,
+    detailLabel,
+    moveLabel,
+    detailTitle: `${statusLabel}: ${routeLabel}; ${presetLabel}; ${detailLabel}; ${moveLabel}.`,
+    tone: targetEventCount === 0 ? "good" : "warn"
+  };
 }
 
 export function createPatternCloneResult(
