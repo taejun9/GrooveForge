@@ -4655,7 +4655,8 @@ h2 {
   font-size: 11px;
 }
 
-.quick-actions-guide-suggestion-reason {
+.quick-actions-guide-suggestion-reason,
+.quick-actions-guide-suggestion-next {
   display: -webkit-box;
   overflow: hidden;
   color: rgba(244, 239, 231, 0.72);

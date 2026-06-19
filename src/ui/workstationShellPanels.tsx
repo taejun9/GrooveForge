@@ -75,6 +75,21 @@ function quickActionGuideSuggestionMetric(detail: string): string {
   return metricParts.length > 0 ? `Metric: ${metricParts.join(" / ")}` : "Metric: current guide signal";
 }
 
+function quickActionGuideSuggestionAfterRun(detail: string): string {
+  const source = detail.split(" / ")[0]?.trim();
+
+  switch (source) {
+    case "First Beat Path":
+      return "After run: inspect the focused path step before editing.";
+    case "Session Pass":
+      return "After run: review the focused pass before choosing a fix.";
+    case "Workflow Spotlight":
+      return "After run: check the highlighted workflow zone before changing the beat.";
+    default:
+      return "After run: inspect the focused guide target before editing.";
+  }
+}
+
 type CommandReferenceItem = {
   id: string;
   command: string;
@@ -509,6 +524,9 @@ export function QuickActions({
   const guideSuggestionMetric = guideSuggestionAction
     ? quickActionGuideSuggestionMetric(guideSuggestionAction.detail)
     : "Metric: current guide signal";
+  const guideSuggestionAfterRun = guideSuggestionAction
+    ? quickActionGuideSuggestionAfterRun(guideSuggestionAction.detail)
+    : "After run: inspect the focused guide target before editing.";
 
   return (
     <div
@@ -594,6 +612,9 @@ export function QuickActions({
               <small data-testid="quick-actions-guide-suggestion-detail">{guideSuggestionAction.detail}</small>
               <small className="quick-actions-guide-suggestion-reason" data-testid="quick-actions-guide-suggestion-reason">
                 {guideSuggestionReason}
+              </small>
+              <small className="quick-actions-guide-suggestion-next" data-testid="quick-actions-guide-suggestion-next">
+                {guideSuggestionAfterRun}
               </small>
               <span className="quick-actions-guide-suggestion-meta" data-testid="quick-actions-guide-suggestion-meta">
                 <span data-testid="quick-actions-guide-suggestion-source">{guideSuggestionSource}</span>
