@@ -153,6 +153,15 @@ type BeatTermItem = {
   target: string;
 };
 
+type CommandReferenceSearchSpotlight = {
+  id: string;
+  status: string;
+  label: string;
+  detail: string;
+  context: string;
+  title: string;
+};
+
 const commandReferenceSections: CommandReferenceSection[] = [
   {
     id: "desktop-shortcuts",
@@ -341,6 +350,50 @@ function commandReferenceItemMatchesQuery(section: CommandReferenceSection, item
 
 function beatTermMatchesQuery(item: BeatTermItem, query: string): boolean {
   return commandReferenceMatchesQuery([item.term, item.meaning, item.target], query);
+}
+
+function createCommandReferenceSearchSpotlight(
+  visibleSections: CommandReferenceSection[],
+  visibleBeatTerms: BeatTermItem[],
+  query: string
+): CommandReferenceSearchSpotlight | null {
+  const hasSearchQuery = query.length > 0;
+  const firstSection = visibleSections[0];
+  const firstCommand = firstSection?.items[0] ?? null;
+
+  if (firstSection && firstCommand) {
+    const status = hasSearchQuery ? "Top command match" : "First visible command";
+    const detail = `${firstSection.title} / ${firstCommand.shortcut}`;
+    const context = firstCommand.target;
+
+    return {
+      id: `command-${firstCommand.id}`,
+      status,
+      label: firstCommand.command,
+      detail,
+      context,
+      title: `${status}: ${firstCommand.command} / ${detail} / ${context}`
+    };
+  }
+
+  const firstTerm = visibleBeatTerms[0] ?? null;
+
+  if (firstTerm) {
+    const status = hasSearchQuery ? "Top Beat Terms match" : "First visible Beat Term";
+    const detail = `Beat Terms / ${firstTerm.target}`;
+    const context = firstTerm.meaning;
+
+    return {
+      id: `term-${firstTerm.id}`,
+      status,
+      label: firstTerm.term,
+      detail,
+      context,
+      title: `${status}: ${firstTerm.term} / ${detail} / ${context}`
+    };
+  }
+
+  return null;
 }
 
 export function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; meta: string }): ReactElement {
@@ -993,6 +1046,11 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
   const visibleCommandCount = visibleSections.reduce((total, section) => total + section.items.length, 0);
   const visibleResultCount = visibleCommandCount + visibleBeatTerms.length;
   const hasVisibleResults = visibleResultCount > 0;
+  const commandReferenceSearchSpotlight = createCommandReferenceSearchSpotlight(
+    visibleSections,
+    visibleBeatTerms,
+    searchQuery.trim()
+  );
 
   useEffect(() => {
     if (!open) {
@@ -1077,6 +1135,20 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
             ) : null}
             <span data-testid="command-reference-search-count">{visibleResultCount} shown</span>
           </div>
+          {commandReferenceSearchSpotlight ? (
+            <div
+              aria-label={commandReferenceSearchSpotlight.title}
+              className="command-reference-spotlight"
+              data-command-reference-spotlight={commandReferenceSearchSpotlight.id}
+              data-testid="command-reference-spotlight"
+              title={commandReferenceSearchSpotlight.title}
+            >
+              <span data-testid="command-reference-spotlight-status">{commandReferenceSearchSpotlight.status}</span>
+              <strong data-testid="command-reference-spotlight-label">{commandReferenceSearchSpotlight.label}</strong>
+              <small data-testid="command-reference-spotlight-detail">{commandReferenceSearchSpotlight.detail}</small>
+              <small data-testid="command-reference-spotlight-context">{commandReferenceSearchSpotlight.context}</small>
+            </div>
+          ) : null}
           <div className="command-reference-grid" data-testid="command-reference-grid">
             {visibleSections.map((section) => (
               <div
