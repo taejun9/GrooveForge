@@ -57,6 +57,16 @@ type GuideQuickStartDecision = {
   tone: MixCoachTone;
 };
 
+type GuideQuickStartPriority = {
+  source: "path" | "session" | "workflow";
+  statusLabel: string;
+  reasonLabel: string;
+  metricLabel: string;
+  nextCheckLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 type GuideQuickStartContextItem = {
   id: "path" | "session" | "workflow";
   statusLabel: string;
@@ -364,6 +374,12 @@ export function GuideQuickStart({
     workflowSpotlight,
     workflowSpotlightItem
   });
+  const priority = createGuideQuickStartPriority({
+    decision,
+    firstBeatPathSummary,
+    sessionPassSummary,
+    workflowSpotlight
+  });
   const contextItems = createGuideQuickStartContextItems({
     firstBeatPathSummary,
     nextStep,
@@ -420,6 +436,17 @@ export function GuideQuickStart({
           <strong data-testid="guide-quick-start-decision-lane">{decision.laneLabel}</strong>
           <small data-testid="guide-quick-start-decision-metric">{decision.metricLabel}</small>
           <small data-testid="guide-quick-start-decision-detail">{decision.detailLabel}</small>
+        </div>
+        <div
+          className={`guide-quick-start-priority ${priority.tone}`}
+          data-guide-quick-start-priority={priority.source}
+          data-testid="guide-quick-start-priority"
+          title={priority.title}
+        >
+          <span data-testid="guide-quick-start-priority-status">{priority.statusLabel}</span>
+          <strong data-testid="guide-quick-start-priority-reason">{priority.reasonLabel}</strong>
+          <small data-testid="guide-quick-start-priority-metric">{priority.metricLabel}</small>
+          <small data-testid="guide-quick-start-priority-next-check">{priority.nextCheckLabel}</small>
         </div>
         <div className="guide-quick-start-context" data-testid="guide-quick-start-context" aria-label="Guide Quick Start context">
           {contextItems.map((item) => (
@@ -497,6 +524,49 @@ export function GuideQuickStart({
       {result && <GuideQuickStartResultStrip result={result} />}
     </section>
   );
+}
+
+function createGuideQuickStartPriority({
+  decision,
+  firstBeatPathSummary,
+  sessionPassSummary,
+  workflowSpotlight
+}: {
+  decision: GuideQuickStartDecision;
+  firstBeatPathSummary: FirstBeatPathSummary;
+  sessionPassSummary: SessionPassSummary;
+  workflowSpotlight: WorkflowSpotlightSummary;
+}): GuideQuickStartPriority {
+  const sourceLabel =
+    decision.source === "path" ? "Path priority" : decision.source === "session" ? "Session priority" : "Workflow priority";
+  const reasonLabel =
+    decision.source === "path"
+      ? "First unfinished beat-making step"
+      : decision.source === "session"
+        ? `${modeLabel(sessionPassSummary.mode)} session lane is active`
+        : "Workflow zone needs attention";
+  const metricLabel =
+    decision.source === "path"
+      ? firstBeatPathSummary.countLabel
+      : decision.source === "session"
+        ? sessionPassSummary.headline
+        : workflowSpotlight.countLabel;
+  const nextCheckLabel =
+    decision.source === "path"
+      ? "Next: jump, finish the step, then return."
+      : decision.source === "session"
+        ? "Next: focus the pass before editing."
+        : "Next: clear the highlighted zone.";
+
+  return {
+    source: decision.source,
+    statusLabel: sourceLabel,
+    reasonLabel,
+    metricLabel,
+    nextCheckLabel,
+    title: `${sourceLabel}: ${reasonLabel} / ${decision.detailLabel} / ${nextCheckLabel}`,
+    tone: decision.tone
+  };
 }
 
 function createGuideQuickStartContextItems({
