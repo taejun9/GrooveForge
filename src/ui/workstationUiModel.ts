@@ -3320,6 +3320,18 @@ export type WorkflowSpotlightSummary = {
   tone: MixCoachTone;
 };
 
+export type WorkflowNavigatorJumpResult = {
+  zoneId: WorkflowZoneId;
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type FirstBeatPathStepId = "setup" | "compose" | "arrange" | "mix" | "deliver";
 export type FirstBeatPathTarget = "transport" | WorkflowZoneId;
 

@@ -536,6 +536,7 @@ import type {
   ExportPreflightFocusSummary,
   WorkflowZoneId,
   WorkflowNavigatorItem,
+  WorkflowNavigatorJumpResult,
   FirstBeatPathTarget,
   FirstBeatPathStep,
   FirstBeatPathSummary,
@@ -1064,6 +1065,7 @@ export function App(): ReactElement {
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [modeSwitchResult, setModeSwitchResult] = useState<ModeSwitchResult | null>(null);
+  const [workflowNavigatorResult, setWorkflowNavigatorResult] = useState<WorkflowNavigatorJumpResult | null>(null);
   const [firstBeatPathResult, setFirstBeatPathResult] = useState<FirstBeatPathJumpResult | null>(null);
   const [swingFeelResult, setSwingFeelResult] = useState<SwingFeelResult | null>(null);
   const [styleGoalCueResult, setStyleGoalCueResult] = useState<StyleGoalCueResult | null>(null);
@@ -1990,6 +1992,7 @@ export function App(): ReactElement {
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
+    setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
     setSwingFeelResult(null);
     setStyleGoalCueResult(null);
@@ -2035,6 +2038,7 @@ export function App(): ReactElement {
       setProject(nextProject);
       setQuickActionResult(null);
       setModeSwitchResult(null);
+      setWorkflowNavigatorResult(null);
       setFirstBeatPathResult(null);
       setSwingFeelResult(null);
       setStyleGoalCueResult(null);
@@ -2173,6 +2177,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
     setSwingFeelResult(null);
     setBeatBlueprintResult(null);
@@ -2222,6 +2227,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
     setSwingFeelResult(null);
     setBeatBlueprintResult(null);
@@ -6189,6 +6195,12 @@ export function App(): ReactElement {
     targetRefs[zone]?.scrollIntoView({ block: "start", behavior: "auto" });
   }
 
+  function jumpToWorkflowNavigatorItem(item: WorkflowNavigatorItem): void {
+    jumpToWorkflowZone(item.id);
+    setWorkflowNavigatorResult(createWorkflowNavigatorJumpResult(item, workflowNavigatorItems));
+    setProjectStatus(`Workflow ${item.label}: ${item.value}`);
+  }
+
   function focusBeatReadinessCheck(check: BeatReadinessCheck): void {
     const targetRefs: Record<BeatReadinessFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -6875,8 +6887,8 @@ export function App(): ReactElement {
     onFocusSessionPass: focusSessionPassCard,
     onFocusStyleInspector: focusStyleInspectorItem,
     onFocusToplineSpace: focusToplineSpaceCard,
-    onFocusWorkflowSpotlight: jumpToWorkflowZone,
-    onJumpWorkflowZone: jumpToWorkflowZone,
+    onFocusWorkflowSpotlight: jumpToWorkflowNavigatorItem,
+    onJumpWorkflowZone: jumpToWorkflowNavigatorItem,
     onOpenCommandReference: openCommandReference,
     onOpenProject: handleOpenProject,
     onRedo: redoProject,
@@ -7230,7 +7242,7 @@ export function App(): ReactElement {
 
       <SessionPass summary={sessionPassSummary} onFocus={focusSessionPassCard} />
 
-      <WorkflowNavigator items={workflowNavigatorItems} onJump={jumpToWorkflowZone} />
+      <WorkflowNavigator items={workflowNavigatorItems} result={workflowNavigatorResult} onJump={jumpToWorkflowNavigatorItem} />
 
       {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
 
@@ -13121,8 +13133,8 @@ function createQuickActions({
   onFocusSessionPass: (card: SessionPassCard) => void;
   onFocusStyleInspector: (item: StyleInspectorFocusItem) => void;
   onFocusToplineSpace: (card: ToplineSpaceFocusItem) => void;
-  onFocusWorkflowSpotlight: (zone: WorkflowZoneId) => void;
-  onJumpWorkflowZone: (zone: WorkflowZoneId) => void;
+  onFocusWorkflowSpotlight: (item: WorkflowNavigatorItem) => void;
+  onJumpWorkflowZone: (item: WorkflowNavigatorItem) => void;
   onOpenCommandReference: () => void;
   onOpenProject: () => Promise<void>;
   onRedo: () => void;
@@ -13606,13 +13618,16 @@ function createQuickActions({
     };
   });
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
+  const workflowSpotlightItem = workflowSpotlight.zoneId
+    ? workflowNavigatorItems.find((item) => item.id === workflowSpotlight.zoneId) ?? null
+    : null;
   const workflowNavigatorActions: QuickAction[] = workflowNavigatorItems.map((item) => ({
     id: `workflow-navigator-${item.id}`,
     title: `Jump Workflow: ${item.label}`,
     detail: `${item.value} / ${item.detail}`,
     group: "Project",
     keywords: `workflow navigator jump ${item.id} ${item.label} ${item.value} ${item.detail} compose arrange mix deliver beginner producer`,
-    run: () => onJumpWorkflowZone(item.id)
+    run: () => onJumpWorkflowZone(item)
   }));
   const deliveryTarget = activeDeliveryTarget(project);
   const deliveryTargetAlignmentPreview = createDeliveryTargetAlignmentPreview(project, deliveryTarget);
@@ -15115,10 +15130,10 @@ function createQuickActions({
       detail: `${workflowSpotlight.statusLabel} / ${workflowSpotlight.detailLabel}`,
       group: "Project",
       keywords: `workflow spotlight focus navigator next blocker review jump ${workflowSpotlight.zoneId ?? "none"} compose arrange mix deliver beginner producer`,
-      disabled: !workflowSpotlight.zoneId,
+      disabled: !workflowSpotlightItem,
       run: () => {
-        if (workflowSpotlight.zoneId) {
-          onFocusWorkflowSpotlight(workflowSpotlight.zoneId);
+        if (workflowSpotlightItem) {
+          onFocusWorkflowSpotlight(workflowSpotlightItem);
         }
       }
     },
@@ -19942,6 +19957,56 @@ function createReviewQueueSummary(
     tone,
     items
   };
+}
+
+function createWorkflowNavigatorJumpResult(
+  item: WorkflowNavigatorItem,
+  items: WorkflowNavigatorItem[]
+): WorkflowNavigatorJumpResult {
+  return {
+    zoneId: item.id,
+    status: "Jumped",
+    title: `${item.label} zone ready`,
+    detail: `${item.value} / ${item.detail}`,
+    metricLabel: "Workflow",
+    metricValue: workflowNavigatorJumpMetricValue(items),
+    auditionCue: workflowNavigatorJumpAuditionCue(item),
+    nextCheck: workflowNavigatorJumpNextCheck(item),
+    tone: item.tone
+  };
+}
+
+function workflowNavigatorJumpMetricValue(items: WorkflowNavigatorItem[]): string {
+  const readyCount = items.filter((item) => item.tone === "good").length;
+  const reviewCount = items.filter((item) => item.tone === "warn").length;
+  const blockerCount = items.filter((item) => item.tone === "danger").length;
+  return `${readyCount}/${items.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function workflowNavigatorJumpAuditionCue(item: WorkflowNavigatorItem): string {
+  switch (item.id) {
+    case "compose":
+      return "Use Pattern loop audition while editing drums, 808/bass, chords, or melody.";
+    case "arrange":
+      return "Use Song or Block loop audition to check section order, energy, and Pattern A/B/C placement.";
+    case "mix":
+      return "Use Stem Audition and Mix Coach before choosing any explicit mix or master move.";
+    case "deliver":
+      return "Use Export Preflight and Handoff Pack before explicit WAV, stems, MIDI, or sheet export.";
+  }
+}
+
+function workflowNavigatorJumpNextCheck(item: WorkflowNavigatorItem): string {
+  switch (item.id) {
+    case "compose":
+      return "Return to Workflow Navigator after the core musical layers are ready.";
+    case "arrange":
+      return "Return after the hook, contrast, and target bar length are clear.";
+    case "mix":
+      return "Return after headroom, stem balance, low end, and master posture are ready.";
+    case "deliver":
+      return "Return after exports and handoff context are ready for the selected target.";
+  }
 }
 
 function createWorkflowNavigatorItems(

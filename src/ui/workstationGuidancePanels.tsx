@@ -26,6 +26,7 @@ import type {
   SessionPassCard,
   SessionPassSummary,
   WorkflowNavigatorItem,
+  WorkflowNavigatorJumpResult,
   WorkflowSpotlightSummary,
   WorkflowZoneId
 } from "./workstationUiModel";
@@ -360,12 +361,15 @@ export function SessionPass({
 
 export function WorkflowNavigator({
   items,
-  onJump
+  onJump,
+  result
 }: {
   items: WorkflowNavigatorItem[];
-  onJump: (zone: WorkflowZoneId) => void;
+  result: WorkflowNavigatorJumpResult | null;
+  onJump: (item: WorkflowNavigatorItem) => void;
 }): ReactElement {
   const spotlight = createWorkflowSpotlightSummary(items);
+  const spotlightItem = spotlight.zoneId ? items.find((item) => item.id === spotlight.zoneId) ?? null : null;
 
   return (
     <nav className="workflow-navigator" data-testid="workflow-navigator" aria-label="Workflow navigator">
@@ -382,10 +386,10 @@ export function WorkflowNavigator({
         className={`workflow-spotlight ${spotlight.tone}`}
         data-spotlight-zone={spotlight.zoneId ?? "none"}
         data-testid="workflow-spotlight"
-        disabled={!spotlight.zoneId}
+        disabled={!spotlightItem}
         onClick={() => {
-          if (spotlight.zoneId) {
-            onJump(spotlight.zoneId);
+          if (spotlightItem) {
+            onJump(spotlightItem);
           }
         }}
         title={spotlight.zoneId ? `Jump to ${spotlight.zoneLabel}` : spotlight.detailTitle}
@@ -402,7 +406,7 @@ export function WorkflowNavigator({
             className={`workflow-navigator-card ${item.tone}`}
             data-testid={`workflow-jump-${item.id}`}
             key={item.id}
-            onClick={() => onJump(item.id)}
+            onClick={() => onJump(item)}
             title={`Jump to ${item.label}`}
             type="button"
           >
@@ -413,7 +417,38 @@ export function WorkflowNavigator({
           </button>
         ))}
       </div>
+      {result && <WorkflowNavigatorJumpResultStrip result={result} />}
     </nav>
+  );
+}
+
+function WorkflowNavigatorJumpResultStrip({ result }: { result: WorkflowNavigatorJumpResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`workflow-navigator-result ${result.tone}`}
+      data-result-workflow-zone={result.zoneId}
+      data-testid="workflow-navigator-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="workflow-navigator-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="workflow-navigator-result-title">{result.title}</strong>
+          <small data-testid="workflow-navigator-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="workflow-navigator-result-metric" data-testid="workflow-navigator-result-metric">
+        <span data-testid="workflow-navigator-result-status">{result.status}</span>
+        <strong data-testid="workflow-navigator-result-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="workflow-navigator-result-followup" data-testid="workflow-navigator-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
