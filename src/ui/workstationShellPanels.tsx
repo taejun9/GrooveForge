@@ -58,6 +58,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "midi-input", command: "MIDI Input", shortcut: "Quick Actions", target: "Controller notes" },
       { id: "editor-audition", command: "Editor Audition", shortcut: "Quick Actions", target: "Selected events" },
       { id: "blueprints", command: "Beat Blueprints", shortcut: "Quick Actions", target: "Sample-free starts" },
+      { id: "style-goal-actions", command: "Style Goal Actions", shortcut: "Quick Actions", target: "Drums / 808 / Harmony / Melody" },
       { id: "layer-starter", command: "Layer Starter", shortcut: "Quick Actions", target: "Drums / 808 / Chords / Synth" },
       { id: "audible-pattern-follow", command: "Audible Pattern Follow", shortcut: "Quick Actions", target: "Heard Pattern" }
     ]
