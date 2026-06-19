@@ -3,7 +3,7 @@ import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { BassNote, ChordEvent, ChordProgressionPreset, ChordQuality, DrumLane, MelodyNote, NoteTrack, PatternSlot, PatternVariationPreset, ProjectState, SoundDesign } from "../domain/workstation";
 import { chordInversions, chordInversionLabel, chordProgressionPresetIds, chordProgressionPresetLabel, chordQualities, drumStepProbability, drumStepTimingMs, drumStepVelocity, hatRepeatCount, maxDrumTimingMs, minDrumTimingMs, normalizeChordInversion, normalizeDrumProbability, normalizeDrumTimingMs, normalizeDrumVelocity, normalizeEventProbability, normalizeHatRepeat, scalePitchNames, soundPresetDesign, soundPresetIds, soundPresetLabel, steps } from "../domain/workstation";
-import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneResult, PatternFillPreviewSummary, PatternFillSuggestionSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundSnapshot, SoundSnapshotComparisonSummary, SoundSnapshotSlotId, SoundSnapshotSlotMap, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
+import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneResult, PatternFillPreviewSummary, PatternFillSuggestionSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationSuggestionSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundSnapshot, SoundSnapshotComparisonSummary, SoundSnapshotSlotId, SoundSnapshotSlotMap, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
 import { drumLabels, keyboardCaptureKeyLabels } from "./workstationUiModel";
 import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyChordStep, percentLabel, pitchParts, timingLabel, trackOctaveRange } from "./workstationPatternTools";
 
@@ -536,6 +536,23 @@ export function PatternVariationPreview({ preview }: { preview: PatternVariation
       <small data-testid="pattern-variation-preview-chord">{preview.chordLabel}</small>
       <small data-testid="pattern-variation-preview-melody">{preview.melodyLabel}</small>
       <small data-testid="pattern-variation-preview-moves">{preview.moveLabel}</small>
+    </div>
+  );
+}
+
+export function PatternVariationSuggestion({ summary }: { summary: PatternVariationSuggestionSummary }): ReactElement {
+  return (
+    <div
+      className={`pattern-variation-suggestion ${summary.tone}`}
+      data-suggested-pattern-variation={summary.preset}
+      data-testid="pattern-variation-suggestion"
+      title={summary.detailTitle}
+    >
+      <span data-testid="pattern-variation-suggestion-status">{summary.statusLabel}</span>
+      <strong data-testid="pattern-variation-suggestion-preset">{summary.presetLabel}</strong>
+      <small data-testid="pattern-variation-suggestion-pattern">{summary.patternLabel}</small>
+      <small data-testid="pattern-variation-suggestion-detail">{summary.detailLabel}</small>
+      <small data-testid="pattern-variation-suggestion-moves">{summary.moveLabel}</small>
     </div>
   );
 }

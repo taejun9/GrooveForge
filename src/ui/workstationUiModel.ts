@@ -1286,6 +1286,17 @@ export type PatternVariationPreviewSummary = {
   tone: MixCoachTone;
 };
 
+export type PatternVariationSuggestionSummary = {
+  preset: PatternVariationPreset;
+  statusLabel: string;
+  patternLabel: string;
+  presetLabel: string;
+  detailLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type PatternVariationResultMetric = {
   id: "events" | "drums" | "bass" | "chords" | "melody";
   label: string;

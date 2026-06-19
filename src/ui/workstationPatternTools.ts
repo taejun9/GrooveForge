@@ -223,6 +223,7 @@ import type {
   PatternFillResultMetric,
   PatternFillResult,
   PatternVariationPreviewSummary,
+  PatternVariationSuggestionSummary,
   PatternVariationResultMetric,
   PatternVariationResult,
   PatternDnaCardId,
@@ -1538,6 +1539,45 @@ export function createPatternVariationPreviewSummary(
     moveLabel,
     detailTitle: `${statusLabel}: ${patternLabel}; ${presetLabelText}; ${drumsLabel}; ${bassLabel}; ${chordLabel}; ${melodyLabel}; ${moveLabel}.`,
     tone: changes.total > 0 ? "warn" : "good"
+  };
+}
+
+export function suggestedPatternVariationPreset(pattern: PatternData): PatternVariationPreset {
+  const totalEvents = patternEventTotal(pattern);
+  const musicEvents = patternMusicEventCount(pattern);
+  const drumHits = activeDrumHitCount(pattern);
+
+  if (totalEvents < 24 || musicEvents < 6) {
+    return "hook";
+  }
+
+  if (totalEvents > 44 || drumHits > 26) {
+    return "breakdown";
+  }
+
+  return "subtle";
+}
+
+export function createPatternVariationSuggestionSummary(
+  patternSlot: PatternSlot,
+  pattern: PatternData
+): PatternVariationSuggestionSummary {
+  const preset = suggestedPatternVariationPreset(pattern);
+  const preview = createPatternVariationPreviewSummary(patternSlot, pattern, preset);
+  const presetLabel = patternVariationPresetLabel(preset);
+  const eventLabel = `${patternEventTotal(pattern)} events`;
+  const statusLabel = preview.tone === "good" ? "Variation aligned" : "Suggested variation";
+  const detailLabel = `${eventLabel} / ${preview.moveLabel}`;
+
+  return {
+    preset,
+    statusLabel,
+    patternLabel: `Pattern ${patternSlot}`,
+    presetLabel,
+    detailLabel,
+    moveLabel: preview.moveLabel,
+    detailTitle: `${statusLabel}: Pattern ${patternSlot}; ${presetLabel}; ${detailLabel}.`,
+    tone: preview.tone
   };
 }
 

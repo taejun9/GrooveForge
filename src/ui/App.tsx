@@ -717,6 +717,7 @@ import {
   PatternStackPads,
   PatternStackPreview,
   PatternStackResultStrip,
+  PatternVariationSuggestion,
   PatternVariationPreview,
   SoundDesigner,
   SwingFeelResultStrip
@@ -787,6 +788,7 @@ import {
   createPatternFillResult,
   suggestedPatternFillPreset,
   createPatternVariationPreviewSummary,
+  createPatternVariationSuggestionSummary,
   createPatternVariationResult,
   createPatternStackEvents,
   samePatternStackEvents,
@@ -1783,6 +1785,10 @@ export function App(): ReactElement {
   const patternVariationPreviewSummary = useMemo(
     () => createPatternVariationPreviewSummary(project.selectedPattern, currentPattern, patternVariationPreviewPreset),
     [project.selectedPattern, currentPattern, patternVariationPreviewPreset]
+  );
+  const patternVariationSuggestionSummary = useMemo(
+    () => createPatternVariationSuggestionSummary(project.selectedPattern, currentPattern),
+    [project.selectedPattern, currentPattern]
   );
   const patternFillPreviewSummary = useMemo(
     () => createPatternFillPreviewSummary(project.selectedPattern, currentPattern, patternFillPreviewPreset, project.key),
@@ -8461,6 +8467,7 @@ export function App(): ReactElement {
           <PatternStackPreview preview={patternStackPreviewSummary} />
           {patternStackResult && <PatternStackResultStrip result={patternStackResult} />}
           <PatternStackPads stacks={patternStackOptions} onApply={applyPatternStack} />
+          <PatternVariationSuggestion summary={patternVariationSuggestionSummary} />
           <PatternVariationPreview preview={patternVariationPreviewSummary} />
           <DrumMovePreview preview={drumMovePreviewSummary} />
           {drumMoveResult && <DrumMoveResultStrip result={drumMoveResult} />}
