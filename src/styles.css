@@ -9071,6 +9071,12 @@ h2 {
 .hook-readiness-focus-readout span,
 .hook-readiness-focus-readout strong,
 .hook-readiness-focus-readout small,
+.hook-readiness-result-main strong,
+.hook-readiness-result-main small,
+.hook-readiness-result-meta span,
+.hook-readiness-result-meta strong,
+.hook-readiness-result-followup span,
+.hook-readiness-result-followup small,
 .hook-fix-result-main strong,
 .hook-fix-result-main small,
 .hook-fix-result-meta span,
@@ -9139,6 +9145,68 @@ h2 {
   display: grid;
   gap: 7px;
   min-width: 0;
+}
+
+.hook-readiness-result {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.24);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.06);
+  padding: 8px 9px;
+}
+
+.hook-readiness-result.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  background: rgba(240, 195, 106, 0.06);
+}
+
+.hook-readiness-result.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.hook-readiness-result-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.hook-readiness-result-main svg {
+  flex: 0 0 auto;
+  color: #78f0c8;
+}
+
+.hook-readiness-result.warn .hook-readiness-result-main svg {
+  color: #f0c36a;
+}
+
+.hook-readiness-result.danger .hook-readiness-result-main svg {
+  color: #ff7a4f;
+}
+
+.hook-readiness-result-main span,
+.hook-readiness-result-meta,
+.hook-readiness-result-followup {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hook-readiness-result-main strong,
+.hook-readiness-result-meta strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.hook-readiness-result-main small,
+.hook-readiness-result-meta span,
+.hook-readiness-result-followup span,
+.hook-readiness-result-followup small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
 }
 
 .hook-fix-result {

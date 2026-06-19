@@ -2136,6 +2136,19 @@ export type HookReadinessFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type HookReadinessFocusResult = {
+  cardId: HookReadinessCardId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type ToplineSpaceCardId = "pocket" | "lead" | "arrangement" | "mix" | "brief";
 export type ToplineSpaceFocusId = ToplineSpaceCardId;
 export type ToplineSpaceFocusTarget = ReviewQueueFocusTarget;

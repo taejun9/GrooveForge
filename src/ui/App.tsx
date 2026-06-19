@@ -416,6 +416,7 @@ import type {
   HookReadinessCard,
   HookReadinessSummary,
   HookReadinessFocusSummary,
+  HookReadinessFocusResult,
   ToplineSpaceFocusId,
   ToplineSpaceCardId,
   ToplineSpaceFocusItem,
@@ -1137,6 +1138,7 @@ export function App(): ReactElement {
   const [snapshotCompareFocusId, setSnapshotCompareFocusId] = useState<SnapshotCompareFocusId | null>(null);
   const [snapshotCompareResult, setSnapshotCompareResult] = useState<SnapshotCompareFocusResult | null>(null);
   const [hookReadinessFocusId, setHookReadinessFocusId] = useState<HookReadinessFocusId | null>(null);
+  const [hookReadinessResult, setHookReadinessResult] = useState<HookReadinessFocusResult | null>(null);
   const [hookFixResult, setHookFixResult] = useState<HookFixResult | null>(null);
   const [toplineSpaceFocusId, setToplineSpaceFocusId] = useState<ToplineSpaceFocusId | null>(null);
   const [toplineFixResult, setToplineFixResult] = useState<ToplineFixResult | null>(null);
@@ -2078,6 +2080,7 @@ export function App(): ReactElement {
     setSessionBriefStarterResult(null);
     setReferenceAlignmentResult(null);
     setReviewFixResult(null);
+    setHookReadinessResult(null);
     setHookFixResult(null);
     setToplineFixResult(null);
     setProjectStatus(status);
@@ -2141,6 +2144,7 @@ export function App(): ReactElement {
       setSessionBriefStarterResult(null);
       setReferenceAlignmentResult(null);
       setReviewFixResult(null);
+      setHookReadinessResult(null);
       setHookFixResult(null);
       setToplineFixResult(null);
     }
@@ -2297,6 +2301,7 @@ export function App(): ReactElement {
     setSessionBriefStarterResult(null);
     setReferenceAlignmentResult(null);
     setReviewFixResult(null);
+    setHookReadinessResult(null);
     setHookFixResult(null);
     setToplineFixResult(null);
     clearLocalDraftState();
@@ -2363,6 +2368,7 @@ export function App(): ReactElement {
     setSessionBriefStarterResult(null);
     setReferenceAlignmentResult(null);
     setReviewFixResult(null);
+    setHookReadinessResult(null);
     setHookFixResult(null);
     setToplineFixResult(null);
     setProjectStatus(status);
@@ -3012,6 +3018,7 @@ export function App(): ReactElement {
       return;
     }
 
+    setHookReadinessResult(null);
     const target = createHookLoopCueTarget(projectRef.current);
     if (card) {
       setHookReadinessFocusId(card.focusId);
@@ -3040,6 +3047,7 @@ export function App(): ReactElement {
 
     if (!targetCard) {
       setHookFixResult(null);
+      setHookReadinessResult(null);
       setProjectStatus("Hook Readiness has no fix target");
       return;
     }
@@ -3047,6 +3055,7 @@ export function App(): ReactElement {
     const fix = createHookFixOption(targetCard);
     const cueTarget = createHookLoopCueTarget(beforeProject);
     setHookReadinessFocusId(targetCard.focusId);
+    setHookReadinessResult(null);
 
     if (cueTarget && (fix.action.kind === "patternVariation" || fix.action.kind === "arrangementMove")) {
       selectArrangementBlock(cueTarget.index);
@@ -6442,6 +6451,7 @@ export function App(): ReactElement {
 
     setHookReadinessFocusId(card.focusId);
     targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setHookReadinessResult(createHookReadinessFocusResult(card, hookReadinessSummary));
     setProjectStatus(`Hook ${card.label}: ${card.value}`);
   }
 
@@ -7516,6 +7526,7 @@ export function App(): ReactElement {
         cued={transportLoopScope === "block" && hookLoopCueTarget?.index === selectedArrangementIndex}
         fixResult={hookFixResult}
         focusedCardId={hookReadinessFocusId}
+        focusResult={hookReadinessResult}
         isPlaying={isPlaying}
         onCue={cueHookLoop}
         onFix={applyHookFix}
@@ -12753,6 +12764,7 @@ function HookReadiness({
   cued,
   fixResult,
   focusedCardId,
+  focusResult,
   isPlaying,
   onCue,
   onFix,
@@ -12763,6 +12775,7 @@ function HookReadiness({
   cued: boolean;
   fixResult: HookFixResult | null;
   focusedCardId: HookReadinessFocusId | null;
+  focusResult: HookReadinessFocusResult | null;
   isPlaying: boolean;
   onCue: (card?: HookReadinessFocusItem) => void;
   onFix: (card?: HookReadinessCard) => void;
@@ -12791,6 +12804,7 @@ function HookReadiness({
           <strong data-testid="hook-readiness-focus-label">{focusSummary.areaLabel}</strong>
           <small data-testid="hook-readiness-focus-detail">{focusSummary.detailLabel}</small>
         </div>
+        {focusResult && <HookReadinessFocusResultStrip result={focusResult} />}
         {fixResult && <HookFixResultStrip result={fixResult} />}
       </div>
       <div className="hook-readiness-grid" data-testid="hook-readiness-cards">
@@ -12845,6 +12859,35 @@ function HookReadiness({
         })}
       </div>
     </section>
+  );
+}
+
+function HookReadinessFocusResultStrip({ result }: { result: HookReadinessFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`hook-readiness-result ${result.tone}`}
+      data-result-hook-readiness={result.cardId}
+      data-testid="hook-readiness-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="hook-readiness-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="hook-readiness-result-title">{result.title}</strong>
+          <small data-testid="hook-readiness-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="hook-readiness-result-meta">
+        <span data-testid="hook-readiness-result-status">{result.status}</span>
+        <strong data-testid="hook-readiness-result-destination">{result.destination}</strong>
+        <span data-testid="hook-readiness-result-value">{`${result.metricLabel}: ${result.metricValue}`}</span>
+      </div>
+      <div className="hook-readiness-result-followup" data-testid="hook-readiness-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -24359,6 +24402,73 @@ function createHookReadinessFocusSummary(
     detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function createHookReadinessFocusResult(
+  card: HookReadinessFocusItem,
+  summary: HookReadinessSummary
+): HookReadinessFocusResult {
+  const summaryCard =
+    summary.cards.find((candidate) => candidate.id === card.focusId) ??
+    ({
+      id: card.focusId,
+      focusId: card.focusId,
+      label: card.label,
+      value: card.value,
+      status: "Focused",
+      detail: card.detail,
+      focusTarget: card.focusTarget,
+      focusLabel: card.focusLabel,
+      tone: summary.tone
+    } satisfies HookReadinessCard);
+
+  return {
+    cardId: summaryCard.id,
+    status: "Focused",
+    title: `${summaryCard.label} hook lane focused`,
+    detail: `${summaryCard.value}: ${summaryCard.detail}`,
+    destination: reviewQueueFocusLabel(summaryCard.focusTarget),
+    metricLabel: "Hook",
+    metricValue: hookReadinessFocusResultMetric(summaryCard, summary),
+    auditionCue: hookReadinessFocusResultAudition(summaryCard),
+    nextCheck: hookReadinessFocusResultNextCheck(summaryCard),
+    tone: summaryCard.tone
+  };
+}
+
+function hookReadinessFocusResultMetric(card: HookReadinessCard, summary: HookReadinessSummary): string {
+  const readyCount = summary.cards.filter((candidate) => candidate.tone === "good").length;
+  return `${card.label}: ${card.value} / ${readyCount}/${summary.cards.length} ready`;
+}
+
+function hookReadinessFocusResultAudition(card: HookReadinessCard): string {
+  switch (card.id) {
+    case "section":
+      return "Cue the Hook loop and confirm the hook block enters clearly before editing nearby sections.";
+    case "motif":
+      return "Loop the Hook and listen for a memorable Synth, chord, or 808 idea before adding density.";
+    case "contrast":
+      return "Play the hook against the previous section and confirm the lift feels intentional.";
+    case "mix":
+      return "Play the Full Mix and check whether hook elements stay present without clipping.";
+    case "handoff":
+      return "Inspect Session Brief and Handoff Pack before sending hook notes or exports.";
+  }
+}
+
+function hookReadinessFocusResultNextCheck(card: HookReadinessCard): string {
+  switch (card.id) {
+    case "section":
+      return "Use Arrange or Hook Loop cue, then return to Hook Readiness.";
+    case "motif":
+      return "Use Pattern DNA or Hook Fix if the motif still feels thin.";
+    case "contrast":
+      return "Check Structure Lens after any Hook Lift or arrangement move.";
+    case "mix":
+      return "Use Mix Coach or Mix Fix before pushing the master.";
+    case "handoff":
+      return "Fill missing brief context before export.";
+  }
 }
 
 function activeHookReadinessQuickActionCard(summary: HookReadinessSummary): HookReadinessCard | null {
