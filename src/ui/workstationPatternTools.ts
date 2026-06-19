@@ -219,6 +219,7 @@ import type {
   PatternEditResultMetric,
   PatternEditResult,
   PatternFillPreviewSummary,
+  PatternFillSuggestionSummary,
   PatternFillResultMetric,
   PatternFillResult,
   PatternVariationPreviewSummary,
@@ -1330,6 +1331,30 @@ export function createPatternFillPreviewSummary(
     moveLabel,
     detailTitle: `${statusLabel}: ${patternLabel}; ${presetLabelText}; ${drumsLabel}; ${bassLabel}; ${chordLabel}; ${melodyLabel}; ${moveLabel}.`,
     tone: changes.total > 0 ? "warn" : "good"
+  };
+}
+
+export function suggestedPatternFillPreset(pattern: PatternData): PatternFillPreset {
+  return pattern.bassNotes.length < 3 ? "bass_pickup" : pattern.melodyNotes.length < 3 ? "melody_turn" : "drum_fill";
+}
+
+export function createPatternFillSuggestionSummary(patternSlot: PatternSlot, pattern: PatternData, key: string): PatternFillSuggestionSummary {
+  const preset = suggestedPatternFillPreset(pattern);
+  const preview = createPatternFillPreviewSummary(patternSlot, pattern, preset, key);
+  const presetLabel = patternFillPresetLabel(preset);
+  const eventLabel = `${patternEventTotal(pattern)} events`;
+  const statusLabel = preview.tone === "good" ? "Fill ready" : "Suggested fill";
+  const detailLabel = `${eventLabel} / ${preview.moveLabel}`;
+
+  return {
+    preset,
+    statusLabel,
+    patternLabel: `Pattern ${patternSlot}`,
+    presetLabel,
+    detailLabel,
+    moveLabel: preview.moveLabel,
+    detailTitle: `${statusLabel}: Pattern ${patternSlot}; ${presetLabel}; ${detailLabel}.`,
+    tone: preview.tone
   };
 }
 

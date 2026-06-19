@@ -1246,6 +1246,17 @@ export type PatternFillPreviewSummary = {
   tone: MixCoachTone;
 };
 
+export type PatternFillSuggestionSummary = {
+  preset: PatternFillPreset;
+  statusLabel: string;
+  patternLabel: string;
+  presetLabel: string;
+  detailLabel: string;
+  moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type PatternFillResult = {
   preset: PatternFillPreset;
   pattern: PatternSlot;

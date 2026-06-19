@@ -13217,6 +13217,56 @@ h2 {
   font-size: 10px;
 }
 
+.pattern-fill-suggestion {
+  display: grid;
+  grid-template-columns: minmax(104px, 0.72fr) minmax(132px, 0.9fr) minmax(100px, 0.7fr) minmax(0, 1fr) minmax(94px, 0.72fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  margin-top: 8px;
+  border: 1px solid rgba(120, 240, 200, 0.24);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.06);
+  padding: 6px 7px;
+}
+
+.pattern-fill-suggestion.warn {
+  border-color: rgba(255, 205, 112, 0.3);
+  background: rgba(255, 205, 112, 0.07);
+}
+
+.pattern-fill-suggestion > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pattern-fill-suggestion span {
+  color: #08120f;
+  background: #78f0c8;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.pattern-fill-suggestion.warn span {
+  background: #ffcd70;
+}
+
+.pattern-fill-suggestion strong {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pattern-fill-suggestion small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 10px;
+}
+
 .pattern-stack-result {
   display: grid;
   grid-template-columns: minmax(150px, 0.86fr) minmax(170px, 0.9fr) minmax(210px, 1.1fr);
@@ -22838,6 +22888,10 @@ input[type="range"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .pattern-fill-suggestion {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .pattern-stack-result {
     grid-template-columns: 1fr;
   }
@@ -23839,6 +23893,11 @@ input[type="range"] {
   }
 
   .pattern-stack-preview {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .pattern-fill-suggestion {
     grid-template-columns: 1fr;
     gap: 4px;
   }

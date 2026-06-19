@@ -712,6 +712,7 @@ import {
   NoteEditor,
   NoteInspector,
   PatternClonePads,
+  PatternFillSuggestion,
   PatternFillPreview,
   PatternStackPads,
   PatternStackPreview,
@@ -782,7 +783,9 @@ import {
   createPatternCloneResult,
   createPatternEditResult,
   createPatternFillPreviewSummary,
+  createPatternFillSuggestionSummary,
   createPatternFillResult,
+  suggestedPatternFillPreset,
   createPatternVariationPreviewSummary,
   createPatternVariationResult,
   createPatternStackEvents,
@@ -1784,6 +1787,10 @@ export function App(): ReactElement {
   const patternFillPreviewSummary = useMemo(
     () => createPatternFillPreviewSummary(project.selectedPattern, currentPattern, patternFillPreviewPreset, project.key),
     [project.selectedPattern, currentPattern, patternFillPreviewPreset, project.key]
+  );
+  const patternFillSuggestionSummary = useMemo(
+    () => createPatternFillSuggestionSummary(project.selectedPattern, currentPattern, project.key),
+    [project.selectedPattern, currentPattern, project.key]
   );
   const patternCloneOptions = useMemo(() => createPatternClonePadOptions(project.selectedPattern), [project.selectedPattern]);
   const drumFoundationOptions = useMemo(() => createDrumFoundationOptions(), []);
@@ -8505,6 +8512,7 @@ export function App(): ReactElement {
             </button>
           </div>
           {patternVariationResult && <PatternVariationResultStrip result={patternVariationResult} />}
+          <PatternFillSuggestion summary={patternFillSuggestionSummary} />
           <PatternFillPreview preview={patternFillPreviewSummary} />
           <div className="pattern-fill-row" aria-label="Pattern fills">
             {patternFillPresetIds.map((preset) => {
@@ -20663,8 +20671,7 @@ function blueprintNextMoveAction(project: ProjectState): NextMoveAction {
 
 function patternFillNextMoveAction(project: ProjectState): NextMoveAction {
   const pattern = activePattern(project);
-  const preset: PatternFillPreset =
-    pattern.bassNotes.length < 3 ? "bass_pickup" : pattern.melodyNotes.length < 3 ? "melody_turn" : "drum_fill";
+  const preset = suggestedPatternFillPreset(pattern);
   return {
     id: `pattern-${preset}`,
     title: `${patternFillPresetLabel(preset)} on Pattern ${project.selectedPattern}`,
