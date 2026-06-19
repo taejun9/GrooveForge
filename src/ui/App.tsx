@@ -539,6 +539,7 @@ import type {
   FirstBeatPathTarget,
   FirstBeatPathStep,
   FirstBeatPathSummary,
+  FirstBeatPathJumpResult,
   BeatSpineCardId,
   BeatSpineTarget,
   BeatSpineActionId,
@@ -1063,6 +1064,7 @@ export function App(): ReactElement {
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [modeSwitchResult, setModeSwitchResult] = useState<ModeSwitchResult | null>(null);
+  const [firstBeatPathResult, setFirstBeatPathResult] = useState<FirstBeatPathJumpResult | null>(null);
   const [swingFeelResult, setSwingFeelResult] = useState<SwingFeelResult | null>(null);
   const [styleGoalCueResult, setStyleGoalCueResult] = useState<StyleGoalCueResult | null>(null);
   const [beatBlueprintResult, setBeatBlueprintResult] = useState<BeatBlueprintResult | null>(null);
@@ -1988,6 +1990,7 @@ export function App(): ReactElement {
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
+    setFirstBeatPathResult(null);
     setSwingFeelResult(null);
     setStyleGoalCueResult(null);
     setBeatBlueprintResult(null);
@@ -2032,6 +2035,7 @@ export function App(): ReactElement {
       setProject(nextProject);
       setQuickActionResult(null);
       setModeSwitchResult(null);
+      setFirstBeatPathResult(null);
       setSwingFeelResult(null);
       setStyleGoalCueResult(null);
       setBeatBlueprintResult(null);
@@ -2169,6 +2173,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setFirstBeatPathResult(null);
     setSwingFeelResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
@@ -2217,6 +2222,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setFirstBeatPathResult(null);
     setSwingFeelResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
@@ -6205,6 +6211,12 @@ export function App(): ReactElement {
     jumpToWorkflowZone(target);
   }
 
+  function jumpToFirstBeatPathStep(step: FirstBeatPathStep): void {
+    jumpToFirstBeatPathTarget(step.target);
+    setFirstBeatPathResult(createFirstBeatPathJumpResult(step, firstBeatPathSummary));
+    setProjectStatus(`First Beat Path ${step.label}: ${step.jumpLabel}`);
+  }
+
   function jumpToBeatSpineTarget(card: BeatSpineCard): void {
     const targetRefs: Record<BeatSpineTarget, HTMLElement | null> = {
       transport: transportPanelRef.current,
@@ -6840,7 +6852,7 @@ export function App(): ReactElement {
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
     onExportWav: handleExportWav,
-    onJumpFirstBeatPath: jumpToFirstBeatPathTarget,
+    onJumpFirstBeatPath: jumpToFirstBeatPathStep,
     onJumpBeatSpine: jumpToBeatSpineTarget,
     onFocusBeatPassport: focusBeatPassportMetric,
     onFocusBeatReadiness: focusBeatReadinessCheck,
@@ -7207,7 +7219,7 @@ export function App(): ReactElement {
 
       <ModeFocus summary={modeFocusSummary} onFocus={focusModeFocusCard} />
 
-      <FirstBeatPath summary={firstBeatPathSummary} onJump={jumpToFirstBeatPathTarget} />
+      <FirstBeatPath result={firstBeatPathResult} summary={firstBeatPathSummary} onJump={jumpToFirstBeatPathStep} />
 
       <BeatSpine
         result={beatSpineResult}
@@ -11182,6 +11194,54 @@ function createFirstBeatPathSummary(
   };
 }
 
+function createFirstBeatPathJumpResult(
+  step: FirstBeatPathStep,
+  summary: FirstBeatPathSummary
+): FirstBeatPathJumpResult {
+  return {
+    stepId: step.id,
+    status: "Jumped",
+    title: `${step.label} jump ready`,
+    detail: `${step.jumpLabel}: ${step.detail}`,
+    metricLabel: "Path",
+    metricValue: `${summary.countLabel} / ${step.value}`,
+    auditionCue: firstBeatPathJumpAuditionCue(step),
+    nextCheck: firstBeatPathJumpNextCheck(step, summary),
+    tone: step.tone
+  };
+}
+
+function firstBeatPathJumpAuditionCue(step: FirstBeatPathStep): string {
+  switch (step.id) {
+    case "setup":
+      return "Confirm BPM, key, style, and transport loop before writing the next layer.";
+    case "compose":
+      return "Edit drums, 808/bass, chords, or melody as local musical events in Compose.";
+    case "arrange":
+      return "Audition section flow with Song, Block, or Pattern loop controls before changing form.";
+    case "mix":
+      return "Use Stem Audition, Mix Coach, or Mix Fix only after choosing an explicit mix move.";
+    case "deliver":
+      return "Check Export Preflight and Handoff Pack before explicit WAV, stems, MIDI, or sheet export.";
+  }
+}
+
+function firstBeatPathJumpNextCheck(step: FirstBeatPathStep, summary: FirstBeatPathSummary): string {
+  const activeStep = summary.steps.find((candidate) => candidate.id === summary.nextStepId) ?? step;
+  switch (step.id) {
+    case "setup":
+      return `Next path check: ${activeStep.label} / ${summary.countLabel}.`;
+    case "compose":
+      return "Use Beat Spine, Composer Actions, or the editor lanes for the next missing musical layer.";
+    case "arrange":
+      return "Return to First Beat Path after sections cover the target and the hook has contrast.";
+    case "mix":
+      return "Return after headroom, stem balance, and low-end posture are ready for the target.";
+    case "deliver":
+      return "Export only after readiness, master posture, and handoff context pass the preflight scan.";
+  }
+}
+
 function createSessionPassSummary(
   project: ProjectState,
   firstBeatPath: FirstBeatPathSummary,
@@ -13037,7 +13097,7 @@ function createQuickActions({
   onExportMidi: () => void;
   onExportStems: () => void;
   onExportWav: () => void;
-  onJumpFirstBeatPath: (target: FirstBeatPathTarget) => void;
+  onJumpFirstBeatPath: (step: FirstBeatPathStep) => void;
   onJumpBeatSpine: (card: BeatSpineCard) => void;
   onFocusBeatPassport: (metric: BeatPassportFocusItem) => void;
   onFocusBeatReadiness: (check: BeatReadinessCheck) => void;
@@ -13202,7 +13262,7 @@ function createQuickActions({
     detail: `${step.value} / ${step.detail} / ${firstBeatPathSummary.countLabel}`,
     group: "Project",
     keywords: `first beat path direct step jump setup compose arrange mix deliver ${step.id} ${step.label} ${step.value} ${step.jumpLabel} ${step.detail} beginner producer`,
-    run: () => onJumpFirstBeatPath(step.target)
+    run: () => onJumpFirstBeatPath(step)
   }));
   const beatSpineCard = activeBeatSpineQuickActionCard(beatSpineSummary);
   const beatSpineApplyCard = activeBeatSpineQuickActionApplyCard(beatSpineSummary);
@@ -14602,7 +14662,7 @@ function createQuickActions({
       disabled: !firstBeatPathStep,
       run: () => {
         if (firstBeatPathStep) {
-          onJumpFirstBeatPath(firstBeatPathStep.target);
+          onJumpFirstBeatPath(firstBeatPathStep);
         }
       }
     },

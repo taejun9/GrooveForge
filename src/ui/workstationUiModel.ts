@@ -3343,6 +3343,18 @@ export type FirstBeatPathSummary = {
   steps: FirstBeatPathStep[];
 };
 
+export type FirstBeatPathJumpResult = {
+  stepId: FirstBeatPathStepId;
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type BeatSpineCardId = "setup" | "drums" | "bass" | "harmony" | "melody" | "sound" | "arrange" | "finish";
 export type BeatSpineTarget = "transport" | "compose" | "sound" | "arrange" | "mix" | "master" | "deliver";
 export type BeatSpineActionId = "drums" | "bass" | "harmony" | "melody" | "sound" | "arrange" | "finish";

@@ -12,8 +12,9 @@ import type { ReactElement } from "react";
 import type { ProjectState } from "../domain/workstation";
 import type {
   FirstBeatPathStepId,
+  FirstBeatPathStep,
+  FirstBeatPathJumpResult,
   FirstBeatPathSummary,
-  FirstBeatPathTarget,
   MixCoachTone,
   ModeFocusCard,
   ModeFocusSummary,
@@ -239,10 +240,12 @@ export function ModeFocus({ onFocus, summary }: { summary: ModeFocusSummary; onF
 
 export function FirstBeatPath({
   onJump,
+  result,
   summary
 }: {
   summary: FirstBeatPathSummary;
-  onJump: (target: FirstBeatPathTarget) => void;
+  result: FirstBeatPathJumpResult | null;
+  onJump: (step: FirstBeatPathStep) => void;
 }): ReactElement {
   return (
     <section className={`first-beat-path ${summary.tone}`} data-testid="first-beat-path" aria-label="First beat path">
@@ -268,7 +271,7 @@ export function FirstBeatPath({
               data-next={next ? "true" : "false"}
               data-testid={`first-beat-path-${step.id}`}
               key={step.id}
-              onClick={() => onJump(step.target)}
+              onClick={() => onJump(step)}
               title={`Jump to ${step.jumpLabel}: ${step.detail}`}
               type="button"
             >
@@ -280,7 +283,38 @@ export function FirstBeatPath({
           );
         })}
       </div>
+      {result && <FirstBeatPathJumpResultStrip result={result} />}
     </section>
+  );
+}
+
+function FirstBeatPathJumpResultStrip({ result }: { result: FirstBeatPathJumpResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`first-beat-path-result ${result.tone}`}
+      data-result-first-beat-path={result.stepId}
+      data-testid="first-beat-path-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="first-beat-path-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="first-beat-path-result-title">{result.title}</strong>
+          <small data-testid="first-beat-path-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="first-beat-path-result-metric" data-testid="first-beat-path-result-metric">
+        <span data-testid="first-beat-path-result-status">{result.status}</span>
+        <strong data-testid="first-beat-path-result-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="first-beat-path-result-followup" data-testid="first-beat-path-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
