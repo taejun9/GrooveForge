@@ -2430,6 +2430,19 @@ export const composerStyleActionProfiles: Record<StyleId, ComposerStyleActionPro
       finish: "vocal headroom"
     }
   },
+  afrobeats: {
+    focus: "syncopated pocket",
+    priorities: { drums: 1, bass: 2, harmony: 3, melody: 4, arrange: 5, finish: 6 },
+    goals: { drumHits: 14, bassNotes: 5, chordEvents: 3, melodyNotes: 4, arrangementBars: 8 },
+    cues: {
+      drums: "cross-rhythm pocket",
+      bass: "rolling offbeat",
+      harmony: "warm lift",
+      melody: "call motif",
+      arrange: "hook space",
+      finish: "vocal headroom"
+    }
+  },
   jersey: {
     focus: "bounce and sections",
     priorities: { drums: 1, bass: 2, arrange: 3, melody: 4, harmony: 5, finish: 6 },

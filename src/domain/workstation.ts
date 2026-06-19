@@ -12,6 +12,7 @@ export type StyleId =
   | "house"
   | "rnb"
   | "k_hiphop_rnb"
+  | "afrobeats"
   | "jersey"
   | "phonk"
   | "garage"
@@ -191,6 +192,7 @@ export const beatBlueprintIds = [
   "warm_loop",
   "rnb_pocket",
   "seoul_pocket",
+  "afro_swing",
   "club_bounce",
   "jersey_drive",
   "phonk_cruise",
@@ -493,6 +495,24 @@ export const beatBlueprints: BeatBlueprint[] = [
     }
   },
   {
+    id: "afro_swing",
+    name: "Afro Swing",
+    focus: "syncopated percussion, warm chords, and rolling bass pocket",
+    styleId: "afrobeats",
+    key: "A minor",
+    bpm: 104,
+    arrangementTemplate: "hook_first",
+    soundPreset: "clean_knock",
+    masterPreset: "Headroom for Vocal",
+    mixer: {
+      drum_rack: { volumeDb: -4.2, lowCut: 0.08, air: 0.26, drive: 0.14, glue: 0.26, send: 0.14 },
+      bass_808: { volumeDb: -6.6, lowCut: 0.01, air: 0.08, drive: 0.18, glue: 0.18, send: 0.04 },
+      synth: { volumeDb: -9.6, pan: -10, lowCut: 0.26, air: 0.46, drive: 0.06, glue: 0.12, send: 0.34 },
+      chord: { volumeDb: -8.4, pan: 12, lowCut: 0.18, air: 0.32, drive: 0.05, glue: 0.18, send: 0.3 },
+      master: { volumeDb: -1.7 }
+    }
+  },
+  {
     id: "club_bounce",
     name: "Club Bounce",
     focus: "four-on-floor drive and bright mids",
@@ -746,6 +766,16 @@ export const styleProfiles: StyleProfile[] = [
     bassStyle: "sub",
     melodyStyle: "chordal",
     color: "#7dd3fc"
+  },
+  {
+    id: "afrobeats",
+    name: "Afrobeats",
+    bpmRange: [96, 116],
+    defaultBpm: 104,
+    defaultSwing: 0.14,
+    bassStyle: "pluck",
+    melodyStyle: "riff",
+    color: "#ffb85c"
   },
   {
     id: "jersey",
@@ -1854,6 +1884,11 @@ const stylePatternBlueprints: Record<StyleId, [PatternBlueprint, PatternBlueprin
     blueprint([0, 5, 8, 13], [4, 12], [0, 2, 5, 8, 10, 13, 15], [3, 7, 11], [0, 3, 5, 7, 5], [5, 4, 2, 0], [0, 3, 5, 4]),
     blueprint([0, 8, 14], [4, 12], [0, 6, 8, 14], [6, 11], [0, 8], [4, 2], [3, 0])
   ],
+  afrobeats: [
+    blueprint([0, 3, 7, 10, 14], [4, 12], [1, 3, 6, 8, 10, 13, 15], [2, 5, 9, 11, 14], [0, 3, 5, 7, 5], [0, 2, 4, 5, 2], [0, 5, 3, 4]),
+    blueprint([0, 2, 6, 9, 13, 15], [4, 12], [0, 2, 5, 7, 9, 11, 14, 15], [3, 6, 10, 13], [0, 2, 5, 4, 7], [4, 5, 2, 0, 4], [0, 3, 5, 4]),
+    blueprint([0, 6, 10, 14], [4, 12], [1, 5, 9, 13], [2, 7, 11, 15], [0, 5, 7, 5], [5, 4, 2], [3, 0, 5])
+  ],
   jersey: [
     blueprint([0, 3, 6, 8, 11, 14], [4, 12], [0, 2, 4, 6, 8, 10, 12, 14], [1, 5, 9, 13, 15], [0, 3, 6, 8, 11, 14], [0, 2, 4, 5, 2], [0, 3, 4, 5]),
     blueprint([0, 2, 5, 8, 10, 13, 15], [4, 12], [0, 1, 3, 4, 6, 8, 9, 11, 12, 14, 15], [2, 6, 10, 14], [0, 2, 5, 8, 10, 13], [4, 5, 2, 0, 4], [0, 4, 5, 3]),
@@ -1888,6 +1923,7 @@ export function styleSoundPreset(styleId: StyleId): (typeof soundPresetIds)[numb
       return "warm_tape";
     case "rnb":
     case "k_hiphop_rnb":
+    case "afrobeats":
       return "clean_knock";
     case "drill":
     case "house":
