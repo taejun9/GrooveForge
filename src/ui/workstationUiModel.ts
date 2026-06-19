@@ -3337,6 +3337,19 @@ export type HandoffPackageCheckFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type HandoffPackageCheckFocusResult = {
+  cardId: HandoffPackageCheckFocusId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type SessionBriefRoleSummary = {
   roleLabel: string;
   statusLabel: string;

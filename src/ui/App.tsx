@@ -525,6 +525,7 @@ import type {
   HandoffManifestAuditSummary,
   HandoffPackageCheckCard,
   HandoffPackageCheckFocusId,
+  HandoffPackageCheckFocusResult,
   HandoffPackageCheckFocusSummary,
   HandoffPackageCheckSummary,
   SessionBriefRoleSummary,
@@ -1155,6 +1156,7 @@ export function App(): ReactElement {
   const [exportPreflightFocusId, setExportPreflightFocusId] = useState<ExportPreflightFocusId | null>(null);
   const [exportPreflightResult, setExportPreflightResult] = useState<ExportPreflightFocusResult | null>(null);
   const [handoffPackageCheckFocusId, setHandoffPackageCheckFocusId] = useState<HandoffPackageCheckFocusId | null>(null);
+  const [handoffPackageCheckResult, setHandoffPackageCheckResult] = useState<HandoffPackageCheckFocusResult | null>(null);
   const [handoffExportReceipt, setHandoffExportReceipt] = useState<HandoffExportReceipt | null>(null);
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const [projectFileLabel, setProjectFileLabel] = useState<string | null>(null);
@@ -2027,6 +2029,7 @@ export function App(): ReactElement {
     setProductionSnapshotResult(null);
     setFinishChecklistResult(null);
     setExportPreflightResult(null);
+    setHandoffPackageCheckResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
@@ -2087,6 +2090,7 @@ export function App(): ReactElement {
       setProductionSnapshotResult(null);
       setFinishChecklistResult(null);
       setExportPreflightResult(null);
+      setHandoffPackageCheckResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
@@ -2239,6 +2243,7 @@ export function App(): ReactElement {
     setProductionSnapshotResult(null);
     setFinishChecklistResult(null);
     setExportPreflightResult(null);
+    setHandoffPackageCheckResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2302,6 +2307,7 @@ export function App(): ReactElement {
     setProductionSnapshotResult(null);
     setFinishChecklistResult(null);
     setExportPreflightResult(null);
+    setHandoffPackageCheckResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -5751,11 +5757,16 @@ export function App(): ReactElement {
     }
   }
 
+  function recordHandoffExportReceipt(receipt: HandoffExportReceipt): void {
+    setHandoffPackageCheckResult(null);
+    setHandoffExportReceipt(receipt);
+  }
+
   function handleExportWav(): void {
     const fileName = mixWavFileName(project);
     try {
       exportWav(project);
-      setHandoffExportReceipt(
+      recordHandoffExportReceipt(
         createHandoffExportReceipt({
           itemId: "wav",
           statusLabel: "Exported WAV",
@@ -5768,7 +5779,7 @@ export function App(): ReactElement {
       setProjectStatus("Exported mix WAV");
     } catch (error) {
       console.error(error);
-      setHandoffExportReceipt(
+      recordHandoffExportReceipt(
         createHandoffExportReceipt({
           itemId: "wav",
           statusLabel: "WAV failed",
@@ -5786,7 +5797,7 @@ export function App(): ReactElement {
     try {
       const fileNames = exportStems(project);
       const audibleStems = audibleStemTracks(stemAnalyses);
-      setHandoffExportReceipt(
+      recordHandoffExportReceipt(
         createHandoffExportReceipt({
           itemId: "stems",
           statusLabel: "Exported stems",
@@ -5799,7 +5810,7 @@ export function App(): ReactElement {
       setProjectStatus(`Exported ${fileNames.length} stems`);
     } catch (error) {
       console.error(error);
-      setHandoffExportReceipt(
+      recordHandoffExportReceipt(
         createHandoffExportReceipt({
           itemId: "stems",
           statusLabel: "Stems failed",
@@ -5816,7 +5827,7 @@ export function App(): ReactElement {
   function handleExportMidi(): void {
     try {
       const fileName = exportMidi(project);
-      setHandoffExportReceipt(
+      recordHandoffExportReceipt(
         createHandoffExportReceipt({
           itemId: "midi",
           statusLabel: "Exported MIDI",
@@ -5829,7 +5840,7 @@ export function App(): ReactElement {
       setProjectStatus("Exported MIDI");
     } catch (error) {
       console.error(error);
-      setHandoffExportReceipt(
+      recordHandoffExportReceipt(
         createHandoffExportReceipt({
           itemId: "midi",
           statusLabel: "MIDI failed",
@@ -5848,7 +5859,7 @@ export function App(): ReactElement {
     try {
       const contents = createHandoffSheet(project, exportAnalysis, stemAnalyses);
       downloadTextFile(contents, fileName);
-      setHandoffExportReceipt(
+      recordHandoffExportReceipt(
         createHandoffExportReceipt({
           itemId: "sheet",
           statusLabel: "Exported sheet",
@@ -5861,7 +5872,7 @@ export function App(): ReactElement {
       setProjectStatus(`Exported ${fileName}`);
     } catch (error) {
       console.error(error);
-      setHandoffExportReceipt(
+      recordHandoffExportReceipt(
         createHandoffExportReceipt({
           itemId: "sheet",
           statusLabel: "Sheet failed",
@@ -6578,6 +6589,7 @@ export function App(): ReactElement {
   function focusHandoffPackageCheckCard(card: HandoffPackageCheckCard): void {
     setHandoffPackageCheckFocusId(card.focusId);
     deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setHandoffPackageCheckResult(createHandoffPackageCheckFocusResult(card, handoffPackageCheckSummary));
     setProjectStatus(`Package ${card.label}: ${card.value}`);
   }
 
@@ -7447,6 +7459,7 @@ export function App(): ReactElement {
         exportReceipt={handoffExportReceipt}
         focusedPackageCheckId={handoffPackageCheckFocusId}
         packageCheckSummary={handoffPackageCheckSummary}
+        packageCheckResult={handoffPackageCheckResult}
         project={project}
         stemAnalyses={stemAnalyses}
         onExportHandoffSheet={handleExportHandoffSheet}
@@ -12306,6 +12319,7 @@ function HandoffPack({
   exportReceipt,
   focusedPackageCheckId,
   packageCheckSummary,
+  packageCheckResult,
   project,
   stemAnalyses,
   onExportHandoffSheet,
@@ -12318,6 +12332,7 @@ function HandoffPack({
   exportReceipt: HandoffExportReceipt | null;
   focusedPackageCheckId: HandoffPackageCheckFocusId | null;
   packageCheckSummary: HandoffPackageCheckSummary;
+  packageCheckResult: HandoffPackageCheckFocusResult | null;
   project: ProjectState;
   stemAnalyses: StemExportAnalyses;
   onExportHandoffSheet: () => void;
@@ -12453,7 +12468,11 @@ function HandoffPack({
           ))}
         </div>
       </div>
-      <div className={`handoff-package-check ${packageCheckSummary.tone}`} data-testid="handoff-package-check" aria-label="Handoff package check">
+      <div
+        className={["handoff-package-check", packageCheckSummary.tone, packageCheckResult ? "has-result" : ""].filter(Boolean).join(" ")}
+        data-testid="handoff-package-check"
+        aria-label="Handoff package check"
+      >
         <div className="handoff-package-check-heading">
           <div>
             <PackageCheck size={15} aria-hidden="true" />
@@ -12471,6 +12490,7 @@ function HandoffPack({
           <strong data-testid="handoff-package-check-focus-label">{packageFocusSummary.areaLabel}</strong>
           <small data-testid="handoff-package-check-focus-detail">{packageFocusSummary.detailLabel}</small>
         </div>
+        {packageCheckResult && <HandoffPackageCheckFocusResultStrip result={packageCheckResult} />}
         <div className="handoff-package-check-grid" data-testid="handoff-package-check-cards">
           {packageCheckSummary.cards.map((card) => {
             const focused = focusedPackageCheckId === card.id;
@@ -12526,6 +12546,38 @@ function HandoffPack({
         ))}
       </div>
     </section>
+  );
+}
+
+function HandoffPackageCheckFocusResultStrip({ result }: { result: HandoffPackageCheckFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`handoff-package-check-result ${result.tone}`}
+      data-result-handoff-package-check={result.cardId}
+      data-testid="handoff-package-check-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="handoff-package-check-result-main">
+        <PackageCheck size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="handoff-package-check-result-title">{result.title}</strong>
+          <small data-testid="handoff-package-check-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="handoff-package-check-result-destination" data-testid="handoff-package-check-result-destination">
+        <span>{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="handoff-package-check-result-metric" data-testid="handoff-package-check-result-metric">
+        <span data-testid="handoff-package-check-result-status">{result.metricLabel}</span>
+        <strong data-testid="handoff-package-check-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="handoff-package-check-result-followup" data-testid="handoff-package-check-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -22113,6 +22165,60 @@ function createHandoffPackageCheckFocusSummary(
     detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function createHandoffPackageCheckFocusResult(
+  card: HandoffPackageCheckCard,
+  summary: HandoffPackageCheckSummary
+): HandoffPackageCheckFocusResult {
+  const summaryCard = summary.cards.find((item) => item.focusId === card.focusId) ?? null;
+
+  return {
+    cardId: card.focusId,
+    status: "Focused",
+    title: `${card.label} package focused`,
+    detail: `${card.value}: ${card.detail}`,
+    destination: `${card.focusLabel} panel`,
+    metricLabel: "Package",
+    metricValue: handoffPackageCheckFocusResultMetric(summary),
+    auditionCue: handoffPackageCheckFocusResultAudition(card),
+    nextCheck: handoffPackageCheckFocusResultNextCheck(card),
+    tone: summaryCard?.tone ?? "warn"
+  };
+}
+
+function handoffPackageCheckFocusResultMetric(summary: HandoffPackageCheckSummary): string {
+  const readyCount = summary.cards.filter((card) => card.tone === "good").length;
+  const reviewCount = summary.cards.filter((card) => card.tone === "warn").length;
+  const blockerCount = summary.cards.filter((card) => card.tone === "danger").length;
+
+  return `${readyCount}/${summary.cards.length} package checks clear / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function handoffPackageCheckFocusResultAudition(card: HandoffPackageCheckCard): string {
+  switch (card.focusId) {
+    case "files":
+      return "Inspect WAV, stems, MIDI, and Handoff Sheet statuses before sending files.";
+    case "order":
+      return "Follow Send Order from the next deliverable before rerunning exports.";
+    case "receipt":
+      return "Check the latest Export Receipt before assuming a deliverable is ready to send.";
+    case "context":
+      return "Read Session Brief and Handoff Sheet context before sending to a vocalist or collaborator.";
+  }
+}
+
+function handoffPackageCheckFocusResultNextCheck(card: HandoffPackageCheckCard): string {
+  switch (card.focusId) {
+    case "files":
+      return "Return after each planned deliverable is exported or intentionally deferred.";
+    case "order":
+      return "Return after the current next deliverable is exported and receipt status updates.";
+    case "receipt":
+      return "Return after the latest receipt matches the deliverable you intend to send.";
+    case "context":
+      return "Return after Session Brief fields carry enough artist, vibe, reference, and notes context.";
+  }
 }
 
 function activeHandoffPackageCheckQuickActionCard(summary: HandoffPackageCheckSummary): HandoffPackageCheckCard | null {
