@@ -286,6 +286,115 @@ export function ModeFocus({
   );
 }
 
+export function GuideQuickStart({
+  firstBeatPathSummary,
+  onFocusSessionPass,
+  onJumpFirstBeatPath,
+  onJumpWorkflowSpotlight,
+  sessionPassSummary,
+  workflowNavigatorItems
+}: {
+  firstBeatPathSummary: FirstBeatPathSummary;
+  sessionPassSummary: SessionPassSummary;
+  workflowNavigatorItems: WorkflowNavigatorItem[];
+  onJumpFirstBeatPath: (step: FirstBeatPathStep) => void;
+  onFocusSessionPass: (card: SessionPassCard) => void;
+  onJumpWorkflowSpotlight: (item: WorkflowNavigatorItem) => void;
+}): ReactElement {
+  const nextStep =
+    firstBeatPathSummary.steps.find((step) => step.id === firstBeatPathSummary.nextStepId) ??
+    firstBeatPathSummary.steps[0] ??
+    null;
+  const sessionCard =
+    sessionPassSummary.cards.find((card) => card.id === sessionPassSummary.mode) ??
+    sessionPassSummary.cards[0] ??
+    null;
+  const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
+  const workflowSpotlightItem = workflowSpotlight.zoneId
+    ? workflowNavigatorItems.find((item) => item.id === workflowSpotlight.zoneId) ?? null
+    : null;
+  const tone = modeSwitchWeakestTone([
+    firstBeatPathSummary.tone,
+    sessionPassSummary.tone,
+    workflowSpotlight.tone,
+    nextStep?.tone ?? "good",
+    sessionCard?.tone ?? "good"
+  ]);
+
+  return (
+    <section
+      className={`guide-quick-start ${tone}`}
+      data-testid="guide-quick-start"
+      aria-label="Guide quick start"
+      title={`${firstBeatPathSummary.headline}: ${firstBeatPathSummary.detail}`}
+    >
+      <div className="guide-quick-start-heading">
+        <div>
+          <ListChecks size={16} aria-hidden="true" />
+          <span data-testid="guide-quick-start-status">{firstBeatPathSummary.statusLabel}</span>
+        </div>
+        <strong data-testid="guide-quick-start-headline">Guide Quick Start</strong>
+        <small data-testid="guide-quick-start-detail">
+          {firstBeatPathSummary.countLabel} / {sessionPassSummary.headline} / {workflowSpotlight.countLabel}
+        </small>
+      </div>
+      <div className="guide-quick-start-actions" data-testid="guide-quick-start-actions">
+        <button
+          className={["guide-quick-start-action", "path", nextStep?.tone ?? "warn"].join(" ")}
+          data-testid="guide-quick-start-path"
+          disabled={!nextStep}
+          onClick={() => {
+            if (nextStep) {
+              onJumpFirstBeatPath(nextStep);
+            }
+          }}
+          title={nextStep ? `Jump to ${nextStep.jumpLabel}: ${nextStep.detail}` : "No First Beat Path target"}
+          type="button"
+        >
+          <Target size={14} aria-hidden="true" />
+          <span>Next path</span>
+          <strong>{nextStep ? `${nextStep.label}: ${nextStep.value}` : "No path target"}</strong>
+          <small>{nextStep?.detail ?? firstBeatPathSummary.detail}</small>
+        </button>
+        <button
+          className={["guide-quick-start-action", "session", sessionCard?.tone ?? "warn"].join(" ")}
+          data-testid="guide-quick-start-session"
+          disabled={!sessionCard}
+          onClick={() => {
+            if (sessionCard) {
+              onFocusSessionPass(sessionCard);
+            }
+          }}
+          title={sessionCard ? `Focus ${sessionCard.focusLabel}: ${sessionCard.value}` : "No Session Pass target"}
+          type="button"
+        >
+          <ArrowRight size={14} aria-hidden="true" />
+          <span>{sessionPassSummary.mode === "guided" ? "Guided pass" : "Studio pass"}</span>
+          <strong>{sessionCard ? `${sessionCard.label}: ${sessionCard.value}` : sessionPassSummary.headline}</strong>
+          <small>{sessionCard?.detail ?? sessionPassSummary.detail}</small>
+        </button>
+        <button
+          className={["guide-quick-start-action", "workflow", workflowSpotlight.tone].join(" ")}
+          data-testid="guide-quick-start-workflow"
+          disabled={!workflowSpotlightItem}
+          onClick={() => {
+            if (workflowSpotlightItem) {
+              onJumpWorkflowSpotlight(workflowSpotlightItem);
+            }
+          }}
+          title={workflowSpotlight.detailTitle}
+          type="button"
+        >
+          <ArrowRight size={14} aria-hidden="true" />
+          <span>{workflowSpotlight.statusLabel}</span>
+          <strong>{workflowSpotlight.zoneLabel}</strong>
+          <small>{workflowSpotlight.detailLabel}</small>
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function ModeFocusJumpResultStrip({ result }: { result: ModeFocusJumpResult }): ReactElement {
   return (
     <div

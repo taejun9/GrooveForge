@@ -43,6 +43,7 @@ button {
 .transport-band,
 .local-draft-recovery,
 .mode-row,
+.guide-quick-start,
 .mode-focus,
 .first-beat-path,
 .beat-spine,
@@ -130,6 +131,7 @@ button {
 .strip-top,
 .session-meter,
 .mode-row,
+.guide-quick-start-heading > div,
 .mode-focus-heading > div,
 .first-beat-path-heading > div,
 .beat-spine-heading > div,
@@ -785,6 +787,149 @@ h2 {
   color: #f4efe7;
   font-size: 12px;
   line-height: 1.05;
+}
+
+.guide-quick-start {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.42fr) minmax(0, 1.58fr);
+  gap: 10px;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 74px;
+  padding: 10px;
+  border-radius: 8px;
+  border-color: rgba(130, 215, 255, 0.22);
+  background: rgba(130, 215, 255, 0.045);
+}
+
+.guide-quick-start.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.guide-quick-start.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.05);
+}
+
+.guide-quick-start-heading {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border-inline-end: 1px solid rgba(244, 239, 231, 0.1);
+  padding-inline-end: 10px;
+}
+
+.guide-quick-start-heading > div {
+  gap: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  font-size: 12px;
+}
+
+.guide-quick-start-heading svg {
+  color: #82d7ff;
+}
+
+.guide-quick-start.warn .guide-quick-start-heading svg {
+  color: #f0c36a;
+}
+
+.guide-quick-start.danger .guide-quick-start-heading svg {
+  color: #ff7a4f;
+}
+
+.guide-quick-start-heading strong,
+.guide-quick-start-heading small,
+.guide-quick-start-action span,
+.guide-quick-start-action strong,
+.guide-quick-start-action small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-quick-start-heading strong {
+  color: #f4efe7;
+  font-size: 13px;
+}
+
+.guide-quick-start-heading small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.guide-quick-start-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.guide-quick-start-action {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  gap: 3px 7px;
+  align-items: center;
+  min-width: 0;
+  min-height: 58px;
+  border: 1px solid rgba(130, 215, 255, 0.2);
+  border-radius: 7px;
+  color: rgba(244, 239, 231, 0.72);
+  background: rgba(130, 215, 255, 0.06);
+  padding: 8px;
+}
+
+.guide-quick-start-action:hover:not(:disabled) {
+  border-color: rgba(130, 215, 255, 0.42);
+  color: #f4efe7;
+  background: rgba(130, 215, 255, 0.11);
+}
+
+.guide-quick-start-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.guide-quick-start-action.warn {
+  border-color: rgba(240, 195, 106, 0.22);
+  background: rgba(240, 195, 106, 0.06);
+}
+
+.guide-quick-start-action.danger {
+  border-color: rgba(255, 122, 79, 0.26);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.guide-quick-start-action svg {
+  grid-row: 1 / 4;
+  color: #82d7ff;
+}
+
+.guide-quick-start-action.warn svg {
+  color: #f0c36a;
+}
+
+.guide-quick-start-action.danger svg {
+  color: #ff7a4f;
+}
+
+.guide-quick-start-action span {
+  color: rgba(244, 239, 231, 0.55);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.guide-quick-start-action strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.guide-quick-start-action small {
+  color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
 }
 
 .mode-focus {
@@ -20876,6 +21021,10 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .guide-quick-start {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
   .mode-focus {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -21699,12 +21848,24 @@ input[type="range"] {
 }
 
 @media (max-width: 620px) {
+  .guide-quick-start,
   .workflow-navigator,
   .mode-focus,
   .key-compass,
   .groove-compass,
   .composer-guide,
   .style-inspector {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-quick-start-heading {
+    border-inline-end: 0;
+    border-block-end: 1px solid rgba(244, 239, 231, 0.1);
+    padding-inline-end: 0;
+    padding-block-end: 7px;
+  }
+
+  .guide-quick-start-actions {
     grid-template-columns: 1fr;
   }
 

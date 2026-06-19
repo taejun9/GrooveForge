@@ -655,6 +655,7 @@ import {
 } from "./workstationSnapshotCompare";
 import {
   FirstBeatPath,
+  GuideQuickStart,
   ModeFocus,
   ModeSwitchResultStrip,
   ReferenceAlignmentReadout,
@@ -8143,6 +8144,15 @@ export function App(): ReactElement {
         {projectFileResult && <ProjectFileResultStrip result={projectFileResult} />}
         {localDraftRecoveryResult && <LocalDraftRecoveryResultStrip result={localDraftRecoveryResult} />}
       </section>
+
+      <GuideQuickStart
+        firstBeatPathSummary={firstBeatPathSummary}
+        sessionPassSummary={sessionPassSummary}
+        workflowNavigatorItems={workflowNavigatorItems}
+        onJumpFirstBeatPath={jumpToFirstBeatPathStep}
+        onFocusSessionPass={focusSessionPassCard}
+        onJumpWorkflowSpotlight={jumpToWorkflowNavigatorItem}
+      />
 
       <ModeFocus result={modeFocusResult} summary={modeFocusSummary} onFocus={focusModeFocusCard} />
 
