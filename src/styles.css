@@ -7523,6 +7523,15 @@ h2 {
 .handoff-export-format-metrics b,
 .handoff-export-format-metrics strong,
 .handoff-export-format-metrics small,
+.handoff-export-format-metrics button span,
+.handoff-export-format-result-main strong,
+.handoff-export-format-result-main small,
+.handoff-export-format-result-destination span,
+.handoff-export-format-result-destination strong,
+.handoff-export-format-result-metric span,
+.handoff-export-format-result-metric strong,
+.handoff-export-format-result-followup span,
+.handoff-export-format-result-followup small,
 .handoff-package-check-heading span,
 .handoff-package-check-heading strong,
 .handoff-package-check-heading small,
@@ -7934,6 +7943,115 @@ h2 {
 
 .handoff-export-format-metrics span.danger {
   border-inline-start-color: rgba(255, 122, 79, 0.52);
+}
+
+.handoff-export-format-metrics span.focused {
+  box-shadow:
+    inset 0 0 0 1px rgba(130, 215, 255, 0.34),
+    0 0 16px rgba(130, 215, 255, 0.1);
+}
+
+.handoff-export-format-focus-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  justify-self: start;
+  min-width: 66px;
+  min-height: 28px;
+  margin-block-start: 3px;
+  border-color: rgba(130, 215, 255, 0.24);
+  background: rgba(130, 215, 255, 0.07);
+  padding: 0 7px;
+  font-size: 10px;
+}
+
+.handoff-export-format-focus-button[aria-pressed="true"] {
+  border-color: rgba(130, 215, 255, 0.5);
+  color: #f4efe7;
+  background: rgba(130, 215, 255, 0.14);
+}
+
+.handoff-export-format-result {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(170px, 0.36fr) minmax(130px, 0.2fr) minmax(190px, 0.42fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(130, 215, 255, 0.045);
+  padding: 7px;
+}
+
+.handoff-export-format-result.good {
+  border-color: rgba(120, 240, 200, 0.22);
+  background: rgba(120, 240, 200, 0.045);
+}
+
+.handoff-export-format-result.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.05);
+}
+
+.handoff-export-format-result.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.055);
+}
+
+.handoff-export-format-result-main,
+.handoff-export-format-result-destination,
+.handoff-export-format-result-metric,
+.handoff-export-format-result-followup {
+  min-width: 0;
+}
+
+.handoff-export-format-result-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.handoff-export-format-result-main svg {
+  flex: 0 0 auto;
+  color: #82d7ff;
+}
+
+.handoff-export-format-result.good .handoff-export-format-result-main svg {
+  color: #78f0c8;
+}
+
+.handoff-export-format-result.warn .handoff-export-format-result-main svg {
+  color: #f0c36a;
+}
+
+.handoff-export-format-result.danger .handoff-export-format-result-main svg {
+  color: #ffb199;
+}
+
+.handoff-export-format-result-main span,
+.handoff-export-format-result-destination,
+.handoff-export-format-result-metric,
+.handoff-export-format-result-followup {
+  display: grid;
+  gap: 2px;
+}
+
+.handoff-export-format-result-main strong,
+.handoff-export-format-result-destination strong,
+.handoff-export-format-result-metric strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.handoff-export-format-result-main small,
+.handoff-export-format-result-destination span,
+.handoff-export-format-result-metric span,
+.handoff-export-format-result-followup span,
+.handoff-export-format-result-followup small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
 }
 
 .handoff-package-check {
@@ -20880,6 +20998,10 @@ input[type="range"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .handoff-export-format-result {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .handoff-package-check {
     grid-template-columns: 1fr;
   }
@@ -21917,7 +22039,8 @@ input[type="range"] {
   .handoff-manifest-audit,
   .handoff-manifest-audit-checks,
   .handoff-export-format,
-  .handoff-export-format-metrics {
+  .handoff-export-format-metrics,
+  .handoff-export-format-result {
     grid-template-columns: 1fr;
   }
 

@@ -3401,6 +3401,21 @@ export type HandoffExportFormatSummary = {
   metrics: HandoffExportFormatMetric[];
 };
 
+export type HandoffExportFormatFocusId = HandoffExportFormatMetric["id"];
+
+export type HandoffExportFormatFocusResult = {
+  metricId: HandoffExportFormatFocusId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type HandoffPackageCheckCardId = "files" | "order" | "receipt" | "context";
 export type HandoffPackageCheckFocusId = HandoffPackageCheckCardId;
 

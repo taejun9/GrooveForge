@@ -527,6 +527,9 @@ import type {
   HandoffPackSendOrderSummary,
   HandoffExportReceipt,
   HandoffFileManifestItem,
+  HandoffExportFormatFocusId,
+  HandoffExportFormatFocusResult,
+  HandoffExportFormatMetric,
   HandoffExportFormatSummary,
   HandoffManifestAuditCheck,
   HandoffManifestAuditSummary,
@@ -1176,6 +1179,8 @@ export function App(): ReactElement {
   const [finishChecklistResult, setFinishChecklistResult] = useState<FinishChecklistFocusResult | null>(null);
   const [exportPreflightFocusId, setExportPreflightFocusId] = useState<ExportPreflightFocusId | null>(null);
   const [exportPreflightResult, setExportPreflightResult] = useState<ExportPreflightFocusResult | null>(null);
+  const [handoffExportFormatFocusId, setHandoffExportFormatFocusId] = useState<HandoffExportFormatFocusId | null>(null);
+  const [handoffExportFormatResult, setHandoffExportFormatResult] = useState<HandoffExportFormatFocusResult | null>(null);
   const [handoffPackageCheckFocusId, setHandoffPackageCheckFocusId] = useState<HandoffPackageCheckFocusId | null>(null);
   const [handoffPackageCheckResult, setHandoffPackageCheckResult] = useState<HandoffPackageCheckFocusResult | null>(null);
   const [handoffExportReceipt, setHandoffExportReceipt] = useState<HandoffExportReceipt | null>(null);
@@ -2052,6 +2057,7 @@ export function App(): ReactElement {
     setReviewQueueResult(null);
     setFinishChecklistResult(null);
     setExportPreflightResult(null);
+    setHandoffExportFormatResult(null);
     setHandoffPackageCheckResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
@@ -2122,6 +2128,7 @@ export function App(): ReactElement {
       setReviewQueueResult(null);
       setFinishChecklistResult(null);
       setExportPreflightResult(null);
+      setHandoffExportFormatResult(null);
       setHandoffPackageCheckResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
@@ -2284,6 +2291,7 @@ export function App(): ReactElement {
     setReviewQueueResult(null);
     setFinishChecklistResult(null);
     setExportPreflightResult(null);
+    setHandoffExportFormatResult(null);
     setHandoffPackageCheckResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
@@ -2357,6 +2365,7 @@ export function App(): ReactElement {
     setReviewQueueResult(null);
     setFinishChecklistResult(null);
     setExportPreflightResult(null);
+    setHandoffExportFormatResult(null);
     setHandoffPackageCheckResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
@@ -5830,6 +5839,7 @@ export function App(): ReactElement {
   }
 
   function recordHandoffExportReceipt(receipt: HandoffExportReceipt): void {
+    setHandoffExportFormatResult(null);
     setHandoffPackageCheckResult(null);
     setHandoffExportReceipt(receipt);
   }
@@ -6679,6 +6689,24 @@ export function App(): ReactElement {
     setProjectStatus(`Package ${card.label}: ${card.value}`);
   }
 
+  function focusHandoffExportFormatMetric(metric: HandoffExportFormatMetric): void {
+    const currentItems = createHandoffPackItems({
+      analysis: exportAnalysis,
+      project,
+      stemAnalyses,
+      onExportHandoffSheet: handleExportHandoffSheet,
+      onExportMidi: handleExportMidi,
+      onExportStems: handleExportStems,
+      onExportWav: handleExportWav
+    });
+    const currentSummary = createHandoffExportFormatSummary(project, exportAnalysis, stemAnalyses, currentItems);
+    const currentMetric = currentSummary.metrics.find((candidate) => candidate.id === metric.id) ?? metric;
+    setHandoffExportFormatFocusId(currentMetric.id);
+    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setHandoffExportFormatResult(createHandoffExportFormatFocusResult(currentMetric, currentSummary));
+    setProjectStatus(`Format ${currentMetric.label}: ${currentMetric.value}`);
+  }
+
   function focusReviewQueueItem(item: ReviewQueueItem): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -7066,6 +7094,7 @@ export function App(): ReactElement {
     onFocusExportPreflight: focusExportPreflightCard,
     onFocusFinishChecklist: focusFinishChecklistCard,
     onFocusGrooveCompass: focusGrooveCompassItem,
+    onFocusHandoffExportFormat: focusHandoffExportFormatMetric,
     onFocusHandoffPackageCheck: focusHandoffPackageCheckCard,
     onFocusHookReadiness: focusHookReadinessCard,
     onFocusKeyCompass: focusKeyCompassItem,
@@ -7546,6 +7575,8 @@ export function App(): ReactElement {
       <HandoffPack
         analysis={exportAnalysis}
         exportReceipt={handoffExportReceipt}
+        exportFormatResult={handoffExportFormatResult}
+        focusedExportFormatId={handoffExportFormatFocusId}
         focusedPackageCheckId={handoffPackageCheckFocusId}
         packageCheckSummary={handoffPackageCheckSummary}
         packageCheckResult={handoffPackageCheckResult}
@@ -7555,6 +7586,7 @@ export function App(): ReactElement {
         onExportMidi={handleExportMidi}
         onExportStems={handleExportStems}
         onExportWav={handleExportWav}
+        onFocusExportFormat={focusHandoffExportFormatMetric}
         onFocusPackageCheck={focusHandoffPackageCheckCard}
       />
 
@@ -12486,6 +12518,8 @@ function ExportPreflightFocusResultStrip({ result }: { result: ExportPreflightFo
 function HandoffPack({
   analysis,
   exportReceipt,
+  exportFormatResult,
+  focusedExportFormatId,
   focusedPackageCheckId,
   packageCheckSummary,
   packageCheckResult,
@@ -12495,10 +12529,13 @@ function HandoffPack({
   onExportMidi,
   onExportStems,
   onExportWav,
+  onFocusExportFormat,
   onFocusPackageCheck
 }: {
   analysis: ExportAnalysis;
   exportReceipt: HandoffExportReceipt | null;
+  exportFormatResult: HandoffExportFormatFocusResult | null;
+  focusedExportFormatId: HandoffExportFormatFocusId | null;
   focusedPackageCheckId: HandoffPackageCheckFocusId | null;
   packageCheckSummary: HandoffPackageCheckSummary;
   packageCheckResult: HandoffPackageCheckFocusResult | null;
@@ -12508,6 +12545,7 @@ function HandoffPack({
   onExportMidi: () => void;
   onExportStems: () => void;
   onExportWav: () => void;
+  onFocusExportFormat: (metric: HandoffExportFormatMetric) => void;
   onFocusPackageCheck: (card: HandoffPackageCheckCard) => void;
 }): ReactElement {
   const items = createHandoffPackItems({
@@ -12614,7 +12652,7 @@ function HandoffPack({
       </div>
       <div
         aria-label={formatSummary.detailTitle}
-        className={`handoff-export-format ${formatSummary.tone}`}
+        className={["handoff-export-format", formatSummary.tone, exportFormatResult ? "has-result" : ""].filter(Boolean).join(" ")}
         data-testid="handoff-export-format"
         title={formatSummary.detailTitle}
       >
@@ -12628,14 +12666,35 @@ function HandoffPack({
           <em data-testid="handoff-export-format-duration">{formatSummary.durationLabel}</em>
         </div>
         <div className="handoff-export-format-metrics" data-testid="handoff-export-format-metrics">
-          {formatSummary.metrics.map((metric) => (
-            <span className={metric.tone} data-testid={`handoff-export-format-${metric.id}`} key={metric.id} title={metric.detail}>
-              <b>{metric.label}</b>
-              <strong>{metric.value}</strong>
-              <small>{metric.detail}</small>
-            </span>
-          ))}
+          {formatSummary.metrics.map((metric) => {
+            const focused = focusedExportFormatId === metric.id;
+            return (
+              <span
+                className={[metric.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+                data-focused={focused ? "true" : "false"}
+                data-testid={`handoff-export-format-${metric.id}`}
+                key={metric.id}
+                title={metric.detail}
+              >
+                <b>{metric.label}</b>
+                <strong>{metric.value}</strong>
+                <small>{metric.detail}</small>
+                <button
+                  aria-pressed={focused}
+                  className="handoff-export-format-focus-button"
+                  data-testid={`handoff-export-format-focus-${metric.id}`}
+                  onClick={() => onFocusExportFormat(metric)}
+                  title={`Focus ${metric.label}: ${metric.value}`}
+                  type="button"
+                >
+                  <Target size={12} aria-hidden="true" />
+                  <span>{focused ? "Focused" : "Focus"}</span>
+                </button>
+              </span>
+            );
+          })}
         </div>
+        {exportFormatResult && <HandoffExportFormatFocusResultStrip result={exportFormatResult} />}
       </div>
       <div
         className={["handoff-package-check", packageCheckSummary.tone, packageCheckResult ? "has-result" : ""].filter(Boolean).join(" ")}
@@ -12715,6 +12774,38 @@ function HandoffPack({
         ))}
       </div>
     </section>
+  );
+}
+
+function HandoffExportFormatFocusResultStrip({ result }: { result: HandoffExportFormatFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`handoff-export-format-result ${result.tone}`}
+      data-result-handoff-export-format={result.metricId}
+      data-testid="handoff-export-format-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="handoff-export-format-result-main">
+        <FileAudio size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="handoff-export-format-result-title">{result.title}</strong>
+          <small data-testid="handoff-export-format-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="handoff-export-format-result-destination" data-testid="handoff-export-format-result-destination">
+        <span>{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="handoff-export-format-result-metric" data-testid="handoff-export-format-result-metric">
+        <span data-testid="handoff-export-format-result-status">{result.metricLabel}</span>
+        <strong data-testid="handoff-export-format-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="handoff-export-format-result-followup" data-testid="handoff-export-format-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -13853,6 +13944,7 @@ function createQuickActions({
   onFocusExportPreflight,
   onFocusFinishChecklist,
   onFocusGrooveCompass,
+  onFocusHandoffExportFormat,
   onFocusHandoffPackageCheck,
   onFocusHookReadiness,
   onFocusKeyCompass,
@@ -14099,6 +14191,7 @@ function createQuickActions({
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
   onFocusFinishChecklist: (card: FinishChecklistCard) => void;
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
+  onFocusHandoffExportFormat: (metric: HandoffExportFormatMetric) => void;
   onFocusHandoffPackageCheck: (card: HandoffPackageCheckCard) => void;
   onFocusHookReadiness: (card: HookReadinessFocusItem) => void;
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
@@ -15182,6 +15275,16 @@ function createQuickActions({
   const nextHandoffItem = handoffSendOrder.nextItemId
     ? (handoffPackItems.find((item) => item.id === handoffSendOrder.nextItemId) ?? null)
     : null;
+  const handoffExportFormatSummary = createHandoffExportFormatSummary(project, exportAnalysis, stemAnalyses, handoffPackItems);
+  const handoffExportFormatMetric = handoffExportFormatFocusMetric(handoffExportFormatSummary);
+  const handoffExportFormatActions: QuickAction[] = handoffExportFormatSummary.metrics.map((metric) => ({
+    id: `handoff-export-format-${metric.id}`,
+    title: `Focus Export Format: ${metric.label}`,
+    detail: `${metric.value} / ${metric.detail}`,
+    group: "Export",
+    keywords: `handoff export format focus metric deliverable ${metric.id} ${metric.label} ${metric.value} ${metric.detail} wav stems midi sheet beginner producer`,
+    run: () => onFocusHandoffExportFormat(metric)
+  }));
   const handoffPackageCheckCard = activeHandoffPackageCheckQuickActionCard(handoffPackageCheckSummary);
   const handoffPackageCheckActions: QuickAction[] = handoffPackageCheckSummary.cards.map((card) => ({
     id: `handoff-package-check-card-${card.id}`,
@@ -16505,6 +16608,24 @@ function createQuickActions({
       run: () => onApplyMasterFinish(pad.id)
     })),
     {
+      id: "handoff-export-format-focus",
+      title: handoffExportFormatMetric
+        ? `Focus Export Format: ${handoffExportFormatMetric.label}`
+        : "Focus Export Format",
+      detail: handoffExportFormatMetric
+        ? `${handoffExportFormatMetric.value} / ${handoffExportFormatMetric.detail}`
+        : "No Handoff Export Format metric available.",
+      group: "Export",
+      keywords: `handoff export format focus wav stems midi sheet deliverable inspect ${handoffExportFormatMetric?.id ?? "none"} ${handoffExportFormatMetric?.value ?? "none"} beginner producer`,
+      disabled: !handoffExportFormatMetric,
+      run: () => {
+        if (handoffExportFormatMetric) {
+          onFocusHandoffExportFormat(handoffExportFormatMetric);
+        }
+      }
+    },
+    ...handoffExportFormatActions,
+    {
       id: "handoff-package-check-focus",
       title: handoffPackageCheckCard
         ? `Focus Handoff Package: ${handoffPackageCheckCard.label}`
@@ -16856,6 +16977,8 @@ function createQuickActionResult(
     action.id.startsWith("topline-space-cue-") ||
     action.id === "handoff-package-check-focus" ||
     action.id.startsWith("handoff-package-check-card-") ||
+    action.id === "handoff-export-format-focus" ||
+    action.id.startsWith("handoff-export-format-") ||
     action.id.startsWith("arrangement-block-cue-") ||
     action.id.startsWith("arrangement-block-jump-") ||
     action.id.startsWith("section-locator-") ||
@@ -17874,6 +17997,22 @@ function quickActionResultMetricSnapshot(
     return {
       id: "handoff-package-check",
       label: "Handoff package",
+      value: action.detail
+    };
+  }
+
+  if (action.id === "handoff-export-format-focus") {
+    return {
+      id: "handoff-export-format",
+      label: "Export format",
+      value: action.detail
+    };
+  }
+
+  if (action.id.startsWith("handoff-export-format-")) {
+    return {
+      id: "handoff-export-format",
+      label: "Export format",
       value: action.detail
     };
   }
@@ -18987,6 +19126,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused package card before running explicit WAV, stem, MIDI, or Handoff Sheet exports.",
       nextCheck: "Return to Handoff Package Check when you need another file-set, order, receipt, or context review."
+    };
+  }
+
+  if (action.id === "handoff-export-format-focus") {
+    return {
+      auditionCue: "Use the focused Export Format metric to inspect WAV, stem, MIDI, or Handoff Sheet format before exporting.",
+      nextCheck: "Return to Export Format Readout after the focused deliverable format is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id.startsWith("handoff-export-format-")) {
+    return {
+      auditionCue: "Use the selected format metric to confirm the deliverable details before running an explicit export.",
+      nextCheck: "Check Handoff Package Send Order before exporting files for delivery."
     };
   }
 
@@ -22439,6 +22592,50 @@ function createHandoffExportFormatSummary(
   };
 }
 
+function createHandoffExportFormatFocusResult(
+  metric: HandoffExportFormatMetric,
+  summary: HandoffExportFormatSummary
+): HandoffExportFormatFocusResult {
+  return {
+    metricId: metric.id,
+    status: "Focused",
+    title: `${metric.label} format focused`,
+    detail: metric.detail,
+    destination: "Deliver / Handoff Pack",
+    metricLabel: "Format",
+    metricValue: `${metric.value} / ${summary.durationLabel}`,
+    auditionCue: handoffExportFormatFocusAudition(metric),
+    nextCheck: handoffExportFormatFocusNextCheck(metric),
+    tone: metric.tone
+  };
+}
+
+function handoffExportFormatFocusAudition(metric: HandoffExportFormatMetric): string {
+  switch (metric.id) {
+    case "wav":
+      return "Play Full Mix and compare the Export Meter before creating the mix WAV.";
+    case "stems":
+      return "Use Stem Audition to confirm Drums, 808, Synth, and Chords are audible before stem export.";
+    case "midi":
+      return "Scan Arrangement and Pattern A/B/C assignments so the MIDI reflects the intended song form.";
+    case "sheet":
+      return "Review Session Brief and Delivery Target so the Handoff Sheet carries useful context.";
+  }
+}
+
+function handoffExportFormatFocusNextCheck(metric: HandoffExportFormatMetric): string {
+  switch (metric.id) {
+    case "wav":
+      return "Run WAV export explicitly only after mix, master, and format posture are ready.";
+    case "stems":
+      return "Run stem export after each expected stem is audible or intentionally quiet.";
+    case "midi":
+      return "Run MIDI export when arrangement length and Pattern assignments match the handoff.";
+    case "sheet":
+      return "Fill missing brief fields before exporting the Handoff Sheet.";
+  }
+}
+
 function sampleRateLabel(sampleRate: number): string {
   return sampleRate % 1000 === 0 ? `${sampleRate / 1000} kHz` : `${(sampleRate / 1000).toFixed(1)} kHz`;
 }
@@ -22649,6 +22846,10 @@ function handoffPackageCheckFocusResultNextCheck(card: HandoffPackageCheckCard):
 
 function activeHandoffPackageCheckQuickActionCard(summary: HandoffPackageCheckSummary): HandoffPackageCheckCard | null {
   return summary.cards.find((card) => card.tone === "danger") ?? summary.cards.find((card) => card.tone === "warn") ?? summary.cards[0] ?? null;
+}
+
+function handoffExportFormatFocusMetric(summary: HandoffExportFormatSummary): HandoffExportFormatMetric | null {
+  return summary.metrics.find((metric) => metric.tone === "danger") ?? summary.metrics.find((metric) => metric.tone === "warn") ?? summary.metrics[0] ?? null;
 }
 
 function createKeyCompassSummary(
