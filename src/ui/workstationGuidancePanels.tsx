@@ -57,6 +57,16 @@ type GuideQuickStartDecision = {
   tone: MixCoachTone;
 };
 
+type GuideQuickStartContextItem = {
+  id: "path" | "session" | "workflow";
+  statusLabel: string;
+  laneLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 export function modeLabel(mode: ProjectState["mode"]): string {
   return mode === "guided" ? "Guided" : "Studio";
 }
@@ -354,6 +364,14 @@ export function GuideQuickStart({
     workflowSpotlight,
     workflowSpotlightItem
   });
+  const contextItems = createGuideQuickStartContextItems({
+    firstBeatPathSummary,
+    nextStep,
+    sessionCard,
+    sessionPassSummary,
+    workflowSpotlight,
+    workflowSpotlightItem
+  });
   const tone = modeSwitchWeakestTone([
     firstBeatPathSummary.tone,
     sessionPassSummary.tone,
@@ -402,6 +420,22 @@ export function GuideQuickStart({
           <strong data-testid="guide-quick-start-decision-lane">{decision.laneLabel}</strong>
           <small data-testid="guide-quick-start-decision-metric">{decision.metricLabel}</small>
           <small data-testid="guide-quick-start-decision-detail">{decision.detailLabel}</small>
+        </div>
+        <div className="guide-quick-start-context" data-testid="guide-quick-start-context" aria-label="Guide Quick Start context">
+          {contextItems.map((item) => (
+            <div
+              className={`guide-quick-start-context-item ${item.tone}`}
+              data-guide-quick-start-context={item.id}
+              data-testid={`guide-quick-start-context-${item.id}`}
+              key={item.id}
+              title={item.title}
+            >
+              <span data-testid={`guide-quick-start-context-${item.id}-status`}>{item.statusLabel}</span>
+              <strong data-testid={`guide-quick-start-context-${item.id}-lane`}>{item.laneLabel}</strong>
+              <small data-testid={`guide-quick-start-context-${item.id}-metric`}>{item.metricLabel}</small>
+              <small data-testid={`guide-quick-start-context-${item.id}-detail`}>{item.detailLabel}</small>
+            </div>
+          ))}
         </div>
         <div className="guide-quick-start-actions" data-testid="guide-quick-start-actions">
           <button
@@ -463,6 +497,61 @@ export function GuideQuickStart({
       {result && <GuideQuickStartResultStrip result={result} />}
     </section>
   );
+}
+
+function createGuideQuickStartContextItems({
+  firstBeatPathSummary,
+  nextStep,
+  sessionCard,
+  sessionPassSummary,
+  workflowSpotlight,
+  workflowSpotlightItem
+}: {
+  firstBeatPathSummary: FirstBeatPathSummary;
+  nextStep: FirstBeatPathStep | null;
+  sessionCard: SessionPassCard | null;
+  sessionPassSummary: SessionPassSummary;
+  workflowSpotlight: WorkflowSpotlightSummary;
+  workflowSpotlightItem: WorkflowNavigatorItem | null;
+}): GuideQuickStartContextItem[] {
+  const pathTone = nextStep?.tone ?? firstBeatPathSummary.tone;
+  const pathLane = nextStep ? `${nextStep.label}: ${nextStep.value}` : firstBeatPathSummary.headline;
+  const pathDetail = nextStep ? nextStep.detail : firstBeatPathSummary.detail;
+  const sessionTone = sessionCard?.tone ?? sessionPassSummary.tone;
+  const sessionLane = sessionCard ? `${sessionCard.label}: ${sessionCard.value}` : sessionPassSummary.headline;
+  const sessionDetail = sessionCard ? sessionCard.detail : sessionPassSummary.detail;
+  const workflowLane = workflowSpotlight.zoneLabel;
+  const workflowDetail = workflowSpotlightItem ? workflowSpotlightItem.detail : workflowSpotlight.detailLabel;
+
+  return [
+    {
+      id: "path",
+      statusLabel: guideQuickStartDecisionStatus("Path", pathTone),
+      laneLabel: pathLane,
+      metricLabel: firstBeatPathSummary.countLabel,
+      detailLabel: pathDetail,
+      title: `Path context: ${pathLane} / ${firstBeatPathSummary.countLabel} / ${pathDetail}`,
+      tone: pathTone
+    },
+    {
+      id: "session",
+      statusLabel: guideQuickStartDecisionStatus("Session", sessionTone),
+      laneLabel: sessionLane,
+      metricLabel: sessionPassSummary.headline,
+      detailLabel: sessionDetail,
+      title: `Session context: ${sessionLane} / ${sessionPassSummary.headline} / ${sessionDetail}`,
+      tone: sessionTone
+    },
+    {
+      id: "workflow",
+      statusLabel: workflowSpotlight.statusLabel,
+      laneLabel: workflowLane,
+      metricLabel: workflowSpotlight.countLabel,
+      detailLabel: workflowDetail,
+      title: `Workflow context: ${workflowLane} / ${workflowSpotlight.countLabel} / ${workflowDetail}`,
+      tone: workflowSpotlight.tone
+    }
+  ];
 }
 
 function createGuideQuickStartDecision({
