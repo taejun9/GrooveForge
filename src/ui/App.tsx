@@ -204,6 +204,7 @@ import type {
   DeliveryTargetAlignmentResult,
   LocalDraftRecovery,
   MixCoachCheck,
+  MixCoachFocusResult,
   MixCoachFocusSummary,
   MixFixPreset,
   MixFixAction,
@@ -1167,6 +1168,7 @@ export function App(): ReactElement {
   const [listeningPassFocusId, setListeningPassFocusId] = useState<ListeningPassId | null>(null);
   const [listeningPassResult, setListeningPassResult] = useState<ListeningPassFocusResult | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
+  const [mixCoachResult, setMixCoachResult] = useState<MixCoachFocusResult | null>(null);
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
   const [reviewQueueResult, setReviewQueueResult] = useState<ReviewQueueFocusResult | null>(null);
   const [reviewFixResult, setReviewFixResult] = useState<ReviewFixResult | null>(null);
@@ -2085,6 +2087,7 @@ export function App(): ReactElement {
     setMixBalanceResult(null);
     setSpaceFxResult(null);
     setMixFixResult(null);
+    setMixCoachResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
     setSessionBriefCompassResult(null);
@@ -2153,6 +2156,7 @@ export function App(): ReactElement {
       setMixBalanceResult(null);
       setSpaceFxResult(null);
       setMixFixResult(null);
+      setMixCoachResult(null);
       setDeliveryTargetAlignmentResult(null);
       setSessionBriefStarterResult(null);
       setSessionBriefCompassResult(null);
@@ -2314,6 +2318,7 @@ export function App(): ReactElement {
     setMixSnapshots({ A: null, B: null });
     setSpaceFxResult(null);
     setMixFixResult(null);
+    setMixCoachResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
     setSessionBriefCompassResult(null);
@@ -2385,6 +2390,7 @@ export function App(): ReactElement {
     setMixBalanceResult(null);
     setSpaceFxResult(null);
     setMixFixResult(null);
+    setMixCoachResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
     setSessionBriefCompassResult(null);
@@ -3451,6 +3457,7 @@ export function App(): ReactElement {
     if (!pad) {
       setMasterFinishResult(null);
       setMasterAutomationResult(null);
+      setMixCoachResult(null);
       setProjectStatus("Master finish pad not found");
       return;
     }
@@ -3460,6 +3467,7 @@ export function App(): ReactElement {
     if (!changed) {
       setMasterFinishResult(null);
       setMasterAutomationResult(null);
+      setMixCoachResult(null);
       setProjectStatus(`${pad.label} master finish already selected`);
       return;
     }
@@ -3473,6 +3481,7 @@ export function App(): ReactElement {
     const pad = masterAutomationPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
       setMasterAutomationResult(null);
+      setMixCoachResult(null);
       setProjectStatus("Master automation pad not found");
       return;
     }
@@ -3481,6 +3490,7 @@ export function App(): ReactElement {
     const changed = updateProject((current) => applyMasterAutomationPreset(current, pad.id), `${pad.label} master automation applied`);
     if (!changed) {
       setMasterAutomationResult(null);
+      setMixCoachResult(null);
       setProjectStatus(`${pad.label} master automation already selected`);
       return;
     }
@@ -3498,6 +3508,7 @@ export function App(): ReactElement {
     );
     if (!changed) {
       setMixFixResult(null);
+      setMixCoachResult(null);
       setProjectStatus(`${mixFixPresetLabel(preset)} mix fix already selected`);
       return;
     }
@@ -3587,6 +3598,7 @@ export function App(): ReactElement {
     const pad = mixBalancePadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
       setMixBalanceResult(null);
+      setMixCoachResult(null);
       setProjectStatus("Mix balance pad not found");
       return;
     }
@@ -3604,6 +3616,7 @@ export function App(): ReactElement {
       setMixBalanceResult(createMixBalanceResult(pad, beforeMixer, projectRef.current.mixer));
     } else {
       setMixBalanceResult(null);
+      setMixCoachResult(null);
       setProjectStatus(`${pad.label} mix balance already selected`);
     }
   }
@@ -6249,9 +6262,12 @@ export function App(): ReactElement {
   }
 
   function focusMixCoachCheck(check: MixCoachCheck): void {
+    const currentChecks = createMixCoachChecks(exportAnalysis, stemAnalyses);
+    const currentCheck = currentChecks.find((candidate) => candidate.id === check.id) ?? check;
     setMixCoachFocusId(check.id);
+    setMixCoachResult(createMixCoachFocusResult(currentCheck, currentChecks));
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-    setProjectStatus(`Review ${check.label}: ${check.status}`);
+    setProjectStatus(`Review ${currentCheck.label}: ${currentCheck.status}`);
   }
 
   function focusMixCoach(): MixCoachCheck | null {
@@ -6260,6 +6276,7 @@ export function App(): ReactElement {
       focusMixCoachCheck(check);
     } else {
       setMixCoachFocusId(null);
+      setMixCoachResult(null);
       masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
     }
     return check;
@@ -8781,6 +8798,7 @@ export function App(): ReactElement {
             checks={mixCoachChecks}
             focusedCheckId={mixCoachFocusId}
             focusSummary={mixCoachFocusSummary}
+            focusResult={mixCoachResult}
             fixPreview={mixFixPreviewSummary}
             fixes={mixFixActions}
             result={mixFixResult}
@@ -28671,6 +28689,60 @@ function createMixCoachFocusSummary(checks: MixCoachCheck[], focusedCheckId: str
     detailTitle: `${statusLabel} / ${check.label}: ${check.status} / ${check.detail}`,
     tone: check.tone
   };
+}
+
+function createMixCoachFocusResult(check: MixCoachCheck, checks: MixCoachCheck[]): MixCoachFocusResult {
+  return {
+    checkId: check.id,
+    status: "Focused",
+    title: `${check.label} mix check focused`,
+    detail: `${check.status}: ${check.detail}`,
+    destination: "Master / Mix Coach",
+    metricLabel: "Mix",
+    metricValue: mixCoachFocusResultMetric(check, checks),
+    auditionCue: mixCoachFocusResultAudition(check),
+    nextCheck: mixCoachFocusResultNextCheck(check),
+    tone: check.tone
+  };
+}
+
+function mixCoachFocusResultMetric(check: MixCoachCheck, checks: MixCoachCheck[]): string {
+  const reviewCount = checks.filter((candidate) => candidate.tone !== "good").length;
+  return `${check.label}: ${check.status} / ${reviewCount}/${checks.length} to review`;
+}
+
+function mixCoachFocusResultAudition(check: MixCoachCheck): string {
+  switch (check.id) {
+    case "headroom":
+      return "Play Full Mix and watch peak/headroom before applying Headroom Mix Fix or trimming master output.";
+    case "limiter":
+      return "Play the loudest section and compare limiter activity before pushing Master Finish.";
+    case "dynamics":
+      return "Play hook and drop sections; listen for punch before changing compression-style controls.";
+    case "stem-balance":
+      return "Use Full Mix and Stem Audition to hear whether one core layer dominates.";
+    case "low-end":
+      return "A/B Drums and 808 stems before changing low-end balance.";
+    default:
+      return "Play Full Mix, then compare the focused Mix Coach check before choosing a mix move.";
+  }
+}
+
+function mixCoachFocusResultNextCheck(check: MixCoachCheck): string {
+  switch (check.id) {
+    case "headroom":
+      return "Use Headroom Mix Fix or manual master trim only if headroom stays tight.";
+    case "limiter":
+      return "If limiter activity still catches peaks, lower loud channels or choose a gentler master finish.";
+    case "dynamics":
+      return "Use Mix Snapshot A/B after any change so punch and body stay intentional.";
+    case "stem-balance":
+      return "Use Mix Balance or Stem Audition only after deciding which layer should lead.";
+    case "low-end":
+      return "Use Low End Mix Fix only after drums and 808 are both audible and intentionally balanced.";
+    default:
+      return "Return to Mix Coach after the next explicit mix or master move.";
+  }
 }
 
 function createMixBalancePadOptions(mixer: MixerChannel[]): MixBalancePadOption[] {

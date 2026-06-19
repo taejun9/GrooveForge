@@ -20150,6 +20150,101 @@ input[type="range"] {
   font-size: 12px;
 }
 
+.mix-coach-result {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.34fr) minmax(118px, 0.2fr) minmax(190px, 0.42fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(138, 168, 255, 0.24);
+  border-radius: 6px;
+  background: rgba(138, 168, 255, 0.07);
+  padding: 7px 8px;
+}
+
+.mix-coach-result.good {
+  border-color: rgba(120, 240, 200, 0.24);
+  background: rgba(120, 240, 200, 0.055);
+}
+
+.mix-coach-result.warn {
+  border-color: rgba(255, 209, 102, 0.28);
+  background: rgba(255, 209, 102, 0.06);
+}
+
+.mix-coach-result.danger {
+  border-color: rgba(255, 122, 79, 0.32);
+  background: rgba(255, 122, 79, 0.07);
+}
+
+.mix-coach-result-main,
+.mix-coach-result-destination,
+.mix-coach-result-metric,
+.mix-coach-result-followup {
+  min-width: 0;
+}
+
+.mix-coach-result-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.mix-coach-result-main svg {
+  flex: 0 0 auto;
+  color: #8aa8ff;
+}
+
+.mix-coach-result.good .mix-coach-result-main svg {
+  color: #78f0c8;
+}
+
+.mix-coach-result.warn .mix-coach-result-main svg {
+  color: #ffd166;
+}
+
+.mix-coach-result.danger .mix-coach-result-main svg {
+  color: #ff7a4f;
+}
+
+.mix-coach-result-main span,
+.mix-coach-result-destination,
+.mix-coach-result-metric,
+.mix-coach-result-followup {
+  display: grid;
+  gap: 2px;
+}
+
+.mix-coach-result-main strong,
+.mix-coach-result-destination strong,
+.mix-coach-result-metric strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.mix-coach-result-main small,
+.mix-coach-result-destination span,
+.mix-coach-result-metric span,
+.mix-coach-result-followup span,
+.mix-coach-result-followup small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+}
+
+.mix-coach-result-main span,
+.mix-coach-result-destination span,
+.mix-coach-result-metric span,
+.mix-coach-result-followup span,
+.mix-coach-result-main strong,
+.mix-coach-result-destination strong,
+.mix-coach-result-metric strong,
+.mix-coach-result-main small,
+.mix-coach-result-followup small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .mix-fix-preview {
   display: grid;
   grid-template-columns: minmax(92px, 0.78fr) minmax(96px, 0.86fr) minmax(110px, 1fr) minmax(0, 1.35fr) minmax(92px, 0.8fr);
@@ -21147,6 +21242,13 @@ input[type="range"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .mix-coach-result,
+  .mix-coach-result-destination,
+  .mix-coach-result-metric,
+  .mix-coach-result-followup {
+    grid-template-columns: 1fr;
+  }
+
   .mix-fix-result {
     grid-template-columns: 1fr;
   }
@@ -22093,6 +22195,13 @@ input[type="range"] {
   .mix-fix-preview {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+
+  .mix-coach-result,
+  .mix-coach-result-destination,
+  .mix-coach-result-metric,
+  .mix-coach-result-followup {
+    grid-template-columns: 1fr;
   }
 
   .mix-balance-preview {

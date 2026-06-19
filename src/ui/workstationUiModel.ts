@@ -469,6 +469,19 @@ export type MixCoachFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type MixCoachFocusResult = {
+  checkId: string;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type MixFixPreset = "headroom" | "stem_balance" | "low_end";
 
 export type MixFixAction = {

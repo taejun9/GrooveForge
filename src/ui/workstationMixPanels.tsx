@@ -14,6 +14,7 @@ import type {
   MixBalancePreviewSummary,
   MixBalanceResult,
   MixCoachCheck,
+  MixCoachFocusResult,
   MixCoachFocusSummary,
   MixFixAction,
   MixFixPreset,
@@ -564,6 +565,7 @@ export function MixCoach({
   checks,
   focusedCheckId,
   focusSummary,
+  focusResult,
   fixPreview,
   fixes,
   result,
@@ -573,6 +575,7 @@ export function MixCoach({
   checks: MixCoachCheck[];
   focusedCheckId: string | null;
   focusSummary: MixCoachFocusSummary;
+  focusResult: MixCoachFocusResult | null;
   fixPreview: MixFixPreviewSummary;
   fixes: MixFixAction[];
   result: MixFixResult | null;
@@ -594,6 +597,7 @@ export function MixCoach({
         <strong data-testid="mix-coach-focus-label">{focusSummary.roleLabel}</strong>
         <small data-testid="mix-coach-focus-detail">{focusSummary.detailLabel}</small>
       </div>
+      {focusResult && <MixCoachFocusResultStrip result={focusResult} />}
       <div
         className={`mix-fix-preview ${fixPreview.tone}`}
         data-preview-fix={fixPreview.fixId}
@@ -651,6 +655,38 @@ export function MixCoach({
             <span>{fix.label}</span>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function MixCoachFocusResultStrip({ result }: { result: MixCoachFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`mix-coach-result ${result.tone}`}
+      data-result-mix-coach={result.checkId}
+      data-testid="mix-coach-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="mix-coach-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="mix-coach-result-title">{result.title}</strong>
+          <small data-testid="mix-coach-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="mix-coach-result-destination" data-testid="mix-coach-result-destination">
+        <span>{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="mix-coach-result-metric" data-testid="mix-coach-result-metric">
+        <span data-testid="mix-coach-result-status">{result.metricLabel}</span>
+        <strong data-testid="mix-coach-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="mix-coach-result-followup" data-testid="mix-coach-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
       </div>
     </div>
   );
