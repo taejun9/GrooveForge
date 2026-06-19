@@ -9985,6 +9985,15 @@ type BeatBlueprintPreviewDecision = {
   tone: MixCoachTone;
 };
 
+type BeatBlueprintPreviewCue = {
+  statusLabel: string;
+  cueLabel: string;
+  detailLabel: string;
+  nextCheckLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 function BeatBlueprints({
   onApply,
   onPreview,
@@ -10008,6 +10017,7 @@ function BeatBlueprints({
   const styleMatchPreviewed = previewSummary.blueprintId === styleMatchSummary.blueprintId;
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const previewDecision = createBeatBlueprintPreviewDecision(previewSummary, styleMatchSummary, styleMatchPreviewed);
+  const previewCue = createBeatBlueprintPreviewCue(previewSummary, styleMatchSummary, styleMatchPreviewed);
 
   return (
     <section className="blueprint-row" data-testid="beat-blueprints" aria-label="Beat blueprints" ref={sectionRef}>
@@ -10067,6 +10077,17 @@ function BeatBlueprints({
           <small data-testid="beat-blueprint-preview-decision-metric">{previewDecision.metricLabel}</small>
           <small data-testid="beat-blueprint-preview-decision-detail">{previewDecision.detailLabel}</small>
           <small data-testid="beat-blueprint-preview-decision-action">{previewDecision.actionLabel}</small>
+        </div>
+        <div
+          className={`blueprint-preview-cue ${previewCue.tone}`}
+          data-blueprint-preview-cue={previewSummary.blueprintId}
+          data-testid="beat-blueprint-preview-cue"
+          title={previewCue.title}
+        >
+          <span data-testid="beat-blueprint-preview-cue-status">{previewCue.statusLabel}</span>
+          <strong data-testid="beat-blueprint-preview-cue-label">{previewCue.cueLabel}</strong>
+          <small data-testid="beat-blueprint-preview-cue-detail">{previewCue.detailLabel}</small>
+          <small data-testid="beat-blueprint-preview-cue-next-check">{previewCue.nextCheckLabel}</small>
         </div>
         <div className="blueprint-preview-head">
           <span>{previewSummary.focus}</span>
@@ -10171,6 +10192,41 @@ function createBeatBlueprintPreviewDecision(
     detailLabel,
     actionLabel,
     title: `${statusLabel}: ${previewSummary.name} / ${metricLabel} / ${detailLabel} / ${actionLabel}`,
+    tone: changedCount === 0 ? "good" : "warn"
+  };
+}
+
+function createBeatBlueprintPreviewCue(
+  previewSummary: BeatBlueprintPreviewSummary,
+  styleMatchSummary: BeatBlueprintPreviewSummary,
+  styleMatchPreviewed: boolean
+): BeatBlueprintPreviewCue {
+  const changedMetrics = previewSummary.metrics.filter((metric) => metric.status === "Change");
+  const changedLabels = changedMetrics.map((metric) => metric.label);
+  const changedCount = changedMetrics.length;
+  const changeScope = changedCount === 0 ? "current starter" : changedLabels.join(" / ");
+  const statusLabel = changedCount === 0 ? "Aligned cue" : styleMatchPreviewed ? "Style-fit cue" : "Compare cue";
+  const cueLabel =
+    changedCount === 0
+      ? "Play the loop before Reapply"
+      : `Listen for ${changeScope}`;
+  const detailLabel =
+    changedCount === 0
+      ? "Preview keeps style, key, tempo, arrangement, sound, and master posture."
+      : styleMatchPreviewed
+        ? "Approve only if the previewed starter posture fits this beat direction."
+        : `Compare against ${styleMatchSummary.name} before Apply.`;
+  const nextCheckLabel =
+    changedCount === 0
+      ? "Next: keep composing or reapply intentionally."
+      : "Next: apply only after the metrics fit the session.";
+
+  return {
+    statusLabel,
+    cueLabel,
+    detailLabel,
+    nextCheckLabel,
+    title: `${statusLabel}: ${cueLabel} / ${detailLabel} / ${nextCheckLabel}`,
     tone: changedCount === 0 ? "good" : "warn"
   };
 }
