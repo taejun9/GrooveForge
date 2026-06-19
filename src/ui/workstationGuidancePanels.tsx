@@ -47,6 +47,16 @@ type GuideQuickStartResult = {
   tone: MixCoachTone;
 };
 
+type GuideQuickStartDecision = {
+  source: "path" | "session" | "workflow";
+  statusLabel: string;
+  laneLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 export function modeLabel(mode: ProjectState["mode"]): string {
   return mode === "guided" ? "Guided" : "Studio";
 }
@@ -326,6 +336,14 @@ export function GuideQuickStart({
   const workflowSpotlightItem = workflowSpotlight.zoneId
     ? workflowNavigatorItems.find((item) => item.id === workflowSpotlight.zoneId) ?? null
     : null;
+  const decision = createGuideQuickStartDecision({
+    firstBeatPathSummary,
+    nextStep,
+    sessionCard,
+    sessionPassSummary,
+    workflowSpotlight,
+    workflowSpotlightItem
+  });
   const tone = modeSwitchWeakestTone([
     firstBeatPathSummary.tone,
     sessionPassSummary.tone,
@@ -363,65 +381,172 @@ export function GuideQuickStart({
           {firstBeatPathSummary.countLabel} / {sessionPassSummary.headline} / {workflowSpotlight.countLabel}
         </small>
       </div>
-      <div className="guide-quick-start-actions" data-testid="guide-quick-start-actions">
-        <button
-          className={["guide-quick-start-action", "path", nextStep?.tone ?? "warn"].join(" ")}
-          data-testid="guide-quick-start-path"
-          disabled={!nextStep}
-          onClick={() => {
-            if (nextStep) {
-              setResult(createGuideQuickStartPathResult(nextStep, firstBeatPathSummary));
-              onJumpFirstBeatPath(nextStep);
-            }
-          }}
-          title={nextStep ? `Jump to ${nextStep.jumpLabel}: ${nextStep.detail}` : "No First Beat Path target"}
-          type="button"
+      <div className="guide-quick-start-body">
+        <div
+          className={`guide-quick-start-decision ${decision.tone}`}
+          data-guide-quick-start-decision={decision.source}
+          data-testid="guide-quick-start-decision"
+          title={decision.title}
         >
-          <Target size={14} aria-hidden="true" />
-          <span>Next path</span>
-          <strong>{nextStep ? `${nextStep.label}: ${nextStep.value}` : "No path target"}</strong>
-          <small>{nextStep?.detail ?? firstBeatPathSummary.detail}</small>
-        </button>
-        <button
-          className={["guide-quick-start-action", "session", sessionCard?.tone ?? "warn"].join(" ")}
-          data-testid="guide-quick-start-session"
-          disabled={!sessionCard}
-          onClick={() => {
-            if (sessionCard) {
-              setResult(createGuideQuickStartSessionResult(sessionCard, sessionPassSummary));
-              onFocusSessionPass(sessionCard);
-            }
-          }}
-          title={sessionCard ? `Focus ${sessionCard.focusLabel}: ${sessionCard.value}` : "No Session Pass target"}
-          type="button"
-        >
-          <ArrowRight size={14} aria-hidden="true" />
-          <span>{sessionPassSummary.mode === "guided" ? "Guided pass" : "Studio pass"}</span>
-          <strong>{sessionCard ? `${sessionCard.label}: ${sessionCard.value}` : sessionPassSummary.headline}</strong>
-          <small>{sessionCard?.detail ?? sessionPassSummary.detail}</small>
-        </button>
-        <button
-          className={["guide-quick-start-action", "workflow", workflowSpotlight.tone].join(" ")}
-          data-testid="guide-quick-start-workflow"
-          disabled={!workflowSpotlightItem}
-          onClick={() => {
-            if (workflowSpotlightItem) {
-              setResult(createGuideQuickStartWorkflowResult(workflowSpotlight, workflowSpotlightItem));
-              onJumpWorkflowSpotlight(workflowSpotlightItem);
-            }
-          }}
-          title={workflowSpotlight.detailTitle}
-          type="button"
-        >
-          <ArrowRight size={14} aria-hidden="true" />
-          <span>{workflowSpotlight.statusLabel}</span>
-          <strong>{workflowSpotlight.zoneLabel}</strong>
-          <small>{workflowSpotlight.detailLabel}</small>
-        </button>
+          <span data-testid="guide-quick-start-decision-status">{decision.statusLabel}</span>
+          <strong data-testid="guide-quick-start-decision-lane">{decision.laneLabel}</strong>
+          <small data-testid="guide-quick-start-decision-metric">{decision.metricLabel}</small>
+          <small data-testid="guide-quick-start-decision-detail">{decision.detailLabel}</small>
+        </div>
+        <div className="guide-quick-start-actions" data-testid="guide-quick-start-actions">
+          <button
+            className={["guide-quick-start-action", "path", nextStep?.tone ?? "warn"].join(" ")}
+            data-testid="guide-quick-start-path"
+            disabled={!nextStep}
+            onClick={() => {
+              if (nextStep) {
+                setResult(createGuideQuickStartPathResult(nextStep, firstBeatPathSummary));
+                onJumpFirstBeatPath(nextStep);
+              }
+            }}
+            title={nextStep ? `Jump to ${nextStep.jumpLabel}: ${nextStep.detail}` : "No First Beat Path target"}
+            type="button"
+          >
+            <Target size={14} aria-hidden="true" />
+            <span>Next path</span>
+            <strong>{nextStep ? `${nextStep.label}: ${nextStep.value}` : "No path target"}</strong>
+            <small>{nextStep?.detail ?? firstBeatPathSummary.detail}</small>
+          </button>
+          <button
+            className={["guide-quick-start-action", "session", sessionCard?.tone ?? "warn"].join(" ")}
+            data-testid="guide-quick-start-session"
+            disabled={!sessionCard}
+            onClick={() => {
+              if (sessionCard) {
+                setResult(createGuideQuickStartSessionResult(sessionCard, sessionPassSummary));
+                onFocusSessionPass(sessionCard);
+              }
+            }}
+            title={sessionCard ? `Focus ${sessionCard.focusLabel}: ${sessionCard.value}` : "No Session Pass target"}
+            type="button"
+          >
+            <ArrowRight size={14} aria-hidden="true" />
+            <span>{sessionPassSummary.mode === "guided" ? "Guided pass" : "Studio pass"}</span>
+            <strong>{sessionCard ? `${sessionCard.label}: ${sessionCard.value}` : sessionPassSummary.headline}</strong>
+            <small>{sessionCard?.detail ?? sessionPassSummary.detail}</small>
+          </button>
+          <button
+            className={["guide-quick-start-action", "workflow", workflowSpotlight.tone].join(" ")}
+            data-testid="guide-quick-start-workflow"
+            disabled={!workflowSpotlightItem}
+            onClick={() => {
+              if (workflowSpotlightItem) {
+                setResult(createGuideQuickStartWorkflowResult(workflowSpotlight, workflowSpotlightItem));
+                onJumpWorkflowSpotlight(workflowSpotlightItem);
+              }
+            }}
+            title={workflowSpotlight.detailTitle}
+            type="button"
+          >
+            <ArrowRight size={14} aria-hidden="true" />
+            <span>{workflowSpotlight.statusLabel}</span>
+            <strong>{workflowSpotlight.zoneLabel}</strong>
+            <small>{workflowSpotlight.detailLabel}</small>
+          </button>
+        </div>
       </div>
       {result && <GuideQuickStartResultStrip result={result} />}
     </section>
   );
+}
+
+function createGuideQuickStartDecision({
+  firstBeatPathSummary,
+  nextStep,
+  sessionCard,
+  sessionPassSummary,
+  workflowSpotlight,
+  workflowSpotlightItem
+}: {
+  firstBeatPathSummary: FirstBeatPathSummary;
+  nextStep: FirstBeatPathStep | null;
+  sessionCard: SessionPassCard | null;
+  sessionPassSummary: SessionPassSummary;
+  workflowSpotlight: WorkflowSpotlightSummary;
+  workflowSpotlightItem: WorkflowNavigatorItem | null;
+}): GuideQuickStartDecision {
+  const candidates: GuideQuickStartDecision[] = [];
+
+  if (nextStep) {
+    candidates.push({
+      source: "path",
+      statusLabel: guideQuickStartDecisionStatus("Path", nextStep.tone),
+      laneLabel: `${nextStep.label}: ${nextStep.value}`,
+      metricLabel: firstBeatPathSummary.countLabel,
+      detailLabel: `Jump to ${nextStep.jumpLabel}; ${nextStep.detail}`,
+      title: `Guide Quick Start recommends the First Beat Path lane: ${nextStep.detail}`,
+      tone: nextStep.tone
+    });
+  }
+
+  if (sessionCard) {
+    candidates.push({
+      source: "session",
+      statusLabel: guideQuickStartDecisionStatus("Session", sessionCard.tone),
+      laneLabel: `${sessionCard.label}: ${sessionCard.value}`,
+      metricLabel: sessionPassSummary.headline,
+      detailLabel: `Focus ${sessionCard.focusLabel}; ${sessionCard.detail}`,
+      title: `Guide Quick Start recommends the Session Pass lane: ${sessionCard.detail}`,
+      tone: sessionCard.tone
+    });
+  }
+
+  if (workflowSpotlightItem) {
+    candidates.push({
+      source: "workflow",
+      statusLabel: guideQuickStartDecisionStatus("Workflow", workflowSpotlight.tone),
+      laneLabel: workflowSpotlight.zoneLabel,
+      metricLabel: workflowSpotlight.countLabel,
+      detailLabel: `${workflowSpotlight.statusLabel}; ${workflowSpotlight.detailLabel}`,
+      title: `Guide Quick Start recommends the Workflow Spotlight lane: ${workflowSpotlightItem.detail}`,
+      tone: workflowSpotlight.tone
+    });
+  }
+
+  return (
+    candidates.reduce<GuideQuickStartDecision | null>((selected, candidate) => {
+      if (!selected) {
+        return candidate;
+      }
+      return guideQuickStartDecisionToneRank(candidate.tone) > guideQuickStartDecisionToneRank(selected.tone)
+        ? candidate
+        : selected;
+    }, null) ?? {
+      source: "path",
+      statusLabel: "Guide ready",
+      laneLabel: "No blocker",
+      metricLabel: firstBeatPathSummary.countLabel,
+      detailLabel: firstBeatPathSummary.detail,
+      title: "Guide Quick Start has no current blocker target.",
+      tone: "good"
+    }
+  );
+}
+
+function guideQuickStartDecisionStatus(label: string, tone: MixCoachTone): string {
+  if (tone === "danger") {
+    return `${label} blocker`;
+  }
+  if (tone === "warn") {
+    return `${label} review`;
+  }
+  return `${label} ready`;
+}
+
+function guideQuickStartDecisionToneRank(tone: MixCoachTone): number {
+  switch (tone) {
+    case "danger":
+      return 3;
+    case "warn":
+      return 2;
+    case "good":
+      return 1;
+  }
 }
 
 function createGuideQuickStartPathResult(step: FirstBeatPathStep, summary: FirstBeatPathSummary): GuideQuickStartResult {
