@@ -13036,7 +13036,7 @@ function activeBeatSpineQuickActionApplyCard(summary: BeatSpineSummary): BeatSpi
   return summary.cards.find((card) => card.tone !== "good" && card.action) ?? summary.cards.find((card) => card.action) ?? null;
 }
 
-function activeKeyCompassQuickActionItem(summary: KeyCompassSummary): KeyCompassFocusItem | null {
+function activeKeyCompassQuickActionItem(summary: KeyCompassSummary): KeyCompassCard | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
     summary.cards.find((card) => card.tone === "warn") ??
@@ -24098,7 +24098,7 @@ function romanDegreeLabel(degree: number): string {
 
 function createKeyCompassFocusSummary(summary: KeyCompassSummary, focusedCardId: KeyCompassFocusId | null): KeyCompassFocusSummary {
   const focusedCard = focusedCardId ? summary.cards.find((card) => card.focusId === focusedCardId) ?? null : null;
-  const card = focusedCard ?? summary.cards[0] ?? null;
+  const card = focusedCard ?? activeKeyCompassQuickActionItem(summary);
 
   if (!card) {
     return {
@@ -24111,7 +24111,7 @@ function createKeyCompassFocusSummary(summary: KeyCompassSummary, focusedCardId:
     };
   }
 
-  const statusLabel = focusedCard ? "Focused Key" : "Key Focus";
+  const statusLabel = focusedCard ? "Focused Key" : keyCompassFocusStatusLabel(card.tone);
   const detailLabel = `${card.focusLabel} panel / ${card.detail}`;
 
   return {
@@ -24122,6 +24122,18 @@ function createKeyCompassFocusSummary(summary: KeyCompassSummary, focusedCardId:
     detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function keyCompassFocusStatusLabel(tone: MixCoachTone): string {
+  if (tone === "danger") {
+    return "Key blocker";
+  }
+
+  if (tone === "warn") {
+    return "Key review";
+  }
+
+  return "Key ready";
 }
 
 function createKeyCompassFocusResult(item: KeyCompassFocusItem, summary: KeyCompassSummary): KeyCompassFocusResult {
