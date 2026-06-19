@@ -512,7 +512,7 @@ Export work must verify a non-silent WAV with expected duration, expected sample
 
 Render noise work must keep offline WAV export, stem export, and export meter analysis deterministic from render-relevant project data, avoid `Math.random()` in the offline render path, and avoid tying audio output to transient UI mode, project title, save timestamps, remote services, imported samples, or hidden audio assets.
 
-Export meter work must label measurements honestly as peak, RMS, headroom, and limiter activity unless a standards-complete LUFS or true-peak implementation is added and validated.
+Export meter work must label measurements honestly as peak, RMS, peak-minus-RMS dynamics, headroom, and limiter activity unless a standards-complete LUFS or true-peak implementation is added and validated.
 
 Stem export work must render isolated drum, 808, synth, and chord WAV files from the current arrangement, keep full-mix WAV export intact, and avoid depending on imported audio or sample assets.
 

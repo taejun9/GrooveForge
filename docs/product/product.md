@@ -381,7 +381,7 @@ MVP capabilities:
 - Master preset ceiling, Master Finish Pads with local Master Finish Preview and Result, master output role readout, and output gain.
 - Master Finish Preview and Result derived from current local master state and existing Master Finish pad options, showing suggested pad, preset, ceiling, output gain, and finish-move count before Apply, then applied preset, ceiling, output gain, audition cue, and next check after explicit pad clicks or Master Finish Quick Action runs without mutating project data outside the clicked Master Finish move; Quick Actions result metrics show preset, ceiling, and output posture.
 - Master Automation Pads derived from local arrangement length and explicit master volume fade presets, with Quick Actions Master Automation commands for the current suggested fade and every direct pad, result metrics for preset/event/range posture, and follow-up audition/export checks after explicit command runs.
-- Reproducible export peak/RMS/headroom meter with limiter activity status for the current arrangement.
+- Reproducible export peak/RMS/dynamics/headroom meter with limiter activity status for the current arrangement.
 - Local project save/load as a `.grooveforge.json` file, with UI-local current-file identity and unsaved-edit status.
 - Local draft recovery as a session-loss safety net only, with a UI-local project safety readout; explicit project files remain the durable save/load workflow.
 - WAV export through deterministic offline rendering.

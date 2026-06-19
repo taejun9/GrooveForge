@@ -29,7 +29,7 @@ import type {
   StemAuditionPadId,
   StemAuditionPadOption
 } from "./workstationUiModel";
-import { formatDb, formatPercent, meterPercent } from "./workstationPatternTools";
+import { exportDynamicsDb, formatDb, formatPercent, meterPercent } from "./workstationPatternTools";
 
 export function MixBalancePads({
   pads,
@@ -539,6 +539,7 @@ function MasterAutomationResultStrip({ result }: { result: MasterAutomationResul
 export function ExportMeter({ analysis }: { analysis: ExportAnalysis }): ReactElement {
   const peakPercent = meterPercent(analysis.peakDb, analysis.ceilingDb);
   const rmsPercent = meterPercent(analysis.rmsDb, analysis.ceilingDb);
+  const dynamicsDb = exportDynamicsDb(analysis);
   return (
     <div className="export-meter" data-testid="export-meter">
       <div className={`meter-status ${analysis.status.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
@@ -551,6 +552,7 @@ export function ExportMeter({ analysis }: { analysis: ExportAnalysis }): ReactEl
       </div>
       <div className="meter-stats">
         <span data-testid="export-headroom-db">Headroom {formatDb(analysis.headroomDb)}</span>
+        <span data-testid="export-dynamics-db">Dynamics {formatDb(dynamicsDb)}</span>
         <span data-testid="export-limiter-percent">Limiter {formatPercent(analysis.limitedPercent)}</span>
         <span>{analysis.durationSeconds.toFixed(1)} sec</span>
       </div>

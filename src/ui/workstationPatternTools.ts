@@ -3702,6 +3702,13 @@ export function formatDb(value: number): string {
   return `${value.toFixed(1)} dB`;
 }
 
+export function exportDynamicsDb(analysis: ExportAnalysis): number {
+  if (!Number.isFinite(analysis.peakDb) || !Number.isFinite(analysis.rmsDb)) {
+    return 0;
+  }
+  return Math.max(0, analysis.peakDb - analysis.rmsDb);
+}
+
 export function createHandoffSheet(
   project: ProjectState,
   analysis: ExportAnalysis,
@@ -3754,6 +3761,7 @@ export function createHandoffSheet(
     `Duration: ${analysis.durationSeconds.toFixed(2)} sec`,
     `Peak: ${formatDb(analysis.peakDb)}`,
     `RMS: ${formatDb(analysis.rmsDb)}`,
+    `Dynamics: ${formatDb(exportDynamicsDb(analysis))}`,
     `Headroom: ${formatDb(analysis.headroomDb)}`,
     `Limiter Activity: ${formatPercent(analysis.limitedPercent)}`,
     "",
@@ -3761,7 +3769,7 @@ export function createHandoffSheet(
     ...stemLines,
     "",
     "Notes",
-    "Peak, RMS, headroom, and limiter activity are local render checks, not platform-compliance, true-peak, LUFS, publishing, or mastering guarantees.",
+    "Peak, RMS, dynamics, headroom, and limiter activity are local render checks, not platform-compliance, true-peak, LUFS, publishing, or mastering guarantees.",
     "This sheet is generated from local project data and does not include audio media."
   ];
 
