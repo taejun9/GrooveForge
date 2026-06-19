@@ -1301,6 +1301,7 @@ export function App(): ReactElement {
   const currentPlaybackStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
   const currentEditorStep = playbackPosition?.pattern === project.selectedPattern ? currentPlaybackStep : null;
   const playingPattern = isPlaying ? playbackPosition?.pattern ?? null : null;
+  const audiblePatternFollowTarget = playingPattern && playingPattern !== project.selectedPattern ? playingPattern : null;
   const patternPlaybackReadout = createPatternPlaybackReadoutSummary(
     project.selectedPattern,
     playingPattern,
@@ -2451,6 +2452,21 @@ export function App(): ReactElement {
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(0);
+  }
+
+  function followAudiblePattern(): void {
+    const target = playbackPosition?.pattern ?? null;
+    if (!isPlaying || !target) {
+      setProjectStatus("No audible Pattern to follow");
+      return;
+    }
+    if (projectRef.current.selectedPattern === target) {
+      setProjectStatus(`Already editing audible Pattern ${target}`);
+      return;
+    }
+
+    selectPattern(target);
+    setProjectStatus(`Editing audible Pattern ${target}`);
   }
 
   function cuePattern(pattern: PatternSlot): void {
@@ -6568,6 +6584,7 @@ export function App(): ReactElement {
     patternStackOptions,
     patternStackPreviewSummary,
     patternDnaSummary,
+    playingPattern,
     playbackMode,
     project,
     productionSnapshotSummary,
@@ -6663,6 +6680,7 @@ export function App(): ReactElement {
     onCueSectionLocator: cueSectionLocator,
     onCueGrooveCompass: cueGrooveCompass,
     onCuePattern: cuePattern,
+    onFollowAudiblePattern: followAudiblePattern,
     onSelectArrangementBlock: selectArrangementBlock,
     onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
@@ -7294,6 +7312,30 @@ export function App(): ReactElement {
             <span data-testid="pattern-playback-status">{patternPlaybackReadout.statusLabel}</span>
             <strong data-testid="pattern-playback-label">{patternPlaybackReadout.roleLabel}</strong>
             <small data-testid="pattern-playback-detail">{patternPlaybackReadout.detailLabel}</small>
+            <button
+              aria-label={
+                audiblePatternFollowTarget
+                  ? `Edit audible Pattern ${audiblePatternFollowTarget}`
+                  : playingPattern
+                    ? "Editing Pattern already matches audible Pattern"
+                    : "No audible Pattern to follow"
+              }
+              className="pattern-playback-follow-button"
+              data-testid="pattern-playback-follow"
+              disabled={!audiblePatternFollowTarget}
+              onClick={followAudiblePattern}
+              title={
+                audiblePatternFollowTarget
+                  ? `Switch edit focus to audible Pattern ${audiblePatternFollowTarget}`
+                  : playingPattern
+                    ? "Editing Pattern already matches audible Pattern"
+                    : "Play Song or Block with another Pattern to follow the audible Pattern"
+              }
+              type="button"
+            >
+              <ArrowRight size={13} aria-hidden="true" />
+              <span>{audiblePatternFollowTarget ? `Edit ${audiblePatternFollowTarget}` : playingPattern ? "In sync" : "Idle"}</span>
+            </button>
           </div>
           <PatternCompareStrip
             playbackMode={playbackMode}
@@ -12278,6 +12320,7 @@ function createQuickActions({
   patternStackOptions,
   patternStackPreviewSummary,
   patternDnaSummary,
+  playingPattern,
   playbackMode,
   project,
   productionSnapshotSummary,
@@ -12372,6 +12415,7 @@ function createQuickActions({
   onCueSectionLocator,
   onCueGrooveCompass,
   onCuePattern,
+  onFollowAudiblePattern,
   onSelectArrangementBlock,
   onSelectPattern,
   onSelectStyle,
@@ -12519,6 +12563,7 @@ function createQuickActions({
   patternStackOptions: PatternStackOption[];
   patternStackPreviewSummary: PatternStackPreviewSummary;
   patternDnaSummary: PatternDnaSummary;
+  playingPattern: PatternSlot | null;
   playbackMode: PlaybackMode;
   project: ProjectState;
   productionSnapshotSummary: ProductionSnapshotSummary;
@@ -12613,6 +12658,7 @@ function createQuickActions({
   onCueSectionLocator: (section: ArrangementSection) => void;
   onCueGrooveCompass: () => void;
   onCuePattern: (pattern: PatternSlot) => void;
+  onFollowAudiblePattern: () => void;
   onSelectArrangementBlock: (index: number) => void;
   onSelectPattern: (pattern: PatternSlot) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
@@ -13827,6 +13873,24 @@ function createQuickActions({
       run: () => onSelectPattern(pattern)
     };
   });
+  const audiblePatternFollowTarget = playingPattern && playingPattern !== project.selectedPattern ? playingPattern : null;
+  const audiblePatternFollowAction: QuickAction = {
+    id: "pattern-follow-audible",
+    title: audiblePatternFollowTarget
+      ? `Edit audible Pattern ${audiblePatternFollowTarget}`
+      : playingPattern
+        ? `Already editing audible Pattern ${project.selectedPattern}`
+        : "Edit audible Pattern",
+    detail: audiblePatternFollowTarget
+      ? `Hearing Pattern ${audiblePatternFollowTarget} while editing Pattern ${project.selectedPattern} / changes edit focus only`
+      : playingPattern
+        ? `Editing and hearing Pattern ${project.selectedPattern} already match.`
+        : "Play Song or Block with another Pattern before following the audible Pattern.",
+    group: "Create",
+    keywords: `pattern audible follow heard hearing playing edit focus playback readout ${playingPattern ?? "none"} ${project.selectedPattern} a b c beginner producer`,
+    disabled: !audiblePatternFollowTarget,
+    run: onFollowAudiblePattern
+  };
   const patternUseActions: QuickAction[] = patternSlots.map((pattern) => {
     const current = selectedBlock?.pattern === pattern;
     const eventCount = patternEventTotal(project.patterns[pattern]);
@@ -14017,6 +14081,7 @@ function createQuickActions({
     ...swingFeelActions,
     ...patternCueActions,
     ...patternSwitchActions,
+    audiblePatternFollowAction,
     {
       id: "midi-input-connect",
       title: midiInputConnectTitle,
@@ -15320,6 +15385,7 @@ function createQuickActionResult(
     action.id.startsWith("section-locator-") ||
     action.id.startsWith("pattern-cue-") ||
     action.id.startsWith("pattern-switch-") ||
+    action.id === "pattern-follow-audible" ||
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-focus" ||
@@ -15921,6 +15987,14 @@ function quickActionResultMetricSnapshot(
       id: "pattern-switch",
       label: "Edit pattern",
       value: `Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
+    };
+  }
+
+  if (action.id === "pattern-follow-audible") {
+    return {
+      id: "pattern-follow-audible",
+      label: "Audible pattern",
+      value: `Editing Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
     };
   }
 
@@ -17032,6 +17106,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm this variation's drums, 808, chords, and Synth before editing.`,
       nextCheck: "Use Pattern Compare, Pattern DNA, Pattern Clone, or Pattern Chain when the selected variation should feed the arrangement."
+    };
+  }
+
+  if (action.id === "pattern-follow-audible") {
+    return {
+      auditionCue: `Keep playback running only if you need live context; edit Pattern ${project.selectedPattern} after confirming it is the audible lane.`,
+      nextCheck: "Use Pattern Playback Readout to confirm Editing and Hearing match before changing events."
     };
   }
 
