@@ -1357,6 +1357,15 @@ export type ListeningPassSummary = {
   items: ListeningPassItem[];
 };
 
+export type ListeningPassFocusSummary = {
+  itemId: ListeningPassId | null;
+  statusLabel: string;
+  checkpointLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type ListeningPassFocusResult = {
   itemId: ListeningPassId;
   status: string;

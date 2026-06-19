@@ -216,6 +216,7 @@ h2 {
 .layer-starter-heading span,
 .layer-starter-row button span,
 .listening-pass-heading span,
+.listening-pass-focus-readout span,
 .listening-pass-focus-button span,
 .drum-move-preview span,
 .drum-foundation-heading span,
@@ -9306,6 +9307,9 @@ h2 {
 
 .listening-pass-heading strong,
 .listening-pass-heading small,
+.listening-pass-focus-readout span,
+.listening-pass-focus-readout strong,
+.listening-pass-focus-readout small,
 .listening-pass-result-main strong,
 .listening-pass-result-main small,
 .listening-pass-result-destination span,
@@ -9338,10 +9342,56 @@ h2 {
 
 .listening-pass-grid {
   display: grid;
-  grid-column: 2;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   min-width: 0;
+}
+
+.listening-pass-stack {
+  display: grid;
+  grid-column: 2;
+  gap: 8px;
+  min-width: 0;
+}
+
+.listening-pass-focus-readout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr) minmax(0, 1.28fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.24);
+  border-radius: 7px;
+  background: rgba(130, 215, 255, 0.055);
+  padding: 7px 8px;
+}
+
+.listening-pass-focus-readout.warn {
+  border-color: rgba(240, 195, 106, 0.28);
+  background: rgba(240, 195, 106, 0.06);
+}
+
+.listening-pass-focus-readout.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.listening-pass-focus-readout > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listening-pass-focus-readout span,
+.listening-pass-focus-readout small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.listening-pass-focus-readout strong {
+  color: #f4efe7;
+  font-size: 12px;
 }
 
 .listening-pass-card {
@@ -9446,18 +9496,8 @@ h2 {
   background: rgba(130, 215, 255, 0.18);
 }
 
-.listening-pass.has-result .listening-pass-heading {
-  grid-row: 1 / span 2;
-}
-
-.listening-pass.has-result .listening-pass-grid {
-  grid-row: 2;
-}
-
 .listening-pass-result {
   display: grid;
-  grid-column: 2;
-  grid-row: 1;
   grid-template-columns: minmax(170px, 0.34fr) minmax(140px, 0.22fr) minmax(180px, 0.42fr) minmax(0, 1fr);
   gap: 8px;
   align-items: center;
@@ -23083,13 +23123,13 @@ input[type="range"] {
     padding-block-end: 7px;
   }
 
-  .listening-pass.has-result .listening-pass-heading,
-  .listening-pass.has-result .listening-pass-grid,
+  .listening-pass-stack,
   .listening-pass-result {
     grid-column: 1;
     grid-row: auto;
   }
 
+  .listening-pass-focus-readout,
   .listening-pass-result {
     grid-template-columns: 1fr;
   }

@@ -298,6 +298,7 @@ import type {
   ListeningPassTarget,
   ListeningPassItem,
   ListeningPassSummary,
+  ListeningPassFocusSummary,
   ListeningPassFocusResult,
   PatternDnaFocusSummary,
   StyleInspectorMetricId,
@@ -11124,6 +11125,8 @@ function ListeningPass({
   onFocus: (item: ListeningPassItem) => void;
   summary: ListeningPassSummary;
 }): ReactElement {
+  const focusSummary = createListeningPassFocusSummary(summary, focusedItemId);
+
   return (
     <section
       aria-label="Listening pass"
@@ -11138,36 +11141,47 @@ function ListeningPass({
         <strong data-testid="listening-pass-headline">{summary.headline}</strong>
         <small data-testid="listening-pass-detail">{summary.detail}</small>
       </div>
-      {result && <ListeningPassFocusResultStrip result={result} />}
-      <div className="listening-pass-grid" data-testid="listening-pass-grid">
-        {summary.items.map((item) => {
-          const focused = focusedItemId === item.id;
-          return (
-            <div
-              className={["listening-pass-card", item.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
-              data-focused={focused ? "true" : "false"}
-              data-testid={`listening-pass-${item.id}`}
-              key={item.id}
-            >
-              <span>{item.label}</span>
-              <strong>{item.status}</strong>
-              <button
-                aria-pressed={focused}
-                className="listening-pass-focus-button"
-                data-testid={`listening-pass-focus-${item.id}`}
-                onClick={() => onFocus(item)}
-                title={`Focus ${item.focusLabel}: ${item.status}`}
-                type="button"
+      <div className="listening-pass-stack">
+        <div
+          className={`listening-pass-focus-readout ${focusSummary.tone}`}
+          data-testid="listening-pass-focus-readout"
+          title={focusSummary.detailTitle}
+        >
+          <span data-testid="listening-pass-focus-status">{focusSummary.statusLabel}</span>
+          <strong data-testid="listening-pass-focus-label">{focusSummary.checkpointLabel}</strong>
+          <small data-testid="listening-pass-focus-detail">{focusSummary.detailLabel}</small>
+        </div>
+        {result && <ListeningPassFocusResultStrip result={result} />}
+        <div className="listening-pass-grid" data-testid="listening-pass-grid">
+          {summary.items.map((item) => {
+            const focused = focusedItemId === item.id;
+            return (
+              <div
+                className={["listening-pass-card", item.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+                data-focused={focused ? "true" : "false"}
+                data-testid={`listening-pass-${item.id}`}
+                key={item.id}
               >
-                <ArrowRight size={13} aria-hidden="true" />
-                <span>{item.focusLabel}</span>
-              </button>
-              <small>{item.cue}</small>
-              <em>{item.detail}</em>
-              <b>{item.metric}</b>
-            </div>
-          );
-        })}
+                <span>{item.label}</span>
+                <strong>{item.status}</strong>
+                <button
+                  aria-pressed={focused}
+                  className="listening-pass-focus-button"
+                  data-testid={`listening-pass-focus-${item.id}`}
+                  onClick={() => onFocus(item)}
+                  title={`Focus ${item.focusLabel}: ${item.status}`}
+                  type="button"
+                >
+                  <ArrowRight size={13} aria-hidden="true" />
+                  <span>{item.focusLabel}</span>
+                </button>
+                <small>{item.cue}</small>
+                <em>{item.detail}</em>
+                <b>{item.metric}</b>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
@@ -29212,6 +29226,37 @@ function createListeningPassFocusResult(item: ListeningPassItem, summary: Listen
     metricValue: listeningPassFocusResultMetric(summary),
     auditionCue: listeningPassFocusResultAudition(item),
     nextCheck: listeningPassFocusResultNextCheck(item),
+    tone: item.tone
+  };
+}
+
+function createListeningPassFocusSummary(
+  summary: ListeningPassSummary,
+  focusedItemId: ListeningPassId | null
+): ListeningPassFocusSummary {
+  const focusedItem = focusedItemId ? summary.items.find((item) => item.id === focusedItemId) ?? null : null;
+  const item = focusedItem ?? summary.items.find((passItem) => passItem.tone !== "good") ?? summary.items[0] ?? null;
+
+  if (!item) {
+    return {
+      itemId: null,
+      statusLabel: "Audition clear",
+      checkpointLabel: "No listening checkpoint",
+      detailLabel: "No Listening Pass items available",
+      detailTitle: "Listening Pass has no checkpoint to focus.",
+      tone: "good"
+    };
+  }
+
+  const statusLabel = focusedItem ? "Focused Audition" : item.tone === "good" ? "Audition ready" : "Next Audition";
+  const detailLabel = `${item.focusLabel} panel / ${item.cue} / ${item.metric}`;
+
+  return {
+    itemId: item.id,
+    statusLabel,
+    checkpointLabel: `${item.label}: ${item.status}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${item.label}: ${item.status} / ${item.detail}`,
     tone: item.tone
   };
 }
