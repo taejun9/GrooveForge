@@ -2267,7 +2267,7 @@ h2 {
 
 .workflow-navigator {
   display: grid;
-  grid-template-columns: minmax(160px, 0.34fr) minmax(190px, 0.56fr) minmax(0, 1fr);
+  grid-template-columns: minmax(160px, 0.26fr) minmax(150px, 0.2fr) minmax(190px, 0.28fr) minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
   min-width: 0;
@@ -2299,6 +2299,9 @@ h2 {
 
 .workflow-navigator-heading strong,
 .workflow-navigator-heading small,
+.workflow-spotlight-decision span,
+.workflow-spotlight-decision strong,
+.workflow-spotlight-decision small,
 .workflow-spotlight span,
 .workflow-spotlight strong,
 .workflow-spotlight small,
@@ -2325,6 +2328,44 @@ h2 {
 .workflow-navigator-heading small {
   color: rgba(244, 239, 231, 0.66);
   font-size: 11px;
+}
+
+.workflow-spotlight-decision {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(130, 215, 255, 0.055);
+  padding: 8px;
+}
+
+.workflow-spotlight-decision.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.workflow-spotlight-decision.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.workflow-spotlight-decision span {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.workflow-spotlight-decision strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.workflow-spotlight-decision small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
 }
 
 .workflow-spotlight {
@@ -22070,6 +22111,14 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .workflow-spotlight-decision {
+    grid-column: 2;
+  }
+
+  .workflow-spotlight {
+    grid-column: 2;
+  }
+
   .workflow-navigator-result {
     grid-column: 1 / -1;
     grid-template-columns: 150px minmax(0, 0.6fr) minmax(0, 1fr);
@@ -22958,6 +23007,8 @@ input[type="range"] {
   }
 
   .workflow-navigator-result,
+  .workflow-spotlight-decision,
+  .workflow-spotlight,
   .workflow-navigator-grid {
     grid-column: 1;
     grid-template-columns: 1fr;

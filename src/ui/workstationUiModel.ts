@@ -3742,6 +3742,10 @@ export type WorkflowSpotlightSummary = {
   detailLabel: string;
   countLabel: string;
   detailTitle: string;
+  decisionStatus: string;
+  decisionLabel: string;
+  decisionDetail: string;
+  decisionTitle: string;
   tone: MixCoachTone;
 };
 

@@ -854,6 +854,16 @@ export function WorkflowNavigator({
         <strong>Compose to deliver</strong>
         <small>Jump across the workstation</small>
       </div>
+      <div
+        className={`workflow-spotlight-decision ${spotlight.tone}`}
+        data-workflow-spotlight-decision={spotlight.zoneId ?? "none"}
+        data-testid="workflow-spotlight-decision"
+        title={spotlight.decisionTitle}
+      >
+        <span data-testid="workflow-spotlight-decision-status">{spotlight.decisionStatus}</span>
+        <strong data-testid="workflow-spotlight-decision-label">{spotlight.decisionLabel}</strong>
+        <small data-testid="workflow-spotlight-decision-detail">{spotlight.decisionDetail}</small>
+      </div>
       <button
         aria-label={spotlight.detailTitle}
         className={`workflow-spotlight ${spotlight.tone}`}
@@ -940,12 +950,21 @@ export function createWorkflowSpotlightSummary(items: WorkflowNavigatorItem[]): 
       detailLabel: "Workflow Navigator has no visible zones",
       countLabel,
       detailTitle: `No workflow zones / ${countLabel}`,
+      decisionStatus: "Workflow empty",
+      decisionLabel: "No jump target",
+      decisionDetail: "Add visible workflow zones before navigating",
+      decisionTitle: `Workflow Spotlight has no visible zones: ${countLabel}`,
       tone: "warn"
     };
   }
 
   const statusLabel = focusItem.tone === "danger" ? "Next blocker" : focusItem.tone === "warn" ? "Next review" : "Workflow clear";
   const detailLabel = `Jump target: ${focusItem.label} / ${focusItem.detail}`;
+  const decisionStatus =
+    focusItem.tone === "danger" ? "Workflow blocker" : focusItem.tone === "warn" ? "Workflow review" : "Workflow ready";
+  const decisionLabel = `Jump ${focusItem.label}`;
+  const decisionDetail = `${focusItem.value}: ${focusItem.detail}`;
+  const decisionTitle = `Workflow Spotlight recommends ${decisionLabel}: ${focusItem.detail}`;
 
   return {
     zoneId: focusItem.id,
@@ -954,6 +973,10 @@ export function createWorkflowSpotlightSummary(items: WorkflowNavigatorItem[]): 
     detailLabel,
     countLabel,
     detailTitle: `${statusLabel} / ${focusItem.label}: ${focusItem.value} / ${focusItem.detail} / ${countLabel}`,
+    decisionStatus,
+    decisionLabel,
+    decisionDetail,
+    decisionTitle,
     tone: focusItem.tone
   };
 }
