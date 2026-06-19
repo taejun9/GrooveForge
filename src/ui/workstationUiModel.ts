@@ -1013,6 +1013,19 @@ export type BeatReadinessCheck = {
   tone: MixCoachTone;
 };
 
+export type BeatReadinessFocusResult = {
+  checkId: BeatReadinessCheckId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type PatternCompareSummary = {
   slot: PatternSlot;
   eventCount: number;

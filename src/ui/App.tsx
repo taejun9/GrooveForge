@@ -275,6 +275,7 @@ import type {
   BeatReadinessCheck,
   BeatReadinessCheckId,
   BeatReadinessFocusTarget,
+  BeatReadinessFocusResult,
   PatternCompareResult,
   PatternCompareSummary,
   PatternClonePadOption,
@@ -1136,6 +1137,7 @@ export function App(): ReactElement {
   const [styleInspectorFocusId, setStyleInspectorFocusId] = useState<StyleInspectorFocusId | null>(null);
   const [styleInspectorResult, setStyleInspectorResult] = useState<StyleInspectorFocusResult | null>(null);
   const [beatReadinessFocusId, setBeatReadinessFocusId] = useState<BeatReadinessCheckId | null>(null);
+  const [beatReadinessResult, setBeatReadinessResult] = useState<BeatReadinessFocusResult | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
   const [reviewFixResult, setReviewFixResult] = useState<ReviewFixResult | null>(null);
@@ -2008,6 +2010,7 @@ export function App(): ReactElement {
     setGrooveCompassResult(null);
     setPatternDnaResult(null);
     setStyleInspectorResult(null);
+    setBeatReadinessResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
@@ -2062,6 +2065,7 @@ export function App(): ReactElement {
       setGrooveCompassResult(null);
       setPatternDnaResult(null);
       setStyleInspectorResult(null);
+      setBeatReadinessResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
@@ -2208,6 +2212,7 @@ export function App(): ReactElement {
     setGrooveCompassResult(null);
     setPatternDnaResult(null);
     setStyleInspectorResult(null);
+    setBeatReadinessResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2265,6 +2270,7 @@ export function App(): ReactElement {
     setGrooveCompassResult(null);
     setPatternDnaResult(null);
     setStyleInspectorResult(null);
+    setBeatReadinessResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -6254,6 +6260,7 @@ export function App(): ReactElement {
 
     setBeatReadinessFocusId(check.id);
     targetRefs[check.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setBeatReadinessResult(createBeatReadinessFocusResult(check, beatReadinessChecks));
     setProjectStatus(`Beat Readiness ${check.label}: ${check.status}`);
   }
 
@@ -7401,7 +7408,12 @@ export function App(): ReactElement {
         onFocusPackageCheck={focusHandoffPackageCheckCard}
       />
 
-      <BeatReadiness checks={beatReadinessChecks} focusedCheckId={beatReadinessFocusId} onFocus={focusBeatReadinessCheck} />
+      <BeatReadiness
+        checks={beatReadinessChecks}
+        focusedCheckId={beatReadinessFocusId}
+        result={beatReadinessResult}
+        onFocus={focusBeatReadinessCheck}
+      />
 
       <ListeningPass summary={listeningPassSummary} onFocus={focusListeningPassItem} />
 
@@ -26674,6 +26686,62 @@ function createBeatReadinessChecks(project: ProjectState, analysis: ExportAnalys
     arrangementReadinessCheck(project.arrangement.length, bars),
     exportReadinessCheck(analysis)
   ];
+}
+
+function createBeatReadinessFocusResult(
+  check: BeatReadinessCheck,
+  checks: BeatReadinessCheck[]
+): BeatReadinessFocusResult {
+  return {
+    checkId: check.id,
+    status: "Focused",
+    title: `${check.label} readiness focused`,
+    detail: `${check.status}: ${check.detail}`,
+    destination: `${check.focusLabel} panel`,
+    metricLabel: "Readiness",
+    metricValue: beatReadinessFocusResultMetric(checks),
+    auditionCue: beatReadinessFocusResultAudition(check),
+    nextCheck: beatReadinessFocusResultNextCheck(check),
+    tone: check.tone
+  };
+}
+
+function beatReadinessFocusResultMetric(checks: BeatReadinessCheck[]): string {
+  const readyCount = checks.filter((check) => check.tone === "good").length;
+  const reviewCount = checks.filter((check) => check.tone === "warn").length;
+  const blockerCount = checks.filter((check) => check.tone === "danger").length;
+
+  return `${readyCount}/${checks.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function beatReadinessFocusResultAudition(check: BeatReadinessCheck): string {
+  switch (check.id) {
+    case "drums":
+      return "Loop the selected Pattern and confirm kick, clap, hat, and perc carry the pocket.";
+    case "bass":
+      return "Listen to kick and 808 together before adding more melody or chords.";
+    case "harmony":
+      return "Audition melody and chords against the groove and leave room for a hook or vocal.";
+    case "arrangement":
+      return "Play Song or Block loop and compare section length, energy, and Pattern changes.";
+    case "export":
+      return "Play the full mix and check signal, headroom, limiter activity, and delivery target.";
+  }
+}
+
+function beatReadinessFocusResultNextCheck(check: BeatReadinessCheck): string {
+  switch (check.id) {
+    case "drums":
+      return "Return after the drum foundation is present or the sparse groove is intentional.";
+    case "bass":
+      return "Return after the low end supports the bounce without masking kick or hook space.";
+    case "harmony":
+      return "Return after melody or chords give the beat a clear musical idea.";
+    case "arrangement":
+      return "Return after the loop has a usable section shape or full-song direction.";
+    case "export":
+      return "Return after the rendered signal is audible, controlled, and ready for handoff.";
+  }
 }
 
 function createListeningPassSummary(
