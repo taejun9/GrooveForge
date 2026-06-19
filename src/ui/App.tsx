@@ -237,6 +237,7 @@ import type {
   SoundFocusPreviewSummary,
   SoundFocusResultMetric,
   SoundFocusResult,
+  SoundTimbreCheckSummary,
   SoundPresetTarget,
   SoundPresetPreviewSummary,
   SoundPresetResultMetric,
@@ -1256,6 +1257,7 @@ export function App(): ReactElement {
     () => createSoundFocusPreviewSummary(project.sound, soundFocusPadOptions),
     [project.sound, soundFocusPadOptions]
   );
+  const soundTimbreCheckSummary = useMemo(() => createSoundTimbreCheckSummary(project.sound), [project.sound]);
   const drumKitPadOptions = useMemo(() => createDrumKitPadOptions(project), [project]);
   const drumKitPreviewSummary = useMemo(
     () => createDrumKitPreviewSummary(drumKitPadOptions),
@@ -7553,6 +7555,7 @@ export function App(): ReactElement {
             presetPreviewId={soundPresetPreviewId}
             presetResult={soundPresetResult}
             sound={project.sound}
+            timbreCheck={soundTimbreCheckSummary}
             onChange={updateSoundDesign}
             onApplyPreset={applySoundPreset}
             onDrumKitPad={applyDrumKitPad}
@@ -26506,6 +26509,132 @@ function createSoundFocusResultMetric(
     after,
     tone: changedEvents === 0 ? "warn" : "good"
   };
+}
+
+type SoundTimbreScore = {
+  id: SoundTimbreCheckSummary["metrics"][number]["id"];
+  label: string;
+  score: number;
+  detail: string;
+};
+
+function createSoundTimbreCheckSummary(sound: SoundDesign): SoundTimbreCheckSummary {
+  const scores: SoundTimbreScore[] = [
+    {
+      id: "drums",
+      label: "Drums",
+      score: soundTimbreAverage([sound.kickPunch, sound.snareSnap, sound.hatBrightness]),
+      detail: `K ${compactUnitPercent(sound.kickPunch)} / S ${compactUnitPercent(sound.snareSnap)} / H ${compactUnitPercent(sound.hatBrightness)}`
+    },
+    {
+      id: "lowEnd",
+      label: "808",
+      score: soundTimbreAverage([sound.bassDrive, sound.bassDecay, sound.sidechainDuck]),
+      detail: `Drive ${compactUnitPercent(sound.bassDrive)} / Decay ${compactUnitPercent(sound.bassDecay)} / Duck ${compactUnitPercent(sound.sidechainDuck)}`
+    },
+    {
+      id: "brightness",
+      label: "Air",
+      score: soundTimbreAverage([sound.hatBrightness, sound.snareSnap, sound.synthBrightness]),
+      detail: `Hat ${compactUnitPercent(sound.hatBrightness)} / Synth ${compactUnitPercent(sound.synthBrightness)}`
+    },
+    {
+      id: "width",
+      label: "Width",
+      score: soundTimbreAverage([sound.synthRelease, sound.chordWidth]),
+      detail: `Release ${compactUnitPercent(sound.synthRelease)} / Chord ${compactUnitPercent(sound.chordWidth)}`
+    },
+    {
+      id: "warmth",
+      label: "Warm",
+      score: soundTimbreAverage([sound.chordWarmth, sound.bassDecay, 1 - sound.hatBrightness]),
+      detail: `Chord ${compactUnitPercent(sound.chordWarmth)} / Body ${compactUnitPercent(sound.bassDecay)}`
+    }
+  ];
+  const average = soundTimbreAverage(scores.map((score) => score.score));
+  const fallbackScore = scores[0] ?? {
+    id: "drums",
+    label: "Drums",
+    score: 0,
+    detail: "No tone data"
+  };
+  const highest = scores.reduce((winner, score) => (score.score > winner.score ? score : winner), fallbackScore);
+  const lowest = scores.reduce((winner, score) => (score.score < winner.score ? score : winner), fallbackScore);
+  const spread = highest.score - lowest.score;
+  const tone: MixCoachTone = spread > 0.42 ? "danger" : spread > 0.26 ? "warn" : "good";
+  const metrics = scores.map((score) => ({
+    id: score.id,
+    label: score.label,
+    value: compactUnitPercent(score.score),
+    detail: score.detail,
+    tone: soundTimbreMetricTone(score.score, average)
+  }));
+  const leaning = soundTimbreLeanLabel(highest);
+  const headline = tone === "good" ? "Balanced tone" : leaning;
+  const nextCheck = soundTimbreNextCheck(highest, lowest, tone);
+
+  return {
+    statusLabel: tone === "good" ? "Timbre balanced" : tone === "warn" ? "Timbre tilted" : "Timbre uneven",
+    headline,
+    balanceLabel: `Spread ${compactUnitPercent(spread)}`,
+    detail: `${highest.label} leads / ${lowest.label} trails`,
+    nextCheck,
+    detailTitle: `${headline}: ${highest.label} ${compactUnitPercent(highest.score)} vs ${lowest.label} ${compactUnitPercent(lowest.score)}.`,
+    metrics,
+    tone
+  };
+}
+
+function soundTimbreAverage(values: number[]): number {
+  return clampUnit(values.reduce((total, value) => total + value, 0) / values.length);
+}
+
+function soundTimbreMetricTone(score: number, average: number): MixCoachTone {
+  const distance = Math.abs(score - average);
+  if (distance > 0.24) {
+    return "danger";
+  }
+  if (distance > 0.13) {
+    return "warn";
+  }
+  return "good";
+}
+
+function soundTimbreLeanLabel(score: SoundTimbreScore): string {
+  switch (score.id) {
+    case "drums":
+      return "Punch-forward";
+    case "lowEnd":
+      return "808-forward";
+    case "brightness":
+      return "Bright top";
+    case "width":
+      return "Wide tail";
+    case "warmth":
+      return "Warm bed";
+  }
+}
+
+function soundTimbreNextCheck(highest: SoundTimbreScore, lowest: SoundTimbreScore, tone: MixCoachTone): string {
+  if (tone === "good") {
+    return "Loop Pattern A/B/C and confirm the tone stays balanced when drums, 808, Synth, and Chords play together.";
+  }
+  if (highest.id === "lowEnd") {
+    return "Loop kick plus 808 and check drive, decay, and duck before pushing the master.";
+  }
+  if (highest.id === "brightness") {
+    return "Loop hats and Synth, then trim top-end brightness if the hook feels sharp.";
+  }
+  if (highest.id === "width") {
+    return "Loop the hook and check whether release or chord width pulls the center away from drums and 808.";
+  }
+  if (highest.id === "warmth") {
+    return "Loop chords with 808 and reduce warmth or decay if the beat feels cloudy.";
+  }
+  if (lowest.id === "drums") {
+    return "Loop the groove and raise kick punch, snare snap, or hat brightness if drums disappear.";
+  }
+  return "Loop the full pattern and use Sound Focus or Studio controls to pull the loudest color back toward the bed.";
 }
 
 function soundFocusChangedParameters(sound: SoundDesign, pad: SoundFocusPadDefinition): SoundFocusParameter[] {

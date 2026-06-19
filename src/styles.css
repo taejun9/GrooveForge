@@ -13016,6 +13016,156 @@ input[type="range"] {
   font-style: normal;
 }
 
+.sound-timbre-check {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.045);
+  padding: 8px;
+}
+
+.sound-timbre-check.warn {
+  border-color: rgba(255, 209, 102, 0.3);
+  background: rgba(255, 209, 102, 0.06);
+}
+
+.sound-timbre-check.danger {
+  border-color: rgba(255, 122, 79, 0.32);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.sound-timbre-heading,
+.sound-timbre-summary,
+.sound-timbre-metrics,
+.sound-timbre-metrics span {
+  min-width: 0;
+}
+
+.sound-timbre-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sound-timbre-heading span {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.sound-timbre-heading strong {
+  color: #78f0c8;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.sound-timbre-check.warn .sound-timbre-heading strong {
+  color: #ffd166;
+}
+
+.sound-timbre-check.danger .sound-timbre-heading strong {
+  color: #ff7a4f;
+}
+
+.sound-timbre-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.sound-timbre-summary span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sound-timbre-summary b,
+.sound-timbre-summary em,
+.sound-timbre-summary strong,
+.sound-timbre-metrics b,
+.sound-timbre-metrics strong,
+.sound-timbre-metrics em,
+.sound-timbre-check > small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sound-timbre-summary b {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.sound-timbre-summary em {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.sound-timbre-summary strong {
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 6px;
+  color: rgba(244, 239, 231, 0.76);
+  background: rgba(244, 239, 231, 0.04);
+  padding: 5px 7px;
+  font-size: 10px;
+}
+
+.sound-timbre-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 6px;
+}
+
+.sound-timbre-metrics span {
+  display: grid;
+  gap: 2px;
+  border-inline-start: 2px solid rgba(120, 240, 200, 0.42);
+  border-radius: 5px;
+  background: rgba(244, 239, 231, 0.035);
+  padding: 6px 7px;
+}
+
+.sound-timbre-metrics span.warn {
+  border-inline-start-color: rgba(255, 209, 102, 0.5);
+}
+
+.sound-timbre-metrics span.danger {
+  border-inline-start-color: rgba(255, 122, 79, 0.54);
+}
+
+.sound-timbre-metrics b {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.sound-timbre-metrics strong {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.sound-timbre-metrics em {
+  color: rgba(244, 239, 231, 0.54);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.sound-timbre-check > small {
+  border-block-start: 1px solid rgba(244, 239, 231, 0.08);
+  color: rgba(244, 239, 231, 0.68);
+  padding-block-start: 6px;
+  font-size: 10px;
+}
+
 .sound-focus-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

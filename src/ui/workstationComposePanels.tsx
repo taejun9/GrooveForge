@@ -3,7 +3,7 @@ import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { BassNote, ChordEvent, ChordProgressionPreset, ChordQuality, DrumLane, MelodyNote, NoteTrack, PatternSlot, PatternVariationPreset, ProjectState, SoundDesign } from "../domain/workstation";
 import { chordInversions, chordInversionLabel, chordProgressionPresetIds, chordProgressionPresetLabel, chordQualities, drumStepProbability, drumStepTimingMs, drumStepVelocity, hatRepeatCount, maxDrumTimingMs, minDrumTimingMs, normalizeChordInversion, normalizeDrumProbability, normalizeDrumTimingMs, normalizeDrumVelocity, normalizeEventProbability, normalizeHatRepeat, scalePitchNames, soundPresetIds, soundPresetLabel, steps } from "../domain/workstation";
-import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneResult, PatternFillPreviewSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SwingFeelResult } from "./workstationUiModel";
+import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneResult, PatternFillPreviewSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
 import { drumLabels, keyboardCaptureKeyLabels } from "./workstationUiModel";
 import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyChordStep, percentLabel, pitchParts, timingLabel, trackOctaveRange } from "./workstationPatternTools";
 
@@ -1499,6 +1499,7 @@ export function SoundDesigner({
   presetPreviewId,
   presetResult,
   sound,
+  timbreCheck,
   onApplyPreset,
   onDrumKitPad,
   onFocusPad,
@@ -1516,6 +1517,7 @@ export function SoundDesigner({
   presetPreviewId: SoundPresetTarget;
   presetResult: SoundPresetResult | null;
   sound: SoundDesign;
+  timbreCheck: SoundTimbreCheckSummary;
   onApplyPreset: (preset?: SoundPresetTarget) => void;
   onDrumKitPad: (pad: DrumKitPadId) => void;
   onFocusPad: (pad: SoundFocusPadId) => void;
@@ -1546,6 +1548,7 @@ export function SoundDesigner({
       {presetResult && <SoundPresetResultStrip result={presetResult} />}
       <DrumKitPads pads={drumKitPads} preview={drumKitPreview} result={drumKitResult} onApply={onDrumKitPad} />
       <SoundFocusPads pads={focusPads} preview={focusPreview} result={focusResult} onApply={onFocusPad} />
+      <SoundTimbreCheck summary={timbreCheck} />
       <div className="sound-readout" aria-label="Sound design state">
         <span data-testid="sound-kick-readout">Kick {percentLabel(sound.kickPunch)}</span>
         <span data-testid="sound-bass-readout">808 {percentLabel(sound.bassDrive)}</span>
@@ -1617,6 +1620,38 @@ export function SoundDesigner({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+export function SoundTimbreCheck({ summary }: { summary: SoundTimbreCheckSummary }): ReactElement {
+  return (
+    <div
+      className={`sound-timbre-check ${summary.tone}`}
+      data-testid="sound-timbre-check"
+      title={summary.detailTitle}
+    >
+      <div className="sound-timbre-heading">
+        <span>Timbre Check</span>
+        <strong data-testid="sound-timbre-status">{summary.statusLabel}</strong>
+      </div>
+      <div className="sound-timbre-summary">
+        <span>
+          <b data-testid="sound-timbre-headline">{summary.headline}</b>
+          <em data-testid="sound-timbre-detail">{summary.detail}</em>
+        </span>
+        <strong data-testid="sound-timbre-balance">{summary.balanceLabel}</strong>
+      </div>
+      <div className="sound-timbre-metrics" aria-label="Sound Timbre metrics">
+        {summary.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`sound-timbre-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <strong>{metric.value}</strong>
+            <em>{metric.detail}</em>
+          </span>
+        ))}
+      </div>
+      <small data-testid="sound-timbre-next-check">{summary.nextCheck}</small>
     </div>
   );
 }

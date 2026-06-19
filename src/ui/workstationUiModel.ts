@@ -715,6 +715,27 @@ export type SoundFocusResult = {
   tone: MixCoachTone;
 };
 
+export type SoundTimbreMetricId = "drums" | "lowEnd" | "brightness" | "width" | "warmth";
+
+export type SoundTimbreMetric = {
+  id: SoundTimbreMetricId;
+  label: string;
+  value: string;
+  detail: string;
+  tone: MixCoachTone;
+};
+
+export type SoundTimbreCheckSummary = {
+  statusLabel: string;
+  headline: string;
+  balanceLabel: string;
+  detail: string;
+  nextCheck: string;
+  detailTitle: string;
+  metrics: SoundTimbreMetric[];
+  tone: MixCoachTone;
+};
+
 export type SoundPresetTarget = (typeof soundPresetIds)[number];
 
 export type SoundPresetPreviewSummary = {
