@@ -12733,6 +12733,68 @@ h2 {
   gap: 6px;
 }
 
+.pattern-compare-decision {
+  display: grid;
+  grid-template-columns: minmax(104px, 0.42fr) minmax(104px, 0.42fr) minmax(126px, 0.54fr) minmax(0, 1fr) minmax(146px, 0.62fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.24);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.06);
+  padding: 7px 8px;
+}
+
+.pattern-compare-decision.warn {
+  border-color: rgba(255, 205, 112, 0.3);
+  background: rgba(255, 205, 112, 0.075);
+}
+
+.pattern-compare-decision.danger {
+  border-color: rgba(255, 122, 79, 0.32);
+  background: rgba(255, 122, 79, 0.075);
+}
+
+.pattern-compare-decision span,
+.pattern-compare-decision strong,
+.pattern-compare-decision small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pattern-compare-decision span {
+  color: #08120f;
+  background: #78f0c8;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.pattern-compare-decision.warn span {
+  color: #171005;
+  background: #ffcd70;
+}
+
+.pattern-compare-decision.danger span {
+  color: #160702;
+  background: #ff7a4f;
+}
+
+.pattern-compare-decision strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.pattern-compare-decision small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 10px;
+}
+
 .pattern-compare-card {
   display: grid;
   gap: 6px;
@@ -24001,6 +24063,11 @@ input[type="range"] {
   }
 
   .pattern-stack-preview {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .pattern-compare-decision {
     grid-template-columns: 1fr;
     gap: 4px;
   }

@@ -278,6 +278,7 @@ import type {
   BeatReadinessFocusTarget,
   BeatReadinessFocusResult,
   PatternCompareResult,
+  PatternCompareDecisionSummary,
   PatternCompareSummary,
   PatternClonePadOption,
   PatternCloneResult,
@@ -729,6 +730,7 @@ import {
   LayerStarterPads,
   LocalDraftRecoveryBanner,
   PanelTitle,
+  PatternCompareDecision,
   PatternCompareStrip,
   ProjectSnapshots,
   QuickActionResultStrip,
@@ -1634,6 +1636,15 @@ export function App(): ReactElement {
       ? playbackPosition.arrangementIndex
       : null;
   const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
+  const patternCompareDecisionSummary = useMemo(
+    () =>
+      createPatternCompareDecisionSummary(
+        patternCompareSummaries,
+        project.selectedPattern,
+        selectedArrangementBlock?.pattern ?? project.selectedPattern
+      ),
+    [patternCompareSummaries, project.selectedPattern, selectedArrangementBlock?.pattern]
+  );
   const audibleArrangementFollowTarget =
     playingArrangementIndex !== null && playingArrangementIndex !== selectedArrangementIndex ? playingArrangementIndex : null;
   const audibleArrangementFollowBlock =
@@ -8450,6 +8461,7 @@ export function App(): ReactElement {
               <span>{audiblePatternFollowTarget ? `Edit ${audiblePatternFollowTarget}` : playingPattern ? "In sync" : "Idle"}</span>
             </button>
           </div>
+          <PatternCompareDecision summary={patternCompareDecisionSummary} />
           <PatternCompareStrip
             playbackMode={playbackMode}
             selectedBlockPattern={selectedArrangementBlock?.pattern ?? project.selectedPattern}
@@ -28518,6 +28530,81 @@ function createPatternCompareSummaries(project: ProjectState): PatternCompareSum
       arrangedBars
     };
   });
+}
+
+function createPatternCompareDecisionSummary(
+  summaries: PatternCompareSummary[],
+  selectedPattern: PatternSlot,
+  selectedBlockPattern: PatternSlot
+): PatternCompareDecisionSummary {
+  const strongest = [...summaries].sort(
+    (first, second) =>
+      second.eventCount - first.eventCount ||
+      second.arrangedBars - first.arrangedBars ||
+      patternSlots.indexOf(first.slot) - patternSlots.indexOf(second.slot)
+  )[0];
+  const selectedSummary = summaries.find((summary) => summary.slot === selectedPattern) ?? strongest;
+
+  if (!strongest || strongest.eventCount === 0) {
+    const target = selectedSummary?.slot ?? selectedPattern;
+    return {
+      action: "cue",
+      target,
+      statusLabel: "Build first",
+      targetLabel: `Pattern ${target}`,
+      actionLabel: "Cue Pattern loop",
+      detailLabel: "No A/B/C events yet; add drums, 808, chords, or Synth before placing a block",
+      metricLabel: "0 events / 0 arranged bars",
+      detailTitle: "Build first / Pattern Compare has no events to place yet / Cue a Pattern loop and write the core beat.",
+      tone: "danger"
+    };
+  }
+
+  const noteCount = strongest.bassNotes + strongest.melodyNotes;
+  const metricLabel = `${strongest.drumHits} drums / ${noteCount} notes / ${strongest.chordEvents} chords`;
+  const tone: MixCoachTone = strongest.eventCount >= 24 ? "good" : strongest.eventCount >= 12 ? "warn" : "danger";
+
+  if (strongest.eventCount < 12) {
+    return {
+      action: "cue",
+      target: strongest.slot,
+      statusLabel: "Cue and build",
+      targetLabel: `Pattern ${strongest.slot}`,
+      actionLabel: "Cue Pattern loop",
+      detailLabel: `${strongest.eventCount} events is thin; add core layers before using it in the song`,
+      metricLabel,
+      detailTitle: `Cue and build / Pattern ${strongest.slot} has ${strongest.eventCount} events / ${metricLabel}`,
+      tone
+    };
+  }
+
+  const action: PatternCompareDecisionSummary["action"] = selectedBlockPattern === strongest.slot ? "cue" : "use";
+
+  if (action === "use") {
+    return {
+      action,
+      target: strongest.slot,
+      statusLabel: "Place strongest",
+      targetLabel: `Pattern ${strongest.slot}`,
+      actionLabel: "Use in selected block",
+      detailLabel: `Selected block has Pattern ${selectedBlockPattern}; Pattern ${strongest.slot} carries ${strongest.eventCount} events`,
+      metricLabel,
+      detailTitle: `Place strongest / Pattern ${strongest.slot} -> selected block / ${metricLabel}`,
+      tone
+    };
+  }
+
+  return {
+    action,
+    target: strongest.slot,
+    statusLabel: "Cue strongest",
+    targetLabel: `Pattern ${strongest.slot}`,
+    actionLabel: "Cue Pattern loop",
+    detailLabel: `Selected block already uses Pattern ${strongest.slot}; audition the loop before editing or arranging`,
+    metricLabel,
+    detailTitle: `Cue strongest / Pattern ${strongest.slot} already sits in the selected block / ${metricLabel}`,
+    tone
+  };
 }
 
 function createPatternCompareResult(

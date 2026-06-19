@@ -26,6 +26,7 @@ import type {
   LayerStarterOption,
   LayerStarterPrioritySummary,
   LocalDraftRecovery,
+  PatternCompareDecisionSummary,
   PatternCompareSummary,
   QuickAction,
   QuickActionRecent,
@@ -420,6 +421,23 @@ export function PatternCompareStrip({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+export function PatternCompareDecision({ summary }: { summary: PatternCompareDecisionSummary }): ReactElement {
+  return (
+    <div
+      className={`pattern-compare-decision ${summary.tone}`}
+      data-suggested-pattern-compare={`${summary.action}-${summary.target}`}
+      data-testid="pattern-compare-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="pattern-compare-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="pattern-compare-decision-target">{summary.targetLabel}</strong>
+      <small data-testid="pattern-compare-decision-action">{summary.actionLabel}</small>
+      <small data-testid="pattern-compare-decision-detail">{summary.detailLabel}</small>
+      <small data-testid="pattern-compare-decision-metric">{summary.metricLabel}</small>
     </div>
   );
 }

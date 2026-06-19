@@ -1145,6 +1145,18 @@ export type PatternCompareSummary = {
   arrangedBars: number;
 };
 
+export type PatternCompareDecisionSummary = {
+  action: "cue" | "use";
+  target: PatternSlot;
+  statusLabel: string;
+  targetLabel: string;
+  actionLabel: string;
+  detailLabel: string;
+  metricLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type PatternCompareResultMetric = {
   id: "pattern" | "events" | "block";
   label: string;
