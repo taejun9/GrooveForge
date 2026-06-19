@@ -458,6 +458,7 @@ import type {
   GrooveCompassCard,
   GrooveCompassSummary,
   GrooveCompassFocusSummary,
+  GrooveCompassFocusResult,
   ComposerGuideCardId,
   ComposerGuideCard,
   ComposerGuideFocusSummary,
@@ -1127,6 +1128,7 @@ export function App(): ReactElement {
   const [keyCompassFocusId, setKeyCompassFocusId] = useState<KeyCompassFocusId | null>(null);
   const [keyCompassResult, setKeyCompassResult] = useState<KeyCompassFocusResult | null>(null);
   const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
+  const [grooveCompassResult, setGrooveCompassResult] = useState<GrooveCompassFocusResult | null>(null);
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
   const [styleInspectorFocusId, setStyleInspectorFocusId] = useState<StyleInspectorFocusId | null>(null);
   const [beatReadinessFocusId, setBeatReadinessFocusId] = useState<BeatReadinessCheckId | null>(null);
@@ -1999,6 +2001,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setComposerGuideResult(null);
     setKeyCompassResult(null);
+    setGrooveCompassResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
@@ -2050,6 +2053,7 @@ export function App(): ReactElement {
       setProject(nextProject);
       setComposerGuideResult(null);
       setKeyCompassResult(null);
+      setGrooveCompassResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
@@ -2193,6 +2197,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setComposerGuideResult(null);
     setKeyCompassResult(null);
+    setGrooveCompassResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2247,6 +2252,7 @@ export function App(): ReactElement {
     setComposerActionResult(null);
     setComposerGuideResult(null);
     setKeyCompassResult(null);
+    setGrooveCompassResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -6441,6 +6447,7 @@ export function App(): ReactElement {
 
     setGrooveCompassFocusId(item.focusId);
     targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setGrooveCompassResult(createGrooveCompassFocusResult(item, grooveCompassSummary));
     setProjectStatus(`Groove ${item.label}: ${item.value}`);
   }
 
@@ -7301,6 +7308,7 @@ export function App(): ReactElement {
         isPlaying={isPlaying}
         onCue={cueGrooveCompass}
         onFocus={focusGrooveCompassItem}
+        result={grooveCompassResult}
         selectedPattern={project.selectedPattern}
         summary={grooveCompassSummary}
       />
@@ -10320,6 +10328,7 @@ function GrooveCompass({
   isPlaying,
   onCue,
   onFocus,
+  result,
   selectedPattern,
   summary
 }: {
@@ -10328,6 +10337,7 @@ function GrooveCompass({
   isPlaying: boolean;
   onCue: () => void;
   onFocus: (item: GrooveCompassFocusItem) => void;
+  result: GrooveCompassFocusResult | null;
   selectedPattern: PatternSlot;
   summary: GrooveCompassSummary;
 }): ReactElement {
@@ -10392,7 +10402,38 @@ function GrooveCompass({
           );
         })}
       </div>
+      {result && <GrooveCompassFocusResultStrip result={result} />}
     </section>
+  );
+}
+
+function GrooveCompassFocusResultStrip({ result }: { result: GrooveCompassFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`groove-compass-result ${result.tone}`}
+      data-result-groove-compass={result.focusId}
+      data-testid="groove-compass-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="groove-compass-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="groove-compass-result-title">{result.title}</strong>
+          <small data-testid="groove-compass-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="groove-compass-result-metric" data-testid="groove-compass-result-metric">
+        <span data-testid="groove-compass-result-status">{result.status}</span>
+        <strong data-testid="groove-compass-result-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="groove-compass-result-followup" data-testid="groove-compass-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -21940,6 +21981,75 @@ function createGrooveCompassFocusSummary(
     detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function createGrooveCompassFocusResult(
+  item: GrooveCompassFocusItem,
+  summary: GrooveCompassSummary
+): GrooveCompassFocusResult {
+  const cardTone = summary.cards.find((card) => card.focusId === item.focusId)?.tone ?? summary.tone;
+
+  return {
+    focusId: item.focusId,
+    status: "Focused",
+    title: `${item.label} pocket lane focused`,
+    detail: `${item.focusLabel}: ${item.value}`,
+    metricLabel: "Groove",
+    metricValue: grooveCompassFocusResultMetric(summary),
+    auditionCue: grooveCompassFocusResultAudition(item),
+    nextCheck: grooveCompassFocusResultNextCheck(item),
+    tone: cardTone
+  };
+}
+
+function grooveCompassFocusResultMetric(summary: GrooveCompassSummary): string {
+  const readyCount = summary.cards.filter((card) => card.tone === "good").length;
+  const reviewCount = summary.cards.filter((card) => card.tone === "warn").length;
+  const blockerCount = summary.cards.filter((card) => card.tone === "danger").length;
+
+  return `${summary.headline} / ${readyCount}/${summary.cards.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function grooveCompassFocusResultAudition(item: GrooveCompassFocusItem): string {
+  switch (item.focusId) {
+    case "density":
+      return "Loop the selected Pattern and listen for whether the drum grid feels empty, busy, or locked.";
+    case "anchors":
+      return "Check kick and clap placement before adding fills, repeats, or timing offsets.";
+    case "hats":
+      return "Listen for hat motion, repeat energy, and whether the groove carries the bounce.";
+    case "timing":
+      return "Audition shifted hits against the metronome or drum pocket before moving steps.";
+    case "chance":
+      return "Check probability movement only after the core drum hits already hold the groove.";
+    case "pocket":
+      return "Listen for early/late balance and velocity motion before shaping the pocket further.";
+    case "focus":
+      return "Inspect the selected drum step before changing timing, velocity, chance, repeat, or placement.";
+    default:
+      return `Review ${item.focusLabel.toLowerCase()} before changing the groove.`;
+  }
+}
+
+function grooveCompassFocusResultNextCheck(item: GrooveCompassFocusItem): string {
+  switch (item.focusId) {
+    case "density":
+      return "Return after the beat has enough hits for the style without crowding the 808 and melody.";
+    case "anchors":
+      return "Return after kick and clap anchors make the downbeat and backbeat obvious or intentionally loose.";
+    case "hats":
+      return "Return after hats add motion without masking the vocal pocket or main rhythm.";
+    case "timing":
+      return "Return after shifted hits feel intentional and still land with the selected Pattern.";
+    case "chance":
+      return "Return after chance variation feels musical and does not remove essential groove anchors.";
+    case "pocket":
+      return "Return after early, late, and velocity movement support the bounce instead of fighting it.";
+    case "focus":
+      return "Return after the selected drum step has a clear pocket role.";
+    default:
+      return `Return after ${item.focusLabel.toLowerCase()} has a clear rhythm role.`;
+  }
 }
 
 function grooveCompassFocusCard(

@@ -2392,6 +2392,18 @@ export type GrooveCompassFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type GrooveCompassFocusResult = {
+  focusId: GrooveCompassFocusId;
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type ComposerGuideCardId = "drums" | "bass" | "harmony" | "melody" | "arrange" | "finish";
 
 export type ComposerGuideCard = {
