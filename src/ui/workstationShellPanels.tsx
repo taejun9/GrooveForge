@@ -13,7 +13,7 @@ import {
   Undo2,
   X
 } from "lucide-react";
-import { useEffect, useState, type ReactElement, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import type { PatternSlot, ProjectState } from "../domain/workstation";
 import { arrangementTotalBars, maxProjectSnapshotNameLength, maxProjectSnapshots, projectSnapshotSummary } from "../domain/workstation";
 import type { PlaybackMode } from "../audio/scheduler";
@@ -669,6 +669,7 @@ export function QuickActions({
 export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClose: () => void }): ReactElement | null {
   const [selectedFilterId, setSelectedFilterId] = useState<CommandReferenceFilterId>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
   const filteredSections =
     selectedFilterId === "all"
@@ -692,8 +693,21 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
     if (!open) {
       setSelectedFilterId("all");
       setSearchQuery("");
+      return;
     }
+    searchInputRef.current?.focus();
   }, [open]);
+
+  function clearCommandReferenceSearch(): void {
+    setSearchQuery("");
+    searchInputRef.current?.focus();
+  }
+
+  function resetCommandReferenceSearch(): void {
+    setSelectedFilterId("all");
+    setSearchQuery("");
+    searchInputRef.current?.focus();
+  }
 
   if (!open) {
     return null;
@@ -741,9 +755,21 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
               data-testid="command-reference-search-input"
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search commands or terms"
+              ref={searchInputRef}
               type="search"
               value={searchQuery}
             />
+            {searchQuery ? (
+              <button
+                className="command-reference-search-clear"
+                data-testid="command-reference-search-clear"
+                onClick={clearCommandReferenceSearch}
+                title="Clear Command Reference search"
+                type="button"
+              >
+                <X size={12} aria-hidden="true" />
+              </button>
+            ) : null}
             <span data-testid="command-reference-search-count">{visibleResultCount} shown</span>
           </div>
           <div className="command-reference-grid" data-testid="command-reference-grid">
@@ -790,6 +816,14 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
             <div className="command-reference-empty" data-testid="command-reference-empty">
               <strong>No command reference matches</strong>
               <small>Try another command, shortcut, production term, or section filter.</small>
+              <div>
+                <button data-testid="command-reference-empty-clear" onClick={clearCommandReferenceSearch} type="button">
+                  Clear Search
+                </button>
+                <button data-testid="command-reference-empty-show-all" onClick={resetCommandReferenceSearch} type="button">
+                  Show All
+                </button>
+              </div>
             </div>
           ) : null}
         </div>

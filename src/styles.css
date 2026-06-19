@@ -4052,7 +4052,7 @@ h2 {
 
 .command-reference-search {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -4086,6 +4086,19 @@ h2 {
   color: rgba(244, 239, 231, 0.58);
   font-size: 10px;
   white-space: nowrap;
+}
+
+.command-reference-search-clear {
+  display: inline-flex;
+  min-width: 26px;
+  min-height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(130, 215, 255, 0.18);
+  border-radius: 6px;
+  color: #82d7ff;
+  background: rgba(130, 215, 255, 0.06);
+  padding: 0;
 }
 
 .command-reference-grid {
@@ -4225,7 +4238,7 @@ h2 {
 
 .command-reference-empty {
   display: grid;
-  gap: 4px;
+  gap: 7px;
   min-width: 0;
   border: 1px solid rgba(244, 239, 231, 0.1);
   border-radius: 7px;
@@ -4241,6 +4254,28 @@ h2 {
 .command-reference-empty small {
   color: rgba(244, 239, 231, 0.58);
   font-size: 10px;
+}
+
+.command-reference-empty div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.command-reference-empty button {
+  min-width: 0;
+  min-height: 30px;
+  border-color: rgba(130, 215, 255, 0.22);
+  color: #f4efe7;
+  background: rgba(130, 215, 255, 0.07);
+  font-size: 11px;
+  padding: 0 9px;
+}
+
+.command-reference-empty button:last-child {
+  border-color: rgba(120, 240, 200, 0.28);
+  background: rgba(120, 240, 200, 0.08);
 }
 
 .quick-actions-scope-bar {
@@ -21866,7 +21901,7 @@ input[type="range"] {
   }
 
   .command-reference-search {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .command-reference-search span {
