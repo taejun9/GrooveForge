@@ -7164,6 +7164,7 @@ export function App(): ReactElement {
 
       <StyleInspector
         composerActionsSummary={composerActionsSummary}
+        composerActionResult={composerActionResult}
         focusedItemId={styleInspectorFocusId}
         onSelectStyle={selectStyle}
         onFocus={focusStyleInspectorItem}
@@ -8524,6 +8525,7 @@ export function App(): ReactElement {
 }
 
 function StyleInspector({
+  composerActionResult,
   composerActionsSummary,
   focusedItemId,
   onFocus,
@@ -8532,6 +8534,7 @@ function StyleInspector({
   selectedStyleId,
   summary
 }: {
+  composerActionResult: ComposerActionResult | null;
   composerActionsSummary: ComposerActionsSummary;
   focusedItemId: StyleInspectorFocusId | null;
   onFocus: (item: StyleInspectorFocusItem) => void;
@@ -8541,11 +8544,14 @@ function StyleInspector({
   summary: StyleInspectorSummary;
 }): ReactElement {
   const focusSummary = createStyleInspectorFocusSummary(summary, focusedItemId);
+  const actionResultGoal = composerActionResult
+    ? styleGoalForComposerActionResult(composerActionResult, summary.goals)
+    : null;
 
   return (
     <section
       aria-label="Style inspector"
-      className="style-inspector"
+      className={["style-inspector", actionResultGoal ? "has-goal-action-result" : ""].filter(Boolean).join(" ")}
       data-testid="style-inspector"
       style={{ "--style-color": summary.profile.color } as CSSProperties}
     >
@@ -8642,6 +8648,9 @@ function StyleInspector({
           );
         })}
       </div>
+      {composerActionResult && actionResultGoal && (
+        <StyleGoalActionResultStrip goal={actionResultGoal} result={composerActionResult} />
+      )}
       <div className="style-quick-picks" aria-label="Style quick picks" data-testid="style-quick-picks">
         {styleProfiles.map((profile) => {
           const selected = profile.id === selectedStyleId;
@@ -8697,8 +8706,39 @@ function StyleInspector({
   );
 }
 
+function StyleGoalActionResultStrip({
+  goal,
+  result
+}: {
+  goal: StyleGoalCard;
+  result: ComposerActionResult;
+}): ReactElement {
+  const primaryMetric = result.metrics[0] ?? null;
+  const metricLabel = primaryMetric ? `${primaryMetric.label}: ${primaryMetric.before} -> ${primaryMetric.after}` : result.detail;
+
+  return (
+    <div
+      className={`style-goal-action-result ${result.tone}`}
+      data-testid="style-goal-action-result"
+      title={`${goal.label}: ${result.title} / ${result.detail}`}
+    >
+      <span data-testid="style-goal-action-result-status">{result.status}</span>
+      <strong data-testid="style-goal-action-result-title">
+        {goal.label}: {result.title}
+      </strong>
+      <small data-testid="style-goal-action-result-metric">{metricLabel}</small>
+      <em data-testid="style-goal-action-result-audition">{result.auditionCue}</em>
+      <i data-testid="style-goal-action-result-next-check">{result.nextCheck}</i>
+    </div>
+  );
+}
+
 function composerActionForStyleGoal(goal: StyleGoalCard, actions: ComposerAction[]): ComposerAction | null {
   return actions.find((action) => action.area === goal.id) ?? null;
+}
+
+function styleGoalForComposerActionResult(result: ComposerActionResult, goals: StyleGoalCard[]): StyleGoalCard | null {
+  return goals.find((goal) => goal.id === result.area) ?? null;
 }
 
 function BeatBlueprints({
@@ -21790,6 +21830,7 @@ function createComposerActionResult(
 
   return {
     actionId: action.id,
+    area: action.area,
     title: `${action.buttonLabel} ${changed ? "applied" : "already current"}`,
     status: changed ? "Applied" : "Already current",
     detail: `${action.label} / ${action.scope}`,

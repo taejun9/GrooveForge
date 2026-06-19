@@ -2445,6 +2445,7 @@ export type ComposerActionResultMetric = {
 
 export type ComposerActionResult = {
   actionId: string;
+  area: ComposerActionArea;
   title: string;
   status: string;
   detail: string;
