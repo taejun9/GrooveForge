@@ -1331,6 +1331,15 @@ export type LayerStarterOption = {
   tone: MixCoachTone;
 };
 
+export type LayerStarterPrioritySummary = {
+  optionId: LayerStarterId | null;
+  statusLabel: string;
+  layerLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type LayerStarterResultMetric = {
   id: LayerStarterId;
   label: string;
@@ -1351,6 +1360,10 @@ export type LayerStarterResult = {
   nextCheck: string;
   tone: MixCoachTone;
 };
+
+export function layerStarterPriorityOption(options: LayerStarterOption[]): LayerStarterOption | null {
+  return options.find((option) => option.tone === "danger") ?? options.find((option) => option.tone === "warn") ?? null;
+}
 
 export type ListeningPassId = "composition" | "arrangement" | "mix" | "delivery";
 export type ListeningPassTarget = "compose" | "arrange" | "mix" | "master" | "deliver";

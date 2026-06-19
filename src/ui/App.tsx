@@ -645,7 +645,8 @@ import {
   grooveFeelDefinitions,
   drumAccentDefinitions,
   drumFoundationDefinitions,
-  beatReadinessPriorityCheck
+  beatReadinessPriorityCheck,
+  layerStarterPriorityOption
 } from "./workstationUiModel";
 import type { SnapshotCompareProjectProfile } from "./workstationSnapshotCompare";
 import {
@@ -13060,7 +13061,7 @@ function activePatternDnaQuickActionCard(summary: PatternDnaSummary): PatternDna
 }
 
 function activeLayerStarterQuickActionOption(options: LayerStarterOption[]): LayerStarterOption | null {
-  return options.find((option) => option.tone === "danger") ?? options.find((option) => option.tone === "warn") ?? null;
+  return layerStarterPriorityOption(options);
 }
 
 function activeDrumMoveQuickActionTarget(

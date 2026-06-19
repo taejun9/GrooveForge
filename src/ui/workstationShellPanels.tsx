@@ -24,6 +24,7 @@ import type {
   BeatReadinessFocusSummary,
   LayerStarterId,
   LayerStarterOption,
+  LayerStarterPrioritySummary,
   LocalDraftRecovery,
   PatternCompareSummary,
   QuickAction,
@@ -39,7 +40,7 @@ import type {
   SnapshotCompareSummary,
   SnapshotSlotRoleSummary
 } from "./workstationUiModel";
-import { beatReadinessPriorityCheck, maxQuickActionPins, snapshotCompareFocusItem } from "./workstationUiModel";
+import { beatReadinessPriorityCheck, layerStarterPriorityOption, maxQuickActionPins, snapshotCompareFocusItem } from "./workstationUiModel";
 import { barCountLabel, formatLocalDraftSavedAt } from "./workstationPatternTools";
 
 function quickActionGuideSuggestionReason(detail: string): string {
@@ -430,11 +431,23 @@ export function LayerStarterPads({
   options: LayerStarterOption[];
   onApply: (starterId: LayerStarterId) => void;
 }): ReactElement {
+  const prioritySummary = createLayerStarterPrioritySummary(options);
+
   return (
     <div className="layer-starter-panel" data-testid="layer-starter-pads">
       <div className="layer-starter-heading">
         <span>Layer Starter</span>
         <strong>Selected Pattern</strong>
+      </div>
+      <div
+        className={`layer-starter-priority-readout ${prioritySummary.tone}`}
+        data-layer-starter-priority-readout={prioritySummary.optionId ?? "none"}
+        data-testid="layer-starter-priority-readout"
+        title={prioritySummary.detailTitle}
+      >
+        <span data-testid="layer-starter-priority-status">{prioritySummary.statusLabel}</span>
+        <strong data-testid="layer-starter-priority-label">{prioritySummary.layerLabel}</strong>
+        <small data-testid="layer-starter-priority-detail">{prioritySummary.detailLabel}</small>
       </div>
       <div className="layer-starter-row" aria-label="Layer Starter Pads">
         {options.map((option) => (
@@ -455,6 +468,33 @@ export function LayerStarterPads({
       </div>
     </div>
   );
+}
+
+function createLayerStarterPrioritySummary(options: LayerStarterOption[]): LayerStarterPrioritySummary {
+  const option = layerStarterPriorityOption(options);
+
+  if (!option) {
+    return {
+      optionId: null,
+      statusLabel: "Layers ready",
+      layerLabel: "All starter layers ready",
+      detailLabel: "No missing or thin layer in selected Pattern",
+      detailTitle: "Layer Starter has no missing or thin layer to prioritize.",
+      tone: "good"
+    };
+  }
+
+  const statusLabel = option.tone === "danger" ? "Layer missing" : "Layer thin";
+  const detailLabel = `${option.countLabel} / ${option.targetLabel} / ${option.actionLabel}`;
+
+  return {
+    optionId: option.id,
+    statusLabel,
+    layerLabel: `${option.label}: ${option.status}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${option.label}: ${option.status} / ${detailLabel}`,
+    tone: option.tone
+  };
 }
 
 export function LocalDraftRecoveryBanner({
