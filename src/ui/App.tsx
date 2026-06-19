@@ -7594,6 +7594,7 @@ export function App(): ReactElement {
     keyboardCaptureTarget,
     layerStarterOptions,
     listeningPassSummary,
+    localDraftRecovery,
     melodyMovePreviewSummary,
     midiCaptureArmed,
     midiCaptureStatus,
@@ -7802,8 +7803,10 @@ export function App(): ReactElement {
     onOpenCommandReference: openCommandReference,
     onOpenProject: handleOpenProject,
     onRedo: redoProject,
+    onRestoreLocalDraft: restoreLocalDraft,
     onSaveProject: handleSaveProject,
     onSaveSnapshot: saveCurrentSnapshot,
+    onClearLocalDraftRecovery: clearLocalDraftRecovery,
     onSelectTransportLoopScope: selectTransportLoopScope,
     onTogglePlayback: togglePlayback,
     onUndo: undoProject
@@ -14455,6 +14458,7 @@ function createQuickActions({
   keyboardCaptureTarget,
   layerStarterOptions,
   listeningPassSummary,
+  localDraftRecovery,
   melodyMovePreviewSummary,
   midiCaptureArmed,
   midiCaptureStatus,
@@ -14663,8 +14667,10 @@ function createQuickActions({
   onOpenCommandReference,
   onOpenProject,
   onRedo,
+  onRestoreLocalDraft,
   onSaveProject,
   onSaveSnapshot,
+  onClearLocalDraftRecovery,
   onSelectTransportLoopScope,
   onTogglePlayback,
   onUndo
@@ -14702,6 +14708,7 @@ function createQuickActions({
   keyboardCaptureTarget: NoteTrack;
   layerStarterOptions: LayerStarterOption[];
   listeningPassSummary: ListeningPassSummary;
+  localDraftRecovery: LocalDraftRecovery | null;
   melodyMovePreviewSummary: MelodyMovePreviewSummary;
   midiCaptureArmed: boolean;
   midiCaptureStatus: MidiCaptureStatus;
@@ -14910,8 +14917,10 @@ function createQuickActions({
   onOpenCommandReference: () => void;
   onOpenProject: () => Promise<void>;
   onRedo: () => void;
+  onRestoreLocalDraft: () => void;
   onSaveProject: () => Promise<void>;
   onSaveSnapshot: () => void;
+  onClearLocalDraftRecovery: () => void;
   onSelectTransportLoopScope: (scope: TransportLoopScope) => void;
   onTogglePlayback: () => void;
   onUndo: () => void;
@@ -14919,6 +14928,11 @@ function createQuickActions({
   const suggestedBlueprint = suggestedBlueprintId(project);
   const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const localDraftRecoveryDetail = localDraftRecovery
+    ? `${localDraftRecovery.project.title} / ${formatLocalDraftSavedAt(localDraftRecovery.savedAt)} / ${projectEventTotal(
+        localDraftRecovery.project
+      )} events`
+    : "No local recovery draft available.";
   const blueprintActions: QuickAction[] = beatBlueprints.flatMap((blueprint): QuickAction[] => {
     const styleName = styleProfiles.find((profile) => profile.id === blueprint.styleId)?.name ?? blueprint.styleId;
     const detail = `${styleName} / ${blueprint.key} / ${blueprint.bpm} BPM / ${arrangementTemplateLabel(
@@ -16366,6 +16380,26 @@ function createQuickActions({
       run: onOpenProject
     },
     {
+      id: "restore-local-draft",
+      title: "Restore local draft",
+      detail: localDraftRecoveryDetail,
+      group: "Project",
+      keywords:
+        "restore local draft recovery renderer localStorage safety recover unsaved project session beginner producer no cloud no sampling",
+      disabled: !localDraftRecovery,
+      run: onRestoreLocalDraft
+    },
+    {
+      id: "clear-local-draft",
+      title: "Clear local draft recovery",
+      detail: localDraftRecoveryDetail,
+      group: "Project",
+      keywords:
+        "clear local draft recovery dismiss renderer localStorage safety keep current project saved file beginner producer no cloud no sampling",
+      disabled: !localDraftRecovery,
+      run: onClearLocalDraftRecovery
+    },
+    {
       id: "command-reference",
       title: "Command Reference",
       detail: "Desktop shortcuts, Beat Terms, Quick Actions, Keyboard Capture, and finish commands.",
@@ -17707,6 +17741,7 @@ function createQuickActionResult(
     action.id === "selected-drum-audition" ||
     action.id === "selected-chord-audition";
   const tapTempoPulseOnly = action.id === "tap-tempo";
+  const localDraftRecoveryOnly = action.id === "restore-local-draft" || action.id === "clear-local-draft";
   const exportOnly = directExportQuickActionTarget(action.id) !== null || action.id === "handoff-next-export";
   const mixSnapshotRecallOnly = action.id === "mix-snapshot-recall-a" || action.id === "mix-snapshot-recall-b";
   const soundSnapshotRecallOnly = action.id === "sound-snapshot-recall-a" || action.id === "sound-snapshot-recall-b";
@@ -17719,7 +17754,8 @@ function createQuickActionResult(
     blockClipboardOnly ||
     noteClipboardOnly ||
     drumClipboardOnly ||
-    chordClipboardOnly;
+    chordClipboardOnly ||
+    localDraftRecoveryOnly;
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
     id: afterMetric.id,
@@ -17752,6 +17788,10 @@ function createQuickActionResult(
                   : "Redone"
               : uiLocal && (action.id === "mix-snapshot-clear" || action.id === "sound-snapshot-clear")
                 ? "Cleared"
+                : localDraftRecoveryOnly
+                  ? action.id === "restore-local-draft"
+                    ? "Restored"
+                    : "Cleared"
                 : mixSnapshotRecallOnly || soundSnapshotRecallOnly
                   ? "Recalled"
                 : uiLocal
@@ -17920,6 +17960,10 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "command-reference" || action.id === "beat-terms-reference") {
     return { id: "command-reference", label: "Reference", value: "Desktop / Create / Finish / Beat Terms" };
+  }
+
+  if (action.id === "restore-local-draft" || action.id === "clear-local-draft") {
+    return { id: "local-draft", label: "Draft recovery", value: `${projectEventTotal(project)} events` };
   }
 
   if (
@@ -19056,6 +19100,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the reference only to choose the next explicit local command or understand the current beat term.",
       nextCheck: "Open Quick Actions when you are ready to run one command."
+    };
+  }
+
+  if (action.id === "restore-local-draft") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the restored draft is the beat state you intended to recover.`,
+      nextCheck: "Save a durable .grooveforge.json copy after confirming the recovered project."
+    };
+  }
+
+  if (action.id === "clear-local-draft") {
+    return {
+      auditionCue: "No audio changed; the current editable project remains available after clearing the recovery copy.",
+      nextCheck: "Save the current project if it still needs durable protection."
     };
   }
 
