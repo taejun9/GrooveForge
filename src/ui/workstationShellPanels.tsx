@@ -78,6 +78,8 @@ const commandReferenceSections: CommandReferenceSection[] = [
     items: [
       { id: "save", command: "Save project", shortcut: "CmdOrCtrl+S", target: ".grooveforge.json" },
       { id: "open", command: "Open project", shortcut: "CmdOrCtrl+O", target: "Project file" },
+      { id: "restore-draft", command: "Restore Draft", shortcut: "Quick Actions", target: "Local recovery" },
+      { id: "clear-draft", command: "Clear Draft", shortcut: "Quick Actions", target: "Local recovery" },
       { id: "undo", command: "Undo", shortcut: "CmdOrCtrl+Z", target: "Edit history" },
       { id: "redo", command: "Redo", shortcut: "Shift+CmdOrCtrl+Z / CmdOrCtrl+Y", target: "Edit history" }
     ]
