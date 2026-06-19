@@ -21,6 +21,7 @@ import type {
   BeatReadinessCheck,
   BeatReadinessCheckId,
   BeatReadinessFocusResult,
+  BeatReadinessFocusSummary,
   LayerStarterId,
   LayerStarterOption,
   LocalDraftRecovery,
@@ -38,7 +39,7 @@ import type {
   SnapshotCompareSummary,
   SnapshotSlotRoleSummary
 } from "./workstationUiModel";
-import { maxQuickActionPins, snapshotCompareFocusItem } from "./workstationUiModel";
+import { beatReadinessPriorityCheck, maxQuickActionPins, snapshotCompareFocusItem } from "./workstationUiModel";
 import { barCountLabel, formatLocalDraftSavedAt } from "./workstationPatternTools";
 
 function quickActionGuideSuggestionReason(detail: string): string {
@@ -1309,6 +1310,7 @@ export function BeatReadiness({
   onFocus: (check: BeatReadinessCheck) => void;
 }): ReactElement {
   const readyCount = checks.filter((check) => check.tone === "good").length;
+  const focusSummary = createBeatReadinessFocusSummary(checks, focusedCheckId);
 
   return (
     <section
@@ -1321,6 +1323,16 @@ export function BeatReadiness({
         <strong data-testid="beat-readiness-summary">
           {readyCount}/{checks.length} ready
         </strong>
+      </div>
+      <div
+        className={`beat-readiness-focus-readout ${focusSummary.tone}`}
+        data-beat-readiness-focus-readout={focusSummary.checkId ?? "none"}
+        data-testid="beat-readiness-focus-readout"
+        title={focusSummary.detailTitle}
+      >
+        <span data-testid="beat-readiness-focus-status">{focusSummary.statusLabel}</span>
+        <strong data-testid="beat-readiness-focus-label">{focusSummary.areaLabel}</strong>
+        <small data-testid="beat-readiness-focus-detail">{focusSummary.detailLabel}</small>
       </div>
       {result && <BeatReadinessFocusResultStrip result={result} />}
       <div className="beat-readiness-list">
@@ -1352,6 +1364,46 @@ export function BeatReadiness({
       </div>
     </section>
   );
+}
+
+function createBeatReadinessFocusSummary(checks: BeatReadinessCheck[], focusedCheckId: BeatReadinessCheckId | null): BeatReadinessFocusSummary {
+  const focusedCheck = focusedCheckId ? checks.find((check) => check.id === focusedCheckId) ?? null : null;
+  const check = focusedCheck ?? beatReadinessPriorityCheck(checks);
+
+  if (!check) {
+    return {
+      checkId: null,
+      statusLabel: "Readiness ready",
+      areaLabel: "No readiness checks",
+      detailLabel: "No Beat Readiness checks available",
+      detailTitle: "Beat Readiness has no checks to focus.",
+      tone: "good"
+    };
+  }
+
+  const statusLabel = focusedCheck ? "Focused Readiness" : beatReadinessFocusStatusLabel(check.tone);
+  const detailLabel = `${check.focusLabel} panel / ${check.detail}`;
+
+  return {
+    checkId: check.id,
+    statusLabel,
+    areaLabel: `${check.label}: ${check.status}`,
+    detailLabel,
+    detailTitle: `${statusLabel} / ${check.label}: ${check.status} / ${detailLabel}`,
+    tone: check.tone
+  };
+}
+
+function beatReadinessFocusStatusLabel(tone: BeatReadinessCheck["tone"]): string {
+  if (tone === "danger") {
+    return "Readiness blocker";
+  }
+
+  if (tone === "warn") {
+    return "Readiness review";
+  }
+
+  return "Readiness ready";
 }
 
 function BeatReadinessFocusResultStrip({ result }: { result: BeatReadinessFocusResult }): ReactElement {

@@ -1108,6 +1108,15 @@ export type BeatReadinessCheck = {
   tone: MixCoachTone;
 };
 
+export type BeatReadinessFocusSummary = {
+  checkId: BeatReadinessCheckId | null;
+  statusLabel: string;
+  areaLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type BeatReadinessFocusResult = {
   checkId: BeatReadinessCheckId;
   status: string;
@@ -1120,6 +1129,10 @@ export type BeatReadinessFocusResult = {
   nextCheck: string;
   tone: MixCoachTone;
 };
+
+export function beatReadinessPriorityCheck(checks: BeatReadinessCheck[]): BeatReadinessCheck | null {
+  return checks.find((check) => check.tone === "danger") ?? checks.find((check) => check.tone === "warn") ?? checks[0] ?? null;
+}
 
 export type PatternCompareSummary = {
   slot: PatternSlot;

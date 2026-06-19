@@ -644,7 +644,8 @@ import {
   patternCloneVariationPresets,
   grooveFeelDefinitions,
   drumAccentDefinitions,
-  drumFoundationDefinitions
+  drumFoundationDefinitions,
+  beatReadinessPriorityCheck
 } from "./workstationUiModel";
 import type { SnapshotCompareProjectProfile } from "./workstationSnapshotCompare";
 import {
@@ -13233,7 +13234,7 @@ function activeBeatPassportQuickActionMetric(summary: BeatPassportSummary): Beat
 }
 
 function activeBeatReadinessQuickActionCheck(checks: BeatReadinessCheck[]): BeatReadinessCheck | null {
-  return checks.find((check) => check.tone === "danger") ?? checks.find((check) => check.tone === "warn") ?? checks[0] ?? null;
+  return beatReadinessPriorityCheck(checks);
 }
 
 function beatReadinessCardActionId(check: BeatReadinessCheck): string {
