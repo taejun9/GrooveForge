@@ -12,6 +12,7 @@ import {
   drumStepVelocity,
   drumStepShouldPlay,
   hatRepeatCount,
+  masterAutomationGainAtStep,
   normalizeArrangementBars,
   noteEventShouldPlay,
   noteToFrequency,
@@ -788,8 +789,10 @@ export function startRealtimePlayback(project: ProjectState, options: SchedulerO
       const startBar = mode === "arrangement" ? Math.max(0, options.startBar ?? 0) : 0;
       const stepDuration = projectStepDurationSeconds(currentProject);
       const ceiling = dbToGain(currentProject.masterCeilingDb);
-      masterGain.gain.setTargetAtTime(masterOutputGain(currentProject) * Math.min(1, ceiling), context.currentTime, 0.01);
       const snapshot = snapshotForStep(currentProject, nextStep, loopSteps, totalBars, mode, startBar);
+      const automationStep = mode === "arrangement" ? startBar * 16 + snapshot.loopStep : snapshot.loopStep;
+      const automationGain = masterAutomationGainAtStep(currentProject, automationStep);
+      masterGain.gain.setTargetAtTime(masterOutputGain(currentProject) * Math.min(1, ceiling) * automationGain, context.currentTime, 0.01);
       const playbackContext = playbackContextForStep(currentProject, mode, snapshot.loopStep, startBar);
       const scheduleDelaySeconds = Math.max(0.015, (nextStepAtMs - nowMs) / 1000);
       scheduleStep(

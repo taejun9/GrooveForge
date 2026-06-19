@@ -2,6 +2,9 @@ import { Copy, Gauge, RotateCcw, Save, SlidersHorizontal, Target, X } from "luci
 import type { ReactElement } from "react";
 import type { ExportAnalysis, StemTrackId } from "../audio/render";
 import type {
+  MasterAutomationPadId,
+  MasterAutomationPadOption,
+  MasterAutomationResult,
   MasterFinishPadId,
   MasterFinishPadOption,
   MasterFinishPreviewSummary,
@@ -434,6 +437,99 @@ function MasterFinishResultStrip({ result }: { result: MasterFinishResult }): Re
         <span>
           <b>Next check</b>
           <em data-testid="master-finish-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function MasterAutomationPads({
+  pads,
+  result,
+  onApply
+}: {
+  pads: MasterAutomationPadOption[];
+  result: MasterAutomationResult | null;
+  onApply: (pad: MasterAutomationPadId) => void;
+}): ReactElement {
+  const activePad = pads.find((pad) => pad.active) ?? pads[0];
+
+  return (
+    <div className="master-finish-panel master-automation-panel" data-testid="master-automation-pads">
+      <div className="master-finish-heading master-automation-heading">
+        <span>Master Automation</span>
+        <strong>Fade lane</strong>
+      </div>
+      <div
+        className="master-finish-preview master-automation-preview good"
+        data-preview-pad={activePad?.id ?? "none"}
+        data-testid="master-automation-status"
+        title={activePad ? `${activePad.label}: ${activePad.description}` : "Master automation"}
+      >
+        <span data-testid="master-automation-active">{activePad?.label ?? "None"}</span>
+        <strong data-testid="master-automation-range">{activePad?.preview ?? "No fade"}</strong>
+        <small>{activePad?.detail ?? "manual"}</small>
+        <small>{activePad?.changedCount ?? 0} event moves</small>
+        <small>Realtime</small>
+        <small>Export</small>
+      </div>
+      {result && <MasterAutomationResultStrip result={result} />}
+      <div className="master-finish-row master-automation-row" aria-label="Master Automation Pads">
+        {pads.map((pad) => (
+          <button
+            className={pad.active ? "active" : ""}
+            data-testid={`master-automation-${pad.id}`}
+            key={pad.id}
+            onClick={() => onApply(pad.id)}
+            title={`${pad.label} ${pad.description}`}
+            type="button"
+          >
+            <span>{pad.label}</span>
+            <strong>{pad.preview}</strong>
+            <small>{pad.changedCount} events / {pad.detail}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MasterAutomationResultStrip({ result }: { result: MasterAutomationResult }): ReactElement {
+  return (
+    <div
+      className={`master-finish-result master-automation-result ${result.tone}`}
+      data-result-master-automation={result.padId}
+      data-testid="master-automation-result"
+      aria-live="polite"
+    >
+      <div className="master-finish-result-main master-automation-result-main">
+        <Gauge size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="master-automation-result-title">{result.title}</strong>
+          <small data-testid="master-automation-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="master-finish-result-meta master-automation-result-meta">
+        <span data-testid="master-automation-result-status">{result.status}</span>
+        <span data-testid="master-automation-result-scope">{result.scope}</span>
+        <span data-testid="master-automation-result-impact">{result.impact}</span>
+      </div>
+      <div className="master-finish-result-metrics master-automation-result-metrics" data-testid="master-automation-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`master-automation-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="master-finish-result-followup master-automation-result-followup" data-testid="master-automation-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="master-automation-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="master-automation-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
     </div>

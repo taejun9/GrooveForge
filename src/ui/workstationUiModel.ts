@@ -16,6 +16,7 @@ import type {
   DrumLane,
   DrumGroovePreset,
   MelodyNote,
+  MasterAutomationPresetId,
   MasterPreset,
   MixerChannel,
   MixPosture,
@@ -289,6 +290,33 @@ export const masterFinishPadDefinitions: MasterFinishPadDefinition[] = [
     preset: "Clean Demo",
     ceilingDb: -0.8,
     masterVolumeDb: -0.6
+  }
+];
+
+export const masterAutomationPadDefinitions: MasterAutomationPadDefinition[] = [
+  {
+    id: "none",
+    label: "None",
+    detail: "manual level",
+    description: "No master fade automation is applied."
+  },
+  {
+    id: "fade_in",
+    label: "Fade In",
+    detail: "first bar",
+    description: "Ramp the master from silence into the first bar."
+  },
+  {
+    id: "fade_out",
+    label: "Fade Out",
+    detail: "last bar",
+    description: "Ramp the master down across the final bar."
+  },
+  {
+    id: "intro_outro",
+    label: "Intro/Outro",
+    detail: "first + last",
+    description: "Fade in over bar one and fade out over the final bar."
   }
 ];
 
@@ -813,6 +841,42 @@ export type MasterFinishResult = {
   scope: string;
   impact: string;
   metrics: MasterFinishResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
+export type MasterAutomationPadId = MasterAutomationPresetId;
+
+export type MasterAutomationPadDefinition = {
+  id: MasterAutomationPadId;
+  label: string;
+  detail: string;
+  description: string;
+};
+
+export type MasterAutomationPadOption = MasterAutomationPadDefinition & {
+  preview: string;
+  changedCount: number;
+  active: boolean;
+};
+
+export type MasterAutomationResultMetric = {
+  id: "preset" | "events" | "range";
+  label: string;
+  before: string;
+  after: string;
+  tone: MixCoachTone;
+};
+
+export type MasterAutomationResult = {
+  padId: MasterAutomationPadId;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: MasterAutomationResultMetric[];
   auditionCue: string;
   nextCheck: string;
   tone: MixCoachTone;

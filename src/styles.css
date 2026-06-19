@@ -16384,6 +16384,11 @@ input[type="range"] {
   gap: 7px;
 }
 
+.master-automation-panel {
+  border-top: 1px solid rgba(244, 239, 231, 0.08);
+  padding-top: 7px;
+}
+
 .master-finish-heading {
   display: flex;
   align-items: center;
@@ -16604,6 +16609,10 @@ input[type="range"] {
   gap: 7px;
 }
 
+.master-automation-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .master-finish-row button {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -16613,6 +16622,11 @@ input[type="range"] {
   min-height: 48px;
   padding: 5px 7px;
   text-align: center;
+}
+
+.master-finish-row button.active {
+  border-color: rgba(120, 240, 200, 0.44);
+  background: rgba(120, 240, 200, 0.1);
 }
 
 .master-finish-row button span,

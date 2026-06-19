@@ -68,10 +68,13 @@ import {
   DrumGroovePreset,
   DrumLane,
   MixPosture,
+  AutomationEvent,
   applyDrumGroovePreset,
+  applyMasterAutomationPreset,
   chordProgressionPresetIds,
   chordProgressionPresetLabel,
   getStyle,
+  MasterAutomationPresetId,
   MasterPreset,
   MelodyNote,
   MixerChannel,
@@ -98,6 +101,7 @@ import {
   arrangementTemplateIds,
   arrangementTemplateLabel,
   arrangementTotalBars,
+  arrangementTotalSteps,
   bassPitchLanes,
   beatBlueprints,
   chordInversions,
@@ -125,6 +129,7 @@ import {
   expandPatternChainArrangement,
   hatRepeatCount,
   masterPresetCeilingDb,
+  masterAutomationPresetForProject,
   masterPresets,
   maxCustomDeliveryTargetFocusLength,
   maxCustomDeliveryTargetNameLength,
@@ -249,6 +254,11 @@ import type {
   MasterFinishPreviewSummary,
   MasterFinishResultMetric,
   MasterFinishResult,
+  MasterAutomationPadId,
+  MasterAutomationPadDefinition,
+  MasterAutomationPadOption,
+  MasterAutomationResultMetric,
+  MasterAutomationResult,
   TransportLoopScope,
   QuickAction,
   QuickActionRecent,
@@ -561,6 +571,7 @@ import {
   soundFocusPadDefinitions,
   drumKitPadDefinitions,
   masterFinishPadDefinitions,
+  masterAutomationPadDefinitions,
   keys,
   historyLimit,
   keyboardCaptureKeys,
@@ -620,6 +631,7 @@ import {
 } from "./workstationPatternResults";
 import {
   ExportMeter,
+  MasterAutomationPads,
   MasterFinishPads,
   MixBalancePads,
   MixCoach,
@@ -1029,6 +1041,7 @@ export function App(): ReactElement {
   const [soundFocusResult, setSoundFocusResult] = useState<SoundFocusResult | null>(null);
   const [drumKitResult, setDrumKitResult] = useState<DrumKitResult | null>(null);
   const [masterFinishResult, setMasterFinishResult] = useState<MasterFinishResult | null>(null);
+  const [masterAutomationResult, setMasterAutomationResult] = useState<MasterAutomationResult | null>(null);
   const [mixBalanceResult, setMixBalanceResult] = useState<MixBalanceResult | null>(null);
   const [mixSnapshots, setMixSnapshots] = useState<MixSnapshotSlotMap>({ A: null, B: null });
   const [spaceFxResult, setSpaceFxResult] = useState<SpaceFxResult | null>(null);
@@ -1252,6 +1265,7 @@ export function App(): ReactElement {
     () => createMasterFinishPreviewSummary(project, masterFinishPadOptions),
     [project, masterFinishPadOptions]
   );
+  const masterAutomationPadOptions = useMemo(() => createMasterAutomationPadOptions(project), [project]);
   const masterOutputRoleSummary = useMemo(
     () => createMasterOutputRoleSummary(project, exportAnalysis),
     [project, exportAnalysis]
@@ -1926,6 +1940,7 @@ export function App(): ReactElement {
     setSoundFocusResult(null);
     setDrumKitResult(null);
     setMasterFinishResult(null);
+    setMasterAutomationResult(null);
     setMixBalanceResult(null);
     setSpaceFxResult(null);
     setMixFixResult(null);
@@ -1968,6 +1983,7 @@ export function App(): ReactElement {
       setSoundFocusResult(null);
       setDrumKitResult(null);
       setMasterFinishResult(null);
+      setMasterAutomationResult(null);
       setMixBalanceResult(null);
       setSpaceFxResult(null);
       setMixFixResult(null);
@@ -2103,6 +2119,7 @@ export function App(): ReactElement {
     setSoundFocusResult(null);
     setDrumKitResult(null);
     setMasterFinishResult(null);
+    setMasterAutomationResult(null);
     setMixBalanceResult(null);
     setMixSnapshots({ A: null, B: null });
     setSpaceFxResult(null);
@@ -2150,6 +2167,7 @@ export function App(): ReactElement {
     setSoundFocusResult(null);
     setDrumKitResult(null);
     setMasterFinishResult(null);
+    setMasterAutomationResult(null);
     setMixBalanceResult(null);
     setSpaceFxResult(null);
     setMixFixResult(null);
@@ -3134,6 +3152,7 @@ export function App(): ReactElement {
     const pad = masterFinishPadDefinitions.find((definition) => definition.id === padId);
     if (!pad) {
       setMasterFinishResult(null);
+      setMasterAutomationResult(null);
       setProjectStatus("Master finish pad not found");
       return;
     }
@@ -3142,6 +3161,7 @@ export function App(): ReactElement {
     const changed = updateProject((current) => applyMasterFinishPadToProject(current, pad), `${pad.label} master finish applied`);
     if (!changed) {
       setMasterFinishResult(null);
+      setMasterAutomationResult(null);
       setProjectStatus(`${pad.label} master finish already selected`);
       return;
     }
@@ -3149,6 +3169,25 @@ export function App(): ReactElement {
     if (options.showResult) {
       setMasterFinishResult(createMasterFinishResult(pad, beforeProject, projectRef.current));
     }
+  }
+
+  function applyMasterAutomationPad(padId: MasterAutomationPadId): void {
+    const pad = masterAutomationPadDefinitions.find((definition) => definition.id === padId);
+    if (!pad) {
+      setMasterAutomationResult(null);
+      setProjectStatus("Master automation pad not found");
+      return;
+    }
+
+    const beforeProject = projectRef.current;
+    const changed = updateProject((current) => applyMasterAutomationPreset(current, pad.id), `${pad.label} master automation applied`);
+    if (!changed) {
+      setMasterAutomationResult(null);
+      setProjectStatus(`${pad.label} master automation already selected`);
+      return;
+    }
+
+    setMasterAutomationResult(createMasterAutomationResult(pad, beforeProject, projectRef.current));
   }
 
   function applyMixFixPreset(preset: MixFixPreset): void {
@@ -8222,6 +8261,11 @@ export function App(): ReactElement {
             preview={masterFinishPreviewSummary}
             result={masterFinishResult}
             onApply={(pad) => applyMasterFinishPad(pad, { showResult: true })}
+          />
+          <MasterAutomationPads
+            pads={masterAutomationPadOptions}
+            result={masterAutomationResult}
+            onApply={applyMasterAutomationPad}
           />
           <label>
             <span>Ceiling</span>
@@ -25590,6 +25634,128 @@ function applyMasterFinishPadToProject(project: ProjectState, pad: MasterFinishP
     mixer
   };
   return masterFinishChangedCount(project, nextProject) === 0 ? project : nextProject;
+}
+
+function createMasterAutomationPadOptions(project: ProjectState): MasterAutomationPadOption[] {
+  const activePreset = masterAutomationPresetForProject(project);
+  return masterAutomationPadDefinitions.map((pad) => {
+    const nextProject = applyMasterAutomationPreset(project, pad.id);
+    return {
+      ...pad,
+      preview: masterAutomationPreview(pad, project),
+      changedCount: masterAutomationChangedCount(project, nextProject),
+      active: activePreset === pad.id
+    };
+  });
+}
+
+function createMasterAutomationResult(
+  pad: MasterAutomationPadDefinition,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): MasterAutomationResult {
+  const changedCount = masterAutomationChangedCount(beforeProject, afterProject);
+  const metrics: MasterAutomationResultMetric[] = [
+    createMasterAutomationResultMetric(
+      "preset",
+      "Preset",
+      masterAutomationPresetLabel(masterAutomationPresetForProject(beforeProject)),
+      masterAutomationPresetLabel(masterAutomationPresetForProject(afterProject))
+    ),
+    createMasterAutomationResultMetric(
+      "events",
+      "Events",
+      masterAutomationEventCountLabel(beforeProject),
+      masterAutomationEventCountLabel(afterProject)
+    ),
+    createMasterAutomationResultMetric(
+      "range",
+      "Range",
+      masterAutomationRangeLabel(beforeProject),
+      masterAutomationRangeLabel(afterProject)
+    )
+  ];
+
+  return {
+    padId: pad.id,
+    title: `${pad.label} Master Automation applied`,
+    status: "Applied",
+    detail: pad.description,
+    scope: "Editable master volume automation",
+    impact: `${changedCount} automation event${changedCount === 1 ? "" : "s"}`,
+    metrics,
+    auditionCue: masterAutomationAuditionCue(pad.id),
+    nextCheck: "Play Song and export WAV/stems to confirm the same master fade is rendered.",
+    tone: changedCount > 0 ? "good" : "warn"
+  };
+}
+
+function createMasterAutomationResultMetric(
+  id: MasterAutomationResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): MasterAutomationResultMetric {
+  return {
+    id,
+    label,
+    before,
+    after,
+    tone: before === after ? "warn" : "good"
+  };
+}
+
+function masterAutomationPreview(pad: MasterAutomationPadDefinition, project: ProjectState): string {
+  switch (pad.id) {
+    case "none":
+      return "No fade";
+    case "fade_in":
+      return "Bar 1 in";
+    case "fade_out":
+      return `${barCountLabel(1)} out`;
+    case "intro_outro":
+      return `In + out / ${barCountLabel(arrangementTotalBars(project))}`;
+  }
+}
+
+function masterAutomationPresetLabel(preset: MasterAutomationPresetId | "custom"): string {
+  if (preset === "custom") {
+    return "Custom";
+  }
+  return masterAutomationPadDefinitions.find((definition) => definition.id === preset)?.label ?? preset;
+}
+
+function masterAutomationEventCountLabel(project: ProjectState): string {
+  return `${project.automation.length} event${project.automation.length === 1 ? "" : "s"}`;
+}
+
+function masterAutomationRangeLabel(project: ProjectState): string {
+  return `${barCountLabel(arrangementTotalBars(project))} / ${arrangementTotalSteps(project)} steps`;
+}
+
+function masterAutomationAuditionCue(preset: MasterAutomationPresetId): string {
+  switch (preset) {
+    case "none":
+      return "Play Song; confirm the master stays at the manual output level.";
+    case "fade_in":
+      return "Play Song from bar one; confirm the first bar rises cleanly.";
+    case "fade_out":
+      return "Play the final bar; confirm the ending fades without cutting the beat early.";
+    case "intro_outro":
+      return "Play Song from the top and final bar; confirm both fades feel intentional.";
+  }
+}
+
+function masterAutomationChangedCount(current: ProjectState, nextProject: ProjectState): number {
+  const currentEvents = current.automation.map(masterAutomationEventSignature);
+  const nextEvents = nextProject.automation.map(masterAutomationEventSignature);
+  const maxLength = Math.max(currentEvents.length, nextEvents.length);
+  const changedEvents = Array.from({ length: maxLength }, (_, index) => currentEvents[index] !== nextEvents[index]).filter(Boolean).length;
+  return changedEvents;
+}
+
+function masterAutomationEventSignature(event: AutomationEvent): string {
+  return `${event.target}:${event.startStep}:${event.endStep}:${event.startValue}:${event.endValue}:${event.curve}`;
 }
 
 function createMasterOutputRoleSummary(project: ProjectState, analysis: ExportAnalysis): MasterOutputRoleSummary {

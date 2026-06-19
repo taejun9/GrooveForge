@@ -11,6 +11,7 @@ import {
   hatRepeatCount,
   noteEventShouldPlay,
   noteToFrequency,
+  masterAutomationGainAtStep,
   patternForSlot,
   projectStepDurationSeconds,
   normalizeArrangementBars,
@@ -519,7 +520,8 @@ function renderProject(project: ProjectState, bars = arrangementBarCount(project
   const totalSamples = buffer[0].length * channels;
   for (let channel = 0; channel < channels; channel += 1) {
     for (let index = 0; index < buffer[channel].length; index += 1) {
-      const value = buffer[channel][index] * outputGain;
+      const absoluteStep = (index / sampleRate) / step;
+      const value = buffer[channel][index] * outputGain * masterAutomationGainAtStep(project, absoluteStep);
       if (Math.abs(value) > ceiling) {
         limitedSamples += 1;
       }

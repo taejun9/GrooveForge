@@ -114,6 +114,22 @@ export type ArrangementBlock = {
   mutedTracks: ArrangementMuteTrack[];
 };
 
+export const automationTargetIds = ["master_volume"] as const;
+export type AutomationTargetId = (typeof automationTargetIds)[number];
+export const automationCurveIds = ["linear"] as const;
+export type AutomationCurve = (typeof automationCurveIds)[number];
+export const masterAutomationPresetIds = ["none", "fade_in", "fade_out", "intro_outro"] as const;
+export type MasterAutomationPresetId = (typeof masterAutomationPresetIds)[number];
+
+export type AutomationEvent = {
+  target: AutomationTargetId;
+  startStep: number;
+  endStep: number;
+  startValue: number;
+  endValue: number;
+  curve: AutomationCurve;
+};
+
 export const arrangementTemplateIds = ["loop", "full", "hook_first", "breakdown"] as const;
 export type ArrangementTemplateId = (typeof arrangementTemplateIds)[number];
 export const patternChainIds = ["eight_bar", "hook_switch", "break_turn"] as const;
@@ -169,6 +185,7 @@ export type ProjectCoreState = {
   patterns: Record<PatternSlot, PatternData>;
   mixer: MixerChannel[];
   arrangement: ArrangementBlock[];
+  automation: AutomationEvent[];
   masterCeilingDb: number;
   masterPreset: MasterPreset;
   deliveryTarget: DeliveryTargetId;
@@ -1166,6 +1183,7 @@ export const starterProject: ProjectState = {
     { id: "master", name: "Master", volumeDb: -1, pan: 0, lowCut: 0, air: 0, drive: 0, glue: 0, send: 0, muted: false, solo: false, accent: "#f0c36a" }
   ],
   arrangement: createArrangementTemplate("full"),
+  automation: [],
   masterCeilingDb: masterPresetCeilingsDb["Headroom for Vocal"],
   masterPreset: "Headroom for Vocal",
   deliveryTarget: defaultDeliveryTarget,
@@ -1195,6 +1213,7 @@ export function applyBeatBlueprint(project: ProjectState, blueprintId: BeatBluep
     sound: soundPresetDesign(blueprint.soundPreset),
     patterns: createStylePatternSet(blueprint.styleId, blueprint.key),
     arrangement: createArrangementTemplate(blueprint.arrangementTemplate),
+    automation: [],
     mixer: applyBeatBlueprintMixer(starterProject.mixer, blueprint.mixer),
     masterCeilingDb: masterPresetCeilingDb(blueprint.masterPreset),
     masterPreset: blueprint.masterPreset
@@ -1445,6 +1464,100 @@ export function arrangementBlockMutesTrack(block: ArrangementBlock | undefined, 
 
 export function arrangementTotalBars(project: ProjectState): number {
   return project.arrangement.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+}
+
+export function arrangementTotalSteps(project: Pick<ProjectCoreState, "arrangement">): number {
+  const bars = project.arrangement.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  return Math.max(stepsPerBar, bars * stepsPerBar);
+}
+
+export function createMasterAutomationPreset(
+  project: Pick<ProjectCoreState, "arrangement">,
+  preset: MasterAutomationPresetId
+): AutomationEvent[] {
+  if (preset === "none") {
+    return [];
+  }
+  const totalSteps = arrangementTotalSteps(project);
+  const fadeSteps = Math.min(stepsPerBar, totalSteps);
+  const fadeOutStart = Math.max(0, totalSteps - fadeSteps);
+  const fadeIn: AutomationEvent = {
+    target: "master_volume",
+    startStep: 0,
+    endStep: fadeSteps,
+    startValue: 0,
+    endValue: 1,
+    curve: "linear"
+  };
+  const fadeOut: AutomationEvent = {
+    target: "master_volume",
+    startStep: fadeOutStart,
+    endStep: totalSteps,
+    startValue: 1,
+    endValue: 0,
+    curve: "linear"
+  };
+  if (preset === "fade_in") {
+    return [fadeIn];
+  }
+  if (preset === "fade_out") {
+    return [fadeOut];
+  }
+  return [fadeIn, fadeOut];
+}
+
+export function applyMasterAutomationPreset(project: ProjectState, preset: MasterAutomationPresetId): ProjectState {
+  const automation = createMasterAutomationPreset(project, preset);
+  if (sameAutomationEvents(project.automation, automation)) {
+    return project;
+  }
+  return { ...project, automation };
+}
+
+export function masterAutomationGainAtStep(project: Pick<ProjectCoreState, "automation">, absoluteStep: number): number {
+  return project.automation
+    .filter((event) => event.target === "master_volume")
+    .reduce((gain, event) => gain * automationEventValueAtStep(event, absoluteStep), 1);
+}
+
+export function masterAutomationPresetForProject(
+  project: Pick<ProjectCoreState, "arrangement" | "automation">
+): MasterAutomationPresetId | "custom" {
+  for (const preset of masterAutomationPresetIds) {
+    if (sameAutomationEvents(project.automation, createMasterAutomationPreset(project, preset))) {
+      return preset;
+    }
+  }
+  return "custom";
+}
+
+function automationEventValueAtStep(event: AutomationEvent, absoluteStep: number): number {
+  if (absoluteStep < event.startStep || absoluteStep > event.endStep) {
+    return 1;
+  }
+  if (event.endStep <= event.startStep) {
+    return normalizeAutomationValue(event.endValue);
+  }
+  const progress = Math.max(0, Math.min(1, (absoluteStep - event.startStep) / (event.endStep - event.startStep)));
+  return normalizeAutomationValue(event.startValue + (event.endValue - event.startValue) * progress);
+}
+
+function sameAutomationEvents(first: AutomationEvent[], second: AutomationEvent[]): boolean {
+  return (
+    first.length === second.length &&
+    first.every((event, index) => {
+      const candidate = second[index];
+      return (
+        candidate &&
+        event.target === candidate.target &&
+        event.startStep === candidate.startStep &&
+        event.endStep === candidate.endStep &&
+        event.startValue === candidate.startValue &&
+        event.endValue === candidate.endValue &&
+        event.curve === candidate.curve
+      );
+    })
+  );
 }
 
 export function soundPresetDesign(preset: (typeof soundPresetIds)[number]): SoundDesign {
@@ -2361,6 +2474,7 @@ function cloneProjectCore(project: ProjectCoreState): ProjectCoreState {
       ...block,
       mutedTracks: [...block.mutedTracks]
     })),
+    automation: project.automation.map((event) => ({ ...event })),
     masterCeilingDb: project.masterCeilingDb,
     masterPreset: project.masterPreset,
     deliveryTarget: project.deliveryTarget,
@@ -2741,6 +2855,42 @@ function normalizeSoundDesign(sound: SoundDesignInput | undefined): SoundDesign 
   };
 }
 
+function normalizeAutomationEvents(events: AutomationEventInput[] | undefined): AutomationEvent[] {
+  return events?.map(normalizeAutomationEvent).filter((event): event is AutomationEvent => event !== null) ?? [];
+}
+
+function normalizeAutomationEvent(event: AutomationEventInput): AutomationEvent | null {
+  if (!isAutomationEventInput(event)) {
+    return null;
+  }
+  const target = event.target;
+  const curve = event.curve;
+  if (!target || !curve) {
+    return null;
+  }
+  const startStep = normalizeAutomationStep(event.startStep);
+  const endStep = normalizeAutomationStep(event.endStep);
+  if (endStep <= startStep) {
+    return null;
+  }
+  return {
+    target,
+    startStep,
+    endStep,
+    startValue: normalizeAutomationValue(event.startValue),
+    endValue: normalizeAutomationValue(event.endValue),
+    curve
+  };
+}
+
+function normalizeAutomationStep(value: unknown): number {
+  return Math.min(maxDeliveryTargetBars * stepsPerBar, Math.max(0, Math.round(Number(value) || 0)));
+}
+
+function normalizeAutomationValue(value: unknown): number {
+  return clampUnit(Number(value) || 0);
+}
+
 function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreState {
   return {
     ...value,
@@ -2751,7 +2901,8 @@ function normalizeProjectCoreState(value: ProjectCoreStateInput): ProjectCoreSta
     sound: normalizeSoundDesign(value.sound),
     patterns: normalizePatternMap(value.patterns),
     mixer: normalizeMixerChannels(value.mixer),
-    arrangement: normalizeArrangement(value.arrangement)
+    arrangement: normalizeArrangement(value.arrangement),
+    automation: normalizeAutomationEvents(value.automation)
   };
 }
 
@@ -2859,6 +3010,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
       },
       mixer: normalizeMixerChannels(value.mixer),
       arrangement: normalizeArrangement(value.arrangement),
+      automation: normalizeAutomationEvents(value.automation),
       masterCeilingDb: value.masterCeilingDb,
       masterPreset: value.masterPreset,
       deliveryTarget: normalizeDeliveryTargetId(value.deliveryTarget),
@@ -2874,6 +3026,7 @@ function normalizeProjectState(value: unknown): ProjectState | null {
 type BassNoteInput = Omit<BassNote, "probability" | "velocity"> & { probability?: number; velocity?: number };
 type MelodyNoteInput = Omit<MelodyNote, "probability"> & { probability?: number };
 type ChordEventInput = Omit<ChordEvent, "probability" | "inversion"> & { probability?: number; inversion?: unknown };
+type AutomationEventInput = Partial<AutomationEvent>;
 type PatternDataInput = Omit<PatternData, "bassNotes" | "melodyNotes" | "chordEvents" | "drumVelocities" | "drumTimings" | "drumProbabilities" | "hatRepeats"> & {
   bassNotes: BassNoteInput[];
   melodyNotes: MelodyNoteInput[];
@@ -2897,7 +3050,7 @@ type ArrangementBlockInput = Omit<ArrangementBlock, "bars" | "mutedTracks"> & {
   bars?: number;
   mutedTracks?: ArrangementMuteTrack[];
 };
-type ProjectCoreStateInput = Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled" | "deliveryTarget" | "customDeliveryTarget" | "sessionBrief"> & {
+type ProjectCoreStateInput = Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "automation" | "metronomeEnabled" | "deliveryTarget" | "customDeliveryTarget" | "sessionBrief"> & {
   metronomeEnabled?: boolean;
   deliveryTarget?: DeliveryTargetId;
   customDeliveryTarget?: CustomDeliveryTargetInput;
@@ -2906,6 +3059,7 @@ type ProjectCoreStateInput = Omit<ProjectCoreState, "patterns" | "sound" | "mixe
   patterns: Record<PatternSlot, PatternDataInput>;
   mixer: MixerChannelInput[];
   arrangement: ArrangementBlockInput[];
+  automation?: AutomationEventInput[];
 };
 type ProjectSnapshotInput = Omit<ProjectSnapshot, "project"> & {
   project: ProjectCoreStateInput;
@@ -2944,6 +3098,7 @@ function isProjectCoreStateShape(value: unknown): value is ProjectCoreStateInput
     Array.isArray(value.mixer) &&
     value.mixer.every(isMixerChannelInput) &&
     isArrangement(value.arrangement) &&
+    (value.automation === undefined || (Array.isArray(value.automation) && value.automation.every(isAutomationEventInput))) &&
     isFiniteNumber(value.masterCeilingDb) &&
     isOneOf(value.masterPreset, masterPresets)
   );
@@ -2963,7 +3118,7 @@ function isProjectSnapshotsInput(value: unknown): value is ProjectSnapshotInput[
   );
 }
 
-function isLegacyProjectState(value: unknown): value is Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "metronomeEnabled" | "deliveryTarget" | "customDeliveryTarget" | "sessionBrief"> & {
+function isLegacyProjectState(value: unknown): value is Omit<ProjectCoreState, "patterns" | "sound" | "mixer" | "arrangement" | "automation" | "metronomeEnabled" | "deliveryTarget" | "customDeliveryTarget" | "sessionBrief"> & {
   metronomeEnabled?: boolean;
   deliveryTarget?: DeliveryTargetId;
   customDeliveryTarget?: CustomDeliveryTargetInput;
@@ -2971,6 +3126,7 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectCoreState, "
   sound?: SoundDesignInput;
   mixer: MixerChannelInput[];
   arrangement: ArrangementBlockInput[];
+  automation?: AutomationEventInput[];
 } & PatternDataInput {
   if (!isRecord(value)) {
     return false;
@@ -3001,6 +3157,7 @@ function isLegacyProjectState(value: unknown): value is Omit<ProjectCoreState, "
     Array.isArray(value.mixer) &&
     value.mixer.every(isMixerChannelInput) &&
     isArrangement(value.arrangement) &&
+    (value.automation === undefined || (Array.isArray(value.automation) && value.automation.every(isAutomationEventInput))) &&
     isFiniteNumber(value.masterCeilingDb) &&
     isOneOf(value.masterPreset, masterPresets)
   );
@@ -3043,6 +3200,18 @@ function isCustomDeliveryTargetInput(value: unknown): value is CustomDeliveryTar
     (value.preferredMasterPreset === undefined || isOneOf(value.preferredMasterPreset, masterPresets)) &&
     (value.stemGoal === undefined || isFiniteNumber(value.stemGoal)) &&
     (value.mixPosture === undefined || isMixPosture(value.mixPosture))
+  );
+}
+
+function isAutomationEventInput(value: unknown): value is AutomationEventInput {
+  return (
+    isRecord(value) &&
+    isOneOf(value.target, automationTargetIds) &&
+    isFiniteNumber(value.startStep) &&
+    isFiniteNumber(value.endStep) &&
+    isFiniteNumber(value.startValue) &&
+    isFiniteNumber(value.endValue) &&
+    isOneOf(value.curve, automationCurveIds)
   );
 }
 
