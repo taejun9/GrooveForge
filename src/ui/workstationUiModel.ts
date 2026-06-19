@@ -2273,6 +2273,19 @@ export type ArrangementMuteMapFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type ArrangementMuteMapFocusResult = {
+  laneId: ArrangementMuteMapFocusId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementTransitionMapFocusId = number;
 
 export type ArrangementTransitionMapTransition = {
@@ -2307,6 +2320,19 @@ export type ArrangementTransitionMapFocusSummary = {
   areaLabel: string;
   detailLabel: string;
   detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export type ArrangementTransitionMapFocusResult = {
+  transitionId: ArrangementTransitionMapFocusId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
   tone: MixCoachTone;
 };
 

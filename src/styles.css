@@ -10062,6 +10062,12 @@ h2 {
 .arrangement-mute-map-focus-readout span,
 .arrangement-mute-map-focus-readout strong,
 .arrangement-mute-map-focus-readout small,
+.arrangement-mute-map-result-main strong,
+.arrangement-mute-map-result-main small,
+.arrangement-mute-map-result-meta span,
+.arrangement-mute-map-result-meta strong,
+.arrangement-mute-map-result-followup span,
+.arrangement-mute-map-result-followup small,
 .arrangement-mute-map-lane span,
 .arrangement-mute-map-lane strong,
 .arrangement-mute-map-lane small,
@@ -10116,6 +10122,68 @@ h2 {
 .arrangement-mute-map-focus-readout strong {
   color: #f4efe7;
   font-size: 11px;
+}
+
+.arrangement-mute-map-result {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.22);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px 9px;
+}
+
+.arrangement-mute-map-result.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  background: rgba(240, 195, 106, 0.06);
+}
+
+.arrangement-mute-map-result.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.arrangement-mute-map-result-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.arrangement-mute-map-result-main svg {
+  flex: 0 0 auto;
+  color: #78f0c8;
+}
+
+.arrangement-mute-map-result.warn .arrangement-mute-map-result-main svg {
+  color: #f0c36a;
+}
+
+.arrangement-mute-map-result.danger .arrangement-mute-map-result-main svg {
+  color: #ff7a4f;
+}
+
+.arrangement-mute-map-result-main span,
+.arrangement-mute-map-result-meta,
+.arrangement-mute-map-result-followup {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.arrangement-mute-map-result-main strong,
+.arrangement-mute-map-result-meta strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.arrangement-mute-map-result-main small,
+.arrangement-mute-map-result-meta span,
+.arrangement-mute-map-result-followup span,
+.arrangement-mute-map-result-followup small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
 }
 
 .arrangement-mute-map-lanes {
@@ -10331,6 +10399,12 @@ h2 {
 .arrangement-transition-map-focus-readout span,
 .arrangement-transition-map-focus-readout strong,
 .arrangement-transition-map-focus-readout small,
+.arrangement-transition-map-result-main strong,
+.arrangement-transition-map-result-main small,
+.arrangement-transition-map-result-meta span,
+.arrangement-transition-map-result-meta strong,
+.arrangement-transition-map-result-followup span,
+.arrangement-transition-map-result-followup small,
 .arrangement-transition-map-card-main span,
 .arrangement-transition-map-card-main strong,
 .arrangement-transition-map-card-main small,
@@ -10384,6 +10458,68 @@ h2 {
 .arrangement-transition-map-focus-readout strong {
   color: #f4efe7;
   font-size: 11px;
+}
+
+.arrangement-transition-map-result {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid rgba(158, 231, 255, 0.22);
+  border-radius: 7px;
+  background: rgba(158, 231, 255, 0.055);
+  padding: 8px 9px;
+}
+
+.arrangement-transition-map-result.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  background: rgba(240, 195, 106, 0.06);
+}
+
+.arrangement-transition-map-result.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.arrangement-transition-map-result-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.arrangement-transition-map-result-main svg {
+  flex: 0 0 auto;
+  color: #9ee7ff;
+}
+
+.arrangement-transition-map-result.warn .arrangement-transition-map-result-main svg {
+  color: #f0c36a;
+}
+
+.arrangement-transition-map-result.danger .arrangement-transition-map-result-main svg {
+  color: #ff7a4f;
+}
+
+.arrangement-transition-map-result-main span,
+.arrangement-transition-map-result-meta,
+.arrangement-transition-map-result-followup {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.arrangement-transition-map-result-main strong,
+.arrangement-transition-map-result-meta strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.arrangement-transition-map-result-main small,
+.arrangement-transition-map-result-meta span,
+.arrangement-transition-map-result-followup span,
+.arrangement-transition-map-result-followup small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
 }
 
 .arrangement-transition-map-grid {

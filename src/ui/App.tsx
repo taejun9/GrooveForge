@@ -433,10 +433,12 @@ import type {
   ArrangementMuteMapSegment,
   ArrangementMuteMapSummary,
   ArrangementMuteMapFocusSummary,
+  ArrangementMuteMapFocusResult,
   ArrangementTransitionMapFocusId,
   ArrangementTransitionMapTransition,
   ArrangementTransitionMapSummary,
   ArrangementTransitionMapFocusSummary,
+  ArrangementTransitionMapFocusResult,
   SectionLocatorPad,
   ArrangementBlockRoleSummary,
   MixerChannelRoleSummary,
@@ -1145,8 +1147,11 @@ export function App(): ReactElement {
   const [toplineSpaceResult, setToplineSpaceResult] = useState<ToplineSpaceFocusResult | null>(null);
   const [toplineFixResult, setToplineFixResult] = useState<ToplineFixResult | null>(null);
   const [arrangementMuteMapFocusId, setArrangementMuteMapFocusId] = useState<ArrangementMuteMapFocusId | null>(null);
+  const [arrangementMuteMapResult, setArrangementMuteMapResult] = useState<ArrangementMuteMapFocusResult | null>(null);
   const [arrangementTransitionMapFocusId, setArrangementTransitionMapFocusId] =
     useState<ArrangementTransitionMapFocusId | null>(null);
+  const [arrangementTransitionMapResult, setArrangementTransitionMapResult] =
+    useState<ArrangementTransitionMapFocusResult | null>(null);
   const [keyCompassFocusId, setKeyCompassFocusId] = useState<KeyCompassFocusId | null>(null);
   const [keyCompassResult, setKeyCompassResult] = useState<KeyCompassFocusResult | null>(null);
   const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
@@ -2086,6 +2091,8 @@ export function App(): ReactElement {
     setHookFixResult(null);
     setToplineSpaceResult(null);
     setToplineFixResult(null);
+    setArrangementMuteMapResult(null);
+    setArrangementTransitionMapResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -2151,6 +2158,8 @@ export function App(): ReactElement {
       setHookFixResult(null);
       setToplineSpaceResult(null);
       setToplineFixResult(null);
+      setArrangementMuteMapResult(null);
+      setArrangementTransitionMapResult(null);
     }
     setProjectStatus(status);
   }
@@ -2309,6 +2318,8 @@ export function App(): ReactElement {
     setHookFixResult(null);
     setToplineSpaceResult(null);
     setToplineFixResult(null);
+    setArrangementMuteMapResult(null);
+    setArrangementTransitionMapResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
   }
@@ -2377,6 +2388,8 @@ export function App(): ReactElement {
     setHookFixResult(null);
     setToplineSpaceResult(null);
     setToplineFixResult(null);
+    setArrangementMuteMapResult(null);
+    setArrangementTransitionMapResult(null);
     setProjectStatus(status);
   }
 
@@ -3013,6 +3026,8 @@ export function App(): ReactElement {
 
     selectArrangementBlock(transition.fromIndex);
     setArrangementTransitionMapFocusId(transition.id);
+    setArrangementMuteMapResult(null);
+    setArrangementTransitionMapResult(null);
     setTransportLoopScope("transition");
     setPlaybackMode("arrangement");
     setProjectStatus(`Transition ${transition.fromIndex + 1}->${transition.toIndex + 1} cued as Transition loop`);
@@ -6482,12 +6497,14 @@ export function App(): ReactElement {
   function focusArrangementMuteMapLane(lane: ArrangementMuteMapLane): void {
     setArrangementMuteMapFocusId(lane.id);
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setArrangementMuteMapResult(createArrangementMuteMapFocusResult(lane, arrangementMuteMapSummary));
     setProjectStatus(`Mute Map ${lane.label}: ${lane.value}`);
   }
 
   function focusArrangementTransitionMapTransition(transition: ArrangementTransitionMapTransition): void {
     setArrangementTransitionMapFocusId(transition.id);
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setArrangementTransitionMapResult(createArrangementTransitionMapFocusResult(transition, arrangementTransitionMapSummary));
     setProjectStatus(`Transition ${transition.fromIndex + 1}->${transition.toIndex + 1}: ${transition.status}`);
   }
 
@@ -8150,6 +8167,7 @@ export function App(): ReactElement {
             focusedLaneId={arrangementMuteMapFocusId}
             onFocus={focusArrangementMuteMapLane}
             playingArrangementIndex={playingArrangementIndex}
+            result={arrangementMuteMapResult}
             summary={arrangementMuteMapSummary}
           />
           <ArrangementTransitionMap
@@ -8159,6 +8177,7 @@ export function App(): ReactElement {
             onCue={cueArrangementTransition}
             onFocus={focusArrangementTransitionMapTransition}
             playingArrangementIndex={playingArrangementIndex}
+            result={arrangementTransitionMapResult}
             summary={arrangementTransitionMapSummary}
           />
           <div
@@ -13189,11 +13208,13 @@ function ArrangementMuteMap({
   focusedLaneId,
   onFocus,
   playingArrangementIndex,
+  result,
   summary
 }: {
   focusedLaneId: ArrangementMuteMapFocusId | null;
   onFocus: (lane: ArrangementMuteMapLane) => void;
   playingArrangementIndex: number | null;
+  result: ArrangementMuteMapFocusResult | null;
   summary: ArrangementMuteMapSummary;
 }): ReactElement {
   const focusSummary = createArrangementMuteMapFocusSummary(summary, focusedLaneId);
@@ -13217,6 +13238,7 @@ function ArrangementMuteMap({
         <strong data-testid="arrangement-mute-map-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="arrangement-mute-map-focus-detail">{focusSummary.detailLabel}</small>
       </div>
+      {result && <ArrangementMuteMapFocusResultStrip result={result} />}
       <div className="arrangement-mute-map-lanes" data-testid="arrangement-mute-map-lanes">
         {summary.lanes.map((lane) => {
           const focused = focusedLaneId === lane.id;
@@ -13277,6 +13299,35 @@ function ArrangementMuteMap({
   );
 }
 
+function ArrangementMuteMapFocusResultStrip({ result }: { result: ArrangementMuteMapFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`arrangement-mute-map-result ${result.tone}`}
+      data-result-arrangement-mute-map={result.laneId}
+      data-testid="arrangement-mute-map-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="arrangement-mute-map-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="arrangement-mute-map-result-title">{result.title}</strong>
+          <small data-testid="arrangement-mute-map-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="arrangement-mute-map-result-meta">
+        <span data-testid="arrangement-mute-map-result-status">{result.status}</span>
+        <strong data-testid="arrangement-mute-map-result-destination">{result.destination}</strong>
+        <span data-testid="arrangement-mute-map-result-value">{`${result.metricLabel}: ${result.metricValue}`}</span>
+      </div>
+      <div className="arrangement-mute-map-result-followup" data-testid="arrangement-mute-map-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
+  );
+}
+
 function ArrangementTransitionMap({
   cuedTransitionId,
   focusedTransitionId,
@@ -13284,6 +13335,7 @@ function ArrangementTransitionMap({
   onCue,
   onFocus,
   playingArrangementIndex,
+  result,
   summary
 }: {
   cuedTransitionId: ArrangementTransitionMapFocusId | null;
@@ -13292,6 +13344,7 @@ function ArrangementTransitionMap({
   onCue: (transition: ArrangementTransitionMapTransition) => void;
   onFocus: (transition: ArrangementTransitionMapTransition) => void;
   playingArrangementIndex: number | null;
+  result: ArrangementTransitionMapFocusResult | null;
   summary: ArrangementTransitionMapSummary;
 }): ReactElement {
   const focusSummary = createArrangementTransitionMapFocusSummary(summary, focusedTransitionId);
@@ -13319,6 +13372,7 @@ function ArrangementTransitionMap({
         <strong data-testid="arrangement-transition-map-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="arrangement-transition-map-focus-detail">{focusSummary.detailLabel}</small>
       </div>
+      {result && <ArrangementTransitionMapFocusResultStrip result={result} />}
       <div className="arrangement-transition-map-grid" data-testid="arrangement-transition-map-grid">
         {summary.transitions.map((transition) => {
           const focused = focusedTransitionId === transition.id;
@@ -13373,6 +13427,39 @@ function ArrangementTransitionMap({
         })}
       </div>
     </section>
+  );
+}
+
+function ArrangementTransitionMapFocusResultStrip({
+  result
+}: {
+  result: ArrangementTransitionMapFocusResult;
+}): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`arrangement-transition-map-result ${result.tone}`}
+      data-result-arrangement-transition-map={result.transitionId}
+      data-testid="arrangement-transition-map-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="arrangement-transition-map-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="arrangement-transition-map-result-title">{result.title}</strong>
+          <small data-testid="arrangement-transition-map-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="arrangement-transition-map-result-meta">
+        <span data-testid="arrangement-transition-map-result-status">{result.status}</span>
+        <strong data-testid="arrangement-transition-map-result-destination">{result.destination}</strong>
+        <span data-testid="arrangement-transition-map-result-value">{`${result.metricLabel}: ${result.metricValue}`}</span>
+      </div>
+      <div className="arrangement-transition-map-result-followup" data-testid="arrangement-transition-map-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -25346,6 +25433,49 @@ function createArrangementMuteMapFocusSummary(
   };
 }
 
+function createArrangementMuteMapFocusResult(
+  lane: ArrangementMuteMapLane,
+  summary: ArrangementMuteMapSummary
+): ArrangementMuteMapFocusResult {
+  const summaryLane = summary.lanes.find((candidate) => candidate.id === lane.id) ?? lane;
+
+  return {
+    laneId: summaryLane.id,
+    status: "Focused",
+    title: `${summaryLane.label} mute lane focused`,
+    detail: `${summaryLane.value}: ${summaryLane.detail}`,
+    destination: reviewQueueFocusLabel("arrange"),
+    metricLabel: "Mute Map",
+    metricValue: arrangementMuteMapFocusResultMetric(summaryLane, summary),
+    auditionCue: arrangementMuteMapFocusResultAudition(summaryLane),
+    nextCheck: arrangementMuteMapFocusResultNextCheck(summaryLane),
+    tone: summaryLane.tone
+  };
+}
+
+function arrangementMuteMapFocusResultMetric(lane: ArrangementMuteMapLane, summary: ArrangementMuteMapSummary): string {
+  const mappedCount = summary.lanes.filter((candidate) => candidate.mutedBlocks > 0).length;
+  return `${lane.label}: ${lane.value} / ${mappedCount}/${summary.lanes.length} lanes mapped`;
+}
+
+function arrangementMuteMapFocusResultAudition(lane: ArrangementMuteMapLane): string {
+  if (lane.mutedBlocks === 0) {
+    return `Play the arrangement and confirm ${lane.label} should stay live through every section.`;
+  }
+
+  return `Play Song playback and follow where ${lane.label} drops out across sections.`;
+}
+
+function arrangementMuteMapFocusResultNextCheck(lane: ArrangementMuteMapLane): string {
+  if (lane.tone === "danger") {
+    return "Use selected-block mute controls only if the lane is unintentionally muted for the full song.";
+  }
+  if (lane.tone === "warn") {
+    return "Check Song Form Overview before deciding whether this lane needs more drop or build contrast.";
+  }
+  return "Use Arrangement Transition Map next to confirm the lane changes support handoffs.";
+}
+
 function activeArrangementMuteMapQuickActionLane(summary: ArrangementMuteMapSummary): ArrangementMuteMapLane | null {
   return summary.lanes.find((lane) => lane.tone === "danger") ?? summary.lanes.find((lane) => lane.tone === "warn") ?? summary.lanes[0] ?? null;
 }
@@ -25505,6 +25635,54 @@ function createArrangementTransitionMapFocusSummary(
     detailTitle: `${statusLabel} / ${transition.value}: ${transition.status} / ${detailLabel}`,
     tone: transition.tone
   };
+}
+
+function createArrangementTransitionMapFocusResult(
+  transition: ArrangementTransitionMapTransition,
+  summary: ArrangementTransitionMapSummary
+): ArrangementTransitionMapFocusResult {
+  const summaryTransition = summary.transitions.find((candidate) => candidate.id === transition.id) ?? transition;
+
+  return {
+    transitionId: summaryTransition.id,
+    status: "Focused",
+    title: `${summaryTransition.value} transition focused`,
+    detail: `${summaryTransition.status}: ${summaryTransition.detail}`,
+    destination: reviewQueueFocusLabel("arrange"),
+    metricLabel: "Transition",
+    metricValue: arrangementTransitionMapFocusResultMetric(summaryTransition, summary),
+    auditionCue: arrangementTransitionMapFocusResultAudition(summaryTransition),
+    nextCheck: arrangementTransitionMapFocusResultNextCheck(summaryTransition),
+    tone: summaryTransition.tone
+  };
+}
+
+function arrangementTransitionMapFocusResultMetric(
+  transition: ArrangementTransitionMapTransition,
+  summary: ArrangementTransitionMapSummary
+): string {
+  const readyCount = summary.transitions.filter((candidate) => candidate.tone === "good").length;
+  return `${transition.energyLabel} / ${transition.patternLabel} / ${readyCount}/${summary.transitions.length} ready`;
+}
+
+function arrangementTransitionMapFocusResultAudition(transition: ArrangementTransitionMapTransition): string {
+  if (transition.tone === "danger") {
+    return "Cue the transition loop and listen for missing contrast across the adjacent blocks.";
+  }
+  if (transition.tone === "warn") {
+    return "Play around the boundary and decide whether the handoff needs one stronger energy, pattern, or mute move.";
+  }
+  return "Play the transition in song context and confirm the turn supports the next section.";
+}
+
+function arrangementTransitionMapFocusResultNextCheck(transition: ArrangementTransitionMapTransition): string {
+  if (transition.tone === "danger") {
+    return "Use Arrangement Focus, Pattern Fill, or selected-block edits before adding more song length.";
+  }
+  if (transition.tone === "warn") {
+    return "Check Mute Map or Arrangement Focus before editing adjacent blocks.";
+  }
+  return "Use Song Form Overview next to confirm the full arrangement arc still reads clearly.";
 }
 
 function activeArrangementTransitionMapQuickActionTransition(
