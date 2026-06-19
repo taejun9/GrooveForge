@@ -425,7 +425,16 @@ export function PatternCompareStrip({
   );
 }
 
-export function PatternCompareDecision({ summary }: { summary: PatternCompareDecisionSummary }): ReactElement {
+export function PatternCompareDecision({
+  onRun,
+  summary
+}: {
+  onRun: (action: PatternCompareDecisionSummary["action"], pattern: PatternSlot) => void;
+  summary: PatternCompareDecisionSummary;
+}): ReactElement {
+  const Icon = summary.action === "use" ? ArrowRight : Play;
+  const runLabel = summary.action === "use" ? `Use ${summary.target}` : `Cue ${summary.target}`;
+
   return (
     <div
       className={`pattern-compare-decision ${summary.tone}`}
@@ -438,6 +447,15 @@ export function PatternCompareDecision({ summary }: { summary: PatternCompareDec
       <small data-testid="pattern-compare-decision-action">{summary.actionLabel}</small>
       <small data-testid="pattern-compare-decision-detail">{summary.detailLabel}</small>
       <small data-testid="pattern-compare-decision-metric">{summary.metricLabel}</small>
+      <button
+        data-testid="pattern-compare-decision-run"
+        onClick={() => onRun(summary.action, summary.target)}
+        title={`${summary.actionLabel}: ${summary.targetLabel}`}
+        type="button"
+      >
+        <Icon size={13} aria-hidden="true" />
+        {runLabel}
+      </button>
     </div>
   );
 }

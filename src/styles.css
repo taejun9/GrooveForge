@@ -12735,7 +12735,7 @@ h2 {
 
 .pattern-compare-decision {
   display: grid;
-  grid-template-columns: minmax(104px, 0.42fr) minmax(104px, 0.42fr) minmax(126px, 0.54fr) minmax(0, 1fr) minmax(146px, 0.62fr);
+  grid-template-columns: minmax(104px, 0.38fr) minmax(104px, 0.38fr) minmax(126px, 0.5fr) minmax(0, 1fr) minmax(146px, 0.58fr) minmax(84px, 0.34fr);
   gap: 6px;
   align-items: center;
   min-width: 0;
@@ -12793,6 +12793,36 @@ h2 {
 .pattern-compare-decision small {
   color: rgba(244, 239, 231, 0.66);
   font-size: 10px;
+}
+
+.pattern-compare-decision button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-color: rgba(120, 240, 200, 0.38);
+  color: #08120f;
+  background: #78f0c8;
+  padding: 0 7px;
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pattern-compare-decision.warn button {
+  border-color: rgba(255, 205, 112, 0.38);
+  color: #171005;
+  background: #ffcd70;
+}
+
+.pattern-compare-decision.danger button {
+  border-color: rgba(255, 122, 79, 0.38);
+  color: #160702;
+  background: #ff7a4f;
 }
 
 .pattern-compare-card {

@@ -3206,6 +3206,15 @@ export function App(): ReactElement {
     }
   }
 
+  function runPatternCompareDecision(action: PatternCompareDecisionSummary["action"], pattern: PatternSlot): void {
+    if (action === "use") {
+      usePatternInSelectedBlockFromCompare(pattern);
+      return;
+    }
+
+    cuePatternFromCompare(pattern);
+  }
+
   function copySelectedPattern(target: PatternSlot): void {
     const sourceSlot = projectRef.current.selectedPattern;
     const beforeProject = projectRef.current;
@@ -8461,7 +8470,7 @@ export function App(): ReactElement {
               <span>{audiblePatternFollowTarget ? `Edit ${audiblePatternFollowTarget}` : playingPattern ? "In sync" : "Idle"}</span>
             </button>
           </div>
-          <PatternCompareDecision summary={patternCompareDecisionSummary} />
+          <PatternCompareDecision summary={patternCompareDecisionSummary} onRun={runPatternCompareDecision} />
           <PatternCompareStrip
             playbackMode={playbackMode}
             selectedBlockPattern={selectedArrangementBlock?.pattern ?? project.selectedPattern}
