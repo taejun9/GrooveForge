@@ -61,6 +61,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "pattern-chain", command: "Pattern Chain", shortcut: "Quick Actions", target: "Arrangement sketch" },
       { id: "mix-coach", command: "Mix Coach", shortcut: "Quick Actions", target: "Headroom / balance" },
       { id: "master-finish", command: "Master Finish", shortcut: "Quick Actions", target: "Output posture" },
+      { id: "master-automation", command: "Master Automation", shortcut: "Quick Actions", target: "Fade in / out" },
       { id: "handoff-pack", command: "Handoff Pack", shortcut: "Quick Actions", target: "WAV / stems / MIDI / sheet" }
     ]
   }
