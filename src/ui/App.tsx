@@ -460,6 +460,7 @@ import type {
   ComposerGuideCardId,
   ComposerGuideCard,
   ComposerGuideFocusSummary,
+  ComposerGuideFocusResult,
   ComposerGuideSummary,
   ComposerActionArea,
   ComposerActionCommand,
@@ -1111,6 +1112,7 @@ export function App(): ReactElement {
   const [sessionBriefCompassFocusId, setSessionBriefCompassFocusId] = useState<SessionBriefCompassCardId | null>(null);
   const [referenceAlignmentFocusId, setReferenceAlignmentFocusId] = useState<ReferenceAlignmentCardId | null>(null);
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
+  const [composerGuideResult, setComposerGuideResult] = useState<ComposerGuideFocusResult | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
   const [snapshotCompareFocusId, setSnapshotCompareFocusId] = useState<SnapshotCompareFocusId | null>(null);
@@ -1993,6 +1995,7 @@ export function App(): ReactElement {
     setProjectHasUnsavedChanges(true);
     setProject(nextProject);
     setComposerActionResult(null);
+    setComposerGuideResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
@@ -2042,6 +2045,7 @@ export function App(): ReactElement {
     if (nextProject !== current) {
       projectRef.current = nextProject;
       setProject(nextProject);
+      setComposerGuideResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
@@ -2183,6 +2187,7 @@ export function App(): ReactElement {
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
     setComposerActionResult(null);
+    setComposerGuideResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2235,6 +2240,7 @@ export function App(): ReactElement {
     setSelectedChordIndex(null);
     setPlaybackPosition(null);
     setComposerActionResult(null);
+    setComposerGuideResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -6407,6 +6413,7 @@ export function App(): ReactElement {
 
     setComposerGuideFocusId(card.id);
     targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setComposerGuideResult(createComposerGuideFocusResult(card, composerGuideSummary));
     setProjectStatus(`Guide ${card.label}: ${card.status}`);
   }
 
@@ -7289,6 +7296,7 @@ export function App(): ReactElement {
       <ComposerGuide
         summary={composerGuideSummary}
         focusedCardId={composerGuideFocusId}
+        result={composerGuideResult}
         onFocus={focusComposerGuideCard}
       />
 
@@ -10346,10 +10354,12 @@ function GrooveCompass({
 function ComposerGuide({
   summary,
   focusedCardId,
+  result,
   onFocus
 }: {
   summary: ComposerGuideSummary;
   focusedCardId: ComposerGuideCardId | null;
+  result: ComposerGuideFocusResult | null;
   onFocus: (card: ComposerGuideCard) => void;
 }): ReactElement {
   const focusSummary = createComposerGuideFocusSummary(summary, focusedCardId);
@@ -10401,7 +10411,38 @@ function ComposerGuide({
           );
         })}
       </div>
+      {result && <ComposerGuideFocusResultStrip result={result} />}
     </section>
+  );
+}
+
+function ComposerGuideFocusResultStrip({ result }: { result: ComposerGuideFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`composer-guide-result ${result.tone}`}
+      data-result-composer-guide={result.cardId}
+      data-testid="composer-guide-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="composer-guide-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="composer-guide-result-title">{result.title}</strong>
+          <small data-testid="composer-guide-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="composer-guide-result-metric" data-testid="composer-guide-result-metric">
+        <span data-testid="composer-guide-result-status">{result.status}</span>
+        <strong data-testid="composer-guide-result-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="composer-guide-result-followup" data-testid="composer-guide-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -22051,6 +22092,64 @@ function createComposerGuideFocusSummary(
     detailTitle: `${statusLabel} / ${card.label}: ${card.status} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function createComposerGuideFocusResult(
+  card: ComposerGuideCard,
+  summary: ComposerGuideSummary
+): ComposerGuideFocusResult {
+  return {
+    cardId: card.id,
+    status: "Focused",
+    title: `${card.label} guide focused`,
+    detail: `${card.focusLabel}: ${card.status}`,
+    metricLabel: "Guide",
+    metricValue: composerGuideFocusResultMetric(summary),
+    auditionCue: composerGuideFocusResultAudition(card),
+    nextCheck: composerGuideFocusResultNextCheck(card),
+    tone: card.tone
+  };
+}
+
+function composerGuideFocusResultMetric(summary: ComposerGuideSummary): string {
+  const readyCount = summary.cards.filter((card) => card.tone === "good").length;
+  const reviewCount = summary.cards.filter((card) => card.tone === "warn").length;
+  const blockerCount = summary.cards.filter((card) => card.tone === "danger").length;
+  return `${readyCount}/${summary.cards.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function composerGuideFocusResultAudition(card: ComposerGuideCard): string {
+  switch (card.id) {
+    case "drums":
+      return "Loop the selected Pattern and check kick, clap, hat, perc, velocity, timing, and chance.";
+    case "bass":
+      return "Loop the selected Pattern and check 808/bass rhythm, pitch role, glide, velocity, and low-end support.";
+    case "harmony":
+      return "Loop the selected Pattern and check chord motion, voicing, length, velocity, and key fit.";
+    case "melody":
+      return "Loop the selected Pattern and check motif direction, pitch spread, velocity, chance, and hook seed.";
+    case "arrange":
+      return "Play Song or Block loop and check section order, Pattern A/B/C use, energy, and target length.";
+    case "finish":
+      return "Play Full Mix and check headroom, stems, master posture, and handoff readiness before export.";
+  }
+}
+
+function composerGuideFocusResultNextCheck(card: ComposerGuideCard): string {
+  switch (card.id) {
+    case "drums":
+      return "Return after the groove has a usable pocket or a clear reason to defer drums.";
+    case "bass":
+      return "Return after the low-end line supports the drums and selected key.";
+    case "harmony":
+      return "Return after the chord loop gives the beat enough movement or intentional space.";
+    case "melody":
+      return "Return after the hook or motif has a repeatable idea for the selected style.";
+    case "arrange":
+      return "Return after the arrangement reaches the target length or has an intentional sketch boundary.";
+    case "finish":
+      return "Return after mix, master, stem, and handoff checks are ready for the selected target.";
+  }
 }
 
 function createComposerActionsSummary(

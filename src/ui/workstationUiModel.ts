@@ -2408,6 +2408,18 @@ export type ComposerGuideSummary = {
   cards: ComposerGuideCard[];
 };
 
+export type ComposerGuideFocusResult = {
+  cardId: ComposerGuideCardId;
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type ComposerActionArea = "drums" | "bass" | "harmony" | "melody" | "arrange" | "finish";
 
 export type ComposerActionCommand =
