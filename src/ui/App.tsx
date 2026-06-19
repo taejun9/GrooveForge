@@ -273,6 +273,8 @@ import type {
   QuickActionResultMetric,
   QuickActionResult,
   BeatReadinessCheck,
+  BeatReadinessCheckId,
+  BeatReadinessFocusTarget,
   PatternCompareResult,
   PatternCompareSummary,
   PatternClonePadOption,
@@ -1073,6 +1075,7 @@ export function App(): ReactElement {
   const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
   const [styleInspectorFocusId, setStyleInspectorFocusId] = useState<StyleInspectorFocusId | null>(null);
+  const [beatReadinessFocusId, setBeatReadinessFocusId] = useState<BeatReadinessCheckId | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
   const [reviewFixResult, setReviewFixResult] = useState<ReviewFixResult | null>(null);
@@ -6051,6 +6054,19 @@ export function App(): ReactElement {
     targetRefs[zone]?.scrollIntoView({ block: "start", behavior: "auto" });
   }
 
+  function focusBeatReadinessCheck(check: BeatReadinessCheck): void {
+    const targetRefs: Record<BeatReadinessFocusTarget, HTMLElement | null> = {
+      compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
+      master: masterPanelRef.current,
+      deliver: deliverPanelRef.current
+    };
+
+    setBeatReadinessFocusId(check.id);
+    targetRefs[check.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Beat Readiness ${check.label}: ${check.status}`);
+  }
+
   function jumpToFirstBeatPathTarget(target: FirstBeatPathTarget): void {
     if (target === "transport") {
       transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -6489,6 +6505,7 @@ export function App(): ReactElement {
     arrangementTransitionLoopTarget,
     arrangementTemplatePreviewSummary,
     bassMovePreviewSummary,
+    beatReadinessChecks,
     canRedo,
     canUndo,
     beatPassportSummary,
@@ -6688,6 +6705,7 @@ export function App(): ReactElement {
     onJumpFirstBeatPath: jumpToFirstBeatPathTarget,
     onJumpBeatSpine: jumpToBeatSpineTarget,
     onFocusBeatPassport: focusBeatPassportMetric,
+    onFocusBeatReadiness: focusBeatReadinessCheck,
     onFocusComposerGuide: focusComposerGuideCard,
     onRunComposerAction: runComposerAction,
     onFocusExportPreflight: focusExportPreflightCard,
@@ -7149,7 +7167,7 @@ export function App(): ReactElement {
         onFocusPackageCheck={focusHandoffPackageCheckCard}
       />
 
-      <BeatReadiness checks={beatReadinessChecks} />
+      <BeatReadiness checks={beatReadinessChecks} focusedCheckId={beatReadinessFocusId} onFocus={focusBeatReadinessCheck} />
 
       <ListeningPass summary={listeningPassSummary} onFocus={focusListeningPassItem} />
 
@@ -11053,6 +11071,29 @@ function activeBeatPassportQuickActionMetric(summary: BeatPassportSummary): Beat
   return summary.metrics.find((metric) => metric.tone !== "good") ?? summary.metrics[0] ?? null;
 }
 
+function activeBeatReadinessQuickActionCheck(checks: BeatReadinessCheck[]): BeatReadinessCheck | null {
+  return checks.find((check) => check.tone === "danger") ?? checks.find((check) => check.tone === "warn") ?? checks[0] ?? null;
+}
+
+function beatReadinessCardActionId(check: BeatReadinessCheck): string {
+  return `beat-readiness-check-${check.id}`;
+}
+
+function beatReadinessQuickActionCheck(project: ProjectState, actionId: string): BeatReadinessCheck | null {
+  if (actionId !== "beat-readiness-focus" && !actionId.startsWith("beat-readiness-check-")) {
+    return null;
+  }
+
+  const checks = createBeatReadinessChecks(project, analyzeExport(project));
+
+  if (actionId === "beat-readiness-focus") {
+    return activeBeatReadinessQuickActionCheck(checks);
+  }
+
+  const checkId = actionId.replace("beat-readiness-check-", "");
+  return checks.find((check) => check.id === checkId) ?? null;
+}
+
 function activeStyleInspectorQuickActionItem(
   summary: StyleInspectorSummary,
   project: ProjectState
@@ -12139,6 +12180,7 @@ function createQuickActions({
   arrangementTransitionLoopTarget,
   arrangementTemplatePreviewSummary,
   bassMovePreviewSummary,
+  beatReadinessChecks,
   beatPassportSummary,
   beatSpineSummary,
   chordMovePreviewSummary,
@@ -12337,6 +12379,7 @@ function createQuickActions({
   onJumpFirstBeatPath,
   onJumpBeatSpine,
   onFocusBeatPassport,
+  onFocusBeatReadiness,
   onFocusComposerGuide,
   onRunComposerAction,
   onFocusExportPreflight,
@@ -12375,6 +12418,7 @@ function createQuickActions({
   arrangementTransitionLoopTarget: ArrangementTransitionLoopTarget | null;
   arrangementTemplatePreviewSummary: ArrangementTemplatePreviewSummary;
   bassMovePreviewSummary: BassMovePreviewSummary;
+  beatReadinessChecks: BeatReadinessCheck[];
   beatPassportSummary: BeatPassportSummary;
   beatSpineSummary: BeatSpineSummary;
   chordMovePreviewSummary: ChordMovePreviewSummary;
@@ -12573,6 +12617,7 @@ function createQuickActions({
   onJumpFirstBeatPath: (target: FirstBeatPathTarget) => void;
   onJumpBeatSpine: (card: BeatSpineCard) => void;
   onFocusBeatPassport: (metric: BeatPassportFocusItem) => void;
+  onFocusBeatReadiness: (check: BeatReadinessCheck) => void;
   onFocusComposerGuide: (card: ComposerGuideCard) => void;
   onRunComposerAction: (action: ComposerAction) => void;
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
@@ -12684,6 +12729,15 @@ function createQuickActions({
     };
   });
   const beatPassportMetric = activeBeatPassportQuickActionMetric(beatPassportSummary);
+  const beatReadinessCheck = activeBeatReadinessQuickActionCheck(beatReadinessChecks);
+  const beatReadinessActions: QuickAction[] = beatReadinessChecks.map((check) => ({
+    id: beatReadinessCardActionId(check),
+    title: `Focus Beat Readiness: ${check.label}`,
+    detail: `${check.status} / ${check.focusLabel} / ${check.detail}`,
+    group: "Project",
+    keywords: `beat readiness focus check direct ${check.id} ${check.label} ${check.status} ${check.focusLabel} ${check.detail} drums 808 bass melody chords arrangement export composer producer`,
+    run: () => onFocusBeatReadiness(check)
+  }));
   const beatPassportActions: QuickAction[] = beatPassportSummary.metrics.map((metric) => ({
     id: `beat-passport-metric-${metric.id}`,
     title: `Focus Beat Passport: ${metric.label}`,
@@ -14314,6 +14368,20 @@ function createQuickActions({
     },
     ...soundPresetActions,
     {
+      id: "beat-readiness-focus",
+      title: beatReadinessCheck ? `Focus Beat Readiness: ${beatReadinessCheck.label}` : "Focus Beat Readiness",
+      detail: beatReadinessCheck ? `${beatReadinessCheck.status} / ${beatReadinessCheck.focusLabel}` : "No Beat Readiness check available.",
+      group: "Project",
+      keywords: `beat readiness focus direct check compose arrange master deliver inspect ${beatReadinessCheck?.id ?? "none"} ${beatReadinessCheck?.focusLabel ?? "none"} beginner producer`,
+      disabled: !beatReadinessCheck,
+      run: () => {
+        if (beatReadinessCheck) {
+          onFocusBeatReadiness(beatReadinessCheck);
+        }
+      }
+    },
+    ...beatReadinessActions,
+    {
       id: "listening-pass-focus",
       title: listeningPassItem ? `Focus Listening Pass: ${listeningPassItem.label}` : "Focus Listening Pass",
       detail: listeningPassItem ? `${listeningPassItem.status} / ${listeningPassItem.focusLabel}` : "No Listening Pass checkpoint available.",
@@ -15135,6 +15203,8 @@ function createQuickActionResult(
     action.id.startsWith("beat-spine-card-jump-") ||
     action.id === "style-inspector-focus" ||
     action.id.startsWith("style-inspector-item-") ||
+    action.id === "beat-readiness-focus" ||
+    action.id.startsWith("beat-readiness-check-") ||
     action.id === "listening-pass-focus" ||
     action.id.startsWith("listening-pass-checkpoint-") ||
     action.id === "key-compass-focus" ||
@@ -15906,6 +15976,15 @@ function quickActionResultMetricSnapshot(
       id: "drum-kit",
       label: "Drum kit",
       value: `K ${compactUnitPercent(project.sound.kickPunch)} / C ${compactUnitPercent(project.sound.snareSnap)} / H ${compactUnitPercent(project.sound.hatBrightness)}`
+    };
+  }
+
+  const beatReadinessTarget = beatReadinessQuickActionCheck(project, action.id);
+  if (beatReadinessTarget) {
+    return {
+      id: "beat-readiness",
+      label: "Beat readiness",
+      value: `${beatReadinessTarget.label} / ${beatReadinessTarget.status}`
     };
   }
 
@@ -16990,6 +17069,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear kick, clap, hat, and 808 balance after the kit change.`,
       nextCheck: "Use the Drum Kit Result plus Studio tone and drum rack mixer controls for manual trim."
+    };
+  }
+
+  if (action.id === "beat-readiness-focus" || action.id.startsWith("beat-readiness-check-")) {
+    return {
+      auditionCue: "Use the focused panel to inspect the readiness issue before changing project data.",
+      nextCheck: "Return to Beat Readiness after the next explicit drums, 808, harmony, arrangement, or export move."
     };
   }
 
@@ -25110,6 +25196,8 @@ function drumReadinessCheck(drumHits: number, hasKick: boolean, hasClap: boolean
       label: "Drums",
       status: "Empty",
       detail: "No arranged drum hits detected.",
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: "danger"
     };
   }
@@ -25119,6 +25207,8 @@ function drumReadinessCheck(drumHits: number, hasKick: boolean, hasClap: boolean
       label: "Drums",
       status: "Sparse",
       detail: `${drumHits} arranged hits across the used patterns.`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: "warn"
     };
   }
@@ -25127,6 +25217,8 @@ function drumReadinessCheck(drumHits: number, hasKick: boolean, hasClap: boolean
     label: "Drums",
     status: "Set",
     detail: `${drumHits} arranged hits with kick and clap anchors.`,
+    focusTarget: "compose",
+    focusLabel: "Compose",
     tone: "good"
   };
 }
@@ -25138,6 +25230,8 @@ function bassReadinessCheck(bassCount: number): BeatReadinessCheck {
       label: "808",
       status: "Missing",
       detail: "No arranged 808 or bass notes detected.",
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: "danger"
     };
   }
@@ -25147,6 +25241,8 @@ function bassReadinessCheck(bassCount: number): BeatReadinessCheck {
       label: "808",
       status: "Light",
       detail: `${bassCount} arranged bass note${bassCount === 1 ? "" : "s"} detected.`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: "warn"
     };
   }
@@ -25155,6 +25251,8 @@ function bassReadinessCheck(bassCount: number): BeatReadinessCheck {
     label: "808",
     status: "Set",
     detail: `${bassCount} arranged bass notes detected.`,
+    focusTarget: "compose",
+    focusLabel: "Compose",
     tone: "good"
   };
 }
@@ -25166,6 +25264,8 @@ function harmonyReadinessCheck(melodyCount: number, chordCount: number): BeatRea
       label: "Melody/chords",
       status: "Missing",
       detail: "No arranged melody or chord events detected.",
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: "danger"
     };
   }
@@ -25175,6 +25275,8 @@ function harmonyReadinessCheck(melodyCount: number, chordCount: number): BeatRea
       label: "Melody/chords",
       status: "Sketch",
       detail: `${melodyCount} melody events and ${chordCount} chord events detected.`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: "warn"
     };
   }
@@ -25183,6 +25285,8 @@ function harmonyReadinessCheck(melodyCount: number, chordCount: number): BeatRea
     label: "Melody/chords",
     status: "Set",
     detail: `${melodyCount} melody events and ${chordCount} chord events detected.`,
+    focusTarget: "compose",
+    focusLabel: "Compose",
     tone: "good"
   };
 }
@@ -25194,6 +25298,8 @@ function arrangementReadinessCheck(blockCount: number, bars: number): BeatReadin
       label: "Arrangement",
       status: "Short",
       detail: `${barCountLabel(bars)} across ${blockCount} block${blockCount === 1 ? "" : "s"}.`,
+      focusTarget: "arrange",
+      focusLabel: "Arrange",
       tone: "warn"
     };
   }
@@ -25203,6 +25309,8 @@ function arrangementReadinessCheck(blockCount: number, bars: number): BeatReadin
       label: "Arrangement",
       status: "Loop ready",
       detail: `${barCountLabel(bars)} in one arrangement block.`,
+      focusTarget: "arrange",
+      focusLabel: "Arrange",
       tone: "good"
     };
   }
@@ -25211,6 +25319,8 @@ function arrangementReadinessCheck(blockCount: number, bars: number): BeatReadin
     label: "Arrangement",
     status: "Structured",
     detail: `${barCountLabel(bars)} across ${blockCount} blocks.`,
+    focusTarget: "arrange",
+    focusLabel: "Arrange",
     tone: "good"
   };
 }
@@ -25222,6 +25332,8 @@ function exportReadinessCheck(analysis: ExportAnalysis): BeatReadinessCheck {
       label: "Export",
       status: "Silent",
       detail: "Rendered arrangement output has no signal.",
+      focusTarget: "compose",
+      focusLabel: "Compose",
       tone: "danger"
     };
   }
@@ -25231,6 +25343,8 @@ function exportReadinessCheck(analysis: ExportAnalysis): BeatReadinessCheck {
       label: "Export",
       status: "Limited",
       detail: `${formatPercent(analysis.limitedPercent)} limiter activity at export.`,
+      focusTarget: "master",
+      focusLabel: "Master",
       tone: "warn"
     };
   }
@@ -25240,6 +25354,8 @@ function exportReadinessCheck(analysis: ExportAnalysis): BeatReadinessCheck {
       label: "Export",
       status: "Hot",
       detail: `${formatDb(analysis.headroomDb)} headroom before the ceiling.`,
+      focusTarget: "master",
+      focusLabel: "Master",
       tone: "warn"
     };
   }
@@ -25248,6 +25364,8 @@ function exportReadinessCheck(analysis: ExportAnalysis): BeatReadinessCheck {
     label: "Export",
     status: "Ready",
     detail: `${formatDb(analysis.headroomDb)} headroom before the ceiling.`,
+    focusTarget: "deliver",
+    focusLabel: "Deliver",
     tone: "good"
   };
 }

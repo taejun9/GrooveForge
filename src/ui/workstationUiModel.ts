@@ -1000,11 +1000,16 @@ export type QuickActionResult = {
   tone: MixCoachTone;
 };
 
+export type BeatReadinessCheckId = "drums" | "bass" | "harmony" | "arrangement" | "export";
+export type BeatReadinessFocusTarget = "compose" | "arrange" | "master" | "deliver";
+
 export type BeatReadinessCheck = {
-  id: string;
+  id: BeatReadinessCheckId;
   label: string;
   status: string;
   detail: string;
+  focusTarget: BeatReadinessFocusTarget;
+  focusLabel: string;
   tone: MixCoachTone;
 };
 

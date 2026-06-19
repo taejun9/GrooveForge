@@ -6829,6 +6829,7 @@ h2 {
 
 .beat-readiness-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 4px;
   align-content: start;
   min-width: 0;
@@ -6836,6 +6837,11 @@ h2 {
   border-radius: 7px;
   background: rgba(120, 240, 200, 0.055);
   padding: 8px 9px;
+}
+
+.beat-readiness-card.focused {
+  border-color: rgba(130, 215, 255, 0.36);
+  box-shadow: 0 0 0 1px rgba(130, 215, 255, 0.12);
 }
 
 .beat-readiness-card.warn {
@@ -6861,7 +6867,35 @@ h2 {
   font-size: 12px;
 }
 
+.beat-readiness-focus-button {
+  display: flex;
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 28px;
+  border-color: rgba(130, 215, 255, 0.2);
+  color: #f4efe7;
+  background: rgba(130, 215, 255, 0.07);
+  padding: 0 7px;
+}
+
+.beat-readiness-focus-button[aria-pressed="true"] {
+  border-color: rgba(130, 215, 255, 0.46);
+  color: #071014;
+  background: #82d7ff;
+}
+
+.beat-readiness-focus-button span {
+  color: inherit;
+  font-size: 10px;
+  font-weight: 850;
+}
+
 .beat-readiness-card p {
+  grid-column: 1 / -1;
   margin: 0;
   color: rgba(244, 239, 231, 0.72);
   font-size: 11px;
@@ -18293,6 +18327,21 @@ input[type="range"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .beat-readiness {
+    grid-template-columns: 1fr;
+  }
+
+  .beat-readiness-heading {
+    border-inline-end: 0;
+    border-block-end: 1px solid rgba(244, 239, 231, 0.1);
+    padding-inline-end: 0;
+    padding-block-end: 7px;
+  }
+
+  .beat-readiness-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .snapshot-compare {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -18852,6 +18901,17 @@ input[type="range"] {
   .handoff-package-check-focus-readout,
   .handoff-package-check-grid {
     grid-template-columns: 1fr;
+  }
+
+  .beat-readiness-list,
+  .beat-readiness-card {
+    grid-template-columns: 1fr;
+  }
+
+  .beat-readiness-focus-button {
+    grid-row: auto;
+    grid-column: 1;
+    width: 100%;
   }
 
   .mix-snapshot-head,

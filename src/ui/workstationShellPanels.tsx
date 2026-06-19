@@ -3,7 +3,7 @@ import type { ReactElement, ReactNode } from "react";
 import type { PatternSlot, ProjectState } from "../domain/workstation";
 import { arrangementTotalBars, maxProjectSnapshotNameLength, maxProjectSnapshots, projectSnapshotSummary } from "../domain/workstation";
 import type { PlaybackMode } from "../audio/scheduler";
-import type { BeatReadinessCheck, LayerStarterId, LayerStarterOption, LocalDraftRecovery, PatternCompareSummary, QuickAction, QuickActionRecent, QuickActionResult, QuickActionScopeId, QuickActionScopeOption, QuickActionSpotlightSummary, SnapshotCompareFocusId, SnapshotCompareFocusItem, SnapshotCompareFocusSummary, SnapshotCompareSummary, SnapshotSlotRoleSummary } from "./workstationUiModel";
+import type { BeatReadinessCheck, BeatReadinessCheckId, LayerStarterId, LayerStarterOption, LocalDraftRecovery, PatternCompareSummary, QuickAction, QuickActionRecent, QuickActionResult, QuickActionScopeId, QuickActionScopeOption, QuickActionSpotlightSummary, SnapshotCompareFocusId, SnapshotCompareFocusItem, SnapshotCompareFocusSummary, SnapshotCompareSummary, SnapshotSlotRoleSummary } from "./workstationUiModel";
 import { maxQuickActionPins, snapshotCompareFocusItem } from "./workstationUiModel";
 import { barCountLabel, formatLocalDraftSavedAt } from "./workstationPatternTools";
 
@@ -782,7 +782,15 @@ export function SnapshotCompare({
   );
 }
 
-export function BeatReadiness({ checks }: { checks: BeatReadinessCheck[] }): ReactElement {
+export function BeatReadiness({
+  checks,
+  focusedCheckId,
+  onFocus
+}: {
+  checks: BeatReadinessCheck[];
+  focusedCheckId: BeatReadinessCheckId | null;
+  onFocus: (check: BeatReadinessCheck) => void;
+}): ReactElement {
   const readyCount = checks.filter((check) => check.tone === "good").length;
 
   return (
@@ -794,13 +802,31 @@ export function BeatReadiness({ checks }: { checks: BeatReadinessCheck[] }): Rea
         </strong>
       </div>
       <div className="beat-readiness-list">
-        {checks.map((check) => (
-          <div className={`beat-readiness-card ${check.tone}`} data-testid={`beat-readiness-check-${check.id}`} key={check.id}>
-            <span>{check.label}</span>
-            <strong>{check.status}</strong>
-            <p>{check.detail}</p>
-          </div>
-        ))}
+        {checks.map((check) => {
+          const focused = focusedCheckId === check.id;
+          return (
+            <div
+              className={`beat-readiness-card ${check.tone} ${focused ? "focused" : ""}`}
+              data-testid={`beat-readiness-check-${check.id}`}
+              key={check.id}
+            >
+              <span>{check.label}</span>
+              <strong>{check.status}</strong>
+              <button
+                aria-pressed={focused}
+                className="beat-readiness-focus-button"
+                data-testid={`beat-readiness-focus-${check.id}`}
+                onClick={() => onFocus(check)}
+                title={`Focus ${check.label}: ${check.detail}`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{check.focusLabel}</span>
+              </button>
+              <p>{check.detail}</p>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
