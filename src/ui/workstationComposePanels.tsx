@@ -30,6 +30,15 @@ type StudioToneBaselineResult = {
   nextCheck: string;
 };
 
+type StudioToneDriftSummary = {
+  changedCount: number;
+  totalCount: number;
+  postureLabel: string;
+  largestLabel: string;
+  directionLabel: string;
+  nextCheck: string;
+};
+
 const studioToneControls: Array<{ id: string; label: string; parameter: SoundControlParameter }> = [
   { id: "kick-punch", label: "Kick punch", parameter: "kickPunch" },
   { id: "snare-snap", label: "Snare snap", parameter: "snareSnap" },
@@ -1574,6 +1583,7 @@ export function SoundDesigner({
   const [studioToneBaselineResult, setStudioToneBaselineResult] = useState<StudioToneBaselineResult | null>(null);
   const [studioToneResetResult, setStudioToneResetResult] = useState<StudioToneResetResult | null>(null);
   const presetBaseline = studioToneBaseline.sound;
+  const studioToneDrift = createStudioToneDriftSummary(sound, presetBaseline);
 
   useEffect(() => {
     if (sound.preset !== "custom") {
@@ -1649,6 +1659,7 @@ export function SoundDesigner({
             </button>
           </div>
           {studioToneBaselineResult && <StudioToneBaselineResultStrip result={studioToneBaselineResult} />}
+          <StudioToneDriftSummaryStrip summary={studioToneDrift} />
           <div className="sound-control-grid">
             {studioToneControls.map((control) => (
               <SoundControl
@@ -2290,6 +2301,27 @@ function StudioToneBaselineResultStrip({ result }: { result: StudioToneBaselineR
   );
 }
 
+function StudioToneDriftSummaryStrip({ summary }: { summary: StudioToneDriftSummary }): ReactElement {
+  return (
+    <div className="studio-tone-drift-summary" data-testid="studio-tone-drift-summary">
+      <div className="studio-tone-drift-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <b data-testid="studio-tone-drift-posture">{summary.postureLabel}</b>
+          <em data-testid="studio-tone-drift-count">
+            {summary.changedCount}/{summary.totalCount} controls changed
+          </em>
+        </span>
+      </div>
+      <div className="studio-tone-drift-meta">
+        <span data-testid="studio-tone-drift-largest">{summary.largestLabel}</span>
+        <span data-testid="studio-tone-drift-direction">{summary.directionLabel}</span>
+      </div>
+      <p data-testid="studio-tone-drift-next-check">{summary.nextCheck}</p>
+    </div>
+  );
+}
+
 function studioToneResetNextCheck(label: string): string {
   if (label.includes("808")) {
     return "Replay the 808 against the kick and confirm the low-end pocket.";
@@ -2317,6 +2349,42 @@ function createCapturedStudioToneBaseline(sound: SoundDesign): StudioToneBaselin
 
 function studioToneBaselineSummaryLabel(sound: SoundDesign): string {
   return `Kick ${percentLabel(sound.kickPunch)} | 808 ${percentLabel(sound.bassDrive)} | Synth ${percentLabel(sound.synthBrightness)} | Chord ${percentLabel(sound.chordWarmth)}`;
+}
+
+function createStudioToneDriftSummary(sound: SoundDesign, baseline: SoundDesign): StudioToneDriftSummary {
+  const deltas = studioToneControls.map((control) => {
+    const currentPercent = Math.round(sound[control.parameter] * 100);
+    const baselinePercent = Math.round(baseline[control.parameter] * 100);
+    return {
+      ...control,
+      deltaPercent: currentPercent - baselinePercent
+    };
+  });
+  const changed = deltas.filter((delta) => delta.deltaPercent !== 0);
+  const largest = deltas.reduce((currentLargest, delta) =>
+    Math.abs(delta.deltaPercent) > Math.abs(currentLargest.deltaPercent) ? delta : currentLargest
+  );
+
+  if (changed.length === 0) {
+    return {
+      changedCount: 0,
+      totalCount: studioToneControls.length,
+      postureLabel: "Tone matches baseline",
+      largestLabel: "Largest 0",
+      directionLabel: "No drift",
+      nextCheck: "Capture a new baseline after you shape a sound worth keeping."
+    };
+  }
+
+  const direction = largest.deltaPercent > 0 ? "above" : "below";
+  return {
+    changedCount: changed.length,
+    totalCount: studioToneControls.length,
+    postureLabel: changed.length >= 4 ? "Tone has broad changes" : "Tone has focused changes",
+    largestLabel: `${largest.label} ${largest.deltaPercent > 0 ? "+" : ""}${largest.deltaPercent}`,
+    directionLabel: `${largest.label} is ${direction} baseline`,
+    nextCheck: `Audition ${largest.label.toLowerCase()} first, then reset or capture if the move works.`
+  };
 }
 
 export function ChordEditor({
