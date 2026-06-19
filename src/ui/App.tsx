@@ -12706,7 +12706,7 @@ function createQuickActions({
     title: `Focus Key Compass: ${item.label}`,
     detail: `${item.value} / ${item.focusLabel} / ${item.detail}`,
     group: "Create",
-    keywords: `key compass focus card harmony scale chord 808 bass melody selected note selected chord inspect ${item.id} ${item.label} ${item.value} ${item.focusLabel} ${item.detail} beginner producer`,
+    keywords: `key compass focus card harmony cadence resolution scale chord 808 bass melody selected note selected chord inspect ${item.id} ${item.label} ${item.value} ${item.focusLabel} ${item.detail} beginner producer`,
     run: () => onFocusKeyCompass(item)
   }));
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
@@ -13971,7 +13971,7 @@ function createQuickActions({
       title: keyCompassItem ? `Focus Key Compass: ${keyCompassItem.label}` : "Focus Key Compass",
       detail: keyCompassItem ? `${keyCompassItem.value} / ${keyCompassItem.focusLabel}` : "No Key Compass card available.",
       group: "Create",
-      keywords: `key compass focus harmony scale chord 808 melody inspect ${keyCompassItem?.focusId ?? "none"} ${keyCompassItem?.focusLabel ?? "none"} beginner producer`,
+      keywords: `key compass focus harmony cadence resolution scale chord 808 melody inspect ${keyCompassItem?.focusId ?? "none"} ${keyCompassItem?.focusLabel ?? "none"} beginner producer`,
       disabled: !keyCompassItem,
       run: () => {
         if (keyCompassItem) {
@@ -16580,7 +16580,7 @@ function quickActionResultFollowup(
 
   if (action.id === "key-compass-focus") {
     return {
-      auditionCue: "Use the focused Key Compass card to inspect scale, chord, bass, or melody posture before editing notes.",
+      auditionCue: "Use the focused Key Compass card to inspect scale, cadence, chord, bass, or melody posture before editing notes.",
       nextCheck: "Return to Key Compass after the focused harmony lane changes."
     };
   }
@@ -16588,7 +16588,7 @@ function quickActionResultFollowup(
   if (action.id.startsWith("key-compass-card-")) {
     return {
       auditionCue: "Use the focused Key Compass card to inspect that harmony lane before editing notes or chords.",
-      nextCheck: "Return to Key Compass when you need another direct scale, chord, 808/bass, melody, or selected focus."
+      nextCheck: "Return to Key Compass when you need another direct scale, cadence, chord, 808/bass, melody, or selected focus."
     };
   }
 
@@ -20203,6 +20203,7 @@ function createKeyCompassSummary(
     pattern.bassNotes.length === 0 ? "danger" : bassWarnings > 0 ? "warn" : pattern.bassNotes.length >= 4 ? "good" : "warn";
   const melodyTone: MixCoachTone =
     pattern.melodyNotes.length === 0 ? "danger" : melodyWarnings > 0 ? "warn" : pattern.melodyNotes.length >= 4 ? "good" : "warn";
+  const cadence = keyCompassCadence(project.key, pattern.chordEvents);
   const focusCard = keyCompassFocusCard(project, selectedNote, selectedChord, selectedDrumStep);
   const cards: KeyCompassCard[] = [
     {
@@ -20227,6 +20228,16 @@ function createKeyCompassSummary(
       focusTarget: "compose",
       focusLabel: "Compose",
       tone: chordTone
+    },
+    {
+      id: "cadence",
+      focusId: "cadence",
+      label: "Cadence",
+      value: cadence.value,
+      detail: cadence.detail,
+      focusTarget: "compose",
+      focusLabel: "Compose",
+      tone: cadence.tone
     },
     {
       id: "bass",
@@ -20264,6 +20275,63 @@ function createKeyCompassSummary(
     scaleNotes,
     cards
   };
+}
+
+function keyCompassCadence(key: string, chords: ChordEvent[]): { value: string; detail: string; tone: MixCoachTone } {
+  if (chords.length === 0) {
+    return {
+      value: "No cadence",
+      detail: "Add chords before judging harmonic resolution",
+      tone: "danger"
+    };
+  }
+
+  const ordered = [...chords].sort((first, second) => first.step - second.step);
+  const degrees = ordered.map((chord) => keyCompassScaleDegree(key, chord.root));
+  const inKeyDegrees = degrees.filter((degree): degree is number => degree !== null);
+  const outsideCount = degrees.length - inKeyDegrees.length;
+  const uniqueDegrees = new Set(inKeyDegrees);
+  const lastDegree = degrees[degrees.length - 1] ?? null;
+  const hasHome = inKeyDegrees.includes(0);
+  const hasTension = inKeyDegrees.some((degree) => degree === 4 || degree === 6);
+
+  if (outsideCount > 0) {
+    return {
+      value: "Outside pull",
+      detail: `${outsideCount} chord root${outsideCount === 1 ? "" : "s"} outside ${key}`,
+      tone: "warn"
+    };
+  }
+  if (chords.length < 2 || uniqueDegrees.size < 2) {
+    return {
+      value: "Thin cadence",
+      detail: `${chords.length} chord event${chords.length === 1 ? "" : "s"} / ${uniqueDegrees.size} degree${uniqueDegrees.size === 1 ? "" : "s"}`,
+      tone: "warn"
+    };
+  }
+  if (lastDegree === 0 && hasTension) {
+    return {
+      value: "Resolving home",
+      detail: `${romanDegreeLabel(lastDegree)} ending after tension`,
+      tone: "good"
+    };
+  }
+  if (hasTension && !hasHome) {
+    return {
+      value: "Tension held",
+      detail: "Add or land on the home chord if the loop needs release",
+      tone: "warn"
+    };
+  }
+  return {
+    value: hasHome ? "Home anchored" : "Motion clear",
+    detail: `${uniqueDegrees.size} chord degrees / ends ${lastDegree === null ? "outside" : romanDegreeLabel(lastDegree)}`,
+    tone: "good"
+  };
+}
+
+function romanDegreeLabel(degree: number): string {
+  return ["I", "II", "III", "IV", "V", "VI", "VII"][degree] ?? `${degree + 1}`;
 }
 
 function createKeyCompassFocusSummary(summary: KeyCompassSummary, focusedCardId: KeyCompassFocusId | null): KeyCompassFocusSummary {

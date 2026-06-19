@@ -2234,7 +2234,7 @@ export type ProductionSnapshotFocusSummary = {
   tone: MixCoachTone;
 };
 
-export type KeyCompassCardId = "scale" | "chords" | "bass" | "melody" | "focus";
+export type KeyCompassCardId = "scale" | "chords" | "cadence" | "bass" | "melody" | "focus";
 export type KeyCompassFocusId = KeyCompassCardId;
 export type KeyCompassFocusTarget = "compose";
 
