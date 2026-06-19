@@ -2733,7 +2733,7 @@ export type BeatPassportFocusSummary = {
   tone: MixCoachTone;
 };
 
-export type FinishChecklistCardId = "compose" | "arrange" | "mix" | "master" | "handoff";
+export type FinishChecklistCardId = "compose" | "arrange" | "mix" | "master" | "automation" | "handoff";
 
 export type FinishChecklistCard = {
   id: FinishChecklistCardId;
@@ -3186,7 +3186,7 @@ export type SessionBriefStarterResult = {
   tone: MixCoachTone;
 };
 
-export type ExportPreflightCardId = "readiness" | "mix" | "deliverables" | "handoff";
+export type ExportPreflightCardId = "readiness" | "mix" | "automation" | "deliverables" | "handoff";
 export type ExportPreflightFocusId = ExportPreflightCardId;
 export type ExportPreflightFocusTarget = ReviewQueueFocusTarget;
 

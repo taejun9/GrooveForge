@@ -12678,7 +12678,7 @@ function createQuickActions({
     title: `Focus Export Preflight: ${card.label}`,
     detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
     group: "Export",
-    keywords: `export preflight focus card delivery risk ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} readiness mix master deliverables handoff beginner producer`,
+    keywords: `export preflight focus card delivery risk ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} readiness mix master automation fade deliverables handoff beginner producer`,
     run: () => onFocusExportPreflight(card)
   }));
   const finishChecklistCard = activeFinishChecklistQuickActionCard(finishChecklistSummary);
@@ -12687,7 +12687,7 @@ function createQuickActions({
     title: `Focus Finish Checklist: ${card.label}`,
     detail: `${card.status} / ${card.focusLabel} / ${card.detail}`,
     group: "Project",
-    keywords: `finish checklist focus card readiness ${card.id} ${card.label} ${card.status} ${card.focusLabel} ${card.detail} compose arrange mix master handoff deliver beginner producer`,
+    keywords: `finish checklist focus card readiness ${card.id} ${card.label} ${card.status} ${card.focusLabel} ${card.detail} compose arrange mix master automation fade handoff deliver beginner producer`,
     run: () => onFocusFinishChecklist(card)
   }));
   const grooveCompassItem = activeGrooveCompassQuickActionItem(grooveCompassSummary);
@@ -18666,6 +18666,9 @@ function createFinishChecklistSummary(
   const mixTone = weakestTone(mixChecks.map((check) => check.tone));
   const mixReviewCount = mixChecks.filter((check) => check.tone !== "good").length;
   const structureTone = createStructureLensSummary(project).tone;
+  const automationPreset = masterAutomationPresetForProject(project);
+  const automationLabel = masterAutomationPresetLabel(automationPreset);
+  const automationTone: MixCoachTone = automationPreset === "custom" ? "warn" : "good";
   const composeTone = weakestTone([drums?.tone ?? "danger", bass?.tone ?? "danger", harmony?.tone ?? "danger"]);
   const arrangeTone = weakestTone([
     arrangement?.tone ?? "danger",
@@ -18712,6 +18715,13 @@ function createFinishChecklistSummary(
       status: project.masterPreset,
       detail: `${analysis.status} / ${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(analysis.headroomDb)} headroom`,
       tone: masterTone
+    },
+    {
+      id: "automation",
+      label: "Automation",
+      status: automationLabel,
+      detail: `${masterAutomationEventCountLabel(project)} / ${masterAutomationRangeLabel(project)} / playback + export`,
+      tone: automationTone
     },
     {
       id: "handoff",
@@ -18939,6 +18949,8 @@ function createExportPreflightSummary(
   const midiTone: MixCoachTone = bars >= 8 ? "good" : bars >= 4 ? "warn" : "danger";
   const deliverableReady = [exportTone, stemTone, midiTone].filter((tone) => tone === "good").length;
   const briefStatus = sessionBriefStatus(project.sessionBrief);
+  const automationPreset = masterAutomationPresetForProject(project);
+  const automationTone: MixCoachTone = automationPreset === "custom" ? "warn" : "good";
   const cards: ExportPreflightCard[] = [
     {
       id: "readiness",
@@ -18962,6 +18974,16 @@ function createExportPreflightSummary(
       focusTarget: "master",
       focusLabel: "Master",
       tone: weakestTone([exportTone, mixTone])
+    },
+    {
+      id: "automation",
+      focusId: "automation",
+      label: "Automation",
+      value: masterAutomationPresetLabel(automationPreset),
+      detail: `${masterAutomationEventCountLabel(project)} / ${masterAutomationRangeLabel(project)} / WAV + stems`,
+      focusTarget: "master",
+      focusLabel: "Master",
+      tone: automationTone
     },
     {
       id: "deliverables",
@@ -19174,6 +19196,7 @@ function finishChecklistFocusTarget(cardId: FinishChecklistCardId): ReviewQueueF
     case "mix":
       return "mix";
     case "master":
+    case "automation":
       return "master";
     case "handoff":
       return "deliver";
