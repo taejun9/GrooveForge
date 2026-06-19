@@ -465,6 +465,7 @@ export function QuickActions({
       ? recentActionSource.find((action) => action.id === "guide-quick-start") ?? null
       : null;
   const guideSuggestionPinned = guideSuggestionAction ? pinnedActionIds.includes(guideSuggestionAction.id) : false;
+  const guideSuggestionSource = guideSuggestionAction ? guideSuggestionAction.detail.split(" / ")[0] || "Guide" : "Guide";
 
   return (
     <div
@@ -548,6 +549,12 @@ export function QuickActions({
               </span>
               <strong data-testid="quick-actions-guide-suggestion-title">{guideSuggestionAction.title}</strong>
               <small data-testid="quick-actions-guide-suggestion-detail">{guideSuggestionAction.detail}</small>
+              <span className="quick-actions-guide-suggestion-meta" data-testid="quick-actions-guide-suggestion-meta">
+                <span data-testid="quick-actions-guide-suggestion-source">{guideSuggestionSource}</span>
+                <span data-testid="quick-actions-guide-suggestion-pin-state">
+                  {guideSuggestionPinned ? "Pinned command" : "Not pinned"}
+                </span>
+              </span>
             </div>
             <button
               data-testid="quick-actions-guide-suggestion-run"
