@@ -2,10 +2,25 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Drum, ListChecks, Musi
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { BassNote, ChordEvent, ChordProgressionPreset, ChordQuality, DrumLane, MelodyNote, NoteTrack, PatternSlot, PatternVariationPreset, ProjectState, SoundDesign } from "../domain/workstation";
-import { chordInversions, chordInversionLabel, chordProgressionPresetIds, chordProgressionPresetLabel, chordQualities, drumStepProbability, drumStepTimingMs, drumStepVelocity, hatRepeatCount, maxDrumTimingMs, minDrumTimingMs, normalizeChordInversion, normalizeDrumProbability, normalizeDrumTimingMs, normalizeDrumVelocity, normalizeEventProbability, normalizeHatRepeat, scalePitchNames, soundPresetIds, soundPresetLabel, steps } from "../domain/workstation";
+import { chordInversions, chordInversionLabel, chordProgressionPresetIds, chordProgressionPresetLabel, chordQualities, drumStepProbability, drumStepTimingMs, drumStepVelocity, hatRepeatCount, maxDrumTimingMs, minDrumTimingMs, normalizeChordInversion, normalizeDrumProbability, normalizeDrumTimingMs, normalizeDrumVelocity, normalizeEventProbability, normalizeHatRepeat, scalePitchNames, soundPresetDesign, soundPresetIds, soundPresetLabel, steps } from "../domain/workstation";
 import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneResult, PatternFillPreviewSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundSnapshot, SoundSnapshotComparisonSummary, SoundSnapshotSlotId, SoundSnapshotSlotMap, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
 import { drumLabels, keyboardCaptureKeyLabels } from "./workstationUiModel";
 import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyChordStep, percentLabel, pitchParts, timingLabel, trackOctaveRange } from "./workstationPatternTools";
+
+type SoundControlParameter = Exclude<keyof SoundDesign, "preset">;
+
+const studioToneControls: Array<{ id: string; label: string; parameter: SoundControlParameter }> = [
+  { id: "kick-punch", label: "Kick punch", parameter: "kickPunch" },
+  { id: "snare-snap", label: "Snare snap", parameter: "snareSnap" },
+  { id: "hat-brightness", label: "Hat bright", parameter: "hatBrightness" },
+  { id: "bass-drive", label: "808 drive", parameter: "bassDrive" },
+  { id: "bass-decay", label: "808 decay", parameter: "bassDecay" },
+  { id: "sidechain-duck", label: "Kick duck", parameter: "sidechainDuck" },
+  { id: "synth-brightness", label: "Synth bright", parameter: "synthBrightness" },
+  { id: "synth-release", label: "Synth release", parameter: "synthRelease" },
+  { id: "chord-warmth", label: "Chord warm", parameter: "chordWarmth" },
+  { id: "chord-width", label: "Chord width", parameter: "chordWidth" }
+];
 
 export function DrumStepInspector({
   selectedStep,
@@ -1534,6 +1549,8 @@ export function SoundDesigner({
   onPreviewPreset: (preset: SoundPresetTarget) => void;
   onChange: (update: Partial<Omit<SoundDesign, "preset">>) => void;
 }): ReactElement {
+  const presetBaseline = sound.preset === "custom" ? sound : soundPresetDesign(sound.preset);
+
   return (
     <div className="sound-designer">
       <div className="lane-header">
@@ -1575,66 +1592,16 @@ export function SoundDesigner({
       </div>
       {mode === "studio" && (
         <div className="sound-control-grid">
-          <SoundControl
-            id="kick-punch"
-            label="Kick punch"
-            value={sound.kickPunch}
-            onChange={(value) => onChange({ kickPunch: value })}
-          />
-          <SoundControl
-            id="snare-snap"
-            label="Snare snap"
-            value={sound.snareSnap}
-            onChange={(value) => onChange({ snareSnap: value })}
-          />
-          <SoundControl
-            id="hat-brightness"
-            label="Hat bright"
-            value={sound.hatBrightness}
-            onChange={(value) => onChange({ hatBrightness: value })}
-          />
-          <SoundControl
-            id="bass-drive"
-            label="808 drive"
-            value={sound.bassDrive}
-            onChange={(value) => onChange({ bassDrive: value })}
-          />
-          <SoundControl
-            id="bass-decay"
-            label="808 decay"
-            value={sound.bassDecay}
-            onChange={(value) => onChange({ bassDecay: value })}
-          />
-          <SoundControl
-            id="sidechain-duck"
-            label="Kick duck"
-            value={sound.sidechainDuck}
-            onChange={(value) => onChange({ sidechainDuck: value })}
-          />
-          <SoundControl
-            id="synth-brightness"
-            label="Synth bright"
-            value={sound.synthBrightness}
-            onChange={(value) => onChange({ synthBrightness: value })}
-          />
-          <SoundControl
-            id="synth-release"
-            label="Synth release"
-            value={sound.synthRelease}
-            onChange={(value) => onChange({ synthRelease: value })}
-          />
-          <SoundControl
-            id="chord-warmth"
-            label="Chord warm"
-            value={sound.chordWarmth}
-            onChange={(value) => onChange({ chordWarmth: value })}
-          />
-          <SoundControl
-            id="chord-width"
-            label="Chord width"
-            value={sound.chordWidth}
-            onChange={(value) => onChange({ chordWidth: value })}
-          />
+          {studioToneControls.map((control) => (
+            <SoundControl
+              baseline={presetBaseline[control.parameter]}
+              id={control.id}
+              key={control.id}
+              label={control.label}
+              value={sound[control.parameter]}
+              onChange={(value) => onChange({ [control.parameter]: value } as Partial<Omit<SoundDesign, "preset">>)}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -2082,17 +2049,24 @@ export function SoundFocusResultStrip({ result }: { result: SoundFocusResult }):
 }
 
 export function SoundControl({
+  baseline,
   id,
   label,
   value,
   onChange
 }: {
+  baseline: number;
   id: string;
   label: string;
   value: number;
   onChange: (value: number) => void;
 }): ReactElement {
   const percentValue = `${Math.round(value * 100)}`;
+  const baselinePercent = Math.round(baseline * 100);
+  const currentPercent = Math.round(value * 100);
+  const deltaPercent = currentPercent - baselinePercent;
+  const deltaLabel = deltaPercent === 0 ? "Delta 0" : `Delta ${deltaPercent > 0 ? "+" : ""}${deltaPercent}`;
+  const resetDisabled = currentPercent === baselinePercent;
   const [percentText, setPercentText] = useState(percentValue);
   const [isEditingPercent, setIsEditingPercent] = useState(false);
   const skipNextBlurCommit = useRef(false);
@@ -2117,7 +2091,7 @@ export function SoundControl({
   }
 
   return (
-    <label className="sound-control">
+    <div className="sound-control">
       <span>
         {label} {percentLabel(value)}
       </span>
@@ -2175,7 +2149,25 @@ export function SoundControl({
           value={isEditingPercent ? percentText : percentValue}
         />
       </div>
-    </label>
+      <div className="sound-control-reference" data-testid={`sound-${id}-reference`}>
+        <span data-testid={`sound-${id}-baseline`}>Baseline {percentLabel(baseline)}</span>
+        <span data-testid={`sound-${id}-delta`}>{deltaLabel}</span>
+        <button
+          data-testid={`sound-${id}-reset`}
+          disabled={resetDisabled}
+          onClick={() => {
+            setIsEditingPercent(false);
+            setPercentText(`${baselinePercent}`);
+            onChange(baseline);
+          }}
+          title={resetDisabled ? `${label} already matches the current preset baseline` : `Reset ${label} to current preset baseline`}
+          type="button"
+        >
+          <RotateCcw size={12} aria-hidden="true" />
+          <span>Reset</span>
+        </button>
+      </div>
+    </div>
   );
 }
 
