@@ -90,6 +90,15 @@ function quickActionGuideSuggestionAfterRun(detail: string): string {
   }
 }
 
+function quickActionPinnedInspectorTarget(action: QuickAction): string {
+  const detailTarget = action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean)[0];
+
+  return `Target: ${detailTarget ?? action.title}`;
+}
+
 type CommandReferenceItem = {
   id: string;
   command: string;
@@ -719,6 +728,12 @@ export function QuickActions({
                 <small data-testid="quick-actions-pinned-inspector-detail">
                   {inspectedPinnedAction.group} / {inspectedPinnedAction.detail}
                 </small>
+                <span className="quick-actions-pinned-inspector-meta" data-testid="quick-actions-pinned-inspector-meta">
+                  <span data-testid="quick-actions-pinned-inspector-group">Group: {inspectedPinnedAction.group}</span>
+                  <span data-testid="quick-actions-pinned-inspector-target">
+                    {quickActionPinnedInspectorTarget(inspectedPinnedAction)}
+                  </span>
+                </span>
               </div>
               <button
                 data-testid="quick-actions-pinned-inspector-run"

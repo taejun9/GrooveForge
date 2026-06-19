@@ -4896,6 +4896,32 @@ h2 {
   white-space: nowrap;
 }
 
+.quick-actions-pinned-inspector-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.quick-actions-pinned-inspector-meta span {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  border: 1px solid rgba(240, 195, 106, 0.2);
+  border-radius: 999px;
+  background: rgba(17, 16, 15, 0.22);
+  color: rgba(244, 239, 231, 0.72);
+  overflow: hidden;
+  padding: 2px 6px;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .quick-actions-pinned-inspector > button {
   display: inline-flex;
   align-items: center;
