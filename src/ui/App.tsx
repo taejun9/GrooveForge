@@ -17948,7 +17948,10 @@ function createQuickActionResult(
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
   const previewOnly = action.id.startsWith("blueprint-preview-");
   const historyOnly = action.id === "undo" || action.id === "redo";
-  const cueOnly = action.id === "groove-compass-cue" || action.id.startsWith("style-goal-cue-");
+  const patternCompareDecisionKind = patternCompareDecisionQuickActionKind(action);
+  const patternCompareDecisionCue = patternCompareDecisionKind === "cue";
+  const cueOnly =
+    action.id === "groove-compass-cue" || action.id.startsWith("style-goal-cue-") || patternCompareDecisionCue;
   const focusOnly =
     action.id === "command-reference" ||
     action.id === "beat-terms-reference" ||
@@ -18234,6 +18237,36 @@ function directExportQuickActionPosture(
         activeDeliveryTarget(project).name
       }`;
   }
+}
+
+function patternCompareDecisionQuickActionKind(action: QuickAction): PatternCompareDecisionSummary["action"] | null {
+  if (action.id !== "pattern-compare-decision") {
+    return null;
+  }
+  return action.title.startsWith("Use recommended Pattern") ? "use" : "cue";
+}
+
+function patternCompareDecisionQuickActionTarget(action: QuickAction): PatternSlot | null {
+  if (action.id !== "pattern-compare-decision") {
+    return null;
+  }
+  const match = action.title.match(/Pattern ([ABC])/);
+  const slot = match?.[1];
+  return slot === "A" || slot === "B" || slot === "C" ? slot : null;
+}
+
+function patternCompareDecisionQuickActionPosture(project: ProjectState, action: QuickAction): string {
+  const target = patternCompareDecisionQuickActionTarget(action) ?? project.selectedPattern;
+  const targetPattern = project.patterns[target];
+  const eventLabel = `${patternEventTotal(targetPattern)} events`;
+  if (patternCompareDecisionQuickActionKind(action) === "use") {
+    const arrangedBlocks = project.arrangement.filter((block) => block.pattern === target);
+    const arrangedBars = arrangedBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+    const blockLabel = `${arrangedBlocks.length} block${arrangedBlocks.length === 1 ? "" : "s"}`;
+    return `Use Pattern ${target} / ${blockLabel} / ${barCountLabel(arrangedBars)} / ${eventLabel}`;
+  }
+
+  return `Cue Pattern ${target} / edit Pattern ${project.selectedPattern} / ${eventLabel}`;
 }
 
 function quickActionResultMetricSnapshot(
@@ -18658,6 +18691,14 @@ function quickActionResultMetricSnapshot(
       id: "pattern-cue",
       label: "Pattern cue",
       value: `Loop Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
+    };
+  }
+
+  if (action.id === "pattern-compare-decision") {
+    return {
+      id: "pattern-compare-decision",
+      label: patternCompareDecisionQuickActionKind(action) === "use" ? "Pattern placement" : "Pattern cue",
+      value: patternCompareDecisionQuickActionPosture(project, action)
     };
   }
 
@@ -19873,6 +19914,21 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Play Pattern loop; compare Pattern ${project.selectedPattern}'s drums, 808, chords, and Synth before editing or arranging.`,
       nextCheck: "Use Pattern Switch to edit the cued variation or Pattern Use to place it into the selected arrangement block."
+    };
+  }
+
+  if (action.id === "pattern-compare-decision") {
+    const target = patternCompareDecisionQuickActionTarget(action) ?? project.selectedPattern;
+    if (patternCompareDecisionQuickActionKind(action) === "use") {
+      return {
+        auditionCue: `Play Block loop; confirm the recommended Pattern ${target} now supports the selected arrangement block.`,
+        nextCheck: "Read Pattern Compare Result, then scan Song Form Overview and Arrangement Playback Readout before placing another variation."
+      };
+    }
+
+    return {
+      auditionCue: `Play Pattern loop; compare recommended Pattern ${target}'s drums, 808, chords, and Synth before editing or arranging.`,
+      nextCheck: "Read Pattern Compare Result, then use Pattern Switch for edits or Pattern Use when this loop should enter the song."
     };
   }
 
