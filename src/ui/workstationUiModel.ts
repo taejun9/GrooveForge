@@ -3450,6 +3450,19 @@ export type ExportPreflightFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type ExportPreflightFocusResult = {
+  cardId: ExportPreflightFocusId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type WorkflowZoneId = "compose" | "arrange" | "mix" | "deliver";
 
 export type WorkflowNavigatorItem = {

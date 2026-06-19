@@ -7008,6 +7008,14 @@ h2 {
 .export-preflight-focus-readout span,
 .export-preflight-focus-readout strong,
 .export-preflight-focus-readout small,
+.export-preflight-result-main strong,
+.export-preflight-result-main small,
+.export-preflight-result-destination span,
+.export-preflight-result-destination strong,
+.export-preflight-result-metric span,
+.export-preflight-result-metric strong,
+.export-preflight-result-followup span,
+.export-preflight-result-followup small,
 .export-preflight-card span,
 .export-preflight-card strong,
 .export-preflight-card small,
@@ -7066,6 +7074,97 @@ h2 {
 .export-preflight-focus-readout strong {
   color: #f4efe7;
   font-size: 11px;
+}
+
+.export-preflight.has-result .export-preflight-heading {
+  grid-row: 1 / 4;
+}
+
+.export-preflight.has-result .export-preflight-grid {
+  grid-row: 3;
+}
+
+.export-preflight-result {
+  display: grid;
+  grid-column: 2;
+  grid-row: 2;
+  grid-template-columns: minmax(170px, 0.34fr) minmax(140px, 0.22fr) minmax(190px, 0.42fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.22);
+  border-radius: 7px;
+  background: rgba(130, 215, 255, 0.045);
+  padding: 7px 8px;
+}
+
+.export-preflight-result.good {
+  border-color: rgba(120, 240, 200, 0.22);
+  background: rgba(120, 240, 200, 0.045);
+}
+
+.export-preflight-result.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.export-preflight-result.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.export-preflight-result-main,
+.export-preflight-result-destination,
+.export-preflight-result-metric,
+.export-preflight-result-followup {
+  min-width: 0;
+}
+
+.export-preflight-result-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.export-preflight-result-main svg {
+  flex: 0 0 auto;
+  color: #82d7ff;
+}
+
+.export-preflight-result.good .export-preflight-result-main svg {
+  color: #78f0c8;
+}
+
+.export-preflight-result.warn .export-preflight-result-main svg {
+  color: #f0c36a;
+}
+
+.export-preflight-result.danger .export-preflight-result-main svg {
+  color: #ff7a4f;
+}
+
+.export-preflight-result-main span,
+.export-preflight-result-destination,
+.export-preflight-result-metric,
+.export-preflight-result-followup {
+  display: grid;
+  gap: 2px;
+}
+
+.export-preflight-result-main strong,
+.export-preflight-result-destination strong,
+.export-preflight-result-metric strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.export-preflight-result-main small,
+.export-preflight-result-destination span,
+.export-preflight-result-metric span,
+.export-preflight-result-followup span,
+.export-preflight-result-followup small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
 }
 
 .export-preflight-grid {
@@ -19929,6 +20028,10 @@ input[type="range"] {
     gap: 3px;
   }
 
+  .export-preflight-result {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .handoff-pack {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -20896,11 +20999,14 @@ input[type="range"] {
   }
 
   .export-preflight-focus-readout,
+  .export-preflight-result,
   .export-preflight-grid {
     grid-column: 1;
     grid-row: auto;
   }
 
+  .export-preflight-focus-readout,
+  .export-preflight-result,
   .export-preflight-grid {
     grid-template-columns: 1fr;
   }

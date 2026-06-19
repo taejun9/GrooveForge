@@ -546,6 +546,7 @@ import type {
   ExportPreflightCard,
   ExportPreflightSummary,
   ExportPreflightFocusSummary,
+  ExportPreflightFocusResult,
   WorkflowZoneId,
   WorkflowNavigatorItem,
   WorkflowNavigatorJumpResult,
@@ -1152,6 +1153,7 @@ export function App(): ReactElement {
   const [finishChecklistFocusId, setFinishChecklistFocusId] = useState<FinishChecklistCardId | null>(null);
   const [finishChecklistResult, setFinishChecklistResult] = useState<FinishChecklistFocusResult | null>(null);
   const [exportPreflightFocusId, setExportPreflightFocusId] = useState<ExportPreflightFocusId | null>(null);
+  const [exportPreflightResult, setExportPreflightResult] = useState<ExportPreflightFocusResult | null>(null);
   const [handoffPackageCheckFocusId, setHandoffPackageCheckFocusId] = useState<HandoffPackageCheckFocusId | null>(null);
   const [handoffExportReceipt, setHandoffExportReceipt] = useState<HandoffExportReceipt | null>(null);
   const [projectStatus, setProjectStatus] = useState("Demo project");
@@ -2024,6 +2026,7 @@ export function App(): ReactElement {
     setBeatPassportResult(null);
     setProductionSnapshotResult(null);
     setFinishChecklistResult(null);
+    setExportPreflightResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
@@ -2083,6 +2086,7 @@ export function App(): ReactElement {
       setBeatPassportResult(null);
       setProductionSnapshotResult(null);
       setFinishChecklistResult(null);
+      setExportPreflightResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
@@ -2234,6 +2238,7 @@ export function App(): ReactElement {
     setBeatPassportResult(null);
     setProductionSnapshotResult(null);
     setFinishChecklistResult(null);
+    setExportPreflightResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2296,6 +2301,7 @@ export function App(): ReactElement {
     setBeatPassportResult(null);
     setProductionSnapshotResult(null);
     setFinishChecklistResult(null);
+    setExportPreflightResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -6565,6 +6571,7 @@ export function App(): ReactElement {
 
     setExportPreflightFocusId(card.focusId);
     targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setExportPreflightResult(createExportPreflightFocusResult(card, exportPreflightSummary));
     setProjectStatus(`Preflight ${card.label}: ${card.value}`);
   }
 
@@ -7429,6 +7436,7 @@ export function App(): ReactElement {
 
       <ExportPreflight
         focusedCardId={exportPreflightFocusId}
+        result={exportPreflightResult}
         onFocus={focusExportPreflightCard}
         sectionRef={deliverPanelRef}
         summary={exportPreflightSummary}
@@ -12191,11 +12199,13 @@ function sessionPassFocusLabel(target: SessionPassTarget): string {
 
 function ExportPreflight({
   focusedCardId,
+  result,
   onFocus,
   sectionRef,
   summary
 }: {
   focusedCardId: ExportPreflightFocusId | null;
+  result: ExportPreflightFocusResult | null;
   onFocus: (card: ExportPreflightFocusItem) => void;
   sectionRef?: Ref<HTMLElement>;
   summary: ExportPreflightSummary;
@@ -12203,7 +12213,12 @@ function ExportPreflight({
   const focusSummary = createExportPreflightFocusSummary(summary, focusedCardId);
 
   return (
-    <section className={`export-preflight ${summary.tone}`} data-testid="export-preflight" aria-label="Export preflight" ref={sectionRef}>
+    <section
+      className={["export-preflight", summary.tone, result ? "has-result" : ""].filter(Boolean).join(" ")}
+      data-testid="export-preflight"
+      aria-label="Export preflight"
+      ref={sectionRef}
+    >
       <div className="export-preflight-heading">
         <div>
           <ListChecks size={17} aria-hidden="true" />
@@ -12221,6 +12236,7 @@ function ExportPreflight({
         <strong data-testid="export-preflight-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="export-preflight-focus-detail">{focusSummary.detailLabel}</small>
       </div>
+      {result && <ExportPreflightFocusResultStrip result={result} />}
       <div className="export-preflight-grid" data-testid="export-preflight-grid">
         {summary.cards.map((card) => {
           const focused = focusedCardId === card.focusId;
@@ -12250,6 +12266,38 @@ function ExportPreflight({
         })}
       </div>
     </section>
+  );
+}
+
+function ExportPreflightFocusResultStrip({ result }: { result: ExportPreflightFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`export-preflight-result ${result.tone}`}
+      data-result-export-preflight={result.cardId}
+      data-testid="export-preflight-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="export-preflight-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="export-preflight-result-title">{result.title}</strong>
+          <small data-testid="export-preflight-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="export-preflight-result-destination" data-testid="export-preflight-result-destination">
+        <span>{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="export-preflight-result-metric" data-testid="export-preflight-result-metric">
+        <span data-testid="export-preflight-result-status">{result.metricLabel}</span>
+        <strong data-testid="export-preflight-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="export-preflight-result-followup" data-testid="export-preflight-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -20814,6 +20862,64 @@ function createExportPreflightFocusSummary(
     detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function createExportPreflightFocusResult(
+  card: ExportPreflightFocusItem,
+  summary: ExportPreflightSummary
+): ExportPreflightFocusResult {
+  const summaryCard = summary.cards.find((item) => item.focusId === card.focusId) ?? null;
+
+  return {
+    cardId: card.focusId,
+    status: "Focused",
+    title: `${card.label} preflight focused`,
+    detail: `${card.value}: ${card.detail}`,
+    destination: `${card.focusLabel} panel`,
+    metricLabel: "Preflight",
+    metricValue: exportPreflightFocusResultMetric(summary),
+    auditionCue: exportPreflightFocusResultAudition(card),
+    nextCheck: exportPreflightFocusResultNextCheck(card),
+    tone: summaryCard?.tone ?? "warn"
+  };
+}
+
+function exportPreflightFocusResultMetric(summary: ExportPreflightSummary): string {
+  const readyCount = summary.cards.filter((card) => card.tone === "good").length;
+  const reviewCount = summary.cards.filter((card) => card.tone === "warn").length;
+  const blockerCount = summary.cards.filter((card) => card.tone === "danger").length;
+
+  return `${readyCount}/${summary.cards.length} delivery risks clear / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function exportPreflightFocusResultAudition(card: ExportPreflightFocusItem): string {
+  switch (card.focusId) {
+    case "readiness":
+      return "Check Beat Readiness and the current Compose or Arrange lane before starting any export.";
+    case "mix":
+      return "Play Full Mix, then use Mix Coach, Stem Audition, and the export meter before rendering files.";
+    case "automation":
+      return "Play intro, outro, and transition ranges to confirm fade posture before WAV or stem export.";
+    case "deliverables":
+      return "Inspect WAV, stem count, MIDI scope, and target length before downloading deliverables.";
+    case "handoff":
+      return "Read Session Brief and Handoff Sheet context before sending files to a vocalist or collaborator.";
+  }
+}
+
+function exportPreflightFocusResultNextCheck(card: ExportPreflightFocusItem): string {
+  switch (card.focusId) {
+    case "readiness":
+      return "Return after composition, arrangement, and readiness blockers are clear or intentionally deferred.";
+    case "mix":
+      return "Return after headroom, balance, master posture, and meter status are ready for export.";
+    case "automation":
+      return "Return after fade automation is clear in realtime playback and export scope.";
+    case "deliverables":
+      return "Return after WAV, stems, and MIDI are ready for the selected delivery target.";
+    case "handoff":
+      return "Return after brief context and Handoff Sheet details are ready for collaborator review.";
+  }
 }
 
 function createModeFocusSummary(
