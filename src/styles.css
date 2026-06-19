@@ -1823,6 +1823,11 @@ h2 {
 .style-inspector-focus-readout span,
 .style-inspector-focus-readout strong,
 .style-inspector-focus-readout small,
+.style-goal-cue-result span,
+.style-goal-cue-result strong,
+.style-goal-cue-result small,
+.style-goal-cue-result em,
+.style-goal-cue-result i,
 .style-goal-action-result span,
 .style-goal-action-result strong,
 .style-goal-action-result small,
@@ -2086,6 +2091,7 @@ h2 {
   background: color-mix(in srgb, var(--style-color) 26%, rgba(244, 239, 231, 0.08));
 }
 
+.style-goal-cue-result,
 .style-goal-action-result {
   display: grid;
   grid-column: 2 / -1;
@@ -2100,6 +2106,15 @@ h2 {
   padding: 7px 8px;
 }
 
+.style-goal-cue-result {
+  border-color: color-mix(in srgb, var(--style-color) 42%, rgba(95, 207, 143, 0.16));
+  background: color-mix(in srgb, var(--style-color) 12%, rgba(95, 207, 143, 0.055));
+}
+
+.style-goal-cue-result.good {
+  border-color: color-mix(in srgb, #5fcf8f 44%, rgba(244, 239, 231, 0.13));
+}
+
 .style-goal-action-result.good {
   border-color: color-mix(in srgb, #5fcf8f 38%, rgba(244, 239, 231, 0.13));
 }
@@ -2112,6 +2127,10 @@ h2 {
   border-color: color-mix(in srgb, #ff7f73 44%, rgba(244, 239, 231, 0.13));
 }
 
+.style-goal-cue-result span,
+.style-goal-cue-result small,
+.style-goal-cue-result em,
+.style-goal-cue-result i,
 .style-goal-action-result span,
 .style-goal-action-result small,
 .style-goal-action-result em,
@@ -2121,13 +2140,26 @@ h2 {
   font-style: normal;
 }
 
+.style-goal-cue-result strong,
 .style-goal-action-result strong {
   color: #f4efe7;
   font-size: 11px;
 }
 
+.style-inspector.has-goal-cue-result .style-goal-action-result {
+  grid-row: 5;
+}
+
+.style-inspector.has-goal-cue-result .style-quick-picks {
+  grid-row: 5;
+}
+
 .style-inspector.has-goal-action-result .style-quick-picks {
   grid-row: 5;
+}
+
+.style-inspector.has-goal-cue-result.has-goal-action-result .style-quick-picks {
+  grid-row: 6;
 }
 
 .style-quick-picks {

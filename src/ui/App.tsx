@@ -985,6 +985,40 @@ function createSwingFeelResult(
   };
 }
 
+type StyleGoalCueResult = {
+  goalId: StyleGoalCardId;
+  status: "Cued";
+  title: string;
+  metric: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
+function createStyleGoalCueResult(goal: StyleGoalCard, project: ProjectState): StyleGoalCueResult {
+  if (goal.id === "arrange") {
+    return {
+      goalId: goal.id,
+      status: "Cued",
+      title: `${goal.label} Song loop ready`,
+      metric: `Song loop / ${barCountLabel(arrangementTotalBars(project))}`,
+      auditionCue: `Play Song loop; scan ${goal.label} across ${barCountLabel(arrangementTotalBars(project))}.`,
+      nextCheck: "Run the matching Style Goal Action only after the song-form cue exposes the next arrangement gap.",
+      tone: "good"
+    };
+  }
+
+  return {
+    goalId: goal.id,
+    status: "Cued",
+    title: `${goal.label} Pattern ${project.selectedPattern} loop ready`,
+    metric: `Pattern ${project.selectedPattern} loop / ${goal.value}`,
+    auditionCue: `Play Pattern loop; inspect ${goal.label} on Pattern ${project.selectedPattern} before applying a writing move.`,
+    nextCheck: "Run the matching Style Goal Action only if the cued loop still needs that layer.",
+    tone: "good"
+  };
+}
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<EditHistoryEntry[]>([]);
@@ -1030,6 +1064,7 @@ export function App(): ReactElement {
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [modeSwitchResult, setModeSwitchResult] = useState<ModeSwitchResult | null>(null);
   const [swingFeelResult, setSwingFeelResult] = useState<SwingFeelResult | null>(null);
+  const [styleGoalCueResult, setStyleGoalCueResult] = useState<StyleGoalCueResult | null>(null);
   const [beatBlueprintResult, setBeatBlueprintResult] = useState<BeatBlueprintResult | null>(null);
   const [beatSpineResult, setBeatSpineResult] = useState<BeatSpineApplyResult | null>(null);
   const [layerStarterResult, setLayerStarterResult] = useState<LayerStarterResult | null>(null);
@@ -1954,6 +1989,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setModeSwitchResult(null);
     setSwingFeelResult(null);
+    setStyleGoalCueResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
     setLayerStarterResult(null);
@@ -1997,6 +2033,7 @@ export function App(): ReactElement {
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setSwingFeelResult(null);
+      setStyleGoalCueResult(null);
       setBeatBlueprintResult(null);
       setBeatSpineResult(null);
       setLayerStarterResult(null);
@@ -2514,12 +2551,14 @@ export function App(): ReactElement {
     setStyleInspectorFocusId(goal.focusId);
     if (goal.id === "arrange") {
       selectTransportLoopScope("arrangement", false);
+      setStyleGoalCueResult(createStyleGoalCueResult(goal, projectRef.current));
       setProjectStatus(`Style Goal ${goal.label} cued as Song loop`);
       return;
     }
 
     const pattern = projectRef.current.selectedPattern;
     cuePattern(pattern);
+    setStyleGoalCueResult(createStyleGoalCueResult(goal, projectRef.current));
     setProjectStatus(`Style Goal ${goal.label} cued Pattern ${pattern} as Pattern loop`);
   }
 
@@ -2550,6 +2589,7 @@ export function App(): ReactElement {
 
     setTransportLoopScope(scope);
     setPlaybackMode(scope === "pattern" ? "pattern" : "arrangement");
+    setStyleGoalCueResult(null);
     if (showStatus) {
       setProjectStatus(`${transportLoopLabel(scope)} loop`);
     }
@@ -7185,6 +7225,7 @@ export function App(): ReactElement {
       <StyleInspector
         composerActionsSummary={composerActionsSummary}
         composerActionResult={composerActionResult}
+        cueResult={styleGoalCueResult}
         focusedItemId={styleInspectorFocusId}
         isPlaying={isPlaying}
         onCueGoal={cueStyleGoal}
@@ -8549,6 +8590,7 @@ export function App(): ReactElement {
 function StyleInspector({
   composerActionResult,
   composerActionsSummary,
+  cueResult,
   focusedItemId,
   isPlaying,
   onCueGoal,
@@ -8560,6 +8602,7 @@ function StyleInspector({
 }: {
   composerActionResult: ComposerActionResult | null;
   composerActionsSummary: ComposerActionsSummary;
+  cueResult: StyleGoalCueResult | null;
   focusedItemId: StyleInspectorFocusId | null;
   isPlaying: boolean;
   onCueGoal: (goal: StyleGoalCard) => void;
@@ -8573,11 +8616,14 @@ function StyleInspector({
   const actionResultGoal = composerActionResult
     ? styleGoalForComposerActionResult(composerActionResult, summary.goals)
     : null;
+  const cueResultGoal = cueResult ? summary.goals.find((goal) => goal.id === cueResult.goalId) ?? null : null;
 
   return (
     <section
       aria-label="Style inspector"
-      className={["style-inspector", actionResultGoal ? "has-goal-action-result" : ""].filter(Boolean).join(" ")}
+      className={["style-inspector", cueResultGoal ? "has-goal-cue-result" : "", actionResultGoal ? "has-goal-action-result" : ""]
+        .filter(Boolean)
+        .join(" ")}
       data-testid="style-inspector"
       style={{ "--style-color": summary.profile.color } as CSSProperties}
     >
@@ -8689,6 +8735,7 @@ function StyleInspector({
           );
         })}
       </div>
+      {cueResult && cueResultGoal && <StyleGoalCueResultStrip goal={cueResultGoal} result={cueResult} />}
       {composerActionResult && actionResultGoal && (
         <StyleGoalActionResultStrip goal={actionResultGoal} result={composerActionResult} />
       )}
@@ -8744,6 +8791,30 @@ function StyleInspector({
         })}
       </div>
     </section>
+  );
+}
+
+function StyleGoalCueResultStrip({
+  goal,
+  result
+}: {
+  goal: StyleGoalCard;
+  result: StyleGoalCueResult;
+}): ReactElement {
+  return (
+    <div
+      className={`style-goal-cue-result ${result.tone}`}
+      data-testid="style-goal-cue-result"
+      title={`${goal.label}: ${result.title} / ${result.metric}`}
+    >
+      <span data-testid="style-goal-cue-result-status">{result.status}</span>
+      <strong data-testid="style-goal-cue-result-title">
+        {goal.label}: {result.title}
+      </strong>
+      <small data-testid="style-goal-cue-result-metric">{result.metric}</small>
+      <em data-testid="style-goal-cue-result-audition">{result.auditionCue}</em>
+      <i data-testid="style-goal-cue-result-next-check">{result.nextCheck}</i>
+    </div>
   );
 }
 
