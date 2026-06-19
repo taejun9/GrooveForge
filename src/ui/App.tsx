@@ -13045,7 +13045,7 @@ function activeKeyCompassQuickActionItem(summary: KeyCompassSummary): KeyCompass
   );
 }
 
-function activeGrooveCompassQuickActionItem(summary: GrooveCompassSummary): GrooveCompassFocusItem | null {
+function activeGrooveCompassQuickActionItem(summary: GrooveCompassSummary): GrooveCompassCard | null {
   return (
     summary.cards.find((card) => card.tone === "danger") ??
     summary.cards.find((card) => card.tone === "warn") ??
@@ -24347,7 +24347,7 @@ function createGrooveCompassFocusSummary(
   focusedCardId: GrooveCompassFocusId | null
 ): GrooveCompassFocusSummary {
   const focusedCard = focusedCardId ? summary.cards.find((card) => card.focusId === focusedCardId) ?? null : null;
-  const card = focusedCard ?? summary.cards[0] ?? null;
+  const card = focusedCard ?? activeGrooveCompassQuickActionItem(summary);
 
   if (!card) {
     return {
@@ -24360,7 +24360,7 @@ function createGrooveCompassFocusSummary(
     };
   }
 
-  const statusLabel = focusedCard ? "Focused Groove" : "Groove Focus";
+  const statusLabel = focusedCard ? "Focused Groove" : grooveCompassFocusStatusLabel(card.tone);
   const detailLabel = `${card.focusLabel} panel / ${card.detail}`;
 
   return {
@@ -24371,6 +24371,18 @@ function createGrooveCompassFocusSummary(
     detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function grooveCompassFocusStatusLabel(tone: MixCoachTone): string {
+  if (tone === "danger") {
+    return "Groove blocker";
+  }
+
+  if (tone === "warn") {
+    return "Groove review";
+  }
+
+  return "Groove ready";
 }
 
 function createGrooveCompassFocusResult(
