@@ -6469,6 +6469,7 @@ export function App(): ReactElement {
     mixBalancePadOptions,
     mixBalancePreviewSummary,
     mixSnapshots,
+    masterAutomationPadOptions,
     modeFocusSummary,
     patternCloneOptions,
     patternStackOptions,
@@ -6532,6 +6533,7 @@ export function App(): ReactElement {
     onApplyDrumKit: applyDrumKitPad,
     onApplyGrooveFeel: applyGrooveFeel,
     onApplyLayerStarter: applyLayerStarter,
+    onApplyMasterAutomation: applyMasterAutomationPad,
     onApplyMasterFinish: applyMasterFinishPad,
     onApplyMelodyMotif: applyMelodyMotif,
     onApplyMelodyAccent: applyMelodyAccent,
@@ -12107,6 +12109,7 @@ function createQuickActions({
   mixBalancePadOptions,
   mixBalancePreviewSummary,
   mixSnapshots,
+  masterAutomationPadOptions,
   modeFocusSummary,
   patternCloneOptions,
   patternStackOptions,
@@ -12169,6 +12172,7 @@ function createQuickActions({
   onApplyDrumKit,
   onApplyGrooveFeel,
   onApplyLayerStarter,
+  onApplyMasterAutomation,
   onApplyMasterFinish,
   onApplyMelodyMotif,
   onApplyMelodyAccent,
@@ -12337,6 +12341,7 @@ function createQuickActions({
   mixBalancePadOptions: MixBalancePadOption[];
   mixBalancePreviewSummary: MixBalancePreviewSummary;
   mixSnapshots: MixSnapshotSlotMap;
+  masterAutomationPadOptions: MasterAutomationPadOption[];
   modeFocusSummary: ModeFocusSummary;
   patternCloneOptions: PatternClonePadOption[];
   patternStackOptions: PatternStackOption[];
@@ -12399,6 +12404,7 @@ function createQuickActions({
   onApplyDrumKit: (pad: DrumKitPadId) => void;
   onApplyGrooveFeel: (feel: GrooveFeelId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
+  onApplyMasterAutomation: (pad: MasterAutomationPadId) => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
   onApplyMelodyMotif: (motif: MelodyMotifId) => void;
   onApplyMelodyAccent: (accent: MelodyAccentId) => void;
@@ -13342,6 +13348,9 @@ function createQuickActions({
   });
   const drumKitReady = drumKitPreviewSummary.statusLabel !== "Kit aligned";
   const mixBalanceReady = mixBalancePreviewSummary.statusLabel !== "Balance aligned";
+  const masterAutomationSuggestedPad =
+    masterAutomationPadOptions.find((pad) => pad.id === suggestedMasterAutomationPad()) ?? masterAutomationPadOptions[0];
+  const masterAutomationReady = Boolean(masterAutomationSuggestedPad && masterAutomationSuggestedPad.changedCount > 0);
   const mixBalancePadActions: QuickAction[] = mixBalancePadOptions.map((pad) => ({
     id: `mix-balance-pad-${pad.id}`,
     title: pad.changedCount > 0 ? `Apply ${pad.label} Mix Balance` : `${pad.label} Mix Balance already applied`,
@@ -14648,6 +14657,45 @@ function createQuickActions({
       run: () => onApplySpaceFx(pad.id)
     })),
     {
+      id: "master-automation",
+      title:
+        masterAutomationReady && masterAutomationSuggestedPad
+          ? `Apply ${masterAutomationSuggestedPad.label} Master Automation`
+          : "Apply Master Automation",
+      detail:
+        masterAutomationReady && masterAutomationSuggestedPad
+          ? `${masterAutomationSuggestedPad.preview} / ${masterAutomationSuggestedPad.changedCount} automation event${
+              masterAutomationSuggestedPad.changedCount === 1 ? "" : "s"
+            }`
+          : "Current master automation already matches the suggested fade.",
+      group: "Mix",
+      keywords: `master automation current fade lane fade in fade out intro outro realtime export wav stems ${masterAutomationSuggestedPad?.id ?? "none"} ${
+        masterAutomationSuggestedPad?.label ?? "none"
+      } beginner producer`,
+      disabled: !masterAutomationReady || !masterAutomationSuggestedPad,
+      run: () => {
+        if (masterAutomationReady && masterAutomationSuggestedPad) {
+          onApplyMasterAutomation(masterAutomationSuggestedPad.id);
+        }
+      }
+    },
+    ...masterAutomationPadOptions.map((pad): QuickAction => ({
+      id: `master-automation-${pad.id}`,
+      title: pad.changedCount > 0 ? `Apply ${pad.label} Master Automation` : `${pad.label} Master Automation already applied`,
+      detail:
+        pad.changedCount > 0
+          ? `${pad.preview} / ${pad.changedCount} automation event${pad.changedCount === 1 ? "" : "s"} / ${pad.detail}`
+          : `${pad.label} already matches the current master automation lane.`,
+      group: "Mix",
+      keywords: `master automation direct pad fade lane ${pad.id} ${pad.label} ${pad.detail} ${pad.preview} realtime export wav stems beginner producer`,
+      disabled: pad.changedCount === 0,
+      run: () => {
+        if (pad.changedCount > 0) {
+          onApplyMasterAutomation(pad.id);
+        }
+      }
+    })),
+    {
       id: "mix-headroom",
       title: "Mix Fix Headroom",
       detail: "Set a vocal-safe ceiling and reduce master gain.",
@@ -15091,10 +15139,24 @@ function masterFinishQuickActionPad(actionId: string): MasterFinishPadDefinition
   return masterFinishPadDefinitions.find((pad) => pad.id === padId) ?? null;
 }
 
+function masterAutomationQuickActionPad(actionId: string): MasterAutomationPadDefinition | null {
+  if (!actionId.startsWith("master-automation-")) {
+    return null;
+  }
+  const padId = actionId.replace("master-automation-", "") as MasterAutomationPadId;
+  return masterAutomationPadDefinitions.find((pad) => pad.id === padId) ?? null;
+}
+
 function masterFinishQuickActionPosture(project: ProjectState): string {
   return `${project.masterPreset} / ${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(
     masterChannelVolumeDb(project.mixer)
   )} output`;
+}
+
+function masterAutomationQuickActionPosture(project: ProjectState): string {
+  return `${masterAutomationPresetLabel(masterAutomationPresetForProject(project))} / ${masterAutomationEventCountLabel(
+    project
+  )} / ${barCountLabel(arrangementTotalBars(project))}`;
 }
 
 function mixSnapshotQuickActionTarget(actionId: string): MixSnapshotQuickActionTarget | null {
@@ -16131,6 +16193,15 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  const masterAutomationPad = masterAutomationQuickActionPad(action.id);
+  if (action.id === "master-automation" || masterAutomationPad) {
+    return {
+      id: masterAutomationPad ? `master-automation-${masterAutomationPad.id}` : "master-automation",
+      label: masterAutomationPad ? `${masterAutomationPad.label} Master Automation` : "Master Automation",
+      value: masterAutomationQuickActionPosture(project)
+    };
+  }
+
   if (action.id.startsWith("space-fx-")) {
     return {
       id: "space-fx",
@@ -16148,7 +16219,7 @@ function quickActionResultMetricSnapshot(
     return { id: "song-length", label: "Song length", value: barCountLabel(arrangementTotalBars(project)) };
   }
 
-  if (action.id.startsWith("mix-") || action.id.startsWith("master-finish-")) {
+  if (action.id.startsWith("mix-") || action.id.startsWith("master-finish-") || action.id.startsWith("master-automation-")) {
     return {
       id: "mix-posture",
       label: "Mix posture",
@@ -17085,6 +17156,16 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Full Mix; watch Export meter headroom and limiter.",
       nextCheck: "Use Ceiling and master output controls for manual trim before WAV/stem export."
+    };
+  }
+
+  const masterAutomationPad = masterAutomationQuickActionPad(action.id);
+  if (action.id === "master-automation" || masterAutomationPad) {
+    return {
+      auditionCue: masterAutomationPad
+        ? masterAutomationAuditionCue(masterAutomationPad.id)
+        : "Play Song from the top and final bar; confirm the master fade supports the arrangement.",
+      nextCheck: "Export WAV/stems after the fade feels right to confirm realtime and render behavior match."
     };
   }
 
@@ -25647,6 +25728,10 @@ function createMasterAutomationPadOptions(project: ProjectState): MasterAutomati
       active: activePreset === pad.id
     };
   });
+}
+
+function suggestedMasterAutomationPad(): MasterAutomationPadId {
+  return "intro_outro";
 }
 
 function createMasterAutomationResult(
