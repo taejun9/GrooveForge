@@ -12,7 +12,7 @@ import {
   Undo2,
   X
 } from "lucide-react";
-import type { ReactElement, ReactNode } from "react";
+import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 import type { PatternSlot, ProjectState } from "../domain/workstation";
 import { arrangementTotalBars, maxProjectSnapshotNameLength, maxProjectSnapshots, projectSnapshotSummary } from "../domain/workstation";
 import type { PlaybackMode } from "../audio/scheduler";
@@ -51,6 +51,23 @@ type CommandReferenceSection = {
   id: string;
   title: string;
   items: CommandReferenceItem[];
+};
+
+type CommandReferenceFilterId =
+  | "all"
+  | "desktop-shortcuts"
+  | "project-edit"
+  | "compose-fast-path"
+  | "sound-fast-path"
+  | "arrange-fast-path"
+  | "mix-fast-path"
+  | "finish-fast-path"
+  | "deliver-fast-path"
+  | "beat-terms";
+
+type CommandReferenceFilterOption = {
+  id: CommandReferenceFilterId;
+  label: string;
 };
 
 type BeatTermItem = {
@@ -185,6 +202,29 @@ const beatTermItems: BeatTermItem[] = [
   { id: "mix-master", term: "Mix / Master", meaning: "Channel balance, space, headroom, dynamics, fades, and output.", target: "Finish" },
   { id: "handoff", term: "Handoff", meaning: "WAV, stems, MIDI, session notes, target, and delivery order.", target: "Deliver" }
 ];
+
+const commandReferenceFilterOptions: CommandReferenceFilterOption[] = [
+  { id: "all", label: "All" },
+  { id: "desktop-shortcuts", label: "Desktop" },
+  { id: "project-edit", label: "Project" },
+  { id: "compose-fast-path", label: "Create" },
+  { id: "sound-fast-path", label: "Sound" },
+  { id: "arrange-fast-path", label: "Arrange" },
+  { id: "mix-fast-path", label: "Mix" },
+  { id: "finish-fast-path", label: "Finish" },
+  { id: "deliver-fast-path", label: "Deliver" },
+  { id: "beat-terms", label: "Beat Terms" }
+];
+
+function commandReferenceFilterCount(filterId: CommandReferenceFilterId): number {
+  if (filterId === "all") {
+    return commandReferenceSections.reduce((total, section) => total + section.items.length, beatTermItems.length);
+  }
+  if (filterId === "beat-terms") {
+    return beatTermItems.length;
+  }
+  return commandReferenceSections.find((section) => section.id === filterId)?.items.length ?? 0;
+}
 
 export function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; meta: string }): ReactElement {
   return (
@@ -611,6 +651,19 @@ export function QuickActions({
 }
 
 export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClose: () => void }): ReactElement | null {
+  const [selectedFilterId, setSelectedFilterId] = useState<CommandReferenceFilterId>("all");
+  const visibleSections =
+    selectedFilterId === "all"
+      ? commandReferenceSections
+      : commandReferenceSections.filter((section) => section.id === selectedFilterId);
+  const showBeatTerms = selectedFilterId === "all" || selectedFilterId === "beat-terms";
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedFilterId("all");
+    }
+  }, [open]);
+
   if (!open) {
     return null;
   }
@@ -636,8 +689,22 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
           </button>
         </div>
         <div className="command-reference-body" data-testid="command-reference-body">
+          <div className="command-reference-filter-bar" data-testid="command-reference-filter-bar" aria-label="Command Reference sections">
+            {commandReferenceFilterOptions.map((option) => (
+              <button
+                aria-pressed={selectedFilterId === option.id}
+                data-testid={`command-reference-filter-${option.id}`}
+                key={option.id}
+                onClick={() => setSelectedFilterId(option.id)}
+                type="button"
+              >
+                <span>{option.label}</span>
+                <strong data-testid={`command-reference-filter-count-${option.id}`}>{commandReferenceFilterCount(option.id)}</strong>
+              </button>
+            ))}
+          </div>
           <div className="command-reference-grid" data-testid="command-reference-grid">
-            {commandReferenceSections.map((section) => (
+            {visibleSections.map((section) => (
               <div
                 className="command-reference-section"
                 data-testid={`command-reference-section-${section.id}`}
@@ -659,21 +726,23 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
               </div>
             ))}
           </div>
-          <div className="command-reference-terms" data-testid="command-reference-terms" aria-label="Beat terms">
-            <div className="command-reference-section-title">
-              <span>Beat Terms</span>
-              <strong>{beatTermItems.length}</strong>
+          {showBeatTerms ? (
+            <div className="command-reference-terms" data-testid="command-reference-terms" aria-label="Beat terms">
+              <div className="command-reference-section-title">
+                <span>Beat Terms</span>
+                <strong>{beatTermItems.length}</strong>
+              </div>
+              <div className="command-reference-terms-grid">
+                {beatTermItems.map((item) => (
+                  <div className="command-reference-term" data-testid={`command-reference-term-${item.id}`} key={item.id}>
+                    <span>{item.target}</span>
+                    <strong>{item.term}</strong>
+                    <small>{item.meaning}</small>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="command-reference-terms-grid">
-              {beatTermItems.map((item) => (
-                <div className="command-reference-term" data-testid={`command-reference-term-${item.id}`} key={item.id}>
-                  <span>{item.target}</span>
-                  <strong>{item.term}</strong>
-                  <small>{item.meaning}</small>
-                </div>
-              ))}
-            </div>
-          </div>
+          ) : null}
         </div>
       </section>
     </div>

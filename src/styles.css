@@ -4006,6 +4006,50 @@ h2 {
   padding-inline-end: 2px;
 }
 
+.command-reference-filter-bar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.command-reference-filter-bar button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid rgba(244, 239, 231, 0.1);
+  border-radius: 6px;
+  color: rgba(244, 239, 231, 0.72);
+  background: rgba(244, 239, 231, 0.045);
+  padding: 5px 7px;
+}
+
+.command-reference-filter-bar button[aria-pressed="true"] {
+  border-color: rgba(130, 215, 255, 0.42);
+  color: #f4efe7;
+  background: rgba(130, 215, 255, 0.12);
+}
+
+.command-reference-filter-bar button span,
+.command-reference-filter-bar button strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-reference-filter-bar button span {
+  font-size: 11px;
+}
+
+.command-reference-filter-bar button strong {
+  color: #82d7ff;
+  font-size: 11px;
+}
+
 .command-reference-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -21061,6 +21105,10 @@ input[type="range"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .command-reference-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .command-reference-grid {
     grid-template-columns: 1fr;
   }
@@ -21752,6 +21800,10 @@ input[type="range"] {
 
   .quick-actions-recents-list,
   .quick-actions-pinned-list {
+    grid-template-columns: 1fr;
+  }
+
+  .command-reference-filter-bar {
     grid-template-columns: 1fr;
   }
 
