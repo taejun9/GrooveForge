@@ -2470,6 +2470,16 @@ export function App(): ReactElement {
     setPatternCompareResult(createPatternCompareResult("cue", pattern, beforeProject, projectRef.current, selectedArrangementIndex));
   }
 
+  function cueGrooveCompass(): void {
+    if (isPlaying) {
+      setProjectStatus("Stop playback before cueing Groove Compass");
+      return;
+    }
+    const pattern = projectRef.current.selectedPattern;
+    cuePattern(pattern);
+    setProjectStatus(`Groove Compass cued Pattern ${pattern} as Pattern loop`);
+  }
+
   function updateKeyboardCaptureDefaults(update: Partial<KeyboardCaptureDefaults>): void {
     setKeyboardCaptureDefaults((current) => {
       const targetDefaults = current[keyboardCaptureTarget];
@@ -6651,6 +6661,7 @@ export function App(): ReactElement {
     onRequestMidiInputAccess: requestMidiInputAccess,
     onCueArrangementBlock: cueArrangementBlock,
     onCueSectionLocator: cueSectionLocator,
+    onCueGrooveCompass: cueGrooveCompass,
     onCuePattern: cuePattern,
     onSelectArrangementBlock: selectArrangementBlock,
     onSelectPattern: selectPattern,
@@ -7109,7 +7120,15 @@ export function App(): ReactElement {
 
       <KeyCompass focusedCardId={keyCompassFocusId} onFocus={focusKeyCompassItem} summary={keyCompassSummary} />
 
-      <GrooveCompass focusedCardId={grooveCompassFocusId} onFocus={focusGrooveCompassItem} summary={grooveCompassSummary} />
+      <GrooveCompass
+        cued={transportLoopScope === "pattern"}
+        focusedCardId={grooveCompassFocusId}
+        isPlaying={isPlaying}
+        onCue={cueGrooveCompass}
+        onFocus={focusGrooveCompassItem}
+        selectedPattern={project.selectedPattern}
+        summary={grooveCompassSummary}
+      />
 
       <ComposerGuide
         summary={composerGuideSummary}
@@ -9859,12 +9878,20 @@ function KeyCompass({
 }
 
 function GrooveCompass({
+  cued,
   focusedCardId,
+  isPlaying,
+  onCue,
   onFocus,
+  selectedPattern,
   summary
 }: {
+  cued: boolean;
   focusedCardId: GrooveCompassFocusId | null;
+  isPlaying: boolean;
+  onCue: () => void;
   onFocus: (item: GrooveCompassFocusItem) => void;
+  selectedPattern: PatternSlot;
   summary: GrooveCompassSummary;
 }): ReactElement {
   const focusSummary = createGrooveCompassFocusSummary(summary, focusedCardId);
@@ -9878,6 +9905,22 @@ function GrooveCompass({
         </div>
         <strong data-testid="groove-compass-headline">{summary.headline}</strong>
         <small data-testid="groove-compass-detail">{summary.detail}</small>
+        <button
+          aria-pressed={cued}
+          className="groove-compass-cue-button"
+          data-testid="groove-compass-cue"
+          disabled={isPlaying}
+          onClick={onCue}
+          title={
+            isPlaying
+              ? "Stop playback before cueing Groove Compass"
+              : `Cue Pattern ${selectedPattern} for Groove Compass audition`
+          }
+          type="button"
+        >
+          <Play size={13} aria-hidden="true" />
+          <span>{cued ? `Cued ${selectedPattern}` : `Cue ${selectedPattern}`}</span>
+        </button>
       </div>
       <div className={`groove-compass-focus-readout ${focusSummary.tone}`} data-testid="groove-compass-focus-readout" title={focusSummary.detailTitle}>
         <span data-testid="groove-compass-focus-status">{focusSummary.statusLabel}</span>
@@ -12327,6 +12370,7 @@ function createQuickActions({
   onRequestMidiInputAccess,
   onCueArrangementBlock,
   onCueSectionLocator,
+  onCueGrooveCompass,
   onCuePattern,
   onSelectArrangementBlock,
   onSelectPattern,
@@ -12567,6 +12611,7 @@ function createQuickActions({
   onRequestMidiInputAccess: () => Promise<void>;
   onCueArrangementBlock: (index: number) => void;
   onCueSectionLocator: (section: ArrangementSection) => void;
+  onCueGrooveCompass: () => void;
   onCuePattern: (pattern: PatternSlot) => void;
   onSelectArrangementBlock: (index: number) => void;
   onSelectPattern: (pattern: PatternSlot) => void;
@@ -12841,6 +12886,20 @@ function createQuickActions({
     keywords: `groove compass focus card rhythm pocket balance early late velocity motion drums density anchors hats timing chance selected drum inspect ${item.id} ${item.label} ${item.value} ${item.focusLabel} ${item.detail} beginner producer`,
     run: () => onFocusGrooveCompass(item)
   }));
+  const grooveCompassCued = transportLoopScope === "pattern";
+  const grooveCompassCueAction: QuickAction = {
+    id: "groove-compass-cue",
+    title: grooveCompassCued
+      ? `Groove Compass Pattern ${project.selectedPattern} already cued`
+      : `Cue Groove Compass: Pattern ${project.selectedPattern}`,
+    detail: grooveCompassCued
+      ? `Pattern ${project.selectedPattern} is the current Pattern loop for groove audition.`
+      : `Set Pattern ${project.selectedPattern} as the Pattern loop before judging density, anchors, hats, timing, chance, and pocket.`,
+    group: "Transport",
+    keywords: `groove compass cue audition loop pattern transport rhythm pocket selected ${project.selectedPattern} density anchors hats timing chance beginner producer`,
+    disabled: isPlaying,
+    run: onCueGrooveCompass
+  };
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
   const keyCompassActions: QuickAction[] = keyCompassSummary.cards.map((item) => ({
     id: `key-compass-card-${item.id}`,
@@ -13930,6 +13989,7 @@ function createQuickActions({
       disabled: isPlaying && transportLoopScope !== "pattern",
       run: () => onSelectTransportLoopScope("pattern")
     },
+    grooveCompassCueAction,
     ...arrangementTransitionLoopActions,
     ...hookReadinessCueActions,
     ...hookReadinessFixActions,
@@ -15207,6 +15267,7 @@ function createQuickActionResult(
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
   const previewOnly = action.id.startsWith("blueprint-preview-");
   const historyOnly = action.id === "undo" || action.id === "redo";
+  const cueOnly = action.id === "groove-compass-cue";
   const focusOnly =
     action.id === "command-reference" ||
     action.id === "beat-terms-reference" ||
@@ -15301,7 +15362,7 @@ function createQuickActionResult(
     label: afterMetric.label,
     before: beforeMetric.value,
     after: afterMetric.value,
-    tone: outcome === "failed" ? "danger" : previewOnly || focusOnly || uiLocal || exportOnly ? "good" : changed ? "good" : "warn"
+    tone: outcome === "failed" ? "danger" : previewOnly || cueOnly || focusOnly || uiLocal || exportOnly ? "good" : changed ? "good" : "warn"
   };
   const followup = quickActionResultFollowup(action, afterProject, outcome);
 
@@ -15313,7 +15374,9 @@ function createQuickActionResult(
         ? "Failed"
         : previewOnly
           ? "Previewed"
-          : focusOnly
+          : cueOnly
+            ? "Cued"
+            : focusOnly
             ? "Focused"
             : auditionOnly
               ? "Auditioned"
@@ -15883,6 +15946,14 @@ function quickActionResultMetricSnapshot(
       id: "pattern-edit",
       label: `Pattern ${project.selectedPattern}`,
       value: `${patternEventTotal(activePattern(project))} events`
+    };
+  }
+
+  if (action.id === "groove-compass-cue") {
+    return {
+      id: "groove-compass-cue",
+      label: "Groove cue",
+      value: `Loop Pattern ${project.selectedPattern} / ${drumHitCount(activePattern(project))} drum hits`
     };
   }
 
@@ -16989,6 +17060,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the cleared slot is silent before writing a new loop.`,
       nextCheck: "Use Layer Starter, Drum Foundation, Keyboard Capture, or manual editors to rebuild the cleared Pattern."
+    };
+  }
+
+  if (action.id === "groove-compass-cue") {
+    return {
+      auditionCue: `Play Pattern loop; listen to Pattern ${project.selectedPattern} density, anchors, hats, timing, chance, and pocket before editing drums.`,
+      nextCheck: "Use Groove Compass focus cards or selected-drum tools only after the cued loop exposes the pocket issue."
     };
   }
 

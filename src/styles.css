@@ -2300,6 +2300,7 @@ h2 {
 .groove-compass-card span,
 .groove-compass-card strong,
 .groove-compass-card small,
+.groove-compass-cue-button span,
 .groove-compass-focus-button span {
   min-width: 0;
   overflow: hidden;
@@ -2315,6 +2316,34 @@ h2 {
 .groove-compass-heading small {
   color: rgba(244, 239, 231, 0.66);
   font-size: 11px;
+}
+
+.groove-compass-cue-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: max-content;
+  max-width: 100%;
+  min-height: 26px;
+  border: 1px solid rgba(89, 213, 197, 0.24);
+  border-radius: 5px;
+  background: rgba(89, 213, 197, 0.06);
+  color: #f4efe7;
+  padding: 5px 8px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.groove-compass-cue-button:hover,
+.groove-compass-cue-button[aria-pressed="true"] {
+  border-color: rgba(89, 213, 197, 0.48);
+  background: rgba(89, 213, 197, 0.11);
+}
+
+.groove-compass-cue-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .groove-compass-focus-readout {
