@@ -13937,9 +13937,17 @@ function createQuickActions({
     {
       id: "command-reference",
       title: "Command Reference",
-      detail: "Desktop shortcuts, Quick Actions, Keyboard Capture, and finish commands.",
+      detail: "Desktop shortcuts, Beat Terms, Quick Actions, Keyboard Capture, and finish commands.",
       group: "Project",
       keywords: "command reference shortcuts keyboard help quick actions desktop capture producer beginner",
+      run: onOpenCommandReference
+    },
+    {
+      id: "beat-terms-reference",
+      title: "Beat Terms Reference",
+      detail: "Pattern, drums, 808, chords, sound, arrangement, mix/master, and handoff terms.",
+      group: "Project",
+      keywords: "beat terms glossary reference beginner producer pattern drums 808 bass chords sound arrangement mix master handoff help",
       run: onOpenCommandReference
     },
     {
@@ -15113,6 +15121,7 @@ function createQuickActionResult(
   const previewOnly = action.id.startsWith("blueprint-preview-");
   const focusOnly =
     action.id === "command-reference" ||
+    action.id === "beat-terms-reference" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
     action.id === "session-brief-compass-focus" ||
@@ -15388,8 +15397,8 @@ function quickActionResultMetricSnapshot(
     return { id: "snapshots", label: "Snapshots", value: `${project.snapshots.length} slots` };
   }
 
-  if (action.id === "command-reference") {
-    return { id: "command-reference", label: "Reference", value: "Desktop / Create / Finish" };
+  if (action.id === "command-reference" || action.id === "beat-terms-reference") {
+    return { id: "command-reference", label: "Reference", value: "Desktop / Create / Finish / Beat Terms" };
   }
 
   if (
@@ -16452,9 +16461,9 @@ function quickActionResultFollowup(
     };
   }
 
-  if (action.id === "command-reference") {
+  if (action.id === "command-reference" || action.id === "beat-terms-reference") {
     return {
-      auditionCue: "Use the reference only to choose the next explicit local command.",
+      auditionCue: "Use the reference only to choose the next explicit local command or understand the current beat term.",
       nextCheck: "Open Quick Actions when you are ready to run one command."
     };
   }

@@ -20,6 +20,13 @@ type CommandReferenceSection = {
   items: CommandReferenceItem[];
 };
 
+type BeatTermItem = {
+  id: string;
+  term: string;
+  meaning: string;
+  target: string;
+};
+
 const commandReferenceSections: CommandReferenceSection[] = [
   {
     id: "desktop-shortcuts",
@@ -65,6 +72,17 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "handoff-pack", command: "Handoff Pack", shortcut: "Quick Actions", target: "WAV / stems / MIDI / sheet" }
     ]
   }
+];
+
+const beatTermItems: BeatTermItem[] = [
+  { id: "pattern", term: "Pattern", meaning: "A/B/C loop with editable drum, 808, chord, and synth events.", target: "Compose" },
+  { id: "drums", term: "Drums", meaning: "Kick, clap/snare, hats, perc, timing, chance, and pocket.", target: "Groove" },
+  { id: "bass-808", term: "808/Bass", meaning: "Synth low-end notes with glide, drive, decay, and kick duck.", target: "Low end" },
+  { id: "chords", term: "Chords", meaning: "Harmony bed, cadence, voicing, rhythm, velocity, and chance.", target: "Harmony" },
+  { id: "sound", term: "Sound", meaning: "Preset, kit, focus, timbre, and A/B tone passes.", target: "Tone" },
+  { id: "arrangement", term: "Arrangement", meaning: "Song sections, pattern blocks, energy, mutes, and transitions.", target: "Song" },
+  { id: "mix-master", term: "Mix / Master", meaning: "Channel balance, space, headroom, dynamics, fades, and output.", target: "Finish" },
+  { id: "handoff", term: "Handoff", meaning: "WAV, stems, MIDI, session notes, target, and delivery order.", target: "Deliver" }
 ];
 
 export function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; meta: string }): ReactElement {
@@ -516,28 +534,45 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
             <X size={14} aria-hidden="true" />
           </button>
         </div>
-        <div className="command-reference-grid" data-testid="command-reference-grid">
-          {commandReferenceSections.map((section) => (
-            <div
-              className="command-reference-section"
-              data-testid={`command-reference-section-${section.id}`}
-              key={section.id}
-            >
-              <div className="command-reference-section-title">
-                <span>{section.title}</span>
-                <strong>{section.items.length}</strong>
+        <div className="command-reference-body" data-testid="command-reference-body">
+          <div className="command-reference-grid" data-testid="command-reference-grid">
+            {commandReferenceSections.map((section) => (
+              <div
+                className="command-reference-section"
+                data-testid={`command-reference-section-${section.id}`}
+                key={section.id}
+              >
+                <div className="command-reference-section-title">
+                  <span>{section.title}</span>
+                  <strong>{section.items.length}</strong>
+                </div>
+                <div className="command-reference-items">
+                  {section.items.map((item) => (
+                    <div className="command-reference-item" data-testid={`command-reference-item-${item.id}`} key={item.id}>
+                      <kbd>{item.shortcut}</kbd>
+                      <strong>{item.command}</strong>
+                      <small>{item.target}</small>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="command-reference-items">
-                {section.items.map((item) => (
-                  <div className="command-reference-item" data-testid={`command-reference-item-${item.id}`} key={item.id}>
-                    <kbd>{item.shortcut}</kbd>
-                    <strong>{item.command}</strong>
-                    <small>{item.target}</small>
-                  </div>
-                ))}
-              </div>
+            ))}
+          </div>
+          <div className="command-reference-terms" data-testid="command-reference-terms" aria-label="Beat terms">
+            <div className="command-reference-section-title">
+              <span>Beat Terms</span>
+              <strong>{beatTermItems.length}</strong>
             </div>
-          ))}
+            <div className="command-reference-terms-grid">
+              {beatTermItems.map((item) => (
+                <div className="command-reference-term" data-testid={`command-reference-term-${item.id}`} key={item.id}>
+                  <span>{item.target}</span>
+                  <strong>{item.term}</strong>
+                  <small>{item.meaning}</small>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
     </div>
