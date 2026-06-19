@@ -7,6 +7,7 @@ import {
   PinOff,
   Play,
   Save,
+  Search,
   Target,
   Trash2,
   Undo2,
@@ -224,6 +225,21 @@ function commandReferenceFilterCount(filterId: CommandReferenceFilterId): number
     return beatTermItems.length;
   }
   return commandReferenceSections.find((section) => section.id === filterId)?.items.length ?? 0;
+}
+
+function commandReferenceMatchesQuery(values: string[], query: string): boolean {
+  if (!query) {
+    return true;
+  }
+  return values.some((value) => value.toLocaleLowerCase().includes(query));
+}
+
+function commandReferenceItemMatchesQuery(section: CommandReferenceSection, item: CommandReferenceItem, query: string): boolean {
+  return commandReferenceMatchesQuery([section.title, item.command, item.shortcut, item.target], query);
+}
+
+function beatTermMatchesQuery(item: BeatTermItem, query: string): boolean {
+  return commandReferenceMatchesQuery([item.term, item.meaning, item.target], query);
 }
 
 export function PanelTitle({ icon, title, meta }: { icon: ReactNode; title: string; meta: string }): ReactElement {
@@ -652,15 +668,30 @@ export function QuickActions({
 
 export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClose: () => void }): ReactElement | null {
   const [selectedFilterId, setSelectedFilterId] = useState<CommandReferenceFilterId>("all");
-  const visibleSections =
+  const [searchQuery, setSearchQuery] = useState("");
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
+  const filteredSections =
     selectedFilterId === "all"
       ? commandReferenceSections
       : commandReferenceSections.filter((section) => section.id === selectedFilterId);
+  const visibleSections = filteredSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => commandReferenceItemMatchesQuery(section, item, normalizedSearchQuery))
+    }))
+    .filter((section) => section.items.length > 0);
   const showBeatTerms = selectedFilterId === "all" || selectedFilterId === "beat-terms";
+  const visibleBeatTerms = showBeatTerms
+    ? beatTermItems.filter((item) => beatTermMatchesQuery(item, normalizedSearchQuery))
+    : [];
+  const visibleCommandCount = visibleSections.reduce((total, section) => total + section.items.length, 0);
+  const visibleResultCount = visibleCommandCount + visibleBeatTerms.length;
+  const hasVisibleResults = visibleResultCount > 0;
 
   useEffect(() => {
     if (!open) {
       setSelectedFilterId("all");
+      setSearchQuery("");
     }
   }, [open]);
 
@@ -703,6 +734,18 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
               </button>
             ))}
           </div>
+          <div className="command-reference-search" data-testid="command-reference-search">
+            <Search size={14} aria-hidden="true" />
+            <input
+              aria-label="Search Command Reference"
+              data-testid="command-reference-search-input"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search commands or terms"
+              type="search"
+              value={searchQuery}
+            />
+            <span data-testid="command-reference-search-count">{visibleResultCount} shown</span>
+          </div>
           <div className="command-reference-grid" data-testid="command-reference-grid">
             {visibleSections.map((section) => (
               <div
@@ -726,14 +769,14 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
               </div>
             ))}
           </div>
-          {showBeatTerms ? (
+          {showBeatTerms && visibleBeatTerms.length > 0 ? (
             <div className="command-reference-terms" data-testid="command-reference-terms" aria-label="Beat terms">
               <div className="command-reference-section-title">
                 <span>Beat Terms</span>
-                <strong>{beatTermItems.length}</strong>
+                <strong>{visibleBeatTerms.length}</strong>
               </div>
               <div className="command-reference-terms-grid">
-                {beatTermItems.map((item) => (
+                {visibleBeatTerms.map((item) => (
                   <div className="command-reference-term" data-testid={`command-reference-term-${item.id}`} key={item.id}>
                     <span>{item.target}</span>
                     <strong>{item.term}</strong>
@@ -741,6 +784,12 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
                   </div>
                 ))}
               </div>
+            </div>
+          ) : null}
+          {!hasVisibleResults ? (
+            <div className="command-reference-empty" data-testid="command-reference-empty">
+              <strong>No command reference matches</strong>
+              <small>Try another command, shortcut, production term, or section filter.</small>
             </div>
           ) : null}
         </div>
