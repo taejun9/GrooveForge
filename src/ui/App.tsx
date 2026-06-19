@@ -8590,11 +8590,13 @@ function StyleInspector({
         title={`${summary.profile.name} direct-composition goals: ${summary.goalHeadline}`}
       >
         {summary.goals.map((goal) => (
-          <div className="style-goal-card" data-testid={`style-goal-${goal.id}`} key={goal.id}>
+          <div className={`style-goal-card ${goal.tone}`} data-testid={`style-goal-${goal.id}`} key={goal.id}>
             <span data-testid={`style-goal-${goal.id}-label`}>{goal.label}</span>
-            <strong data-testid={`style-goal-${goal.id}-target`}>{goal.target}</strong>
-            <small data-testid={`style-goal-${goal.id}-cue`}>{goal.cue}</small>
-            <em data-testid={`style-goal-${goal.id}-detail`}>{goal.detail}</em>
+            <strong data-testid={`style-goal-${goal.id}-current`}>{goal.current}</strong>
+            <small data-testid={`style-goal-${goal.id}-target`}>Target {goal.target}</small>
+            <b data-testid={`style-goal-${goal.id}-progress`}>{goal.progress}</b>
+            <em data-testid={`style-goal-${goal.id}-cue`}>{goal.cue}</em>
+            <i data-testid={`style-goal-${goal.id}-detail`}>{goal.detail}</i>
           </div>
         ))}
       </div>
@@ -25300,7 +25302,7 @@ function createStyleInspectorSummary(
     goalHeadline: styleActionProfile.focus,
     totalEvents,
     metrics,
-    goals: createStyleGoalCards(styleActionProfile),
+    goals: createStyleGoalCards(project, styleActionProfile),
     patterns: patternSummaries.map((pattern) => ({
       slot: pattern.slot,
       label: styleDensityLabel(pattern.eventCount),
@@ -25314,45 +25316,48 @@ function createStyleInspectorSummary(
   };
 }
 
-function createStyleGoalCards(styleActionProfile: ComposerStyleActionProfile): StyleGoalCard[] {
+function createStyleGoalCards(project: ProjectState, styleActionProfile: ComposerStyleActionProfile): StyleGoalCard[] {
   const { cues, goals, priorities } = styleActionProfile;
+  const pattern = activePattern(project);
+  const drumHits = drumHitCount(pattern);
+  const bassNotes = pattern.bassNotes.length;
+  const chordEvents = pattern.chordEvents.length;
+  const melodyNotes = pattern.melodyNotes.length;
+  const arrangedBars = arrangementTotalBars(project);
+
   return [
-    {
-      id: "drums",
-      label: "Drums",
-      target: `${goals.drumHits} hits`,
-      cue: cues.drums,
-      detail: styleGoalPriorityLabel(priorities.drums)
-    },
-    {
-      id: "bass",
-      label: "808/Bass",
-      target: `${goals.bassNotes} notes`,
-      cue: cues.bass,
-      detail: styleGoalPriorityLabel(priorities.bass)
-    },
-    {
-      id: "harmony",
-      label: "Harmony",
-      target: `${goals.chordEvents} chords`,
-      cue: cues.harmony,
-      detail: styleGoalPriorityLabel(priorities.harmony)
-    },
-    {
-      id: "melody",
-      label: "Melody",
-      target: `${goals.melodyNotes} notes`,
-      cue: cues.melody,
-      detail: styleGoalPriorityLabel(priorities.melody)
-    },
-    {
-      id: "arrange",
-      label: "Arrange",
-      target: barCountLabel(goals.arrangementBars),
-      cue: cues.arrange,
-      detail: styleGoalPriorityLabel(priorities.arrange)
-    }
+    createStyleGoalCard("drums", "Drums", drumHits, goals.drumHits, "hits", cues.drums, priorities.drums),
+    createStyleGoalCard("bass", "808/Bass", bassNotes, goals.bassNotes, "notes", cues.bass, priorities.bass),
+    createStyleGoalCard("harmony", "Harmony", chordEvents, goals.chordEvents, "chords", cues.harmony, priorities.harmony),
+    createStyleGoalCard("melody", "Melody", melodyNotes, goals.melodyNotes, "notes", cues.melody, priorities.melody),
+    createStyleGoalCard("arrange", "Arrange", arrangedBars, goals.arrangementBars, "bars", cues.arrange, priorities.arrange)
   ];
+}
+
+function createStyleGoalCard(
+  id: StyleGoalCard["id"],
+  label: string,
+  current: number,
+  goal: number,
+  unit: string,
+  cue: string,
+  priority: number
+): StyleGoalCard {
+  const tone = composerActionTone(current, goal);
+  return {
+    id,
+    label,
+    current: styleGoalCountLabel(current, unit),
+    target: `${goal} ${unit}`,
+    progress: `${Math.min(current, goal)}/${goal}`,
+    cue,
+    detail: styleGoalPriorityLabel(priority),
+    tone
+  };
+}
+
+function styleGoalCountLabel(count: number, unit: string): string {
+  return `${count} ${unit} now`;
 }
 
 function styleGoalPriorityLabel(priority: number): string {

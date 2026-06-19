@@ -1295,9 +1295,12 @@ export type StyleGoalCardId = "drums" | "bass" | "harmony" | "melody" | "arrange
 export type StyleGoalCard = {
   id: StyleGoalCardId;
   label: string;
+  current: string;
   target: string;
+  progress: string;
   cue: string;
   detail: string;
+  tone: MixCoachTone;
 };
 
 export type StyleInspectorSummary = {
