@@ -1290,6 +1290,16 @@ export type StylePatternDensity = {
   focusLabel: "Compose";
 };
 
+export type StyleGoalCardId = "drums" | "bass" | "harmony" | "melody" | "arrange";
+
+export type StyleGoalCard = {
+  id: StyleGoalCardId;
+  label: string;
+  target: string;
+  cue: string;
+  detail: string;
+};
+
 export type StyleInspectorSummary = {
   profile: StyleProfile;
   bpm: string;
@@ -1297,8 +1307,10 @@ export type StyleInspectorSummary = {
   bass: string;
   melody: string;
   soundPreset: string;
+  goalHeadline: string;
   totalEvents: number;
   metrics: StyleInspectorMetric[];
+  goals: StyleGoalCard[];
   patterns: StylePatternDensity[];
 };
 

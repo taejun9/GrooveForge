@@ -302,6 +302,7 @@ import type {
   StyleInspectorFocusItem,
   StyleInspectorMetric,
   StylePatternDensity,
+  StyleGoalCard,
   StyleInspectorSummary,
   StyleInspectorFocusSummary,
   BasslinePadId,
@@ -8581,6 +8582,21 @@ function StyleInspector({
             </div>
           );
         })}
+      </div>
+      <div
+        aria-label={`${summary.profile.name} style goals: ${summary.goalHeadline}`}
+        className="style-inspector-goals"
+        data-testid="style-goal-cards"
+        title={`${summary.profile.name} direct-composition goals: ${summary.goalHeadline}`}
+      >
+        {summary.goals.map((goal) => (
+          <div className="style-goal-card" data-testid={`style-goal-${goal.id}`} key={goal.id}>
+            <span data-testid={`style-goal-${goal.id}-label`}>{goal.label}</span>
+            <strong data-testid={`style-goal-${goal.id}-target`}>{goal.target}</strong>
+            <small data-testid={`style-goal-${goal.id}-cue`}>{goal.cue}</small>
+            <em data-testid={`style-goal-${goal.id}-detail`}>{goal.detail}</em>
+          </div>
+        ))}
       </div>
       <div className="style-quick-picks" aria-label="Style quick picks" data-testid="style-quick-picks">
         {styleProfiles.map((profile) => {
@@ -25219,6 +25235,7 @@ function createStyleInspectorSummary(
   patternSummaries: PatternCompareSummary[]
 ): StyleInspectorSummary {
   const totalEvents = patternSummaries.reduce((total, pattern) => total + pattern.eventCount, 0);
+  const styleActionProfile = composerStyleActionProfiles[profile.id];
   const soundPreset = styleSoundPreset(profile.id);
   const bpm = `${project.bpm} active / ${profile.bpmRange[0]}-${profile.bpmRange[1]}`;
   const swing = `${percentLabel(project.swing)} active / ${percentLabel(profile.defaultSwing)} default`;
@@ -25280,8 +25297,10 @@ function createStyleInspectorSummary(
     bass,
     melody,
     soundPreset: soundPresetName,
+    goalHeadline: styleActionProfile.focus,
     totalEvents,
     metrics,
+    goals: createStyleGoalCards(styleActionProfile),
     patterns: patternSummaries.map((pattern) => ({
       slot: pattern.slot,
       label: styleDensityLabel(pattern.eventCount),
@@ -25293,6 +25312,51 @@ function createStyleInspectorSummary(
       focusLabel: "Compose"
     }))
   };
+}
+
+function createStyleGoalCards(styleActionProfile: ComposerStyleActionProfile): StyleGoalCard[] {
+  const { cues, goals, priorities } = styleActionProfile;
+  return [
+    {
+      id: "drums",
+      label: "Drums",
+      target: `${goals.drumHits} hits`,
+      cue: cues.drums,
+      detail: styleGoalPriorityLabel(priorities.drums)
+    },
+    {
+      id: "bass",
+      label: "808/Bass",
+      target: `${goals.bassNotes} notes`,
+      cue: cues.bass,
+      detail: styleGoalPriorityLabel(priorities.bass)
+    },
+    {
+      id: "harmony",
+      label: "Harmony",
+      target: `${goals.chordEvents} chords`,
+      cue: cues.harmony,
+      detail: styleGoalPriorityLabel(priorities.harmony)
+    },
+    {
+      id: "melody",
+      label: "Melody",
+      target: `${goals.melodyNotes} notes`,
+      cue: cues.melody,
+      detail: styleGoalPriorityLabel(priorities.melody)
+    },
+    {
+      id: "arrange",
+      label: "Arrange",
+      target: barCountLabel(goals.arrangementBars),
+      cue: cues.arrange,
+      detail: styleGoalPriorityLabel(priorities.arrange)
+    }
+  ];
+}
+
+function styleGoalPriorityLabel(priority: number): string {
+  return `Writing priority ${priority}`;
 }
 
 function createStyleInspectorFocusSummary(
