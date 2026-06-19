@@ -1103,6 +1103,7 @@ h2 {
 }
 
 .mode-focus-heading {
+  grid-row: 1 / span 2;
   display: grid;
   gap: 4px;
   align-content: center;
@@ -1131,6 +1132,9 @@ h2 {
 
 .mode-focus-heading strong,
 .mode-focus-heading small,
+.mode-focus-decision span,
+.mode-focus-decision strong,
+.mode-focus-decision small,
 .mode-focus-card span,
 .mode-focus-card strong,
 .mode-focus-card small,
@@ -1157,7 +1161,48 @@ h2 {
   font-size: 11px;
 }
 
+.mode-focus-decision {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: minmax(92px, 0.28fr) minmax(132px, 0.32fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.16);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 7px 8px;
+}
+
+.mode-focus-decision.warn {
+  border-color: rgba(240, 195, 106, 0.2);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.mode-focus-decision.danger {
+  border-color: rgba(255, 122, 79, 0.24);
+  background: rgba(255, 122, 79, 0.058);
+}
+
+.mode-focus-decision span {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.mode-focus-decision strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.mode-focus-decision small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 10px;
+}
+
 .mode-focus-grid {
+  grid-column: 2;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
@@ -22102,6 +22147,10 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .mode-focus-decision {
+    grid-template-columns: minmax(88px, 0.3fr) minmax(116px, 0.34fr) minmax(0, 1fr);
+  }
+
   .mode-focus-result {
     grid-column: 1 / -1;
     grid-template-columns: 150px minmax(0, 0.6fr) minmax(0, 1fr);
@@ -22987,10 +23036,16 @@ input[type="range"] {
   }
 
   .mode-focus-heading {
+    grid-row: auto;
     border-inline-end: 0;
     border-block-end: 1px solid rgba(244, 239, 231, 0.1);
     padding-inline-end: 0;
     padding-block-end: 7px;
+  }
+
+  .mode-focus-decision {
+    grid-column: 1;
+    grid-template-columns: 1fr;
   }
 
   .mode-focus-result,

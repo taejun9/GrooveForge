@@ -12946,7 +12946,7 @@ function activeFirstBeatPathQuickActionStep(summary: FirstBeatPathSummary): Firs
 }
 
 function activeModeFocusQuickActionCard(summary: ModeFocusSummary): ModeFocusCard | null {
-  const preferredId = summary.mode === "guided" ? "stage" : "issue";
+  const preferredId = preferredModeFocusCardId(summary.mode);
   return summary.cards.find((card) => card.id === preferredId) ?? summary.cards[0] ?? null;
 }
 
@@ -22537,6 +22537,7 @@ function createModeFocusSummary(
       headline: reviewQueue.headline,
       detail: `${target.name} / ${project.masterPreset} / ${finish.detail}`,
       tone: weakestTone(cards.map((card) => card.tone)),
+      ...createModeFocusDecision("studio", cards),
       cards
     };
   }
@@ -22580,8 +22581,54 @@ function createModeFocusSummary(
     headline: composer.headline,
     detail: `${beatMap.headline} / Pattern ${project.selectedPattern} / ${target.name}`,
     tone: weakestTone(cards.map((card) => card.tone)),
+    ...createModeFocusDecision("guided", cards),
     cards
   };
+}
+
+function createModeFocusDecision(
+  mode: ProjectState["mode"],
+  cards: ModeFocusCard[]
+): Pick<ModeFocusSummary, "activeCardId" | "decisionStatus" | "decisionLabel" | "decisionDetail" | "decisionTitle" | "decisionTone"> {
+  const preferredId = preferredModeFocusCardId(mode);
+  const activeCard = cards.find((card) => card.id === preferredId) ?? cards[0] ?? null;
+  const label = modeLabel(mode);
+
+  if (!activeCard) {
+    return {
+      activeCardId: preferredId,
+      decisionStatus: `${label} ready`,
+      decisionLabel: `Jump to ${label}`,
+      decisionDetail: `${label} mode has no active orientation card.`,
+      decisionTitle: `${label} Mode Focus has no active orientation card.`,
+      decisionTone: "good"
+    };
+  }
+
+  return {
+    activeCardId: activeCard.id,
+    decisionStatus: modeFocusDecisionStatus(label, activeCard.tone),
+    decisionLabel: `Jump to ${activeCard.focusLabel}`,
+    decisionDetail: `${activeCard.label}: ${activeCard.value} / ${activeCard.detail}`,
+    decisionTitle: `${label} Mode Focus uses ${activeCard.label} as the current decision and jumps to ${activeCard.focusLabel}.`,
+    decisionTone: activeCard.tone
+  };
+}
+
+function modeFocusDecisionStatus(label: string, tone: MixCoachTone): string {
+  if (tone === "danger") {
+    return `${label} blocker`;
+  }
+
+  if (tone === "warn") {
+    return `${label} review`;
+  }
+
+  return `${label} ready`;
+}
+
+function preferredModeFocusCardId(mode: ProjectState["mode"]): string {
+  return mode === "guided" ? "stage" : "issue";
 }
 
 function modeFocusStageTarget(stageId: string): ReviewQueueFocusTarget {

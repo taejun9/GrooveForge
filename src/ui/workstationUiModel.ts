@@ -3177,6 +3177,12 @@ export type ModeFocusSummary = {
   headline: string;
   detail: string;
   tone: MixCoachTone;
+  activeCardId: string;
+  decisionStatus: string;
+  decisionLabel: string;
+  decisionDetail: string;
+  decisionTitle: string;
+  decisionTone: MixCoachTone;
   cards: ModeFocusCard[];
 };
 

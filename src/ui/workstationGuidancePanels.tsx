@@ -285,6 +285,16 @@ export function ModeFocus({
         <strong data-testid="mode-focus-headline">{summary.headline}</strong>
         <small data-testid="mode-focus-detail">{summary.detail}</small>
       </div>
+      <div
+        className={`mode-focus-decision ${summary.decisionTone}`}
+        data-mode-focus-decision={summary.activeCardId}
+        data-testid="mode-focus-decision"
+        title={summary.decisionTitle}
+      >
+        <span data-testid="mode-focus-decision-status">{summary.decisionStatus}</span>
+        <strong data-testid="mode-focus-decision-label">{summary.decisionLabel}</strong>
+        <small data-testid="mode-focus-decision-detail">{summary.decisionDetail}</small>
+      </div>
       <div className="mode-focus-grid" data-testid="mode-focus-grid">
         {summary.cards.map((card) => (
           <div className={`mode-focus-card ${card.tone}`} data-testid={`mode-focus-${card.id}`} key={card.id}>
