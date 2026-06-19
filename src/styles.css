@@ -1828,6 +1828,7 @@ h2 {
 .style-goal-cue-result small,
 .style-goal-cue-result em,
 .style-goal-cue-result i,
+.style-goal-cue-result-action-button span,
 .style-goal-action-result span,
 .style-goal-action-result strong,
 .style-goal-action-result small,
@@ -2107,6 +2108,11 @@ h2 {
 }
 
 .style-goal-cue-result {
+  grid-template-columns:
+    minmax(0, 0.52fr) minmax(0, 1.12fr) minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.2fr) minmax(82px, 0.62fr);
+}
+
+.style-goal-cue-result {
   border-color: color-mix(in srgb, var(--style-color) 42%, rgba(95, 207, 143, 0.16));
   background: color-mix(in srgb, var(--style-color) 12%, rgba(95, 207, 143, 0.055));
 }
@@ -2144,6 +2150,31 @@ h2 {
 .style-goal-action-result strong {
   color: #f4efe7;
   font-size: 11px;
+}
+
+.style-goal-cue-result-action-button {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--style-color) 46%, rgba(244, 239, 231, 0.18));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--style-color) 18%, rgba(244, 239, 231, 0.06));
+  color: #f4efe7;
+  padding: 5px 7px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.style-goal-cue-result-action-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--style-color) 70%, rgba(244, 239, 231, 0.22));
+  background: color-mix(in srgb, var(--style-color) 26%, rgba(244, 239, 231, 0.08));
+}
+
+.style-goal-cue-result-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .style-inspector.has-goal-cue-result .style-goal-action-result {

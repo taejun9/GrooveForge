@@ -8735,7 +8735,14 @@ function StyleInspector({
           );
         })}
       </div>
-      {cueResult && cueResultGoal && <StyleGoalCueResultStrip goal={cueResultGoal} result={cueResult} />}
+      {cueResult && cueResultGoal && (
+        <StyleGoalCueResultStrip
+          action={composerActionForStyleGoal(cueResultGoal, composerActionsSummary.actions)}
+          goal={cueResultGoal}
+          onRunAction={onRunGoalAction}
+          result={cueResult}
+        />
+      )}
       {composerActionResult && actionResultGoal && (
         <StyleGoalActionResultStrip goal={actionResultGoal} result={composerActionResult} />
       )}
@@ -8795,10 +8802,14 @@ function StyleInspector({
 }
 
 function StyleGoalCueResultStrip({
+  action,
   goal,
+  onRunAction,
   result
 }: {
+  action: ComposerAction | null;
   goal: StyleGoalCard;
+  onRunAction: (action: ComposerAction) => void;
   result: StyleGoalCueResult;
 }): ReactElement {
   return (
@@ -8814,6 +8825,21 @@ function StyleGoalCueResultStrip({
       <small data-testid="style-goal-cue-result-metric">{result.metric}</small>
       <em data-testid="style-goal-cue-result-audition">{result.auditionCue}</em>
       <i data-testid="style-goal-cue-result-next-check">{result.nextCheck}</i>
+      <button
+        className="style-goal-cue-result-action-button"
+        data-testid="style-goal-cue-result-action"
+        disabled={!action}
+        onClick={() => {
+          if (action) {
+            onRunAction(action);
+          }
+        }}
+        title={action ? `${goal.label} goal action: ${action.label}` : `${goal.label} goal action unavailable`}
+        type="button"
+      >
+        <Sparkles size={12} aria-hidden="true" />
+        <span>{action ? action.buttonLabel : "No Action"}</span>
+      </button>
     </div>
   );
 }
