@@ -7163,9 +7163,11 @@ export function App(): ReactElement {
       {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}
 
       <StyleInspector
+        composerActionsSummary={composerActionsSummary}
         focusedItemId={styleInspectorFocusId}
         onSelectStyle={selectStyle}
         onFocus={focusStyleInspectorItem}
+        onRunGoalAction={runComposerAction}
         selectedStyleId={project.styleId}
         summary={styleInspectorSummary}
       />
@@ -8522,14 +8524,18 @@ export function App(): ReactElement {
 }
 
 function StyleInspector({
+  composerActionsSummary,
   focusedItemId,
   onFocus,
+  onRunGoalAction,
   onSelectStyle,
   selectedStyleId,
   summary
 }: {
+  composerActionsSummary: ComposerActionsSummary;
   focusedItemId: StyleInspectorFocusId | null;
   onFocus: (item: StyleInspectorFocusItem) => void;
+  onRunGoalAction: (action: ComposerAction) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
   selectedStyleId: ProjectState["styleId"];
   summary: StyleInspectorSummary;
@@ -8590,34 +8596,51 @@ function StyleInspector({
         data-testid="style-goal-cards"
         title={`${summary.profile.name} direct-composition goals: ${summary.goalHeadline}`}
       >
-        {summary.goals.map((goal) => (
-          <div
-            className={["style-goal-card", goal.tone, focusedItemId === goal.focusId ? "focused" : ""]
-              .filter(Boolean)
-              .join(" ")}
-            data-focused={focusedItemId === goal.focusId ? "true" : "false"}
-            data-testid={`style-goal-${goal.id}`}
-            key={goal.id}
-          >
-            <span data-testid={`style-goal-${goal.id}-label`}>{goal.label}</span>
-            <strong data-testid={`style-goal-${goal.id}-current`}>{goal.current}</strong>
-            <small data-testid={`style-goal-${goal.id}-target`}>Target {goal.target}</small>
-            <b data-testid={`style-goal-${goal.id}-progress`}>{goal.progress}</b>
-            <button
-              aria-pressed={focusedItemId === goal.focusId}
-              className="style-goal-focus-button"
-              data-testid={`style-goal-focus-${goal.id}`}
-              onClick={() => onFocus(goal)}
-              title={`Focus ${goal.focusLabel}: ${goal.value}`}
-              type="button"
+        {summary.goals.map((goal) => {
+          const goalAction = composerActionForStyleGoal(goal, composerActionsSummary.actions);
+          return (
+            <div
+              className={["style-goal-card", goal.tone, focusedItemId === goal.focusId ? "focused" : ""]
+                .filter(Boolean)
+                .join(" ")}
+              data-focused={focusedItemId === goal.focusId ? "true" : "false"}
+              data-testid={`style-goal-${goal.id}`}
+              key={goal.id}
             >
-              <ArrowRight size={13} aria-hidden="true" />
-              <span>{goal.focusLabel}</span>
-            </button>
-            <em data-testid={`style-goal-${goal.id}-cue`}>{goal.cue}</em>
-            <i data-testid={`style-goal-${goal.id}-detail`}>{goal.detail}</i>
-          </div>
-        ))}
+              <span data-testid={`style-goal-${goal.id}-label`}>{goal.label}</span>
+              <strong data-testid={`style-goal-${goal.id}-current`}>{goal.current}</strong>
+              <small data-testid={`style-goal-${goal.id}-target`}>Target {goal.target}</small>
+              <b data-testid={`style-goal-${goal.id}-progress`}>{goal.progress}</b>
+              <div className="style-goal-card-actions" data-testid={`style-goal-${goal.id}-actions`}>
+                <button
+                  aria-pressed={focusedItemId === goal.focusId}
+                  className="style-goal-focus-button"
+                  data-testid={`style-goal-focus-${goal.id}`}
+                  onClick={() => onFocus(goal)}
+                  title={`Focus ${goal.focusLabel}: ${goal.value}`}
+                  type="button"
+                >
+                  <ArrowRight size={13} aria-hidden="true" />
+                  <span>{goal.focusLabel}</span>
+                </button>
+                {goalAction && (
+                  <button
+                    className="style-goal-action-button"
+                    data-testid={`style-goal-action-${goal.id}`}
+                    onClick={() => onRunGoalAction(goalAction)}
+                    title={`${goal.label} goal action: ${goalAction.label}`}
+                    type="button"
+                  >
+                    <Sparkles size={12} aria-hidden="true" />
+                    <span>{goalAction.buttonLabel}</span>
+                  </button>
+                )}
+              </div>
+              <em data-testid={`style-goal-${goal.id}-cue`}>{goal.cue}</em>
+              <i data-testid={`style-goal-${goal.id}-detail`}>{goal.detail}</i>
+            </div>
+          );
+        })}
       </div>
       <div className="style-quick-picks" aria-label="Style quick picks" data-testid="style-quick-picks">
         {styleProfiles.map((profile) => {
@@ -8672,6 +8695,10 @@ function StyleInspector({
       </div>
     </section>
   );
+}
+
+function composerActionForStyleGoal(goal: StyleGoalCard, actions: ComposerAction[]): ComposerAction | null {
+  return actions.find((action) => action.area === goal.id) ?? null;
 }
 
 function BeatBlueprints({
