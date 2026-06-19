@@ -2926,6 +2926,18 @@ export type SessionPassSummary = {
   cards: SessionPassCard[];
 };
 
+export type SessionPassFocusResult = {
+  cardId: SessionPassCardId;
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type SnapshotCompareMetricId = "setup" | "length" | "readiness" | "export" | "stems" | "master";
 
 export type SnapshotCompareFocusId = `${string}:${SnapshotCompareMetricId}`;

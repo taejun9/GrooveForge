@@ -1588,7 +1588,13 @@ h2 {
 .session-pass-card span,
 .session-pass-card strong,
 .session-pass-card small,
-.session-pass-focus {
+.session-pass-focus,
+.session-pass-result-main strong,
+.session-pass-result-main small,
+.session-pass-result-metric span,
+.session-pass-result-metric strong,
+.session-pass-result-followup span,
+.session-pass-result-followup small {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1684,6 +1690,75 @@ h2 {
 
 .session-pass-card small {
   color: rgba(244, 239, 231, 0.68);
+  font-size: 10px;
+}
+
+.session-pass-result {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(160px, 0.34fr) minmax(160px, 0.32fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(130, 215, 255, 0.055);
+  padding: 8px;
+}
+
+.session-pass-result.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.session-pass-result.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.session-pass-result-main,
+.session-pass-result-metric,
+.session-pass-result-followup {
+  min-width: 0;
+}
+
+.session-pass-result-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.session-pass-result-main svg {
+  flex: 0 0 auto;
+  color: #82d7ff;
+}
+
+.session-pass-result.warn .session-pass-result-main svg {
+  color: #f0c36a;
+}
+
+.session-pass-result.danger .session-pass-result-main svg {
+  color: #ff7a4f;
+}
+
+.session-pass-result-main span,
+.session-pass-result-metric,
+.session-pass-result-followup {
+  display: grid;
+  gap: 2px;
+}
+
+.session-pass-result-main strong,
+.session-pass-result-metric strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.session-pass-result-main small,
+.session-pass-result-metric span,
+.session-pass-result-followup span,
+.session-pass-result-followup small {
+  color: rgba(244, 239, 231, 0.64);
   font-size: 10px;
 }
 
@@ -18758,6 +18833,11 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .session-pass-result {
+    grid-column: 1 / -1;
+    grid-template-columns: 150px minmax(0, 0.6fr) minmax(0, 1fr);
+  }
+
   .session-pass-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -19603,6 +19683,11 @@ input[type="range"] {
   }
 
   .session-pass-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .session-pass-result {
+    grid-column: 1;
     grid-template-columns: 1fr;
   }
 

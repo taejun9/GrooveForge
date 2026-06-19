@@ -24,6 +24,7 @@ import type {
   ReferenceAlignmentCardId,
   ReferenceAlignmentSummary,
   SessionPassCard,
+  SessionPassFocusResult,
   SessionPassSummary,
   WorkflowNavigatorItem,
   WorkflowNavigatorJumpResult,
@@ -321,9 +322,11 @@ function FirstBeatPathJumpResultStrip({ result }: { result: FirstBeatPathJumpRes
 
 export function SessionPass({
   onFocus,
+  result,
   summary
 }: {
   summary: SessionPassSummary;
+  result: SessionPassFocusResult | null;
   onFocus: (card: SessionPassCard) => void;
 }): ReactElement {
   return (
@@ -355,7 +358,38 @@ export function SessionPass({
           </div>
         ))}
       </div>
+      {result && <SessionPassFocusResultStrip result={result} />}
     </section>
+  );
+}
+
+function SessionPassFocusResultStrip({ result }: { result: SessionPassFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`session-pass-result ${result.tone}`}
+      data-result-session-pass={result.cardId}
+      data-testid="session-pass-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="session-pass-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="session-pass-result-title">{result.title}</strong>
+          <small data-testid="session-pass-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="session-pass-result-metric" data-testid="session-pass-result-metric">
+        <span data-testid="session-pass-result-status">{result.status}</span>
+        <strong data-testid="session-pass-result-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="session-pass-result-followup" data-testid="session-pass-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 

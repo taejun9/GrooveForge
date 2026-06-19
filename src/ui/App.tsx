@@ -490,6 +490,7 @@ import type {
   SessionPassTarget,
   SessionPassCardId,
   SessionPassCard,
+  SessionPassFocusResult,
   SessionPassSummary,
   SnapshotCompareFocusId,
   SnapshotCompareFocusTarget,
@@ -1067,6 +1068,7 @@ export function App(): ReactElement {
   const [modeSwitchResult, setModeSwitchResult] = useState<ModeSwitchResult | null>(null);
   const [workflowNavigatorResult, setWorkflowNavigatorResult] = useState<WorkflowNavigatorJumpResult | null>(null);
   const [firstBeatPathResult, setFirstBeatPathResult] = useState<FirstBeatPathJumpResult | null>(null);
+  const [sessionPassResult, setSessionPassResult] = useState<SessionPassFocusResult | null>(null);
   const [swingFeelResult, setSwingFeelResult] = useState<SwingFeelResult | null>(null);
   const [styleGoalCueResult, setStyleGoalCueResult] = useState<StyleGoalCueResult | null>(null);
   const [beatBlueprintResult, setBeatBlueprintResult] = useState<BeatBlueprintResult | null>(null);
@@ -1994,6 +1996,7 @@ export function App(): ReactElement {
     setModeSwitchResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
+    setSessionPassResult(null);
     setSwingFeelResult(null);
     setStyleGoalCueResult(null);
     setBeatBlueprintResult(null);
@@ -2040,6 +2043,7 @@ export function App(): ReactElement {
       setModeSwitchResult(null);
       setWorkflowNavigatorResult(null);
       setFirstBeatPathResult(null);
+      setSessionPassResult(null);
       setSwingFeelResult(null);
       setStyleGoalCueResult(null);
       setBeatBlueprintResult(null);
@@ -2179,6 +2183,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
+    setSessionPassResult(null);
     setSwingFeelResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
@@ -2229,6 +2234,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
+    setSessionPassResult(null);
     setSwingFeelResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
@@ -6379,6 +6385,7 @@ export function App(): ReactElement {
     };
 
     targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setSessionPassResult(createSessionPassFocusResult(card, sessionPassSummary));
     setProjectStatus(`Session Pass ${card.label}: ${card.value}`);
   }
 
@@ -7240,7 +7247,7 @@ export function App(): ReactElement {
         onJump={jumpToBeatSpineTarget}
       />
 
-      <SessionPass summary={sessionPassSummary} onFocus={focusSessionPassCard} />
+      <SessionPass result={sessionPassResult} summary={sessionPassSummary} onFocus={focusSessionPassCard} />
 
       <WorkflowNavigator items={workflowNavigatorItems} result={workflowNavigatorResult} onJump={jumpToWorkflowNavigatorItem} />
 
@@ -11327,6 +11334,53 @@ function createSessionPassSummary(
 
 function activeSessionPassQuickActionCard(summary: SessionPassSummary): SessionPassCard {
   return summary.mode === "guided" ? summary.cards[0] : summary.cards[1];
+}
+
+function createSessionPassFocusResult(card: SessionPassCard, summary: SessionPassSummary): SessionPassFocusResult {
+  return {
+    cardId: card.id,
+    status: "Focused",
+    title: `${card.label} focused`,
+    detail: `${card.focusLabel}: ${card.value}`,
+    metricLabel: "Session",
+    metricValue: sessionPassFocusResultMetric(summary),
+    auditionCue: sessionPassFocusResultAudition(card),
+    nextCheck: sessionPassFocusResultNextCheck(card),
+    tone: card.tone
+  };
+}
+
+function sessionPassFocusResultMetric(summary: SessionPassSummary): string {
+  const readyCount = summary.cards.filter((card) => card.tone === "good").length;
+  const reviewCount = summary.cards.filter((card) => card.tone === "warn").length;
+  const blockerCount = summary.cards.filter((card) => card.tone === "danger").length;
+  return `${readyCount}/${summary.cards.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function sessionPassFocusResultAudition(card: SessionPassCard): string {
+  switch (card.id) {
+    case "guided":
+      return "Use First Beat Path and Beat Spine to move through the next direct beat-making step.";
+    case "studio":
+      return "Use Review Queue, Production Snapshot, and Workflow Navigator before choosing a fix.";
+    case "finish":
+      return "Use Finish Checklist, Mix Coach, and Master controls before final moves.";
+    case "deliver":
+      return "Use Export Preflight and Handoff Pack before explicit WAV, stems, MIDI, or sheet export.";
+  }
+}
+
+function sessionPassFocusResultNextCheck(card: SessionPassCard): string {
+  switch (card.id) {
+    case "guided":
+      return "Return after the guided step is ready or intentionally deferred.";
+    case "studio":
+      return "Return after the top studio issue is reviewed or fixed explicitly.";
+    case "finish":
+      return "Return after compose, arrange, mix, master, automation, and handoff checks are ready.";
+    case "deliver":
+      return "Return after deliverables and handoff context match the selected target.";
+  }
 }
 
 function activeFirstBeatPathQuickActionStep(summary: FirstBeatPathSummary): FirstBeatPathStep | null {
