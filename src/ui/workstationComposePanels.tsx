@@ -9,6 +9,15 @@ import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyCho
 
 type SoundControlParameter = Exclude<keyof SoundDesign, "preset">;
 
+type StudioToneResetResult = {
+  id: string;
+  label: string;
+  beforeLabel: string;
+  baselineLabel: string;
+  deltaLabel: string;
+  nextCheck: string;
+};
+
 const studioToneControls: Array<{ id: string; label: string; parameter: SoundControlParameter }> = [
   { id: "kick-punch", label: "Kick punch", parameter: "kickPunch" },
   { id: "snare-snap", label: "Snare snap", parameter: "snareSnap" },
@@ -1550,6 +1559,7 @@ export function SoundDesigner({
   onChange: (update: Partial<Omit<SoundDesign, "preset">>) => void;
 }): ReactElement {
   const presetBaseline = sound.preset === "custom" ? sound : soundPresetDesign(sound.preset);
+  const [studioToneResetResult, setStudioToneResetResult] = useState<StudioToneResetResult | null>(null);
 
   return (
     <div className="sound-designer">
@@ -1591,18 +1601,22 @@ export function SoundDesigner({
         <span data-testid="sound-chord-readout">Chord {percentLabel(sound.chordWarmth)}</span>
       </div>
       {mode === "studio" && (
-        <div className="sound-control-grid">
-          {studioToneControls.map((control) => (
-            <SoundControl
-              baseline={presetBaseline[control.parameter]}
-              id={control.id}
-              key={control.id}
-              label={control.label}
-              value={sound[control.parameter]}
-              onChange={(value) => onChange({ [control.parameter]: value } as Partial<Omit<SoundDesign, "preset">>)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="sound-control-grid">
+            {studioToneControls.map((control) => (
+              <SoundControl
+                baseline={presetBaseline[control.parameter]}
+                id={control.id}
+                key={control.id}
+                label={control.label}
+                value={sound[control.parameter]}
+                onChange={(value) => onChange({ [control.parameter]: value } as Partial<Omit<SoundDesign, "preset">>)}
+                onResetResult={setStudioToneResetResult}
+              />
+            ))}
+          </div>
+          {studioToneResetResult && <StudioToneResetResultStrip result={studioToneResetResult} />}
+        </>
       )}
     </div>
   );
@@ -2053,13 +2067,15 @@ export function SoundControl({
   id,
   label,
   value,
-  onChange
+  onChange,
+  onResetResult
 }: {
   baseline: number;
   id: string;
   label: string;
   value: number;
   onChange: (value: number) => void;
+  onResetResult?: (result: StudioToneResetResult) => void;
 }): ReactElement {
   const percentValue = `${Math.round(value * 100)}`;
   const baselinePercent = Math.round(baseline * 100);
@@ -2158,6 +2174,14 @@ export function SoundControl({
           onClick={() => {
             setIsEditingPercent(false);
             setPercentText(`${baselinePercent}`);
+            onResetResult?.({
+              id,
+              label,
+              beforeLabel: percentLabel(value),
+              baselineLabel: percentLabel(baseline),
+              deltaLabel: `${deltaLabel} -> 0`,
+              nextCheck: studioToneResetNextCheck(label)
+            });
             onChange(baseline);
           }}
           title={resetDisabled ? `${label} already matches the current preset baseline` : `Reset ${label} to current preset baseline`}
@@ -2169,6 +2193,44 @@ export function SoundControl({
       </div>
     </div>
   );
+}
+
+function StudioToneResetResultStrip({ result }: { result: StudioToneResetResult }): ReactElement {
+  return (
+    <div className="studio-tone-reset-result" data-testid="studio-tone-reset-result">
+      <div className="studio-tone-reset-result-main">
+        <ListChecks size={15} aria-hidden="true" />
+        <span>
+          <b data-testid="studio-tone-reset-title">Reset {result.label}</b>
+          <em data-testid="studio-tone-reset-detail">
+            {result.beforeLabel}
+            {" -> "}
+            {result.baselineLabel}
+          </em>
+        </span>
+      </div>
+      <div className="studio-tone-reset-result-meta">
+        <span data-testid="studio-tone-reset-baseline">Baseline {result.baselineLabel}</span>
+        <span data-testid="studio-tone-reset-delta">{result.deltaLabel}</span>
+      </div>
+      <p className="studio-tone-reset-result-next" data-testid="studio-tone-reset-next-check">
+        {result.nextCheck}
+      </p>
+    </div>
+  );
+}
+
+function studioToneResetNextCheck(label: string): string {
+  if (label.includes("808")) {
+    return "Replay the 808 against the kick and confirm the low-end pocket.";
+  }
+  if (label.includes("Kick") || label.includes("Snare") || label.includes("Hat")) {
+    return "Replay the drum loop and confirm the groove still cuts through.";
+  }
+  if (label.includes("Synth") || label.includes("Chord")) {
+    return "Replay the harmony layers and confirm the top-end balance.";
+  }
+  return "Replay the beat and confirm the tone matches the preset target.";
 }
 
 export function ChordEditor({
