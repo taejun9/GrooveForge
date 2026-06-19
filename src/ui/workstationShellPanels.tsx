@@ -51,6 +51,20 @@ function quickActionGuideSuggestionReason(detail: string): string {
   return reasonParts.length > 0 ? `Why now: ${reasonParts.join(" / ")}` : "Why now: current guide target";
 }
 
+function quickActionGuideSuggestionTarget(title: string, detail: string): string {
+  const titleTarget = title.includes(":") ? title.split(":").slice(1).join(":").trim() : "";
+
+  if (titleTarget) {
+    return `Target: ${titleTarget}`;
+  }
+
+  const detailParts = detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return `Target: ${detailParts[1] ?? detailParts[0] ?? "Guide"}`;
+}
+
 type CommandReferenceItem = {
   id: string;
   command: string;
@@ -479,6 +493,9 @@ export function QuickActions({
   const guideSuggestionReason = guideSuggestionAction
     ? quickActionGuideSuggestionReason(guideSuggestionAction.detail)
     : "Why now: current guide target";
+  const guideSuggestionTarget = guideSuggestionAction
+    ? quickActionGuideSuggestionTarget(guideSuggestionAction.title, guideSuggestionAction.detail)
+    : "Target: Guide";
 
   return (
     <div
@@ -567,6 +584,7 @@ export function QuickActions({
               </small>
               <span className="quick-actions-guide-suggestion-meta" data-testid="quick-actions-guide-suggestion-meta">
                 <span data-testid="quick-actions-guide-suggestion-source">{guideSuggestionSource}</span>
+                <span data-testid="quick-actions-guide-suggestion-target">{guideSuggestionTarget}</span>
                 <span data-testid="quick-actions-guide-suggestion-pin-state">
                   {guideSuggestionPinned ? "Pinned command" : "Not pinned"}
                 </span>
