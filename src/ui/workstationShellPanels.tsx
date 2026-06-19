@@ -103,6 +103,18 @@ const commandReferenceSections: CommandReferenceSection[] = [
     ]
   },
   {
+    id: "sound-fast-path",
+    title: "Sound",
+    items: [
+      { id: "sound-preset", command: "Sound Preset", shortcut: "Quick Actions", target: "Full-tone presets" },
+      { id: "drum-kit", command: "Drum Kit", shortcut: "Quick Actions", target: "Kick / clap / hat tone" },
+      { id: "sound-focus", command: "Sound Focus", shortcut: "Quick Actions", target: "808 / Synth / Chords" },
+      { id: "timbre-check", command: "Timbre Check", shortcut: "Readout", target: "Drums / 808 / air / width" },
+      { id: "sound-snapshot-ab", command: "Sound Snapshot A/B", shortcut: "Quick Actions", target: "Tone-pass compare" },
+      { id: "space-fx", command: "Space FX", shortcut: "Quick Actions", target: "Dry / room / wide / wash" }
+    ]
+  },
+  {
     id: "mix-fast-path",
     title: "Mix",
     items: [
