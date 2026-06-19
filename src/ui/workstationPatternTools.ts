@@ -3912,12 +3912,12 @@ export function normalizeStepModulo(value: number): number {
   return ((rounded % steps.length) + steps.length) % steps.length;
 }
 
-export function appendHistory(history: ProjectState[], project: ProjectState): ProjectState[] {
-  return [...history, project].slice(-historyLimit);
+export function appendHistory<T>(history: T[], entry: T): T[] {
+  return [...history, entry].slice(-historyLimit);
 }
 
-export function prependFuture(history: ProjectState[], project: ProjectState): ProjectState[] {
-  return [project, ...history].slice(0, historyLimit);
+export function prependFuture<T>(history: T[], entry: T): T[] {
+  return [entry, ...history].slice(0, historyLimit);
 }
 
 export function readLocalDraftRecovery(): LocalDraftRecovery | null {

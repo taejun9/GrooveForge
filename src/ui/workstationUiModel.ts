@@ -3005,6 +3005,8 @@ export type EditHistoryReadoutSummary = {
   statusLabel: string;
   detailLabel: string;
   detailTitle: string;
+  nextUndoLabel: string | null;
+  nextRedoLabel: string | null;
   tone: MixCoachTone;
 };
 

@@ -933,6 +933,11 @@ import {
   weakestTone
 } from "./workstationAnalysis";
 
+type EditHistoryEntry = {
+  project: ProjectState;
+  label: string;
+};
+
 const minProjectSwing = 0;
 const maxProjectSwing = 0.24;
 
@@ -980,8 +985,8 @@ function createSwingFeelResult(
 
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
-  const [undoStack, setUndoStack] = useState<ProjectState[]>([]);
-  const [redoStack, setRedoStack] = useState<ProjectState[]>([]);
+  const [undoStack, setUndoStack] = useState<EditHistoryEntry[]>([]);
+  const [redoStack, setRedoStack] = useState<EditHistoryEntry[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>("arrangement");
   const [transportLoopScope, setTransportLoopScope] = useState<TransportLoopScope>("arrangement");
@@ -1284,7 +1289,15 @@ export function App(): ReactElement {
   );
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
-  const editHistoryReadout = createEditHistoryReadoutSummary(undoStack.length, redoStack.length, projectStatus);
+  const nextUndoLabel = undoStack[undoStack.length - 1]?.label ?? null;
+  const nextRedoLabel = redoStack[0]?.label ?? null;
+  const editHistoryReadout = createEditHistoryReadoutSummary(
+    undoStack.length,
+    redoStack.length,
+    projectStatus,
+    nextUndoLabel,
+    nextRedoLabel
+  );
   const currentPlaybackStep = playbackPosition ? playbackPosition.loopStep % 16 : null;
   const currentEditorStep = playbackPosition?.pattern === project.selectedPattern ? currentPlaybackStep : null;
   const playingPattern = isPlaying ? playbackPosition?.pattern ?? null : null;
@@ -1921,7 +1934,7 @@ export function App(): ReactElement {
     }
 
     projectRef.current = nextProject;
-    setUndoStack((history) => appendHistory(history, current));
+    setUndoStack((history) => appendHistory(history, createEditHistoryEntry(current, status)));
     setRedoStack([]);
     setLocalDraftWriteArmed(true);
     setProjectHasUnsavedChanges(true);
@@ -2192,29 +2205,29 @@ export function App(): ReactElement {
   }
 
   function undoProject(): void {
-    const previousProject = undoStack[undoStack.length - 1];
-    if (!previousProject) {
+    const previousEntry = undoStack[undoStack.length - 1];
+    if (!previousEntry) {
       setProjectStatus("Nothing to undo");
       return;
     }
 
     const current = projectRef.current;
     setUndoStack((history) => history.slice(0, -1));
-    setRedoStack((history) => prependFuture(history, current));
-    restoreProjectFromHistory(previousProject, "Undo applied");
+    setRedoStack((history) => prependFuture(history, createEditHistoryEntry(current, previousEntry.label)));
+    restoreProjectFromHistory(previousEntry.project, `Undo: ${previousEntry.label}`);
   }
 
   function redoProject(): void {
-    const nextProject = redoStack[0];
-    if (!nextProject) {
+    const nextEntry = redoStack[0];
+    if (!nextEntry) {
       setProjectStatus("Nothing to redo");
       return;
     }
 
     const current = projectRef.current;
     setRedoStack((history) => history.slice(1));
-    setUndoStack((history) => appendHistory(history, current));
-    restoreProjectFromHistory(nextProject, "Redo applied");
+    setUndoStack((history) => appendHistory(history, createEditHistoryEntry(current, nextEntry.label)));
+    restoreProjectFromHistory(nextEntry.project, `Redo: ${nextEntry.label}`);
   }
 
   function clearLocalDraftState(): void {
@@ -6508,6 +6521,8 @@ export function App(): ReactElement {
     beatReadinessChecks,
     canRedo,
     canUndo,
+    nextRedoLabel,
+    nextUndoLabel,
     beatPassportSummary,
     beatSpineSummary,
     chordMovePreviewSummary,
@@ -12186,6 +12201,8 @@ function createQuickActions({
   chordMovePreviewSummary,
   canRedo,
   canUndo,
+  nextRedoLabel,
+  nextUndoLabel,
   composerGuideSummary,
   composerActionsSummary,
   drumKitPreviewSummary,
@@ -12424,6 +12441,8 @@ function createQuickActions({
   chordMovePreviewSummary: ChordMovePreviewSummary;
   canRedo: boolean;
   canUndo: boolean;
+  nextRedoLabel: string | null;
+  nextUndoLabel: string | null;
   composerGuideSummary: ComposerGuideSummary;
   composerActionsSummary: ComposerActionsSummary;
   drumKitPreviewSummary: DrumKitPreviewSummary;
@@ -14543,19 +14562,19 @@ function createQuickActions({
     ...workflowNavigatorActions,
     {
       id: "undo",
-      title: "Undo",
-      detail: "Undo the last project edit.",
+      title: nextUndoLabel ? `Undo: ${nextUndoLabel}` : "Undo",
+      detail: nextUndoLabel ? `Restore state before ${nextUndoLabel}.` : "Undo the last project edit.",
       group: "Edit",
-      keywords: "undo edit history revert",
+      keywords: `undo edit history revert ${nextUndoLabel ?? "none"}`,
       disabled: !canUndo,
       run: onUndo
     },
     {
       id: "redo",
-      title: "Redo",
-      detail: "Redo the last undone project edit.",
+      title: nextRedoLabel ? `Redo: ${nextRedoLabel}` : "Redo",
+      detail: nextRedoLabel ? `Restore ${nextRedoLabel} after undo.` : "Redo the last undone project edit.",
       group: "Edit",
-      keywords: "redo edit history",
+      keywords: `redo edit history ${nextRedoLabel ?? "none"}`,
       disabled: !canRedo,
       run: onRedo
     },
@@ -15187,6 +15206,7 @@ function createQuickActionResult(
   const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action);
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
   const previewOnly = action.id.startsWith("blueprint-preview-");
+  const historyOnly = action.id === "undo" || action.id === "redo";
   const focusOnly =
     action.id === "command-reference" ||
     action.id === "beat-terms-reference" ||
@@ -15299,6 +15319,10 @@ function createQuickActionResult(
               ? "Auditioned"
             : blockClipboardOnly || noteClipboardOnly || drumClipboardOnly || chordClipboardOnly
               ? "Copied"
+              : historyOnly
+                ? action.id === "undo"
+                  ? "Undone"
+                  : "Redone"
               : uiLocal && (action.id === "mix-snapshot-clear" || action.id === "sound-snapshot-clear")
                 ? "Cleared"
                 : mixSnapshotRecallOnly || soundSnapshotRecallOnly
@@ -15491,6 +15515,14 @@ function quickActionResultMetricSnapshot(
 
   if (action.id.startsWith("mode-switch-")) {
     return { id: "mode-switch", label: "Mode", value: modeLabel(project.mode) };
+  }
+
+  if (action.id === "undo" || action.id === "redo") {
+    return {
+      id: "edit-history",
+      label: "Edit history",
+      value: `${projectEventTotal(project)} events / Pattern ${project.selectedPattern}`
+    };
   }
 
   if (action.id === "session-pass-focus") {
@@ -17484,6 +17516,13 @@ function quickActionResultFollowup(
     };
   }
 
+  if (action.id === "undo" || action.id === "redo") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; confirm ${action.detail.toLowerCase()} restored the intended beat state.`,
+      nextCheck: "Read the Edit History label before the next undo or redo so experiments stay reversible."
+    };
+  }
+
   switch (action.group) {
     case "Transport":
       return {
@@ -18515,20 +18554,39 @@ function createArrangementPlaybackReadoutSummary(
   };
 }
 
+function createEditHistoryEntry(project: ProjectState, status: string): EditHistoryEntry {
+  return {
+    project,
+    label: editHistoryEntryLabel(status)
+  };
+}
+
+function editHistoryEntryLabel(status: string): string {
+  const label = status.trim();
+  return label && label !== "Unsaved changes" ? label : "Project edit";
+}
+
 function createEditHistoryReadoutSummary(
   undoDepth: number,
   redoDepth: number,
-  projectStatus: string
+  projectStatus: string,
+  nextUndoLabel: string | null,
+  nextRedoLabel: string | null
 ): EditHistoryReadoutSummary {
   const statusLabel = `${undoDepth} undo / ${redoDepth} redo`;
   const statusDetail = projectStatus.trim() || "Project ready";
+  const undoDetail = nextUndoLabel ? `Undo: ${nextUndoLabel}` : null;
+  const redoDetail = nextRedoLabel ? `Redo: ${nextRedoLabel}` : null;
+  const actionDetail = [undoDetail, redoDetail].filter(Boolean).join(" / ");
 
   if (redoDepth > 0) {
     return {
       roleLabel: "Redo window",
       statusLabel,
-      detailLabel: `${redoDepth} redo ready`,
-      detailTitle: `${statusLabel} / ${statusDetail}`,
+      detailLabel: actionDetail || `${redoDepth} redo ready`,
+      detailTitle: `${statusLabel} / ${actionDetail || "Redo ready"} / ${statusDetail}`,
+      nextUndoLabel,
+      nextRedoLabel,
       tone: "good"
     };
   }
@@ -18537,8 +18595,10 @@ function createEditHistoryReadoutSummary(
     return {
       roleLabel: "Undo ready",
       statusLabel,
-      detailLabel: `${undoDepth} ${undoDepth === 1 ? "edit" : "edits"} backed up`,
-      detailTitle: `${statusLabel} / ${statusDetail}`,
+      detailLabel: undoDetail ?? `${undoDepth} ${undoDepth === 1 ? "edit" : "edits"} backed up`,
+      detailTitle: `${statusLabel} / ${undoDetail ?? "Undo ready"} / ${statusDetail}`,
+      nextUndoLabel,
+      nextRedoLabel,
       tone: "good"
     };
   }
@@ -18548,6 +18608,8 @@ function createEditHistoryReadoutSummary(
     statusLabel,
     detailLabel: "No edit history",
     detailTitle: `${statusLabel} / ${statusDetail}`,
+    nextUndoLabel,
+    nextRedoLabel,
     tone: "warn"
   };
 }
