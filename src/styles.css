@@ -1838,6 +1838,7 @@ h2 {
 .style-goal-card em,
 .style-goal-card i,
 .style-goal-focus-button span,
+.style-goal-cue-button span,
 .style-goal-action-button span,
 .style-inspector-pattern span,
 .style-inspector-pattern strong,
@@ -2030,6 +2031,7 @@ h2 {
 }
 
 .style-goal-focus-button,
+.style-goal-cue-button,
 .style-goal-action-button {
   display: inline-flex;
   min-width: 0;
@@ -2047,6 +2049,7 @@ h2 {
 }
 
 .style-goal-focus-button span,
+.style-goal-cue-button span,
 .style-goal-action-button span {
   color: inherit;
   font-size: inherit;
@@ -2056,6 +2059,21 @@ h2 {
 .style-goal-focus-button[aria-pressed="true"] {
   border-color: color-mix(in srgb, var(--style-color) 58%, rgba(244, 239, 231, 0.2));
   background: color-mix(in srgb, var(--style-color) 18%, rgba(244, 239, 231, 0.06));
+}
+
+.style-goal-cue-button {
+  border-color: color-mix(in srgb, var(--style-color) 36%, rgba(244, 239, 231, 0.16));
+  background: color-mix(in srgb, var(--style-color) 14%, rgba(244, 239, 231, 0.05));
+}
+
+.style-goal-cue-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--style-color) 62%, rgba(244, 239, 231, 0.22));
+  background: color-mix(in srgb, var(--style-color) 22%, rgba(244, 239, 231, 0.07));
+}
+
+.style-goal-cue-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .style-goal-action-button {

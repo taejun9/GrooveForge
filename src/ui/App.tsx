@@ -303,6 +303,7 @@ import type {
   StyleInspectorMetric,
   StylePatternDensity,
   StyleGoalCard,
+  StyleGoalCardId,
   StyleInspectorSummary,
   StyleInspectorFocusSummary,
   BasslinePadId,
@@ -2502,6 +2503,24 @@ export function App(): ReactElement {
     const pattern = projectRef.current.selectedPattern;
     cuePattern(pattern);
     setProjectStatus(`Groove Compass cued Pattern ${pattern} as Pattern loop`);
+  }
+
+  function cueStyleGoal(goal: StyleGoalCard): void {
+    if (isPlaying) {
+      setProjectStatus("Stop playback before cueing Style Goal");
+      return;
+    }
+
+    setStyleInspectorFocusId(goal.focusId);
+    if (goal.id === "arrange") {
+      selectTransportLoopScope("arrangement", false);
+      setProjectStatus(`Style Goal ${goal.label} cued as Song loop`);
+      return;
+    }
+
+    const pattern = projectRef.current.selectedPattern;
+    cuePattern(pattern);
+    setProjectStatus(`Style Goal ${goal.label} cued Pattern ${pattern} as Pattern loop`);
   }
 
   function updateKeyboardCaptureDefaults(update: Partial<KeyboardCaptureDefaults>): void {
@@ -6712,6 +6731,7 @@ export function App(): ReactElement {
     onCueArrangementBlock: cueArrangementBlock,
     onCueSectionLocator: cueSectionLocator,
     onCueGrooveCompass: cueGrooveCompass,
+    onCueStyleGoal: cueStyleGoal,
     onCuePattern: cuePattern,
     onFollowAudiblePattern: followAudiblePattern,
     onFollowAudibleArrangementBlock: followAudibleArrangementBlock,
@@ -7166,6 +7186,8 @@ export function App(): ReactElement {
         composerActionsSummary={composerActionsSummary}
         composerActionResult={composerActionResult}
         focusedItemId={styleInspectorFocusId}
+        isPlaying={isPlaying}
+        onCueGoal={cueStyleGoal}
         onSelectStyle={selectStyle}
         onFocus={focusStyleInspectorItem}
         onRunGoalAction={runComposerAction}
@@ -8528,6 +8550,8 @@ function StyleInspector({
   composerActionResult,
   composerActionsSummary,
   focusedItemId,
+  isPlaying,
+  onCueGoal,
   onFocus,
   onRunGoalAction,
   onSelectStyle,
@@ -8537,6 +8561,8 @@ function StyleInspector({
   composerActionResult: ComposerActionResult | null;
   composerActionsSummary: ComposerActionsSummary;
   focusedItemId: StyleInspectorFocusId | null;
+  isPlaying: boolean;
+  onCueGoal: (goal: StyleGoalCard) => void;
   onFocus: (item: StyleInspectorFocusItem) => void;
   onRunGoalAction: (action: ComposerAction) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
@@ -8628,6 +8654,21 @@ function StyleInspector({
                 >
                   <ArrowRight size={13} aria-hidden="true" />
                   <span>{goal.focusLabel}</span>
+                </button>
+                <button
+                  className="style-goal-cue-button"
+                  data-testid={`style-goal-cue-${goal.id}`}
+                  disabled={isPlaying}
+                  onClick={() => onCueGoal(goal)}
+                  title={
+                    isPlaying
+                      ? "Stop playback before cueing Style Goal"
+                      : `Cue ${goal.id === "arrange" ? "Song loop" : "Pattern loop"} for ${goal.label}`
+                  }
+                  type="button"
+                >
+                  <Play size={12} aria-hidden="true" />
+                  <span>Cue</span>
                 </button>
                 {goalAction && (
                   <button
@@ -12584,6 +12625,7 @@ function createQuickActions({
   onCueArrangementBlock,
   onCueSectionLocator,
   onCueGrooveCompass,
+  onCueStyleGoal,
   onCuePattern,
   onFollowAudiblePattern,
   onFollowAudibleArrangementBlock,
@@ -12829,6 +12871,7 @@ function createQuickActions({
   onCueArrangementBlock: (index: number) => void;
   onCueSectionLocator: (section: ArrangementSection) => void;
   onCueGrooveCompass: () => void;
+  onCueStyleGoal: (goal: StyleGoalCard) => void;
   onCuePattern: (pattern: PatternSlot) => void;
   onFollowAudiblePattern: () => void;
   onFollowAudibleArrangementBlock: () => void;
@@ -13372,6 +13415,21 @@ function createQuickActions({
     keywords: `style inspector focus genre lane ${item.focusId} ${item.label} ${item.value} ${item.focusLabel} ${item.detail} bpm swing bass melody sound density goal pattern beginner producer`,
     run: () => onFocusStyleInspector(item)
   }));
+  const styleGoalCueCommands: QuickAction[] = styleInspectorSummary.goals.map((goal) => {
+    const isArrangementGoal = goal.id === "arrange";
+    const target = isArrangementGoal ? "Song loop" : `Pattern ${project.selectedPattern} loop`;
+    const cued = isArrangementGoal ? transportLoopScope === "arrangement" : transportLoopScope === "pattern";
+
+    return {
+      id: `style-goal-cue-${goal.id}`,
+      title: cued ? `${goal.label} Style Goal already cued` : `Cue Style Goal: ${goal.label}`,
+      detail: `${target} / ${goal.value} / ${goal.cue}`,
+      group: "Transport",
+      keywords: `style goal cue audition loop ${goal.id} ${goal.label} ${goal.value} ${goal.current} ${goal.target} ${goal.progress} ${goal.cue} ${goal.detail} ${project.selectedPattern} pattern song transport drums 808 bass harmony melody arrange sample free beginner producer`,
+      disabled: isPlaying,
+      run: () => onCueStyleGoal(goal)
+    };
+  });
   const styleGoalActionCommands: QuickAction[] = styleInspectorSummary.goals.map((goal) => {
     const goalAction = composerActionForStyleGoal(goal, composerActionsSummary.actions);
     return {
@@ -14511,6 +14569,7 @@ function createQuickActions({
       }
     },
     ...styleInspectorActions,
+    ...styleGoalCueCommands,
     ...styleGoalActionCommands,
     ...styleQuickActions,
     ...keyQuickActions,
@@ -15404,11 +15463,39 @@ function styleGoalActionQuickActionArea(actionId: string): ComposerActionArea | 
   }
 
   const goalId = actionId.slice("style-goal-action-".length);
-  if (goalId === "drums" || goalId === "bass" || goalId === "harmony" || goalId === "melody" || goalId === "arrange") {
+  if (isStyleGoalCardId(goalId)) {
     return goalId;
   }
 
   return null;
+}
+
+function styleGoalCueQuickActionGoal(actionId: string): StyleGoalCardId | null {
+  if (!actionId.startsWith("style-goal-cue-")) {
+    return null;
+  }
+
+  const goalId = actionId.slice("style-goal-cue-".length);
+  return isStyleGoalCardId(goalId) ? goalId : null;
+}
+
+function isStyleGoalCardId(value: string): value is StyleGoalCardId {
+  return value === "drums" || value === "bass" || value === "harmony" || value === "melody" || value === "arrange";
+}
+
+function styleGoalCueLabel(goalId: StyleGoalCardId): string {
+  switch (goalId) {
+    case "drums":
+      return "drums";
+    case "bass":
+      return "808/bass";
+    case "harmony":
+      return "harmony";
+    case "melody":
+      return "melody";
+    case "arrange":
+      return "arrangement";
+  }
 }
 
 const quickActionScopeDefinitions: Array<Omit<QuickActionScopeOption, "count">> = [
@@ -15568,7 +15655,7 @@ function createQuickActionResult(
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
   const previewOnly = action.id.startsWith("blueprint-preview-");
   const historyOnly = action.id === "undo" || action.id === "redo";
-  const cueOnly = action.id === "groove-compass-cue";
+  const cueOnly = action.id === "groove-compass-cue" || action.id.startsWith("style-goal-cue-");
   const focusOnly =
     action.id === "command-reference" ||
     action.id === "beat-terms-reference" ||
@@ -15707,7 +15794,7 @@ function createQuickActionResult(
     metric,
     auditionCue: followup.auditionCue,
     nextCheck: followup.nextCheck,
-    tone: outcome === "failed" ? "danger" : previewOnly || focusOnly || uiLocal || exportOnly ? "good" : changed ? "good" : "warn"
+    tone: outcome === "failed" ? "danger" : previewOnly || cueOnly || focusOnly || uiLocal || exportOnly ? "good" : changed ? "good" : "warn"
   };
 }
 
@@ -16216,6 +16303,18 @@ function quickActionResultMetricSnapshot(
       id: "style-inspector",
       label: "Style inspector",
       value: action.detail
+    };
+  }
+
+  const styleGoalCueGoal = styleGoalCueQuickActionGoal(action.id);
+  if (styleGoalCueGoal) {
+    return {
+      id: "style-goal-cue",
+      label: "Style goal cue",
+      value:
+        styleGoalCueGoal === "arrange"
+          ? `Song loop / ${barCountLabel(arrangementTotalBars(project))}`
+          : `Loop Pattern ${project.selectedPattern} / ${styleGoalCueLabel(styleGoalCueGoal)}`
     };
   }
 
@@ -17346,6 +17445,23 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Play Block loop; audition the cued block against Pattern ${project.selectedPattern} before editing arrangement details.`,
       nextCheck: "Use Arrangement Playback Readout, Song Form Overview, or Arrangement Focus before changing nearby blocks."
+    };
+  }
+
+  const styleGoalCueGoal = styleGoalCueQuickActionGoal(action.id);
+  if (styleGoalCueGoal) {
+    if (styleGoalCueGoal === "arrange") {
+      return {
+        auditionCue: `Play Song loop; scan the Style Goal arrangement cue across ${barCountLabel(arrangementTotalBars(project))}.`,
+        nextCheck: "Run the matching Style Goal Action only after the song-form cue exposes the next arrangement gap."
+      };
+    }
+
+    return {
+      auditionCue: `Play Pattern loop; inspect the Style Goal ${styleGoalCueLabel(
+        styleGoalCueGoal
+      )} cue on Pattern ${project.selectedPattern} before applying a writing move.`,
+      nextCheck: "Run the matching Style Goal Action only if the cued loop still needs that layer."
     };
   }
 
