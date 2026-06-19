@@ -2898,6 +2898,19 @@ export type BeatPassportFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type BeatPassportFocusResult = {
+  metricId: BeatPassportFocusId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type FinishChecklistCardId = "compose" | "arrange" | "mix" | "master" | "automation" | "handoff";
 
 export type FinishChecklistCard = {

@@ -483,6 +483,7 @@ import type {
   BeatPassportMetric,
   BeatPassportSummary,
   BeatPassportFocusSummary,
+  BeatPassportFocusResult,
   FinishChecklistCardId,
   FinishChecklistCard,
   FinishChecklistFocusSummary,
@@ -1120,6 +1121,7 @@ export function App(): ReactElement {
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [composerGuideResult, setComposerGuideResult] = useState<ComposerGuideFocusResult | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
+  const [beatPassportResult, setBeatPassportResult] = useState<BeatPassportFocusResult | null>(null);
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
   const [snapshotCompareFocusId, setSnapshotCompareFocusId] = useState<SnapshotCompareFocusId | null>(null);
   const [hookReadinessFocusId, setHookReadinessFocusId] = useState<HookReadinessFocusId | null>(null);
@@ -2015,6 +2017,7 @@ export function App(): ReactElement {
     setStyleInspectorResult(null);
     setBeatReadinessResult(null);
     setListeningPassResult(null);
+    setBeatPassportResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
@@ -2071,6 +2074,7 @@ export function App(): ReactElement {
       setStyleInspectorResult(null);
       setBeatReadinessResult(null);
       setListeningPassResult(null);
+      setBeatPassportResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
@@ -2219,6 +2223,7 @@ export function App(): ReactElement {
     setStyleInspectorResult(null);
     setBeatReadinessResult(null);
     setListeningPassResult(null);
+    setBeatPassportResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2278,6 +2283,7 @@ export function App(): ReactElement {
     setStyleInspectorResult(null);
     setBeatReadinessResult(null);
     setListeningPassResult(null);
+    setBeatPassportResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -6342,6 +6348,7 @@ export function App(): ReactElement {
 
     setBeatPassportFocusId(metric.focusId);
     targetRefs[metric.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setBeatPassportResult(createBeatPassportFocusResult(metric, beatPassportSummary));
     setProjectStatus(`Passport ${metric.label}: ${metric.value}`);
   }
 
@@ -7392,7 +7399,12 @@ export function App(): ReactElement {
         onFocusReferenceAlignment={focusReferenceAlignmentCard}
       />
 
-      <BeatPassport focusedMetricId={beatPassportFocusId} onFocus={focusBeatPassportMetric} summary={beatPassportSummary} />
+      <BeatPassport
+        focusedMetricId={beatPassportFocusId}
+        result={beatPassportResult}
+        summary={beatPassportSummary}
+        onFocus={focusBeatPassportMetric}
+      />
 
       <ProductionSnapshot focusedMetricId={productionSnapshotFocusId} onFocus={focusProductionSnapshotMetric} summary={productionSnapshotSummary} />
 
@@ -10274,17 +10286,23 @@ function ListeningPassFocusResultStrip({ result }: { result: ListeningPassFocusR
 
 function BeatPassport({
   focusedMetricId,
+  result,
   onFocus,
   summary
 }: {
   focusedMetricId: BeatPassportFocusId | null;
+  result: BeatPassportFocusResult | null;
   onFocus: (metric: BeatPassportFocusItem) => void;
   summary: BeatPassportSummary;
 }): ReactElement {
   const focusSummary = createBeatPassportFocusSummary(summary, focusedMetricId);
 
   return (
-    <section className={`beat-passport ${summary.tone}`} data-testid="beat-passport" aria-label="Beat passport">
+    <section
+      aria-label="Beat passport"
+      className={["beat-passport", summary.tone, result ? "has-result" : ""].filter(Boolean).join(" ")}
+      data-testid="beat-passport"
+    >
       <div className="beat-passport-heading">
         <div>
           <Gauge size={17} aria-hidden="true" />
@@ -10298,6 +10316,7 @@ function BeatPassport({
         <strong data-testid="beat-passport-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="beat-passport-focus-detail">{focusSummary.detailLabel}</small>
       </div>
+      {result && <BeatPassportFocusResultStrip result={result} />}
       <div className="beat-passport-grid" data-testid="beat-passport-grid">
         {summary.metrics.map((metric) => {
           const focused = focusedMetricId === metric.focusId;
@@ -10327,6 +10346,38 @@ function BeatPassport({
         })}
       </div>
     </section>
+  );
+}
+
+function BeatPassportFocusResultStrip({ result }: { result: BeatPassportFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`beat-passport-result ${result.tone}`}
+      data-result-beat-passport={result.metricId}
+      data-testid="beat-passport-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="beat-passport-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="beat-passport-result-title">{result.title}</strong>
+          <small data-testid="beat-passport-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="beat-passport-result-destination" data-testid="beat-passport-result-destination">
+        <span>{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="beat-passport-result-metric" data-testid="beat-passport-result-metric">
+        <span data-testid="beat-passport-result-status">{result.metricLabel}</span>
+        <strong data-testid="beat-passport-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="beat-passport-result-followup" data-testid="beat-passport-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -20117,6 +20168,69 @@ function createBeatPassportFocusSummary(summary: BeatPassportSummary, focusedMet
     detailTitle: `${statusLabel} / ${metric.label}: ${metric.value} / ${detailLabel}`,
     tone: metric.tone
   };
+}
+
+function createBeatPassportFocusResult(metric: BeatPassportFocusItem, summary: BeatPassportSummary): BeatPassportFocusResult {
+  const summaryMetric = summary.metrics.find((item) => item.focusId === metric.focusId) ?? null;
+
+  return {
+    metricId: metric.focusId,
+    status: "Focused",
+    title: `${metric.label} passport focused`,
+    detail: `${metric.value}: ${metric.detail}`,
+    destination: `${metric.focusLabel} panel`,
+    metricLabel: "Passport",
+    metricValue: beatPassportFocusResultMetric(summary),
+    auditionCue: beatPassportFocusResultAudition(metric),
+    nextCheck: beatPassportFocusResultNextCheck(metric),
+    tone: summaryMetric?.tone ?? "warn"
+  };
+}
+
+function beatPassportFocusResultMetric(summary: BeatPassportSummary): string {
+  const readyCount = summary.metrics.filter((metric) => metric.tone === "good").length;
+  const reviewCount = summary.metrics.filter((metric) => metric.tone === "warn").length;
+  const blockerCount = summary.metrics.filter((metric) => metric.tone === "danger").length;
+
+  return `${readyCount}/${summary.metrics.length} identity metrics ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function beatPassportFocusResultAudition(metric: BeatPassportFocusItem): string {
+  switch (metric.focusId) {
+    case "target":
+      return "Check Delivery Target and Session Brief before changing arrangement or mix posture.";
+    case "length":
+      return "Play Song loop and scan whether section length matches the selected delivery target.";
+    case "patterns":
+      return "Audition Pattern A/B/C use across Song Form and confirm each section has the right loop.";
+    case "readiness":
+      return "Review Beat Readiness and listen for the missing compose, arrange, or export foundation.";
+    case "export":
+      return "Check the full mix export posture before handing the beat off.";
+    case "stems":
+      return "Audition Full Mix and stems to confirm audible tracks match handoff needs.";
+    case "master":
+      return "Play the full mix against the master ceiling and limiter posture.";
+  }
+}
+
+function beatPassportFocusResultNextCheck(metric: BeatPassportFocusItem): string {
+  switch (metric.focusId) {
+    case "target":
+      return "Return after target, brief, arrangement length, and mix posture agree.";
+    case "length":
+      return "Return after the beat has enough bars and sections for the chosen target.";
+    case "patterns":
+      return "Return after Pattern A/B/C coverage supports verse, hook, or variation decisions.";
+    case "readiness":
+      return "Return after the core readiness checks are green or intentionally deferred.";
+    case "export":
+      return "Return after the full-mix export status and headroom are delivery-safe.";
+    case "stems":
+      return "Return after the audible stem count and stem labels match the handoff expectation.";
+    case "master":
+      return "Return after the master preset, ceiling, and output level fit the target.";
+  }
 }
 
 function createSnapshotCompareProjectProfile(project: ProjectState): SnapshotCompareProjectProfile {
