@@ -16521,6 +16521,35 @@ input[type="range"] {
   gap: 8px;
 }
 
+.studio-tone-baseline-source {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(244, 239, 231, 0.09);
+  border-radius: 7px;
+  background: rgba(244, 239, 231, 0.035);
+  padding: 7px 9px;
+}
+
+.studio-tone-baseline-source span,
+.studio-tone-baseline-source strong {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-tone-baseline-source span {
+  color: rgba(244, 239, 231, 0.54);
+  font-size: 10px;
+}
+
+.studio-tone-baseline-source strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
 .sound-control {
   display: grid;
   gap: 5px;

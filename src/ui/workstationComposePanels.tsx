@@ -14,8 +14,14 @@ type StudioToneResetResult = {
   label: string;
   beforeLabel: string;
   baselineLabel: string;
+  baselineSourceLabel: string;
   deltaLabel: string;
   nextCheck: string;
+};
+
+type StudioToneBaseline = {
+  sound: SoundDesign;
+  sourceLabel: string;
 };
 
 const studioToneControls: Array<{ id: string; label: string; parameter: SoundControlParameter }> = [
@@ -1558,8 +1564,16 @@ export function SoundDesigner({
   onPreviewPreset: (preset: SoundPresetTarget) => void;
   onChange: (update: Partial<Omit<SoundDesign, "preset">>) => void;
 }): ReactElement {
-  const presetBaseline = sound.preset === "custom" ? sound : soundPresetDesign(sound.preset);
+  const [studioToneBaseline, setStudioToneBaseline] = useState<StudioToneBaseline>(() => createStudioToneBaseline(sound));
   const [studioToneResetResult, setStudioToneResetResult] = useState<StudioToneResetResult | null>(null);
+  const presetBaseline = studioToneBaseline.sound;
+
+  useEffect(() => {
+    if (sound.preset !== "custom") {
+      setStudioToneBaseline(createStudioToneBaseline(sound));
+      setStudioToneResetResult(null);
+    }
+  }, [sound.preset]);
 
   return (
     <div className="sound-designer">
@@ -1602,10 +1616,15 @@ export function SoundDesigner({
       </div>
       {mode === "studio" && (
         <>
+          <div className="studio-tone-baseline-source" data-testid="studio-tone-baseline-source">
+            <span>Reset baseline</span>
+            <strong data-testid="studio-tone-baseline-source-label">{studioToneBaseline.sourceLabel}</strong>
+          </div>
           <div className="sound-control-grid">
             {studioToneControls.map((control) => (
               <SoundControl
                 baseline={presetBaseline[control.parameter]}
+                baselineSourceLabel={studioToneBaseline.sourceLabel}
                 id={control.id}
                 key={control.id}
                 label={control.label}
@@ -2064,6 +2083,7 @@ export function SoundFocusResultStrip({ result }: { result: SoundFocusResult }):
 
 export function SoundControl({
   baseline,
+  baselineSourceLabel,
   id,
   label,
   value,
@@ -2071,6 +2091,7 @@ export function SoundControl({
   onResetResult
 }: {
   baseline: number;
+  baselineSourceLabel: string;
   id: string;
   label: string;
   value: number;
@@ -2166,7 +2187,9 @@ export function SoundControl({
         />
       </div>
       <div className="sound-control-reference" data-testid={`sound-${id}-reference`}>
-        <span data-testid={`sound-${id}-baseline`}>Baseline {percentLabel(baseline)}</span>
+        <span data-testid={`sound-${id}-baseline`} title={`Baseline from ${baselineSourceLabel}`}>
+          Baseline {percentLabel(baseline)}
+        </span>
         <span data-testid={`sound-${id}-delta`}>{deltaLabel}</span>
         <button
           data-testid={`sound-${id}-reset`}
@@ -2179,12 +2202,13 @@ export function SoundControl({
               label,
               beforeLabel: percentLabel(value),
               baselineLabel: percentLabel(baseline),
+              baselineSourceLabel,
               deltaLabel: `${deltaLabel} -> 0`,
               nextCheck: studioToneResetNextCheck(label)
             });
             onChange(baseline);
           }}
-          title={resetDisabled ? `${label} already matches the current preset baseline` : `Reset ${label} to current preset baseline`}
+          title={resetDisabled ? `${label} already matches ${baselineSourceLabel}` : `Reset ${label} to ${baselineSourceLabel}`}
           type="button"
         >
           <RotateCcw size={12} aria-hidden="true" />
@@ -2210,7 +2234,9 @@ function StudioToneResetResultStrip({ result }: { result: StudioToneResetResult 
         </span>
       </div>
       <div className="studio-tone-reset-result-meta">
-        <span data-testid="studio-tone-reset-baseline">Baseline {result.baselineLabel}</span>
+        <span data-testid="studio-tone-reset-baseline">
+          Baseline {result.baselineSourceLabel} {result.baselineLabel}
+        </span>
         <span data-testid="studio-tone-reset-delta">{result.deltaLabel}</span>
       </div>
       <p className="studio-tone-reset-result-next" data-testid="studio-tone-reset-next-check">
@@ -2231,6 +2257,14 @@ function studioToneResetNextCheck(label: string): string {
     return "Replay the harmony layers and confirm the top-end balance.";
   }
   return "Replay the beat and confirm the tone matches the preset target.";
+}
+
+function createStudioToneBaseline(sound: SoundDesign): StudioToneBaseline {
+  if (sound.preset === "custom") {
+    return { sound, sourceLabel: "Initial custom tone" };
+  }
+
+  return { sound: soundPresetDesign(sound.preset), sourceLabel: `${soundPresetLabel(sound.preset)} preset` };
 }
 
 export function ChordEditor({
