@@ -4655,6 +4655,17 @@ h2 {
   font-size: 11px;
 }
 
+.quick-actions-guide-suggestion-reason {
+  display: -webkit-box;
+  overflow: hidden;
+  color: rgba(244, 239, 231, 0.72);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .quick-actions-guide-suggestion-meta {
   display: flex;
   flex-wrap: wrap;

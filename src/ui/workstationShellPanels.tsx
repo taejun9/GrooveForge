@@ -41,6 +41,16 @@ import type {
 import { maxQuickActionPins, snapshotCompareFocusItem } from "./workstationUiModel";
 import { barCountLabel, formatLocalDraftSavedAt } from "./workstationPatternTools";
 
+function quickActionGuideSuggestionReason(detail: string): string {
+  const parts = detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const reasonParts = parts.slice(1);
+
+  return reasonParts.length > 0 ? `Why now: ${reasonParts.join(" / ")}` : "Why now: current guide target";
+}
+
 type CommandReferenceItem = {
   id: string;
   command: string;
@@ -466,6 +476,9 @@ export function QuickActions({
       : null;
   const guideSuggestionPinned = guideSuggestionAction ? pinnedActionIds.includes(guideSuggestionAction.id) : false;
   const guideSuggestionSource = guideSuggestionAction ? guideSuggestionAction.detail.split(" / ")[0] || "Guide" : "Guide";
+  const guideSuggestionReason = guideSuggestionAction
+    ? quickActionGuideSuggestionReason(guideSuggestionAction.detail)
+    : "Why now: current guide target";
 
   return (
     <div
@@ -549,6 +562,9 @@ export function QuickActions({
               </span>
               <strong data-testid="quick-actions-guide-suggestion-title">{guideSuggestionAction.title}</strong>
               <small data-testid="quick-actions-guide-suggestion-detail">{guideSuggestionAction.detail}</small>
+              <small className="quick-actions-guide-suggestion-reason" data-testid="quick-actions-guide-suggestion-reason">
+                {guideSuggestionReason}
+              </small>
               <span className="quick-actions-guide-suggestion-meta" data-testid="quick-actions-guide-suggestion-meta">
                 <span data-testid="quick-actions-guide-suggestion-source">{guideSuggestionSource}</span>
                 <span data-testid="quick-actions-guide-suggestion-pin-state">
