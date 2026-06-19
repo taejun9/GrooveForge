@@ -6361,6 +6361,7 @@ export function App(): ReactElement {
     const targetRefs: Record<StyleInspectorFocusTarget, HTMLElement | null> = {
       transport: transportPanelRef.current,
       compose: composePanelRef.current,
+      arrange: arrangePanelRef.current,
       sound: soundPanelRef.current
     };
 
@@ -8590,11 +8591,29 @@ function StyleInspector({
         title={`${summary.profile.name} direct-composition goals: ${summary.goalHeadline}`}
       >
         {summary.goals.map((goal) => (
-          <div className={`style-goal-card ${goal.tone}`} data-testid={`style-goal-${goal.id}`} key={goal.id}>
+          <div
+            className={["style-goal-card", goal.tone, focusedItemId === goal.focusId ? "focused" : ""]
+              .filter(Boolean)
+              .join(" ")}
+            data-focused={focusedItemId === goal.focusId ? "true" : "false"}
+            data-testid={`style-goal-${goal.id}`}
+            key={goal.id}
+          >
             <span data-testid={`style-goal-${goal.id}-label`}>{goal.label}</span>
             <strong data-testid={`style-goal-${goal.id}-current`}>{goal.current}</strong>
             <small data-testid={`style-goal-${goal.id}-target`}>Target {goal.target}</small>
             <b data-testid={`style-goal-${goal.id}-progress`}>{goal.progress}</b>
+            <button
+              aria-pressed={focusedItemId === goal.focusId}
+              className="style-goal-focus-button"
+              data-testid={`style-goal-focus-${goal.id}`}
+              onClick={() => onFocus(goal)}
+              title={`Focus ${goal.focusLabel}: ${goal.value}`}
+              type="button"
+            >
+              <ArrowRight size={13} aria-hidden="true" />
+              <span>{goal.focusLabel}</span>
+            </button>
             <em data-testid={`style-goal-${goal.id}-cue`}>{goal.cue}</em>
             <i data-testid={`style-goal-${goal.id}-detail`}>{goal.detail}</i>
           </div>
@@ -11289,9 +11308,12 @@ function activeStyleInspectorQuickActionItem(
   }
 
   return (
+    summary.goals.find((goal) => goal.tone === "danger") ??
+    summary.goals.find((goal) => goal.tone === "warn") ??
     summary.patterns.find((pattern) => pattern.eventCount < 12) ??
     summary.patterns.find((pattern) => pattern.eventCount < 20) ??
     summary.metrics[0] ??
+    summary.goals[0] ??
     summary.patterns[0] ??
     null
   );
@@ -13271,12 +13293,16 @@ function createQuickActions({
     run: () => onApplySessionBriefStarter(pad.id)
   }));
   const styleInspectorItem = activeStyleInspectorQuickActionItem(styleInspectorSummary, project);
-  const styleInspectorActions: QuickAction[] = [...styleInspectorSummary.metrics, ...styleInspectorSummary.patterns].map((item) => ({
+  const styleInspectorActions: QuickAction[] = [
+    ...styleInspectorSummary.metrics,
+    ...styleInspectorSummary.goals,
+    ...styleInspectorSummary.patterns
+  ].map((item) => ({
     id: `style-inspector-item-${item.focusId}`,
     title: `Focus Style Inspector: ${item.label}`,
     detail: `${item.value} / ${item.focusLabel} / ${item.detail}`,
     group: "Create",
-    keywords: `style inspector focus genre lane ${item.focusId} ${item.label} ${item.value} ${item.focusLabel} ${item.detail} bpm swing bass melody sound density pattern beginner producer`,
+    keywords: `style inspector focus genre lane ${item.focusId} ${item.label} ${item.value} ${item.focusLabel} ${item.detail} bpm swing bass melody sound density goal pattern beginner producer`,
     run: () => onFocusStyleInspector(item)
   }));
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
@@ -17197,7 +17223,7 @@ function quickActionResultFollowup(
 
   if (action.id === "style-inspector-focus") {
     return {
-      auditionCue: "Use the focused Style Inspector item to inspect BPM, swing, bass, melody, sound, or Pattern density before changing style or writing parts.",
+      auditionCue: "Use the focused Style Inspector item to inspect BPM, swing, bass, melody, sound, goal progress, or Pattern density before changing style or writing parts.",
       nextCheck: "Return to Style Inspector after the focused style posture item is ready or intentionally deferred."
     };
   }
@@ -17205,7 +17231,7 @@ function quickActionResultFollowup(
   if (action.id.startsWith("style-inspector-item-")) {
     return {
       auditionCue: "Use the focused Style Inspector lane to inspect genre fit before changing style or writing parts.",
-      nextCheck: "Return to Style Inspector when you need another direct BPM, swing, bass, melody, sound, or density focus."
+      nextCheck: "Return to Style Inspector when you need another direct BPM, swing, bass, melody, sound, goal, or density focus."
     };
   }
 
@@ -25344,14 +25370,20 @@ function createStyleGoalCard(
   priority: number
 ): StyleGoalCard {
   const tone = composerActionTone(current, goal);
+  const currentLabel = styleGoalCountLabel(current, unit);
+  const targetLabel = `${goal} ${unit}`;
   return {
     id,
+    focusId: `goal-${id}`,
     label,
-    current: styleGoalCountLabel(current, unit),
-    target: `${goal} ${unit}`,
+    value: `${currentLabel} / target ${targetLabel}`,
+    current: currentLabel,
+    target: targetLabel,
     progress: `${Math.min(current, goal)}/${goal}`,
     cue,
     detail: styleGoalPriorityLabel(priority),
+    focusTarget: id === "arrange" ? "arrange" : "compose",
+    focusLabel: id === "arrange" ? "Arrange" : "Compose",
     tone
   };
 }
@@ -25368,7 +25400,7 @@ function createStyleInspectorFocusSummary(
   summary: StyleInspectorSummary,
   focusedItemId: StyleInspectorFocusId | null
 ): StyleInspectorFocusSummary {
-  const items: StyleInspectorFocusItem[] = [...summary.metrics, ...summary.patterns];
+  const items: StyleInspectorFocusItem[] = [...summary.metrics, ...summary.goals, ...summary.patterns];
   const focusedItem = focusedItemId ? items.find((item) => item.focusId === focusedItemId) ?? null : null;
   const item = focusedItem ?? items[0] ?? null;
 

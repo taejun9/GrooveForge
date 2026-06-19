@@ -1832,6 +1832,7 @@ h2 {
 .style-goal-card b,
 .style-goal-card em,
 .style-goal-card i,
+.style-goal-focus-button span,
 .style-inspector-pattern span,
 .style-inspector-pattern strong,
 .style-inspector-pattern small,
@@ -1964,6 +1965,12 @@ h2 {
   border-color: color-mix(in srgb, #ff7f73 44%, rgba(244, 239, 231, 0.12));
 }
 
+.style-goal-card.focused {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--style-color) 44%, rgba(244, 239, 231, 0.1)),
+    0 0 15px color-mix(in srgb, var(--style-color) 18%, transparent);
+}
+
 .style-goal-card span,
 .style-goal-card em,
 .style-goal-card i {
@@ -2002,6 +2009,32 @@ h2 {
   padding: 3px 6px;
   font-size: 9px;
   line-height: 1;
+}
+
+.style-goal-focus-button {
+  display: inline-flex;
+  grid-column: 2;
+  grid-row: 3 / 6;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  align-self: center;
+  justify-self: end;
+  min-inline-size: 58px;
+  max-inline-size: 78px;
+  border: 1px solid color-mix(in srgb, var(--style-color) 28%, rgba(244, 239, 231, 0.13));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--style-color) 10%, rgba(244, 239, 231, 0.035));
+  color: #f4efe7;
+  padding: 4px 5px;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.style-goal-focus-button:hover,
+.style-goal-focus-button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--style-color) 58%, rgba(244, 239, 231, 0.2));
+  background: color-mix(in srgb, var(--style-color) 18%, rgba(244, 239, 231, 0.06));
 }
 
 .style-quick-picks {

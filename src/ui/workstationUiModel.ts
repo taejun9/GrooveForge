@@ -1262,9 +1262,10 @@ export type PatternDnaFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type StyleGoalCardId = "drums" | "bass" | "harmony" | "melody" | "arrange";
 export type StyleInspectorMetricId = "bpm" | "swing" | "bass" | "melody" | "sound";
-export type StyleInspectorFocusId = StyleInspectorMetricId | `density-${PatternSlot}`;
-export type StyleInspectorFocusTarget = "transport" | "compose" | "sound";
+export type StyleInspectorFocusId = StyleInspectorMetricId | `density-${PatternSlot}` | `goal-${StyleGoalCardId}`;
+export type StyleInspectorFocusTarget = "transport" | "compose" | "sound" | "arrange";
 
 export type StyleInspectorFocusItem = {
   focusId: StyleInspectorFocusId;
@@ -1290,16 +1291,12 @@ export type StylePatternDensity = {
   focusLabel: "Compose";
 };
 
-export type StyleGoalCardId = "drums" | "bass" | "harmony" | "melody" | "arrange";
-
-export type StyleGoalCard = {
+export type StyleGoalCard = StyleInspectorFocusItem & {
   id: StyleGoalCardId;
-  label: string;
   current: string;
   target: string;
   progress: string;
   cue: string;
-  detail: string;
   tone: MixCoachTone;
 };
 
