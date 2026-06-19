@@ -37,6 +37,16 @@ type StudioToneDriftSummary = {
   largestLabel: string;
   directionLabel: string;
   nextCheck: string;
+  resetTarget: StudioToneDriftResetTarget | null;
+};
+
+type StudioToneDriftResetTarget = {
+  id: string;
+  label: string;
+  parameter: SoundControlParameter;
+  beforeValue: number;
+  baselineValue: number;
+  deltaLabel: string;
 };
 
 const studioToneControls: Array<{ id: string; label: string; parameter: SoundControlParameter }> = [
@@ -1604,6 +1614,24 @@ export function SoundDesigner({
     });
   }
 
+  function resetLargestStudioToneDrift(): void {
+    const target = studioToneDrift.resetTarget;
+    if (!target) {
+      return;
+    }
+
+    setStudioToneResetResult({
+      id: target.id,
+      label: target.label,
+      beforeLabel: percentLabel(target.beforeValue),
+      baselineLabel: percentLabel(target.baselineValue),
+      baselineSourceLabel: studioToneBaseline.sourceLabel,
+      deltaLabel: `${target.deltaLabel} -> 0`,
+      nextCheck: studioToneResetNextCheck(target.label)
+    });
+    onChange({ [target.parameter]: target.baselineValue } as Partial<Omit<SoundDesign, "preset">>);
+  }
+
   return (
     <div className="sound-designer">
       <div className="lane-header">
@@ -1659,7 +1687,7 @@ export function SoundDesigner({
             </button>
           </div>
           {studioToneBaselineResult && <StudioToneBaselineResultStrip result={studioToneBaselineResult} />}
-          <StudioToneDriftSummaryStrip summary={studioToneDrift} />
+          <StudioToneDriftSummaryStrip summary={studioToneDrift} onResetLargest={resetLargestStudioToneDrift} />
           <div className="sound-control-grid">
             {studioToneControls.map((control) => (
               <SoundControl
@@ -2301,7 +2329,13 @@ function StudioToneBaselineResultStrip({ result }: { result: StudioToneBaselineR
   );
 }
 
-function StudioToneDriftSummaryStrip({ summary }: { summary: StudioToneDriftSummary }): ReactElement {
+function StudioToneDriftSummaryStrip({
+  summary,
+  onResetLargest
+}: {
+  summary: StudioToneDriftSummary;
+  onResetLargest: () => void;
+}): ReactElement {
   return (
     <div className="studio-tone-drift-summary" data-testid="studio-tone-drift-summary">
       <div className="studio-tone-drift-main">
@@ -2317,6 +2351,16 @@ function StudioToneDriftSummaryStrip({ summary }: { summary: StudioToneDriftSumm
         <span data-testid="studio-tone-drift-largest">{summary.largestLabel}</span>
         <span data-testid="studio-tone-drift-direction">{summary.directionLabel}</span>
       </div>
+      <button
+        data-testid="studio-tone-drift-reset-largest"
+        disabled={!summary.resetTarget}
+        onClick={onResetLargest}
+        title={summary.resetTarget ? `Reset ${summary.resetTarget.label} to baseline` : "No Studio tone drift to reset"}
+        type="button"
+      >
+        <RotateCcw size={12} aria-hidden="true" />
+        <span>Reset Largest</span>
+      </button>
       <p data-testid="studio-tone-drift-next-check">{summary.nextCheck}</p>
     </div>
   );
@@ -2372,18 +2416,28 @@ function createStudioToneDriftSummary(sound: SoundDesign, baseline: SoundDesign)
       postureLabel: "Tone matches baseline",
       largestLabel: "Largest 0",
       directionLabel: "No drift",
-      nextCheck: "Capture a new baseline after you shape a sound worth keeping."
+      nextCheck: "Capture a new baseline after you shape a sound worth keeping.",
+      resetTarget: null
     };
   }
 
   const direction = largest.deltaPercent > 0 ? "above" : "below";
+  const deltaLabel = `Delta ${largest.deltaPercent > 0 ? "+" : ""}${largest.deltaPercent}`;
   return {
     changedCount: changed.length,
     totalCount: studioToneControls.length,
     postureLabel: changed.length >= 4 ? "Tone has broad changes" : "Tone has focused changes",
     largestLabel: `${largest.label} ${largest.deltaPercent > 0 ? "+" : ""}${largest.deltaPercent}`,
     directionLabel: `${largest.label} is ${direction} baseline`,
-    nextCheck: `Audition ${largest.label.toLowerCase()} first, then reset or capture if the move works.`
+    nextCheck: `Audition ${largest.label.toLowerCase()} first, then reset or capture if the move works.`,
+    resetTarget: {
+      id: largest.id,
+      label: largest.label,
+      parameter: largest.parameter,
+      beforeValue: sound[largest.parameter],
+      baselineValue: baseline[largest.parameter],
+      deltaLabel
+    }
   };
 }
 
