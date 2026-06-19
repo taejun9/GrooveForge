@@ -1997,7 +1997,7 @@ h2 {
 
 .session-pass {
   display: grid;
-  grid-template-columns: minmax(180px, 0.34fr) minmax(0, 1fr);
+  grid-template-columns: minmax(180px, 0.28fr) minmax(150px, 0.22fr) minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
   min-width: 0;
@@ -2047,6 +2047,9 @@ h2 {
 
 .session-pass-heading strong,
 .session-pass-heading small,
+.session-pass-decision span,
+.session-pass-decision strong,
+.session-pass-decision small,
 .session-pass-card span,
 .session-pass-card strong,
 .session-pass-card small,
@@ -2071,6 +2074,44 @@ h2 {
 .session-pass-heading small {
   color: rgba(244, 239, 231, 0.66);
   font-size: 11px;
+}
+
+.session-pass-decision {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(130, 215, 255, 0.055);
+  padding: 8px;
+}
+
+.session-pass-decision.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.session-pass-decision.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.session-pass-decision span {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.session-pass-decision strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.session-pass-decision small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
 }
 
 .session-pass-grid {
@@ -22169,12 +22210,17 @@ input[type="range"] {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .session-pass-decision {
+    grid-column: 2;
+  }
+
   .session-pass-result {
     grid-column: 1 / -1;
     grid-template-columns: 150px minmax(0, 0.6fr) minmax(0, 1fr);
   }
 
   .session-pass-grid {
+    grid-column: 1 / -1;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -23238,7 +23284,12 @@ input[type="range"] {
   }
 
   .session-pass-grid {
+    grid-column: 1;
     grid-template-columns: 1fr;
+  }
+
+  .session-pass-decision {
+    grid-column: 1;
   }
 
   .session-pass-result {

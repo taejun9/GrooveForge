@@ -12793,11 +12793,22 @@ function createSessionPassSummary(
   ];
   const activeCard = project.mode === "guided" ? cards[0] : cards[1];
   const tone = weakestTone(cards.map((card) => card.tone));
+  const decisionStatus =
+    activeCard.tone === "danger" ? "Session blocker" : activeCard.tone === "warn" ? "Session review" : "Session ready";
+  const decisionLabel = `Focus ${activeCard.focusLabel}`;
+  const decisionDetail = `${activeCard.label}: ${activeCard.detail}`;
+  const decisionTitle = `Session Pass recommends ${decisionLabel}: ${activeCard.detail}`;
 
   return {
     mode: project.mode,
     headline: `${activeCard.label}: ${activeCard.value}`,
     detail: `${firstBeatPath.countLabel} / ${reviewQueue.headline} / ${exportPreflight.headline}`,
+    activeCardId: activeCard.id,
+    decisionStatus,
+    decisionLabel,
+    decisionDetail,
+    decisionTitle,
+    decisionTone: activeCard.tone,
     tone,
     cards
   };

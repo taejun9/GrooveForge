@@ -3229,6 +3229,12 @@ export type SessionPassSummary = {
   mode: ProjectState["mode"];
   headline: string;
   detail: string;
+  activeCardId: SessionPassCardId;
+  decisionStatus: string;
+  decisionLabel: string;
+  decisionDetail: string;
+  decisionTitle: string;
+  decisionTone: MixCoachTone;
   tone: MixCoachTone;
   cards: SessionPassCard[];
 };

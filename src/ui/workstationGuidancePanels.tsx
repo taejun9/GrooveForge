@@ -768,6 +768,16 @@ export function SessionPass({
         <strong data-testid="session-pass-headline">{summary.headline}</strong>
         <small data-testid="session-pass-detail">{summary.detail}</small>
       </div>
+      <div
+        className={`session-pass-decision ${summary.decisionTone}`}
+        data-session-pass-decision={summary.activeCardId}
+        data-testid="session-pass-decision"
+        title={summary.decisionTitle}
+      >
+        <span data-testid="session-pass-decision-status">{summary.decisionStatus}</span>
+        <strong data-testid="session-pass-decision-label">{summary.decisionLabel}</strong>
+        <small data-testid="session-pass-decision-detail">{summary.decisionDetail}</small>
+      </div>
       <div className="session-pass-grid" data-testid="session-pass-grid">
         {summary.cards.map((card) => (
           <div className={`session-pass-card ${card.tone}`} data-testid={`session-pass-${card.id}`} key={card.id}>
