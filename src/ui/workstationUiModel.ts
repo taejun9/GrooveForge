@@ -3133,7 +3133,7 @@ export type SessionBriefCompassSummary = {
   cards: SessionBriefCompassCard[];
 };
 
-export type ReferenceAlignmentCardId = "reference" | "direction" | "arrangement" | "mix" | "handoff";
+export type ReferenceAlignmentCardId = "reference" | "direction" | "arrangement" | "mix" | "listen" | "handoff";
 export type ReferenceAlignmentFocusTarget = "artist" | "vibe" | "reference" | "notes" | "arrange" | "master" | "deliver";
 
 export type ReferenceAlignmentCard = {

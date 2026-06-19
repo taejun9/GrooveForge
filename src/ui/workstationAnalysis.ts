@@ -321,6 +321,14 @@ export function createReferenceAlignmentSummary(
         ? "warn"
         : "danger";
   const mixCardTone: MixCoachTone = analysis.status === "Silent" ? "danger" : mixSummary.tone === "good" && analysis.status === "Ready" ? "good" : "warn";
+  const listenCue = referenceListenCue({
+    arrangementTone,
+    handoffTone,
+    hasReference,
+    hasVibe,
+    mixCardTone,
+    status: analysis.status
+  });
   const cards: ReferenceAlignmentCard[] = [
     {
       id: "reference",
@@ -369,6 +377,16 @@ export function createReferenceAlignmentSummary(
       tone: mixCardTone
     },
     {
+      id: "listen",
+      label: "Listen Cue",
+      value: listenCue.value,
+      detail: `${target.name} / ${listenCue.detail}`,
+      nextCheck: listenCue.nextCheck,
+      focusTarget: listenCue.focusTarget,
+      focusLabel: listenCue.focusLabel,
+      tone: listenCue.tone
+    },
+    {
       id: "handoff",
       label: "Handoff",
       value: `${filledFields}/4 brief`,
@@ -392,6 +410,95 @@ export function createReferenceAlignmentSummary(
     detail: `${readyCount}/${cards.length} aligned / ${target.name} / no audio import`,
     tone,
     cards
+  };
+}
+
+type ReferenceListenCueInput = {
+  arrangementTone: MixCoachTone;
+  handoffTone: MixCoachTone;
+  hasReference: boolean;
+  hasVibe: boolean;
+  mixCardTone: MixCoachTone;
+  status: ExportAnalysis["status"];
+};
+
+type ReferenceListenCue = {
+  value: string;
+  detail: string;
+  nextCheck: string;
+  focusTarget: ReferenceAlignmentCard["focusTarget"];
+  focusLabel: string;
+  tone: MixCoachTone;
+};
+
+function referenceListenCue(input: ReferenceListenCueInput): ReferenceListenCue {
+  if (!input.hasReference) {
+    return {
+      value: "Reference first",
+      detail: "write the comparison cue before listening",
+      nextCheck: "Fill Reference, then run Listening Pass without importing audio.",
+      focusTarget: "reference",
+      focusLabel: "Reference",
+      tone: "warn"
+    };
+  }
+  if (!input.hasVibe) {
+    return {
+      value: "Direction first",
+      detail: "write the vibe target before comparing takes",
+      nextCheck: "Fill Vibe so the reference pass has a clear sound direction.",
+      focusTarget: "vibe",
+      focusLabel: "Vibe",
+      tone: "warn"
+    };
+  }
+  if (input.arrangementTone !== "good") {
+    return {
+      value: "Song form first",
+      detail: "compare section energy after arrangement is ready",
+      nextCheck: "Use Arrange, Section Locator, or Structure Lens before the reference pass.",
+      focusTarget: "arrange",
+      focusLabel: "Arrange",
+      tone: input.arrangementTone
+    };
+  }
+  if (input.status === "Silent") {
+    return {
+      value: "Signal first",
+      detail: "create audible export signal before reference listening",
+      nextCheck: "Add or unmute musical events, then run the reference pass again.",
+      focusTarget: "master",
+      focusLabel: "Master",
+      tone: "danger"
+    };
+  }
+  if (input.mixCardTone !== "good") {
+    return {
+      value: "Mix pass first",
+      detail: "compare loudness posture after Mix Coach improves",
+      nextCheck: "Use Mix Coach or Master Finish before judging final reference fit.",
+      focusTarget: "master",
+      focusLabel: "Master",
+      tone: "warn"
+    };
+  }
+  if (input.handoffTone !== "good") {
+    return {
+      value: "Full mix pass",
+      detail: "compare groove, hook, space, and finish by ear",
+      nextCheck: "Run Listening Pass, then complete the Handoff Pack checks.",
+      focusTarget: "master",
+      focusLabel: "Master",
+      tone: "good"
+    };
+  }
+  return {
+    value: "Handoff pass",
+    detail: "final compare before WAV, stems, MIDI, and sheet export",
+    nextCheck: "Run Listening Pass and Export Preflight before sending files.",
+    focusTarget: "deliver",
+    focusLabel: "Deliver",
+    tone: "good"
   };
 }
 

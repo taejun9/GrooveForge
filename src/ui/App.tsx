@@ -12900,7 +12900,7 @@ function createQuickActions({
     title: `Focus Reference Alignment: ${card.label}`,
     detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
     group: "Project",
-    keywords: `reference alignment ${card.id} ${card.label} ${card.value} ${card.focusLabel} arrange mix master handoff`,
+    keywords: `reference alignment listen cue ${card.id} ${card.label} ${card.value} ${card.focusLabel} arrange mix master handoff`,
     run: () => onFocusReferenceAlignment(card)
   }));
   const sessionBriefStarterActions: QuickAction[] = sessionBriefStarterPads.map((pad) => ({
@@ -13854,7 +13854,7 @@ function createQuickActions({
       title: `Focus Reference Alignment: ${referenceAlignmentCard.label}`,
       detail: `${referenceAlignmentCard.value} / ${referenceAlignmentCard.focusLabel} / ${referenceAlignmentCard.detail}`,
       group: "Project",
-      keywords: `reference alignment focus ${referenceAlignmentCard.id} ${referenceAlignmentCard.label} ${referenceAlignmentCard.value} ${referenceAlignmentCard.focusLabel}`,
+      keywords: `reference alignment focus listen cue ${referenceAlignmentCard.id} ${referenceAlignmentCard.label} ${referenceAlignmentCard.value} ${referenceAlignmentCard.focusLabel}`,
       run: () => onFocusReferenceAlignment(referenceAlignmentCard)
     },
     ...referenceAlignmentActions,
@@ -16341,14 +16341,14 @@ function quickActionResultFollowup(
 
   if (action.id === "reference-alignment-focus") {
     return {
-      auditionCue: "Use the focused Reference Alignment lane to compare the written reference, arrangement, mix, and handoff posture by ear.",
+      auditionCue: "Use the focused Reference Alignment lane to compare the written reference, listen cue, arrangement, mix, and handoff posture by ear.",
       nextCheck: "Return to Reference Alignment before export to confirm no audio import or matching step is required."
     };
   }
 
   if (action.id.startsWith("reference-alignment-card-")) {
     return {
-      auditionCue: "Use the selected Reference Alignment card to inspect reference fit through existing brief, arrangement, master, or delivery panels.",
+      auditionCue: "Use the selected Reference Alignment card to inspect reference fit and listen scope through existing brief, arrangement, master, or delivery panels.",
       nextCheck: "After the focused lane is ready, run Listening Pass and Handoff Pack checks before sending the beat."
     };
   }
