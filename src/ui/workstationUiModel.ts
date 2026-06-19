@@ -736,6 +736,45 @@ export type SoundTimbreCheckSummary = {
   tone: MixCoachTone;
 };
 
+export type SoundSnapshotSlotId = "A" | "B";
+
+export type SoundSnapshotSlotMap = Record<SoundSnapshotSlotId, SoundSnapshot | null>;
+
+export type SoundSnapshot = {
+  slot: SoundSnapshotSlotId;
+  capturedAtLabel: string;
+  statusLabel: string;
+  presetLabel: string;
+  timbreLabel: string;
+  drumLabel: string;
+  bassLabel: string;
+  synthLabel: string;
+  chordLabel: string;
+  spreadLabel: string;
+  score: number;
+  sound: SoundDesign;
+  tone: MixCoachTone;
+};
+
+export type SoundSnapshotMetricId = "preset" | "drums" | "bass" | "synth" | "chords";
+
+export type SoundSnapshotComparisonMetric = {
+  id: SoundSnapshotMetricId;
+  label: string;
+  aLabel: string;
+  bLabel: string;
+  tone: MixCoachTone;
+};
+
+export type SoundSnapshotComparisonSummary = {
+  statusLabel: string;
+  winnerLabel: string;
+  detailLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+  metrics: SoundSnapshotComparisonMetric[];
+};
+
 export type SoundPresetTarget = (typeof soundPresetIds)[number];
 
 export type SoundPresetPreviewSummary = {

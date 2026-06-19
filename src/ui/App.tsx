@@ -238,6 +238,10 @@ import type {
   SoundFocusResultMetric,
   SoundFocusResult,
   SoundTimbreCheckSummary,
+  SoundSnapshot,
+  SoundSnapshotComparisonSummary,
+  SoundSnapshotSlotId,
+  SoundSnapshotSlotMap,
   SoundPresetTarget,
   SoundPresetPreviewSummary,
   SoundPresetResultMetric,
@@ -1042,6 +1046,7 @@ export function App(): ReactElement {
   const [soundPresetResult, setSoundPresetResult] = useState<SoundPresetResult | null>(null);
   const [soundFocusResult, setSoundFocusResult] = useState<SoundFocusResult | null>(null);
   const [drumKitResult, setDrumKitResult] = useState<DrumKitResult | null>(null);
+  const [soundSnapshots, setSoundSnapshots] = useState<SoundSnapshotSlotMap>({ A: null, B: null });
   const [masterFinishResult, setMasterFinishResult] = useState<MasterFinishResult | null>(null);
   const [masterAutomationResult, setMasterAutomationResult] = useState<MasterAutomationResult | null>(null);
   const [mixBalanceResult, setMixBalanceResult] = useState<MixBalanceResult | null>(null);
@@ -1258,6 +1263,7 @@ export function App(): ReactElement {
     [project.sound, soundFocusPadOptions]
   );
   const soundTimbreCheckSummary = useMemo(() => createSoundTimbreCheckSummary(project.sound), [project.sound]);
+  const soundSnapshotComparison = useMemo(() => createSoundSnapshotComparison(soundSnapshots), [soundSnapshots]);
   const drumKitPadOptions = useMemo(() => createDrumKitPadOptions(project), [project]);
   const drumKitPreviewSummary = useMemo(
     () => createDrumKitPreviewSummary(drumKitPadOptions),
@@ -3419,6 +3425,48 @@ export function App(): ReactElement {
         preset: "custom"
       }
     }));
+  }
+
+  function captureSoundSnapshot(slot: SoundSnapshotSlotId): void {
+    const snapshot = createSoundSnapshot(slot, projectRef.current.sound);
+    setSoundSnapshots((current) => ({ ...current, [slot]: snapshot }));
+    setProjectStatus(`Captured Sound Snapshot ${slot}: ${snapshot.statusLabel}`);
+  }
+
+  function recallSoundSnapshot(slot: SoundSnapshotSlotId): void {
+    const snapshot = soundSnapshots[slot];
+    if (!snapshot) {
+      setProjectStatus(`Sound Snapshot ${slot} is empty`);
+      return;
+    }
+
+    const changed = updateProject(
+      (current) => (sameSoundDesign(current.sound, snapshot.sound) ? current : { ...current, sound: cloneSoundDesign(snapshot.sound) }),
+      `Recalled Sound Snapshot ${slot}`
+    );
+
+    if (!changed) {
+      setProjectStatus(`Sound Snapshot ${slot} already matches current sound`);
+      return;
+    }
+
+    setSelectedNote(null);
+    setSelectedDrumStep(null);
+    setSelectedChordIndex(null);
+    setSoundPresetResult(null);
+    setSoundFocusResult(null);
+    setDrumKitResult(null);
+    setSoundPresetPreviewId(snapshot.sound.preset === "custom" ? defaultSoundPresetPreview(projectRef.current) : snapshot.sound.preset);
+    setProjectStatus(`Recalled Sound Snapshot ${slot}: ${snapshot.statusLabel}`);
+  }
+
+  function clearSoundSnapshots(): void {
+    if (!soundSnapshots.A && !soundSnapshots.B) {
+      setProjectStatus("Sound Snapshot A/B already clear");
+      return;
+    }
+    setSoundSnapshots({ A: null, B: null });
+    setProjectStatus("Cleared Sound Snapshot A/B");
   }
 
   function duplicateArrangementBlock(): void {
@@ -6501,6 +6549,7 @@ export function App(): ReactElement {
     sessionPassSummary,
     soundFocusPreviewSummary,
     soundPresetPreviewSummary,
+    soundSnapshots,
     spaceFxPadOptions,
     stemAnalyses,
     stemAuditionPadOptions,
@@ -6557,6 +6606,9 @@ export function App(): ReactElement {
     onApplyStemAudition: applyStemAuditionPad,
     onApplySoundFocus: applySoundFocusPad,
     onApplySoundPreset: applySoundPreset,
+    onCaptureSoundSnapshot: captureSoundSnapshot,
+    onRecallSoundSnapshot: recallSoundSnapshot,
+    onClearSoundSnapshots: clearSoundSnapshots,
     onExpandPatternChain: expandPatternChain,
     onApplyProjectKey: applyProjectKey,
     onApplyTempoNudge: applyTempoNudgePad,
@@ -7555,11 +7607,16 @@ export function App(): ReactElement {
             presetPreviewId={soundPresetPreviewId}
             presetResult={soundPresetResult}
             sound={project.sound}
+            soundSnapshots={soundSnapshots}
+            soundSnapshotSummary={soundSnapshotComparison}
             timbreCheck={soundTimbreCheckSummary}
             onChange={updateSoundDesign}
             onApplyPreset={applySoundPreset}
             onDrumKitPad={applyDrumKitPad}
             onFocusPad={applySoundFocusPad}
+            onCaptureSoundSnapshot={captureSoundSnapshot}
+            onRecallSoundSnapshot={recallSoundSnapshot}
+            onClearSoundSnapshots={clearSoundSnapshots}
             onPreviewPreset={previewSoundPreset}
           />
           <ChordEditor
@@ -12142,6 +12199,7 @@ function createQuickActions({
   sessionPassSummary,
   soundFocusPreviewSummary,
   soundPresetPreviewSummary,
+  soundSnapshots,
   spaceFxPadOptions,
   stemAnalyses,
   stemAuditionPadOptions,
@@ -12197,6 +12255,9 @@ function createQuickActions({
   onApplyStemAudition,
   onApplySoundFocus,
   onApplySoundPreset,
+  onCaptureSoundSnapshot,
+  onRecallSoundSnapshot,
+  onClearSoundSnapshots,
   onExpandPatternChain,
   onApplyProjectKey,
   onApplyTempoNudge,
@@ -12374,6 +12435,7 @@ function createQuickActions({
   sessionPassSummary: SessionPassSummary;
   soundFocusPreviewSummary: SoundFocusPreviewSummary;
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
+  soundSnapshots: SoundSnapshotSlotMap;
   spaceFxPadOptions: SpaceFxPadOption[];
   stemAnalyses: StemExportAnalyses;
   stemAuditionPadOptions: StemAuditionPadOption[];
@@ -12429,6 +12491,9 @@ function createQuickActions({
   onApplyStemAudition: (pad: StemAuditionPadId) => void;
   onApplySoundFocus: (pad: SoundFocusPadId) => void;
   onApplySoundPreset: (preset: SoundPresetTarget) => void;
+  onCaptureSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
+  onRecallSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
+  onClearSoundSnapshots: () => void;
   onExpandPatternChain: () => void;
   onApplyProjectKey: (key: string) => void;
   onApplyTempoNudge: (pad: TempoNudgePadDefinition) => void;
@@ -13442,6 +13507,58 @@ function createQuickActions({
       }
     }
   }));
+  const soundSnapshotActions: QuickAction[] = [
+    {
+      id: "sound-snapshot-capture-a",
+      title: "Capture Sound Snapshot A",
+      detail: soundSnapshots.A
+        ? `Replace A / ${soundSnapshots.A.timbreLabel} / ${soundSnapshots.A.spreadLabel}`
+        : "Capture current sound into A for tone comparison.",
+      group: "Create",
+      keywords: "sound snapshot capture a ab compare tone timbre preset drums 808 synth chords beginner producer",
+      run: () => onCaptureSoundSnapshot("A")
+    },
+    {
+      id: "sound-snapshot-capture-b",
+      title: "Capture Sound Snapshot B",
+      detail: soundSnapshots.B
+        ? `Replace B / ${soundSnapshots.B.timbreLabel} / ${soundSnapshots.B.spreadLabel}`
+        : "Capture current sound into B for tone comparison.",
+      group: "Create",
+      keywords: "sound snapshot capture b ab compare tone timbre preset drums 808 synth chords beginner producer",
+      run: () => onCaptureSoundSnapshot("B")
+    },
+    {
+      id: "sound-snapshot-recall-a",
+      title: "Recall Sound Snapshot A",
+      detail: soundSnapshots.A ? `Apply A / ${soundSnapshots.A.presetLabel} / ${soundSnapshots.A.timbreLabel}` : "Capture A before recalling a sound pass.",
+      group: "Create",
+      keywords: "sound snapshot recall restore apply a ab compare tone timbre preset drums 808 synth chords beginner producer",
+      disabled: !soundSnapshots.A,
+      run: () => onRecallSoundSnapshot("A")
+    },
+    {
+      id: "sound-snapshot-recall-b",
+      title: "Recall Sound Snapshot B",
+      detail: soundSnapshots.B ? `Apply B / ${soundSnapshots.B.presetLabel} / ${soundSnapshots.B.timbreLabel}` : "Capture B before recalling a sound pass.",
+      group: "Create",
+      keywords: "sound snapshot recall restore apply b ab compare tone timbre preset drums 808 synth chords beginner producer",
+      disabled: !soundSnapshots.B,
+      run: () => onRecallSoundSnapshot("B")
+    },
+    {
+      id: "sound-snapshot-clear",
+      title: "Clear Sound Snapshot A/B",
+      detail:
+        soundSnapshots.A || soundSnapshots.B
+          ? `${soundSnapshots.A ? "A held" : "A empty"} / ${soundSnapshots.B ? "B held" : "B empty"}`
+          : "Sound Snapshot A/B already clear.",
+      group: "Create",
+      keywords: "sound snapshot clear reset ab compare tone timbre preset drums 808 synth chords beginner producer",
+      disabled: !soundSnapshots.A && !soundSnapshots.B,
+      run: onClearSoundSnapshots
+    }
+  ];
   const handoffPackItems = createHandoffPackItems({
     analysis: exportAnalysis,
     project,
@@ -14171,6 +14288,7 @@ function createQuickActions({
       }
     },
     ...soundFocusPadActions,
+    ...soundSnapshotActions,
     {
       id: "sound-preset",
       title: soundPresetReady ? `Apply ${soundPresetPreviewSummary.presetLabel}` : "Apply Sound Preset",
@@ -15067,8 +15185,10 @@ function createQuickActionResult(
   const tapTempoPulseOnly = action.id === "tap-tempo";
   const exportOnly = directExportQuickActionTarget(action.id) !== null || action.id === "handoff-next-export";
   const mixSnapshotRecallOnly = action.id === "mix-snapshot-recall-a" || action.id === "mix-snapshot-recall-b";
+  const soundSnapshotRecallOnly = action.id === "sound-snapshot-recall-a" || action.id === "sound-snapshot-recall-b";
   const uiLocal =
     (action.id.startsWith("mix-snapshot-") && !mixSnapshotRecallOnly) ||
+    (action.id.startsWith("sound-snapshot-") && !soundSnapshotRecallOnly) ||
     inputSetupOnly ||
     auditionOnly ||
     tapTempoPulseOnly ||
@@ -15100,9 +15220,9 @@ function createQuickActionResult(
               ? "Auditioned"
             : blockClipboardOnly || noteClipboardOnly || drumClipboardOnly || chordClipboardOnly
               ? "Copied"
-              : uiLocal && action.id === "mix-snapshot-clear"
+              : uiLocal && (action.id === "mix-snapshot-clear" || action.id === "sound-snapshot-clear")
                 ? "Cleared"
-                : mixSnapshotRecallOnly
+                : mixSnapshotRecallOnly || soundSnapshotRecallOnly
                   ? "Recalled"
                 : uiLocal
                   ? inputSetupOnly
@@ -15178,6 +15298,34 @@ function mixSnapshotQuickActionTarget(actionId: string): MixSnapshotQuickActionT
     default:
       return null;
   }
+}
+
+type SoundSnapshotQuickActionTarget = {
+  id: "capture-a" | "capture-b" | "recall-a" | "recall-b" | "clear";
+  label: string;
+  metricId: string;
+};
+
+function soundSnapshotQuickActionTarget(actionId: string): SoundSnapshotQuickActionTarget | null {
+  switch (actionId) {
+    case "sound-snapshot-capture-a":
+      return { id: "capture-a", label: "Sound Snapshot A", metricId: "sound-snapshot-a" };
+    case "sound-snapshot-capture-b":
+      return { id: "capture-b", label: "Sound Snapshot B", metricId: "sound-snapshot-b" };
+    case "sound-snapshot-recall-a":
+      return { id: "recall-a", label: "Recall Sound Snapshot A", metricId: "sound-snapshot-recall-a" };
+    case "sound-snapshot-recall-b":
+      return { id: "recall-b", label: "Recall Sound Snapshot B", metricId: "sound-snapshot-recall-b" };
+    case "sound-snapshot-clear":
+      return { id: "clear", label: "Sound Snapshot A/B", metricId: "sound-snapshot-clear" };
+    default:
+      return null;
+  }
+}
+
+function soundSnapshotQuickActionPosture(sound: SoundDesign): string {
+  const snapshot = createSoundSnapshot("A", sound);
+  return `${snapshot.presetLabel} / ${snapshot.timbreLabel}`;
 }
 
 function mixSnapshotQuickActionPosture(project: ProjectState, exportAnalysis: ExportAnalysis): string {
@@ -16159,6 +16307,15 @@ function quickActionResultMetricSnapshot(
       id: mixSnapshotTarget.metricId,
       label: mixSnapshotTarget.label,
       value: mixSnapshotQuickActionPosture(project, exportAnalysis)
+    };
+  }
+
+  const soundSnapshotTarget = soundSnapshotQuickActionTarget(action.id);
+  if (soundSnapshotTarget) {
+    return {
+      id: soundSnapshotTarget.metricId,
+      label: soundSnapshotTarget.label,
+      value: soundSnapshotTarget.id === "clear" ? "Slots cleared / ready to recapture" : soundSnapshotQuickActionPosture(project.sound)
     };
   }
 
@@ -17144,6 +17301,25 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Full Mix and compare the held snapshot against the alternate slot after a concrete mix change.",
       nextCheck: "Use Mix Snapshot A/B metrics for headroom, balance, master, and stem posture before Mix Fix or Master Finish."
+    };
+  }
+
+  if (action.id.startsWith("sound-snapshot-")) {
+    if (action.id === "sound-snapshot-clear") {
+      return {
+        auditionCue: "Loop Pattern A/B/C after the next concrete sound change, then capture A before capturing B.",
+        nextCheck: "Use Sound Snapshot A/B after at least one preset, kit, focus, or Studio tone change creates something worth comparing."
+      };
+    }
+    if (action.id === "sound-snapshot-recall-a" || action.id === "sound-snapshot-recall-b") {
+      return {
+        auditionCue: "Loop Pattern A/B/C with drums, 808, Synth, and Chords active to confirm the recalled tone pass.",
+        nextCheck: "Capture the alternate slot again after the next concrete Sound Preset, Drum Kit, Sound Focus, or Studio tone change."
+      };
+    }
+    return {
+      auditionCue: "Loop Pattern A/B/C and compare the held tone pass against the alternate slot after a concrete sound change.",
+      nextCheck: "Use Sound Snapshot A/B with Timbre Check before committing to a preset, kit, or focus direction."
     };
   }
 
@@ -26635,6 +26811,125 @@ function soundTimbreNextCheck(highest: SoundTimbreScore, lowest: SoundTimbreScor
     return "Loop the groove and raise kick punch, snare snap, or hat brightness if drums disappear.";
   }
   return "Loop the full pattern and use Sound Focus or Studio controls to pull the loudest color back toward the bed.";
+}
+
+function createSoundSnapshot(slot: SoundSnapshotSlotId, sound: SoundDesign): SoundSnapshot {
+  const snapshotSound = cloneSoundDesign(sound);
+  const timbre = createSoundTimbreCheckSummary(snapshotSound);
+  const spread = soundSnapshotSpread(snapshotSound);
+  const score = soundSnapshotScore(spread, timbre.tone);
+
+  return {
+    slot,
+    capturedAtLabel: mixSnapshotCapturedAtLabel(),
+    statusLabel: timbre.statusLabel,
+    presetLabel: soundPresetLabel(snapshotSound.preset),
+    timbreLabel: `${timbre.headline} / ${timbre.balanceLabel}`,
+    drumLabel: soundFocusDrumLabel(snapshotSound),
+    bassLabel: soundFocusBassLabel(snapshotSound),
+    synthLabel: soundFocusSynthLabel(snapshotSound),
+    chordLabel: soundFocusChordLabel(snapshotSound),
+    spreadLabel: timbre.balanceLabel,
+    score,
+    sound: snapshotSound,
+    tone: timbre.tone
+  };
+}
+
+function createSoundSnapshotComparison(snapshots: SoundSnapshotSlotMap): SoundSnapshotComparisonSummary {
+  const a = snapshots.A;
+  const b = snapshots.B;
+  if (!a && !b) {
+    return {
+      statusLabel: "No sound snapshots",
+      winnerLabel: "Capture A/B",
+      detailLabel: "No tone passes held",
+      detailTitle: "Capture a sound pass into A and another into B before comparing.",
+      tone: "warn",
+      metrics: emptySoundSnapshotMetrics()
+    };
+  }
+  if (!a || !b) {
+    const held = a ?? b;
+    return {
+      statusLabel: "One sound pass",
+      winnerLabel: held ? `Sound ${held.slot} held` : "Capture pair",
+      detailLabel: held ? `${held.presetLabel} / ${held.timbreLabel}` : "Capture another slot",
+      detailTitle: "Capture the other Sound Snapshot slot to compare tone passes.",
+      tone: "warn",
+      metrics: soundSnapshotComparisonMetrics(a, b)
+    };
+  }
+
+  const scoreDelta = a.score - b.score;
+  const winnerLabel = Math.abs(scoreDelta) <= 3 ? "Close tone passes" : scoreDelta > 0 ? "A is cleaner" : "B is cleaner";
+  const tone = weakestTone([a.tone, b.tone, Math.abs(scoreDelta) <= 3 ? "good" : "warn"]);
+
+  return {
+    statusLabel: Math.abs(scoreDelta) <= 3 ? "Close A/B" : scoreDelta > 0 ? "A leads" : "B leads",
+    winnerLabel,
+    detailLabel: `${a.timbreLabel} vs ${b.timbreLabel}`,
+    detailTitle: `Sound A score ${a.score}; Sound B score ${b.score}. Recall only applies the selected SoundDesign pass.`,
+    tone,
+    metrics: soundSnapshotComparisonMetrics(a, b)
+  };
+}
+
+function soundSnapshotComparisonMetrics(
+  a: SoundSnapshot | null,
+  b: SoundSnapshot | null
+): SoundSnapshotComparisonSummary["metrics"] {
+  return [
+    soundSnapshotComparisonMetric("preset", "Preset", a?.presetLabel, b?.presetLabel),
+    soundSnapshotComparisonMetric("drums", "Drums", a?.drumLabel, b?.drumLabel),
+    soundSnapshotComparisonMetric("bass", "808", a?.bassLabel, b?.bassLabel),
+    soundSnapshotComparisonMetric("synth", "Synth", a?.synthLabel, b?.synthLabel),
+    soundSnapshotComparisonMetric("chords", "Chords", a?.chordLabel, b?.chordLabel)
+  ];
+}
+
+function emptySoundSnapshotMetrics(): SoundSnapshotComparisonSummary["metrics"] {
+  return soundSnapshotComparisonMetrics(null, null);
+}
+
+function soundSnapshotComparisonMetric(
+  id: SoundSnapshotComparisonSummary["metrics"][number]["id"],
+  label: string,
+  aLabel: string | undefined,
+  bLabel: string | undefined
+): SoundSnapshotComparisonSummary["metrics"][number] {
+  const normalizedA = aLabel ?? "empty";
+  const normalizedB = bLabel ?? "empty";
+  return {
+    id,
+    label,
+    aLabel: normalizedA,
+    bLabel: normalizedB,
+    tone: !aLabel || !bLabel ? "warn" : normalizedA === normalizedB ? "good" : "warn"
+  };
+}
+
+function soundSnapshotSpread(sound: SoundDesign): number {
+  const scores = [
+    soundTimbreAverage([sound.kickPunch, sound.snareSnap, sound.hatBrightness]),
+    soundTimbreAverage([sound.bassDrive, sound.bassDecay, sound.sidechainDuck]),
+    soundTimbreAverage([sound.hatBrightness, sound.snareSnap, sound.synthBrightness]),
+    soundTimbreAverage([sound.synthRelease, sound.chordWidth]),
+    soundTimbreAverage([sound.chordWarmth, sound.bassDecay, 1 - sound.hatBrightness])
+  ];
+  return Math.max(...scores) - Math.min(...scores);
+}
+
+function soundSnapshotScore(spread: number, tone: MixCoachTone): number {
+  const spreadPenalty = Math.min(52, Math.round(spread * 100));
+  const tonePenalty = tone === "danger" ? 18 : tone === "warn" ? 8 : 0;
+  return Math.max(0, 100 - spreadPenalty - tonePenalty);
+}
+
+function cloneSoundDesign(sound: SoundDesign): SoundDesign {
+  return {
+    ...sound
+  };
 }
 
 function soundFocusChangedParameters(sound: SoundDesign, pad: SoundFocusPadDefinition): SoundFocusParameter[] {

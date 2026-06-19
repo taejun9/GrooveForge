@@ -1,9 +1,9 @@
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Drum, ListChecks, Music2, Play, Plus, SlidersHorizontal, Trash2, Waves } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Drum, ListChecks, Music2, Play, Plus, RotateCcw, Save, SlidersHorizontal, Trash2, Waves, X } from "lucide-react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { BassNote, ChordEvent, ChordProgressionPreset, ChordQuality, DrumLane, MelodyNote, NoteTrack, PatternSlot, PatternVariationPreset, ProjectState, SoundDesign } from "../domain/workstation";
 import { chordInversions, chordInversionLabel, chordProgressionPresetIds, chordProgressionPresetLabel, chordQualities, drumStepProbability, drumStepTimingMs, drumStepVelocity, hatRepeatCount, maxDrumTimingMs, minDrumTimingMs, normalizeChordInversion, normalizeDrumProbability, normalizeDrumTimingMs, normalizeDrumVelocity, normalizeEventProbability, normalizeHatRepeat, scalePitchNames, soundPresetIds, soundPresetLabel, steps } from "../domain/workstation";
-import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneResult, PatternFillPreviewSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
+import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneResult, PatternFillPreviewSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundSnapshot, SoundSnapshotComparisonSummary, SoundSnapshotSlotId, SoundSnapshotSlotMap, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
 import { drumLabels, keyboardCaptureKeyLabels } from "./workstationUiModel";
 import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyChordStep, percentLabel, pitchParts, timingLabel, trackOctaveRange } from "./workstationPatternTools";
 
@@ -1499,10 +1499,15 @@ export function SoundDesigner({
   presetPreviewId,
   presetResult,
   sound,
+  soundSnapshots,
+  soundSnapshotSummary,
   timbreCheck,
   onApplyPreset,
   onDrumKitPad,
   onFocusPad,
+  onCaptureSoundSnapshot,
+  onRecallSoundSnapshot,
+  onClearSoundSnapshots,
   onPreviewPreset,
   onChange
 }: {
@@ -1517,10 +1522,15 @@ export function SoundDesigner({
   presetPreviewId: SoundPresetTarget;
   presetResult: SoundPresetResult | null;
   sound: SoundDesign;
+  soundSnapshots: SoundSnapshotSlotMap;
+  soundSnapshotSummary: SoundSnapshotComparisonSummary;
   timbreCheck: SoundTimbreCheckSummary;
   onApplyPreset: (preset?: SoundPresetTarget) => void;
   onDrumKitPad: (pad: DrumKitPadId) => void;
   onFocusPad: (pad: SoundFocusPadId) => void;
+  onCaptureSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
+  onRecallSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
+  onClearSoundSnapshots: () => void;
   onPreviewPreset: (preset: SoundPresetTarget) => void;
   onChange: (update: Partial<Omit<SoundDesign, "preset">>) => void;
 }): ReactElement {
@@ -1549,6 +1559,13 @@ export function SoundDesigner({
       <DrumKitPads pads={drumKitPads} preview={drumKitPreview} result={drumKitResult} onApply={onDrumKitPad} />
       <SoundFocusPads pads={focusPads} preview={focusPreview} result={focusResult} onApply={onFocusPad} />
       <SoundTimbreCheck summary={timbreCheck} />
+      <SoundSnapshotAB
+        snapshots={soundSnapshots}
+        summary={soundSnapshotSummary}
+        onCapture={onCaptureSoundSnapshot}
+        onRecall={onRecallSoundSnapshot}
+        onClear={onClearSoundSnapshots}
+      />
       <div className="sound-readout" aria-label="Sound design state">
         <span data-testid="sound-kick-readout">Kick {percentLabel(sound.kickPunch)}</span>
         <span data-testid="sound-bass-readout">808 {percentLabel(sound.bassDrive)}</span>
@@ -1652,6 +1669,131 @@ export function SoundTimbreCheck({ summary }: { summary: SoundTimbreCheckSummary
         ))}
       </div>
       <small data-testid="sound-timbre-next-check">{summary.nextCheck}</small>
+    </div>
+  );
+}
+
+export function SoundSnapshotAB({
+  snapshots,
+  summary,
+  onCapture,
+  onRecall,
+  onClear
+}: {
+  snapshots: SoundSnapshotSlotMap;
+  summary: SoundSnapshotComparisonSummary;
+  onCapture: (slot: SoundSnapshotSlotId) => void;
+  onRecall: (slot: SoundSnapshotSlotId) => void;
+  onClear: () => void;
+}): ReactElement {
+  const slotIds: SoundSnapshotSlotId[] = ["A", "B"];
+
+  return (
+    <div className={`sound-snapshot-ab ${summary.tone}`} data-testid="sound-snapshot-ab">
+      <div className="sound-snapshot-head">
+        <span>Sound Snapshot A/B</span>
+        <strong>Compare tone</strong>
+        <div className="sound-snapshot-actions" aria-label="Sound Snapshot A/B actions">
+          <button
+            data-testid="sound-snapshot-capture-a"
+            onClick={() => onCapture("A")}
+            title="Capture current sound as Snapshot A"
+            type="button"
+          >
+            <Save size={13} aria-hidden="true" />
+            <span>Capture A</span>
+          </button>
+          <button
+            data-testid="sound-snapshot-capture-b"
+            onClick={() => onCapture("B")}
+            title="Capture current sound as Snapshot B"
+            type="button"
+          >
+            <Copy size={13} aria-hidden="true" />
+            <span>Capture B</span>
+          </button>
+          <button
+            data-testid="sound-snapshot-recall-a"
+            disabled={!snapshots.A}
+            onClick={() => onRecall("A")}
+            title={snapshots.A ? "Recall Snapshot A into the current sound" : "Capture Snapshot A before recall"}
+            type="button"
+          >
+            <RotateCcw size={13} aria-hidden="true" />
+            <span>Recall A</span>
+          </button>
+          <button
+            data-testid="sound-snapshot-recall-b"
+            disabled={!snapshots.B}
+            onClick={() => onRecall("B")}
+            title={snapshots.B ? "Recall Snapshot B into the current sound" : "Capture Snapshot B before recall"}
+            type="button"
+          >
+            <RotateCcw size={13} aria-hidden="true" />
+            <span>Recall B</span>
+          </button>
+          <button
+            data-testid="sound-snapshot-clear"
+            disabled={!snapshots.A && !snapshots.B}
+            onClick={onClear}
+            title={snapshots.A || snapshots.B ? "Clear Sound Snapshot A/B" : "Sound Snapshot A/B is already clear"}
+            type="button"
+          >
+            <X size={13} aria-hidden="true" />
+            <span>Clear</span>
+          </button>
+        </div>
+      </div>
+      <div className={`sound-snapshot-status ${summary.tone}`} data-testid="sound-snapshot-status-card" title={summary.detailTitle}>
+        <span data-testid="sound-snapshot-status">{summary.statusLabel}</span>
+        <strong data-testid="sound-snapshot-winner">{summary.winnerLabel}</strong>
+        <small data-testid="sound-snapshot-detail">{summary.detailLabel}</small>
+      </div>
+      <div className="sound-snapshot-slots">
+        {slotIds.map((slot) => (
+          <SoundSnapshotSlotCard key={slot} snapshot={snapshots[slot]} slot={slot} />
+        ))}
+      </div>
+      <div className="sound-snapshot-metrics" data-testid="sound-snapshot-metrics">
+        {summary.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`sound-snapshot-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em data-testid={`sound-snapshot-metric-${metric.id}-a`}>A {metric.aLabel}</em>
+            <em data-testid={`sound-snapshot-metric-${metric.id}-b`}>B {metric.bLabel}</em>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SoundSnapshotSlotCard({
+  snapshot,
+  slot
+}: {
+  snapshot: SoundSnapshot | null;
+  slot: SoundSnapshotSlotId;
+}): ReactElement {
+  const testSlot = slot.toLowerCase();
+  if (!snapshot) {
+    return (
+      <div className="sound-snapshot-slot empty" data-testid={`sound-snapshot-slot-${testSlot}`}>
+        <span data-testid={`sound-snapshot-slot-${testSlot}-time`}>Sound {slot}</span>
+        <strong data-testid={`sound-snapshot-slot-${testSlot}-preset`}>Empty slot</strong>
+        <small data-testid={`sound-snapshot-slot-${testSlot}-timbre`}>No tone pass</small>
+        <small data-testid={`sound-snapshot-slot-${testSlot}-drums`}>No drum tone</small>
+        <small data-testid={`sound-snapshot-slot-${testSlot}-bass`}>No 808 tone</small>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`sound-snapshot-slot ${snapshot.tone}`} data-testid={`sound-snapshot-slot-${testSlot}`}>
+      <span data-testid={`sound-snapshot-slot-${testSlot}-time`}>Sound {slot} / {snapshot.capturedAtLabel}</span>
+      <strong data-testid={`sound-snapshot-slot-${testSlot}-preset`}>{snapshot.presetLabel}</strong>
+      <small data-testid={`sound-snapshot-slot-${testSlot}-timbre`}>{snapshot.timbreLabel}</small>
+      <small data-testid={`sound-snapshot-slot-${testSlot}-drums`}>{snapshot.drumLabel}</small>
+      <small data-testid={`sound-snapshot-slot-${testSlot}-bass`}>{snapshot.bassLabel}</small>
     </div>
   );
 }
