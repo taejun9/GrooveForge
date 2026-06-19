@@ -23,6 +23,7 @@ import type {
   QuickAction,
   ReferenceAlignmentCard,
   ReferenceAlignmentCardId,
+  ReferenceAlignmentFocusResult,
   ReferenceAlignmentSummary,
   SessionPassCard,
   SessionPassFocusResult,
@@ -112,10 +113,12 @@ export function ModeSwitchResultStrip({ result }: { result: ModeSwitchResult }):
 export function ReferenceAlignmentReadout({
   focusedCardId,
   onFocus,
+  result,
   summary
 }: {
   focusedCardId: ReferenceAlignmentCardId | null;
   onFocus: (card: ReferenceAlignmentCard) => void;
+  result: ReferenceAlignmentFocusResult | null;
   summary: ReferenceAlignmentSummary;
 }): ReactElement {
   return (
@@ -130,6 +133,7 @@ export function ReferenceAlignmentReadout({
         <strong data-testid="reference-alignment-headline">{summary.headline}</strong>
         <small data-testid="reference-alignment-detail">{summary.detail}</small>
       </div>
+      {result && <ReferenceAlignmentFocusResultStrip result={result} />}
       <div className="reference-alignment-grid" data-testid="reference-alignment-grid">
         {summary.cards.map((card) => {
           const focused = focusedCardId === card.id;
@@ -159,6 +163,38 @@ export function ReferenceAlignmentReadout({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function ReferenceAlignmentFocusResultStrip({ result }: { result: ReferenceAlignmentFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`reference-alignment-result ${result.tone}`}
+      data-result-reference-alignment={result.cardId}
+      data-testid="reference-alignment-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="reference-alignment-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="reference-alignment-result-title">{result.title}</strong>
+          <small data-testid="reference-alignment-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="reference-alignment-result-destination" data-testid="reference-alignment-result-destination">
+        <span>{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="reference-alignment-result-metric" data-testid="reference-alignment-result-metric">
+        <span data-testid="reference-alignment-result-status">{result.metricLabel}</span>
+        <strong data-testid="reference-alignment-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="reference-alignment-result-followup" data-testid="reference-alignment-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
       </div>
     </div>
   );

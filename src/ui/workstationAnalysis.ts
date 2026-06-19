@@ -14,6 +14,7 @@ import type {
   MixSnapshotSlotMap,
   MixCoachTone,
   ReferenceAlignmentCard,
+  ReferenceAlignmentFocusResult,
   ReferenceAlignmentSummary,
   SessionBriefCompassCard,
   SessionBriefCompassSummary,
@@ -513,6 +514,67 @@ export function activeReferenceAlignmentQuickActionCard(summary: ReferenceAlignm
     throw new Error("Reference Alignment requires at least one card");
   }
   return card;
+}
+
+export function createReferenceAlignmentFocusResult(
+  card: ReferenceAlignmentCard,
+  summary: ReferenceAlignmentSummary
+): ReferenceAlignmentFocusResult {
+  const summaryCard = summary.cards.find((candidate) => candidate.id === card.id) ?? card;
+
+  return {
+    cardId: card.id,
+    status: "Focused",
+    title: `${card.label} reference lane focused`,
+    detail: `${card.value}: ${card.detail}`,
+    destination: referenceAlignmentFocusDestination(card),
+    metricLabel: "Alignment",
+    metricValue: referenceAlignmentFocusResultMetric(summaryCard, summary),
+    auditionCue: referenceAlignmentFocusResultAudition(card),
+    nextCheck: card.nextCheck,
+    tone: summaryCard.tone
+  };
+}
+
+function referenceAlignmentFocusDestination(card: ReferenceAlignmentCard): string {
+  switch (card.focusTarget) {
+    case "artist":
+      return "Artist field";
+    case "vibe":
+      return "Vibe field";
+    case "reference":
+      return "Reference field";
+    case "notes":
+      return "Notes field";
+    case "arrange":
+      return "Arrange panel";
+    case "master":
+      return "Master panel";
+    case "deliver":
+      return "Deliver panel";
+  }
+}
+
+function referenceAlignmentFocusResultMetric(card: ReferenceAlignmentCard, summary: ReferenceAlignmentSummary): string {
+  const alignedCount = summary.cards.filter((candidate) => candidate.tone === "good").length;
+  return `${card.label}: ${card.value} / ${alignedCount}/${summary.cards.length} aligned`;
+}
+
+function referenceAlignmentFocusResultAudition(card: ReferenceAlignmentCard): string {
+  switch (card.id) {
+    case "reference":
+      return "Compare the beat by ear against the written reference text, without importing reference audio.";
+    case "direction":
+      return "Use the vibe field to keep Composer Actions, sound moves, and mix choices pointed at the same direction.";
+    case "arrangement":
+      return "Play the Song loop and compare section energy, hook shape, and form against the written cue.";
+    case "mix":
+      return "Play the Full Mix and compare loudness, headroom, and space posture by ear.";
+    case "listen":
+      return "Run the focused listening pass from the indicated field or panel before changing the beat.";
+    case "handoff":
+      return "Inspect Deliver and Handoff Pack before sending WAV, stems, MIDI, or sheet files.";
+  }
 }
 
 function sessionBriefFilledFields(brief: SessionBrief): number {

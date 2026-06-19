@@ -3420,6 +3420,19 @@ export type ReferenceAlignmentCard = {
   tone: MixCoachTone;
 };
 
+export type ReferenceAlignmentFocusResult = {
+  cardId: ReferenceAlignmentCardId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type ReferenceAlignmentSummary = {
   headline: string;
   detail: string;

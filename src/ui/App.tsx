@@ -536,6 +536,7 @@ import type {
   SessionBriefCompassSummary,
   ReferenceAlignmentCard,
   ReferenceAlignmentCardId,
+  ReferenceAlignmentFocusResult,
   ReferenceAlignmentSummary,
   SessionBriefStarterPadId,
   SessionBriefStarterPadDefinition,
@@ -946,6 +947,7 @@ import {
   activeSessionBriefCompassQuickActionCard,
   audibleStemTracks,
   createMixSnapshotComparison,
+  createReferenceAlignmentFocusResult,
   createReferenceAlignmentSummary,
   createSessionBriefCompassSummary,
   createSessionBriefRoleSummary,
@@ -1125,6 +1127,7 @@ export function App(): ReactElement {
   const [beatBlueprintPreviewId, setBeatBlueprintPreviewId] = useState<BeatBlueprintId>("dark_808");
   const [sessionBriefCompassFocusId, setSessionBriefCompassFocusId] = useState<SessionBriefCompassCardId | null>(null);
   const [referenceAlignmentFocusId, setReferenceAlignmentFocusId] = useState<ReferenceAlignmentCardId | null>(null);
+  const [referenceAlignmentResult, setReferenceAlignmentResult] = useState<ReferenceAlignmentFocusResult | null>(null);
   const [composerGuideFocusId, setComposerGuideFocusId] = useState<ComposerGuideCardId | null>(null);
   const [composerGuideResult, setComposerGuideResult] = useState<ComposerGuideFocusResult | null>(null);
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
@@ -2073,6 +2076,7 @@ export function App(): ReactElement {
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
+    setReferenceAlignmentResult(null);
     setReviewFixResult(null);
     setHookFixResult(null);
     setToplineFixResult(null);
@@ -2135,6 +2139,7 @@ export function App(): ReactElement {
       setMixFixResult(null);
       setDeliveryTargetAlignmentResult(null);
       setSessionBriefStarterResult(null);
+      setReferenceAlignmentResult(null);
       setReviewFixResult(null);
       setHookFixResult(null);
       setToplineFixResult(null);
@@ -2290,6 +2295,7 @@ export function App(): ReactElement {
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
+    setReferenceAlignmentResult(null);
     setReviewFixResult(null);
     setHookFixResult(null);
     setToplineFixResult(null);
@@ -2355,6 +2361,7 @@ export function App(): ReactElement {
     setMixFixResult(null);
     setDeliveryTargetAlignmentResult(null);
     setSessionBriefStarterResult(null);
+    setReferenceAlignmentResult(null);
     setReviewFixResult(null);
     setHookFixResult(null);
     setToplineFixResult(null);
@@ -6194,6 +6201,7 @@ export function App(): ReactElement {
       field?.scrollIntoView({ block: "center", behavior: "auto" });
       field?.focus({ preventScroll: true });
     }
+    setReferenceAlignmentResult(createReferenceAlignmentFocusResult(card, referenceAlignmentSummary));
     setProjectStatus(`Reference Alignment ${card.label}: ${card.value}`);
   }
 
@@ -7432,6 +7440,7 @@ export function App(): ReactElement {
         focusedCompassCardId={sessionBriefCompassFocusId}
         focusedReferenceCardId={referenceAlignmentFocusId}
         referenceAlignment={referenceAlignmentSummary}
+        referenceAlignmentResult={referenceAlignmentResult}
         result={sessionBriefStarterResult}
         starterPads={sessionBriefStarterPads}
         fieldRefs={{
@@ -10034,6 +10043,7 @@ function SessionBriefPanel({
   focusedCompassCardId,
   focusedReferenceCardId,
   referenceAlignment,
+  referenceAlignmentResult,
   result,
   starterPads,
   onApplyStarter,
@@ -10048,6 +10058,7 @@ function SessionBriefPanel({
   focusedCompassCardId: SessionBriefCompassCardId | null;
   focusedReferenceCardId: ReferenceAlignmentCardId | null;
   referenceAlignment: ReferenceAlignmentSummary;
+  referenceAlignmentResult: ReferenceAlignmentFocusResult | null;
   result: SessionBriefStarterResult | null;
   starterPads: SessionBriefStarterPadOption[];
   onApplyStarter: (pad: SessionBriefStarterPadId) => void;
@@ -10126,6 +10137,7 @@ function SessionBriefPanel({
         <ReferenceAlignmentReadout
           focusedCardId={focusedReferenceCardId}
           onFocus={onFocusReferenceAlignment}
+          result={referenceAlignmentResult}
           summary={referenceAlignment}
         />
         <div className="session-brief-starters" aria-label="Session Brief Starter Pads">

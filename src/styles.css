@@ -5964,6 +5964,7 @@ h2 {
 }
 
 .reference-alignment-heading {
+  grid-row: span 2;
   gap: 2px;
   align-content: center;
   border-inline-end: 1px solid rgba(244, 239, 231, 0.08);
@@ -5973,6 +5974,10 @@ h2 {
 .reference-alignment-heading span,
 .reference-alignment-heading strong,
 .reference-alignment-heading small,
+.reference-alignment-result-main span,
+.reference-alignment-result-destination span,
+.reference-alignment-result-metric span,
+.reference-alignment-result-followup span,
 .reference-alignment-card span,
 .reference-alignment-card strong,
 .reference-alignment-card small,
@@ -6003,9 +6008,92 @@ h2 {
 
 .reference-alignment-grid {
   display: grid;
+  grid-column: 2;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   min-width: 0;
+}
+
+.reference-alignment-result {
+  display: grid;
+  grid-column: 2;
+  grid-template-columns: minmax(160px, 0.34fr) minmax(120px, 0.2fr) minmax(190px, 0.42fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(83, 196, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(83, 196, 255, 0.055);
+  padding: 7px 8px;
+}
+
+.reference-alignment-result.good {
+  border-color: rgba(120, 240, 200, 0.24);
+  background: rgba(120, 240, 200, 0.055);
+}
+
+.reference-alignment-result.warn {
+  border-color: rgba(255, 209, 102, 0.26);
+  background: rgba(255, 209, 102, 0.06);
+}
+
+.reference-alignment-result.danger {
+  border-color: rgba(255, 96, 120, 0.3);
+  background: rgba(255, 96, 120, 0.06);
+}
+
+.reference-alignment-result-main,
+.reference-alignment-result-destination,
+.reference-alignment-result-metric,
+.reference-alignment-result-followup {
+  min-width: 0;
+}
+
+.reference-alignment-result-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.reference-alignment-result-main svg {
+  flex: 0 0 auto;
+  color: #53c4ff;
+}
+
+.reference-alignment-result.good .reference-alignment-result-main svg {
+  color: #78f0c8;
+}
+
+.reference-alignment-result.warn .reference-alignment-result-main svg {
+  color: #ffd166;
+}
+
+.reference-alignment-result.danger .reference-alignment-result-main svg {
+  color: #ff6078;
+}
+
+.reference-alignment-result-main span,
+.reference-alignment-result-destination,
+.reference-alignment-result-metric,
+.reference-alignment-result-followup {
+  display: grid;
+  gap: 2px;
+}
+
+.reference-alignment-result-main strong,
+.reference-alignment-result-destination strong,
+.reference-alignment-result-metric strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.reference-alignment-result-main small,
+.reference-alignment-result-destination span,
+.reference-alignment-result-metric span,
+.reference-alignment-result-followup span,
+.reference-alignment-result-followup small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
 }
 
 .reference-alignment-card {
@@ -21122,8 +21210,22 @@ input[type="range"] {
   .session-brief-fields,
   .session-brief-compass-grid,
   .reference-alignment,
+  .reference-alignment-result,
   .reference-alignment-grid {
     grid-template-columns: 1fr;
+  }
+
+  .reference-alignment-result {
+    grid-column: 1;
+  }
+
+  .reference-alignment-heading,
+  .reference-alignment-grid {
+    grid-column: 1;
+  }
+
+  .reference-alignment-heading {
+    grid-row: auto;
   }
 
   .first-beat-path {
