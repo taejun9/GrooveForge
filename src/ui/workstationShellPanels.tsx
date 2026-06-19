@@ -58,6 +58,7 @@ type CommandReferenceFilterId =
   | "all"
   | "desktop-shortcuts"
   | "project-edit"
+  | "guide-fast-path"
   | "compose-fast-path"
   | "sound-fast-path"
   | "arrange-fast-path"
@@ -102,6 +103,29 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "clear-draft", command: "Clear Draft", shortcut: "Quick Actions", target: "Local recovery" },
       { id: "undo", command: "Undo", shortcut: "CmdOrCtrl+Z", target: "Edit history" },
       { id: "redo", command: "Redo", shortcut: "Shift+CmdOrCtrl+Z / CmdOrCtrl+Y", target: "Edit history" }
+    ]
+  },
+  {
+    id: "guide-fast-path",
+    title: "Guide",
+    items: [
+      { id: "first-beat-path", command: "First Beat Path", shortcut: "Quick Actions", target: "Setup / compose / arrange / mix / deliver" },
+      { id: "beat-spine", command: "Beat Spine", shortcut: "Quick Actions", target: "Setup / drums / 808 / sound / finish" },
+      { id: "mode-focus", command: "Mode Focus", shortcut: "Quick Actions", target: "Guided / Studio orientation" },
+      { id: "mode-switch", command: "Mode Switch", shortcut: "Quick Actions", target: "Guided / Studio mode" },
+      { id: "session-pass", command: "Session Pass", shortcut: "Quick Actions", target: "Setup / risk / delivery" },
+      { id: "session-brief-compass", command: "Session Brief Compass", shortcut: "Quick Actions", target: "Direction / reference / handoff" },
+      { id: "composer-guide", command: "Composer Guide", shortcut: "Quick Actions", target: "Drums / 808 / harmony / melody" },
+      { id: "key-compass", command: "Key Compass", shortcut: "Quick Actions", target: "Scale / cadence / chords" },
+      { id: "groove-compass", command: "Groove Compass", shortcut: "Quick Actions", target: "Pocket / timing / anchors" },
+      { id: "listening-pass", command: "Listening Pass", shortcut: "Quick Actions", target: "Compose / arrange / mix / deliver" },
+      { id: "beat-passport", command: "Beat Passport", shortcut: "Quick Actions", target: "Identity / readiness / export" },
+      { id: "production-snapshot", command: "Production Snapshot", shortcut: "Quick Actions", target: "Target / form / mix / handoff" },
+      { id: "beat-readiness", command: "Beat Readiness", shortcut: "Quick Actions", target: "Drums / 808 / melody / export" },
+      { id: "review-queue", command: "Review Queue", shortcut: "Quick Actions", target: "Issues / focus / fixes" },
+      { id: "workflow-navigator", command: "Workflow Navigator", shortcut: "Quick Actions", target: "Stage jumps" },
+      { id: "workflow-spotlight", command: "Workflow Spotlight", shortcut: "Readout", target: "Current command target" },
+      { id: "next-move", command: "Next Move", shortcut: "Quick Actions", target: "One explicit next step" }
     ]
   },
   {
@@ -208,6 +232,7 @@ const commandReferenceFilterOptions: CommandReferenceFilterOption[] = [
   { id: "all", label: "All" },
   { id: "desktop-shortcuts", label: "Desktop" },
   { id: "project-edit", label: "Project" },
+  { id: "guide-fast-path", label: "Guide" },
   { id: "compose-fast-path", label: "Create" },
   { id: "sound-fast-path", label: "Sound" },
   { id: "arrange-fast-path", label: "Arrange" },

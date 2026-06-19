@@ -16402,9 +16402,9 @@ function createQuickActions({
     {
       id: "command-reference",
       title: "Command Reference",
-      detail: "Desktop, Project, Create, Sound, Arrange, Mix, Finish, Deliver, and Beat Terms command map.",
+      detail: "Desktop, Project, Guide, Create, Sound, Arrange, Mix, Finish, Deliver, and Beat Terms command map.",
       group: "Project",
-      keywords: "command reference shortcuts keyboard help quick actions desktop capture producer beginner",
+      keywords: "command reference shortcuts keyboard help quick actions desktop guide capture producer beginner first beat path beat spine composer",
       run: onOpenCommandReference
     },
     {
@@ -17959,7 +17959,7 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "command-reference" || action.id === "beat-terms-reference") {
-    return { id: "command-reference", label: "Reference", value: "Desktop / Project / Create / Sound / Arrange / Mix / Finish / Deliver / Beat Terms" };
+    return { id: "command-reference", label: "Reference", value: "Desktop / Project / Guide / Create / Sound / Arrange / Mix / Finish / Deliver / Beat Terms" };
   }
 
   if (action.id === "restore-local-draft" || action.id === "clear-local-draft") {
