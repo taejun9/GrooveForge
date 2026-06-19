@@ -485,7 +485,7 @@ export type MixFixResult = {
 export type MixSnapshotSlotId = "A" | "B";
 
 export type MixSnapshotQuickActionTarget = {
-  id: "capture-a" | "capture-b" | "clear";
+  id: "capture-a" | "capture-b" | "recall-a" | "recall-b" | "clear";
   label: string;
   metricId: string;
 };
@@ -514,6 +514,9 @@ export type MixSnapshot = {
   stemLabel: string;
   audibleStemCount: number;
   score: number;
+  mixer: MixerChannel[];
+  masterPreset: MasterPreset;
+  masterCeilingDb: number;
   tone: MixCoachTone;
 };
 

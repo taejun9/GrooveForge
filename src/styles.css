@@ -15910,7 +15910,7 @@ input[type="range"] {
 
 .mix-snapshot-head {
   display: grid;
-  grid-template-columns: minmax(126px, 0.55fr) minmax(90px, 0.36fr) minmax(250px, auto);
+  grid-template-columns: minmax(126px, 0.45fr) minmax(90px, 0.32fr) minmax(340px, auto);
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -15937,7 +15937,7 @@ input[type="range"] {
 
 .mix-snapshot-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   min-width: 0;
 }
@@ -15957,6 +15957,11 @@ input[type="range"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mix-snapshot-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .mix-snapshot-status {
@@ -18418,7 +18423,7 @@ input[type="range"] {
   }
 
   .mix-snapshot-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .session-brief-row,

@@ -6,6 +6,12 @@ import { activeDeliveryTarget, arrangementTotalBars, getStyle } from "../domain/
 import { barCountLabel, formatDb } from "./workstationPatternTools";
 import type {
   BeatReadinessCheck,
+  MixSnapshot,
+  MixSnapshotComparisonMetric,
+  MixSnapshotComparisonSummary,
+  MixSnapshotMetricId,
+  MixSnapshotSlotId,
+  MixSnapshotSlotMap,
   MixCoachTone,
   ReferenceAlignmentCard,
   ReferenceAlignmentSummary,
@@ -42,6 +48,128 @@ export function stemSpreadDb(stemAnalyses: StemExportAnalyses): number | null {
   }
   const levels = audibleStems.map((analysis) => analysis.rmsDb);
   return Math.max(...levels) - Math.min(...levels);
+}
+
+export function createMixSnapshotComparison(snapshots: MixSnapshotSlotMap): MixSnapshotComparisonSummary {
+  const { A, B } = snapshots;
+  const metrics = createMixSnapshotComparisonMetrics(A, B);
+
+  if (!A && !B) {
+    return {
+      statusLabel: "No captures",
+      winnerLabel: "A/B empty",
+      detailLabel: "Capture a current mix into A or B.",
+      detailTitle: "Mix Snapshot A/B has no captured mix passes.",
+      tone: "warn",
+      metrics
+    };
+  }
+
+  if (!A || !B) {
+    const captured = A ?? B;
+    const missingSlot: MixSnapshotSlotId = A ? "B" : "A";
+    const capturedSlot = captured?.slot ?? "A";
+    return {
+      statusLabel: "One capture",
+      winnerLabel: `Mix ${capturedSlot} held`,
+      detailLabel: `Capture ${missingSlot} to compare against ${captured?.exportLabel ?? "the held mix"}.`,
+      detailTitle: `Mix ${capturedSlot} is captured for ${captured?.projectTitle ?? "current project"}; Mix ${missingSlot} is empty.`,
+      tone: captured?.tone ?? "warn",
+      metrics
+    };
+  }
+
+  const scoreDelta = A.score - B.score;
+  if (Math.abs(scoreDelta) <= 2) {
+    return {
+      statusLabel: "Close passes",
+      winnerLabel: "A/B close",
+      detailLabel: `${A.exportLabel} vs ${B.exportLabel}; choose by listening context.`,
+      detailTitle: `Mix A and Mix B are close. A score ${A.score}, B score ${B.score}; A ${A.balanceLabel}; B ${B.balanceLabel}.`,
+      tone: weakestTone([A.tone, B.tone]),
+      metrics
+    };
+  }
+
+  const winner = scoreDelta > 0 ? A : B;
+  const runnerUp = scoreDelta > 0 ? B : A;
+  return {
+    statusLabel: "Safer pass",
+    winnerLabel: `Mix ${winner.slot} safer`,
+    detailLabel: `${winner.exportLabel}; ${winner.balanceLabel}; ${winner.stemLabel}.`,
+    detailTitle: `Mix ${winner.slot} scored ${winner.score} against Mix ${runnerUp.slot} at ${runnerUp.score}; ${winner.masterLabel}.`,
+    tone: winner.tone === "danger" ? "warn" : winner.tone,
+    metrics
+  };
+}
+
+function createMixSnapshotComparisonMetrics(
+  aSnapshot: MixSnapshot | null,
+  bSnapshot: MixSnapshot | null
+): MixSnapshotComparisonMetric[] {
+  const metricLabels: Array<{ id: MixSnapshotMetricId; label: string }> = [
+    { id: "headroom", label: "Headroom" },
+    { id: "balance", label: "Balance" },
+    { id: "master", label: "Master" },
+    { id: "stems", label: "Stems" }
+  ];
+
+  return metricLabels.map(({ id, label }) => ({
+    id,
+    label,
+    aLabel: mixSnapshotMetricLabel(aSnapshot, id),
+    bLabel: mixSnapshotMetricLabel(bSnapshot, id),
+    tone: mixSnapshotMetricTone(aSnapshot, bSnapshot, id)
+  }));
+}
+
+function mixSnapshotMetricLabel(snapshot: MixSnapshot | null, id: MixSnapshotMetricId): string {
+  if (!snapshot) {
+    return "waiting";
+  }
+  switch (id) {
+    case "headroom":
+      return snapshot.exportLabel;
+    case "balance":
+      return snapshot.balanceLabel;
+    case "master":
+      return snapshot.masterLabel;
+    case "stems":
+      return snapshot.stemLabel;
+  }
+}
+
+function mixSnapshotMetricTone(
+  aSnapshot: MixSnapshot | null,
+  bSnapshot: MixSnapshot | null,
+  id: MixSnapshotMetricId
+): MixCoachTone {
+  const tones = [mixSnapshotSingleMetricTone(aSnapshot, id), mixSnapshotSingleMetricTone(bSnapshot, id)].filter(
+    (tone): tone is MixCoachTone => tone !== null
+  );
+  return tones.length === 0 ? "warn" : weakestTone(tones);
+}
+
+function mixSnapshotSingleMetricTone(snapshot: MixSnapshot | null, id: MixSnapshotMetricId): MixCoachTone | null {
+  if (!snapshot) {
+    return null;
+  }
+  switch (id) {
+    case "headroom":
+      if (snapshot.exportLabel.startsWith("Silent")) {
+        return "danger";
+      }
+      return snapshot.headroomDb < 0.5 || snapshot.limitedPercent > 0 ? "warn" : "good";
+    case "balance":
+      if (snapshot.balanceSpreadDb === null) {
+        return "danger";
+      }
+      return snapshot.balanceSpreadDb > 18 ? "warn" : "good";
+    case "master":
+      return snapshot.tone;
+    case "stems":
+      return snapshot.audibleStemCount === 0 ? "danger" : snapshot.audibleStemCount < 2 ? "warn" : "good";
+  }
 }
 
 const sessionBriefAnalysisFields: (keyof SessionBrief)[] = ["artist", "vibe", "reference", "notes"];

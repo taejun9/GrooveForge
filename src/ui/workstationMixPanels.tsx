@@ -1,4 +1,4 @@
-import { Copy, Gauge, Save, SlidersHorizontal, Target, X } from "lucide-react";
+import { Copy, Gauge, RotateCcw, Save, SlidersHorizontal, Target, X } from "lucide-react";
 import type { ReactElement } from "react";
 import type { ExportAnalysis, StemTrackId } from "../audio/render";
 import type {
@@ -233,11 +233,13 @@ export function MixSnapshotAB({
   snapshots,
   summary,
   onCapture,
+  onRecall,
   onClear
 }: {
   snapshots: MixSnapshotSlotMap;
   summary: MixSnapshotComparisonSummary;
   onCapture: (slot: MixSnapshotSlotId) => void;
+  onRecall: (slot: MixSnapshotSlotId) => void;
   onClear: () => void;
 }): ReactElement {
   const slotIds: MixSnapshotSlotId[] = ["A", "B"];
@@ -265,6 +267,26 @@ export function MixSnapshotAB({
           >
             <Copy size={13} aria-hidden="true" />
             <span>Capture B</span>
+          </button>
+          <button
+            data-testid="mix-snapshot-recall-a"
+            disabled={!snapshots.A}
+            onClick={() => onRecall("A")}
+            title={snapshots.A ? "Recall Snapshot A into the current mix" : "Capture Snapshot A before recall"}
+            type="button"
+          >
+            <RotateCcw size={13} aria-hidden="true" />
+            <span>Recall A</span>
+          </button>
+          <button
+            data-testid="mix-snapshot-recall-b"
+            disabled={!snapshots.B}
+            onClick={() => onRecall("B")}
+            title={snapshots.B ? "Recall Snapshot B into the current mix" : "Capture Snapshot B before recall"}
+            type="button"
+          >
+            <RotateCcw size={13} aria-hidden="true" />
+            <span>Recall B</span>
           </button>
           <button data-testid="mix-snapshot-clear" onClick={onClear} title="Clear Mix Snapshot A/B" type="button">
             <X size={13} aria-hidden="true" />
