@@ -17,37 +17,39 @@ function matchesAuditionNote(note: BassNote | MelodyNote, selectedNote: Selected
   return note.step === selectedNote.step && note.pitch === selectedNote.pitch;
 }
 
-function runEditorAudition(context: EditorAuditionContext, target: Parameters<typeof playEditorAudition>[1], status: string): void {
+function runEditorAudition(context: EditorAuditionContext, target: Parameters<typeof playEditorAudition>[1], status: string): boolean {
   try {
     context.auditionControllerRef.current?.stop();
     context.auditionControllerRef.current = playEditorAudition(context.projectRef.current, target);
     context.setProjectStatus(status);
+    return true;
   } catch {
     context.setProjectStatus("Editor audition is unavailable in this runtime");
+    return false;
   }
 }
 
-export function auditionSelectedDrumHit(context: EditorAuditionContext, selectedDrumStep: SelectedDrumStep | null): void {
+export function auditionSelectedDrumHit(context: EditorAuditionContext, selectedDrumStep: SelectedDrumStep | null): boolean {
   const target = selectedDrumStep;
   if (!target) {
     context.setProjectStatus("Select an active drum step");
-    return;
+    return false;
   }
 
   const pattern = activePattern(context.projectRef.current);
   if (!pattern.drumPattern[target.lane][target.step]) {
     context.setProjectStatus("Select an active drum step");
-    return;
+    return false;
   }
 
-  runEditorAudition(context, { kind: "drum", lane: target.lane, step: target.step }, `Auditioned ${drumLabels[target.lane]} ${target.step + 1}`);
+  return runEditorAudition(context, { kind: "drum", lane: target.lane, step: target.step }, `Auditioned ${drumLabels[target.lane]} ${target.step + 1}`);
 }
 
-export function auditionSelectedNote(context: EditorAuditionContext, selectedNote: SelectedNote | null): void {
+export function auditionSelectedNote(context: EditorAuditionContext, selectedNote: SelectedNote | null): boolean {
   const target = selectedNote;
   if (!target) {
     context.setProjectStatus("Select an 808 or Synth note");
-    return;
+    return false;
   }
 
   const pattern = activePattern(context.projectRef.current);
@@ -57,22 +59,22 @@ export function auditionSelectedNote(context: EditorAuditionContext, selectedNot
       : pattern.melodyNotes.find((candidate) => matchesAuditionNote(candidate, target));
   if (!note) {
     context.setProjectStatus("Select an active note");
-    return;
+    return false;
   }
 
-  runEditorAudition(
+  return runEditorAudition(
     context,
     { kind: "note", track: target.track, note },
     `Auditioned ${target.track === "bass" ? "808" : "Synth"} ${note.pitch}.${note.step + 1}`
   );
 }
 
-export function auditionSelectedChord(context: EditorAuditionContext, selectedChord: ChordEvent | undefined): void {
+export function auditionSelectedChord(context: EditorAuditionContext, selectedChord: ChordEvent | undefined): boolean {
   const chord = selectedChord;
   if (!chord) {
     context.setProjectStatus("Select a chord event");
-    return;
+    return false;
   }
 
-  runEditorAudition(context, { kind: "chord", chord }, `Auditioned chord ${chord.root}${chord.quality}.${chord.step + 1}`);
+  return runEditorAudition(context, { kind: "chord", chord }, `Auditioned chord ${chord.root}${chord.quality}.${chord.step + 1}`);
 }

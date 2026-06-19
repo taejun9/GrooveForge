@@ -1013,6 +1013,22 @@ export type QuickActionResult = {
   tone: MixCoachTone;
 };
 
+export type EditorAuditionResultKind = "drum" | "note" | "chord";
+
+export type EditorAuditionResult = {
+  kind: EditorAuditionResultKind;
+  targetId: string;
+  status: "Auditioned";
+  title: string;
+  detail: string;
+  patternLabel: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type BeatReadinessCheckId = "drums" | "bass" | "harmony" | "arrangement" | "export";
 export type BeatReadinessFocusTarget = "compose" | "arrange" | "master" | "deliver";
 

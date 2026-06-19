@@ -575,6 +575,7 @@ import type {
   BeatSpineSummary,
   BeatSpineApplyResultMetric,
   BeatSpineApplyResult,
+  EditorAuditionResult,
   SelectedDrumStep,
   DrumPocketSummary,
   DrumClipboard,
@@ -1049,6 +1050,39 @@ function createStyleGoalCueResult(goal: StyleGoalCard, project: ProjectState): S
   };
 }
 
+function EditorAuditionResultStrip({ result }: { result: EditorAuditionResult }): ReactElement {
+  return (
+    <div
+      className={`quick-action-result editor-audition-result ${result.tone}`}
+      data-result-editor-audition={result.targetId}
+      data-testid="editor-audition-result"
+      aria-live="polite"
+    >
+      <div className="quick-action-result-main">
+        <span data-testid="editor-audition-result-status">{result.status}</span>
+        <strong data-testid="editor-audition-result-title">{result.title}</strong>
+        <small data-testid="editor-audition-result-detail">{result.detail}</small>
+      </div>
+      <div className={`quick-action-result-metric ${result.tone}`} data-testid="editor-audition-result-metric">
+        <span data-testid="editor-audition-result-pattern">{result.patternLabel}</span>
+        <strong data-testid="editor-audition-result-metric-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="quick-action-result-followup" data-testid="editor-audition-result-followup">
+        <span>
+          <b>Listen</b>
+          <em data-testid="editor-audition-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next</b>
+          <em data-testid="editor-audition-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<EditHistoryEntry[]>([]);
@@ -1092,6 +1126,7 @@ export function App(): ReactElement {
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
+  const [editorAuditionResult, setEditorAuditionResult] = useState<EditorAuditionResult | null>(null);
   const [modeSwitchResult, setModeSwitchResult] = useState<ModeSwitchResult | null>(null);
   const [modeFocusResult, setModeFocusResult] = useState<ModeFocusJumpResult | null>(null);
   const [workflowNavigatorResult, setWorkflowNavigatorResult] = useState<WorkflowNavigatorJumpResult | null>(null);
@@ -1747,6 +1782,18 @@ export function App(): ReactElement {
       : 1;
 
   useEffect(() => {
+    setEditorAuditionResult(null);
+  }, [
+    project.selectedPattern,
+    selectedDrumStep?.lane,
+    selectedDrumStep?.step,
+    selectedNote?.track,
+    selectedNote?.step,
+    selectedNote?.pitch,
+    selectedChordIndex
+  ]);
+
+  useEffect(() => {
     return () => {
       controllerRef.current?.stop();
       controllerRef.current = null;
@@ -2061,6 +2108,7 @@ export function App(): ReactElement {
     setHandoffPackageCheckResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setEditorAuditionResult(null);
     setModeSwitchResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
@@ -2131,6 +2179,7 @@ export function App(): ReactElement {
       setHandoffExportFormatResult(null);
       setHandoffPackageCheckResult(null);
       setQuickActionResult(null);
+      setEditorAuditionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
       setWorkflowNavigatorResult(null);
@@ -2295,6 +2344,7 @@ export function App(): ReactElement {
     setHandoffPackageCheckResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setEditorAuditionResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -2369,6 +2419,7 @@ export function App(): ReactElement {
     setHandoffPackageCheckResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
+    setEditorAuditionResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -4254,16 +4305,98 @@ export function App(): ReactElement {
     }
   }
 
+  function createDrumEditorAuditionResult(): EditorAuditionResult | null {
+    if (!selectedDrumStep || !selectedDrumActive) {
+      return null;
+    }
+
+    const velocity = selectedDrumVelocity ?? defaultDrumVelocity(selectedDrumStep.lane, selectedDrumStep.step);
+    const probability = selectedDrumProbability ?? 1;
+    const timing = selectedDrumTiming;
+    const repeat = selectedDrumStep.lane === "hat" ? selectedHatRepeat : 1;
+
+    return {
+      kind: "drum",
+      targetId: `drum-${project.selectedPattern}-${selectedDrumStep.lane}-${selectedDrumStep.step}`,
+      status: "Auditioned",
+      title: `${drumLabels[selectedDrumStep.lane]} step ${selectedDrumStep.step + 1}`,
+      detail: `Pattern ${project.selectedPattern} / ${percentLabel(velocity)} velocity / ${percentLabel(probability)} chance`,
+      patternLabel: `Pattern ${project.selectedPattern}`,
+      metricLabel: "Pocket",
+      metricValue: `${timingLabel(timing)}${selectedDrumStep.lane === "hat" ? ` / x${repeat}` : " / single"}`,
+      auditionCue: "Check velocity, timing, hat repeat, and drum rack tone before editing the groove.",
+      nextCheck: `Loop Pattern ${project.selectedPattern}; hear the hit against 808, chords, and Synth before moving it.`,
+      tone: "good"
+    };
+  }
+
+  function createNoteEditorAuditionResult(): EditorAuditionResult | null {
+    if (!selectedNote) {
+      return null;
+    }
+
+    const note = selectedNote.track === "bass" ? selectedBassNote : selectedMelodyNote;
+    if (!note) {
+      return null;
+    }
+
+    const trackLabel = selectedNote.track === "bass" ? "808" : "Synth";
+    const supportingLayers = selectedNote.track === "bass" ? "drums, chords, and Synth" : "drums, 808, and chords";
+    const articulation = selectedNote.track === "bass" ? (selectedBassNote?.glide ? "glide" : "no glide") : "melody";
+
+    return {
+      kind: "note",
+      targetId: `note-${project.selectedPattern}-${selectedNote.track}-${note.step}-${note.pitch}`,
+      status: "Auditioned",
+      title: `${trackLabel} ${note.pitch} step ${note.step + 1}`,
+      detail: `Pattern ${project.selectedPattern} / length ${note.length} / ${percentLabel(note.velocity)} velocity`,
+      patternLabel: `Pattern ${project.selectedPattern}`,
+      metricLabel: "Pitch",
+      metricValue: `${note.pitch} / ${percentLabel(normalizeEventProbability(note.probability))} chance / ${articulation}`,
+      auditionCue: "Check pitch, length, velocity, and current device tone before changing the phrase.",
+      nextCheck: `Loop Pattern ${project.selectedPattern}; hear the ${trackLabel} against ${supportingLayers} before duplicating it.`,
+      tone: "good"
+    };
+  }
+
+  function createChordEditorAuditionResult(): EditorAuditionResult | null {
+    if (!selectedChord) {
+      return null;
+    }
+
+    const inversion = chordInversionLabel(normalizeChordInversion(selectedChord.inversion));
+
+    return {
+      kind: "chord",
+      targetId: `chord-${project.selectedPattern}-${selectedChord.step}-${selectedChord.root}-${selectedChord.quality}`,
+      status: "Auditioned",
+      title: `Chord ${selectedChord.root}${selectedChord.quality} step ${selectedChord.step + 1}`,
+      detail: `Pattern ${project.selectedPattern} / length ${selectedChord.length} / ${percentLabel(selectedChord.velocity)} velocity`,
+      patternLabel: `Pattern ${project.selectedPattern}`,
+      metricLabel: "Voicing",
+      metricValue: `${inversion} / ${percentLabel(normalizeEventProbability(selectedChord.probability))} chance`,
+      auditionCue: "Check root, quality, voicing, length, and chord tone before reharmonizing.",
+      nextCheck: `Loop Pattern ${project.selectedPattern}; hear the chord against 808 and Synth before moving it.`,
+      tone: "good"
+    };
+  }
+
   function auditionSelectedDrumHit(): void {
-    auditionSelectedDrumHitEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedDrumStep);
+    if (auditionSelectedDrumHitEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedDrumStep)) {
+      setEditorAuditionResult(createDrumEditorAuditionResult());
+    }
   }
 
   function auditionSelectedNote(): void {
-    auditionSelectedNoteEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedNote);
+    if (auditionSelectedNoteEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedNote)) {
+      setEditorAuditionResult(createNoteEditorAuditionResult());
+    }
   }
 
   function auditionSelectedChord(): void {
-    auditionSelectedChordEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedChord);
+    if (auditionSelectedChordEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedChord)) {
+      setEditorAuditionResult(createChordEditorAuditionResult());
+    }
   }
 
   function writeDrumHitAtStep(pattern: PatternData, hit: DrumClipboard, step: number): PatternData {
@@ -7968,6 +8101,7 @@ export function App(): ReactElement {
                 }
               }}
             />
+            {editorAuditionResult?.kind === "drum" && <EditorAuditionResultStrip result={editorAuditionResult} />}
           </div>
         </section>
 
@@ -8063,6 +8197,7 @@ export function App(): ReactElement {
               }}
             />
           )}
+          {editorAuditionResult?.kind === "note" && <EditorAuditionResultStrip result={editorAuditionResult} />}
         </section>
 
         <section className="panel instrument-panel" data-testid="workflow-target-sound" aria-label="Instrument panel" ref={soundPanelRef}>
@@ -8141,6 +8276,7 @@ export function App(): ReactElement {
             onSelect={selectChordEvent}
             onVoicing={applyChordVoicingPad}
           />
+          {editorAuditionResult?.kind === "chord" && <EditorAuditionResultStrip result={editorAuditionResult} />}
         </section>
 
         <section className="panel arrangement-panel" data-testid="workflow-target-arrange" aria-label="Arrangement" ref={arrangePanelRef}>
