@@ -12722,6 +12722,82 @@ function activeSessionPassQuickActionCard(summary: SessionPassSummary): SessionP
   return summary.mode === "guided" ? summary.cards[0] : summary.cards[1];
 }
 
+type GuideQuickStartQuickActionTarget = {
+  source: "path" | "session" | "workflow";
+  title: string;
+  detail: string;
+  metricValue: string;
+  tone: MixCoachTone;
+  keywords: string;
+};
+
+function activeGuideQuickStartQuickActionTarget({
+  firstBeatPathStep,
+  firstBeatPathSummary,
+  sessionPassCard,
+  sessionPassSummary,
+  workflowSpotlight,
+  workflowSpotlightItem
+}: {
+  firstBeatPathStep: FirstBeatPathStep | null;
+  firstBeatPathSummary: FirstBeatPathSummary;
+  sessionPassCard: SessionPassCard;
+  sessionPassSummary: SessionPassSummary;
+  workflowSpotlight: ReturnType<typeof createWorkflowSpotlightSummary>;
+  workflowSpotlightItem: WorkflowNavigatorItem | null;
+}): GuideQuickStartQuickActionTarget | null {
+  const candidates: GuideQuickStartQuickActionTarget[] = [];
+
+  if (firstBeatPathStep) {
+    candidates.push({
+      source: "path",
+      title: `Guide Quick Start: ${firstBeatPathStep.label}`,
+      detail: `First Beat Path / ${firstBeatPathStep.value} / ${firstBeatPathStep.detail}`,
+      metricValue: `${firstBeatPathSummary.countLabel} / ${firstBeatPathStep.value}`,
+      tone: firstBeatPathStep.tone,
+      keywords: `${firstBeatPathStep.id} ${firstBeatPathStep.label} ${firstBeatPathStep.jumpLabel} ${firstBeatPathStep.detail}`
+    });
+  }
+
+  candidates.push({
+    source: "session",
+    title: `Guide Quick Start: ${sessionPassCard.label}`,
+    detail: `Session Pass / ${sessionPassCard.value} / ${sessionPassCard.focusLabel}`,
+    metricValue: `${sessionPassSummary.headline} / ${sessionPassCard.detail}`,
+    tone: sessionPassCard.tone,
+    keywords: `${sessionPassCard.id} ${sessionPassCard.label} ${sessionPassCard.value} ${sessionPassCard.focusLabel}`
+  });
+
+  if (workflowSpotlightItem) {
+    candidates.push({
+      source: "workflow",
+      title: `Guide Quick Start: ${workflowSpotlight.zoneLabel}`,
+      detail: `Workflow Spotlight / ${workflowSpotlight.statusLabel} / ${workflowSpotlight.detailLabel}`,
+      metricValue: `${workflowSpotlight.countLabel} / ${workflowSpotlightItem.detail}`,
+      tone: workflowSpotlight.tone,
+      keywords: `${workflowSpotlightItem.id} ${workflowSpotlightItem.label} ${workflowSpotlightItem.value} ${workflowSpotlightItem.detail}`
+    });
+  }
+
+  return candidates.reduce<GuideQuickStartQuickActionTarget | null>((selected, candidate) => {
+    if (!selected) {
+      return candidate;
+    }
+    return guideQuickStartToneRank(candidate.tone) > guideQuickStartToneRank(selected.tone) ? candidate : selected;
+  }, null);
+}
+
+function guideQuickStartToneRank(tone: MixCoachTone): number {
+  switch (tone) {
+    case "danger":
+      return 3;
+    case "warn":
+      return 2;
+    case "good":
+      return 1;
+  }
+}
+
 function createSessionPassFocusResult(card: SessionPassCard, summary: SessionPassSummary): SessionPassFocusResult {
   return {
     cardId: card.id,
@@ -15417,6 +15493,14 @@ function createQuickActions({
   const workflowSpotlightItem = workflowSpotlight.zoneId
     ? workflowNavigatorItems.find((item) => item.id === workflowSpotlight.zoneId) ?? null
     : null;
+  const guideQuickStartTarget = activeGuideQuickStartQuickActionTarget({
+    firstBeatPathStep,
+    firstBeatPathSummary,
+    sessionPassCard,
+    sessionPassSummary,
+    workflowSpotlight,
+    workflowSpotlightItem
+  });
   const workflowNavigatorActions: QuickAction[] = workflowNavigatorItems.map((item) => ({
     id: `workflow-navigator-${item.id}`,
     title: `Jump Workflow: ${item.label}`,
@@ -16416,6 +16500,39 @@ function createQuickActions({
       group: "Project",
       keywords: "command reference shortcuts keyboard help quick actions desktop guide capture producer beginner first beat path beat spine composer",
       run: onOpenCommandReference
+    },
+    {
+      id: "guide-quick-start",
+      title: guideQuickStartTarget ? guideQuickStartTarget.title : "Guide Quick Start",
+      detail: guideQuickStartTarget
+        ? `${guideQuickStartTarget.detail} / ${guideQuickStartTarget.metricValue}`
+        : "No Guide Quick Start target available.",
+      group: "Project",
+      keywords: `guide quick start one command current next path session workflow spotlight first beat pass beginner producer direct beat workstation ${
+        guideQuickStartTarget?.keywords ?? "none"
+      }`,
+      disabled: !guideQuickStartTarget,
+      run: () => {
+        if (!guideQuickStartTarget) {
+          return;
+        }
+
+        switch (guideQuickStartTarget.source) {
+          case "path":
+            if (firstBeatPathStep) {
+              onJumpFirstBeatPath(firstBeatPathStep);
+            }
+            break;
+          case "session":
+            onFocusSessionPass(sessionPassCard);
+            break;
+          case "workflow":
+            if (workflowSpotlightItem) {
+              onFocusWorkflowSpotlight(workflowSpotlightItem);
+            }
+            break;
+        }
+      }
     },
     {
       id: "beat-terms-reference",
@@ -17675,6 +17792,7 @@ function createQuickActionResult(
   const focusOnly =
     action.id === "command-reference" ||
     action.id === "beat-terms-reference" ||
+    action.id === "guide-quick-start" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
     action.id === "session-brief-compass-focus" ||
@@ -17970,6 +18088,10 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "command-reference" || action.id === "beat-terms-reference") {
     return { id: "command-reference", label: "Reference", value: "Desktop / Project / Guide / Create / Sound / Arrange / Mix / Finish / Deliver / Beat Terms" };
+  }
+
+  if (action.id === "guide-quick-start") {
+    return { id: "guide-quick-start", label: "Guide quick start", value: action.detail };
   }
 
   if (action.id === "restore-local-draft" || action.id === "clear-local-draft") {
@@ -19110,6 +19232,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the reference only to choose the next explicit local command or understand the current beat term.",
       nextCheck: "Open Quick Actions when you are ready to run one command."
+    };
+  }
+
+  if (action.id === "guide-quick-start") {
+    return {
+      auditionCue: "Use the focused guide target to inspect the current Path, Session Pass, or Workflow Spotlight lane before editing.",
+      nextCheck: "Return to Guide Quick Start or run this command again after the target lane is ready or intentionally deferred."
     };
   }
 
