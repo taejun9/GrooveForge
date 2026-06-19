@@ -13,6 +13,7 @@ export type StyleId =
   | "rnb"
   | "k_hiphop_rnb"
   | "afrobeats"
+  | "amapiano"
   | "reggaeton"
   | "jersey"
   | "phonk"
@@ -194,6 +195,7 @@ export const beatBlueprintIds = [
   "rnb_pocket",
   "seoul_pocket",
   "afro_swing",
+  "amapiano_log_bass",
   "reggaeton_dembow",
   "club_bounce",
   "jersey_drive",
@@ -515,6 +517,24 @@ export const beatBlueprints: BeatBlueprint[] = [
     }
   },
   {
+    id: "amapiano_log_bass",
+    name: "Amapiano Log Bass",
+    focus: "shuffled percussion, deep log-bass synth motion, and airy chord space",
+    styleId: "amapiano",
+    key: "F minor",
+    bpm: 112,
+    arrangementTemplate: "hook_first",
+    soundPreset: "clean_knock",
+    masterPreset: "Headroom for Vocal",
+    mixer: {
+      drum_rack: { volumeDb: -4.4, lowCut: 0.06, air: 0.32, drive: 0.14, glue: 0.28, send: 0.16 },
+      bass_808: { volumeDb: -6.8, lowCut: 0.01, air: 0.08, drive: 0.28, glue: 0.18, send: 0.04 },
+      synth: { volumeDb: -9.8, pan: -14, lowCut: 0.28, air: 0.54, drive: 0.06, glue: 0.12, send: 0.32 },
+      chord: { volumeDb: -9.4, pan: 14, lowCut: 0.18, air: 0.4, drive: 0.05, glue: 0.16, send: 0.36 },
+      master: { volumeDb: -2.1 }
+    }
+  },
+  {
     id: "reggaeton_dembow",
     name: "Reggaeton Dembow",
     focus: "dembow drum pocket, clipped bass movement, and chant-ready synth hooks",
@@ -796,6 +816,16 @@ export const styleProfiles: StyleProfile[] = [
     bassStyle: "pluck",
     melodyStyle: "riff",
     color: "#ffb85c"
+  },
+  {
+    id: "amapiano",
+    name: "Amapiano",
+    bpmRange: [108, 116],
+    defaultBpm: 112,
+    defaultSwing: 0.16,
+    bassStyle: "pluck",
+    melodyStyle: "chordal",
+    color: "#f59e0b"
   },
   {
     id: "reggaeton",
@@ -1919,6 +1949,11 @@ const stylePatternBlueprints: Record<StyleId, [PatternBlueprint, PatternBlueprin
     blueprint([0, 2, 6, 9, 13, 15], [4, 12], [0, 2, 5, 7, 9, 11, 14, 15], [3, 6, 10, 13], [0, 2, 5, 4, 7], [4, 5, 2, 0, 4], [0, 3, 5, 4]),
     blueprint([0, 6, 10, 14], [4, 12], [1, 5, 9, 13], [2, 7, 11, 15], [0, 5, 7, 5], [5, 4, 2], [3, 0, 5])
   ],
+  amapiano: [
+    blueprint([0, 4, 7, 11, 14], [4, 12], [1, 3, 6, 8, 10, 13, 15], [2, 5, 9, 11, 14], [0, 3, 7, 10, 14], [0, 2, 4, 5, 2], [0, 3, 5, 4]),
+    blueprint([0, 3, 6, 10, 13, 15], [4, 12], [0, 2, 5, 7, 9, 11, 14, 15], [1, 5, 8, 12, 15], [0, 2, 5, 8, 12, 14], [4, 5, 2, 0, 4], [0, 5, 3, 4]),
+    blueprint([0, 7, 10, 14], [4, 12], [1, 5, 9, 13], [2, 6, 11, 15], [0, 7, 12], [5, 4, 2], [3, 0, 5])
+  ],
   reggaeton: [
     blueprint([0, 3, 8, 11, 14], [4, 12], [0, 2, 4, 6, 8, 10, 12, 14], [3, 7, 11, 15], [0, 3, 5, 7, 5], [0, 2, 4, 5, 2], [0, 5, 3, 4]),
     blueprint([0, 2, 6, 8, 11, 15], [4, 12], [0, 1, 3, 4, 6, 8, 10, 12, 14, 15], [2, 5, 9, 13], [0, 2, 5, 4, 7], [4, 5, 2, 0, 4], [0, 3, 5, 4]),
@@ -1960,6 +1995,7 @@ export function styleSoundPreset(styleId: StyleId): (typeof soundPresetIds)[numb
     case "rnb":
     case "k_hiphop_rnb":
     case "afrobeats":
+    case "amapiano":
       return "clean_knock";
     case "drill":
     case "house":

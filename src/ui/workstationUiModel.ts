@@ -2443,6 +2443,19 @@ export const composerStyleActionProfiles: Record<StyleId, ComposerStyleActionPro
       finish: "vocal headroom"
     }
   },
+  amapiano: {
+    focus: "shuffle and log-bass",
+    priorities: { drums: 1, bass: 2, harmony: 3, arrange: 4, melody: 5, finish: 6 },
+    goals: { drumHits: 16, bassNotes: 5, chordEvents: 3, melodyNotes: 3, arrangementBars: 8 },
+    cues: {
+      drums: "shuffled percussion",
+      bass: "log-bass pocket",
+      harmony: "airy chords",
+      melody: "short call",
+      arrange: "drop lift",
+      finish: "club headroom"
+    }
+  },
   reggaeton: {
     focus: "dembow pocket",
     priorities: { drums: 1, bass: 2, melody: 3, arrange: 4, harmony: 5, finish: 6 },
@@ -2519,6 +2532,7 @@ const suggestedBlueprintIdsByStyle: Record<StyleId, BeatBlueprintId> = {
   rnb: "rnb_pocket",
   k_hiphop_rnb: "seoul_pocket",
   afrobeats: "afro_swing",
+  amapiano: "amapiano_log_bass",
   reggaeton: "reggaeton_dembow",
   jersey: "jersey_drive",
   phonk: "phonk_cruise",
@@ -2533,6 +2547,7 @@ export function suggestedBlueprintId(project: Pick<ProjectState, "styleId">): Be
 export function composerDrumFoundation(project: Pick<ProjectState, "styleId">): DrumFoundationId {
   switch (project.styleId) {
     case "house":
+    case "amapiano":
     case "jersey":
     case "garage":
       return "club";
@@ -2557,6 +2572,7 @@ export function composerBasslinePad(project: Pick<ProjectState, "styleId">): Bas
     case "jersey":
     case "garage":
     case "afrobeats":
+    case "amapiano":
     case "reggaeton":
       return "offbeat";
     case "trap":
@@ -2582,6 +2598,7 @@ export function composerChordPreset(project: Pick<ProjectState, "styleId">): Cho
     case "rnb":
     case "k_hiphop_rnb":
     case "afrobeats":
+    case "amapiano":
     case "reggaeton":
       return "lift";
     case "boom_bap":
@@ -2598,6 +2615,7 @@ export function composerChordPreset(project: Pick<ProjectState, "styleId">): Cho
 export function composerMelodyMotif(project: Pick<ProjectState, "styleId">): MelodyMotifId {
   switch (project.styleId) {
     case "house":
+    case "amapiano":
     case "jersey":
     case "garage":
       return "rise";
