@@ -14231,7 +14231,7 @@ input[type="range"] {
 
 .arrangement-playback-readout {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1fr) minmax(72px, auto);
   align-items: center;
   gap: 8px;
   min-height: 38px;
@@ -14272,6 +14272,40 @@ input[type="range"] {
 .arrangement-playback-readout.danger {
   border-color: rgba(255, 122, 79, 0.3);
   background: rgba(255, 122, 79, 0.075);
+}
+
+.arrangement-playback-follow-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 28px;
+  min-width: 72px;
+  border: 1px solid rgba(120, 240, 200, 0.24);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.08);
+  color: #d8fff0;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.arrangement-playback-follow-button span {
+  color: inherit;
+  font-size: inherit;
+}
+
+.arrangement-playback-follow-button:hover:not(:disabled) {
+  border-color: rgba(120, 240, 200, 0.42);
+  background: rgba(120, 240, 200, 0.14);
+}
+
+.arrangement-playback-follow-button:disabled {
+  cursor: not-allowed;
+  border-color: rgba(244, 239, 231, 0.1);
+  background: rgba(244, 239, 231, 0.04);
+  color: rgba(244, 239, 231, 0.42);
 }
 
 .arrangement-track {

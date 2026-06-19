@@ -1313,6 +1313,13 @@ export function App(): ReactElement {
       ? playbackPosition.arrangementIndex
       : null;
   const selectedArrangementBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
+  const audibleArrangementFollowTarget =
+    playingArrangementIndex !== null && playingArrangementIndex !== selectedArrangementIndex ? playingArrangementIndex : null;
+  const audibleArrangementFollowBlock =
+    audibleArrangementFollowTarget !== null ? project.arrangement[audibleArrangementFollowTarget] ?? null : null;
+  const audibleArrangementFollowBlockNumber = audibleArrangementFollowTarget !== null ? audibleArrangementFollowTarget + 1 : 0;
+  const editingAudibleArrangementBlock =
+    playingArrangementIndex !== null && playingArrangementIndex === selectedArrangementIndex;
   const arrangementPlaybackReadout = createArrangementPlaybackReadoutSummary(
     project,
     selectedArrangementIndex,
@@ -2759,6 +2766,29 @@ export function App(): ReactElement {
     setSelectedNote(null);
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
+  }
+
+  function followAudibleArrangementBlock(): void {
+    const targetIndex =
+      isPlaying && playbackPosition?.mode === "arrangement" && typeof playbackPosition.arrangementIndex === "number"
+        ? playbackPosition.arrangementIndex
+        : null;
+    if (targetIndex === null) {
+      setProjectStatus("No audible arrangement block to follow");
+      return;
+    }
+    const targetBlock = projectRef.current.arrangement[targetIndex];
+    if (!targetBlock) {
+      setProjectStatus("No audible arrangement block to follow");
+      return;
+    }
+    if (targetIndex === selectedArrangementIndex) {
+      setProjectStatus(`Already editing audible Block ${targetIndex + 1}`);
+      return;
+    }
+
+    selectArrangementBlock(targetIndex);
+    setProjectStatus(`Editing audible Block ${targetIndex + 1} ${targetBlock.section}`);
   }
 
   function cueArrangementBlock(index: number): void {
@@ -6595,6 +6625,7 @@ export function App(): ReactElement {
     reviewQueueSummary,
     selectedNote,
     noteClipboard,
+    playingArrangementIndex,
     selectedArrangementIndex,
     arrangementBlockClipboard,
     splitAfterBars,
@@ -6681,6 +6712,7 @@ export function App(): ReactElement {
     onCueGrooveCompass: cueGrooveCompass,
     onCuePattern: cuePattern,
     onFollowAudiblePattern: followAudiblePattern,
+    onFollowAudibleArrangementBlock: followAudibleArrangementBlock,
     onSelectArrangementBlock: selectArrangementBlock,
     onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
@@ -7857,6 +7889,36 @@ export function App(): ReactElement {
             <span data-testid="arrangement-playback-label">{arrangementPlaybackReadout.roleLabel}</span>
             <strong data-testid="arrangement-playback-status">{arrangementPlaybackReadout.statusLabel}</strong>
             <small data-testid="arrangement-playback-detail">{arrangementPlaybackReadout.detailLabel}</small>
+            <button
+              aria-label={
+                audibleArrangementFollowBlock
+                  ? `Edit audible Block ${audibleArrangementFollowBlockNumber}`
+                  : editingAudibleArrangementBlock
+                    ? "Editing block already matches audible block"
+                    : "No audible arrangement block to follow"
+              }
+              className="arrangement-playback-follow-button"
+              data-testid="arrangement-playback-follow"
+              disabled={!audibleArrangementFollowBlock}
+              onClick={followAudibleArrangementBlock}
+              title={
+                audibleArrangementFollowBlock
+                  ? `Switch edit focus to audible Block ${audibleArrangementFollowBlockNumber}`
+                  : editingAudibleArrangementBlock
+                    ? "Editing block already matches audible block"
+                    : "Play Song loop with another block to follow the audible block"
+              }
+              type="button"
+            >
+              <ArrowRight size={13} aria-hidden="true" />
+              <span>
+                {audibleArrangementFollowBlock
+                  ? `Edit ${audibleArrangementFollowBlockNumber}`
+                  : editingAudibleArrangementBlock
+                    ? "In sync"
+                    : "Idle"}
+              </span>
+            </button>
           </div>
           <div className="arrangement-track">
             {project.arrangement.map((block, index) => {
@@ -12321,6 +12383,7 @@ function createQuickActions({
   patternStackPreviewSummary,
   patternDnaSummary,
   playingPattern,
+  playingArrangementIndex,
   playbackMode,
   project,
   productionSnapshotSummary,
@@ -12416,6 +12479,7 @@ function createQuickActions({
   onCueGrooveCompass,
   onCuePattern,
   onFollowAudiblePattern,
+  onFollowAudibleArrangementBlock,
   onSelectArrangementBlock,
   onSelectPattern,
   onSelectStyle,
@@ -12564,6 +12628,7 @@ function createQuickActions({
   patternStackPreviewSummary: PatternStackPreviewSummary;
   patternDnaSummary: PatternDnaSummary;
   playingPattern: PatternSlot | null;
+  playingArrangementIndex: number | null;
   playbackMode: PlaybackMode;
   project: ProjectState;
   productionSnapshotSummary: ProductionSnapshotSummary;
@@ -12659,6 +12724,7 @@ function createQuickActions({
   onCueGrooveCompass: () => void;
   onCuePattern: (pattern: PatternSlot) => void;
   onFollowAudiblePattern: () => void;
+  onFollowAudibleArrangementBlock: () => void;
   onSelectArrangementBlock: (index: number) => void;
   onSelectPattern: (pattern: PatternSlot) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
@@ -12838,6 +12904,32 @@ function createQuickActions({
       run: () => onCueArrangementBlock(index)
     };
   });
+  const audibleArrangementFollowTarget =
+    playingArrangementIndex !== null && playingArrangementIndex !== selectedArrangementIndex ? playingArrangementIndex : null;
+  const audibleArrangementFollowBlock =
+    audibleArrangementFollowTarget !== null ? project.arrangement[audibleArrangementFollowTarget] ?? null : null;
+  const audibleArrangementFollowBlockNumber = audibleArrangementFollowTarget !== null ? audibleArrangementFollowTarget + 1 : 0;
+  const editingAudibleArrangementBlock =
+    playingArrangementIndex !== null && playingArrangementIndex === selectedArrangementIndex;
+  const audibleArrangementFollowAction: QuickAction = {
+    id: "arrangement-follow-audible",
+    title: audibleArrangementFollowBlock
+      ? `Edit audible Block ${audibleArrangementFollowBlockNumber}`
+      : editingAudibleArrangementBlock
+        ? `Already editing audible Block ${selectedBlockNumber || selectedArrangementIndex + 1}`
+        : "Edit audible Block",
+    detail: audibleArrangementFollowBlock
+      ? `Hearing Block ${audibleArrangementFollowBlockNumber} ${audibleArrangementFollowBlock.section} Pattern ${audibleArrangementFollowBlock.pattern} while editing ${selectedBlockLabel} / changes edit focus only`
+      : editingAudibleArrangementBlock
+        ? `Editing and hearing ${selectedBlockLabel} already match.`
+        : "Play Song loop with another block before following the audible block.",
+    group: "Arrange",
+    keywords: `arrangement audible block follow heard hearing playing edit focus playback readout ${
+      playingArrangementIndex ?? "none"
+    } ${selectedArrangementIndex + 1} ${audibleArrangementFollowBlock?.section ?? "none"} song form beginner producer`,
+    disabled: !audibleArrangementFollowBlock,
+    run: onFollowAudibleArrangementBlock
+  };
   const beatPassportMetric = activeBeatPassportQuickActionMetric(beatPassportSummary);
   const beatReadinessCheck = activeBeatReadinessQuickActionCheck(beatReadinessChecks);
   const beatReadinessActions: QuickAction[] = beatReadinessChecks.map((check) => ({
@@ -14772,6 +14864,7 @@ function createQuickActions({
       run: () => onApplyPatternFill("clear_tail")
     },
     ...arrangementBlockJumpActions,
+    audibleArrangementFollowAction,
     ...selectedBlockActions,
     ...patternUseActions,
     {
@@ -15386,6 +15479,7 @@ function createQuickActionResult(
     action.id.startsWith("pattern-cue-") ||
     action.id.startsWith("pattern-switch-") ||
     action.id === "pattern-follow-audible" ||
+    action.id === "arrangement-follow-audible" ||
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-focus" ||
@@ -15888,6 +15982,15 @@ function quickActionResultMetricSnapshot(
       id: "tap-tempo",
       label: "Tap Tempo",
       value: `${project.bpm} BPM`
+    };
+  }
+
+  if (action.id === "arrangement-follow-audible") {
+    const usedSlots = usedPatternSlots(project).join("/") || project.selectedPattern;
+    return {
+      id: "arrangement-follow-audible",
+      label: "Audible block",
+      value: `Editing Pattern ${project.selectedPattern} / used ${usedSlots}`
     };
   }
 
@@ -17113,6 +17216,14 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Keep playback running only if you need live context; edit Pattern ${project.selectedPattern} after confirming it is the audible lane.`,
       nextCheck: "Use Pattern Playback Readout to confirm Editing and Hearing match before changing events."
+    };
+  }
+
+  if (action.id === "arrangement-follow-audible") {
+    return {
+      auditionCue:
+        "Keep Song playback running only if you need live context; edit the selected block after confirming it is the audible section.",
+      nextCheck: "Use Arrangement Playback Readout and Song Form Overview to confirm Editing and Hearing match before changing arrangement details."
     };
   }
 
