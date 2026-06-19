@@ -1262,6 +1262,18 @@ export type PatternDnaFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type PatternDnaFocusResult = {
+  cardId: PatternDnaCardId;
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type StyleGoalCardId = "drums" | "bass" | "harmony" | "melody" | "arrange";
 export type StyleInspectorMetricId = "bpm" | "swing" | "bass" | "melody" | "sound";
 export type StyleInspectorFocusId = StyleInspectorMetricId | `density-${PatternSlot}` | `goal-${StyleGoalCardId}`;

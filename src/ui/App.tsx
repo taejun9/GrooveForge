@@ -288,6 +288,7 @@ import type {
   PatternDnaFocusTarget,
   PatternDnaCard,
   PatternDnaSummary,
+  PatternDnaFocusResult,
   LayerStarterId,
   LayerStarterOption,
   LayerStarterResult,
@@ -1130,6 +1131,7 @@ export function App(): ReactElement {
   const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
   const [grooveCompassResult, setGrooveCompassResult] = useState<GrooveCompassFocusResult | null>(null);
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
+  const [patternDnaResult, setPatternDnaResult] = useState<PatternDnaFocusResult | null>(null);
   const [styleInspectorFocusId, setStyleInspectorFocusId] = useState<StyleInspectorFocusId | null>(null);
   const [beatReadinessFocusId, setBeatReadinessFocusId] = useState<BeatReadinessCheckId | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
@@ -2002,6 +2004,7 @@ export function App(): ReactElement {
     setComposerGuideResult(null);
     setKeyCompassResult(null);
     setGrooveCompassResult(null);
+    setPatternDnaResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
@@ -2054,6 +2057,7 @@ export function App(): ReactElement {
       setComposerGuideResult(null);
       setKeyCompassResult(null);
       setGrooveCompassResult(null);
+      setPatternDnaResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
@@ -2198,6 +2202,7 @@ export function App(): ReactElement {
     setComposerGuideResult(null);
     setKeyCompassResult(null);
     setGrooveCompassResult(null);
+    setPatternDnaResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2253,6 +2258,7 @@ export function App(): ReactElement {
     setComposerGuideResult(null);
     setKeyCompassResult(null);
     setGrooveCompassResult(null);
+    setPatternDnaResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -6459,6 +6465,7 @@ export function App(): ReactElement {
 
     setPatternDnaFocusId(card.id);
     targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setPatternDnaResult(createPatternDnaFocusResult(card, patternDnaSummary));
     setProjectStatus(`Pattern DNA ${card.label}: ${card.value}`);
   }
 
@@ -7512,7 +7519,12 @@ export function App(): ReactElement {
             onUse={usePatternInSelectedBlockFromCompare}
           />
           {patternCompareResult && <PatternCompareResultStrip result={patternCompareResult} />}
-          <PatternDna summary={patternDnaSummary} focusedCardId={patternDnaFocusId} onFocus={focusPatternDnaCard} />
+          <PatternDna
+            summary={patternDnaSummary}
+            focusedCardId={patternDnaFocusId}
+            result={patternDnaResult}
+            onFocus={focusPatternDnaCard}
+          />
           <LayerStarterPads options={layerStarterOptions} onApply={applyLayerStarter} />
           {layerStarterResult && <LayerStarterResultStrip result={layerStarterResult} />}
           <PatternClonePads clones={patternCloneOptions} onApply={cloneSelectedPatternVariation} />
@@ -9134,10 +9146,12 @@ function BeatBlueprintResultStrip({ result }: { result: BeatBlueprintResult }): 
 function PatternDna({
   summary,
   focusedCardId,
+  result,
   onFocus
 }: {
   summary: PatternDnaSummary;
   focusedCardId: PatternDnaCardId | null;
+  result: PatternDnaFocusResult | null;
   onFocus: (card: PatternDnaCard) => void;
 }): ReactElement {
   const focusSummary = createPatternDnaFocusSummary(summary, focusedCardId);
@@ -9185,7 +9199,38 @@ function PatternDna({
           );
         })}
       </div>
+      {result && <PatternDnaFocusResultStrip result={result} />}
     </section>
+  );
+}
+
+function PatternDnaFocusResultStrip({ result }: { result: PatternDnaFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`pattern-dna-result ${result.tone}`}
+      data-result-pattern-dna={result.cardId}
+      data-testid="pattern-dna-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="pattern-dna-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="pattern-dna-result-title">{result.title}</strong>
+          <small data-testid="pattern-dna-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="pattern-dna-result-metric" data-testid="pattern-dna-result-metric">
+        <span data-testid="pattern-dna-result-status">{result.status}</span>
+        <strong data-testid="pattern-dna-result-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="pattern-dna-result-followup" data-testid="pattern-dna-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -26150,6 +26195,58 @@ function createPatternDnaFocusSummary(
     detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function createPatternDnaFocusResult(card: PatternDnaCard, summary: PatternDnaSummary): PatternDnaFocusResult {
+  return {
+    cardId: card.id,
+    status: "Focused",
+    title: `${card.label} DNA focused`,
+    detail: `${card.focusLabel}: ${card.value}`,
+    metricLabel: "Pattern",
+    metricValue: patternDnaFocusResultMetric(summary),
+    auditionCue: patternDnaFocusResultAudition(card),
+    nextCheck: patternDnaFocusResultNextCheck(card),
+    tone: card.tone
+  };
+}
+
+function patternDnaFocusResultMetric(summary: PatternDnaSummary): string {
+  const readyCount = summary.cards.filter((card) => card.tone === "good").length;
+  const reviewCount = summary.cards.filter((card) => card.tone === "warn").length;
+  const blockerCount = summary.cards.filter((card) => card.tone === "danger").length;
+
+  return `Pattern ${summary.slot} / ${readyCount}/${summary.cards.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function patternDnaFocusResultAudition(card: PatternDnaCard): string {
+  switch (card.id) {
+    case "layers":
+      return "Loop the selected Pattern and check whether drums, 808, chords, and synth each have a role.";
+    case "density":
+      return "Listen for whether event density fits the style without crowding the bounce or topline space.";
+    case "dynamics":
+      return "Check velocity contrast across drums, 808, chords, and synth before adding more events.";
+    case "variation":
+      return "Listen for chance, timing, glide, repeat, or roll movement before duplicating the loop.";
+    case "arrangement":
+      return "Play Song or Block loop and check whether this Pattern has a useful section role.";
+  }
+}
+
+function patternDnaFocusResultNextCheck(card: PatternDnaCard): string {
+  switch (card.id) {
+    case "layers":
+      return "Return after each missing core layer is added or intentionally left open.";
+    case "density":
+      return "Return after the loop feels full enough without masking vocal or hook space.";
+    case "dynamics":
+      return "Return after events have enough velocity contrast to avoid a flat loop.";
+    case "variation":
+      return "Return after the loop has intentional movement or a clear reason to stay straight.";
+    case "arrangement":
+      return "Return after the selected Pattern has a clear arrangement role or section destination.";
+  }
 }
 
 function patternVariationSignals(pattern: PatternData): string[] {
