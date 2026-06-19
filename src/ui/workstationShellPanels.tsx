@@ -32,6 +32,7 @@ import type {
   QuickActionSpotlightSummary,
   SnapshotCompareFocusId,
   SnapshotCompareFocusItem,
+  SnapshotCompareFocusResult,
   SnapshotCompareFocusSummary,
   SnapshotCompareSummary,
   SnapshotSlotRoleSummary
@@ -746,11 +747,13 @@ export function SnapshotCompare({
   focusedMetricId,
   focusSummary,
   onFocus,
+  result,
   summary
 }: {
   focusedMetricId: SnapshotCompareFocusId | null;
   focusSummary: SnapshotCompareFocusSummary;
   onFocus: (item: SnapshotCompareFocusItem) => void;
+  result: SnapshotCompareFocusResult | null;
   summary: SnapshotCompareSummary;
 }): ReactElement {
   return (
@@ -768,6 +771,7 @@ export function SnapshotCompare({
         <strong data-testid="snapshot-compare-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="snapshot-compare-focus-detail">{focusSummary.detailLabel}</small>
       </div>
+      {result && <SnapshotCompareFocusResultStrip result={result} />}
       {summary.cards.length === 0 ? (
         <div className="snapshot-compare-empty" data-testid="snapshot-compare-empty">
           <span>Save a slot to compare takes</span>
@@ -815,6 +819,38 @@ export function SnapshotCompare({
         </div>
       )}
     </section>
+  );
+}
+
+function SnapshotCompareFocusResultStrip({ result }: { result: SnapshotCompareFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`snapshot-compare-result ${result.tone}`}
+      data-result-snapshot-compare={result.focusId}
+      data-testid="snapshot-compare-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="snapshot-compare-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="snapshot-compare-result-title">{result.title}</strong>
+          <small data-testid="snapshot-compare-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="snapshot-compare-result-destination" data-testid="snapshot-compare-result-destination">
+        <span>{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="snapshot-compare-result-metric" data-testid="snapshot-compare-result-metric">
+        <span data-testid="snapshot-compare-result-status">{result.metricLabel}</span>
+        <strong data-testid="snapshot-compare-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="snapshot-compare-result-followup" data-testid="snapshot-compare-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 

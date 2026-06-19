@@ -507,6 +507,7 @@ import type {
   SnapshotCompareFocusId,
   SnapshotCompareFocusTarget,
   SnapshotCompareFocusItem,
+  SnapshotCompareFocusResult,
   SnapshotCompareSummary,
   SnapshotSlotRoleSummary,
   EditHistoryReadoutSummary,
@@ -631,6 +632,7 @@ import {
 import type { SnapshotCompareProjectProfile } from "./workstationSnapshotCompare";
 import {
   activeSnapshotCompareQuickActionItem,
+  createSnapshotCompareFocusResult,
   createSnapshotCompareFocusSummary,
   createSnapshotCompareSummary,
   snapshotCompareDirectMetricItems
@@ -1130,6 +1132,7 @@ export function App(): ReactElement {
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
   const [productionSnapshotResult, setProductionSnapshotResult] = useState<ProductionSnapshotFocusResult | null>(null);
   const [snapshotCompareFocusId, setSnapshotCompareFocusId] = useState<SnapshotCompareFocusId | null>(null);
+  const [snapshotCompareResult, setSnapshotCompareResult] = useState<SnapshotCompareFocusResult | null>(null);
   const [hookReadinessFocusId, setHookReadinessFocusId] = useState<HookReadinessFocusId | null>(null);
   const [hookFixResult, setHookFixResult] = useState<HookFixResult | null>(null);
   const [toplineSpaceFocusId, setToplineSpaceFocusId] = useState<ToplineSpaceFocusId | null>(null);
@@ -2029,6 +2032,7 @@ export function App(): ReactElement {
     setListeningPassResult(null);
     setBeatPassportResult(null);
     setProductionSnapshotResult(null);
+    setSnapshotCompareResult(null);
     setReviewQueueResult(null);
     setFinishChecklistResult(null);
     setExportPreflightResult(null);
@@ -2091,6 +2095,7 @@ export function App(): ReactElement {
       setListeningPassResult(null);
       setBeatPassportResult(null);
       setProductionSnapshotResult(null);
+      setSnapshotCompareResult(null);
       setReviewQueueResult(null);
       setFinishChecklistResult(null);
       setExportPreflightResult(null);
@@ -2245,6 +2250,7 @@ export function App(): ReactElement {
     setListeningPassResult(null);
     setBeatPassportResult(null);
     setProductionSnapshotResult(null);
+    setSnapshotCompareResult(null);
     setReviewQueueResult(null);
     setFinishChecklistResult(null);
     setExportPreflightResult(null);
@@ -2310,6 +2316,7 @@ export function App(): ReactElement {
     setListeningPassResult(null);
     setBeatPassportResult(null);
     setProductionSnapshotResult(null);
+    setSnapshotCompareResult(null);
     setReviewQueueResult(null);
     setFinishChecklistResult(null);
     setExportPreflightResult(null);
@@ -6412,6 +6419,7 @@ export function App(): ReactElement {
 
     setSnapshotCompareFocusId(item.focusId);
     targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setSnapshotCompareResult(createSnapshotCompareFocusResult(item, snapshotCompareSummary));
     setProjectStatus(`Snapshot Compare ${item.cardName} ${item.label}: ${item.value}`);
   }
 
@@ -7545,6 +7553,7 @@ export function App(): ReactElement {
         focusedMetricId={snapshotCompareFocusId}
         focusSummary={createSnapshotCompareFocusSummary(snapshotCompareSummary, snapshotCompareFocusId)}
         onFocus={focusSnapshotCompareMetric}
+        result={snapshotCompareResult}
         summary={snapshotCompareSummary}
       />
 

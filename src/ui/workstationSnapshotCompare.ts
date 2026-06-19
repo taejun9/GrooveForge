@@ -5,6 +5,7 @@ import type {
   SnapshotCompareCard,
   SnapshotCompareFocusId,
   SnapshotCompareFocusItem,
+  SnapshotCompareFocusResult,
   SnapshotCompareFocusSummary,
   SnapshotCompareMetric,
   SnapshotCompareMetricId,
@@ -106,7 +107,68 @@ export function snapshotCompareDirectMetricItems(summary: SnapshotCompareSummary
   });
 }
 
+export function createSnapshotCompareFocusResult(
+  item: SnapshotCompareFocusItem,
+  summary: SnapshotCompareSummary
+): SnapshotCompareFocusResult {
+  const summaryItem = snapshotCompareFocusItems(summary).find((candidate) => candidate.focusId === item.focusId) ?? null;
+  const resultItem = summaryItem ?? item;
+
+  return {
+    focusId: item.focusId,
+    cardId: item.cardId,
+    metricId: item.metricId,
+    status: "Focused",
+    title: `${item.cardName} ${item.label} focused`,
+    detail: `${item.value} saved / current ${item.currentValue}`,
+    destination: `${item.focusLabel} panel`,
+    metricLabel: "Compare",
+    metricValue: snapshotCompareFocusResultMetric(resultItem),
+    auditionCue: snapshotCompareFocusResultAudition(item),
+    nextCheck: snapshotCompareFocusResultNextCheck(item),
+    tone: resultItem.tone
+  };
+}
+
 const snapshotCompareMetricOrder: SnapshotCompareMetricId[] = ["setup", "length", "readiness", "export", "stems", "master"];
+
+function snapshotCompareFocusResultMetric(item: SnapshotCompareFocusItem): string {
+  return `${item.label}: saved ${item.value} / current ${item.currentValue}`;
+}
+
+function snapshotCompareFocusResultAudition(item: SnapshotCompareFocusItem): string {
+  switch (item.metricId) {
+    case "setup":
+      return "Inspect Compose setup before restoring or rewriting the saved take.";
+    case "length":
+      return "Use Song or Block loop audition to compare the saved arrangement length against the current beat.";
+    case "readiness":
+      return "Check the focused Compose lane against Beat Readiness before changing musical layers.";
+    case "export":
+      return "Inspect Deliver and Export Preflight before exporting or restoring the saved take.";
+    case "stems":
+      return "Check Deliver stem posture against the current handoff target before sending files.";
+    case "master":
+      return "Play the Full Mix through Master and compare output posture before changing master settings.";
+  }
+}
+
+function snapshotCompareFocusResultNextCheck(item: SnapshotCompareFocusItem): string {
+  switch (item.metricId) {
+    case "setup":
+      return "Return to Snapshot Compare after the saved setup is understood or intentionally ignored.";
+    case "length":
+      return "Return to Snapshot Compare after section length or selected-block intent is clear.";
+    case "readiness":
+      return "Return to Snapshot Compare after the saved readiness lane is matched, improved, or deferred.";
+    case "export":
+      return "Return to Snapshot Compare after export posture is ready or no longer needed.";
+    case "stems":
+      return "Return to Snapshot Compare after stem coverage matches the delivery target.";
+    case "master":
+      return "Return to Snapshot Compare after master posture is ready or intentionally different.";
+  }
+}
 
 function createSnapshotCompareCard(
   current: SnapshotCompareProjectProfile,

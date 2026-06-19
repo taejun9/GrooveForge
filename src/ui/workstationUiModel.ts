@@ -3099,12 +3099,28 @@ export type SnapshotCompareFocusItem = {
   metricId: SnapshotCompareMetricId;
   label: string;
   value: string;
+  currentValue: string;
   detail: string;
   tone: MixCoachTone;
   focusTarget: SnapshotCompareFocusTarget;
   focusLabel: string;
   cardId: string;
   cardName: string;
+};
+
+export type SnapshotCompareFocusResult = {
+  focusId: SnapshotCompareFocusId;
+  cardId: string;
+  metricId: SnapshotCompareMetricId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
 };
 
 export type SnapshotCompareMetric = {
@@ -3155,6 +3171,7 @@ export function snapshotCompareFocusItem(
     metricId: metric.id,
     label: metric.label,
     value: metric.snapshot,
+    currentValue: metric.current,
     detail: `${metric.detail} / current ${metric.current}`,
     tone: metric.tone,
     focusTarget: metric.focusTarget,
