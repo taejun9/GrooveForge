@@ -96,6 +96,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "style-goal-cues", command: "Style Goal Cues", shortcut: "Quick Actions", target: "Pattern / Song loop" },
       { id: "style-goal-actions", command: "Style Goal Actions", shortcut: "Quick Actions", target: "Drums / 808 / Harmony / Melody" },
       { id: "layer-starter", command: "Layer Starter", shortcut: "Quick Actions", target: "Drums / 808 / Chords / Synth" },
+      { id: "pattern-playback-readout", command: "Pattern Playback Readout", shortcut: "Readout", target: "Edit vs heard Pattern" },
       { id: "audible-pattern-follow", command: "Audible Pattern Follow", shortcut: "Quick Actions", target: "Heard Pattern" }
     ]
   },
@@ -104,6 +105,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
     title: "Finish",
     items: [
       { id: "pattern-chain", command: "Pattern Chain", shortcut: "Quick Actions", target: "Arrangement sketch" },
+      { id: "arrangement-playback-readout", command: "Arrangement Playback Readout", shortcut: "Readout", target: "Edit vs heard Block" },
       { id: "audible-arrangement-follow", command: "Audible Arrangement Follow", shortcut: "Quick Actions", target: "Heard Block" },
       { id: "mix-coach", command: "Mix Coach", shortcut: "Quick Actions", target: "Headroom / balance" },
       { id: "master-finish", command: "Master Finish", shortcut: "Quick Actions", target: "Output posture" },
