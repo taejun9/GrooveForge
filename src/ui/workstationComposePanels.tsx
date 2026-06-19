@@ -24,6 +24,12 @@ type StudioToneBaseline = {
   sourceLabel: string;
 };
 
+type StudioToneBaselineResult = {
+  sourceLabel: string;
+  toneLabel: string;
+  nextCheck: string;
+};
+
 const studioToneControls: Array<{ id: string; label: string; parameter: SoundControlParameter }> = [
   { id: "kick-punch", label: "Kick punch", parameter: "kickPunch" },
   { id: "snare-snap", label: "Snare snap", parameter: "snareSnap" },
@@ -1565,15 +1571,28 @@ export function SoundDesigner({
   onChange: (update: Partial<Omit<SoundDesign, "preset">>) => void;
 }): ReactElement {
   const [studioToneBaseline, setStudioToneBaseline] = useState<StudioToneBaseline>(() => createStudioToneBaseline(sound));
+  const [studioToneBaselineResult, setStudioToneBaselineResult] = useState<StudioToneBaselineResult | null>(null);
   const [studioToneResetResult, setStudioToneResetResult] = useState<StudioToneResetResult | null>(null);
   const presetBaseline = studioToneBaseline.sound;
 
   useEffect(() => {
     if (sound.preset !== "custom") {
       setStudioToneBaseline(createStudioToneBaseline(sound));
+      setStudioToneBaselineResult(null);
       setStudioToneResetResult(null);
     }
   }, [sound.preset]);
+
+  function captureStudioToneBaseline(): void {
+    const baseline = createCapturedStudioToneBaseline(sound);
+    setStudioToneBaseline(baseline);
+    setStudioToneResetResult(null);
+    setStudioToneBaselineResult({
+      sourceLabel: baseline.sourceLabel,
+      toneLabel: studioToneBaselineSummaryLabel(baseline.sound),
+      nextCheck: "Adjust one tone control, then use Reset to compare against this captured baseline."
+    });
+  }
 
   return (
     <div className="sound-designer">
@@ -1619,7 +1638,17 @@ export function SoundDesigner({
           <div className="studio-tone-baseline-source" data-testid="studio-tone-baseline-source">
             <span>Reset baseline</span>
             <strong data-testid="studio-tone-baseline-source-label">{studioToneBaseline.sourceLabel}</strong>
+            <button
+              data-testid="studio-tone-baseline-capture"
+              onClick={captureStudioToneBaseline}
+              title="Capture current Studio tone as the reset baseline"
+              type="button"
+            >
+              <Save size={12} aria-hidden="true" />
+              <span>Capture</span>
+            </button>
           </div>
+          {studioToneBaselineResult && <StudioToneBaselineResultStrip result={studioToneBaselineResult} />}
           <div className="sound-control-grid">
             {studioToneControls.map((control) => (
               <SoundControl
@@ -2246,6 +2275,21 @@ function StudioToneResetResultStrip({ result }: { result: StudioToneResetResult 
   );
 }
 
+function StudioToneBaselineResultStrip({ result }: { result: StudioToneBaselineResult }): ReactElement {
+  return (
+    <div className="studio-tone-baseline-result" data-testid="studio-tone-baseline-result">
+      <div className="studio-tone-baseline-result-main">
+        <Save size={14} aria-hidden="true" />
+        <span>
+          <b data-testid="studio-tone-baseline-result-title">{result.sourceLabel}</b>
+          <em data-testid="studio-tone-baseline-result-tone">{result.toneLabel}</em>
+        </span>
+      </div>
+      <p data-testid="studio-tone-baseline-result-next-check">{result.nextCheck}</p>
+    </div>
+  );
+}
+
 function studioToneResetNextCheck(label: string): string {
   if (label.includes("808")) {
     return "Replay the 808 against the kick and confirm the low-end pocket.";
@@ -2261,10 +2305,18 @@ function studioToneResetNextCheck(label: string): string {
 
 function createStudioToneBaseline(sound: SoundDesign): StudioToneBaseline {
   if (sound.preset === "custom") {
-    return { sound, sourceLabel: "Initial custom tone" };
+    return { sound: { ...sound }, sourceLabel: "Initial custom tone" };
   }
 
-  return { sound: soundPresetDesign(sound.preset), sourceLabel: `${soundPresetLabel(sound.preset)} preset` };
+  return { sound: { ...soundPresetDesign(sound.preset) }, sourceLabel: `${soundPresetLabel(sound.preset)} preset` };
+}
+
+function createCapturedStudioToneBaseline(sound: SoundDesign): StudioToneBaseline {
+  return { sound: { ...sound }, sourceLabel: "Captured Studio tone" };
+}
+
+function studioToneBaselineSummaryLabel(sound: SoundDesign): string {
+  return `Kick ${percentLabel(sound.kickPunch)} | 808 ${percentLabel(sound.bassDrive)} | Synth ${percentLabel(sound.synthBrightness)} | Chord ${percentLabel(sound.chordWarmth)}`;
 }
 
 export function ChordEditor({
