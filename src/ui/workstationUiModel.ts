@@ -2945,6 +2945,19 @@ export type FinishChecklistFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type FinishChecklistFocusResult = {
+  cardId: FinishChecklistCardId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type FinishChecklistSummary = {
   headline: string;
   detail: string;

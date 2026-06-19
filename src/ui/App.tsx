@@ -488,6 +488,7 @@ import type {
   FinishChecklistCardId,
   FinishChecklistCard,
   FinishChecklistFocusSummary,
+  FinishChecklistFocusResult,
   FinishChecklistSummary,
   ReviewQueueItem,
   ReviewQueueFocusTarget,
@@ -1149,6 +1150,7 @@ export function App(): ReactElement {
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
   const [reviewFixResult, setReviewFixResult] = useState<ReviewFixResult | null>(null);
   const [finishChecklistFocusId, setFinishChecklistFocusId] = useState<FinishChecklistCardId | null>(null);
+  const [finishChecklistResult, setFinishChecklistResult] = useState<FinishChecklistFocusResult | null>(null);
   const [exportPreflightFocusId, setExportPreflightFocusId] = useState<ExportPreflightFocusId | null>(null);
   const [handoffPackageCheckFocusId, setHandoffPackageCheckFocusId] = useState<HandoffPackageCheckFocusId | null>(null);
   const [handoffExportReceipt, setHandoffExportReceipt] = useState<HandoffExportReceipt | null>(null);
@@ -2021,6 +2023,7 @@ export function App(): ReactElement {
     setListeningPassResult(null);
     setBeatPassportResult(null);
     setProductionSnapshotResult(null);
+    setFinishChecklistResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
@@ -2079,6 +2082,7 @@ export function App(): ReactElement {
       setListeningPassResult(null);
       setBeatPassportResult(null);
       setProductionSnapshotResult(null);
+      setFinishChecklistResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
@@ -2229,6 +2233,7 @@ export function App(): ReactElement {
     setListeningPassResult(null);
     setBeatPassportResult(null);
     setProductionSnapshotResult(null);
+    setFinishChecklistResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2290,6 +2295,7 @@ export function App(): ReactElement {
     setListeningPassResult(null);
     setBeatPassportResult(null);
     setProductionSnapshotResult(null);
+    setFinishChecklistResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -6544,6 +6550,7 @@ export function App(): ReactElement {
 
     setFinishChecklistFocusId(card.id);
     targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setFinishChecklistResult(createFinishChecklistFocusResult(card, finishChecklistSummary));
     setProjectStatus(`Finish ${card.label}: ${card.status}`);
   }
 
@@ -8659,6 +8666,7 @@ export function App(): ReactElement {
           <FinishChecklist
             summary={finishChecklistSummary}
             focusedCardId={finishChecklistFocusId}
+            result={finishChecklistResult}
             onFocus={focusFinishChecklistCard}
           />
           <ReviewQueue
@@ -10912,16 +10920,22 @@ function composerActionIcon(action: ComposerAction): ReactElement {
 function FinishChecklist({
   summary,
   focusedCardId,
+  result,
   onFocus
 }: {
   summary: FinishChecklistSummary;
   focusedCardId: FinishChecklistCardId | null;
+  result: FinishChecklistFocusResult | null;
   onFocus: (card: FinishChecklistCard) => void;
 }): ReactElement {
   const focusSummary = createFinishChecklistFocusSummary(summary, focusedCardId);
 
   return (
-    <section className={`finish-checklist ${summary.tone}`} data-testid="finish-checklist" aria-label="Finish checklist">
+    <section
+      className={["finish-checklist", summary.tone, result ? "has-result" : ""].filter(Boolean).join(" ")}
+      data-testid="finish-checklist"
+      aria-label="Finish checklist"
+    >
       <div className="finish-checklist-heading">
         <div>
           <Gauge size={16} aria-hidden="true" />
@@ -10939,6 +10953,7 @@ function FinishChecklist({
         <strong data-testid="finish-checklist-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="finish-checklist-focus-detail">{focusSummary.detailLabel}</small>
       </div>
+      {result && <FinishChecklistFocusResultStrip result={result} />}
       <div className="finish-checklist-grid" data-testid="finish-checklist-grid">
         {summary.cards.map((card) => {
           const focused = focusedCardId !== null && card.id === focusedCardId;
@@ -10968,6 +10983,38 @@ function FinishChecklist({
         })}
       </div>
     </section>
+  );
+}
+
+function FinishChecklistFocusResultStrip({ result }: { result: FinishChecklistFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`finish-checklist-result ${result.tone}`}
+      data-result-finish-checklist={result.cardId}
+      data-testid="finish-checklist-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="finish-checklist-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="finish-checklist-result-title">{result.title}</strong>
+          <small data-testid="finish-checklist-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="finish-checklist-result-destination" data-testid="finish-checklist-result-destination">
+        <span>{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="finish-checklist-result-metric" data-testid="finish-checklist-result-metric">
+        <span data-testid="finish-checklist-result-status">{result.metricLabel}</span>
+        <strong data-testid="finish-checklist-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="finish-checklist-result-followup" data-testid="finish-checklist-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -20953,6 +21000,68 @@ function createFinishChecklistFocusSummary(
     detailTitle: `${statusLabel} / ${card.label}: ${card.status} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function createFinishChecklistFocusResult(
+  card: FinishChecklistCard,
+  summary: FinishChecklistSummary
+): FinishChecklistFocusResult {
+  const summaryCard = summary.cards.find((item) => item.id === card.id) ?? null;
+
+  return {
+    cardId: card.id,
+    status: "Focused",
+    title: `${card.label} finish check focused`,
+    detail: `${card.status}: ${card.detail}`,
+    destination: `${card.focusLabel} panel`,
+    metricLabel: "Checklist",
+    metricValue: finishChecklistFocusResultMetric(summary),
+    auditionCue: finishChecklistFocusResultAudition(card),
+    nextCheck: finishChecklistFocusResultNextCheck(card),
+    tone: summaryCard?.tone ?? "warn"
+  };
+}
+
+function finishChecklistFocusResultMetric(summary: FinishChecklistSummary): string {
+  const readyCount = summary.cards.filter((card) => card.tone === "good").length;
+  const reviewCount = summary.cards.filter((card) => card.tone === "warn").length;
+  const blockerCount = summary.cards.filter((card) => card.tone === "danger").length;
+
+  return `${readyCount}/${summary.cards.length} finish checks ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function finishChecklistFocusResultAudition(card: FinishChecklistCard): string {
+  switch (card.id) {
+    case "compose":
+      return "Play Pattern loop and confirm drums, 808/bass, chords, and melody hold together before arranging further.";
+    case "arrange":
+      return "Play Song loop and scan section length, hook lift, Pattern A/B/C spread, and target fit.";
+    case "mix":
+      return "Play Full Mix, then use Stem Audition and Mix Coach to check headroom, balance, and low end.";
+    case "master":
+      return "Play the mastered full mix and compare master preset, ceiling, headroom, and output posture.";
+    case "automation":
+      return "Play intro, outro, and transition ranges to confirm fade automation supports the delivery target.";
+    case "handoff":
+      return "Check WAV, stems, MIDI, Session Brief, and Handoff Sheet context before sending files.";
+  }
+}
+
+function finishChecklistFocusResultNextCheck(card: FinishChecklistCard): string {
+  switch (card.id) {
+    case "compose":
+      return "Return after the core musical layers are playable or intentionally sparse.";
+    case "arrange":
+      return "Return after song form, section contrast, and target length are ready.";
+    case "mix":
+      return "Return after Mix Coach and Stem Audition show balance issues are resolved or intentionally deferred.";
+    case "master":
+      return "Return after master preset, ceiling, headroom, and output role match the delivery target.";
+    case "automation":
+      return "Return after fade posture is clear in realtime playback and export scope.";
+    case "handoff":
+      return "Return after deliverables, stems, and brief context are ready for collaborator review.";
+  }
 }
 
 function reviewQueueFocusTarget(item: Pick<ReviewQueueItem, "id" | "area">): ReviewQueueFocusTarget {
