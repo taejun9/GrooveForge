@@ -521,6 +521,7 @@ import type {
   PatternPlaybackReadoutSummary,
   ArrangementPlaybackReadoutSummary,
   KeyboardCapturePostureSummary,
+  ProjectFileResult,
   ProjectSafetyReadoutSummary,
   HandoffPackItem,
   HandoffPackRouteSummary,
@@ -1185,6 +1186,39 @@ function UndoRedoResultStrip({ result }: { result: UndoRedoResult }): ReactEleme
   );
 }
 
+function ProjectFileResultStrip({ result }: { result: ProjectFileResult }): ReactElement {
+  return (
+    <div
+      className={`quick-action-result project-file-result ${result.tone}`}
+      data-result-project-file={result.targetId}
+      data-testid="project-file-result"
+      aria-live="polite"
+    >
+      <div className="quick-action-result-main">
+        <span data-testid="project-file-result-status">{result.status}</span>
+        <strong data-testid="project-file-result-title">{result.title}</strong>
+        <small data-testid="project-file-result-detail">{result.detail}</small>
+      </div>
+      <div className={`quick-action-result-metric ${result.tone}`} data-testid="project-file-result-metric">
+        <span data-testid="project-file-result-file">{result.fileLabel}</span>
+        <strong data-testid="project-file-result-metric-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="quick-action-result-followup" data-testid="project-file-result-followup">
+        <span>
+          <b>Safety</b>
+          <em data-testid="project-file-result-safety">{result.safetyCue}</em>
+        </span>
+        <span>
+          <b>Next</b>
+          <em data-testid="project-file-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<EditHistoryEntry[]>([]);
@@ -1327,6 +1361,7 @@ export function App(): ReactElement {
   const [projectStatus, setProjectStatus] = useState("Demo project");
   const [projectFileLabel, setProjectFileLabel] = useState<string | null>(null);
   const [projectHasUnsavedChanges, setProjectHasUnsavedChanges] = useState(false);
+  const [projectFileResult, setProjectFileResult] = useState<ProjectFileResult | null>(null);
   const [tapTempo, setTapTempo] = useState<TapTempoState>({ taps: 0, bpm: null, applied: true });
   const [localDraftRecovery, setLocalDraftRecovery] = useState<LocalDraftRecovery | null>(() => readLocalDraftRecovery());
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState<string | null>(localDraftRecovery?.savedAt ?? null);
@@ -2246,6 +2281,7 @@ export function App(): ReactElement {
     setInputCaptureResult(null);
     setSelectedEventDeleteResult(null);
     setUndoRedoResult(null);
+    setProjectFileResult(null);
     setModeSwitchResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
@@ -2488,6 +2524,7 @@ export function App(): ReactElement {
     setInputCaptureResult(null);
     setSelectedEventDeleteResult(null);
     setUndoRedoResult(null);
+    setProjectFileResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -2566,6 +2603,7 @@ export function App(): ReactElement {
     setInputCaptureResult(null);
     setSelectedEventDeleteResult(null);
     setUndoRedoResult(null);
+    setProjectFileResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -6269,12 +6307,18 @@ export function App(): ReactElement {
     try {
       const result = await window.grooveforge?.saveProject?.(contents, defaultName);
       if (result) {
-        if (!result.canceled) {
-          clearLocalDraftState();
-          setProjectFileLabel(fileDisplayName(result.filePath));
-          setProjectHasUnsavedChanges(false);
+        if (result.canceled) {
+          setProjectFileResult(null);
+          setProjectStatus("Save canceled");
+          return;
         }
-        setProjectStatus(result.canceled ? "Save canceled" : `Saved ${fileDisplayName(result.filePath)}`);
+
+        const fileLabel = fileDisplayName(result.filePath);
+        clearLocalDraftState();
+        setProjectFileLabel(fileLabel);
+        setProjectHasUnsavedChanges(false);
+        setProjectFileResult(createProjectFileResult("save", fileLabel, project));
+        setProjectStatus(`Saved ${fileLabel}`);
         return;
       }
 
@@ -6282,9 +6326,11 @@ export function App(): ReactElement {
       clearLocalDraftState();
       setProjectFileLabel(defaultName);
       setProjectHasUnsavedChanges(false);
+      setProjectFileResult(createProjectFileResult("download", defaultName, project));
       setProjectStatus(`Downloaded ${defaultName}`);
     } catch (error) {
       console.error(error);
+      setProjectFileResult(null);
       setProjectStatus("Save failed");
     }
   }
@@ -6294,16 +6340,19 @@ export function App(): ReactElement {
       const result = await window.grooveforge?.openProject?.();
       if (result) {
         if (result.canceled || !result.contents) {
+          setProjectFileResult(null);
           setProjectStatus("Open canceled");
           return;
         }
-        loadProjectText(result.contents, fileDisplayName(result.filePath));
+        loadProjectText(result.contents, fileDisplayName(result.filePath), "open");
         return;
       }
 
+      setProjectFileResult(null);
       importInputRef.current?.click();
     } catch (error) {
       console.error(error);
+      setProjectFileResult(null);
       setProjectStatus("Open failed");
     }
   }
@@ -6312,19 +6361,62 @@ export function App(): ReactElement {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file) {
+      setProjectFileResult(null);
       return;
     }
 
     void file
       .text()
-      .then((contents) => loadProjectText(contents, file.name))
+      .then((contents) => loadProjectText(contents, file.name, "import"))
       .catch((error: unknown) => {
         console.error(error);
+        setProjectFileResult(null);
         setProjectStatus("Open failed");
       });
   }
 
-  function loadProjectText(contents: string, sourceName: string): void {
+  function createProjectFileResult(
+    action: ProjectFileResult["action"],
+    fileLabel: string,
+    resultProject: ProjectState
+  ): ProjectFileResult {
+    const statusByAction: Record<ProjectFileResult["action"], ProjectFileResult["status"]> = {
+      save: "Saved",
+      download: "Downloaded",
+      open: "Loaded",
+      import: "Imported"
+    };
+    const titleAction: Record<ProjectFileResult["action"], string> = {
+      save: "Saved project",
+      download: "Downloaded project",
+      open: "Opened project",
+      import: "Imported project"
+    };
+    const safetyCue =
+      action === "save" || action === "download"
+        ? "Local draft recovery was cleared after this durable project copy."
+        : "Loaded file is now current; undo and redo history were reset for this project.";
+    const nextCheck =
+      action === "save" || action === "download"
+        ? "Keep composing; save again after the next meaningful edit."
+        : `Play Pattern ${resultProject.selectedPattern}; confirm the loaded beat before editing.`;
+
+    return {
+      action,
+      targetId: `${action}-${fileLabel}`,
+      status: statusByAction[action],
+      title: `${titleAction[action]}: ${fileLabel}`,
+      detail: `${resultProject.title} / ${barCountLabel(arrangementTotalBars(resultProject))}`,
+      fileLabel,
+      metricLabel: "Project",
+      metricValue: `${projectEventTotal(resultProject)} events / Pattern ${resultProject.selectedPattern}`,
+      safetyCue,
+      nextCheck,
+      tone: "good"
+    };
+  }
+
+  function loadProjectText(contents: string, sourceName: string, action: "open" | "import"): void {
     try {
       const nextProject = parseProjectFile(contents);
       controllerRef.current?.stop();
@@ -6332,8 +6424,10 @@ export function App(): ReactElement {
       replaceProject(nextProject, `Loaded ${sourceName}`, sourceName);
       setPlaybackPosition(null);
       setIsPlaying(false);
+      setProjectFileResult(createProjectFileResult(action, sourceName, nextProject));
     } catch (error) {
       console.error(error);
+      setProjectFileResult(null);
       setProjectStatus("Invalid project file");
     }
   }
@@ -7949,6 +8043,7 @@ export function App(): ReactElement {
           <span data-testid="project-status">{projectStatus}</span>
         </div>
         {modeSwitchResult && <ModeSwitchResultStrip result={modeSwitchResult} />}
+        {projectFileResult && <ProjectFileResultStrip result={projectFileResult} />}
       </section>
 
       <ModeFocus result={modeFocusResult} summary={modeFocusSummary} onFocus={focusModeFocusCard} />

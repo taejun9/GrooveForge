@@ -3379,6 +3379,22 @@ export type ProjectSafetyReadoutSummary = {
   tone: MixCoachTone;
 };
 
+export type ProjectFileResultAction = "save" | "download" | "open" | "import";
+
+export type ProjectFileResult = {
+  action: ProjectFileResultAction;
+  targetId: string;
+  status: "Saved" | "Downloaded" | "Loaded" | "Imported";
+  title: string;
+  detail: string;
+  fileLabel: string;
+  metricLabel: string;
+  metricValue: string;
+  safetyCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type HandoffPackItem = {
   id: "wav" | "stems" | "midi" | "sheet";
   label: string;
