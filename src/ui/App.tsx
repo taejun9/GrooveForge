@@ -12663,6 +12663,11 @@ function createFirstBeatPathSummary(
   const nextStep = steps.find((step) => step.tone === "danger") ?? steps.find((step) => step.tone === "warn") ?? steps[steps.length - 1];
   const tone = weakestTone(steps.map((step) => step.tone));
   const statusLabel = tone === "good" ? "Beat path ready" : tone === "warn" ? "Beat path review" : "Beat path blocker";
+  const decisionStatus =
+    nextStep.tone === "danger" ? "Path blocker" : nextStep.tone === "warn" ? "Path review" : "Path ready";
+  const decisionLabel = `Jump ${nextStep.jumpLabel}`;
+  const decisionDetail = `${nextStep.label}: ${nextStep.detail}`;
+  const decisionTitle = `First Beat Path recommends ${decisionLabel}: ${nextStep.detail}`;
 
   return {
     statusLabel,
@@ -12670,6 +12675,10 @@ function createFirstBeatPathSummary(
     detail: `${target.name} / ${project.mode === "guided" ? "guided route" : "studio scan"} / next jump ${nextStep.jumpLabel}`,
     countLabel: `${readyCount}/5 ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`,
     nextStepId: nextStep.id,
+    decisionStatus,
+    decisionLabel,
+    decisionDetail,
+    decisionTitle,
     tone,
     steps
   };

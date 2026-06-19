@@ -3770,6 +3770,10 @@ export type FirstBeatPathSummary = {
   detail: string;
   countLabel: string;
   nextStepId: FirstBeatPathStepId;
+  decisionStatus: string;
+  decisionLabel: string;
+  decisionDetail: string;
+  decisionTitle: string;
   tone: MixCoachTone;
   steps: FirstBeatPathStep[];
 };

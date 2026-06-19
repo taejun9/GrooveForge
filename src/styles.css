@@ -1308,7 +1308,7 @@ h2 {
 
 .first-beat-path {
   display: grid;
-  grid-template-columns: minmax(160px, 0.32fr) minmax(140px, 0.26fr) minmax(0, 1fr);
+  grid-template-columns: minmax(160px, 0.28fr) minmax(130px, 0.2fr) minmax(140px, 0.22fr) minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
   min-width: 0;
@@ -1331,6 +1331,7 @@ h2 {
 
 .first-beat-path-heading,
 .first-beat-path-count,
+.first-beat-path-decision,
 .first-beat-path-step {
   min-width: 0;
 }
@@ -1366,6 +1367,9 @@ h2 {
 .first-beat-path-count span,
 .first-beat-path-count strong,
 .first-beat-path-count small,
+.first-beat-path-decision span,
+.first-beat-path-decision strong,
+.first-beat-path-decision small,
 .first-beat-path-step span,
 .first-beat-path-step strong,
 .first-beat-path-step small {
@@ -1416,8 +1420,46 @@ h2 {
   background: rgba(255, 122, 79, 0.055);
 }
 
+.first-beat-path-decision {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px;
+}
+
+.first-beat-path-decision.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.first-beat-path-decision.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.first-beat-path-decision span {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.first-beat-path-decision strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.first-beat-path-decision small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+}
+
 .first-beat-path-steps {
   display: grid;
+  grid-column: 4;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 7px;
   min-width: 0;
@@ -22090,6 +22132,10 @@ input[type="range"] {
     gap: 4px 8px;
   }
 
+  .first-beat-path-decision {
+    grid-column: 2;
+  }
+
   .first-beat-path-result {
     grid-column: 1 / -1;
     grid-template-columns: 150px minmax(0, 0.6fr) minmax(0, 1fr);
@@ -23143,12 +23189,14 @@ input[type="range"] {
   }
 
   .first-beat-path-count,
+  .first-beat-path-decision,
   .first-beat-path-steps,
   .first-beat-path-result {
     grid-column: 1;
   }
 
   .first-beat-path-count,
+  .first-beat-path-decision,
   .first-beat-path-steps,
   .first-beat-path-result {
     grid-template-columns: 1fr;

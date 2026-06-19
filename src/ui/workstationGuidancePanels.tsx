@@ -683,6 +683,16 @@ export function FirstBeatPath({
         <strong>{summary.countLabel}</strong>
         <small>{firstBeatPathToneLabel(summary.tone)}</small>
       </div>
+      <div
+        className={`first-beat-path-decision ${summary.tone}`}
+        data-first-beat-path-decision={summary.nextStepId}
+        data-testid="first-beat-path-decision"
+        title={summary.decisionTitle}
+      >
+        <span data-testid="first-beat-path-decision-status">{summary.decisionStatus}</span>
+        <strong data-testid="first-beat-path-decision-label">{summary.decisionLabel}</strong>
+        <small data-testid="first-beat-path-decision-detail">{summary.decisionDetail}</small>
+      </div>
       <div className="first-beat-path-steps" data-testid="first-beat-path-steps">
         {summary.steps.map((step) => {
           const next = step.id === summary.nextStepId;
