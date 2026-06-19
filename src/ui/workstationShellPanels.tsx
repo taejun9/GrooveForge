@@ -121,6 +121,16 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "master-automation", command: "Master Automation", shortcut: "Quick Actions", target: "Fade in / out" },
       { id: "handoff-pack", command: "Handoff Pack", shortcut: "Quick Actions", target: "WAV / stems / MIDI / sheet" }
     ]
+  },
+  {
+    id: "deliver-fast-path",
+    title: "Deliver",
+    items: [
+      { id: "export-format-readout", command: "Export Format Readout", shortcut: "Readout", target: "WAV / stems / MIDI / sheet" },
+      { id: "handoff-package-check", command: "Handoff Package Check", shortcut: "Quick Actions", target: "File set / send order" },
+      { id: "handoff-next-export", command: "Handoff Next Export", shortcut: "Quick Actions", target: "Next deliverable" },
+      { id: "direct-exports", command: "Direct Exports", shortcut: "Quick Actions", target: "WAV / stems / MIDI / sheet" }
+    ]
   }
 ];
 
