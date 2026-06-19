@@ -65,6 +65,16 @@ function quickActionGuideSuggestionTarget(title: string, detail: string): string
   return `Target: ${detailParts[1] ?? detailParts[0] ?? "Guide"}`;
 }
 
+function quickActionGuideSuggestionMetric(detail: string): string {
+  const detailParts = detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const metricParts = detailParts.slice(-2);
+
+  return metricParts.length > 0 ? `Metric: ${metricParts.join(" / ")}` : "Metric: current guide signal";
+}
+
 type CommandReferenceItem = {
   id: string;
   command: string;
@@ -496,6 +506,9 @@ export function QuickActions({
   const guideSuggestionTarget = guideSuggestionAction
     ? quickActionGuideSuggestionTarget(guideSuggestionAction.title, guideSuggestionAction.detail)
     : "Target: Guide";
+  const guideSuggestionMetric = guideSuggestionAction
+    ? quickActionGuideSuggestionMetric(guideSuggestionAction.detail)
+    : "Metric: current guide signal";
 
   return (
     <div
@@ -585,6 +598,7 @@ export function QuickActions({
               <span className="quick-actions-guide-suggestion-meta" data-testid="quick-actions-guide-suggestion-meta">
                 <span data-testid="quick-actions-guide-suggestion-source">{guideSuggestionSource}</span>
                 <span data-testid="quick-actions-guide-suggestion-target">{guideSuggestionTarget}</span>
+                <span data-testid="quick-actions-guide-suggestion-metric">{guideSuggestionMetric}</span>
                 <span data-testid="quick-actions-guide-suggestion-pin-state">
                   {guideSuggestionPinned ? "Pinned command" : "Not pinned"}
                 </span>
