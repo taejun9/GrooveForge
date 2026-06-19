@@ -61,6 +61,10 @@ export function createMixSnapshotComparison(snapshots: MixSnapshotSlotMap): MixS
       winnerLabel: "A/B empty",
       detailLabel: "Capture a current mix into A or B.",
       detailTitle: "Mix Snapshot A/B has no captured mix passes.",
+      decisionStatus: "Capture start",
+      decisionLabel: "Capture A first",
+      decisionDetail: "Save the current mix into A, then make one concrete mix change before B.",
+      decisionTitle: "No Mix Snapshot slots are captured. Capture A before comparing A/B.",
       tone: "warn",
       metrics
     };
@@ -75,6 +79,10 @@ export function createMixSnapshotComparison(snapshots: MixSnapshotSlotMap): MixS
       winnerLabel: `Mix ${capturedSlot} held`,
       detailLabel: `Capture ${missingSlot} to compare against ${captured?.exportLabel ?? "the held mix"}.`,
       detailTitle: `Mix ${capturedSlot} is captured for ${captured?.projectTitle ?? "current project"}; Mix ${missingSlot} is empty.`,
+      decisionStatus: "Capture pair",
+      decisionLabel: `Capture ${missingSlot} next`,
+      decisionDetail: `Keep Mix ${capturedSlot} held, change one mix/master choice, then capture ${missingSlot}.`,
+      decisionTitle: `Mix ${capturedSlot} is held. Capture Mix ${missingSlot} before deciding between passes.`,
       tone: captured?.tone ?? "warn",
       metrics
     };
@@ -87,6 +95,10 @@ export function createMixSnapshotComparison(snapshots: MixSnapshotSlotMap): MixS
       winnerLabel: "A/B close",
       detailLabel: `${A.exportLabel} vs ${B.exportLabel}; choose by listening context.`,
       detailTitle: `Mix A and Mix B are close. A score ${A.score}, B score ${B.score}; A ${A.balanceLabel}; B ${B.balanceLabel}.`,
+      decisionStatus: "Listen close",
+      decisionLabel: "Choose by hook context",
+      decisionDetail: "Recall A or B explicitly, then play Full Mix and the core stems before committing.",
+      decisionTitle: `Mix A and Mix B are close: A score ${A.score}, B score ${B.score}. Choose by listening context.`,
       tone: weakestTone([A.tone, B.tone]),
       metrics
     };
@@ -99,6 +111,10 @@ export function createMixSnapshotComparison(snapshots: MixSnapshotSlotMap): MixS
     winnerLabel: `Mix ${winner.slot} safer`,
     detailLabel: `${winner.exportLabel}; ${winner.balanceLabel}; ${winner.stemLabel}.`,
     detailTitle: `Mix ${winner.slot} scored ${winner.score} against Mix ${runnerUp.slot} at ${runnerUp.score}; ${winner.masterLabel}.`,
+    decisionStatus: "Recall candidate",
+    decisionLabel: `Recall Mix ${winner.slot}`,
+    decisionDetail: `Play Full Mix after recall; compare against Mix ${runnerUp.slot} before another fix.`,
+    decisionTitle: `Mix ${winner.slot} is the safer pass by score. Recall remains explicit and undoable.`,
     tone: winner.tone === "danger" ? "warn" : winner.tone,
     metrics
   };

@@ -591,6 +591,10 @@ export type MixSnapshotComparisonSummary = {
   winnerLabel: string;
   detailLabel: string;
   detailTitle: string;
+  decisionStatus: string;
+  decisionLabel: string;
+  decisionDetail: string;
+  decisionTitle: string;
   tone: MixCoachTone;
   metrics: MixSnapshotComparisonMetric[];
 };

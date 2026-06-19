@@ -303,6 +303,11 @@ export function MixSnapshotAB({
         <strong data-testid="mix-snapshot-winner">{summary.winnerLabel}</strong>
         <small data-testid="mix-snapshot-detail">{summary.detailLabel}</small>
       </div>
+      <div className={`mix-snapshot-decision ${summary.tone}`} data-testid="mix-snapshot-decision" title={summary.decisionTitle}>
+        <span data-testid="mix-snapshot-decision-status">{summary.decisionStatus}</span>
+        <strong data-testid="mix-snapshot-decision-label">{summary.decisionLabel}</strong>
+        <small data-testid="mix-snapshot-decision-detail">{summary.decisionDetail}</small>
+      </div>
       <div className="mix-snapshot-slots">
         {slotIds.map((slot) => (
           <MixSnapshotSlotCard key={slot} snapshot={snapshots[slot]} slot={slot} />
