@@ -2649,7 +2649,13 @@ h2 {
 .key-compass-card strong,
 .key-compass-card small,
 .key-compass-focus-button span,
-.key-compass-notes span {
+.key-compass-notes span,
+.key-compass-result-main strong,
+.key-compass-result-main small,
+.key-compass-result-metric span,
+.key-compass-result-metric strong,
+.key-compass-result-followup span,
+.key-compass-result-followup small {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2815,6 +2821,74 @@ h2 {
 .key-compass-focus-button[aria-pressed="true"] {
   border-color: rgba(240, 195, 106, 0.48);
   background: rgba(240, 195, 106, 0.11);
+}
+
+.key-compass-result {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.34fr) minmax(160px, 0.3fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(240, 195, 106, 0.24);
+  border-radius: 7px;
+  background: rgba(240, 195, 106, 0.065);
+  padding: 8px;
+}
+
+.key-compass-result.good {
+  border-color: rgba(120, 240, 200, 0.22);
+  background: rgba(120, 240, 200, 0.045);
+}
+
+.key-compass-result.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  background: rgba(255, 122, 79, 0.045);
+}
+
+.key-compass-result-main,
+.key-compass-result-metric,
+.key-compass-result-followup {
+  min-width: 0;
+}
+
+.key-compass-result-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.key-compass-result-main svg {
+  flex: 0 0 auto;
+  color: #f0c36a;
+}
+
+.key-compass-result.good .key-compass-result-main svg {
+  color: #78f0c8;
+}
+
+.key-compass-result.danger .key-compass-result-main svg {
+  color: #ff7a4f;
+}
+
+.key-compass-result-main span,
+.key-compass-result-metric,
+.key-compass-result-followup {
+  display: grid;
+  gap: 2px;
+}
+
+.key-compass-result-main strong,
+.key-compass-result-metric strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.key-compass-result-main small,
+.key-compass-result-metric span,
+.key-compass-result-followup span,
+.key-compass-result-followup small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
 }
 
 .groove-compass {
@@ -19605,6 +19679,7 @@ input[type="range"] {
 @media (max-width: 620px) {
   .workflow-navigator,
   .mode-focus,
+  .key-compass,
   .composer-guide,
   .style-inspector {
     grid-template-columns: 1fr;
@@ -19633,6 +19708,23 @@ input[type="range"] {
   .workflow-navigator-result,
   .workflow-navigator-grid {
     grid-column: 1;
+    grid-template-columns: 1fr;
+  }
+
+  .key-compass-heading {
+    border-inline-end: 0;
+    border-block-end: 1px solid rgba(244, 239, 231, 0.1);
+    padding-inline-end: 0;
+    padding-block-end: 7px;
+  }
+
+  .key-compass-notes {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .key-compass-focus-readout,
+  .key-compass-grid,
+  .key-compass-result {
     grid-template-columns: 1fr;
   }
 

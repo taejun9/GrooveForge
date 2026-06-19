@@ -450,6 +450,7 @@ import type {
   KeyCompassCard,
   KeyCompassSummary,
   KeyCompassFocusSummary,
+  KeyCompassFocusResult,
   GrooveCompassCardId,
   GrooveCompassFocusId,
   GrooveCompassFocusTarget,
@@ -1124,6 +1125,7 @@ export function App(): ReactElement {
   const [arrangementTransitionMapFocusId, setArrangementTransitionMapFocusId] =
     useState<ArrangementTransitionMapFocusId | null>(null);
   const [keyCompassFocusId, setKeyCompassFocusId] = useState<KeyCompassFocusId | null>(null);
+  const [keyCompassResult, setKeyCompassResult] = useState<KeyCompassFocusResult | null>(null);
   const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
   const [styleInspectorFocusId, setStyleInspectorFocusId] = useState<StyleInspectorFocusId | null>(null);
@@ -1996,6 +1998,7 @@ export function App(): ReactElement {
     setProject(nextProject);
     setComposerActionResult(null);
     setComposerGuideResult(null);
+    setKeyCompassResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
@@ -2046,6 +2049,7 @@ export function App(): ReactElement {
       projectRef.current = nextProject;
       setProject(nextProject);
       setComposerGuideResult(null);
+      setKeyCompassResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
@@ -2188,6 +2192,7 @@ export function App(): ReactElement {
     setSelectedChordIndex(null);
     setComposerActionResult(null);
     setComposerGuideResult(null);
+    setKeyCompassResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2241,6 +2246,7 @@ export function App(): ReactElement {
     setPlaybackPosition(null);
     setComposerActionResult(null);
     setComposerGuideResult(null);
+    setKeyCompassResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -6424,6 +6430,7 @@ export function App(): ReactElement {
 
     setKeyCompassFocusId(item.focusId);
     targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setKeyCompassResult(createKeyCompassFocusResult(item, keyCompassSummary));
     setProjectStatus(`Key ${item.label}: ${item.value}`);
   }
 
@@ -7281,7 +7288,12 @@ export function App(): ReactElement {
         summary={styleInspectorSummary}
       />
 
-      <KeyCompass focusedCardId={keyCompassFocusId} onFocus={focusKeyCompassItem} summary={keyCompassSummary} />
+      <KeyCompass
+        focusedCardId={keyCompassFocusId}
+        onFocus={focusKeyCompassItem}
+        result={keyCompassResult}
+        summary={keyCompassSummary}
+      />
 
       <GrooveCompass
         cued={transportLoopScope === "pattern"}
@@ -10205,10 +10217,12 @@ function ProductionSnapshot({
 function KeyCompass({
   focusedCardId,
   onFocus,
+  result,
   summary
 }: {
   focusedCardId: KeyCompassFocusId | null;
   onFocus: (item: KeyCompassFocusItem) => void;
+  result: KeyCompassFocusResult | null;
   summary: KeyCompassSummary;
 }): ReactElement {
   const focusSummary = createKeyCompassFocusSummary(summary, focusedCardId);
@@ -10264,8 +10278,39 @@ function KeyCompass({
             );
           })}
         </div>
+        {result && <KeyCompassFocusResultStrip result={result} />}
       </div>
     </section>
+  );
+}
+
+function KeyCompassFocusResultStrip({ result }: { result: KeyCompassFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`key-compass-result ${result.tone}`}
+      data-result-key-compass={result.focusId}
+      data-testid="key-compass-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="key-compass-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="key-compass-result-title">{result.title}</strong>
+          <small data-testid="key-compass-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="key-compass-result-metric" data-testid="key-compass-result-metric">
+        <span data-testid="key-compass-result-status">{result.status}</span>
+        <strong data-testid="key-compass-result-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="key-compass-result-followup" data-testid="key-compass-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -21658,6 +21703,68 @@ function createKeyCompassFocusSummary(summary: KeyCompassSummary, focusedCardId:
     detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function createKeyCompassFocusResult(item: KeyCompassFocusItem, summary: KeyCompassSummary): KeyCompassFocusResult {
+  const cardTone = summary.cards.find((card) => card.focusId === item.focusId)?.tone ?? summary.tone;
+
+  return {
+    focusId: item.focusId,
+    status: "Focused",
+    title: `${item.label} key lane focused`,
+    detail: `${item.focusLabel}: ${item.value}`,
+    metricLabel: "Key",
+    metricValue: keyCompassFocusResultMetric(summary),
+    auditionCue: keyCompassFocusResultAudition(item),
+    nextCheck: keyCompassFocusResultNextCheck(item),
+    tone: cardTone
+  };
+}
+
+function keyCompassFocusResultMetric(summary: KeyCompassSummary): string {
+  const readyCount = summary.cards.filter((card) => card.tone === "good").length;
+  const reviewCount = summary.cards.filter((card) => card.tone === "warn").length;
+  const blockerCount = summary.cards.filter((card) => card.tone === "danger").length;
+
+  return `${summary.headline} / ${readyCount}/${summary.cards.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function keyCompassFocusResultAudition(item: KeyCompassFocusItem): string {
+  switch (item.focusId) {
+    case "scale":
+      return "Use the scale notes before retargeting or editing pitch.";
+    case "chords":
+      return "Check chord roots, chord motion, and selected-chord controls before harmonic edits.";
+    case "cadence":
+      return "Loop the selected Pattern and listen for tension, release, and home resolution.";
+    case "bass":
+      return "Check 808/bass notes against the key before pitch, glide, or contour edits.";
+    case "melody":
+      return "Check melody notes against the key before motif, contour, or accent edits.";
+    case "focus":
+      return "Inspect the selected note or chord degree before editing pitch, root, quality, or inversion.";
+    default:
+      return `Review ${item.focusLabel.toLowerCase()} before changing harmony.`;
+  }
+}
+
+function keyCompassFocusResultNextCheck(item: KeyCompassFocusItem): string {
+  switch (item.focusId) {
+    case "scale":
+      return "Return after the intended key center and safe-note set are clear.";
+    case "chords":
+      return "Return after chord roots and motion fit the selected key or the outside pull is intentional.";
+    case "cadence":
+      return "Return after the loop has enough home, tension, or intentional ambiguity.";
+    case "bass":
+      return "Return after the low end supports the drum pocket and selected key.";
+    case "melody":
+      return "Return after the hook or motif stays in key or deliberately steps outside.";
+    case "focus":
+      return "Return after the selected note or chord has a clear scale role.";
+    default:
+      return `Return after ${item.focusLabel.toLowerCase()} has a clear harmonic role.`;
+  }
 }
 
 function createGrooveCompassSummary(project: ProjectState, selectedDrumStep: SelectedDrumStep | null): GrooveCompassSummary {

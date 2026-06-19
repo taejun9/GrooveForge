@@ -2346,6 +2346,18 @@ export type KeyCompassFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type KeyCompassFocusResult = {
+  focusId: KeyCompassFocusId;
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type GrooveCompassCardId = "density" | "anchors" | "hats" | "timing" | "chance" | "pocket" | "focus";
 export type GrooveCompassFocusId = GrooveCompassCardId;
 export type GrooveCompassFocusTarget = "compose";
