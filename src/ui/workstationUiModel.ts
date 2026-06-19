@@ -2269,7 +2269,7 @@ export type KeyCompassFocusSummary = {
   tone: MixCoachTone;
 };
 
-export type GrooveCompassCardId = "density" | "anchors" | "hats" | "timing" | "chance" | "focus";
+export type GrooveCompassCardId = "density" | "anchors" | "hats" | "timing" | "chance" | "pocket" | "focus";
 export type GrooveCompassFocusId = GrooveCompassCardId;
 export type GrooveCompassFocusTarget = "compose";
 

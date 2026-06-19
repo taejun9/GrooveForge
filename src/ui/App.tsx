@@ -12697,7 +12697,7 @@ function createQuickActions({
     title: `Focus Groove Compass: ${item.label}`,
     detail: `${item.value} / ${item.focusLabel} / ${item.detail}`,
     group: "Create",
-    keywords: `groove compass focus card rhythm pocket drums density anchors hats timing chance selected drum inspect ${item.id} ${item.label} ${item.value} ${item.focusLabel} ${item.detail} beginner producer`,
+    keywords: `groove compass focus card rhythm pocket balance early late velocity motion drums density anchors hats timing chance selected drum inspect ${item.id} ${item.label} ${item.value} ${item.focusLabel} ${item.detail} beginner producer`,
     run: () => onFocusGrooveCompass(item)
   }));
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
@@ -13985,7 +13985,7 @@ function createQuickActions({
       title: grooveCompassItem ? `Focus Groove Compass: ${grooveCompassItem.label}` : "Focus Groove Compass",
       detail: grooveCompassItem ? `${grooveCompassItem.value} / ${grooveCompassItem.focusLabel}` : "No Groove Compass card available.",
       group: "Create",
-      keywords: `groove compass focus rhythm pocket drums density anchors hats timing chance inspect ${grooveCompassItem?.focusId ?? "none"} ${grooveCompassItem?.focusLabel ?? "none"} beginner producer`,
+      keywords: `groove compass focus rhythm pocket balance early late velocity motion drums density anchors hats timing chance inspect ${grooveCompassItem?.focusId ?? "none"} ${grooveCompassItem?.focusLabel ?? "none"} beginner producer`,
       disabled: !grooveCompassItem,
       run: () => {
         if (grooveCompassItem) {
@@ -16714,7 +16714,7 @@ function quickActionResultFollowup(
 
   if (action.id === "groove-compass-focus") {
     return {
-      auditionCue: "Use the focused Groove Compass card to inspect rhythm density, anchors, hats, timing, or chance before editing drums.",
+      auditionCue: "Use the focused Groove Compass card to inspect rhythm density, anchors, hats, timing, chance, or pocket balance before editing drums.",
       nextCheck: "Return to Groove Compass after the focused pocket lane changes."
     };
   }
@@ -16722,7 +16722,7 @@ function quickActionResultFollowup(
   if (action.id.startsWith("groove-compass-card-")) {
     return {
       auditionCue: "Use the focused Groove Compass card to inspect that pocket lane before editing drums.",
-      nextCheck: "Return to Groove Compass when you need another direct density, anchors, hats, timing, chance, or selected-drum focus."
+      nextCheck: "Return to Groove Compass when you need another direct density, anchors, hats, timing, chance, pocket balance, or selected-drum focus."
     };
   }
 
@@ -20307,6 +20307,7 @@ function createGrooveCompassSummary(project: ProjectState, selectedDrumStep: Sel
   const activeSteps = new Set<number>();
   const activeTimings: number[] = [];
   const activeChances: number[] = [];
+  const activeVelocities: number[] = [];
 
   lanes.forEach((lane) => {
     pattern.drumPattern[lane].forEach((enabled, step) => {
@@ -20316,6 +20317,7 @@ function createGrooveCompassSummary(project: ProjectState, selectedDrumStep: Sel
       activeSteps.add(step);
       activeTimings.push(drumStepTimingMs(pattern, lane, step));
       activeChances.push(drumStepProbability(pattern, lane, step));
+      activeVelocities.push(drumStepVelocity(pattern, lane, step));
     });
   });
 
@@ -20327,6 +20329,10 @@ function createGrooveCompassSummary(project: ProjectState, selectedDrumStep: Sel
   const timingSpread =
     activeTimings.length > 0 ? Math.max(...activeTimings) - Math.min(...activeTimings) : 0;
   const shiftedHits = activeTimings.filter((timing) => timing !== 0).length;
+  const earlyHits = activeTimings.filter((timing) => timing < 0).length;
+  const lateHits = activeTimings.filter((timing) => timing > 0).length;
+  const velocitySpread =
+    activeVelocities.length > 0 ? Math.max(...activeVelocities) - Math.min(...activeVelocities) : 0;
   const chanceAverage =
     activeChances.length > 0 ? activeChances.reduce((total, chance) => total + chance, 0) / activeChances.length : 1;
   const chanceFloor = activeChances.length > 0 ? Math.min(...activeChances) : 1;
@@ -20339,6 +20345,26 @@ function createGrooveCompassSummary(project: ProjectState, selectedDrumStep: Sel
   const timingTone: MixCoachTone =
     !hasDrums || activeTimings.length === 0 ? "danger" : shiftedHits >= 3 && timingSpread >= 8 ? "good" : shiftedHits > 0 ? "warn" : "good";
   const chanceTone: MixCoachTone = !hasDrums ? "danger" : chanceFloor < 0.88 ? "good" : chanceAverage < 0.98 ? "warn" : "good";
+  const pocketIsBalanced = shiftedHits >= 2 && Math.abs(earlyHits - lateHits) <= 1;
+  const pocketHasMotion = velocitySpread >= 0.18;
+  const pocketValue = !hasDrums
+    ? "No pocket"
+    : shiftedHits === 0 && velocitySpread < 0.12
+      ? "Grid-flat"
+      : pocketIsBalanced
+        ? "Balanced"
+        : earlyHits > lateHits
+          ? "Early lean"
+          : lateHits > earlyHits
+            ? "Late lean"
+            : pocketHasMotion
+              ? "Velocity motion"
+              : "Needs shape";
+  const pocketTone: MixCoachTone = !hasDrums
+    ? "danger"
+    : pocketValue === "Grid-flat" || pocketValue === "Needs shape"
+      ? "warn"
+      : "good";
   const focusCard = grooveCompassFocusCard(pattern, project.selectedPattern, selectedDrumStep);
   const cards: GrooveCompassCard[] = [
     {
@@ -20391,12 +20417,22 @@ function createGrooveCompassSummary(project: ProjectState, selectedDrumStep: Sel
       focusLabel: "Compose",
       tone: chanceTone
     },
+    {
+      id: "pocket",
+      focusId: "pocket",
+      label: "Pocket Balance",
+      value: pocketValue,
+      detail: `${earlyHits} early / ${lateHits} late / ${percentLabel(velocitySpread)} vel spread`,
+      focusTarget: "compose",
+      focusLabel: "Compose",
+      tone: pocketTone
+    },
     focusCard
   ];
 
   return {
     headline: `Pattern ${project.selectedPattern} groove compass`,
-    detail: `${totalHits} drum hits / ${activeSteps.size}/16 steps / ${shiftedHits} timed moves`,
+    detail: `${totalHits} drum hits / ${activeSteps.size}/16 steps / ${shiftedHits} timed moves / ${pocketValue}`,
     tone: weakestTone(cards.map((card) => card.tone)),
     cards
   };
