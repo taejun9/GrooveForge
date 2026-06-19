@@ -84,6 +84,29 @@ The core project model should make composition events first-class. In the core a
 - `Device`: synth, drum rack, EQ, compressor, saturation, limiter, meter, send effect.
 - `StyleProfile`: genre rules for BPM range, swing, density, quantize strength, humanization, bass style, and melody style.
 
+Core MVP schema contract:
+
+```ts
+type CoreMusicalEvent = NoteEvent | DrumHitEvent | AutomationEvent;
+type CoreClipType = "pattern" | "midi" | "automation";
+type CoreTrackType =
+  | "drum_rack"
+  | "bass_808"
+  | "synth"
+  | "chord"
+  | "fx_return"
+  | "master";
+```
+
+Optional sampling extension contract, later:
+
+```ts
+type OptionalSamplingTrackType = "audio" | "sampler";
+type OptionalSamplingEvent = AudioClipEvent;
+```
+
+The optional contract is additive. It must plug into the event-first project, track, arrangement, mixer/master, and export flow instead of replacing the core composition model.
+
 Default device palette: drum rack, synth 808/bass, simple synth, chord synth, built-in FX, mixer, and master devices. A sampler device is not part of the MVP default palette; it belongs to the optional sampling extension after the direct beat workstation can stand without imported audio.
 
 Sound-source nuance: a built-in drum rack may use internal one-shot sounds, and a future bass patch may optionally use a sample 808 source, but those are instrument sound sources under direct event editing. They are not permission to introduce sample browsing, chopping, audio clips, sampler tracks, or user-file dependencies into the core MVP flow. The MVP default remains built-in drum rack plus synth 808/bass.

@@ -29,6 +29,12 @@ Trap, drill, boom bap, house, lofi, R&B, K-hip-hop/R&B, Afrobeats, Amapiano, Reg
 
 When there is ambiguity, read the product draft in this order: all-genre beat creation first, direct composition and sound design second, arrangement/mixing/mastering/export third, optional sampling extensions last.
 
+## Audience Promise
+
+GrooveForge should satisfy two workflows at once: beginners get a clear setup -> compose -> arrange -> mix -> deliver path, while working producers can move quickly across editable events, instrument tone, arrangement structure, mix/master posture, and handoff checks without being forced through tutorials or sample-prep steps.
+
+The first-session acceptance test is concrete: choose BPM/key/style, program drums, write 808/bass, add melody/chords, shape sounds, arrange sections, balance the mix, set the master posture, and export WAV/stems without importing audio. A product draft that cannot explain this path before mentioning extension features is not aligned.
+
 ## Product Boundary
 
 Core product:
@@ -265,6 +271,16 @@ type MvpTrackType =
 ```
 
 `audio` and `sampler` are valid only as later optional sampling extension track types, not as default project tracks or first-run instrument-panel entries.
+
+Optional sampling extension examples must stay in a separate later scope:
+
+```ts
+type OptionalSamplingTrackType = "audio" | "sampler";
+type OptionalSamplingEvent = AudioClipEvent;
+type OptionalSamplingSource = "sample_import" | "one_shot_mapping" | "chop_pad";
+```
+
+Those names describe future material sources, not the core project spine. They can be added only after the direct beat workstation is already useful and must not change the requirement that notes, drum hits, automation, built-in instruments, arrangement, mixer/master, and export can produce a complete beat on their own.
 
 ## MVP Scope
 

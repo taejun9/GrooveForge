@@ -5,6 +5,8 @@ GrooveForge is a desktop-ready, web-first, event-based mini DAW for making beats
 
 Project type: `web-first TypeScript mini DAW / beat workstation`.
 
+Audience promise: first-time beat makers should be able to follow a clear setup -> compose -> arrange -> mix -> deliver path, while working producers should be able to bypass guidance and edit events, sound, arrangement, mix, master, and handoff checks directly.
+
 This repository includes an agent-readable project base: concise root docs, durable project knowledge under `docs/`, and a local harness under `harness/`.
 
 Agent team: `Team Forge`. See `AGENTS.md`.
@@ -24,6 +26,8 @@ The core flow is:
 ```text
 BPM/key/style -> pattern programming -> drums -> 808/bass -> melody/chords -> sound design -> arrangement -> mixing -> mastering -> export
 ```
+
+A corrected draft passes this first-session test: a user can create a beat by choosing BPM/key/style, programming drums and 808/bass, adding melody/chords, shaping sounds, arranging sections, balancing the mix, setting a master posture, and exporting WAV/stems without importing audio.
 
 Sampling stays a later optional sound-source module, not the product spine. The first proof of GrooveForge is still a complete beat made from editable events, built-in instruments, arrangement, mixer/master, and export without imported audio.
 
