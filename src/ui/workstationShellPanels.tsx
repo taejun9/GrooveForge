@@ -58,7 +58,8 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "midi-input", command: "MIDI Input", shortcut: "Quick Actions", target: "Controller notes" },
       { id: "editor-audition", command: "Editor Audition", shortcut: "Quick Actions", target: "Selected events" },
       { id: "blueprints", command: "Beat Blueprints", shortcut: "Quick Actions", target: "Sample-free starts" },
-      { id: "layer-starter", command: "Layer Starter", shortcut: "Quick Actions", target: "Drums / 808 / Chords / Synth" }
+      { id: "layer-starter", command: "Layer Starter", shortcut: "Quick Actions", target: "Drums / 808 / Chords / Synth" },
+      { id: "audible-pattern-follow", command: "Audible Pattern Follow", shortcut: "Quick Actions", target: "Heard Pattern" }
     ]
   },
   {
@@ -66,6 +67,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
     title: "Finish",
     items: [
       { id: "pattern-chain", command: "Pattern Chain", shortcut: "Quick Actions", target: "Arrangement sketch" },
+      { id: "audible-arrangement-follow", command: "Audible Arrangement Follow", shortcut: "Quick Actions", target: "Heard Block" },
       { id: "mix-coach", command: "Mix Coach", shortcut: "Quick Actions", target: "Headroom / balance" },
       { id: "master-finish", command: "Master Finish", shortcut: "Quick Actions", target: "Output posture" },
       { id: "master-automation", command: "Master Automation", shortcut: "Quick Actions", target: "Fade in / out" },
