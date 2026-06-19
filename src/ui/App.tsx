@@ -12293,6 +12293,16 @@ function BeatSpine({
         <strong>{summary.countLabel}</strong>
         <small>{summary.tone === "good" ? "Core path clear" : "Jump to the highlighted axis"}</small>
       </div>
+      <div
+        className={`beat-spine-decision ${summary.tone}`}
+        data-beat-spine-decision={summary.nextCardId}
+        data-testid="beat-spine-decision"
+        title={summary.decisionTitle}
+      >
+        <span data-testid="beat-spine-decision-status">{summary.decisionStatus}</span>
+        <strong data-testid="beat-spine-decision-label">{summary.decisionLabel}</strong>
+        <small data-testid="beat-spine-decision-detail">{summary.decisionDetail}</small>
+      </div>
       <div className="beat-spine-grid" data-testid="beat-spine-grid">
         {summary.cards.map((card) => {
           const next = card.id === summary.nextCardId;
@@ -12529,6 +12539,22 @@ function createBeatSpineSummary(
   const nextCard = cards.find((card) => card.tone === "danger") ?? cards.find((card) => card.tone === "warn") ?? cards[cards.length - 1];
   const tone = weakestTone(cards.map((card) => card.tone));
   const statusLabel = tone === "good" ? "Beat Spine ready" : tone === "warn" ? "Beat Spine review" : "Beat Spine blocker";
+  const decisionStatus = nextCard.action
+    ? nextCard.tone === "danger"
+      ? "Apply blocker"
+      : nextCard.tone === "warn"
+        ? "Apply review"
+        : "Apply polish"
+    : nextCard.tone === "good"
+      ? "Jump ready"
+      : "Jump inspect";
+  const decisionLabel = nextCard.action ? `Apply ${nextCard.action.label}` : `Jump ${nextCard.focusLabel}`;
+  const decisionDetail = nextCard.action
+    ? `${nextCard.label}: ${nextCard.detail}`
+    : `${nextCard.label}: inspect ${nextCard.focusLabel} before changing the beat.`;
+  const decisionTitle = nextCard.action
+    ? `Beat Spine recommends ${nextCard.action.label}: ${nextCard.action.detail}`
+    : `Beat Spine recommends jumping to ${nextCard.focusLabel}: ${nextCard.detail}`;
 
   return {
     statusLabel,
@@ -12536,6 +12562,10 @@ function createBeatSpineSummary(
     detail: `${style.name} direct composition / ${target.name} / Pattern ${project.selectedPattern}`,
     countLabel: `${readyCount}/${cards.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`,
     nextCardId: nextCard.id,
+    decisionStatus,
+    decisionLabel,
+    decisionDetail,
+    decisionTitle,
     tone,
     cards
   };

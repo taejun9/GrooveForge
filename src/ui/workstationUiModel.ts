@@ -3813,6 +3813,10 @@ export type BeatSpineSummary = {
   detail: string;
   countLabel: string;
   nextCardId: BeatSpineCardId;
+  decisionStatus: string;
+  decisionLabel: string;
+  decisionDetail: string;
+  decisionTitle: string;
   tone: MixCoachTone;
   cards: BeatSpineCard[];
 };
