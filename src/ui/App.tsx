@@ -13372,6 +13372,24 @@ function createQuickActions({
     keywords: `style inspector focus genre lane ${item.focusId} ${item.label} ${item.value} ${item.focusLabel} ${item.detail} bpm swing bass melody sound density goal pattern beginner producer`,
     run: () => onFocusStyleInspector(item)
   }));
+  const styleGoalActionCommands: QuickAction[] = styleInspectorSummary.goals.map((goal) => {
+    const goalAction = composerActionForStyleGoal(goal, composerActionsSummary.actions);
+    return {
+      id: `style-goal-action-${goal.id}`,
+      title: goalAction ? `Run Style Goal Action: ${goal.label}` : `${goal.label} Style Goal action unavailable`,
+      detail: goalAction
+        ? `${goal.value} / ${goalAction.label} / ${goalAction.scope} / ${goalAction.safety}`
+        : `${goal.value} / no matching Composer Action available.`,
+      group: goalAction ? composerActionQuickActionGroup(goalAction) : "Create",
+      keywords: `style goal action direct compose ${goal.id} ${goal.label} ${goal.value} ${goal.current} ${goal.target} ${goal.progress} ${goal.cue} ${goal.detail} ${goalAction?.id ?? "none"} ${goalAction?.label ?? "none"} ${goalAction?.buttonLabel ?? "none"} ${goalAction?.scope ?? "none"} drums 808 bass harmony melody arrange sample free beginner producer`,
+      disabled: !goalAction,
+      run: () => {
+        if (goalAction) {
+          onRunComposerAction(goalAction);
+        }
+      }
+    };
+  });
   const workflowSpotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
   const workflowNavigatorActions: QuickAction[] = workflowNavigatorItems.map((item) => ({
     id: `workflow-navigator-${item.id}`,
@@ -14493,6 +14511,7 @@ function createQuickActions({
       }
     },
     ...styleInspectorActions,
+    ...styleGoalActionCommands,
     ...styleQuickActions,
     ...keyQuickActions,
     {
@@ -15374,6 +15393,19 @@ function composerActionQuickActionArea(actionId: string): ComposerActionArea | n
   }
   if (actionSlug.startsWith("finish-")) {
     return "finish";
+  }
+
+  return null;
+}
+
+function styleGoalActionQuickActionArea(actionId: string): ComposerActionArea | null {
+  if (!actionId.startsWith("style-goal-action-")) {
+    return null;
+  }
+
+  const goalId = actionId.slice("style-goal-action-".length);
+  if (goalId === "drums" || goalId === "bass" || goalId === "harmony" || goalId === "melody" || goalId === "arrange") {
+    return goalId;
   }
 
   return null;
@@ -17179,6 +17211,42 @@ function quickActionResultFollowup(
       auditionCue: "Use the focused Composer Guide lane to inspect that writing area before applying any move.",
       nextCheck: "Return to Composer Guide when you need another direct drums, 808, harmony, melody, arrangement, or finish focus."
     };
+  }
+
+  const styleGoalQuickActionArea = styleGoalActionQuickActionArea(action.id);
+  if (styleGoalQuickActionArea) {
+    switch (styleGoalQuickActionArea) {
+      case "drums":
+        return {
+          auditionCue: `Loop Pattern ${project.selectedPattern}; check the Style Goal drum action against 808 support.`,
+          nextCheck: `${drumHitCount(pattern)} drum hits now; read the Style Goal Action Result before another drum pass.`
+        };
+      case "bass":
+        return {
+          auditionCue: `Loop Pattern ${project.selectedPattern}; hear the Style Goal 808 action against kick placement.`,
+          nextCheck: `${pattern.bassNotes.length} 808 notes now; read the Style Goal Action Result before adding more low-end movement.`
+        };
+      case "harmony":
+        return {
+          auditionCue: `Loop Pattern ${project.selectedPattern}; hear the Style Goal harmony action under the 808 and Synth lanes.`,
+          nextCheck: `${chordMotionLabel(pattern.chordEvents)} chord motion now; read the Style Goal Action Result before changing harmony again.`
+        };
+      case "melody":
+        return {
+          auditionCue: `Loop Pattern ${project.selectedPattern}; hear the Style Goal melody action against chords and 808.`,
+          nextCheck: `${pattern.melodyNotes.length} Synth notes now; read the Style Goal Action Result before writing another hook pass.`
+        };
+      case "arrange":
+        return {
+          auditionCue: `Play Song loop; scan the Style Goal arrangement action across ${barCountLabel(arrangementTotalBars(project))}.`,
+          nextCheck: `${project.arrangement.length} blocks now; read the Style Goal Action Result before changing song form again.`
+        };
+      case "finish":
+        return {
+          auditionCue: "Play full mix after the Style Goal finish action.",
+          nextCheck: "Read Style Goal Action Result before exporting."
+        };
+    }
   }
 
   const composerQuickActionArea = composerActionQuickActionArea(action.id);
