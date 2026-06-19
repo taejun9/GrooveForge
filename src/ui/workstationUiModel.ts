@@ -2184,6 +2184,19 @@ export type ToplineSpaceFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type ToplineSpaceFocusResult = {
+  cardId: ToplineSpaceCardId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type SongFormMetricId = "flow" | "patterns" | "selected" | "energy";
 
 export type SongFormMetric = {

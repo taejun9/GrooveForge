@@ -423,6 +423,7 @@ import type {
   ToplineSpaceCard,
   ToplineSpaceSummary,
   ToplineSpaceFocusSummary,
+  ToplineSpaceFocusResult,
   SongFormMetricId,
   SongFormMetric,
   SongFormSegment,
@@ -1141,6 +1142,7 @@ export function App(): ReactElement {
   const [hookReadinessResult, setHookReadinessResult] = useState<HookReadinessFocusResult | null>(null);
   const [hookFixResult, setHookFixResult] = useState<HookFixResult | null>(null);
   const [toplineSpaceFocusId, setToplineSpaceFocusId] = useState<ToplineSpaceFocusId | null>(null);
+  const [toplineSpaceResult, setToplineSpaceResult] = useState<ToplineSpaceFocusResult | null>(null);
   const [toplineFixResult, setToplineFixResult] = useState<ToplineFixResult | null>(null);
   const [arrangementMuteMapFocusId, setArrangementMuteMapFocusId] = useState<ArrangementMuteMapFocusId | null>(null);
   const [arrangementTransitionMapFocusId, setArrangementTransitionMapFocusId] =
@@ -2082,6 +2084,7 @@ export function App(): ReactElement {
     setReviewFixResult(null);
     setHookReadinessResult(null);
     setHookFixResult(null);
+    setToplineSpaceResult(null);
     setToplineFixResult(null);
     setProjectStatus(status);
     return true;
@@ -2146,6 +2149,7 @@ export function App(): ReactElement {
       setReviewFixResult(null);
       setHookReadinessResult(null);
       setHookFixResult(null);
+      setToplineSpaceResult(null);
       setToplineFixResult(null);
     }
     setProjectStatus(status);
@@ -2303,6 +2307,7 @@ export function App(): ReactElement {
     setReviewFixResult(null);
     setHookReadinessResult(null);
     setHookFixResult(null);
+    setToplineSpaceResult(null);
     setToplineFixResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
@@ -2370,6 +2375,7 @@ export function App(): ReactElement {
     setReviewFixResult(null);
     setHookReadinessResult(null);
     setHookFixResult(null);
+    setToplineSpaceResult(null);
     setToplineFixResult(null);
     setProjectStatus(status);
   }
@@ -3108,6 +3114,7 @@ export function App(): ReactElement {
     if (card) {
       setToplineSpaceFocusId(card.focusId);
     }
+    setToplineSpaceResult(null);
 
     if (target.mode === "block") {
       selectArrangementBlock(target.index);
@@ -3133,6 +3140,7 @@ export function App(): ReactElement {
     const targetCard = card ?? activeToplineSpaceQuickActionCard(beforeSummary);
 
     if (!targetCard) {
+      setToplineSpaceResult(null);
       setToplineFixResult(null);
       setProjectStatus("Topline Space has no fix target");
       return;
@@ -3141,6 +3149,7 @@ export function App(): ReactElement {
     const fix = createToplineFixOption(targetCard);
     const cueTarget = createToplineLoopCueTarget(beforeProject);
     setToplineSpaceFocusId(targetCard.focusId);
+    setToplineSpaceResult(null);
 
     if (cueTarget.mode === "block") {
       selectArrangementBlock(cueTarget.index);
@@ -6466,6 +6475,7 @@ export function App(): ReactElement {
 
     setToplineSpaceFocusId(card.focusId);
     targetRefs[card.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setToplineSpaceResult(createToplineSpaceFocusResult(card, toplineSpaceSummary));
     setProjectStatus(`Topline ${card.label}: ${card.value}`);
   }
 
@@ -7542,6 +7552,7 @@ export function App(): ReactElement {
             : transportLoopScope === "pattern" && project.selectedPattern === toplineLoopCueTarget.pattern
         }
         focusedCardId={toplineSpaceFocusId}
+        focusResult={toplineSpaceResult}
         fixResult={toplineFixResult}
         isPlaying={isPlaying}
         onCue={cueToplineLoop}
@@ -12938,6 +12949,7 @@ function ToplineSpace({
   cued,
   fixResult,
   focusedCardId,
+  focusResult,
   isPlaying,
   onCue,
   onFix,
@@ -12948,6 +12960,7 @@ function ToplineSpace({
   cued: boolean;
   fixResult: ToplineFixResult | null;
   focusedCardId: ToplineSpaceFocusId | null;
+  focusResult: ToplineSpaceFocusResult | null;
   isPlaying: boolean;
   onCue: (card?: ToplineSpaceFocusItem) => void;
   onFix: (card?: ToplineSpaceCard) => void;
@@ -12976,6 +12989,7 @@ function ToplineSpace({
           <strong data-testid="topline-space-focus-label">{focusSummary.areaLabel}</strong>
           <small data-testid="topline-space-focus-detail">{focusSummary.detailLabel}</small>
         </div>
+        {focusResult && <ToplineSpaceFocusResultStrip result={focusResult} />}
         {fixResult && <ToplineFixResultStrip result={fixResult} />}
       </div>
       <div className="topline-space-grid" data-testid="topline-space-cards">
@@ -13028,6 +13042,35 @@ function ToplineSpace({
         })}
       </div>
     </section>
+  );
+}
+
+function ToplineSpaceFocusResultStrip({ result }: { result: ToplineSpaceFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`topline-space-result ${result.tone}`}
+      data-result-topline-space={result.cardId}
+      data-testid="topline-space-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="topline-space-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="topline-space-result-title">{result.title}</strong>
+          <small data-testid="topline-space-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="topline-space-result-meta">
+        <span data-testid="topline-space-result-status">{result.status}</span>
+        <strong data-testid="topline-space-result-destination">{result.destination}</strong>
+        <span data-testid="topline-space-result-value">{`${result.metricLabel}: ${result.metricValue}`}</span>
+      </div>
+      <div className="topline-space-result-followup" data-testid="topline-space-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -24849,6 +24892,73 @@ function createToplineSpaceFocusSummary(
     detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function createToplineSpaceFocusResult(
+  card: ToplineSpaceFocusItem,
+  summary: ToplineSpaceSummary
+): ToplineSpaceFocusResult {
+  const summaryCard =
+    summary.cards.find((candidate) => candidate.id === card.focusId) ??
+    ({
+      id: card.focusId,
+      focusId: card.focusId,
+      label: card.label,
+      value: card.value,
+      status: "Focused",
+      detail: card.detail,
+      focusTarget: card.focusTarget,
+      focusLabel: card.focusLabel,
+      tone: summary.tone
+    } satisfies ToplineSpaceCard);
+
+  return {
+    cardId: summaryCard.id,
+    status: "Focused",
+    title: `${summaryCard.label} topline lane focused`,
+    detail: `${summaryCard.value}: ${summaryCard.detail}`,
+    destination: reviewQueueFocusLabel(summaryCard.focusTarget),
+    metricLabel: "Topline",
+    metricValue: toplineSpaceFocusResultMetric(summaryCard, summary),
+    auditionCue: toplineSpaceFocusResultAudition(summaryCard),
+    nextCheck: toplineSpaceFocusResultNextCheck(summaryCard),
+    tone: summaryCard.tone
+  };
+}
+
+function toplineSpaceFocusResultMetric(card: ToplineSpaceCard, summary: ToplineSpaceSummary): string {
+  const readyCount = summary.cards.filter((candidate) => candidate.tone === "good").length;
+  return `${card.label}: ${card.value} / ${readyCount}/${summary.cards.length} open`;
+}
+
+function toplineSpaceFocusResultAudition(card: ToplineSpaceCard): string {
+  switch (card.id) {
+    case "pocket":
+      return "Loop the Hook or selected Pattern and check whether drums and 808 leave a stable topline pocket.";
+    case "lead":
+      return "Listen for lead/Synth density against the hook window before adding a vocal or top melody.";
+    case "arrangement":
+      return "Cue the topline loop and confirm the hook window gives a clear entry point.";
+    case "mix":
+      return "Play the Full Mix and check headroom and vocal space before mastering.";
+    case "brief":
+      return "Inspect Session Brief artist, vibe, and reference notes before deciding topline space is ready.";
+  }
+}
+
+function toplineSpaceFocusResultNextCheck(card: ToplineSpaceCard): string {
+  switch (card.id) {
+    case "pocket":
+      return "Use Groove Compass or Pocket Groove Feel before adding more lead density.";
+    case "lead":
+      return "Use Clear Tail or Pattern DNA if the lead lane still crowds the topline.";
+    case "arrangement":
+      return "Return to Arrange or Topline Loop before changing section length.";
+    case "mix":
+      return "Use Mix Coach or Headroom Mix Fix if the topline still feels masked.";
+    case "brief":
+      return "Fill missing brief context before export or handoff.";
+  }
 }
 
 function activeToplineSpaceQuickActionCard(summary: ToplineSpaceSummary): ToplineSpaceCard | null {

@@ -9462,6 +9462,12 @@ h2 {
 .topline-space-focus-readout span,
 .topline-space-focus-readout strong,
 .topline-space-focus-readout small,
+.topline-space-result-main strong,
+.topline-space-result-main small,
+.topline-space-result-meta span,
+.topline-space-result-meta strong,
+.topline-space-result-followup span,
+.topline-space-result-followup small,
 .topline-fix-result-main strong,
 .topline-fix-result-main small,
 .topline-fix-result-meta span,
@@ -9530,6 +9536,68 @@ h2 {
   display: grid;
   gap: 7px;
   min-width: 0;
+}
+
+.topline-space-result {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid rgba(142, 203, 255, 0.24);
+  border-radius: 7px;
+  background: rgba(142, 203, 255, 0.06);
+  padding: 8px 9px;
+}
+
+.topline-space-result.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  background: rgba(240, 195, 106, 0.06);
+}
+
+.topline-space-result.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.topline-space-result-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.topline-space-result-main svg {
+  flex: 0 0 auto;
+  color: #8ecbff;
+}
+
+.topline-space-result.warn .topline-space-result-main svg {
+  color: #f0c36a;
+}
+
+.topline-space-result.danger .topline-space-result-main svg {
+  color: #ff7a4f;
+}
+
+.topline-space-result-main span,
+.topline-space-result-meta,
+.topline-space-result-followup {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.topline-space-result-main strong,
+.topline-space-result-meta strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.topline-space-result-main small,
+.topline-space-result-meta span,
+.topline-space-result-followup span,
+.topline-space-result-followup small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
 }
 
 .topline-fix-result {
