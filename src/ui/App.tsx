@@ -7650,6 +7650,7 @@ export function App(): ReactElement {
     masterAutomationPadOptions,
     modeFocusSummary,
     patternCloneOptions,
+    patternCompareDecisionSummary,
     patternStackOptions,
     patternStackPreviewSummary,
     patternDnaSummary,
@@ -7751,6 +7752,7 @@ export function App(): ReactElement {
     onCueGrooveCompass: cueGrooveCompass,
     onCueStyleGoal: cueStyleGoal,
     onCuePattern: cuePattern,
+    onRunPatternCompareDecision: runPatternCompareDecision,
     onFollowAudiblePattern: followAudiblePattern,
     onFollowAudibleArrangementBlock: followAudibleArrangementBlock,
     onSelectArrangementBlock: selectArrangementBlock,
@@ -14697,6 +14699,7 @@ function createQuickActions({
   masterAutomationPadOptions,
   modeFocusSummary,
   patternCloneOptions,
+  patternCompareDecisionSummary,
   patternStackOptions,
   patternStackPreviewSummary,
   patternDnaSummary,
@@ -14797,6 +14800,7 @@ function createQuickActions({
   onCueGrooveCompass,
   onCueStyleGoal,
   onCuePattern,
+  onRunPatternCompareDecision,
   onFollowAudiblePattern,
   onFollowAudibleArrangementBlock,
   onSelectArrangementBlock,
@@ -14947,6 +14951,7 @@ function createQuickActions({
   masterAutomationPadOptions: MasterAutomationPadOption[];
   modeFocusSummary: ModeFocusSummary;
   patternCloneOptions: PatternClonePadOption[];
+  patternCompareDecisionSummary: PatternCompareDecisionSummary;
   patternStackOptions: PatternStackOption[];
   patternStackPreviewSummary: PatternStackPreviewSummary;
   patternDnaSummary: PatternDnaSummary;
@@ -15047,6 +15052,7 @@ function createQuickActions({
   onCueGrooveCompass: () => void;
   onCueStyleGoal: (goal: StyleGoalCard) => void;
   onCuePattern: (pattern: PatternSlot) => void;
+  onRunPatternCompareDecision: (action: PatternCompareDecisionSummary["action"], pattern: PatternSlot) => void;
   onFollowAudiblePattern: () => void;
   onFollowAudibleArrangementBlock: () => void;
   onSelectArrangementBlock: (index: number) => void;
@@ -16341,6 +16347,18 @@ function createQuickActions({
       run: () => onCuePattern(pattern)
     };
   });
+  const patternCompareDecisionAction: QuickAction = {
+    id: "pattern-compare-decision",
+    title:
+      patternCompareDecisionSummary.action === "use"
+        ? `Use recommended Pattern ${patternCompareDecisionSummary.target}`
+        : `Cue recommended Pattern ${patternCompareDecisionSummary.target}`,
+    detail: `${patternCompareDecisionSummary.statusLabel} / ${patternCompareDecisionSummary.detailLabel} / ${patternCompareDecisionSummary.metricLabel}`,
+    group: patternCompareDecisionSummary.action === "use" ? "Arrange" : "Transport",
+    keywords: `pattern compare decision recommended current ${patternCompareDecisionSummary.action} ${patternCompareDecisionSummary.target} ${patternCompareDecisionSummary.statusLabel} ${patternCompareDecisionSummary.actionLabel} a b c cue use arrangement selected block audition beginner producer`,
+    disabled: patternCompareDecisionSummary.action === "use" && !selectedBlock,
+    run: () => onRunPatternCompareDecision(patternCompareDecisionSummary.action, patternCompareDecisionSummary.target)
+  };
   const patternSwitchActions: QuickAction[] = patternSlots.map((pattern) => {
     const selected = pattern === project.selectedPattern;
     const eventCount = patternEventTotal(project.patterns[pattern]);
@@ -16561,6 +16579,7 @@ function createQuickActions({
     },
     ...tempoNudgeActions,
     ...swingFeelActions,
+    patternCompareDecisionAction,
     ...patternCueActions,
     ...patternSwitchActions,
     audiblePatternFollowAction,
