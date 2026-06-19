@@ -2986,6 +2986,19 @@ export type ReviewQueueFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type ReviewQueueFocusResult = {
+  itemId: string;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type ReviewQueueSummary = {
   headline: string;
   detail: string;

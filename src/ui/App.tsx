@@ -492,6 +492,7 @@ import type {
   FinishChecklistSummary,
   ReviewQueueItem,
   ReviewQueueFocusTarget,
+  ReviewQueueFocusResult,
   ReviewQueueFocusSummary,
   ReviewQueueSummary,
   ModeFocusCard,
@@ -1150,6 +1151,7 @@ export function App(): ReactElement {
   const [listeningPassResult, setListeningPassResult] = useState<ListeningPassFocusResult | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
+  const [reviewQueueResult, setReviewQueueResult] = useState<ReviewQueueFocusResult | null>(null);
   const [reviewFixResult, setReviewFixResult] = useState<ReviewFixResult | null>(null);
   const [finishChecklistFocusId, setFinishChecklistFocusId] = useState<FinishChecklistCardId | null>(null);
   const [finishChecklistResult, setFinishChecklistResult] = useState<FinishChecklistFocusResult | null>(null);
@@ -2027,6 +2029,7 @@ export function App(): ReactElement {
     setListeningPassResult(null);
     setBeatPassportResult(null);
     setProductionSnapshotResult(null);
+    setReviewQueueResult(null);
     setFinishChecklistResult(null);
     setExportPreflightResult(null);
     setHandoffPackageCheckResult(null);
@@ -2088,6 +2091,7 @@ export function App(): ReactElement {
       setListeningPassResult(null);
       setBeatPassportResult(null);
       setProductionSnapshotResult(null);
+      setReviewQueueResult(null);
       setFinishChecklistResult(null);
       setExportPreflightResult(null);
       setHandoffPackageCheckResult(null);
@@ -2241,6 +2245,7 @@ export function App(): ReactElement {
     setListeningPassResult(null);
     setBeatPassportResult(null);
     setProductionSnapshotResult(null);
+    setReviewQueueResult(null);
     setFinishChecklistResult(null);
     setExportPreflightResult(null);
     setHandoffPackageCheckResult(null);
@@ -2305,6 +2310,7 @@ export function App(): ReactElement {
     setListeningPassResult(null);
     setBeatPassportResult(null);
     setProductionSnapshotResult(null);
+    setReviewQueueResult(null);
     setFinishChecklistResult(null);
     setExportPreflightResult(null);
     setHandoffPackageCheckResult(null);
@@ -6608,6 +6614,7 @@ export function App(): ReactElement {
       setMixCoachFocusId(mixCheckId);
     }
     targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setReviewQueueResult(createReviewQueueFocusResult(item, reviewQueueSummary));
     setProjectStatus(`Review ${item.area}: ${item.status}`);
   }
 
@@ -8693,6 +8700,7 @@ export function App(): ReactElement {
           <ReviewQueue
             summary={reviewQueueSummary}
             focusedItemId={reviewQueueFocusId}
+            result={reviewQueueResult}
             fixResult={reviewFixResult}
             project={project}
             onFix={applyReviewFix}
@@ -11043,6 +11051,7 @@ function ReviewQueue({
   summary,
   fixResult,
   focusedItemId,
+  result,
   project,
   onFix,
   onFocus
@@ -11050,6 +11059,7 @@ function ReviewQueue({
   summary: ReviewQueueSummary;
   fixResult: ReviewFixResult | null;
   focusedItemId: string | null;
+  result: ReviewQueueFocusResult | null;
   project: ProjectState;
   onFix: (item?: ReviewQueueItem) => void;
   onFocus: (item: ReviewQueueItem) => void;
@@ -11076,6 +11086,7 @@ function ReviewQueue({
           <strong data-testid="review-queue-focus-label">{focusSummary.areaLabel}</strong>
           <small data-testid="review-queue-focus-detail">{focusSummary.detailLabel}</small>
         </div>
+        {result && <ReviewQueueFocusResultStrip result={result} />}
         {fixResult && <ReviewFixResultStrip result={fixResult} />}
       </div>
       <div className="review-queue-list" data-testid="review-queue-list">
@@ -11122,6 +11133,38 @@ function ReviewQueue({
         })}
       </div>
     </section>
+  );
+}
+
+function ReviewQueueFocusResultStrip({ result }: { result: ReviewQueueFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`review-queue-result ${result.tone}`}
+      data-result-review-queue={result.itemId}
+      data-testid="review-queue-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="review-queue-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="review-queue-result-title">{result.title}</strong>
+          <small data-testid="review-queue-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="review-queue-result-destination" data-testid="review-queue-result-destination">
+        <span>{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="review-queue-result-metric" data-testid="review-queue-result-metric">
+        <span data-testid="review-queue-result-status">{result.metricLabel}</span>
+        <strong data-testid="review-queue-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="review-queue-result-followup" data-testid="review-queue-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -21288,6 +21331,61 @@ function createReviewQueueFocusSummary(
     detailTitle: `${statusLabel} / ${item.area}: ${item.status} / ${detailLabel}`,
     tone: item.tone
   };
+}
+
+function createReviewQueueFocusResult(item: ReviewQueueItem, summary: ReviewQueueSummary): ReviewQueueFocusResult {
+  const summaryItem = summary.items.find((queueItem) => queueItem.id === item.id) ?? null;
+
+  return {
+    itemId: item.id,
+    status: "Focused",
+    title: `${item.area} review focused`,
+    detail: `${item.status}: ${item.detail}`,
+    destination: `${item.focusLabel} panel`,
+    metricLabel: "Queue",
+    metricValue: reviewQueueFocusResultMetric(summary),
+    auditionCue: reviewQueueFocusResultAudition(item),
+    nextCheck: reviewQueueFocusResultNextCheck(item),
+    tone: summaryItem?.tone ?? item.tone
+  };
+}
+
+function reviewQueueFocusResultMetric(summary: ReviewQueueSummary): string {
+  const readyCount = summary.items.filter((item) => item.tone === "good").length;
+  const reviewCount = summary.items.filter((item) => item.tone === "warn").length;
+  const blockerCount = summary.items.filter((item) => item.tone === "danger").length;
+
+  return `${readyCount}/${summary.items.length} review items clear / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function reviewQueueFocusResultAudition(item: ReviewQueueItem): string {
+  switch (item.focusTarget) {
+    case "compose":
+      return "Loop the selected Pattern and inspect the queued composition layer before applying any fix.";
+    case "arrange":
+      return "Use Song or Block loop audition to inspect section flow, energy, and Pattern A/B/C placement.";
+    case "mix":
+      return "Play the Full Mix and compare the focused issue against Mix Coach before changing balance.";
+    case "master":
+      return "Play the Full Mix through Master and check limiter, output, and finish posture before export.";
+    case "deliver":
+      return "Inspect Export Preflight, Handoff Pack, and Session Brief before sending files.";
+  }
+}
+
+function reviewQueueFocusResultNextCheck(item: ReviewQueueItem): string {
+  switch (item.focusTarget) {
+    case "compose":
+      return "Return to Review Queue after the layer is audible and editable in the selected Pattern.";
+    case "arrange":
+      return "Return to Review Queue after the arrangement issue is fixed or intentionally deferred.";
+    case "mix":
+      return "Return to Review Queue and Mix Coach after headroom, balance, or low-end posture changes.";
+    case "master":
+      return "Return to Review Queue after master preset, limiter, and export posture match the target.";
+    case "deliver":
+      return "Return to Review Queue after deliverable, stem, or handoff context checks are clear.";
+  }
 }
 
 type ReviewFixAction =
