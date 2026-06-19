@@ -521,6 +521,7 @@ import type {
   PatternPlaybackReadoutSummary,
   ArrangementPlaybackReadoutSummary,
   KeyboardCapturePostureSummary,
+  LocalDraftRecoveryResult,
   ProjectFileResult,
   ProjectSafetyReadoutSummary,
   HandoffPackItem,
@@ -1219,6 +1220,41 @@ function ProjectFileResultStrip({ result }: { result: ProjectFileResult }): Reac
   );
 }
 
+function LocalDraftRecoveryResultStrip({ result }: { result: LocalDraftRecoveryResult }): ReactElement {
+  return (
+    <div
+      className={`quick-action-result local-draft-recovery-result ${result.tone}`}
+      data-result-local-draft={result.targetId}
+      data-testid="local-draft-recovery-result"
+      aria-live="polite"
+    >
+      <div className="quick-action-result-main">
+        <span data-testid="local-draft-recovery-result-status">{result.status}</span>
+        <strong data-testid="local-draft-recovery-result-title">{result.title}</strong>
+        <small data-testid="local-draft-recovery-result-detail">{result.detail}</small>
+      </div>
+      <div className={`quick-action-result-metric ${result.tone}`} data-testid="local-draft-recovery-result-metric">
+        <span data-testid="local-draft-recovery-result-action">
+          {result.action === "restore" ? "Restore Draft" : "Clear Draft"}
+        </span>
+        <strong data-testid="local-draft-recovery-result-metric-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="quick-action-result-followup" data-testid="local-draft-recovery-result-followup">
+        <span>
+          <b>Safety</b>
+          <em data-testid="local-draft-recovery-result-safety">{result.safetyCue}</em>
+        </span>
+        <span>
+          <b>Next</b>
+          <em data-testid="local-draft-recovery-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<EditHistoryEntry[]>([]);
@@ -1362,6 +1398,7 @@ export function App(): ReactElement {
   const [projectFileLabel, setProjectFileLabel] = useState<string | null>(null);
   const [projectHasUnsavedChanges, setProjectHasUnsavedChanges] = useState(false);
   const [projectFileResult, setProjectFileResult] = useState<ProjectFileResult | null>(null);
+  const [localDraftRecoveryResult, setLocalDraftRecoveryResult] = useState<LocalDraftRecoveryResult | null>(null);
   const [tapTempo, setTapTempo] = useState<TapTempoState>({ taps: 0, bpm: null, applied: true });
   const [localDraftRecovery, setLocalDraftRecovery] = useState<LocalDraftRecovery | null>(() => readLocalDraftRecovery());
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState<string | null>(localDraftRecovery?.savedAt ?? null);
@@ -2282,6 +2319,7 @@ export function App(): ReactElement {
     setSelectedEventDeleteResult(null);
     setUndoRedoResult(null);
     setProjectFileResult(null);
+    setLocalDraftRecoveryResult(null);
     setModeSwitchResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
@@ -2525,6 +2563,7 @@ export function App(): ReactElement {
     setSelectedEventDeleteResult(null);
     setUndoRedoResult(null);
     setProjectFileResult(null);
+    setLocalDraftRecoveryResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -2604,6 +2643,7 @@ export function App(): ReactElement {
     setSelectedEventDeleteResult(null);
     setUndoRedoResult(null);
     setProjectFileResult(null);
+    setLocalDraftRecoveryResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -2716,19 +2756,22 @@ export function App(): ReactElement {
 
   function restoreLocalDraft(): void {
     if (!localDraftRecovery) {
+      setLocalDraftRecoveryResult(null);
       setProjectStatus("No local draft to restore");
       return;
     }
+
+    const recovery = localDraftRecovery;
 
     controllerRef.current?.stop();
     controllerRef.current = null;
     setPlaybackPosition(null);
     setIsPlaying(false);
 
-    const draftProject = localDraftRecovery.project;
+    const draftProject = recovery.project;
     const changed = updateProject(
       () => draftProject,
-      `Restored local draft ${formatLocalDraftSavedAt(localDraftRecovery.savedAt)}`
+      `Restored local draft ${formatLocalDraftSavedAt(recovery.savedAt)}`
     );
     clearLocalDraftState();
 
@@ -2737,11 +2780,19 @@ export function App(): ReactElement {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
+      setLocalDraftRecoveryResult(createLocalDraftRecoveryResult("restore", recovery, draftProject));
     }
   }
 
   function clearLocalDraftRecovery(): void {
+    if (!localDraftRecovery) {
+      setLocalDraftRecoveryResult(null);
+      return;
+    }
+
+    const recovery = localDraftRecovery;
     clearLocalDraftState();
+    setLocalDraftRecoveryResult(createLocalDraftRecoveryResult("clear", recovery, projectRef.current));
     setProjectStatus("Cleared local draft recovery");
   }
 
@@ -6309,6 +6360,7 @@ export function App(): ReactElement {
       if (result) {
         if (result.canceled) {
           setProjectFileResult(null);
+          setLocalDraftRecoveryResult(null);
           setProjectStatus("Save canceled");
           return;
         }
@@ -6317,6 +6369,7 @@ export function App(): ReactElement {
         clearLocalDraftState();
         setProjectFileLabel(fileLabel);
         setProjectHasUnsavedChanges(false);
+        setLocalDraftRecoveryResult(null);
         setProjectFileResult(createProjectFileResult("save", fileLabel, project));
         setProjectStatus(`Saved ${fileLabel}`);
         return;
@@ -6326,11 +6379,13 @@ export function App(): ReactElement {
       clearLocalDraftState();
       setProjectFileLabel(defaultName);
       setProjectHasUnsavedChanges(false);
+      setLocalDraftRecoveryResult(null);
       setProjectFileResult(createProjectFileResult("download", defaultName, project));
       setProjectStatus(`Downloaded ${defaultName}`);
     } catch (error) {
       console.error(error);
       setProjectFileResult(null);
+      setLocalDraftRecoveryResult(null);
       setProjectStatus("Save failed");
     }
   }
@@ -6341,6 +6396,7 @@ export function App(): ReactElement {
       if (result) {
         if (result.canceled || !result.contents) {
           setProjectFileResult(null);
+          setLocalDraftRecoveryResult(null);
           setProjectStatus("Open canceled");
           return;
         }
@@ -6349,10 +6405,12 @@ export function App(): ReactElement {
       }
 
       setProjectFileResult(null);
+      setLocalDraftRecoveryResult(null);
       importInputRef.current?.click();
     } catch (error) {
       console.error(error);
       setProjectFileResult(null);
+      setLocalDraftRecoveryResult(null);
       setProjectStatus("Open failed");
     }
   }
@@ -6362,6 +6420,7 @@ export function App(): ReactElement {
     event.currentTarget.value = "";
     if (!file) {
       setProjectFileResult(null);
+      setLocalDraftRecoveryResult(null);
       return;
     }
 
@@ -6371,8 +6430,41 @@ export function App(): ReactElement {
       .catch((error: unknown) => {
         console.error(error);
         setProjectFileResult(null);
+        setLocalDraftRecoveryResult(null);
         setProjectStatus("Open failed");
       });
+  }
+
+  function createLocalDraftRecoveryResult(
+    action: LocalDraftRecoveryResult["action"],
+    recovery: LocalDraftRecovery,
+    resultProject: ProjectState
+  ): LocalDraftRecoveryResult {
+    const savedLabel = formatLocalDraftSavedAt(recovery.savedAt);
+    const status = action === "restore" ? "Restored" : "Cleared";
+    const title =
+      action === "restore" ? `Restored local draft: ${resultProject.title}` : `Cleared local draft: ${savedLabel}`;
+    const safetyCue =
+      action === "restore"
+        ? "The recovered draft is now the editable project; save a durable file copy when ready."
+        : "Only the renderer-local recovery copy was cleared; the current project and saved files were not deleted.";
+    const nextCheck =
+      action === "restore"
+        ? `Play Pattern ${resultProject.selectedPattern}; confirm the recovered beat before continuing.`
+        : "Keep composing or save the current project if it needs durable protection.";
+
+    return {
+      action,
+      targetId: `${action}-${recovery.savedAt}`,
+      status,
+      title,
+      detail: `${resultProject.title} / ${barCountLabel(arrangementTotalBars(resultProject))}`,
+      metricLabel: action === "restore" ? "Recovered project" : "Cleared draft",
+      metricValue: `${projectEventTotal(resultProject)} events / ${recovery.characterCount.toLocaleString()} chars`,
+      safetyCue,
+      nextCheck,
+      tone: "good"
+    };
   }
 
   function createProjectFileResult(
@@ -6424,10 +6516,12 @@ export function App(): ReactElement {
       replaceProject(nextProject, `Loaded ${sourceName}`, sourceName);
       setPlaybackPosition(null);
       setIsPlaying(false);
+      setLocalDraftRecoveryResult(null);
       setProjectFileResult(createProjectFileResult(action, sourceName, nextProject));
     } catch (error) {
       console.error(error);
       setProjectFileResult(null);
+      setLocalDraftRecoveryResult(null);
       setProjectStatus("Invalid project file");
     }
   }
@@ -8044,6 +8138,7 @@ export function App(): ReactElement {
         </div>
         {modeSwitchResult && <ModeSwitchResultStrip result={modeSwitchResult} />}
         {projectFileResult && <ProjectFileResultStrip result={projectFileResult} />}
+        {localDraftRecoveryResult && <LocalDraftRecoveryResultStrip result={localDraftRecoveryResult} />}
       </section>
 
       <ModeFocus result={modeFocusResult} summary={modeFocusSummary} onFocus={focusModeFocusCard} />

@@ -452,6 +452,21 @@ export type LocalDraftRecovery = {
   characterCount: number;
 };
 
+export type LocalDraftRecoveryResultAction = "restore" | "clear";
+
+export type LocalDraftRecoveryResult = {
+  action: LocalDraftRecoveryResultAction;
+  targetId: string;
+  status: "Restored" | "Cleared";
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  safetyCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type MixCoachCheck = {
   id: string;
   label: string;
