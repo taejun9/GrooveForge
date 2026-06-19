@@ -1334,6 +1334,19 @@ export type StyleInspectorFocusSummary = {
   detailTitle: string;
 };
 
+export type StyleInspectorFocusResult = {
+  focusId: StyleInspectorFocusId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type BasslinePadId = "root" | "bounce" | "slide" | "offbeat";
 
 export type BasslinePadStep = {

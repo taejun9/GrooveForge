@@ -307,6 +307,7 @@ import type {
   StyleGoalCardId,
   StyleInspectorSummary,
   StyleInspectorFocusSummary,
+  StyleInspectorFocusResult,
   BasslinePadId,
   BasslinePadStep,
   BasslinePadDefinition,
@@ -1133,6 +1134,7 @@ export function App(): ReactElement {
   const [patternDnaFocusId, setPatternDnaFocusId] = useState<PatternDnaCardId | null>(null);
   const [patternDnaResult, setPatternDnaResult] = useState<PatternDnaFocusResult | null>(null);
   const [styleInspectorFocusId, setStyleInspectorFocusId] = useState<StyleInspectorFocusId | null>(null);
+  const [styleInspectorResult, setStyleInspectorResult] = useState<StyleInspectorFocusResult | null>(null);
   const [beatReadinessFocusId, setBeatReadinessFocusId] = useState<BeatReadinessCheckId | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
@@ -2005,6 +2007,7 @@ export function App(): ReactElement {
     setKeyCompassResult(null);
     setGrooveCompassResult(null);
     setPatternDnaResult(null);
+    setStyleInspectorResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
@@ -2058,6 +2061,7 @@ export function App(): ReactElement {
       setKeyCompassResult(null);
       setGrooveCompassResult(null);
       setPatternDnaResult(null);
+      setStyleInspectorResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
@@ -2203,6 +2207,7 @@ export function App(): ReactElement {
     setKeyCompassResult(null);
     setGrooveCompassResult(null);
     setPatternDnaResult(null);
+    setStyleInspectorResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2259,6 +2264,7 @@ export function App(): ReactElement {
     setKeyCompassResult(null);
     setGrooveCompassResult(null);
     setPatternDnaResult(null);
+    setStyleInspectorResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2597,6 +2603,7 @@ export function App(): ReactElement {
     }
 
     setStyleInspectorFocusId(goal.focusId);
+    setStyleInspectorResult(null);
     if (goal.id === "arrange") {
       selectTransportLoopScope("arrangement", false);
       setStyleGoalCueResult(createStyleGoalCueResult(goal, projectRef.current));
@@ -6492,6 +6499,7 @@ export function App(): ReactElement {
 
     setStyleInspectorFocusId(item.focusId);
     targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setStyleInspectorResult(createStyleInspectorFocusResult(item, styleInspectorSummary));
     setProjectStatus(`Style ${item.label}: ${item.value}`);
   }
 
@@ -7294,6 +7302,7 @@ export function App(): ReactElement {
         cueResult={styleGoalCueResult}
         focusedItemId={styleInspectorFocusId}
         isPlaying={isPlaying}
+        result={styleInspectorResult}
         onCueGoal={cueStyleGoal}
         onSelectStyle={selectStyle}
         onFocus={focusStyleInspectorItem}
@@ -8671,6 +8680,7 @@ function StyleInspector({
   cueResult,
   focusedItemId,
   isPlaying,
+  result,
   onCueGoal,
   onFocus,
   onRunGoalAction,
@@ -8683,6 +8693,7 @@ function StyleInspector({
   cueResult: StyleGoalCueResult | null;
   focusedItemId: StyleInspectorFocusId | null;
   isPlaying: boolean;
+  result: StyleInspectorFocusResult | null;
   onCueGoal: (goal: StyleGoalCard) => void;
   onFocus: (item: StyleInspectorFocusItem) => void;
   onRunGoalAction: (action: ComposerAction) => void;
@@ -8699,7 +8710,12 @@ function StyleInspector({
   return (
     <section
       aria-label="Style inspector"
-      className={["style-inspector", cueResultGoal ? "has-goal-cue-result" : "", actionResultGoal ? "has-goal-action-result" : ""]
+      className={[
+        "style-inspector",
+        result ? "has-focus-result" : "",
+        cueResultGoal ? "has-goal-cue-result" : "",
+        actionResultGoal ? "has-goal-action-result" : ""
+      ]
         .filter(Boolean)
         .join(" ")}
       data-testid="style-inspector"
@@ -8718,6 +8734,7 @@ function StyleInspector({
         <strong data-testid="style-inspector-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="style-inspector-focus-detail">{focusSummary.detailLabel}</small>
       </div>
+      {result && <StyleInspectorFocusResultStrip result={result} />}
       <div className="style-inspector-metrics">
         {summary.metrics.map((metric) => {
           const focused = focusedItemId === metric.focusId;
@@ -8876,6 +8893,38 @@ function StyleInspector({
         })}
       </div>
     </section>
+  );
+}
+
+function StyleInspectorFocusResultStrip({ result }: { result: StyleInspectorFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`style-inspector-result ${result.tone}`}
+      data-result-style-inspector={result.focusId}
+      data-testid="style-inspector-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="style-inspector-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="style-inspector-result-title">{result.title}</strong>
+          <small data-testid="style-inspector-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="style-inspector-result-destination" data-testid="style-inspector-result-destination">
+        <span>{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="style-inspector-result-metric" data-testid="style-inspector-result-metric">
+        <span data-testid="style-inspector-result-status">{result.metricLabel}</span>
+        <strong data-testid="style-inspector-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="style-inspector-result-followup" data-testid="style-inspector-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -26445,6 +26494,122 @@ function createStyleInspectorFocusSummary(
     detailLabel,
     detailTitle: `${statusLabel} / ${item.label}: ${item.value} / ${detailLabel}`
   };
+}
+
+function createStyleInspectorFocusResult(
+  item: StyleInspectorFocusItem,
+  summary: StyleInspectorSummary
+): StyleInspectorFocusResult {
+  return {
+    focusId: item.focusId,
+    status: "Focused",
+    title: styleInspectorFocusResultTitle(item),
+    detail: `${item.focusLabel}: ${styleInspectorFocusResultDetail(item)}`,
+    destination: `${item.focusLabel} panel`,
+    metricLabel: "Style",
+    metricValue: styleInspectorFocusResultMetric(summary),
+    auditionCue: styleInspectorFocusResultAudition(item),
+    nextCheck: styleInspectorFocusResultNextCheck(item),
+    tone: styleInspectorFocusResultTone(item)
+  };
+}
+
+function styleInspectorFocusResultTitle(item: StyleInspectorFocusItem): string {
+  if (item.focusId.startsWith("density-")) {
+    return `Pattern ${item.focusId.replace("density-", "")} density focused`;
+  }
+  if (item.focusId.startsWith("goal-")) {
+    return `${item.label} goal focused`;
+  }
+  return `${item.label} style focused`;
+}
+
+function styleInspectorFocusResultDetail(item: StyleInspectorFocusItem): string {
+  if (item.focusId.startsWith("density-")) {
+    return `Pattern ${item.focusId.replace("density-", "")} ${item.value}`;
+  }
+  return item.value;
+}
+
+function styleInspectorFocusResultMetric(summary: StyleInspectorSummary): string {
+  const readyCount = summary.goals.filter((goal) => goal.tone === "good").length;
+  const reviewCount = summary.goals.filter((goal) => goal.tone === "warn").length;
+  const blockerCount = summary.goals.filter((goal) => goal.tone === "danger").length;
+
+  return `${summary.profile.name} / ${summary.totalEvents} events / ${readyCount}/${summary.goals.length} goals ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function styleInspectorFocusResultAudition(item: StyleInspectorFocusItem): string {
+  switch (item.focusId) {
+    case "bpm":
+      return "Tap, nudge, or play the beat and check whether tempo sits inside the style pocket.";
+    case "swing":
+      return "Loop the selected Pattern and check whether hats, drums, and notes lean with the style.";
+    case "bass":
+      return "Loop 808/Bass against kick and confirm the low-end role matches this style.";
+    case "melody":
+      return "Audition melody with chords and leave space for the hook or topline.";
+    case "sound":
+      return "Play the full loop and confirm drums, 808, synth, and chords share one tone direction.";
+    case "goal-drums":
+      return "Loop the Pattern and check whether the drum foundation carries the style.";
+    case "goal-bass":
+      return "Check kick-to-808 movement before adding extra melody.";
+    case "goal-harmony":
+      return "Listen for chord support and make sure harmony does not crowd the hook.";
+    case "goal-melody":
+      return "Audition the motif against the groove and confirm the lead role is clear.";
+    case "goal-arrange":
+      return "Play Song loop and check whether the arrangement has enough section movement.";
+  }
+
+  return `Audition Pattern ${item.focusId.replace("density-", "")} and compare density against the active style.`;
+}
+
+function styleInspectorFocusResultNextCheck(item: StyleInspectorFocusItem): string {
+  switch (item.focusId) {
+    case "bpm":
+      return "Return after the tempo feels locked for both writing grid and bounce.";
+    case "swing":
+      return "Return after groove timing feels intentional instead of random.";
+    case "bass":
+      return "Return after the bass role supports the groove without masking kick or hook space.";
+    case "melody":
+      return "Return after the motif has a clear role and leaves room for a vocal or hook.";
+    case "sound":
+      return "Return after the tone direction feels consistent across the core instruments.";
+    case "goal-drums":
+      return "Return after drum hits meet the style goal or the sparse choice is intentional.";
+    case "goal-bass":
+      return "Return after 808/Bass notes meet the style goal or leave deliberate low-end space.";
+    case "goal-harmony":
+      return "Return after harmony supports the loop without overfilling the pocket.";
+    case "goal-melody":
+      return "Return after the melody goal is met or the beat intentionally stays minimal.";
+    case "goal-arrange":
+      return "Return after sections give the beat a usable producer handoff shape.";
+  }
+
+  return "Return after Pattern density feels deliberate for this genre pocket.";
+}
+
+function styleInspectorFocusResultTone(item: StyleInspectorFocusItem): StyleInspectorFocusResult["tone"] {
+  if (item.focusId.startsWith("goal-") && "tone" in item) {
+    return (item as StyleGoalCard).tone;
+  }
+
+  if (item.focusId.startsWith("density-") && "eventCount" in item) {
+    const eventCount = (item as StylePatternDensity).eventCount;
+    if (eventCount >= 12) {
+      return "good";
+    }
+    if (eventCount >= 8) {
+      return "warn";
+    }
+    return "danger";
+  }
+
+  return "good";
 }
 
 function styleDensityLabel(eventCount: number): string {

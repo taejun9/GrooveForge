@@ -2130,6 +2130,14 @@ h2 {
 .style-inspector-focus-readout span,
 .style-inspector-focus-readout strong,
 .style-inspector-focus-readout small,
+.style-inspector-result-main strong,
+.style-inspector-result-main small,
+.style-inspector-result-destination span,
+.style-inspector-result-destination strong,
+.style-inspector-result-metric span,
+.style-inspector-result-metric strong,
+.style-inspector-result-followup span,
+.style-inspector-result-followup small,
 .style-goal-cue-result span,
 .style-goal-cue-result strong,
 .style-goal-cue-result small,
@@ -2412,6 +2420,102 @@ h2 {
   border-radius: 6px;
   background: color-mix(in srgb, var(--style-color) 10%, rgba(244, 239, 231, 0.045));
   padding: 7px 8px;
+}
+
+.style-inspector-result {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-row: 4;
+  grid-template-columns: minmax(170px, 0.34fr) minmax(140px, 0.22fr) minmax(180px, 0.42fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--style-color) 34%, rgba(95, 207, 143, 0.16));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--style-color) 10%, rgba(95, 207, 143, 0.045));
+  padding: 7px 8px;
+}
+
+.style-inspector-result.warn {
+  border-color: color-mix(in srgb, #e6c86a 42%, rgba(244, 239, 231, 0.13));
+  background: color-mix(in srgb, var(--style-color) 8%, rgba(230, 200, 106, 0.045));
+}
+
+.style-inspector-result.danger {
+  border-color: color-mix(in srgb, #ff7f73 44%, rgba(244, 239, 231, 0.13));
+  background: color-mix(in srgb, var(--style-color) 8%, rgba(255, 127, 115, 0.045));
+}
+
+.style-inspector-result-main,
+.style-inspector-result-destination,
+.style-inspector-result-metric,
+.style-inspector-result-followup {
+  min-width: 0;
+}
+
+.style-inspector-result-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.style-inspector-result-main svg {
+  flex: 0 0 auto;
+  color: var(--style-color);
+}
+
+.style-inspector-result.warn .style-inspector-result-main svg {
+  color: #e6c86a;
+}
+
+.style-inspector-result.danger .style-inspector-result-main svg {
+  color: #ff7f73;
+}
+
+.style-inspector-result-main span,
+.style-inspector-result-destination,
+.style-inspector-result-metric,
+.style-inspector-result-followup {
+  display: grid;
+  gap: 2px;
+}
+
+.style-inspector-result-main strong,
+.style-inspector-result-destination strong,
+.style-inspector-result-metric strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.style-inspector-result-main small,
+.style-inspector-result-destination span,
+.style-inspector-result-metric span,
+.style-inspector-result-followup span,
+.style-inspector-result-followup small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+}
+
+.style-inspector.has-focus-result .style-quick-picks {
+  grid-row: 5;
+}
+
+.style-inspector.has-focus-result .style-goal-cue-result,
+.style-inspector.has-focus-result .style-goal-action-result {
+  grid-row: 5;
+}
+
+.style-inspector.has-focus-result.has-goal-cue-result .style-goal-action-result {
+  grid-row: 6;
+}
+
+.style-inspector.has-focus-result.has-goal-cue-result .style-quick-picks,
+.style-inspector.has-focus-result.has-goal-action-result .style-quick-picks {
+  grid-row: 6;
+}
+
+.style-inspector.has-focus-result.has-goal-cue-result.has-goal-action-result .style-quick-picks {
+  grid-row: 7;
 }
 
 .style-goal-cue-result {
@@ -19174,6 +19278,7 @@ input[type="range"] {
 
   .style-inspector-patterns,
   .style-inspector-goals,
+  .style-inspector-result,
   .style-quick-picks {
     grid-column: 1 / -1;
   }
@@ -19186,8 +19291,35 @@ input[type="range"] {
     grid-row: 4;
   }
 
+  .style-inspector-result {
+    grid-row: 5;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .style-quick-picks {
     grid-row: 5;
+  }
+
+  .style-inspector.has-focus-result .style-quick-picks {
+    grid-row: 6;
+  }
+
+  .style-inspector.has-focus-result .style-goal-cue-result,
+  .style-inspector.has-focus-result .style-goal-action-result {
+    grid-row: 6;
+  }
+
+  .style-inspector.has-focus-result.has-goal-cue-result .style-goal-action-result {
+    grid-row: 7;
+  }
+
+  .style-inspector.has-focus-result.has-goal-cue-result .style-quick-picks,
+  .style-inspector.has-focus-result.has-goal-action-result .style-quick-picks {
+    grid-row: 7;
+  }
+
+  .style-inspector.has-focus-result.has-goal-cue-result.has-goal-action-result .style-quick-picks {
+    grid-row: 8;
   }
 
   .first-beat-path {
@@ -19927,6 +20059,7 @@ input[type="range"] {
 
   .style-inspector-heading,
   .style-inspector-focus-readout,
+  .style-inspector-result,
   .style-inspector-metrics,
   .style-inspector-patterns,
   .style-inspector-goals,
@@ -19943,6 +20076,7 @@ input[type="range"] {
   }
 
   .style-inspector-focus-readout,
+  .style-inspector-result,
   .style-inspector-metrics,
   .style-inspector-patterns,
   .style-inspector-goals,
