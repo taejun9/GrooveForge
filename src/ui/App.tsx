@@ -17959,7 +17959,7 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "command-reference" || action.id === "beat-terms-reference") {
-    return { id: "command-reference", label: "Reference", value: "Desktop / Create / Finish / Beat Terms" };
+    return { id: "command-reference", label: "Reference", value: "Desktop / Create / Mix / Finish / Beat Terms" };
   }
 
   if (action.id === "restore-local-draft" || action.id === "clear-local-draft") {

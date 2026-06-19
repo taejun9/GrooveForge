@@ -101,13 +101,22 @@ const commandReferenceSections: CommandReferenceSection[] = [
     ]
   },
   {
+    id: "mix-fast-path",
+    title: "Mix",
+    items: [
+      { id: "stem-audition-readout", command: "Stem Audition Readout", shortcut: "Readout", target: "Full Mix / stems" },
+      { id: "stem-audition", command: "Stem Audition", shortcut: "Quick Actions", target: "Full Mix / Drums / 808 / Synth / Chords" },
+      { id: "mix-balance", command: "Mix Balance", shortcut: "Quick Actions", target: "Rough balance pads" },
+      { id: "mix-coach", command: "Mix Coach", shortcut: "Quick Actions", target: "Headroom / balance" }
+    ]
+  },
+  {
     id: "finish-fast-path",
     title: "Finish",
     items: [
       { id: "pattern-chain", command: "Pattern Chain", shortcut: "Quick Actions", target: "Arrangement sketch" },
       { id: "arrangement-playback-readout", command: "Arrangement Playback Readout", shortcut: "Readout", target: "Edit vs heard Block" },
       { id: "audible-arrangement-follow", command: "Audible Arrangement Follow", shortcut: "Quick Actions", target: "Heard Block" },
-      { id: "mix-coach", command: "Mix Coach", shortcut: "Quick Actions", target: "Headroom / balance" },
       { id: "master-finish", command: "Master Finish", shortcut: "Quick Actions", target: "Output posture" },
       { id: "master-automation", command: "Master Automation", shortcut: "Quick Actions", target: "Fade in / out" },
       { id: "handoff-pack", command: "Handoff Pack", shortcut: "Quick Actions", target: "WAV / stems / MIDI / sheet" }
