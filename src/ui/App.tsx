@@ -11951,6 +11951,7 @@ function ReviewQueue({
   onFocus: (item: ReviewQueueItem) => void;
 }): ReactElement {
   const focusSummary = createReviewQueueFocusSummary(summary, focusedItemId);
+  const fixPreview = createReviewFixPreview(summary, focusedItemId, project, analyzeExport(project));
 
   return (
     <section className={`review-queue ${summary.tone}`} data-testid="review-queue" aria-label="Review queue">
@@ -11972,6 +11973,7 @@ function ReviewQueue({
           <strong data-testid="review-queue-focus-label">{focusSummary.areaLabel}</strong>
           <small data-testid="review-queue-focus-detail">{focusSummary.detailLabel}</small>
         </div>
+        <ReviewFixPreviewStrip preview={fixPreview} />
         {result && <ReviewQueueFocusResultStrip result={result} />}
         {fixResult && <ReviewFixResultStrip result={fixResult} />}
       </div>
@@ -12019,6 +12021,33 @@ function ReviewQueue({
         })}
       </div>
     </section>
+  );
+}
+
+function ReviewFixPreviewStrip({ preview }: { preview: ReviewFixPreviewSummary }): ReactElement {
+  return (
+    <div
+      className={`review-fix-preview ${preview.tone}`}
+      data-preview-fix={preview.fixId ?? "none"}
+      data-testid="review-fix-preview"
+      title={preview.detailTitle}
+    >
+      <div className="review-fix-preview-main">
+        <SlidersHorizontal size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="review-fix-preview-title">{preview.title}</strong>
+          <small data-testid="review-fix-preview-detail">{preview.detail}</small>
+        </span>
+      </div>
+      <div className="review-fix-preview-scope" data-testid="review-fix-preview-scope">
+        <span>{preview.status}</span>
+        <strong>{preview.scope}</strong>
+      </div>
+      <div className="review-fix-preview-followup" data-testid="review-fix-preview-followup">
+        <span data-testid="review-fix-preview-audition">{preview.auditionCue}</span>
+        <small data-testid="review-fix-preview-next-check">{preview.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -22833,6 +22862,19 @@ type ReviewFixOption = {
   nextCheck: string;
 };
 
+type ReviewFixPreviewSummary = {
+  itemId: string | null;
+  fixId: string | null;
+  status: string;
+  title: string;
+  detail: string;
+  detailTitle: string;
+  scope: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 type ReviewFixResultMetric = {
   id: "item" | "queue" | "project";
   label: string;
@@ -22856,6 +22898,50 @@ type ReviewFixResult = {
 
 function activeReviewFixItem(summary: ReviewQueueSummary): ReviewQueueItem | null {
   return summary.items.find((item) => item.tone !== "good") ?? null;
+}
+
+function createReviewFixPreview(
+  summary: ReviewQueueSummary,
+  focusedItemId: string | null,
+  project: ProjectState,
+  analysis: ExportAnalysis
+): ReviewFixPreviewSummary {
+  const focusedItem = focusedItemId ? summary.items.find((item) => item.id === focusedItemId) ?? null : null;
+  const focusedFix = focusedItem ? createReviewFixOption(focusedItem, project, analysis) : null;
+  const fallbackItem = summary.items.find((item) => item.tone !== "good" && createReviewFixOption(item, project, analysis) !== null) ?? null;
+  const item = focusedFix ? focusedItem : fallbackItem;
+  const fix = focusedFix ?? (item ? createReviewFixOption(item, project, analysis) : null);
+
+  if (!item || !fix) {
+    return {
+      itemId: null,
+      fixId: null,
+      status: "No fix target",
+      title: "Review Fix Preview clear",
+      detail: "No one-step Review Fix is available for the current queue.",
+      detailTitle: "Review Queue has no one-step fix target.",
+      scope: "Review Queue",
+      auditionCue: "Keep composing, arranging, mixing, or preparing delivery from the visible workstation panels.",
+      nextCheck: "Return when Review Queue shows a warn or danger item with an explicit fix.",
+      tone: "good"
+    };
+  }
+
+  const status = focusedFix ? "Focused fix" : "Next fix";
+  const scope = reviewFixScopeLabel(fix);
+
+  return {
+    itemId: item.id,
+    fixId: fix.fixId,
+    status,
+    title: `${fix.label} preview`,
+    detail: `${item.area}: ${item.status} / ${fix.detail}`,
+    detailTitle: `${status} / ${item.area}: ${item.status} / ${scope}`,
+    scope,
+    auditionCue: fix.auditionCue,
+    nextCheck: fix.nextCheck,
+    tone: item.tone
+  };
 }
 
 function createReviewFixOption(

@@ -271,6 +271,9 @@ h2 {
 .review-queue-result-destination span,
 .review-queue-result-metric span,
 .review-queue-result-followup span,
+.review-fix-preview-main span,
+.review-fix-preview-scope span,
+.review-fix-preview-followup span,
 .review-queue-item span,
 .review-queue-fix-button span,
 .inspector-heading span,
@@ -20928,6 +20931,86 @@ input[type="range"] {
   font-size: 10px;
 }
 
+.review-fix-preview {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.36fr) minmax(140px, 0.24fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(138, 168, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(138, 168, 255, 0.055);
+  padding: 7px 8px;
+}
+
+.review-fix-preview.warn {
+  border-color: rgba(240, 195, 106, 0.28);
+  background: rgba(240, 195, 106, 0.06);
+}
+
+.review-fix-preview.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.review-fix-preview-main,
+.review-fix-preview-scope,
+.review-fix-preview-followup {
+  min-width: 0;
+}
+
+.review-fix-preview-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.review-fix-preview-main svg {
+  flex: 0 0 auto;
+  color: #8aa8ff;
+}
+
+.review-fix-preview.warn .review-fix-preview-main svg {
+  color: #f0c36a;
+}
+
+.review-fix-preview.danger .review-fix-preview-main svg {
+  color: #ff7a4f;
+}
+
+.review-fix-preview-main span,
+.review-fix-preview-scope,
+.review-fix-preview-followup {
+  display: grid;
+  gap: 2px;
+}
+
+.review-fix-preview-main strong,
+.review-fix-preview-scope strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.review-fix-preview-main small,
+.review-fix-preview-scope span,
+.review-fix-preview-followup span,
+.review-fix-preview-followup small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+}
+
+.review-fix-preview-main strong,
+.review-fix-preview-main small,
+.review-fix-preview-scope span,
+.review-fix-preview-scope strong,
+.review-fix-preview-followup span,
+.review-fix-preview-followup small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .review-fix-result {
   display: grid;
   gap: 7px;
@@ -23266,6 +23349,7 @@ input[type="range"] {
   }
 
   .review-queue-focus-readout,
+  .review-fix-preview,
   .review-queue-result,
   .finish-checklist-focus-readout,
   .finish-checklist-result,
