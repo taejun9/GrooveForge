@@ -569,6 +569,11 @@ import {
   beatBlueprintPreviewMetricTestIds,
   maxQuickActionPins,
   composerStyleActionProfiles,
+  suggestedBlueprintId,
+  composerDrumFoundation,
+  composerBasslinePad,
+  composerChordPreset,
+  composerMelodyMotif,
   arrangementFocusPresets,
   arrangementArcPadDefinitions,
   chordPadDefinitions,
@@ -17353,35 +17358,6 @@ function blueprintNextMoveAction(project: ProjectState): NextMoveAction {
   };
 }
 
-function suggestedBlueprintId(project: ProjectState): BeatBlueprintId {
-  switch (project.styleId) {
-    case "trap":
-      return "trap_bounce";
-    case "drill":
-      return "dark_808";
-    case "boom_bap":
-      return "boom_bap_knock";
-    case "lofi":
-      return "warm_loop";
-    case "house":
-      return "club_bounce";
-    case "rnb":
-      return "rnb_pocket";
-    case "k_hiphop_rnb":
-      return "seoul_pocket";
-    case "afrobeats":
-      return "afro_swing";
-    case "jersey":
-      return "jersey_drive";
-    case "phonk":
-      return "phonk_cruise";
-    case "garage":
-      return "garage_skip";
-    case "experimental":
-      return "experimental_pulse";
-  }
-}
-
 function patternFillNextMoveAction(project: ProjectState): NextMoveAction {
   const pattern = activePattern(project);
   const preset: PatternFillPreset =
@@ -20992,89 +20968,6 @@ function chordMotionLabel(chords: ChordEvent[]): string {
     return "none";
   }
   return chords.map((event) => event.root).join("-");
-}
-
-function composerDrumFoundation(project: ProjectState): DrumFoundationId {
-  switch (project.styleId) {
-    case "house":
-    case "jersey":
-    case "garage":
-      return "club";
-    case "drill":
-    case "experimental":
-      return "half";
-    case "trap":
-    case "boom_bap":
-    case "lofi":
-    case "rnb":
-    case "k_hiphop_rnb":
-    case "afrobeats":
-    case "phonk":
-      return "bounce";
-  }
-}
-
-function composerBasslinePad(project: ProjectState): BasslinePadId {
-  switch (project.styleId) {
-    case "house":
-    case "jersey":
-    case "garage":
-    case "afrobeats":
-      return "offbeat";
-    case "trap":
-    case "drill":
-    case "phonk":
-      return "slide";
-    case "boom_bap":
-    case "lofi":
-    case "rnb":
-    case "k_hiphop_rnb":
-      return "bounce";
-    case "experimental":
-      return "root";
-  }
-}
-
-function composerChordPreset(project: ProjectState): ChordProgressionPreset {
-  switch (project.styleId) {
-    case "house":
-    case "jersey":
-    case "garage":
-      return "bounce";
-    case "rnb":
-    case "k_hiphop_rnb":
-    case "afrobeats":
-      return "lift";
-    case "boom_bap":
-    case "lofi":
-      return "sparse";
-    case "trap":
-    case "drill":
-    case "phonk":
-    case "experimental":
-      return "moody";
-  }
-}
-
-function composerMelodyMotif(project: ProjectState): MelodyMotifId {
-  switch (project.styleId) {
-    case "house":
-    case "jersey":
-    case "garage":
-      return "rise";
-    case "boom_bap":
-    case "lofi":
-      return "answer";
-    case "rnb":
-    case "k_hiphop_rnb":
-    case "afrobeats":
-      return "pocket";
-    case "trap":
-    case "drill":
-    case "phonk":
-    case "experimental":
-      return "hook";
-  }
 }
 
 function basslinePadLabel(pad: BasslinePadId): string {

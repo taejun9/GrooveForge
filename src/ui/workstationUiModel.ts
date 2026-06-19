@@ -2443,6 +2443,19 @@ export const composerStyleActionProfiles: Record<StyleId, ComposerStyleActionPro
       finish: "vocal headroom"
     }
   },
+  reggaeton: {
+    focus: "dembow pocket",
+    priorities: { drums: 1, bass: 2, melody: 3, arrange: 4, harmony: 5, finish: 6 },
+    goals: { drumHits: 16, bassNotes: 5, chordEvents: 3, melodyNotes: 4, arrangementBars: 8 },
+    cues: {
+      drums: "dembow pocket",
+      bass: "clipped offbeat",
+      harmony: "simple lift",
+      melody: "chant hook",
+      arrange: "hook switch",
+      finish: "vocal headroom"
+    }
+  },
   jersey: {
     focus: "bounce and sections",
     priorities: { drums: 1, bass: 2, arrange: 3, melody: 4, harmony: 5, finish: 6 },
@@ -2496,6 +2509,113 @@ export const composerStyleActionProfiles: Record<StyleId, ComposerStyleActionPro
     }
   }
 };
+
+const suggestedBlueprintIdsByStyle: Record<StyleId, BeatBlueprintId> = {
+  trap: "trap_bounce",
+  drill: "dark_808",
+  boom_bap: "boom_bap_knock",
+  lofi: "warm_loop",
+  house: "club_bounce",
+  rnb: "rnb_pocket",
+  k_hiphop_rnb: "seoul_pocket",
+  afrobeats: "afro_swing",
+  reggaeton: "reggaeton_dembow",
+  jersey: "jersey_drive",
+  phonk: "phonk_cruise",
+  garage: "garage_skip",
+  experimental: "experimental_pulse"
+};
+
+export function suggestedBlueprintId(project: Pick<ProjectState, "styleId">): BeatBlueprintId {
+  return suggestedBlueprintIdsByStyle[project.styleId];
+}
+
+export function composerDrumFoundation(project: Pick<ProjectState, "styleId">): DrumFoundationId {
+  switch (project.styleId) {
+    case "house":
+    case "jersey":
+    case "garage":
+      return "club";
+    case "drill":
+    case "experimental":
+      return "half";
+    case "trap":
+    case "boom_bap":
+    case "lofi":
+    case "rnb":
+    case "k_hiphop_rnb":
+    case "afrobeats":
+    case "reggaeton":
+    case "phonk":
+      return "bounce";
+  }
+}
+
+export function composerBasslinePad(project: Pick<ProjectState, "styleId">): BasslinePadId {
+  switch (project.styleId) {
+    case "house":
+    case "jersey":
+    case "garage":
+    case "afrobeats":
+    case "reggaeton":
+      return "offbeat";
+    case "trap":
+    case "drill":
+    case "phonk":
+      return "slide";
+    case "boom_bap":
+    case "lofi":
+    case "rnb":
+    case "k_hiphop_rnb":
+      return "bounce";
+    case "experimental":
+      return "root";
+  }
+}
+
+export function composerChordPreset(project: Pick<ProjectState, "styleId">): ChordProgressionPreset {
+  switch (project.styleId) {
+    case "house":
+    case "jersey":
+    case "garage":
+      return "bounce";
+    case "rnb":
+    case "k_hiphop_rnb":
+    case "afrobeats":
+    case "reggaeton":
+      return "lift";
+    case "boom_bap":
+    case "lofi":
+      return "sparse";
+    case "trap":
+    case "drill":
+    case "phonk":
+    case "experimental":
+      return "moody";
+  }
+}
+
+export function composerMelodyMotif(project: Pick<ProjectState, "styleId">): MelodyMotifId {
+  switch (project.styleId) {
+    case "house":
+    case "jersey":
+    case "garage":
+      return "rise";
+    case "boom_bap":
+    case "lofi":
+      return "answer";
+    case "rnb":
+    case "k_hiphop_rnb":
+    case "afrobeats":
+    case "reggaeton":
+      return "pocket";
+    case "trap":
+    case "drill":
+    case "phonk":
+    case "experimental":
+      return "hook";
+  }
+}
 
 export type BeatPassportMetricId = "target" | "length" | "patterns" | "readiness" | "export" | "stems" | "master";
 export type BeatPassportFocusId = BeatPassportMetricId;
