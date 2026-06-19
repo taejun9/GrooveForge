@@ -577,6 +577,7 @@ import type {
   BeatSpineApplyResult,
   EditorAuditionResult,
   InputCaptureResult,
+  SelectedEventDeleteResult,
   SelectedDrumStep,
   DrumPocketSummary,
   DrumClipboard,
@@ -1117,6 +1118,39 @@ function InputCaptureResultStrip({ result }: { result: InputCaptureResult }): Re
   );
 }
 
+function SelectedEventDeleteResultStrip({ result }: { result: SelectedEventDeleteResult }): ReactElement {
+  return (
+    <div
+      className={`quick-action-result selected-event-delete-result ${result.tone}`}
+      data-result-selected-event-delete={result.targetId}
+      data-testid="selected-event-delete-result"
+      aria-live="polite"
+    >
+      <div className="quick-action-result-main">
+        <span data-testid="selected-event-delete-result-status">{result.status}</span>
+        <strong data-testid="selected-event-delete-result-title">{result.title}</strong>
+        <small data-testid="selected-event-delete-result-detail">{result.detail}</small>
+      </div>
+      <div className={`quick-action-result-metric ${result.tone}`} data-testid="selected-event-delete-result-metric">
+        <span data-testid="selected-event-delete-result-pattern">{result.patternLabel}</span>
+        <strong data-testid="selected-event-delete-result-metric-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="quick-action-result-followup" data-testid="selected-event-delete-result-followup">
+        <span>
+          <b>Undo</b>
+          <em data-testid="selected-event-delete-result-recovery">{result.recoveryCue}</em>
+        </span>
+        <span>
+          <b>Next</b>
+          <em data-testid="selected-event-delete-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
   const [undoStack, setUndoStack] = useState<EditHistoryEntry[]>([]);
@@ -1162,6 +1196,7 @@ export function App(): ReactElement {
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
   const [editorAuditionResult, setEditorAuditionResult] = useState<EditorAuditionResult | null>(null);
   const [inputCaptureResult, setInputCaptureResult] = useState<InputCaptureResult | null>(null);
+  const [selectedEventDeleteResult, setSelectedEventDeleteResult] = useState<SelectedEventDeleteResult | null>(null);
   const [modeSwitchResult, setModeSwitchResult] = useState<ModeSwitchResult | null>(null);
   const [modeFocusResult, setModeFocusResult] = useState<ModeFocusJumpResult | null>(null);
   const [workflowNavigatorResult, setWorkflowNavigatorResult] = useState<WorkflowNavigatorJumpResult | null>(null);
@@ -1266,6 +1301,7 @@ export function App(): ReactElement {
   const tapTempoCommitTimerRef = useRef<number | null>(null);
   const localDraftReadyRef = useRef(false);
   const localDraftSkipNextWriteRef = useRef(false);
+  const selectedEventDeleteSelectionGuardRef = useRef(false);
   const controllerRef = useRef<PlaybackController | null>(null);
   const auditionControllerRef = useRef<PlaybackController | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -1841,6 +1877,22 @@ export function App(): ReactElement {
   ]);
 
   useEffect(() => {
+    if (selectedEventDeleteSelectionGuardRef.current) {
+      selectedEventDeleteSelectionGuardRef.current = false;
+      return;
+    }
+    setSelectedEventDeleteResult(null);
+  }, [
+    project.selectedPattern,
+    selectedDrumStep?.lane,
+    selectedDrumStep?.step,
+    selectedNote?.track,
+    selectedNote?.step,
+    selectedNote?.pitch,
+    selectedChordIndex
+  ]);
+
+  useEffect(() => {
     return () => {
       controllerRef.current?.stop();
       controllerRef.current = null;
@@ -2157,6 +2209,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setEditorAuditionResult(null);
     setInputCaptureResult(null);
+    setSelectedEventDeleteResult(null);
     setModeSwitchResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
@@ -2229,6 +2282,7 @@ export function App(): ReactElement {
       setQuickActionResult(null);
       setEditorAuditionResult(null);
       setInputCaptureResult(null);
+      setSelectedEventDeleteResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
       setWorkflowNavigatorResult(null);
@@ -2395,6 +2449,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setEditorAuditionResult(null);
     setInputCaptureResult(null);
+    setSelectedEventDeleteResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -2471,6 +2526,7 @@ export function App(): ReactElement {
     setQuickActionResult(null);
     setEditorAuditionResult(null);
     setInputCaptureResult(null);
+    setSelectedEventDeleteResult(null);
     setModeFocusResult(null);
     setWorkflowNavigatorResult(null);
     setFirstBeatPathResult(null);
@@ -3054,6 +3110,87 @@ export function App(): ReactElement {
     setSelectedChordIndex(null);
   }
 
+  function showSelectedEventDeleteResult(result: SelectedEventDeleteResult, preserveNextSelectionChange = true): void {
+    selectedEventDeleteSelectionGuardRef.current = preserveNextSelectionChange;
+    setSelectedEventDeleteResult(result);
+  }
+
+  function createSelectedNoteDeleteResult(
+    target: SelectedNote,
+    note: BassNote | MelodyNote | undefined,
+    patternSlot: PatternSlot
+  ): SelectedEventDeleteResult | null {
+    if (!note) {
+      return null;
+    }
+
+    const trackLabel = target.track === "bass" ? "808" : "Synth";
+    const articulation = target.track === "bass" ? ((note as BassNote).glide ? "glide" : "no glide") : "melody";
+
+    return {
+      kind: "note",
+      targetId: `note-delete-${patternSlot}-${target.track}-${target.step}-${target.pitch}`,
+      status: "Deleted",
+      title: `${trackLabel} ${target.pitch} step ${target.step + 1}`,
+      detail: `Pattern ${patternSlot} / length ${note.length} / ${percentLabel(clampVelocity(note.velocity))} velocity`,
+      patternLabel: `Pattern ${patternSlot}`,
+      metricLabel: "Removed",
+      metricValue: `${target.pitch} / ${percentLabel(normalizeEventProbability(note.probability))} chance / ${articulation}`,
+      recoveryCue: "Use Undo immediately if this note carried the phrase or low-end anchor.",
+      nextCheck: `Loop Pattern ${patternSlot}; confirm the ${trackLabel} gap still supports drums, chords, and melody.`,
+      tone: "warn"
+    };
+  }
+
+  function createSelectedDrumDeleteResult(
+    target: SelectedDrumStep,
+    patternSlot: PatternSlot,
+    velocity: number,
+    timing: number,
+    probability: number,
+    repeat: number
+  ): SelectedEventDeleteResult {
+    return {
+      kind: "drum",
+      targetId: `drum-delete-${patternSlot}-${target.lane}-${target.step}`,
+      status: "Deleted",
+      title: `${drumLabels[target.lane]} step ${target.step + 1}`,
+      detail: `Pattern ${patternSlot} / ${percentLabel(velocity)} velocity / ${percentLabel(probability)} chance`,
+      patternLabel: `Pattern ${patternSlot}`,
+      metricLabel: "Pocket",
+      metricValue: `${timingLabel(timing)}${target.lane === "hat" ? ` / x${repeat}` : " / single"}`,
+      recoveryCue: "Use Undo immediately if this hit was the groove anchor.",
+      nextCheck: `Loop Pattern ${patternSlot}; confirm the pocket still works against 808, chords, and Synth.`,
+      tone: "warn"
+    };
+  }
+
+  function createSelectedChordDeleteResult(
+    chord: ChordEvent | undefined,
+    index: number,
+    patternSlot: PatternSlot
+  ): SelectedEventDeleteResult | null {
+    if (!chord) {
+      return null;
+    }
+
+    return {
+      kind: "chord",
+      targetId: `chord-delete-${patternSlot}-${index}-${chord.step}-${chord.root}-${chord.quality}`,
+      status: "Deleted",
+      title: `Chord ${chord.root}${chord.quality} step ${chord.step + 1}`,
+      detail: `Pattern ${patternSlot} / length ${chord.length} / ${percentLabel(clampVelocity(chord.velocity))} velocity`,
+      patternLabel: `Pattern ${patternSlot}`,
+      metricLabel: "Harmony",
+      metricValue: `${chordInversionLabel(normalizeChordInversion(chord.inversion))} / ${percentLabel(
+        normalizeEventProbability(chord.probability)
+      )} chance`,
+      recoveryCue: "Use Undo immediately if this chord was the progression anchor.",
+      nextCheck: `Loop Pattern ${patternSlot}; confirm the harmony still supports 808 and Synth movement.`,
+      tone: "warn"
+    };
+  }
+
   function deleteSelectedEvent(): void {
     if (deleteSelectedNote()) {
       return;
@@ -3064,6 +3201,7 @@ export function App(): ReactElement {
     if (deleteSelectedChordEvent()) {
       return;
     }
+    setSelectedEventDeleteResult(null);
     setProjectStatus("Select a step, note, or chord to delete");
   }
 
@@ -3073,6 +3211,9 @@ export function App(): ReactElement {
     }
 
     const target = selectedNote;
+    const patternSlot = projectRef.current.selectedPattern;
+    const deletedNote = target.track === "bass" ? selectedBassNote : selectedMelodyNote;
+    const result = createSelectedNoteDeleteResult(target, deletedNote, patternSlot);
     const changed = updateCurrentPattern(
       (pattern) => {
         if (target.track === "bass") {
@@ -3091,7 +3232,12 @@ export function App(): ReactElement {
     );
 
     if (changed) {
+      if (result) {
+        showSelectedEventDeleteResult(result);
+      }
       setSelectedNote(null);
+    } else {
+      setSelectedEventDeleteResult(null);
     }
     return changed;
   }
@@ -3109,6 +3255,15 @@ export function App(): ReactElement {
     }
 
     const target = selectedDrumStep;
+    const patternSlot = projectRef.current.selectedPattern;
+    const result = createSelectedDrumDeleteResult(
+      target,
+      patternSlot,
+      selectedDrumVelocity ?? defaultDrumVelocity(target.lane, target.step),
+      selectedDrumTiming,
+      selectedDrumProbability ?? 1,
+      selectedHatRepeat
+    );
     const changed = updateCurrentPattern(
       (pattern) => {
         if (!pattern.drumPattern[target.lane][target.step]) {
@@ -3139,7 +3294,10 @@ export function App(): ReactElement {
     );
 
     if (changed) {
+      showSelectedEventDeleteResult(result);
       setSelectedDrumStep(null);
+    } else {
+      setSelectedEventDeleteResult(null);
     }
     return changed;
   }
@@ -5715,10 +5873,13 @@ export function App(): ReactElement {
   function deleteChordEvent(index: number): boolean {
     const currentChords = activePattern(projectRef.current).chordEvents;
     if (currentChords.length <= 1) {
+      setSelectedEventDeleteResult(null);
       setProjectStatus("Chord progression needs one chord");
       return false;
     }
 
+    const patternSlot = projectRef.current.selectedPattern;
+    const result = createSelectedChordDeleteResult(currentChords[index], index, patternSlot);
     let nextSelectedIndex: number | null = null;
     const changed = updateCurrentPattern(
       (pattern) => {
@@ -5735,9 +5896,14 @@ export function App(): ReactElement {
       `Deleted chord ${index + 1} from Pattern ${projectRef.current.selectedPattern}`
     );
     if (changed) {
+      if (result) {
+        showSelectedEventDeleteResult(result, nextSelectedIndex !== selectedChordIndex);
+      }
       setSelectedChordIndex(nextSelectedIndex);
       setSelectedNote(null);
       setSelectedDrumStep(null);
+    } else {
+      setSelectedEventDeleteResult(null);
     }
     return changed;
   }
@@ -8231,6 +8397,7 @@ export function App(): ReactElement {
               }}
             />
             {editorAuditionResult?.kind === "drum" && <EditorAuditionResultStrip result={editorAuditionResult} />}
+            {selectedEventDeleteResult?.kind === "drum" && <SelectedEventDeleteResultStrip result={selectedEventDeleteResult} />}
           </div>
         </section>
 
@@ -8328,6 +8495,7 @@ export function App(): ReactElement {
             />
           )}
           {editorAuditionResult?.kind === "note" && <EditorAuditionResultStrip result={editorAuditionResult} />}
+          {selectedEventDeleteResult?.kind === "note" && <SelectedEventDeleteResultStrip result={selectedEventDeleteResult} />}
         </section>
 
         <section className="panel instrument-panel" data-testid="workflow-target-sound" aria-label="Instrument panel" ref={soundPanelRef}>
@@ -8407,6 +8575,7 @@ export function App(): ReactElement {
             onVoicing={applyChordVoicingPad}
           />
           {editorAuditionResult?.kind === "chord" && <EditorAuditionResultStrip result={editorAuditionResult} />}
+          {selectedEventDeleteResult?.kind === "chord" && <SelectedEventDeleteResultStrip result={selectedEventDeleteResult} />}
         </section>
 
         <section className="panel arrangement-panel" data-testid="workflow-target-arrange" aria-label="Arrangement" ref={arrangePanelRef}>

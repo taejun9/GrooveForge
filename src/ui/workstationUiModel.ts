@@ -1045,6 +1045,22 @@ export type InputCaptureResult = {
   tone: MixCoachTone;
 };
 
+export type SelectedEventDeleteResultKind = "drum" | "note" | "chord";
+
+export type SelectedEventDeleteResult = {
+  kind: SelectedEventDeleteResultKind;
+  targetId: string;
+  status: "Deleted";
+  title: string;
+  detail: string;
+  patternLabel: string;
+  metricLabel: string;
+  metricValue: string;
+  recoveryCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type BeatReadinessCheckId = "drums" | "bass" | "harmony" | "arrangement" | "export";
 export type BeatReadinessFocusTarget = "compose" | "arrange" | "master" | "deliver";
 
