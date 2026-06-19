@@ -447,6 +447,7 @@ import type {
   ProductionSnapshotMetric,
   ProductionSnapshotSummary,
   ProductionSnapshotFocusSummary,
+  ProductionSnapshotFocusResult,
   KeyCompassCardId,
   KeyCompassFocusId,
   KeyCompassFocusTarget,
@@ -1123,6 +1124,7 @@ export function App(): ReactElement {
   const [beatPassportFocusId, setBeatPassportFocusId] = useState<BeatPassportFocusId | null>(null);
   const [beatPassportResult, setBeatPassportResult] = useState<BeatPassportFocusResult | null>(null);
   const [productionSnapshotFocusId, setProductionSnapshotFocusId] = useState<ProductionSnapshotFocusId | null>(null);
+  const [productionSnapshotResult, setProductionSnapshotResult] = useState<ProductionSnapshotFocusResult | null>(null);
   const [snapshotCompareFocusId, setSnapshotCompareFocusId] = useState<SnapshotCompareFocusId | null>(null);
   const [hookReadinessFocusId, setHookReadinessFocusId] = useState<HookReadinessFocusId | null>(null);
   const [hookFixResult, setHookFixResult] = useState<HookFixResult | null>(null);
@@ -2018,6 +2020,7 @@ export function App(): ReactElement {
     setBeatReadinessResult(null);
     setListeningPassResult(null);
     setBeatPassportResult(null);
+    setProductionSnapshotResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
@@ -2075,6 +2078,7 @@ export function App(): ReactElement {
       setBeatReadinessResult(null);
       setListeningPassResult(null);
       setBeatPassportResult(null);
+      setProductionSnapshotResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
@@ -2224,6 +2228,7 @@ export function App(): ReactElement {
     setBeatReadinessResult(null);
     setListeningPassResult(null);
     setBeatPassportResult(null);
+    setProductionSnapshotResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2284,6 +2289,7 @@ export function App(): ReactElement {
     setBeatReadinessResult(null);
     setListeningPassResult(null);
     setBeatPassportResult(null);
+    setProductionSnapshotResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -6362,6 +6368,7 @@ export function App(): ReactElement {
 
     setProductionSnapshotFocusId(metric.focusId);
     targetRefs[metric.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProductionSnapshotResult(createProductionSnapshotFocusResult(metric, productionSnapshotSummary));
     setProjectStatus(`Snapshot ${metric.label}: ${metric.value}`);
   }
 
@@ -7406,7 +7413,12 @@ export function App(): ReactElement {
         onFocus={focusBeatPassportMetric}
       />
 
-      <ProductionSnapshot focusedMetricId={productionSnapshotFocusId} onFocus={focusProductionSnapshotMetric} summary={productionSnapshotSummary} />
+      <ProductionSnapshot
+        focusedMetricId={productionSnapshotFocusId}
+        result={productionSnapshotResult}
+        summary={productionSnapshotSummary}
+        onFocus={focusProductionSnapshotMetric}
+      />
 
       <ExportPreflight
         focusedCardId={exportPreflightFocusId}
@@ -10383,17 +10395,23 @@ function BeatPassportFocusResultStrip({ result }: { result: BeatPassportFocusRes
 
 function ProductionSnapshot({
   focusedMetricId,
+  result,
   onFocus,
   summary
 }: {
   focusedMetricId: ProductionSnapshotFocusId | null;
+  result: ProductionSnapshotFocusResult | null;
   onFocus: (metric: ProductionSnapshotFocusItem) => void;
   summary: ProductionSnapshotSummary;
 }): ReactElement {
   const focusSummary = createProductionSnapshotFocusSummary(summary, focusedMetricId);
 
   return (
-    <section className={`production-snapshot ${summary.tone}`} data-testid="production-snapshot" aria-label="Production snapshot">
+    <section
+      aria-label="Production snapshot"
+      className={["production-snapshot", summary.tone, result ? "has-result" : ""].filter(Boolean).join(" ")}
+      data-testid="production-snapshot"
+    >
       <div className="production-snapshot-heading">
         <div>
           <SlidersHorizontal size={17} aria-hidden="true" />
@@ -10411,6 +10429,7 @@ function ProductionSnapshot({
         <strong data-testid="production-snapshot-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="production-snapshot-focus-detail">{focusSummary.detailLabel}</small>
       </div>
+      {result && <ProductionSnapshotFocusResultStrip result={result} />}
       <div className="production-snapshot-grid" data-testid="production-snapshot-grid">
         {summary.metrics.map((metric) => {
           const focused = focusedMetricId === metric.focusId;
@@ -10440,6 +10459,38 @@ function ProductionSnapshot({
         })}
       </div>
     </section>
+  );
+}
+
+function ProductionSnapshotFocusResultStrip({ result }: { result: ProductionSnapshotFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`production-snapshot-result ${result.tone}`}
+      data-result-production-snapshot={result.metricId}
+      data-testid="production-snapshot-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="production-snapshot-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="production-snapshot-result-title">{result.title}</strong>
+          <small data-testid="production-snapshot-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="production-snapshot-result-destination" data-testid="production-snapshot-result-destination">
+        <span>{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="production-snapshot-result-metric" data-testid="production-snapshot-result-metric">
+        <span data-testid="production-snapshot-result-status">{result.metricLabel}</span>
+        <strong data-testid="production-snapshot-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="production-snapshot-result-followup" data-testid="production-snapshot-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -23431,6 +23482,64 @@ function createProductionSnapshotFocusSummary(
     detailTitle: `${statusLabel} / ${metric.label}: ${metric.value} / ${detailLabel}`,
     tone: metric.tone
   };
+}
+
+function createProductionSnapshotFocusResult(
+  metric: ProductionSnapshotFocusItem,
+  summary: ProductionSnapshotSummary
+): ProductionSnapshotFocusResult {
+  const summaryMetric = summary.metrics.find((item) => item.focusId === metric.focusId) ?? null;
+
+  return {
+    metricId: metric.focusId,
+    status: "Focused",
+    title: `${metric.label} snapshot focused`,
+    detail: `${metric.value}: ${metric.detail}`,
+    destination: `${metric.focusLabel} panel`,
+    metricLabel: "Snapshot",
+    metricValue: productionSnapshotFocusResultMetric(summary),
+    auditionCue: productionSnapshotFocusResultAudition(metric),
+    nextCheck: productionSnapshotFocusResultNextCheck(metric),
+    tone: summaryMetric?.tone ?? "warn"
+  };
+}
+
+function productionSnapshotFocusResultMetric(summary: ProductionSnapshotSummary): string {
+  const readyCount = summary.metrics.filter((metric) => metric.tone === "good").length;
+  const reviewCount = summary.metrics.filter((metric) => metric.tone === "warn").length;
+  const blockerCount = summary.metrics.filter((metric) => metric.tone === "danger").length;
+
+  return `${readyCount}/${summary.metrics.length} session metrics ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function productionSnapshotFocusResultAudition(metric: ProductionSnapshotFocusItem): string {
+  switch (metric.focusId) {
+    case "target":
+      return "Check the delivery target against the current bar count and mix posture before changing the beat.";
+    case "form":
+      return "Play Song loop and scan verse, hook, bridge, and outro movement against the target.";
+    case "patterns":
+      return "Audition Pattern A/B/C across the arrangement and confirm each section has enough contrast.";
+    case "mix":
+      return "Play Full Mix, then use Mix Coach and Stem Audition to hear balance and headroom.";
+    case "handoff":
+      return "Check stems, export status, and Session Brief before sending the beat.";
+  }
+}
+
+function productionSnapshotFocusResultNextCheck(metric: ProductionSnapshotFocusItem): string {
+  switch (metric.focusId) {
+    case "target":
+      return "Return after target fit, arrangement length, and mix posture agree.";
+    case "form":
+      return "Return after the song form has enough section movement for the intended delivery.";
+    case "patterns":
+      return "Return after Pattern coverage supports hook, verse, and variation decisions.";
+    case "mix":
+      return "Return after mix posture, stem balance, and headroom are ready or intentionally deferred.";
+    case "handoff":
+      return "Return after export, stems, and brief context are ready for handoff.";
+  }
 }
 
 function createBeatMapSummary(

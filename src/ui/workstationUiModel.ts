@@ -2362,6 +2362,19 @@ export type ProductionSnapshotFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type ProductionSnapshotFocusResult = {
+  metricId: ProductionSnapshotFocusId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type KeyCompassCardId = "scale" | "chords" | "cadence" | "bass" | "melody" | "focus";
 export type KeyCompassFocusId = KeyCompassCardId;
 export type KeyCompassFocusTarget = "compose";
