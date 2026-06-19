@@ -297,6 +297,7 @@ import type {
   ListeningPassTarget,
   ListeningPassItem,
   ListeningPassSummary,
+  ListeningPassFocusResult,
   PatternDnaFocusSummary,
   StyleInspectorMetricId,
   StyleInspectorFocusId,
@@ -1138,6 +1139,8 @@ export function App(): ReactElement {
   const [styleInspectorResult, setStyleInspectorResult] = useState<StyleInspectorFocusResult | null>(null);
   const [beatReadinessFocusId, setBeatReadinessFocusId] = useState<BeatReadinessCheckId | null>(null);
   const [beatReadinessResult, setBeatReadinessResult] = useState<BeatReadinessFocusResult | null>(null);
+  const [listeningPassFocusId, setListeningPassFocusId] = useState<ListeningPassId | null>(null);
+  const [listeningPassResult, setListeningPassResult] = useState<ListeningPassFocusResult | null>(null);
   const [mixCoachFocusId, setMixCoachFocusId] = useState<string | null>(null);
   const [reviewQueueFocusId, setReviewQueueFocusId] = useState<string | null>(null);
   const [reviewFixResult, setReviewFixResult] = useState<ReviewFixResult | null>(null);
@@ -2011,6 +2014,7 @@ export function App(): ReactElement {
     setPatternDnaResult(null);
     setStyleInspectorResult(null);
     setBeatReadinessResult(null);
+    setListeningPassResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeSwitchResult(null);
@@ -2066,6 +2070,7 @@ export function App(): ReactElement {
       setPatternDnaResult(null);
       setStyleInspectorResult(null);
       setBeatReadinessResult(null);
+      setListeningPassResult(null);
       setQuickActionResult(null);
       setModeSwitchResult(null);
       setModeFocusResult(null);
@@ -2213,6 +2218,7 @@ export function App(): ReactElement {
     setPatternDnaResult(null);
     setStyleInspectorResult(null);
     setBeatReadinessResult(null);
+    setListeningPassResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -2271,6 +2277,7 @@ export function App(): ReactElement {
     setPatternDnaResult(null);
     setStyleInspectorResult(null);
     setBeatReadinessResult(null);
+    setListeningPassResult(null);
     setNextMoveResult(null);
     setQuickActionResult(null);
     setModeFocusResult(null);
@@ -6492,7 +6499,9 @@ export function App(): ReactElement {
       deliver: deliverPanelRef.current
     };
 
+    setListeningPassFocusId(item.id);
     targetRefs[item.focusTarget]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setListeningPassResult(createListeningPassFocusResult(item, listeningPassSummary));
     setProjectStatus(`Listening ${item.label}: ${item.status}`);
   }
 
@@ -7415,7 +7424,12 @@ export function App(): ReactElement {
         onFocus={focusBeatReadinessCheck}
       />
 
-      <ListeningPass summary={listeningPassSummary} onFocus={focusListeningPassItem} />
+      <ListeningPass
+        focusedItemId={listeningPassFocusId}
+        result={listeningPassResult}
+        summary={listeningPassSummary}
+        onFocus={focusListeningPassItem}
+      />
 
       <BeatMap summary={beatMapSummary} actions={beatMapActions} onRun={runNextMove} />
 
@@ -10167,14 +10181,22 @@ function SessionBriefStarterResultStrip({ result }: { result: SessionBriefStarte
 }
 
 function ListeningPass({
+  focusedItemId,
+  result,
   onFocus,
   summary
 }: {
+  focusedItemId: ListeningPassId | null;
+  result: ListeningPassFocusResult | null;
   onFocus: (item: ListeningPassItem) => void;
   summary: ListeningPassSummary;
 }): ReactElement {
   return (
-    <section className={`listening-pass ${summary.tone}`} data-testid="listening-pass" aria-label="Listening pass">
+    <section
+      aria-label="Listening pass"
+      className={["listening-pass", summary.tone, result ? "has-result" : ""].filter(Boolean).join(" ")}
+      data-testid="listening-pass"
+    >
       <div className="listening-pass-heading">
         <div>
           <Disc3 size={17} aria-hidden="true" />
@@ -10183,28 +10205,70 @@ function ListeningPass({
         <strong data-testid="listening-pass-headline">{summary.headline}</strong>
         <small data-testid="listening-pass-detail">{summary.detail}</small>
       </div>
+      {result && <ListeningPassFocusResultStrip result={result} />}
       <div className="listening-pass-grid" data-testid="listening-pass-grid">
-        {summary.items.map((item) => (
-          <div className={`listening-pass-card ${item.tone}`} data-testid={`listening-pass-${item.id}`} key={item.id}>
-            <span>{item.label}</span>
-            <strong>{item.status}</strong>
-            <button
-              className="listening-pass-focus-button"
-              data-testid={`listening-pass-focus-${item.id}`}
-              onClick={() => onFocus(item)}
-              title={`Focus ${item.focusLabel}: ${item.status}`}
-              type="button"
+        {summary.items.map((item) => {
+          const focused = focusedItemId === item.id;
+          return (
+            <div
+              className={["listening-pass-card", item.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
+              data-focused={focused ? "true" : "false"}
+              data-testid={`listening-pass-${item.id}`}
+              key={item.id}
             >
-              <ArrowRight size={13} aria-hidden="true" />
-              <span>{item.focusLabel}</span>
-            </button>
-            <small>{item.cue}</small>
-            <em>{item.detail}</em>
-            <b>{item.metric}</b>
-          </div>
-        ))}
+              <span>{item.label}</span>
+              <strong>{item.status}</strong>
+              <button
+                aria-pressed={focused}
+                className="listening-pass-focus-button"
+                data-testid={`listening-pass-focus-${item.id}`}
+                onClick={() => onFocus(item)}
+                title={`Focus ${item.focusLabel}: ${item.status}`}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{item.focusLabel}</span>
+              </button>
+              <small>{item.cue}</small>
+              <em>{item.detail}</em>
+              <b>{item.metric}</b>
+            </div>
+          );
+        })}
       </div>
     </section>
+  );
+}
+
+function ListeningPassFocusResultStrip({ result }: { result: ListeningPassFocusResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`listening-pass-result ${result.tone}`}
+      data-result-listening-pass={result.itemId}
+      data-testid="listening-pass-result"
+      title={`${result.title}: ${result.detail}`}
+    >
+      <div className="listening-pass-result-main">
+        <Target size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="listening-pass-result-title">{result.title}</strong>
+          <small data-testid="listening-pass-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="listening-pass-result-destination" data-testid="listening-pass-result-destination">
+        <span>{result.status}</span>
+        <strong>{result.destination}</strong>
+      </div>
+      <div className="listening-pass-result-metric" data-testid="listening-pass-result-metric">
+        <span data-testid="listening-pass-result-status">{result.metricLabel}</span>
+        <strong data-testid="listening-pass-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="listening-pass-result-followup" data-testid="listening-pass-result-followup">
+        <span>{result.auditionCue}</span>
+        <small>{result.nextCheck}</small>
+      </div>
+    </div>
   );
 }
 
@@ -26841,6 +26905,55 @@ function createListeningPassSummary(
     tone,
     items
   };
+}
+
+function createListeningPassFocusResult(item: ListeningPassItem, summary: ListeningPassSummary): ListeningPassFocusResult {
+  return {
+    itemId: item.id,
+    status: "Focused",
+    title: `${item.label} listening focused`,
+    detail: `${item.status}: ${item.detail}`,
+    destination: `${item.focusLabel} panel`,
+    metricLabel: "Listening",
+    metricValue: listeningPassFocusResultMetric(summary),
+    auditionCue: listeningPassFocusResultAudition(item),
+    nextCheck: listeningPassFocusResultNextCheck(item),
+    tone: item.tone
+  };
+}
+
+function listeningPassFocusResultMetric(summary: ListeningPassSummary): string {
+  const readyCount = summary.items.filter((item) => item.tone === "good").length;
+  const reviewCount = summary.items.filter((item) => item.tone === "warn").length;
+  const blockerCount = summary.items.filter((item) => item.tone === "danger").length;
+
+  return `${readyCount}/${summary.items.length} passes ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
+function listeningPassFocusResultAudition(item: ListeningPassItem): string {
+  switch (item.id) {
+    case "composition":
+      return "Loop the selected Pattern and listen for drums, 808, chords, and synth as one idea.";
+    case "arrangement":
+      return "Play Song loop and compare section length, energy, Pattern changes, and target fit.";
+    case "mix":
+      return "Play Full Mix, then audition stems to hear balance, low end, and headroom.";
+    case "delivery":
+      return "Check the full mix against the delivery target, stems, brief, and handoff posture.";
+  }
+}
+
+function listeningPassFocusResultNextCheck(item: ListeningPassItem): string {
+  switch (item.id) {
+    case "composition":
+      return "Return after the core loop has a clear musical idea and no missing foundation layer.";
+    case "arrangement":
+      return "Return after the beat has enough section movement for the intended target.";
+    case "mix":
+      return "Return after the mix has controlled headroom and audible stem balance.";
+    case "delivery":
+      return "Return after export, stems, MIDI, and session context are ready for handoff.";
+  }
 }
 
 function listeningPassFocusLabel(target: ListeningPassTarget): string {

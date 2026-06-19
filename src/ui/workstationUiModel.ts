@@ -1266,6 +1266,19 @@ export type ListeningPassSummary = {
   items: ListeningPassItem[];
 };
 
+export type ListeningPassFocusResult = {
+  itemId: ListeningPassId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type PatternDnaFocusSummary = {
   cardId: PatternDnaCardId | null;
   statusLabel: string;
