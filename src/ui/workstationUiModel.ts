@@ -3458,6 +3458,19 @@ export type SessionBriefCompassSummary = {
   cards: SessionBriefCompassCard[];
 };
 
+export type SessionBriefCompassFocusResult = {
+  cardId: SessionBriefCompassCardId;
+  status: string;
+  title: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type ReferenceAlignmentCardId = "reference" | "direction" | "arrangement" | "mix" | "listen" | "handoff";
 export type ReferenceAlignmentFocusTarget = "artist" | "vibe" | "reference" | "notes" | "arrange" | "master" | "deliver";
 
