@@ -289,7 +289,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "mix-snapshot-ab", command: "Mix Snapshot A/B", shortcut: "Quick Actions", target: "Headroom / balance compare" },
       { id: "mix-balance-decision", command: "Mix Balance Decision", shortcut: "Quick Actions", target: "Suggested rough balance" },
       { id: "mix-balance", command: "Mix Balance", shortcut: "Quick Actions", target: "Rough balance pads" },
-      { id: "mix-coach", command: "Mix Coach", shortcut: "Quick Actions", target: "Headroom / balance" }
+      { id: "mix-coach", command: "Mix Coach", shortcut: "Quick Actions / Readout", target: "Headroom / balance" }
     ]
   },
   {
