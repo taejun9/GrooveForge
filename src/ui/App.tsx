@@ -17919,7 +17919,7 @@ function createQuickActions({
     };
   });
   const drumKitReady = drumKitPreviewSummary.statusLabel !== "Kit aligned";
-  const mixBalanceReady = mixBalancePreviewSummary.statusLabel !== "Balance aligned";
+  const mixBalanceReady = mixBalancePreviewSummary.changedControls > 0;
   const masterAutomationSuggestedPad =
     masterAutomationPadOptions.find((pad) => pad.id === suggestedMasterAutomationPad()) ?? masterAutomationPadOptions[0];
   const masterAutomationReady = Boolean(masterAutomationSuggestedPad && masterAutomationSuggestedPad.changedCount > 0);
@@ -32887,6 +32887,8 @@ function createMixBalancePreviewSummary(mixer: MixerChannel[], pads: MixBalanceP
   if (!pad) {
     return {
       padId: "clean",
+      changedChannels: 0,
+      changedControls: 0,
       statusLabel: "Balance aligned",
       padLabel: "No balance target",
       channelLabel: "No channel target",
@@ -32906,6 +32908,8 @@ function createMixBalancePreviewSummary(mixer: MixerChannel[], pads: MixBalanceP
 
   return {
     padId: pad.id,
+    changedChannels: pad.changedCount,
+    changedControls,
     statusLabel: changedControls === 0 ? "Balance aligned" : "Suggested balance",
     padLabel: `${pad.label} balance`,
     channelLabel,

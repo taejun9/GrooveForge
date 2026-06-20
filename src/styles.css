@@ -22193,6 +22193,95 @@ input[type="range"] {
   font-size: 10px;
 }
 
+.mix-balance-decision {
+  display: grid;
+  grid-template-columns: minmax(106px, 0.72fr) minmax(116px, 0.86fr) minmax(118px, 0.82fr) minmax(190px, 1.38fr) minmax(154px, auto);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(255, 209, 102, 0.28);
+  border-radius: 6px;
+  background: rgba(255, 209, 102, 0.065);
+  padding: 6px 7px;
+}
+
+.mix-balance-decision.good {
+  border-color: rgba(120, 240, 200, 0.22);
+  background: rgba(120, 240, 200, 0.055);
+}
+
+.mix-balance-decision.danger {
+  border-color: rgba(255, 122, 79, 0.32);
+  background: rgba(255, 122, 79, 0.07);
+}
+
+.mix-balance-decision > * {
+  min-width: 0;
+}
+
+.mix-balance-decision span,
+.mix-balance-decision strong,
+.mix-balance-decision small,
+.mix-balance-decision-run span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mix-balance-decision > span {
+  color: #08120f;
+  background: #ffd166;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.mix-balance-decision.good > span {
+  background: #78f0c8;
+}
+
+.mix-balance-decision.danger > span {
+  background: #ff7a4f;
+}
+
+.mix-balance-decision > strong {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mix-balance-decision > small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 10px;
+}
+
+.mix-balance-decision-run {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 28px;
+  border-color: rgba(120, 240, 200, 0.42);
+  color: #08120f;
+  background: #78f0c8;
+  padding: 0 9px;
+}
+
+.mix-balance-decision-run:disabled {
+  border-color: rgba(244, 239, 231, 0.12);
+  color: rgba(244, 239, 231, 0.42);
+  background: rgba(244, 239, 231, 0.08);
+}
+
+.mix-balance-decision-run svg {
+  color: currentColor;
+}
+
 .mix-balance-result {
   display: grid;
   grid-template-columns: minmax(150px, 0.84fr) minmax(170px, 0.86fr) minmax(330px, 1.3fr) minmax(260px, 1.08fr);
@@ -25889,6 +25978,10 @@ input[type="range"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .mix-balance-decision {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .mix-balance-result,
   .mix-balance-result-meta,
   .mix-balance-result-metrics,
@@ -27100,6 +27193,11 @@ input[type="range"] {
   }
 
   .mix-balance-preview {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .mix-balance-decision {
     grid-template-columns: 1fr;
     gap: 4px;
   }

@@ -623,11 +623,26 @@ export type MixBalancePadOption = MixBalancePadDefinition & {
 
 export type MixBalancePreviewSummary = {
   padId: MixBalancePadId;
+  changedChannels: number;
+  changedControls: number;
   statusLabel: string;
   padLabel: string;
   channelLabel: string;
   auditionLabel: string;
   moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export type MixBalancePreviewDecisionSummary = {
+  padId: MixBalancePadId;
+  actionId: "apply-suggested" | "aligned";
+  statusLabel: string;
+  padLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  actionLabel: string;
+  disabled: boolean;
   detailTitle: string;
   tone: MixCoachTone;
 };

@@ -11,6 +11,7 @@ import type {
   MasterFinishResult,
   MixBalancePadId,
   MixBalancePadOption,
+  MixBalancePreviewDecisionSummary,
   MixBalancePreviewSummary,
   MixBalanceResult,
   MixCoachCheck,
@@ -43,6 +44,8 @@ export function MixBalancePads({
   result: MixBalanceResult | null;
   onApply: (pad: MixBalancePadId) => void;
 }): ReactElement {
+  const decision = createMixBalancePreviewDecision(preview);
+
   return (
     <div className="mix-balance-panel" data-testid="mix-balance-pads">
       <div className="mix-balance-heading">
@@ -61,6 +64,7 @@ export function MixBalancePads({
         <small data-testid="mix-balance-preview-audition">{preview.auditionLabel}</small>
         <small data-testid="mix-balance-preview-moves">{preview.moveLabel}</small>
       </div>
+      <MixBalancePreviewDecision summary={decision} onApply={() => onApply(decision.padId)} />
       {result && <MixBalanceResultStrip result={result} />}
       <div className="mix-balance-row" aria-label="Mix Balance Pads">
         {pads.map((pad) => (
@@ -79,6 +83,59 @@ export function MixBalancePads({
       </div>
     </div>
   );
+}
+
+export function MixBalancePreviewDecision({
+  summary,
+  onApply
+}: {
+  summary: MixBalancePreviewDecisionSummary;
+  onApply: () => void;
+}): ReactElement {
+  return (
+    <div
+      className={`mix-balance-decision ${summary.tone}`}
+      data-mix-balance-decision={summary.padId}
+      data-testid="mix-balance-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="mix-balance-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="mix-balance-decision-label">{summary.padLabel}</strong>
+      <small data-testid="mix-balance-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="mix-balance-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="mix-balance-decision-run"
+        data-mix-balance-decision-action={summary.actionId}
+        data-testid="mix-balance-decision-run"
+        disabled={summary.disabled}
+        onClick={onApply}
+        title={summary.disabled ? "Current mixer already matches this balance" : `Apply ${summary.padLabel}`}
+        type="button"
+      >
+        <Gauge size={12} aria-hidden="true" />
+        <span data-testid="mix-balance-decision-action">{summary.actionLabel}</span>
+      </button>
+    </div>
+  );
+}
+
+function createMixBalancePreviewDecision(summary: MixBalancePreviewSummary): MixBalancePreviewDecisionSummary {
+  const aligned = summary.changedControls === 0;
+
+  return {
+    padId: summary.padId,
+    actionId: aligned ? "aligned" : "apply-suggested",
+    statusLabel: aligned ? "Balance aligned" : "Ready to apply",
+    padLabel: summary.padLabel,
+    metricLabel: `${summary.changedChannels} channels / ${summary.changedControls} controls`,
+    detailLabel: aligned ? "Current editable mixer already matches this balance." : `${summary.channelLabel} / ${summary.auditionLabel}`,
+    actionLabel: aligned ? "Aligned" : "Apply Suggested Balance",
+    disabled: aligned,
+    detailTitle: aligned
+      ? `${summary.detailTitle} No Mix Balance action is needed.`
+      : `${summary.detailTitle} Apply only after this rough balance fits the beat.`,
+    tone: aligned ? "good" : summary.tone
+  };
 }
 
 function MixBalanceResultStrip({ result }: { result: MixBalanceResult }): ReactElement {
