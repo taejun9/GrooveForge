@@ -3,7 +3,7 @@ import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { BassNote, ChordEvent, ChordProgressionPreset, ChordQuality, DrumLane, MelodyNote, NoteTrack, PatternSlot, PatternVariationPreset, ProjectState, SoundDesign } from "../domain/workstation";
 import { chordInversions, chordInversionLabel, chordProgressionPresetIds, chordProgressionPresetLabel, chordQualities, drumStepProbability, drumStepTimingMs, drumStepVelocity, hatRepeatCount, maxDrumTimingMs, minDrumTimingMs, normalizeChordInversion, normalizeDrumProbability, normalizeDrumTimingMs, normalizeDrumVelocity, normalizeEventProbability, normalizeHatRepeat, scalePitchNames, soundPresetDesign, soundPresetIds, soundPresetLabel, steps } from "../domain/workstation";
-import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneSuggestionSummary, PatternCloneResult, PatternFillPreviewSummary, PatternFillSuggestionSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationSuggestionSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundSnapshot, SoundSnapshotComparisonSummary, SoundSnapshotSlotId, SoundSnapshotSlotMap, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
+import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneSuggestionSummary, PatternCloneResult, PatternFillPreviewSummary, PatternFillSuggestionSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationSuggestionSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewDecisionSummary, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundSnapshot, SoundSnapshotComparisonSummary, SoundSnapshotSlotId, SoundSnapshotSlotMap, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
 import { drumLabels, keyboardCaptureKeyLabels } from "./workstationUiModel";
 import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyChordStep, percentLabel, pitchParts, timingLabel, trackOctaveRange } from "./workstationPatternTools";
 
@@ -1645,6 +1645,7 @@ export function SoundDesigner({
   const [studioToneResetResult, setStudioToneResetResult] = useState<StudioToneResetResult | null>(null);
   const presetBaseline = studioToneBaseline.sound;
   const studioToneDrift = createStudioToneDriftSummary(sound, presetBaseline);
+  const presetDecision = createSoundPresetPreviewDecision(presetPreview);
 
   useEffect(() => {
     if (sound.preset !== "custom") {
@@ -1704,6 +1705,7 @@ export function SoundDesigner({
         ))}
       </div>
       <SoundPresetPreview summary={presetPreview} onApply={() => onApplyPreset(presetPreviewId)} />
+      <SoundPresetPreviewDecision summary={presetDecision} onApply={() => onApplyPreset(presetDecision.presetId)} />
       {presetResult && <SoundPresetResultStrip result={presetResult} />}
       <DrumKitPads pads={drumKitPads} preview={drumKitPreview} result={drumKitResult} onApply={onDrumKitPad} />
       <SoundFocusPads pads={focusPads} preview={focusPreview} result={focusResult} onApply={onFocusPad} />
@@ -2007,6 +2009,59 @@ export function SoundPresetPreview({
       </button>
     </div>
   );
+}
+
+export function SoundPresetPreviewDecision({
+  summary,
+  onApply
+}: {
+  summary: SoundPresetPreviewDecisionSummary;
+  onApply: () => void;
+}): ReactElement {
+  return (
+    <div
+      className={`sound-preset-decision ${summary.tone}`}
+      data-sound-preset-decision={summary.presetId}
+      data-testid="sound-preset-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="sound-preset-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="sound-preset-decision-label">{summary.presetLabel}</strong>
+      <small data-testid="sound-preset-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="sound-preset-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="sound-preset-decision-run"
+        data-sound-preset-decision-action={summary.actionId}
+        data-testid="sound-preset-decision-run"
+        disabled={summary.disabled}
+        onClick={onApply}
+        title={summary.disabled ? "Current sound already matches this preview" : `Apply ${summary.presetLabel}`}
+        type="button"
+      >
+        <SlidersHorizontal size={12} aria-hidden="true" />
+        <span data-testid="sound-preset-decision-action">{summary.actionLabel}</span>
+      </button>
+    </div>
+  );
+}
+
+function createSoundPresetPreviewDecision(summary: SoundPresetPreviewSummary): SoundPresetPreviewDecisionSummary {
+  const aligned = summary.changedMoves === 0;
+
+  return {
+    presetId: summary.presetId,
+    actionId: aligned ? "aligned" : "apply-preview",
+    statusLabel: aligned ? "Preset aligned" : "Ready to apply",
+    presetLabel: summary.presetLabel,
+    metricLabel: summary.changeLabel,
+    detailLabel: aligned ? "Current editable tone already matches this preview." : summary.toneLabel,
+    actionLabel: aligned ? "Aligned" : "Apply Preview",
+    disabled: aligned,
+    detailTitle: aligned
+      ? `${summary.detailTitle} No Sound Preset action is needed.`
+      : `${summary.detailTitle} Apply only after this full-tone target fits the beat.`,
+    tone: aligned ? "good" : summary.tone
+  };
 }
 
 export function SoundPresetResultStrip({ result }: { result: SoundPresetResult }): ReactElement {

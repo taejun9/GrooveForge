@@ -33903,6 +33903,7 @@ function createSoundPresetPreviewSummary(sound: SoundDesign, presetId: SoundPres
 
   return {
     presetId,
+    changedMoves,
     statusLabel: changedMoves === 0 ? "Preset aligned" : "Preview preset",
     presetLabel: `${presetLabel} target`,
     toneLabel,

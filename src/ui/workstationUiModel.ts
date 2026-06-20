@@ -819,10 +819,24 @@ export type SoundPresetTarget = (typeof soundPresetIds)[number];
 
 export type SoundPresetPreviewSummary = {
   presetId: SoundPresetTarget;
+  changedMoves: number;
   statusLabel: string;
   presetLabel: string;
   toneLabel: string;
   changeLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export type SoundPresetPreviewDecisionSummary = {
+  presetId: SoundPresetTarget;
+  actionId: "apply-preview" | "aligned";
+  statusLabel: string;
+  presetLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  actionLabel: string;
+  disabled: boolean;
   detailTitle: string;
   tone: MixCoachTone;
 };
