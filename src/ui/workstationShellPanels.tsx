@@ -252,7 +252,9 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "sound-focus-decision", command: "Sound Focus Decision", shortcut: "Quick Actions", target: "Suggested tone focus" },
       { id: "sound-focus", command: "Sound Focus", shortcut: "Quick Actions", target: "808 / Synth / Chords" },
       { id: "timbre-check", command: "Timbre Check", shortcut: "Quick Actions / Readout", target: "Drums / 808 / air / width" },
+      { id: "sound-snapshot-decision", command: "Sound Snapshot A/B Decision", shortcut: "Quick Actions", target: "Capture / recall recommendation" },
       { id: "sound-snapshot-ab", command: "Sound Snapshot A/B", shortcut: "Quick Actions", target: "Tone-pass compare" },
+      { id: "space-fx-decision", command: "Space FX Decision", shortcut: "Quick Actions", target: "Suggested send space" },
       { id: "space-fx", command: "Space FX", shortcut: "Quick Actions", target: "Dry / room / wide / wash" }
     ]
   },
@@ -279,7 +281,10 @@ const commandReferenceSections: CommandReferenceSection[] = [
     title: "Mix",
     items: [
       { id: "stem-audition-readout", command: "Stem Audition Readout", shortcut: "Readout", target: "Full Mix / stems" },
+      { id: "stem-audition-decision", command: "Stem Audition Decision", shortcut: "Quick Actions", target: "Next mix audition" },
       { id: "stem-audition", command: "Stem Audition", shortcut: "Quick Actions", target: "Full Mix / Drums / 808 / Synth / Chords" },
+      { id: "mix-snapshot-decision", command: "Mix Snapshot A/B Decision", shortcut: "Quick Actions", target: "Capture / recall recommendation" },
+      { id: "mix-snapshot-ab", command: "Mix Snapshot A/B", shortcut: "Quick Actions", target: "Headroom / balance compare" },
       { id: "mix-balance-decision", command: "Mix Balance Decision", shortcut: "Quick Actions", target: "Suggested rough balance" },
       { id: "mix-balance", command: "Mix Balance", shortcut: "Quick Actions", target: "Rough balance pads" },
       { id: "mix-coach", command: "Mix Coach", shortcut: "Quick Actions", target: "Headroom / balance" }
@@ -289,6 +294,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
     id: "finish-fast-path",
     title: "Finish",
     items: [
+      { id: "master-finish-decision", command: "Master Finish Decision", shortcut: "Quick Actions", target: "Suggested output posture" },
       { id: "master-finish", command: "Master Finish", shortcut: "Quick Actions", target: "Output posture" },
       { id: "master-automation-decision", command: "Master Automation Decision", shortcut: "Quick Actions", target: "Suggested fade" },
       { id: "master-automation", command: "Master Automation", shortcut: "Quick Actions", target: "Fade in / out" },
