@@ -2510,6 +2510,16 @@ export type ArrangementTransitionMapFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type ArrangementTransitionMapPrioritySummary = {
+  transitionId: ArrangementTransitionMapFocusId | null;
+  statusLabel: string;
+  transitionLabel: string;
+  reasonLabel: string;
+  nextCheckLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementTransitionMapFocusResult = {
   transitionId: ArrangementTransitionMapFocusId;
   status: string;

@@ -12056,6 +12056,9 @@ h2 {
 .arrangement-transition-map-focus-readout span,
 .arrangement-transition-map-focus-readout strong,
 .arrangement-transition-map-focus-readout small,
+.arrangement-transition-map-priority span,
+.arrangement-transition-map-priority strong,
+.arrangement-transition-map-priority small,
 .arrangement-transition-map-result-main strong,
 .arrangement-transition-map-result-main small,
 .arrangement-transition-map-result-meta span,
@@ -12113,6 +12116,39 @@ h2 {
 }
 
 .arrangement-transition-map-focus-readout strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.arrangement-transition-map-priority {
+  display: grid;
+  grid-template-columns: minmax(98px, 0.42fr) minmax(0, 0.9fr) minmax(0, 1.18fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(158, 231, 255, 0.22);
+  border-radius: 7px;
+  background: rgba(158, 231, 255, 0.055);
+  padding: 8px 9px;
+}
+
+.arrangement-transition-map-priority.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.arrangement-transition-map-priority.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.arrangement-transition-map-priority span,
+.arrangement-transition-map-priority small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+}
+
+.arrangement-transition-map-priority strong {
   color: #f4efe7;
   font-size: 11px;
 }
@@ -23345,6 +23381,7 @@ input[type="range"] {
   .arrangement-mute-map-lanes,
   .arrangement-mute-map-grid,
   .arrangement-mute-map-priority,
+  .arrangement-transition-map-priority,
   .arrangement-transition-map-grid {
     grid-column: 1 / -1;
   }
@@ -24700,6 +24737,7 @@ input[type="range"] {
   .arrangement-mute-map-lanes,
   .arrangement-mute-map-grid,
   .arrangement-transition-map-focus-readout,
+  .arrangement-transition-map-priority,
   .arrangement-transition-map-grid {
     grid-column: 1;
   }
@@ -24712,6 +24750,7 @@ input[type="range"] {
   .arrangement-mute-map-grid,
   .arrangement-mute-map-segment,
   .arrangement-transition-map-focus-readout,
+  .arrangement-transition-map-priority,
   .arrangement-transition-map-grid,
   .arrangement-transition-map-card,
   .arrangement-transition-map-card-actions,

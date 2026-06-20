@@ -442,6 +442,7 @@ import type {
   ArrangementTransitionMapTransition,
   ArrangementTransitionMapSummary,
   ArrangementTransitionMapFocusSummary,
+  ArrangementTransitionMapPrioritySummary,
   ArrangementTransitionMapFocusResult,
   SectionLocatorPad,
   ArrangementBlockRoleSummary,
@@ -14941,6 +14942,7 @@ function ArrangementTransitionMap({
   summary: ArrangementTransitionMapSummary;
 }): ReactElement {
   const focusSummary = createArrangementTransitionMapFocusSummary(summary, focusedTransitionId);
+  const prioritySummary = createArrangementTransitionMapPrioritySummary(summary);
 
   return (
     <section
@@ -14964,6 +14966,17 @@ function ArrangementTransitionMap({
         <span data-testid="arrangement-transition-map-focus-status">{focusSummary.statusLabel}</span>
         <strong data-testid="arrangement-transition-map-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="arrangement-transition-map-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
+      <div
+        className={`arrangement-transition-map-priority ${prioritySummary.tone}`}
+        data-arrangement-transition-map-priority={prioritySummary.transitionId ?? "none"}
+        data-testid="arrangement-transition-map-priority"
+        title={prioritySummary.detailTitle}
+      >
+        <span data-testid="arrangement-transition-map-priority-status">{prioritySummary.statusLabel}</span>
+        <strong data-testid="arrangement-transition-map-priority-transition">{prioritySummary.transitionLabel}</strong>
+        <small data-testid="arrangement-transition-map-priority-reason">{prioritySummary.reasonLabel}</small>
+        <small data-testid="arrangement-transition-map-priority-next-check">{prioritySummary.nextCheckLabel}</small>
       </div>
       {result && <ArrangementTransitionMapFocusResultStrip result={result} />}
       <div className="arrangement-transition-map-grid" data-testid="arrangement-transition-map-grid">
@@ -27843,6 +27856,69 @@ function createArrangementTransitionMapFocusSummary(
     detailTitle: `${statusLabel} / ${transition.value}: ${transition.status} / ${detailLabel}`,
     tone: transition.tone
   };
+}
+
+function createArrangementTransitionMapPrioritySummary(
+  summary: ArrangementTransitionMapSummary
+): ArrangementTransitionMapPrioritySummary {
+  const transition = activeArrangementTransitionMapQuickActionTransition(summary);
+
+  if (!transition) {
+    return {
+      transitionId: null,
+      statusLabel: "Build form first",
+      transitionLabel: "No transition available",
+      reasonLabel: "Add at least two arrangement blocks before checking handoffs",
+      nextCheckLabel: "Next: create a second section before cueing a transition loop.",
+      detailTitle: "Arrangement Transition Map priority has no available transition.",
+      tone: "danger"
+    };
+  }
+
+  const statusLabel = arrangementTransitionMapPriorityStatus(transition);
+  const transitionLabel = `${transition.value}: ${transition.status}`;
+  const reasonLabel = arrangementTransitionMapPriorityReason(transition);
+  const nextCheckLabel = arrangementTransitionMapPriorityNextCheck(transition);
+
+  return {
+    transitionId: transition.id,
+    statusLabel,
+    transitionLabel,
+    reasonLabel,
+    nextCheckLabel,
+    detailTitle: `${statusLabel} / ${transitionLabel} / ${reasonLabel} / ${nextCheckLabel}`,
+    tone: transition.tone
+  };
+}
+
+function arrangementTransitionMapPriorityStatus(transition: ArrangementTransitionMapTransition): string {
+  if (transition.tone === "danger") {
+    return "Review first";
+  }
+  if (transition.tone === "warn") {
+    return "Contrast check";
+  }
+  return "Priority handoff";
+}
+
+function arrangementTransitionMapPriorityReason(transition: ArrangementTransitionMapTransition): string {
+  if (transition.tone === "danger") {
+    return `${transition.detail} / flat handoff needs a focused listen`;
+  }
+  if (transition.tone === "warn") {
+    return `${transition.energyLabel} / ${transition.patternLabel} / light transition contrast`;
+  }
+  return `${transition.energyLabel} / ${transition.patternLabel} / ${transition.muteLabel}`;
+}
+
+function arrangementTransitionMapPriorityNextCheck(transition: ArrangementTransitionMapTransition): string {
+  if (transition.tone === "danger") {
+    return "Next: cue this turn and decide whether it needs a pattern, layer, fill, or energy move.";
+  }
+  if (transition.tone === "warn") {
+    return "Next: compare this handoff against Song Form before editing adjacent blocks.";
+  }
+  return "Next: cue the handoff, then keep arranging if the turn supports the hook.";
 }
 
 function createArrangementTransitionMapFocusResult(
