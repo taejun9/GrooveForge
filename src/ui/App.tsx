@@ -9259,6 +9259,7 @@ export function App(): ReactElement {
                   selectedArrangementIndex,
                   project.arrangement.length
                 )}
+                onApply={applyArrangementMoveToSelected}
               />
               <div className="arrangement-move-row" aria-label="Arrangement moves">
                 {arrangementMovePresetIds.map((preset) => (
@@ -10788,7 +10789,14 @@ function ArrangementArcPads({
   );
 }
 
-function ArrangementMovePriorityReadout({ summary }: { summary: ArrangementMovePrioritySummary }): ReactElement {
+function ArrangementMovePriorityReadout({
+  onApply,
+  summary
+}: {
+  onApply: (preset: ArrangementMovePreset) => void;
+  summary: ArrangementMovePrioritySummary;
+}): ReactElement {
+  const disabled = summary.presetId === "none";
   return (
     <div
       className={`arrangement-move-priority ${summary.tone}`}
@@ -10802,6 +10810,19 @@ function ArrangementMovePriorityReadout({ summary }: { summary: ArrangementMoveP
       <small data-testid="arrangement-move-priority-scope">{summary.scopeLabel}</small>
       <small data-testid="arrangement-move-priority-impact">{summary.impactLabel}</small>
       <small data-testid="arrangement-move-priority-next-check">{summary.nextCheckLabel}</small>
+      <button
+        data-testid="arrangement-move-priority-run"
+        disabled={disabled}
+        onClick={() => {
+          if (summary.presetId !== "none") {
+            onApply(summary.presetId);
+          }
+        }}
+        title={disabled ? summary.reasonLabel : `Apply ${summary.presetLabel} move`}
+        type="button"
+      >
+        {disabled ? "Select Block" : summary.presetLabel}
+      </button>
     </div>
   );
 }
