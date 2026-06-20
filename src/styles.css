@@ -255,6 +255,7 @@ h2 {
 .space-fx-row button span,
 .stem-audition-heading span,
 .stem-audition-row button span,
+.mix-coach-priority span,
 .master-finish-heading span,
 .master-finish-row button span,
 .studio-controls span,
@@ -22520,6 +22521,51 @@ input[type="range"] {
   font-size: 12px;
 }
 
+.mix-coach-priority {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.34fr) minmax(0, 0.78fr) minmax(0, 1.08fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.22);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.05);
+  padding: 7px 8px;
+}
+
+.mix-coach-priority.good {
+  border-color: rgba(120, 240, 200, 0.24);
+  background: rgba(120, 240, 200, 0.055);
+}
+
+.mix-coach-priority.warn {
+  border-color: rgba(240, 195, 106, 0.3);
+  background: rgba(240, 195, 106, 0.07);
+}
+
+.mix-coach-priority.danger {
+  border-color: rgba(255, 122, 79, 0.32);
+  background: rgba(255, 122, 79, 0.07);
+}
+
+.mix-coach-priority > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mix-coach-priority span,
+.mix-coach-priority small {
+  color: rgba(244, 239, 231, 0.66);
+  font-size: 11px;
+}
+
+.mix-coach-priority strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
 .mix-coach-result {
   display: grid;
   grid-template-columns: minmax(150px, 0.34fr) minmax(118px, 0.2fr) minmax(190px, 0.42fr) minmax(0, 1fr);
@@ -23727,6 +23773,10 @@ input[type="range"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .mix-coach-priority {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .mix-coach-result,
   .mix-coach-result-destination,
   .mix-coach-result-metric,
@@ -24802,6 +24852,7 @@ input[type="range"] {
     gap: 4px;
   }
 
+  .mix-coach-priority,
   .mix-coach-result,
   .mix-coach-result-destination,
   .mix-coach-result-metric,

@@ -587,6 +587,8 @@ export function MixCoach({
   onApplyFix: (preset: MixFixPreset) => void;
   onFocusCheck: (check: MixCoachCheck) => void;
 }): ReactElement {
+  const priority = createMixCoachPriority(checks);
+
   return (
     <div className="mix-coach" data-testid="mix-coach">
       <div className="mix-coach-heading">
@@ -601,6 +603,17 @@ export function MixCoach({
         <span data-testid="mix-coach-focus-status">{focusSummary.statusLabel}</span>
         <strong data-testid="mix-coach-focus-label">{focusSummary.roleLabel}</strong>
         <small data-testid="mix-coach-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
+      <div
+        className={`mix-coach-priority ${priority.tone}`}
+        data-mix-coach-priority={priority.checkId ?? "none"}
+        data-testid="mix-coach-priority"
+        title={priority.title}
+      >
+        <span data-testid="mix-coach-priority-status">{priority.statusLabel}</span>
+        <strong data-testid="mix-coach-priority-label">{priority.areaLabel}</strong>
+        <small data-testid="mix-coach-priority-check">{priority.checkLabel}</small>
+        <small data-testid="mix-coach-priority-next-check">{priority.nextCheckLabel}</small>
       </div>
       {focusResult && <MixCoachFocusResultStrip result={focusResult} />}
       <div
@@ -663,6 +676,62 @@ export function MixCoach({
       </div>
     </div>
   );
+}
+
+type MixCoachPriority = {
+  checkId: string | null;
+  statusLabel: string;
+  areaLabel: string;
+  checkLabel: string;
+  nextCheckLabel: string;
+  title: string;
+  tone: MixCoachCheck["tone"];
+};
+
+function createMixCoachPriority(checks: MixCoachCheck[]): MixCoachPriority {
+  const check = checks.find((candidate) => candidate.tone !== "good") ?? checks[0] ?? null;
+
+  if (!check) {
+    return {
+      checkId: null,
+      statusLabel: "Mix clear",
+      areaLabel: "No priority check",
+      checkLabel: "No Mix Coach checks available",
+      nextCheckLabel: "Next: return after Mix Coach checks are available.",
+      title: "Mix Coach priority has no available check.",
+      tone: "good"
+    };
+  }
+
+  const statusLabel = check.tone === "danger" ? "Mix blocker" : check.tone === "warn" ? "Mix review" : "Mix clear";
+  const nextCheckLabel = mixCoachPriorityNextCheck(check);
+
+  return {
+    checkId: check.id,
+    statusLabel,
+    areaLabel: `${check.label}: ${check.status}`,
+    checkLabel: `Listen first / ${check.detail}`,
+    nextCheckLabel,
+    title: `${statusLabel}: ${check.label}: ${check.status} / ${check.detail} / ${nextCheckLabel}`,
+    tone: check.tone
+  };
+}
+
+function mixCoachPriorityNextCheck(check: MixCoachCheck): string {
+  switch (check.id) {
+    case "headroom":
+      return "Next: play Full Mix and watch peak/headroom before trimming.";
+    case "limiter":
+      return "Next: play the loudest section and compare limiter activity.";
+    case "dynamics":
+      return "Next: play hook and drop sections before changing compression-style controls.";
+    case "stem-balance":
+      return "Next: use Stem Audition to decide which core layer should lead.";
+    case "low-end":
+      return "Next: A/B Drums and 808 before changing low-end balance.";
+    default:
+      return "Next: play Full Mix before choosing a mix move.";
+  }
 }
 
 function MixCoachFocusResultStrip({ result }: { result: MixCoachFocusResult }): ReactElement {
