@@ -18256,6 +18256,7 @@ function createQuickActions({
     };
   });
   const arrangementArcReady = arrangementArcPreviewSummary.statusLabel !== "Arc aligned";
+  const arrangementArcDecisionSummary = createArrangementArcPreviewDecision(arrangementArcPreviewSummary);
   const arrangementTemplateActions: QuickAction[] = arrangementTemplateIds.map((template) => {
     const targetArrangement = createArrangementTemplate(template);
     const changedBlocks = arrangementTemplateChangedBlockCount(project.arrangement, targetArrangement);
@@ -19723,6 +19724,23 @@ function createQuickActions({
       }
     },
     ...arrangementTemplateActions,
+    {
+      id: "arrangement-arc-decision",
+      title: arrangementArcDecisionSummary.disabled
+        ? "Run Arrangement Arc Decision"
+        : `Run Arrangement Arc Decision: ${arrangementArcDecisionSummary.padLabel}`,
+      detail: arrangementArcDecisionSummary.disabled
+        ? arrangementArcDecisionSummary.detailLabel
+        : `${arrangementArcDecisionSummary.statusLabel} / ${arrangementArcDecisionSummary.metricLabel} / ${arrangementArcDecisionSummary.detailLabel}`,
+      group: "Arrange",
+      keywords: `arrangement arc decision preview full song energy section pattern mute hook lift break rise ${arrangementArcDecisionSummary.targetPadId} ${arrangementArcDecisionSummary.padLabel} beginner producer`,
+      disabled: arrangementArcDecisionSummary.disabled,
+      run: () => {
+        if (!arrangementArcDecisionSummary.disabled) {
+          onApplyArrangementArc(arrangementArcDecisionSummary.targetPadId);
+        }
+      }
+    },
     {
       id: "arrangement-arc",
       title: arrangementArcReady ? `Apply ${arrangementArcPreviewSummary.padLabel} Arc` : "Apply Arrangement Arc",
@@ -21602,7 +21620,7 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "arrangement-arc" || action.id.startsWith("arrangement-arc-pad-")) {
+  if (action.id === "arrangement-arc" || action.id === "arrangement-arc-decision" || action.id.startsWith("arrangement-arc-pad-")) {
     return {
       id: "song-arc",
       label: "Song arc",
@@ -22785,10 +22803,13 @@ function quickActionResultFollowup(
     };
   }
 
-  if (action.id === "arrangement-arc" || action.id.startsWith("arrangement-arc-pad-")) {
+  if (action.id === "arrangement-arc" || action.id === "arrangement-arc-decision" || action.id.startsWith("arrangement-arc-pad-")) {
     return {
       auditionCue: "Play Song loop; listen for intro, verse, hook, bridge, and outro energy movement.",
-      nextCheck: `${Math.round(arrangementAverageEnergy(project) * 100)}% average energy; scan Song Form Overview before detailed block edits.`
+      nextCheck:
+        action.id === "arrangement-arc-decision"
+          ? "Return to Arrangement Arc Preview Decision before running another full-song arc move."
+          : `${Math.round(arrangementAverageEnergy(project) * 100)}% average energy; scan Song Form Overview before detailed block edits.`
     };
   }
 
