@@ -7848,6 +7848,7 @@ export function App(): ReactElement {
     songFormOverviewSummary,
     soundFocusPreviewSummary,
     soundPresetPreviewSummary,
+    soundSnapshotComparison,
     soundSnapshots,
     spaceFxPadOptions,
     spaceFxPreviewSummary,
@@ -16888,6 +16889,7 @@ function createQuickActions({
   songFormOverviewSummary,
   soundFocusPreviewSummary,
   soundPresetPreviewSummary,
+  soundSnapshotComparison,
   soundSnapshots,
   spaceFxPadOptions,
   spaceFxPreviewSummary,
@@ -17151,6 +17153,7 @@ function createQuickActions({
   songFormOverviewSummary: SongFormOverviewSummary;
   soundFocusPreviewSummary: SoundFocusPreviewSummary;
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
+  soundSnapshotComparison: SoundSnapshotComparisonSummary;
   soundSnapshots: SoundSnapshotSlotMap;
   spaceFxPadOptions: SpaceFxPadOption[];
   spaceFxPreviewSummary: SpaceFxPreviewSummary;
@@ -18487,7 +18490,33 @@ function createQuickActions({
       }
     }
   }));
+  const soundSnapshotDecisionAction: QuickAction = {
+    id: "sound-snapshot-decision",
+    title: `Run Sound Snapshot Decision: ${soundSnapshotComparison.actionLabel}`,
+    detail: `${soundSnapshotComparison.statusLabel} / ${soundSnapshotComparison.winnerLabel} / ${soundSnapshotComparison.detailLabel}`,
+    group: "Create",
+    keywords: `Quick Actions Sound Snapshot Decision decision readout capture recall compare tone timbre preset drums 808 synth chords ${
+      soundSnapshotComparison.actionId
+    } ${soundSnapshotComparison.actionLabel} beginner producer`,
+    run: () => {
+      switch (soundSnapshotComparison.actionId) {
+        case "capture-a":
+          onCaptureSoundSnapshot("A");
+          return;
+        case "capture-b":
+          onCaptureSoundSnapshot("B");
+          return;
+        case "recall-a":
+          onRecallSoundSnapshot("A");
+          return;
+        case "recall-b":
+          onRecallSoundSnapshot("B");
+          return;
+      }
+    }
+  };
   const soundSnapshotActions: QuickAction[] = [
+    soundSnapshotDecisionAction,
     {
       id: "sound-snapshot-capture-a",
       title: "Capture Sound Snapshot A",
@@ -20542,7 +20571,9 @@ function createQuickActionResult(
   const mixSnapshotDecisionRecallOnly = isMixSnapshotDecisionRecallAction(action);
   const mixSnapshotRecallOnly =
     action.id === "mix-snapshot-recall-a" || action.id === "mix-snapshot-recall-b" || mixSnapshotDecisionRecallOnly;
-  const soundSnapshotRecallOnly = action.id === "sound-snapshot-recall-a" || action.id === "sound-snapshot-recall-b";
+  const soundSnapshotDecisionRecallOnly = isSoundSnapshotDecisionRecallAction(action);
+  const soundSnapshotRecallOnly =
+    action.id === "sound-snapshot-recall-a" || action.id === "sound-snapshot-recall-b" || soundSnapshotDecisionRecallOnly;
   const uiLocal =
     (action.id.startsWith("mix-snapshot-") && !mixSnapshotRecallOnly) ||
     (action.id.startsWith("sound-snapshot-") && !soundSnapshotRecallOnly) ||
@@ -20693,7 +20724,7 @@ function isMixSnapshotDecisionRecallAction(action: QuickAction): boolean {
 }
 
 type SoundSnapshotQuickActionTarget = {
-  id: "capture-a" | "capture-b" | "recall-a" | "recall-b" | "clear";
+  id: "capture-a" | "capture-b" | "recall-a" | "recall-b" | "clear" | "decision";
   label: string;
   metricId: string;
 };
@@ -20710,9 +20741,15 @@ function soundSnapshotQuickActionTarget(actionId: string): SoundSnapshotQuickAct
       return { id: "recall-b", label: "Recall Sound Snapshot B", metricId: "sound-snapshot-recall-b" };
     case "sound-snapshot-clear":
       return { id: "clear", label: "Sound Snapshot A/B", metricId: "sound-snapshot-clear" };
+    case "sound-snapshot-decision":
+      return { id: "decision", label: "Sound Snapshot Decision", metricId: "sound-snapshot-decision" };
     default:
       return null;
   }
+}
+
+function isSoundSnapshotDecisionRecallAction(action: QuickAction): boolean {
+  return action.id === "sound-snapshot-decision" && (action.keywords.includes("recall-a") || action.keywords.includes("recall-b"));
 }
 
 function soundSnapshotQuickActionPosture(sound: SoundDesign): string {
@@ -23053,10 +23090,20 @@ function quickActionResultFollowup(
         nextCheck: "Use Sound Snapshot A/B after at least one preset, kit, focus, or Studio tone change creates something worth comparing."
       };
     }
-    if (action.id === "sound-snapshot-recall-a" || action.id === "sound-snapshot-recall-b") {
+    if (
+      action.id === "sound-snapshot-recall-a" ||
+      action.id === "sound-snapshot-recall-b" ||
+      isSoundSnapshotDecisionRecallAction(action)
+    ) {
       return {
         auditionCue: "Loop Pattern A/B/C with drums, 808, Synth, and Chords active to confirm the recalled tone pass.",
         nextCheck: "Capture the alternate slot again after the next concrete Sound Preset, Drum Kit, Sound Focus, or Studio tone change."
+      };
+    }
+    if (action.id === "sound-snapshot-decision") {
+      return {
+        auditionCue: "Loop Pattern A/B/C and follow the visible Sound Snapshot readout before the next capture.",
+        nextCheck: "Use the Sound Snapshot readout after one concrete preset, kit, focus, or Studio tone change creates an alternate pass."
       };
     }
     return {
