@@ -296,7 +296,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
     id: "finish-fast-path",
     title: "Finish",
     items: [
-      { id: "master-finish-decision", command: "Master Finish Decision", shortcut: "Quick Actions", target: "Suggested output posture" },
+      { id: "master-finish-decision", command: "Master Finish Decision", shortcut: "Quick Actions / Readout", target: "Suggested output posture" },
       { id: "master-finish", command: "Master Finish", shortcut: "Quick Actions", target: "Output posture" },
       { id: "master-automation-decision", command: "Master Automation Decision", shortcut: "Quick Actions / Readout", target: "Suggested fade" },
       { id: "master-automation", command: "Master Automation", shortcut: "Quick Actions", target: "Fade in / out" },
