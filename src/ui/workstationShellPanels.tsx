@@ -254,7 +254,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "sound-focus-decision", command: "Sound Focus Decision", shortcut: "Quick Actions", target: "Suggested tone focus" },
       { id: "sound-focus", command: "Sound Focus", shortcut: "Quick Actions", target: "808 / Synth / Chords" },
       { id: "timbre-check", command: "Timbre Check", shortcut: "Quick Actions / Readout", target: "Drums / 808 / air / width" },
-      { id: "sound-snapshot-decision", command: "Sound Snapshot A/B Decision", shortcut: "Quick Actions", target: "Capture / recall recommendation" },
+      { id: "sound-snapshot-decision", command: "Sound Snapshot A/B Decision", shortcut: "Quick Actions / Readout", target: "Capture / recall recommendation" },
       { id: "sound-snapshot-ab", command: "Sound Snapshot A/B", shortcut: "Quick Actions", target: "Tone-pass compare" },
       { id: "space-fx-decision", command: "Space FX Decision", shortcut: "Quick Actions", target: "Suggested send space" },
       { id: "space-fx", command: "Space FX", shortcut: "Quick Actions", target: "Dry / room / wide / wash" }
