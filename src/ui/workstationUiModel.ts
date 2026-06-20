@@ -2123,12 +2123,26 @@ export type ArrangementArcPreviewSummary = {
 
 export type ArrangementTemplatePreviewSummary = {
   templateId: ArrangementTemplateId | "aligned";
+  changedBlockCount: number;
+  changedFieldCount: number;
   statusLabel: string;
   templateLabel: string;
   sectionLabel: string;
   patternLabel: string;
   energyLabel: string;
   moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export type ArrangementTemplatePrioritySummary = {
+  templateId: ArrangementTemplatePreviewSummary["templateId"];
+  statusLabel: string;
+  templateLabel: string;
+  reasonLabel: string;
+  scopeLabel: string;
+  moveLabel: string;
+  nextCheckLabel: string;
   detailTitle: string;
   tone: MixCoachTone;
 };

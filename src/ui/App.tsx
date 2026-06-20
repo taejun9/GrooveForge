@@ -398,6 +398,7 @@ import type {
   ArrangementArcPadOption,
   ArrangementArcPreviewSummary,
   ArrangementTemplatePreviewSummary,
+  ArrangementTemplatePrioritySummary,
   ArrangementTemplateResultMetric,
   ArrangementTemplateResultSummary,
   ArrangementArcResultMetric,
@@ -10413,6 +10414,7 @@ function ArrangementTemplateControls({
         <small data-testid="arrangement-template-preview-energy">{preview.energyLabel}</small>
         <small data-testid="arrangement-template-preview-moves">{preview.moveLabel}</small>
       </div>
+      <ArrangementTemplatePriorityReadout summary={createArrangementTemplatePrioritySummary(preview)} />
       <div className="arrangement-template-row" aria-label="Arrangement template buttons">
         {arrangementTemplateIds.map((template) => {
           const templateBlocks = createArrangementTemplate(template);
@@ -10434,6 +10436,24 @@ function ArrangementTemplateControls({
       </div>
       {result && <ArrangementTemplateResultStrip result={result} />}
     </section>
+  );
+}
+
+function ArrangementTemplatePriorityReadout({ summary }: { summary: ArrangementTemplatePrioritySummary }): ReactElement {
+  return (
+    <div
+      className={`arrangement-template-priority ${summary.tone}`}
+      data-arrangement-template-priority={summary.templateId}
+      data-testid="arrangement-template-priority"
+      title={summary.detailTitle}
+    >
+      <span data-testid="arrangement-template-priority-status">{summary.statusLabel}</span>
+      <strong data-testid="arrangement-template-priority-template">{summary.templateLabel}</strong>
+      <small data-testid="arrangement-template-priority-reason">{summary.reasonLabel}</small>
+      <small data-testid="arrangement-template-priority-scope">{summary.scopeLabel}</small>
+      <small data-testid="arrangement-template-priority-moves">{summary.moveLabel}</small>
+      <small data-testid="arrangement-template-priority-next-check">{summary.nextCheckLabel}</small>
+    </div>
   );
 }
 
@@ -28674,6 +28694,8 @@ function createArrangementTemplatePreviewSummary(arrangement: ArrangementBlock[]
   if (!candidate) {
     return {
       templateId: "aligned",
+      changedBlockCount: 0,
+      changedFieldCount: 0,
       statusLabel: "Template aligned",
       templateLabel: "No template target",
       sectionLabel: arrangementTemplatePreviewSectionLabel(arrangement),
@@ -28695,6 +28717,8 @@ function createArrangementTemplatePreviewSummary(arrangement: ArrangementBlock[]
 
   return {
     templateId: candidate.templateId,
+    changedBlockCount: changedBlocks,
+    changedFieldCount: changedFields,
     statusLabel: changedFields === 0 ? "Template aligned" : "Suggested template",
     templateLabel: candidate.templateLabel,
     sectionLabel,
@@ -28706,6 +28730,52 @@ function createArrangementTemplatePreviewSummary(arrangement: ArrangementBlock[]
         ? `${candidate.templateLabel} already matches the current arrangement posture.`
         : `${candidate.templateLabel}: ${sectionLabel}; ${patternLabel}; ${energyLabel}; ${moveLabel}.`,
     tone
+  };
+}
+
+function createArrangementTemplatePrioritySummary(preview: ArrangementTemplatePreviewSummary): ArrangementTemplatePrioritySummary {
+  const statusLabel =
+    preview.templateId === "aligned"
+      ? "Template aligned"
+      : preview.templateId === "loop"
+        ? "Tighten loop"
+        : preview.templateId === "full"
+          ? "Build full beat"
+          : preview.templateId === "hook_first"
+            ? "Lead with hook"
+            : "Shape breakdown";
+  const reasonLabel =
+    preview.templateId === "aligned"
+      ? "Current arrangement already matches available Arrangement Template targets."
+      : preview.templateId === "loop"
+        ? "Keep the structure compact before expanding the beat."
+        : preview.templateId === "full"
+          ? "Open the current loop into a full editable beat structure."
+          : preview.templateId === "hook_first"
+            ? "Put hook contrast first so the song shape is obvious sooner."
+            : "Add breakdown contrast before returning to the main beat.";
+  const scopeLabel = `${preview.sectionLabel} / ${preview.patternLabel}`;
+  const nextCheckLabel =
+    preview.templateId === "aligned"
+      ? "Audition Song, then inspect Song Form before more template changes."
+      : preview.templateId === "loop"
+        ? "Apply, then build Pattern A/B/C contrast before expanding."
+        : preview.templateId === "full"
+          ? "Apply, then audition Song and inspect Transition Map."
+          : preview.templateId === "hook_first"
+            ? "Apply, then cue Hook and inspect Song Form priority."
+            : "Apply, then audition breakdown-to-hook movement.";
+
+  return {
+    templateId: preview.templateId,
+    statusLabel,
+    templateLabel: preview.templateLabel,
+    reasonLabel,
+    scopeLabel,
+    moveLabel: preview.moveLabel,
+    nextCheckLabel,
+    detailTitle: `${statusLabel} / ${preview.templateLabel} / ${reasonLabel} / ${scopeLabel} / ${preview.moveLabel} / ${nextCheckLabel}`,
+    tone: preview.tone
   };
 }
 
