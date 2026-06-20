@@ -10816,7 +10816,7 @@ function ArrangementArcPads({
         <small data-testid="arrangement-arc-preview-mutes">{preview.muteLabel}</small>
         <small data-testid="arrangement-arc-preview-moves">{preview.moveLabel}</small>
       </div>
-      <ArrangementArcPriorityReadout summary={createArrangementArcPrioritySummary(preview)} />
+      <ArrangementArcPriorityReadout summary={createArrangementArcPrioritySummary(preview)} onApply={onApply} />
       <div className="arrangement-arc-row">
         {pads.map((pad) => (
           <button
@@ -10994,7 +10994,14 @@ function SelectedBlockEditResultStrip({ result }: { result: SelectedBlockEditRes
   );
 }
 
-function ArrangementArcPriorityReadout({ summary }: { summary: ArrangementArcPrioritySummary }): ReactElement {
+function ArrangementArcPriorityReadout({
+  onApply,
+  summary
+}: {
+  onApply: (pad: ArrangementArcPadId) => void;
+  summary: ArrangementArcPrioritySummary;
+}): ReactElement {
+  const disabled = summary.statusLabel === "Arc aligned";
   return (
     <div
       className={`arrangement-arc-priority ${summary.tone}`}
@@ -11008,6 +11015,19 @@ function ArrangementArcPriorityReadout({ summary }: { summary: ArrangementArcPri
       <small data-testid="arrangement-arc-priority-scope">{summary.scopeLabel}</small>
       <small data-testid="arrangement-arc-priority-moves">{summary.moveLabel}</small>
       <small data-testid="arrangement-arc-priority-next-check">{summary.nextCheckLabel}</small>
+      <button
+        data-testid="arrangement-arc-priority-run"
+        disabled={disabled}
+        onClick={() => {
+          if (!disabled) {
+            onApply(summary.padId);
+          }
+        }}
+        title={disabled ? summary.reasonLabel : `Apply ${summary.padLabel} arc`}
+        type="button"
+      >
+        {disabled ? "Aligned" : summary.padLabel}
+      </button>
     </div>
   );
 }
