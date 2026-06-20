@@ -14868,6 +14868,8 @@ function HookReadiness({
 }): ReactElement {
   const focusSummary = createHookReadinessFocusSummary(summary, focusedCardId);
   const prioritySummary = createHookReadinessPrioritySummary(summary);
+  const priorityCard = summary.cards.find((card) => card.id === prioritySummary.cardId) ?? null;
+  const priorityActionDisabled = priorityCard === null;
 
   return (
     <section className={`hook-readiness ${summary.tone}`} data-testid="hook-readiness" aria-label="Hook readiness">
@@ -14899,6 +14901,19 @@ function HookReadiness({
           <strong data-testid="hook-readiness-priority-card">{prioritySummary.cardLabel}</strong>
           <small data-testid="hook-readiness-priority-reason">{prioritySummary.reasonLabel}</small>
           <small data-testid="hook-readiness-priority-next-check">{prioritySummary.nextCheckLabel}</small>
+          <button
+            data-testid="hook-readiness-priority-run"
+            disabled={priorityActionDisabled}
+            onClick={() => {
+              if (priorityCard) {
+                onFocus(priorityCard);
+              }
+            }}
+            title={priorityCard ? `Focus ${prioritySummary.cardLabel}` : prioritySummary.reasonLabel}
+            type="button"
+          >
+            {prioritySummary.actionLabel}
+          </button>
         </div>
         {focusResult && <HookReadinessFocusResultStrip result={focusResult} />}
         {fixResult && <HookFixResultStrip result={fixResult} />}
@@ -27701,6 +27716,7 @@ function createHookReadinessPrioritySummary(summary: HookReadinessSummary): Hook
   if (!card) {
     return {
       cardId: null,
+      actionLabel: "No hook",
       statusLabel: "Hook priority",
       cardLabel: "No hook card",
       reasonLabel: "No Hook Readiness cards available",
@@ -27711,6 +27727,7 @@ function createHookReadinessPrioritySummary(summary: HookReadinessSummary): Hook
 
   return {
     cardId: card.id,
+    actionLabel: "Focus hook",
     statusLabel: hookReadinessPriorityStatus(card),
     cardLabel: `${card.label}: ${card.value}`,
     reasonLabel: hookReadinessPriorityReason(card),

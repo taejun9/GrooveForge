@@ -10694,6 +10694,7 @@ h2 {
 .hook-readiness-focus-readout small,
 .hook-readiness-priority span,
 .hook-readiness-priority strong,
+.hook-readiness-priority button,
 .hook-readiness-priority small,
 .hook-readiness-result-main strong,
 .hook-readiness-result-main small,
@@ -10767,7 +10768,7 @@ h2 {
 
 .hook-readiness-priority {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   align-content: center;
   min-width: 0;
   border: 1px solid rgba(120, 240, 200, 0.2);
@@ -10798,6 +10799,28 @@ h2 {
 .hook-readiness-priority strong {
   color: #f4efe7;
   font-size: 12px;
+}
+
+.hook-readiness-priority button {
+  min-height: 30px;
+  border: 1px solid rgba(120, 240, 200, 0.28);
+  border-radius: 5px;
+  background: rgba(120, 240, 200, 0.11);
+  color: #f4efe7;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.hook-readiness-priority.warn button {
+  border-color: rgba(240, 195, 106, 0.34);
+  background: rgba(240, 195, 106, 0.12);
+}
+
+.hook-readiness-priority.danger button {
+  border-color: rgba(255, 122, 79, 0.34);
+  background: rgba(255, 122, 79, 0.12);
 }
 
 .hook-readiness-stack {

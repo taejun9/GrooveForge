@@ -2446,6 +2446,7 @@ export type HookReadinessFocusSummary = {
 
 export type HookReadinessPrioritySummary = {
   cardId: HookReadinessCardId | null;
+  actionLabel: string;
   statusLabel: string;
   cardLabel: string;
   reasonLabel: string;
