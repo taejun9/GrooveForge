@@ -2244,6 +2244,19 @@ export type ArrangementMovePrioritySummary = {
   tone: MixCoachTone;
 };
 
+export type ArrangementMovePreviewDecisionSummary = {
+  targetPresetId: ArrangementMovePreset | "none";
+  actionId: "apply-suggested" | "aligned" | "select-block";
+  statusLabel: string;
+  presetLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  buttonLabel: string;
+  disabled: boolean;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementMoveResultMetricId = "energy" | "mutes";
 
 export type ArrangementMoveResultMetric = {

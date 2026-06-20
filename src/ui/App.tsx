@@ -395,6 +395,7 @@ import type {
   ArrangementFocusPrioritySummary,
   ArrangementFocusResultMetric,
   ArrangementFocusResultSummary,
+  ArrangementMovePreviewDecisionSummary,
   ArrangementMovePrioritySummary,
   ArrangementMoveResultMetric,
   ArrangementMoveResultSummary,
@@ -1758,6 +1759,10 @@ export function App(): ReactElement {
   const sectionLocatorPads = useMemo(
     () => createSectionLocatorPads(project, selectedArrangementIndex, playingArrangementIndex),
     [playingArrangementIndex, project, selectedArrangementIndex]
+  );
+  const arrangementMovePrioritySummary = useMemo(
+    () => createArrangementMovePrioritySummary(selectedArrangementBlock, selectedArrangementIndex, project.arrangement.length),
+    [project.arrangement.length, selectedArrangementBlock, selectedArrangementIndex]
   );
   const selectedArrangementBlockRole = useMemo(
     () => selectedArrangementBlockRoleSummary(project, selectedArrangementIndex),
@@ -9305,14 +9310,15 @@ export function App(): ReactElement {
                   );
                 })}
               </div>
-              <ArrangementMovePriorityReadout
-                summary={createArrangementMovePrioritySummary(
-                  selectedArrangementBlock,
-                  selectedArrangementIndex,
-                  project.arrangement.length
-                )}
-                onApply={applyArrangementMoveToSelected}
+              <ArrangementMovePreviewDecision
+                summary={createArrangementMovePreviewDecision(arrangementMovePrioritySummary)}
+                onApply={() => {
+                  if (arrangementMovePrioritySummary.presetId !== "none") {
+                    applyArrangementMoveToSelected(arrangementMovePrioritySummary.presetId);
+                  }
+                }}
               />
+              <ArrangementMovePriorityReadout summary={arrangementMovePrioritySummary} onApply={applyArrangementMoveToSelected} />
               <div className="arrangement-move-row" aria-label="Arrangement moves">
                 {arrangementMovePresetIds.map((preset) => (
                   <button
@@ -11123,6 +11129,40 @@ function ArrangementMovePriorityReadout({
         type="button"
       >
         {disabled ? "Select Block" : summary.presetLabel}
+      </button>
+    </div>
+  );
+}
+
+function ArrangementMovePreviewDecision({
+  onApply,
+  summary
+}: {
+  onApply: () => void;
+  summary: ArrangementMovePreviewDecisionSummary;
+}): ReactElement {
+  return (
+    <div
+      className={`arrangement-move-priority arrangement-move-decision ${summary.tone}`}
+      data-arrangement-move-decision={summary.targetPresetId}
+      data-testid="arrangement-move-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="arrangement-move-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="arrangement-move-decision-preset">{summary.presetLabel}</strong>
+      <small data-testid="arrangement-move-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="arrangement-move-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="arrangement-move-decision-run"
+        data-arrangement-move-decision-action={summary.actionId}
+        data-testid="arrangement-move-decision-run"
+        disabled={summary.disabled}
+        onClick={onApply}
+        title={summary.disabled ? summary.detailLabel : `Apply ${summary.presetLabel} move`}
+        type="button"
+      >
+        <ListChecks size={12} aria-hidden="true" />
+        <span data-testid="arrangement-move-decision-label">{summary.buttonLabel}</span>
       </button>
     </div>
   );
@@ -16301,6 +16341,33 @@ function createArrangementMovePrioritySummary(
     nextCheckLabel,
     detailTitle: `${statusLabel} / ${presetLabel} / ${reasonLabel} / ${scopeLabel} / ${impactLabel} / ${nextCheckLabel}`,
     tone: aligned ? "good" : changedFields === 1 ? "warn" : "danger"
+  };
+}
+
+function createArrangementMovePreviewDecision(
+  summary: ArrangementMovePrioritySummary
+): ArrangementMovePreviewDecisionSummary {
+  const missingTarget = summary.presetId === "none";
+  const aligned = !missingTarget && summary.statusLabel === "Move aligned";
+  const disabled = missingTarget || aligned;
+
+  return {
+    targetPresetId: summary.presetId,
+    actionId: missingTarget ? "select-block" : aligned ? "aligned" : "apply-suggested",
+    statusLabel: missingTarget ? "Select block" : aligned ? "Move aligned" : "Ready to apply",
+    presetLabel: summary.presetLabel,
+    metricLabel: summary.impactLabel,
+    detailLabel: missingTarget
+      ? "Select an arrangement block before applying a move."
+      : aligned
+        ? "Selected block already matches the suggested move."
+        : `${summary.scopeLabel} / ${summary.reasonLabel}`,
+    buttonLabel: missingTarget ? "Select Block" : aligned ? "Aligned" : "Apply Suggested Move",
+    disabled,
+    detailTitle: disabled
+      ? `${summary.detailTitle} No Arrangement Move action is needed.`
+      : `${summary.detailTitle} Apply only after this block should take the suggested energy and mute posture.`,
+    tone: missingTarget ? "warn" : aligned ? "good" : summary.tone
   };
 }
 
