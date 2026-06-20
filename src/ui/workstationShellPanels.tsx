@@ -265,7 +265,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
     title: "Arrange",
     items: [
       { id: "pattern-chain", command: "Pattern Chain", shortcut: "Quick Actions / Readout", target: "8-bar sketch" },
-      { id: "chain-expand", command: "Chain Expand", shortcut: "Quick Actions", target: "16-bar outline" },
+      { id: "chain-expand", command: "Chain Expand", shortcut: "Quick Actions / Readout", target: "16-bar outline" },
       { id: "arrangement-template", command: "Arrangement Template", shortcut: "Quick Actions", target: "Song form" },
       { id: "arrangement-arc", command: "Arrangement Arc", shortcut: "Quick Actions", target: "Energy shape" },
       { id: "arrangement-focus", command: "Arrangement Focus", shortcut: "Quick Actions", target: "Selected block" },
