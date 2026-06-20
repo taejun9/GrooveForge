@@ -7821,6 +7821,7 @@ export function App(): ReactElement {
     stemAnalyses,
     stemAuditionPadOptions,
     styleInspectorSummary,
+    beatBlueprintPreviewId,
     transportLoopScope,
     toplineLoopCueTarget,
     toplineSpaceSummary,
@@ -7883,6 +7884,7 @@ export function App(): ReactElement {
     onToggleMetronome: toggleMetronome,
     onTapTempo: tapProjectTempo,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
+    onCueBlueprintPreview: cueBeatBlueprintPreview,
     onRequestMidiInputAccess: requestMidiInputAccess,
     onCueArrangementBlock: cueArrangementBlock,
     onCueSectionLocator: cueSectionLocator,
@@ -16512,6 +16514,7 @@ function createQuickActions({
   stemAnalyses,
   stemAuditionPadOptions,
   styleInspectorSummary,
+  beatBlueprintPreviewId,
   transportLoopScope,
   toplineLoopCueTarget,
   toplineSpaceSummary,
@@ -16573,6 +16576,7 @@ function createQuickActions({
   onToggleMetronome,
   onTapTempo,
   onPreviewBlueprint,
+  onCueBlueprintPreview,
   onRequestMidiInputAccess,
   onCueArrangementBlock,
   onCueSectionLocator,
@@ -16765,6 +16769,7 @@ function createQuickActions({
   stemAnalyses: StemExportAnalyses;
   stemAuditionPadOptions: StemAuditionPadOption[];
   styleInspectorSummary: StyleInspectorSummary;
+  beatBlueprintPreviewId: BeatBlueprintId;
   transportLoopScope: TransportLoopScope;
   toplineLoopCueTarget: ToplineLoopCueTarget;
   toplineSpaceSummary: ToplineSpaceSummary;
@@ -16826,6 +16831,7 @@ function createQuickActions({
   onToggleMetronome: () => void;
   onTapTempo: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
+  onCueBlueprintPreview: (scope: Extract<TransportLoopScope, "arrangement" | "pattern">) => void;
   onRequestMidiInputAccess: () => Promise<void>;
   onCueArrangementBlock: (index: number) => void;
   onCueSectionLocator: (section: ArrangementSection) => void;
@@ -16942,6 +16948,13 @@ function createQuickActions({
   const suggestedBlueprint = suggestedBlueprintId(project);
   const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const previewBlueprint = beatBlueprints.find((blueprint) => blueprint.id === beatBlueprintPreviewId) ?? beatBlueprints[0];
+  const styleMatchBlueprint = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint) ?? previewBlueprint;
+  const blueprintPreviewSummary = createBeatBlueprintPreviewSummary(project, previewBlueprint);
+  const styleMatchPreviewSummary = createBeatBlueprintPreviewSummary(project, styleMatchBlueprint);
+  const styleMatchPreviewed = blueprintPreviewSummary.blueprintId === styleMatchPreviewSummary.blueprintId;
+  const blueprintPreviewCue = createBeatBlueprintPreviewCue(blueprintPreviewSummary, styleMatchPreviewSummary, styleMatchPreviewed);
+  const blueprintPreviewCueActive = transportLoopScope === blueprintPreviewCue.actionLoopScope;
   const localDraftRecoveryDetail = localDraftRecovery
     ? `${localDraftRecovery.project.title} / ${formatLocalDraftSavedAt(localDraftRecovery.savedAt)} / ${projectEventTotal(
         localDraftRecovery.project
@@ -17156,6 +17169,17 @@ function createQuickActions({
     keywords: `groove compass cue audition loop pattern transport rhythm pocket selected ${project.selectedPattern} density anchors hats timing chance beginner producer`,
     disabled: isPlaying,
     run: onCueGrooveCompass
+  };
+  const blueprintPreviewCueAction: QuickAction = {
+    id: "blueprint-preview-cue",
+    title: blueprintPreviewCueActive
+      ? `${blueprintPreviewCue.actionLabel} already cued for ${blueprintPreviewSummary.name}`
+      : `${blueprintPreviewCue.actionLabel}: ${blueprintPreviewSummary.name}`,
+    detail: `${blueprintPreviewCue.cueLabel} / ${blueprintPreviewCue.detailLabel} / ${blueprintPreviewCue.nextCheckLabel}`,
+    group: "Transport",
+    keywords: `beat blueprint preview cue audition loop ${blueprintPreviewCue.actionLoopScope} ${blueprintPreviewCue.actionId} ${blueprintPreviewSummary.blueprintId} ${blueprintPreviewSummary.name} ${blueprintPreviewSummary.focus} ${currentStyleName} ${project.styleId} song pattern transport starter sample free drums 808 bass chords synth arrangement sound master beginner producer`,
+    disabled: isPlaying,
+    run: () => onCueBlueprintPreview(blueprintPreviewCue.actionLoopScope)
   };
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
   const keyCompassActions: QuickAction[] = keyCompassSummary.cards.map((item) => ({
@@ -18355,6 +18379,7 @@ function createQuickActions({
       run: () => onSelectTransportLoopScope("pattern")
     },
     grooveCompassCueAction,
+    blueprintPreviewCueAction,
     ...arrangementTransitionLoopActions,
     ...hookReadinessCueActions,
     ...hookReadinessFixActions,
@@ -19747,12 +19772,16 @@ function createQuickActionResult(
 ): QuickActionResult {
   const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action);
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
-  const previewOnly = action.id.startsWith("blueprint-preview-");
+  const blueprintPreviewCueOnly = action.id === "blueprint-preview-cue";
+  const previewOnly = action.id.startsWith("blueprint-preview-") && !blueprintPreviewCueOnly;
   const historyOnly = action.id === "undo" || action.id === "redo";
   const patternCompareDecisionKind = patternCompareDecisionQuickActionKind(action);
   const patternCompareDecisionCue = patternCompareDecisionKind === "cue";
   const cueOnly =
-    action.id === "groove-compass-cue" || action.id.startsWith("style-goal-cue-") || patternCompareDecisionCue;
+    action.id === "groove-compass-cue" ||
+    blueprintPreviewCueOnly ||
+    action.id.startsWith("style-goal-cue-") ||
+    patternCompareDecisionCue;
   const focusOnly =
     action.id === "command-reference" ||
     action.id === "beat-terms-reference" ||
@@ -21210,6 +21239,13 @@ function quickActionResultFollowup(
   const analysis = analyzeExport(project);
   const target = activeDeliveryTarget(project);
   const pattern = activePattern(project);
+
+  if (action.id === "blueprint-preview-cue") {
+    return {
+      auditionCue: "Play the cued Song or Pattern loop before applying the previewed starter.",
+      nextCheck: "Apply the Beat Blueprint only after the preview cue confirms the starter fits the session."
+    };
+  }
 
   if (action.id.startsWith("blueprint-preview-")) {
     return {
