@@ -213,6 +213,7 @@ import type {
   MixFixResult,
   MixSnapshotSlotId,
   MixSnapshotQuickActionTarget,
+  MixSnapshotComparisonSummary,
   DirectExportQuickActionTarget,
   MixSnapshotSlotMap,
   MixSnapshot,
@@ -7808,6 +7809,7 @@ export function App(): ReactElement {
     midiInputOptions,
     mixBalancePadOptions,
     mixBalancePreviewSummary,
+    mixSnapshotComparison,
     mixSnapshots,
     masterFinishPadOptions,
     masterFinishPreviewSummary,
@@ -16847,6 +16849,7 @@ function createQuickActions({
   midiInputOptions,
   mixBalancePadOptions,
   mixBalancePreviewSummary,
+  mixSnapshotComparison,
   mixSnapshots,
   masterFinishPadOptions,
   masterFinishPreviewSummary,
@@ -17109,6 +17112,7 @@ function createQuickActions({
   midiInputOptions: MidiInputOption[];
   mixBalancePadOptions: MixBalancePadOption[];
   mixBalancePreviewSummary: MixBalancePreviewSummary;
+  mixSnapshotComparison: MixSnapshotComparisonSummary;
   mixSnapshots: MixSnapshotSlotMap;
   masterFinishPadOptions: MasterFinishPadOption[];
   masterFinishPreviewSummary: MasterFinishPreviewSummary;
@@ -17649,6 +17653,31 @@ function createQuickActions({
     keywords: `mix coach focus check diagnostic headroom limiter stem balance low end ${check.id} ${check.label} ${check.status} ${check.detail} beginner producer`,
     run: () => onFocusMixCoach(check)
   }));
+  const mixSnapshotDecisionAction: QuickAction = {
+    id: "mix-snapshot-decision",
+    title: `Run Mix Snapshot Decision: ${mixSnapshotComparison.decisionActionLabel}`,
+    detail: `${mixSnapshotComparison.decisionStatus} / ${mixSnapshotComparison.decisionLabel} / ${mixSnapshotComparison.decisionDetail}`,
+    group: "Mix",
+    keywords: `Quick Actions Mix Snapshot Decision decision readout capture recall compare headroom balance master stems ${
+      mixSnapshotComparison.decisionActionId
+    } ${mixSnapshotComparison.decisionActionLabel} ${mixSnapshotComparison.decisionLabel} beginner producer`,
+    run: () => {
+      switch (mixSnapshotComparison.decisionActionId) {
+        case "capture-a":
+          onCaptureMixSnapshot("A");
+          return;
+        case "capture-b":
+          onCaptureMixSnapshot("B");
+          return;
+        case "recall-a":
+          onRecallMixSnapshot("A");
+          return;
+        case "recall-b":
+          onRecallMixSnapshot("B");
+          return;
+      }
+    }
+  };
   const stemAuditionDecisionAction: QuickAction = {
     id: "stem-audition-decision",
     title: stemAuditionDecision.targetId
@@ -19894,6 +19923,7 @@ function createQuickActions({
       disabled: pad.active,
       run: () => onApplyStemAudition(pad.id)
     })),
+    mixSnapshotDecisionAction,
     {
       id: "mix-snapshot-capture-a",
       title: "Capture Mix Snapshot A",
@@ -20509,7 +20539,9 @@ function createQuickActionResult(
   const tapTempoPulseOnly = action.id === "tap-tempo";
   const localDraftRecoveryOnly = action.id === "restore-local-draft" || action.id === "clear-local-draft";
   const exportOnly = directExportQuickActionTarget(action.id) !== null || action.id === "handoff-next-export";
-  const mixSnapshotRecallOnly = action.id === "mix-snapshot-recall-a" || action.id === "mix-snapshot-recall-b";
+  const mixSnapshotDecisionRecallOnly = isMixSnapshotDecisionRecallAction(action);
+  const mixSnapshotRecallOnly =
+    action.id === "mix-snapshot-recall-a" || action.id === "mix-snapshot-recall-b" || mixSnapshotDecisionRecallOnly;
   const soundSnapshotRecallOnly = action.id === "sound-snapshot-recall-a" || action.id === "sound-snapshot-recall-b";
   const uiLocal =
     (action.id.startsWith("mix-snapshot-") && !mixSnapshotRecallOnly) ||
@@ -20649,9 +20681,15 @@ function mixSnapshotQuickActionTarget(actionId: string): MixSnapshotQuickActionT
       return { id: "recall-b", label: "Recall Mix Snapshot B", metricId: "mix-snapshot-recall-b" };
     case "mix-snapshot-clear":
       return { id: "clear", label: "Mix Snapshot A/B", metricId: "mix-snapshot-clear" };
+    case "mix-snapshot-decision":
+      return { id: "decision", label: "Mix Snapshot Decision", metricId: "mix-snapshot-decision" };
     default:
       return null;
   }
+}
+
+function isMixSnapshotDecisionRecallAction(action: QuickAction): boolean {
+  return action.id === "mix-snapshot-decision" && (action.keywords.includes("recall-a") || action.keywords.includes("recall-b"));
 }
 
 type SoundSnapshotQuickActionTarget = {
@@ -22986,10 +23024,20 @@ function quickActionResultFollowup(
         nextCheck: "Use Mix Snapshot A/B after at least one level, space, or master change creates something worth comparing."
       };
     }
-    if (action.id === "mix-snapshot-recall-a" || action.id === "mix-snapshot-recall-b") {
+    if (
+      action.id === "mix-snapshot-recall-a" ||
+      action.id === "mix-snapshot-recall-b" ||
+      isMixSnapshotDecisionRecallAction(action)
+    ) {
       return {
         auditionCue: "Play Full Mix to confirm the recalled mixer and master pass still fits the beat.",
         nextCheck: "Capture the alternate slot again after the next concrete level, space, or master change."
+      };
+    }
+    if (action.id === "mix-snapshot-decision") {
+      return {
+        auditionCue: "Play Full Mix and follow the visible Mix Snapshot Decision Readout before the next capture.",
+        nextCheck: "Use the Decision Readout after one concrete level, space, or master change creates an alternate pass."
       };
     }
     return {

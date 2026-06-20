@@ -541,7 +541,7 @@ export type MixFixResult = {
 export type MixSnapshotSlotId = "A" | "B";
 
 export type MixSnapshotQuickActionTarget = {
-  id: "capture-a" | "capture-b" | "recall-a" | "recall-b" | "clear";
+  id: "capture-a" | "capture-b" | "recall-a" | "recall-b" | "clear" | "decision";
   label: string;
   metricId: string;
 };
