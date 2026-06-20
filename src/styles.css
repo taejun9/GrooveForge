@@ -19357,6 +19357,7 @@ input[type="range"] {
 .section-locator {
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 8px;
   min-width: 0;
   align-items: stretch;
@@ -19381,8 +19382,43 @@ input[type="range"] {
   white-space: nowrap;
 }
 
+.section-locator-priority {
+  display: grid;
+  grid-column: 2;
+  grid-template-columns: minmax(100px, 0.4fr) minmax(0, 0.72fr) minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.22);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px 9px;
+}
+
+.section-locator-priority.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.section-locator-priority.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.section-locator-priority span,
+.section-locator-priority small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+}
+
+.section-locator-priority strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
 .section-locator-row {
   display: grid;
+  grid-column: 2;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 7px;
   min-width: 0;
@@ -19424,6 +19460,9 @@ input[type="range"] {
   opacity: 0.86;
 }
 
+.section-locator-priority span,
+.section-locator-priority strong,
+.section-locator-priority small,
 .section-locator-row button span,
 .section-locator-row button strong,
 .section-locator-row button small {

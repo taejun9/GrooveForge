@@ -448,6 +448,7 @@ import type {
   ArrangementTransitionMapPrioritySummary,
   ArrangementTransitionMapFocusResult,
   SectionLocatorPad,
+  SectionLocatorPrioritySummary,
   ArrangementBlockRoleSummary,
   MixerChannelRoleSummary,
   StemAuditionReadoutSummary,
@@ -10743,11 +10744,24 @@ function SectionLocatorPads({
   onCue: (section: ArrangementSection) => void;
   pads: SectionLocatorPad[];
 }): ReactElement {
+  const prioritySummary = createSectionLocatorPrioritySummary(pads);
+
   return (
     <section className="section-locator" data-testid="section-locator-pads" aria-label="Section Locator Pads">
       <div className="section-locator-heading">
         <span>Locator</span>
         <strong>Section cue</strong>
+      </div>
+      <div
+        className={`section-locator-priority ${prioritySummary.tone}`}
+        data-section-locator-priority={prioritySummary.section ? sectionLocatorTestId(prioritySummary.section) : "none"}
+        data-testid="section-locator-priority"
+        title={prioritySummary.detailTitle}
+      >
+        <span data-testid="section-locator-priority-status">{prioritySummary.statusLabel}</span>
+        <strong data-testid="section-locator-priority-section">{prioritySummary.sectionLabel}</strong>
+        <small data-testid="section-locator-priority-reason">{prioritySummary.reasonLabel}</small>
+        <small data-testid="section-locator-priority-next-check">{prioritySummary.nextCheckLabel}</small>
       </div>
       <div className="section-locator-row">
         {pads.map((pad) => {
@@ -28399,6 +28413,88 @@ function createSectionLocatorPads(
       tone: songFormSegmentTone(eventCount, energy, mutedTracks.length)
     };
   });
+}
+
+function createSectionLocatorPrioritySummary(pads: SectionLocatorPad[]): SectionLocatorPrioritySummary {
+  const pad = activeSectionLocatorPriorityPad(pads);
+
+  if (!pad) {
+    return {
+      section: null,
+      statusLabel: "Section priority",
+      sectionLabel: "No section cue",
+      reasonLabel: "No arrangement section is available to cue.",
+      nextCheckLabel: "Add an arrangement block, then return to Section Locator.",
+      detailTitle: "Section priority / No section cue / No arrangement section is available to cue.",
+      tone: "warn"
+    };
+  }
+
+  const sectionLabel = `${pad.section}: ${pad.pattern ? `Pattern ${pad.pattern}` : "Missing"}`;
+  const reasonLabel = sectionLocatorPriorityReason(pad);
+  const nextCheckLabel = sectionLocatorPriorityNextCheck(pad);
+  const statusLabel = sectionLocatorPriorityStatus(pad);
+
+  return {
+    section: pad.section,
+    statusLabel,
+    sectionLabel,
+    reasonLabel,
+    nextCheckLabel,
+    detailTitle: `${statusLabel} / ${sectionLabel} / ${reasonLabel} / ${nextCheckLabel}`,
+    tone: pad.tone
+  };
+}
+
+function activeSectionLocatorPriorityPad(pads: SectionLocatorPad[]): SectionLocatorPad | null {
+  return (
+    pads.find((pad) => pad.playing && pad.index !== null) ??
+    pads.find((pad) => pad.selected && pad.index !== null) ??
+    pads.find((pad) => pad.section === "Hook" && pad.index !== null) ??
+    pads.find((pad) => pad.index !== null) ??
+    null
+  );
+}
+
+function sectionLocatorPriorityStatus(pad: SectionLocatorPad): string {
+  if (pad.playing) {
+    return "Hearing section";
+  }
+  if (pad.selected) {
+    return "Edit section cue";
+  }
+  if (pad.section === "Hook") {
+    return "Cue hook first";
+  }
+  return "Cue first section";
+}
+
+function sectionLocatorPriorityReason(pad: SectionLocatorPad): string {
+  const rangeLabel = pad.startBar === null || pad.endBar === null ? "missing bars" : `Bars ${pad.startBar}-${pad.endBar}`;
+
+  if (pad.playing) {
+    return `${pad.section} is currently playing; confirm the audible section before editing nearby blocks.`;
+  }
+  if (pad.selected) {
+    return `${pad.section} is selected; cue it before changing section role, energy, mutes, or Pattern.`;
+  }
+  if (pad.section === "Hook") {
+    return `Hook is available at ${rangeLabel}; audition the main lift before detailed arrangement edits.`;
+  }
+  return `${pad.section} is the first available section at ${rangeLabel}; audition the form entry before moving blocks.`;
+}
+
+function sectionLocatorPriorityNextCheck(pad: SectionLocatorPad): string {
+  if (pad.playing) {
+    return "Compare Arrangement Playback Readout and Song Form before editing.";
+  }
+  if (pad.selected) {
+    return "Cue the selected section, then use Arrangement Focus or Song Form.";
+  }
+  if (pad.section === "Hook") {
+    return "Cue Hook, then check Hook Readiness, Topline Space, or Transition Map.";
+  }
+  return "Cue this section, then confirm Song Form flow before editing.";
 }
 
 function firstArrangementSectionIndex(project: ProjectState, section: ArrangementSection): number | null {

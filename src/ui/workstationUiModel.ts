@@ -2573,6 +2573,16 @@ export type SectionLocatorPad = {
   tone: MixCoachTone;
 };
 
+export type SectionLocatorPrioritySummary = {
+  section: ArrangementSection | null;
+  statusLabel: string;
+  sectionLabel: string;
+  reasonLabel: string;
+  nextCheckLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementBlockRoleSummary = {
   roleLabel: string;
   timelineLabel: string;
