@@ -19707,6 +19707,25 @@ function createQuickActions({
       run: onExpandPatternChain
     },
     {
+      id: "arrangement-template-decision",
+      title: arrangementTemplateDecision.disabled
+        ? "Run Arrangement Template Decision"
+        : `Run Arrangement Template Decision: ${arrangementTemplateDecision.templateLabel}`,
+      detail: arrangementTemplateDecision.disabled
+        ? arrangementTemplateDecision.detailLabel
+        : `${arrangementTemplateDecision.statusLabel} / ${arrangementTemplateDecision.metricLabel} / ${arrangementTemplateDecision.detailLabel}`,
+      group: "Arrange",
+      keywords: `arrangement template decision preview song form full beat hook first breakdown structure current suggested ${
+        arrangementTemplateId ?? "aligned"
+      } ${arrangementTemplateDecision.templateLabel} ${arrangementTemplateDecision.actionId} beginner producer`,
+      disabled: arrangementTemplateDecision.disabled,
+      run: () => {
+        if (!arrangementTemplateDecision.disabled && arrangementTemplateId) {
+          onApplyArrangementTemplate(arrangementTemplateId);
+        }
+      }
+    },
+    {
       id: "arrangement-template",
       title: arrangementTemplateId ? arrangementTemplateDecision.actionLabel : "Apply Arrangement Template",
       detail: arrangementTemplateId
@@ -21737,6 +21756,7 @@ function quickActionResultMetricSnapshot(
   if (
     action.id.startsWith("pattern-chain-") ||
     action.id === "chain-expand" ||
+    action.id === "arrangement-template-decision" ||
     action.id === "arrangement-template" ||
     action.id.startsWith("arrangement-template-direct-")
   ) {
@@ -22738,10 +22758,17 @@ function quickActionResultFollowup(
     };
   }
 
-  if (action.id === "arrangement-template" || action.id.startsWith("arrangement-template-direct-")) {
+  if (
+    action.id === "arrangement-template-decision" ||
+    action.id === "arrangement-template" ||
+    action.id.startsWith("arrangement-template-direct-")
+  ) {
     return {
       auditionCue: "Play Song loop; check section order, Pattern A/B/C spread, and hook placement.",
-      nextCheck: `${barCountLabel(arrangementTotalBars(project))} arranged; scan Song Form Overview before mix decisions.`
+      nextCheck:
+        action.id === "arrangement-template-decision"
+          ? "Return to Arrangement Template Preview Decision before running another song-form template move."
+          : `${barCountLabel(arrangementTotalBars(project))} arranged; scan Song Form Overview before mix decisions.`
     };
   }
 
