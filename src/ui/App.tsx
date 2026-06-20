@@ -12062,6 +12062,16 @@ function composerActionIcon(action: ComposerAction): ReactElement {
   }
 }
 
+type FinishChecklistPriority = {
+  cardId: FinishChecklistCardId | null;
+  statusLabel: string;
+  areaLabel: string;
+  cardLabel: string;
+  nextCheckLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 function FinishChecklist({
   summary,
   focusedCardId,
@@ -12074,6 +12084,7 @@ function FinishChecklist({
   onFocus: (card: FinishChecklistCard) => void;
 }): ReactElement {
   const focusSummary = createFinishChecklistFocusSummary(summary, focusedCardId);
+  const priority = createFinishChecklistPriority(summary);
 
   return (
     <section
@@ -12097,6 +12108,17 @@ function FinishChecklist({
         <span data-testid="finish-checklist-focus-status">{focusSummary.statusLabel}</span>
         <strong data-testid="finish-checklist-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="finish-checklist-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
+      <div
+        className={`finish-checklist-priority ${priority.tone}`}
+        data-finish-checklist-priority={priority.cardId ?? "none"}
+        data-testid="finish-checklist-priority"
+        title={priority.title}
+      >
+        <span data-testid="finish-checklist-priority-status">{priority.statusLabel}</span>
+        <strong data-testid="finish-checklist-priority-label">{priority.areaLabel}</strong>
+        <small data-testid="finish-checklist-priority-card">{priority.cardLabel}</small>
+        <small data-testid="finish-checklist-priority-next-check">{priority.nextCheckLabel}</small>
       </div>
       {result && <FinishChecklistFocusResultStrip result={result} />}
       <div className="finish-checklist-grid" data-testid="finish-checklist-grid">
@@ -12129,6 +12151,57 @@ function FinishChecklist({
       </div>
     </section>
   );
+}
+
+function createFinishChecklistPriority(summary: FinishChecklistSummary): FinishChecklistPriority {
+  const card =
+    summary.cards.find((item) => item.tone === "danger") ??
+    summary.cards.find((item) => item.tone === "warn") ??
+    summary.cards[0] ??
+    null;
+
+  if (!card) {
+    return {
+      cardId: null,
+      statusLabel: "Finish clear",
+      areaLabel: "No priority lane",
+      cardLabel: "No Finish Checklist cards available",
+      nextCheckLabel: "Next: return after finish cards are available.",
+      title: "Finish Checklist priority has no available card.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel =
+    card.tone === "danger" ? "Finish blocker" : card.tone === "warn" ? "Finish review" : "Finish ready";
+  const nextCheckLabel = finishChecklistPriorityNextCheck(card);
+
+  return {
+    cardId: card.id,
+    statusLabel,
+    areaLabel: `${card.label}: ${card.status}`,
+    cardLabel: `${card.focusLabel} priority / ${card.detail}`,
+    nextCheckLabel,
+    title: `${statusLabel}: ${card.label}: ${card.status} / ${card.detail} / ${nextCheckLabel}`,
+    tone: card.tone
+  };
+}
+
+function finishChecklistPriorityNextCheck(card: FinishChecklistCard): string {
+  switch (card.id) {
+    case "compose":
+      return "Next: confirm core musical layers before export.";
+    case "arrange":
+      return "Next: scan song form, contrast, and target length.";
+    case "mix":
+      return "Next: check Full Mix, stems, and Mix Coach.";
+    case "master":
+      return "Next: confirm master preset, ceiling, and headroom.";
+    case "automation":
+      return "Next: play fades across realtime playback and export scope.";
+    case "handoff":
+      return "Next: confirm deliverables, stems, and brief context.";
+  }
 }
 
 function FinishChecklistFocusResultStrip({ result }: { result: FinishChecklistFocusResult }): ReactElement {

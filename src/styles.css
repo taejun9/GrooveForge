@@ -261,6 +261,7 @@ h2 {
 .sound-control span,
 .master-panel label span,
 .finish-checklist-heading span,
+.finish-checklist-priority span,
 .finish-checklist-result-main span,
 .finish-checklist-result-destination span,
 .finish-checklist-result-metric span,
@@ -21485,6 +21486,57 @@ input[type="range"] {
   font-size: 12px;
 }
 
+.finish-checklist-priority {
+  display: grid;
+  grid-template-columns: minmax(116px, 0.34fr) minmax(0, 0.74fr) minmax(0, 1.14fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 6px 8px;
+}
+
+.finish-checklist-priority.good {
+  border-color: rgba(120, 240, 200, 0.18);
+  background: rgba(120, 240, 200, 0.035);
+}
+
+.finish-checklist-priority.warn {
+  border-color: rgba(240, 195, 106, 0.22);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.finish-checklist-priority.danger {
+  border-color: rgba(255, 122, 79, 0.26);
+  background: rgba(255, 122, 79, 0.05);
+}
+
+.finish-checklist-priority > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finish-checklist-priority span {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.finish-checklist-priority strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.finish-checklist-priority small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+}
+
 .finish-checklist-result {
   display: grid;
   grid-template-columns: minmax(170px, 0.34fr) minmax(140px, 0.22fr) minmax(190px, 0.42fr) minmax(0, 1fr);
@@ -23016,6 +23068,10 @@ input[type="range"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .finish-checklist-priority {
+    grid-template-columns: minmax(100px, 0.38fr) minmax(0, 0.72fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+
   .export-preflight {
     grid-template-columns: 150px minmax(0, 1fr);
   }
@@ -24388,6 +24444,7 @@ input[type="range"] {
   .review-fix-preview,
   .review-queue-result,
   .finish-checklist-focus-readout,
+  .finish-checklist-priority,
   .finish-checklist-result,
   .review-queue-item {
     grid-template-columns: 1fr;
