@@ -10633,6 +10633,7 @@ function ArrangementFocusPanel({
   }
 
   const prioritySummary = createArrangementFocusPrioritySummary(summary, preview);
+  const priorityActionDisabled = prioritySummary.statusLabel === "Focus aligned";
 
   return (
     <section className="arrangement-focus" data-testid="arrangement-focus" aria-label="Arrangement focus">
@@ -10670,6 +10671,19 @@ function ArrangementFocusPanel({
         <small data-testid="arrangement-focus-priority-reason">{prioritySummary.reasonLabel}</small>
         <small data-testid="arrangement-focus-priority-scope">{prioritySummary.scopeLabel}</small>
         <small data-testid="arrangement-focus-priority-next-check">{prioritySummary.nextCheckLabel}</small>
+        <button
+          data-testid="arrangement-focus-priority-run"
+          disabled={priorityActionDisabled}
+          onClick={() => {
+            if (!priorityActionDisabled) {
+              onApply(prioritySummary.presetId);
+            }
+          }}
+          title={priorityActionDisabled ? prioritySummary.reasonLabel : `Apply ${prioritySummary.presetLabel} focus`}
+          type="button"
+        >
+          {priorityActionDisabled ? "Aligned" : prioritySummary.presetLabel}
+        </button>
       </div>
       <div className="arrangement-focus-actions">
         {arrangementFocusPresets.map((preset) => (

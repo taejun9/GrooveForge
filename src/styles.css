@@ -20093,7 +20093,7 @@ input[type="range"] {
 .arrangement-focus-priority {
   display: grid;
   grid-column: 2;
-  grid-template-columns: minmax(96px, 0.54fr) minmax(118px, 0.72fr) minmax(0, 1.16fr) minmax(136px, 0.84fr) minmax(0, 1fr);
+  grid-template-columns: minmax(96px, 0.54fr) minmax(118px, 0.72fr) minmax(0, 1.16fr) minmax(136px, 0.84fr) minmax(0, 1fr) minmax(112px, 0.66fr);
   gap: 6px;
   align-items: center;
   min-width: 0;
@@ -20115,7 +20115,8 @@ input[type="range"] {
 
 .arrangement-focus-priority span,
 .arrangement-focus-priority strong,
-.arrangement-focus-priority small {
+.arrangement-focus-priority small,
+.arrangement-focus-priority button {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -20135,6 +20136,35 @@ input[type="range"] {
 .arrangement-focus-priority small {
   color: rgba(244, 239, 231, 0.58);
   font-size: 10px;
+}
+
+.arrangement-focus-priority button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border: 1px solid rgba(120, 240, 200, 0.26);
+  border-radius: 5px;
+  color: #08120f;
+  background: #78f0c8;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.arrangement-focus-priority.warn button {
+  border-color: rgba(240, 195, 106, 0.3);
+  background: #f0c36a;
+}
+
+.arrangement-focus-priority.danger button {
+  border-color: rgba(255, 122, 79, 0.34);
+  background: #ff7a4f;
+}
+
+.arrangement-focus-priority button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
 }
 
 .arrangement-focus-actions {
