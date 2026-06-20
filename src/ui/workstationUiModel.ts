@@ -2879,6 +2879,19 @@ export type SectionLocatorPrioritySummary = {
   tone: MixCoachTone;
 };
 
+export type SectionLocatorCueDecisionSummary = {
+  section: ArrangementSection | null;
+  actionId: "cue-section" | "stop-playback" | "unavailable";
+  statusLabel: string;
+  sectionLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  buttonLabel: string;
+  disabled: boolean;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementBlockRoleSummary = {
   roleLabel: string;
   timelineLabel: string;

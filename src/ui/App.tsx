@@ -462,6 +462,7 @@ import type {
   ArrangementTransitionMapFocusSummary,
   ArrangementTransitionMapPrioritySummary,
   ArrangementTransitionMapFocusResult,
+  SectionLocatorCueDecisionSummary,
   SectionLocatorPad,
   SectionLocatorPrioritySummary,
   ArrangementBlockRoleSummary,
@@ -11386,6 +11387,7 @@ function SectionLocatorPads({
   pads: SectionLocatorPad[];
 }): ReactElement {
   const prioritySummary = createSectionLocatorPrioritySummary(pads);
+  const cueDecision = createSectionLocatorCueDecisionSummary(pads, disabled);
   const priorityActionDisabled = disabled || prioritySummary.section === null;
   const priorityActionTitle = disabled
     ? "Stop playback before cueing a section"
@@ -11423,6 +11425,7 @@ function SectionLocatorPads({
           {prioritySummary.section ? `Cue ${prioritySummary.section}` : "No cue"}
         </button>
       </div>
+      <SectionLocatorCueDecision summary={cueDecision} onCue={onCue} />
       <div className="section-locator-row">
         {pads.map((pad) => {
           const missing = pad.index === null;
@@ -11459,6 +11462,46 @@ function SectionLocatorPads({
         })}
       </div>
     </section>
+  );
+}
+
+function SectionLocatorCueDecision({
+  onCue,
+  summary
+}: {
+  onCue: (section: ArrangementSection) => void;
+  summary: SectionLocatorCueDecisionSummary;
+}): ReactElement {
+  return (
+    <div
+      className={`section-locator-priority section-locator-decision ${summary.tone}`}
+      data-section-locator-decision={summary.section ? sectionLocatorTestId(summary.section) : "none"}
+      data-testid="section-locator-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="section-locator-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="section-locator-decision-section">{summary.sectionLabel}</strong>
+      <small data-testid="section-locator-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="section-locator-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="section-locator-decision-run"
+        data-section-locator-decision-action={summary.actionId}
+        data-testid="section-locator-decision-run"
+        disabled={summary.disabled}
+        onClick={() => {
+          if (!summary.disabled && summary.section) {
+            onCue(summary.section);
+          }
+        }}
+        title={summary.disabled ? summary.detailLabel : `Cue ${summary.section} section`}
+        type="button"
+      >
+        <ListChecks size={12} aria-hidden="true" />
+        <span className="section-locator-decision-label" data-testid="section-locator-decision-label">
+          {summary.buttonLabel}
+        </span>
+      </button>
+    </div>
   );
 }
 
@@ -29977,6 +30020,45 @@ function createSectionLocatorPrioritySummary(pads: SectionLocatorPad[]): Section
     nextCheckLabel,
     detailTitle: `${statusLabel} / ${sectionLabel} / ${reasonLabel} / ${nextCheckLabel}`,
     tone: pad.tone
+  };
+}
+
+function createSectionLocatorCueDecisionSummary(pads: SectionLocatorPad[], disabled: boolean): SectionLocatorCueDecisionSummary {
+  const pad = activeSectionLocatorPriorityPad(pads);
+
+  if (!pad) {
+    return {
+      section: null,
+      actionId: "unavailable",
+      statusLabel: "Cue unavailable",
+      sectionLabel: "No section target",
+      metricLabel: "No block",
+      detailLabel: "Add an arrangement block before cueing a section.",
+      buttonLabel: "No Section Cue",
+      disabled: true,
+      detailTitle: "Cue unavailable / No section target / Add an arrangement block before cueing a section.",
+      tone: "warn"
+    };
+  }
+
+  const rangeLabel = pad.startBar === null || pad.endBar === null ? "missing bars" : `Bars ${pad.startBar}-${pad.endBar}`;
+  const sectionLabel = `${pad.section}: ${pad.pattern ? `Pattern ${pad.pattern}` : "Missing Pattern"}`;
+  const metricLabel = `Block ${pad.index === null ? "?" : pad.index + 1} / ${rangeLabel}`;
+  const detailLabel = `${Math.round(pad.energy * 100)}% energy / ${pad.eventCount} events`;
+  const statusLabel = disabled ? "Stop playback first" : pad.playing ? "Already hearing" : pad.selected ? "Ready to cue edit section" : "Ready to cue";
+  const buttonLabel = disabled ? "Stop Playback First" : "Cue Suggested Section";
+
+  return {
+    section: pad.section,
+    actionId: disabled ? "stop-playback" : "cue-section",
+    statusLabel,
+    sectionLabel,
+    metricLabel,
+    detailLabel,
+    buttonLabel,
+    disabled,
+    detailTitle: `${statusLabel} / ${sectionLabel} / ${metricLabel} / ${detailLabel}`,
+    tone: disabled ? "warn" : pad.tone
   };
 }
 
