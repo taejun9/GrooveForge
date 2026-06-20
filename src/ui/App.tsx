@@ -34066,17 +34066,22 @@ function createSoundSnapshotComparison(snapshots: SoundSnapshotSlotMap): SoundSn
       winnerLabel: "Capture A/B",
       detailLabel: "No tone passes held",
       detailTitle: "Capture a sound pass into A and another into B before comparing.",
+      actionId: "capture-a",
+      actionLabel: "Capture A",
       tone: "warn",
       metrics: emptySoundSnapshotMetrics()
     };
   }
   if (!a || !b) {
     const held = a ?? b;
+    const missingSlot: SoundSnapshotSlotId = a ? "B" : "A";
     return {
       statusLabel: "One sound pass",
       winnerLabel: held ? `Sound ${held.slot} held` : "Capture pair",
       detailLabel: held ? `${held.presetLabel} / ${held.timbreLabel}` : "Capture another slot",
       detailTitle: "Capture the other Sound Snapshot slot to compare tone passes.",
+      actionId: missingSlot === "A" ? "capture-a" : "capture-b",
+      actionLabel: `Capture ${missingSlot}`,
       tone: "warn",
       metrics: soundSnapshotComparisonMetrics(a, b)
     };
@@ -34084,6 +34089,7 @@ function createSoundSnapshotComparison(snapshots: SoundSnapshotSlotMap): SoundSn
 
   const scoreDelta = a.score - b.score;
   const winnerLabel = Math.abs(scoreDelta) <= 3 ? "Close tone passes" : scoreDelta > 0 ? "A is cleaner" : "B is cleaner";
+  const winnerSlot: SoundSnapshotSlotId = scoreDelta > 0 ? "A" : "B";
   const tone = weakestTone([a.tone, b.tone, Math.abs(scoreDelta) <= 3 ? "good" : "warn"]);
 
   return {
@@ -34091,6 +34097,8 @@ function createSoundSnapshotComparison(snapshots: SoundSnapshotSlotMap): SoundSn
     winnerLabel,
     detailLabel: `${a.timbreLabel} vs ${b.timbreLabel}`,
     detailTitle: `Sound A score ${a.score}; Sound B score ${b.score}. Recall only applies the selected SoundDesign pass.`,
+    actionId: Math.abs(scoreDelta) <= 3 ? "recall-a" : winnerSlot === "A" ? "recall-a" : "recall-b",
+    actionLabel: Math.abs(scoreDelta) <= 3 ? "Recall A" : `Recall ${winnerSlot}`,
     tone,
     metrics: soundSnapshotComparisonMetrics(a, b)
   };

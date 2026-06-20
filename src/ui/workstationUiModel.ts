@@ -802,11 +802,15 @@ export type SoundSnapshotComparisonMetric = {
   tone: MixCoachTone;
 };
 
+export type SoundSnapshotDecisionActionId = "capture-a" | "capture-b" | "recall-a" | "recall-b";
+
 export type SoundSnapshotComparisonSummary = {
   statusLabel: string;
   winnerLabel: string;
   detailLabel: string;
   detailTitle: string;
+  actionId: SoundSnapshotDecisionActionId;
+  actionLabel: string;
   tone: MixCoachTone;
   metrics: SoundSnapshotComparisonMetric[];
 };

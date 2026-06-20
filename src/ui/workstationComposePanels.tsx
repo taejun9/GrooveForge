@@ -1840,6 +1840,24 @@ export function SoundSnapshotAB({
   onClear: () => void;
 }): ReactElement {
   const slotIds: SoundSnapshotSlotId[] = ["A", "B"];
+  const actionIsCapture = summary.actionId.startsWith("capture");
+
+  function runSnapshotAction(): void {
+    switch (summary.actionId) {
+      case "capture-a":
+        onCapture("A");
+        return;
+      case "capture-b":
+        onCapture("B");
+        return;
+      case "recall-a":
+        onRecall("A");
+        return;
+      case "recall-b":
+        onRecall("B");
+        return;
+    }
+  }
 
   return (
     <div className={`sound-snapshot-ab ${summary.tone}`} data-testid="sound-snapshot-ab">
@@ -1901,6 +1919,21 @@ export function SoundSnapshotAB({
         <span data-testid="sound-snapshot-status">{summary.statusLabel}</span>
         <strong data-testid="sound-snapshot-winner">{summary.winnerLabel}</strong>
         <small data-testid="sound-snapshot-detail">{summary.detailLabel}</small>
+        <button
+          className="sound-snapshot-action"
+          data-sound-snapshot-action={summary.actionId}
+          data-testid="sound-snapshot-run"
+          onClick={runSnapshotAction}
+          title={`Run ${summary.actionLabel}: ${summary.detailTitle}`}
+          type="button"
+        >
+          {actionIsCapture ? (
+            <Save size={13} aria-hidden="true" />
+          ) : (
+            <RotateCcw size={13} aria-hidden="true" />
+          )}
+          <span>{summary.actionLabel}</span>
+        </button>
       </div>
       <div className="sound-snapshot-slots">
         {slotIds.map((slot) => (

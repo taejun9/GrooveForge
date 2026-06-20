@@ -18121,7 +18121,7 @@ input[type="range"] {
 
 .sound-snapshot-status {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: minmax(104px, 0.56fr) minmax(116px, 0.64fr) minmax(170px, 1.2fr) minmax(112px, auto);
   gap: 6px;
   align-items: center;
   border: 1px solid rgba(244, 239, 231, 0.08);
@@ -18137,7 +18137,7 @@ input[type="range"] {
   white-space: nowrap;
 }
 
-.sound-snapshot-status span {
+.sound-snapshot-status > span {
   color: #071014;
   background: #8aa8ff;
   border-radius: 6px;
@@ -18147,23 +18147,66 @@ input[type="range"] {
   text-align: center;
 }
 
-.sound-snapshot-status.warn span {
+.sound-snapshot-status.warn > span {
   background: #ffd166;
 }
 
-.sound-snapshot-status.danger span {
+.sound-snapshot-status.danger > span {
   background: #ff7a4f;
 }
 
-.sound-snapshot-status strong {
+.sound-snapshot-status > strong {
   color: #f4efe7;
   font-size: 12px;
   font-weight: 850;
 }
 
-.sound-snapshot-status small {
+.sound-snapshot-status > small {
   color: rgba(244, 239, 231, 0.62);
   font-size: 10px;
+}
+
+.sound-snapshot-action {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 27px;
+  min-width: 0;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 6px;
+  color: rgba(244, 239, 231, 0.76);
+  background: rgba(244, 239, 231, 0.06);
+  padding: 4px 7px;
+}
+
+.sound-snapshot-action:hover {
+  border-color: rgba(138, 168, 255, 0.5);
+  color: #f4efe7;
+  background: rgba(138, 168, 255, 0.14);
+}
+
+.sound-snapshot-action svg {
+  color: #8aa8ff;
+}
+
+.sound-snapshot-status.warn .sound-snapshot-action svg {
+  color: #ffd166;
+}
+
+.sound-snapshot-status.danger .sound-snapshot-action svg {
+  color: #ff7a4f;
+}
+
+.sound-snapshot-action span {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sound-snapshot-slots {
@@ -25375,6 +25418,10 @@ input[type="range"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .sound-snapshot-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .mix-snapshot-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -26087,7 +26134,8 @@ input[type="range"] {
   .mix-snapshot-status,
   .mix-snapshot-decision,
   .mix-snapshot-slots,
-  .mix-snapshot-metrics {
+  .mix-snapshot-metrics,
+  .sound-snapshot-status {
     grid-template-columns: 1fr;
   }
 
