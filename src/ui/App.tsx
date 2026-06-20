@@ -11967,6 +11967,7 @@ function BeatPassportFocusResultStrip({ result }: { result: BeatPassportFocusRes
 
 type ProductionSnapshotPriority = {
   metricId: ProductionSnapshotMetricId | null;
+  actionLabel: string;
   statusLabel: string;
   areaLabel: string;
   metricLabel: string;
@@ -11988,6 +11989,8 @@ function ProductionSnapshot({
 }): ReactElement {
   const focusSummary = createProductionSnapshotFocusSummary(summary, focusedMetricId);
   const priority = createProductionSnapshotPriority(summary);
+  const priorityMetric = summary.metrics.find((metric) => metric.id === priority.metricId) ?? null;
+  const priorityActionDisabled = priorityMetric === null;
 
   return (
     <section
@@ -12022,6 +12025,19 @@ function ProductionSnapshot({
         <strong data-testid="production-snapshot-priority-label">{priority.areaLabel}</strong>
         <small data-testid="production-snapshot-priority-metric">{priority.metricLabel}</small>
         <small data-testid="production-snapshot-priority-next-check">{priority.nextCheckLabel}</small>
+        <button
+          data-testid="production-snapshot-priority-run"
+          disabled={priorityActionDisabled}
+          onClick={() => {
+            if (priorityMetric) {
+              onFocus(priorityMetric);
+            }
+          }}
+          title={priorityMetric ? `Focus ${priority.areaLabel}` : priority.title}
+          type="button"
+        >
+          {priority.actionLabel}
+        </button>
       </div>
       {result && <ProductionSnapshotFocusResultStrip result={result} />}
       <div className="production-snapshot-grid" data-testid="production-snapshot-grid">
@@ -12066,6 +12082,7 @@ function createProductionSnapshotPriority(summary: ProductionSnapshotSummary): P
   if (!metric) {
     return {
       metricId: null,
+      actionLabel: "No metric",
       statusLabel: "Snapshot clear",
       areaLabel: "No priority lane",
       metricLabel: "No Production Snapshot metrics available",
@@ -12081,6 +12098,7 @@ function createProductionSnapshotPriority(summary: ProductionSnapshotSummary): P
 
   return {
     metricId: metric.id,
+    actionLabel: "Focus lane",
     statusLabel,
     areaLabel: `${metric.label}: ${metric.value}`,
     metricLabel: `${metric.focusLabel} priority / ${metric.detail}`,
