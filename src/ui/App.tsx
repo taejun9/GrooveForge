@@ -14348,6 +14348,7 @@ type HandoffExportFormatPriority = {
 
 type HandoffPackageCheckPriority = {
   focusId: HandoffPackageCheckFocusId | null;
+  actionLabel: string;
   statusLabel: string;
   areaLabel: string;
   cardLabel: string;
@@ -14409,6 +14410,8 @@ function HandoffPack({
   const formatPriority = createHandoffExportFormatPriority(formatSummary);
   const packageFocusSummary = createHandoffPackageCheckFocusSummary(packageCheckSummary, focusedPackageCheckId);
   const packagePriority = createHandoffPackageCheckPriority(packageCheckSummary);
+  const packagePriorityCard = packageCheckSummary.cards.find((card) => card.focusId === packagePriority.focusId) ?? null;
+  const packagePriorityActionDisabled = packagePriorityCard === null;
 
   return (
     <section className={`handoff-pack ${tone}`} data-testid="handoff-pack" aria-label="Handoff pack">
@@ -14582,6 +14585,19 @@ function HandoffPack({
           <strong data-testid="handoff-package-check-priority-label">{packagePriority.areaLabel}</strong>
           <small data-testid="handoff-package-check-priority-card">{packagePriority.cardLabel}</small>
           <small data-testid="handoff-package-check-priority-next-check">{packagePriority.nextCheckLabel}</small>
+          <button
+            data-testid="handoff-package-check-priority-run"
+            disabled={packagePriorityActionDisabled}
+            onClick={() => {
+              if (packagePriorityCard) {
+                onFocusPackageCheck(packagePriorityCard);
+              }
+            }}
+            title={packagePriorityCard ? `Focus ${packagePriority.areaLabel}` : packagePriority.title}
+            type="button"
+          >
+            {packagePriority.actionLabel}
+          </button>
         </div>
         {packageCheckResult && <HandoffPackageCheckFocusResultStrip result={packageCheckResult} />}
         <div className="handoff-package-check-grid" data-testid="handoff-package-check-cards">
@@ -14691,6 +14707,7 @@ function createHandoffPackageCheckPriority(summary: HandoffPackageCheckSummary):
   if (!card) {
     return {
       focusId: null,
+      actionLabel: "No lane",
       statusLabel: "Package clear",
       areaLabel: "No package lane",
       cardLabel: "No Handoff Package Check cards available",
@@ -14706,6 +14723,7 @@ function createHandoffPackageCheckPriority(summary: HandoffPackageCheckSummary):
 
   return {
     focusId: card.focusId,
+    actionLabel: "Focus package",
     statusLabel,
     areaLabel: `${card.label}: ${card.value}`,
     cardLabel: `${card.focusLabel} priority / ${card.status}`,
