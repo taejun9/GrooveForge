@@ -247,6 +247,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
     items: [
       { id: "sound-preset-decision", command: "Sound Preset Decision", shortcut: "Quick Actions", target: "Suggested full-tone preset" },
       { id: "sound-preset", command: "Sound Preset", shortcut: "Quick Actions", target: "Full-tone presets" },
+      { id: "drum-kit-decision", command: "Drum Kit Decision", shortcut: "Quick Actions", target: "Suggested drum kit" },
       { id: "drum-kit", command: "Drum Kit", shortcut: "Quick Actions", target: "Kick / clap / hat tone" },
       { id: "sound-focus", command: "Sound Focus", shortcut: "Quick Actions", target: "808 / Synth / Chords" },
       { id: "timbre-check", command: "Timbre Check", shortcut: "Readout", target: "Drums / 808 / air / width" },

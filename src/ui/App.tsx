@@ -19394,6 +19394,23 @@ function createQuickActions({
       }
     },
     {
+      id: "drum-kit-decision",
+      title: drumKitReady ? `Run Drum Kit Decision: Apply ${drumKitPreviewSummary.kitLabel}` : "Run Drum Kit Decision: Aligned",
+      detail: drumKitReady
+        ? `${drumKitPreviewSummary.statusLabel} / ${drumKitPreviewSummary.moveLabel} / ${drumKitPreviewSummary.rackLabel}`
+        : `${drumKitPreviewSummary.statusLabel} / Current editable drums already match this kit.`,
+      group: "Create",
+      keywords: `Quick Actions Drum Kit Decision preview decision apply suggested kit tone kick clap snare hat rack punch clean knock dust air ${
+        drumKitPreviewSummary.padId
+      } ${drumKitPreviewSummary.kitLabel} ${drumKitReady ? "apply-suggested" : "aligned"} beginner producer`,
+      disabled: !drumKitReady,
+      run: () => {
+        if (drumKitReady) {
+          onApplyDrumKit(drumKitPreviewSummary.padId);
+        }
+      }
+    },
+    {
       id: "drum-kit",
       title: drumKitReady ? `Apply ${drumKitPreviewSummary.kitLabel}` : "Apply Drum Kit",
       detail: drumKitReady
@@ -21523,6 +21540,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "drum-kit-decision") {
+    return {
+      id: "drum-kit-decision",
+      label: "Drum Kit Decision",
+      value: `K ${compactUnitPercent(project.sound.kickPunch)} / C ${compactUnitPercent(project.sound.snareSnap)} / H ${compactUnitPercent(project.sound.hatBrightness)}`
+    };
+  }
+
   if (action.id === "drum-kit" || action.id.startsWith("drum-kit-pad-")) {
     return {
       id: "drum-kit",
@@ -22821,6 +22846,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, Synth, and Chords under the applied full-tone preset.`,
       nextCheck: "Use the Sound Preset Result, then trim with Drum Kit, Sound Focus, or Studio tone controls."
+    };
+  }
+
+  if (action.id === "drum-kit-decision") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; follow the visible Drum Kit Preview Decision before another built-in kit move.`,
+      nextCheck: "Use the Drum Kit Result plus Studio tone and drum rack mixer controls for manual trim."
     };
   }
 
