@@ -396,6 +396,7 @@ import type {
   ArrangementMoveResultMetric,
   ArrangementMoveResultSummary,
   SelectedBlockEditActionId,
+  SelectedBlockEditPrioritySummary,
   SelectedBlockEditResultMetric,
   SelectedBlockEditResultSummary,
   ArrangementArcPadId,
@@ -9241,6 +9242,9 @@ export function App(): ReactElement {
               {arrangementMoveResult?.blockIndex === selectedArrangementIndex && (
                 <ArrangementMoveResultStrip result={arrangementMoveResult} />
               )}
+              <SelectedBlockEditPriorityReadout
+                summary={createSelectedBlockEditPrioritySummary(project, selectedArrangementIndex, arrangementBlockClipboard)}
+              />
               <div className="arrangement-clipboard-row" aria-label="Arrangement block clipboard">
                 <button
                   data-testid="arrangement-copy"
@@ -10805,6 +10809,24 @@ function ArrangementMoveResultStrip({ result }: { result: ArrangementMoveResultS
           <em data-testid="arrangement-move-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
+    </div>
+  );
+}
+
+function SelectedBlockEditPriorityReadout({ summary }: { summary: SelectedBlockEditPrioritySummary }): ReactElement {
+  return (
+    <div
+      className={`selected-block-edit-priority ${summary.tone}`}
+      data-selected-block-edit-priority={summary.actionId}
+      data-testid="selected-block-edit-priority"
+      title={summary.detailTitle}
+    >
+      <span data-testid="selected-block-edit-priority-status">{summary.statusLabel}</span>
+      <strong data-testid="selected-block-edit-priority-action">{summary.actionLabel}</strong>
+      <small data-testid="selected-block-edit-priority-reason">{summary.reasonLabel}</small>
+      <small data-testid="selected-block-edit-priority-scope">{summary.scopeLabel}</small>
+      <small data-testid="selected-block-edit-priority-impact">{summary.impactLabel}</small>
+      <small data-testid="selected-block-edit-priority-next-check">{summary.nextCheckLabel}</small>
     </div>
   );
 }
@@ -15641,6 +15663,116 @@ function arrangementMoveResultAuditionCue(preset: ArrangementMovePreset): string
     case "reset":
       return "Audition Block and verify the neutral mute posture.";
   }
+}
+
+function createSelectedBlockEditPrioritySummary(
+  project: ProjectState,
+  selectedIndex: number,
+  clipboard: ArrangementBlockClipboard | null
+): SelectedBlockEditPrioritySummary {
+  const block = project.arrangement[selectedIndex] ?? project.arrangement[0];
+  if (!block) {
+    return {
+      actionId: "none",
+      statusLabel: "Select block",
+      actionLabel: "No edit target",
+      reasonLabel: "Select an arrangement block before choosing a structure edit.",
+      scopeLabel: "No selected block",
+      impactLabel: "0 blocks / 0 bars",
+      nextCheckLabel: "Select a block, then cue Block before changing song form.",
+      detailTitle: "Select an arrangement block before choosing a structure edit.",
+      tone: "warn"
+    };
+  }
+
+  const blockCount = project.arrangement.length;
+  const blockNumber = Math.min(Math.max(selectedIndex + 1, 1), Math.max(blockCount, 1));
+  const blockBars = normalizeArrangementBars(block.bars);
+  const totalBars = arrangementTotalBars(project);
+  const nextBlock = project.arrangement[selectedIndex + 1] ?? null;
+  const nextBlockBars = nextBlock ? normalizeArrangementBars(nextBlock.bars) : 0;
+  const canMerge = Boolean(nextBlock && blockBars + nextBlockBars <= maxArrangementBars);
+  const scopeLabel = selectedBlockEditBlockLabel(project, selectedIndex);
+  let actionId: SelectedBlockEditActionId = "copy";
+  let statusLabel = "Stage edit";
+  let actionLabel = "Copy Block";
+  let reasonLabel = "No structure pressure; copy first when you may repeat this section later.";
+  let impactLabel = "Clipboard only / no project data";
+  let nextCheckLabel = "Copy only when you know where the section should repeat.";
+  let tone: SelectedBlockEditPrioritySummary["tone"] = "good";
+
+  if (clipboard) {
+    const clipboardBars = normalizeArrangementBars(clipboard.bars);
+    actionId = "paste";
+    statusLabel = "Clipboard first";
+    actionLabel = "Paste After";
+    reasonLabel = "A copied block is waiting; place it before starting another structure pass.";
+    impactLabel = `+1 block / ${barCountLabel(totalBars)} -> ${barCountLabel(totalBars + clipboardBars)}`;
+    nextCheckLabel = "Paste, then audition the inserted handoff.";
+    tone = "warn";
+  } else if (canMerge && nextBlock && selectedBlockEditMergeCandidate(block, nextBlock)) {
+    actionId = "merge";
+    statusLabel = "Tidy adjacent";
+    actionLabel = "Merge Next";
+    reasonLabel = "The next block shares the same section, Pattern, energy, and mute posture.";
+    impactLabel = `-1 block / ${barCountLabel(totalBars)} unchanged`;
+    nextCheckLabel = "Merge, then play the longer block before more edits.";
+    tone = "warn";
+  } else if (blockBars >= 4) {
+    actionId = "split";
+    statusLabel = "Divide long block";
+    actionLabel = "Split Block";
+    reasonLabel = "This block is long enough to become two editable song moments.";
+    impactLabel = `+1 block / ${barCountLabel(totalBars)} unchanged`;
+    nextCheckLabel = "Split, then cue the two-block transition.";
+    tone = "warn";
+  } else if (blockCount < 8 || totalBars < 16) {
+    actionId = "duplicate";
+    statusLabel = "Extend form";
+    actionLabel = "Duplicate";
+    reasonLabel = "The arrangement is still compact; repeat a proven section before detailed shaping.";
+    impactLabel = `+1 block / ${barCountLabel(totalBars)} -> ${barCountLabel(totalBars + blockBars)}`;
+    nextCheckLabel = "Duplicate, then shape energy or mutes on the new copy.";
+    tone = "warn";
+  } else if (block.section === "Intro" && selectedIndex > 0) {
+    actionId = "move_left";
+    statusLabel = "Fix order";
+    actionLabel = "Move Left";
+    reasonLabel = "Intro reads later than expected in the song form.";
+    impactLabel = `Order only / Block ${blockNumber} -> ${blockNumber - 1}`;
+    nextCheckLabel = "Move, then scan Song Form Overview from the top.";
+    tone = "warn";
+  } else if (block.section === "Outro" && selectedIndex < blockCount - 1) {
+    actionId = "move_right";
+    statusLabel = "Fix order";
+    actionLabel = "Move Right";
+    reasonLabel = "Outro reads before the end of the song form.";
+    impactLabel = `Order only / Block ${blockNumber} -> ${blockNumber + 1}`;
+    nextCheckLabel = "Move, then audition into the ending.";
+    tone = "warn";
+  }
+
+  return {
+    actionId,
+    statusLabel,
+    actionLabel,
+    reasonLabel,
+    scopeLabel,
+    impactLabel,
+    nextCheckLabel,
+    detailTitle: `${statusLabel} / ${actionLabel} / ${reasonLabel} / ${scopeLabel} / ${impactLabel} / ${nextCheckLabel}`,
+    tone
+  };
+}
+
+function selectedBlockEditMergeCandidate(block: ArrangementBlock, nextBlock: ArrangementBlock): boolean {
+  return (
+    block.section === nextBlock.section &&
+    block.pattern === nextBlock.pattern &&
+    normalizeArrangementEnergy(block.energy) === normalizeArrangementEnergy(nextBlock.energy) &&
+    normalizeArrangementMutedTracks(block.mutedTracks).join(",") ===
+      normalizeArrangementMutedTracks(nextBlock.mutedTracks).join(",")
+  );
 }
 
 function createSelectedBlockEditResult(

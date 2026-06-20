@@ -2125,6 +2125,20 @@ export type ArrangementMoveResultSummary = {
 
 export type SelectedBlockEditActionId = "copy" | "paste" | "duplicate" | "split" | "merge" | "move_left" | "move_right" | "delete";
 
+export type SelectedBlockEditPriorityActionId = SelectedBlockEditActionId | "none";
+
+export type SelectedBlockEditPrioritySummary = {
+  actionId: SelectedBlockEditPriorityActionId;
+  statusLabel: string;
+  actionLabel: string;
+  reasonLabel: string;
+  scopeLabel: string;
+  impactLabel: string;
+  nextCheckLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type SelectedBlockEditResultMetricId = "blocks" | "bars" | "selected";
 
 export type SelectedBlockEditResultMetric = {
