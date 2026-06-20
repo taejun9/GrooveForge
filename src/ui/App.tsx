@@ -15481,6 +15481,8 @@ function ArrangementTransitionMap({
 }): ReactElement {
   const focusSummary = createArrangementTransitionMapFocusSummary(summary, focusedTransitionId);
   const prioritySummary = createArrangementTransitionMapPrioritySummary(summary);
+  const priorityTransition = summary.transitions.find((transition) => transition.id === prioritySummary.transitionId) ?? null;
+  const priorityActionDisabled = priorityTransition === null;
 
   return (
     <section
@@ -15515,6 +15517,19 @@ function ArrangementTransitionMap({
         <strong data-testid="arrangement-transition-map-priority-transition">{prioritySummary.transitionLabel}</strong>
         <small data-testid="arrangement-transition-map-priority-reason">{prioritySummary.reasonLabel}</small>
         <small data-testid="arrangement-transition-map-priority-next-check">{prioritySummary.nextCheckLabel}</small>
+        <button
+          data-testid="arrangement-transition-map-priority-run"
+          disabled={priorityActionDisabled}
+          onClick={() => {
+            if (priorityTransition) {
+              onFocus(priorityTransition);
+            }
+          }}
+          title={priorityTransition ? `Focus ${prioritySummary.transitionLabel}` : prioritySummary.reasonLabel}
+          type="button"
+        >
+          {prioritySummary.actionLabel}
+        </button>
       </div>
       {result && <ArrangementTransitionMapFocusResultStrip result={result} />}
       <div className="arrangement-transition-map-grid" data-testid="arrangement-transition-map-grid">
@@ -29001,6 +29016,7 @@ function createArrangementTransitionMapPrioritySummary(
   if (!transition) {
     return {
       transitionId: null,
+      actionLabel: "No handoff",
       statusLabel: "Build form first",
       transitionLabel: "No transition available",
       reasonLabel: "Add at least two arrangement blocks before checking handoffs",
@@ -29017,6 +29033,7 @@ function createArrangementTransitionMapPrioritySummary(
 
   return {
     transitionId: transition.id,
+    actionLabel: "Focus handoff",
     statusLabel,
     transitionLabel,
     reasonLabel,

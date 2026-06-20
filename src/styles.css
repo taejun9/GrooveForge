@@ -12218,6 +12218,7 @@ h2 {
 .arrangement-transition-map-focus-readout small,
 .arrangement-transition-map-priority span,
 .arrangement-transition-map-priority strong,
+.arrangement-transition-map-priority button,
 .arrangement-transition-map-priority small,
 .arrangement-transition-map-result-main strong,
 .arrangement-transition-map-result-main small,
@@ -12282,8 +12283,8 @@ h2 {
 
 .arrangement-transition-map-priority {
   display: grid;
-  grid-template-columns: minmax(98px, 0.42fr) minmax(0, 0.9fr) minmax(0, 1.18fr) minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: minmax(98px, 0.42fr) minmax(0, 0.82fr) minmax(0, 1.08fr) minmax(0, 0.96fr) minmax(98px, 0.44fr);
+  gap: 6px;
   align-items: center;
   min-width: 0;
   border: 1px solid rgba(158, 231, 255, 0.22);
@@ -12311,6 +12312,27 @@ h2 {
 .arrangement-transition-map-priority strong {
   color: #f4efe7;
   font-size: 11px;
+}
+
+.arrangement-transition-map-priority button {
+  border: 1px solid rgba(158, 231, 255, 0.28);
+  border-radius: 5px;
+  background: rgba(158, 231, 255, 0.11);
+  color: #f4efe7;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.arrangement-transition-map-priority.warn button {
+  border-color: rgba(240, 195, 106, 0.34);
+  background: rgba(240, 195, 106, 0.12);
+}
+
+.arrangement-transition-map-priority.danger button {
+  border-color: rgba(255, 122, 79, 0.34);
+  background: rgba(255, 122, 79, 0.12);
 }
 
 .arrangement-transition-map-result {

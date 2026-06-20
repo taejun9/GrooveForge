@@ -2673,6 +2673,7 @@ export type ArrangementTransitionMapFocusSummary = {
 
 export type ArrangementTransitionMapPrioritySummary = {
   transitionId: ArrangementTransitionMapFocusId | null;
+  actionLabel: string;
   statusLabel: string;
   transitionLabel: string;
   reasonLabel: string;
