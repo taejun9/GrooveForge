@@ -415,6 +415,45 @@ export function GuideQuickStart({
     sessionCard?.tone ?? "good"
   ]);
   const [result, setResult] = useState<GuideQuickStartResult | null>(null);
+  const decisionActionDisabled =
+    (decision.source === "path" && !nextStep) ||
+    (decision.source === "session" && !sessionCard) ||
+    (decision.source === "workflow" && !workflowSpotlightItem);
+
+  function runGuideQuickStartPath(): void {
+    if (nextStep) {
+      setResult(createGuideQuickStartPathResult(nextStep, firstBeatPathSummary));
+      onJumpFirstBeatPath(nextStep);
+    }
+  }
+
+  function runGuideQuickStartSession(): void {
+    if (sessionCard) {
+      setResult(createGuideQuickStartSessionResult(sessionCard, sessionPassSummary));
+      onFocusSessionPass(sessionCard);
+    }
+  }
+
+  function runGuideQuickStartWorkflow(): void {
+    if (workflowSpotlightItem) {
+      setResult(createGuideQuickStartWorkflowResult(workflowSpotlight, workflowSpotlightItem));
+      onJumpWorkflowSpotlight(workflowSpotlightItem);
+    }
+  }
+
+  function runGuideQuickStartDecision(): void {
+    switch (decision.source) {
+      case "path":
+        runGuideQuickStartPath();
+        return;
+      case "session":
+        runGuideQuickStartSession();
+        return;
+      case "workflow":
+        runGuideQuickStartWorkflow();
+        return;
+    }
+  }
 
   useEffect(() => {
     setResult(null);
@@ -455,6 +494,18 @@ export function GuideQuickStart({
           <strong data-testid="guide-quick-start-decision-lane">{decision.laneLabel}</strong>
           <small data-testid="guide-quick-start-decision-metric">{decision.metricLabel}</small>
           <small data-testid="guide-quick-start-decision-detail">{decision.detailLabel}</small>
+          <button
+            className="guide-quick-start-decision-action"
+            data-guide-quick-start-decision-action={decision.source}
+            data-testid="guide-quick-start-decision-run"
+            disabled={decisionActionDisabled}
+            onClick={runGuideQuickStartDecision}
+            title={decision.title}
+            type="button"
+          >
+            <ArrowRight size={13} aria-hidden="true" />
+            <span>Run {decision.source}</span>
+          </button>
         </div>
         <div
           className={`guide-quick-start-priority ${priority.tone}`}
@@ -488,12 +539,7 @@ export function GuideQuickStart({
             className={["guide-quick-start-action", "path", nextStep?.tone ?? "warn"].join(" ")}
             data-testid="guide-quick-start-path"
             disabled={!nextStep}
-            onClick={() => {
-              if (nextStep) {
-                setResult(createGuideQuickStartPathResult(nextStep, firstBeatPathSummary));
-                onJumpFirstBeatPath(nextStep);
-              }
-            }}
+            onClick={runGuideQuickStartPath}
             title={nextStep ? `Jump to ${nextStep.jumpLabel}: ${nextStep.detail}` : "No First Beat Path target"}
             type="button"
           >
@@ -506,12 +552,7 @@ export function GuideQuickStart({
             className={["guide-quick-start-action", "session", sessionCard?.tone ?? "warn"].join(" ")}
             data-testid="guide-quick-start-session"
             disabled={!sessionCard}
-            onClick={() => {
-              if (sessionCard) {
-                setResult(createGuideQuickStartSessionResult(sessionCard, sessionPassSummary));
-                onFocusSessionPass(sessionCard);
-              }
-            }}
+            onClick={runGuideQuickStartSession}
             title={sessionCard ? `Focus ${sessionCard.focusLabel}: ${sessionCard.value}` : "No Session Pass target"}
             type="button"
           >
@@ -524,12 +565,7 @@ export function GuideQuickStart({
             className={["guide-quick-start-action", "workflow", workflowSpotlight.tone].join(" ")}
             data-testid="guide-quick-start-workflow"
             disabled={!workflowSpotlightItem}
-            onClick={() => {
-              if (workflowSpotlightItem) {
-                setResult(createGuideQuickStartWorkflowResult(workflowSpotlight, workflowSpotlightItem));
-                onJumpWorkflowSpotlight(workflowSpotlightItem);
-              }
-            }}
+            onClick={runGuideQuickStartWorkflow}
             title={workflowSpotlight.detailTitle}
             type="button"
           >
