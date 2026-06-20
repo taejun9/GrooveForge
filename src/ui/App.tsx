@@ -392,6 +392,7 @@ import type {
   ArrangementFocusPrioritySummary,
   ArrangementFocusResultMetric,
   ArrangementFocusResultSummary,
+  ArrangementMovePrioritySummary,
   ArrangementArcPadId,
   ArrangementArcPoint,
   ArrangementArcPadDefinition,
@@ -9154,6 +9155,13 @@ export function App(): ReactElement {
                   );
                 })}
               </div>
+              <ArrangementMovePriorityReadout
+                summary={createArrangementMovePrioritySummary(
+                  selectedArrangementBlock,
+                  selectedArrangementIndex,
+                  project.arrangement.length
+                )}
+              />
               <div className="arrangement-move-row" aria-label="Arrangement moves">
                 {arrangementMovePresetIds.map((preset) => (
                   <button
@@ -10669,6 +10677,24 @@ function ArrangementArcPads({
       </div>
       {result && <ArrangementArcResultStrip result={result} />}
     </section>
+  );
+}
+
+function ArrangementMovePriorityReadout({ summary }: { summary: ArrangementMovePrioritySummary }): ReactElement {
+  return (
+    <div
+      className={`arrangement-move-priority ${summary.tone}`}
+      data-arrangement-move-priority={summary.presetId}
+      data-testid="arrangement-move-priority"
+      title={summary.detailTitle}
+    >
+      <span data-testid="arrangement-move-priority-status">{summary.statusLabel}</span>
+      <strong data-testid="arrangement-move-priority-preset">{summary.presetLabel}</strong>
+      <small data-testid="arrangement-move-priority-reason">{summary.reasonLabel}</small>
+      <small data-testid="arrangement-move-priority-scope">{summary.scopeLabel}</small>
+      <small data-testid="arrangement-move-priority-impact">{summary.impactLabel}</small>
+      <small data-testid="arrangement-move-priority-next-check">{summary.nextCheckLabel}</small>
+    </div>
   );
 }
 
@@ -15291,6 +15317,84 @@ function selectedArrangementMoveQuickActionPreset(block: ArrangementBlock | unde
       return "drop";
   }
   return null;
+}
+
+function createArrangementMovePrioritySummary(
+  block: ArrangementBlock | undefined,
+  selectedIndex: number,
+  blockCount: number
+): ArrangementMovePrioritySummary {
+  const preset = selectedArrangementMoveQuickActionPreset(block);
+  if (!block || !preset) {
+    return {
+      presetId: "none",
+      statusLabel: "Select block",
+      presetLabel: "No move target",
+      reasonLabel: "Select an arrangement block before choosing a block move.",
+      scopeLabel: "No selected block",
+      impactLabel: "0 fields",
+      nextCheckLabel: "Select a block, then audition Block before applying a move.",
+      detailTitle: "Select an arrangement block before choosing a block move.",
+      tone: "warn"
+    };
+  }
+
+  const nextBlock = applyArrangementMovePreset(block, preset);
+  const energyBefore = normalizeArrangementEnergy(block.energy);
+  const energyAfter = normalizeArrangementEnergy(nextBlock.energy);
+  const mutedBefore = normalizeArrangementMutedTracks(block.mutedTracks);
+  const mutedAfter = normalizeArrangementMutedTracks(nextBlock.mutedTracks);
+  const energyChanged = energyBefore !== energyAfter;
+  const muteChanged = mutedBefore.join(",") !== mutedAfter.join(",");
+  const changedFields = (energyChanged ? 1 : 0) + (muteChanged ? 1 : 0);
+  const presetLabel = arrangementMovePresetLabel(preset);
+  const blockNumber = Math.min(selectedIndex + 1, Math.max(blockCount, 1));
+  const aligned = changedFields === 0;
+  const statusLabel = aligned
+    ? "Move aligned"
+    : preset === "hook_lift"
+      ? "Lift hook"
+      : preset === "build"
+        ? "Build block"
+        : preset === "drop"
+          ? "Create drop"
+          : "Reset block";
+  const reasonLabel = aligned
+    ? `${block.section} already matches ${presetLabel}.`
+    : preset === "hook_lift"
+      ? "Push the selected hook so the peak reads before detailed edits."
+      : preset === "build"
+        ? "Raise the selected section into the next song moment."
+        : preset === "drop"
+          ? "Make space in this section before the beat returns."
+          : "Return this block to a neutral arrangement posture.";
+  const scopeLabel = `Block ${blockNumber} ${block.section} / Pattern ${block.pattern} / ${barCountLabel(block.bars)}`;
+  const impactLabel = aligned
+    ? "0 fields / energy and mutes aligned"
+    : `${changedFields} fields / ${percentLabel(energyBefore)} -> ${percentLabel(energyAfter)} / ${arrangementFocusPreviewMuteLabel(
+        mutedAfter
+      )}`;
+  const nextCheckLabel = aligned
+    ? "Audition Block, then inspect Arrangement Focus before more changes."
+    : preset === "hook_lift"
+      ? "Apply, then cue Hook and compare against Verse."
+      : preset === "build"
+        ? "Apply, then audition this block into the next section."
+        : preset === "drop"
+          ? "Apply, then audition the drop into the following block."
+          : "Apply, then audition Block and verify mutes.";
+
+  return {
+    presetId: preset,
+    statusLabel,
+    presetLabel,
+    reasonLabel,
+    scopeLabel,
+    impactLabel,
+    nextCheckLabel,
+    detailTitle: `${statusLabel} / ${presetLabel} / ${reasonLabel} / ${scopeLabel} / ${impactLabel} / ${nextCheckLabel}`,
+    tone: aligned ? "good" : changedFields === 1 ? "warn" : "danger"
+  };
 }
 
 function isArrangementMovePresetApplied(block: ArrangementBlock, preset: ArrangementMovePreset): boolean {

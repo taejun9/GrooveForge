@@ -2086,6 +2086,18 @@ export type ArrangementFocusResultSummary = {
   tone: MixCoachTone;
 };
 
+export type ArrangementMovePrioritySummary = {
+  presetId: ArrangementMovePreset | "none";
+  statusLabel: string;
+  presetLabel: string;
+  reasonLabel: string;
+  scopeLabel: string;
+  impactLabel: string;
+  nextCheckLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementArcPadId = "clean" | "lift" | "break" | "rise";
 
 export type ArrangementArcPoint = {
