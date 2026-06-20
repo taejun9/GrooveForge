@@ -407,6 +407,7 @@ import type {
   ArrangementArcPadOption,
   ArrangementArcPreviewSummary,
   ArrangementArcPrioritySummary,
+  ArrangementTemplatePreviewDecisionSummary,
   ArrangementTemplatePreviewSummary,
   ArrangementTemplatePrioritySummary,
   ArrangementTemplateResultMetric,
@@ -10649,6 +10650,8 @@ function ArrangementTemplateControls({
   preview: ArrangementTemplatePreviewSummary;
   result: ArrangementTemplateResultSummary | null;
 }): ReactElement {
+  const decision = createArrangementTemplatePreviewDecision(preview);
+
   return (
     <section className="arrangement-template-panel" data-testid="arrangement-template-panel" aria-label="Arrangement templates">
       <div
@@ -10664,6 +10667,14 @@ function ArrangementTemplateControls({
         <small data-testid="arrangement-template-preview-energy">{preview.energyLabel}</small>
         <small data-testid="arrangement-template-preview-moves">{preview.moveLabel}</small>
       </div>
+      <ArrangementTemplatePreviewDecision
+        summary={decision}
+        onApply={() => {
+          if (decision.templateId !== "aligned") {
+            onApply(decision.templateId);
+          }
+        }}
+      />
       <ArrangementTemplatePriorityReadout summary={createArrangementTemplatePrioritySummary(preview)} onApply={onApply} />
       <div className="arrangement-template-row" aria-label="Arrangement template buttons">
         {arrangementTemplateIds.map((template) => {
@@ -10686,6 +10697,40 @@ function ArrangementTemplateControls({
       </div>
       {result && <ArrangementTemplateResultStrip result={result} />}
     </section>
+  );
+}
+
+function ArrangementTemplatePreviewDecision({
+  onApply,
+  summary
+}: {
+  onApply: () => void;
+  summary: ArrangementTemplatePreviewDecisionSummary;
+}): ReactElement {
+  return (
+    <div
+      className={`arrangement-template-priority arrangement-template-decision ${summary.tone}`}
+      data-arrangement-template-decision={summary.templateId}
+      data-testid="arrangement-template-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="arrangement-template-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="arrangement-template-decision-template">{summary.templateLabel}</strong>
+      <small data-testid="arrangement-template-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="arrangement-template-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="arrangement-template-decision-run"
+        data-arrangement-template-decision-action={summary.actionId}
+        data-testid="arrangement-template-decision-run"
+        disabled={summary.disabled}
+        onClick={onApply}
+        title={summary.disabled ? "Current arrangement already matches this template" : `Apply ${summary.templateLabel} template`}
+        type="button"
+      >
+        <ListChecks size={12} aria-hidden="true" />
+        <span data-testid="arrangement-template-decision-action">{summary.actionLabel}</span>
+      </button>
+    </div>
   );
 }
 
@@ -17844,8 +17889,9 @@ function createQuickActions({
   );
   const arrangementMoveLabel = arrangementMovePreset ? arrangementMovePresetLabel(arrangementMovePreset) : "Arrangement Move";
   const arrangementMoveBlockNumber = selectedBlock ? Math.min(selectedArrangementIndex + 1, project.arrangement.length) : 0;
+  const arrangementTemplateDecision = createArrangementTemplatePreviewDecision(arrangementTemplatePreviewSummary);
   const arrangementTemplateId =
-    arrangementTemplatePreviewSummary.templateId === "aligned" ? null : arrangementTemplatePreviewSummary.templateId;
+    arrangementTemplateDecision.templateId === "aligned" ? null : arrangementTemplateDecision.templateId;
   const arrangementFocusSummary = createArrangementFocusSummary(project, selectedArrangementIndex);
   const arrangementFocusPreviewSummary = createArrangementFocusPreviewSummary(
     project,
@@ -19296,12 +19342,14 @@ function createQuickActions({
     },
     {
       id: "arrangement-template",
-      title: arrangementTemplateId ? `Apply ${arrangementTemplatePreviewSummary.templateLabel} Template` : "Apply Arrangement Template",
+      title: arrangementTemplateId ? arrangementTemplateDecision.actionLabel : "Apply Arrangement Template",
       detail: arrangementTemplateId
-        ? `${arrangementTemplatePreviewSummary.sectionLabel} / ${arrangementTemplatePreviewSummary.patternLabel}`
+        ? `${arrangementTemplateDecision.metricLabel} / ${arrangementTemplateDecision.detailLabel}`
         : "Current arrangement already matches available templates.",
       group: "Arrange",
-      keywords: `arrangement template song form full beat hook first breakdown structure ${arrangementTemplateId ?? "aligned"} ${arrangementTemplatePreviewSummary.templateLabel} beginner producer`,
+      keywords: `arrangement template song form full beat hook first breakdown structure current suggested ${
+        arrangementTemplateId ?? "aligned"
+      } ${arrangementTemplateDecision.templateLabel} ${arrangementTemplateDecision.actionId} beginner producer`,
       disabled: !arrangementTemplateId,
       run: () => {
         if (arrangementTemplateId) {
@@ -30165,6 +30213,29 @@ function createArrangementTemplatePrioritySummary(preview: ArrangementTemplatePr
     nextCheckLabel,
     detailTitle: `${statusLabel} / ${preview.templateLabel} / ${reasonLabel} / ${scopeLabel} / ${preview.moveLabel} / ${nextCheckLabel}`,
     tone: preview.tone
+  };
+}
+
+function createArrangementTemplatePreviewDecision(
+  preview: ArrangementTemplatePreviewSummary
+): ArrangementTemplatePreviewDecisionSummary {
+  const aligned = preview.templateId === "aligned" || preview.changedFieldCount === 0;
+
+  return {
+    templateId: preview.templateId,
+    actionId: aligned ? "aligned" : "apply-suggested",
+    statusLabel: aligned ? "Template aligned" : "Ready to apply",
+    templateLabel: preview.templateLabel,
+    metricLabel: `${preview.changedBlockCount} block${preview.changedBlockCount === 1 ? "" : "s"} / ${
+      preview.changedFieldCount
+    } field${preview.changedFieldCount === 1 ? "" : "s"}`,
+    detailLabel: aligned ? "Current editable arrangement already matches available templates." : `${preview.sectionLabel} / ${preview.patternLabel}`,
+    actionLabel: aligned ? "Aligned" : "Apply Suggested Template",
+    disabled: aligned,
+    detailTitle: aligned
+      ? `${preview.detailTitle} No Arrangement Template action is needed.`
+      : `${preview.detailTitle} Apply only after this structure supports the beat.`,
+    tone: aligned ? "good" : preview.tone
   };
 }
 

@@ -2372,6 +2372,19 @@ export type ArrangementTemplatePrioritySummary = {
   tone: MixCoachTone;
 };
 
+export type ArrangementTemplatePreviewDecisionSummary = {
+  templateId: ArrangementTemplatePreviewSummary["templateId"];
+  actionId: "apply-suggested" | "aligned";
+  statusLabel: string;
+  templateLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  actionLabel: string;
+  disabled: boolean;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementTemplateResultMetric = {
   id: "sections" | "patterns" | "bars" | "energy" | "mutes";
   label: string;
