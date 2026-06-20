@@ -11823,6 +11823,7 @@ h2 {
 .arrangement-mute-map-focus-readout small,
 .arrangement-mute-map-priority span,
 .arrangement-mute-map-priority strong,
+.arrangement-mute-map-priority button,
 .arrangement-mute-map-priority small,
 .arrangement-mute-map-result-main strong,
 .arrangement-mute-map-result-main small,
@@ -11888,8 +11889,8 @@ h2 {
 
 .arrangement-mute-map-priority {
   display: grid;
-  grid-template-columns: minmax(96px, 0.42fr) minmax(0, 0.8fr) minmax(0, 1.15fr) minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: minmax(96px, 0.42fr) minmax(0, 0.74fr) minmax(0, 1.08fr) minmax(0, 0.96fr) minmax(92px, 0.42fr);
+  gap: 6px;
   align-items: center;
   min-width: 0;
   border: 1px solid rgba(120, 240, 200, 0.22);
@@ -11917,6 +11918,27 @@ h2 {
 .arrangement-mute-map-priority strong {
   color: #f4efe7;
   font-size: 11px;
+}
+
+.arrangement-mute-map-priority button {
+  border: 1px solid rgba(120, 240, 200, 0.28);
+  border-radius: 5px;
+  background: rgba(120, 240, 200, 0.11);
+  color: #f4efe7;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.arrangement-mute-map-priority.warn button {
+  border-color: rgba(240, 195, 106, 0.34);
+  background: rgba(240, 195, 106, 0.12);
+}
+
+.arrangement-mute-map-priority.danger button {
+  border-color: rgba(255, 122, 79, 0.34);
+  background: rgba(255, 122, 79, 0.12);
 }
 
 .arrangement-mute-map-result {

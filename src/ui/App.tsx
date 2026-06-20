@@ -15324,6 +15324,8 @@ function ArrangementMuteMap({
 }): ReactElement {
   const focusSummary = createArrangementMuteMapFocusSummary(summary, focusedLaneId);
   const prioritySummary = createArrangementMuteMapPrioritySummary(summary);
+  const priorityLane = summary.lanes.find((lane) => lane.id === prioritySummary.laneId) ?? null;
+  const priorityActionDisabled = priorityLane === null;
 
   return (
     <section className={`arrangement-mute-map ${summary.tone}`} data-testid="arrangement-mute-map" aria-label="Arrangement mute map">
@@ -15354,6 +15356,19 @@ function ArrangementMuteMap({
         <strong data-testid="arrangement-mute-map-priority-lane">{prioritySummary.laneLabel}</strong>
         <small data-testid="arrangement-mute-map-priority-reason">{prioritySummary.reasonLabel}</small>
         <small data-testid="arrangement-mute-map-priority-next-check">{prioritySummary.nextCheckLabel}</small>
+        <button
+          data-testid="arrangement-mute-map-priority-run"
+          disabled={priorityActionDisabled}
+          onClick={() => {
+            if (priorityLane) {
+              onFocus(priorityLane);
+            }
+          }}
+          title={priorityLane ? `Focus ${prioritySummary.laneLabel}` : prioritySummary.reasonLabel}
+          type="button"
+        >
+          {prioritySummary.actionLabel}
+        </button>
       </div>
       {result && <ArrangementMuteMapFocusResultStrip result={result} />}
       <div className="arrangement-mute-map-lanes" data-testid="arrangement-mute-map-lanes">
@@ -28700,6 +28715,7 @@ function createArrangementMuteMapPrioritySummary(summary: ArrangementMuteMapSumm
   if (!lane) {
     return {
       laneId: null,
+      actionLabel: "No lane",
       statusLabel: "No mute priority",
       laneLabel: "No arrangement lane",
       reasonLabel: "Add arrangement blocks before checking layer dropouts",
@@ -28716,6 +28732,7 @@ function createArrangementMuteMapPrioritySummary(summary: ArrangementMuteMapSumm
 
   return {
     laneId: lane.id,
+    actionLabel: `Focus ${lane.label}`,
     statusLabel,
     laneLabel,
     reasonLabel,

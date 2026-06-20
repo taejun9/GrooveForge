@@ -2612,6 +2612,7 @@ export type ArrangementMuteMapFocusSummary = {
 
 export type ArrangementMuteMapPrioritySummary = {
   laneId: ArrangementMuteMapFocusId | null;
+  actionLabel: string;
   statusLabel: string;
   laneLabel: string;
   reasonLabel: string;
