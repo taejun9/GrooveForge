@@ -18201,6 +18201,12 @@ function createQuickActions({
     }
   ];
   const arrangementMovePreset = selectedArrangementMoveQuickActionPreset(selectedBlock);
+  const arrangementMoveQuickActionPrioritySummary = createArrangementMovePrioritySummary(
+    selectedBlock,
+    selectedArrangementIndex,
+    project.arrangement.length
+  );
+  const arrangementMoveDecisionSummary = createArrangementMovePreviewDecision(arrangementMoveQuickActionPrioritySummary);
   const arrangementMoveReady = Boolean(
     selectedBlock && arrangementMovePreset && !isArrangementMovePresetApplied(selectedBlock, arrangementMovePreset)
   );
@@ -19573,6 +19579,23 @@ function createQuickActions({
     audibleArrangementFollowAction,
     ...selectedBlockActions,
     ...patternUseActions,
+    {
+      id: "arrangement-move-decision",
+      title: arrangementMoveDecisionSummary.disabled
+        ? "Run Arrangement Move Decision"
+        : `Run Arrangement Move Decision: ${arrangementMoveDecisionSummary.presetLabel}`,
+      detail: arrangementMoveDecisionSummary.disabled
+        ? arrangementMoveDecisionSummary.detailLabel
+        : `${arrangementMoveDecisionSummary.statusLabel} / ${arrangementMoveDecisionSummary.metricLabel} / ${arrangementMoveDecisionSummary.detailLabel}`,
+      group: "Arrange",
+      keywords: `arrangement move decision preview selected block energy mute drop build hook lift reset ${arrangementMoveDecisionSummary.targetPresetId} ${arrangementMoveDecisionSummary.presetLabel} beginner producer`,
+      disabled: arrangementMoveDecisionSummary.disabled,
+      run: () => {
+        if (arrangementMoveDecisionSummary.targetPresetId !== "none") {
+          onApplyArrangementMove(arrangementMoveDecisionSummary.targetPresetId);
+        }
+      }
+    },
     {
       id: "arrangement-move",
       title: arrangementMoveReady ? `Apply ${arrangementMoveLabel} Move` : "Apply Arrangement Move",
@@ -21526,7 +21549,7 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "arrangement-move") {
+  if (action.id === "arrangement-move" || action.id === "arrangement-move-decision") {
     return {
       id: "arrangement-move",
       label: "Arrangement move",
@@ -22675,10 +22698,13 @@ function quickActionResultFollowup(
     };
   }
 
-  if (action.id === "arrangement-move") {
+  if (action.id === "arrangement-move" || action.id === "arrangement-move-decision") {
     return {
       auditionCue: "Play Block loop; hear the selected block's energy and mute contrast against the surrounding song form.",
-      nextCheck: "Use Arrangement Playback Readout, Song Form Overview, and Arrangement Focus before changing nearby blocks."
+      nextCheck:
+        action.id === "arrangement-move-decision"
+          ? "Return to Arrangement Move Preview Decision before running another selected-block energy or mute move."
+          : "Use Arrangement Playback Readout, Song Form Overview, and Arrangement Focus before changing nearby blocks."
     };
   }
 
