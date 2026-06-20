@@ -21077,7 +21077,7 @@ input[type="range"] {
 
 .arrangement-focus-summary {
   display: grid;
-  grid-row: span 3;
+  grid-row: span 4;
   gap: 4px;
   align-content: center;
   min-width: 0;
@@ -21241,6 +21241,26 @@ input[type="range"] {
 .arrangement-focus-priority button:disabled {
   cursor: not-allowed;
   opacity: 0.46;
+}
+
+.arrangement-focus-decision {
+  grid-template-columns: minmax(96px, 0.58fr) minmax(118px, 0.74fr) minmax(92px, 0.64fr) minmax(0, 1.34fr) minmax(150px, 0.9fr);
+}
+
+.arrangement-focus-decision-run {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.arrangement-focus-decision-run svg {
+  flex: 0 0 auto;
+}
+
+.arrangement-focus-decision-run span {
+  color: #08120f;
+  font-weight: 850;
 }
 
 .arrangement-focus-actions {
@@ -26515,6 +26535,7 @@ input[type="range"] {
 
   .arrangement-focus-summary,
   .arrangement-focus-preview,
+  .arrangement-focus-decision,
   .arrangement-focus-priority,
   .arrangement-focus-actions,
   .arrangement-focus-result {
@@ -26530,6 +26551,10 @@ input[type="range"] {
   }
 
   .arrangement-focus-priority {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .arrangement-focus-decision {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -26848,6 +26873,11 @@ input[type="range"] {
   }
 
   .arrangement-focus-priority {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .arrangement-focus-decision {
     grid-template-columns: 1fr;
     gap: 4px;
   }

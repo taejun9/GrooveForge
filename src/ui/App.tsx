@@ -390,6 +390,7 @@ import type {
   ArrangementFocusPresetId,
   ArrangementFocusPreset,
   ArrangementFocusSummary,
+  ArrangementFocusPreviewDecisionSummary,
   ArrangementFocusPreviewSummary,
   ArrangementFocusPrioritySummary,
   ArrangementFocusResultMetric,
@@ -10836,6 +10837,7 @@ function ArrangementFocusPanel({
     return null;
   }
 
+  const decisionSummary = createArrangementFocusPreviewDecision(preview);
   const prioritySummary = createArrangementFocusPrioritySummary(summary, preview);
   const priorityActionDisabled = prioritySummary.statusLabel === "Focus aligned";
 
@@ -10864,6 +10866,14 @@ function ArrangementFocusPanel({
         <small data-testid="arrangement-focus-preview-mutes">{preview.muteLabel}</small>
         <small data-testid="arrangement-focus-preview-moves">{preview.moveLabel}</small>
       </div>
+      <ArrangementFocusPreviewDecision
+        summary={decisionSummary}
+        onApply={() => {
+          if (!decisionSummary.disabled) {
+            onApply(decisionSummary.targetPresetId);
+          }
+        }}
+      />
       <div
         className={`arrangement-focus-priority ${prioritySummary.tone}`}
         data-arrangement-focus-priority={prioritySummary.presetId}
@@ -10909,6 +10919,40 @@ function ArrangementFocusPanel({
       </div>
       {result && <ArrangementFocusResultStrip result={result} />}
     </section>
+  );
+}
+
+function ArrangementFocusPreviewDecision({
+  onApply,
+  summary
+}: {
+  onApply: () => void;
+  summary: ArrangementFocusPreviewDecisionSummary;
+}): ReactElement {
+  return (
+    <div
+      className={`arrangement-focus-priority arrangement-focus-decision ${summary.tone}`}
+      data-arrangement-focus-decision={summary.targetPresetId}
+      data-testid="arrangement-focus-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="arrangement-focus-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="arrangement-focus-decision-preset">{summary.presetLabel}</strong>
+      <small data-testid="arrangement-focus-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="arrangement-focus-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="arrangement-focus-decision-run"
+        data-arrangement-focus-decision-action={summary.actionId}
+        data-testid="arrangement-focus-decision-run"
+        disabled={summary.disabled}
+        onClick={onApply}
+        title={summary.disabled ? "Selected block already matches this focus preset" : `Apply ${summary.presetLabel} focus`}
+        type="button"
+      >
+        <ListChecks size={12} aria-hidden="true" />
+        <span data-testid="arrangement-focus-decision-label">{summary.buttonLabel}</span>
+      </button>
+    </div>
   );
 }
 
@@ -31376,6 +31420,29 @@ function createArrangementFocusPrioritySummary(
     nextCheckLabel,
     detailTitle: `${statusLabel} / ${preview.presetLabel} / ${reasonLabel} / ${scopeLabel} / ${nextCheckLabel}`,
     tone: preview.tone
+  };
+}
+
+function createArrangementFocusPreviewDecision(
+  preview: ArrangementFocusPreviewSummary
+): ArrangementFocusPreviewDecisionSummary {
+  const aligned = preview.changeCount === 0;
+
+  return {
+    targetPresetId: preview.presetId,
+    actionId: aligned ? "aligned" : "apply-suggested",
+    statusLabel: aligned ? "Focus aligned" : "Ready to apply",
+    presetLabel: preview.presetLabel,
+    metricLabel: preview.moveLabel,
+    detailLabel: aligned
+      ? "Selected block already matches the suggested focus preset."
+      : `${preview.blockLabel} / ${preview.sectionLabel} / ${preview.energyLabel} / ${preview.muteLabel}`,
+    buttonLabel: aligned ? "Aligned" : "Apply Suggested Focus",
+    disabled: aligned,
+    detailTitle: aligned
+      ? `${preview.detailTitle} No Arrangement Focus action is needed.`
+      : `${preview.detailTitle} Apply only after this selected block should take the suggested section role.`,
+    tone: aligned ? "good" : preview.tone
   };
 }
 

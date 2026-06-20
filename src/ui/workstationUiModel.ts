@@ -2186,6 +2186,19 @@ export type ArrangementFocusPreviewSummary = {
   tone: MixCoachTone;
 };
 
+export type ArrangementFocusPreviewDecisionSummary = {
+  targetPresetId: ArrangementFocusPresetId;
+  actionId: "apply-suggested" | "aligned";
+  statusLabel: string;
+  presetLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  buttonLabel: string;
+  disabled: boolean;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementFocusPrioritySummary = {
   presetId: ArrangementFocusPresetId;
   statusLabel: string;
