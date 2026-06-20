@@ -13772,6 +13772,16 @@ function ExportPreflightFocusResultStrip({ result }: { result: ExportPreflightFo
   );
 }
 
+type HandoffPackageCheckPriority = {
+  focusId: HandoffPackageCheckFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  cardLabel: string;
+  nextCheckLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 function HandoffPack({
   analysis,
   exportReceipt,
@@ -13823,6 +13833,7 @@ function HandoffPack({
   const manifestAudit = createHandoffManifestAudit(project, items, fileManifest, receiptSummary, sendOrderSummary);
   const formatSummary = createHandoffExportFormatSummary(project, analysis, stemAnalyses, items);
   const packageFocusSummary = createHandoffPackageCheckFocusSummary(packageCheckSummary, focusedPackageCheckId);
+  const packagePriority = createHandoffPackageCheckPriority(packageCheckSummary);
 
   return (
     <section className={`handoff-pack ${tone}`} data-testid="handoff-pack" aria-label="Handoff pack">
@@ -13975,6 +13986,17 @@ function HandoffPack({
           <strong data-testid="handoff-package-check-focus-label">{packageFocusSummary.areaLabel}</strong>
           <small data-testid="handoff-package-check-focus-detail">{packageFocusSummary.detailLabel}</small>
         </div>
+        <div
+          className={`handoff-package-check-priority ${packagePriority.tone}`}
+          data-handoff-package-priority={packagePriority.focusId ?? "none"}
+          data-testid="handoff-package-check-priority"
+          title={packagePriority.title}
+        >
+          <span data-testid="handoff-package-check-priority-status">{packagePriority.statusLabel}</span>
+          <strong data-testid="handoff-package-check-priority-label">{packagePriority.areaLabel}</strong>
+          <small data-testid="handoff-package-check-priority-card">{packagePriority.cardLabel}</small>
+          <small data-testid="handoff-package-check-priority-next-check">{packagePriority.nextCheckLabel}</small>
+        </div>
         {packageCheckResult && <HandoffPackageCheckFocusResultStrip result={packageCheckResult} />}
         <div className="handoff-package-check-grid" data-testid="handoff-package-check-cards">
           {packageCheckSummary.cards.map((card) => {
@@ -14032,6 +14054,49 @@ function HandoffPack({
       </div>
     </section>
   );
+}
+
+function createHandoffPackageCheckPriority(summary: HandoffPackageCheckSummary): HandoffPackageCheckPriority {
+  const card = activeHandoffPackageCheckQuickActionCard(summary);
+
+  if (!card) {
+    return {
+      focusId: null,
+      statusLabel: "Package clear",
+      areaLabel: "No package lane",
+      cardLabel: "No Handoff Package Check cards available",
+      nextCheckLabel: "Next: return after send-package cards are available.",
+      title: "Handoff Package priority has no available card.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel =
+    card.tone === "danger" ? "Package blocker" : card.tone === "warn" ? "Package review" : "Package ready";
+  const nextCheckLabel = handoffPackageCheckPriorityNextCheck(card);
+
+  return {
+    focusId: card.focusId,
+    statusLabel,
+    areaLabel: `${card.label}: ${card.value}`,
+    cardLabel: `${card.focusLabel} priority / ${card.status}`,
+    nextCheckLabel,
+    title: `${statusLabel}: ${card.label}: ${card.value} / ${card.detail} / ${nextCheckLabel}`,
+    tone: card.tone
+  };
+}
+
+function handoffPackageCheckPriorityNextCheck(card: HandoffPackageCheckCard): string {
+  switch (card.focusId) {
+    case "files":
+      return "Next: verify WAV, stems, MIDI, and Handoff Sheet files.";
+    case "order":
+      return "Next: follow the current Send Order item.";
+    case "receipt":
+      return "Next: confirm the latest explicit export receipt.";
+    case "context":
+      return "Next: confirm artist, vibe, reference, and handoff notes.";
+  }
 }
 
 function HandoffExportFormatFocusResultStrip({ result }: { result: HandoffExportFormatFocusResult }): ReactElement {
