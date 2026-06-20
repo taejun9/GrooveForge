@@ -19427,6 +19427,25 @@ function createQuickActions({
     },
     ...drumKitPadActions,
     {
+      id: "sound-focus-decision",
+      title: soundFocusReady
+        ? `Run Sound Focus Decision: Apply ${soundFocusPreviewSummary.padLabel}`
+        : "Run Sound Focus Decision: Aligned",
+      detail: soundFocusReady
+        ? `${soundFocusPreviewSummary.statusLabel} / ${soundFocusPreviewSummary.changeLabel} / ${soundFocusPreviewSummary.parameterLabel}`
+        : `${soundFocusPreviewSummary.statusLabel} / Current editable sound already matches this focus.`,
+      group: "Create",
+      keywords: `Quick Actions Sound Focus Decision preview decision apply suggested tone focus kick drums 808 bass duck sidechain synth chords ${
+        soundFocusPreviewSummary.padId
+      } ${soundFocusPreviewSummary.padLabel} ${soundFocusReady ? "apply-suggested" : "aligned"} beginner producer`,
+      disabled: !soundFocusReady,
+      run: () => {
+        if (soundFocusReady) {
+          onApplySoundFocus(soundFocusPreviewSummary.padId);
+        }
+      }
+    },
+    {
       id: "sound-focus",
       title: soundFocusReady ? `Apply ${soundFocusPreviewSummary.padLabel}` : "Apply Sound Focus",
       detail: soundFocusReady
@@ -21516,6 +21535,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "sound-focus-decision") {
+    return {
+      id: "sound-focus-decision",
+      label: "Sound Focus Decision",
+      value: soundPresetToneLabel(project.sound)
+    };
+  }
+
   if (action.id === "sound-focus" || action.id.startsWith("sound-focus-pad-")) {
     return {
       id: "sound-focus",
@@ -22825,6 +22852,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; check chord color, rhythm, and voicing against 808 and Synth.`,
       nextCheck: "Use the Chord Move Result plus selected-chord harmonic readout and chord edit tools for manual corrections."
+    };
+  }
+
+  if (action.id === "sound-focus-decision") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; follow the visible Sound Focus Preview Decision before another tone-focus move.`,
+      nextCheck: "Use the Sound Focus Result and Studio tone controls for manual kick, 808, Synth, and Chord corrections."
     };
   }
 
