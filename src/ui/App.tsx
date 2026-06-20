@@ -12763,6 +12763,8 @@ function ReviewQueue({
 }): ReactElement {
   const focusSummary = createReviewQueueFocusSummary(summary, focusedItemId);
   const priority = createReviewQueuePriority(summary);
+  const priorityItem = summary.items.find((item) => item.id === priority.itemId) ?? null;
+  const priorityActionDisabled = priorityItem === null;
   const fixPreview = createReviewFixPreview(summary, focusedItemId, project, analyzeExport(project));
 
   return (
@@ -12795,6 +12797,19 @@ function ReviewQueue({
           <strong data-testid="review-queue-priority-label">{priority.areaLabel}</strong>
           <small data-testid="review-queue-priority-item">{priority.itemLabel}</small>
           <small data-testid="review-queue-priority-next-check">{priority.nextCheckLabel}</small>
+          <button
+            data-testid="review-queue-priority-run"
+            disabled={priorityActionDisabled}
+            onClick={() => {
+              if (priorityItem) {
+                onFocus(priorityItem);
+              }
+            }}
+            title={priorityItem ? `Focus ${priority.areaLabel}` : priority.title}
+            type="button"
+          >
+            {priority.actionLabel}
+          </button>
         </div>
         <ReviewFixPreviewStrip preview={fixPreview} />
         {result && <ReviewQueueFocusResultStrip result={result} />}
@@ -12849,6 +12864,7 @@ function ReviewQueue({
 
 type ReviewQueuePriority = {
   itemId: string | null;
+  actionLabel: string;
   statusLabel: string;
   areaLabel: string;
   itemLabel: string;
@@ -24623,6 +24639,7 @@ function createReviewQueuePriority(summary: ReviewQueueSummary): ReviewQueuePrio
   if (!item) {
     return {
       itemId: null,
+      actionLabel: "No issue",
       statusLabel: "Review clear",
       areaLabel: "No priority issue",
       itemLabel: "No Review Queue items available",
@@ -24638,6 +24655,7 @@ function createReviewQueuePriority(summary: ReviewQueueSummary): ReviewQueuePrio
 
   return {
     itemId: item.id,
+    actionLabel: "Focus issue",
     statusLabel,
     areaLabel: `${item.area}: ${item.status}`,
     itemLabel: `${item.focusLabel} priority / ${item.detail}`,
