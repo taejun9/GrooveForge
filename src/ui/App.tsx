@@ -14141,6 +14141,7 @@ function activeExportPreflightQuickActionCard(summary: ExportPreflightSummary): 
 
 type ExportPreflightPriority = {
   focusId: ExportPreflightFocusId | null;
+  actionLabel: string;
   statusLabel: string;
   areaLabel: string;
   cardLabel: string;
@@ -14168,6 +14169,8 @@ function ExportPreflight({
 }): ReactElement {
   const focusSummary = createExportPreflightFocusSummary(summary, focusedCardId);
   const priority = createExportPreflightPriority(summary);
+  const priorityCard = summary.cards.find((card) => card.focusId === priority.focusId) ?? null;
+  const priorityActionDisabled = priorityCard === null;
 
   return (
     <section
@@ -14203,6 +14206,19 @@ function ExportPreflight({
         <strong data-testid="export-preflight-priority-label">{priority.areaLabel}</strong>
         <small data-testid="export-preflight-priority-card">{priority.cardLabel}</small>
         <small data-testid="export-preflight-priority-next-check">{priority.nextCheckLabel}</small>
+        <button
+          data-testid="export-preflight-priority-run"
+          disabled={priorityActionDisabled}
+          onClick={() => {
+            if (priorityCard) {
+              onFocus(priorityCard);
+            }
+          }}
+          title={priorityCard ? `Focus ${priority.areaLabel}` : priority.title}
+          type="button"
+        >
+          {priority.actionLabel}
+        </button>
       </div>
       {result && <ExportPreflightFocusResultStrip result={result} />}
       <div className="export-preflight-grid" data-testid="export-preflight-grid">
@@ -14247,6 +14263,7 @@ function createExportPreflightPriority(summary: ExportPreflightSummary): ExportP
   if (!card) {
     return {
       focusId: null,
+      actionLabel: "No lane",
       statusLabel: "Preflight clear",
       areaLabel: "No priority lane",
       cardLabel: "No Export Preflight cards available",
@@ -14262,6 +14279,7 @@ function createExportPreflightPriority(summary: ExportPreflightSummary): ExportP
 
   return {
     focusId: card.focusId,
+    actionLabel: "Focus lane",
     statusLabel,
     areaLabel: `${card.label}: ${card.value}`,
     cardLabel: `${card.focusLabel} priority / ${card.detail}`,
