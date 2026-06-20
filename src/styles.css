@@ -255,6 +255,7 @@ h2 {
 .space-fx-row button span,
 .stem-audition-heading span,
 .stem-audition-row button span,
+.stem-audition-decision span,
 .mix-coach-priority span,
 .master-finish-heading span,
 .master-finish-row button span,
@@ -20744,6 +20745,51 @@ input[type="range"] {
   background: rgba(255, 122, 79, 0.075);
 }
 
+.stem-audition-decision {
+  display: grid;
+  grid-template-columns: minmax(98px, 0.36fr) minmax(0, 0.72fr) minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid rgba(120, 240, 200, 0.22);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px 10px;
+}
+
+.stem-audition-decision.good {
+  border-color: rgba(120, 240, 200, 0.26);
+  background: rgba(120, 240, 200, 0.07);
+}
+
+.stem-audition-decision.warn {
+  border-color: rgba(240, 195, 106, 0.28);
+  background: rgba(240, 195, 106, 0.075);
+}
+
+.stem-audition-decision.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.075);
+}
+
+.stem-audition-decision > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stem-audition-decision span,
+.stem-audition-decision small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 11px;
+}
+
+.stem-audition-decision strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
 .mix-snapshot-ab {
   display: grid;
   gap: 7px;
@@ -23773,6 +23819,7 @@ input[type="range"] {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .stem-audition-decision,
   .mix-coach-priority {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -24852,6 +24899,7 @@ input[type="range"] {
     gap: 4px;
   }
 
+  .stem-audition-decision,
   .mix-coach-priority,
   .mix-coach-result,
   .mix-coach-result-destination,

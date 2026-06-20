@@ -446,6 +446,7 @@ import type {
   ArrangementBlockRoleSummary,
   MixerChannelRoleSummary,
   StemAuditionReadoutSummary,
+  StemAuditionDecisionSummary,
   MasterOutputRoleSummary,
   ProductionSnapshotMetricId,
   ProductionSnapshotFocusId,
@@ -1568,6 +1569,10 @@ export function App(): ReactElement {
   const spaceFxPadOptions = useMemo(() => createSpaceFxPadOptions(project.mixer), [project.mixer]);
   const stemAuditionPadOptions = useMemo(() => createStemAuditionPadOptions(project.mixer), [project.mixer]);
   const stemAuditionReadout = useMemo(() => createStemAuditionReadoutSummary(project.mixer), [project.mixer]);
+  const stemAuditionDecision = useMemo(
+    () => createStemAuditionDecisionSummary(stemAuditionPadOptions, stemAuditionReadout),
+    [stemAuditionPadOptions, stemAuditionReadout]
+  );
   const mixCoachChecks = useMemo(
     () => createMixCoachChecks(exportAnalysis, stemAnalyses),
     [exportAnalysis, stemAnalyses]
@@ -9319,6 +9324,17 @@ export function App(): ReactElement {
             <span data-testid="stem-audition-status">{stemAuditionReadout.statusLabel}</span>
             <strong data-testid="stem-audition-label">{stemAuditionReadout.roleLabel}</strong>
             <small data-testid="stem-audition-detail">{stemAuditionReadout.detailLabel}</small>
+          </div>
+          <div
+            className={["stem-audition-decision", stemAuditionDecision.tone].join(" ")}
+            data-stem-audition-decision={stemAuditionDecision.targetId ?? "none"}
+            data-testid="stem-audition-decision"
+            title={stemAuditionDecision.detailTitle}
+          >
+            <span data-testid="stem-audition-decision-status">{stemAuditionDecision.statusLabel}</span>
+            <strong data-testid="stem-audition-decision-target">{stemAuditionDecision.targetLabel}</strong>
+            <small data-testid="stem-audition-decision-detail">{stemAuditionDecision.detailLabel}</small>
+            <small data-testid="stem-audition-decision-next-check">{stemAuditionDecision.nextCheckLabel}</small>
           </div>
           <MixSnapshotAB
             snapshots={mixSnapshots}
@@ -31137,6 +31153,92 @@ function createStemAuditionReadoutSummary(mixer: MixerChannel[]): StemAuditionRe
     detailLabel,
     detailTitle: `Custom mixer audition / ${detailLabel}`,
     tone: "warn"
+  };
+}
+
+function createStemAuditionDecisionSummary(
+  pads: StemAuditionPadOption[],
+  readout: StemAuditionReadoutSummary
+): StemAuditionDecisionSummary {
+  const activePad = pads.find((pad) => pad.active) ?? null;
+  const fullPad = pads.find((pad) => pad.id === "full") ?? null;
+  const drumsPad = pads.find((pad) => pad.id === "drum_rack") ?? pads.find((pad) => pad.trackId !== null) ?? null;
+  const targetPad = activePad?.id === "full" ? drumsPad : fullPad;
+
+  if (!targetPad) {
+    return {
+      targetId: null,
+      statusLabel: "Audition unavailable",
+      targetLabel: "No audition target",
+      detailLabel: "No Stem Audition pads available",
+      nextCheckLabel: "Next: return after audition pads are available.",
+      detailTitle: "Stem Audition has no available decision target.",
+      tone: "warn"
+    };
+  }
+
+  if (readout.tone === "danger") {
+    return stemAuditionDecisionFromPad({
+      targetPad: fullPad ?? targetPad,
+      statusLabel: "Restore audition",
+      detailLabel: `${readout.detailLabel} / hear all stems before judging balance`,
+      nextCheckLabel: "Next: play Full Mix before soloing individual stems.",
+      tone: "danger"
+    });
+  }
+
+  if (activePad?.id === "full") {
+    return stemAuditionDecisionFromPad({
+      targetPad,
+      statusLabel: "Next compare",
+      detailLabel: "Start from the rhythmic anchor against the Full Mix.",
+      nextCheckLabel: "Next: solo Drums, then compare 808 low-end against the full mix.",
+      tone: "good"
+    });
+  }
+
+  if (activePad) {
+    return stemAuditionDecisionFromPad({
+      targetPad,
+      statusLabel: "Compare back",
+      detailLabel: `${readout.roleLabel} active / return to context before level moves`,
+      nextCheckLabel: "Next: return to Full Mix, then trim only if the issue remains.",
+      tone: readout.tone
+    });
+  }
+
+  return stemAuditionDecisionFromPad({
+    targetPad,
+    statusLabel: "Reset context",
+    detailLabel: `${readout.detailLabel} / restore a clean listening comparison`,
+    nextCheckLabel: "Next: use Full Mix before choosing another stem or balance move.",
+    tone: "warn"
+  });
+}
+
+function stemAuditionDecisionFromPad({
+  targetPad,
+  statusLabel,
+  detailLabel,
+  nextCheckLabel,
+  tone
+}: {
+  targetPad: StemAuditionPadOption;
+  statusLabel: string;
+  detailLabel: string;
+  nextCheckLabel: string;
+  tone: MixCoachTone;
+}): StemAuditionDecisionSummary {
+  const targetLabel = targetPad.trackId === null ? "Audition Full Mix" : `Audition ${targetPad.label} Stem`;
+
+  return {
+    targetId: targetPad.id,
+    statusLabel,
+    targetLabel,
+    detailLabel,
+    nextCheckLabel,
+    detailTitle: `${statusLabel}: ${targetLabel} / ${detailLabel} / ${nextCheckLabel}`,
+    tone
   };
 }
 

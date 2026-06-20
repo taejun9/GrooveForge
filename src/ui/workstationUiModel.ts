@@ -2548,6 +2548,16 @@ export type StemAuditionReadoutSummary = {
   tone: MixCoachTone;
 };
 
+export type StemAuditionDecisionSummary = {
+  targetId: StemAuditionPadId | null;
+  statusLabel: string;
+  targetLabel: string;
+  detailLabel: string;
+  nextCheckLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type MasterOutputRoleSummary = {
   roleLabel: string;
   statusLabel: string;
