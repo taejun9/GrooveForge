@@ -19683,7 +19683,7 @@ input[type="range"] {
 .pattern-chain-priority {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(98px, 0.54fr) minmax(128px, 0.74fr) minmax(0, 1.18fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-columns: minmax(98px, 0.54fr) minmax(128px, 0.74fr) minmax(0, 1.18fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(112px, 0.66fr);
   gap: 6px;
   align-items: center;
   min-width: 0;
@@ -19705,7 +19705,8 @@ input[type="range"] {
 
 .pattern-chain-priority span,
 .pattern-chain-priority strong,
-.pattern-chain-priority small {
+.pattern-chain-priority small,
+.pattern-chain-priority button {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -19725,6 +19726,27 @@ input[type="range"] {
 .pattern-chain-priority small {
   color: rgba(244, 239, 231, 0.58);
   font-size: 10px;
+}
+
+.pattern-chain-priority button {
+  border: 1px solid rgba(120, 240, 200, 0.28);
+  border-radius: 5px;
+  background: rgba(120, 240, 200, 0.11);
+  color: #f4efe7;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.pattern-chain-priority.warn button {
+  border-color: rgba(240, 195, 106, 0.34);
+  background: rgba(240, 195, 106, 0.12);
+}
+
+.pattern-chain-priority.danger button {
+  border-color: rgba(255, 122, 79, 0.36);
+  background: rgba(255, 122, 79, 0.13);
 }
 
 .pattern-chain-result {

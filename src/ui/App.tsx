@@ -1764,6 +1764,10 @@ export function App(): ReactElement {
     () => createPatternChainPreviewSummary(project.arrangement),
     [project.arrangement]
   );
+  const patternChainPrioritySummary = useMemo(
+    () => createPatternChainPrioritySummary(patternChainPreviewSummary),
+    [patternChainPreviewSummary]
+  );
   const canSplitArrangementBlock = selectedArrangementBars > 1;
   const canMergeArrangementBlock =
     Boolean(selectedArrangementNextBlock) && selectedArrangementBars + selectedArrangementNextBars <= maxArrangementBars;
@@ -3996,6 +4000,17 @@ export function App(): ReactElement {
     } else {
       setPatternChainResult(null);
     }
+  }
+
+  function runPatternChainPriorityAction(actionId: PatternChainPrioritySummary["actionId"]): void {
+    if (actionId === "aligned") {
+      return;
+    }
+    if (actionId === "expand") {
+      expandPatternChain();
+      return;
+    }
+    applyPatternChain(actionId);
   }
 
   function updateMixerChannel(id: MixerChannel["id"], update: Partial<MixerChannel>): void {
@@ -9035,7 +9050,7 @@ export function App(): ReactElement {
           <SectionLocatorPads disabled={isPlaying} pads={sectionLocatorPads} onCue={cueSectionLocator} />
           <div className="pattern-chain-row" aria-label="Pattern chain">
             <PatternChainPreview preview={patternChainPreviewSummary} />
-            <PatternChainPriorityReadout summary={createPatternChainPrioritySummary(patternChainPreviewSummary)} />
+            <PatternChainPriorityReadout summary={patternChainPrioritySummary} onRun={runPatternChainPriorityAction} />
             <div className="pattern-chain-heading">
               <span>Chain</span>
               <strong data-testid="pattern-chain-current">{patternChainReadout(project.arrangement)}</strong>
@@ -11037,7 +11052,14 @@ function PatternChainPreview({ preview }: { preview: PatternChainPreviewSummary 
   );
 }
 
-function PatternChainPriorityReadout({ summary }: { summary: PatternChainPrioritySummary }): ReactElement {
+function PatternChainPriorityReadout({
+  onRun,
+  summary
+}: {
+  onRun: (actionId: PatternChainPrioritySummary["actionId"]) => void;
+  summary: PatternChainPrioritySummary;
+}): ReactElement {
+  const disabled = summary.actionId === "aligned";
   return (
     <div
       className={`pattern-chain-priority ${summary.tone}`}
@@ -11050,6 +11072,19 @@ function PatternChainPriorityReadout({ summary }: { summary: PatternChainPriorit
       <small data-testid="pattern-chain-priority-reason">{summary.reasonLabel}</small>
       <small data-testid="pattern-chain-priority-scope">{summary.scopeLabel}</small>
       <small data-testid="pattern-chain-priority-next-check">{summary.nextCheckLabel}</small>
+      <button
+        data-testid="pattern-chain-priority-run"
+        disabled={disabled}
+        onClick={() => {
+          if (!disabled) {
+            onRun(summary.actionId);
+          }
+        }}
+        title={disabled ? summary.reasonLabel : `Run ${summary.actionLabel}`}
+        type="button"
+      >
+        {disabled ? "Aligned" : summary.actionLabel}
+      </button>
     </div>
   );
 }
