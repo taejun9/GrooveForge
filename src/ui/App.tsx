@@ -12254,6 +12254,7 @@ function ReviewQueue({
   onFocus: (item: ReviewQueueItem) => void;
 }): ReactElement {
   const focusSummary = createReviewQueueFocusSummary(summary, focusedItemId);
+  const priority = createReviewQueuePriority(summary);
   const fixPreview = createReviewFixPreview(summary, focusedItemId, project, analyzeExport(project));
 
   return (
@@ -12275,6 +12276,17 @@ function ReviewQueue({
           <span data-testid="review-queue-focus-status">{focusSummary.statusLabel}</span>
           <strong data-testid="review-queue-focus-label">{focusSummary.areaLabel}</strong>
           <small data-testid="review-queue-focus-detail">{focusSummary.detailLabel}</small>
+        </div>
+        <div
+          className={`review-queue-priority ${priority.tone}`}
+          data-review-queue-priority={priority.itemId ?? "none"}
+          data-testid="review-queue-priority"
+          title={priority.title}
+        >
+          <span data-testid="review-queue-priority-status">{priority.statusLabel}</span>
+          <strong data-testid="review-queue-priority-label">{priority.areaLabel}</strong>
+          <small data-testid="review-queue-priority-item">{priority.itemLabel}</small>
+          <small data-testid="review-queue-priority-next-check">{priority.nextCheckLabel}</small>
         </div>
         <ReviewFixPreviewStrip preview={fixPreview} />
         {result && <ReviewQueueFocusResultStrip result={result} />}
@@ -12326,6 +12338,16 @@ function ReviewQueue({
     </section>
   );
 }
+
+type ReviewQueuePriority = {
+  itemId: string | null;
+  statusLabel: string;
+  areaLabel: string;
+  itemLabel: string;
+  nextCheckLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
 
 function ReviewFixPreviewStrip({ preview }: { preview: ReviewFixPreviewSummary }): ReactElement {
   return (
@@ -23480,6 +23502,55 @@ function reviewQueueFocusResultNextCheck(item: ReviewQueueItem): string {
       return "Return to Review Queue after master preset, limiter, and export posture match the target.";
     case "deliver":
       return "Return to Review Queue after deliverable, stem, or handoff context checks are clear.";
+  }
+}
+
+function createReviewQueuePriority(summary: ReviewQueueSummary): ReviewQueuePriority {
+  const item =
+    summary.items.find((candidate) => candidate.tone === "danger") ??
+    summary.items.find((candidate) => candidate.tone === "warn") ??
+    summary.items[0] ??
+    null;
+
+  if (!item) {
+    return {
+      itemId: null,
+      statusLabel: "Review clear",
+      areaLabel: "No priority issue",
+      itemLabel: "No Review Queue items available",
+      nextCheckLabel: "Next: return after Review Queue items are available.",
+      title: "Review Queue priority has no available item.",
+      tone: "good"
+    };
+  }
+
+  const statusLabel =
+    item.tone === "danger" ? "Review blocker" : item.tone === "warn" ? "Review priority" : "Review clear";
+  const nextCheckLabel = reviewQueuePriorityNextCheck(item);
+
+  return {
+    itemId: item.id,
+    statusLabel,
+    areaLabel: `${item.area}: ${item.status}`,
+    itemLabel: `${item.focusLabel} priority / ${item.detail}`,
+    nextCheckLabel,
+    title: `${statusLabel}: ${item.area}: ${item.status} / ${item.detail} / ${nextCheckLabel}`,
+    tone: item.tone
+  };
+}
+
+function reviewQueuePriorityNextCheck(item: ReviewQueueItem): string {
+  switch (item.focusTarget) {
+    case "compose":
+      return "Next: loop Pattern and confirm the core musical layer.";
+    case "arrange":
+      return "Next: play Song or Block loop and check form or contrast.";
+    case "mix":
+      return "Next: play Full Mix and compare Mix Coach before balance changes.";
+    case "master":
+      return "Next: check master preset, limiter, ceiling, and headroom.";
+    case "deliver":
+      return "Next: inspect Export Preflight, stems, and handoff context.";
   }
 }
 
