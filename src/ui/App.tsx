@@ -7547,6 +7547,11 @@ export function App(): ReactElement {
     setProjectStatus(`Style ${item.label}: ${item.value}`);
   }
 
+  function focusTimbreCheck(): void {
+    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Timbre Check ${soundTimbreCheckSummary.statusLabel}: ${soundTimbreCheckSummary.balanceLabel}`);
+  }
+
   function focusFinishChecklistCard(card: FinishChecklistCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -7850,6 +7855,7 @@ export function App(): ReactElement {
     soundPresetPreviewSummary,
     soundSnapshotComparison,
     soundSnapshots,
+    soundTimbreCheckSummary,
     spaceFxPadOptions,
     spaceFxPreviewSummary,
     stemAnalyses,
@@ -7912,6 +7918,7 @@ export function App(): ReactElement {
     onCaptureSoundSnapshot: captureSoundSnapshot,
     onRecallSoundSnapshot: recallSoundSnapshot,
     onClearSoundSnapshots: clearSoundSnapshots,
+    onFocusTimbreCheck: focusTimbreCheck,
     onExpandPatternChain: expandPatternChain,
     onApplyProjectKey: applyProjectKey,
     onApplyTempoNudge: applyTempoNudgePad,
@@ -16891,6 +16898,7 @@ function createQuickActions({
   soundPresetPreviewSummary,
   soundSnapshotComparison,
   soundSnapshots,
+  soundTimbreCheckSummary,
   spaceFxPadOptions,
   spaceFxPreviewSummary,
   stemAnalyses,
@@ -16952,6 +16960,7 @@ function createQuickActions({
   onCaptureSoundSnapshot,
   onRecallSoundSnapshot,
   onClearSoundSnapshots,
+  onFocusTimbreCheck,
   onExpandPatternChain,
   onApplyProjectKey,
   onApplyTempoNudge,
@@ -17155,6 +17164,7 @@ function createQuickActions({
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
   soundSnapshotComparison: SoundSnapshotComparisonSummary;
   soundSnapshots: SoundSnapshotSlotMap;
+  soundTimbreCheckSummary: SoundTimbreCheckSummary;
   spaceFxPadOptions: SpaceFxPadOption[];
   spaceFxPreviewSummary: SpaceFxPreviewSummary;
   stemAnalyses: StemExportAnalyses;
@@ -17216,6 +17226,7 @@ function createQuickActions({
   onCaptureSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
   onRecallSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
   onClearSoundSnapshots: () => void;
+  onFocusTimbreCheck: () => void;
   onExpandPatternChain: () => void;
   onApplyProjectKey: (key: string) => void;
   onApplyTempoNudge: (pad: TempoNudgePadDefinition) => void;
@@ -19461,6 +19472,14 @@ function createQuickActions({
       }
     },
     ...soundFocusPadActions,
+    {
+      id: "timbre-check",
+      title: `Check Timbre: ${soundTimbreCheckSummary.statusLabel}`,
+      detail: `${soundTimbreCheckSummary.headline} / ${soundTimbreCheckSummary.balanceLabel} / ${soundTimbreCheckSummary.detail}`,
+      group: "Create",
+      keywords: `Quick Actions Timbre Check readout balance tone drums 808 air width warmth sound focus studio ${soundTimbreCheckSummary.statusLabel} ${soundTimbreCheckSummary.headline} beginner producer`,
+      run: onFocusTimbreCheck
+    },
     ...soundSnapshotActions,
     {
       id: "sound-preset-decision",
@@ -20617,6 +20636,7 @@ function createQuickActionResult(
     action.id === "command-reference" ||
     action.id === "beat-terms-reference" ||
     action.id === "guide-quick-start" ||
+    action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
     action.id === "session-brief-compass-focus" ||
@@ -21548,6 +21568,15 @@ function quickActionResultMetricSnapshot(
       id: "sound-focus",
       label: "Sound focus",
       value: soundPresetToneLabel(project.sound)
+    };
+  }
+
+  if (action.id === "timbre-check") {
+    const timbre = createSoundTimbreCheckSummary(project.sound);
+    return {
+      id: "timbre-check",
+      label: "Timbre Check",
+      value: `${timbre.headline} / ${timbre.balanceLabel}`
     };
   }
 
@@ -22866,6 +22895,14 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, Synth, and Chords with the new tone posture.`,
       nextCheck: "Use the Sound Focus Result and Studio tone controls for manual kick, 808, Synth, and Chord corrections."
+    };
+  }
+
+  if (action.id === "timbre-check") {
+    const timbre = createSoundTimbreCheckSummary(project.sound);
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; inspect Timbre Check before changing preset, kit, focus, or Studio tone controls.`,
+      nextCheck: timbre.nextCheck
     };
   }
 
