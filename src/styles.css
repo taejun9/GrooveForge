@@ -11683,6 +11683,9 @@ h2 {
 .arrangement-mute-map-focus-readout span,
 .arrangement-mute-map-focus-readout strong,
 .arrangement-mute-map-focus-readout small,
+.arrangement-mute-map-priority span,
+.arrangement-mute-map-priority strong,
+.arrangement-mute-map-priority small,
 .arrangement-mute-map-result-main strong,
 .arrangement-mute-map-result-main small,
 .arrangement-mute-map-result-meta span,
@@ -11741,6 +11744,39 @@ h2 {
 }
 
 .arrangement-mute-map-focus-readout strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.arrangement-mute-map-priority {
+  display: grid;
+  grid-template-columns: minmax(96px, 0.42fr) minmax(0, 0.8fr) minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.22);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 8px 9px;
+}
+
+.arrangement-mute-map-priority.warn {
+  border-color: rgba(240, 195, 106, 0.26);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.arrangement-mute-map-priority.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.06);
+}
+
+.arrangement-mute-map-priority span,
+.arrangement-mute-map-priority small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+}
+
+.arrangement-mute-map-priority strong {
   color: #f4efe7;
   font-size: 11px;
 }
@@ -23308,6 +23344,7 @@ input[type="range"] {
 
   .arrangement-mute-map-lanes,
   .arrangement-mute-map-grid,
+  .arrangement-mute-map-priority,
   .arrangement-transition-map-grid {
     grid-column: 1 / -1;
   }
@@ -24659,6 +24696,7 @@ input[type="range"] {
   .topline-space-focus-readout,
   .topline-space-grid,
   .arrangement-mute-map-focus-readout,
+  .arrangement-mute-map-priority,
   .arrangement-mute-map-lanes,
   .arrangement-mute-map-grid,
   .arrangement-transition-map-focus-readout,
@@ -24669,6 +24707,7 @@ input[type="range"] {
   .hook-readiness-grid,
   .topline-space-grid,
   .arrangement-mute-map-focus-readout,
+  .arrangement-mute-map-priority,
   .arrangement-mute-map-lanes,
   .arrangement-mute-map-grid,
   .arrangement-mute-map-segment,

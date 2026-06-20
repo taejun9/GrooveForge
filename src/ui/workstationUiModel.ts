@@ -2450,6 +2450,16 @@ export type ArrangementMuteMapFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type ArrangementMuteMapPrioritySummary = {
+  laneId: ArrangementMuteMapFocusId | null;
+  statusLabel: string;
+  laneLabel: string;
+  reasonLabel: string;
+  nextCheckLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementMuteMapFocusResult = {
   laneId: ArrangementMuteMapFocusId;
   status: string;

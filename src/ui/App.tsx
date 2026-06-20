@@ -436,6 +436,7 @@ import type {
   ArrangementMuteMapSegment,
   ArrangementMuteMapSummary,
   ArrangementMuteMapFocusSummary,
+  ArrangementMuteMapPrioritySummary,
   ArrangementMuteMapFocusResult,
   ArrangementTransitionMapFocusId,
   ArrangementTransitionMapTransition,
@@ -14798,6 +14799,7 @@ function ArrangementMuteMap({
   summary: ArrangementMuteMapSummary;
 }): ReactElement {
   const focusSummary = createArrangementMuteMapFocusSummary(summary, focusedLaneId);
+  const prioritySummary = createArrangementMuteMapPrioritySummary(summary);
 
   return (
     <section className={`arrangement-mute-map ${summary.tone}`} data-testid="arrangement-mute-map" aria-label="Arrangement mute map">
@@ -14817,6 +14819,17 @@ function ArrangementMuteMap({
         <span data-testid="arrangement-mute-map-focus-status">{focusSummary.statusLabel}</span>
         <strong data-testid="arrangement-mute-map-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="arrangement-mute-map-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
+      <div
+        className={`arrangement-mute-map-priority ${prioritySummary.tone}`}
+        data-arrangement-mute-map-priority={prioritySummary.laneId ?? "none"}
+        data-testid="arrangement-mute-map-priority"
+        title={prioritySummary.detailTitle}
+      >
+        <span data-testid="arrangement-mute-map-priority-status">{prioritySummary.statusLabel}</span>
+        <strong data-testid="arrangement-mute-map-priority-lane">{prioritySummary.laneLabel}</strong>
+        <small data-testid="arrangement-mute-map-priority-reason">{prioritySummary.reasonLabel}</small>
+        <small data-testid="arrangement-mute-map-priority-next-check">{prioritySummary.nextCheckLabel}</small>
       </div>
       {result && <ArrangementMuteMapFocusResultStrip result={result} />}
       <div className="arrangement-mute-map-lanes" data-testid="arrangement-mute-map-lanes">
@@ -27548,6 +27561,84 @@ function createArrangementMuteMapFocusSummary(
     detailTitle: `${statusLabel} / ${lane.label}: ${lane.value} / ${detailLabel}`,
     tone: lane.tone
   };
+}
+
+function createArrangementMuteMapPrioritySummary(summary: ArrangementMuteMapSummary): ArrangementMuteMapPrioritySummary {
+  const lane = activeArrangementMuteMapQuickActionLane(summary);
+
+  if (!lane) {
+    return {
+      laneId: null,
+      statusLabel: "No mute priority",
+      laneLabel: "No arrangement lane",
+      reasonLabel: "Add arrangement blocks before checking layer dropouts",
+      nextCheckLabel: "Next: build a song form before editing mutes.",
+      detailTitle: "Arrangement Mute Map priority has no available lane.",
+      tone: "danger"
+    };
+  }
+
+  const statusLabel = arrangementMuteMapPriorityStatus(lane);
+  const laneLabel = `${lane.label}: ${lane.value}`;
+  const reasonLabel = arrangementMuteMapPriorityReason(lane, summary);
+  const nextCheckLabel = arrangementMuteMapPriorityNextCheck(lane);
+
+  return {
+    laneId: lane.id,
+    statusLabel,
+    laneLabel,
+    reasonLabel,
+    nextCheckLabel,
+    detailTitle: `${statusLabel} / ${laneLabel} / ${reasonLabel} / ${nextCheckLabel}`,
+    tone: lane.tone
+  };
+}
+
+function arrangementMuteMapPriorityStatus(lane: ArrangementMuteMapLane): string {
+  if (lane.status === "No blocks") {
+    return "Build form first";
+  }
+  if (lane.tone === "danger") {
+    return "Review first";
+  }
+  if (lane.tone === "warn") {
+    return lane.mutedBlocks === 0 ? "Add contrast check" : "Contrast check";
+  }
+  return "Priority lane";
+}
+
+function arrangementMuteMapPriorityReason(lane: ArrangementMuteMapLane, summary: ArrangementMuteMapSummary): string {
+  const mappedCount = summary.lanes.filter((candidate) => candidate.mutedBlocks > 0).length;
+
+  if (lane.status === "No blocks") {
+    return "No arrangement blocks available / build song form first";
+  }
+  if (lane.tone === "danger") {
+    return `${lane.status} / confirm this layer is not missing from the whole beat`;
+  }
+  if (lane.mutedBlocks === 0) {
+    return `${lane.status} / ${mappedCount}/${summary.lanes.length} lanes currently create space`;
+  }
+  if (lane.tone === "warn") {
+    return `${lane.status} / ${lane.detail} needs a song-form check`;
+  }
+  return `${lane.status} / ${lane.detail} is the first mapped layer to audition`;
+}
+
+function arrangementMuteMapPriorityNextCheck(lane: ArrangementMuteMapLane): string {
+  if (lane.status === "No blocks") {
+    return "Next: add or restore arrangement blocks before editing mutes.";
+  }
+  if (lane.tone === "danger") {
+    return "Next: play Song and restore the lane only if the full-song mute is unintended.";
+  }
+  if (lane.mutedBlocks === 0) {
+    return "Next: decide whether the song needs a drop, build, or space moment.";
+  }
+  if (lane.tone === "warn") {
+    return "Next: compare Song Form and Transition Map before changing mutes.";
+  }
+  return "Next: audition this lane, then check transition handoffs.";
 }
 
 function createArrangementMuteMapFocusResult(
