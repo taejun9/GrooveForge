@@ -2123,6 +2123,33 @@ export type ArrangementMoveResultSummary = {
   tone: MixCoachTone;
 };
 
+export type SelectedBlockEditActionId = "copy" | "paste" | "duplicate" | "split" | "merge" | "move_left" | "move_right" | "delete";
+
+export type SelectedBlockEditResultMetricId = "blocks" | "bars" | "selected";
+
+export type SelectedBlockEditResultMetric = {
+  id: SelectedBlockEditResultMetricId;
+  label: string;
+  before: string;
+  after: string;
+  changed: boolean;
+  tone: MixCoachTone;
+};
+
+export type SelectedBlockEditResultSummary = {
+  actionId: SelectedBlockEditActionId;
+  blockIndex: number;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: SelectedBlockEditResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementArcPadId = "clean" | "lift" | "break" | "rise";
 
 export type ArrangementArcPoint = {

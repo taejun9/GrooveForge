@@ -395,6 +395,9 @@ import type {
   ArrangementMovePrioritySummary,
   ArrangementMoveResultMetric,
   ArrangementMoveResultSummary,
+  SelectedBlockEditActionId,
+  SelectedBlockEditResultMetric,
+  SelectedBlockEditResultSummary,
   ArrangementArcPadId,
   ArrangementArcPoint,
   ArrangementArcPadDefinition,
@@ -1356,6 +1359,7 @@ export function App(): ReactElement {
   const [arrangementArcResult, setArrangementArcResult] = useState<ArrangementArcResultSummary | null>(null);
   const [arrangementFocusResult, setArrangementFocusResult] = useState<ArrangementFocusResultSummary | null>(null);
   const [arrangementMoveResult, setArrangementMoveResult] = useState<ArrangementMoveResultSummary | null>(null);
+  const [selectedBlockEditResult, setSelectedBlockEditResult] = useState<SelectedBlockEditResultSummary | null>(null);
   const [patternChainResult, setPatternChainResult] = useState<PatternChainResultSummary | null>(null);
   const [soundPresetPreviewId, setSoundPresetPreviewId] = useState<SoundPresetTarget>(() =>
     defaultSoundPresetPreview(starterProject)
@@ -2398,6 +2402,7 @@ export function App(): ReactElement {
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
     setArrangementMoveResult(null);
+    setSelectedBlockEditResult(null);
     setPatternChainResult(null);
     setSoundPresetResult(null);
     setSoundFocusResult(null);
@@ -2473,6 +2478,7 @@ export function App(): ReactElement {
       setArrangementArcResult(null);
       setArrangementFocusResult(null);
       setArrangementMoveResult(null);
+      setSelectedBlockEditResult(null);
       setPatternChainResult(null);
       setSoundPresetResult(null);
       setSoundFocusResult(null);
@@ -2641,6 +2647,7 @@ export function App(): ReactElement {
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
     setArrangementMoveResult(null);
+    setSelectedBlockEditResult(null);
     setPatternChainResult(null);
     setSoundPresetPreviewId(defaultSoundPresetPreview(nextProject));
     setSoundPresetResult(null);
@@ -2722,6 +2729,7 @@ export function App(): ReactElement {
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
     setArrangementMoveResult(null);
+    setSelectedBlockEditResult(null);
     setPatternChainResult(null);
     setSoundPresetPreviewId(defaultSoundPresetPreview(nextProject));
     setSoundPresetResult(null);
@@ -4340,6 +4348,9 @@ export function App(): ReactElement {
   }
 
   function duplicateArrangementBlock(): void {
+    const beforeProject = projectRef.current;
+    const beforeIndex = selectedArrangementIndex;
+    const afterIndex = Math.min(beforeIndex + 1, beforeProject.arrangement.length);
     const changed = updateProject((current) => {
       const source = current.arrangement[selectedArrangementIndex] ?? current.arrangement[0];
       if (!source) {
@@ -4361,12 +4372,16 @@ export function App(): ReactElement {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
+      setSelectedBlockEditResult(createSelectedBlockEditResult("duplicate", beforeProject, projectRef.current, beforeIndex, afterIndex));
+    } else {
+      setSelectedBlockEditResult(null);
     }
   }
 
   function copySelectedArrangementBlock(): void {
     const source = projectRef.current.arrangement[selectedArrangementIndex];
     if (!source) {
+      setSelectedBlockEditResult(null);
       setProjectStatus("Select an arrangement block");
       return;
     }
@@ -4375,16 +4390,23 @@ export function App(): ReactElement {
       ...source,
       mutedTracks: [...source.mutedTracks]
     });
+    setSelectedBlockEditResult(
+      createSelectedBlockEditResult("copy", projectRef.current, projectRef.current, selectedArrangementIndex, selectedArrangementIndex)
+    );
     setProjectStatus(`Copied ${source.section} Pattern ${source.pattern} block`);
   }
 
   function pasteArrangementBlockAfterSelected(): void {
     const clipboard = arrangementBlockClipboard;
     if (!clipboard) {
+      setSelectedBlockEditResult(null);
       setProjectStatus("Copy an arrangement block first");
       return;
     }
 
+    const beforeProject = projectRef.current;
+    const beforeIndex = selectedArrangementIndex;
+    const afterIndex = Math.min(beforeIndex + 1, beforeProject.arrangement.length);
     const changed = updateProject((current) => {
       const selectedBlock = current.arrangement[selectedArrangementIndex];
       if (!selectedBlock) {
@@ -4413,12 +4435,17 @@ export function App(): ReactElement {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
+      setSelectedBlockEditResult(createSelectedBlockEditResult("paste", beforeProject, projectRef.current, beforeIndex, afterIndex));
     } else {
+      setSelectedBlockEditResult(null);
       setProjectStatus("Select an arrangement block");
     }
   }
 
   function splitArrangementBlock(): void {
+    const beforeProject = projectRef.current;
+    const beforeIndex = selectedArrangementIndex;
+    const afterIndex = Math.min(beforeIndex + 1, beforeProject.arrangement.length);
     const changed = updateProject((current) => {
       const block = current.arrangement[selectedArrangementIndex];
       if (!block) {
@@ -4461,11 +4488,16 @@ export function App(): ReactElement {
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
     if (!changed) {
+      setSelectedBlockEditResult(null);
       setProjectStatus("Block needs 2+ bars to split");
+    } else {
+      setSelectedBlockEditResult(createSelectedBlockEditResult("split", beforeProject, projectRef.current, beforeIndex, afterIndex));
     }
   }
 
   function mergeArrangementBlock(): void {
+    const beforeProject = projectRef.current;
+    const beforeIndex = selectedArrangementIndex;
     const changed = updateProject((current) => {
       const block = current.arrangement[selectedArrangementIndex];
       const nextBlock = current.arrangement[selectedArrangementIndex + 1];
@@ -4497,11 +4529,17 @@ export function App(): ReactElement {
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
     if (!changed) {
+      setSelectedBlockEditResult(null);
       setProjectStatus("Merge needs a next block within 16 bars");
+    } else {
+      setSelectedBlockEditResult(createSelectedBlockEditResult("merge", beforeProject, projectRef.current, beforeIndex, beforeIndex));
     }
   }
 
   function moveArrangementBlock(direction: -1 | 1): void {
+    const beforeProject = projectRef.current;
+    const beforeIndex = selectedArrangementIndex;
+    const afterIndex = beforeIndex + direction;
     const changed = updateProject((current) => {
       const fromIndex = selectedArrangementIndex;
       const toIndex = fromIndex + direction;
@@ -4524,10 +4562,18 @@ export function App(): ReactElement {
       setSelectedNote(null);
       setSelectedDrumStep(null);
       setSelectedChordIndex(null);
+      setSelectedBlockEditResult(
+        createSelectedBlockEditResult(direction < 0 ? "move_left" : "move_right", beforeProject, projectRef.current, beforeIndex, afterIndex)
+      );
+    } else {
+      setSelectedBlockEditResult(null);
     }
   }
 
   function deleteArrangementBlock(): void {
+    const beforeProject = projectRef.current;
+    const beforeIndex = selectedArrangementIndex;
+    const afterIndex = Math.min(beforeIndex, Math.max(0, beforeProject.arrangement.length - 2));
     const changed = updateProject((current) => {
       if (current.arrangement.length <= 1) {
         return current;
@@ -4547,7 +4593,10 @@ export function App(): ReactElement {
     setSelectedDrumStep(null);
     setSelectedChordIndex(null);
     if (!changed) {
+      setSelectedBlockEditResult(null);
       setProjectStatus("Arrangement needs one block");
+    } else {
+      setSelectedBlockEditResult(createSelectedBlockEditResult("delete", beforeProject, projectRef.current, beforeIndex, afterIndex));
     }
   }
 
@@ -9338,6 +9387,9 @@ export function App(): ReactElement {
                   <span>Delete</span>
                 </button>
               </div>
+              {selectedBlockEditResult?.blockIndex === selectedArrangementIndex && (
+                <SelectedBlockEditResultStrip result={selectedBlockEditResult} />
+              )}
             </div>
           )}
         </section>
@@ -10751,6 +10803,48 @@ function ArrangementMoveResultStrip({ result }: { result: ArrangementMoveResultS
         <span>
           <b>Next check</b>
           <em data-testid="arrangement-move-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SelectedBlockEditResultStrip({ result }: { result: SelectedBlockEditResultSummary }): ReactElement {
+  return (
+    <div
+      className={`selected-block-edit-result ${result.tone}`}
+      data-result-selected-block-edit={result.actionId}
+      data-testid="selected-block-edit-result"
+      aria-live="polite"
+    >
+      <div className="selected-block-edit-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="selected-block-edit-result-title">{result.title}</strong>
+          <small data-testid="selected-block-edit-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="selected-block-edit-result-meta">
+        <span data-testid="selected-block-edit-result-status">{result.status}</span>
+        <span data-testid="selected-block-edit-result-scope">{result.scope}</span>
+        <span data-testid="selected-block-edit-result-impact">{result.impact}</span>
+      </div>
+      <div className="selected-block-edit-result-metrics" data-testid="selected-block-edit-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`selected-block-edit-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="selected-block-edit-result-followup" data-testid="selected-block-edit-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="selected-block-edit-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="selected-block-edit-result-next-check">{result.nextCheck}</em>
         </span>
       </div>
     </div>
@@ -15547,6 +15641,159 @@ function arrangementMoveResultAuditionCue(preset: ArrangementMovePreset): string
     case "reset":
       return "Audition Block and verify the neutral mute posture.";
   }
+}
+
+function createSelectedBlockEditResult(
+  actionId: SelectedBlockEditActionId,
+  beforeProject: ProjectState,
+  afterProject: ProjectState,
+  beforeIndex: number,
+  afterIndex: number
+): SelectedBlockEditResultSummary {
+  const title = selectedBlockEditActionTitle(actionId);
+  const afterBlock = afterProject.arrangement[afterIndex] ?? afterProject.arrangement[0];
+  const beforeBars = arrangementTotalBars(beforeProject);
+  const afterBars = arrangementTotalBars(afterProject);
+  const beforeSelected = selectedBlockEditBlockLabel(beforeProject, beforeIndex);
+  const afterSelected = selectedBlockEditBlockLabel(afterProject, afterIndex);
+  const metrics: SelectedBlockEditResultMetric[] = [
+    createSelectedBlockEditResultMetric(
+      "blocks",
+      "Blocks",
+      `${beforeProject.arrangement.length}`,
+      `${afterProject.arrangement.length}`
+    ),
+    createSelectedBlockEditResultMetric("bars", "Bars", barCountLabel(beforeBars), barCountLabel(afterBars)),
+    createSelectedBlockEditResultMetric("selected", "Selected", beforeSelected, afterSelected)
+  ];
+  const blockDelta = afterProject.arrangement.length - beforeProject.arrangement.length;
+  const barDelta = afterBars - beforeBars;
+  const changedMetrics = metrics.filter((metric) => metric.changed).length;
+  const scope = afterBlock
+    ? `Block ${Math.min(afterIndex + 1, afterProject.arrangement.length)} ${afterBlock.section} / Pattern ${afterBlock.pattern}`
+    : "No selected block";
+
+  return {
+    actionId,
+    blockIndex: Math.max(0, Math.min(afterIndex, Math.max(afterProject.arrangement.length - 1, 0))),
+    title,
+    status: selectedBlockEditActionStatus(actionId),
+    detail: `${beforeSelected} -> ${afterSelected}`,
+    scope,
+    impact: `${selectedBlockEditDeltaLabel(blockDelta, "block", "blocks")} / ${selectedBlockEditDeltaLabel(
+      barDelta,
+      "bar",
+      "bars"
+    )}`,
+    metrics,
+    auditionCue: selectedBlockEditAuditionCue(actionId),
+    nextCheck: selectedBlockEditNextCheck(actionId, changedMetrics),
+    tone: actionId === "delete" ? "danger" : actionId === "copy" ? "good" : "warn"
+  };
+}
+
+function createSelectedBlockEditResultMetric(
+  id: SelectedBlockEditResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): SelectedBlockEditResultMetric {
+  const changed = before !== after;
+  return {
+    id,
+    label,
+    before,
+    after,
+    changed,
+    tone: changed ? "warn" : "good"
+  };
+}
+
+function selectedBlockEditActionTitle(actionId: SelectedBlockEditActionId): string {
+  switch (actionId) {
+    case "copy":
+      return "Copied block";
+    case "paste":
+      return "Pasted block";
+    case "duplicate":
+      return "Duplicated block";
+    case "split":
+      return "Split block";
+    case "merge":
+      return "Merged blocks";
+    case "move_left":
+      return "Moved block left";
+    case "move_right":
+      return "Moved block right";
+    case "delete":
+      return "Deleted block";
+  }
+}
+
+function selectedBlockEditActionStatus(actionId: SelectedBlockEditActionId): string {
+  switch (actionId) {
+    case "copy":
+      return "Clipboard ready";
+    case "paste":
+      return "Block inserted";
+    case "duplicate":
+      return "Block repeated";
+    case "split":
+      return "Block divided";
+    case "merge":
+      return "Blocks combined";
+    case "move_left":
+    case "move_right":
+      return "Order changed";
+    case "delete":
+      return "Block removed";
+  }
+}
+
+function selectedBlockEditBlockLabel(project: ProjectState, index: number): string {
+  const block = project.arrangement[index] ?? project.arrangement[0];
+  if (!block) {
+    return "No block";
+  }
+  const blockNumber = Math.min(Math.max(index + 1, 1), project.arrangement.length);
+  return `Block ${blockNumber} ${block.section} / Pattern ${block.pattern} / ${barCountLabel(block.bars)}`;
+}
+
+function selectedBlockEditDeltaLabel(value: number, singular: string, plural: string): string {
+  if (value === 0) {
+    return `${plural} unchanged`;
+  }
+  const label = Math.abs(value) === 1 ? singular : plural;
+  return `${value > 0 ? "+" : ""}${value} ${label}`;
+}
+
+function selectedBlockEditAuditionCue(actionId: SelectedBlockEditActionId): string {
+  switch (actionId) {
+    case "copy":
+      return "Paste when this section shape should repeat later in the arrangement.";
+    case "paste":
+    case "duplicate":
+      return "Play Song loop around the inserted block and check the handoff.";
+    case "split":
+      return "Play the two split blocks as a Block or Transition loop.";
+    case "merge":
+      return "Play the merged block and confirm the longer section still breathes.";
+    case "move_left":
+    case "move_right":
+      return "Play Song loop through the moved block and its neighbors.";
+    case "delete":
+      return "Play Song loop across the removed block's gap.";
+  }
+}
+
+function selectedBlockEditNextCheck(actionId: SelectedBlockEditActionId, changedMetrics: number): string {
+  if (actionId === "copy") {
+    return "Paste explicitly before leaving the arrangement edit pass.";
+  }
+  if (changedMetrics === 0) {
+    return "No structure metric changed; scan Song Form Overview before another edit.";
+  }
+  return "Scan Song Form Overview and Arrangement Playback before the next structure edit.";
 }
 
 function isArrangementMovePresetApplied(block: ArrangementBlock, preset: ArrangementMovePreset): boolean {

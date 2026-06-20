@@ -20828,6 +20828,161 @@ input[type="range"] {
   opacity: 0.42;
 }
 
+.selected-block-edit-result {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(156px, 0.82fr) minmax(230px, 1fr) minmax(220px, 1fr) minmax(250px, 1.08fr);
+  gap: 7px;
+  align-items: stretch;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 7px;
+}
+
+.selected-block-edit-result.warn {
+  border-color: rgba(240, 195, 106, 0.28);
+  background: rgba(240, 195, 106, 0.06);
+}
+
+.selected-block-edit-result.danger {
+  border-color: rgba(255, 122, 79, 0.32);
+  background: rgba(255, 122, 79, 0.065);
+}
+
+.selected-block-edit-result-main,
+.selected-block-edit-result-meta,
+.selected-block-edit-result-metrics,
+.selected-block-edit-result-followup,
+.selected-block-edit-result-main span,
+.selected-block-edit-result-metrics span,
+.selected-block-edit-result-followup span {
+  min-width: 0;
+}
+
+.selected-block-edit-result-main,
+.selected-block-edit-result-meta,
+.selected-block-edit-result-metrics {
+  display: grid;
+  gap: 5px;
+}
+
+.selected-block-edit-result-main {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.selected-block-edit-result-main svg {
+  color: #78f0c8;
+}
+
+.selected-block-edit-result.warn .selected-block-edit-result-main svg {
+  color: #f0c36a;
+}
+
+.selected-block-edit-result.danger .selected-block-edit-result-main svg {
+  color: #ff7a4f;
+}
+
+.selected-block-edit-result-main span,
+.selected-block-edit-result-metrics span,
+.selected-block-edit-result-followup span {
+  display: grid;
+  gap: 2px;
+}
+
+.selected-block-edit-result-main strong,
+.selected-block-edit-result-main small,
+.selected-block-edit-result-meta span,
+.selected-block-edit-result-metrics b,
+.selected-block-edit-result-metrics em,
+.selected-block-edit-result-followup b,
+.selected-block-edit-result-followup em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-block-edit-result-main strong {
+  color: #f4efe7;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.selected-block-edit-result-main small {
+  color: rgba(244, 239, 231, 0.6);
+  font-size: 10px;
+}
+
+.selected-block-edit-result-meta {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.selected-block-edit-result-meta span {
+  border-radius: 5px;
+  background: rgba(244, 239, 231, 0.06);
+  color: rgba(244, 239, 231, 0.64);
+  padding: 5px 6px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.selected-block-edit-result-meta span:first-child {
+  color: #08120f;
+  background: #78f0c8;
+}
+
+.selected-block-edit-result.warn .selected-block-edit-result-meta span:first-child {
+  background: #f0c36a;
+}
+
+.selected-block-edit-result.danger .selected-block-edit-result-meta span:first-child {
+  background: #ff7a4f;
+}
+
+.selected-block-edit-result-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.selected-block-edit-result-metrics span {
+  border: 1px solid rgba(244, 239, 231, 0.08);
+  border-radius: 5px;
+  padding: 5px 6px;
+}
+
+.selected-block-edit-result-metrics span.warn {
+  border-color: rgba(240, 195, 106, 0.2);
+  background: rgba(240, 195, 106, 0.07);
+}
+
+.selected-block-edit-result-metrics b,
+.selected-block-edit-result-followup b {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.selected-block-edit-result-metrics em,
+.selected-block-edit-result-followup em {
+  color: rgba(244, 239, 231, 0.82);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.selected-block-edit-result-followup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.selected-block-edit-result-followup span {
+  border-radius: 5px;
+  background: rgba(244, 239, 231, 0.055);
+  padding: 5px 6px;
+}
+
 .mix-balance-panel,
 .space-fx-panel {
   display: grid;
@@ -23671,6 +23826,10 @@ input[type="range"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .selected-block-edit-result {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .pattern-dna {
     grid-template-columns: 1fr;
   }
@@ -24856,6 +25015,13 @@ input[type="range"] {
   .arrangement-move-result-meta,
   .arrangement-move-result-metrics,
   .arrangement-move-result-followup {
+    grid-template-columns: 1fr;
+  }
+
+  .selected-block-edit-result,
+  .selected-block-edit-result-meta,
+  .selected-block-edit-result-metrics,
+  .selected-block-edit-result-followup {
     grid-template-columns: 1fr;
   }
 
