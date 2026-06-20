@@ -13593,6 +13593,16 @@ function activeExportPreflightQuickActionCard(summary: ExportPreflightSummary): 
   );
 }
 
+type ExportPreflightPriority = {
+  focusId: ExportPreflightFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  cardLabel: string;
+  nextCheckLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 function sessionPassFocusLabel(target: SessionPassTarget): string {
   return target === "transport" ? "Transport" : reviewQueueFocusLabel(target);
 }
@@ -13611,6 +13621,7 @@ function ExportPreflight({
   summary: ExportPreflightSummary;
 }): ReactElement {
   const focusSummary = createExportPreflightFocusSummary(summary, focusedCardId);
+  const priority = createExportPreflightPriority(summary);
 
   return (
     <section
@@ -13635,6 +13646,17 @@ function ExportPreflight({
         <span data-testid="export-preflight-focus-status">{focusSummary.statusLabel}</span>
         <strong data-testid="export-preflight-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="export-preflight-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
+      <div
+        className={`export-preflight-priority ${priority.tone}`}
+        data-export-preflight-priority={priority.focusId ?? "none"}
+        data-testid="export-preflight-priority"
+        title={priority.title}
+      >
+        <span data-testid="export-preflight-priority-status">{priority.statusLabel}</span>
+        <strong data-testid="export-preflight-priority-label">{priority.areaLabel}</strong>
+        <small data-testid="export-preflight-priority-card">{priority.cardLabel}</small>
+        <small data-testid="export-preflight-priority-next-check">{priority.nextCheckLabel}</small>
       </div>
       {result && <ExportPreflightFocusResultStrip result={result} />}
       <div className="export-preflight-grid" data-testid="export-preflight-grid">
@@ -13667,6 +13689,55 @@ function ExportPreflight({
       </div>
     </section>
   );
+}
+
+function createExportPreflightPriority(summary: ExportPreflightSummary): ExportPreflightPriority {
+  const card =
+    summary.cards.find((item) => item.tone === "danger") ??
+    summary.cards.find((item) => item.tone === "warn") ??
+    summary.cards[0] ??
+    null;
+
+  if (!card) {
+    return {
+      focusId: null,
+      statusLabel: "Preflight clear",
+      areaLabel: "No priority lane",
+      cardLabel: "No Export Preflight cards available",
+      nextCheckLabel: "Next: return after delivery-risk cards are available.",
+      title: "Export Preflight priority has no available card.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel =
+    card.tone === "danger" ? "Export blocker" : card.tone === "warn" ? "Export review" : "Export ready";
+  const nextCheckLabel = exportPreflightPriorityNextCheck(card);
+
+  return {
+    focusId: card.focusId,
+    statusLabel,
+    areaLabel: `${card.label}: ${card.value}`,
+    cardLabel: `${card.focusLabel} priority / ${card.detail}`,
+    nextCheckLabel,
+    title: `${statusLabel}: ${card.label}: ${card.value} / ${card.detail} / ${nextCheckLabel}`,
+    tone: card.tone
+  };
+}
+
+function exportPreflightPriorityNextCheck(card: ExportPreflightFocusItem): string {
+  switch (card.focusId) {
+    case "readiness":
+      return "Next: clear composition and arrangement blockers.";
+    case "mix":
+      return "Next: check Full Mix, Mix Coach, and export meter.";
+    case "automation":
+      return "Next: play fades before WAV or stem export.";
+    case "deliverables":
+      return "Next: confirm WAV, stems, MIDI, and target length.";
+    case "handoff":
+      return "Next: confirm brief context and Handoff Sheet details.";
+  }
 }
 
 function ExportPreflightFocusResultStrip({ result }: { result: ExportPreflightFocusResult }): ReactElement {

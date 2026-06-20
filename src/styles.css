@@ -8337,7 +8337,7 @@ h2 {
 
 .export-preflight-heading {
   display: grid;
-  grid-row: 1 / 3;
+  grid-row: 1 / 4;
   gap: 4px;
   align-content: center;
   min-width: 0;
@@ -8368,6 +8368,9 @@ h2 {
 .export-preflight-focus-readout span,
 .export-preflight-focus-readout strong,
 .export-preflight-focus-readout small,
+.export-preflight-priority span,
+.export-preflight-priority strong,
+.export-preflight-priority small,
 .export-preflight-result-main strong,
 .export-preflight-result-main small,
 .export-preflight-result-destination span,
@@ -8436,18 +8439,64 @@ h2 {
   font-size: 11px;
 }
 
+.export-preflight-priority {
+  display: grid;
+  grid-column: 2;
+  grid-row: 2;
+  grid-template-columns: minmax(116px, 0.34fr) minmax(0, 0.74fr) minmax(0, 1.14fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 6px 8px;
+}
+
+.export-preflight-priority.good {
+  border-color: rgba(120, 240, 200, 0.18);
+  background: rgba(120, 240, 200, 0.035);
+}
+
+.export-preflight-priority.warn {
+  border-color: rgba(240, 195, 106, 0.22);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.export-preflight-priority.danger {
+  border-color: rgba(255, 122, 79, 0.26);
+  background: rgba(255, 122, 79, 0.05);
+}
+
+.export-preflight-priority span {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.export-preflight-priority strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.export-preflight-priority small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+}
+
 .export-preflight.has-result .export-preflight-heading {
-  grid-row: 1 / 4;
+  grid-row: 1 / 5;
 }
 
 .export-preflight.has-result .export-preflight-grid {
-  grid-row: 3;
+  grid-row: 4;
 }
 
 .export-preflight-result {
   display: grid;
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
   grid-template-columns: minmax(170px, 0.34fr) minmax(140px, 0.22fr) minmax(190px, 0.42fr) minmax(0, 1fr);
   gap: 8px;
   align-items: center;
@@ -8530,7 +8579,7 @@ h2 {
 .export-preflight-grid {
   display: grid;
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
   min-width: 0;
@@ -23081,6 +23130,10 @@ input[type="range"] {
     gap: 3px;
   }
 
+  .export-preflight-priority {
+    grid-template-columns: minmax(100px, 0.38fr) minmax(0, 0.72fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+
   .export-preflight-result {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -24230,6 +24283,7 @@ input[type="range"] {
   }
 
   .export-preflight-focus-readout,
+  .export-preflight-priority,
   .export-preflight-result,
   .export-preflight-grid {
     grid-column: 1;
@@ -24237,6 +24291,7 @@ input[type="range"] {
   }
 
   .export-preflight-focus-readout,
+  .export-preflight-priority,
   .export-preflight-result,
   .export-preflight-grid {
     grid-template-columns: 1fr;
