@@ -18221,6 +18221,9 @@ function createQuickActions({
     selectedArrangementIndex,
     arrangementFocusSummary
   );
+  const arrangementFocusDecisionSummary = arrangementFocusPreviewSummary
+    ? createArrangementFocusPreviewDecision(arrangementFocusPreviewSummary)
+    : null;
   const arrangementFocusReady = Boolean(arrangementFocusPreviewSummary && arrangementFocusPreviewSummary.statusLabel !== "Focus aligned");
   const arrangementMuteMapLane = activeArrangementMuteMapQuickActionLane(arrangementMuteMapSummary);
   const arrangementMuteMapActions: QuickAction[] = arrangementMuteMapSummary.lanes.map((lane) => ({
@@ -19631,6 +19634,28 @@ function createQuickActions({
       run: () => {
         if (arrangementFocusReady && arrangementFocusPreviewSummary) {
           onApplyArrangementFocus(arrangementFocusPreviewSummary.presetId);
+        }
+      }
+    },
+    {
+      id: "arrangement-focus-decision",
+      title:
+        arrangementFocusDecisionSummary && !arrangementFocusDecisionSummary.disabled
+          ? `Run Arrangement Focus Decision: ${arrangementFocusDecisionSummary.presetLabel}`
+          : "Run Arrangement Focus Decision",
+      detail: arrangementFocusDecisionSummary
+        ? arrangementFocusDecisionSummary.disabled
+          ? arrangementFocusDecisionSummary.detailLabel
+          : `${arrangementFocusDecisionSummary.statusLabel} / ${arrangementFocusDecisionSummary.metricLabel} / ${arrangementFocusDecisionSummary.detailLabel}`
+        : "No arrangement block selected.",
+      group: "Arrange",
+      keywords: `arrangement focus decision preview selected block section pattern energy mute intro verse hook bridge outro ${
+        arrangementFocusDecisionSummary?.targetPresetId ?? "none"
+      } ${arrangementFocusDecisionSummary?.presetLabel ?? "none"} beginner producer`,
+      disabled: !arrangementFocusDecisionSummary || arrangementFocusDecisionSummary.disabled,
+      run: () => {
+        if (arrangementFocusDecisionSummary && !arrangementFocusDecisionSummary.disabled) {
+          onApplyArrangementFocus(arrangementFocusDecisionSummary.targetPresetId);
         }
       }
     },
@@ -21565,7 +21590,11 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "arrangement-focus" || action.id.startsWith("arrangement-focus-preset-")) {
+  if (
+    action.id === "arrangement-focus" ||
+    action.id === "arrangement-focus-decision" ||
+    action.id.startsWith("arrangement-focus-preset-")
+  ) {
     return {
       id: "arrangement-focus",
       label: "Arrangement focus",
@@ -22742,10 +22771,17 @@ function quickActionResultFollowup(
     };
   }
 
-  if (action.id === "arrangement-focus" || action.id.startsWith("arrangement-focus-preset-")) {
+  if (
+    action.id === "arrangement-focus" ||
+    action.id === "arrangement-focus-decision" ||
+    action.id.startsWith("arrangement-focus-preset-")
+  ) {
     return {
       auditionCue: "Play Block loop; hear the selected block's section role, Pattern assignment, energy, and mutes in context.",
-      nextCheck: "Use the Arrangement Focus Result, Arrangement Playback Readout, and Song Form Overview before changing nearby blocks."
+      nextCheck:
+        action.id === "arrangement-focus-decision"
+          ? "Return to Arrangement Focus Preview Decision before running another selected-block focus move."
+          : "Use the Arrangement Focus Result, Arrangement Playback Readout, and Song Form Overview before changing nearby blocks."
     };
   }
 
