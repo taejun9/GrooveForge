@@ -2041,6 +2041,7 @@ export type ArrangementFocusSummary = {
 
 export type ArrangementFocusPreviewSummary = {
   presetId: ArrangementFocusPresetId;
+  changeCount: number;
   statusLabel: string;
   presetLabel: string;
   blockLabel: string;
@@ -2048,6 +2049,17 @@ export type ArrangementFocusPreviewSummary = {
   energyLabel: string;
   muteLabel: string;
   moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export type ArrangementFocusPrioritySummary = {
+  presetId: ArrangementFocusPresetId;
+  statusLabel: string;
+  presetLabel: string;
+  reasonLabel: string;
+  scopeLabel: string;
+  nextCheckLabel: string;
   detailTitle: string;
   tone: MixCoachTone;
 };

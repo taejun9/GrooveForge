@@ -19861,7 +19861,7 @@ input[type="range"] {
 
 .arrangement-focus-summary {
   display: grid;
-  grid-row: span 2;
+  grid-row: span 3;
   gap: 4px;
   align-content: center;
   min-width: 0;
@@ -19947,6 +19947,53 @@ input[type="range"] {
 
 .arrangement-focus-preview small {
   color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+}
+
+.arrangement-focus-priority {
+  display: grid;
+  grid-column: 2;
+  grid-template-columns: minmax(96px, 0.54fr) minmax(118px, 0.72fr) minmax(0, 1.16fr) minmax(136px, 0.84fr) minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.2);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.055);
+  padding: 6px 7px;
+}
+
+.arrangement-focus-priority.warn {
+  border-color: rgba(240, 195, 106, 0.25);
+  background: rgba(240, 195, 106, 0.065);
+}
+
+.arrangement-focus-priority.danger {
+  border-color: rgba(255, 122, 79, 0.3);
+  background: rgba(255, 122, 79, 0.07);
+}
+
+.arrangement-focus-priority span,
+.arrangement-focus-priority strong,
+.arrangement-focus-priority small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrangement-focus-priority span {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+}
+
+.arrangement-focus-priority strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.arrangement-focus-priority small {
+  color: rgba(244, 239, 231, 0.58);
   font-size: 10px;
 }
 
@@ -24188,6 +24235,7 @@ input[type="range"] {
 
   .arrangement-focus-summary,
   .arrangement-focus-preview,
+  .arrangement-focus-priority,
   .arrangement-focus-actions,
   .arrangement-focus-result {
     grid-column: auto;
@@ -24199,6 +24247,10 @@ input[type="range"] {
 
   .arrangement-focus-preview {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .arrangement-focus-priority {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .arrangement-focus-result {
@@ -24445,6 +24497,11 @@ input[type="range"] {
   }
 
   .arrangement-focus-preview {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .arrangement-focus-priority {
     grid-template-columns: 1fr;
     gap: 4px;
   }

@@ -389,6 +389,7 @@ import type {
   ArrangementFocusPreset,
   ArrangementFocusSummary,
   ArrangementFocusPreviewSummary,
+  ArrangementFocusPrioritySummary,
   ArrangementFocusResultMetric,
   ArrangementFocusResultSummary,
   ArrangementArcPadId,
@@ -10491,6 +10492,8 @@ function ArrangementFocusPanel({
     return null;
   }
 
+  const prioritySummary = createArrangementFocusPrioritySummary(summary, preview);
+
   return (
     <section className="arrangement-focus" data-testid="arrangement-focus" aria-label="Arrangement focus">
       <div className="arrangement-focus-summary">
@@ -10515,6 +10518,18 @@ function ArrangementFocusPanel({
         <small data-testid="arrangement-focus-preview-energy">{preview.energyLabel}</small>
         <small data-testid="arrangement-focus-preview-mutes">{preview.muteLabel}</small>
         <small data-testid="arrangement-focus-preview-moves">{preview.moveLabel}</small>
+      </div>
+      <div
+        className={`arrangement-focus-priority ${prioritySummary.tone}`}
+        data-arrangement-focus-priority={prioritySummary.presetId}
+        data-testid="arrangement-focus-priority"
+        title={prioritySummary.detailTitle}
+      >
+        <span data-testid="arrangement-focus-priority-status">{prioritySummary.statusLabel}</span>
+        <strong data-testid="arrangement-focus-priority-preset">{prioritySummary.presetLabel}</strong>
+        <small data-testid="arrangement-focus-priority-reason">{prioritySummary.reasonLabel}</small>
+        <small data-testid="arrangement-focus-priority-scope">{prioritySummary.scopeLabel}</small>
+        <small data-testid="arrangement-focus-priority-next-check">{prioritySummary.nextCheckLabel}</small>
       </div>
       <div className="arrangement-focus-actions">
         {arrangementFocusPresets.map((preset) => (
@@ -29489,6 +29504,36 @@ function createArrangementFocusSummary(project: ProjectState, selectedIndex: num
   };
 }
 
+function createArrangementFocusPrioritySummary(
+  summary: ArrangementFocusSummary,
+  preview: ArrangementFocusPreviewSummary
+): ArrangementFocusPrioritySummary {
+  const changeCount = preview.changeCount;
+  const statusLabel = changeCount === 0 ? "Focus aligned" : changeCount <= 2 ? "Light focus" : "Deep focus";
+  const reasonLabel =
+    changeCount === 0
+      ? `${summary.section} already matches the suggested ${preview.presetLabel} posture.`
+      : `${preview.moveLabel} would align ${summary.section} toward ${preview.presetLabel}.`;
+  const scopeLabel = `Block ${summary.blockNumber} / Pattern ${summary.pattern} / ${barCountLabel(summary.bars)}`;
+  const nextCheckLabel =
+    changeCount === 0
+      ? "Audition the block, then confirm Song Form before editing."
+      : changeCount <= 2
+        ? "Apply only if this block should match the selected section role."
+        : "Check Arrangement Playback and Song Form before applying this reshape.";
+
+  return {
+    presetId: preview.presetId,
+    statusLabel,
+    presetLabel: preview.presetLabel,
+    reasonLabel,
+    scopeLabel,
+    nextCheckLabel,
+    detailTitle: `${statusLabel} / ${preview.presetLabel} / ${reasonLabel} / ${scopeLabel} / ${nextCheckLabel}`,
+    tone: preview.tone
+  };
+}
+
 function createArrangementFocusPreviewSummary(
   project: ProjectState,
   selectedIndex: number,
@@ -29510,6 +29555,7 @@ function createArrangementFocusPreviewSummary(
 
   return {
     presetId: preset.id,
+    changeCount: changedFields,
     statusLabel: changedFields === 0 ? "Focus aligned" : "Suggested focus",
     presetLabel: preset.label,
     blockLabel,
