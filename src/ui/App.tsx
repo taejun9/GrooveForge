@@ -11900,6 +11900,7 @@ function BeatPassport({
   summary: BeatPassportSummary;
 }): ReactElement {
   const focusSummary = createBeatPassportFocusSummary(summary, focusedMetricId);
+  const focusMetric = focusSummary.focusId ? summary.metrics.find((metric) => metric.focusId === focusSummary.focusId) ?? null : null;
 
   return (
     <section
@@ -11919,6 +11920,25 @@ function BeatPassport({
         <span data-testid="beat-passport-focus-status">{focusSummary.statusLabel}</span>
         <strong data-testid="beat-passport-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="beat-passport-focus-detail">{focusSummary.detailLabel}</small>
+        <button
+          className="beat-passport-focus-action"
+          data-testid="beat-passport-focus-run"
+          disabled={!focusMetric}
+          onClick={() => {
+            if (focusMetric) {
+              onFocus(focusMetric);
+            }
+          }}
+          title={
+            focusMetric
+              ? `Open ${focusMetric.focusLabel}: ${focusMetric.label} ${focusMetric.value}`
+              : "No Beat Passport metric to focus."
+          }
+          type="button"
+        >
+          <ArrowRight size={13} aria-hidden="true" />
+          <span>{focusSummary.actionLabel}</span>
+        </button>
       </div>
       {result && <BeatPassportFocusResultStrip result={result} />}
       <div className="beat-passport-grid" data-testid="beat-passport-grid">
@@ -23679,6 +23699,7 @@ function createBeatPassportFocusSummary(summary: BeatPassportSummary, focusedMet
       statusLabel: "Passport clear",
       areaLabel: "No passport focus",
       detailLabel: "No Beat Passport metrics available",
+      actionLabel: "Ready",
       detailTitle: "Beat Passport has no focusable metrics.",
       tone: "warn"
     };
@@ -23692,6 +23713,7 @@ function createBeatPassportFocusSummary(summary: BeatPassportSummary, focusedMet
     statusLabel,
     areaLabel: `${metric.label}: ${metric.value}`,
     detailLabel,
+    actionLabel: `Open ${metric.focusLabel}`,
     detailTitle: `${statusLabel} / ${metric.label}: ${metric.value} / ${detailLabel}`,
     tone: metric.tone
   };

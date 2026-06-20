@@ -3343,6 +3343,7 @@ export type BeatPassportFocusSummary = {
   statusLabel: string;
   areaLabel: string;
   detailLabel: string;
+  actionLabel: string;
   detailTitle: string;
   tone: MixCoachTone;
 };
