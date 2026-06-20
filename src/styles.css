@@ -2196,9 +2196,9 @@ h2 {
 
 .session-pass-heading strong,
 .session-pass-heading small,
-.session-pass-decision span,
-.session-pass-decision strong,
-.session-pass-decision small,
+.session-pass-decision > span,
+.session-pass-decision > strong,
+.session-pass-decision > small,
 .session-pass-card span,
 .session-pass-card strong,
 .session-pass-card small,
@@ -2227,8 +2227,9 @@ h2 {
 
 .session-pass-decision {
   display: grid;
-  gap: 4px;
-  align-content: center;
+  grid-template-columns: minmax(88px, 0.34fr) minmax(120px, 0.5fr) minmax(0, 1fr) minmax(120px, auto);
+  gap: 6px 8px;
+  align-items: center;
   min-width: 0;
   border: 1px solid rgba(130, 215, 255, 0.2);
   border-radius: 7px;
@@ -2246,21 +2247,69 @@ h2 {
   background: rgba(255, 122, 79, 0.06);
 }
 
-.session-pass-decision span {
+.session-pass-decision > span {
   color: rgba(244, 239, 231, 0.62);
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
 }
 
-.session-pass-decision strong {
+.session-pass-decision > strong {
   color: #f4efe7;
   font-size: 12px;
 }
 
-.session-pass-decision small {
+.session-pass-decision > small {
   color: rgba(244, 239, 231, 0.64);
   font-size: 10px;
+}
+
+.session-pass-decision-action {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  min-height: 27px;
+  min-width: 0;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 6px;
+  color: rgba(244, 239, 231, 0.76);
+  background: rgba(244, 239, 231, 0.06);
+  padding: 4px 7px;
+}
+
+.session-pass-decision-action:hover:not(:disabled) {
+  border-color: rgba(130, 215, 255, 0.46);
+  color: #f4efe7;
+  background: rgba(130, 215, 255, 0.13);
+}
+
+.session-pass-decision-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.session-pass-decision-action svg {
+  color: #82d7ff;
+}
+
+.session-pass-decision.warn .session-pass-decision-action svg {
+  color: #f0c36a;
+}
+
+.session-pass-decision.danger .session-pass-decision-action svg {
+  color: #ff7a4f;
+}
+
+.session-pass-decision-action span {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .session-pass-grid {
@@ -24660,6 +24709,11 @@ input[type="range"] {
 
   .session-pass-decision {
     grid-column: 2;
+    grid-template-columns: 1fr;
+  }
+
+  .session-pass-decision-action {
+    width: 100%;
   }
 
   .session-pass-result {
@@ -25894,6 +25948,7 @@ input[type="range"] {
 
   .session-pass-decision {
     grid-column: 1;
+    grid-template-columns: 1fr;
   }
 
   .session-pass-result {

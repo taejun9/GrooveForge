@@ -927,6 +927,9 @@ export function SessionPass({
   result: SessionPassFocusResult | null;
   onFocus: (card: SessionPassCard) => void;
 }): ReactElement {
+  const activeCard = summary.cards.find((card) => card.id === summary.activeCardId) ?? null;
+  const decisionActionDisabled = activeCard === null;
+
   return (
     <section className={`session-pass ${summary.tone}`} data-testid="session-pass" aria-label="Session pass">
       <div className="session-pass-heading">
@@ -946,6 +949,22 @@ export function SessionPass({
         <span data-testid="session-pass-decision-status">{summary.decisionStatus}</span>
         <strong data-testid="session-pass-decision-label">{summary.decisionLabel}</strong>
         <small data-testid="session-pass-decision-detail">{summary.decisionDetail}</small>
+        <button
+          className="session-pass-decision-action"
+          data-session-pass-decision-action={activeCard?.id ?? "none"}
+          data-testid="session-pass-decision-run"
+          disabled={decisionActionDisabled}
+          onClick={() => {
+            if (activeCard) {
+              onFocus(activeCard);
+            }
+          }}
+          title={activeCard ? `Focus ${activeCard.focusLabel}: ${activeCard.value}` : summary.decisionTitle}
+          type="button"
+        >
+          <ArrowRight size={13} aria-hidden="true" />
+          <span>{summary.decisionLabel}</span>
+        </button>
       </div>
       <div className="session-pass-grid" data-testid="session-pass-grid">
         {summary.cards.map((card) => (
