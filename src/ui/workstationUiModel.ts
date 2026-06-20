@@ -2298,6 +2298,19 @@ export type SelectedBlockEditPrioritySummary = {
   tone: MixCoachTone;
 };
 
+export type SelectedBlockEditPreviewDecisionSummary = {
+  targetActionId: SelectedBlockEditPriorityActionId;
+  actionId: "run-suggested" | "select-block";
+  statusLabel: string;
+  actionLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  buttonLabel: string;
+  disabled: boolean;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type SelectedBlockEditResultMetricId = "blocks" | "bars" | "selected";
 
 export type SelectedBlockEditResultMetric = {

@@ -400,6 +400,7 @@ import type {
   ArrangementMoveResultMetric,
   ArrangementMoveResultSummary,
   SelectedBlockEditActionId,
+  SelectedBlockEditPreviewDecisionSummary,
   SelectedBlockEditPrioritySummary,
   SelectedBlockEditResultMetric,
   SelectedBlockEditResultSummary,
@@ -1763,6 +1764,10 @@ export function App(): ReactElement {
   const arrangementMovePrioritySummary = useMemo(
     () => createArrangementMovePrioritySummary(selectedArrangementBlock, selectedArrangementIndex, project.arrangement.length),
     [project.arrangement.length, selectedArrangementBlock, selectedArrangementIndex]
+  );
+  const selectedBlockEditPrioritySummary = useMemo(
+    () => createSelectedBlockEditPrioritySummary(project, selectedArrangementIndex, arrangementBlockClipboard),
+    [arrangementBlockClipboard, project, selectedArrangementIndex]
   );
   const selectedArrangementBlockRole = useMemo(
     () => selectedArrangementBlockRoleSummary(project, selectedArrangementIndex),
@@ -9335,8 +9340,12 @@ export function App(): ReactElement {
               {arrangementMoveResult?.blockIndex === selectedArrangementIndex && (
                 <ArrangementMoveResultStrip result={arrangementMoveResult} />
               )}
+              <SelectedBlockEditPreviewDecision
+                summary={createSelectedBlockEditPreviewDecision(selectedBlockEditPrioritySummary)}
+                onRun={runSelectedBlockEditPriorityAction}
+              />
               <SelectedBlockEditPriorityReadout
-                summary={createSelectedBlockEditPrioritySummary(project, selectedArrangementIndex, arrangementBlockClipboard)}
+                summary={selectedBlockEditPrioritySummary}
                 onRun={runSelectedBlockEditPriorityAction}
               />
               <div className="arrangement-clipboard-row" aria-label="Arrangement block clipboard">
@@ -11239,6 +11248,40 @@ function SelectedBlockEditPriorityReadout({
         type="button"
       >
         {disabled ? "Select Block" : summary.actionLabel}
+      </button>
+    </div>
+  );
+}
+
+function SelectedBlockEditPreviewDecision({
+  onRun,
+  summary
+}: {
+  onRun: (actionId: SelectedBlockEditPrioritySummary["actionId"]) => void;
+  summary: SelectedBlockEditPreviewDecisionSummary;
+}): ReactElement {
+  return (
+    <div
+      className={`selected-block-edit-priority selected-block-edit-decision ${summary.tone}`}
+      data-selected-block-edit-decision={summary.targetActionId}
+      data-testid="selected-block-edit-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="selected-block-edit-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="selected-block-edit-decision-action">{summary.actionLabel}</strong>
+      <small data-testid="selected-block-edit-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="selected-block-edit-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="selected-block-edit-decision-run"
+        data-selected-block-edit-decision-action={summary.actionId}
+        data-testid="selected-block-edit-decision-run"
+        disabled={summary.disabled}
+        onClick={() => onRun(summary.targetActionId)}
+        title={summary.disabled ? summary.detailLabel : `Run ${summary.actionLabel}`}
+        type="button"
+      >
+        <ListChecks size={12} aria-hidden="true" />
+        <span data-testid="selected-block-edit-decision-label">{summary.buttonLabel}</span>
       </button>
     </div>
   );
@@ -16561,6 +16604,29 @@ function createSelectedBlockEditPrioritySummary(
     nextCheckLabel,
     detailTitle: `${statusLabel} / ${actionLabel} / ${reasonLabel} / ${scopeLabel} / ${impactLabel} / ${nextCheckLabel}`,
     tone
+  };
+}
+
+function createSelectedBlockEditPreviewDecision(
+  summary: SelectedBlockEditPrioritySummary
+): SelectedBlockEditPreviewDecisionSummary {
+  const missingTarget = summary.actionId === "none";
+
+  return {
+    targetActionId: summary.actionId,
+    actionId: missingTarget ? "select-block" : "run-suggested",
+    statusLabel: missingTarget ? "Select block" : "Ready to edit",
+    actionLabel: summary.actionLabel,
+    metricLabel: summary.impactLabel,
+    detailLabel: missingTarget
+      ? "Select an arrangement block before running a structure edit."
+      : `${summary.scopeLabel} / ${summary.reasonLabel}`,
+    buttonLabel: missingTarget ? "Select Block" : "Run Suggested Edit",
+    disabled: missingTarget,
+    detailTitle: missingTarget
+      ? `${summary.detailTitle} No Selected Block Edit action is available.`
+      : `${summary.detailTitle} Run only after this selected block should take the suggested structure edit.`,
+    tone: missingTarget ? "warn" : summary.tone
   };
 }
 
