@@ -13772,6 +13772,16 @@ function ExportPreflightFocusResultStrip({ result }: { result: ExportPreflightFo
   );
 }
 
+type HandoffExportFormatPriority = {
+  metricId: HandoffExportFormatFocusId | null;
+  statusLabel: string;
+  areaLabel: string;
+  metricLabel: string;
+  nextCheckLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 type HandoffPackageCheckPriority = {
   focusId: HandoffPackageCheckFocusId | null;
   statusLabel: string;
@@ -13832,6 +13842,7 @@ function HandoffPack({
   const fileManifest = createHandoffFileManifest(project, stemAnalyses, items);
   const manifestAudit = createHandoffManifestAudit(project, items, fileManifest, receiptSummary, sendOrderSummary);
   const formatSummary = createHandoffExportFormatSummary(project, analysis, stemAnalyses, items);
+  const formatPriority = createHandoffExportFormatPriority(formatSummary);
   const packageFocusSummary = createHandoffPackageCheckFocusSummary(packageCheckSummary, focusedPackageCheckId);
   const packagePriority = createHandoffPackageCheckPriority(packageCheckSummary);
 
@@ -13932,6 +13943,17 @@ function HandoffPack({
             <small data-testid="handoff-export-format-detail">{formatSummary.detailLabel}</small>
           </span>
           <em data-testid="handoff-export-format-duration">{formatSummary.durationLabel}</em>
+        </div>
+        <div
+          className={`handoff-export-format-priority ${formatPriority.tone}`}
+          data-handoff-export-format-priority={formatPriority.metricId ?? "none"}
+          data-testid="handoff-export-format-priority"
+          title={formatPriority.title}
+        >
+          <span data-testid="handoff-export-format-priority-status">{formatPriority.statusLabel}</span>
+          <strong data-testid="handoff-export-format-priority-label">{formatPriority.areaLabel}</strong>
+          <small data-testid="handoff-export-format-priority-metric">{formatPriority.metricLabel}</small>
+          <small data-testid="handoff-export-format-priority-next-check">{formatPriority.nextCheckLabel}</small>
         </div>
         <div className="handoff-export-format-metrics" data-testid="handoff-export-format-metrics">
           {formatSummary.metrics.map((metric) => {
@@ -14054,6 +14076,49 @@ function HandoffPack({
       </div>
     </section>
   );
+}
+
+function createHandoffExportFormatPriority(summary: HandoffExportFormatSummary): HandoffExportFormatPriority {
+  const metric = handoffExportFormatFocusMetric(summary);
+
+  if (!metric) {
+    return {
+      metricId: null,
+      statusLabel: "Format clear",
+      areaLabel: "No format lane",
+      metricLabel: "No Handoff Export Format metrics available",
+      nextCheckLabel: "Next: return after deliverable-format metrics are available.",
+      title: "Handoff Export Format priority has no available metric.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel =
+    metric.tone === "danger" ? "Format blocker" : metric.tone === "warn" ? "Format review" : "Format ready";
+  const nextCheckLabel = handoffExportFormatPriorityNextCheck(metric);
+
+  return {
+    metricId: metric.id,
+    statusLabel,
+    areaLabel: `${metric.label}: ${metric.value}`,
+    metricLabel: `${metric.detail} / ${summary.durationLabel}`,
+    nextCheckLabel,
+    title: `${statusLabel}: ${metric.label}: ${metric.value} / ${metric.detail} / ${nextCheckLabel}`,
+    tone: metric.tone
+  };
+}
+
+function handoffExportFormatPriorityNextCheck(metric: HandoffExportFormatMetric): string {
+  switch (metric.id) {
+    case "wav":
+      return "Next: confirm full-mix WAV format and meter posture.";
+    case "stems":
+      return "Next: confirm audible stem count and planned stem files.";
+    case "midi":
+      return "Next: confirm arrangement length before MIDI export.";
+    case "sheet":
+      return "Next: confirm brief context before Handoff Sheet export.";
+  }
 }
 
 function createHandoffPackageCheckPriority(summary: HandoffPackageCheckSummary): HandoffPackageCheckPriority {

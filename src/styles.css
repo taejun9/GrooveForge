@@ -8740,6 +8740,9 @@ h2 {
 .handoff-export-format-main strong,
 .handoff-export-format-main small,
 .handoff-export-format-main em,
+.handoff-export-format-priority span,
+.handoff-export-format-priority strong,
+.handoff-export-format-priority small,
 .handoff-export-format-metrics b,
 .handoff-export-format-metrics strong,
 .handoff-export-format-metrics small,
@@ -9072,13 +9075,18 @@ h2 {
 }
 
 .handoff-export-format-main,
+.handoff-export-format-priority,
 .handoff-export-format-metrics,
 .handoff-export-format-main span,
+.handoff-export-format-priority span,
+.handoff-export-format-priority strong,
+.handoff-export-format-priority small,
 .handoff-export-format-metrics span {
   min-width: 0;
 }
 
 .handoff-export-format-main,
+.handoff-export-format-priority,
 .handoff-export-format-metrics {
   display: grid;
   gap: 4px;
@@ -9089,6 +9097,8 @@ h2 {
 }
 
 .handoff-export-format-main {
+  grid-column: 1;
+  grid-row: 1;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
@@ -9107,12 +9117,14 @@ h2 {
 }
 
 .handoff-export-format-main span,
+.handoff-export-format-priority,
 .handoff-export-format-metrics span {
   display: grid;
   gap: 2px;
 }
 
 .handoff-export-format-main b,
+.handoff-export-format-priority span,
 .handoff-export-format-metrics b {
   color: rgba(244, 239, 231, 0.58);
   font-size: 9px;
@@ -9121,12 +9133,14 @@ h2 {
 }
 
 .handoff-export-format-main strong,
+.handoff-export-format-priority strong,
 .handoff-export-format-metrics strong {
   color: #f4efe7;
   font-size: 11px;
 }
 
 .handoff-export-format-main small,
+.handoff-export-format-priority small,
 .handoff-export-format-metrics small {
   color: rgba(244, 239, 231, 0.6);
   font-size: 9px;
@@ -9151,7 +9165,36 @@ h2 {
   border-color: rgba(255, 122, 79, 0.32);
 }
 
+.handoff-export-format-priority {
+  grid-column: 1;
+  grid-row: 2;
+  border-color: rgba(130, 215, 255, 0.16);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.handoff-export-format-priority.good {
+  border-color: rgba(120, 240, 200, 0.18);
+  background: rgba(120, 240, 200, 0.035);
+}
+
+.handoff-export-format-priority.warn {
+  border-color: rgba(240, 195, 106, 0.22);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.handoff-export-format-priority.danger {
+  border-color: rgba(255, 122, 79, 0.26);
+  background: rgba(255, 122, 79, 0.05);
+}
+
+.handoff-export-format-priority span {
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
 .handoff-export-format-metrics {
+  grid-column: 2;
+  grid-row: 1 / 3;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
@@ -23211,6 +23254,15 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 
+  .handoff-export-format-main,
+  .handoff-export-format-priority,
+  .handoff-export-format-metrics,
+  .handoff-export-format-result {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .handoff-export-format-priority,
   .handoff-export-format-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -24387,8 +24439,12 @@ input[type="range"] {
   .handoff-manifest-audit,
   .handoff-manifest-audit-checks,
   .handoff-export-format,
+  .handoff-export-format-main,
+  .handoff-export-format-priority,
   .handoff-export-format-metrics,
   .handoff-export-format-result {
+    grid-column: 1;
+    grid-row: auto;
     grid-template-columns: 1fr;
   }
 
