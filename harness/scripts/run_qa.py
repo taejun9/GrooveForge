@@ -1594,6 +1594,8 @@ TEXT_EXPECTATIONS = {
         "it must not change Arrangement Template definitions, apply routing, Quick Actions execution, playback, render/export, project schema, save/load, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.",
         "Arrangement Arc Command Reference work must mark Arrangement Arc as `Quick Actions / Readout` only when it reflects existing Arrangement Arc Preview, Preview Decision Readout, Priority Readout, current/direct Arrangement Arc commands, and Arrangement Arc Result feedback",
         "it must not change Arrangement Arc definitions, apply routing, Quick Actions execution, playback, render/export, project schema, save/load, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.",
+        "Arrangement Focus Command Reference work must mark Arrangement Focus as `Quick Actions / Readout` only when it reflects existing Arrangement Focus Preview, Preview Decision Readout, Priority Readout, current/direct Arrangement Focus commands, and Arrangement Focus Result feedback",
+        "it must not change Arrangement Focus definitions, apply routing, Quick Actions execution, playback, render/export, project schema, save/load, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.",
         "Pattern Chain work must replace only arrangement blocks with deterministic Pattern A/B/C sequences",
         "Quick Actions Pattern Chain work must expose every `patternChainIds` preset as an explicit command-palette action routed only through the existing `applyPatternChain` handler",
         "expose any Quick Actions Pattern Chain Decision command target only through the existing Pattern Chain apply or Chain Expand handlers",

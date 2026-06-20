@@ -268,7 +268,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "chain-expand", command: "Chain Expand", shortcut: "Quick Actions / Readout", target: "16-bar outline" },
       { id: "arrangement-template", command: "Arrangement Template", shortcut: "Quick Actions / Readout", target: "Song form" },
       { id: "arrangement-arc", command: "Arrangement Arc", shortcut: "Quick Actions / Readout", target: "Energy shape" },
-      { id: "arrangement-focus", command: "Arrangement Focus", shortcut: "Quick Actions", target: "Selected block" },
+      { id: "arrangement-focus", command: "Arrangement Focus", shortcut: "Quick Actions / Readout", target: "Selected block" },
       { id: "arrangement-move", command: "Arrangement Move", shortcut: "Quick Actions", target: "Drop / build / hook lift" },
       { id: "section-locator", command: "Section Locator", shortcut: "Quick Actions", target: "Intro / verse / hook" },
       { id: "song-form-overview", command: "Song Form Overview", shortcut: "Quick Actions / Readout", target: "Sections / patterns" },
