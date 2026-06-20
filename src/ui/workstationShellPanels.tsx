@@ -277,6 +277,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
     items: [
       { id: "stem-audition-readout", command: "Stem Audition Readout", shortcut: "Readout", target: "Full Mix / stems" },
       { id: "stem-audition", command: "Stem Audition", shortcut: "Quick Actions", target: "Full Mix / Drums / 808 / Synth / Chords" },
+      { id: "mix-balance-decision", command: "Mix Balance Decision", shortcut: "Quick Actions", target: "Suggested rough balance" },
       { id: "mix-balance", command: "Mix Balance", shortcut: "Quick Actions", target: "Rough balance pads" },
       { id: "mix-coach", command: "Mix Coach", shortcut: "Quick Actions", target: "Headroom / balance" }
     ]

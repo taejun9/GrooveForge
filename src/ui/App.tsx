@@ -20008,6 +20008,23 @@ function createQuickActions({
       run: onClearMixSnapshots
     },
     {
+      id: "mix-balance-decision",
+      title: mixBalanceReady ? `Run Mix Balance Decision: Apply ${mixBalancePreviewSummary.padLabel}` : "Run Mix Balance Decision: Aligned",
+      detail: mixBalanceReady
+        ? `${mixBalancePreviewSummary.statusLabel} / ${mixBalancePreviewSummary.channelLabel} / ${mixBalancePreviewSummary.auditionLabel}`
+        : `${mixBalancePreviewSummary.statusLabel} / Current editable mixer already matches this balance.`,
+      group: "Mix",
+      keywords: `Quick Actions Mix Balance Decision preview decision apply suggested rough levels drums 808 bass synth chords stem audition ${
+        mixBalancePreviewSummary.padId
+      } ${mixBalancePreviewSummary.padLabel} ${mixBalanceReady ? "apply-suggested" : "aligned"} beginner producer`,
+      disabled: !mixBalanceReady,
+      run: () => {
+        if (mixBalanceReady) {
+          onApplyMixBalance(mixBalancePreviewSummary.padId);
+        }
+      }
+    },
+    {
       id: "mix-balance",
       title: mixBalanceReady ? `Apply ${mixBalancePreviewSummary.padLabel}` : "Apply Mix Balance",
       detail: mixBalanceReady
@@ -21882,6 +21899,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "mix-balance-decision") {
+    return {
+      id: "mix-balance-decision",
+      label: "Mix Balance Decision",
+      value: `Drums ${mixBalanceChannelPosture(project.mixer, "drum_rack")} / 808 ${mixBalanceChannelPosture(project.mixer, "bass_808")}`
+    };
+  }
+
   if (action.id === "mix-balance" || action.id.startsWith("mix-balance-pad-")) {
     return {
       id: "mix-balance",
@@ -23113,6 +23138,13 @@ function quickActionResultFollowup(
         action.id === "arrangement-arc-decision"
           ? "Return to Arrangement Arc Preview Decision before running another full-song arc move."
           : `${Math.round(arrangementAverageEnergy(project) * 100)}% average energy; scan Song Form Overview before detailed block edits.`
+    };
+  }
+
+  if (action.id === "mix-balance-decision") {
+    return {
+      auditionCue: "Play Full Mix and follow the visible Mix Balance Preview Decision before another rough-balance move.",
+      nextCheck: "Use the Mix Balance Result, Stem Audition Pads, and manual mixer controls for final level, pan, EQ, and send trim."
     };
   }
 
