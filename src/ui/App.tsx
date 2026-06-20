@@ -15223,6 +15223,7 @@ function SongFormOverview({
   summary: SongFormOverviewSummary;
 }): ReactElement {
   const prioritySummary = createSongFormPrioritySummary(summary);
+  const priorityActionDisabled = prioritySummary.targetIndex === null;
 
   return (
     <section className={`song-form-overview ${summary.tone}`} data-testid="song-form-overview" aria-label="Song form overview">
@@ -15245,6 +15246,19 @@ function SongFormOverview({
           <strong data-testid="song-form-priority-metric">{prioritySummary.metricLabel}</strong>
           <small data-testid="song-form-priority-reason">{prioritySummary.reasonLabel}</small>
           <small data-testid="song-form-priority-next-check">{prioritySummary.nextCheckLabel}</small>
+          <button
+            data-testid="song-form-priority-run"
+            disabled={priorityActionDisabled}
+            onClick={() => {
+              if (prioritySummary.targetIndex !== null) {
+                onSelectBlock(prioritySummary.targetIndex);
+              }
+            }}
+            title={prioritySummary.targetIndex === null ? prioritySummary.reasonLabel : `Open ${prioritySummary.targetLabel}`}
+            type="button"
+          >
+            {prioritySummary.targetLabel}
+          </button>
         </div>
         {summary.metrics.map((metric) => (
           <div className={`song-form-metric ${metric.tone}`} data-testid={`song-form-metric-${metric.id}`} key={metric.id}>
@@ -29140,6 +29154,8 @@ function createSongFormPrioritySummary(summary: SongFormOverviewSummary): SongFo
   if (!metric) {
     return {
       metricId: null,
+      targetIndex: null,
+      targetLabel: "No block",
       statusLabel: "Song form priority",
       metricLabel: "No form metric",
       reasonLabel: "No Song Form metrics available",
@@ -29148,14 +29164,40 @@ function createSongFormPrioritySummary(summary: SongFormOverviewSummary): SongFo
     };
   }
 
+  const target = songFormPriorityTargetSegment(summary, metric);
+
   return {
     metricId: metric.id,
+    targetIndex: target?.index ?? null,
+    targetLabel: target ? `Block ${target.index + 1}` : "No block",
     statusLabel: songFormPriorityStatus(metric),
     metricLabel: `${metric.label}: ${metric.value}`,
     reasonLabel: songFormPriorityReason(metric),
     nextCheckLabel: songFormPriorityNextCheck(metric),
     tone: metric.tone
   };
+}
+
+function songFormPriorityTargetSegment(summary: SongFormOverviewSummary, metric: SongFormMetric): SongFormSegment | null {
+  const selected = summary.segments.find((segment) => segment.index === summary.selectedIndex) ?? summary.segments[0] ?? null;
+
+  switch (metric.id) {
+    case "flow":
+      return summary.segments.find((segment) => segment.section === "Hook") ?? selected;
+    case "patterns":
+      return summary.segments.find((segment) => segment.tone !== "good") ?? summary.segments.find((segment) => segment.index !== summary.selectedIndex) ?? selected;
+    case "selected":
+      return selected;
+    case "energy":
+      return (
+        summary.segments.find((segment) => segment.section === "Hook") ??
+        summary.segments.reduce<SongFormSegment | null>(
+          (loudest, segment) => (loudest === null || segment.energy > loudest.energy ? segment : loudest),
+          null
+        ) ??
+        selected
+      );
+  }
 }
 
 function activeSongFormPriorityMetric(summary: SongFormOverviewSummary): SongFormMetric | null {

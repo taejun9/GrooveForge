@@ -2558,6 +2558,8 @@ export type SongFormOverviewSummary = {
 
 export type SongFormPrioritySummary = {
   metricId: SongFormMetricId | null;
+  targetIndex: number | null;
+  targetLabel: string;
   statusLabel: string;
   metricLabel: string;
   reasonLabel: string;
