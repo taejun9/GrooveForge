@@ -20024,6 +20024,23 @@ function createQuickActions({
     },
     ...mixBalancePadActions,
     {
+      id: "space-fx-decision",
+      title: spaceFxReady ? `Run Space FX Decision: Apply ${spaceFxPreviewSummary.padLabel}` : "Run Space FX Decision: Aligned",
+      detail: spaceFxReady
+        ? `${spaceFxPreviewSummary.statusLabel} / ${spaceFxPreviewSummary.sendLabel} / ${spaceFxPreviewSummary.focusLabel}`
+        : `${spaceFxPreviewSummary.statusLabel} / Current editable sends already match this space.`,
+      group: "Mix",
+      keywords: `Quick Actions Space FX Decision preview decision apply suggested space send ambience reverb room wide wash dry ${
+        spaceFxPreviewSummary.padId
+      } ${spaceFxPreviewSummary.padLabel} ${spaceFxReady ? "apply-suggested" : "aligned"} drums 808 synth chords beginner producer`,
+      disabled: !spaceFxReady,
+      run: () => {
+        if (spaceFxReady) {
+          onApplySpaceFx(spaceFxPreviewSummary.padId);
+        }
+      }
+    },
+    {
       id: "space-fx",
       title: spaceFxReady ? `Apply ${spaceFxPreviewSummary.padLabel}` : "Apply Space FX",
       detail: spaceFxReady
@@ -21921,6 +21938,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "space-fx-decision") {
+    return {
+      id: "space-fx-decision",
+      label: "Space FX Decision",
+      value: `D ${spaceFxTrackPosture(project.mixer, "drum_rack")} / 8 ${spaceFxTrackPosture(project.mixer, "bass_808")} / Sy ${spaceFxTrackPosture(project.mixer, "synth")} / Ch ${spaceFxTrackPosture(project.mixer, "chord")}`
+    };
+  }
+
   if (action.id === "space-fx" || action.id.startsWith("space-fx-")) {
     return {
       id: "space-fx",
@@ -23168,6 +23193,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Confirm the downloaded deliverable outside the app, then return to Handoff Pack before exporting the next item.",
       nextCheck: "Use Handoff Export Receipt, Manifest Audit, and Send Order to verify the next WAV, stems, MIDI, or sheet step."
+    };
+  }
+
+  if (action.id === "space-fx-decision") {
+    return {
+      auditionCue: "Play Full Mix and follow the visible Space FX Preview Decision before another shared-send move.",
+      nextCheck: "Use the Space FX Result and manual Space sliders for final dry, room, wide, or wash trim."
     };
   }
 
