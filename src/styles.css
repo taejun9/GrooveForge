@@ -1236,9 +1236,9 @@ h2 {
 
 .mode-focus-heading strong,
 .mode-focus-heading small,
-.mode-focus-decision span,
-.mode-focus-decision strong,
-.mode-focus-decision small,
+.mode-focus-decision > span,
+.mode-focus-decision > strong,
+.mode-focus-decision > small,
 .mode-focus-card span,
 .mode-focus-card strong,
 .mode-focus-card small,
@@ -1268,7 +1268,7 @@ h2 {
 .mode-focus-decision {
   grid-column: 2;
   display: grid;
-  grid-template-columns: minmax(92px, 0.28fr) minmax(132px, 0.32fr) minmax(0, 1fr);
+  grid-template-columns: minmax(92px, 0.28fr) minmax(132px, 0.32fr) minmax(0, 1fr) minmax(120px, auto);
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -1288,21 +1288,68 @@ h2 {
   background: rgba(255, 122, 79, 0.058);
 }
 
-.mode-focus-decision span {
+.mode-focus-decision > span {
   color: rgba(244, 239, 231, 0.58);
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
 }
 
-.mode-focus-decision strong {
+.mode-focus-decision > strong {
   color: #f4efe7;
   font-size: 11px;
 }
 
-.mode-focus-decision small {
+.mode-focus-decision > small {
   color: rgba(244, 239, 231, 0.66);
   font-size: 10px;
+}
+
+.mode-focus-decision-action {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  min-height: 27px;
+  min-width: 0;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 6px;
+  color: rgba(244, 239, 231, 0.76);
+  background: rgba(244, 239, 231, 0.06);
+  padding: 4px 7px;
+}
+
+.mode-focus-decision-action:hover:not(:disabled) {
+  border-color: rgba(120, 240, 200, 0.42);
+  color: #f4efe7;
+  background: rgba(120, 240, 200, 0.12);
+}
+
+.mode-focus-decision-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.mode-focus-decision-action svg {
+  color: #78f0c8;
+}
+
+.mode-focus-decision.warn .mode-focus-decision-action svg {
+  color: #f0c36a;
+}
+
+.mode-focus-decision.danger .mode-focus-decision-action svg {
+  color: #ff7a4f;
+}
+
+.mode-focus-decision-action span {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mode-focus-grid {
@@ -24547,7 +24594,11 @@ input[type="range"] {
   }
 
   .mode-focus-decision {
-    grid-template-columns: minmax(88px, 0.3fr) minmax(116px, 0.34fr) minmax(0, 1fr);
+    grid-template-columns: 1fr;
+  }
+
+  .mode-focus-decision-action {
+    width: 100%;
   }
 
   .mode-focus-result {

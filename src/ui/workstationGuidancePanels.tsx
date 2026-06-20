@@ -295,6 +295,9 @@ export function ModeFocus({
   result: ModeFocusJumpResult | null;
   onFocus: (card: ModeFocusCard) => void;
 }): ReactElement {
+  const activeCard = summary.cards.find((card) => card.id === summary.activeCardId) ?? null;
+  const decisionActionDisabled = activeCard === null;
+
   return (
     <section className={`mode-focus ${summary.tone}`} data-testid="mode-focus" aria-label="Mode focus">
       <div className="mode-focus-heading">
@@ -314,6 +317,22 @@ export function ModeFocus({
         <span data-testid="mode-focus-decision-status">{summary.decisionStatus}</span>
         <strong data-testid="mode-focus-decision-label">{summary.decisionLabel}</strong>
         <small data-testid="mode-focus-decision-detail">{summary.decisionDetail}</small>
+        <button
+          className="mode-focus-decision-action"
+          data-mode-focus-decision-action={activeCard?.id ?? "none"}
+          data-testid="mode-focus-decision-run"
+          disabled={decisionActionDisabled}
+          onClick={() => {
+            if (activeCard) {
+              onFocus(activeCard);
+            }
+          }}
+          title={activeCard ? `Jump to ${activeCard.focusLabel}: ${activeCard.value}` : summary.decisionTitle}
+          type="button"
+        >
+          <ArrowRight size={13} aria-hidden="true" />
+          <span>{summary.decisionLabel}</span>
+        </button>
       </div>
       <div className="mode-focus-grid" data-testid="mode-focus-grid">
         {summary.cards.map((card) => (
