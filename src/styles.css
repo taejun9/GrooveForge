@@ -5980,9 +5980,10 @@ h2 {
 .blueprint-preview-head span,
 .blueprint-preview-head strong,
 .blueprint-preview-head small,
-.blueprint-preview-decision span,
-.blueprint-preview-decision strong,
-.blueprint-preview-decision small,
+.blueprint-preview-decision > span,
+.blueprint-preview-decision > strong,
+.blueprint-preview-decision > small,
+.blueprint-preview-decision-run span,
 .blueprint-preview-cue span,
 .blueprint-preview-cue strong,
 .blueprint-preview-cue small,
@@ -6019,7 +6020,7 @@ h2 {
 .blueprint-preview-decision {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(120px, 0.55fr) minmax(0, 0.9fr) minmax(130px, 0.72fr) minmax(0, 1.35fr) minmax(104px, 0.48fr);
+  grid-template-columns: minmax(120px, 0.55fr) minmax(0, 0.9fr) minmax(130px, 0.72fr) minmax(0, 1.35fr) minmax(118px, auto);
   gap: 7px;
   align-items: center;
   min-width: 0;
@@ -6035,7 +6036,7 @@ h2 {
   background: rgba(120, 240, 200, 0.055);
 }
 
-.blueprint-preview-decision span {
+.blueprint-preview-decision > span {
   color: #061118;
   background: #f0c36a;
   border-radius: 5px;
@@ -6046,18 +6047,49 @@ h2 {
   text-transform: uppercase;
 }
 
-.blueprint-preview-decision.good span {
+.blueprint-preview-decision.good > span {
   background: #78f0c8;
 }
 
-.blueprint-preview-decision strong {
+.blueprint-preview-decision > strong {
   color: #f4efe7;
   font-size: 11px;
 }
 
-.blueprint-preview-decision small {
+.blueprint-preview-decision > small {
   color: rgba(244, 239, 231, 0.62);
   font-size: 10px;
+}
+
+.blueprint-preview-decision-run {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  border: 1px solid rgba(120, 240, 200, 0.26);
+  border-radius: 6px;
+  background: rgba(120, 240, 200, 0.09);
+  color: #f4efe7;
+  padding: 4px 7px;
+}
+
+.blueprint-preview-decision-run:hover {
+  border-color: rgba(120, 240, 200, 0.48);
+  background: rgba(120, 240, 200, 0.15);
+}
+
+.blueprint-preview-decision-run svg {
+  color: #78f0c8;
+}
+
+.blueprint-preview-decision-run span {
+  color: inherit;
+  font-size: 10px;
+  font-weight: 850;
 }
 
 .blueprint-preview-cue {

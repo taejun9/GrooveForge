@@ -10159,6 +10159,8 @@ type BeatBlueprintPreviewDecision = {
   blueprintLabel: string;
   metricLabel: string;
   detailLabel: string;
+  actionId: "apply-preview" | "preview-style-match";
+  actionBlueprintId: BeatBlueprintId;
   actionLabel: string;
   title: string;
   tone: MixCoachTone;
@@ -10197,6 +10199,15 @@ function BeatBlueprints({
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const previewDecision = createBeatBlueprintPreviewDecision(previewSummary, styleMatchSummary, styleMatchPreviewed);
   const previewCue = createBeatBlueprintPreviewCue(previewSummary, styleMatchSummary, styleMatchPreviewed);
+  const previewDecisionApplies = previewDecision.actionId === "apply-preview";
+
+  function runPreviewDecisionAction(): void {
+    if (previewDecisionApplies) {
+      onApply(previewDecision.actionBlueprintId);
+      return;
+    }
+    onPreview(previewDecision.actionBlueprintId);
+  }
 
   return (
     <section className="blueprint-row" data-testid="beat-blueprints" aria-label="Beat blueprints" ref={sectionRef}>
@@ -10255,7 +10266,22 @@ function BeatBlueprints({
           <strong data-testid="beat-blueprint-preview-decision-label">{previewDecision.blueprintLabel}</strong>
           <small data-testid="beat-blueprint-preview-decision-metric">{previewDecision.metricLabel}</small>
           <small data-testid="beat-blueprint-preview-decision-detail">{previewDecision.detailLabel}</small>
-          <small data-testid="beat-blueprint-preview-decision-action">{previewDecision.actionLabel}</small>
+          <button
+            className="blueprint-preview-decision-run"
+            data-blueprint-preview-decision-action={previewDecision.actionId}
+            data-blueprint-preview-decision-target={previewDecision.actionBlueprintId}
+            data-testid="beat-blueprint-preview-decision-run"
+            onClick={runPreviewDecisionAction}
+            title={`Run ${previewDecision.actionLabel}: ${previewDecision.title}`}
+            type="button"
+          >
+            {previewDecisionApplies ? (
+              <ArrowRight size={13} aria-hidden="true" />
+            ) : (
+              <Sparkles size={13} aria-hidden="true" />
+            )}
+            <span data-testid="beat-blueprint-preview-decision-action">{previewDecision.actionLabel}</span>
+          </button>
         </div>
         <div
           className={`blueprint-preview-cue ${previewCue.tone}`}
@@ -10363,12 +10389,16 @@ function createBeatBlueprintPreviewDecision(
   const actionLabel = styleMatchPreviewed
     ? previewSummary.applyLabel
     : `Compare ${styleMatchSummary.name}`;
+  const actionId = styleMatchPreviewed ? "apply-preview" : "preview-style-match";
+  const actionBlueprintId = styleMatchPreviewed ? previewSummary.blueprintId : styleMatchSummary.blueprintId;
 
   return {
     statusLabel,
     blueprintLabel: previewSummary.name,
     metricLabel,
     detailLabel,
+    actionId,
+    actionBlueprintId,
     actionLabel,
     title: `${statusLabel}: ${previewSummary.name} / ${metricLabel} / ${detailLabel} / ${actionLabel}`,
     tone: changedCount === 0 ? "good" : "warn"
