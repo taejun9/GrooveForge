@@ -17141,7 +17141,56 @@ function createQuickActions({
       run: () => onUpdateKeyboardCaptureDefaults({ glide: !activeCaptureDefaults.glide })
     }
   ];
+  const selectedBlockEditPrioritySummary = createSelectedBlockEditPrioritySummary(
+    project,
+    selectedArrangementIndex,
+    arrangementBlockClipboard
+  );
   const selectedBlockActions: QuickAction[] = [
+    {
+      id: "selected-block-priority-edit",
+      title:
+        selectedBlockEditPrioritySummary.actionId === "none"
+          ? "Run Selected Block Priority"
+          : `Run Selected Block Priority: ${selectedBlockEditPrioritySummary.actionLabel}`,
+      detail:
+        selectedBlockEditPrioritySummary.actionId === "none"
+          ? selectedBlockEditPrioritySummary.reasonLabel
+          : `${selectedBlockEditPrioritySummary.statusLabel} / ${selectedBlockEditPrioritySummary.scopeLabel} / ${selectedBlockEditPrioritySummary.impactLabel}`,
+      group: "Arrange",
+      keywords: `selected block priority recommended edit quick action arrangement song form copy paste duplicate split merge move ${selectedBlockEditPrioritySummary.actionId} beginner producer`,
+      disabled: selectedBlockEditPrioritySummary.actionId === "none",
+      run: () => {
+        switch (selectedBlockEditPrioritySummary.actionId) {
+          case "copy":
+            onCopySelectedArrangementBlock();
+            break;
+          case "paste":
+            onPasteArrangementBlockAfterSelected();
+            break;
+          case "duplicate":
+            onDuplicateArrangementBlock();
+            break;
+          case "split":
+            onSplitArrangementBlock();
+            break;
+          case "merge":
+            onMergeArrangementBlock();
+            break;
+          case "move_left":
+            onMoveArrangementBlock(-1);
+            break;
+          case "move_right":
+            onMoveArrangementBlock(1);
+            break;
+          case "delete":
+            onDeleteArrangementBlock();
+            break;
+          case "none":
+            break;
+        }
+      }
+    },
     {
       id: "selected-block-copy",
       title: "Copy selected block",
@@ -19307,7 +19356,9 @@ function createQuickActionResult(
     action.id.startsWith("capture-target-") ||
     action.id.startsWith("capture-step-mode-") ||
     action.id.startsWith("capture-default-");
-  const blockClipboardOnly = action.id === "selected-block-copy";
+  const blockClipboardOnly =
+    action.id === "selected-block-copy" ||
+    (action.id === "selected-block-priority-edit" && action.title.includes("Copy Block"));
   const noteClipboardOnly = action.id === "selected-note-copy";
   const drumClipboardOnly = action.id === "selected-drum-copy";
   const chordClipboardOnly = action.id === "selected-chord-copy";
@@ -21633,6 +21684,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use Paste copied block when the copied section shape should repeat in the arrangement.",
       nextCheck: "The arrangement block clipboard is UI-local; paste explicitly before changing to another editing task."
+    };
+  }
+
+  if (action.id === "selected-block-priority-edit") {
+    return {
+      auditionCue: "Play Song or Block loop after the recommended selected-block edit and compare it against the priority readout.",
+      nextCheck: "Return to Selected Block Edit Priority before running another structure edit."
     };
   }
 
