@@ -11146,6 +11146,7 @@ h2 {
 .topline-space-focus-readout small,
 .topline-space-priority span,
 .topline-space-priority strong,
+.topline-space-priority button,
 .topline-space-priority small,
 .topline-space-result-main strong,
 .topline-space-result-main small,
@@ -11219,7 +11220,7 @@ h2 {
 
 .topline-space-priority {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   align-content: center;
   min-width: 0;
   border: 1px solid rgba(142, 203, 255, 0.24);
@@ -11250,6 +11251,28 @@ h2 {
 .topline-space-priority strong {
   color: #f4efe7;
   font-size: 12px;
+}
+
+.topline-space-priority button {
+  min-height: 30px;
+  border: 1px solid rgba(142, 203, 255, 0.3);
+  border-radius: 5px;
+  background: rgba(142, 203, 255, 0.12);
+  color: #f4efe7;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 5px 7px;
+  text-align: center;
+}
+
+.topline-space-priority.warn button {
+  border-color: rgba(240, 195, 106, 0.34);
+  background: rgba(240, 195, 106, 0.12);
+}
+
+.topline-space-priority.danger button {
+  border-color: rgba(255, 122, 79, 0.34);
+  background: rgba(255, 122, 79, 0.12);
 }
 
 .topline-space-stack {

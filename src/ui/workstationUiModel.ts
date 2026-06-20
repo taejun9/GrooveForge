@@ -2504,6 +2504,7 @@ export type ToplineSpaceFocusSummary = {
 
 export type ToplineSpacePrioritySummary = {
   cardId: ToplineSpaceCardId | null;
+  actionLabel: string;
   statusLabel: string;
   cardLabel: string;
   reasonLabel: string;

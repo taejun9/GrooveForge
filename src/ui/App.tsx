@@ -15069,6 +15069,8 @@ function ToplineSpace({
 }): ReactElement {
   const focusSummary = createToplineSpaceFocusSummary(summary, focusedCardId);
   const prioritySummary = createToplineSpacePrioritySummary(summary);
+  const priorityCard = summary.cards.find((card) => card.id === prioritySummary.cardId) ?? null;
+  const priorityActionDisabled = priorityCard === null;
 
   return (
     <section className={`topline-space ${summary.tone}`} data-testid="topline-space" aria-label="Topline space">
@@ -15100,6 +15102,19 @@ function ToplineSpace({
           <strong data-testid="topline-space-priority-card">{prioritySummary.cardLabel}</strong>
           <small data-testid="topline-space-priority-reason">{prioritySummary.reasonLabel}</small>
           <small data-testid="topline-space-priority-next-check">{prioritySummary.nextCheckLabel}</small>
+          <button
+            data-testid="topline-space-priority-run"
+            disabled={priorityActionDisabled}
+            onClick={() => {
+              if (priorityCard) {
+                onFocus(priorityCard);
+              }
+            }}
+            title={priorityCard ? `Focus ${prioritySummary.cardLabel}` : prioritySummary.reasonLabel}
+            type="button"
+          >
+            {prioritySummary.actionLabel}
+          </button>
         </div>
         {focusResult && <ToplineSpaceFocusResultStrip result={focusResult} />}
         {fixResult && <ToplineFixResultStrip result={fixResult} />}
@@ -28230,6 +28245,7 @@ function createToplineSpacePrioritySummary(summary: ToplineSpaceSummary): Toplin
   if (!card) {
     return {
       cardId: null,
+      actionLabel: "No topline",
       statusLabel: "Topline priority",
       cardLabel: "No topline card",
       reasonLabel: "No Topline Space cards available",
@@ -28240,6 +28256,7 @@ function createToplineSpacePrioritySummary(summary: ToplineSpaceSummary): Toplin
 
   return {
     cardId: card.id,
+    actionLabel: "Focus topline",
     statusLabel: toplineSpacePriorityStatus(card),
     cardLabel: `${card.label}: ${card.value}`,
     reasonLabel: toplineSpacePriorityReason(card),
