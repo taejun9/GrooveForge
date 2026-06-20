@@ -522,6 +522,8 @@ export function LayerStarterPads({
   onApply: (starterId: LayerStarterId) => void;
 }): ReactElement {
   const prioritySummary = createLayerStarterPrioritySummary(options);
+  const priorityOption = options.find((option) => option.id === prioritySummary.optionId) ?? null;
+  const priorityActionDisabled = priorityOption === null;
 
   return (
     <div className="layer-starter-panel" data-testid="layer-starter-pads">
@@ -538,6 +540,19 @@ export function LayerStarterPads({
         <span data-testid="layer-starter-priority-status">{prioritySummary.statusLabel}</span>
         <strong data-testid="layer-starter-priority-label">{prioritySummary.layerLabel}</strong>
         <small data-testid="layer-starter-priority-detail">{prioritySummary.detailLabel}</small>
+        <button
+          data-testid="layer-starter-priority-run"
+          disabled={priorityActionDisabled}
+          onClick={() => {
+            if (priorityOption) {
+              onApply(priorityOption.id);
+            }
+          }}
+          title={priorityOption ? `Start ${priorityOption.label}: ${priorityOption.actionLabel}` : prioritySummary.detailTitle}
+          type="button"
+        >
+          {prioritySummary.actionLabel}
+        </button>
       </div>
       <div className="layer-starter-row" aria-label="Layer Starter Pads">
         {options.map((option) => (
@@ -566,6 +581,7 @@ function createLayerStarterPrioritySummary(options: LayerStarterOption[]): Layer
   if (!option) {
     return {
       optionId: null,
+      actionLabel: "Ready",
       statusLabel: "Layers ready",
       layerLabel: "All starter layers ready",
       detailLabel: "No missing or thin layer in selected Pattern",
@@ -579,6 +595,7 @@ function createLayerStarterPrioritySummary(options: LayerStarterOption[]): Layer
 
   return {
     optionId: option.id,
+    actionLabel: "Start layer",
     statusLabel,
     layerLabel: `${option.label}: ${option.status}`,
     detailLabel,

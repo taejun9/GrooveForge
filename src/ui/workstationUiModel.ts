@@ -1380,6 +1380,7 @@ export type LayerStarterOption = {
 
 export type LayerStarterPrioritySummary = {
   optionId: LayerStarterId | null;
+  actionLabel: string;
   statusLabel: string;
   layerLabel: string;
   detailLabel: string;
