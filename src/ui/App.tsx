@@ -11475,6 +11475,16 @@ function BeatPassportFocusResultStrip({ result }: { result: BeatPassportFocusRes
   );
 }
 
+type ProductionSnapshotPriority = {
+  metricId: ProductionSnapshotMetricId | null;
+  statusLabel: string;
+  areaLabel: string;
+  metricLabel: string;
+  nextCheckLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 function ProductionSnapshot({
   focusedMetricId,
   result,
@@ -11487,6 +11497,7 @@ function ProductionSnapshot({
   summary: ProductionSnapshotSummary;
 }): ReactElement {
   const focusSummary = createProductionSnapshotFocusSummary(summary, focusedMetricId);
+  const priority = createProductionSnapshotPriority(summary);
 
   return (
     <section
@@ -11510,6 +11521,17 @@ function ProductionSnapshot({
         <span data-testid="production-snapshot-focus-status">{focusSummary.statusLabel}</span>
         <strong data-testid="production-snapshot-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="production-snapshot-focus-detail">{focusSummary.detailLabel}</small>
+      </div>
+      <div
+        className={`production-snapshot-priority ${priority.tone}`}
+        data-production-snapshot-priority={priority.metricId ?? "none"}
+        data-testid="production-snapshot-priority"
+        title={priority.title}
+      >
+        <span data-testid="production-snapshot-priority-status">{priority.statusLabel}</span>
+        <strong data-testid="production-snapshot-priority-label">{priority.areaLabel}</strong>
+        <small data-testid="production-snapshot-priority-metric">{priority.metricLabel}</small>
+        <small data-testid="production-snapshot-priority-next-check">{priority.nextCheckLabel}</small>
       </div>
       {result && <ProductionSnapshotFocusResultStrip result={result} />}
       <div className="production-snapshot-grid" data-testid="production-snapshot-grid">
@@ -11542,6 +11564,55 @@ function ProductionSnapshot({
       </div>
     </section>
   );
+}
+
+function createProductionSnapshotPriority(summary: ProductionSnapshotSummary): ProductionSnapshotPriority {
+  const metric =
+    summary.metrics.find((item) => item.tone === "danger") ??
+    summary.metrics.find((item) => item.tone === "warn") ??
+    summary.metrics[0] ??
+    null;
+
+  if (!metric) {
+    return {
+      metricId: null,
+      statusLabel: "Snapshot clear",
+      areaLabel: "No priority lane",
+      metricLabel: "No Production Snapshot metrics available",
+      nextCheckLabel: "Next: return after the session has metrics to scan.",
+      title: "Production Snapshot priority has no available metric.",
+      tone: "warn"
+    };
+  }
+
+  const statusLabel =
+    metric.tone === "danger" ? "Snapshot blocker" : metric.tone === "warn" ? "Snapshot review" : "Snapshot ready";
+  const nextCheckLabel = productionSnapshotPriorityNextCheck(metric);
+
+  return {
+    metricId: metric.id,
+    statusLabel,
+    areaLabel: `${metric.label}: ${metric.value}`,
+    metricLabel: `${metric.focusLabel} priority / ${metric.detail}`,
+    nextCheckLabel,
+    title: `${statusLabel}: ${metric.label}: ${metric.value} / ${metric.detail} / ${nextCheckLabel}`,
+    tone: metric.tone
+  };
+}
+
+function productionSnapshotPriorityNextCheck(metric: ProductionSnapshotMetric): string {
+  switch (metric.id) {
+    case "target":
+      return "Next: confirm target bars and delivery posture.";
+    case "form":
+      return "Next: check section motion before more writing.";
+    case "patterns":
+      return "Next: verify Pattern A/B/C coverage and contrast.";
+    case "mix":
+      return "Next: inspect headroom, balance, and stem posture.";
+    case "handoff":
+      return "Next: confirm stems, export, and brief context.";
+  }
 }
 
 function ProductionSnapshotFocusResultStrip({ result }: { result: ProductionSnapshotFocusResult }): ReactElement {
