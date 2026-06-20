@@ -19427,6 +19427,25 @@ function createQuickActions({
     ...soundFocusPadActions,
     ...soundSnapshotActions,
     {
+      id: "sound-preset-decision",
+      title: soundPresetReady
+        ? `Run Sound Preset Decision: Apply ${soundPresetPreviewSummary.presetLabel}`
+        : "Run Sound Preset Decision: Aligned",
+      detail: soundPresetReady
+        ? `${soundPresetPreviewSummary.statusLabel} / ${soundPresetPreviewSummary.changeLabel} / ${soundPresetPreviewSummary.toneLabel}`
+        : `${soundPresetPreviewSummary.statusLabel} / Current editable sound already matches this preset.`,
+      group: "Create",
+      keywords: `Quick Actions Sound Preset Decision preview decision apply full tone design preset drums 808 bass duck sidechain synth chords ${
+        soundPresetPreviewSummary.presetId
+      } ${soundPresetPreviewSummary.presetLabel} ${soundPresetReady ? "apply-suggested" : "aligned"} beginner producer`,
+      disabled: !soundPresetReady,
+      run: () => {
+        if (soundPresetReady) {
+          onApplySoundPreset(soundPresetPreviewSummary.presetId);
+        }
+      }
+    },
+    {
       id: "sound-preset",
       title: soundPresetReady ? `Apply ${soundPresetPreviewSummary.presetLabel}` : "Apply Sound Preset",
       detail: soundPresetReady
@@ -21488,6 +21507,14 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "sound-preset-decision") {
+    return {
+      id: "sound-preset-decision",
+      label: "Sound Preset Decision",
+      value: `${soundPresetLabel(project.sound.preset)} / ${soundPresetToneLabel(project.sound)}`
+    };
+  }
+
   if (action.id === "sound-preset" || action.id.startsWith("sound-preset-pad-")) {
     return {
       id: "sound-preset",
@@ -22780,6 +22807,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, Synth, and Chords with the new tone posture.`,
       nextCheck: "Use the Sound Focus Result and Studio tone controls for manual kick, 808, Synth, and Chord corrections."
+    };
+  }
+
+  if (action.id === "sound-preset-decision") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; follow the visible Sound Preset Preview Decision before another full-tone move.`,
+      nextCheck: "Use the Sound Preset Result, then trim with Drum Kit, Sound Focus, or Studio tone controls."
     };
   }
 
