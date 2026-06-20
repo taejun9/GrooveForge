@@ -255,7 +255,7 @@ h2 {
 .space-fx-row button span,
 .stem-audition-heading span,
 .stem-audition-row button span,
-.stem-audition-decision span,
+.stem-audition-decision > span,
 .mix-coach-priority span,
 .master-finish-heading span,
 .master-finish-row button span,
@@ -22269,7 +22269,7 @@ input[type="range"] {
 
 .stem-audition-decision {
   display: grid;
-  grid-template-columns: minmax(98px, 0.36fr) minmax(0, 0.72fr) minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(98px, 0.34fr) minmax(0, 0.7fr) minmax(0, 1.05fr) minmax(0, 0.95fr) minmax(112px, auto);
   align-items: center;
   gap: 8px;
   min-height: 38px;
@@ -22301,15 +22301,63 @@ input[type="range"] {
   white-space: nowrap;
 }
 
-.stem-audition-decision span,
-.stem-audition-decision small {
+.stem-audition-decision > span,
+.stem-audition-decision > small {
   color: rgba(244, 239, 231, 0.62);
   font-size: 11px;
 }
 
-.stem-audition-decision strong {
+.stem-audition-decision > strong {
   color: #f4efe7;
   font-size: 12px;
+}
+
+.stem-audition-decision-action {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 27px;
+  min-width: 0;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 6px;
+  color: rgba(244, 239, 231, 0.76);
+  background: rgba(244, 239, 231, 0.06);
+  padding: 4px 7px;
+}
+
+.stem-audition-decision-action:hover:not(:disabled) {
+  border-color: rgba(130, 215, 255, 0.46);
+  color: #f4efe7;
+  background: rgba(130, 215, 255, 0.13);
+}
+
+.stem-audition-decision-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.stem-audition-decision-action svg {
+  color: #82d7ff;
+}
+
+.stem-audition-decision.warn .stem-audition-decision-action svg {
+  color: #f0c36a;
+}
+
+.stem-audition-decision.danger .stem-audition-decision-action svg {
+  color: #ff7a4f;
+}
+
+.stem-audition-decision-action span {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mix-snapshot-ab {

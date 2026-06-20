@@ -9478,6 +9478,26 @@ export function App(): ReactElement {
             <strong data-testid="stem-audition-decision-target">{stemAuditionDecision.targetLabel}</strong>
             <small data-testid="stem-audition-decision-detail">{stemAuditionDecision.detailLabel}</small>
             <small data-testid="stem-audition-decision-next-check">{stemAuditionDecision.nextCheckLabel}</small>
+            <button
+              className="stem-audition-decision-action"
+              data-stem-audition-decision-action={stemAuditionDecision.targetId ?? "none"}
+              data-testid="stem-audition-decision-run"
+              disabled={stemAuditionDecision.targetId === null}
+              onClick={() => {
+                if (stemAuditionDecision.targetId) {
+                  applyStemAuditionPad(stemAuditionDecision.targetId);
+                }
+              }}
+              title={
+                stemAuditionDecision.targetId
+                  ? `Run ${stemAuditionDecision.targetLabel}: ${stemAuditionDecision.nextCheckLabel}`
+                  : stemAuditionDecision.detailTitle
+              }
+              type="button"
+            >
+              <Play size={13} aria-hidden="true" />
+              <span>{stemAuditionDecision.targetLabel}</span>
+            </button>
           </div>
           <MixSnapshotAB
             snapshots={mixSnapshots}
