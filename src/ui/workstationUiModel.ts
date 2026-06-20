@@ -721,11 +721,25 @@ export type SoundFocusPadOption = SoundFocusPadDefinition & {
 
 export type SoundFocusPreviewSummary = {
   padId: SoundFocusPadId;
+  changedMoves: number;
   statusLabel: string;
   padLabel: string;
   focusLabel: string;
   parameterLabel: string;
   changeLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export type SoundFocusPreviewDecisionSummary = {
+  padId: SoundFocusPadId;
+  actionId: "apply-suggested" | "aligned";
+  statusLabel: string;
+  padLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  actionLabel: string;
+  disabled: boolean;
   detailTitle: string;
   tone: MixCoachTone;
 };

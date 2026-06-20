@@ -17962,7 +17962,7 @@ function createQuickActions({
       }
     };
   });
-  const soundFocusReady = soundFocusPreviewSummary.statusLabel !== "Sound aligned";
+  const soundFocusReady = soundFocusPreviewSummary.changedMoves > 0;
   const soundPresetReady = soundPresetPreviewSummary.statusLabel !== "Preset aligned";
   const directDrumKitPadOptions = createDrumKitPadOptions(project);
   const directSoundFocusPadOptions = createSoundFocusPadOptions(project.sound);
@@ -34000,6 +34000,7 @@ function createSoundFocusPreviewSummary(sound: SoundDesign, pads: SoundFocusPadO
   if (!pad) {
     return {
       padId: "punch",
+      changedMoves: 0,
       statusLabel: "Sound aligned",
       padLabel: "Punch focus",
       focusLabel: "No focus target",
@@ -34017,6 +34018,7 @@ function createSoundFocusPreviewSummary(sound: SoundDesign, pads: SoundFocusPadO
 
   return {
     padId: pad.id,
+    changedMoves: pad.changedCount,
     statusLabel: pad.changedCount === 0 ? "Sound aligned" : "Suggested focus",
     padLabel: `${pad.label} focus`,
     focusLabel: `${pad.detail} tone posture`,

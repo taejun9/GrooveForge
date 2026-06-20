@@ -3,7 +3,7 @@ import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { BassNote, ChordEvent, ChordProgressionPreset, ChordQuality, DrumLane, MelodyNote, NoteTrack, PatternSlot, PatternVariationPreset, ProjectState, SoundDesign } from "../domain/workstation";
 import { chordInversions, chordInversionLabel, chordProgressionPresetIds, chordProgressionPresetLabel, chordQualities, drumStepProbability, drumStepTimingMs, drumStepVelocity, hatRepeatCount, maxDrumTimingMs, minDrumTimingMs, normalizeChordInversion, normalizeDrumProbability, normalizeDrumTimingMs, normalizeDrumVelocity, normalizeEventProbability, normalizeHatRepeat, scalePitchNames, soundPresetDesign, soundPresetIds, soundPresetLabel, steps } from "../domain/workstation";
-import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewDecisionSummary, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneSuggestionSummary, PatternCloneResult, PatternFillPreviewSummary, PatternFillSuggestionSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationSuggestionSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewDecisionSummary, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundSnapshot, SoundSnapshotComparisonSummary, SoundSnapshotSlotId, SoundSnapshotSlotMap, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
+import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewDecisionSummary, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneSuggestionSummary, PatternCloneResult, PatternFillPreviewSummary, PatternFillSuggestionSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationSuggestionSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewDecisionSummary, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewDecisionSummary, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundSnapshot, SoundSnapshotComparisonSummary, SoundSnapshotSlotId, SoundSnapshotSlotMap, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
 import { drumLabels, keyboardCaptureKeyLabels } from "./workstationUiModel";
 import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyChordStep, percentLabel, pitchParts, timingLabel, trackOctaveRange } from "./workstationPatternTools";
 
@@ -2264,6 +2264,8 @@ export function SoundFocusPads({
   result: SoundFocusResult | null;
   onApply: (pad: SoundFocusPadId) => void;
 }): ReactElement {
+  const decision = createSoundFocusPreviewDecision(preview);
+
   return (
     <div className="sound-focus-panel" data-testid="sound-focus-pads">
       <div className="sound-focus-heading">
@@ -2282,6 +2284,7 @@ export function SoundFocusPads({
         <small data-testid="sound-focus-preview-parameters">{preview.parameterLabel}</small>
         <small data-testid="sound-focus-preview-changes">{preview.changeLabel}</small>
       </div>
+      <SoundFocusPreviewDecision summary={decision} onApply={() => onApply(decision.padId)} />
       {result && <SoundFocusResultStrip result={result} />}
       <div className="sound-focus-row" aria-label="Sound Focus Pads">
         {pads.map((pad) => (
@@ -2300,6 +2303,59 @@ export function SoundFocusPads({
       </div>
     </div>
   );
+}
+
+export function SoundFocusPreviewDecision({
+  summary,
+  onApply
+}: {
+  summary: SoundFocusPreviewDecisionSummary;
+  onApply: () => void;
+}): ReactElement {
+  return (
+    <div
+      className={`sound-focus-decision ${summary.tone}`}
+      data-sound-focus-decision={summary.padId}
+      data-testid="sound-focus-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="sound-focus-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="sound-focus-decision-label">{summary.padLabel}</strong>
+      <small data-testid="sound-focus-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="sound-focus-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="sound-focus-decision-run"
+        data-sound-focus-decision-action={summary.actionId}
+        data-testid="sound-focus-decision-run"
+        disabled={summary.disabled}
+        onClick={onApply}
+        title={summary.disabled ? "Current sound already matches this focus" : `Apply ${summary.padLabel}`}
+        type="button"
+      >
+        <SlidersHorizontal size={12} aria-hidden="true" />
+        <span data-testid="sound-focus-decision-action">{summary.actionLabel}</span>
+      </button>
+    </div>
+  );
+}
+
+function createSoundFocusPreviewDecision(summary: SoundFocusPreviewSummary): SoundFocusPreviewDecisionSummary {
+  const aligned = summary.changedMoves === 0;
+
+  return {
+    padId: summary.padId,
+    actionId: aligned ? "aligned" : "apply-suggested",
+    statusLabel: aligned ? "Focus aligned" : "Ready to apply",
+    padLabel: summary.padLabel,
+    metricLabel: summary.changeLabel,
+    detailLabel: aligned ? "Current editable tone already matches this focus." : `${summary.focusLabel} / ${summary.parameterLabel}`,
+    actionLabel: aligned ? "Aligned" : "Apply Suggested Focus",
+    disabled: aligned,
+    detailTitle: aligned
+      ? `${summary.detailTitle} No Sound Focus action is needed.`
+      : `${summary.detailTitle} Apply only after this focused tone posture fits the beat.`,
+    tone: aligned ? "good" : summary.tone
+  };
 }
 
 export function SoundFocusResultStrip({ result }: { result: SoundFocusResult }): ReactElement {
