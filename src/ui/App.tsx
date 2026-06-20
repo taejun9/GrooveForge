@@ -7799,6 +7799,7 @@ export function App(): ReactElement {
     arrangementTransitionLoopTarget,
     arrangementTemplatePreviewSummary,
     bassMovePreviewSummary,
+    beatMapActions,
     beatReadinessChecks,
     canRedo,
     canUndo,
@@ -7881,6 +7882,7 @@ export function App(): ReactElement {
     stemAnalyses,
     stemAuditionDecision,
     stemAuditionPadOptions,
+    structureLensActions,
     styleInspectorSummary,
     beatBlueprintPreviewId,
     transportLoopScope,
@@ -8028,6 +8030,7 @@ export function App(): ReactElement {
     onFocusBeatReadiness: focusBeatReadinessCheck,
     onFocusComposerGuide: focusComposerGuideCard,
     onRunComposerAction: runComposerAction,
+    onRunNextMove: runNextMove,
     onFocusExportPreflight: focusExportPreflightCard,
     onFocusFinishChecklist: focusFinishChecklistCard,
     onFocusGrooveCompass: focusGrooveCompassItem,
@@ -16844,6 +16847,7 @@ function createQuickActions({
   arrangementTransitionLoopTarget,
   arrangementTemplatePreviewSummary,
   bassMovePreviewSummary,
+  beatMapActions,
   beatReadinessChecks,
   beatPassportSummary,
   beatSpineSummary,
@@ -16926,6 +16930,7 @@ function createQuickActions({
   stemAnalyses,
   stemAuditionDecision,
   stemAuditionPadOptions,
+  structureLensActions,
   styleInspectorSummary,
   beatBlueprintPreviewId,
   transportLoopScope,
@@ -17072,6 +17077,7 @@ function createQuickActions({
   onFocusBeatReadiness,
   onFocusComposerGuide,
   onRunComposerAction,
+  onRunNextMove,
   onFocusExportPreflight,
   onFocusFinishChecklist,
   onFocusGrooveCompass,
@@ -17112,6 +17118,7 @@ function createQuickActions({
   arrangementTransitionLoopTarget: ArrangementTransitionLoopTarget | null;
   arrangementTemplatePreviewSummary: ArrangementTemplatePreviewSummary;
   bassMovePreviewSummary: BassMovePreviewSummary;
+  beatMapActions: NextMoveAction[];
   beatReadinessChecks: BeatReadinessCheck[];
   beatPassportSummary: BeatPassportSummary;
   beatSpineSummary: BeatSpineSummary;
@@ -17194,6 +17201,7 @@ function createQuickActions({
   stemAnalyses: StemExportAnalyses;
   stemAuditionDecision: StemAuditionDecisionSummary;
   stemAuditionPadOptions: StemAuditionPadOption[];
+  structureLensActions: NextMoveAction[];
   styleInspectorSummary: StyleInspectorSummary;
   beatBlueprintPreviewId: BeatBlueprintId;
   transportLoopScope: TransportLoopScope;
@@ -17340,6 +17348,7 @@ function createQuickActions({
   onFocusBeatReadiness: (check: BeatReadinessCheck) => void;
   onFocusComposerGuide: (card: ComposerGuideCard) => void;
   onRunComposerAction: (action: ComposerAction) => void;
+  onRunNextMove: (action: NextMoveAction) => void;
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
   onFocusFinishChecklist: (card: FinishChecklistCard) => void;
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
@@ -17495,6 +17504,12 @@ function createQuickActions({
     disabled: !audibleArrangementFollowBlock,
     run: onFollowAudibleArrangementBlock
   };
+  const beatMapCommandActions = createNextMoveSourceQuickActions("beat-map", beatMapActions, onRunNextMove);
+  const structureLensCommandActions = createNextMoveSourceQuickActions(
+    "structure-lens",
+    structureLensActions,
+    onRunNextMove
+  );
   const songFormPrioritySummary = createSongFormPrioritySummary(songFormOverviewSummary);
   const songFormPriorityAction: QuickAction = {
     id: "song-form-priority",
@@ -19118,6 +19133,7 @@ function createQuickActions({
         }
       }
     },
+    ...beatMapCommandActions,
     {
       id: "beat-terms-reference",
       title: "Beat Terms Reference",
@@ -19817,6 +19833,7 @@ function createQuickActions({
     },
     ...arrangementBlockJumpActions,
     songFormPriorityAction,
+    ...structureLensCommandActions,
     audibleArrangementFollowAction,
     ...selectedBlockActions,
     ...patternUseActions,
@@ -20465,6 +20482,65 @@ function createQuickActions({
   ];
 }
 
+type NextMoveQuickActionSource = "beat-map" | "structure-lens";
+
+function createNextMoveSourceQuickActions(
+  source: NextMoveQuickActionSource,
+  actions: NextMoveAction[],
+  onRunNextMove: (action: NextMoveAction) => void
+): QuickAction[] {
+  const sourceLabel = nextMoveQuickActionSourceLabel(source);
+  const sourceGroup = source === "beat-map" ? "Project" : "Arrange";
+
+  return actions.map((action) => ({
+    id: nextMoveSourceQuickActionId(source, action.id),
+    title: `${sourceLabel}: ${action.buttonLabel}`,
+    detail: `${action.title} / ${action.detail}`,
+    group: sourceGroup,
+    keywords: `${sourceLabel} quick action workflow overview structure lens beat map next move ${action.id} ${action.buttonLabel} ${action.title} ${action.detail} ${action.command.kind} beginner producer direct beat composition`,
+    run: () => onRunNextMove(action)
+  }));
+}
+
+function nextMoveSourceQuickActionId(source: NextMoveQuickActionSource, actionId: string): string {
+  return `${source}-action-${actionId}`;
+}
+
+function nextMoveQuickActionSourceLabel(source: NextMoveQuickActionSource): string {
+  return source === "beat-map" ? "Beat Map" : "Structure Lens";
+}
+
+function nextMoveQuickActionSource(actionId: string): NextMoveQuickActionSource | null {
+  if (actionId.startsWith("beat-map-action-")) {
+    return "beat-map";
+  }
+  if (actionId.startsWith("structure-lens-action-")) {
+    return "structure-lens";
+  }
+  return null;
+}
+
+function nextMoveQuickActionTargetId(actionId: string, source: NextMoveQuickActionSource): string {
+  return actionId.slice(`${source}-action-`.length);
+}
+
+function nextMoveQuickActionForProject(project: ProjectState, action: QuickAction): NextMoveAction | null {
+  const source = nextMoveQuickActionSource(action.id);
+  if (!source) {
+    return null;
+  }
+
+  const targetId = nextMoveQuickActionTargetId(action.id, source);
+  if (source === "structure-lens") {
+    return createStructureLensActions(project).find((candidate) => candidate.id === targetId) ?? null;
+  }
+
+  const analysis = analyzeExport(project);
+  const stemState = analyzeStemExports(project);
+  const checks = createBeatReadinessChecks(project, analysis);
+  return createBeatMapActions(project, checks, analysis, stemState).find((candidate) => candidate.id === targetId) ?? null;
+}
+
 function composerActionQuickActionGroup(action: ComposerAction): string {
   if (action.area === "arrange") {
     return "Arrange";
@@ -20704,6 +20780,8 @@ function createQuickActionResult(
 ): QuickActionResult {
   const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action);
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
+  const nextMoveQuickAction = nextMoveQuickActionForProject(afterProject, action);
+  const nextMoveQuickActionOnly = nextMoveQuickAction !== null;
   const blueprintPreviewCueOnly = action.id === "blueprint-preview-cue";
   const blueprintPreviewDecisionOnly = action.id === "blueprint-preview-decision";
   const previewOnly = action.id.startsWith("blueprint-preview-") && !blueprintPreviewCueOnly && !blueprintPreviewDecisionOnly;
@@ -20833,6 +20911,10 @@ function createQuickActionResult(
         ? "danger"
         : previewOnly || blueprintPreviewDecisionOnly || cueOnly || focusOnly || uiLocal || exportOnly
           ? "good"
+          : nextMoveQuickActionOnly
+            ? changed
+              ? "good"
+              : nextMoveQuickAction.tone
           : changed
             ? "good"
             : "warn"
@@ -20855,6 +20937,10 @@ function createQuickActionResult(
             ? "Cued"
             : focusOnly
             ? "Focused"
+            : nextMoveQuickActionOnly
+              ? changed
+                ? "Applied"
+                : "Checked"
             : auditionOnly
               ? "Auditioned"
             : blockClipboardOnly || noteClipboardOnly || drumClipboardOnly || chordClipboardOnly
@@ -20890,6 +20976,10 @@ function createQuickActionResult(
         ? "danger"
         : previewOnly || blueprintPreviewDecisionOnly || cueOnly || focusOnly || uiLocal || exportOnly
           ? "good"
+          : nextMoveQuickActionOnly
+            ? changed
+              ? "good"
+              : nextMoveQuickAction.tone
           : changed
             ? "good"
             : "warn"
@@ -21090,6 +21180,17 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "guide-quick-start") {
     return { id: "guide-quick-start", label: "Guide quick start", value: action.detail };
+  }
+
+  const nextMoveAction = nextMoveQuickActionForProject(project, action);
+  if (nextMoveAction) {
+    const source = nextMoveQuickActionSource(action.id);
+    const metric = nextMoveResultMetricSnapshot(project, nextMoveAction);
+    return {
+      id: `${source ?? "next-move"}-${metric.id}`,
+      label: `${source ? nextMoveQuickActionSourceLabel(source) : "Next Move"} ${metric.label}`,
+      value: metric.value
+    };
   }
 
   if (action.id === "restore-local-draft" || action.id === "clear-local-draft") {
@@ -22315,6 +22416,11 @@ function quickActionResultFollowup(
   const analysis = analyzeExport(project);
   const target = activeDeliveryTarget(project);
   const pattern = activePattern(project);
+
+  const nextMoveAction = nextMoveQuickActionForProject(project, action);
+  if (nextMoveAction) {
+    return nextMoveResultFollowup(nextMoveAction, project);
+  }
 
   if (action.id === "blueprint-preview-cue") {
     return {

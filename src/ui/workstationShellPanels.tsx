@@ -209,6 +209,8 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "review-queue", command: "Review Queue", shortcut: "Quick Actions", target: "Issues / focus / fixes" },
       { id: "workflow-navigator", command: "Workflow Navigator", shortcut: "Quick Actions", target: "Stage jumps" },
       { id: "workflow-spotlight", command: "Workflow Spotlight", shortcut: "Readout", target: "Current command target" },
+      { id: "beat-map", command: "Beat Map", shortcut: "Quick Actions", target: "Workflow / producer metrics" },
+      { id: "structure-lens", command: "Structure Lens", shortcut: "Quick Actions", target: "Arrangement shape actions" },
       { id: "next-move", command: "Next Move", shortcut: "Quick Actions", target: "One explicit next step" }
     ]
   },
