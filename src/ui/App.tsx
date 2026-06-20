@@ -20072,6 +20072,29 @@ function createQuickActions({
       }
     })),
     {
+      id: "master-automation-decision",
+      title:
+        masterAutomationReady && masterAutomationSuggestedPad
+          ? `Run Master Automation Decision: Apply ${masterAutomationPreviewSummary.padLabel}`
+          : "Run Master Automation Decision: Aligned",
+      detail:
+        masterAutomationReady && masterAutomationSuggestedPad
+          ? `${masterAutomationPreviewSummary.statusLabel} / ${masterAutomationPreviewSummary.eventLabel} / ${masterAutomationPreviewSummary.rangeLabel}`
+          : `${masterAutomationPreviewSummary.statusLabel} / Current editable automation already matches this fade.`,
+      group: "Mix",
+      keywords: `Quick Actions Master Automation Decision preview decision apply suggested fade lane fade in fade out intro outro realtime export wav stems ${
+        masterAutomationPreviewSummary.padId
+      } ${masterAutomationPreviewSummary.padLabel} ${
+        masterAutomationReady && masterAutomationSuggestedPad ? "apply-suggested" : "aligned"
+      } beginner producer`,
+      disabled: !masterAutomationReady || !masterAutomationSuggestedPad,
+      run: () => {
+        if (masterAutomationReady && masterAutomationSuggestedPad) {
+          onApplyMasterAutomation(masterAutomationPreviewSummary.padId);
+        }
+      }
+    },
+    {
       id: "master-automation",
       title:
         masterAutomationReady && masterAutomationSuggestedPad
@@ -21957,6 +21980,14 @@ function quickActionResultMetricSnapshot(
   }
 
   const masterAutomationPad = masterAutomationQuickActionPad(action.id);
+  if (action.id === "master-automation-decision") {
+    return {
+      id: "master-automation-decision",
+      label: "Master Automation Decision",
+      value: masterAutomationQuickActionPosture(project)
+    };
+  }
+
   if (action.id === "master-automation" || masterAutomationPad) {
     return {
       id: masterAutomationPad ? `master-automation-${masterAutomationPad.id}` : "master-automation",
@@ -23188,6 +23219,13 @@ function quickActionResultFollowup(
   }
 
   const masterAutomationPad = masterAutomationQuickActionPad(action.id);
+  if (action.id === "master-automation-decision") {
+    return {
+      auditionCue: "Play Song and follow the visible Master Automation Preview Decision before another fade-lane move.",
+      nextCheck: "Export WAV/stems after the fade feels right to confirm realtime and render behavior match."
+    };
+  }
+
   if (action.id === "master-automation" || masterAutomationPad) {
     return {
       auditionCue: masterAutomationPad
