@@ -20131,6 +20131,25 @@ function createQuickActions({
       run: () => onApplyMixFix("low_end")
     },
     {
+      id: "master-finish-decision",
+      title: masterFinishReady
+        ? `Run Master Finish Decision: Apply ${masterFinishPreviewSummary.padLabel}`
+        : "Run Master Finish Decision: Aligned",
+      detail: masterFinishReady
+        ? `${masterFinishPreviewSummary.statusLabel} / ${masterFinishPreviewSummary.presetLabel} / ${masterFinishPreviewSummary.outputLabel}`
+        : `${masterFinishPreviewSummary.statusLabel} / Current editable master already matches this finish.`,
+      group: "Mix",
+      keywords: `Quick Actions Master Finish Decision preview decision apply suggested finish output ceiling demo vocal store club ${
+        masterFinishPreviewSummary.padId
+      } ${masterFinishPreviewSummary.padLabel} ${masterFinishReady ? "apply-suggested" : "aligned"} beginner producer`,
+      disabled: !masterFinishReady,
+      run: () => {
+        if (masterFinishReady) {
+          onApplyMasterFinish(masterFinishPreviewSummary.padId);
+        }
+      }
+    },
+    {
       id: "master-finish",
       title: masterFinishReady ? `Apply ${masterFinishPreviewSummary.padLabel}` : "Apply Master Finish",
       detail: masterFinishReady
@@ -21920,6 +21939,14 @@ function quickActionResultMetricSnapshot(
   }
 
   const masterFinishPad = masterFinishQuickActionPad(action.id);
+  if (action.id === "master-finish-decision") {
+    return {
+      id: "master-finish-decision",
+      label: "Master Finish Decision",
+      value: masterFinishQuickActionPosture(project)
+    };
+  }
+
   if (action.id === "master-finish" || masterFinishPad) {
     const label = masterFinishPad ? `${masterFinishPad.label} Master Finish` : "Master Finish";
     return {
@@ -23146,6 +23173,13 @@ function quickActionResultFollowup(
   }
 
   const masterFinishPad = masterFinishQuickActionPad(action.id);
+  if (action.id === "master-finish-decision") {
+    return {
+      auditionCue: "Play Full Mix and follow the visible Master Finish Preview Decision before another output posture move.",
+      nextCheck: "Use Ceiling and master output controls for manual trim before WAV/stem export."
+    };
+  }
+
   if (action.id === "master-finish" || masterFinishPad) {
     return {
       auditionCue: "Play Full Mix; watch Export meter headroom and limiter.",
