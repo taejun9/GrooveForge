@@ -6962,6 +6962,15 @@ export function App(): ReactElement {
     setBeatBlueprintPreviewId(blueprintId);
   }
 
+  function cueBeatBlueprintPreview(scope: Extract<TransportLoopScope, "arrangement" | "pattern">): void {
+    if (isPlaying) {
+      setProjectStatus("Stop playback before cueing Beat Blueprint preview");
+      return;
+    }
+    selectTransportLoopScope(scope, false);
+    setProjectStatus(`Beat Blueprint preview cued as ${transportLoopLabel(scope)} loop`);
+  }
+
   function focusBeatBlueprintsPanel(): void {
     beatBlueprintPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
   }
@@ -8391,11 +8400,14 @@ export function App(): ReactElement {
       <ComposerActions summary={composerActionsSummary} result={composerActionResult} onRun={runComposerAction} />
 
       <BeatBlueprints
+        isPlaying={isPlaying}
         onApply={applySelectedBeatBlueprint}
+        onCuePreview={cueBeatBlueprintPreview}
         onPreview={setBeatBlueprintPreviewId}
         previewBlueprintId={beatBlueprintPreviewId}
         project={project}
         result={beatBlueprintResult}
+        transportLoopScope={transportLoopScope}
         sectionRef={beatBlueprintPanelRef}
       />
 
@@ -10171,23 +10183,32 @@ type BeatBlueprintPreviewCue = {
   cueLabel: string;
   detailLabel: string;
   nextCheckLabel: string;
+  actionId: "cue-song" | "cue-pattern";
+  actionLoopScope: Extract<TransportLoopScope, "arrangement" | "pattern">;
+  actionLabel: string;
   title: string;
   tone: MixCoachTone;
 };
 
 function BeatBlueprints({
+  isPlaying,
   onApply,
+  onCuePreview,
   onPreview,
   previewBlueprintId,
   project,
   result,
+  transportLoopScope,
   sectionRef
 }: {
+  isPlaying: boolean;
   onApply: (blueprintId: BeatBlueprintId) => void;
+  onCuePreview: (scope: Extract<TransportLoopScope, "arrangement" | "pattern">) => void;
   onPreview: (blueprintId: BeatBlueprintId) => void;
   previewBlueprintId: BeatBlueprintId;
   project: ProjectState;
   result: BeatBlueprintResult | null;
+  transportLoopScope: TransportLoopScope;
   sectionRef?: Ref<HTMLElement>;
 }): ReactElement {
   const previewBlueprint = beatBlueprints.find((blueprint) => blueprint.id === previewBlueprintId) ?? beatBlueprints[0];
@@ -10200,6 +10221,7 @@ function BeatBlueprints({
   const previewDecision = createBeatBlueprintPreviewDecision(previewSummary, styleMatchSummary, styleMatchPreviewed);
   const previewCue = createBeatBlueprintPreviewCue(previewSummary, styleMatchSummary, styleMatchPreviewed);
   const previewDecisionApplies = previewDecision.actionId === "apply-preview";
+  const previewCueActive = transportLoopScope === previewCue.actionLoopScope;
 
   function runPreviewDecisionAction(): void {
     if (previewDecisionApplies) {
@@ -10293,6 +10315,20 @@ function BeatBlueprints({
           <strong data-testid="beat-blueprint-preview-cue-label">{previewCue.cueLabel}</strong>
           <small data-testid="beat-blueprint-preview-cue-detail">{previewCue.detailLabel}</small>
           <small data-testid="beat-blueprint-preview-cue-next-check">{previewCue.nextCheckLabel}</small>
+          <button
+            aria-pressed={previewCueActive}
+            className="blueprint-preview-cue-run"
+            data-blueprint-preview-cue-action={previewCue.actionId}
+            data-blueprint-preview-cue-scope={previewCue.actionLoopScope}
+            data-testid="beat-blueprint-preview-cue-run"
+            disabled={isPlaying}
+            onClick={() => onCuePreview(previewCue.actionLoopScope)}
+            title={isPlaying ? "Stop playback before cueing Beat Blueprint preview" : `Run ${previewCue.actionLabel}: ${previewCue.title}`}
+            type="button"
+          >
+            <Play size={13} aria-hidden="true" />
+            <span data-testid="beat-blueprint-preview-cue-action">{previewCueActive ? "Cued" : previewCue.actionLabel}</span>
+          </button>
         </div>
         <div className="blueprint-preview-head">
           <span>{previewSummary.focus}</span>
@@ -10429,12 +10465,21 @@ function createBeatBlueprintPreviewCue(
     changedCount === 0
       ? "Next: keep composing or reapply intentionally."
       : "Next: apply only after the metrics fit the session.";
+  const songCueRecommended =
+    changedCount === 0 ||
+    changedMetrics.some((metric) => metric.id === "arrangement" || metric.id === "master");
+  const actionId = songCueRecommended ? "cue-song" : "cue-pattern";
+  const actionLoopScope = songCueRecommended ? "arrangement" : "pattern";
+  const actionLabel = songCueRecommended ? "Cue Song" : "Cue Pattern";
 
   return {
     statusLabel,
     cueLabel,
     detailLabel,
     nextCheckLabel,
+    actionId,
+    actionLoopScope,
+    actionLabel,
     title: `${statusLabel}: ${cueLabel} / ${detailLabel} / ${nextCheckLabel}`,
     tone: changedCount === 0 ? "good" : "warn"
   };
