@@ -7850,6 +7850,7 @@ export function App(): ReactElement {
     spaceFxPadOptions,
     spaceFxPreviewSummary,
     stemAnalyses,
+    stemAuditionDecision,
     stemAuditionPadOptions,
     styleInspectorSummary,
     beatBlueprintPreviewId,
@@ -16888,6 +16889,7 @@ function createQuickActions({
   spaceFxPadOptions,
   spaceFxPreviewSummary,
   stemAnalyses,
+  stemAuditionDecision,
   stemAuditionPadOptions,
   styleInspectorSummary,
   beatBlueprintPreviewId,
@@ -17149,6 +17151,7 @@ function createQuickActions({
   spaceFxPadOptions: SpaceFxPadOption[];
   spaceFxPreviewSummary: SpaceFxPreviewSummary;
   stemAnalyses: StemExportAnalyses;
+  stemAuditionDecision: StemAuditionDecisionSummary;
   stemAuditionPadOptions: StemAuditionPadOption[];
   styleInspectorSummary: StyleInspectorSummary;
   beatBlueprintPreviewId: BeatBlueprintId;
@@ -17646,6 +17649,23 @@ function createQuickActions({
     keywords: `mix coach focus check diagnostic headroom limiter stem balance low end ${check.id} ${check.label} ${check.status} ${check.detail} beginner producer`,
     run: () => onFocusMixCoach(check)
   }));
+  const stemAuditionDecisionAction: QuickAction = {
+    id: "stem-audition-decision",
+    title: stemAuditionDecision.targetId
+      ? `Run Stem Audition Decision: ${stemAuditionDecision.targetLabel}`
+      : "Run Stem Audition Decision",
+    detail: `${stemAuditionDecision.statusLabel} / ${stemAuditionDecision.detailLabel} / ${stemAuditionDecision.nextCheckLabel}`,
+    group: "Mix",
+    keywords: `Quick Actions Stem Audition Decision stem audition readout solo mute full mix drums 808 bass synth chords ${
+      stemAuditionDecision.targetId ?? "none"
+    } ${stemAuditionDecision.targetLabel} mixer compare beginner producer`,
+    disabled: stemAuditionDecision.targetId === null,
+    run: () => {
+      if (stemAuditionDecision.targetId) {
+        onApplyStemAudition(stemAuditionDecision.targetId);
+      }
+    }
+  };
   const bassMoveTarget = activeBassMoveQuickActionTarget(project, bassMovePreviewSummary);
   const chordMoveTarget = activeChordMoveQuickActionTarget(project, selectedChord, chordMovePreviewSummary);
   const drumMoveTarget = activeDrumMoveQuickActionTarget(project, drumMovePreviewSummary);
@@ -19861,6 +19881,7 @@ function createQuickActions({
       }
     },
     ...mixCoachActions,
+    stemAuditionDecisionAction,
     ...stemAuditionPadOptions.map((pad): QuickAction => ({
       id: `stem-audition-${pad.id}`,
       title: pad.trackId === null ? "Audition Full Mix" : `Audition ${pad.label} Stem`,
