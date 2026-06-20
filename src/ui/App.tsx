@@ -16953,6 +16953,11 @@ function createQuickActions({
   const blueprintPreviewSummary = createBeatBlueprintPreviewSummary(project, previewBlueprint);
   const styleMatchPreviewSummary = createBeatBlueprintPreviewSummary(project, styleMatchBlueprint);
   const styleMatchPreviewed = blueprintPreviewSummary.blueprintId === styleMatchPreviewSummary.blueprintId;
+  const blueprintPreviewDecision = createBeatBlueprintPreviewDecision(
+    blueprintPreviewSummary,
+    styleMatchPreviewSummary,
+    styleMatchPreviewed
+  );
   const blueprintPreviewCue = createBeatBlueprintPreviewCue(blueprintPreviewSummary, styleMatchPreviewSummary, styleMatchPreviewed);
   const blueprintPreviewCueActive = transportLoopScope === blueprintPreviewCue.actionLoopScope;
   const localDraftRecoveryDetail = localDraftRecovery
@@ -17180,6 +17185,23 @@ function createQuickActions({
     keywords: `beat blueprint preview cue audition loop ${blueprintPreviewCue.actionLoopScope} ${blueprintPreviewCue.actionId} ${blueprintPreviewSummary.blueprintId} ${blueprintPreviewSummary.name} ${blueprintPreviewSummary.focus} ${currentStyleName} ${project.styleId} song pattern transport starter sample free drums 808 bass chords synth arrangement sound master beginner producer`,
     disabled: isPlaying,
     run: () => onCueBlueprintPreview(blueprintPreviewCue.actionLoopScope)
+  };
+  const blueprintPreviewDecisionAction: QuickAction = {
+    id: "blueprint-preview-decision",
+    title:
+      blueprintPreviewDecision.actionId === "apply-preview"
+        ? `Apply Preview: ${blueprintPreviewDecision.blueprintLabel}`
+        : `Compare Style Match: ${styleMatchPreviewSummary.name}`,
+    detail: `${blueprintPreviewDecision.statusLabel} / ${blueprintPreviewDecision.metricLabel} / ${blueprintPreviewDecision.detailLabel} / ${blueprintPreviewDecision.actionLabel}`,
+    group: "Create",
+    keywords: `beat blueprint preview decision ${blueprintPreviewDecision.actionId} ${blueprintPreviewDecision.actionBlueprintId} ${blueprintPreviewDecision.blueprintLabel} ${blueprintPreviewDecision.actionLabel} ${styleMatchPreviewSummary.name} ${currentStyleName} ${project.styleId} apply compare style match starter sample free drums 808 bass chords synth arrangement sound master beginner producer`,
+    run: () => {
+      if (blueprintPreviewDecision.actionId === "apply-preview") {
+        onApplyBlueprint(blueprintPreviewDecision.actionBlueprintId);
+        return;
+      }
+      onPreviewBlueprint(blueprintPreviewDecision.actionBlueprintId);
+    }
   };
   const keyCompassItem = activeKeyCompassQuickActionItem(keyCompassSummary);
   const keyCompassActions: QuickAction[] = keyCompassSummary.cards.map((item) => ({
@@ -19109,6 +19131,7 @@ function createQuickActions({
       keywords: `preview current style match blueprint starter ${currentStyleName} ${project.styleId} ${suggestedBlueprintName} beat drums 808 bass chords synth arrangement sound master sample free safe`,
       run: () => onPreviewBlueprint(suggestedBlueprint)
     },
+    blueprintPreviewDecisionAction,
     ...blueprintActions,
     ...patternVariationPresetIds.map((preset): QuickAction => {
       const label = patternVariationPresetLabel(preset);
@@ -19773,7 +19796,8 @@ function createQuickActionResult(
   const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action);
   const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
   const blueprintPreviewCueOnly = action.id === "blueprint-preview-cue";
-  const previewOnly = action.id.startsWith("blueprint-preview-") && !blueprintPreviewCueOnly;
+  const blueprintPreviewDecisionOnly = action.id === "blueprint-preview-decision";
+  const previewOnly = action.id.startsWith("blueprint-preview-") && !blueprintPreviewCueOnly && !blueprintPreviewDecisionOnly;
   const historyOnly = action.id === "undo" || action.id === "redo";
   const patternCompareDecisionKind = patternCompareDecisionQuickActionKind(action);
   const patternCompareDecisionCue = patternCompareDecisionKind === "cue";
@@ -19885,7 +19909,14 @@ function createQuickActionResult(
     label: afterMetric.label,
     before: beforeMetric.value,
     after: afterMetric.value,
-    tone: outcome === "failed" ? "danger" : previewOnly || cueOnly || focusOnly || uiLocal || exportOnly ? "good" : changed ? "good" : "warn"
+    tone:
+      outcome === "failed"
+        ? "danger"
+        : previewOnly || blueprintPreviewDecisionOnly || cueOnly || focusOnly || uiLocal || exportOnly
+          ? "good"
+          : changed
+            ? "good"
+            : "warn"
   };
   const followup = quickActionResultFollowup(action, afterProject, outcome);
 
@@ -19897,6 +19928,10 @@ function createQuickActionResult(
         ? "Failed"
         : previewOnly
           ? "Previewed"
+          : blueprintPreviewDecisionOnly
+            ? action.title.startsWith("Apply Preview")
+              ? "Applied"
+              : "Previewed"
           : cueOnly
             ? "Cued"
             : focusOnly
@@ -19931,7 +19966,14 @@ function createQuickActionResult(
     metric,
     auditionCue: followup.auditionCue,
     nextCheck: followup.nextCheck,
-    tone: outcome === "failed" ? "danger" : previewOnly || cueOnly || focusOnly || uiLocal || exportOnly ? "good" : changed ? "good" : "warn"
+    tone:
+      outcome === "failed"
+        ? "danger"
+        : previewOnly || blueprintPreviewDecisionOnly || cueOnly || focusOnly || uiLocal || exportOnly
+          ? "good"
+          : changed
+            ? "good"
+            : "warn"
   };
 }
 
@@ -21244,6 +21286,20 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play the cued Song or Pattern loop before applying the previewed starter.",
       nextCheck: "Apply the Beat Blueprint only after the preview cue confirms the starter fits the session."
+    };
+  }
+
+  if (action.id === "blueprint-preview-decision") {
+    if (action.title.startsWith("Apply Preview")) {
+      return {
+        auditionCue: "Loop the applied preview and hear drums, 808, chords, Synth, arrangement, sound, and master together.",
+        nextCheck: "Use Beat Spine, Pattern DNA, and First Beat Path to keep editing the starter as musical events."
+      };
+    }
+
+    return {
+      auditionCue: "Read the compared style-match preview before applying a starter.",
+      nextCheck: "Apply only after the preview decision matches the beat direction."
     };
   }
 
