@@ -247,6 +247,24 @@ export function MixSnapshotAB({
   onClear: () => void;
 }): ReactElement {
   const slotIds: MixSnapshotSlotId[] = ["A", "B"];
+  const decisionActionIsCapture = summary.decisionActionId.startsWith("capture");
+
+  function runDecisionAction(): void {
+    switch (summary.decisionActionId) {
+      case "capture-a":
+        onCapture("A");
+        return;
+      case "capture-b":
+        onCapture("B");
+        return;
+      case "recall-a":
+        onRecall("A");
+        return;
+      case "recall-b":
+        onRecall("B");
+        return;
+    }
+  }
 
   return (
     <div className={`mix-snapshot-ab ${summary.tone}`} data-testid="mix-snapshot-ab">
@@ -307,6 +325,21 @@ export function MixSnapshotAB({
         <span data-testid="mix-snapshot-decision-status">{summary.decisionStatus}</span>
         <strong data-testid="mix-snapshot-decision-label">{summary.decisionLabel}</strong>
         <small data-testid="mix-snapshot-decision-detail">{summary.decisionDetail}</small>
+        <button
+          className="mix-snapshot-decision-action"
+          data-mix-snapshot-decision-action={summary.decisionActionId}
+          data-testid="mix-snapshot-decision-run"
+          onClick={runDecisionAction}
+          title={`Run ${summary.decisionActionLabel}: ${summary.decisionTitle}`}
+          type="button"
+        >
+          {decisionActionIsCapture ? (
+            <Save size={13} aria-hidden="true" />
+          ) : (
+            <RotateCcw size={13} aria-hidden="true" />
+          )}
+          <span>{summary.decisionActionLabel}</span>
+        </button>
       </div>
       <div className="mix-snapshot-slots">
         {slotIds.map((slot) => (

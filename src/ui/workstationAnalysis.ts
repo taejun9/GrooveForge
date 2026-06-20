@@ -65,6 +65,8 @@ export function createMixSnapshotComparison(snapshots: MixSnapshotSlotMap): MixS
       decisionLabel: "Capture A first",
       decisionDetail: "Save the current mix into A, then make one concrete mix change before B.",
       decisionTitle: "No Mix Snapshot slots are captured. Capture A before comparing A/B.",
+      decisionActionId: "capture-a",
+      decisionActionLabel: "Capture A",
       tone: "warn",
       metrics
     };
@@ -83,6 +85,8 @@ export function createMixSnapshotComparison(snapshots: MixSnapshotSlotMap): MixS
       decisionLabel: `Capture ${missingSlot} next`,
       decisionDetail: `Keep Mix ${capturedSlot} held, change one mix/master choice, then capture ${missingSlot}.`,
       decisionTitle: `Mix ${capturedSlot} is held. Capture Mix ${missingSlot} before deciding between passes.`,
+      decisionActionId: missingSlot === "A" ? "capture-a" : "capture-b",
+      decisionActionLabel: `Capture ${missingSlot}`,
       tone: captured?.tone ?? "warn",
       metrics
     };
@@ -99,6 +103,8 @@ export function createMixSnapshotComparison(snapshots: MixSnapshotSlotMap): MixS
       decisionLabel: "Choose by hook context",
       decisionDetail: "Recall A or B explicitly, then play Full Mix and the core stems before committing.",
       decisionTitle: `Mix A and Mix B are close: A score ${A.score}, B score ${B.score}. Choose by listening context.`,
+      decisionActionId: "recall-a",
+      decisionActionLabel: "Recall A",
       tone: weakestTone([A.tone, B.tone]),
       metrics
     };
@@ -115,6 +121,8 @@ export function createMixSnapshotComparison(snapshots: MixSnapshotSlotMap): MixS
     decisionLabel: `Recall Mix ${winner.slot}`,
     decisionDetail: `Play Full Mix after recall; compare against Mix ${runnerUp.slot} before another fix.`,
     decisionTitle: `Mix ${winner.slot} is the safer pass by score. Recall remains explicit and undoable.`,
+    decisionActionId: winner.slot === "A" ? "recall-a" : "recall-b",
+    decisionActionLabel: `Recall ${winner.slot}`,
     tone: winner.tone === "danger" ? "warn" : winner.tone,
     metrics
   };

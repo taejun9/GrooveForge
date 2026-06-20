@@ -586,6 +586,8 @@ export type MixSnapshotComparisonMetric = {
   tone: MixCoachTone;
 };
 
+export type MixSnapshotDecisionActionId = "capture-a" | "capture-b" | "recall-a" | "recall-b";
+
 export type MixSnapshotComparisonSummary = {
   statusLabel: string;
   winnerLabel: string;
@@ -595,6 +597,8 @@ export type MixSnapshotComparisonSummary = {
   decisionLabel: string;
   decisionDetail: string;
   decisionTitle: string;
+  decisionActionId: MixSnapshotDecisionActionId;
+  decisionActionLabel: string;
   tone: MixCoachTone;
   metrics: MixSnapshotComparisonMetric[];
 };

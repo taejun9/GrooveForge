@@ -22451,6 +22451,7 @@ input[type="range"] {
 }
 
 .mix-snapshot-decision {
+  grid-template-columns: minmax(104px, 0.42fr) minmax(116px, 0.56fr) minmax(220px, 1.2fr) minmax(116px, auto);
   border-color: rgba(138, 168, 255, 0.22);
   background: rgba(138, 168, 255, 0.055);
 }
@@ -22475,8 +22476,8 @@ input[type="range"] {
   white-space: nowrap;
 }
 
-.mix-snapshot-status span,
-.mix-snapshot-decision span {
+.mix-snapshot-status > span,
+.mix-snapshot-decision > span {
   color: #08120f;
   background: #78f0c8;
   border-radius: 6px;
@@ -22486,26 +22487,69 @@ input[type="range"] {
   text-align: center;
 }
 
-.mix-snapshot-status.warn span,
-.mix-snapshot-decision.warn span {
+.mix-snapshot-status.warn > span,
+.mix-snapshot-decision.warn > span {
   background: #ffd166;
 }
 
-.mix-snapshot-status.danger span,
-.mix-snapshot-decision.danger span {
+.mix-snapshot-status.danger > span,
+.mix-snapshot-decision.danger > span {
   background: #ff7a4f;
 }
 
-.mix-snapshot-status strong,
-.mix-snapshot-decision strong {
+.mix-snapshot-status > strong,
+.mix-snapshot-decision > strong {
   color: #f4efe7;
   font-size: 12px;
 }
 
-.mix-snapshot-status small,
-.mix-snapshot-decision small {
+.mix-snapshot-status > small,
+.mix-snapshot-decision > small {
   color: rgba(244, 239, 231, 0.64);
   font-size: 10px;
+}
+
+.mix-snapshot-decision-action {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 27px;
+  min-width: 0;
+  border: 1px solid rgba(244, 239, 231, 0.12);
+  border-radius: 6px;
+  color: rgba(244, 239, 231, 0.76);
+  background: rgba(244, 239, 231, 0.06);
+  padding: 4px 7px;
+}
+
+.mix-snapshot-decision-action:hover {
+  border-color: rgba(130, 215, 255, 0.46);
+  color: #f4efe7;
+  background: rgba(130, 215, 255, 0.13);
+}
+
+.mix-snapshot-decision-action svg {
+  color: #82d7ff;
+}
+
+.mix-snapshot-decision.warn .mix-snapshot-decision-action svg {
+  color: #f0c36a;
+}
+
+.mix-snapshot-decision.danger .mix-snapshot-decision-action svg {
+  color: #ff7a4f;
+}
+
+.mix-snapshot-decision-action span {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mix-snapshot-slots {
@@ -25325,6 +25369,10 @@ input[type="range"] {
   .mix-snapshot-head,
   .mix-snapshot-status {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mix-snapshot-decision {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .mix-snapshot-metrics {
