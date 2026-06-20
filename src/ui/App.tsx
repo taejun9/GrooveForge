@@ -12554,6 +12554,7 @@ function composerActionIcon(action: ComposerAction): ReactElement {
 
 type FinishChecklistPriority = {
   cardId: FinishChecklistCardId | null;
+  actionLabel: string;
   statusLabel: string;
   areaLabel: string;
   cardLabel: string;
@@ -12575,6 +12576,8 @@ function FinishChecklist({
 }): ReactElement {
   const focusSummary = createFinishChecklistFocusSummary(summary, focusedCardId);
   const priority = createFinishChecklistPriority(summary);
+  const priorityCard = summary.cards.find((card) => card.id === priority.cardId) ?? null;
+  const priorityActionDisabled = priorityCard === null;
 
   return (
     <section
@@ -12609,6 +12612,19 @@ function FinishChecklist({
         <strong data-testid="finish-checklist-priority-label">{priority.areaLabel}</strong>
         <small data-testid="finish-checklist-priority-card">{priority.cardLabel}</small>
         <small data-testid="finish-checklist-priority-next-check">{priority.nextCheckLabel}</small>
+        <button
+          data-testid="finish-checklist-priority-run"
+          disabled={priorityActionDisabled}
+          onClick={() => {
+            if (priorityCard) {
+              onFocus(priorityCard);
+            }
+          }}
+          title={priorityCard ? `Focus ${priority.areaLabel}` : priority.title}
+          type="button"
+        >
+          {priority.actionLabel}
+        </button>
       </div>
       {result && <FinishChecklistFocusResultStrip result={result} />}
       <div className="finish-checklist-grid" data-testid="finish-checklist-grid">
@@ -12653,6 +12669,7 @@ function createFinishChecklistPriority(summary: FinishChecklistSummary): FinishC
   if (!card) {
     return {
       cardId: null,
+      actionLabel: "No finish",
       statusLabel: "Finish clear",
       areaLabel: "No priority lane",
       cardLabel: "No Finish Checklist cards available",
@@ -12668,6 +12685,7 @@ function createFinishChecklistPriority(summary: FinishChecklistSummary): FinishC
 
   return {
     cardId: card.id,
+    actionLabel: "Focus finish",
     statusLabel,
     areaLabel: `${card.label}: ${card.status}`,
     cardLabel: `${card.focusLabel} priority / ${card.detail}`,
