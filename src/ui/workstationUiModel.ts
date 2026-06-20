@@ -682,6 +682,31 @@ export type SpaceFxPadOption = SpaceFxPadDefinition & {
   changedCount: number;
 };
 
+export type SpaceFxPreviewSummary = {
+  padId: SpaceFxPadId;
+  changedSends: number;
+  statusLabel: string;
+  padLabel: string;
+  sendLabel: string;
+  focusLabel: string;
+  changeLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export type SpaceFxPreviewDecisionSummary = {
+  padId: SpaceFxPadId;
+  actionId: "apply-suggested" | "aligned";
+  statusLabel: string;
+  padLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  actionLabel: string;
+  disabled: boolean;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type SpaceFxResultMetric = {
   id: "drums" | "bass" | "synth" | "chords";
   label: string;

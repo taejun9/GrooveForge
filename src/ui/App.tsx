@@ -226,6 +226,7 @@ import type {
   SpaceFxPadId,
   SpaceFxPadDefinition,
   SpaceFxPadOption,
+  SpaceFxPreviewSummary,
   SpaceFxResultMetric,
   SpaceFxResult,
   StemAuditionPadId,
@@ -1586,6 +1587,10 @@ export function App(): ReactElement {
   );
   const mixSnapshotComparison = useMemo(() => createMixSnapshotComparison(mixSnapshots), [mixSnapshots]);
   const spaceFxPadOptions = useMemo(() => createSpaceFxPadOptions(project.mixer), [project.mixer]);
+  const spaceFxPreviewSummary = useMemo(
+    () => createSpaceFxPreviewSummary(project.mixer, spaceFxPadOptions),
+    [project.mixer, spaceFxPadOptions]
+  );
   const stemAuditionPadOptions = useMemo(() => createStemAuditionPadOptions(project.mixer), [project.mixer]);
   const stemAuditionReadout = useMemo(() => createStemAuditionReadoutSummary(project.mixer), [project.mixer]);
   const stemAuditionDecision = useMemo(
@@ -7820,6 +7825,7 @@ export function App(): ReactElement {
     soundPresetPreviewSummary,
     soundSnapshots,
     spaceFxPadOptions,
+    spaceFxPreviewSummary,
     stemAnalyses,
     stemAuditionPadOptions,
     styleInspectorSummary,
@@ -9473,7 +9479,12 @@ export function App(): ReactElement {
             result={mixBalanceResult}
             onApply={applyMixBalancePad}
           />
-          <SpaceFxPads pads={spaceFxPadOptions} result={spaceFxResult} onApply={applySpaceFxPad} />
+          <SpaceFxPads
+            pads={spaceFxPadOptions}
+            preview={spaceFxPreviewSummary}
+            result={spaceFxResult}
+            onApply={applySpaceFxPad}
+          />
           <StemAuditionPads pads={stemAuditionPadOptions} onApply={applyStemAuditionPad} />
           <div
             className={["stem-audition-readout", stemAuditionReadout.tone].join(" ")}
@@ -16515,6 +16526,7 @@ function createQuickActions({
   soundPresetPreviewSummary,
   soundSnapshots,
   spaceFxPadOptions,
+  spaceFxPreviewSummary,
   stemAnalyses,
   stemAuditionPadOptions,
   styleInspectorSummary,
@@ -16772,6 +16784,7 @@ function createQuickActions({
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
   soundSnapshots: SoundSnapshotSlotMap;
   spaceFxPadOptions: SpaceFxPadOption[];
+  spaceFxPreviewSummary: SpaceFxPreviewSummary;
   stemAnalyses: StemExportAnalyses;
   stemAuditionPadOptions: StemAuditionPadOption[];
   styleInspectorSummary: StyleInspectorSummary;
@@ -17930,6 +17943,7 @@ function createQuickActions({
     masterAutomationPadOptions.find((pad) => pad.id === suggestedMasterAutomationPad()) ?? masterAutomationPadOptions[0];
   const masterAutomationReady = Boolean(masterAutomationSuggestedPad && masterAutomationSuggestedPad.changedCount > 0);
   const masterFinishReady = masterFinishPreviewSummary.changedMoves > 0;
+  const spaceFxReady = spaceFxPreviewSummary.changedSends > 0;
   const mixBalancePadActions: QuickAction[] = mixBalancePadOptions.map((pad) => ({
     id: `mix-balance-pad-${pad.id}`,
     title: pad.changedCount > 0 ? `Apply ${pad.label} Mix Balance` : `${pad.label} Mix Balance already applied`,
@@ -19399,6 +19413,21 @@ function createQuickActions({
       }
     },
     ...mixBalancePadActions,
+    {
+      id: "space-fx",
+      title: spaceFxReady ? `Apply ${spaceFxPreviewSummary.padLabel}` : "Apply Space FX",
+      detail: spaceFxReady
+        ? `${spaceFxPreviewSummary.sendLabel} / ${spaceFxPreviewSummary.focusLabel}`
+        : "Current Space sends already match the previewed space.",
+      group: "Mix",
+      keywords: `space fx current suggested send ambience reverb room wide wash dry ${spaceFxPreviewSummary.padId} ${spaceFxPreviewSummary.padLabel} drums 808 synth chords beginner producer`,
+      disabled: !spaceFxReady,
+      run: () => {
+        if (spaceFxReady) {
+          onApplySpaceFx(spaceFxPreviewSummary.padId);
+        }
+      }
+    },
     ...spaceFxPadOptions.map((pad): QuickAction => ({
       id: `space-fx-${pad.id}`,
       title: `Apply ${pad.label} Space FX`,
@@ -19409,7 +19438,11 @@ function createQuickActions({
       group: "Mix",
       keywords: `space fx send ambience reverb room wide wash dry ${pad.id} ${pad.label} ${pad.detail} drums 808 synth chords beginner producer`,
       disabled: pad.changedCount === 0,
-      run: () => onApplySpaceFx(pad.id)
+      run: () => {
+        if (pad.changedCount > 0) {
+          onApplySpaceFx(pad.id);
+        }
+      }
     })),
     {
       id: "master-automation",
@@ -21252,7 +21285,7 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id.startsWith("space-fx-")) {
+  if (action.id === "space-fx" || action.id.startsWith("space-fx-")) {
     return {
       id: "space-fx",
       label: "Space FX",
@@ -22431,7 +22464,7 @@ function quickActionResultFollowup(
     };
   }
 
-  if (action.id.startsWith("space-fx-")) {
+  if (action.id === "space-fx" || action.id.startsWith("space-fx-")) {
     return {
       auditionCue: "Play Full Mix, then solo Synth and Chords to hear the shared Space send around the drums and 808.",
       nextCheck: "Use the Space FX Result and manual Space sliders for final dry, room, wide, or wash trim."
@@ -33081,6 +33114,43 @@ function createSpaceFxPadOptions(mixer: MixerChannel[]): SpaceFxPadOption[] {
       changedCount: spaceFxChangedSendCount(mixer, transformed)
     };
   });
+}
+
+function createSpaceFxPreviewSummary(mixer: MixerChannel[], pads: SpaceFxPadOption[]): SpaceFxPreviewSummary {
+  const pad = pads.find((option) => option.changedCount > 0) ?? pads[0];
+  if (!pad) {
+    return {
+      padId: "dry",
+      changedSends: 0,
+      statusLabel: "Space aligned",
+      padLabel: "No space target",
+      sendLabel: "No send target",
+      focusLabel: "No FX focus",
+      changeLabel: "0 sends",
+      detailTitle: "No Space FX pads are available.",
+      tone: "good"
+    };
+  }
+
+  const transformed = applySpaceFxPadToMixer(mixer, pad);
+  const changedSends = spaceFxChangedSendCount(mixer, transformed);
+  const sendLabel = spaceFxPreview(pad);
+  const focusLabel = `${pad.label} / ${pad.detail}`;
+  const changeLabel = `${changedSends} send${changedSends === 1 ? "" : "s"} before Apply`;
+  const statusLabel = changedSends === 0 ? "Space aligned" : "Suggested space";
+  const tone: MixCoachTone = changedSends === 0 ? "good" : changedSends <= 2 ? "warn" : "danger";
+
+  return {
+    padId: pad.id,
+    changedSends,
+    statusLabel,
+    padLabel: `${pad.label} space`,
+    sendLabel,
+    focusLabel,
+    changeLabel,
+    detailTitle: `${statusLabel}: ${pad.label} ${pad.detail}; ${sendLabel}; ${changeLabel}.`,
+    tone
+  };
 }
 
 function createSpaceFxResult(

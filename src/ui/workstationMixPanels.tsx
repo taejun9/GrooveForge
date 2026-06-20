@@ -28,6 +28,8 @@ import type {
   MixSnapshotSlotMap,
   SpaceFxPadId,
   SpaceFxPadOption,
+  SpaceFxPreviewDecisionSummary,
+  SpaceFxPreviewSummary,
   SpaceFxResult,
   StemAuditionPadId,
   StemAuditionPadOption
@@ -183,19 +185,36 @@ function MixBalanceResultStrip({ result }: { result: MixBalanceResult }): ReactE
 
 export function SpaceFxPads({
   pads,
+  preview,
   result,
   onApply
 }: {
   pads: SpaceFxPadOption[];
+  preview: SpaceFxPreviewSummary;
   result: SpaceFxResult | null;
   onApply: (pad: SpaceFxPadId) => void;
 }): ReactElement {
+  const decision = createSpaceFxPreviewDecision(preview);
+
   return (
     <div className="space-fx-panel" data-testid="space-fx-pads">
       <div className="space-fx-heading">
         <span>Space FX</span>
         <strong>Built-in send</strong>
       </div>
+      <div
+        className={`space-fx-preview ${preview.tone}`}
+        data-preview-space-fx={preview.padId}
+        data-testid="space-fx-preview"
+        title={preview.detailTitle}
+      >
+        <span data-testid="space-fx-preview-status">{preview.statusLabel}</span>
+        <strong data-testid="space-fx-preview-label">{preview.padLabel}</strong>
+        <small data-testid="space-fx-preview-sends">{preview.sendLabel}</small>
+        <small data-testid="space-fx-preview-focus">{preview.focusLabel}</small>
+        <small data-testid="space-fx-preview-changes">{preview.changeLabel}</small>
+      </div>
+      <SpaceFxPreviewDecision summary={decision} onApply={() => onApply(decision.padId)} />
       {result && <SpaceFxResultStrip result={result} />}
       <div className="space-fx-row" aria-label="Space FX Pads">
         {pads.map((pad) => (
@@ -214,6 +233,59 @@ export function SpaceFxPads({
       </div>
     </div>
   );
+}
+
+export function SpaceFxPreviewDecision({
+  summary,
+  onApply
+}: {
+  summary: SpaceFxPreviewDecisionSummary;
+  onApply: () => void;
+}): ReactElement {
+  return (
+    <div
+      className={`space-fx-decision ${summary.tone}`}
+      data-space-fx-decision={summary.padId}
+      data-testid="space-fx-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="space-fx-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="space-fx-decision-label">{summary.padLabel}</strong>
+      <small data-testid="space-fx-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="space-fx-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="space-fx-decision-run"
+        data-space-fx-decision-action={summary.actionId}
+        data-testid="space-fx-decision-run"
+        disabled={summary.disabled}
+        onClick={onApply}
+        title={summary.disabled ? "Current sends already match this space" : `Apply ${summary.padLabel}`}
+        type="button"
+      >
+        <SlidersHorizontal size={12} aria-hidden="true" />
+        <span data-testid="space-fx-decision-action">{summary.actionLabel}</span>
+      </button>
+    </div>
+  );
+}
+
+function createSpaceFxPreviewDecision(summary: SpaceFxPreviewSummary): SpaceFxPreviewDecisionSummary {
+  const aligned = summary.changedSends === 0;
+
+  return {
+    padId: summary.padId,
+    actionId: aligned ? "aligned" : "apply-suggested",
+    statusLabel: aligned ? "Space aligned" : "Ready to apply",
+    padLabel: summary.padLabel,
+    metricLabel: `${summary.changedSends} send${summary.changedSends === 1 ? "" : "s"}`,
+    detailLabel: aligned ? "Current editable sends already match this space." : `${summary.sendLabel} / ${summary.focusLabel}`,
+    actionLabel: aligned ? "Aligned" : "Apply Suggested Space",
+    disabled: aligned,
+    detailTitle: aligned
+      ? `${summary.detailTitle} No Space FX action is needed.`
+      : `${summary.detailTitle} Apply only after this space fits the beat.`,
+    tone: aligned ? "good" : summary.tone
+  };
 }
 
 function SpaceFxResultStrip({ result }: { result: SpaceFxResult }): ReactElement {
