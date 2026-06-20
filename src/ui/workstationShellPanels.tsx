@@ -1477,6 +1477,7 @@ export function BeatReadiness({
 }): ReactElement {
   const readyCount = checks.filter((check) => check.tone === "good").length;
   const focusSummary = createBeatReadinessFocusSummary(checks, focusedCheckId);
+  const focusCheck = focusSummary.checkId ? checks.find((check) => check.id === focusSummary.checkId) ?? null : null;
 
   return (
     <section
@@ -1499,6 +1500,25 @@ export function BeatReadiness({
         <span data-testid="beat-readiness-focus-status">{focusSummary.statusLabel}</span>
         <strong data-testid="beat-readiness-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="beat-readiness-focus-detail">{focusSummary.detailLabel}</small>
+        <button
+          className="beat-readiness-focus-action"
+          data-testid="beat-readiness-focus-run"
+          disabled={!focusCheck}
+          onClick={() => {
+            if (focusCheck) {
+              onFocus(focusCheck);
+            }
+          }}
+          title={
+            focusCheck
+              ? `Open ${focusCheck.focusLabel}: ${focusCheck.label} ${focusCheck.status}`
+              : "No Beat Readiness check to focus."
+          }
+          type="button"
+        >
+          <ArrowRight size={13} aria-hidden="true" />
+          <span>{focusSummary.actionLabel}</span>
+        </button>
       </div>
       {result && <BeatReadinessFocusResultStrip result={result} />}
       <div className="beat-readiness-list">
@@ -1542,6 +1562,7 @@ function createBeatReadinessFocusSummary(checks: BeatReadinessCheck[], focusedCh
       statusLabel: "Readiness ready",
       areaLabel: "No readiness checks",
       detailLabel: "No Beat Readiness checks available",
+      actionLabel: "Ready",
       detailTitle: "Beat Readiness has no checks to focus.",
       tone: "good"
     };
@@ -1555,6 +1576,7 @@ function createBeatReadinessFocusSummary(checks: BeatReadinessCheck[], focusedCh
     statusLabel,
     areaLabel: `${check.label}: ${check.status}`,
     detailLabel,
+    actionLabel: `Open ${check.focusLabel}`,
     detailTitle: `${statusLabel} / ${check.label}: ${check.status} / ${detailLabel}`,
     tone: check.tone
   };

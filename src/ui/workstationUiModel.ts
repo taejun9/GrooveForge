@@ -1113,6 +1113,7 @@ export type BeatReadinessFocusSummary = {
   statusLabel: string;
   areaLabel: string;
   detailLabel: string;
+  actionLabel: string;
   detailTitle: string;
   tone: MixCoachTone;
 };
