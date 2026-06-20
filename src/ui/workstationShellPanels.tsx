@@ -282,7 +282,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
     id: "mix-fast-path",
     title: "Mix",
     items: [
-      { id: "stem-audition-readout", command: "Stem Audition Readout", shortcut: "Readout", target: "Full Mix / stems" },
+      { id: "stem-audition-readout", command: "Stem Audition Readout", shortcut: "Quick Actions / Readout", target: "Full Mix / stems" },
       { id: "stem-audition-decision", command: "Stem Audition Decision", shortcut: "Quick Actions", target: "Next mix audition" },
       { id: "stem-audition", command: "Stem Audition", shortcut: "Quick Actions", target: "Full Mix / Drums / 808 / Synth / Chords" },
       { id: "mix-snapshot-decision", command: "Mix Snapshot A/B Decision", shortcut: "Quick Actions", target: "Capture / recall recommendation" },
