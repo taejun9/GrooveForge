@@ -419,6 +419,7 @@ import type {
   HookReadinessCard,
   HookReadinessSummary,
   HookReadinessFocusSummary,
+  HookReadinessPrioritySummary,
   HookReadinessFocusResult,
   ToplineSpaceFocusId,
   ToplineSpaceCardId,
@@ -14395,6 +14396,7 @@ function HookReadiness({
   summary: HookReadinessSummary;
 }): ReactElement {
   const focusSummary = createHookReadinessFocusSummary(summary, focusedCardId);
+  const prioritySummary = createHookReadinessPrioritySummary(summary);
 
   return (
     <section className={`hook-readiness ${summary.tone}`} data-testid="hook-readiness" aria-label="Hook readiness">
@@ -14415,6 +14417,17 @@ function HookReadiness({
           <span data-testid="hook-readiness-focus-status">{focusSummary.statusLabel}</span>
           <strong data-testid="hook-readiness-focus-label">{focusSummary.areaLabel}</strong>
           <small data-testid="hook-readiness-focus-detail">{focusSummary.detailLabel}</small>
+        </div>
+        <div
+          className={`hook-readiness-priority ${prioritySummary.tone}`}
+          data-hook-readiness-priority={prioritySummary.cardId ?? "none"}
+          data-testid="hook-readiness-priority"
+          title={`${prioritySummary.statusLabel} / ${prioritySummary.cardLabel} / ${prioritySummary.reasonLabel} / ${prioritySummary.nextCheckLabel}`}
+        >
+          <span data-testid="hook-readiness-priority-status">{prioritySummary.statusLabel}</span>
+          <strong data-testid="hook-readiness-priority-card">{prioritySummary.cardLabel}</strong>
+          <small data-testid="hook-readiness-priority-reason">{prioritySummary.reasonLabel}</small>
+          <small data-testid="hook-readiness-priority-next-check">{prioritySummary.nextCheckLabel}</small>
         </div>
         {focusResult && <HookReadinessFocusResultStrip result={focusResult} />}
         {fixResult && <HookFixResultStrip result={fixResult} />}
@@ -26675,6 +26688,71 @@ function createHookReadinessFocusSummary(
     detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function createHookReadinessPrioritySummary(summary: HookReadinessSummary): HookReadinessPrioritySummary {
+  const card = activeHookReadinessQuickActionCard(summary);
+
+  if (!card) {
+    return {
+      cardId: null,
+      statusLabel: "Hook priority",
+      cardLabel: "No hook card",
+      reasonLabel: "No Hook Readiness cards available",
+      nextCheckLabel: "Add a Hook block, then return to Hook Readiness.",
+      tone: "warn"
+    };
+  }
+
+  return {
+    cardId: card.id,
+    statusLabel: hookReadinessPriorityStatus(card),
+    cardLabel: `${card.label}: ${card.value}`,
+    reasonLabel: hookReadinessPriorityReason(card),
+    nextCheckLabel: hookReadinessPriorityNextCheck(card),
+    tone: card.tone
+  };
+}
+
+function hookReadinessPriorityStatus(card: HookReadinessCard): string {
+  switch (card.tone) {
+    case "danger":
+      return "Fix hook first";
+    case "warn":
+      return "Review hook first";
+    case "good":
+      return "Confirm hook lane";
+  }
+}
+
+function hookReadinessPriorityReason(card: HookReadinessCard): string {
+  switch (card.id) {
+    case "section":
+      return `${card.status}: Hook section location is the current priority.`;
+    case "motif":
+      return `${card.status}: Motif density is the current priority.`;
+    case "contrast":
+      return `${card.status}: Hook lift against the previous section is the current priority.`;
+    case "mix":
+      return `${card.status}: Mix support during the hook is the current priority.`;
+    case "handoff":
+      return `${card.status}: Handoff context for the hook is the current priority.`;
+  }
+}
+
+function hookReadinessPriorityNextCheck(card: HookReadinessCard): string {
+  switch (card.id) {
+    case "section":
+      return "Cue Hook Loop and confirm the Hook block is easy to find.";
+    case "motif":
+      return "Use Pattern DNA or Hook Fix, then confirm the Hook motif is memorable.";
+    case "contrast":
+      return "Check Structure Lens after the next Hook Lift or arrangement move.";
+    case "mix":
+      return "Check Mix Coach after the next Headroom Mix Fix or manual mix trim.";
+    case "handoff":
+      return "Review Session Brief and Handoff Pack after filling hook context.";
+  }
 }
 
 function createHookReadinessFocusResult(

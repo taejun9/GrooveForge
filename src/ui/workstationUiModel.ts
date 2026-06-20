@@ -2313,6 +2313,15 @@ export type HookReadinessFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type HookReadinessPrioritySummary = {
+  cardId: HookReadinessCardId | null;
+  statusLabel: string;
+  cardLabel: string;
+  reasonLabel: string;
+  nextCheckLabel: string;
+  tone: MixCoachTone;
+};
+
 export type HookReadinessFocusResult = {
   cardId: HookReadinessCardId;
   status: string;
