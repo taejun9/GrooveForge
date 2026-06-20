@@ -11181,6 +11181,12 @@ function SectionLocatorPads({
   pads: SectionLocatorPad[];
 }): ReactElement {
   const prioritySummary = createSectionLocatorPrioritySummary(pads);
+  const priorityActionDisabled = disabled || prioritySummary.section === null;
+  const priorityActionTitle = disabled
+    ? "Stop playback before cueing a section"
+    : prioritySummary.section
+      ? `Cue ${prioritySummary.section} section`
+      : prioritySummary.reasonLabel;
 
   return (
     <section className="section-locator" data-testid="section-locator-pads" aria-label="Section Locator Pads">
@@ -11198,6 +11204,19 @@ function SectionLocatorPads({
         <strong data-testid="section-locator-priority-section">{prioritySummary.sectionLabel}</strong>
         <small data-testid="section-locator-priority-reason">{prioritySummary.reasonLabel}</small>
         <small data-testid="section-locator-priority-next-check">{prioritySummary.nextCheckLabel}</small>
+        <button
+          data-testid="section-locator-priority-run"
+          disabled={priorityActionDisabled}
+          onClick={() => {
+            if (!priorityActionDisabled && prioritySummary.section) {
+              onCue(prioritySummary.section);
+            }
+          }}
+          title={priorityActionTitle}
+          type="button"
+        >
+          {prioritySummary.section ? `Cue ${prioritySummary.section}` : "No cue"}
+        </button>
       </div>
       <div className="section-locator-row">
         {pads.map((pad) => {
