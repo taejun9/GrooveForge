@@ -7843,6 +7843,7 @@ export function App(): ReactElement {
     sessionBriefStarterPads,
     sessionBriefCompassSummary,
     sessionPassSummary,
+    songFormOverviewSummary,
     soundFocusPreviewSummary,
     soundPresetPreviewSummary,
     soundSnapshots,
@@ -16880,6 +16881,7 @@ function createQuickActions({
   sessionBriefStarterPads,
   sessionBriefCompassSummary,
   sessionPassSummary,
+  songFormOverviewSummary,
   soundFocusPreviewSummary,
   soundPresetPreviewSummary,
   soundSnapshots,
@@ -17140,6 +17142,7 @@ function createQuickActions({
   sessionBriefStarterPads: SessionBriefStarterPadOption[];
   sessionBriefCompassSummary: SessionBriefCompassSummary;
   sessionPassSummary: SessionPassSummary;
+  songFormOverviewSummary: SongFormOverviewSummary;
   soundFocusPreviewSummary: SoundFocusPreviewSummary;
   soundPresetPreviewSummary: SoundPresetPreviewSummary;
   soundSnapshots: SoundSnapshotSlotMap;
@@ -17445,6 +17448,25 @@ function createQuickActions({
     } ${selectedArrangementIndex + 1} ${audibleArrangementFollowBlock?.section ?? "none"} song form beginner producer`,
     disabled: !audibleArrangementFollowBlock,
     run: onFollowAudibleArrangementBlock
+  };
+  const songFormPrioritySummary = createSongFormPrioritySummary(songFormOverviewSummary);
+  const songFormPriorityAction: QuickAction = {
+    id: "song-form-priority",
+    title:
+      songFormPrioritySummary.targetIndex === null
+        ? "Open Song Form Priority"
+        : `Open Song Form Priority: ${songFormPrioritySummary.targetLabel}`,
+    detail: `${songFormPrioritySummary.statusLabel} / ${songFormPrioritySummary.metricLabel} / ${songFormPrioritySummary.reasonLabel} / ${songFormPrioritySummary.nextCheckLabel}`,
+    group: "Arrange",
+    keywords: `Quick Actions Song Form Priority song form overview priority metric current block navigation section pattern energy ${
+      songFormPrioritySummary.metricId ?? "none"
+    } ${songFormPrioritySummary.targetLabel} ${songFormPrioritySummary.statusLabel} beginner producer`,
+    disabled: songFormPrioritySummary.targetIndex === null,
+    run: () => {
+      if (songFormPrioritySummary.targetIndex !== null) {
+        onSelectArrangementBlock(songFormPrioritySummary.targetIndex);
+      }
+    }
   };
   const beatPassportMetric = activeBeatPassportQuickActionMetric(beatPassportSummary);
   const beatReadinessCheck = activeBeatReadinessQuickActionCheck(beatReadinessChecks);
@@ -19604,6 +19626,7 @@ function createQuickActions({
       run: () => onApplyPatternFill("clear_tail")
     },
     ...arrangementBlockJumpActions,
+    songFormPriorityAction,
     audibleArrangementFollowAction,
     ...selectedBlockActions,
     ...patternUseActions,
@@ -20429,6 +20452,7 @@ function createQuickActionResult(
     action.id.startsWith("handoff-package-check-card-") ||
     action.id === "handoff-export-format-focus" ||
     action.id.startsWith("handoff-export-format-") ||
+    action.id === "song-form-priority" ||
     action.id.startsWith("arrangement-block-cue-") ||
     action.id.startsWith("arrangement-block-jump-") ||
     action.id.startsWith("section-locator-") ||
@@ -21047,6 +21071,10 @@ function quickActionResultMetricSnapshot(
         };
       }
     }
+  }
+
+  if (action.id === "song-form-priority") {
+    return { id: "song-form-priority", label: "Song Form Priority", value: action.detail };
   }
 
   if (action.id === "section-locator-decision") {
@@ -22305,6 +22333,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Play Block loop; hear the cued ${section} block against its assigned Pattern before changing the arrangement.`,
       nextCheck: "Use Song Form Overview, Arrangement Playback Readout, or Arrangement Focus before editing nearby blocks."
+    };
+  }
+
+  if (action.id === "song-form-priority") {
+    return {
+      auditionCue: "Play Song or Block loop after focusing the priority block and compare the section, Pattern, energy, and mute posture.",
+      nextCheck: "Return to Song Form Overview before applying Pattern Chain, Arrangement Template, Arrangement Arc, or selected-block edits."
     };
   }
 
