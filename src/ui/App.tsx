@@ -393,6 +393,8 @@ import type {
   ArrangementFocusResultMetric,
   ArrangementFocusResultSummary,
   ArrangementMovePrioritySummary,
+  ArrangementMoveResultMetric,
+  ArrangementMoveResultSummary,
   ArrangementArcPadId,
   ArrangementArcPoint,
   ArrangementArcPadDefinition,
@@ -1353,6 +1355,7 @@ export function App(): ReactElement {
   const [arrangementTemplateResult, setArrangementTemplateResult] = useState<ArrangementTemplateResultSummary | null>(null);
   const [arrangementArcResult, setArrangementArcResult] = useState<ArrangementArcResultSummary | null>(null);
   const [arrangementFocusResult, setArrangementFocusResult] = useState<ArrangementFocusResultSummary | null>(null);
+  const [arrangementMoveResult, setArrangementMoveResult] = useState<ArrangementMoveResultSummary | null>(null);
   const [patternChainResult, setPatternChainResult] = useState<PatternChainResultSummary | null>(null);
   const [soundPresetPreviewId, setSoundPresetPreviewId] = useState<SoundPresetTarget>(() =>
     defaultSoundPresetPreview(starterProject)
@@ -2394,6 +2397,7 @@ export function App(): ReactElement {
     setArrangementTemplateResult(null);
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
+    setArrangementMoveResult(null);
     setPatternChainResult(null);
     setSoundPresetResult(null);
     setSoundFocusResult(null);
@@ -2468,6 +2472,7 @@ export function App(): ReactElement {
       setArrangementTemplateResult(null);
       setArrangementArcResult(null);
       setArrangementFocusResult(null);
+      setArrangementMoveResult(null);
       setPatternChainResult(null);
       setSoundPresetResult(null);
       setSoundFocusResult(null);
@@ -2635,6 +2640,7 @@ export function App(): ReactElement {
     setArrangementTemplateResult(null);
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
+    setArrangementMoveResult(null);
     setPatternChainResult(null);
     setSoundPresetPreviewId(defaultSoundPresetPreview(nextProject));
     setSoundPresetResult(null);
@@ -2715,6 +2721,7 @@ export function App(): ReactElement {
     setArrangementTemplateResult(null);
     setArrangementArcResult(null);
     setArrangementFocusResult(null);
+    setArrangementMoveResult(null);
     setPatternChainResult(null);
     setSoundPresetPreviewId(defaultSoundPresetPreview(nextProject));
     setSoundPresetResult(null);
@@ -3819,20 +3826,27 @@ export function App(): ReactElement {
   }
 
   function applyArrangementMoveToSelected(preset: ArrangementMovePreset): void {
+    const beforeProject = projectRef.current;
+    const blockIndex = selectedArrangementIndex;
     const block = projectRef.current.arrangement[selectedArrangementIndex];
     if (!block) {
+      setArrangementMoveResult(null);
       setProjectStatus("Select an arrangement block");
       return;
     }
     const nextBlock = applyArrangementMovePreset(block, preset);
-    updateArrangementBlock(
-      selectedArrangementIndex,
+    const changed = updateArrangementBlock(
+      blockIndex,
       {
         energy: nextBlock.energy,
         mutedTracks: nextBlock.mutedTracks
       },
       `Applied ${arrangementMovePresetLabel(preset)} move`
     );
+    setArrangementMoveResult(createArrangementMoveResult(preset, blockIndex, beforeProject, projectRef.current));
+    if (!changed) {
+      setProjectStatus(`${arrangementMovePresetLabel(preset)} move already aligned`);
+    }
   }
 
   function applyArrangementFocusPreset(presetId: ArrangementFocusPresetId): void {
@@ -9175,6 +9189,9 @@ export function App(): ReactElement {
                   </button>
                 ))}
               </div>
+              {arrangementMoveResult?.blockIndex === selectedArrangementIndex && (
+                <ArrangementMoveResultStrip result={arrangementMoveResult} />
+              )}
               <div className="arrangement-clipboard-row" aria-label="Arrangement block clipboard">
                 <button
                   data-testid="arrangement-copy"
@@ -10694,6 +10711,48 @@ function ArrangementMovePriorityReadout({ summary }: { summary: ArrangementMoveP
       <small data-testid="arrangement-move-priority-scope">{summary.scopeLabel}</small>
       <small data-testid="arrangement-move-priority-impact">{summary.impactLabel}</small>
       <small data-testid="arrangement-move-priority-next-check">{summary.nextCheckLabel}</small>
+    </div>
+  );
+}
+
+function ArrangementMoveResultStrip({ result }: { result: ArrangementMoveResultSummary }): ReactElement {
+  return (
+    <div
+      className={`arrangement-move-result ${result.tone}`}
+      data-result-arrangement-move={result.presetId}
+      data-testid="arrangement-move-result"
+      aria-live="polite"
+    >
+      <div className="arrangement-move-result-main">
+        <ListChecks size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="arrangement-move-result-title">{result.title}</strong>
+          <small data-testid="arrangement-move-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="arrangement-move-result-meta">
+        <span data-testid="arrangement-move-result-status">{result.status}</span>
+        <span data-testid="arrangement-move-result-scope">{result.scope}</span>
+        <span data-testid="arrangement-move-result-impact">{result.impact}</span>
+      </div>
+      <div className="arrangement-move-result-metrics" data-testid="arrangement-move-result-metrics">
+        {result.metrics.map((metric) => (
+          <span className={metric.tone} data-testid={`arrangement-move-result-metric-${metric.id}`} key={metric.id}>
+            <b>{metric.label}</b>
+            <em>{`${metric.before} -> ${metric.after}`}</em>
+          </span>
+        ))}
+      </div>
+      <div className="arrangement-move-result-followup" data-testid="arrangement-move-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="arrangement-move-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="arrangement-move-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
     </div>
   );
 }
@@ -15395,6 +15454,99 @@ function createArrangementMovePrioritySummary(
     detailTitle: `${statusLabel} / ${presetLabel} / ${reasonLabel} / ${scopeLabel} / ${impactLabel} / ${nextCheckLabel}`,
     tone: aligned ? "good" : changedFields === 1 ? "warn" : "danger"
   };
+}
+
+function createArrangementMoveResult(
+  preset: ArrangementMovePreset,
+  blockIndex: number,
+  beforeProject: ProjectState,
+  afterProject: ProjectState
+): ArrangementMoveResultSummary {
+  const beforeBlock = beforeProject.arrangement[blockIndex] ?? beforeProject.arrangement[0];
+  const afterBlock = afterProject.arrangement[blockIndex] ?? afterProject.arrangement[0];
+  const presetLabel = arrangementMovePresetLabel(preset);
+  const blockNumber = Math.min(blockIndex + 1, Math.max(afterProject.arrangement.length, 1));
+
+  if (!beforeBlock || !afterBlock) {
+    return {
+      presetId: preset,
+      blockIndex,
+      title: `${presetLabel} move skipped`,
+      status: "No block",
+      detail: "Select an arrangement block before applying a move.",
+      scope: "No selected block",
+      impact: "0 fields changed",
+      metrics: [],
+      auditionCue: "Select a block, then audition Block before applying a move.",
+      nextCheck: "Add or select an arrangement block.",
+      tone: "danger"
+    };
+  }
+
+  const energyBefore = normalizeArrangementEnergy(beforeBlock.energy);
+  const energyAfter = normalizeArrangementEnergy(afterBlock.energy);
+  const mutedBefore = normalizeArrangementMutedTracks(beforeBlock.mutedTracks);
+  const mutedAfter = normalizeArrangementMutedTracks(afterBlock.mutedTracks);
+  const metrics: ArrangementMoveResultMetric[] = [
+    createArrangementMoveResultMetric("energy", "Energy", percentLabel(energyBefore), percentLabel(energyAfter)),
+    createArrangementMoveResultMetric(
+      "mutes",
+      "Mutes",
+      arrangementFocusPreviewMuteLabel(mutedBefore),
+      arrangementFocusPreviewMuteLabel(mutedAfter)
+    )
+  ];
+  const changedFields = metrics.filter((metric) => metric.changed).length;
+  const aligned = changedFields === 0;
+  const sectionLabel = `Block ${blockNumber} ${afterBlock.section}`;
+  const scope = `${afterBlock.section} / Pattern ${afterBlock.pattern} / ${barCountLabel(afterBlock.bars)}`;
+  const status = aligned ? "Move aligned" : `${presetLabel} applied`;
+
+  return {
+    presetId: preset,
+    blockIndex,
+    title: `${presetLabel} move`,
+    status,
+    detail: `${sectionLabel} / Pattern ${afterBlock.pattern}`,
+    scope,
+    impact: `${changedFields} field${changedFields === 1 ? "" : "s"} changed`,
+    metrics,
+    auditionCue: arrangementMoveResultAuditionCue(preset),
+    nextCheck: aligned
+      ? "No move needed; inspect Arrangement Focus before changing nearby blocks."
+      : "Audition Block, then inspect Arrangement Focus and Song Form Overview before another move.",
+    tone: aligned ? "good" : changedFields === 1 ? "warn" : "danger"
+  };
+}
+
+function createArrangementMoveResultMetric(
+  id: ArrangementMoveResultMetric["id"],
+  label: string,
+  before: string,
+  after: string
+): ArrangementMoveResultMetric {
+  const changed = before !== after;
+  return {
+    id,
+    label,
+    before,
+    after,
+    changed,
+    tone: changed ? "warn" : "good"
+  };
+}
+
+function arrangementMoveResultAuditionCue(preset: ArrangementMovePreset): string {
+  switch (preset) {
+    case "hook_lift":
+      return "Audition Block, then cue Hook against Verse.";
+    case "build":
+      return "Audition this block into the next section.";
+    case "drop":
+      return "Audition the drop into the following block.";
+    case "reset":
+      return "Audition Block and verify the neutral mute posture.";
+  }
 }
 
 function isArrangementMovePresetApplied(block: ArrangementBlock, preset: ArrangementMovePreset): boolean {

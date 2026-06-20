@@ -2098,6 +2098,31 @@ export type ArrangementMovePrioritySummary = {
   tone: MixCoachTone;
 };
 
+export type ArrangementMoveResultMetricId = "energy" | "mutes";
+
+export type ArrangementMoveResultMetric = {
+  id: ArrangementMoveResultMetricId;
+  label: string;
+  before: string;
+  after: string;
+  changed: boolean;
+  tone: MixCoachTone;
+};
+
+export type ArrangementMoveResultSummary = {
+  presetId: ArrangementMovePreset;
+  blockIndex: number;
+  title: string;
+  status: string;
+  detail: string;
+  scope: string;
+  impact: string;
+  metrics: ArrangementMoveResultMetric[];
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementArcPadId = "clean" | "lift" | "break" | "rise";
 
 export type ArrangementArcPoint = {
