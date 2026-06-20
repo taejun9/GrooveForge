@@ -10547,7 +10547,7 @@ function ArrangementTemplateControls({
         <small data-testid="arrangement-template-preview-energy">{preview.energyLabel}</small>
         <small data-testid="arrangement-template-preview-moves">{preview.moveLabel}</small>
       </div>
-      <ArrangementTemplatePriorityReadout summary={createArrangementTemplatePrioritySummary(preview)} />
+      <ArrangementTemplatePriorityReadout summary={createArrangementTemplatePrioritySummary(preview)} onApply={onApply} />
       <div className="arrangement-template-row" aria-label="Arrangement template buttons">
         {arrangementTemplateIds.map((template) => {
           const templateBlocks = createArrangementTemplate(template);
@@ -10572,7 +10572,14 @@ function ArrangementTemplateControls({
   );
 }
 
-function ArrangementTemplatePriorityReadout({ summary }: { summary: ArrangementTemplatePrioritySummary }): ReactElement {
+function ArrangementTemplatePriorityReadout({
+  onApply,
+  summary
+}: {
+  onApply: (template: ArrangementTemplateId) => void;
+  summary: ArrangementTemplatePrioritySummary;
+}): ReactElement {
+  const disabled = summary.templateId === "aligned";
   return (
     <div
       className={`arrangement-template-priority ${summary.tone}`}
@@ -10586,6 +10593,19 @@ function ArrangementTemplatePriorityReadout({ summary }: { summary: ArrangementT
       <small data-testid="arrangement-template-priority-scope">{summary.scopeLabel}</small>
       <small data-testid="arrangement-template-priority-moves">{summary.moveLabel}</small>
       <small data-testid="arrangement-template-priority-next-check">{summary.nextCheckLabel}</small>
+      <button
+        data-testid="arrangement-template-priority-run"
+        disabled={disabled}
+        onClick={() => {
+          if (summary.templateId !== "aligned") {
+            onApply(summary.templateId);
+          }
+        }}
+        title={disabled ? summary.reasonLabel : `Apply ${summary.templateLabel} template`}
+        type="button"
+      >
+        {disabled ? "Aligned" : summary.templateLabel}
+      </button>
     </div>
   );
 }
