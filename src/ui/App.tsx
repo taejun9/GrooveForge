@@ -4601,6 +4601,39 @@ export function App(): ReactElement {
     }
   }
 
+  function runSelectedBlockEditPriorityAction(actionId: SelectedBlockEditPrioritySummary["actionId"]): void {
+    switch (actionId) {
+      case "copy":
+        copySelectedArrangementBlock();
+        break;
+      case "paste":
+        pasteArrangementBlockAfterSelected();
+        break;
+      case "duplicate":
+        duplicateArrangementBlock();
+        break;
+      case "split":
+        splitArrangementBlock();
+        break;
+      case "merge":
+        mergeArrangementBlock();
+        break;
+      case "move_left":
+        moveArrangementBlock(-1);
+        break;
+      case "move_right":
+        moveArrangementBlock(1);
+        break;
+      case "delete":
+        deleteArrangementBlock();
+        break;
+      case "none":
+        setSelectedBlockEditResult(null);
+        setProjectStatus("Select an arrangement block before running the priority edit");
+        break;
+    }
+  }
+
   function toggleStep(lane: DrumLane, step: number): void {
     const selectedSameStep = selectedDrumStep?.lane === lane && selectedDrumStep.step === step;
     const active = currentPattern.drumPattern[lane][step];
@@ -7847,6 +7880,7 @@ export function App(): ReactElement {
     onSetMidiCaptureArmed: setMidiCaptureArmed,
     onApplySessionBriefStarter: applySessionBriefStarterPad,
     onFocusSessionBriefCompass: focusSessionBriefCompassCard,
+    onRunSelectedBlockEditPriority: runSelectedBlockEditPriorityAction,
     onCopySelectedArrangementBlock: copySelectedArrangementBlock,
     onPasteArrangementBlockAfterSelected: pasteArrangementBlockAfterSelected,
     onDuplicateArrangementBlock: duplicateArrangementBlock,
@@ -9244,6 +9278,7 @@ export function App(): ReactElement {
               )}
               <SelectedBlockEditPriorityReadout
                 summary={createSelectedBlockEditPrioritySummary(project, selectedArrangementIndex, arrangementBlockClipboard)}
+                onRun={runSelectedBlockEditPriorityAction}
               />
               <div className="arrangement-clipboard-row" aria-label="Arrangement block clipboard">
                 <button
@@ -10813,7 +10848,14 @@ function ArrangementMoveResultStrip({ result }: { result: ArrangementMoveResultS
   );
 }
 
-function SelectedBlockEditPriorityReadout({ summary }: { summary: SelectedBlockEditPrioritySummary }): ReactElement {
+function SelectedBlockEditPriorityReadout({
+  onRun,
+  summary
+}: {
+  onRun: (actionId: SelectedBlockEditPrioritySummary["actionId"]) => void;
+  summary: SelectedBlockEditPrioritySummary;
+}): ReactElement {
+  const disabled = summary.actionId === "none";
   return (
     <div
       className={`selected-block-edit-priority ${summary.tone}`}
@@ -10827,6 +10869,15 @@ function SelectedBlockEditPriorityReadout({ summary }: { summary: SelectedBlockE
       <small data-testid="selected-block-edit-priority-scope">{summary.scopeLabel}</small>
       <small data-testid="selected-block-edit-priority-impact">{summary.impactLabel}</small>
       <small data-testid="selected-block-edit-priority-next-check">{summary.nextCheckLabel}</small>
+      <button
+        data-testid="selected-block-edit-priority-run"
+        disabled={disabled}
+        onClick={() => onRun(summary.actionId)}
+        title={disabled ? summary.reasonLabel : `Run ${summary.actionLabel}`}
+        type="button"
+      >
+        {disabled ? "Select Block" : summary.actionLabel}
+      </button>
     </div>
   );
 }
@@ -16099,6 +16150,7 @@ function createQuickActions({
   onSetMidiCaptureArmed,
   onApplySessionBriefStarter,
   onFocusSessionBriefCompass,
+  onRunSelectedBlockEditPriority,
   onCopySelectedArrangementBlock,
   onPasteArrangementBlockAfterSelected,
   onDuplicateArrangementBlock,
@@ -16351,6 +16403,7 @@ function createQuickActions({
   onSetMidiCaptureArmed: (armed: boolean) => void;
   onApplySessionBriefStarter: (pad: SessionBriefStarterPadId) => void;
   onFocusSessionBriefCompass: (card: SessionBriefCompassCard) => void;
+  onRunSelectedBlockEditPriority: (actionId: SelectedBlockEditPrioritySummary["actionId"]) => void;
   onCopySelectedArrangementBlock: () => void;
   onPasteArrangementBlockAfterSelected: () => void;
   onDuplicateArrangementBlock: () => void;
@@ -17160,36 +17213,7 @@ function createQuickActions({
       group: "Arrange",
       keywords: `selected block priority recommended edit quick action arrangement song form copy paste duplicate split merge move ${selectedBlockEditPrioritySummary.actionId} beginner producer`,
       disabled: selectedBlockEditPrioritySummary.actionId === "none",
-      run: () => {
-        switch (selectedBlockEditPrioritySummary.actionId) {
-          case "copy":
-            onCopySelectedArrangementBlock();
-            break;
-          case "paste":
-            onPasteArrangementBlockAfterSelected();
-            break;
-          case "duplicate":
-            onDuplicateArrangementBlock();
-            break;
-          case "split":
-            onSplitArrangementBlock();
-            break;
-          case "merge":
-            onMergeArrangementBlock();
-            break;
-          case "move_left":
-            onMoveArrangementBlock(-1);
-            break;
-          case "move_right":
-            onMoveArrangementBlock(1);
-            break;
-          case "delete":
-            onDeleteArrangementBlock();
-            break;
-          case "none":
-            break;
-        }
-      }
+      run: () => onRunSelectedBlockEditPriority(selectedBlockEditPrioritySummary.actionId)
     },
     {
       id: "selected-block-copy",
