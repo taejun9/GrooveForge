@@ -7816,6 +7816,7 @@ export function App(): ReactElement {
     modeFocusSummary,
     patternCloneOptions,
     patternCompareDecisionSummary,
+    patternChainPreviewSummary,
     patternStackOptions,
     patternStackPreviewSummary,
     patternDnaSummary,
@@ -16852,6 +16853,7 @@ function createQuickActions({
   modeFocusSummary,
   patternCloneOptions,
   patternCompareDecisionSummary,
+  patternChainPreviewSummary,
   patternStackOptions,
   patternStackPreviewSummary,
   patternDnaSummary,
@@ -17111,6 +17113,7 @@ function createQuickActions({
   modeFocusSummary: ModeFocusSummary;
   patternCloneOptions: PatternClonePadOption[];
   patternCompareDecisionSummary: PatternCompareDecisionSummary;
+  patternChainPreviewSummary: PatternChainPreviewSummary;
   patternStackOptions: PatternStackOption[];
   patternStackPreviewSummary: PatternStackPreviewSummary;
   patternDnaSummary: PatternDnaSummary;
@@ -18694,6 +18697,7 @@ function createQuickActions({
       run: () => onApplyPatternChain(chain)
     };
   });
+  const patternChainDecisionSummary = createPatternChainPreviewDecision(patternChainPreviewSummary);
 
   return [
     {
@@ -19697,6 +19701,30 @@ function createQuickActions({
       }
     },
     ...arrangementTransitionMapActions,
+    {
+      id: "pattern-chain-decision",
+      title: patternChainDecisionSummary.disabled
+        ? "Run Pattern Chain Decision"
+        : `Run Pattern Chain Decision: ${patternChainDecisionSummary.actionLabel}`,
+      detail: patternChainDecisionSummary.disabled
+        ? patternChainDecisionSummary.detailLabel
+        : `${patternChainDecisionSummary.statusLabel} / ${patternChainDecisionSummary.metricLabel} / ${patternChainDecisionSummary.detailLabel}`,
+      group: "Arrange",
+      keywords: `pattern chain decision preview arrangement structure sketch song current suggested ${
+        patternChainDecisionSummary.targetActionId
+      } ${patternChainDecisionSummary.actionLabel} ${patternChainDecisionSummary.actionId} a b c hook switch break turn expand beginner producer`,
+      disabled: patternChainDecisionSummary.disabled,
+      run: () => {
+        if (patternChainDecisionSummary.disabled || patternChainDecisionSummary.targetActionId === "aligned") {
+          return;
+        }
+        if (patternChainDecisionSummary.targetActionId === "expand") {
+          onExpandPatternChain();
+          return;
+        }
+        onApplyPatternChain(patternChainDecisionSummary.targetActionId);
+      }
+    },
     ...patternChainActions,
     {
       id: "chain-expand",
@@ -22754,7 +22782,10 @@ function quickActionResultFollowup(
   if (action.id.startsWith("pattern-chain-")) {
     return {
       auditionCue: "Play Song loop; check Pattern A/B/C contrast, section energy, and hook placement.",
-      nextCheck: `${barCountLabel(arrangementTotalBars(project))} arranged; use the Pattern Chain Result and Song Form Overview before mix decisions.`
+      nextCheck:
+        action.id === "pattern-chain-decision"
+          ? "Return to Pattern Chain Preview Decision before running another chain or expand move."
+          : `${barCountLabel(arrangementTotalBars(project))} arranged; use the Pattern Chain Result and Song Form Overview before mix decisions.`
     };
   }
 
