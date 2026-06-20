@@ -18557,6 +18557,7 @@ function createQuickActions({
       run: () => onCueSectionLocator(pad.section)
     };
   });
+  const sectionLocatorCueDecision = createSectionLocatorCueDecisionSummary(sectionLocatorPads, isPlaying);
   const keyQuickActions: QuickAction[] = keys.map((key) => {
     const selected = key === project.key;
     const keySlug = key.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -18814,6 +18815,25 @@ function createQuickActions({
     ...hookReadinessFixActions,
     ...toplineSpaceCueActions,
     ...toplineSpaceFixActions,
+    {
+      id: "section-locator-decision",
+      title: sectionLocatorCueDecision.disabled
+        ? "Run Section Locator Cue Decision"
+        : `Run Section Locator Cue Decision: ${sectionLocatorCueDecision.sectionLabel}`,
+      detail: sectionLocatorCueDecision.disabled
+        ? sectionLocatorCueDecision.detailLabel
+        : `${sectionLocatorCueDecision.statusLabel} / ${sectionLocatorCueDecision.metricLabel} / ${sectionLocatorCueDecision.detailLabel}`,
+      group: "Transport",
+      keywords: `section locator cue decision preview arrangement block loop transport intro verse hook bridge outro suggested ${
+        sectionLocatorCueDecision.section ? sectionLocatorTestId(sectionLocatorCueDecision.section) : "none"
+      } ${sectionLocatorCueDecision.sectionLabel} ${sectionLocatorCueDecision.actionId} beginner producer`,
+      disabled: sectionLocatorCueDecision.disabled,
+      run: () => {
+        if (!sectionLocatorCueDecision.disabled && sectionLocatorCueDecision.section) {
+          onCueSectionLocator(sectionLocatorCueDecision.section);
+        }
+      }
+    },
     ...sectionLocatorActions,
     ...arrangementBlockCueActions,
     {
@@ -21029,6 +21049,10 @@ function quickActionResultMetricSnapshot(
     }
   }
 
+  if (action.id === "section-locator-decision") {
+    return { id: "section-locator", label: "Section cue", value: action.detail };
+  }
+
   if (action.id.startsWith("section-locator-")) {
     const section = sectionLocatorActionSection(action.id);
     if (section) {
@@ -22266,6 +22290,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Run Tap tempo pulse repeatedly in time with the groove, then pause briefly so the existing Tap Tempo commit can apply the averaged BPM.",
       nextCheck: "Check the Tap Tempo readout and project BPM before locking arrangement, metronome, or export timing."
+    };
+  }
+
+  if (action.id === "section-locator-decision") {
+    return {
+      auditionCue: "Play Block loop; hear the suggested section cue against its assigned Pattern before changing the arrangement.",
+      nextCheck: "Return to Section Locator Cue Decision before cueing another suggested section."
     };
   }
 
