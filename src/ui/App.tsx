@@ -403,6 +403,7 @@ import type {
   ArrangementArcResultMetric,
   ArrangementArcResultSummary,
   PatternChainPreviewSummary,
+  PatternChainPrioritySummary,
   PatternChainResultMetric,
   PatternChainResultSummary,
   NextMoveCommand,
@@ -8933,6 +8934,7 @@ export function App(): ReactElement {
           <SectionLocatorPads disabled={isPlaying} pads={sectionLocatorPads} onCue={cueSectionLocator} />
           <div className="pattern-chain-row" aria-label="Pattern chain">
             <PatternChainPreview preview={patternChainPreviewSummary} />
+            <PatternChainPriorityReadout summary={createPatternChainPrioritySummary(patternChainPreviewSummary)} />
             <div className="pattern-chain-heading">
               <span>Chain</span>
               <strong data-testid="pattern-chain-current">{patternChainReadout(project.arrangement)}</strong>
@@ -10704,6 +10706,23 @@ function PatternChainPreview({ preview }: { preview: PatternChainPreviewSummary 
       <small data-testid="pattern-chain-preview-sections">{preview.sectionLabel}</small>
       <small data-testid="pattern-chain-preview-energy">{preview.energyLabel}</small>
       <small data-testid="pattern-chain-preview-moves">{preview.moveLabel}</small>
+    </div>
+  );
+}
+
+function PatternChainPriorityReadout({ summary }: { summary: PatternChainPrioritySummary }): ReactElement {
+  return (
+    <div
+      className={`pattern-chain-priority ${summary.tone}`}
+      data-pattern-chain-priority={summary.actionId}
+      data-testid="pattern-chain-priority"
+      title={summary.detailTitle}
+    >
+      <span data-testid="pattern-chain-priority-status">{summary.statusLabel}</span>
+      <strong data-testid="pattern-chain-priority-action">{summary.actionLabel}</strong>
+      <small data-testid="pattern-chain-priority-reason">{summary.reasonLabel}</small>
+      <small data-testid="pattern-chain-priority-scope">{summary.scopeLabel}</small>
+      <small data-testid="pattern-chain-priority-next-check">{summary.nextCheckLabel}</small>
     </div>
   );
 }
@@ -28821,6 +28840,8 @@ function createPatternChainPreviewSummary(arrangement: ArrangementBlock[]): Patt
   if (!candidate) {
     return {
       actionId: "aligned",
+      changedBlockCount: 0,
+      changedFieldCount: 0,
       statusLabel: "Chain aligned",
       actionLabel: "No chain target",
       sequenceLabel: `Sequence ${patternChainReadout(arrangement) || "empty"}`,
@@ -28842,6 +28863,8 @@ function createPatternChainPreviewSummary(arrangement: ArrangementBlock[]): Patt
 
   return {
     actionId: candidate.actionId,
+    changedBlockCount: changedBlocks,
+    changedFieldCount: changedFields,
     statusLabel: changedFields === 0 ? "Chain aligned" : "Suggested chain",
     actionLabel: candidate.actionLabel,
     sequenceLabel,
@@ -28853,6 +28876,43 @@ function createPatternChainPreviewSummary(arrangement: ArrangementBlock[]): Patt
         ? `${candidate.actionLabel} already matches the current arrangement.`
         : `${candidate.actionLabel}: ${sequenceLabel}; ${sectionLabel}; ${energyLabel}; ${moveLabel}.`,
     tone
+  };
+}
+
+function createPatternChainPrioritySummary(preview: PatternChainPreviewSummary): PatternChainPrioritySummary {
+  const statusLabel =
+    preview.actionId === "aligned"
+      ? "Chain aligned"
+      : preview.actionId === "expand"
+        ? "Expand form"
+        : preview.changedBlockCount <= 4
+          ? "Sketch chain"
+          : "Reshape chain";
+  const reasonLabel =
+    preview.actionId === "aligned"
+      ? "Current arrangement already matches available Pattern Chain targets."
+      : preview.actionId === "expand"
+        ? "The current loop is ready to expand into a longer editable song form."
+        : `${preview.moveLabel} would shape the current loop into ${preview.actionLabel}.`;
+  const scopeLabel = `${preview.sequenceLabel} / ${preview.sectionLabel}`;
+  const nextCheckLabel =
+    preview.actionId === "aligned"
+      ? "Audition Song, then inspect Song Form before more changes."
+      : preview.actionId === "expand"
+        ? "Expand, then check Song Form and Transition Map."
+        : preview.changedBlockCount <= 4
+          ? "Apply, then audition Song and inspect Pattern spread."
+          : "Confirm Arrangement Playback before applying a full-chain reshape.";
+
+  return {
+    actionId: preview.actionId,
+    statusLabel,
+    actionLabel: preview.actionLabel,
+    reasonLabel,
+    scopeLabel,
+    nextCheckLabel,
+    detailTitle: `${statusLabel} / ${preview.actionLabel} / ${reasonLabel} / ${scopeLabel} / ${nextCheckLabel}`,
+    tone: preview.tone
   };
 }
 

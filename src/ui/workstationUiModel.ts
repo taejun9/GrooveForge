@@ -2179,12 +2179,25 @@ export type ArrangementArcResultSummary = {
 
 export type PatternChainPreviewSummary = {
   actionId: PatternChainId | "expand" | "aligned";
+  changedBlockCount: number;
+  changedFieldCount: number;
   statusLabel: string;
   actionLabel: string;
   sequenceLabel: string;
   sectionLabel: string;
   energyLabel: string;
   moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export type PatternChainPrioritySummary = {
+  actionId: PatternChainPreviewSummary["actionId"];
+  statusLabel: string;
+  actionLabel: string;
+  reasonLabel: string;
+  scopeLabel: string;
+  nextCheckLabel: string;
   detailTitle: string;
   tone: MixCoachTone;
 };
