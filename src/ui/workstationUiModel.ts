@@ -1441,6 +1441,7 @@ export type ListeningPassFocusSummary = {
   statusLabel: string;
   checkpointLabel: string;
   detailLabel: string;
+  actionLabel: string;
   detailTitle: string;
   tone: MixCoachTone;
 };

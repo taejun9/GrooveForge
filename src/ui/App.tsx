@@ -11775,6 +11775,7 @@ function ListeningPass({
   summary: ListeningPassSummary;
 }): ReactElement {
   const focusSummary = createListeningPassFocusSummary(summary, focusedItemId);
+  const focusItem = focusSummary.itemId ? summary.items.find((item) => item.id === focusSummary.itemId) ?? null : null;
 
   return (
     <section
@@ -11799,6 +11800,25 @@ function ListeningPass({
           <span data-testid="listening-pass-focus-status">{focusSummary.statusLabel}</span>
           <strong data-testid="listening-pass-focus-label">{focusSummary.checkpointLabel}</strong>
           <small data-testid="listening-pass-focus-detail">{focusSummary.detailLabel}</small>
+          <button
+            className="listening-pass-focus-action"
+            data-testid="listening-pass-focus-run"
+            disabled={!focusItem}
+            onClick={() => {
+              if (focusItem) {
+                onFocus(focusItem);
+              }
+            }}
+            title={
+              focusItem
+                ? `Open ${focusItem.focusLabel}: ${focusItem.label} ${focusItem.status}`
+                : "No Listening Pass checkpoint to focus."
+            }
+            type="button"
+          >
+            <ArrowRight size={13} aria-hidden="true" />
+            <span>{focusSummary.actionLabel}</span>
+          </button>
         </div>
         {result && <ListeningPassFocusResultStrip result={result} />}
         <div className="listening-pass-grid" data-testid="listening-pass-grid">
@@ -31994,6 +32014,7 @@ function createListeningPassFocusSummary(
       statusLabel: "Audition clear",
       checkpointLabel: "No listening checkpoint",
       detailLabel: "No Listening Pass items available",
+      actionLabel: "Ready",
       detailTitle: "Listening Pass has no checkpoint to focus.",
       tone: "good"
     };
@@ -32007,6 +32028,7 @@ function createListeningPassFocusSummary(
     statusLabel,
     checkpointLabel: `${item.label}: ${item.status}`,
     detailLabel,
+    actionLabel: `Open ${item.focusLabel}`,
     detailTitle: `${statusLabel} / ${item.label}: ${item.status} / ${item.detail}`,
     tone: item.tone
   };
