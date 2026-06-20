@@ -11121,6 +11121,9 @@ h2 {
 .topline-space-focus-readout span,
 .topline-space-focus-readout strong,
 .topline-space-focus-readout small,
+.topline-space-priority span,
+.topline-space-priority strong,
+.topline-space-priority small,
 .topline-space-result-main strong,
 .topline-space-result-main small,
 .topline-space-result-meta span,
@@ -11187,6 +11190,41 @@ h2 {
 }
 
 .topline-space-focus-readout strong {
+  color: #f4efe7;
+  font-size: 12px;
+}
+
+.topline-space-priority {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  border: 1px solid rgba(142, 203, 255, 0.24);
+  border-inline-start: 3px solid #8ecbff;
+  border-radius: 7px;
+  background: rgba(142, 203, 255, 0.045);
+  padding: 8px 9px;
+}
+
+.topline-space-priority.warn {
+  border-color: rgba(240, 195, 106, 0.24);
+  border-inline-start-color: #f0c36a;
+  background: rgba(240, 195, 106, 0.05);
+}
+
+.topline-space-priority.danger {
+  border-color: rgba(255, 122, 79, 0.28);
+  border-inline-start-color: #ff7a4f;
+  background: rgba(255, 122, 79, 0.05);
+}
+
+.topline-space-priority span,
+.topline-space-priority small {
+  color: rgba(244, 239, 231, 0.64);
+  font-size: 10px;
+}
+
+.topline-space-priority strong {
   color: #f4efe7;
   font-size: 12px;
 }

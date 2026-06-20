@@ -427,6 +427,7 @@ import type {
   ToplineSpaceCard,
   ToplineSpaceSummary,
   ToplineSpaceFocusSummary,
+  ToplineSpacePrioritySummary,
   ToplineSpaceFocusResult,
   SongFormMetricId,
   SongFormMetric,
@@ -14582,6 +14583,7 @@ function ToplineSpace({
   summary: ToplineSpaceSummary;
 }): ReactElement {
   const focusSummary = createToplineSpaceFocusSummary(summary, focusedCardId);
+  const prioritySummary = createToplineSpacePrioritySummary(summary);
 
   return (
     <section className={`topline-space ${summary.tone}`} data-testid="topline-space" aria-label="Topline space">
@@ -14602,6 +14604,17 @@ function ToplineSpace({
           <span data-testid="topline-space-focus-status">{focusSummary.statusLabel}</span>
           <strong data-testid="topline-space-focus-label">{focusSummary.areaLabel}</strong>
           <small data-testid="topline-space-focus-detail">{focusSummary.detailLabel}</small>
+        </div>
+        <div
+          className={`topline-space-priority ${prioritySummary.tone}`}
+          data-testid="topline-space-priority"
+          data-topline-space-priority={prioritySummary.cardId ?? "none"}
+          title={`${prioritySummary.statusLabel} / ${prioritySummary.cardLabel} / ${prioritySummary.reasonLabel} / ${prioritySummary.nextCheckLabel}`}
+        >
+          <span data-testid="topline-space-priority-status">{prioritySummary.statusLabel}</span>
+          <strong data-testid="topline-space-priority-card">{prioritySummary.cardLabel}</strong>
+          <small data-testid="topline-space-priority-reason">{prioritySummary.reasonLabel}</small>
+          <small data-testid="topline-space-priority-next-check">{prioritySummary.nextCheckLabel}</small>
         </div>
         {focusResult && <ToplineSpaceFocusResultStrip result={focusResult} />}
         {fixResult && <ToplineFixResultStrip result={fixResult} />}
@@ -27200,6 +27213,71 @@ function createToplineSpaceFocusSummary(
     detailTitle: `${statusLabel} / ${card.label}: ${card.value} / ${detailLabel}`,
     tone: card.tone
   };
+}
+
+function createToplineSpacePrioritySummary(summary: ToplineSpaceSummary): ToplineSpacePrioritySummary {
+  const card = activeToplineSpaceQuickActionCard(summary);
+
+  if (!card) {
+    return {
+      cardId: null,
+      statusLabel: "Topline priority",
+      cardLabel: "No topline card",
+      reasonLabel: "No Topline Space cards available",
+      nextCheckLabel: "Add a Hook block or selected Pattern, then return to Topline Space.",
+      tone: "warn"
+    };
+  }
+
+  return {
+    cardId: card.id,
+    statusLabel: toplineSpacePriorityStatus(card),
+    cardLabel: `${card.label}: ${card.value}`,
+    reasonLabel: toplineSpacePriorityReason(card),
+    nextCheckLabel: toplineSpacePriorityNextCheck(card),
+    tone: card.tone
+  };
+}
+
+function toplineSpacePriorityStatus(card: ToplineSpaceCard): string {
+  switch (card.tone) {
+    case "danger":
+      return "Fix topline space first";
+    case "warn":
+      return "Review topline space first";
+    case "good":
+      return "Confirm topline lane";
+  }
+}
+
+function toplineSpacePriorityReason(card: ToplineSpaceCard): string {
+  switch (card.id) {
+    case "pocket":
+      return `${card.status}: Rhythm pocket is the current vocal-space priority.`;
+    case "lead":
+      return `${card.status}: Lead density is the current vocal-space priority.`;
+    case "arrangement":
+      return `${card.status}: Hook window clarity is the current vocal-space priority.`;
+    case "mix":
+      return `${card.status}: Mix headroom is the current vocal-space priority.`;
+    case "brief":
+      return `${card.status}: Artist context is the current vocal-space priority.`;
+  }
+}
+
+function toplineSpacePriorityNextCheck(card: ToplineSpaceCard): string {
+  switch (card.id) {
+    case "pocket":
+      return "Cue Topline loop and confirm drums plus 808 leave a stable pocket.";
+    case "lead":
+      return "Use Clear Tail or Pattern DNA, then confirm the lead lane leaves room.";
+    case "arrangement":
+      return "Check Song Form or Topline Loop before changing the hook window.";
+    case "mix":
+      return "Check Mix Coach after the next Headroom Mix Fix or manual space trim.";
+    case "brief":
+      return "Review Session Brief and Handoff Pack after filling artist context.";
+  }
 }
 
 function createToplineSpaceFocusResult(

@@ -2370,6 +2370,15 @@ export type ToplineSpaceFocusSummary = {
   tone: MixCoachTone;
 };
 
+export type ToplineSpacePrioritySummary = {
+  cardId: ToplineSpaceCardId | null;
+  statusLabel: string;
+  cardLabel: string;
+  reasonLabel: string;
+  nextCheckLabel: string;
+  tone: MixCoachTone;
+};
+
 export type ToplineSpaceFocusResult = {
   cardId: ToplineSpaceCardId;
   status: string;
