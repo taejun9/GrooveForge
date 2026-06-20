@@ -7784,6 +7784,8 @@ export function App(): ReactElement {
     mixBalancePadOptions,
     mixBalancePreviewSummary,
     mixSnapshots,
+    masterFinishPadOptions,
+    masterFinishPreviewSummary,
     masterAutomationPadOptions,
     modeFocusSummary,
     patternCloneOptions,
@@ -16477,6 +16479,8 @@ function createQuickActions({
   mixBalancePadOptions,
   mixBalancePreviewSummary,
   mixSnapshots,
+  masterFinishPadOptions,
+  masterFinishPreviewSummary,
   masterAutomationPadOptions,
   modeFocusSummary,
   patternCloneOptions,
@@ -16732,6 +16736,8 @@ function createQuickActions({
   mixBalancePadOptions: MixBalancePadOption[];
   mixBalancePreviewSummary: MixBalancePreviewSummary;
   mixSnapshots: MixSnapshotSlotMap;
+  masterFinishPadOptions: MasterFinishPadOption[];
+  masterFinishPreviewSummary: MasterFinishPreviewSummary;
   masterAutomationPadOptions: MasterAutomationPadOption[];
   modeFocusSummary: ModeFocusSummary;
   patternCloneOptions: PatternClonePadOption[];
@@ -17923,6 +17929,7 @@ function createQuickActions({
   const masterAutomationSuggestedPad =
     masterAutomationPadOptions.find((pad) => pad.id === suggestedMasterAutomationPad()) ?? masterAutomationPadOptions[0];
   const masterAutomationReady = Boolean(masterAutomationSuggestedPad && masterAutomationSuggestedPad.changedCount > 0);
+  const masterFinishReady = masterFinishPreviewSummary.changedMoves > 0;
   const mixBalancePadActions: QuickAction[] = mixBalancePadOptions.map((pad) => ({
     id: `mix-balance-pad-${pad.id}`,
     title: pad.changedCount > 0 ? `Apply ${pad.label} Mix Balance` : `${pad.label} Mix Balance already applied`,
@@ -19467,13 +19474,38 @@ function createQuickActions({
       keywords: "mix fix low end 808 drums bass glue",
       run: () => onApplyMixFix("low_end")
     },
-    ...masterFinishPadDefinitions.map((pad): QuickAction => ({
+    {
+      id: "master-finish",
+      title: masterFinishReady ? `Apply ${masterFinishPreviewSummary.padLabel}` : "Apply Master Finish",
+      detail: masterFinishReady
+        ? `${masterFinishPreviewSummary.presetLabel} / ${masterFinishPreviewSummary.ceilingLabel} / ${masterFinishPreviewSummary.outputLabel}`
+        : "Current master already matches the previewed finish.",
+      group: "Mix",
+      keywords: `master finish current suggested output ceiling demo vocal store club ${masterFinishPreviewSummary.padId} ${masterFinishPreviewSummary.padLabel} beginner producer`,
+      disabled: !masterFinishReady,
+      run: () => {
+        if (masterFinishReady) {
+          onApplyMasterFinish(masterFinishPreviewSummary.padId);
+        }
+      }
+    },
+    ...masterFinishPadOptions.map((pad): QuickAction => ({
       id: `master-finish-${pad.id}`,
-      title: `${pad.label} master finish`,
-      detail: `${pad.preset} at ${formatDb(pad.ceilingDb)} ceiling / ${formatDb(pad.masterVolumeDb)} output.`,
+      title: pad.changedCount > 0 ? `Apply ${pad.label} Master Finish` : `${pad.label} Master Finish already applied`,
+      detail:
+        pad.changedCount > 0
+          ? `${pad.preset} at ${formatDb(pad.ceilingDb)} ceiling / ${formatDb(pad.masterVolumeDb)} output / ${
+              pad.changedCount
+            } finish move${pad.changedCount === 1 ? "" : "s"}`
+          : `${pad.label} already matches the current master output posture.`,
       group: "Mix",
       keywords: `master finish ${pad.id} ${pad.label} ${pad.detail} output ceiling demo vocal store club`,
-      run: () => onApplyMasterFinish(pad.id)
+      disabled: pad.changedCount === 0,
+      run: () => {
+        if (pad.changedCount > 0) {
+          onApplyMasterFinish(pad.id);
+        }
+      }
     })),
     {
       id: "handoff-export-format-focus",
@@ -19728,11 +19760,16 @@ function quickActionMatchesScope(action: QuickAction, scope: QuickActionScopeId)
     case "mix":
       return (
         action.group === "Mix" &&
+        action.id !== "master-finish" &&
         !action.id.startsWith("master-finish-") &&
         composerActionQuickActionArea(action.id) !== "finish"
       );
     case "master":
-      return action.id.startsWith("master-finish-") || composerActionQuickActionArea(action.id) === "finish";
+      return (
+        action.id === "master-finish" ||
+        action.id.startsWith("master-finish-") ||
+        composerActionQuickActionArea(action.id) === "finish"
+      );
     case "project":
       return action.group === "Project" || action.group === "Edit";
     case "export":
@@ -21197,10 +21234,11 @@ function quickActionResultMetricSnapshot(
   }
 
   const masterFinishPad = masterFinishQuickActionPad(action.id);
-  if (masterFinishPad) {
+  if (action.id === "master-finish" || masterFinishPad) {
+    const label = masterFinishPad ? `${masterFinishPad.label} Master Finish` : "Master Finish";
     return {
-      id: `master-finish-${masterFinishPad.id}`,
-      label: `${masterFinishPad.label} Master Finish`,
+      id: masterFinishPad ? `master-finish-${masterFinishPad.id}` : "master-finish",
+      label,
       value: masterFinishQuickActionPosture(project)
     };
   }
@@ -22343,7 +22381,7 @@ function quickActionResultFollowup(
   }
 
   const masterFinishPad = masterFinishQuickActionPad(action.id);
-  if (masterFinishPad) {
+  if (action.id === "master-finish" || masterFinishPad) {
     return {
       auditionCue: "Play Full Mix; watch Export meter headroom and limiter.",
       nextCheck: "Use Ceiling and master output controls for manual trim before WAV/stem export."
@@ -33329,6 +33367,7 @@ function createMasterFinishPreviewSummary(
 
   return {
     padId: pad.id,
+    changedMoves: pad.changedCount,
     statusLabel,
     padLabel,
     presetLabel,

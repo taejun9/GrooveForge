@@ -7,6 +7,7 @@ import type {
   MasterAutomationResult,
   MasterFinishPadId,
   MasterFinishPadOption,
+  MasterFinishPreviewDecisionSummary,
   MasterFinishPreviewSummary,
   MasterFinishResult,
   MixBalancePadId,
@@ -458,6 +459,8 @@ export function MasterFinishPads({
   result: MasterFinishResult | null;
   onApply: (pad: MasterFinishPadId) => void;
 }): ReactElement {
+  const decision = createMasterFinishPreviewDecision(preview);
+
   return (
     <div className="master-finish-panel" data-testid="master-finish-pads">
       <div className="master-finish-heading">
@@ -477,6 +480,7 @@ export function MasterFinishPads({
         <small data-testid="master-finish-preview-output">{preview.outputLabel}</small>
         <small data-testid="master-finish-preview-changes">{preview.changeLabel}</small>
       </div>
+      <MasterFinishPreviewDecision summary={decision} onApply={() => onApply(decision.padId)} />
       {result && <MasterFinishResultStrip result={result} />}
       <div className="master-finish-row" aria-label="Master Finish Pads">
         {pads.map((pad) => (
@@ -495,6 +499,59 @@ export function MasterFinishPads({
       </div>
     </div>
   );
+}
+
+export function MasterFinishPreviewDecision({
+  summary,
+  onApply
+}: {
+  summary: MasterFinishPreviewDecisionSummary;
+  onApply: () => void;
+}): ReactElement {
+  return (
+    <div
+      className={`master-finish-decision ${summary.tone}`}
+      data-master-finish-decision={summary.padId}
+      data-testid="master-finish-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="master-finish-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="master-finish-decision-label">{summary.padLabel}</strong>
+      <small data-testid="master-finish-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="master-finish-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="master-finish-decision-run"
+        data-master-finish-decision-action={summary.actionId}
+        data-testid="master-finish-decision-run"
+        disabled={summary.disabled}
+        onClick={onApply}
+        title={summary.disabled ? "Current master already matches this finish" : `Apply ${summary.padLabel}`}
+        type="button"
+      >
+        <Gauge size={12} aria-hidden="true" />
+        <span data-testid="master-finish-decision-action">{summary.actionLabel}</span>
+      </button>
+    </div>
+  );
+}
+
+function createMasterFinishPreviewDecision(summary: MasterFinishPreviewSummary): MasterFinishPreviewDecisionSummary {
+  const aligned = summary.changedMoves === 0;
+
+  return {
+    padId: summary.padId,
+    actionId: aligned ? "aligned" : "apply-suggested",
+    statusLabel: aligned ? "Finish aligned" : "Ready to apply",
+    padLabel: summary.padLabel,
+    metricLabel: `${summary.changedMoves} finish move${summary.changedMoves === 1 ? "" : "s"}`,
+    detailLabel: aligned ? "Current editable master already matches this finish." : `${summary.presetLabel} / ${summary.outputLabel}`,
+    actionLabel: aligned ? "Aligned" : "Apply Suggested Finish",
+    disabled: aligned,
+    detailTitle: aligned
+      ? `${summary.detailTitle} No Master Finish action is needed.`
+      : `${summary.detailTitle} Apply only after this output posture fits the beat.`,
+    tone: aligned ? "good" : summary.tone
+  };
 }
 
 function MasterFinishResultStrip({ result }: { result: MasterFinishResult }): ReactElement {

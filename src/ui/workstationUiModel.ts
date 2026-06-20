@@ -972,12 +972,26 @@ export type MasterFinishPadOption = MasterFinishPadDefinition & {
 
 export type MasterFinishPreviewSummary = {
   padId: MasterFinishPadId;
+  changedMoves: number;
   statusLabel: string;
   padLabel: string;
   presetLabel: string;
   ceilingLabel: string;
   outputLabel: string;
   changeLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export type MasterFinishPreviewDecisionSummary = {
+  padId: MasterFinishPadId;
+  actionId: "apply-suggested" | "aligned";
+  statusLabel: string;
+  padLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  actionLabel: string;
+  disabled: boolean;
   detailTitle: string;
   tone: MixCoachTone;
 };
