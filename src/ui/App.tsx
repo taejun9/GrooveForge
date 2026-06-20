@@ -397,6 +397,7 @@ import type {
   ArrangementArcPadDefinition,
   ArrangementArcPadOption,
   ArrangementArcPreviewSummary,
+  ArrangementArcPrioritySummary,
   ArrangementTemplatePreviewSummary,
   ArrangementTemplatePrioritySummary,
   ArrangementTemplateResultMetric,
@@ -10649,6 +10650,7 @@ function ArrangementArcPads({
         <small data-testid="arrangement-arc-preview-mutes">{preview.muteLabel}</small>
         <small data-testid="arrangement-arc-preview-moves">{preview.moveLabel}</small>
       </div>
+      <ArrangementArcPriorityReadout summary={createArrangementArcPrioritySummary(preview)} />
       <div className="arrangement-arc-row">
         {pads.map((pad) => (
           <button
@@ -10667,6 +10669,24 @@ function ArrangementArcPads({
       </div>
       {result && <ArrangementArcResultStrip result={result} />}
     </section>
+  );
+}
+
+function ArrangementArcPriorityReadout({ summary }: { summary: ArrangementArcPrioritySummary }): ReactElement {
+  return (
+    <div
+      className={`arrangement-arc-priority ${summary.tone}`}
+      data-arrangement-arc-priority={summary.padId}
+      data-testid="arrangement-arc-priority"
+      title={summary.detailTitle}
+    >
+      <span data-testid="arrangement-arc-priority-status">{summary.statusLabel}</span>
+      <strong data-testid="arrangement-arc-priority-pad">{summary.padLabel}</strong>
+      <small data-testid="arrangement-arc-priority-reason">{summary.reasonLabel}</small>
+      <small data-testid="arrangement-arc-priority-scope">{summary.scopeLabel}</small>
+      <small data-testid="arrangement-arc-priority-moves">{summary.moveLabel}</small>
+      <small data-testid="arrangement-arc-priority-next-check">{summary.nextCheckLabel}</small>
+    </div>
   );
 }
 
@@ -29132,6 +29152,8 @@ function createArrangementArcPreviewSummary(
   if (!pad) {
     return {
       padId: "clean",
+      changedBlockCount: 0,
+      changedFieldCount: 0,
       statusLabel: "Arc aligned",
       padLabel: "No arc target",
       sectionLabel: "No arrangement blocks",
@@ -29156,6 +29178,8 @@ function createArrangementArcPreviewSummary(
 
   return {
     padId: pad.id,
+    changedBlockCount: changedBlocks,
+    changedFieldCount: changedFields,
     statusLabel: changedFields === 0 ? "Arc aligned" : "Suggested arc",
     padLabel: pad.label,
     sectionLabel,
@@ -29168,6 +29192,50 @@ function createArrangementArcPreviewSummary(
         ? `${pad.label} already matches the current arrangement posture.`
         : `${pad.label}: ${sectionLabel}; ${patternLabel}; ${energyLabel}; ${muteLabel}; ${moveLabel}.`,
     tone
+  };
+}
+
+function createArrangementArcPrioritySummary(preview: ArrangementArcPreviewSummary): ArrangementArcPrioritySummary {
+  const isAligned = preview.statusLabel === "Arc aligned";
+  const statusLabel = isAligned
+    ? "Arc aligned"
+    : preview.padId === "clean"
+      ? "Stabilize arc"
+      : preview.padId === "lift"
+        ? "Lift hook"
+        : preview.padId === "break"
+          ? "Shape break"
+          : "Push rise";
+  const reasonLabel = isAligned
+    ? "Current arrangement already matches the suggested full-song energy arc."
+    : preview.padId === "clean"
+      ? "Make the full song feel steady before detailed block edits."
+      : preview.padId === "lift"
+        ? "Push hook energy and width so the peak is obvious."
+        : preview.padId === "break"
+          ? "Add a clear drop turn before the hook returns."
+          : "Build late-song lift for a stronger club-style payoff.";
+  const scopeLabel = `${preview.sectionLabel} / ${preview.energyLabel}`;
+  const nextCheckLabel = isAligned
+    ? "Audition Song, then inspect Transition Map before more arc changes."
+    : preview.padId === "clean"
+      ? "Apply, then audition Song and check Song Form flow."
+      : preview.padId === "lift"
+        ? "Apply, then cue Hook and inspect hook energy contrast."
+        : preview.padId === "break"
+          ? "Apply, then audition Bridge into Hook."
+          : "Apply, then audition the late Hook and Outro movement.";
+
+  return {
+    padId: preview.padId,
+    statusLabel,
+    padLabel: preview.padLabel,
+    reasonLabel,
+    scopeLabel,
+    moveLabel: preview.moveLabel,
+    nextCheckLabel,
+    detailTitle: `${statusLabel} / ${preview.padLabel} / ${reasonLabel} / ${scopeLabel} / ${preview.moveLabel} / ${nextCheckLabel}`,
+    tone: preview.tone
   };
 }
 

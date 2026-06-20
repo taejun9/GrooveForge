@@ -2110,6 +2110,8 @@ export type ArrangementArcPadOption = ArrangementArcPadDefinition & {
 
 export type ArrangementArcPreviewSummary = {
   padId: ArrangementArcPadId;
+  changedBlockCount: number;
+  changedFieldCount: number;
   statusLabel: string;
   padLabel: string;
   sectionLabel: string;
@@ -2117,6 +2119,18 @@ export type ArrangementArcPreviewSummary = {
   energyLabel: string;
   muteLabel: string;
   moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export type ArrangementArcPrioritySummary = {
+  padId: ArrangementArcPreviewSummary["padId"];
+  statusLabel: string;
+  padLabel: string;
+  reasonLabel: string;
+  scopeLabel: string;
+  moveLabel: string;
+  nextCheckLabel: string;
   detailTitle: string;
   tone: MixCoachTone;
 };
