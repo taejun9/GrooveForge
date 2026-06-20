@@ -1070,6 +1070,22 @@ export function WorkflowNavigator({
         <span data-testid="workflow-spotlight-decision-status">{spotlight.decisionStatus}</span>
         <strong data-testid="workflow-spotlight-decision-label">{spotlight.decisionLabel}</strong>
         <small data-testid="workflow-spotlight-decision-detail">{spotlight.decisionDetail}</small>
+        <button
+          className="workflow-spotlight-decision-action"
+          data-workflow-spotlight-decision-action={spotlightItem?.id ?? "none"}
+          data-testid="workflow-spotlight-decision-run"
+          disabled={!spotlightItem}
+          onClick={() => {
+            if (spotlightItem) {
+              onJump(spotlightItem);
+            }
+          }}
+          title={spotlightItem ? `Jump to ${spotlightItem.label}: ${spotlightItem.detail}` : spotlight.detailTitle}
+          type="button"
+        >
+          <ArrowRight size={13} aria-hidden="true" />
+          <span>{spotlight.decisionLabel}</span>
+        </button>
       </div>
       <button
         aria-label={spotlight.detailTitle}
