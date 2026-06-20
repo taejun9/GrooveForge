@@ -18065,7 +18065,21 @@ function createQuickActions({
     selectedArrangementIndex,
     arrangementBlockClipboard
   );
+  const selectedBlockEditDecisionSummary = createSelectedBlockEditPreviewDecision(selectedBlockEditPrioritySummary);
   const selectedBlockActions: QuickAction[] = [
+    {
+      id: "selected-block-edit-decision",
+      title: selectedBlockEditDecisionSummary.disabled
+        ? "Run Selected Block Edit Decision"
+        : `Run Selected Block Edit Decision: ${selectedBlockEditDecisionSummary.actionLabel}`,
+      detail: selectedBlockEditDecisionSummary.disabled
+        ? selectedBlockEditDecisionSummary.detailLabel
+        : `${selectedBlockEditDecisionSummary.statusLabel} / ${selectedBlockEditDecisionSummary.metricLabel} / ${selectedBlockEditDecisionSummary.detailLabel}`,
+      group: "Arrange",
+      keywords: `selected block edit decision preview run suggested arrangement song form copy paste duplicate split merge move delete ${selectedBlockEditDecisionSummary.targetActionId} ${selectedBlockEditDecisionSummary.actionLabel} beginner producer`,
+      disabled: selectedBlockEditDecisionSummary.disabled,
+      run: () => onRunSelectedBlockEditPriority(selectedBlockEditDecisionSummary.targetActionId)
+    },
     {
       id: "selected-block-priority-edit",
       title:
@@ -20305,6 +20319,7 @@ function createQuickActionResult(
     action.id.startsWith("capture-default-");
   const blockClipboardOnly =
     action.id === "selected-block-copy" ||
+    (action.id === "selected-block-edit-decision" && action.title.includes("Copy Block")) ||
     (action.id === "selected-block-priority-edit" && action.title.includes("Copy Block"));
   const noteClipboardOnly = action.id === "selected-note-copy";
   const drumClipboardOnly = action.id === "selected-drum-copy";
@@ -22671,6 +22686,19 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use Paste copied block when the copied section shape should repeat in the arrangement.",
       nextCheck: "The arrangement block clipboard is UI-local; paste explicitly before changing to another editing task."
+    };
+  }
+
+  if (action.id === "selected-block-edit-decision") {
+    if (action.title.includes("Copy Block")) {
+      return {
+        auditionCue: "Use Paste copied block when the preview decision copied a section shape for later repetition.",
+        nextCheck: "Return to Selected Block Edit Preview Decision after pasting or intentionally leaving the clipboard staged."
+      };
+    }
+    return {
+      auditionCue: "Play Song or Block loop after the preview-decision edit and compare it against the decision readout.",
+      nextCheck: "Return to Selected Block Edit Preview Decision before running another structure edit."
     };
   }
 
