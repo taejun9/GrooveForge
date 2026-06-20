@@ -14338,6 +14338,7 @@ function ExportPreflightFocusResultStrip({ result }: { result: ExportPreflightFo
 
 type HandoffExportFormatPriority = {
   metricId: HandoffExportFormatFocusId | null;
+  actionLabel: string;
   statusLabel: string;
   areaLabel: string;
   metricLabel: string;
@@ -14408,6 +14409,8 @@ function HandoffPack({
   const manifestAudit = createHandoffManifestAudit(project, items, fileManifest, receiptSummary, sendOrderSummary);
   const formatSummary = createHandoffExportFormatSummary(project, analysis, stemAnalyses, items);
   const formatPriority = createHandoffExportFormatPriority(formatSummary);
+  const formatPriorityMetric = formatSummary.metrics.find((metric) => metric.id === formatPriority.metricId) ?? null;
+  const formatPriorityActionDisabled = formatPriorityMetric === null;
   const packageFocusSummary = createHandoffPackageCheckFocusSummary(packageCheckSummary, focusedPackageCheckId);
   const packagePriority = createHandoffPackageCheckPriority(packageCheckSummary);
   const packagePriorityCard = packageCheckSummary.cards.find((card) => card.focusId === packagePriority.focusId) ?? null;
@@ -14521,6 +14524,19 @@ function HandoffPack({
           <strong data-testid="handoff-export-format-priority-label">{formatPriority.areaLabel}</strong>
           <small data-testid="handoff-export-format-priority-metric">{formatPriority.metricLabel}</small>
           <small data-testid="handoff-export-format-priority-next-check">{formatPriority.nextCheckLabel}</small>
+          <button
+            data-testid="handoff-export-format-priority-run"
+            disabled={formatPriorityActionDisabled}
+            onClick={() => {
+              if (formatPriorityMetric) {
+                onFocusExportFormat(formatPriorityMetric);
+              }
+            }}
+            title={formatPriorityMetric ? `Focus ${formatPriority.areaLabel}` : formatPriority.title}
+            type="button"
+          >
+            {formatPriority.actionLabel}
+          </button>
         </div>
         <div className="handoff-export-format-metrics" data-testid="handoff-export-format-metrics">
           {formatSummary.metrics.map((metric) => {
@@ -14664,6 +14680,7 @@ function createHandoffExportFormatPriority(summary: HandoffExportFormatSummary):
   if (!metric) {
     return {
       metricId: null,
+      actionLabel: "No format",
       statusLabel: "Format clear",
       areaLabel: "No format lane",
       metricLabel: "No Handoff Export Format metrics available",
@@ -14679,6 +14696,7 @@ function createHandoffExportFormatPriority(summary: HandoffExportFormatSummary):
 
   return {
     metricId: metric.id,
+    actionLabel: "Focus format",
     statusLabel,
     areaLabel: `${metric.label}: ${metric.value}`,
     metricLabel: `${metric.detail} / ${summary.durationLabel}`,
