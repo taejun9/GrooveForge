@@ -4,6 +4,8 @@ import type { ExportAnalysis, StemTrackId } from "../audio/render";
 import type {
   MasterAutomationPadId,
   MasterAutomationPadOption,
+  MasterAutomationPreviewDecisionSummary,
+  MasterAutomationPreviewSummary,
   MasterAutomationResult,
   MasterFinishPadId,
   MasterFinishPadOption,
@@ -670,14 +672,16 @@ function MasterFinishResultStrip({ result }: { result: MasterFinishResult }): Re
 
 export function MasterAutomationPads({
   pads,
+  preview,
   result,
   onApply
 }: {
   pads: MasterAutomationPadOption[];
+  preview: MasterAutomationPreviewSummary;
   result: MasterAutomationResult | null;
   onApply: (pad: MasterAutomationPadId) => void;
 }): ReactElement {
-  const activePad = pads.find((pad) => pad.active) ?? pads[0];
+  const decision = createMasterAutomationPreviewDecision(preview);
 
   return (
     <div className="master-finish-panel master-automation-panel" data-testid="master-automation-pads">
@@ -686,18 +690,19 @@ export function MasterAutomationPads({
         <strong>Fade lane</strong>
       </div>
       <div
-        className="master-finish-preview master-automation-preview good"
-        data-preview-pad={activePad?.id ?? "none"}
-        data-testid="master-automation-status"
-        title={activePad ? `${activePad.label}: ${activePad.description}` : "Master automation"}
+        className={`master-finish-preview master-automation-preview ${preview.tone}`}
+        data-preview-master-automation={preview.padId}
+        data-testid="master-automation-preview"
+        title={preview.detailTitle}
       >
-        <span data-testid="master-automation-active">{activePad?.label ?? "None"}</span>
-        <strong data-testid="master-automation-range">{activePad?.preview ?? "No fade"}</strong>
-        <small>{activePad?.detail ?? "manual"}</small>
-        <small>{activePad?.changedCount ?? 0} event moves</small>
-        <small>Realtime</small>
-        <small>Export</small>
+        <span data-testid="master-automation-preview-status">{preview.statusLabel}</span>
+        <strong data-testid="master-automation-preview-label">{preview.padLabel}</strong>
+        <small data-testid="master-automation-preview-current">{preview.currentLabel}</small>
+        <small data-testid="master-automation-preview-events">{preview.eventLabel}</small>
+        <small data-testid="master-automation-preview-range">{preview.rangeLabel}</small>
+        <small data-testid="master-automation-preview-changes">{preview.changeLabel}</small>
       </div>
+      <MasterAutomationPreviewDecision summary={decision} onApply={() => onApply(decision.padId)} />
       {result && <MasterAutomationResultStrip result={result} />}
       <div className="master-finish-row master-automation-row" aria-label="Master Automation Pads">
         {pads.map((pad) => (
@@ -717,6 +722,61 @@ export function MasterAutomationPads({
       </div>
     </div>
   );
+}
+
+export function MasterAutomationPreviewDecision({
+  summary,
+  onApply
+}: {
+  summary: MasterAutomationPreviewDecisionSummary;
+  onApply: () => void;
+}): ReactElement {
+  return (
+    <div
+      className={`master-finish-decision master-automation-decision ${summary.tone}`}
+      data-master-automation-decision={summary.padId}
+      data-testid="master-automation-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="master-automation-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="master-automation-decision-label">{summary.padLabel}</strong>
+      <small data-testid="master-automation-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="master-automation-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="master-finish-decision-run master-automation-decision-run"
+        data-master-automation-decision-action={summary.actionId}
+        data-testid="master-automation-decision-run"
+        disabled={summary.disabled}
+        onClick={onApply}
+        title={summary.disabled ? "Current master automation already matches this fade" : `Apply ${summary.padLabel}`}
+        type="button"
+      >
+        <Gauge size={12} aria-hidden="true" />
+        <span data-testid="master-automation-decision-action">{summary.actionLabel}</span>
+      </button>
+    </div>
+  );
+}
+
+function createMasterAutomationPreviewDecision(
+  summary: MasterAutomationPreviewSummary
+): MasterAutomationPreviewDecisionSummary {
+  const aligned = summary.changedEvents === 0;
+
+  return {
+    padId: summary.padId,
+    actionId: aligned ? "aligned" : "apply-suggested",
+    statusLabel: aligned ? "Automation aligned" : "Ready to apply",
+    padLabel: summary.padLabel,
+    metricLabel: `${summary.changedEvents} automation event${summary.changedEvents === 1 ? "" : "s"}`,
+    detailLabel: aligned ? "Current editable master automation already matches this fade." : `${summary.eventLabel} / ${summary.rangeLabel}`,
+    actionLabel: aligned ? "Aligned" : "Apply Suggested Automation",
+    disabled: aligned,
+    detailTitle: aligned
+      ? `${summary.detailTitle} No Master Automation action is needed.`
+      : `${summary.detailTitle} Apply only after this fade supports the arrangement.`,
+    tone: aligned ? "good" : summary.tone
+  };
 }
 
 function MasterAutomationResultStrip({ result }: { result: MasterAutomationResult }): ReactElement {

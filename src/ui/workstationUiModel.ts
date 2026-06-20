@@ -1057,6 +1057,32 @@ export type MasterAutomationPadOption = MasterAutomationPadDefinition & {
   active: boolean;
 };
 
+export type MasterAutomationPreviewSummary = {
+  padId: MasterAutomationPadId;
+  changedEvents: number;
+  statusLabel: string;
+  padLabel: string;
+  currentLabel: string;
+  eventLabel: string;
+  rangeLabel: string;
+  changeLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export type MasterAutomationPreviewDecisionSummary = {
+  padId: MasterAutomationPadId;
+  actionId: "apply-suggested" | "aligned";
+  statusLabel: string;
+  padLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  actionLabel: string;
+  disabled: boolean;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type MasterAutomationResultMetric = {
   id: "preset" | "events" | "range";
   label: string;

@@ -264,6 +264,7 @@ import type {
   MasterAutomationPadId,
   MasterAutomationPadDefinition,
   MasterAutomationPadOption,
+  MasterAutomationPreviewSummary,
   MasterAutomationResultMetric,
   MasterAutomationResult,
   TransportLoopScope,
@@ -1635,6 +1636,10 @@ export function App(): ReactElement {
     [project, masterFinishPadOptions]
   );
   const masterAutomationPadOptions = useMemo(() => createMasterAutomationPadOptions(project), [project]);
+  const masterAutomationPreviewSummary = useMemo(
+    () => createMasterAutomationPreviewSummary(project, masterAutomationPadOptions),
+    [project, masterAutomationPadOptions]
+  );
   const masterOutputRoleSummary = useMemo(
     () => createMasterOutputRoleSummary(project, exportAnalysis),
     [project, exportAnalysis]
@@ -7792,6 +7797,7 @@ export function App(): ReactElement {
     masterFinishPadOptions,
     masterFinishPreviewSummary,
     masterAutomationPadOptions,
+    masterAutomationPreviewSummary,
     modeFocusSummary,
     patternCloneOptions,
     patternCompareDecisionSummary,
@@ -9813,6 +9819,7 @@ export function App(): ReactElement {
           />
           <MasterAutomationPads
             pads={masterAutomationPadOptions}
+            preview={masterAutomationPreviewSummary}
             result={masterAutomationResult}
             onApply={applyMasterAutomationPad}
           />
@@ -16493,6 +16500,7 @@ function createQuickActions({
   masterFinishPadOptions,
   masterFinishPreviewSummary,
   masterAutomationPadOptions,
+  masterAutomationPreviewSummary,
   modeFocusSummary,
   patternCloneOptions,
   patternCompareDecisionSummary,
@@ -16751,6 +16759,7 @@ function createQuickActions({
   masterFinishPadOptions: MasterFinishPadOption[];
   masterFinishPreviewSummary: MasterFinishPreviewSummary;
   masterAutomationPadOptions: MasterAutomationPadOption[];
+  masterAutomationPreviewSummary: MasterAutomationPreviewSummary;
   modeFocusSummary: ModeFocusSummary;
   patternCloneOptions: PatternClonePadOption[];
   patternCompareDecisionSummary: PatternCompareDecisionSummary;
@@ -17940,8 +17949,8 @@ function createQuickActions({
   const drumKitReady = drumKitPreviewSummary.statusLabel !== "Kit aligned";
   const mixBalanceReady = mixBalancePreviewSummary.changedControls > 0;
   const masterAutomationSuggestedPad =
-    masterAutomationPadOptions.find((pad) => pad.id === suggestedMasterAutomationPad()) ?? masterAutomationPadOptions[0];
-  const masterAutomationReady = Boolean(masterAutomationSuggestedPad && masterAutomationSuggestedPad.changedCount > 0);
+    masterAutomationPadOptions.find((pad) => pad.id === masterAutomationPreviewSummary.padId) ?? masterAutomationPadOptions[0];
+  const masterAutomationReady = masterAutomationPreviewSummary.changedEvents > 0;
   const masterFinishReady = masterFinishPreviewSummary.changedMoves > 0;
   const spaceFxReady = spaceFxPreviewSummary.changedSends > 0;
   const mixBalancePadActions: QuickAction[] = mixBalancePadOptions.map((pad) => ({
@@ -19448,22 +19457,18 @@ function createQuickActions({
       id: "master-automation",
       title:
         masterAutomationReady && masterAutomationSuggestedPad
-          ? `Apply ${masterAutomationSuggestedPad.label} Master Automation`
+          ? `Apply ${masterAutomationPreviewSummary.padLabel}`
           : "Apply Master Automation",
       detail:
         masterAutomationReady && masterAutomationSuggestedPad
-          ? `${masterAutomationSuggestedPad.preview} / ${masterAutomationSuggestedPad.changedCount} automation event${
-              masterAutomationSuggestedPad.changedCount === 1 ? "" : "s"
-            }`
+          ? `${masterAutomationPreviewSummary.eventLabel} / ${masterAutomationPreviewSummary.rangeLabel}`
           : "Current master automation already matches the suggested fade.",
       group: "Mix",
-      keywords: `master automation current fade lane fade in fade out intro outro realtime export wav stems ${masterAutomationSuggestedPad?.id ?? "none"} ${
-        masterAutomationSuggestedPad?.label ?? "none"
-      } beginner producer`,
+      keywords: `master automation current suggested fade lane fade in fade out intro outro realtime export wav stems ${masterAutomationPreviewSummary.padId} ${masterAutomationPreviewSummary.padLabel} beginner producer`,
       disabled: !masterAutomationReady || !masterAutomationSuggestedPad,
       run: () => {
         if (masterAutomationReady && masterAutomationSuggestedPad) {
-          onApplyMasterAutomation(masterAutomationSuggestedPad.id);
+          onApplyMasterAutomation(masterAutomationPreviewSummary.padId);
         }
       }
     },
@@ -33542,6 +33547,54 @@ function createMasterAutomationPadOptions(project: ProjectState): MasterAutomati
 
 function suggestedMasterAutomationPad(): MasterAutomationPadId {
   return "intro_outro";
+}
+
+function createMasterAutomationPreviewSummary(
+  project: ProjectState,
+  pads: MasterAutomationPadOption[]
+): MasterAutomationPreviewSummary {
+  const suggestedPadId = suggestedMasterAutomationPad();
+  const pad = pads.find((option) => option.id === suggestedPadId) ?? pads[0];
+  if (!pad) {
+    return {
+      padId: "none",
+      changedEvents: 0,
+      statusLabel: "Automation aligned",
+      padLabel: "No automation target",
+      currentLabel: "No fade target",
+      eventLabel: "0 events",
+      rangeLabel: masterAutomationRangeLabel(project),
+      changeLabel: "0 automation events",
+      detailTitle: "No Master Automation pads are available.",
+      tone: "good"
+    };
+  }
+
+  const nextProject = applyMasterAutomationPreset(project, pad.id);
+  const changedEvents = masterAutomationChangedCount(project, nextProject);
+  const currentPreset = masterAutomationPresetForProject(project);
+  const currentLabel =
+    currentPreset === pad.id
+      ? `${pad.label} active`
+      : `${masterAutomationPresetLabel(currentPreset)} -> ${pad.label}`;
+  const eventLabel = `${masterAutomationEventCountLabel(nextProject)} / ${pad.preview}`;
+  const rangeLabel = masterAutomationRangeLabel(project);
+  const changeLabel = `${changedEvents} automation event${changedEvents === 1 ? "" : "s"} before Apply`;
+  const statusLabel = changedEvents === 0 ? "Automation aligned" : "Suggested fade";
+  const tone: MixCoachTone = changedEvents === 0 ? "good" : changedEvents <= 2 ? "warn" : "danger";
+
+  return {
+    padId: pad.id,
+    changedEvents,
+    statusLabel,
+    padLabel: `${pad.label} automation`,
+    currentLabel,
+    eventLabel,
+    rangeLabel,
+    changeLabel,
+    detailTitle: `${statusLabel}: ${currentLabel}; ${eventLabel}; ${rangeLabel}; ${changeLabel}.`,
+    tone
+  };
 }
 
 function createMasterAutomationResult(
