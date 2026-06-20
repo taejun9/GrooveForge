@@ -18603,6 +18603,8 @@ function createQuickActions({
     run: () => onFocusHandoffExportFormat(metric)
   }));
   const handoffPackageCheckCard = activeHandoffPackageCheckQuickActionCard(handoffPackageCheckSummary);
+  const handoffExportReceiptCard =
+    handoffPackageCheckSummary.cards.find((card) => card.focusId === "receipt") ?? null;
   const handoffPackageCheckActions: QuickAction[] = handoffPackageCheckSummary.cards.map((card) => ({
     id: `handoff-package-check-card-${card.id}`,
     title: `Focus Handoff Package: ${card.label}`,
@@ -20315,6 +20317,24 @@ function createQuickActions({
     },
     ...handoffExportFormatActions,
     {
+      id: "handoff-export-receipt-focus",
+      title: handoffExportReceiptCard
+        ? `Focus Handoff Export Receipt: ${handoffExportReceiptCard.value}`
+        : "Focus Handoff Export Receipt",
+      detail: handoffExportReceiptCard
+        ? `${handoffExportReceiptCard.status} / ${handoffExportReceiptCard.detail}`
+        : "No Handoff Export Receipt readout available.",
+      group: "Export",
+      keywords: `handoff export receipt focus latest downloaded file confirm wav stems midi sheet deliverable ${
+        handoffExportReceiptCard?.value ?? "none"
+      } ${handoffExportReceiptCard?.status ?? "none"} beginner producer`,
+      run: () => {
+        if (handoffExportReceiptCard) {
+          onFocusHandoffPackageCheck(handoffExportReceiptCard);
+        }
+      }
+    },
+    {
       id: "handoff-package-check-focus",
       title: handoffPackageCheckCard
         ? `Focus Handoff Package: ${handoffPackageCheckCard.label}`
@@ -20681,6 +20701,7 @@ function createQuickActionResult(
     action.id.startsWith("topline-space-cue-") ||
     action.id === "handoff-package-check-focus" ||
     action.id.startsWith("handoff-package-check-card-") ||
+    action.id === "handoff-export-receipt-focus" ||
     action.id === "handoff-export-format-focus" ||
     action.id.startsWith("handoff-export-format-") ||
     action.id === "song-form-priority" ||
@@ -21832,6 +21853,14 @@ function quickActionResultMetricSnapshot(
     return {
       id: "handoff-package-check",
       label: "Handoff package",
+      value: action.detail
+    };
+  }
+
+  if (action.id === "handoff-export-receipt-focus") {
+    return {
+      id: "handoff-export-receipt",
+      label: "Handoff receipt",
       value: action.detail
     };
   }
@@ -23099,6 +23128,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused package card before running explicit WAV, stem, MIDI, or Handoff Sheet exports.",
       nextCheck: "Return to Handoff Package Check when you need another file-set, order, receipt, or context review."
+    };
+  }
+
+  if (action.id === "handoff-export-receipt-focus") {
+    return {
+      auditionCue: "Read the latest Handoff Export Receipt before assuming a WAV, stems, MIDI, or Handoff Sheet deliverable is ready.",
+      nextCheck: "If the receipt is empty or outdated, run Handoff Next Export or the explicit deliverable export you need."
     };
   }
 
