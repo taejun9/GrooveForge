@@ -2454,6 +2454,19 @@ export type PatternChainPrioritySummary = {
   tone: MixCoachTone;
 };
 
+export type PatternChainPreviewDecisionSummary = {
+  targetActionId: PatternChainPreviewSummary["actionId"];
+  actionId: "apply-suggested" | "aligned";
+  statusLabel: string;
+  actionLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  buttonLabel: string;
+  disabled: boolean;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type PatternChainResultMetric = {
   id: "sequence" | "sections" | "bars" | "energy" | "mutes";
   label: string;

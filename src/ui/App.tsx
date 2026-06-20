@@ -414,6 +414,7 @@ import type {
   ArrangementTemplateResultSummary,
   ArrangementArcResultMetric,
   ArrangementArcResultSummary,
+  PatternChainPreviewDecisionSummary,
   PatternChainPreviewSummary,
   PatternChainPrioritySummary,
   PatternChainResultMetric,
@@ -9079,6 +9080,10 @@ export function App(): ReactElement {
           <SectionLocatorPads disabled={isPlaying} pads={sectionLocatorPads} onCue={cueSectionLocator} />
           <div className="pattern-chain-row" aria-label="Pattern chain">
             <PatternChainPreview preview={patternChainPreviewSummary} />
+            <PatternChainPreviewDecision
+              summary={createPatternChainPreviewDecision(patternChainPreviewSummary)}
+              onRun={runPatternChainPriorityAction}
+            />
             <PatternChainPriorityReadout summary={patternChainPrioritySummary} onRun={runPatternChainPriorityAction} />
             <div className="pattern-chain-heading">
               <span>Chain</span>
@@ -11250,6 +11255,44 @@ function PatternChainPreview({ preview }: { preview: PatternChainPreviewSummary 
       <small data-testid="pattern-chain-preview-sections">{preview.sectionLabel}</small>
       <small data-testid="pattern-chain-preview-energy">{preview.energyLabel}</small>
       <small data-testid="pattern-chain-preview-moves">{preview.moveLabel}</small>
+    </div>
+  );
+}
+
+function PatternChainPreviewDecision({
+  onRun,
+  summary
+}: {
+  onRun: (actionId: PatternChainPreviewSummary["actionId"]) => void;
+  summary: PatternChainPreviewDecisionSummary;
+}): ReactElement {
+  return (
+    <div
+      className={`pattern-chain-priority pattern-chain-decision ${summary.tone}`}
+      data-pattern-chain-decision={summary.targetActionId}
+      data-testid="pattern-chain-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="pattern-chain-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="pattern-chain-decision-action">{summary.actionLabel}</strong>
+      <small data-testid="pattern-chain-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="pattern-chain-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="pattern-chain-decision-run"
+        data-pattern-chain-decision-action={summary.actionId}
+        data-testid="pattern-chain-decision-run"
+        disabled={summary.disabled}
+        onClick={() => {
+          if (!summary.disabled) {
+            onRun(summary.targetActionId);
+          }
+        }}
+        title={summary.disabled ? "Current arrangement already matches this chain" : `Run ${summary.actionLabel}`}
+        type="button"
+      >
+        <ListChecks size={12} aria-hidden="true" />
+        <span data-testid="pattern-chain-decision-label">{summary.buttonLabel}</span>
+      </button>
     </div>
   );
 }
@@ -30443,6 +30486,27 @@ function createPatternChainPrioritySummary(preview: PatternChainPreviewSummary):
     nextCheckLabel,
     detailTitle: `${statusLabel} / ${preview.actionLabel} / ${reasonLabel} / ${scopeLabel} / ${nextCheckLabel}`,
     tone: preview.tone
+  };
+}
+
+function createPatternChainPreviewDecision(preview: PatternChainPreviewSummary): PatternChainPreviewDecisionSummary {
+  const aligned = preview.actionId === "aligned" || preview.changedFieldCount === 0;
+
+  return {
+    targetActionId: preview.actionId,
+    actionId: aligned ? "aligned" : "apply-suggested",
+    statusLabel: aligned ? "Chain aligned" : "Ready to apply",
+    actionLabel: preview.actionLabel,
+    metricLabel: `${preview.changedBlockCount} block${preview.changedBlockCount === 1 ? "" : "s"} / ${
+      preview.changedFieldCount
+    } field${preview.changedFieldCount === 1 ? "" : "s"}`,
+    detailLabel: aligned ? "Current editable arrangement already matches available chains." : `${preview.sequenceLabel} / ${preview.sectionLabel}`,
+    buttonLabel: aligned ? "Aligned" : "Apply Suggested Chain",
+    disabled: aligned,
+    detailTitle: aligned
+      ? `${preview.detailTitle} No Pattern Chain action is needed.`
+      : `${preview.detailTitle} Apply only after this chain supports the beat.`,
+    tone: aligned ? "good" : preview.tone
   };
 }
 
