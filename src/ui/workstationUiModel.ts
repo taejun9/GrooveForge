@@ -2346,6 +2346,19 @@ export type ArrangementArcPrioritySummary = {
   tone: MixCoachTone;
 };
 
+export type ArrangementArcPreviewDecisionSummary = {
+  targetPadId: ArrangementArcPreviewSummary["padId"];
+  actionId: "apply-suggested" | "aligned";
+  statusLabel: string;
+  padLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  buttonLabel: string;
+  disabled: boolean;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementTemplatePreviewSummary = {
   templateId: ArrangementTemplateId | "aligned";
   changedBlockCount: number;

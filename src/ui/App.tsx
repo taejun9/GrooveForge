@@ -405,6 +405,7 @@ import type {
   ArrangementArcPoint,
   ArrangementArcPadDefinition,
   ArrangementArcPadOption,
+  ArrangementArcPreviewDecisionSummary,
   ArrangementArcPreviewSummary,
   ArrangementArcPrioritySummary,
   ArrangementTemplatePreviewDecisionSummary,
@@ -10984,6 +10985,7 @@ function ArrangementArcPads({
         <small data-testid="arrangement-arc-preview-mutes">{preview.muteLabel}</small>
         <small data-testid="arrangement-arc-preview-moves">{preview.moveLabel}</small>
       </div>
+      <ArrangementArcPreviewDecision summary={createArrangementArcPreviewDecision(preview)} onApply={onApply} />
       <ArrangementArcPriorityReadout summary={createArrangementArcPrioritySummary(preview)} onApply={onApply} />
       <div className="arrangement-arc-row">
         {pads.map((pad) => (
@@ -11003,6 +11005,44 @@ function ArrangementArcPads({
       </div>
       {result && <ArrangementArcResultStrip result={result} />}
     </section>
+  );
+}
+
+function ArrangementArcPreviewDecision({
+  onApply,
+  summary
+}: {
+  onApply: (pad: ArrangementArcPadId) => void;
+  summary: ArrangementArcPreviewDecisionSummary;
+}): ReactElement {
+  return (
+    <div
+      className={`arrangement-arc-priority arrangement-arc-decision ${summary.tone}`}
+      data-arrangement-arc-decision={summary.targetPadId}
+      data-testid="arrangement-arc-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="arrangement-arc-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="arrangement-arc-decision-pad">{summary.padLabel}</strong>
+      <small data-testid="arrangement-arc-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="arrangement-arc-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="arrangement-arc-decision-run"
+        data-arrangement-arc-decision-action={summary.actionId}
+        data-testid="arrangement-arc-decision-run"
+        disabled={summary.disabled}
+        onClick={() => {
+          if (!summary.disabled) {
+            onApply(summary.targetPadId);
+          }
+        }}
+        title={summary.disabled ? "Current arrangement already matches this arc" : `Apply ${summary.padLabel} arc`}
+        type="button"
+      >
+        <ListChecks size={12} aria-hidden="true" />
+        <span data-testid="arrangement-arc-decision-label">{summary.buttonLabel}</span>
+      </button>
+    </div>
   );
 }
 
@@ -30822,6 +30862,27 @@ function createArrangementArcPrioritySummary(preview: ArrangementArcPreviewSumma
     nextCheckLabel,
     detailTitle: `${statusLabel} / ${preview.padLabel} / ${reasonLabel} / ${scopeLabel} / ${preview.moveLabel} / ${nextCheckLabel}`,
     tone: preview.tone
+  };
+}
+
+function createArrangementArcPreviewDecision(preview: ArrangementArcPreviewSummary): ArrangementArcPreviewDecisionSummary {
+  const aligned = preview.statusLabel === "Arc aligned" || preview.changedFieldCount === 0;
+
+  return {
+    targetPadId: preview.padId,
+    actionId: aligned ? "aligned" : "apply-suggested",
+    statusLabel: aligned ? "Arc aligned" : "Ready to apply",
+    padLabel: preview.padLabel,
+    metricLabel: `${preview.changedBlockCount} block${preview.changedBlockCount === 1 ? "" : "s"} / ${
+      preview.changedFieldCount
+    } field${preview.changedFieldCount === 1 ? "" : "s"}`,
+    detailLabel: aligned ? "Current arrangement already matches the suggested arc." : `${preview.sectionLabel} / ${preview.energyLabel}`,
+    buttonLabel: aligned ? "Aligned" : "Apply Suggested Arc",
+    disabled: aligned,
+    detailTitle: aligned
+      ? `${preview.detailTitle} No Arrangement Arc action is needed.`
+      : `${preview.detailTitle} Apply only after this arc supports the beat.`,
+    tone: aligned ? "good" : preview.tone
   };
 }
 

@@ -20216,6 +20216,26 @@ input[type="range"] {
   background: rgba(255, 122, 79, 0.13);
 }
 
+.arrangement-arc-decision {
+  grid-template-columns: minmax(104px, 0.58fr) minmax(122px, 0.7fr) minmax(120px, 0.66fr) minmax(0, 1.16fr) minmax(150px, 0.8fr);
+}
+
+.arrangement-arc-decision-run {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.arrangement-arc-decision-run:disabled {
+  cursor: default;
+  opacity: 0.56;
+}
+
+.arrangement-arc-decision-run svg {
+  flex: 0 0 auto;
+}
+
 .arrangement-arc-row {
   display: grid;
   grid-column: 2;
@@ -26450,6 +26470,7 @@ input[type="range"] {
 
   .arrangement-arc-heading,
   .arrangement-arc-preview,
+  .arrangement-arc-decision,
   .arrangement-arc-priority,
   .arrangement-arc-row,
   .arrangement-arc-result {
@@ -26465,6 +26486,10 @@ input[type="range"] {
   }
 
   .arrangement-arc-priority {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .arrangement-arc-decision {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -26802,6 +26827,11 @@ input[type="range"] {
   }
 
   .arrangement-arc-priority {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .arrangement-arc-decision {
     grid-template-columns: 1fr;
     gap: 4px;
   }
