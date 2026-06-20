@@ -307,6 +307,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
     items: [
       { id: "export-format-readout", command: "Export Format Readout", shortcut: "Readout", target: "WAV / stems / MIDI / sheet" },
       { id: "handoff-send-order", command: "Handoff Send Order", shortcut: "Quick Actions / Readout", target: "WAV -> stems -> MIDI -> sheet" },
+      { id: "handoff-manifest-audit", command: "Handoff Manifest Audit", shortcut: "Quick Actions / Readout", target: "Planned files / readiness" },
       { id: "handoff-export-receipt", command: "Handoff Export Receipt", shortcut: "Quick Actions / Readout", target: "Latest explicit export" },
       { id: "handoff-package-check", command: "Handoff Package Check", shortcut: "Quick Actions", target: "File set / send order" },
       { id: "handoff-next-export", command: "Handoff Next Export", shortcut: "Quick Actions", target: "Next deliverable" },

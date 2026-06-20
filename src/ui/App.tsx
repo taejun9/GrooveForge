@@ -7589,6 +7589,25 @@ export function App(): ReactElement {
     setProjectStatus(`Package ${card.label}: ${card.value}`);
   }
 
+  function focusHandoffManifestAudit(): void {
+    const currentItems = createHandoffPackItems({
+      analysis: exportAnalysis,
+      project,
+      stemAnalyses,
+      onExportHandoffSheet: handleExportHandoffSheet,
+      onExportMidi: handleExportMidi,
+      onExportStems: handleExportStems,
+      onExportWav: handleExportWav
+    });
+    const currentSendOrder = createHandoffPackSendOrderSummary(project, currentItems);
+    const currentReceipt = handoffExportReceipt ?? emptyHandoffExportReceipt();
+    const currentManifest = createHandoffFileManifest(project, stemAnalyses, currentItems);
+    const currentAudit = createHandoffManifestAudit(project, currentItems, currentManifest, currentReceipt, currentSendOrder);
+
+    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Manifest ${currentAudit.statusLabel}: ${currentAudit.detailLabel}`);
+  }
+
   function focusHandoffExportFormatMetric(metric: HandoffExportFormatMetric): void {
     const currentItems = createHandoffPackItems({
       analysis: exportAnalysis,
@@ -7795,6 +7814,7 @@ export function App(): ReactElement {
     firstBeatPathSummary,
     finishChecklistSummary,
     grooveCompassSummary,
+    handoffExportReceipt,
     handoffPackageCheckSummary,
     hookLoopCueTarget,
     hookReadinessSummary,
@@ -8012,6 +8032,7 @@ export function App(): ReactElement {
     onFocusFinishChecklist: focusFinishChecklistCard,
     onFocusGrooveCompass: focusGrooveCompassItem,
     onFocusHandoffExportFormat: focusHandoffExportFormatMetric,
+    onFocusHandoffManifestAudit: focusHandoffManifestAudit,
     onFocusHandoffPackageCheck: focusHandoffPackageCheckCard,
     onFocusHookReadiness: focusHookReadinessCard,
     onFocusKeyCompass: focusKeyCompassItem,
@@ -16838,6 +16859,7 @@ function createQuickActions({
   firstBeatPathSummary,
   finishChecklistSummary,
   grooveCompassSummary,
+  handoffExportReceipt,
   handoffPackageCheckSummary,
   hookLoopCueTarget,
   hookReadinessSummary,
@@ -17054,6 +17076,7 @@ function createQuickActions({
   onFocusFinishChecklist,
   onFocusGrooveCompass,
   onFocusHandoffExportFormat,
+  onFocusHandoffManifestAudit,
   onFocusHandoffPackageCheck,
   onFocusHookReadiness,
   onFocusKeyCompass,
@@ -17104,6 +17127,7 @@ function createQuickActions({
   firstBeatPathSummary: FirstBeatPathSummary;
   finishChecklistSummary: FinishChecklistSummary;
   grooveCompassSummary: GrooveCompassSummary;
+  handoffExportReceipt: HandoffExportReceipt | null;
   handoffPackageCheckSummary: HandoffPackageCheckSummary;
   hookLoopCueTarget: HookLoopCueTarget | null;
   hookReadinessSummary: HookReadinessSummary;
@@ -17320,6 +17344,7 @@ function createQuickActions({
   onFocusFinishChecklist: (card: FinishChecklistCard) => void;
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
   onFocusHandoffExportFormat: (metric: HandoffExportFormatMetric) => void;
+  onFocusHandoffManifestAudit: () => void;
   onFocusHandoffPackageCheck: (card: HandoffPackageCheckCard) => void;
   onFocusHookReadiness: (card: HookReadinessFocusItem) => void;
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
@@ -18589,6 +18614,15 @@ function createQuickActions({
     onExportWav
   });
   const handoffSendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const handoffReceipt = handoffExportReceipt ?? emptyHandoffExportReceipt();
+  const handoffFileManifest = createHandoffFileManifest(project, stemAnalyses, handoffPackItems);
+  const handoffManifestAudit = createHandoffManifestAudit(
+    project,
+    handoffPackItems,
+    handoffFileManifest,
+    handoffReceipt,
+    handoffSendOrder
+  );
   const nextHandoffItem = handoffSendOrder.nextItemId
     ? (handoffPackItems.find((item) => item.id === handoffSendOrder.nextItemId) ?? null)
     : null;
@@ -20319,6 +20353,16 @@ function createQuickActions({
     },
     ...handoffExportFormatActions,
     {
+      id: "handoff-manifest-audit-focus",
+      title: `Focus Handoff Manifest Audit: ${handoffManifestAudit.statusLabel}`,
+      detail: `${handoffManifestAudit.detailLabel} / ${handoffManifestAudit.receiptLabel} / ${handoffManifestAudit.nextLabel}`,
+      group: "Export",
+      keywords: `handoff manifest audit focus planned files readiness receipt next step wav stems midi sheet ${
+        handoffManifestAudit.statusLabel
+      } ${handoffManifestAudit.checks.map((check) => `${check.id} ${check.statusLabel}`).join(" ")} beginner producer`,
+      run: onFocusHandoffManifestAudit
+    },
+    {
       id: "handoff-send-order-focus",
       title: handoffSendOrderCard
         ? `Focus Handoff Send Order: ${handoffSendOrder.nextLabel}`
@@ -20720,6 +20764,7 @@ function createQuickActionResult(
     action.id.startsWith("topline-space-cue-") ||
     action.id === "handoff-package-check-focus" ||
     action.id.startsWith("handoff-package-check-card-") ||
+    action.id === "handoff-manifest-audit-focus" ||
     action.id === "handoff-send-order-focus" ||
     action.id === "handoff-export-receipt-focus" ||
     action.id === "handoff-export-format-focus" ||
@@ -21889,6 +21934,14 @@ function quickActionResultMetricSnapshot(
     return {
       id: "handoff-send-order",
       label: "Handoff send order",
+      value: action.detail
+    };
+  }
+
+  if (action.id === "handoff-manifest-audit-focus") {
+    return {
+      id: "handoff-manifest-audit",
+      label: "Handoff manifest",
       value: action.detail
     };
   }
@@ -23170,6 +23223,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Read Handoff Send Order before running Handoff Next Export so the next WAV, stems, MIDI, or Handoff Sheet step is deliberate.",
       nextCheck: "If the next step is correct, run Handoff Next Export or the matching explicit export button."
+    };
+  }
+
+  if (action.id === "handoff-manifest-audit-focus") {
+    return {
+      auditionCue: "Read Manifest Audit before sending files so planned WAV, stems, MIDI, and Handoff Sheet readiness match the latest receipt.",
+      nextCheck: "If any file lane is not ready, use Handoff Send Order, Handoff Export Receipt, or the explicit deliverable export before sending."
     };
   }
 
