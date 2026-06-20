@@ -2425,6 +2425,15 @@ export type SongFormOverviewSummary = {
   selectedIndex: number;
 };
 
+export type SongFormPrioritySummary = {
+  metricId: SongFormMetricId | null;
+  statusLabel: string;
+  metricLabel: string;
+  reasonLabel: string;
+  nextCheckLabel: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementMuteMapFocusId = ArrangementMuteTrack;
 
 export type ArrangementMuteMapLane = {

@@ -433,6 +433,7 @@ import type {
   SongFormMetric,
   SongFormSegment,
   SongFormOverviewSummary,
+  SongFormPrioritySummary,
   ArrangementMuteMapFocusId,
   ArrangementMuteMapLane,
   ArrangementMuteMapSegment,
@@ -14752,6 +14753,8 @@ function SongFormOverview({
   playingArrangementIndex: number | null;
   summary: SongFormOverviewSummary;
 }): ReactElement {
+  const prioritySummary = createSongFormPrioritySummary(summary);
+
   return (
     <section className={`song-form-overview ${summary.tone}`} data-testid="song-form-overview" aria-label="Song form overview">
       <div className="song-form-heading">
@@ -14763,6 +14766,17 @@ function SongFormOverview({
         <small data-testid="song-form-detail">{summary.detail}</small>
       </div>
       <div className="song-form-metrics" data-testid="song-form-metrics">
+        <div
+          className={`song-form-priority ${prioritySummary.tone}`}
+          data-song-form-priority={prioritySummary.metricId ?? "none"}
+          data-testid="song-form-priority"
+          title={`${prioritySummary.statusLabel} / ${prioritySummary.metricLabel} / ${prioritySummary.reasonLabel} / ${prioritySummary.nextCheckLabel}`}
+        >
+          <span data-testid="song-form-priority-status">{prioritySummary.statusLabel}</span>
+          <strong data-testid="song-form-priority-metric">{prioritySummary.metricLabel}</strong>
+          <small data-testid="song-form-priority-reason">{prioritySummary.reasonLabel}</small>
+          <small data-testid="song-form-priority-next-check">{prioritySummary.nextCheckLabel}</small>
+        </div>
         {summary.metrics.map((metric) => (
           <div className={`song-form-metric ${metric.tone}`} data-testid={`song-form-metric-${metric.id}`} key={metric.id}>
             <span>{metric.label}</span>
@@ -28184,6 +28198,71 @@ function arrangementTransitionLoopDetail(target: ArrangementTransitionLoopTarget
 
 function uniquePatternSlots(slots: PatternSlot[]): PatternSlot[] {
   return patternSlots.filter((slot) => slots.includes(slot));
+}
+
+function createSongFormPrioritySummary(summary: SongFormOverviewSummary): SongFormPrioritySummary {
+  const metric = activeSongFormPriorityMetric(summary);
+
+  if (!metric) {
+    return {
+      metricId: null,
+      statusLabel: "Song form priority",
+      metricLabel: "No form metric",
+      reasonLabel: "No Song Form metrics available",
+      nextCheckLabel: "Add arrangement blocks, then return to Song Form Overview.",
+      tone: "warn"
+    };
+  }
+
+  return {
+    metricId: metric.id,
+    statusLabel: songFormPriorityStatus(metric),
+    metricLabel: `${metric.label}: ${metric.value}`,
+    reasonLabel: songFormPriorityReason(metric),
+    nextCheckLabel: songFormPriorityNextCheck(metric),
+    tone: metric.tone
+  };
+}
+
+function activeSongFormPriorityMetric(summary: SongFormOverviewSummary): SongFormMetric | null {
+  return summary.metrics.find((metric) => metric.tone === "danger") ?? summary.metrics.find((metric) => metric.tone === "warn") ?? summary.metrics[0] ?? null;
+}
+
+function songFormPriorityStatus(metric: SongFormMetric): string {
+  switch (metric.tone) {
+    case "danger":
+      return "Fix song form first";
+    case "warn":
+      return "Review song form first";
+    case "good":
+      return "Confirm song form lane";
+  }
+}
+
+function songFormPriorityReason(metric: SongFormMetric): string {
+  switch (metric.id) {
+    case "flow":
+      return `${metric.detail}: Section flow is the current form priority.`;
+    case "patterns":
+      return `${metric.detail}: Pattern A/B/C spread is the current form priority.`;
+    case "selected":
+      return `${metric.detail}: Selected block posture is the current form priority.`;
+    case "energy":
+      return `${metric.detail}: Energy arc contrast is the current form priority.`;
+  }
+}
+
+function songFormPriorityNextCheck(metric: SongFormMetric): string {
+  switch (metric.id) {
+    case "flow":
+      return "Use Pattern Chain, Arrangement Template, or Section Locator before detailed block edits.";
+    case "patterns":
+      return "Use Pattern Compare or Pattern Chain, then confirm A/B/C roles across the form.";
+    case "selected":
+      return "Use Arrangement Playback Readout or Arrangement Focus before changing the selected block.";
+    case "energy":
+      return "Use Arrangement Arc or Transition Map before editing block energy.";
+  }
 }
 
 function createSongFormOverviewSummary(project: ProjectState, selectedIndex: number): SongFormOverviewSummary {
