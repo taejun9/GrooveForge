@@ -33694,6 +33694,7 @@ function createDrumKitPreviewSummary(pads: DrumKitPadOption[]): DrumKitPreviewSu
   if (!pad) {
     return {
       padId: "clean",
+      changedMoves: 0,
       statusLabel: "Kit aligned",
       kitLabel: "No kit target",
       drumLabel: "No drum tone target",
@@ -33711,6 +33712,7 @@ function createDrumKitPreviewSummary(pads: DrumKitPadOption[]): DrumKitPreviewSu
 
   return {
     padId: pad.id,
+    changedMoves: pad.changedCount,
     statusLabel: pad.changedCount === 0 ? "Kit aligned" : "Suggested kit",
     kitLabel: `${pad.label} kit`,
     drumLabel,

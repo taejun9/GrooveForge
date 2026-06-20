@@ -881,11 +881,25 @@ export type DrumKitPadOption = DrumKitPadDefinition & {
 
 export type DrumKitPreviewSummary = {
   padId: DrumKitPadId;
+  changedMoves: number;
   statusLabel: string;
   kitLabel: string;
   drumLabel: string;
   rackLabel: string;
   moveLabel: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+};
+
+export type DrumKitPreviewDecisionSummary = {
+  padId: DrumKitPadId;
+  actionId: "apply-suggested" | "aligned";
+  statusLabel: string;
+  kitLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  actionLabel: string;
+  disabled: boolean;
   detailTitle: string;
   tone: MixCoachTone;
 };

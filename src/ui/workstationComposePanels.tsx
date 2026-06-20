@@ -3,7 +3,7 @@ import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { BassNote, ChordEvent, ChordProgressionPreset, ChordQuality, DrumLane, MelodyNote, NoteTrack, PatternSlot, PatternVariationPreset, ProjectState, SoundDesign } from "../domain/workstation";
 import { chordInversions, chordInversionLabel, chordProgressionPresetIds, chordProgressionPresetLabel, chordQualities, drumStepProbability, drumStepTimingMs, drumStepVelocity, hatRepeatCount, maxDrumTimingMs, minDrumTimingMs, normalizeChordInversion, normalizeDrumProbability, normalizeDrumTimingMs, normalizeDrumVelocity, normalizeEventProbability, normalizeHatRepeat, scalePitchNames, soundPresetDesign, soundPresetIds, soundPresetLabel, steps } from "../domain/workstation";
-import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneSuggestionSummary, PatternCloneResult, PatternFillPreviewSummary, PatternFillSuggestionSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationSuggestionSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewDecisionSummary, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundSnapshot, SoundSnapshotComparisonSummary, SoundSnapshotSlotId, SoundSnapshotSlotMap, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
+import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewDecisionSummary, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneSuggestionSummary, PatternCloneResult, PatternFillPreviewSummary, PatternFillSuggestionSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationSuggestionSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewDecisionSummary, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundSnapshot, SoundSnapshotComparisonSummary, SoundSnapshotSlotId, SoundSnapshotSlotMap, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
 import { drumLabels, keyboardCaptureKeyLabels } from "./workstationUiModel";
 import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyChordStep, percentLabel, pitchParts, timingLabel, trackOctaveRange } from "./workstationPatternTools";
 
@@ -2117,6 +2117,8 @@ export function DrumKitPads({
   result: DrumKitResult | null;
   onApply: (pad: DrumKitPadId) => void;
 }): ReactElement {
+  const decision = createDrumKitPreviewDecision(preview);
+
   return (
     <div className="drum-kit-panel" data-testid="drum-kit-pads">
       <div className="drum-kit-heading">
@@ -2135,6 +2137,7 @@ export function DrumKitPads({
         <small data-testid="drum-kit-preview-rack">{preview.rackLabel}</small>
         <small data-testid="drum-kit-preview-moves">{preview.moveLabel}</small>
       </div>
+      <DrumKitPreviewDecision summary={decision} onApply={() => onApply(decision.padId)} />
       <div className="drum-kit-row" aria-label="Drum Kit Pads">
         {pads.map((pad) => (
           <button
@@ -2153,6 +2156,59 @@ export function DrumKitPads({
       {result && <DrumKitResultStrip result={result} />}
     </div>
   );
+}
+
+export function DrumKitPreviewDecision({
+  summary,
+  onApply
+}: {
+  summary: DrumKitPreviewDecisionSummary;
+  onApply: () => void;
+}): ReactElement {
+  return (
+    <div
+      className={`drum-kit-decision ${summary.tone}`}
+      data-drum-kit-decision={summary.padId}
+      data-testid="drum-kit-decision"
+      title={summary.detailTitle}
+    >
+      <span data-testid="drum-kit-decision-status">{summary.statusLabel}</span>
+      <strong data-testid="drum-kit-decision-label">{summary.kitLabel}</strong>
+      <small data-testid="drum-kit-decision-metric">{summary.metricLabel}</small>
+      <small data-testid="drum-kit-decision-detail">{summary.detailLabel}</small>
+      <button
+        className="drum-kit-decision-run"
+        data-drum-kit-decision-action={summary.actionId}
+        data-testid="drum-kit-decision-run"
+        disabled={summary.disabled}
+        onClick={onApply}
+        title={summary.disabled ? "Current drums already match this kit" : `Apply ${summary.kitLabel}`}
+        type="button"
+      >
+        <Drum size={12} aria-hidden="true" />
+        <span data-testid="drum-kit-decision-action">{summary.actionLabel}</span>
+      </button>
+    </div>
+  );
+}
+
+function createDrumKitPreviewDecision(summary: DrumKitPreviewSummary): DrumKitPreviewDecisionSummary {
+  const aligned = summary.changedMoves === 0;
+
+  return {
+    padId: summary.padId,
+    actionId: aligned ? "aligned" : "apply-suggested",
+    statusLabel: aligned ? "Kit aligned" : "Ready to apply",
+    kitLabel: summary.kitLabel,
+    metricLabel: summary.moveLabel,
+    detailLabel: aligned ? "Current drum tone and rack already match this kit." : `${summary.drumLabel} / ${summary.rackLabel}`,
+    actionLabel: aligned ? "Aligned" : "Apply Suggested Kit",
+    disabled: aligned,
+    detailTitle: aligned
+      ? `${summary.detailTitle} No Drum Kit action is needed.`
+      : `${summary.detailTitle} Apply only after the suggested kit fits the drum and 808 balance.`,
+    tone: aligned ? "good" : summary.tone
+  };
 }
 
 export function DrumKitResultStrip({ result }: { result: DrumKitResult }): ReactElement {
