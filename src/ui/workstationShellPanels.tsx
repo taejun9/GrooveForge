@@ -232,7 +232,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "pattern-compare-decision", command: "Pattern Compare Decision", shortcut: "Quick Actions", target: "Current Cue / Use recommendation" },
       { id: "pattern-dna", command: "Pattern DNA", shortcut: "Quick Actions / Readout", target: "Layers / density / variation" },
       { id: "pattern-variation", command: "Pattern Variation", shortcut: "Quick Actions / Readout", target: "Hook / breakdown variation" },
-      { id: "pattern-fill", command: "Pattern Fill", shortcut: "Quick Actions", target: "Tail moves" },
+      { id: "pattern-fill", command: "Pattern Fill", shortcut: "Quick Actions / Readout", target: "Tail moves" },
       { id: "pattern-clone", command: "Pattern Clone", shortcut: "Quick Actions", target: "Clone to A/B/C" },
       { id: "pattern-copy-clear", command: "Pattern Copy / Clear", shortcut: "Quick Actions", target: "Copy / reset Patterns" },
       { id: "drum-move", command: "Drum Move", shortcut: "Quick Actions", target: "Foundation / feel / accent" },
