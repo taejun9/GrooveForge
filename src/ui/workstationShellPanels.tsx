@@ -199,7 +199,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "mode-switch", command: "Mode Switch", shortcut: "Quick Actions", target: "Guided / Studio mode" },
       { id: "session-pass", command: "Session Pass", shortcut: "Quick Actions / Readout", target: "Setup / risk / delivery" },
       { id: "session-brief-compass", command: "Session Brief Compass", shortcut: "Quick Actions / Readout", target: "Direction / reference / handoff" },
-      { id: "composer-guide", command: "Composer Guide", shortcut: "Quick Actions", target: "Drums / 808 / harmony / melody" },
+      { id: "composer-guide", command: "Composer Guide", shortcut: "Quick Actions / Readout", target: "Drums / 808 / harmony / melody" },
       { id: "key-compass", command: "Key Compass", shortcut: "Quick Actions", target: "Scale / cadence / chords" },
       { id: "groove-compass", command: "Groove Compass", shortcut: "Quick Actions", target: "Pocket / timing / anchors" },
       { id: "listening-pass", command: "Listening Pass", shortcut: "Quick Actions", target: "Compose / arrange / mix / deliver" },
