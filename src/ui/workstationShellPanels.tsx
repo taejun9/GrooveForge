@@ -195,7 +195,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "guide-quick-start", command: "Guide Quick Start", shortcut: "Quick Actions", target: "Current path / session / workflow target" },
       { id: "first-beat-path", command: "First Beat Path", shortcut: "Quick Actions", target: "Setup / compose / arrange / mix / deliver" },
       { id: "beat-spine", command: "Beat Spine", shortcut: "Quick Actions", target: "Setup / drums / 808 / sound / finish" },
-      { id: "mode-focus", command: "Mode Focus", shortcut: "Quick Actions", target: "Guided / Studio orientation" },
+      { id: "mode-focus", command: "Mode Focus", shortcut: "Quick Actions / Readout", target: "Guided / Studio orientation" },
       { id: "mode-switch", command: "Mode Switch", shortcut: "Quick Actions", target: "Guided / Studio mode" },
       { id: "session-pass", command: "Session Pass", shortcut: "Quick Actions", target: "Setup / risk / delivery" },
       { id: "session-brief-compass", command: "Session Brief Compass", shortcut: "Quick Actions", target: "Direction / reference / handoff" },
