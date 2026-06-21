@@ -211,7 +211,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "workflow-spotlight", command: "Workflow Spotlight", shortcut: "Quick Actions / Readout", target: "Current command target" },
       { id: "beat-map", command: "Beat Map", shortcut: "Quick Actions / Readout", target: "Workflow / producer metrics" },
       { id: "structure-lens", command: "Structure Lens", shortcut: "Quick Actions / Readout", target: "Arrangement shape actions" },
-      { id: "next-move", command: "Next Move", shortcut: "Quick Actions", target: "One explicit next step" }
+      { id: "next-move", command: "Next Move", shortcut: "Quick Actions / Readout", target: "One explicit next step" }
     ]
   },
   {
