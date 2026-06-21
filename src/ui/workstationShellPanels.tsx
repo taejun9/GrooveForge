@@ -205,7 +205,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "listening-pass", command: "Listening Pass", shortcut: "Quick Actions / Readout", target: "Compose / arrange / mix / deliver" },
       { id: "beat-passport", command: "Beat Passport", shortcut: "Quick Actions / Readout", target: "Identity / readiness / export" },
       { id: "production-snapshot", command: "Production Snapshot", shortcut: "Quick Actions / Readout", target: "Target / form / mix / handoff" },
-      { id: "beat-readiness", command: "Beat Readiness", shortcut: "Quick Actions", target: "Drums / 808 / melody / export" },
+      { id: "beat-readiness", command: "Beat Readiness", shortcut: "Quick Actions / Readout", target: "Drums / 808 / melody / export" },
       { id: "review-queue", command: "Review Queue", shortcut: "Quick Actions", target: "Issues / focus / fixes" },
       { id: "workflow-navigator", command: "Workflow Navigator", shortcut: "Quick Actions", target: "Stage jumps" },
       { id: "workflow-spotlight", command: "Workflow Spotlight", shortcut: "Quick Actions / Readout", target: "Current command target" },
