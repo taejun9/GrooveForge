@@ -230,6 +230,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "pattern-stack", command: "Pattern Stack", shortcut: "Quick Actions", target: "808 / chords / synth sketch" },
       { id: "pattern-compare", command: "Pattern Compare", shortcut: "Quick Actions", target: "Cue / use Pattern A/B/C" },
       { id: "pattern-compare-decision", command: "Pattern Compare Decision", shortcut: "Quick Actions", target: "Current Cue / Use recommendation" },
+      { id: "pattern-dna", command: "Pattern DNA", shortcut: "Quick Actions / Readout", target: "Layers / density / variation" },
       { id: "pattern-variation", command: "Pattern Variation", shortcut: "Quick Actions", target: "Hook / breakdown variation" },
       { id: "pattern-fill", command: "Pattern Fill", shortcut: "Quick Actions", target: "Tail moves" },
       { id: "pattern-clone", command: "Pattern Clone", shortcut: "Quick Actions", target: "Clone to A/B/C" },
