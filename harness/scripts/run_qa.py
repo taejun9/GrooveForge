@@ -965,6 +965,8 @@ TEXT_EXPECTATIONS = {
         "visible Section Locator pads, selected section state, playing section state, the current Hook pad, and the first available section",
         "keep Cue Decision state, Priority Readout state, and visible priority action state UI-local and out of saved project schema and undo history",
         "route visible pad clicks, visible Section Locator Cue Decision action clicks, Quick Actions Section Locator Cue Decision command runs, and visible Section Locator Priority action clicks only through existing selected-block navigation and UI-local Block loop cueing while playback is stopped",
+        "Section Locator Command Reference work must mark Section Locator as `Quick Actions / Readout` only when it reflects existing Section Locator Cue Decision Readout, Priority Readout, direct Section Locator cue commands, and Section cue result feedback",
+        "it must not change Section Locator cue derivation, cue routing, Quick Actions execution, playback scheduling, render/export, project schema, save/load, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.",
         "Arrangement Playhead Highlighting work must derive the currently playing arrangement block only from local realtime playback snapshots",
         "render it as UI-only state across Arrangement Track, Section Locator Pads, and Song Form Overview",
         "keep selected arrangement block navigation independent",

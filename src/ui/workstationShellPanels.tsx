@@ -270,7 +270,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "arrangement-arc", command: "Arrangement Arc", shortcut: "Quick Actions / Readout", target: "Energy shape" },
       { id: "arrangement-focus", command: "Arrangement Focus", shortcut: "Quick Actions / Readout", target: "Selected block" },
       { id: "arrangement-move", command: "Arrangement Move", shortcut: "Quick Actions / Readout", target: "Drop / build / hook lift" },
-      { id: "section-locator", command: "Section Locator", shortcut: "Quick Actions", target: "Intro / verse / hook" },
+      { id: "section-locator", command: "Section Locator", shortcut: "Quick Actions / Readout", target: "Intro / verse / hook" },
       { id: "song-form-overview", command: "Song Form Overview", shortcut: "Quick Actions / Readout", target: "Sections / patterns" },
       { id: "arrangement-mute-map", command: "Arrangement Mute Map", shortcut: "Quick Actions / Readout", target: "Layer dropouts" },
       { id: "arrangement-transition-map", command: "Arrangement Transition Map", shortcut: "Quick Actions / Readout", target: "Section handoffs" },
