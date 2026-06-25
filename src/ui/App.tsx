@@ -21458,11 +21458,14 @@ function quickActionResultMetricSnapshot(
     return { id: "local-draft", label: "Draft recovery", value: `${projectEventTotal(project)} events` };
   }
 
+  const blueprintMetric = quickActionBeatBlueprintMetricSnapshot(project, action);
+  if (blueprintMetric) {
+    return blueprintMetric;
+  }
+
   if (
-    action.id === "blueprint" ||
-    action.id === "blueprint-style-match" ||
-    action.id.startsWith("blueprint-preview-") ||
-    action.id.startsWith("blueprint-apply-")
+    action.id === "blueprint-preview-cue" ||
+    action.id === "blueprint-preview-decision"
   ) {
     return { id: "project-events", label: "Project events", value: `${projectEventTotal(project)} events` };
   }
@@ -22667,6 +22670,68 @@ function quickActionResultMetricSnapshot(
   }
 
   return { id: "project-events", label: "Project events", value: `${projectEventTotal(project)} events` };
+}
+
+function quickActionBeatBlueprintMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const applyBlueprint = beatBlueprintForApplyQuickAction(project, action);
+  if (applyBlueprint) {
+    return {
+      id: "blueprint-starter",
+      label: "Blueprint starter",
+      value: `${applyBlueprint.name} / ${beatBlueprintStyleLabel(project)} / ${project.key} / ${project.bpm} BPM / ${barCountLabel(
+        arrangementTotalBars(project)
+      )} / ${projectEventTotal(project)} events / edit Pattern ${project.selectedPattern}`
+    };
+  }
+
+  const previewBlueprint = beatBlueprintForPreviewQuickAction(project, action);
+  if (previewBlueprint) {
+    const styleName = styleProfiles.find((profile) => profile.id === previewBlueprint.styleId)?.name ?? previewBlueprint.styleId;
+    return {
+      id: "blueprint-preview",
+      label: "Blueprint preview",
+      value: `${previewBlueprint.name} / ${styleName} / ${previewBlueprint.key} / ${previewBlueprint.bpm} BPM / ${arrangementTemplateLabel(
+        previewBlueprint.arrangementTemplate
+      )} / preview only / no edits`
+    };
+  }
+
+  return null;
+}
+
+function beatBlueprintForApplyQuickAction(project: ProjectState, action: QuickAction): BeatBlueprint | null {
+  if (action.id === "blueprint" || action.id === "blueprint-style-match") {
+    const blueprintId = suggestedBlueprintId(project);
+    return beatBlueprints.find((candidate) => candidate.id === blueprintId) ?? null;
+  }
+
+  if (action.id.startsWith("blueprint-apply-")) {
+    const blueprintId = action.id.slice("blueprint-apply-".length);
+    return beatBlueprints.find((candidate) => candidate.id === blueprintId) ?? null;
+  }
+
+  return null;
+}
+
+function beatBlueprintForPreviewQuickAction(project: ProjectState, action: QuickAction): BeatBlueprint | null {
+  if (action.id === "blueprint-preview-style-match") {
+    const blueprintId = suggestedBlueprintId(project);
+    return beatBlueprints.find((candidate) => candidate.id === blueprintId) ?? null;
+  }
+
+  if (
+    action.id.startsWith("blueprint-preview-") &&
+    action.id !== "blueprint-preview-cue" &&
+    action.id !== "blueprint-preview-decision"
+  ) {
+    const blueprintId = action.id.slice("blueprint-preview-".length);
+    return beatBlueprints.find((candidate) => candidate.id === blueprintId) ?? null;
+  }
+
+  return null;
 }
 
 function quickActionResultFollowup(
