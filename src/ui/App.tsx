@@ -25604,20 +25604,9 @@ function quickActionResultMetricSnapshot(
     );
   }
 
-  if (action.id === "mix-balance-decision") {
-    return {
-      id: "mix-balance-decision",
-      label: "Mix Balance Decision",
-      value: `Drums ${mixBalanceChannelPosture(project.mixer, "drum_rack")} / 808 ${mixBalanceChannelPosture(project.mixer, "bass_808")}`
-    };
-  }
-
-  if (action.id === "mix-balance" || action.id.startsWith("mix-balance-pad-")) {
-    return {
-      id: "mix-balance",
-      label: "Mix balance",
-      value: `Drums ${mixBalanceChannelPosture(project.mixer, "drum_rack")} / 808 ${mixBalanceChannelPosture(project.mixer, "bass_808")}`
-    };
+  const mixBalanceMetric = quickActionMixBalanceMetricSnapshot(project, action, analysis ?? undefined);
+  if (mixBalanceMetric) {
+    return mixBalanceMetric;
   }
 
   if (action.id === "mix-coach-focus" || action.id.startsWith("mix-coach-check-")) {
@@ -26405,6 +26394,137 @@ function quickActionSpaceFxPadOption(project: ProjectState, action: QuickAction)
   return (
     options.find((pad) => text.includes(pad.id) || text.includes(pad.label)) ??
     options.find((pad) => pad.id === createSpaceFxPreviewSummary(project.mixer, options).padId) ??
+    null
+  );
+}
+
+function quickActionMixBalanceMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const pad = quickActionMixBalancePadOption(project, action);
+  if (!pad) {
+    return null;
+  }
+
+  const transformed = applyMixBalancePadToMixer(project.mixer, pad);
+  const changedControls = mixBalanceChangedControlCount(project.mixer, transformed);
+  const stemAnalyses = analyzeStemExports(project);
+  return {
+    id: action.id === "mix-balance-decision" ? "mix-balance-decision" : "mix-balance",
+    label: action.id === "mix-balance-decision" ? "Mix Balance Decision" : "Mix balance",
+    value: quickActionMixBalanceMetricValue(project, action, analysis, stemAnalyses, [
+      quickActionMixBalanceActionLabel(action),
+      `target ${pad.label} balance`,
+      `status ${changedControls === 0 ? "Balance aligned" : "Suggested balance"}`,
+      `context ${quickActionMixBalanceContextLabel(action, pad.detail)}`,
+      `target channels ${mixBalancePreviewChannelLabel(pad)}`,
+      `current channels ${quickActionMixBalanceChannelPosture(project.mixer)}`,
+      `audition ${createStemAuditionReadoutSummary(transformed).roleLabel}`,
+      `moves ${pad.changedCount} channels / ${changedControls} controls`
+    ])
+  };
+}
+
+function quickActionMixBalanceMetricValue(
+  project: ProjectState,
+  action: QuickAction,
+  analysis: ExportAnalysis | undefined,
+  stemAnalyses: StemExportAnalyses,
+  parts: string[]
+): string {
+  return [
+    ...parts,
+    ...quickActionMixBalanceProjectMetricParts(project, stemAnalyses, analysis),
+    `next ${quickActionMixBalanceNextCheck(action)}`
+  ].join(" / ");
+}
+
+function quickActionMixBalanceProjectMetricParts(
+  project: ProjectState,
+  stemAnalyses: StemExportAnalyses,
+  analysis?: ExportAnalysis
+): string[] {
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+
+  return [
+    `Pattern ${project.selectedPattern}`,
+    `${drumHitCount(pattern)} drum hits`,
+    `${pattern.bassNotes.length} 808`,
+    `${pattern.melodyNotes.length} Synth`,
+    `${pattern.chordEvents.length} chords`,
+    `${patternEventTotal(pattern)} editable events`,
+    patternUseLabel,
+    `${project.arrangement.length} blocks`,
+    barCountLabel(arrangementTotalBars(project)),
+    `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+    `stems ${audibleStemCount}/${stemTrackIds.length} audible`
+  ];
+}
+
+function quickActionMixBalanceChannelPosture(mixer: MixerChannel[]): string {
+  return `D ${mixBalanceChannelPosture(mixer, "drum_rack")} / 8 ${mixBalanceChannelPosture(
+    mixer,
+    "bass_808"
+  )} / Sy ${mixBalanceChannelPosture(mixer, "synth")} / Ch ${mixBalanceChannelPosture(mixer, "chord")}`;
+}
+
+function quickActionMixBalanceContextLabel(action: QuickAction, fallback: string): string {
+  return quickActionMixBalanceDetailParts(action).join(" / ") || fallback;
+}
+
+function quickActionMixBalanceDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionMixBalanceNextCheck(action: QuickAction): string {
+  if (action.id === "mix-balance-decision") {
+    return "play Full Mix and follow the visible Mix Balance Preview Decision before another rough-balance move";
+  }
+
+  if (action.id === "mix-balance" || action.id.startsWith("mix-balance-pad-")) {
+    return "play Full Mix, then solo Drums and 808 before manual mixer trim or Stem Audition";
+  }
+
+  return "use the Mix Balance Result, Stem Audition Pads, and manual mixer controls for final trim";
+}
+
+function quickActionMixBalanceActionLabel(action: QuickAction): string {
+  if (action.id === "mix-balance-decision") {
+    return "run mix balance decision";
+  }
+  if (action.id === "mix-balance") {
+    return "apply current mix balance";
+  }
+  if (action.id.startsWith("mix-balance-pad-")) {
+    return "apply direct mix balance";
+  }
+  return "run mix balance action";
+}
+
+function quickActionMixBalancePadOption(project: ProjectState, action: QuickAction): MixBalancePadOption | null {
+  const options = createMixBalancePadOptions(project.mixer);
+  const directId = action.id.startsWith("mix-balance-pad-") ? action.id.slice("mix-balance-pad-".length) : null;
+  if (directId) {
+    return options.find((pad) => pad.id === directId) ?? null;
+  }
+
+  if (action.id !== "mix-balance-decision" && action.id !== "mix-balance") {
+    return null;
+  }
+
+  const text = `${action.title} ${action.detail}`;
+  return (
+    options.find((pad) => text.includes(pad.id) || text.includes(pad.label)) ??
+    options.find((pad) => pad.id === createMixBalancePreviewSummary(project.mixer, options).padId) ??
     null
   );
 }
