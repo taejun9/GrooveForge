@@ -21770,6 +21770,50 @@ function patternUseSelectedBlockPlacement(
   return `${placementLabel} / Block ${boundedIndex + 1} ${block.section} / ${rangeLabel} / ${barCountLabel(bars)}`;
 }
 
+function quickActionGuideQuickStartMetricSnapshot(action: QuickAction): { id: string; label: string; value: string } | null {
+  if (action.id !== "guide-quick-start" && action.id !== "guide-bottleneck-focus") {
+    return null;
+  }
+
+  const parts = quickActionGuideQuickStartDetailParts(action);
+  if (parts.length === 0) {
+    return {
+      id: action.id,
+      label: action.id === "guide-bottleneck-focus" ? "Guide bottleneck" : "Guide quick start",
+      value: action.detail
+    };
+  }
+
+  const metaIndex = parts.findIndex((part) => part.startsWith("Breakdown ") || part.startsWith("Bottleneck "));
+  const detailEnd = metaIndex === -1 ? parts.length : metaIndex;
+  const contextEnd = Math.min(detailEnd, 3);
+  const routeLabel = parts[0] ?? "Guide";
+  const contextLabel = parts.slice(1, contextEnd).join(" / ") || "context unavailable";
+  const metricLabel = parts.slice(contextEnd, detailEnd).join(" / ") || "metric unavailable";
+  const breakdownLabel = parts.find((part) => part.startsWith("Breakdown ")) ?? "Breakdown unavailable";
+  const bottleneckLabel = parts.find((part) => part.startsWith("Bottleneck ")) ?? "Bottleneck unavailable";
+  const actionLabel = action.id === "guide-bottleneck-focus" ? "focus guide bottleneck" : "run guide quick start";
+  const targetLabel = quickActionGuideQuickStartTargetLabel(action);
+
+  return {
+    id: action.id,
+    label: action.id === "guide-bottleneck-focus" ? "Guide bottleneck" : "Guide quick start",
+    value: `${actionLabel} / target ${targetLabel} / route ${routeLabel} / context ${contextLabel} / completion ${metricLabel} / ${breakdownLabel} / ${bottleneckLabel}`
+  };
+}
+
+function quickActionGuideQuickStartDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionGuideQuickStartTargetLabel(action: QuickAction): string {
+  const label = action.title.replace(/^Guide Quick Start:\s*/, "").replace(/^Guide Bottleneck Focus:\s*/, "").trim();
+  return label || "target unavailable";
+}
+
 function quickActionAudiblePatternFollowMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -21903,11 +21947,23 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "guide-quick-start") {
-    return { id: "guide-quick-start", label: "Guide quick start", value: action.detail };
+    return (
+      quickActionGuideQuickStartMetricSnapshot(action) ?? {
+        id: "guide-quick-start",
+        label: "Guide quick start",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id === "guide-bottleneck-focus") {
-    return { id: "guide-bottleneck-focus", label: "Guide bottleneck", value: action.detail };
+    return (
+      quickActionGuideQuickStartMetricSnapshot(action) ?? {
+        id: "guide-bottleneck-focus",
+        label: "Guide bottleneck",
+        value: action.detail
+      }
+    );
   }
 
   const nextMoveAction = nextMoveQuickActionForProject(project, action);
