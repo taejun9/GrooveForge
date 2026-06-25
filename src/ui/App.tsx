@@ -24129,6 +24129,116 @@ function quickActionReviewFixFollowup(
   };
 }
 
+function quickActionSongFormPriorityMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "song-form-priority") {
+    return null;
+  }
+
+  const summary = createSongFormOverviewSummary(project, selectedArrangementIndex);
+  const priority = createSongFormPrioritySummary(summary);
+  if (priority.targetIndex === null) {
+    return null;
+  }
+
+  const target = summary.segments.find((segment) => segment.index === priority.targetIndex) ?? null;
+  if (!target) {
+    return null;
+  }
+
+  const metric = priority.metricId ? summary.metrics.find((item) => item.id === priority.metricId) ?? null : null;
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const muteMapSummary = createArrangementMuteMapSummary(project);
+  const transitionSummary = createArrangementTransitionMapSummary(project);
+  const detailParts = quickActionSongFormPriorityDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || priority.reasonLabel;
+
+  return {
+    id: "song-form-priority",
+    label: "Song Form Priority",
+    value: [
+      "open priority song form",
+      "destination Arrange panel",
+      `metric ${quickActionSongFormPriorityMetricLabel(priority, metric)}`,
+      `status ${priority.statusLabel}`,
+      `context ${contextLabel}`,
+      `target ${quickActionSongFormPriorityTargetLabel(action, priority, target)}`,
+      `section ${target.section}`,
+      `Pattern ${target.pattern}`,
+      quickActionSongFormPriorityBarRangeLabel(target),
+      `energy ${Math.round(target.energy * 100)}%`,
+      `mutes ${target.mutedLabel}`,
+      `${target.eventCount} block events`,
+      `selected ${quickActionArrangementSelectedBlockLabel(project, selectedArrangementIndex)}`,
+      `edit Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `song form ${quickActionSongFormPriorityPosture(summary)}`,
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `mute map ${quickActionArrangementMuteMapPosture(muteMapSummary)}`,
+      `transition map ${quickActionArrangementTransitionMapPosture(transitionSummary)}`,
+      `audition ${quickActionSongFormPriorityAudition(priority, target)}`,
+      `next ${priority.nextCheckLabel}`
+    ].join(" / ")
+  };
+}
+
+function quickActionSongFormPriorityDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionSongFormPriorityMetricLabel(
+  priority: SongFormPrioritySummary,
+  metric: SongFormMetric | null
+): string {
+  return metric ? `${metric.label}: ${metric.value} / ${metric.detail}` : priority.metricLabel;
+}
+
+function quickActionSongFormPriorityTargetLabel(
+  action: QuickAction,
+  priority: SongFormPrioritySummary,
+  segment: SongFormSegment
+): string {
+  const titleLabel = action.title.replace(/^Open Song Form Priority:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Open Song Form Priority"
+    ? titleLabel
+    : `${priority.targetLabel} ${segment.section}`;
+}
+
+function quickActionSongFormPriorityBarRangeLabel(segment: SongFormSegment): string {
+  const barLabel = segment.startBar === segment.endBar ? `Bar ${segment.startBar}` : `Bars ${segment.startBar}-${segment.endBar}`;
+  return `${barLabel} / ${barCountLabel(segment.bars)}`;
+}
+
+function quickActionSongFormPriorityPosture(summary: SongFormOverviewSummary): string {
+  const readyCount = summary.metrics.filter((metric) => metric.tone === "good").length;
+  const reviewCount = summary.metrics.filter((metric) => metric.tone === "warn").length;
+  const blockerCount = summary.metrics.filter((metric) => metric.tone === "danger").length;
+  const metricPosture = summary.metrics.map((metric) => `${metric.label} ${metric.value} ${metric.detail}`).join(" / ");
+  return `${summary.headline} / ${summary.detail} / ${readyCount}/${summary.metrics.length} ready / ${workflowCountLabel(
+    reviewCount,
+    "review"
+  )} / ${workflowCountLabel(blockerCount, "blocker")} / ${metricPosture}`;
+}
+
+function quickActionSongFormPriorityAudition(
+  priority: SongFormPrioritySummary,
+  segment: SongFormSegment
+): string {
+  return `Play Song or Block loop around ${priority.targetLabel} ${segment.section} Pattern ${segment.pattern} and compare section, energy, and mute posture.`;
+}
+
 function quickActionArrangementMuteMapMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -26221,6 +26331,16 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "song-form-priority") {
+    const songFormMetric = quickActionSongFormPriorityMetricSnapshot(
+      project,
+      action,
+      selectedArrangementIndex,
+      analysis ?? undefined
+    );
+    if (songFormMetric) {
+      return songFormMetric;
+    }
+
     return { id: "song-form-priority", label: "Song Form Priority", value: action.detail };
   }
 
