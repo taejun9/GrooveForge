@@ -7865,6 +7865,10 @@ export function App(): ReactElement {
     setProjectStatus(`Quick Action ${quickActionPinnedIds.includes(action.id) ? "unpinned" : "pinned"}: ${action.title}`);
   }
 
+  function checkProjectSafetyReadout(): void {
+    setProjectStatus(`Checked project safety: ${projectSafetyReadout.statusLabel}`);
+  }
+
   const quickActions = createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
@@ -7925,6 +7929,7 @@ export function App(): ReactElement {
     playingPattern,
     playbackMode,
     project,
+    projectSafetyReadout,
     productionSnapshotSummary,
     referenceAlignmentSummary,
     snapshotCompareSummary,
@@ -8128,6 +8133,7 @@ export function App(): ReactElement {
     onJumpWorkflowZone: jumpToWorkflowNavigatorItem,
     onOpenCommandReference: openCommandReference,
     onOpenProject: handleOpenProject,
+    onCheckProjectSafety: checkProjectSafetyReadout,
     onRedo: redoProject,
     onRestoreLocalDraft: restoreLocalDraft,
     onSaveProject: handleSaveProject,
@@ -17266,6 +17272,7 @@ function createQuickActions({
   playingArrangementIndex,
   playbackMode,
   project,
+  projectSafetyReadout,
   productionSnapshotSummary,
   referenceAlignmentSummary,
   snapshotCompareSummary,
@@ -17468,6 +17475,7 @@ function createQuickActions({
   onJumpWorkflowZone,
   onOpenCommandReference,
   onOpenProject,
+  onCheckProjectSafety,
   onRedo,
   onRestoreLocalDraft,
   onSaveProject,
@@ -17537,6 +17545,7 @@ function createQuickActions({
   playingArrangementIndex: number | null;
   playbackMode: PlaybackMode;
   project: ProjectState;
+  projectSafetyReadout: ProjectSafetyReadoutSummary;
   productionSnapshotSummary: ProductionSnapshotSummary;
   referenceAlignmentSummary: ReferenceAlignmentSummary;
   snapshotCompareSummary: SnapshotCompareSummary;
@@ -17739,6 +17748,7 @@ function createQuickActions({
   onJumpWorkflowZone: (item: WorkflowNavigatorItem) => void;
   onOpenCommandReference: () => void;
   onOpenProject: () => Promise<void>;
+  onCheckProjectSafety: () => void;
   onRedo: () => void;
   onRestoreLocalDraft: () => void;
   onSaveProject: () => Promise<void>;
@@ -19452,6 +19462,14 @@ function createQuickActions({
       keywords: `midi input arm disarm web midi controller keyboard note capture ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} connected ${connectedMidiInputCount} beginner producer`,
       disabled: !midiInputArmReady,
       run: () => onSetMidiCaptureArmed(!midiCaptureArmed)
+    },
+    {
+      id: "project-safety-readout",
+      title: "Project Safety Readout",
+      detail: `${projectSafetyReadout.statusLabel} / ${projectSafetyReadout.roleLabel} / ${projectSafetyReadout.detailLabel}`,
+      group: "Project",
+      keywords: `project safety readout save file draft local recovery unsaved snapshot durable ${projectSafetyReadout.statusLabel} ${projectSafetyReadout.roleLabel} beginner producer no cloud no sampling`,
+      run: onCheckProjectSafety
     },
     {
       id: "save-project",
@@ -21314,6 +21332,7 @@ function createQuickActionResult(
     action.id === "selected-drum-audition" ||
     action.id === "selected-chord-audition";
   const tapTempoPulseOnly = action.id === "tap-tempo";
+  const projectSafetyReadoutOnly = action.id === "project-safety-readout";
   const localDraftRecoveryOnly = action.id === "restore-local-draft" || action.id === "clear-local-draft";
   const exportOnly = directExportQuickActionTarget(action.id) !== null || action.id === "handoff-next-export";
   const mixSnapshotDecisionRecallOnly = isMixSnapshotDecisionRecallAction(action);
@@ -21332,6 +21351,7 @@ function createQuickActionResult(
     noteClipboardOnly ||
     drumClipboardOnly ||
     chordClipboardOnly ||
+    projectSafetyReadoutOnly ||
     localDraftRecoveryOnly;
   const changed = beforeProject !== afterProject || beforeMetric.value !== afterMetric.value;
   const metric: QuickActionResultMetric = {
@@ -21388,6 +21408,8 @@ function createQuickActionResult(
                   ? action.id === "restore-local-draft"
                     ? "Restored"
                     : "Cleared"
+                : projectSafetyReadoutOnly
+                  ? "Checked"
                 : mixSnapshotRecallOnly || soundSnapshotRecallOnly
                   ? "Recalled"
                 : uiLocal
@@ -22346,6 +22368,59 @@ function quickActionProjectSnapshotSafetyLabel(): string {
 
 function quickActionProjectSnapshotNextCheck(): string {
   return "Use Snapshot Compare before major edits, then save a durable project file copy";
+}
+
+function quickActionProjectSafetyMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "project-safety-readout") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const contextLabel = action.detail.trim() || action.title;
+
+  return {
+    id: "project-safety",
+    label: "Project safety",
+    value: [
+      `action Check safety`,
+      `command ${action.title}`,
+      `context ${contextLabel}`,
+      `file ${projectFileName(project)}`,
+      `snapshots ${project.snapshots.length}/${maxProjectSnapshots}`,
+      `Pattern ${project.selectedPattern}`,
+      `drums ${drumHitCount(pattern)} hits`,
+      `808 ${pattern.bassNotes.length} notes`,
+      `Synth ${pattern.melodyNotes.length} notes`,
+      `chords ${pattern.chordEvents.length} events`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `next ${quickActionProjectSafetyNextCheck(action)}`
+    ].join(" / ")
+  };
+}
+
+function quickActionProjectSafetyNextCheck(action: QuickAction): string {
+  const detail = action.detail.toLowerCase();
+  if (detail.includes("draft found")) {
+    return "Restore or clear the local draft before choosing the durable file state";
+  }
+  if (detail.includes("unsaved") || detail.includes("file changed") || detail.includes("draft")) {
+    return "Save a durable project file after the next meaningful beat edit";
+  }
+  if (detail.includes("file saved") || detail.includes("durable copy")) {
+    return "Use Save Snapshot before risky edits, then keep composing";
+  }
+  return "Save a durable project file before leaving the session";
 }
 
 function quickActionSessionBriefStarterMetricSnapshot(
@@ -24392,6 +24467,15 @@ function quickActionResultMetricSnapshot(
   handoffExportReceipt: HandoffExportReceipt | null = null
 ): { id: string; label: string; value: string } {
   const analysis = action.group === "Mix" || action.group === "Export" ? analyzeExport(project) : null;
+
+  if (action.id === "project-safety-readout") {
+    const projectSafetyMetric = quickActionProjectSafetyMetricSnapshot(project, action, analysis ?? undefined);
+    if (projectSafetyMetric) {
+      return projectSafetyMetric;
+    }
+
+    return { id: "project-safety", label: "Project safety", value: action.detail };
+  }
 
   if (action.id === "save-snapshot") {
     const snapshotMetric = quickActionProjectSnapshotMetricSnapshot(project, action, analysis ?? undefined);
@@ -26576,6 +26660,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the reference only to choose the next explicit local command or understand the current beat term.",
       nextCheck: "Open Quick Actions when you are ready to run one command."
+    };
+  }
+
+  if (action.id === "project-safety-readout") {
+    return {
+      auditionCue: "No audio changed; this command only checks the current file, draft, snapshot, and beat-state safety posture.",
+      nextCheck: quickActionProjectSafetyNextCheck(action)
     };
   }
 
