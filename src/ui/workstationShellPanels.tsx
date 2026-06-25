@@ -222,7 +222,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "capture-step-mode", command: "Capture Step Mode", shortcut: "Quick Actions", target: "Next / Replace" },
       { id: "midi-input", command: "MIDI Input", shortcut: "Quick Actions", target: "Controller notes" },
       { id: "editor-audition", command: "Editor Audition", shortcut: "Quick Actions", target: "Selected events" },
-      { id: "blueprints", command: "Beat Blueprints", shortcut: "Quick Actions", target: "Sample-free starts" },
+      { id: "blueprints", command: "Beat Blueprints", shortcut: "Quick Actions / Readout", target: "Sample-free starts" },
       { id: "composer-actions", command: "Composer Actions", shortcut: "Quick Actions", target: "Guided writing moves" },
       { id: "style-goal-cues", command: "Style Goal Cues", shortcut: "Quick Actions", target: "Pattern / Song loop" },
       { id: "style-goal-actions", command: "Style Goal Actions", shortcut: "Quick Actions", target: "Drums / 808 / Harmony / Melody" },
