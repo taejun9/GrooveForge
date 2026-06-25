@@ -21846,10 +21846,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("pattern-switch-")) {
+    const usedSlots = usedPatternSlots(project).join("/") || project.selectedPattern;
     return {
       id: "pattern-switch",
       label: "Edit pattern",
-      value: `Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
+      value: `Edit Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events / used ${usedSlots}`
     };
   }
 
