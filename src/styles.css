@@ -5391,6 +5391,7 @@ h2 {
 }
 
 .quick-actions-guide-suggestion-reason,
+.quick-actions-guide-suggestion-breakdown,
 .quick-actions-guide-suggestion-next {
   display: -webkit-box;
   overflow: hidden;
@@ -5400,6 +5401,10 @@ h2 {
   white-space: normal;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.quick-actions-guide-suggestion-breakdown {
+  color: rgba(120, 240, 200, 0.78);
 }
 
 .quick-actions-guide-suggestion-meta {

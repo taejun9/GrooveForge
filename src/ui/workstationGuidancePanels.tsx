@@ -735,7 +735,7 @@ export function createGuideQuickStartCompletionScore({
   };
 }
 
-function createGuideQuickStartCompletionBreakdownItems({
+export function createGuideQuickStartCompletionBreakdownItems({
   firstBeatPathSummary,
   sessionPassSummary,
   workflowNavigatorItems,

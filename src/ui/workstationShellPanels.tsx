@@ -76,8 +76,14 @@ function quickActionGuideSuggestionCompletion(detail: string): string {
   return quickActionGuideSuggestionParts(detail).find((part) => part.startsWith("Completion ")) ?? "Completion: not scored";
 }
 
+function quickActionGuideSuggestionBreakdown(detail: string): string {
+  return quickActionGuideSuggestionParts(detail).find((part) => part.startsWith("Breakdown ")) ?? "Breakdown: not scored";
+}
+
 function quickActionGuideSuggestionNonCompletionParts(detail: string): string[] {
-  return quickActionGuideSuggestionParts(detail).filter((part) => !part.startsWith("Completion "));
+  return quickActionGuideSuggestionParts(detail).filter(
+    (part) => !part.startsWith("Completion ") && !part.startsWith("Breakdown ")
+  );
 }
 
 function quickActionGuideSuggestionParts(detail: string): string[] {
@@ -761,6 +767,9 @@ export function QuickActions({
   const guideSuggestionCompletion = guideSuggestionAction
     ? quickActionGuideSuggestionCompletion(guideSuggestionAction.detail)
     : "Completion: not scored";
+  const guideSuggestionBreakdown = guideSuggestionAction
+    ? quickActionGuideSuggestionBreakdown(guideSuggestionAction.detail)
+    : "Breakdown: not scored";
   const guideSuggestionAfterRun = guideSuggestionAction
     ? quickActionGuideSuggestionAfterRun(guideSuggestionAction.detail)
     : "After run: inspect the focused guide target before editing.";
@@ -849,6 +858,9 @@ export function QuickActions({
               <small data-testid="quick-actions-guide-suggestion-detail">{guideSuggestionAction.detail}</small>
               <small className="quick-actions-guide-suggestion-reason" data-testid="quick-actions-guide-suggestion-reason">
                 {guideSuggestionReason}
+              </small>
+              <small className="quick-actions-guide-suggestion-breakdown" data-testid="quick-actions-guide-suggestion-breakdown">
+                {guideSuggestionBreakdown}
               </small>
               <small className="quick-actions-guide-suggestion-next" data-testid="quick-actions-guide-suggestion-next">
                 {guideSuggestionAfterRun}

@@ -693,6 +693,7 @@ import {
   ReferenceAlignmentReadout,
   SessionPass,
   WorkflowNavigator,
+  createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
   createModeSwitchQuickActions,
   createModeSwitchResult,
@@ -14182,12 +14183,14 @@ type GuideQuickStartQuickActionTarget = {
   source: "path" | "session" | "workflow";
   title: string;
   detail: string;
+  completionBreakdown: string;
   metricValue: string;
   tone: MixCoachTone;
   keywords: string;
 };
 
 function activeGuideQuickStartQuickActionTarget({
+  completionBreakdown,
   completionScore,
   firstBeatPathStep,
   firstBeatPathSummary,
@@ -14196,6 +14199,7 @@ function activeGuideQuickStartQuickActionTarget({
   workflowSpotlight,
   workflowSpotlightItem
 }: {
+  completionBreakdown: string;
   completionScore: ReturnType<typeof createGuideQuickStartCompletionScore>;
   firstBeatPathStep: FirstBeatPathStep | null;
   firstBeatPathSummary: FirstBeatPathSummary;
@@ -14211,9 +14215,10 @@ function activeGuideQuickStartQuickActionTarget({
       source: "path",
       title: `Guide Quick Start: ${firstBeatPathStep.label}`,
       detail: `First Beat Path / ${firstBeatPathStep.value} / ${firstBeatPathStep.detail}`,
+      completionBreakdown,
       metricValue: `${firstBeatPathSummary.countLabel} / ${firstBeatPathStep.value} / ${completionScore.statusLabel}: ${completionScore.scoreLabel}`,
       tone: firstBeatPathStep.tone,
-      keywords: `${firstBeatPathStep.id} ${firstBeatPathStep.label} ${firstBeatPathStep.jumpLabel} ${firstBeatPathStep.detail} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel}`
+      keywords: `${firstBeatPathStep.id} ${firstBeatPathStep.label} ${firstBeatPathStep.jumpLabel} ${firstBeatPathStep.detail} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel} ${completionBreakdown}`
     });
   }
 
@@ -14221,9 +14226,10 @@ function activeGuideQuickStartQuickActionTarget({
     source: "session",
     title: `Guide Quick Start: ${sessionPassCard.label}`,
     detail: `Session Pass / ${sessionPassCard.value} / ${sessionPassCard.focusLabel}`,
+    completionBreakdown,
     metricValue: `${sessionPassSummary.headline} / ${sessionPassCard.detail} / ${completionScore.statusLabel}: ${completionScore.scoreLabel}`,
     tone: sessionPassCard.tone,
-    keywords: `${sessionPassCard.id} ${sessionPassCard.label} ${sessionPassCard.value} ${sessionPassCard.focusLabel} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel}`
+    keywords: `${sessionPassCard.id} ${sessionPassCard.label} ${sessionPassCard.value} ${sessionPassCard.focusLabel} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel} ${completionBreakdown}`
   });
 
   if (workflowSpotlightItem) {
@@ -14231,9 +14237,10 @@ function activeGuideQuickStartQuickActionTarget({
       source: "workflow",
       title: `Guide Quick Start: ${workflowSpotlight.zoneLabel}`,
       detail: `Workflow Spotlight / ${workflowSpotlight.statusLabel} / ${workflowSpotlight.detailLabel}`,
+      completionBreakdown,
       metricValue: `${workflowSpotlight.countLabel} / ${workflowSpotlightItem.detail} / ${completionScore.statusLabel}: ${completionScore.scoreLabel}`,
       tone: workflowSpotlight.tone,
-      keywords: `${workflowSpotlightItem.id} ${workflowSpotlightItem.label} ${workflowSpotlightItem.value} ${workflowSpotlightItem.detail} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel}`
+      keywords: `${workflowSpotlightItem.id} ${workflowSpotlightItem.label} ${workflowSpotlightItem.value} ${workflowSpotlightItem.detail} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel} ${completionBreakdown}`
     });
   }
 
@@ -14243,6 +14250,26 @@ function activeGuideQuickStartQuickActionTarget({
     }
     return guideQuickStartToneRank(candidate.tone) > guideQuickStartToneRank(selected.tone) ? candidate : selected;
   }, null);
+}
+
+function guideQuickStartCompletionBreakdownLabel(
+  breakdownItems: ReturnType<typeof createGuideQuickStartCompletionBreakdownItems>
+): string {
+  const summary = breakdownItems
+    .map((item) => `${guideQuickStartCompletionBreakdownName(item.id)} ${item.scoreLabel.replace(` ${item.id}`, "")}`)
+    .join("; ");
+  return `Breakdown ${summary}`;
+}
+
+function guideQuickStartCompletionBreakdownName(id: "path" | "session" | "workflow"): string {
+  switch (id) {
+    case "path":
+      return "Path";
+    case "session":
+      return "Session";
+    case "workflow":
+      return "Workflow";
+  }
 }
 
 function guideQuickStartToneRank(tone: MixCoachTone): number {
@@ -17980,7 +18007,16 @@ function createQuickActions({
     workflowNavigatorItems,
     workflowSpotlight
   });
+  const guideQuickStartCompletionBreakdown = guideQuickStartCompletionBreakdownLabel(
+    createGuideQuickStartCompletionBreakdownItems({
+      firstBeatPathSummary,
+      sessionPassSummary,
+      workflowNavigatorItems,
+      workflowSpotlight
+    })
+  );
   const guideQuickStartTarget = activeGuideQuickStartQuickActionTarget({
+    completionBreakdown: guideQuickStartCompletionBreakdown,
     completionScore: guideQuickStartCompletionScore,
     firstBeatPathStep,
     firstBeatPathSummary,
@@ -19114,7 +19150,7 @@ function createQuickActions({
       id: "guide-quick-start",
       title: guideQuickStartTarget ? guideQuickStartTarget.title : "Guide Quick Start",
       detail: guideQuickStartTarget
-        ? `${guideQuickStartTarget.detail} / ${guideQuickStartTarget.metricValue}`
+        ? `${guideQuickStartTarget.detail} / ${guideQuickStartTarget.metricValue} / ${guideQuickStartTarget.completionBreakdown}`
         : "No Guide Quick Start target available.",
       group: "Project",
       keywords: `guide quick start one command current next path session workflow spotlight first beat pass beginner producer direct beat workstation ${
