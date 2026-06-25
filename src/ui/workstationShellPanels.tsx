@@ -45,10 +45,7 @@ import { beatReadinessPriorityCheck, layerStarterPriorityOption, maxQuickActionP
 import { barCountLabel, formatLocalDraftSavedAt } from "./workstationPatternTools";
 
 function quickActionGuideSuggestionReason(detail: string): string {
-  const parts = detail
-    .split(" / ")
-    .map((part) => part.trim())
-    .filter(Boolean);
+  const parts = quickActionGuideSuggestionNonCompletionParts(detail);
   const reasonParts = parts.slice(1);
 
   return reasonParts.length > 0 ? `Why now: ${reasonParts.join(" / ")}` : "Why now: current guide target";
@@ -69,13 +66,25 @@ function quickActionGuideSuggestionTarget(title: string, detail: string): string
 }
 
 function quickActionGuideSuggestionMetric(detail: string): string {
-  const detailParts = detail
-    .split(" / ")
-    .map((part) => part.trim())
-    .filter(Boolean);
+  const detailParts = quickActionGuideSuggestionNonCompletionParts(detail);
   const metricParts = detailParts.slice(-2);
 
   return metricParts.length > 0 ? `Metric: ${metricParts.join(" / ")}` : "Metric: current guide signal";
+}
+
+function quickActionGuideSuggestionCompletion(detail: string): string {
+  return quickActionGuideSuggestionParts(detail).find((part) => part.startsWith("Completion ")) ?? "Completion: not scored";
+}
+
+function quickActionGuideSuggestionNonCompletionParts(detail: string): string[] {
+  return quickActionGuideSuggestionParts(detail).filter((part) => !part.startsWith("Completion "));
+}
+
+function quickActionGuideSuggestionParts(detail: string): string[] {
+  return detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 function quickActionGuideSuggestionAfterRun(detail: string): string {
@@ -749,6 +758,9 @@ export function QuickActions({
   const guideSuggestionMetric = guideSuggestionAction
     ? quickActionGuideSuggestionMetric(guideSuggestionAction.detail)
     : "Metric: current guide signal";
+  const guideSuggestionCompletion = guideSuggestionAction
+    ? quickActionGuideSuggestionCompletion(guideSuggestionAction.detail)
+    : "Completion: not scored";
   const guideSuggestionAfterRun = guideSuggestionAction
     ? quickActionGuideSuggestionAfterRun(guideSuggestionAction.detail)
     : "After run: inspect the focused guide target before editing.";
@@ -845,6 +857,12 @@ export function QuickActions({
                 <span data-testid="quick-actions-guide-suggestion-source">{guideSuggestionSource}</span>
                 <span data-testid="quick-actions-guide-suggestion-target">{guideSuggestionTarget}</span>
                 <span data-testid="quick-actions-guide-suggestion-metric">{guideSuggestionMetric}</span>
+                <span
+                  className="quick-actions-guide-suggestion-completion"
+                  data-testid="quick-actions-guide-suggestion-completion"
+                >
+                  {guideSuggestionCompletion}
+                </span>
                 <span data-testid="quick-actions-guide-suggestion-pin-state">
                   {guideSuggestionPinned ? "Pinned command" : "Not pinned"}
                 </span>

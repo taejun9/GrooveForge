@@ -5372,6 +5372,11 @@ h2 {
   white-space: nowrap;
 }
 
+.quick-actions-guide-suggestion-meta .quick-actions-guide-suggestion-completion {
+  border-color: rgba(120, 240, 200, 0.28);
+  color: #78f0c8;
+}
+
 .quick-actions-guide-suggestion > button {
   display: inline-flex;
   align-items: center;

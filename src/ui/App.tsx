@@ -693,6 +693,7 @@ import {
   ReferenceAlignmentReadout,
   SessionPass,
   WorkflowNavigator,
+  createGuideQuickStartCompletionScore,
   createModeSwitchQuickActions,
   createModeSwitchResult,
   createWorkflowSpotlightSummary,
@@ -14187,6 +14188,7 @@ type GuideQuickStartQuickActionTarget = {
 };
 
 function activeGuideQuickStartQuickActionTarget({
+  completionScore,
   firstBeatPathStep,
   firstBeatPathSummary,
   sessionPassCard,
@@ -14194,6 +14196,7 @@ function activeGuideQuickStartQuickActionTarget({
   workflowSpotlight,
   workflowSpotlightItem
 }: {
+  completionScore: ReturnType<typeof createGuideQuickStartCompletionScore>;
   firstBeatPathStep: FirstBeatPathStep | null;
   firstBeatPathSummary: FirstBeatPathSummary;
   sessionPassCard: SessionPassCard;
@@ -14208,9 +14211,9 @@ function activeGuideQuickStartQuickActionTarget({
       source: "path",
       title: `Guide Quick Start: ${firstBeatPathStep.label}`,
       detail: `First Beat Path / ${firstBeatPathStep.value} / ${firstBeatPathStep.detail}`,
-      metricValue: `${firstBeatPathSummary.countLabel} / ${firstBeatPathStep.value}`,
+      metricValue: `${firstBeatPathSummary.countLabel} / ${firstBeatPathStep.value} / ${completionScore.statusLabel}: ${completionScore.scoreLabel}`,
       tone: firstBeatPathStep.tone,
-      keywords: `${firstBeatPathStep.id} ${firstBeatPathStep.label} ${firstBeatPathStep.jumpLabel} ${firstBeatPathStep.detail}`
+      keywords: `${firstBeatPathStep.id} ${firstBeatPathStep.label} ${firstBeatPathStep.jumpLabel} ${firstBeatPathStep.detail} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel}`
     });
   }
 
@@ -14218,9 +14221,9 @@ function activeGuideQuickStartQuickActionTarget({
     source: "session",
     title: `Guide Quick Start: ${sessionPassCard.label}`,
     detail: `Session Pass / ${sessionPassCard.value} / ${sessionPassCard.focusLabel}`,
-    metricValue: `${sessionPassSummary.headline} / ${sessionPassCard.detail}`,
+    metricValue: `${sessionPassSummary.headline} / ${sessionPassCard.detail} / ${completionScore.statusLabel}: ${completionScore.scoreLabel}`,
     tone: sessionPassCard.tone,
-    keywords: `${sessionPassCard.id} ${sessionPassCard.label} ${sessionPassCard.value} ${sessionPassCard.focusLabel}`
+    keywords: `${sessionPassCard.id} ${sessionPassCard.label} ${sessionPassCard.value} ${sessionPassCard.focusLabel} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel}`
   });
 
   if (workflowSpotlightItem) {
@@ -14228,9 +14231,9 @@ function activeGuideQuickStartQuickActionTarget({
       source: "workflow",
       title: `Guide Quick Start: ${workflowSpotlight.zoneLabel}`,
       detail: `Workflow Spotlight / ${workflowSpotlight.statusLabel} / ${workflowSpotlight.detailLabel}`,
-      metricValue: `${workflowSpotlight.countLabel} / ${workflowSpotlightItem.detail}`,
+      metricValue: `${workflowSpotlight.countLabel} / ${workflowSpotlightItem.detail} / ${completionScore.statusLabel}: ${completionScore.scoreLabel}`,
       tone: workflowSpotlight.tone,
-      keywords: `${workflowSpotlightItem.id} ${workflowSpotlightItem.label} ${workflowSpotlightItem.value} ${workflowSpotlightItem.detail}`
+      keywords: `${workflowSpotlightItem.id} ${workflowSpotlightItem.label} ${workflowSpotlightItem.value} ${workflowSpotlightItem.detail} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel}`
     });
   }
 
@@ -17971,7 +17974,14 @@ function createQuickActions({
   const workflowSpotlightItem = workflowSpotlight.zoneId
     ? workflowNavigatorItems.find((item) => item.id === workflowSpotlight.zoneId) ?? null
     : null;
+  const guideQuickStartCompletionScore = createGuideQuickStartCompletionScore({
+    firstBeatPathSummary,
+    sessionPassSummary,
+    workflowNavigatorItems,
+    workflowSpotlight
+  });
   const guideQuickStartTarget = activeGuideQuickStartQuickActionTarget({
+    completionScore: guideQuickStartCompletionScore,
     firstBeatPathStep,
     firstBeatPathSummary,
     sessionPassCard,

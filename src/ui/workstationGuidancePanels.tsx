@@ -653,7 +653,7 @@ function createGuideQuickStartPriority({
   };
 }
 
-function createGuideQuickStartCompletionScore({
+export function createGuideQuickStartCompletionScore({
   firstBeatPathSummary,
   sessionPassSummary,
   workflowNavigatorItems,
