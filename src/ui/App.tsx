@@ -4941,7 +4941,14 @@ export function App(): ReactElement {
     }
   }
 
-  function createDrumEditorAuditionResult(): EditorAuditionResult | null {
+  function editorAuditionFallbackDetail(runtimeDetail?: string): string {
+    if (runtimeDetail?.toLowerCase().includes("audiocontext")) {
+      return "Web Audio unavailable in this runtime";
+    }
+    return runtimeDetail ? "One-shot Web Audio blocked by this runtime" : "One-shot Web Audio did not start";
+  }
+
+  function createDrumEditorAuditionResult(status: EditorAuditionResult["status"] = "Auditioned", runtimeDetail?: string): EditorAuditionResult | null {
     if (!selectedDrumStep || !selectedDrumActive) {
       return null;
     }
@@ -4950,23 +4957,30 @@ export function App(): ReactElement {
     const probability = selectedDrumProbability ?? 1;
     const timing = selectedDrumTiming;
     const repeat = selectedDrumStep.lane === "hat" ? selectedHatRepeat : 1;
+    const heard = status === "Auditioned";
 
     return {
       kind: "drum",
       targetId: `drum-${project.selectedPattern}-${selectedDrumStep.lane}-${selectedDrumStep.step}`,
-      status: "Auditioned",
+      status,
       title: `${drumLabels[selectedDrumStep.lane]} step ${selectedDrumStep.step + 1}`,
-      detail: `Pattern ${project.selectedPattern} / ${percentLabel(velocity)} velocity / ${percentLabel(probability)} chance`,
+      detail: heard
+        ? `Pattern ${project.selectedPattern} / ${percentLabel(velocity)} velocity / ${percentLabel(probability)} chance`
+        : `Pattern ${project.selectedPattern} / ${editorAuditionFallbackDetail(runtimeDetail)} / ${percentLabel(velocity)} velocity`,
       patternLabel: `Pattern ${project.selectedPattern}`,
       metricLabel: "Pocket",
       metricValue: `${timingLabel(timing)}${selectedDrumStep.lane === "hat" ? ` / x${repeat}` : " / single"}`,
-      auditionCue: "Check velocity, timing, hat repeat, and drum rack tone before editing the groove.",
-      nextCheck: `Loop Pattern ${project.selectedPattern}; hear the hit against 808, chords, and Synth before moving it.`,
-      tone: "good"
+      auditionCue: heard
+        ? "Check velocity, timing, hat repeat, and drum rack tone before editing the groove."
+        : "Audio did not start; the selected hit remains the audition target for this drum edit.",
+      nextCheck: heard
+        ? `Loop Pattern ${project.selectedPattern}; hear the hit against 808, chords, and Synth before moving it.`
+        : `Enable browser audio, then audition ${drumLabels[selectedDrumStep.lane]} ${selectedDrumStep.step + 1} again or loop Pattern ${project.selectedPattern}.`,
+      tone: heard ? "good" : "warn"
     };
   }
 
-  function createNoteEditorAuditionResult(): EditorAuditionResult | null {
+  function createNoteEditorAuditionResult(status: EditorAuditionResult["status"] = "Auditioned", runtimeDetail?: string): EditorAuditionResult | null {
     if (!selectedNote) {
       return null;
     }
@@ -4979,59 +4993,82 @@ export function App(): ReactElement {
     const trackLabel = selectedNote.track === "bass" ? "808" : "Synth";
     const supportingLayers = selectedNote.track === "bass" ? "drums, chords, and Synth" : "drums, 808, and chords";
     const articulation = selectedNote.track === "bass" ? (selectedBassNote?.glide ? "glide" : "no glide") : "melody";
+    const heard = status === "Auditioned";
 
     return {
       kind: "note",
       targetId: `note-${project.selectedPattern}-${selectedNote.track}-${note.step}-${note.pitch}`,
-      status: "Auditioned",
+      status,
       title: `${trackLabel} ${note.pitch} step ${note.step + 1}`,
-      detail: `Pattern ${project.selectedPattern} / length ${note.length} / ${percentLabel(note.velocity)} velocity`,
+      detail: heard
+        ? `Pattern ${project.selectedPattern} / length ${note.length} / ${percentLabel(note.velocity)} velocity`
+        : `Pattern ${project.selectedPattern} / ${editorAuditionFallbackDetail(runtimeDetail)} / ${note.pitch}`,
       patternLabel: `Pattern ${project.selectedPattern}`,
       metricLabel: "Pitch",
       metricValue: `${note.pitch} / ${percentLabel(normalizeEventProbability(note.probability))} chance / ${articulation}`,
-      auditionCue: "Check pitch, length, velocity, and current device tone before changing the phrase.",
-      nextCheck: `Loop Pattern ${project.selectedPattern}; hear the ${trackLabel} against ${supportingLayers} before duplicating it.`,
-      tone: "good"
+      auditionCue: heard
+        ? "Check pitch, length, velocity, and current device tone before changing the phrase."
+        : "Audio did not start; the selected note remains the audition target for this phrase edit.",
+      nextCheck: heard
+        ? `Loop Pattern ${project.selectedPattern}; hear the ${trackLabel} against ${supportingLayers} before duplicating it.`
+        : `Enable browser audio, then audition the ${trackLabel} note again or loop Pattern ${project.selectedPattern} against ${supportingLayers}.`,
+      tone: heard ? "good" : "warn"
     };
   }
 
-  function createChordEditorAuditionResult(): EditorAuditionResult | null {
+  function createChordEditorAuditionResult(status: EditorAuditionResult["status"] = "Auditioned", runtimeDetail?: string): EditorAuditionResult | null {
     if (!selectedChord) {
       return null;
     }
 
     const inversion = chordInversionLabel(normalizeChordInversion(selectedChord.inversion));
+    const heard = status === "Auditioned";
 
     return {
       kind: "chord",
       targetId: `chord-${project.selectedPattern}-${selectedChord.step}-${selectedChord.root}-${selectedChord.quality}`,
-      status: "Auditioned",
+      status,
       title: `Chord ${selectedChord.root}${selectedChord.quality} step ${selectedChord.step + 1}`,
-      detail: `Pattern ${project.selectedPattern} / length ${selectedChord.length} / ${percentLabel(selectedChord.velocity)} velocity`,
+      detail: heard
+        ? `Pattern ${project.selectedPattern} / length ${selectedChord.length} / ${percentLabel(selectedChord.velocity)} velocity`
+        : `Pattern ${project.selectedPattern} / ${editorAuditionFallbackDetail(runtimeDetail)} / ${selectedChord.root}${selectedChord.quality}`,
       patternLabel: `Pattern ${project.selectedPattern}`,
       metricLabel: "Voicing",
       metricValue: `${inversion} / ${percentLabel(normalizeEventProbability(selectedChord.probability))} chance`,
-      auditionCue: "Check root, quality, voicing, length, and chord tone before reharmonizing.",
-      nextCheck: `Loop Pattern ${project.selectedPattern}; hear the chord against 808 and Synth before moving it.`,
-      tone: "good"
+      auditionCue: heard
+        ? "Check root, quality, voicing, length, and chord tone before reharmonizing."
+        : "Audio did not start; the selected chord remains the audition target for this harmony edit.",
+      nextCheck: heard
+        ? `Loop Pattern ${project.selectedPattern}; hear the chord against 808 and Synth before moving it.`
+        : `Enable browser audio, then audition the chord again or loop Pattern ${project.selectedPattern} against 808 and Synth.`,
+      tone: heard ? "good" : "warn"
     };
   }
 
   function auditionSelectedDrumHit(): void {
-    if (auditionSelectedDrumHitEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedDrumStep)) {
+    const outcome = auditionSelectedDrumHitEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedDrumStep);
+    if (outcome.ok) {
       setEditorAuditionResult(createDrumEditorAuditionResult());
+    } else if (outcome.runtimeDetail) {
+      setEditorAuditionResult(createDrumEditorAuditionResult("Audio not started", outcome.runtimeDetail));
     }
   }
 
   function auditionSelectedNote(): void {
-    if (auditionSelectedNoteEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedNote)) {
+    const outcome = auditionSelectedNoteEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedNote);
+    if (outcome.ok) {
       setEditorAuditionResult(createNoteEditorAuditionResult());
+    } else if (outcome.runtimeDetail) {
+      setEditorAuditionResult(createNoteEditorAuditionResult("Audio not started", outcome.runtimeDetail));
     }
   }
 
   function auditionSelectedChord(): void {
-    if (auditionSelectedChordEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedChord)) {
+    const outcome = auditionSelectedChordEvent({ projectRef, auditionControllerRef, setProjectStatus }, selectedChord);
+    if (outcome.ok) {
       setEditorAuditionResult(createChordEditorAuditionResult());
+    } else if (outcome.runtimeDetail) {
+      setEditorAuditionResult(createChordEditorAuditionResult("Audio not started", outcome.runtimeDetail));
     }
   }
 

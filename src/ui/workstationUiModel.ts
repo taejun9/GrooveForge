@@ -1167,7 +1167,7 @@ export type EditorAuditionResultKind = "drum" | "note" | "chord";
 export type EditorAuditionResult = {
   kind: EditorAuditionResultKind;
   targetId: string;
-  status: "Auditioned";
+  status: "Auditioned" | "Audio not started";
   title: string;
   detail: string;
   patternLabel: string;
