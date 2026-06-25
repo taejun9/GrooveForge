@@ -67,6 +67,16 @@ type GuideQuickStartPriority = {
   tone: MixCoachTone;
 };
 
+type GuideQuickStartCompletionScore = {
+  percent: number;
+  statusLabel: string;
+  scoreLabel: string;
+  metricLabel: string;
+  nextCheckLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 type GuideQuickStartContextItem = {
   id: "path" | "session" | "workflow";
   statusLabel: string;
@@ -399,6 +409,12 @@ export function GuideQuickStart({
     sessionPassSummary,
     workflowSpotlight
   });
+  const completionScore = createGuideQuickStartCompletionScore({
+    firstBeatPathSummary,
+    sessionPassSummary,
+    workflowNavigatorItems,
+    workflowSpotlight
+  });
   const contextItems = createGuideQuickStartContextItems({
     firstBeatPathSummary,
     nextStep,
@@ -518,6 +534,19 @@ export function GuideQuickStart({
           <small data-testid="guide-quick-start-priority-metric">{priority.metricLabel}</small>
           <small data-testid="guide-quick-start-priority-next-check">{priority.nextCheckLabel}</small>
         </div>
+        <div
+          aria-label="Beat Completion Score"
+          className={`guide-quick-start-completion ${completionScore.tone}`}
+          data-guide-quick-start-completion={completionScore.percent}
+          data-testid="guide-quick-start-completion"
+          title={completionScore.title}
+        >
+          <Gauge size={14} aria-hidden="true" />
+          <span data-testid="guide-quick-start-completion-status">{completionScore.statusLabel}</span>
+          <strong data-testid="guide-quick-start-completion-score">{completionScore.scoreLabel}</strong>
+          <small data-testid="guide-quick-start-completion-metric">{completionScore.metricLabel}</small>
+          <small data-testid="guide-quick-start-completion-next-check">{completionScore.nextCheckLabel}</small>
+        </div>
         <div className="guide-quick-start-context" data-testid="guide-quick-start-context" aria-label="Guide Quick Start context">
           {contextItems.map((item) => (
             <div
@@ -622,6 +651,62 @@ function createGuideQuickStartPriority({
     title: `${sourceLabel}: ${reasonLabel} / ${decision.detailLabel} / ${nextCheckLabel}`,
     tone: decision.tone
   };
+}
+
+function createGuideQuickStartCompletionScore({
+  firstBeatPathSummary,
+  sessionPassSummary,
+  workflowNavigatorItems,
+  workflowSpotlight
+}: {
+  firstBeatPathSummary: FirstBeatPathSummary;
+  sessionPassSummary: SessionPassSummary;
+  workflowNavigatorItems: WorkflowNavigatorItem[];
+  workflowSpotlight: WorkflowSpotlightSummary;
+}): GuideQuickStartCompletionScore {
+  const workflowTones = workflowNavigatorItems.length > 0 ? workflowNavigatorItems.map((item) => item.tone) : [workflowSpotlight.tone];
+  const tones = [
+    ...firstBeatPathSummary.steps.map((step) => step.tone),
+    ...sessionPassSummary.cards.map((card) => card.tone),
+    ...workflowTones
+  ];
+  const possible = Math.max(tones.length, 1);
+  const achieved = tones.reduce((total, tone) => total + guideQuickStartToneValue(tone), 0);
+  const percent = Math.round((achieved / possible) * 100);
+  const readyCount = tones.filter((tone) => tone === "good").length;
+  const reviewCount = tones.filter((tone) => tone === "warn").length;
+  const blockerCount = tones.filter((tone) => tone === "danger").length;
+  const tone = modeSwitchWeakestTone(tones);
+  const statusLabel =
+    tone === "danger" ? "Completion blocker" : tone === "warn" ? "Completion review" : "Completion ready";
+  const nextCheckLabel =
+    tone === "danger"
+      ? "Next: clear the blocker before export."
+      : tone === "warn"
+        ? "Next: review the lowest-scoring lane."
+        : "Next: audition and export deliberately.";
+  const metricLabel = `${readyCount}/${possible} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+  const scoreLabel = `${percent}% complete`;
+
+  return {
+    percent,
+    statusLabel,
+    scoreLabel,
+    metricLabel,
+    nextCheckLabel,
+    title: `${statusLabel}: ${scoreLabel} / ${metricLabel} / ${nextCheckLabel}`,
+    tone
+  };
+}
+
+function guideQuickStartToneValue(tone: MixCoachTone): number {
+  if (tone === "good") {
+    return 1;
+  }
+  if (tone === "warn") {
+    return 0.5;
+  }
+  return 0;
 }
 
 function createGuideQuickStartContextItems({
