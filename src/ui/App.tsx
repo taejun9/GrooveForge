@@ -7806,6 +7806,20 @@ export function App(): ReactElement {
       return;
     }
     const beforeProject = projectRef.current;
+    const inputSetupResult = createQuickActionInputSetupResultState(action, {
+      keyboardCaptureEnabled,
+      keyboardCaptureTarget,
+      keyboardCaptureDefaults,
+      keyboardCaptureStepMode,
+      midiCaptureStatus,
+      midiCaptureArmed,
+      midiInputCount: midiInputOptions.length,
+      connectedMidiInputCount: midiInputOptions.filter((input) => input.connected).length,
+      midiStatusLabel: midiCaptureSummary.statusLabel,
+      midiDetailLabel: midiCaptureSummary.detailLabel,
+      midiSelectedInputId,
+      midiLastNoteLabel
+    });
     closeQuickActions();
     try {
       void Promise.resolve(action.run())
@@ -7816,7 +7830,8 @@ export function App(): ReactElement {
             projectRef.current,
             "complete",
             selectedArrangementIndex,
-            handoffExportReceiptRef.current
+            handoffExportReceiptRef.current,
+            inputSetupResult
           );
           setQuickActionResult(result);
           setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
@@ -7830,7 +7845,8 @@ export function App(): ReactElement {
             projectRef.current,
             "failed",
             selectedArrangementIndex,
-            handoffExportReceiptRef.current
+            handoffExportReceiptRef.current,
+            inputSetupResult
           );
           setQuickActionResult(result);
           setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
@@ -7844,7 +7860,8 @@ export function App(): ReactElement {
         projectRef.current,
         "failed",
         selectedArrangementIndex,
-        handoffExportReceiptRef.current
+        handoffExportReceiptRef.current,
+        inputSetupResult
       );
       setQuickActionResult(result);
       setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
@@ -21234,16 +21251,153 @@ function createQuickActionPinnedOptions(pinnedIds: string[], actions: QuickActio
   });
 }
 
+type QuickActionInputSetupSnapshot = {
+  keyboardCaptureEnabled: boolean;
+  keyboardCaptureTarget: NoteTrack;
+  keyboardCaptureDefaults: Record<NoteTrack, KeyboardCaptureDefaults>;
+  keyboardCaptureStepMode: KeyboardCaptureStepMode;
+  midiCaptureStatus: MidiCaptureStatus;
+  midiCaptureArmed: boolean;
+  midiInputCount: number;
+  connectedMidiInputCount: number;
+  midiStatusLabel: string;
+  midiDetailLabel: string;
+  midiSelectedInputId: string;
+  midiLastNoteLabel: string;
+};
+
+type QuickActionInputSetupResultState = {
+  before: QuickActionInputSetupSnapshot;
+  after: QuickActionInputSetupSnapshot;
+};
+
+function isInputSetupQuickAction(action: QuickAction): boolean {
+  return (
+    action.id === "keyboard-capture-toggle" ||
+    action.id === "midi-input-connect" ||
+    action.id === "midi-input-arm" ||
+    action.id.startsWith("capture-target-") ||
+    action.id.startsWith("capture-step-mode-") ||
+    action.id.startsWith("capture-default-")
+  );
+}
+
+function createQuickActionInputSetupResultState(
+  action: QuickAction,
+  snapshot: QuickActionInputSetupSnapshot
+): QuickActionInputSetupResultState | null {
+  if (!isInputSetupQuickAction(action)) {
+    return null;
+  }
+
+  const before = cloneQuickActionInputSetupSnapshot(snapshot);
+  return {
+    before,
+    after: applyQuickActionInputSetupSnapshot(action, before)
+  };
+}
+
+function cloneQuickActionInputSetupSnapshot(snapshot: QuickActionInputSetupSnapshot): QuickActionInputSetupSnapshot {
+  return {
+    ...snapshot,
+    keyboardCaptureDefaults: cloneKeyboardCaptureDefaults(snapshot.keyboardCaptureDefaults)
+  };
+}
+
+function cloneKeyboardCaptureDefaults(
+  defaults: Record<NoteTrack, KeyboardCaptureDefaults>
+): Record<NoteTrack, KeyboardCaptureDefaults> {
+  return {
+    bass: { ...defaults.bass },
+    melody: { ...defaults.melody }
+  };
+}
+
+function applyQuickActionInputSetupSnapshot(
+  action: QuickAction,
+  snapshot: QuickActionInputSetupSnapshot
+): QuickActionInputSetupSnapshot {
+  const next = cloneQuickActionInputSetupSnapshot(snapshot);
+  if (action.id === "keyboard-capture-toggle") {
+    next.keyboardCaptureEnabled = !snapshot.keyboardCaptureEnabled;
+  }
+  if (action.id === "midi-input-arm") {
+    next.midiCaptureArmed = !snapshot.midiCaptureArmed;
+    next.midiStatusLabel = next.midiCaptureArmed ? "MIDI armed" : "MIDI disarmed";
+    next.midiDetailLabel = `${next.connectedMidiInputCount}/${next.midiInputCount} inputs connected`;
+  }
+  if (action.id === "midi-input-connect") {
+    next.midiStatusLabel = action.title.includes("Refresh") ? "MIDI refresh requested" : "MIDI connect requested";
+    next.midiDetailLabel = snapshot.midiDetailLabel;
+  }
+  if (action.id === "capture-target-bass") {
+    next.keyboardCaptureTarget = "bass";
+  }
+  if (action.id === "capture-target-melody") {
+    next.keyboardCaptureTarget = "melody";
+  }
+  if (action.id === "capture-step-mode-next") {
+    next.keyboardCaptureStepMode = "next-free";
+  }
+  if (action.id === "capture-step-mode-replace") {
+    next.keyboardCaptureStepMode = "replace-selected";
+  }
+
+  const target = next.keyboardCaptureTarget;
+  const targetDefaults = next.keyboardCaptureDefaults[target];
+  if (action.id === "capture-default-octave-down" || action.id === "capture-default-octave-up") {
+    const [minOctave, maxOctave] = trackOctaveRange(target);
+    targetDefaults.octave = clampKeyboardCaptureOctave(
+      target,
+      action.id === "capture-default-octave-down"
+        ? Math.max(minOctave, targetDefaults.octave - 1)
+        : Math.min(maxOctave, targetDefaults.octave + 1)
+    );
+  }
+  if (action.id === "capture-default-length-short") {
+    targetDefaults.length = clampStepLength(targetDefaults.length - 1);
+  }
+  if (action.id === "capture-default-length-long") {
+    targetDefaults.length = clampStepLength(targetDefaults.length + 1);
+  }
+  if (action.id === "capture-default-velocity-down") {
+    targetDefaults.velocity = clampVelocity(targetDefaults.velocity - 0.1);
+  }
+  if (action.id === "capture-default-velocity-up") {
+    targetDefaults.velocity = clampVelocity(targetDefaults.velocity + 0.1);
+  }
+  if (action.id === "capture-default-glide-toggle" && target === "bass") {
+    targetDefaults.glide = !targetDefaults.glide;
+  }
+
+  return next;
+}
+
 function createQuickActionResult(
   action: QuickAction,
   beforeProject: ProjectState,
   afterProject: ProjectState,
   outcome: "complete" | "failed",
   selectedArrangementIndex = 0,
-  handoffExportReceipt: HandoffExportReceipt | null = null
+  handoffExportReceipt: HandoffExportReceipt | null = null,
+  inputSetupResult: QuickActionInputSetupResultState | null = null
 ): QuickActionResult {
-  const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action, selectedArrangementIndex, "before", handoffExportReceipt);
-  const afterMetric = quickActionResultMetricSnapshot(afterProject, action, selectedArrangementIndex, "after", handoffExportReceipt);
+  const beforeMetric = quickActionResultMetricSnapshot(
+    beforeProject,
+    action,
+    selectedArrangementIndex,
+    "before",
+    handoffExportReceipt,
+    inputSetupResult
+  );
+  const afterMetric = quickActionResultMetricSnapshot(
+    afterProject,
+    action,
+    selectedArrangementIndex,
+    "after",
+    handoffExportReceipt,
+    inputSetupResult
+  );
   const nextMoveQuickAction = nextMoveQuickActionForProject(afterProject, action);
   const nextMoveQuickActionOnly = nextMoveQuickAction !== null;
   const blueprintPreviewCueOnly = action.id === "blueprint-preview-cue";
@@ -21327,13 +21481,7 @@ function createQuickActionResult(
     action.id.startsWith("finish-checklist-card-") ||
     action.id === "export-preflight-focus" ||
     action.id.startsWith("export-preflight-card-");
-  const inputSetupOnly =
-    action.id === "keyboard-capture-toggle" ||
-    action.id === "midi-input-connect" ||
-    action.id === "midi-input-arm" ||
-    action.id.startsWith("capture-target-") ||
-    action.id.startsWith("capture-step-mode-") ||
-    action.id.startsWith("capture-default-");
+  const inputSetupOnly = isInputSetupQuickAction(action);
   const blockClipboardOnly =
     action.id === "selected-block-copy" ||
     (action.id === "selected-block-edit-decision" && action.title.includes("Copy Block")) ||
@@ -26125,12 +26273,98 @@ function quickActionWorkflowSpotlightFollowup(
   };
 }
 
+function quickActionInputSetupMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  inputSetupResult: QuickActionInputSetupResultState | null,
+  phase: "before" | "after",
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (!isInputSetupQuickAction(action) || !inputSetupResult) {
+    return null;
+  }
+
+  const snapshot = phase === "before" ? inputSetupResult.before : inputSetupResult.after;
+  const target = snapshot.keyboardCaptureTarget;
+  const defaults = snapshot.keyboardCaptureDefaults[target];
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "input-capture-setup",
+    label: "Input capture setup",
+    value: [
+      `command ${action.title}`,
+      `route ${quickActionInputSetupRouteLabel(action)}`,
+      `target ${quickActionInputTargetLabel(target)}`,
+      `keyboard ${snapshot.keyboardCaptureEnabled ? "Armed" : "Off"}`,
+      `midi ${snapshot.midiCaptureArmed ? "Armed" : "Disarmed"} / ${snapshot.midiStatusLabel} / ${
+        snapshot.connectedMidiInputCount
+      }/${snapshot.midiInputCount} inputs / selected ${snapshot.midiSelectedInputId}`,
+      `placement ${quickActionCaptureStepModeLabel(snapshot.keyboardCaptureStepMode)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `default pitch ${quickActionInputPitchMapLabel(project, snapshot)}`,
+      `oct ${defaults.octave}`,
+      `len ${defaults.length} steps`,
+      `vel ${percentLabel(defaults.velocity)}`,
+      `glide ${target === "bass" ? (defaults.glide ? "On" : "Off") : "Synth n/a"}`,
+      `808 ${pattern.bassNotes.length} notes`,
+      `Synth ${pattern.melodyNotes.length} notes`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `last MIDI ${snapshot.midiLastNoteLabel}`,
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
+function quickActionInputSetupRouteLabel(action: QuickAction): string {
+  if (action.id === "midi-input-connect" || action.id === "midi-input-arm") {
+    return "Create / MIDI Input";
+  }
+  if (action.id.startsWith("capture-target-")) {
+    return "Create / Capture Target";
+  }
+  if (action.id.startsWith("capture-step-mode-")) {
+    return "Create / Capture Step Mode";
+  }
+  if (action.id.startsWith("capture-default-")) {
+    return "Create / Capture Defaults";
+  }
+  return "Create / Keyboard Capture";
+}
+
+function quickActionInputTargetLabel(target: NoteTrack): string {
+  return target === "bass" ? "808" : "Synth";
+}
+
+function quickActionCaptureStepModeLabel(mode: KeyboardCaptureStepMode): string {
+  return mode === "next-free" ? "Next empty" : "Replace selected";
+}
+
+function quickActionInputPitchMapLabel(project: ProjectState, snapshot: QuickActionInputSetupSnapshot): string {
+  const defaults = snapshot.keyboardCaptureDefaults[snapshot.keyboardCaptureTarget];
+  const lanes = keyboardCapturePitchLanes(project.key, snapshot.keyboardCaptureTarget, defaults);
+  if (lanes.length === 0) {
+    return "unavailable";
+  }
+
+  return lanes.length === 1 ? lanes[0] : `${lanes[0]}-${lanes[lanes.length - 1]}`;
+}
+
 function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
   selectedArrangementIndex = 0,
   phase: "before" | "after" = "after",
-  handoffExportReceipt: HandoffExportReceipt | null = null
+  handoffExportReceipt: HandoffExportReceipt | null = null,
+  inputSetupResult: QuickActionInputSetupResultState | null = null
 ): { id: string; label: string; value: string } {
   const analysis = action.group === "Mix" || action.group === "Export" ? analyzeExport(project) : null;
 
@@ -26358,6 +26592,17 @@ function quickActionResultMetricSnapshot(
         value: action.detail
       }
     );
+  }
+
+  const inputSetupMetric = quickActionInputSetupMetricSnapshot(
+    project,
+    action,
+    inputSetupResult,
+    phase,
+    analysis ?? undefined
+  );
+  if (inputSetupMetric) {
+    return inputSetupMetric;
   }
 
   if (action.id === "midi-input-connect") {
