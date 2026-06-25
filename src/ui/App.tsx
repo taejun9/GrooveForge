@@ -21837,11 +21837,17 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("style-quick-")) {
-    const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+    const profile = styleProfiles.find((candidate) => candidate.id === project.styleId);
+    const styleName = profile?.name ?? project.styleId;
+    const styleRoleSummary = profile
+      ? `${bassStyleRoleLabel(profile.bassStyle)} / ${melodyStyleRoleLabel(profile.melodyStyle)}`
+      : "Custom style roles";
     return {
       id: "style-quick",
-      label: "Style",
-      value: `${styleName} / ${project.bpm} BPM / ${percentLabel(project.swing)} swing`
+      label: "Style quick pick",
+      value: `${styleName} / ${project.bpm} BPM / ${percentLabel(
+        project.swing
+      )} swing / ${styleRoleSummary} / ${projectEventTotal(project)} events / edit Pattern ${project.selectedPattern}`
     };
   }
 
