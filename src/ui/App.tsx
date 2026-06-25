@@ -22293,6 +22293,83 @@ function quickActionExportPreflightLaneLabel(action: QuickAction, card: ExportPr
   return titleLabel && titleLabel !== "Focus Export Preflight" ? titleLabel : card.label;
 }
 
+function quickActionHandoffSendOrderMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "handoff-send-order-focus") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionHandoffSendOrderDetailParts(action);
+  const statusLabel = detailParts[0] ?? sendOrder.statusLabel;
+  const contextLabel = detailParts.slice(1).join(" / ") || sendOrder.detailLabel;
+  const nextItem = sendOrder.nextItemId
+    ? (handoffPackItems.find((item) => item.id === sendOrder.nextItemId) ?? null)
+    : null;
+  const nextLabel = nextItem
+    ? `${sendOrder.nextLabel} / ${nextItem.label} ${nextItem.value}`
+    : sendOrder.nextLabel;
+  const sequencePosture = handoffPackItems.map((item) => `${item.buttonLabel} ${item.value}`).join(" -> ");
+  const readyCount = handoffPackItems.filter((item) => item.tone === "good").length;
+  const reviewCount = handoffPackItems.filter((item) => item.tone === "warn").length;
+  const blockerCount = handoffPackItems.filter((item) => item.tone === "danger").length;
+  const receiptLabel = receipt.itemId ? receipt.statusLabel : "No receipt yet";
+
+  return {
+    id: "handoff-send-order",
+    label: "Handoff send order",
+    value: [
+      "focus send order",
+      "destination Deliver panel",
+      `next ${nextLabel}`,
+      `status ${statusLabel}`,
+      `context ${contextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} events`,
+      patternUseLabel,
+      `sequence ${sendOrder.sequenceLabel}`,
+      `posture ${sequencePosture}`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `receipt ${receiptLabel}`,
+      `file ${receipt.fileLabel}`,
+      `checks ${readyCount}/${handoffPackItems.length} ready`,
+      workflowCountLabel(reviewCount, "review"),
+      workflowCountLabel(blockerCount, "blocker"),
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project))
+    ].join(" / ")
+  };
+}
+
+function quickActionHandoffSendOrderDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function quickActionHandoffManifestAuditMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -24055,6 +24132,16 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "handoff-send-order-focus") {
+    const handoffSendOrderMetric = quickActionHandoffSendOrderMetricSnapshot(
+      project,
+      action,
+      handoffExportReceipt,
+      analysis ?? undefined
+    );
+    if (handoffSendOrderMetric) {
+      return handoffSendOrderMetric;
+    }
+
     return {
       id: "handoff-send-order",
       label: "Handoff send order",
