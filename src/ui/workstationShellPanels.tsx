@@ -237,7 +237,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "pattern-copy-clear", command: "Pattern Copy / Clear", shortcut: "Quick Actions / Readout", target: "Copy / reset Patterns" },
       { id: "drum-move", command: "Drum Move", shortcut: "Quick Actions / Readout", target: "Foundation / feel / accent" },
       { id: "808-move", command: "808 Move", shortcut: "Quick Actions / Readout", target: "Bassline / glide / contour" },
-      { id: "melody-move", command: "Melody Move", shortcut: "Quick Actions", target: "Motif / accent / contour" },
+      { id: "melody-move", command: "Melody Move", shortcut: "Quick Actions / Readout", target: "Motif / accent / contour" },
       { id: "chord-move", command: "Chord Move", shortcut: "Quick Actions", target: "Pads / rhythm / voicing" },
       { id: "selected-event-tools", command: "Selected Event Tools", shortcut: "Quick Actions", target: "Drum / note / chord edits" },
       { id: "pattern-playback-readout", command: "Pattern Playback Readout", shortcut: "Readout", target: "Edit vs heard Pattern" },
