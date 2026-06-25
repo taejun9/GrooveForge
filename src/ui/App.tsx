@@ -21809,6 +21809,78 @@ function quickActionDeliveryTargetAlignDetailParts(action: QuickAction): string[
     .filter(Boolean);
 }
 
+function quickActionSessionBriefStarterMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const pad = quickActionSessionBriefStarterPad(action);
+  if (!pad) {
+    return null;
+  }
+
+  const starterBrief = createSessionBriefStarterBrief(project, pad.id);
+  const nextBrief = applySessionBriefStarter(project.sessionBrief, starterBrief);
+  const changedCount = sessionBriefChangedFieldCount(project.sessionBrief, nextBrief);
+  const filledFields = sessionBriefFilledFields(project.sessionBrief);
+  const target = activeDeliveryTarget(project);
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, null);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionSessionBriefStarterDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || pad.detail;
+  const blankPosture = changedCount > 0 ? `${changedCount}/4 blank fields fillable` : "blank fields already covered";
+
+  return {
+    id: "session-brief",
+    label: "Brief starter",
+    value: [
+      `action ${action.title}`,
+      `starter ${pad.label}`,
+      `status ${blankPosture}`,
+      `context ${contextLabel}`,
+      `brief ${filledFields}/4`,
+      `fields ${quickActionSessionBriefStarterFieldPosture(project.sessionBrief)}`,
+      `target ${target.name}`,
+      `target focus ${target.focus}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `next ${changedCount > 0 ? "Review Brief Compass" : "Handoff Package Check"}`
+    ].join(" / ")
+  };
+}
+
+function quickActionSessionBriefStarterPad(action: QuickAction): SessionBriefStarterPadDefinition | null {
+  if (!action.id.startsWith("session-brief-starter-")) {
+    return null;
+  }
+
+  const padId = action.id.slice("session-brief-starter-".length);
+  return sessionBriefStarterPadDefinitions.find((pad) => pad.id === padId) ?? null;
+}
+
+function quickActionSessionBriefStarterDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionSessionBriefStarterFieldPosture(brief: SessionBrief): string {
+  return sessionBriefFields
+    .map((field) => `${sessionBriefFieldLabel(field)} ${brief[field].trim() ? compactSessionBriefValue(brief[field]) : "empty"}`)
+    .join(" / ");
+}
+
 function quickActionHandoffNextExportMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -23916,6 +23988,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("session-brief-starter-")) {
+    const sessionBriefStarterMetric = quickActionSessionBriefStarterMetricSnapshot(project, action, analysis ?? undefined);
+    if (sessionBriefStarterMetric) {
+      return sessionBriefStarterMetric;
+    }
+
     return {
       id: "session-brief",
       label: "Brief fields",
