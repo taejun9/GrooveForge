@@ -222,6 +222,11 @@ const commandReferenceSections: CommandReferenceSection[] = [
     id: "compose-fast-path",
     title: "Create",
     items: [
+      { id: "tap-tempo", command: "Tap Tempo", shortcut: "Quick Actions / Readout", target: "Tap pulse / BPM" },
+      { id: "tempo-nudge", command: "Tempo Nudge", shortcut: "Quick Actions / Readout", target: "-1 / +1 / half / double BPM" },
+      { id: "swing-feel", command: "Swing Feel", shortcut: "Quick Actions / Readout", target: "Straight / Tight / Laid / Loose" },
+      { id: "key-retarget", command: "Key Retarget", shortcut: "Quick Actions / Readout", target: "Project key / event retarget" },
+      { id: "style-quick-picks", command: "Style Quick Picks", shortcut: "Quick Actions / Readout", target: "Style direction" },
       { id: "keyboard-capture", command: "Keyboard Capture", shortcut: "Quick Actions / Readout", target: "808 / Synth notes" },
       { id: "capture-step-mode", command: "Capture Step Mode", shortcut: "Quick Actions / Readout", target: "Next / Replace" },
       { id: "midi-input", command: "MIDI Input", shortcut: "Quick Actions / Readout", target: "Controller notes" },
