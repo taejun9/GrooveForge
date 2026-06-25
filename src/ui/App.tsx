@@ -21897,11 +21897,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("pattern-copy-") || action.id === "pattern-clear") {
-    return {
-      id: "pattern-edit",
-      label: `Pattern ${project.selectedPattern}`,
-      value: `${patternEventTotal(activePattern(project))} events`
-    };
+    return (
+      quickActionPatternEditMetricSnapshot(project, action) ?? {
+        id: "pattern-edit",
+        label: `Pattern ${project.selectedPattern}`,
+        value: `${patternEventTotal(activePattern(project))} events`
+      }
+    );
   }
 
   if (action.id === "groove-compass-cue") {
@@ -22833,6 +22835,66 @@ function patternStackQuickActionId(actionId: string): PatternStackId | null {
   return stackId === "pocket" || stackId === "hook" || stackId === "lift" || stackId === "break" ? stackId : null;
 }
 
+type PatternEditQuickActionRoute = {
+  action: "copy" | "clear";
+  source: PatternSlot;
+  target: PatternSlot;
+};
+
+function quickActionPatternEditMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const route = patternEditQuickActionRoute(action);
+  if (!route) {
+    return null;
+  }
+
+  const targetPattern = project.patterns[route.target];
+  const sourceEvents = patternEventTotal(project.patterns[route.source]);
+  const targetEvents = patternEventTotal(targetPattern);
+  const targetDrums = drumHitCount(targetPattern);
+  const targetMusicEvents = targetPattern.bassNotes.length + targetPattern.chordEvents.length + targetPattern.melodyNotes.length;
+  const actionLabel = route.action === "copy" ? "copy" : "clear";
+  const routeLabel =
+    route.action === "copy"
+      ? `Pattern ${route.source} -> ${route.target} / source ${sourceEvents} events`
+      : `Pattern ${route.target} cleared`;
+
+  return {
+    id: "pattern-edit",
+    label: `Pattern ${actionLabel}`,
+    value: `${routeLabel} / target ${targetEvents} events / ${targetDrums} drums / ${targetMusicEvents} music`
+  };
+}
+
+function patternEditQuickActionRoute(action: QuickAction): PatternEditQuickActionRoute | null {
+  if (action.id.startsWith("pattern-copy-")) {
+    const idMatch = /^pattern-copy-([abcABC])$/.exec(action.id);
+    const titleMatch = /^Copy Pattern ([ABC]) to ([ABC])$/.exec(action.title);
+    const source = titleMatch ? patternSlotFromQuickActionValue(titleMatch[1]) : null;
+    const titleTarget = titleMatch ? patternSlotFromQuickActionValue(titleMatch[2]) : null;
+    const target = idMatch ? patternSlotFromQuickActionValue(idMatch[1]) : null;
+    if (!source || !target || titleTarget !== target) {
+      return null;
+    }
+
+    return { action: "copy", source, target };
+  }
+
+  if (action.id === "pattern-clear") {
+    const titleMatch = /^Clear Pattern ([ABC])$/.exec(action.title);
+    const target = titleMatch ? patternSlotFromQuickActionValue(titleMatch[1]) : null;
+    if (!target) {
+      return null;
+    }
+
+    return { action: "clear", source: target, target };
+  }
+
+  return null;
+}
+
 function quickActionPatternCloneMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -22878,7 +22940,8 @@ function patternCloneQuickActionRoute(
 }
 
 function patternSlotFromQuickActionValue(value: string): PatternSlot | null {
-  return patternSlots.includes(value as PatternSlot) ? (value as PatternSlot) : null;
+  const normalized = value.toUpperCase();
+  return patternSlots.includes(normalized as PatternSlot) ? (normalized as PatternSlot) : null;
 }
 
 function patternCloneQuickActionPreset(value: string): PatternVariationPreset | null {
