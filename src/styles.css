@@ -858,6 +858,9 @@ h2 {
 .guide-quick-start-completion span,
 .guide-quick-start-completion strong,
 .guide-quick-start-completion small,
+.guide-quick-start-completion-breakdown-item span,
+.guide-quick-start-completion-breakdown-item strong,
+.guide-quick-start-completion-breakdown-item small,
 .guide-quick-start-context-item span,
 .guide-quick-start-context-item strong,
 .guide-quick-start-context-item small,
@@ -1093,6 +1096,59 @@ h2 {
 }
 
 .guide-quick-start-completion small {
+  color: rgba(244, 239, 231, 0.62);
+  font-size: 10px;
+}
+
+.guide-quick-start-completion-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.guide-quick-start-completion-breakdown-item {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  min-height: 54px;
+  border: 1px solid rgba(120, 240, 200, 0.16);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.04);
+  padding: 7px 8px;
+}
+
+.guide-quick-start-completion-breakdown-item.warn {
+  border-color: rgba(240, 195, 106, 0.2);
+  background: rgba(240, 195, 106, 0.045);
+}
+
+.guide-quick-start-completion-breakdown-item.danger {
+  border-color: rgba(255, 122, 79, 0.24);
+  background: rgba(255, 122, 79, 0.05);
+}
+
+.guide-quick-start-completion-breakdown-item span {
+  color: #78f0c8;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.guide-quick-start-completion-breakdown-item.warn span {
+  color: #f0c36a;
+}
+
+.guide-quick-start-completion-breakdown-item.danger span {
+  color: #ff7a4f;
+}
+
+.guide-quick-start-completion-breakdown-item strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.guide-quick-start-completion-breakdown-item small {
   color: rgba(244, 239, 231, 0.62);
   font-size: 10px;
 }
@@ -25721,6 +25777,10 @@ input[type="range"] {
     grid-template-columns: auto minmax(96px, 0.34fr) minmax(102px, 0.34fr) minmax(0, 0.74fr) minmax(0, 1fr);
   }
 
+  .guide-quick-start-completion-breakdown {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .guide-quick-start-result {
     grid-template-columns: 150px minmax(0, 0.6fr) minmax(0, 0.5fr) minmax(0, 1fr);
   }
@@ -26758,6 +26818,10 @@ input[type="range"] {
   }
 
   .guide-quick-start-completion {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-quick-start-completion-breakdown {
     grid-template-columns: 1fr;
   }
 

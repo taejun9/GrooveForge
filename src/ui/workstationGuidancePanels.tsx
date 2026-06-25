@@ -77,6 +77,16 @@ type GuideQuickStartCompletionScore = {
   tone: MixCoachTone;
 };
 
+type GuideQuickStartCompletionBreakdownItem = {
+  id: "path" | "session" | "workflow";
+  statusLabel: string;
+  scoreLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  title: string;
+  tone: MixCoachTone;
+};
+
 type GuideQuickStartContextItem = {
   id: "path" | "session" | "workflow";
   statusLabel: string;
@@ -415,6 +425,12 @@ export function GuideQuickStart({
     workflowNavigatorItems,
     workflowSpotlight
   });
+  const completionBreakdownItems = createGuideQuickStartCompletionBreakdownItems({
+    firstBeatPathSummary,
+    sessionPassSummary,
+    workflowNavigatorItems,
+    workflowSpotlight
+  });
   const contextItems = createGuideQuickStartContextItems({
     firstBeatPathSummary,
     nextStep,
@@ -546,6 +562,26 @@ export function GuideQuickStart({
           <strong data-testid="guide-quick-start-completion-score">{completionScore.scoreLabel}</strong>
           <small data-testid="guide-quick-start-completion-metric">{completionScore.metricLabel}</small>
           <small data-testid="guide-quick-start-completion-next-check">{completionScore.nextCheckLabel}</small>
+        </div>
+        <div
+          aria-label="Beat Completion Score breakdown"
+          className="guide-quick-start-completion-breakdown"
+          data-testid="guide-quick-start-completion-breakdown"
+        >
+          {completionBreakdownItems.map((item) => (
+            <div
+              className={`guide-quick-start-completion-breakdown-item ${item.tone}`}
+              data-guide-quick-start-completion-breakdown={item.id}
+              data-testid={`guide-quick-start-completion-breakdown-${item.id}`}
+              key={item.id}
+              title={item.title}
+            >
+              <span data-testid={`guide-quick-start-completion-breakdown-${item.id}-status`}>{item.statusLabel}</span>
+              <strong data-testid={`guide-quick-start-completion-breakdown-${item.id}-score`}>{item.scoreLabel}</strong>
+              <small data-testid={`guide-quick-start-completion-breakdown-${item.id}-metric`}>{item.metricLabel}</small>
+              <small data-testid={`guide-quick-start-completion-breakdown-${item.id}-detail`}>{item.detailLabel}</small>
+            </div>
+          ))}
         </div>
         <div className="guide-quick-start-context" data-testid="guide-quick-start-context" aria-label="Guide Quick Start context">
           {contextItems.map((item) => (
@@ -695,6 +731,73 @@ export function createGuideQuickStartCompletionScore({
     metricLabel,
     nextCheckLabel,
     title: `${statusLabel}: ${scoreLabel} / ${metricLabel} / ${nextCheckLabel}`,
+    tone
+  };
+}
+
+function createGuideQuickStartCompletionBreakdownItems({
+  firstBeatPathSummary,
+  sessionPassSummary,
+  workflowNavigatorItems,
+  workflowSpotlight
+}: {
+  firstBeatPathSummary: FirstBeatPathSummary;
+  sessionPassSummary: SessionPassSummary;
+  workflowNavigatorItems: WorkflowNavigatorItem[];
+  workflowSpotlight: WorkflowSpotlightSummary;
+}): GuideQuickStartCompletionBreakdownItem[] {
+  const workflowTones = workflowNavigatorItems.length > 0 ? workflowNavigatorItems.map((item) => item.tone) : [workflowSpotlight.tone];
+
+  return [
+    createGuideQuickStartCompletionBreakdownItem({
+      id: "path",
+      statusLabel: "Path readiness",
+      detailLabel: "First Beat Path steps",
+      tones: firstBeatPathSummary.steps.map((step) => step.tone)
+    }),
+    createGuideQuickStartCompletionBreakdownItem({
+      id: "session",
+      statusLabel: "Session readiness",
+      detailLabel: `${modeLabel(sessionPassSummary.mode)} pass cards`,
+      tones: sessionPassSummary.cards.map((card) => card.tone)
+    }),
+    createGuideQuickStartCompletionBreakdownItem({
+      id: "workflow",
+      statusLabel: "Workflow readiness",
+      detailLabel: "Workflow Navigator zones",
+      tones: workflowTones
+    })
+  ];
+}
+
+function createGuideQuickStartCompletionBreakdownItem({
+  detailLabel,
+  id,
+  statusLabel,
+  tones
+}: {
+  id: GuideQuickStartCompletionBreakdownItem["id"];
+  statusLabel: string;
+  detailLabel: string;
+  tones: MixCoachTone[];
+}): GuideQuickStartCompletionBreakdownItem {
+  const possible = Math.max(tones.length, 1);
+  const achieved = tones.reduce((total, tone) => total + guideQuickStartToneValue(tone), 0);
+  const percent = Math.round((achieved / possible) * 100);
+  const readyCount = tones.filter((tone) => tone === "good").length;
+  const reviewCount = tones.filter((tone) => tone === "warn").length;
+  const blockerCount = tones.filter((tone) => tone === "danger").length;
+  const tone = tones.length > 0 ? modeSwitchWeakestTone(tones) : "warn";
+  const scoreLabel = `${percent}% ${id}`;
+  const metricLabel = `${readyCount}/${possible} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+
+  return {
+    id,
+    statusLabel,
+    scoreLabel,
+    metricLabel,
+    detailLabel,
+    title: `${statusLabel}: ${scoreLabel} / ${metricLabel} / ${detailLabel}`,
     tone
   };
 }
