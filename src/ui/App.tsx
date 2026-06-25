@@ -22271,6 +22271,87 @@ function quickActionExportPreflightLaneLabel(action: QuickAction, card: ExportPr
   return titleLabel && titleLabel !== "Focus Export Preflight" ? titleLabel : card.label;
 }
 
+function quickActionHandoffExportFormatMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const summary = createHandoffExportFormatSummary(project, exportAnalysis, stemAnalyses, handoffPackItems);
+  const metric = quickActionHandoffExportFormatMetric(summary, action);
+  if (!metric) {
+    return null;
+  }
+
+  const result = createHandoffExportFormatFocusResult(metric, summary);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const actionLabel =
+    action.id === "handoff-export-format-focus" ? "focus priority export format" : "focus direct export format";
+  const laneLabel = quickActionHandoffExportFormatLaneLabel(action, metric);
+  const detailParts = quickActionHandoffExportFormatDetailParts(action);
+  const statusLabel = detailParts[0] ?? metric.value;
+  const contextLabel = detailParts.slice(1).join(" / ") || metric.detail;
+  const postureLabel = summary.metrics.map((item) => `${item.label} ${item.value}`).join(" / ");
+
+  return {
+    id: "handoff-export-format",
+    label: "Export format",
+    value: `${actionLabel} / metric ${laneLabel} / destination ${result.destination} / status ${statusLabel} / context ${contextLabel} / Pattern ${
+      project.selectedPattern
+    } / ${patternEventTotal(pattern)} events / ${patternUseLabel} / formats ${postureLabel} / handoff ${
+      summary.statusLabel
+    } / ${summary.detailLabel} / metric ${result.metricValue} / ${
+      project.arrangement.length
+    } blocks / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionHandoffExportFormatMetric(
+  summary: HandoffExportFormatSummary,
+  action: QuickAction
+): HandoffExportFormatMetric | null {
+  if (action.id === "handoff-export-format-focus") {
+    return handoffExportFormatFocusMetric(summary);
+  }
+
+  const metricId = handoffExportFormatQuickActionMetricId(action.id);
+  return metricId ? summary.metrics.find((metric) => metric.id === metricId) ?? null : null;
+}
+
+function handoffExportFormatQuickActionMetricId(actionId: string): HandoffExportFormatFocusId | null {
+  if (!actionId.startsWith("handoff-export-format-")) {
+    return null;
+  }
+
+  const metricId = actionId.slice("handoff-export-format-".length);
+  return metricId === "wav" || metricId === "stems" || metricId === "midi" || metricId === "sheet" ? metricId : null;
+}
+
+function quickActionHandoffExportFormatDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionHandoffExportFormatLaneLabel(action: QuickAction, metric: HandoffExportFormatMetric): string {
+  const titleLabel = action.title.replace(/^Focus Export Format:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Export Format" ? titleLabel : metric.label;
+}
+
 function quickActionGuideQuickStartMetricSnapshot(action: QuickAction): { id: string; label: string; value: string } | null {
   if (action.id !== "guide-quick-start" && action.id !== "guide-bottleneck-focus") {
     return null;
@@ -23897,15 +23978,12 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "handoff-export-format-focus") {
-    return {
-      id: "handoff-export-format",
-      label: "Export format",
-      value: action.detail
-    };
-  }
+  if (action.id === "handoff-export-format-focus" || action.id.startsWith("handoff-export-format-")) {
+    const handoffExportFormatMetric = quickActionHandoffExportFormatMetricSnapshot(project, action, analysis ?? undefined);
+    if (handoffExportFormatMetric) {
+      return handoffExportFormatMetric;
+    }
 
-  if (action.id.startsWith("handoff-export-format-")) {
     return {
       id: "handoff-export-format",
       label: "Export format",
