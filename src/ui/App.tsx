@@ -21902,6 +21902,79 @@ function quickActionListeningPassLaneLabel(action: QuickAction, item: ListeningP
   return titleLabel && titleLabel !== "Focus Listening Pass" ? titleLabel : item.label;
 }
 
+function quickActionBeatPassportMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const exportAnalysis = analyzeExport(project);
+  const summary = createBeatPassportSummary(
+    project,
+    createBeatReadinessChecks(project, exportAnalysis),
+    exportAnalysis,
+    analyzeStemExports(project)
+  );
+  const metric = quickActionBeatPassportMetric(summary, action);
+  if (!metric) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const actionLabel = action.id === "beat-passport-focus" ? "focus priority beat passport" : "focus direct beat passport";
+  const laneLabel = quickActionBeatPassportLaneLabel(action, metric);
+  const detailParts = quickActionBeatPassportDetailParts(action);
+  const contextLabel = detailParts.slice(2).join(" / ") || metric.detail;
+
+  return {
+    id: "beat-passport",
+    label: "Beat passport",
+    value: `${actionLabel} / metric ${laneLabel} / destination ${metric.focusLabel} panel / status ${metric.value} / context ${contextLabel} / Pattern ${
+      project.selectedPattern
+    } / ${patternEventTotal(pattern)} events / ${patternUseLabel} / identity ${summary.headline} / ${summary.detail} / passport ${beatPassportFocusResultMetric(
+      summary
+    )} / ${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionBeatPassportMetric(summary: BeatPassportSummary, action: QuickAction): BeatPassportMetric | null {
+  if (action.id === "beat-passport-focus") {
+    return activeBeatPassportQuickActionMetric(summary);
+  }
+
+  const metricId = beatPassportQuickActionMetricId(action.id);
+  return metricId ? summary.metrics.find((metric) => metric.id === metricId) ?? null : null;
+}
+
+function beatPassportQuickActionMetricId(actionId: string): BeatPassportMetricId | null {
+  if (!actionId.startsWith("beat-passport-metric-")) {
+    return null;
+  }
+
+  const metricId = actionId.slice("beat-passport-metric-".length);
+  return metricId === "target" ||
+    metricId === "length" ||
+    metricId === "patterns" ||
+    metricId === "readiness" ||
+    metricId === "export" ||
+    metricId === "stems" ||
+    metricId === "master"
+    ? metricId
+    : null;
+}
+
+function quickActionBeatPassportDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionBeatPassportLaneLabel(action: QuickAction, metric: BeatPassportMetric): string {
+  const titleLabel = action.title.replace(/^Focus Beat Passport:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Beat Passport" ? titleLabel : metric.label;
+}
+
 function quickActionGuideQuickStartMetricSnapshot(action: QuickAction): { id: string; label: string; value: string } | null {
   if (action.id !== "guide-quick-start" && action.id !== "guide-bottleneck-focus") {
     return null;
@@ -23323,20 +23396,11 @@ function quickActionResultMetricSnapshot(
     }
   }
 
-  if (action.id === "beat-passport-focus") {
-    return {
-      id: "beat-passport",
-      label: "Beat passport",
-      value: `${activeDeliveryTarget(project).name} / ${barCountLabel(arrangementTotalBars(project))}`
-    };
-  }
-
-  if (action.id.startsWith("beat-passport-metric-")) {
-    return {
-      id: "beat-passport",
-      label: "Beat passport",
-      value: action.detail
-    };
+  if (action.id === "beat-passport-focus" || action.id.startsWith("beat-passport-metric-")) {
+    const passportMetric = quickActionBeatPassportMetricSnapshot(project, action);
+    if (passportMetric) {
+      return passportMetric;
+    }
   }
 
   if (action.id === "production-snapshot-focus") {
