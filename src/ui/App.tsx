@@ -22106,6 +22106,79 @@ function beatSpineDestinationLabelFromCardLabel(label: string): string {
   }
 }
 
+function quickActionComposerGuideMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "composer-guide-focus" && !action.id.startsWith("composer-guide-card-")) {
+    return null;
+  }
+
+  const parts = quickActionComposerGuideDetailParts(action);
+  const laneLabel = quickActionComposerGuideLaneLabel(action);
+  const statusLabel = parts[0] ?? "guide status unavailable";
+  const destinationLabel = parts[1] ?? composerGuideDestinationLabelFromLane(laneLabel);
+  const detailLabel = parts.slice(2).join(" / ") || "current writing lane";
+  const actionLabel = action.id === "composer-guide-focus" ? "focus active composer guide" : "focus direct composer guide";
+
+  return {
+    id: "composer-guide",
+    label: "Composer guide",
+    value: `${actionLabel} / lane ${laneLabel} / destination ${destinationLabel} / status ${statusLabel} / detail ${detailLabel} / mode ${modeLabel(
+      project.mode
+    )} / Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionComposerGuideDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionComposerGuideLaneLabel(action: QuickAction): string {
+  const directId = action.id.startsWith("composer-guide-card-") ? action.id.slice("composer-guide-card-".length) : "";
+  const directLabel = directId ? composerGuideLaneLabelFromQuickActionId(directId) : "";
+  const titleLabel = action.title.replace(/^Focus Composer Guide:\s*/, "").trim();
+  return directLabel || titleLabel || "writing lane unavailable";
+}
+
+function composerGuideLaneLabelFromQuickActionId(id: string): string {
+  switch (id) {
+    case "drums":
+      return "Drums";
+    case "bass":
+      return "808/Bass";
+    case "harmony":
+      return "Harmony";
+    case "melody":
+      return "Melody";
+    case "arrange":
+      return "Arrange";
+    case "finish":
+      return "Finish";
+    default:
+      return "";
+  }
+}
+
+function composerGuideDestinationLabelFromLane(label: string): string {
+  switch (label.toLowerCase()) {
+    case "drums":
+    case "808/bass":
+    case "harmony":
+    case "melody":
+      return "Compose";
+    case "arrange":
+      return "Arrange";
+    case "finish":
+      return "Master";
+    default:
+      return "destination unavailable";
+  }
+}
+
 function quickActionAudiblePatternFollowMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -22491,19 +22564,23 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "composer-guide-focus") {
-    return {
-      id: "composer-guide",
-      label: "Composer guide",
-      value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
-    };
+    return (
+      quickActionComposerGuideMetricSnapshot(project, action) ?? {
+        id: "composer-guide",
+        label: "Composer guide",
+        value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
+      }
+    );
   }
 
   if (action.id.startsWith("composer-guide-card-")) {
-    return {
-      id: "composer-guide",
-      label: "Composer guide",
-      value: action.detail
-    };
+    return (
+      quickActionComposerGuideMetricSnapshot(project, action) ?? {
+        id: "composer-guide",
+        label: "Composer guide",
+        value: action.detail
+      }
+    );
   }
 
   const composerQuickActionArea = composerActionQuickActionArea(action.id);
