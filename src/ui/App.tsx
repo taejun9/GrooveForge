@@ -22433,11 +22433,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("pattern-variation-")) {
-    return {
-      id: "pattern-variation",
-      label: `Pattern ${project.selectedPattern}`,
-      value: `${patternEventTotal(activePattern(project))} events`
-    };
+    return (
+      quickActionPatternVariationMetricSnapshot(project, action) ?? {
+        id: "pattern-variation",
+        label: `Pattern ${project.selectedPattern}`,
+        value: `${patternEventTotal(activePattern(project))} events`
+      }
+    );
   }
 
   if (action.id.startsWith("fill-")) {
@@ -22825,6 +22827,43 @@ function patternStackQuickActionId(actionId: string): PatternStackId | null {
 
   const stackId = actionId.slice("pattern-stack-pad-".length);
   return stackId === "pocket" || stackId === "hook" || stackId === "lift" || stackId === "break" ? stackId : null;
+}
+
+function quickActionPatternVariationMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const preset = patternVariationQuickActionPreset(action.id);
+  if (!preset) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const presetLabel = patternVariationPresetLabel(preset);
+  const drumHits = drumHitCount(pattern);
+  const bassNotes = pattern.bassNotes.length;
+  const chordEvents = pattern.chordEvents.length;
+  const melodyNotes = pattern.melodyNotes.length;
+  return {
+    id: "pattern-variation",
+    label: "Pattern variation",
+    value: `Pattern ${project.selectedPattern} / ${presetLabel} variation / ${drumHits} drums / ${bassNotes} 808 / ${chordEvents} chords / ${melodyNotes} Synth / ${patternEventTotal(
+      pattern
+    )} events`
+  };
+}
+
+function patternVariationQuickActionPreset(actionId: string): PatternVariationPreset | null {
+  switch (actionId) {
+    case "pattern-variation-subtle":
+      return "subtle";
+    case "pattern-variation-hook":
+      return "hook";
+    case "pattern-variation-breakdown":
+      return "breakdown";
+    default:
+      return null;
+  }
 }
 
 function quickActionResultFollowup(
