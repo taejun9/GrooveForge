@@ -20768,6 +20768,7 @@ function createQuickActions({
         masterFinishPreviewSummary.padId
       } ${masterFinishPreviewSummary.padLabel} ${masterFinishReady ? "apply-suggested" : "aligned"} beginner producer`,
       disabled: !masterFinishReady,
+      resultTargetId: masterFinishPreviewSummary.padId,
       run: () => {
         if (masterFinishReady) {
           onApplyMasterFinish(masterFinishPreviewSummary.padId);
@@ -20783,6 +20784,7 @@ function createQuickActions({
       group: "Mix",
       keywords: `master finish current suggested output ceiling demo vocal store club ${masterFinishPreviewSummary.padId} ${masterFinishPreviewSummary.padLabel} beginner producer`,
       disabled: !masterFinishReady,
+      resultTargetId: masterFinishPreviewSummary.padId,
       run: () => {
         if (masterFinishReady) {
           onApplyMasterFinish(masterFinishPreviewSummary.padId);
@@ -20801,6 +20803,7 @@ function createQuickActions({
       group: "Mix",
       keywords: `master finish ${pad.id} ${pad.label} ${pad.detail} output ceiling demo vocal store club`,
       disabled: pad.changedCount === 0,
+      resultTargetId: pad.id,
       run: () => {
         if (pad.changedCount > 0) {
           onApplyMasterFinish(pad.id);
@@ -21482,6 +21485,143 @@ function masterFinishQuickActionPosture(project: ProjectState): string {
   return `${project.masterPreset} / ${formatDb(project.masterCeilingDb)} ceiling / ${formatDb(
     masterChannelVolumeDb(project.mixer)
   )} output`;
+}
+
+function quickActionMasterFinishMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  actionPad: MasterFinishPadDefinition | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "master-finish-decision" && action.id !== "master-finish" && !actionPad) {
+    return null;
+  }
+
+  const pad = quickActionMasterFinishPadOption(project, action, actionPad);
+  if (!pad) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const targetProject = applyMasterFinishPadToProject(project, pad);
+  const changedMoves = masterFinishChangedCount(project, targetProject);
+  return {
+    id:
+      action.id === "master-finish-decision"
+        ? "master-finish-decision"
+        : action.id === "master-finish"
+          ? "master-finish"
+          : `master-finish-${pad.id}`,
+    label: action.id === "master-finish-decision" ? "Master Finish Decision" : `${pad.label} Master Finish`,
+    value: quickActionMasterFinishMetricValue(project, exportAnalysis, stemAnalyses, [
+      quickActionMasterFinishActionLabel(action),
+      `target ${pad.label} / ${pad.detail}`,
+      `context ${quickActionMasterFinishContextLabel(action)}`,
+      `current ${masterFinishQuickActionPosture(project)}`,
+      `target ${pad.preset} / ${formatDb(pad.ceilingDb)} ceiling / ${formatDb(pad.masterVolumeDb)} output`,
+      `moves ${changedMoves} finish move${changedMoves === 1 ? "" : "s"}`
+    ], quickActionMasterFinishNextCheck(action, pad))
+  };
+}
+
+function quickActionMasterFinishMetricValue(
+  project: ProjectState,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses,
+  parts: string[],
+  nextCheck: string
+): string {
+  return [
+    ...parts,
+    ...quickActionMasterFinishProjectMetricParts(project, stemAnalyses, analysis),
+    `next ${nextCheck}`
+  ].join(" / ");
+}
+
+function quickActionMasterFinishProjectMetricParts(
+  project: ProjectState,
+  stemAnalyses: StemExportAnalyses,
+  analysis: ExportAnalysis
+): string[] {
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+
+  return [
+    `Pattern ${project.selectedPattern}`,
+    `${drumHitCount(pattern)} drum hits`,
+    `${pattern.bassNotes.length} 808`,
+    `${pattern.melodyNotes.length} Synth`,
+    `${pattern.chordEvents.length} chords`,
+    `${patternEventTotal(pattern)} editable events`,
+    patternUseLabel,
+    `${project.arrangement.length} blocks`,
+    barCountLabel(arrangementTotalBars(project)),
+    `export ${analysis.status} / H ${formatDb(analysis.headroomDb)}`,
+    `stems ${audibleStemCount}/${stemTrackIds.length} audible`
+  ];
+}
+
+function quickActionMasterFinishPadOption(
+  project: ProjectState,
+  action: QuickAction,
+  actionPad: MasterFinishPadDefinition | null
+): MasterFinishPadDefinition | null {
+  const targetId = quickActionMasterFinishTargetId(project, action, actionPad);
+  return masterFinishPadDefinitions.find((pad) => pad.id === targetId) ?? null;
+}
+
+function quickActionMasterFinishTargetId(
+  project: ProjectState,
+  action: QuickAction,
+  actionPad: MasterFinishPadDefinition | null
+): MasterFinishPadId {
+  if (isMasterFinishPadId(action.resultTargetId)) {
+    return action.resultTargetId;
+  }
+  if (actionPad) {
+    return actionPad.id;
+  }
+  return suggestedMasterFinishPad(project);
+}
+
+function isMasterFinishPadId(value: string | undefined): value is MasterFinishPadId {
+  return value === "demo" || value === "vocal" || value === "store" || value === "club";
+}
+
+function quickActionMasterFinishActionLabel(action: QuickAction): string {
+  if (action.id === "master-finish-decision") {
+    return "run master finish decision";
+  }
+  if (action.id === "master-finish") {
+    return "apply current master finish";
+  }
+  return "apply direct master finish";
+}
+
+function quickActionMasterFinishContextLabel(action: QuickAction): string {
+  if (action.id === "master-finish-decision") {
+    return "decision";
+  }
+  if (action.id === "master-finish") {
+    return "current preview";
+  }
+  return "direct pad";
+}
+
+function quickActionMasterFinishNextCheck(action: QuickAction, pad: MasterFinishPadDefinition): string {
+  if (action.id === "master-finish-decision") {
+    return "play Full Mix and inspect Export meter before another output posture move";
+  }
+  if (pad.id === "vocal") {
+    return "confirm vocal headroom before WAV/stem export or Handoff";
+  }
+  if (pad.id === "club") {
+    return "check limiter activity and low-end control before export";
+  }
+  return "play Full Mix, inspect Export meter, then manually trim ceiling or output only if needed";
 }
 
 function masterAutomationQuickActionPosture(project: ProjectState): string {
@@ -25837,21 +25977,9 @@ function quickActionResultMetricSnapshot(
   }
 
   const masterFinishPad = masterFinishQuickActionPad(action.id);
-  if (action.id === "master-finish-decision") {
-    return {
-      id: "master-finish-decision",
-      label: "Master Finish Decision",
-      value: masterFinishQuickActionPosture(project)
-    };
-  }
-
-  if (action.id === "master-finish" || masterFinishPad) {
-    const label = masterFinishPad ? `${masterFinishPad.label} Master Finish` : "Master Finish";
-    return {
-      id: masterFinishPad ? `master-finish-${masterFinishPad.id}` : "master-finish",
-      label,
-      value: masterFinishQuickActionPosture(project)
-    };
+  const masterFinishMetric = quickActionMasterFinishMetricSnapshot(project, action, masterFinishPad, analysis ?? undefined);
+  if (masterFinishMetric) {
+    return masterFinishMetric;
   }
 
   const masterAutomationPad = masterAutomationQuickActionPad(action.id);
