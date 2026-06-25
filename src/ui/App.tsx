@@ -25726,20 +25726,9 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "space-fx-decision") {
-    return {
-      id: "space-fx-decision",
-      label: "Space FX Decision",
-      value: `D ${spaceFxTrackPosture(project.mixer, "drum_rack")} / 8 ${spaceFxTrackPosture(project.mixer, "bass_808")} / Sy ${spaceFxTrackPosture(project.mixer, "synth")} / Ch ${spaceFxTrackPosture(project.mixer, "chord")}`
-    };
-  }
-
-  if (action.id === "space-fx" || action.id.startsWith("space-fx-")) {
-    return {
-      id: "space-fx",
-      label: "Space FX",
-      value: `D ${spaceFxTrackPosture(project.mixer, "drum_rack")} / 8 ${spaceFxTrackPosture(project.mixer, "bass_808")} / Sy ${spaceFxTrackPosture(project.mixer, "synth")} / Ch ${spaceFxTrackPosture(project.mixer, "chord")}`
-    };
+  const spaceFxMetric = quickActionSpaceFxMetricSnapshot(project, action, analysis ?? undefined);
+  if (spaceFxMetric) {
+    return spaceFxMetric;
   }
 
   if (action.id.startsWith("pattern-chain-") || action.id === "chain-expand") {
@@ -26294,6 +26283,128 @@ function quickActionSoundFocusPadOption(project: ProjectState, action: QuickActi
   return (
     options.find((pad) => text.includes(pad.id) || text.includes(pad.label)) ??
     options.find((pad) => pad.id === createSoundFocusPreviewSummary(project.sound, options).padId) ??
+    null
+  );
+}
+
+function quickActionSpaceFxMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const pad = quickActionSpaceFxPadOption(project, action);
+  if (!pad) {
+    return null;
+  }
+
+  return {
+    id: action.id === "space-fx-decision" ? "space-fx-decision" : "space-fx",
+    label: action.id === "space-fx-decision" ? "Space FX Decision" : "Space FX",
+    value: quickActionSpaceFxMetricValue(project, action, analysis, [
+      quickActionSpaceFxActionLabel(action),
+      `target ${pad.label} space`,
+      `status ${pad.changedCount === 0 ? "Space aligned" : "Suggested space"}`,
+      `context ${quickActionSpaceFxContextLabel(action, pad.detail)}`,
+      `focus ${pad.detail}`,
+      `target sends ${spaceFxPreview(pad)}`,
+      `current sends ${quickActionSpaceFxSendPosture(project.mixer)}`,
+      `moves ${pad.changedCount} send${pad.changedCount === 1 ? "" : "s"}`
+    ])
+  };
+}
+
+function quickActionSpaceFxMetricValue(
+  project: ProjectState,
+  action: QuickAction,
+  analysis: ExportAnalysis | undefined,
+  parts: string[]
+): string {
+  return [
+    ...parts,
+    ...quickActionSpaceFxProjectMetricParts(project, analysis),
+    `next ${quickActionSpaceFxNextCheck(action)}`
+  ].join(" / ");
+}
+
+function quickActionSpaceFxProjectMetricParts(project: ProjectState, analysis?: ExportAnalysis): string[] {
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+
+  return [
+    `Pattern ${project.selectedPattern}`,
+    `${drumHitCount(pattern)} drum hits`,
+    `${pattern.bassNotes.length} 808`,
+    `${pattern.melodyNotes.length} Synth`,
+    `${pattern.chordEvents.length} chords`,
+    `${patternEventTotal(pattern)} editable events`,
+    patternUseLabel,
+    `${project.arrangement.length} blocks`,
+    barCountLabel(arrangementTotalBars(project)),
+    `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`
+  ];
+}
+
+function quickActionSpaceFxSendPosture(mixer: MixerChannel[]): string {
+  return `D ${spaceFxTrackPosture(mixer, "drum_rack")} / 8 ${spaceFxTrackPosture(mixer, "bass_808")} / Sy ${spaceFxTrackPosture(
+    mixer,
+    "synth"
+  )} / Ch ${spaceFxTrackPosture(mixer, "chord")}`;
+}
+
+function quickActionSpaceFxContextLabel(action: QuickAction, fallback: string): string {
+  return quickActionSpaceFxDetailParts(action).join(" / ") || fallback;
+}
+
+function quickActionSpaceFxDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionSpaceFxNextCheck(action: QuickAction): string {
+  if (action.id === "space-fx-decision") {
+    return "play Full Mix and follow the visible Space FX Preview Decision before another shared-send move";
+  }
+
+  if (action.id === "space-fx" || (action.id.startsWith("space-fx-") && action.id !== "space-fx-decision")) {
+    return "play Full Mix, then solo Synth and Chords around Drums and 808 before manual Space slider trim";
+  }
+
+  return "use the Space FX Result and manual Space sliders for final dry, room, wide, or wash trim";
+}
+
+function quickActionSpaceFxActionLabel(action: QuickAction): string {
+  if (action.id === "space-fx-decision") {
+    return "run space fx decision";
+  }
+  if (action.id === "space-fx") {
+    return "apply current space fx";
+  }
+  if (action.id.startsWith("space-fx-") && action.id !== "space-fx-decision") {
+    return "apply direct space fx";
+  }
+  return "run space fx action";
+}
+
+function quickActionSpaceFxPadOption(project: ProjectState, action: QuickAction): SpaceFxPadOption | null {
+  const options = createSpaceFxPadOptions(project.mixer);
+  const directId =
+    action.id.startsWith("space-fx-") && action.id !== "space-fx-decision" ? action.id.slice("space-fx-".length) : null;
+  if (directId) {
+    return options.find((pad) => pad.id === directId) ?? null;
+  }
+
+  if (action.id !== "space-fx-decision" && action.id !== "space-fx") {
+    return null;
+  }
+
+  const text = `${action.title} ${action.detail}`;
+  return (
+    options.find((pad) => text.includes(pad.id) || text.includes(pad.label)) ??
+    options.find((pad) => pad.id === createSpaceFxPreviewSummary(project.mixer, options).padId) ??
     null
   );
 }
