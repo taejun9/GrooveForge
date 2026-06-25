@@ -227,7 +227,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "style-goal-cues", command: "Style Goal Cues", shortcut: "Quick Actions", target: "Pattern / Song loop" },
       { id: "style-goal-actions", command: "Style Goal Actions", shortcut: "Quick Actions", target: "Drums / 808 / Harmony / Melody" },
       { id: "layer-starter", command: "Layer Starter", shortcut: "Quick Actions / Readout", target: "Drums / 808 / Chords / Synth" },
-      { id: "pattern-stack", command: "Pattern Stack", shortcut: "Quick Actions", target: "808 / chords / synth sketch" },
+      { id: "pattern-stack", command: "Pattern Stack", shortcut: "Quick Actions / Readout", target: "808 / chords / synth sketch" },
       { id: "pattern-compare", command: "Pattern Compare", shortcut: "Quick Actions", target: "Cue / use Pattern A/B/C" },
       { id: "pattern-compare-decision", command: "Pattern Compare Decision", shortcut: "Quick Actions / Readout", target: "Current Cue / Use recommendation" },
       { id: "pattern-dna", command: "Pattern DNA", shortcut: "Quick Actions / Readout", target: "Layers / density / variation" },
