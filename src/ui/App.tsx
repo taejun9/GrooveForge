@@ -22290,6 +22290,64 @@ function quickActionLocalDraftNextCheck(action: QuickAction): string {
     : "Keep composing or save the current project if it needs durable protection";
 }
 
+function quickActionProjectSnapshotMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "save-snapshot") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const contextLabel = action.detail.trim() || action.title;
+  const latestSnapshot = project.snapshots[0] ?? null;
+  const snapshotLabel = latestSnapshot ? `${latestSnapshot.name} (${projectSnapshotSummary(latestSnapshot)})` : "no snapshot saved";
+
+  return {
+    id: "snapshots",
+    label: quickActionProjectSnapshotMetricLabel(),
+    value: [
+      `action ${quickActionProjectSnapshotActionLabel()}`,
+      `command ${action.title}`,
+      `slot ${project.snapshots.length}/${maxProjectSnapshots}`,
+      `snapshot ${snapshotLabel}`,
+      `safety ${quickActionProjectSnapshotSafetyLabel()}`,
+      `context ${contextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `drums ${drumHitCount(pattern)} hits`,
+      `808 ${pattern.bassNotes.length} notes`,
+      `Synth ${pattern.melodyNotes.length} notes`,
+      `chords ${pattern.chordEvents.length} events`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `next ${quickActionProjectSnapshotNextCheck()}`
+    ].join(" / ")
+  };
+}
+
+function quickActionProjectSnapshotActionLabel(): "Save" {
+  return "Save";
+}
+
+function quickActionProjectSnapshotMetricLabel(): string {
+  return `${quickActionProjectSnapshotActionLabel()} snapshot`;
+}
+
+function quickActionProjectSnapshotSafetyLabel(): string {
+  return "local project-file idea slot";
+}
+
+function quickActionProjectSnapshotNextCheck(): string {
+  return "Use Snapshot Compare before major edits, then save a durable project file copy";
+}
+
 function quickActionSessionBriefStarterMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -24336,6 +24394,11 @@ function quickActionResultMetricSnapshot(
   const analysis = action.group === "Mix" || action.group === "Export" ? analyzeExport(project) : null;
 
   if (action.id === "save-snapshot") {
+    const snapshotMetric = quickActionProjectSnapshotMetricSnapshot(project, action, analysis ?? undefined);
+    if (snapshotMetric) {
+      return snapshotMetric;
+    }
+
     return { id: "snapshots", label: "Snapshots", value: `${project.snapshots.length} slots` };
   }
 
