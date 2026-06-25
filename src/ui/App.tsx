@@ -21999,6 +21999,113 @@ function modeFocusCardLabelFromQuickActionId(id: string): string {
   }
 }
 
+function quickActionBeatSpineMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const isJump = action.id === "beat-spine-jump" || action.id.startsWith("beat-spine-card-jump-");
+  const isApply = action.id === "beat-spine-apply" || action.id.startsWith("beat-spine-card-apply-");
+  if (!isJump && !isApply) {
+    return null;
+  }
+
+  const parts = quickActionBeatSpineDetailParts(action);
+  const cardLabel = quickActionBeatSpineCardLabel(action);
+  const actionLabel =
+    action.id === "beat-spine-jump"
+      ? "jump current beat spine"
+      : action.id.startsWith("beat-spine-card-jump-")
+        ? "jump direct beat spine"
+        : action.id === "beat-spine-apply"
+          ? "apply current beat spine"
+          : "apply direct beat spine";
+
+  const projectContext = `mode ${modeLabel(project.mode)} / Pattern ${project.selectedPattern} / ${projectEventTotal(
+    project
+  )} events / ${barCountLabel(arrangementTotalBars(project))}`;
+
+  if (isJump) {
+    const contextLabel = parts[0] ?? "core context unavailable";
+    const destinationLabel = parts[1] ?? beatSpineDestinationLabelFromCardLabel(cardLabel);
+    const detailLabel = parts.slice(2).join(" / ") || "current core card";
+    return {
+      id: "beat-spine",
+      label: "Beat spine",
+      value: `${actionLabel} / card ${cardLabel} / destination ${destinationLabel} / context ${contextLabel} / detail ${detailLabel} / ${projectContext}`
+    };
+  }
+
+  const moveLabel = parts[0] ?? "apply move unavailable";
+  const contextLabel = parts.slice(1).join(" / ") || "apply context unavailable";
+  return {
+    id: "beat-spine",
+    label: "Beat spine",
+    value: `${actionLabel} / card ${cardLabel} / move ${moveLabel} / context ${contextLabel} / ${projectContext}`
+  };
+}
+
+function quickActionBeatSpineDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionBeatSpineCardLabel(action: QuickAction): string {
+  const jumpId = action.id.startsWith("beat-spine-card-jump-") ? action.id.slice("beat-spine-card-jump-".length) : "";
+  const applyId = action.id.startsWith("beat-spine-card-apply-") ? action.id.slice("beat-spine-card-apply-".length) : "";
+  const directLabel = beatSpineCardLabelFromQuickActionId(jumpId || applyId);
+  const titleLabel = action.title
+    .replace(/^Jump Beat Spine:\s*/, "")
+    .replace(/^Apply Beat Spine:\s*/, "")
+    .replace(/\s*Beat Spine apply unavailable$/, "")
+    .trim();
+  return directLabel || titleLabel || "core card unavailable";
+}
+
+function beatSpineCardLabelFromQuickActionId(id: string): string {
+  switch (id) {
+    case "setup":
+      return "Setup";
+    case "drums":
+      return "Drums";
+    case "bass":
+      return "808 / Bass";
+    case "harmony":
+      return "Harmony";
+    case "melody":
+      return "Melody";
+    case "sound":
+      return "Sound";
+    case "arrange":
+      return "Arrange";
+    case "finish":
+      return "Finish";
+    default:
+      return "";
+  }
+}
+
+function beatSpineDestinationLabelFromCardLabel(label: string): string {
+  switch (label.toLowerCase()) {
+    case "setup":
+      return "Transport";
+    case "drums":
+    case "808 / bass":
+    case "harmony":
+    case "melody":
+      return "Compose";
+    case "sound":
+      return "Sound";
+    case "arrange":
+      return "Arrange";
+    case "finish":
+      return "Master or Deliver";
+    default:
+      return "destination unavailable";
+  }
+}
+
 function quickActionAudiblePatternFollowMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -22354,23 +22461,33 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "beat-spine-jump" || action.id === "beat-spine-apply") {
-    return {
-      id: "beat-spine",
-      label: "Beat spine",
-      value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
-    };
+    return (
+      quickActionBeatSpineMetricSnapshot(project, action) ?? {
+        id: "beat-spine",
+        label: "Beat spine",
+        value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
+      }
+    );
   }
 
   if (action.id.startsWith("beat-spine-card-jump-")) {
-    return { id: "beat-spine", label: "Beat spine", value: action.detail };
+    return (
+      quickActionBeatSpineMetricSnapshot(project, action) ?? {
+        id: "beat-spine",
+        label: "Beat spine",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id.startsWith("beat-spine-card-apply-")) {
-    return {
-      id: "beat-spine",
-      label: "Beat spine",
-      value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
-    };
+    return (
+      quickActionBeatSpineMetricSnapshot(project, action) ?? {
+        id: "beat-spine",
+        label: "Beat spine",
+        value: `Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events`
+      }
+    );
   }
 
   if (action.id === "composer-guide-focus") {
