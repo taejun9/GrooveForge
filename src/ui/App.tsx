@@ -22004,6 +22004,117 @@ function referenceAlignmentDestinationLabel(card: ReferenceAlignmentCard): strin
   }
 }
 
+function quickActionSelectedEventMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const eventType = quickActionSelectedEventType(action.id);
+  if (!eventType) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const detailParts = quickActionSelectedEventDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || action.title;
+
+  return {
+    id: `selected-${eventType}`,
+    label: quickActionSelectedEventMetricLabel(eventType),
+    value: [
+      `action ${action.title}`,
+      `lane ${quickActionSelectedEventLaneLabel(eventType)}`,
+      `command ${quickActionSelectedEventCommandLabel(action)}`,
+      `context ${contextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `drums ${drumHitCount(pattern)} hits`,
+      `808 ${pattern.bassNotes.length} notes`,
+      `Synth ${pattern.melodyNotes.length} notes`,
+      `chords ${pattern.chordEvents.length} events`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `next ${quickActionSelectedEventNextCheck(eventType, action)}`
+    ].join(" / ")
+  };
+}
+
+type QuickActionSelectedEventType = "note" | "drum" | "chord";
+
+function quickActionSelectedEventType(actionId: string): QuickActionSelectedEventType | null {
+  if (actionId.startsWith("selected-note-")) {
+    return "note";
+  }
+  if (actionId.startsWith("selected-drum-")) {
+    return "drum";
+  }
+  if (actionId.startsWith("selected-chord-")) {
+    return "chord";
+  }
+  return null;
+}
+
+function quickActionSelectedEventMetricLabel(eventType: QuickActionSelectedEventType): string {
+  switch (eventType) {
+    case "note":
+      return "Selected note";
+    case "drum":
+      return "Selected drum";
+    case "chord":
+      return "Selected chord";
+  }
+}
+
+function quickActionSelectedEventLaneLabel(eventType: QuickActionSelectedEventType): string {
+  switch (eventType) {
+    case "note":
+      return "808/Synth note";
+    case "drum":
+      return "Drum hit";
+    case "chord":
+      return "Chord event";
+  }
+}
+
+function quickActionSelectedEventCommandLabel(action: QuickAction): string {
+  return action.title.replace(/^Selected\s+/i, "").trim() || action.title;
+}
+
+function quickActionSelectedEventDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionSelectedEventNextCheck(eventType: QuickActionSelectedEventType, action: QuickAction): string {
+  if (action.id.endsWith("-audition")) {
+    return `Loop Pattern after the one-shot ${quickActionSelectedEventMetricLabel(eventType).toLowerCase()} check if it needs full-context judgment`;
+  }
+
+  if (action.id.endsWith("-copy")) {
+    return "Paste or duplicate explicitly; clipboard state stays UI-local until the next write command";
+  }
+
+  if (action.id.endsWith("-delete")) {
+    return "Audition the Pattern and undo if the groove, bass, melody, or harmony support disappeared";
+  }
+
+  switch (eventType) {
+    case "note":
+      return "Loop Pattern, then continue selected-note edits or compare Pattern A/B/C when the phrase feels right";
+    case "drum":
+      return "Loop Pattern, then continue selected-drum edits or use Drum Move for broader groove shaping";
+    case "chord":
+      return "Loop Pattern, then continue selected-chord edits or use Chord Move for broader harmonic shaping";
+  }
+}
+
 function quickActionSessionBriefStarterMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -24258,6 +24369,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("selected-note-")) {
+    const selectedEventMetric = quickActionSelectedEventMetricSnapshot(project, action, analysis ?? undefined);
+    if (selectedEventMetric) {
+      return selectedEventMetric;
+    }
+
     return {
       id: "selected-note",
       label: "Selected note",
@@ -24266,6 +24382,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("selected-drum-")) {
+    const selectedEventMetric = quickActionSelectedEventMetricSnapshot(project, action, analysis ?? undefined);
+    if (selectedEventMetric) {
+      return selectedEventMetric;
+    }
+
     return {
       id: "selected-drum",
       label: "Selected drum",
@@ -24274,6 +24395,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("selected-chord-")) {
+    const selectedEventMetric = quickActionSelectedEventMetricSnapshot(project, action, analysis ?? undefined);
+    if (selectedEventMetric) {
+      return selectedEventMetric;
+    }
+
     return {
       id: "selected-chord",
       label: "Selected chord",
