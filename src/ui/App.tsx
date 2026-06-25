@@ -22234,6 +22234,62 @@ function quickActionProjectFileNextCheck(action: QuickAction): string {
     : "Play the loaded Pattern, confirm the beat, then save a durable copy after changes";
 }
 
+function quickActionLocalDraftMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "restore-local-draft" && action.id !== "clear-local-draft") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const contextLabel = action.detail.trim() || action.title;
+
+  return {
+    id: "local-draft",
+    label: quickActionLocalDraftMetricLabel(action),
+    value: [
+      `action ${quickActionLocalDraftActionLabel(action)}`,
+      `command ${action.title}`,
+      `safety ${quickActionLocalDraftSafetyLabel(action)}`,
+      `context ${contextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `drums ${drumHitCount(pattern)} hits`,
+      `808 ${pattern.bassNotes.length} notes`,
+      `Synth ${pattern.melodyNotes.length} notes`,
+      `chords ${pattern.chordEvents.length} events`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `next ${quickActionLocalDraftNextCheck(action)}`
+    ].join(" / ")
+  };
+}
+
+function quickActionLocalDraftActionLabel(action: QuickAction): "Restore" | "Clear" {
+  return action.id === "restore-local-draft" ? "Restore" : "Clear";
+}
+
+function quickActionLocalDraftMetricLabel(action: QuickAction): string {
+  return `${quickActionLocalDraftActionLabel(action)} draft`;
+}
+
+function quickActionLocalDraftSafetyLabel(action: QuickAction): string {
+  return action.id === "restore-local-draft" ? "recovered editable project" : "cleared recovery copy only";
+}
+
+function quickActionLocalDraftNextCheck(action: QuickAction): string {
+  return action.id === "restore-local-draft"
+    ? "Play the recovered Pattern, confirm the beat, then save a durable project copy"
+    : "Keep composing or save the current project if it needs durable protection";
+}
+
 function quickActionSessionBriefStarterMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -24319,6 +24375,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "restore-local-draft" || action.id === "clear-local-draft") {
+    const localDraftMetric = quickActionLocalDraftMetricSnapshot(project, action, analysis ?? undefined);
+    if (localDraftMetric) {
+      return localDraftMetric;
+    }
+
     return { id: "local-draft", label: "Draft recovery", value: `${projectEventTotal(project)} events` };
   }
 
