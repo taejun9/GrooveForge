@@ -23101,36 +23101,84 @@ function quickActionHandoffPackageCheckMetricSnapshot(
   const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
   const detailParts = quickActionHandoffPackageCheckDetailParts(action);
   const contextLabel = detailParts.slice(2).join(" / ") || card.detail;
-  const exportStemReadinessLabel = `export ${exportAnalysis.status} / stems ${audibleStemTracks(stemAnalyses).length}/${stemTrackIds.length} audible`;
 
   return {
     id: "handoff-package-check",
     label: "Handoff package",
     value: [
-      `action ${action.title}`,
+      quickActionHandoffPackageCheckActionLabel(action),
       `lane ${quickActionHandoffPackageCheckLaneLabel(action, card)}`,
       `destination ${card.focusLabel} panel`,
       `status ${card.status}`,
       `context ${contextLabel}`,
       `Pattern ${project.selectedPattern}`,
-      `${patternEventTotal(pattern)} events`,
+      `${patternEventTotal(pattern)} editable events`,
       patternUseLabel,
-      `${project.arrangement.length} blocks`,
-      barCountLabel(arrangementTotalBars(project)),
       `files ${quickActionHandoffPackageCheckCardPosture(summary, "files")}`,
       `order ${quickActionHandoffPackageCheckCardPosture(summary, "order")}`,
       `receipt ${quickActionHandoffPackageCheckCardPosture(summary, "receipt")}`,
       `session ${quickActionHandoffPackageCheckCardPosture(summary, "context")}`,
-      exportStemReadinessLabel,
-      `latest ${receipt.itemId ? `${receipt.statusLabel} / ${receipt.fileLabel}` : "No export receipt yet"}`,
-      `next ${sendOrder.nextLabel}`,
-      `sequence ${sendOrder.sequenceLabel}`,
       `package ${summary.headline}`,
       summary.detail,
-      `target ${activeDeliveryTarget(project).name}`,
-      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4`
+      ...quickActionHandoffPackageCheckDeliveryMetricParts(
+        project,
+        summary,
+        exportAnalysis,
+        stemAnalyses,
+        handoffPackItems,
+        sendOrder,
+        receipt,
+        card
+      ),
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project))
     ].join(" / ")
   };
+}
+
+function quickActionHandoffPackageCheckDeliveryMetricParts(
+  project: ProjectState,
+  summary: HandoffPackageCheckSummary,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses,
+  handoffPackItems: HandoffPackItem[],
+  sendOrder: HandoffPackSendOrderSummary,
+  receipt: HandoffExportReceipt,
+  card: HandoffPackageCheckCard
+): string[] {
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
+  const readyCount = handoffPackItems.filter((item) => item.tone === "good").length;
+  const reviewCount = handoffPackItems.filter((item) => item.tone === "warn").length;
+  const blockerCount = handoffPackItems.filter((item) => item.tone === "danger").length;
+  const nextItem = sendOrder.nextItemId
+    ? (handoffPackItems.find((item) => item.id === sendOrder.nextItemId) ?? null)
+    : null;
+  const nextItemLabel = nextItem ? `${nextItem.label} ${nextItem.value} / ${nextItem.detail}` : "All deliverables ready";
+
+  return [
+    `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
+    `wav ${mixWavFileName(project)} / ${analysis.status} / H ${formatDb(analysis.headroomDb)}`,
+    `stems ${audibleStemCount}/${target.stemGoal} target / ${audibleStemCount}/${stemTrackIds.length} audible / ${stemWavFileNames(
+      project
+    ).length} files`,
+    `midi ${midiFileName(project)} / ${barCountLabel(bars)}`,
+    `sheet ${handoffSheetFileName(project)} / brief ${sessionBriefFilledFields(project.sessionBrief)}/4 / ${briefStatus.value}`,
+    `latest ${receipt.itemId ? `${receipt.statusLabel} / ${receipt.fileLabel} / ${receipt.nextLabel}` : "No export receipt yet"}`,
+    `send next ${sendOrder.nextLabel} / ${nextItemLabel}`,
+    `sequence ${sendOrder.sequenceLabel}`,
+    `checks ${readyCount}/${handoffPackItems.length} ready`,
+    workflowCountLabel(reviewCount, "review"),
+    workflowCountLabel(blockerCount, "blocker"),
+    `package metric ${handoffPackageCheckFocusResultMetric(summary)}`,
+    `next ${handoffPackageCheckFocusResultNextCheck(card)}`
+  ];
+}
+
+function quickActionHandoffPackageCheckActionLabel(action: QuickAction): string {
+  return action.id === "handoff-package-check-focus" ? "focus priority handoff package" : "focus direct handoff package";
 }
 
 function quickActionHandoffPackageCheckCard(
