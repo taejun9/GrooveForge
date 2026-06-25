@@ -24539,7 +24539,7 @@ function quickActionResultMetricSnapshot(
     return { id: "project-file", label: "Project file", value: `${projectEventTotal(project)} events` };
   }
 
-  const blueprintMetric = quickActionBeatBlueprintMetricSnapshot(project, action);
+  const blueprintMetric = quickActionBeatBlueprintMetricSnapshot(project, action, analysis ?? undefined);
   if (blueprintMetric) {
     return blueprintMetric;
   }
@@ -25855,7 +25855,8 @@ function quickActionResultMetricSnapshot(
 
 function quickActionBeatBlueprintMetricSnapshot(
   project: ProjectState,
-  action: QuickAction
+  action: QuickAction,
+  analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
   const applyBlueprint = beatBlueprintForApplyQuickAction(project, action);
   if (applyBlueprint) {
@@ -25868,16 +25869,9 @@ function quickActionBeatBlueprintMetricSnapshot(
     };
   }
 
-  const previewBlueprint = beatBlueprintForPreviewQuickAction(project, action);
-  if (previewBlueprint) {
-    const styleName = styleProfiles.find((profile) => profile.id === previewBlueprint.styleId)?.name ?? previewBlueprint.styleId;
-    return {
-      id: "blueprint-preview",
-      label: "Blueprint preview",
-      value: `${previewBlueprint.name} / ${styleName} / ${previewBlueprint.key} / ${previewBlueprint.bpm} BPM / ${arrangementTemplateLabel(
-        previewBlueprint.arrangementTemplate
-      )} / preview only / no edits`
-    };
+  const previewMetric = quickActionBeatBlueprintPreviewMetricSnapshot(project, action, analysis);
+  if (previewMetric) {
+    return previewMetric;
   }
 
   return null;
@@ -25913,6 +25907,153 @@ function beatBlueprintForPreviewQuickAction(project: ProjectState, action: Quick
   }
 
   return null;
+}
+
+function quickActionBeatBlueprintPreviewMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const previewBlueprint = beatBlueprintForPreviewMetricQuickAction(project, action);
+  if (!previewBlueprint) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const styleMatchBlueprint =
+    beatBlueprints.find((candidate) => candidate.id === suggestedBlueprintId(project)) ?? previewBlueprint;
+  const previewSummary = createBeatBlueprintPreviewSummary(project, previewBlueprint);
+  const styleMatchSummary = createBeatBlueprintPreviewSummary(project, styleMatchBlueprint);
+  const styleMatchPreviewed = previewSummary.blueprintId === styleMatchSummary.blueprintId;
+  const previewDecision = createBeatBlueprintPreviewDecision(previewSummary, styleMatchSummary, styleMatchPreviewed);
+  const previewCue = createBeatBlueprintPreviewCue(previewSummary, styleMatchSummary, styleMatchPreviewed);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const styleName = styleProfiles.find((profile) => profile.id === previewBlueprint.styleId)?.name ?? previewBlueprint.styleId;
+  const changedCount = previewSummary.metrics.filter((metric) => metric.status === "Change").length;
+  const postureLabel = previewSummary.metrics.map((metric) => `${metric.label} ${metric.value}`).join(" / ");
+
+  return {
+    id: "blueprint-preview",
+    label: "Blueprint preview",
+    value: [
+      quickActionBeatBlueprintPreviewActionLabel(action),
+      `blueprint ${previewSummary.name}`,
+      `context ${quickActionBeatBlueprintPreviewContextLabel(action, previewSummary, previewDecision, previewCue)}`,
+      `cue ${previewCue.actionLabel} ${previewCue.actionLoopScope}`,
+      `starter ${styleName} / ${previewBlueprint.key} / ${previewBlueprint.bpm} BPM / ${arrangementTemplateLabel(
+        previewBlueprint.arrangementTemplate
+      )}`,
+      `sound ${soundPresetLabel(previewBlueprint.soundPreset)}`,
+      `master ${previewBlueprint.masterPreset}`,
+      `posture ${postureLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `${changedCount} preview change${changedCount === 1 ? "" : "s"}`,
+      `next ${quickActionBeatBlueprintPreviewNextCheck(action, previewDecision, previewCue)}`
+    ].join(" / ")
+  };
+}
+
+function beatBlueprintForPreviewMetricQuickAction(project: ProjectState, action: QuickAction): BeatBlueprint | null {
+  const directPreviewBlueprint = beatBlueprintForPreviewQuickAction(project, action);
+  if (directPreviewBlueprint) {
+    return directPreviewBlueprint;
+  }
+
+  if (action.id !== "blueprint-preview-cue" && action.id !== "blueprint-preview-decision") {
+    return null;
+  }
+
+  return (
+    beatBlueprintFromQuickActionText(action) ??
+    beatBlueprints.find((candidate) => candidate.id === suggestedBlueprintId(project)) ??
+    null
+  );
+}
+
+function beatBlueprintFromQuickActionText(action: QuickAction): BeatBlueprint | null {
+  const text = `${action.title} ${action.detail} ${action.keywords}`;
+  return (
+    beatBlueprints.find((blueprint) => text.includes(blueprint.id)) ??
+    beatBlueprints.find((blueprint) => text.includes(blueprint.name)) ??
+    null
+  );
+}
+
+function quickActionBeatBlueprintPreviewActionLabel(action: QuickAction): string {
+  if (action.id === "blueprint-preview-style-match") {
+    return "preview current style starter";
+  }
+
+  if (action.id === "blueprint-preview-cue") {
+    return "cue blueprint preview";
+  }
+
+  if (action.id === "blueprint-preview-decision") {
+    return action.title.startsWith("Apply Preview") ? "apply preview decision" : "compare style-match decision";
+  }
+
+  if (action.id.startsWith("blueprint-preview-")) {
+    return "preview direct blueprint";
+  }
+
+  return "preview blueprint";
+}
+
+function quickActionBeatBlueprintPreviewContextLabel(
+  action: QuickAction,
+  previewSummary: BeatBlueprintPreviewSummary,
+  previewDecision: BeatBlueprintPreviewDecision,
+  previewCue: BeatBlueprintPreviewCue
+): string {
+  if (action.id === "blueprint-preview-decision") {
+    const detailParts = quickActionBeatBlueprintPreviewDetailParts(action);
+    const explicitContext = detailParts.join(" / ");
+    return explicitContext || `${previewDecision.statusLabel} / ${previewDecision.metricLabel} / ${previewDecision.detailLabel} / action ${previewDecision.actionLabel}`;
+  }
+
+  if (action.id === "blueprint-preview-cue") {
+    return `${previewCue.statusLabel} / ${previewCue.cueLabel} / ${previewCue.detailLabel}`;
+  }
+
+  const detailParts = quickActionBeatBlueprintPreviewDetailParts(action);
+  const explicitPosture = detailParts.slice(0, 6).join(" / ");
+  return explicitPosture || `${previewSummary.statusLabel} / ${previewSummary.detailLabel}`;
+}
+
+function quickActionBeatBlueprintPreviewNextCheck(
+  action: QuickAction,
+  previewDecision: BeatBlueprintPreviewDecision,
+  previewCue: BeatBlueprintPreviewCue
+): string {
+  if (action.id === "blueprint-preview-cue") {
+    return previewCue.nextCheckLabel;
+  }
+
+  if (action.id === "blueprint-preview-decision") {
+    if (action.title.startsWith("Apply Preview")) {
+      return "loop the applied starter, then continue editing musical events";
+    }
+
+    const detailParts = quickActionBeatBlueprintPreviewDetailParts(action);
+    const actionTarget = detailParts[detailParts.length - 1] ?? previewDecision.actionLabel;
+    return `${actionTarget} before Apply`;
+  }
+
+  return "apply only after style, key, BPM, arrangement, sound, and master fit the session";
+}
+
+function quickActionBeatBlueprintPreviewDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 function quickActionLayerStarterMetricSnapshot(
