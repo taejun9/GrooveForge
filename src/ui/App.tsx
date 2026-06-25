@@ -7808,21 +7808,42 @@ export function App(): ReactElement {
     try {
       void Promise.resolve(action.run())
         .then(() => {
-          const result = createQuickActionResult(action, beforeProject, projectRef.current, "complete", selectedArrangementIndex);
+          const result = createQuickActionResult(
+            action,
+            beforeProject,
+            projectRef.current,
+            "complete",
+            selectedArrangementIndex,
+            handoffExportReceipt
+          );
           setQuickActionResult(result);
           setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
         })
         .catch((error: unknown) => {
           console.error(error);
           setProjectStatus("Quick action failed");
-          const result = createQuickActionResult(action, beforeProject, projectRef.current, "failed", selectedArrangementIndex);
+          const result = createQuickActionResult(
+            action,
+            beforeProject,
+            projectRef.current,
+            "failed",
+            selectedArrangementIndex,
+            handoffExportReceipt
+          );
           setQuickActionResult(result);
           setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
         });
     } catch (error) {
       console.error(error);
       setProjectStatus("Quick action failed");
-      const result = createQuickActionResult(action, beforeProject, projectRef.current, "failed", selectedArrangementIndex);
+      const result = createQuickActionResult(
+        action,
+        beforeProject,
+        projectRef.current,
+        "failed",
+        selectedArrangementIndex,
+        handoffExportReceipt
+      );
       setQuickActionResult(result);
       setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
     }
@@ -21184,10 +21205,11 @@ function createQuickActionResult(
   beforeProject: ProjectState,
   afterProject: ProjectState,
   outcome: "complete" | "failed",
-  selectedArrangementIndex = 0
+  selectedArrangementIndex = 0,
+  handoffExportReceipt: HandoffExportReceipt | null = null
 ): QuickActionResult {
-  const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action, selectedArrangementIndex, "before");
-  const afterMetric = quickActionResultMetricSnapshot(afterProject, action, selectedArrangementIndex, "after");
+  const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action, selectedArrangementIndex, "before", handoffExportReceipt);
+  const afterMetric = quickActionResultMetricSnapshot(afterProject, action, selectedArrangementIndex, "after", handoffExportReceipt);
   const nextMoveQuickAction = nextMoveQuickActionForProject(afterProject, action);
   const nextMoveQuickActionOnly = nextMoveQuickAction !== null;
   const blueprintPreviewCueOnly = action.id === "blueprint-preview-cue";
@@ -22271,6 +22293,75 @@ function quickActionExportPreflightLaneLabel(action: QuickAction, card: ExportPr
   return titleLabel && titleLabel !== "Focus Export Preflight" ? titleLabel : card.label;
 }
 
+function quickActionHandoffManifestAuditMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "handoff-manifest-audit-focus") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const manifest = createHandoffFileManifest(project, stemAnalyses, handoffPackItems);
+  const summary = createHandoffManifestAudit(project, handoffPackItems, manifest, receipt, sendOrder);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionHandoffManifestAuditDetailParts(action);
+  const contextLabel = detailParts[0] ?? summary.detailLabel;
+  const receiptLabel = detailParts[1] ?? summary.receiptLabel;
+  const nextLabel = detailParts[2] ?? summary.nextLabel;
+  const manifestPosture = summary.checks.map((check) => `${check.label} ${check.statusLabel}`).join(" / ");
+  const readyCount = summary.checks.filter((check) => check.tone === "good").length;
+  const reviewCount = summary.checks.filter((check) => check.tone === "warn").length;
+  const blockerCount = summary.checks.filter((check) => check.tone === "danger").length;
+
+  return {
+    id: "handoff-manifest-audit",
+    label: "Handoff manifest",
+    value: [
+      "focus manifest audit",
+      "destination Deliver panel",
+      `status ${summary.statusLabel}`,
+      `context ${contextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} events`,
+      patternUseLabel,
+      `manifest ${manifestPosture}`,
+      `receipt ${receiptLabel}`,
+      `file ${receipt.fileLabel}`,
+      `next ${nextLabel}`,
+      `checks ${readyCount}/${summary.checks.length} clear`,
+      workflowCountLabel(reviewCount, "review"),
+      workflowCountLabel(blockerCount, "blocker"),
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project))
+    ].join(" / ")
+  };
+}
+
+function quickActionHandoffManifestAuditDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function quickActionHandoffExportFormatMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -23075,7 +23166,8 @@ function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
   selectedArrangementIndex = 0,
-  phase: "before" | "after" = "after"
+  phase: "before" | "after" = "after",
+  handoffExportReceipt: HandoffExportReceipt | null = null
 ): { id: string; label: string; value: string } {
   const analysis = action.group === "Mix" || action.group === "Export" ? analyzeExport(project) : null;
 
@@ -23971,6 +24063,16 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "handoff-manifest-audit-focus") {
+    const handoffManifestMetric = quickActionHandoffManifestAuditMetricSnapshot(
+      project,
+      action,
+      handoffExportReceipt,
+      analysis ?? undefined
+    );
+    if (handoffManifestMetric) {
+      return handoffManifestMetric;
+    }
+
     return {
       id: "handoff-manifest-audit",
       label: "Handoff manifest",
