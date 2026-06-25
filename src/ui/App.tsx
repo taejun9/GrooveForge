@@ -8005,7 +8005,7 @@ export function App(): ReactElement {
     onCueSectionLocator: cueSectionLocator,
     onCueGrooveCompass: cueGrooveCompass,
     onCueStyleGoal: cueStyleGoal,
-    onCuePattern: cuePattern,
+    onCuePattern: cuePatternFromCompare,
     onRunPatternCompareDecision: runPatternCompareDecision,
     onFollowAudiblePattern: followAudiblePattern,
     onFollowAudibleArrangementBlock: followAudibleArrangementBlock,
