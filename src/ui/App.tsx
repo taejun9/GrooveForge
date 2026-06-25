@@ -22425,11 +22425,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("pattern-clone-")) {
-    return {
-      id: "pattern-clone",
-      label: `Pattern ${project.selectedPattern}`,
-      value: `${patternEventTotal(activePattern(project))} events`
-    };
+    return (
+      quickActionPatternCloneMetricSnapshot(project, action) ?? {
+        id: "pattern-clone",
+        label: `Pattern ${project.selectedPattern}`,
+        value: `${patternEventTotal(activePattern(project))} events`
+      }
+    );
   }
 
   if (action.id.startsWith("pattern-variation-")) {
@@ -22829,6 +22831,58 @@ function patternStackQuickActionId(actionId: string): PatternStackId | null {
 
   const stackId = actionId.slice("pattern-stack-pad-".length);
   return stackId === "pocket" || stackId === "hook" || stackId === "lift" || stackId === "break" ? stackId : null;
+}
+
+function quickActionPatternCloneMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const route = patternCloneQuickActionRoute(action);
+  if (!route) {
+    return null;
+  }
+
+  const sourcePattern = project.patterns[route.source];
+  const targetPattern = project.patterns[route.target];
+  const sourceEvents = patternEventTotal(sourcePattern);
+  const targetEvents = patternEventTotal(targetPattern);
+  const targetDrums = drumHitCount(targetPattern);
+  const targetMusicEvents = targetPattern.bassNotes.length + targetPattern.chordEvents.length + targetPattern.melodyNotes.length;
+  return {
+    id: "pattern-clone",
+    label: "Pattern clone",
+    value: `Pattern ${route.source} -> ${route.target} / ${patternVariationPresetLabel(
+      route.preset
+    )} clone / source ${sourceEvents} events / target ${targetEvents} events / ${targetDrums} drums / ${targetMusicEvents} music`
+  };
+}
+
+function patternCloneQuickActionRoute(
+  action: QuickAction
+): { source: PatternSlot; target: PatternSlot; preset: PatternVariationPreset } | null {
+  const idMatch = /^pattern-clone-([ABC])-(hook|breakdown)$/.exec(action.id);
+  if (!idMatch) {
+    return null;
+  }
+
+  const target = patternSlotFromQuickActionValue(idMatch[1]);
+  const preset = patternCloneQuickActionPreset(idMatch[2]);
+  const detailMatch = /Clone ([ABC]) -> ([ABC])/.exec(action.detail);
+  const source = detailMatch ? patternSlotFromQuickActionValue(detailMatch[1]) : null;
+  const detailTarget = detailMatch ? patternSlotFromQuickActionValue(detailMatch[2]) : null;
+  if (!source || !target || !preset || detailTarget !== target) {
+    return null;
+  }
+
+  return { source, target, preset };
+}
+
+function patternSlotFromQuickActionValue(value: string): PatternSlot | null {
+  return patternSlots.includes(value as PatternSlot) ? (value as PatternSlot) : null;
+}
+
+function patternCloneQuickActionPreset(value: string): PatternVariationPreset | null {
+  return value === "hook" || value === "breakdown" ? value : null;
 }
 
 function quickActionPatternVariationMetricSnapshot(
