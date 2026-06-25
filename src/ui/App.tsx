@@ -21942,6 +21942,63 @@ function firstBeatPathStageDestination(label: string): string {
   }
 }
 
+function quickActionModeFocusMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "mode-focus-jump" && !action.id.startsWith("mode-focus-card-")) {
+    return null;
+  }
+
+  const parts = quickActionModeFocusDetailParts(action);
+  const cardLabel = quickActionModeFocusCardLabel(action);
+  const contextLabel = parts[0] ?? "orientation context unavailable";
+  const destinationLabel = parts[1] ?? "destination unavailable";
+  const detailLabel = parts.slice(2).join(" / ") || "current orientation card";
+  const actionLabel = action.id === "mode-focus-jump" ? "jump active mode focus" : "jump direct mode focus";
+
+  return {
+    id: "mode-focus",
+    label: "Mode focus",
+    value: `${actionLabel} / card ${cardLabel} / destination ${destinationLabel} / context ${contextLabel} / detail ${detailLabel} / mode ${modeLabel(
+      project.mode
+    )} / Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionModeFocusDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionModeFocusCardLabel(action: QuickAction): string {
+  const directId = action.id.startsWith("mode-focus-card-") ? action.id.slice("mode-focus-card-".length) : "";
+  const directLabel = directId ? modeFocusCardLabelFromQuickActionId(directId) : "";
+  const titleLabel = action.title.replace(/^Jump Mode Focus:\s*/, "").trim();
+  return directLabel || titleLabel || "orientation unavailable";
+}
+
+function modeFocusCardLabelFromQuickActionId(id: string): string {
+  switch (id) {
+    case "stage":
+      return "Current stage";
+    case "focus":
+      return "Writing focus";
+    case "check":
+      return "Local check";
+    case "session":
+      return "Session scan";
+    case "issue":
+      return "Issue";
+    case "handoff":
+      return "Handoff";
+    default:
+      return "";
+  }
+}
+
 function quickActionAudiblePatternFollowMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -22277,15 +22334,23 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "mode-focus-jump") {
-    return {
-      id: "mode-focus",
-      label: "Mode focus",
-      value: `${project.mode} / ${project.selectedPattern}`
-    };
+    return (
+      quickActionModeFocusMetricSnapshot(project, action) ?? {
+        id: "mode-focus",
+        label: "Mode focus",
+        value: `${project.mode} / ${project.selectedPattern}`
+      }
+    );
   }
 
   if (action.id.startsWith("mode-focus-card-")) {
-    return { id: "mode-focus", label: "Mode focus", value: action.detail };
+    return (
+      quickActionModeFocusMetricSnapshot(project, action) ?? {
+        id: "mode-focus",
+        label: "Mode focus",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id === "beat-spine-jump" || action.id === "beat-spine-apply") {
