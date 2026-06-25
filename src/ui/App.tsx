@@ -22179,6 +22179,63 @@ function composerGuideDestinationLabelFromLane(label: string): string {
   }
 }
 
+function quickActionKeyCompassMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "key-compass-focus" && !action.id.startsWith("key-compass-card-")) {
+    return null;
+  }
+
+  const parts = quickActionKeyCompassDetailParts(action);
+  const laneLabel = quickActionKeyCompassLaneLabel(action);
+  const keyMetricLabel = parts[0] ?? project.key;
+  const destinationLabel = parts[1] ?? "Compose";
+  const detailLabel = parts.slice(2).join(" / ") || "current harmony lane";
+  const actionLabel = action.id === "key-compass-focus" ? "focus active key compass" : "focus direct key compass";
+
+  return {
+    id: "key-compass",
+    label: "Key compass",
+    value: `${actionLabel} / lane ${laneLabel} / destination ${destinationLabel} / key ${project.key} / metric ${keyMetricLabel} / detail ${detailLabel} / Pattern ${
+      project.selectedPattern
+    } / ${projectEventTotal(project)} events / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionKeyCompassDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionKeyCompassLaneLabel(action: QuickAction): string {
+  const directId = action.id.startsWith("key-compass-card-") ? action.id.slice("key-compass-card-".length) : "";
+  const directLabel = directId ? keyCompassLaneLabelFromQuickActionId(directId) : "";
+  const titleLabel = action.title.replace(/^Focus Key Compass:\s*/, "").trim();
+  return directLabel || titleLabel || "harmony lane unavailable";
+}
+
+function keyCompassLaneLabelFromQuickActionId(id: string): string {
+  switch (id) {
+    case "scale":
+      return "Scale";
+    case "chords":
+      return "Chords";
+    case "cadence":
+      return "Cadence";
+    case "bass":
+      return "808/Bass";
+    case "melody":
+      return "Melody";
+    case "focus":
+      return "Selected focus";
+    default:
+      return "";
+  }
+}
+
 function quickActionAudiblePatternFollowMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -22607,19 +22664,23 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "key-compass-focus") {
-    return {
-      id: "key-compass",
-      label: "Key compass",
-      value: `${project.key} / Pattern ${project.selectedPattern}`
-    };
+    return (
+      quickActionKeyCompassMetricSnapshot(project, action) ?? {
+        id: "key-compass",
+        label: "Key compass",
+        value: `${project.key} / Pattern ${project.selectedPattern}`
+      }
+    );
   }
 
   if (action.id.startsWith("key-compass-card-")) {
-    return {
-      id: "key-compass",
-      label: "Key compass",
-      value: action.detail
-    };
+    return (
+      quickActionKeyCompassMetricSnapshot(project, action) ?? {
+        id: "key-compass",
+        label: "Key compass",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id.startsWith("tempo-nudge-")) {
