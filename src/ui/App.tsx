@@ -21814,6 +21814,59 @@ function quickActionGuideQuickStartTargetLabel(action: QuickAction): string {
   return label || "target unavailable";
 }
 
+function quickActionSessionPassMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "session-pass-focus" && !action.id.startsWith("session-pass-card-")) {
+    return null;
+  }
+
+  const parts = quickActionSessionPassDetailParts(action);
+  const passLabel = quickActionSessionPassLabel(action);
+  const sessionLabel = parts[0] ?? `${modeLabel(project.mode)} mode`;
+  const destinationLabel = parts[1] ?? "destination unavailable";
+  const contextLabel = parts.slice(2).join(" / ") || "current decision target";
+  const actionLabel = action.id === "session-pass-focus" ? "focus active session pass" : "focus direct session pass";
+
+  return {
+    id: "session-pass",
+    label: "Session pass",
+    value: `${actionLabel} / pass ${passLabel} / destination ${destinationLabel} / session ${sessionLabel} / context ${contextLabel} / mode ${modeLabel(
+      project.mode
+    )} / Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionSessionPassDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionSessionPassLabel(action: QuickAction): string {
+  const directId = action.id.startsWith("session-pass-card-") ? action.id.slice("session-pass-card-".length) : "";
+  const directLabel = directId ? sessionPassLabelFromQuickActionId(directId) : "";
+  const titleLabel = action.title.replace(/^Focus Session Pass:\s*/, "").replace(/^Focus\s*/, "").trim();
+  return directLabel || titleLabel || "pass unavailable";
+}
+
+function sessionPassLabelFromQuickActionId(id: string): string {
+  switch (id) {
+    case "guided":
+      return "Guided pass";
+    case "studio":
+      return "Studio pass";
+    case "finish":
+      return "Finish pass";
+    case "deliver":
+      return "Delivery pass";
+    default:
+      return "";
+  }
+}
+
 function quickActionAudiblePatternFollowMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -22015,11 +22068,23 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "session-pass-focus") {
-    return { id: "session-pass", label: "Session pass", value: `${project.mode} mode` };
+    return (
+      quickActionSessionPassMetricSnapshot(project, action) ?? {
+        id: "session-pass",
+        label: "Session pass",
+        value: `${project.mode} mode`
+      }
+    );
   }
 
   if (action.id.startsWith("session-pass-card-")) {
-    return { id: "session-pass", label: "Session pass", value: action.detail };
+    return (
+      quickActionSessionPassMetricSnapshot(project, action) ?? {
+        id: "session-pass",
+        label: "Session pass",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id === "session-brief-compass-focus") {
