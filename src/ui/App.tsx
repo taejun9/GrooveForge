@@ -22293,6 +22293,70 @@ function quickActionExportPreflightLaneLabel(action: QuickAction, card: ExportPr
   return titleLabel && titleLabel !== "Focus Export Preflight" ? titleLabel : card.label;
 }
 
+function quickActionHandoffExportReceiptMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "handoff-export-receipt-focus") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionHandoffExportReceiptDetailParts(action);
+  const statusLabel = detailParts[0] ?? receipt.statusLabel;
+  const contextLabel = detailParts.slice(1).join(" / ") || `${receipt.fileLabel} / ${receipt.detailLabel}`;
+  const deliverableLabel = receipt.itemId ? handoffExportReceiptItemLabel(receipt.itemId) : "No deliverable";
+
+  return {
+    id: "handoff-export-receipt",
+    label: "Handoff receipt",
+    value: [
+      "focus export receipt",
+      "destination Deliver panel",
+      `status ${statusLabel}`,
+      `deliverable ${deliverableLabel}`,
+      `file ${receipt.fileLabel}`,
+      `context ${contextLabel}`,
+      `next ${receipt.nextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} events`,
+      patternUseLabel,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project))
+    ].join(" / ")
+  };
+}
+
+function quickActionHandoffExportReceiptDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function handoffExportReceiptItemLabel(itemId: HandoffPackItem["id"]): string {
+  switch (itemId) {
+    case "wav":
+      return "Mix WAV";
+    case "stems":
+      return "Stem WAVs";
+    case "midi":
+      return "Arrangement MIDI";
+    case "sheet":
+      return "Handoff Sheet";
+  }
+}
+
 function quickActionHandoffSendOrderMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -24124,6 +24188,16 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "handoff-export-receipt-focus") {
+    const handoffReceiptMetric = quickActionHandoffExportReceiptMetricSnapshot(
+      project,
+      action,
+      handoffExportReceipt,
+      analysis ?? undefined
+    );
+    if (handoffReceiptMetric) {
+      return handoffReceiptMetric;
+    }
+
     return {
       id: "handoff-export-receipt",
       label: "Handoff receipt",
