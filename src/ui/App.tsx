@@ -21802,8 +21802,8 @@ function quickActionResultMetricSnapshot(
   if (action.id.startsWith("key-quick-")) {
     return {
       id: "key-quick",
-      label: "Key",
-      value: `${project.key} / Pattern ${project.selectedPattern}`
+      label: "Key retarget",
+      value: `Key ${project.key} / ${projectEventTotal(project)} events / edit Pattern ${project.selectedPattern}`
     };
   }
 
