@@ -17022,6 +17022,147 @@ function selectedBlockEditNextCheck(actionId: SelectedBlockEditActionId, changed
   return "Scan Song Form Overview and Arrangement Playback before the next structure edit.";
 }
 
+type SelectedBlockQuickActionDescriptor = {
+  blockNumber: number | null;
+  section: ArrangementSection | null;
+  pattern: PatternSlot | null;
+  bars: number | null;
+};
+
+function quickActionSelectedBlockMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const editAction = selectedBlockQuickActionEditAction(action);
+  if (!editAction) {
+    return null;
+  }
+
+  const descriptor = selectedBlockQuickActionDescriptor(action);
+  const blockIndex = selectedBlockQuickActionBlockIndex(project, action);
+  const block = project.arrangement[blockIndex] ?? project.arrangement[0];
+  const blockNumber =
+    descriptor.blockNumber ?? (block ? Math.min(blockIndex + 1, Math.max(project.arrangement.length, 1)) : null);
+  const section = descriptor.section ?? block?.section ?? null;
+  const pattern = descriptor.pattern ?? block?.pattern ?? project.selectedPattern;
+  const bars = descriptor.bars ?? (block ? normalizeArrangementBars(block.bars) : 0);
+  const scopeLabel = blockNumber && section ? `Block ${blockNumber} ${section}` : "No selected block";
+
+  return {
+    id: "selected-block",
+    label: "Selected block",
+    value: `${selectedBlockEditActionTitle(editAction)} / ${scopeLabel} / Pattern ${pattern} / ${barCountLabel(
+      bars
+    )} / ${project.arrangement.length} blocks / ${barCountLabel(
+      arrangementTotalBars(project)
+    )} / ${selectedBlockQuickActionStructuralDeltaLabel(project, editAction, blockIndex, block)}`
+  };
+}
+
+function selectedBlockQuickActionEditAction(action: QuickAction): SelectedBlockEditActionId | null {
+  switch (action.id) {
+    case "selected-block-copy":
+      return "copy";
+    case "selected-block-paste":
+      return "paste";
+    case "selected-block-duplicate":
+      return "duplicate";
+    case "selected-block-split":
+      return "split";
+    case "selected-block-merge":
+      return "merge";
+    case "selected-block-move-left":
+      return "move_left";
+    case "selected-block-move-right":
+      return "move_right";
+    case "selected-block-delete":
+      return "delete";
+  }
+
+  const text = `${action.title} ${action.detail} ${action.keywords}`;
+  return selectedBlockQuickActionTitleAction.find((candidate) => candidate.pattern.test(text))?.actionId ?? null;
+}
+
+const selectedBlockQuickActionTitleAction: Array<{
+  pattern: RegExp;
+  actionId: SelectedBlockEditActionId;
+}> = [
+  { pattern: /\bPaste After\b|\bPaste copied block\b|\bPasted block\b/i, actionId: "paste" },
+  { pattern: /\bDuplicate\b|\bDuplicated block\b/i, actionId: "duplicate" },
+  { pattern: /\bSplit Block\b|\bSplit selected block\b|\bSplit block\b/i, actionId: "split" },
+  { pattern: /\bMerge Next\b|\bMerge selected block\b|\bMerged blocks\b/i, actionId: "merge" },
+  { pattern: /\bMove Left\b|\bMove selected block left\b|\bMoved block left\b/i, actionId: "move_left" },
+  { pattern: /\bMove Right\b|\bMove selected block right\b|\bMoved block right\b/i, actionId: "move_right" },
+  { pattern: /\bDelete selected block\b|\bDelete block\b|\bDeleted block\b/i, actionId: "delete" },
+  { pattern: /\bCopy Block\b|\bCopy selected block\b|\bCopied block\b/i, actionId: "copy" }
+];
+
+function selectedBlockQuickActionBlockIndex(project: ProjectState, action: QuickAction): number {
+  const blockNumber = selectedBlockQuickActionDescriptor(action).blockNumber;
+  if (!blockNumber) {
+    return 0;
+  }
+
+  return Math.min(Math.max(blockNumber - 1, 0), Math.max(project.arrangement.length - 1, 0));
+}
+
+function selectedBlockQuickActionDescriptor(action: QuickAction): SelectedBlockQuickActionDescriptor {
+  const text = `${action.title} ${action.detail}`;
+  const blockNumberMatch = /\bBlock\s+(\d+)\b/i.exec(text);
+  const sectionMatch = /\bBlock\s+\d+\s+([A-Za-z]+)(?:\s+\/|\s+Pattern\b)/i.exec(text);
+  const patternMatch = /\bPattern\s+([ABC])\b/i.exec(text);
+  const barsMatch = /\b(\d+)\s+bars?\b/i.exec(text);
+  const section = sectionMatch ? selectedBlockQuickActionSection(sectionMatch[1]) : null;
+  const pattern = patternMatch ? selectedBlockQuickActionPattern(patternMatch[1]) : null;
+  const bars = barsMatch ? Number(barsMatch[1]) : null;
+
+  return {
+    blockNumber: blockNumberMatch ? Number(blockNumberMatch[1]) : null,
+    section,
+    pattern,
+    bars: bars !== null && Number.isFinite(bars) ? bars : null
+  };
+}
+
+function selectedBlockQuickActionSection(value: string): ArrangementSection | null {
+  return arrangementSections.includes(value as ArrangementSection) ? (value as ArrangementSection) : null;
+}
+
+function selectedBlockQuickActionPattern(value: string): PatternSlot | null {
+  const pattern = value.toUpperCase();
+  return patternSlots.includes(pattern as PatternSlot) ? (pattern as PatternSlot) : null;
+}
+
+function selectedBlockQuickActionStructuralDeltaLabel(
+  project: ProjectState,
+  actionId: SelectedBlockEditActionId,
+  blockIndex: number,
+  block: ArrangementBlock | undefined
+): string {
+  const blockBars = block ? normalizeArrangementBars(block.bars) : 0;
+  const nextBlock = project.arrangement[blockIndex + 1] ?? null;
+  switch (actionId) {
+    case "copy":
+      return "clipboard only";
+    case "paste":
+      return "paste after selected";
+    case "duplicate":
+      return `+1 block target / +${barCountLabel(blockBars)}`;
+    case "split":
+      return "split selected block / bars unchanged";
+    case "merge":
+      return nextBlock
+        ? `merge next / ${barCountLabel(blockBars + normalizeArrangementBars(nextBlock.bars))}`
+        : "merge unavailable / no next block";
+    case "move_left":
+      return "order -1";
+    case "move_right":
+      return "order +1";
+    case "delete":
+      return `-1 block target / -${barCountLabel(blockBars)}`;
+  }
+}
+
 function isArrangementMovePresetApplied(block: ArrangementBlock, preset: ArrangementMovePreset): boolean {
   const transformed = applyArrangementMovePreset(block, preset);
   return (
@@ -17624,7 +17765,7 @@ function createQuickActions({
   const selectedBlockNumber = selectedBlock ? Math.min(selectedArrangementIndex + 1, project.arrangement.length) : 0;
   const selectedBlockBars = selectedBlock ? normalizeArrangementBars(selectedBlock.bars) : 0;
   const selectedBlockLabel = selectedBlock
-    ? `Block ${selectedBlockNumber} ${selectedBlock.section} Pattern ${selectedBlock.pattern}`
+    ? `Block ${selectedBlockNumber} ${selectedBlock.section} Pattern ${selectedBlock.pattern} / ${barCountLabel(selectedBlockBars)}`
     : "No selected block";
   const selectedBlockSplitAfter = selectedBlock ? clampSplitAfterBars(splitAfterBars, selectedBlockBars) : 1;
   const nextArrangementBlock = project.arrangement[selectedArrangementIndex + 1] ?? null;
@@ -22467,11 +22608,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("selected-block-")) {
-    return {
-      id: "selected-block",
-      label: "Selected block",
-      value: `${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`
-    };
+    return (
+      quickActionSelectedBlockMetricSnapshot(project, action) ?? {
+        id: "selected-block",
+        label: "Selected block",
+        value: `${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`
+      }
+    );
   }
 
   if (
