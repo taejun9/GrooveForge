@@ -170,6 +170,9 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "reference", command: "Command Reference", shortcut: "? / CmdOrCtrl+/", target: "Help" },
       { id: "actions", command: "Quick Actions", shortcut: "CmdOrCtrl+K", target: "Command palette" },
       { id: "playback", command: "Play / Stop", shortcut: "Space", target: "Selected loop" },
+      { id: "transport-position", command: "Transport Position Readout", shortcut: "Readout", target: "Bar / beat / loop scope" },
+      { id: "loop-scope", command: "Loop Scope", shortcut: "Quick Actions / Readout", target: "Song / Block / Pattern loop" },
+      { id: "metronome", command: "Metronome", shortcut: "Quick Actions / Readout", target: "Realtime click / grid" },
       { id: "patterns", command: "Pattern A/B/C", shortcut: "1 / 2 / 3", target: "Edit focus" },
       { id: "delete", command: "Delete selected event", shortcut: "Backspace / Delete", target: "Selected event" }
     ]
