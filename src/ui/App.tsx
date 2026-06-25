@@ -22457,11 +22457,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "arrangement-move" || action.id === "arrangement-move-decision") {
-    return {
-      id: "arrangement-move",
-      label: "Arrangement move",
-      value: `${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
-    };
+    return (
+      quickActionArrangementMoveMetricSnapshot(project, action) ?? {
+        id: "arrangement-move",
+        label: "Arrangement move",
+        value: `${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
+      }
+    );
   }
 
   if (action.id.startsWith("selected-block-")) {
@@ -22862,6 +22864,83 @@ function patternChainQuickActionId(actionId: string): PatternChainId | null {
 
   const chainId = actionId.slice("pattern-chain-".length);
   return patternChainIds.includes(chainId as PatternChainId) ? (chainId as PatternChainId) : null;
+}
+
+function quickActionArrangementMoveMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const preset = arrangementMoveQuickActionPreset(action);
+  if (!preset) {
+    return null;
+  }
+
+  const blockIndex = arrangementMoveQuickActionBlockIndex(project, action);
+  const block = project.arrangement[blockIndex] ?? project.arrangement[0];
+  if (!block) {
+    return {
+      id: "arrangement-move",
+      label: "Arrangement move",
+      value: `${arrangementMovePresetLabel(preset)} move / no selected block / 0 blocks / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
+  const targetBlock = applyArrangementMovePreset(block, preset);
+  const energy = normalizeArrangementEnergy(block.energy);
+  const targetEnergy = normalizeArrangementEnergy(targetBlock.energy);
+  const mutedTracks = normalizeArrangementMutedTracks(block.mutedTracks);
+  const targetMutedTracks = normalizeArrangementMutedTracks(targetBlock.mutedTracks);
+  const changedFields =
+    (energy === targetEnergy ? 0 : 1) + (mutedTracks.join(",") === targetMutedTracks.join(",") ? 0 : 1);
+  const blockNumber = Math.min(blockIndex + 1, Math.max(project.arrangement.length, 1));
+  const presetLabel = arrangementMovePresetLabel(preset);
+  const actionLabel = action.id === "arrangement-move-decision" ? `${presetLabel} move decision` : `${presetLabel} move`;
+
+  return {
+    id: "arrangement-move",
+    label: "Arrangement move",
+    value: `${actionLabel} / Block ${blockNumber} ${block.section} / Pattern ${block.pattern} / ${barCountLabel(
+      block.bars
+    )} / Energy ${percentLabel(energy)} / ${arrangementFocusPreviewMuteLabel(mutedTracks)} / ${changedFields} field${
+      changedFields === 1 ? "" : "s"
+    } / ${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function arrangementMoveQuickActionPreset(action: QuickAction): ArrangementMovePreset | null {
+  return arrangementMoveQuickActionPresetId(action.id) ?? arrangementMoveQuickActionTextPreset(action);
+}
+
+function arrangementMoveQuickActionTextPreset(action: QuickAction): ArrangementMovePreset | null {
+  const text = `${action.title} ${action.detail} ${action.keywords}`;
+  return (
+    arrangementMovePresetIds.find((preset) => text.includes(arrangementMovePresetLabel(preset))) ??
+    null
+  );
+}
+
+function arrangementMoveQuickActionPresetId(actionId: string): ArrangementMovePreset | null {
+  if (!actionId.startsWith("arrangement-move-preset-")) {
+    return null;
+  }
+
+  const presetId = actionId.slice("arrangement-move-preset-".length);
+  return arrangementMovePresetIds.includes(presetId as ArrangementMovePreset) ? (presetId as ArrangementMovePreset) : null;
+}
+
+function arrangementMoveQuickActionBlockIndex(project: ProjectState, action: QuickAction): number {
+  const text = `${action.title} ${action.detail}`;
+  const match = /\bBlock\s+(\d+)\b/i.exec(text);
+  if (!match) {
+    return 0;
+  }
+
+  const blockNumber = Number(match[1]);
+  if (!Number.isFinite(blockNumber)) {
+    return 0;
+  }
+
+  return Math.min(Math.max(blockNumber - 1, 0), Math.max(project.arrangement.length - 1, 0));
 }
 
 function quickActionArrangementTemplateMetricSnapshot(
