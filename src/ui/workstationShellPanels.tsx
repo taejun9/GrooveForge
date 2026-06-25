@@ -323,6 +323,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
     id: "deliver-fast-path",
     title: "Deliver",
     items: [
+      { id: "delivery-target-alignment", command: "Delivery Target Alignment", shortcut: "Quick Actions / Readout", target: "Target fit / length / mix" },
       { id: "export-preflight", command: "Export Preflight", shortcut: "Quick Actions / Readout", target: "Readiness / mix / handoff risk" },
       { id: "export-format-readout", command: "Export Format Readout", shortcut: "Quick Actions / Readout", target: "WAV / stems / MIDI / sheet" },
       { id: "handoff-send-order", command: "Handoff Send Order", shortcut: "Quick Actions / Readout", target: "WAV -> stems -> MIDI -> sheet" },
