@@ -25174,61 +25174,9 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "sound-focus-decision") {
-    return {
-      id: "sound-focus-decision",
-      label: "Sound Focus Decision",
-      value: soundPresetToneLabel(project.sound)
-    };
-  }
-
-  if (action.id === "sound-focus" || action.id.startsWith("sound-focus-pad-")) {
-    return {
-      id: "sound-focus",
-      label: "Sound focus",
-      value: soundPresetToneLabel(project.sound)
-    };
-  }
-
-  if (action.id === "timbre-check") {
-    const timbre = createSoundTimbreCheckSummary(project.sound);
-    return {
-      id: "timbre-check",
-      label: "Timbre Check",
-      value: `${timbre.headline} / ${timbre.balanceLabel}`
-    };
-  }
-
-  if (action.id === "sound-preset-decision") {
-    return {
-      id: "sound-preset-decision",
-      label: "Sound Preset Decision",
-      value: `${soundPresetLabel(project.sound.preset)} / ${soundPresetToneLabel(project.sound)}`
-    };
-  }
-
-  if (action.id === "sound-preset" || action.id.startsWith("sound-preset-pad-")) {
-    return {
-      id: "sound-preset",
-      label: "Sound preset",
-      value: `${soundPresetLabel(project.sound.preset)} / ${soundPresetToneLabel(project.sound)}`
-    };
-  }
-
-  if (action.id === "drum-kit-decision") {
-    return {
-      id: "drum-kit-decision",
-      label: "Drum Kit Decision",
-      value: `K ${compactUnitPercent(project.sound.kickPunch)} / C ${compactUnitPercent(project.sound.snareSnap)} / H ${compactUnitPercent(project.sound.hatBrightness)}`
-    };
-  }
-
-  if (action.id === "drum-kit" || action.id.startsWith("drum-kit-pad-")) {
-    return {
-      id: "drum-kit",
-      label: "Drum kit",
-      value: `K ${compactUnitPercent(project.sound.kickPunch)} / C ${compactUnitPercent(project.sound.snareSnap)} / H ${compactUnitPercent(project.sound.hatBrightness)}`
-    };
+  const soundDecisionMetric = quickActionSoundDecisionMetricSnapshot(project, action, analysis ?? undefined);
+  if (soundDecisionMetric) {
+    return soundDecisionMetric;
   }
 
   if (action.id === "beat-readiness-focus" || action.id.startsWith("beat-readiness-check-")) {
@@ -26054,6 +26002,300 @@ function quickActionBeatBlueprintPreviewDetailParts(action: QuickAction): string
     .split(" / ")
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+function quickActionSoundDecisionMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id === "timbre-check") {
+    return quickActionTimbreCheckMetricSnapshot(project, action, analysis);
+  }
+
+  if (action.id === "sound-preset-decision" || action.id === "sound-preset" || action.id.startsWith("sound-preset-pad-")) {
+    return quickActionSoundPresetMetricSnapshot(project, action, analysis);
+  }
+
+  if (action.id === "drum-kit-decision" || action.id === "drum-kit" || action.id.startsWith("drum-kit-pad-")) {
+    return quickActionDrumKitMetricSnapshot(project, action, analysis);
+  }
+
+  if (action.id === "sound-focus-decision" || action.id === "sound-focus" || action.id.startsWith("sound-focus-pad-")) {
+    return quickActionSoundFocusMetricSnapshot(project, action, analysis);
+  }
+
+  return null;
+}
+
+function quickActionSoundPresetMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const target = quickActionSoundPresetTarget(project, action);
+  if (!target) {
+    return null;
+  }
+
+  const summary = createSoundPresetPreviewSummary(project.sound, target);
+  return {
+    id: action.id === "sound-preset-decision" ? "sound-preset-decision" : "sound-preset",
+    label: action.id === "sound-preset-decision" ? "Sound Preset Decision" : "Sound preset",
+    value: quickActionSoundMetricValue(project, action, analysis, [
+      quickActionSoundActionLabel(action),
+      `target ${summary.presetLabel}`,
+      `status ${summary.statusLabel}`,
+      `context ${quickActionSoundDecisionContextLabel(action, summary.detailTitle)}`,
+      `preview ${summary.toneLabel}`,
+      `moves ${summary.changeLabel}`
+    ])
+  };
+}
+
+function quickActionDrumKitMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const pad = quickActionDrumKitPadOption(project, action);
+  if (!pad) {
+    return null;
+  }
+
+  return {
+    id: action.id === "drum-kit-decision" ? "drum-kit-decision" : "drum-kit",
+    label: action.id === "drum-kit-decision" ? "Drum Kit Decision" : "Drum kit",
+    value: quickActionSoundMetricValue(project, action, analysis, [
+      quickActionSoundActionLabel(action),
+      `target ${pad.label} kit`,
+      `status ${pad.changedCount === 0 ? "Kit aligned" : "Suggested kit"}`,
+      `context ${quickActionSoundDecisionContextLabel(action, pad.detail)}`,
+      `drums ${drumKitPreviewDrumLabel(pad)}`,
+      `rack ${drumKitPreviewRackLabel(pad)}`,
+      `moves ${pad.changedCount} kit move${pad.changedCount === 1 ? "" : "s"}`
+    ])
+  };
+}
+
+function quickActionSoundFocusMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const pad = quickActionSoundFocusPadOption(project, action);
+  if (!pad) {
+    return null;
+  }
+
+  const changedParameters = soundFocusChangedParameters(project.sound, pad);
+  const changedLabel = soundFocusChangedParameterLabel(changedParameters);
+  return {
+    id: action.id === "sound-focus-decision" ? "sound-focus-decision" : "sound-focus",
+    label: action.id === "sound-focus-decision" ? "Sound Focus Decision" : "Sound focus",
+    value: quickActionSoundMetricValue(project, action, analysis, [
+      quickActionSoundActionLabel(action),
+      `target ${pad.label} focus`,
+      `status ${pad.changedCount === 0 ? "Sound aligned" : "Suggested focus"}`,
+      `context ${quickActionSoundDecisionContextLabel(action, pad.detail)}`,
+      `focus ${pad.detail} tone posture`,
+      `parameters ${soundFocusPreviewParameterLabel(pad)}`,
+      `moves ${pad.changedCount} tone move${pad.changedCount === 1 ? "" : "s"} / ${changedLabel}`
+    ])
+  };
+}
+
+function quickActionTimbreCheckMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } {
+  const timbre = createSoundTimbreCheckSummary(project.sound);
+  return {
+    id: "timbre-check",
+    label: "Timbre Check",
+    value: quickActionSoundMetricValue(project, action, analysis, [
+      quickActionSoundActionLabel(action),
+      `check ${timbre.statusLabel}`,
+      `context ${quickActionSoundDecisionContextLabel(action, timbre.detailTitle)}`,
+      `balance ${timbre.headline} / ${timbre.balanceLabel} / ${timbre.detail}`,
+      `timbre ${timbre.metrics.map((metric) => `${metric.label} ${metric.value}`).join(" / ")}`
+    ], timbre.nextCheck)
+  };
+}
+
+function quickActionSoundMetricValue(
+  project: ProjectState,
+  action: QuickAction,
+  analysis: ExportAnalysis | undefined,
+  parts: string[],
+  nextCheck = quickActionSoundDecisionNextCheck(action)
+): string {
+  return [
+    ...parts,
+    `current ${soundPresetLabel(project.sound.preset)} / ${quickActionSoundDesignPosture(project.sound)}`,
+    ...quickActionSoundProjectMetricParts(project, analysis),
+    `next ${nextCheck}`
+  ].join(" / ");
+}
+
+function quickActionSoundProjectMetricParts(project: ProjectState, analysis?: ExportAnalysis): string[] {
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+
+  return [
+    `Pattern ${project.selectedPattern}`,
+    `${drumHitCount(pattern)} drum hits`,
+    `${pattern.bassNotes.length} 808`,
+    `${pattern.melodyNotes.length} synth`,
+    `${pattern.chordEvents.length} chords`,
+    `${patternEventTotal(pattern)} editable events`,
+    patternUseLabel,
+    `${project.arrangement.length} blocks`,
+    barCountLabel(arrangementTotalBars(project)),
+    `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`
+  ];
+}
+
+function quickActionSoundDesignPosture(sound: SoundDesign): string {
+  return [
+    `drums ${soundFocusDrumLabel(sound)}`,
+    `808 ${soundFocusBassLabel(sound)}`,
+    `duck ${soundFocusDuckLabel(sound)}`,
+    `synth ${soundFocusSynthLabel(sound)}`,
+    `chords ${soundFocusChordLabel(sound)}`
+  ].join(" / ");
+}
+
+function quickActionSoundDecisionContextLabel(action: QuickAction, fallback: string): string {
+  return quickActionSoundDecisionDetailParts(action).join(" / ") || fallback;
+}
+
+function quickActionSoundDecisionDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionSoundDecisionNextCheck(action: QuickAction): string {
+  if (action.id === "sound-preset-decision" || action.id === "sound-preset" || action.id.startsWith("sound-preset-pad-")) {
+    return "loop drums, 808, Synth, and Chords together before trimming with Sound Focus or Studio controls";
+  }
+
+  if (action.id === "drum-kit-decision" || action.id === "drum-kit" || action.id.startsWith("drum-kit-pad-")) {
+    return "loop kick, clap, hat, and 808 balance before changing another kit or drum rack control";
+  }
+
+  if (action.id === "sound-focus-decision" || action.id === "sound-focus" || action.id.startsWith("sound-focus-pad-")) {
+    return "loop the focused tone against the full Pattern before changing another focus lane";
+  }
+
+  return "inspect Timbre Check before changing preset, kit, focus, or Studio tone controls";
+}
+
+function quickActionSoundActionLabel(action: QuickAction): string {
+  if (action.id === "sound-preset-decision") {
+    return "run sound preset decision";
+  }
+  if (action.id === "sound-preset") {
+    return "apply current sound preset";
+  }
+  if (action.id.startsWith("sound-preset-pad-")) {
+    return "apply direct sound preset";
+  }
+  if (action.id === "drum-kit-decision") {
+    return "run drum kit decision";
+  }
+  if (action.id === "drum-kit") {
+    return "apply current drum kit";
+  }
+  if (action.id.startsWith("drum-kit-pad-")) {
+    return "apply direct drum kit";
+  }
+  if (action.id === "sound-focus-decision") {
+    return "run sound focus decision";
+  }
+  if (action.id === "sound-focus") {
+    return "apply current sound focus";
+  }
+  if (action.id.startsWith("sound-focus-pad-")) {
+    return "apply direct sound focus";
+  }
+  if (action.id === "timbre-check") {
+    return "check timbre balance";
+  }
+  return "run sound action";
+}
+
+function quickActionSoundPresetTarget(project: ProjectState, action: QuickAction): SoundPresetTarget | null {
+  const directTarget = soundPresetTargetFromQuickActionId(action.id);
+  if (directTarget) {
+    return directTarget;
+  }
+
+  if (action.id !== "sound-preset-decision" && action.id !== "sound-preset") {
+    return null;
+  }
+
+  return quickActionSoundPresetTargetFromText(action) ?? defaultSoundPresetPreview(project);
+}
+
+function soundPresetTargetFromQuickActionId(actionId: string): SoundPresetTarget | null {
+  if (!actionId.startsWith("sound-preset-pad-")) {
+    return null;
+  }
+
+  const presetId = actionId.slice("sound-preset-pad-".length);
+  return soundPresetIds.includes(presetId as SoundPresetTarget) ? (presetId as SoundPresetTarget) : null;
+}
+
+function quickActionSoundPresetTargetFromText(action: QuickAction): SoundPresetTarget | null {
+  const text = `${action.title} ${action.detail} ${action.keywords}`;
+  return (
+    soundPresetIds.find((preset) => text.includes(preset) || text.includes(soundPresetLabel(preset))) ??
+    null
+  );
+}
+
+function quickActionDrumKitPadOption(project: ProjectState, action: QuickAction): DrumKitPadOption | null {
+  const options = createDrumKitPadOptions(project);
+  const directId = action.id.startsWith("drum-kit-pad-") ? action.id.slice("drum-kit-pad-".length) : null;
+  if (directId) {
+    return options.find((pad) => pad.id === directId) ?? null;
+  }
+
+  if (action.id !== "drum-kit-decision" && action.id !== "drum-kit") {
+    return null;
+  }
+
+  const text = `${action.title} ${action.detail} ${action.keywords}`;
+  return (
+    options.find((pad) => text.includes(pad.id) || text.includes(pad.label)) ??
+    options.find((pad) => pad.id === createDrumKitPreviewSummary(options).padId) ??
+    null
+  );
+}
+
+function quickActionSoundFocusPadOption(project: ProjectState, action: QuickAction): SoundFocusPadOption | null {
+  const options = createSoundFocusPadOptions(project.sound);
+  const directId = action.id.startsWith("sound-focus-pad-") ? action.id.slice("sound-focus-pad-".length) : null;
+  if (directId) {
+    return options.find((pad) => pad.id === directId) ?? null;
+  }
+
+  if (action.id !== "sound-focus-decision" && action.id !== "sound-focus") {
+    return null;
+  }
+
+  const text = `${action.title} ${action.detail} ${action.keywords}`;
+  return (
+    options.find((pad) => text.includes(pad.id) || text.includes(pad.label)) ??
+    options.find((pad) => pad.id === createSoundFocusPreviewSummary(project.sound, options).padId) ??
+    null
+  );
 }
 
 function quickActionLayerStarterMetricSnapshot(
