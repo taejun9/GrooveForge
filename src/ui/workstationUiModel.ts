@@ -1125,6 +1125,20 @@ export type QuickActionRecent = {
 
 export const maxQuickActionPins = 4;
 
+export type QuickActionPinnedResultKind = "pin" | "unpin" | "inspect";
+
+export type QuickActionPinnedResult = {
+  kind: QuickActionPinnedResultKind;
+  actionId: string;
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type QuickActionScopeId = "all" | "transport" | "compose" | "arrange" | "mix" | "master" | "project" | "export";
 
 export type QuickActionScopeOption = {
