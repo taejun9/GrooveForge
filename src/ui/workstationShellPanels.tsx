@@ -275,7 +275,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "song-form-overview", command: "Song Form Overview", shortcut: "Quick Actions / Readout", target: "Sections / patterns" },
       { id: "arrangement-mute-map", command: "Arrangement Mute Map", shortcut: "Quick Actions / Readout", target: "Layer dropouts" },
       { id: "arrangement-transition-map", command: "Arrangement Transition Map", shortcut: "Quick Actions / Readout", target: "Section handoffs" },
-      { id: "arrangement-playback-readout", command: "Arrangement Playback Readout", shortcut: "Readout", target: "Edit vs heard Block" },
+      { id: "arrangement-playback-readout", command: "Arrangement Playback Readout", shortcut: "Quick Actions / Readout", target: "Edit vs heard Block" },
       { id: "audible-arrangement-follow", command: "Audible Arrangement Follow", shortcut: "Quick Actions / Readout", target: "Heard Block" }
     ]
   },
