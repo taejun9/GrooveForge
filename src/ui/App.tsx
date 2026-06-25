@@ -23832,11 +23832,12 @@ function quickActionExportPreflightMetricSnapshot(
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
   const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
   const summary = createExportPreflightSummary(
     project,
     createBeatReadinessChecks(project, exportAnalysis),
     exportAnalysis,
-    analyzeStemExports(project)
+    stemAnalyses
   );
   const card = quickActionExportPreflightCard(summary, action);
   if (!card) {
@@ -23856,14 +23857,49 @@ function quickActionExportPreflightMetricSnapshot(
   return {
     id: "export-preflight",
     label: "Export preflight",
-    value: `${actionLabel} / card ${laneLabel} / destination ${card.focusLabel} panel / status ${card.value} / context ${contextLabel} / Pattern ${
-      project.selectedPattern
-    } / ${patternEventTotal(pattern)} events / ${patternUseLabel} / delivery ${postureLabel} / preflight ${
-      summary.headline
-    } / ${summary.detail} / metric ${exportPreflightFocusResultMetric(summary)} / ${
-      project.arrangement.length
-    } blocks / ${barCountLabel(arrangementTotalBars(project))}`
+    value: [
+      actionLabel,
+      `card ${laneLabel}`,
+      `destination ${card.focusLabel} panel`,
+      `status ${card.value}`,
+      `context ${contextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `delivery ${postureLabel}`,
+      `preflight ${summary.headline}`,
+      summary.detail,
+      ...quickActionExportPreflightDeliveryMetricParts(project, summary, exportAnalysis, stemAnalyses, card),
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project))
+    ].join(" / ")
   };
+}
+
+function quickActionExportPreflightDeliveryMetricParts(
+  project: ProjectState,
+  summary: ExportPreflightSummary,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses,
+  card: ExportPreflightCard
+): string[] {
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
+
+  return [
+    `target ${target.name}`,
+    `target length ${barCountLabel(target.targetBars)}`,
+    `wav ${analysis.status} / H ${formatDb(analysis.headroomDb)}`,
+    `stems ${audibleStemCount}/${target.stemGoal} target / ${audibleStemCount}/${stemTrackIds.length} audible`,
+    `midi ${barCountLabel(bars)}`,
+    `brief ${sessionBriefFilledFields(project.sessionBrief)}/4 / ${briefStatus.value}`,
+    `sheet ${handoffSheetFileName(project)}`,
+    `automation ${masterAutomationQuickActionPosture(project)}`,
+    `metric ${exportPreflightFocusResultMetric(summary)}`,
+    `next ${exportPreflightFocusResultNextCheck(card)}`
+  ];
 }
 
 function quickActionExportPreflightCard(summary: ExportPreflightSummary, action: QuickAction): ExportPreflightCard | null {
