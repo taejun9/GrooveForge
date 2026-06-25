@@ -22236,6 +22236,67 @@ function keyCompassLaneLabelFromQuickActionId(id: string): string {
   }
 }
 
+function quickActionGrooveCompassMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "groove-compass-focus" && !action.id.startsWith("groove-compass-card-")) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const parts = quickActionGrooveCompassDetailParts(action);
+  const laneLabel = quickActionGrooveCompassLaneLabel(action);
+  const grooveMetricLabel = parts[0] ?? `${drumHitCount(pattern)} drum hits`;
+  const destinationLabel = parts[1] ?? "Compose";
+  const detailLabel = parts.slice(2).join(" / ") || "current pocket lane";
+  const actionLabel =
+    action.id === "groove-compass-focus" ? "focus active groove compass" : "focus direct groove compass";
+
+  return {
+    id: "groove-compass",
+    label: "Groove compass",
+    value: `${actionLabel} / lane ${laneLabel} / destination ${destinationLabel} / metric ${grooveMetricLabel} / detail ${detailLabel} / Pattern ${
+      project.selectedPattern
+    } / ${projectEventTotal(project)} events / ${drumHitCount(pattern)} drum hits / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionGrooveCompassDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionGrooveCompassLaneLabel(action: QuickAction): string {
+  const directId = action.id.startsWith("groove-compass-card-") ? action.id.slice("groove-compass-card-".length) : "";
+  const directLabel = directId ? grooveCompassLaneLabelFromQuickActionId(directId) : "";
+  const titleLabel = action.title.replace(/^Focus Groove Compass:\s*/, "").trim();
+  return directLabel || titleLabel || "pocket lane unavailable";
+}
+
+function grooveCompassLaneLabelFromQuickActionId(id: string): string {
+  switch (id) {
+    case "density":
+      return "Density";
+    case "anchors":
+      return "Anchors";
+    case "hats":
+      return "Hat motion";
+    case "timing":
+      return "Timing";
+    case "chance":
+      return "Chance";
+    case "pocket":
+      return "Pocket balance";
+    case "focus":
+      return "Selected drum";
+    default:
+      return "";
+  }
+}
+
 function quickActionAudiblePatternFollowMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -22880,19 +22941,23 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "groove-compass-focus") {
-    return {
-      id: "groove-compass",
-      label: "Groove compass",
-      value: `Pattern ${project.selectedPattern} / ${drumHitCount(activePattern(project))} hits`
-    };
+    return (
+      quickActionGrooveCompassMetricSnapshot(project, action) ?? {
+        id: "groove-compass",
+        label: "Groove compass",
+        value: `Pattern ${project.selectedPattern} / ${drumHitCount(activePattern(project))} hits`
+      }
+    );
   }
 
   if (action.id.startsWith("groove-compass-card-")) {
-    return {
-      id: "groove-compass",
-      label: "Groove compass",
-      value: action.detail
-    };
+    return (
+      quickActionGrooveCompassMetricSnapshot(project, action) ?? {
+        id: "groove-compass",
+        label: "Groove compass",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id === "pattern-dna-focus") {
