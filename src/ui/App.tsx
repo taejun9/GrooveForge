@@ -25082,6 +25082,94 @@ function audibleArrangementFollowQuickActionBeforeEditIndex(action: QuickAction)
   return Number.isInteger(blockNumber) && blockNumber > 0 ? blockNumber - 1 : null;
 }
 
+function quickActionWorkflowNavigatorContext(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { item: WorkflowNavigatorItem; items: WorkflowNavigatorItem[]; exportAnalysis: ExportAnalysis; stemAnalyses: StemExportAnalyses } | null {
+  const zone = workflowNavigatorZoneFromQuickAction(action.id);
+  if (!zone) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const checks = createBeatReadinessChecks(project, exportAnalysis);
+  const beatMap = createBeatMapSummary(project, checks, exportAnalysis, stemAnalyses);
+  const exportPreflight = createExportPreflightSummary(project, checks, exportAnalysis, stemAnalyses);
+  const items = createWorkflowNavigatorItems(project, beatMap, exportPreflight, exportAnalysis);
+  const item = items.find((candidate) => candidate.id === zone);
+  return item ? { item, items, exportAnalysis, stemAnalyses } : null;
+}
+
+function quickActionWorkflowNavigatorMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const context = quickActionWorkflowNavigatorContext(project, action, analysis);
+  if (!context) {
+    return null;
+  }
+
+  const { item, items, exportAnalysis, stemAnalyses } = context;
+  const target = activeDeliveryTarget(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+
+  return {
+    id: "workflow-navigator",
+    label: "Workflow navigator",
+    value: [
+      `command ${action.title}`,
+      `detail ${action.detail}`,
+      `destination Guide / Workflow Navigator / ${item.label}`,
+      `zone ${item.label} / ${item.value} / ${item.detail}`,
+      `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
+      `workflow ${workflowNavigatorJumpMetricValue(items)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `stems ${audibleStemCount}/${target.stemGoal} target`,
+      `audition ${workflowNavigatorJumpAuditionCue(item)}`,
+      `next ${workflowNavigatorJumpNextCheck(item)}`
+    ].join(" / ")
+  };
+}
+
+function quickActionWorkflowNavigatorFollowup(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { auditionCue: string; nextCheck: string } | null {
+  const context = quickActionWorkflowNavigatorContext(project, action, analysis);
+  if (!context) {
+    return null;
+  }
+
+  return {
+    auditionCue: workflowNavigatorJumpAuditionCue(context.item),
+    nextCheck: workflowNavigatorJumpNextCheck(context.item)
+  };
+}
+
+function workflowNavigatorZoneFromQuickAction(actionId: string): WorkflowZoneId | null {
+  const zoneId = actionId.slice("workflow-navigator-".length);
+  switch (zoneId) {
+    case "compose":
+    case "arrange":
+    case "mix":
+    case "deliver":
+      return zoneId;
+    default:
+      return null;
+  }
+}
+
 function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -26153,6 +26241,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("workflow-navigator-")) {
+    const workflowNavigatorMetric = quickActionWorkflowNavigatorMetricSnapshot(project, action, analysis ?? undefined);
+    if (workflowNavigatorMetric) {
+      return workflowNavigatorMetric;
+    }
+
     return {
       id: "workflow-navigator",
       label: "Workflow navigator",
@@ -28981,10 +29074,12 @@ function quickActionResultFollowup(
   }
 
   if (action.id.startsWith("workflow-navigator-")) {
-    return {
-      auditionCue: "Use the jumped workflow panel to continue the current compose, arrange, mix, or deliver pass.",
-      nextCheck: "Return to Workflow Navigator when you need another direct workstation zone jump."
-    };
+    return (
+      quickActionWorkflowNavigatorFollowup(project, action, analysis) ?? {
+        auditionCue: "Use the jumped workflow panel to continue the current compose, arrange, mix, or deliver pass.",
+        nextCheck: "Return to Workflow Navigator when you need another direct workstation zone jump."
+      }
+    );
   }
 
   if (action.id === "chain-expand") {
