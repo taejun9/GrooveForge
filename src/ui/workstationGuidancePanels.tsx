@@ -79,6 +79,7 @@ type GuideQuickStartCompletionScore = {
 
 type GuideQuickStartCompletionBreakdownItem = {
   id: "path" | "session" | "workflow";
+  percent: number;
   statusLabel: string;
   scoreLabel: string;
   metricLabel: string;
@@ -431,6 +432,7 @@ export function GuideQuickStart({
     workflowNavigatorItems,
     workflowSpotlight
   });
+  const completionBottleneckLabel = createGuideQuickStartCompletionBottleneckLabel(completionBreakdownItems);
   const contextItems = createGuideQuickStartContextItems({
     firstBeatPathSummary,
     nextStep,
@@ -562,6 +564,14 @@ export function GuideQuickStart({
           <strong data-testid="guide-quick-start-completion-score">{completionScore.scoreLabel}</strong>
           <small data-testid="guide-quick-start-completion-metric">{completionScore.metricLabel}</small>
           <small data-testid="guide-quick-start-completion-next-check">{completionScore.nextCheckLabel}</small>
+        </div>
+        <div
+          className={`guide-quick-start-completion-bottleneck ${completionScore.tone}`}
+          data-testid="guide-quick-start-completion-bottleneck"
+          title={completionBottleneckLabel}
+        >
+          <span data-testid="guide-quick-start-completion-bottleneck-status">Lowest lane</span>
+          <strong data-testid="guide-quick-start-completion-bottleneck-label">{completionBottleneckLabel}</strong>
         </div>
         <div
           aria-label="Beat Completion Score breakdown"
@@ -735,6 +745,39 @@ export function createGuideQuickStartCompletionScore({
   };
 }
 
+export function createGuideQuickStartCompletionBottleneckLabel(
+  breakdownItems: ReturnType<typeof createGuideQuickStartCompletionBreakdownItems>
+): string {
+  if (breakdownItems.length === 0) {
+    return "Bottleneck: not scored";
+  }
+
+  const bottleneck = breakdownItems.reduce((selected, item) => {
+    if (item.percent < selected.percent) {
+      return item;
+    }
+    if (item.percent === selected.percent && guideQuickStartDecisionToneRank(item.tone) > guideQuickStartDecisionToneRank(selected.tone)) {
+      return item;
+    }
+    return selected;
+  });
+  const scoreLabel = bottleneck.scoreLabel.replace(` ${bottleneck.id}`, "");
+  const metricLabel = bottleneck.metricLabel.split(" / ").join("; ");
+
+  return `Bottleneck ${guideQuickStartCompletionBreakdownName(bottleneck.id)}: ${scoreLabel} (${metricLabel})`;
+}
+
+function guideQuickStartCompletionBreakdownName(id: GuideQuickStartCompletionBreakdownItem["id"]): string {
+  switch (id) {
+    case "path":
+      return "Path";
+    case "session":
+      return "Session";
+    case "workflow":
+      return "Workflow";
+  }
+}
+
 export function createGuideQuickStartCompletionBreakdownItems({
   firstBeatPathSummary,
   sessionPassSummary,
@@ -793,6 +836,7 @@ function createGuideQuickStartCompletionBreakdownItem({
 
   return {
     id,
+    percent,
     statusLabel,
     scoreLabel,
     metricLabel,

@@ -80,9 +80,13 @@ function quickActionGuideSuggestionBreakdown(detail: string): string {
   return quickActionGuideSuggestionParts(detail).find((part) => part.startsWith("Breakdown ")) ?? "Breakdown: not scored";
 }
 
+function quickActionGuideSuggestionBottleneck(detail: string): string {
+  return quickActionGuideSuggestionParts(detail).find((part) => part.startsWith("Bottleneck ")) ?? "Bottleneck: not scored";
+}
+
 function quickActionGuideSuggestionNonCompletionParts(detail: string): string[] {
   return quickActionGuideSuggestionParts(detail).filter(
-    (part) => !part.startsWith("Completion ") && !part.startsWith("Breakdown ")
+    (part) => !part.startsWith("Completion ") && !part.startsWith("Breakdown ") && !part.startsWith("Bottleneck ")
   );
 }
 
@@ -770,6 +774,9 @@ export function QuickActions({
   const guideSuggestionBreakdown = guideSuggestionAction
     ? quickActionGuideSuggestionBreakdown(guideSuggestionAction.detail)
     : "Breakdown: not scored";
+  const guideSuggestionBottleneck = guideSuggestionAction
+    ? quickActionGuideSuggestionBottleneck(guideSuggestionAction.detail)
+    : "Bottleneck: not scored";
   const guideSuggestionAfterRun = guideSuggestionAction
     ? quickActionGuideSuggestionAfterRun(guideSuggestionAction.detail)
     : "After run: inspect the focused guide target before editing.";
@@ -861,6 +868,9 @@ export function QuickActions({
               </small>
               <small className="quick-actions-guide-suggestion-breakdown" data-testid="quick-actions-guide-suggestion-breakdown">
                 {guideSuggestionBreakdown}
+              </small>
+              <small className="quick-actions-guide-suggestion-bottleneck" data-testid="quick-actions-guide-suggestion-bottleneck">
+                {guideSuggestionBottleneck}
               </small>
               <small className="quick-actions-guide-suggestion-next" data-testid="quick-actions-guide-suggestion-next">
                 {guideSuggestionAfterRun}

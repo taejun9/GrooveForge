@@ -693,6 +693,7 @@ import {
   ReferenceAlignmentReadout,
   SessionPass,
   WorkflowNavigator,
+  createGuideQuickStartCompletionBottleneckLabel,
   createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
   createModeSwitchQuickActions,
@@ -14182,6 +14183,7 @@ function activeSessionPassQuickActionCard(summary: SessionPassSummary): SessionP
 type GuideQuickStartQuickActionTarget = {
   source: "path" | "session" | "workflow";
   title: string;
+  completionBottleneck: string;
   detail: string;
   completionBreakdown: string;
   metricValue: string;
@@ -14190,6 +14192,7 @@ type GuideQuickStartQuickActionTarget = {
 };
 
 function activeGuideQuickStartQuickActionTarget({
+  completionBottleneck,
   completionBreakdown,
   completionScore,
   firstBeatPathStep,
@@ -14199,6 +14202,7 @@ function activeGuideQuickStartQuickActionTarget({
   workflowSpotlight,
   workflowSpotlightItem
 }: {
+  completionBottleneck: string;
   completionBreakdown: string;
   completionScore: ReturnType<typeof createGuideQuickStartCompletionScore>;
   firstBeatPathStep: FirstBeatPathStep | null;
@@ -14214,33 +14218,36 @@ function activeGuideQuickStartQuickActionTarget({
     candidates.push({
       source: "path",
       title: `Guide Quick Start: ${firstBeatPathStep.label}`,
+      completionBottleneck,
       detail: `First Beat Path / ${firstBeatPathStep.value} / ${firstBeatPathStep.detail}`,
       completionBreakdown,
       metricValue: `${firstBeatPathSummary.countLabel} / ${firstBeatPathStep.value} / ${completionScore.statusLabel}: ${completionScore.scoreLabel}`,
       tone: firstBeatPathStep.tone,
-      keywords: `${firstBeatPathStep.id} ${firstBeatPathStep.label} ${firstBeatPathStep.jumpLabel} ${firstBeatPathStep.detail} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel} ${completionBreakdown}`
+      keywords: `${firstBeatPathStep.id} ${firstBeatPathStep.label} ${firstBeatPathStep.jumpLabel} ${firstBeatPathStep.detail} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel} ${completionBreakdown} ${completionBottleneck}`
     });
   }
 
   candidates.push({
     source: "session",
     title: `Guide Quick Start: ${sessionPassCard.label}`,
+    completionBottleneck,
     detail: `Session Pass / ${sessionPassCard.value} / ${sessionPassCard.focusLabel}`,
     completionBreakdown,
     metricValue: `${sessionPassSummary.headline} / ${sessionPassCard.detail} / ${completionScore.statusLabel}: ${completionScore.scoreLabel}`,
     tone: sessionPassCard.tone,
-    keywords: `${sessionPassCard.id} ${sessionPassCard.label} ${sessionPassCard.value} ${sessionPassCard.focusLabel} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel} ${completionBreakdown}`
+    keywords: `${sessionPassCard.id} ${sessionPassCard.label} ${sessionPassCard.value} ${sessionPassCard.focusLabel} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel} ${completionBreakdown} ${completionBottleneck}`
   });
 
   if (workflowSpotlightItem) {
     candidates.push({
       source: "workflow",
       title: `Guide Quick Start: ${workflowSpotlight.zoneLabel}`,
+      completionBottleneck,
       detail: `Workflow Spotlight / ${workflowSpotlight.statusLabel} / ${workflowSpotlight.detailLabel}`,
       completionBreakdown,
       metricValue: `${workflowSpotlight.countLabel} / ${workflowSpotlightItem.detail} / ${completionScore.statusLabel}: ${completionScore.scoreLabel}`,
       tone: workflowSpotlight.tone,
-      keywords: `${workflowSpotlightItem.id} ${workflowSpotlightItem.label} ${workflowSpotlightItem.value} ${workflowSpotlightItem.detail} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel} ${completionBreakdown}`
+      keywords: `${workflowSpotlightItem.id} ${workflowSpotlightItem.label} ${workflowSpotlightItem.value} ${workflowSpotlightItem.detail} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel} ${completionBreakdown} ${completionBottleneck}`
     });
   }
 
@@ -18007,15 +18014,16 @@ function createQuickActions({
     workflowNavigatorItems,
     workflowSpotlight
   });
-  const guideQuickStartCompletionBreakdown = guideQuickStartCompletionBreakdownLabel(
-    createGuideQuickStartCompletionBreakdownItems({
-      firstBeatPathSummary,
-      sessionPassSummary,
-      workflowNavigatorItems,
-      workflowSpotlight
-    })
-  );
+  const guideQuickStartCompletionBreakdownItems = createGuideQuickStartCompletionBreakdownItems({
+    firstBeatPathSummary,
+    sessionPassSummary,
+    workflowNavigatorItems,
+    workflowSpotlight
+  });
+  const guideQuickStartCompletionBreakdown = guideQuickStartCompletionBreakdownLabel(guideQuickStartCompletionBreakdownItems);
+  const guideQuickStartCompletionBottleneck = createGuideQuickStartCompletionBottleneckLabel(guideQuickStartCompletionBreakdownItems);
   const guideQuickStartTarget = activeGuideQuickStartQuickActionTarget({
+    completionBottleneck: guideQuickStartCompletionBottleneck,
     completionBreakdown: guideQuickStartCompletionBreakdown,
     completionScore: guideQuickStartCompletionScore,
     firstBeatPathStep,
@@ -19150,7 +19158,7 @@ function createQuickActions({
       id: "guide-quick-start",
       title: guideQuickStartTarget ? guideQuickStartTarget.title : "Guide Quick Start",
       detail: guideQuickStartTarget
-        ? `${guideQuickStartTarget.detail} / ${guideQuickStartTarget.metricValue} / ${guideQuickStartTarget.completionBreakdown}`
+        ? `${guideQuickStartTarget.detail} / ${guideQuickStartTarget.metricValue} / ${guideQuickStartTarget.completionBreakdown} / ${guideQuickStartTarget.completionBottleneck}`
         : "No Guide Quick Start target available.",
       group: "Project",
       keywords: `guide quick start one command current next path session workflow spotlight first beat pass beginner producer direct beat workstation ${
