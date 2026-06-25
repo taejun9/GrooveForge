@@ -810,6 +810,11 @@ export function QuickActions({
   const guideBottleneckSuggestionCheck = guideBottleneckSuggestionAction
     ? quickActionGuideSuggestionAfterRun(guideBottleneckSuggestionAction.detail).replace("After run: ", "Bottleneck check: ")
     : "Bottleneck check: unavailable";
+  const guideSuggestionPinCapacity = `Pin slots: ${pinnedActions.length}/${maxQuickActionPins} used`;
+  const guideSuggestionPinHint =
+    pinnedActions.length >= maxQuickActionPins
+      ? "Pin hint: next new pin keeps the newest session commands."
+      : "Pin hint: guide and bottleneck pins stay session-local.";
 
   return (
     <div
@@ -911,10 +916,14 @@ export function QuickActions({
               <small className="quick-actions-guide-suggestion-next" data-testid="quick-actions-guide-suggestion-next">
                 {guideSuggestionAfterRun}
               </small>
+              <small className="quick-actions-guide-suggestion-pin-hint" data-testid="quick-actions-guide-suggestion-pin-hint">
+                {guideSuggestionPinHint}
+              </small>
               <span className="quick-actions-guide-suggestion-meta" data-testid="quick-actions-guide-suggestion-meta">
                 <span data-testid="quick-actions-guide-suggestion-source">{guideSuggestionSource}</span>
                 <span data-testid="quick-actions-guide-suggestion-target">{guideSuggestionTarget}</span>
                 <span data-testid="quick-actions-guide-suggestion-metric">{guideSuggestionMetric}</span>
+                <span data-testid="quick-actions-guide-suggestion-pin-capacity">{guideSuggestionPinCapacity}</span>
                 <span
                   className="quick-actions-guide-suggestion-completion"
                   data-testid="quick-actions-guide-suggestion-completion"
