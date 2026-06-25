@@ -14797,6 +14797,16 @@ function beatReadinessQuickActionCheck(project: ProjectState, actionId: string):
   }
 
   const checks = createBeatReadinessChecks(project, analyzeExport(project));
+  return beatReadinessQuickActionCheckFromChecks(checks, actionId);
+}
+
+function beatReadinessQuickActionCheckFromChecks(
+  checks: BeatReadinessCheck[],
+  actionId: string
+): BeatReadinessCheck | null {
+  if (actionId !== "beat-readiness-focus" && !actionId.startsWith("beat-readiness-check-")) {
+    return null;
+  }
 
   if (actionId === "beat-readiness-focus") {
     return activeBeatReadinessQuickActionCheck(checks);
@@ -21770,6 +21780,61 @@ function patternUseSelectedBlockPlacement(
   return `${placementLabel} / Block ${boundedIndex + 1} ${block.section} / ${rangeLabel} / ${barCountLabel(bars)}`;
 }
 
+function quickActionBeatReadinessMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const checks = createBeatReadinessChecks(project, analyzeExport(project));
+  const check = beatReadinessQuickActionCheckFromChecks(checks, action.id);
+  if (!check) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const parts = quickActionBeatReadinessDetailParts(action);
+  const contextLabel = parts.slice(1).join(" / ") || check.detail;
+  const actionLabel = action.id === "beat-readiness-focus" ? "focus priority beat readiness" : "focus direct beat readiness";
+  const laneLabel = quickActionBeatReadinessLaneLabel(action, check);
+  const drumCount = drumHitCount(pattern);
+  const musicEvents = pattern.bassNotes.length + pattern.chordEvents.length + pattern.melodyNotes.length;
+  const readyLayerCount = [
+    drumCount > 0,
+    pattern.bassNotes.length > 0,
+    pattern.chordEvents.length > 0,
+    pattern.melodyNotes.length > 0
+  ].filter(Boolean).length;
+  const readyCount = checks.filter((item) => item.tone === "good").length;
+  const reviewCount = checks.filter((item) => item.tone === "warn").length;
+  const blockerCount = checks.filter((item) => item.tone === "danger").length;
+
+  return {
+    id: "beat-readiness",
+    label: "Beat readiness",
+    value: `${actionLabel} / lane ${laneLabel} / destination ${check.focusLabel} panel / status ${check.status} / context ${contextLabel} / Pattern ${
+      project.selectedPattern
+    } / ${patternEventTotal(pattern)} events / ${drumCount} drum hits / ${musicEvents} music events / ${
+      pattern.bassNotes.length
+    } 808 / ${pattern.chordEvents.length} chords / ${pattern.melodyNotes.length} synth / ${readyLayerCount}/4 layers / ${
+      project.arrangement.length
+    } blocks / ${barCountLabel(arrangementTotalBars(project))} / ${readyCount}/${checks.length} ready / ${workflowCountLabel(
+      reviewCount,
+      "review"
+    )} / ${workflowCountLabel(blockerCount, "blocker")}`
+  };
+}
+
+function quickActionBeatReadinessDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionBeatReadinessLaneLabel(action: QuickAction, check: BeatReadinessCheck): string {
+  const titleLabel = action.title.replace(/^Focus Beat Readiness:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Beat Readiness" ? titleLabel : check.label;
+}
+
 function quickActionGuideQuickStartMetricSnapshot(action: QuickAction): { id: string; label: string; value: string } | null {
   if (action.id !== "guide-quick-start" && action.id !== "guide-bottleneck-focus") {
     return null;
@@ -23177,13 +23242,11 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  const beatReadinessTarget = beatReadinessQuickActionCheck(project, action.id);
-  if (beatReadinessTarget) {
-    return {
-      id: "beat-readiness",
-      label: "Beat readiness",
-      value: `${beatReadinessTarget.label} / ${beatReadinessTarget.status}`
-    };
+  if (action.id === "beat-readiness-focus" || action.id.startsWith("beat-readiness-check-")) {
+    const readinessMetric = quickActionBeatReadinessMetricSnapshot(project, action);
+    if (readinessMetric) {
+      return readinessMetric;
+    }
   }
 
   if (action.id === "listening-pass-focus") {
