@@ -24129,6 +24129,166 @@ function quickActionReviewFixFollowup(
   };
 }
 
+function quickActionComposerActionMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const area = composerActionQuickActionArea(action.id);
+  if (!area) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const checks = createBeatReadinessChecks(project, exportAnalysis);
+  const summary = createComposerActionsSummary(project, checks, exportAnalysis, stemAnalyses);
+  const actionId = quickActionComposerActionId(action.id);
+  const composerAction = actionId ? (summary.actions.find((candidate) => candidate.id === actionId) ?? null) : null;
+  const detailParts = quickActionComposerActionDetailParts(action);
+  const profile = styleProfiles.find((candidate) => candidate.id === project.styleId) ?? styleProfiles[0];
+  const styleSummary = profile
+    ? createStyleInspectorSummary(project, profile, createPatternCompareSummaries(project))
+    : null;
+  const followup = quickActionResultFollowup(action, project, "complete");
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const target = activeDeliveryTarget(project);
+
+  return {
+    id: `composer-action-${area}`,
+    label: quickActionComposerActionMetricLabel(area),
+    value: [
+      `move ${quickActionComposerActionMoveLabel(action, composerAction, detailParts)}`,
+      `area ${quickActionComposerActionAreaLabel(area)}`,
+      `route ${quickActionComposerActionRouteLabel(composerAction, area)}`,
+      `scope ${composerAction?.scope ?? detailParts[1] ?? "current beat"}`,
+      `impact ${composerAction?.impact ?? detailParts[2] ?? "writing state"}`,
+      `undo ${composerAction?.safety ?? detailParts[3] ?? "undoable local action"}`,
+      `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `drums ${drumHitCount(pattern)} hits`,
+      `808 ${pattern.bassNotes.length} notes`,
+      `harmony ${pattern.chordEvents.length} chords`,
+      `melody ${pattern.melodyNotes.length} notes`,
+      `selected ${quickActionArrangementSelectedBlockLabel(project, selectedArrangementIndex)}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `style goals ${styleSummary ? quickActionStyleInspectorGoalPosture(styleSummary) : "style goals unavailable"}`,
+      `composer ${summary.headline} / ${summary.detail}`,
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
+function quickActionComposerActionId(actionId: string): string | null {
+  if (!actionId.startsWith("composer-action-")) {
+    return null;
+  }
+
+  return actionId.slice("composer-action-".length);
+}
+
+function quickActionComposerActionDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionComposerActionMoveLabel(
+  action: QuickAction,
+  composerAction: ComposerAction | null,
+  detailParts: string[]
+): string {
+  const commandLabel = action.title.replace(/^Run Composer Action:\s*/, "").trim();
+  const moveLabel = composerAction?.buttonLabel ?? commandLabel;
+  const contextLabel = composerAction?.label ?? detailParts[0] ?? "";
+  if (!contextLabel || contextLabel === moveLabel) {
+    return moveLabel || "Composer Action";
+  }
+
+  return `${moveLabel} / ${contextLabel}`;
+}
+
+function quickActionComposerActionMetricLabel(area: ComposerActionArea): string {
+  switch (area) {
+    case "drums":
+      return "Composer drums";
+    case "bass":
+      return "Composer 808";
+    case "harmony":
+      return "Composer harmony";
+    case "melody":
+      return "Composer melody";
+    case "arrange":
+      return "Composer arrange";
+    case "finish":
+      return "Composer finish";
+  }
+}
+
+function quickActionComposerActionAreaLabel(area: ComposerActionArea): string {
+  switch (area) {
+    case "drums":
+      return "Drums";
+    case "bass":
+      return "808/Bass";
+    case "harmony":
+      return "Harmony";
+    case "melody":
+      return "Melody";
+    case "arrange":
+      return "Arrange";
+    case "finish":
+      return "Finish";
+  }
+}
+
+function quickActionComposerActionRouteLabel(action: ComposerAction | null, area: ComposerActionArea): string {
+  const group = area === "arrange" ? "Arrange" : area === "finish" ? "Mix" : "Create";
+  if (!action) {
+    return `${group} / Composer Actions`;
+  }
+
+  return `${group} / ${quickActionComposerActionCommandLabel(action)}`;
+}
+
+function quickActionComposerActionCommandLabel(action: ComposerAction): string {
+  const command = action.command;
+  switch (command.kind) {
+    case "blueprint": {
+      const blueprint = beatBlueprints.find((candidate) => candidate.id === command.blueprintId);
+      return `Beat Blueprint ${blueprint?.name ?? command.blueprintId}`;
+    }
+    case "drumFoundation":
+      return `Drum Foundation ${drumFoundationLabel(command.foundation)}`;
+    case "bassline":
+      return `808 Bassline ${basslinePadLabel(command.pad)}`;
+    case "chordProgression":
+      return `Chord Progression ${quickActionComposerActionPresetLabel(command.preset)}`;
+    case "melodyMotif":
+      return `Melody Motif ${melodyMotifLabel(command.motif)}`;
+    case "patternFill":
+      return `Pattern Fill ${patternFillPresetLabel(command.preset)}`;
+    case "patternChain":
+      return `Pattern Chain ${patternChainLabel(command.chain)}`;
+    case "arrangementTemplate":
+      return `Arrangement Template ${arrangementTemplateLabel(command.template)}`;
+    case "masterFinish":
+      return `Master Finish ${masterFinishPadLabel(command.pad)}`;
+  }
+}
+
+function quickActionComposerActionPresetLabel(value: string): string {
+  return value.replace(/_/g, " ");
+}
+
 function quickActionStyleInspectorMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -26346,6 +26506,16 @@ function quickActionResultMetricSnapshot(
 
   const composerQuickActionArea = composerActionQuickActionArea(action.id);
   if (composerQuickActionArea) {
+    const composerActionMetric = quickActionComposerActionMetricSnapshot(
+      project,
+      action,
+      selectedArrangementIndex,
+      analysis ?? undefined
+    );
+    if (composerActionMetric) {
+      return composerActionMetric;
+    }
+
     const pattern = activePattern(project);
     switch (composerQuickActionArea) {
       case "drums":
