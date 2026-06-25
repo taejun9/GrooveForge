@@ -21549,7 +21549,16 @@ function patternCompareDecisionQuickActionTarget(action: QuickAction): PatternSl
   return slot === "A" || slot === "B" || slot === "C" ? slot : null;
 }
 
-function patternCompareDecisionQuickActionPosture(project: ProjectState, action: QuickAction): string {
+function patternCompareDecisionQuickActionPosture(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): string {
+  const metric = quickActionPatternCompareDecisionMetricSnapshot(project, action, selectedArrangementIndex);
+  if (metric) {
+    return metric.value;
+  }
+
   const target = patternCompareDecisionQuickActionTarget(action) ?? project.selectedPattern;
   const targetPattern = project.patterns[target];
   const eventLabel = `${patternEventTotal(targetPattern)} events`;
@@ -21561,6 +21570,73 @@ function patternCompareDecisionQuickActionPosture(project: ProjectState, action:
   }
 
   return `Cue Pattern ${target} / edit Pattern ${project.selectedPattern} / ${eventLabel}`;
+}
+
+function quickActionPatternCompareDecisionMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  const kind = patternCompareDecisionQuickActionKind(action);
+  const target = patternCompareDecisionQuickActionTarget(action);
+  if (!kind || !target) {
+    return null;
+  }
+
+  const identity = patternCompareDecisionMetricIdentity(kind);
+  const targetPattern = project.patterns[target];
+  const eventCount = patternEventTotal(targetPattern);
+  const drumCount = drumHitCount(targetPattern);
+  const musicEvents = targetPattern.bassNotes.length + targetPattern.chordEvents.length + targetPattern.melodyNotes.length;
+  const arrangedBlocks = project.arrangement.filter((block) => block.pattern === target);
+  const arrangedBars = arrangedBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  const arrangementUse =
+    arrangedBlocks.length === 0
+      ? "not arranged"
+      : `${arrangedBlocks.length} block${arrangedBlocks.length === 1 ? "" : "s"} / ${barCountLabel(arrangedBars)}`;
+  const selectedBlockPlacement = patternCompareDecisionSelectedBlockPlacement(project, selectedArrangementIndex, target);
+
+  return {
+    id: "pattern-compare-decision",
+    label: identity.label,
+    value: `${identity.actionLabel} / Pattern ${target} / ${eventCount} events / ${drumCount} drums / ${musicEvents} music / ${selectedBlockPlacement} / arrangement ${arrangementUse} / edit Pattern ${project.selectedPattern}`
+  };
+}
+
+function patternCompareDecisionMetricIdentity(kind: PatternCompareDecisionSummary["action"]): {
+  label: string;
+  actionLabel: string;
+} {
+  if (kind === "use") {
+    return {
+      label: "Pattern placement",
+      actionLabel: "use recommendation"
+    };
+  }
+
+  return {
+    label: "Pattern cue",
+    actionLabel: "cue recommendation"
+  };
+}
+
+function patternCompareDecisionSelectedBlockPlacement(
+  project: ProjectState,
+  selectedArrangementIndex: number,
+  target: PatternSlot
+): string {
+  if (project.arrangement.length === 0) {
+    return `no selected block / ${barCountLabel(arrangementTotalBars(project))}`;
+  }
+
+  const boundedIndex = Math.min(Math.max(0, selectedArrangementIndex), project.arrangement.length - 1);
+  const block = project.arrangement[boundedIndex];
+  const bars = normalizeArrangementBars(block.bars);
+  const startBar = arrangementStartBar(project, boundedIndex) + 1;
+  const endBar = startBar + bars - 1;
+  const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+  const placementLabel = block.pattern === target ? "target in selected block" : `selected block uses Pattern ${block.pattern}`;
+  return `${placementLabel} / Block ${boundedIndex + 1} ${block.section} / ${rangeLabel} / ${barCountLabel(bars)}`;
 }
 
 function quickActionPatternCueSwitchMetricSnapshot(
@@ -22126,11 +22202,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "pattern-compare-decision") {
-    return {
-      id: "pattern-compare-decision",
-      label: patternCompareDecisionQuickActionKind(action) === "use" ? "Pattern placement" : "Pattern cue",
-      value: patternCompareDecisionQuickActionPosture(project, action)
-    };
+    return (
+      quickActionPatternCompareDecisionMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "pattern-compare-decision",
+        label: patternCompareDecisionQuickActionKind(action) === "use" ? "Pattern placement" : "Pattern cue",
+        value: patternCompareDecisionQuickActionPosture(project, action, selectedArrangementIndex)
+      }
+    );
   }
 
   if (action.id.startsWith("pattern-use-")) {
