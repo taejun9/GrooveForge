@@ -5485,7 +5485,8 @@ h2 {
 .quick-actions-guide-suggestion-bottleneck,
 .quick-actions-guide-suggestion-bottleneck-check,
 .quick-actions-guide-suggestion-next,
-.quick-actions-guide-suggestion-pin-hint {
+.quick-actions-guide-suggestion-pin-hint,
+.quick-actions-guide-suggestion-recent {
   display: -webkit-box;
   overflow: hidden;
   color: rgba(244, 239, 231, 0.72);
@@ -5510,6 +5511,10 @@ h2 {
 
 .quick-actions-guide-suggestion-pin-hint {
   color: rgba(244, 239, 231, 0.58);
+}
+
+.quick-actions-guide-suggestion-recent {
+  color: rgba(120, 240, 200, 0.68);
 }
 
 .quick-actions-guide-suggestion-meta {
