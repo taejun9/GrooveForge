@@ -25139,6 +25139,9 @@ function quickActionResultMetricSnapshot(
     if (source === "beat-map") {
       return quickActionBeatMapMetricSnapshot(project, action, nextMoveAction);
     }
+    if (source === "structure-lens") {
+      return quickActionStructureLensMetricSnapshot(project, action, nextMoveAction);
+    }
 
     const metric = nextMoveResultMetricSnapshot(project, nextMoveAction);
     return {
@@ -29433,6 +29436,118 @@ function beatMapStageIdForNextMoveAction(action: NextMoveAction): string {
 }
 
 function beatMapRouteLabel(action: NextMoveAction): string {
+  switch (action.command.kind) {
+    case "blueprint":
+      return "Create / Beat Blueprint";
+    case "patternFill":
+      return "Create / Pattern Fill";
+    case "arrangementMove":
+      return "Arrange / Arrangement Move";
+    case "patternChain":
+      return "Arrange / Pattern Chain";
+    case "chainExpand":
+      return "Arrange / Chain Expand";
+    case "arrangementTemplate":
+      return "Arrange / Arrangement Template";
+    case "deliveryTarget":
+      return "Deliver / Delivery Target Align";
+    case "masterFinish":
+      return "Master / Master Finish";
+    case "snapshot":
+      return "Project / Save Snapshot";
+    case "reviewMix":
+      return "Mix / Mix Coach";
+  }
+}
+
+function quickActionStructureLensMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  nextMoveAction: NextMoveAction
+): { id: string; label: string; value: string } {
+  const summary = createStructureLensSummary(project);
+  const signal = structureLensSignalForNextMoveAction(summary, nextMoveAction);
+  const target = activeDeliveryTarget(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const targetSignal = structureLensSignalById(summary, "target");
+  const sectionsSignal = structureLensSignalById(summary, "sections");
+  const hookSignal = structureLensSignalById(summary, "hook");
+  const arcSignal = structureLensSignalById(summary, "arc");
+  const readyCount = summary.signals.filter((candidate) => candidate.tone === "good").length;
+  const reviewCount = summary.signals.filter((candidate) => candidate.tone === "warn").length;
+  const blockerCount = summary.signals.filter((candidate) => candidate.tone === "danger").length;
+  const followup = nextMoveResultFollowup(nextMoveAction, project);
+
+  return {
+    id: "structure-lens-result",
+    label: "Structure Lens result",
+    value: [
+      `action ${action.title}`,
+      "destination Guide / Structure Lens / Arrange",
+      `signal ${signal.label} / ${signal.value} / ${signal.detail}`,
+      `target ${target.name} / ${barCountLabel(target.targetBars)}`,
+      `completion ${summary.headline} / ${readyCount}/${summary.signals.length} signals ready / ${workflowCountLabel(
+        reviewCount,
+        "review"
+      )} / ${workflowCountLabel(blockerCount, "blocker")}`,
+      `target fit ${structureLensSignalMetricLabel(targetSignal)}`,
+      `sections ${structureLensSignalMetricLabel(sectionsSignal)}`,
+      `hook ${structureLensSignalMetricLabel(hookSignal)}`,
+      `arc ${structureLensSignalMetricLabel(arcSignal)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `route ${structureLensRouteLabel(nextMoveAction)}`,
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
+function structureLensSignalForNextMoveAction(summary: StructureLensSummary, action: NextMoveAction): StructureLensSignal {
+  return structureLensSignalById(summary, structureLensSignalIdForNextMoveAction(action));
+}
+
+function structureLensSignalById(summary: StructureLensSummary, id: StructureLensSignal["id"]): StructureLensSignal {
+  return (
+    summary.signals.find((candidate) => candidate.id === id) ??
+    summary.signals[0] ?? {
+      id: "target",
+      label: "Target Fit",
+      value: "Unavailable",
+      detail: summary.detail,
+      tone: summary.tone
+    }
+  );
+}
+
+function structureLensSignalIdForNextMoveAction(action: NextMoveAction): StructureLensSignal["id"] {
+  switch (action.command.kind) {
+    case "deliveryTarget":
+      return "target";
+    case "patternChain":
+    case "chainExpand":
+    case "arrangementTemplate":
+      return "sections";
+    case "arrangementMove":
+      return "hook";
+    case "blueprint":
+    case "patternFill":
+    case "masterFinish":
+    case "snapshot":
+    case "reviewMix":
+      return "arc";
+  }
+}
+
+function structureLensSignalMetricLabel(signal: StructureLensSignal): string {
+  return `${signal.value} / ${signal.detail}`;
+}
+
+function structureLensRouteLabel(action: NextMoveAction): string {
   switch (action.command.kind) {
     case "blueprint":
       return "Create / Beat Blueprint";
