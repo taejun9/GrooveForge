@@ -21975,6 +21975,84 @@ function quickActionBeatPassportLaneLabel(action: QuickAction, metric: BeatPassp
   return titleLabel && titleLabel !== "Focus Beat Passport" ? titleLabel : metric.label;
 }
 
+function quickActionProductionSnapshotMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const exportAnalysis = analyzeExport(project);
+  const summary = createProductionSnapshotSummary(
+    project,
+    createBeatReadinessChecks(project, exportAnalysis),
+    exportAnalysis,
+    analyzeStemExports(project)
+  );
+  const metric = quickActionProductionSnapshotMetric(summary, action);
+  if (!metric) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const actionLabel =
+    action.id === "production-snapshot-focus" ? "focus priority production snapshot" : "focus direct production snapshot";
+  const laneLabel = quickActionProductionSnapshotLaneLabel(action, metric);
+  const detailParts = quickActionProductionSnapshotDetailParts(action);
+  const contextLabel = detailParts.slice(2).join(" / ") || metric.detail;
+  const postureLabel = summary.metrics.map((item) => `${item.label} ${item.value}`).join(" / ");
+
+  return {
+    id: "production-snapshot",
+    label: "Production snapshot",
+    value: `${actionLabel} / metric ${laneLabel} / destination ${metric.focusLabel} panel / status ${metric.value} / context ${contextLabel} / Pattern ${
+      project.selectedPattern
+    } / ${patternEventTotal(pattern)} events / ${patternUseLabel} / posture ${postureLabel} / session ${
+      summary.headline
+    } / ${summary.detail} / snapshot ${productionSnapshotFocusResultMetric(summary)} / ${
+      project.arrangement.length
+    } blocks / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionProductionSnapshotMetric(
+  summary: ProductionSnapshotSummary,
+  action: QuickAction
+): ProductionSnapshotMetric | null {
+  if (action.id === "production-snapshot-focus") {
+    return activeProductionSnapshotQuickActionMetric(summary);
+  }
+
+  const metricId = productionSnapshotQuickActionMetricId(action.id);
+  return metricId ? summary.metrics.find((metric) => metric.id === metricId) ?? null : null;
+}
+
+function productionSnapshotQuickActionMetricId(actionId: string): ProductionSnapshotMetricId | null {
+  if (!actionId.startsWith("production-snapshot-metric-")) {
+    return null;
+  }
+
+  const metricId = actionId.slice("production-snapshot-metric-".length);
+  return metricId === "target" ||
+    metricId === "form" ||
+    metricId === "patterns" ||
+    metricId === "mix" ||
+    metricId === "handoff"
+    ? metricId
+    : null;
+}
+
+function quickActionProductionSnapshotDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionProductionSnapshotLaneLabel(action: QuickAction, metric: ProductionSnapshotMetric): string {
+  const titleLabel = action.title.replace(/^Focus Production Snapshot:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Production Snapshot" ? titleLabel : metric.label;
+}
+
 function quickActionGuideQuickStartMetricSnapshot(action: QuickAction): { id: string; label: string; value: string } | null {
   if (action.id !== "guide-quick-start" && action.id !== "guide-bottleneck-focus") {
     return null;
@@ -23403,20 +23481,11 @@ function quickActionResultMetricSnapshot(
     }
   }
 
-  if (action.id === "production-snapshot-focus") {
-    return {
-      id: "production-snapshot",
-      label: "Production snapshot",
-      value: `${activeDeliveryTarget(project).name} / ${barCountLabel(arrangementTotalBars(project))}`
-    };
-  }
-
-  if (action.id.startsWith("production-snapshot-metric-")) {
-    return {
-      id: "production-snapshot",
-      label: "Production snapshot",
-      value: action.detail
-    };
+  if (action.id === "production-snapshot-focus" || action.id.startsWith("production-snapshot-metric-")) {
+    const productionSnapshotMetric = quickActionProductionSnapshotMetricSnapshot(project, action);
+    if (productionSnapshotMetric) {
+      return productionSnapshotMetric;
+    }
   }
 
   if (action.id === "snapshot-compare-focus") {
