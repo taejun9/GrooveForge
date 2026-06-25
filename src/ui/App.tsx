@@ -23960,6 +23960,175 @@ function quickActionReviewQueueLaneLabel(action: QuickAction, item: ReviewQueueI
   return titleLabel && titleLabel !== "Focus Review Queue" ? titleLabel : item.area;
 }
 
+function quickActionReviewFixMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const checks = createBeatReadinessChecks(project, exportAnalysis);
+  const summary = createReviewQueueSummary(project, checks, exportAnalysis, stemAnalyses);
+  const targetId = quickActionReviewFixTargetId(action);
+  const item = quickActionReviewFixItem(summary, action, targetId);
+  const fix = item ? createReviewFixOption(item, project, exportAnalysis) : null;
+  const pattern = activePattern(project);
+  const target = activeDeliveryTarget(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionReviewFixDetailParts(action);
+  const selectedFixLabel =
+    fix ? `${fix.label} / ${fix.detail}` : detailParts.slice(0, 2).join(" / ") || "No one-step fix";
+  const scopeLabel = fix ? reviewFixScopeLabel(fix) : quickActionReviewFixFallbackScope(action);
+  const issueLabel = quickActionReviewFixLaneLabel(action, item);
+  const statusLabel = item ? item.status : targetId ? "Cleared or moved down" : "No fix target";
+  const contextLabel = item?.detail ?? (detailParts.slice(2).join(" / ") || summary.detail);
+  const destinationLabel = item?.focusLabel ?? quickActionReviewFixDestinationLabel(action);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const followup = quickActionReviewFixFollowup(project, action, exportAnalysis);
+
+  return {
+    id: "review-fix",
+    label: "Review fix",
+    value: [
+      quickActionReviewFixActionLabel(action),
+      `destination Project / Review Queue -> ${destinationLabel} panel`,
+      `issue ${issueLabel}`,
+      `status ${statusLabel}`,
+      `context ${contextLabel}`,
+      `fix ${selectedFixLabel}`,
+      `scope ${scopeLabel}`,
+      `impact ${quickActionReviewFixImpactLabel(item, targetId)}`,
+      `target ${target.name}`,
+      `queue ${quickActionReviewFixQueuePosture(summary)}`,
+      `readiness ${quickActionReviewFixBeatReadinessPosture(checks)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `stems ${audibleStemCount}/${stemTrackIds.length} audible`,
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
+function quickActionReviewFixItem(
+  summary: ReviewQueueSummary,
+  action: QuickAction,
+  targetId: string | null = quickActionReviewFixTargetId(action)
+): ReviewQueueItem | null {
+  if (targetId) {
+    return summary.items.find((item) => item.id === targetId) ?? null;
+  }
+
+  return action.id === "review-fix" ? activeReviewFixItem(summary) : null;
+}
+
+function quickActionReviewFixTargetId(action: QuickAction): string | null {
+  if (action.id.startsWith("review-queue-fix-")) {
+    return action.id.slice("review-queue-fix-".length);
+  }
+
+  const marker = "review fix action top issue triage ";
+  const markerIndex = action.keywords.indexOf(marker);
+  if (markerIndex === -1) {
+    return null;
+  }
+
+  const [candidate] = action.keywords.slice(markerIndex + marker.length).trim().split(/\s+/);
+  return candidate && candidate !== "none" ? candidate : null;
+}
+
+function quickActionReviewFixDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionReviewFixActionLabel(action: QuickAction): string {
+  return action.id === "review-fix" ? "apply priority Review Fix" : "apply direct Review Fix";
+}
+
+function quickActionReviewFixLaneLabel(action: QuickAction, item: ReviewQueueItem | null): string {
+  const titleLabel = action.title.replace(/^Apply Review Fix:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Apply Review Fix" ? titleLabel : item?.area ?? "Review Queue issue";
+}
+
+function quickActionReviewFixDestinationLabel(action: QuickAction): string {
+  switch (action.group) {
+    case "Create":
+      return "Compose";
+    case "Arrange":
+      return "Arrange";
+    case "Mix":
+      return "Mix";
+    case "Master":
+      return "Master";
+    case "Export":
+      return "Deliver";
+    default:
+      return "Review Queue";
+  }
+}
+
+function quickActionReviewFixFallbackScope(action: QuickAction): string {
+  return action.group && action.group !== "Project" ? `${action.group} / Review Fix` : "Project / Review Queue";
+}
+
+function quickActionReviewFixImpactLabel(item: ReviewQueueItem | null, targetId: string | null): string {
+  if (item) {
+    return `target still queued as ${item.tone}`;
+  }
+
+  return targetId ? "target cleared or moved down" : "no queue item selected";
+}
+
+function quickActionReviewFixQueuePosture(summary: ReviewQueueSummary): string {
+  const itemPosture = summary.items.map((item) => `${item.area} ${item.status}`).join(" / ");
+  return itemPosture ? `${summary.headline} / ${summary.detail} / ${itemPosture}` : `${summary.headline} / ${summary.detail}`;
+}
+
+function quickActionReviewFixBeatReadinessPosture(checks: BeatReadinessCheck[]): string {
+  const readyCount = checks.filter((check) => check.tone === "good").length;
+  const reviewCount = checks.filter((check) => check.tone === "warn").length;
+  const blockerCount = checks.filter((check) => check.tone === "danger").length;
+  return `${readyCount}/${checks.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(
+    blockerCount,
+    "blocker"
+  )}`;
+}
+
+function quickActionReviewFixFollowup(
+  project: ProjectState,
+  action: QuickAction,
+  analysis: ExportAnalysis = analyzeExport(project)
+): { auditionCue: string; nextCheck: string } {
+  const summary = createReviewQueueSummary(
+    project,
+    createBeatReadinessChecks(project, analysis),
+    analysis,
+    analyzeStemExports(project)
+  );
+  const item = quickActionReviewFixItem(summary, action);
+  const fix = item ? createReviewFixOption(item, project, analysis) : null;
+  if (fix) {
+    return {
+      auditionCue: fix.auditionCue,
+      nextCheck: fix.nextCheck
+    };
+  }
+
+  const issueLabel = quickActionReviewFixLaneLabel(action, item);
+  return {
+    auditionCue: `Play the relevant Pattern, Song, Full Mix, or Handoff check for ${issueLabel}.`,
+    nextCheck: "Return to Review Queue and confirm the fixed issue moved down or cleared before applying another one-step fix."
+  };
+}
+
 function quickActionExportPreflightMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -26259,13 +26428,10 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "review-fix" || action.id.startsWith("review-queue-fix-")) {
-    const exportAnalysis = analysis ?? analyzeExport(project);
-    const summary = createReviewQueueSummary(project, createBeatReadinessChecks(project, exportAnalysis), exportAnalysis, analyzeStemExports(project));
-    return {
-      id: "review-fix",
-      label: "Review fix",
-      value: `${summary.headline} / ${summary.detail}`
-    };
+    const reviewFixMetric = quickActionReviewFixMetricSnapshot(project, action, analysis ?? undefined);
+    if (reviewFixMetric) {
+      return reviewFixMetric;
+    }
   }
 
   if (action.id === "export-preflight-focus" || action.id.startsWith("export-preflight-card-")) {
@@ -29134,10 +29300,7 @@ function quickActionResultFollowup(
   }
 
   if (action.id === "review-fix" || action.id.startsWith("review-queue-fix-")) {
-    return {
-      auditionCue: "Play the relevant Pattern, Song, Full Mix, or Handoff check after the fix, based on the Review Queue area.",
-      nextCheck: "Return to Review Queue and confirm the fixed issue moved down or cleared before applying another one-step fix."
-    };
+    return quickActionReviewFixFollowup(project, action, analysis);
   }
 
   if (action.id === "export-preflight-focus") {
