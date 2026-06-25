@@ -25170,6 +25170,89 @@ function workflowNavigatorZoneFromQuickAction(actionId: string): WorkflowZoneId 
   }
 }
 
+function quickActionWorkflowSpotlightContext(
+  project: ProjectState,
+  analysis?: ExportAnalysis
+): {
+  item: WorkflowNavigatorItem | null;
+  items: WorkflowNavigatorItem[];
+  spotlight: ReturnType<typeof createWorkflowSpotlightSummary>;
+  exportAnalysis: ExportAnalysis;
+  stemAnalyses: StemExportAnalyses;
+} {
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const checks = createBeatReadinessChecks(project, exportAnalysis);
+  const beatMap = createBeatMapSummary(project, checks, exportAnalysis, stemAnalyses);
+  const exportPreflight = createExportPreflightSummary(project, checks, exportAnalysis, stemAnalyses);
+  const items = createWorkflowNavigatorItems(project, beatMap, exportPreflight, exportAnalysis);
+  const spotlight = createWorkflowSpotlightSummary(items);
+  const item = spotlight.zoneId ? items.find((candidate) => candidate.id === spotlight.zoneId) ?? null : null;
+  return { item, items, spotlight, exportAnalysis, stemAnalyses };
+}
+
+function quickActionWorkflowSpotlightMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "workflow-spotlight-focus") {
+    return null;
+  }
+
+  const { item, spotlight, exportAnalysis, stemAnalyses } = quickActionWorkflowSpotlightContext(project, analysis);
+  const target = activeDeliveryTarget(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const auditionCue = item ? workflowNavigatorJumpAuditionCue(item) : "Inspect Workflow Navigator before choosing another zone.";
+  const nextCheck = item ? workflowNavigatorJumpNextCheck(item) : "Return to Workflow Navigator after zones are available.";
+
+  return {
+    id: "workflow-spotlight",
+    label: "Workflow spotlight",
+    value: [
+      `command ${action.title}`,
+      `detail ${action.detail}`,
+      `destination Guide / Workflow Spotlight / ${spotlight.zoneLabel}`,
+      `spotlight ${spotlight.statusLabel} / ${spotlight.detailLabel}`,
+      `decision ${spotlight.decisionStatus} / ${spotlight.decisionDetail}`,
+      item ? `zone ${item.label} / ${item.value} / ${item.detail}` : `zone ${spotlight.zoneLabel} / ${spotlight.detailLabel}`,
+      `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
+      `workflow ${spotlight.countLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `stems ${audibleStemCount}/${target.stemGoal} target`,
+      `audition ${auditionCue}`,
+      `next ${nextCheck}`
+    ].join(" / ")
+  };
+}
+
+function quickActionWorkflowSpotlightFollowup(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { auditionCue: string; nextCheck: string } | null {
+  if (action.id !== "workflow-spotlight-focus") {
+    return null;
+  }
+
+  const { item } = quickActionWorkflowSpotlightContext(project, analysis);
+  if (!item) {
+    return null;
+  }
+
+  return {
+    auditionCue: workflowNavigatorJumpAuditionCue(item),
+    nextCheck: workflowNavigatorJumpNextCheck(item)
+  };
+}
+
 function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -26233,6 +26316,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "workflow-spotlight-focus") {
+    const workflowSpotlightMetric = quickActionWorkflowSpotlightMetricSnapshot(project, action, analysis ?? undefined);
+    if (workflowSpotlightMetric) {
+      return workflowSpotlightMetric;
+    }
+
     return {
       id: "workflow-spotlight",
       label: "Workflow spotlight",
@@ -29067,10 +29155,12 @@ function quickActionResultFollowup(
   }
 
   if (action.id === "workflow-spotlight-focus") {
-    return {
-      auditionCue: "Use the focused workflow panel to inspect the highlighted blocker or review zone.",
-      nextCheck: "Return to Workflow Spotlight after the zone looks ready and run the command again for the next jump."
-    };
+    return (
+      quickActionWorkflowSpotlightFollowup(project, action, analysis) ?? {
+        auditionCue: "Use the focused workflow panel to inspect the highlighted blocker or review zone.",
+        nextCheck: "Return to Workflow Spotlight after the zone looks ready and run the command again for the next jump."
+      }
+    );
   }
 
   if (action.id.startsWith("workflow-navigator-")) {
