@@ -22477,11 +22477,13 @@ function quickActionResultMetricSnapshot(
     action.id === "arrangement-focus-decision" ||
     action.id.startsWith("arrangement-focus-preset-")
   ) {
-    return {
-      id: "arrangement-focus",
-      label: "Arrangement focus",
-      value: `${barCountLabel(arrangementTotalBars(project))} / ${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
-    };
+    return (
+      quickActionArrangementFocusMetricSnapshot(project, action) ?? {
+        id: "arrangement-focus",
+        label: "Arrangement focus",
+        value: `${barCountLabel(arrangementTotalBars(project))} / ${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
+      }
+    );
   }
 
   if (action.id === "arrangement-arc" || action.id === "arrangement-arc-decision" || action.id.startsWith("arrangement-arc-pad-")) {
@@ -22909,6 +22911,77 @@ function arrangementTemplateQuickActionId(actionId: string): ArrangementTemplate
 
   const templateId = actionId.slice("arrangement-template-direct-".length);
   return arrangementTemplateIds.includes(templateId as ArrangementTemplateId) ? (templateId as ArrangementTemplateId) : null;
+}
+
+function quickActionArrangementFocusMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const preset = arrangementFocusQuickActionPreset(action);
+  if (!preset) {
+    return null;
+  }
+
+  const blockIndex = arrangementFocusQuickActionBlockIndex(project, action);
+  const block = project.arrangement[blockIndex] ?? project.arrangement[0];
+  if (!block) {
+    return {
+      id: "arrangement-focus",
+      label: "Arrangement focus",
+      value: `${preset.label} focus / no selected block / 0 blocks / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
+  const blockNumber = Math.min(blockIndex + 1, Math.max(project.arrangement.length, 1));
+  const changedFields = arrangementFocusChangedFieldCount(block, preset);
+  const actionLabel = action.id === "arrangement-focus-decision" ? `${preset.label} focus decision` : `${preset.label} focus`;
+
+  return {
+    id: "arrangement-focus",
+    label: "Arrangement focus",
+    value: `${actionLabel} / Block ${blockNumber} ${block.section} / Pattern ${block.pattern} / ${barCountLabel(
+      block.bars
+    )} / Energy ${percentLabel(block.energy)} / ${arrangementFocusPreviewMuteLabel(block.mutedTracks)} / ${changedFields} field${
+      changedFields === 1 ? "" : "s"
+    } / ${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function arrangementFocusQuickActionPreset(action: QuickAction): ArrangementFocusPreset | null {
+  return arrangementFocusQuickActionPresetId(action.id) ?? arrangementFocusQuickActionTextPreset(action);
+}
+
+function arrangementFocusQuickActionTextPreset(action: QuickAction): ArrangementFocusPreset | null {
+  const text = `${action.title} ${action.detail} ${action.keywords}`;
+  return (
+    arrangementFocusPresets.find((preset) => text.includes(preset.label)) ??
+    arrangementFocusPresets.find((preset) => text.includes(preset.id)) ??
+    null
+  );
+}
+
+function arrangementFocusQuickActionPresetId(actionId: string): ArrangementFocusPreset | null {
+  if (!actionId.startsWith("arrangement-focus-preset-")) {
+    return null;
+  }
+
+  const presetId = actionId.slice("arrangement-focus-preset-".length);
+  return arrangementFocusPresets.find((preset) => preset.id === presetId) ?? null;
+}
+
+function arrangementFocusQuickActionBlockIndex(project: ProjectState, action: QuickAction): number {
+  const text = `${action.title} ${action.detail}`;
+  const match = /\bBlock\s+(\d+)\b/i.exec(text);
+  if (!match) {
+    return 0;
+  }
+
+  const blockNumber = Number(match[1]);
+  if (!Number.isFinite(blockNumber)) {
+    return 0;
+  }
+
+  return Math.min(Math.max(blockNumber - 1, 0), Math.max(project.arrangement.length - 1, 0));
 }
 
 function quickActionArrangementArcMetricSnapshot(
