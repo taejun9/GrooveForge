@@ -2944,6 +2944,20 @@ export type SectionLocatorCueDecisionSummary = {
   tone: MixCoachTone;
 };
 
+export type SectionCueResult = {
+  source: "arrangement-block" | "section-locator";
+  targetId: string;
+  status: "Cued";
+  title: string;
+  detail: string;
+  patternLabel: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type ArrangementBlockRoleSummary = {
   roleLabel: string;
   timelineLabel: string;

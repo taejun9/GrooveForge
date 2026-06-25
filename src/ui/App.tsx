@@ -468,6 +468,7 @@ import type {
   ArrangementTransitionMapPrioritySummary,
   ArrangementTransitionMapFocusResult,
   SectionLocatorCueDecisionSummary,
+  SectionCueResult,
   SectionLocatorPad,
   SectionLocatorPrioritySummary,
   ArrangementBlockRoleSummary,
@@ -1416,6 +1417,7 @@ export function App(): ReactElement {
     useState<ArrangementTransitionMapFocusId | null>(null);
   const [arrangementTransitionMapResult, setArrangementTransitionMapResult] =
     useState<ArrangementTransitionMapFocusResult | null>(null);
+  const [sectionCueResult, setSectionCueResult] = useState<SectionCueResult | null>(null);
   const [keyCompassFocusId, setKeyCompassFocusId] = useState<KeyCompassFocusId | null>(null);
   const [keyCompassResult, setKeyCompassResult] = useState<KeyCompassFocusResult | null>(null);
   const [grooveCompassFocusId, setGrooveCompassFocusId] = useState<GrooveCompassFocusId | null>(null);
@@ -2459,6 +2461,7 @@ export function App(): ReactElement {
     setToplineFixResult(null);
     setArrangementMuteMapResult(null);
     setArrangementTransitionMapResult(null);
+    setSectionCueResult(null);
     setProjectStatus(status);
     return true;
   }
@@ -2535,6 +2538,7 @@ export function App(): ReactElement {
       setToplineFixResult(null);
       setArrangementMuteMapResult(null);
       setArrangementTransitionMapResult(null);
+      setSectionCueResult(null);
     }
     setProjectStatus(status);
   }
@@ -2706,6 +2710,7 @@ export function App(): ReactElement {
     setToplineFixResult(null);
     setArrangementMuteMapResult(null);
     setArrangementTransitionMapResult(null);
+    setSectionCueResult(null);
     clearLocalDraftState();
     setProjectStatus(status);
   }
@@ -2787,6 +2792,7 @@ export function App(): ReactElement {
     setToplineFixResult(null);
     setArrangementMuteMapResult(null);
     setArrangementTransitionMapResult(null);
+    setSectionCueResult(null);
     setProjectStatus(status);
   }
 
@@ -3580,6 +3586,7 @@ export function App(): ReactElement {
     }
 
     setSelectedArrangementIndex(index);
+    setSectionCueResult(null);
     setArrangementFocusResult(null);
     updateProjectView((current) => ({ ...current, selectedPattern: block.pattern }), `Arranging ${block.section}`);
     setSelectedNote(null);
@@ -3624,6 +3631,7 @@ export function App(): ReactElement {
 
     selectArrangementBlock(index);
     selectTransportLoopScope("block", false);
+    setSectionCueResult(createSectionCueResult(projectRef.current, index, "arrangement-block"));
     setProjectStatus(`Block ${index + 1} ${block.section} cued as Block loop`);
   }
 
@@ -3644,6 +3652,7 @@ export function App(): ReactElement {
     setArrangementTransitionMapFocusId(transition.id);
     setArrangementMuteMapResult(null);
     setArrangementTransitionMapResult(null);
+    setSectionCueResult(null);
     setTransportLoopScope("transition");
     setPlaybackMode("arrangement");
     setProjectStatus(`Transition ${transition.fromIndex + 1}->${transition.toIndex + 1} cued as Transition loop`);
@@ -3822,6 +3831,7 @@ export function App(): ReactElement {
 
     selectArrangementBlock(index);
     selectTransportLoopScope("block", false);
+    setSectionCueResult(createSectionCueResult(projectRef.current, index, "section-locator"));
     setProjectStatus(`${section} section cued as Block loop`);
   }
 
@@ -9168,7 +9178,7 @@ export function App(): ReactElement {
             result={arrangementArcResult}
             onApply={applyArrangementArcPad}
           />
-          <SectionLocatorPads disabled={isPlaying} pads={sectionLocatorPads} onCue={cueSectionLocator} />
+          <SectionLocatorPads disabled={isPlaying} pads={sectionLocatorPads} result={sectionCueResult} onCue={cueSectionLocator} />
           <div className="pattern-chain-row" aria-label="Pattern chain">
             <PatternChainPreview preview={patternChainPreviewSummary} />
             <PatternChainPreviewDecision
@@ -11625,11 +11635,13 @@ function PatternChainResultStrip({ result }: { result: PatternChainResultSummary
 function SectionLocatorPads({
   disabled,
   onCue,
-  pads
+  pads,
+  result
 }: {
   disabled: boolean;
   onCue: (section: ArrangementSection) => void;
   pads: SectionLocatorPad[];
+  result: SectionCueResult | null;
 }): ReactElement {
   const prioritySummary = createSectionLocatorPrioritySummary(pads);
   const cueDecision = createSectionLocatorCueDecisionSummary(pads, disabled);
@@ -11671,6 +11683,7 @@ function SectionLocatorPads({
         </button>
       </div>
       <SectionLocatorCueDecision summary={cueDecision} onCue={onCue} />
+      {result && <SectionCueResultStrip result={result} />}
       <div className="section-locator-row">
         {pads.map((pad) => {
           const missing = pad.index === null;
@@ -11707,6 +11720,40 @@ function SectionLocatorPads({
         })}
       </div>
     </section>
+  );
+}
+
+function SectionCueResultStrip({ result }: { result: SectionCueResult }): ReactElement {
+  return (
+    <div
+      className={`quick-action-result section-cue-result ${result.tone}`}
+      data-result-section-cue={result.targetId}
+      data-section-cue-source={result.source}
+      data-testid="section-cue-result"
+      aria-live="polite"
+    >
+      <div className="quick-action-result-main">
+        <span data-testid="section-cue-result-status">{result.status}</span>
+        <strong data-testid="section-cue-result-title">{result.title}</strong>
+        <small data-testid="section-cue-result-detail">{result.detail}</small>
+      </div>
+      <div className={`quick-action-result-metric ${result.tone}`} data-testid="section-cue-result-metric">
+        <span data-testid="section-cue-result-pattern">{result.patternLabel}</span>
+        <strong data-testid="section-cue-result-metric-value">
+          {result.metricLabel}: {result.metricValue}
+        </strong>
+      </div>
+      <div className="quick-action-result-followup" data-testid="section-cue-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="section-cue-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="section-cue-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -31358,6 +31405,44 @@ function createSectionLocatorCueDecisionSummary(pads: SectionLocatorPad[], disab
     disabled,
     detailTitle: `${statusLabel} / ${sectionLabel} / ${metricLabel} / ${detailLabel}`,
     tone: disabled ? "warn" : pad.tone
+  };
+}
+
+function createSectionCueResult(
+  project: ProjectState,
+  index: number,
+  source: SectionCueResult["source"]
+): SectionCueResult | null {
+  const block = project.arrangement[index];
+  if (!block) {
+    return null;
+  }
+
+  const blockNumber = index + 1;
+  const bars = normalizeArrangementBars(block.bars);
+  const startBar = arrangementStartBar(project, index) + 1;
+  const endBar = startBar + bars - 1;
+  const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+  const eventCount = patternEventTotal(project.patterns[block.pattern]);
+  const energyLabel = percentLabel(normalizeArrangementEnergy(block.energy));
+  const mutedLabel = arrangementFocusPreviewMuteLabel(normalizeArrangementMutedTracks(block.mutedTracks));
+  const sourceLabel = source === "arrangement-block" ? "Arrangement Block Cue" : "Section Locator";
+
+  return {
+    source,
+    targetId: `${source}-${blockNumber}-${block.section}-${block.pattern}`,
+    status: "Cued",
+    title: `${block.section} Block ${blockNumber} loop`,
+    detail: `${sourceLabel} / Pattern ${block.pattern} / ${rangeLabel}`,
+    patternLabel: `Pattern ${block.pattern}`,
+    metricLabel: "Block loop",
+    metricValue: `${rangeLabel} / ${eventCount} events / ${energyLabel} energy / ${mutedLabel}`,
+    auditionCue: `Play Block loop; hear ${block.section} with Pattern ${block.pattern} before changing song form.`,
+    nextCheck:
+      block.section === "Hook"
+        ? "Check Hook Readiness, Topline Space, or Arrangement Focus before editing the lift."
+        : "Compare Song Form Overview and Arrangement Focus before moving or reshaping this block.",
+    tone: eventCount > 0 ? "good" : "warn"
   };
 }
 
