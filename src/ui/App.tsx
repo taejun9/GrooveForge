@@ -21793,6 +21793,114 @@ function handoffNextExportReceiptLabel(
   return "No export receipt yet";
 }
 
+function quickActionHandoffPackageCheckMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "handoff-package-check-focus" && !action.id.startsWith("handoff-package-check-card-")) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const summary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const card = quickActionHandoffPackageCheckCard(summary, action);
+  if (!card) {
+    return null;
+  }
+
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const detailParts = quickActionHandoffPackageCheckDetailParts(action);
+  const contextLabel = detailParts.slice(2).join(" / ") || card.detail;
+  const exportStemReadinessLabel = `export ${exportAnalysis.status} / stems ${audibleStemTracks(stemAnalyses).length}/${stemTrackIds.length} audible`;
+
+  return {
+    id: "handoff-package-check",
+    label: "Handoff package",
+    value: [
+      `action ${action.title}`,
+      `lane ${quickActionHandoffPackageCheckLaneLabel(action, card)}`,
+      `destination ${card.focusLabel} panel`,
+      `status ${card.status}`,
+      `context ${contextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `files ${quickActionHandoffPackageCheckCardPosture(summary, "files")}`,
+      `order ${quickActionHandoffPackageCheckCardPosture(summary, "order")}`,
+      `receipt ${quickActionHandoffPackageCheckCardPosture(summary, "receipt")}`,
+      `session ${quickActionHandoffPackageCheckCardPosture(summary, "context")}`,
+      exportStemReadinessLabel,
+      `latest ${receipt.itemId ? `${receipt.statusLabel} / ${receipt.fileLabel}` : "No export receipt yet"}`,
+      `next ${sendOrder.nextLabel}`,
+      `sequence ${sendOrder.sequenceLabel}`,
+      `package ${summary.headline}`,
+      summary.detail,
+      `target ${activeDeliveryTarget(project).name}`,
+      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4`
+    ].join(" / ")
+  };
+}
+
+function quickActionHandoffPackageCheckCard(
+  summary: HandoffPackageCheckSummary,
+  action: QuickAction
+): HandoffPackageCheckCard | null {
+  if (action.id === "handoff-package-check-focus") {
+    return activeHandoffPackageCheckQuickActionCard(summary);
+  }
+
+  const cardId = quickActionHandoffPackageCheckCardId(action.id);
+  return cardId ? summary.cards.find((card) => card.id === cardId) ?? null : null;
+}
+
+function quickActionHandoffPackageCheckCardId(actionId: string): HandoffPackageCheckCard["id"] | null {
+  if (!actionId.startsWith("handoff-package-check-card-")) {
+    return null;
+  }
+
+  const cardId = actionId.slice("handoff-package-check-card-".length);
+  return cardId === "files" || cardId === "order" || cardId === "receipt" || cardId === "context" ? cardId : null;
+}
+
+function quickActionHandoffPackageCheckDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionHandoffPackageCheckLaneLabel(action: QuickAction, card: HandoffPackageCheckCard): string {
+  const titleLabel = action.title.replace(/^Focus Handoff Package:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Handoff Package" ? titleLabel : card.label;
+}
+
+function quickActionHandoffPackageCheckCardPosture(
+  summary: HandoffPackageCheckSummary,
+  cardId: HandoffPackageCheckCard["id"]
+): string {
+  const card = summary.cards.find((item) => item.id === cardId);
+  return card ? `${card.value} / ${card.status}` : "unavailable";
+}
+
 function patternCompareDecisionQuickActionKind(action: QuickAction): PatternCompareDecisionSummary["action"] | null {
   if (action.id !== "pattern-compare-decision") {
     return null;
@@ -24399,15 +24507,17 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "handoff-package-check-focus") {
-    return {
-      id: "handoff-package-check",
-      label: "Handoff package",
-      value: action.detail
-    };
-  }
+  if (action.id === "handoff-package-check-focus" || action.id.startsWith("handoff-package-check-card-")) {
+    const handoffPackageMetric = quickActionHandoffPackageCheckMetricSnapshot(
+      project,
+      action,
+      handoffExportReceipt,
+      analysis ?? undefined
+    );
+    if (handoffPackageMetric) {
+      return handoffPackageMetric;
+    }
 
-  if (action.id.startsWith("handoff-package-check-card-")) {
     return {
       id: "handoff-package-check",
       label: "Handoff package",
