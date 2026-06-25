@@ -21638,6 +21638,62 @@ function patternCueSwitchSelectedBlockPlacement(
   return `${placementLabel} / Block ${boundedIndex + 1} ${block.section} / ${barCountLabel(block.bars)}`;
 }
 
+function quickActionPatternUseMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  const target = patternUseQuickActionTarget(action);
+  if (!target) {
+    return null;
+  }
+
+  const targetPattern = project.patterns[target];
+  const eventCount = patternEventTotal(targetPattern);
+  const drumCount = drumHitCount(targetPattern);
+  const musicEvents = targetPattern.bassNotes.length + targetPattern.chordEvents.length + targetPattern.melodyNotes.length;
+  const arrangedBlocks = project.arrangement.filter((block) => block.pattern === target);
+  const arrangedBars = arrangedBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  const arrangementUse =
+    arrangedBlocks.length === 0
+      ? "not arranged"
+      : `${arrangedBlocks.length} block${arrangedBlocks.length === 1 ? "" : "s"} / ${barCountLabel(arrangedBars)}`;
+  const selectedBlockPlacement = patternUseSelectedBlockPlacement(project, selectedArrangementIndex, target);
+
+  return {
+    id: "pattern-use",
+    label: "Arrangement pattern",
+    value: `assign selected block / Pattern ${target} / ${selectedBlockPlacement} / ${eventCount} events / ${drumCount} drums / ${musicEvents} music / arrangement ${arrangementUse} / edit Pattern ${project.selectedPattern}`
+  };
+}
+
+function patternUseQuickActionTarget(action: QuickAction): PatternSlot | null {
+  if (!action.id.startsWith("pattern-use-")) {
+    return null;
+  }
+
+  return patternSlotFromQuickActionValue(action.id.slice("pattern-use-".length));
+}
+
+function patternUseSelectedBlockPlacement(
+  project: ProjectState,
+  selectedArrangementIndex: number,
+  target: PatternSlot
+): string {
+  if (project.arrangement.length === 0) {
+    return `no selected block / ${barCountLabel(arrangementTotalBars(project))}`;
+  }
+
+  const boundedIndex = Math.min(Math.max(0, selectedArrangementIndex), project.arrangement.length - 1);
+  const block = project.arrangement[boundedIndex];
+  const bars = normalizeArrangementBars(block.bars);
+  const startBar = arrangementStartBar(project, boundedIndex) + 1;
+  const endBar = startBar + bars - 1;
+  const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+  const placementLabel = block.pattern === target ? "target assigned to selected block" : `selected block uses Pattern ${block.pattern}`;
+  return `${placementLabel} / Block ${boundedIndex + 1} ${block.section} / ${rangeLabel} / ${barCountLabel(bars)}`;
+}
+
 function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -22078,12 +22134,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("pattern-use-")) {
-    const usedSlots = usedPatternSlots(project).join("/") || project.selectedPattern;
-    return {
-      id: "pattern-use",
-      label: "Arrangement pattern",
-      value: `Edit ${project.selectedPattern} / used ${usedSlots}`
-    };
+    return (
+      quickActionPatternUseMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "pattern-use",
+        label: "Arrangement pattern",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id.startsWith("pattern-copy-") || action.id === "pattern-clear") {
