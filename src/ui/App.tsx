@@ -21959,20 +21959,17 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "pattern-stack") {
-    const pattern = activePattern(project);
-    return {
-      id: "pattern-stack",
-      label: "Pattern stack",
-      value: `${pattern.bassNotes.length} 808 / ${pattern.chordEvents.length} chords / ${pattern.melodyNotes.length} synth`
-    };
+    const stackMetric = quickActionPatternStackMetricSnapshot(project, action);
+    if (stackMetric) {
+      return stackMetric;
+    }
   }
 
   if (action.id.startsWith("pattern-stack-pad-")) {
-    return {
-      id: "pattern-stack",
-      label: "Pattern stack",
-      value: action.detail
-    };
+    const stackMetric = quickActionPatternStackMetricSnapshot(project, action);
+    if (stackMetric) {
+      return stackMetric;
+    }
   }
 
   if (action.id === "drum-move") {
@@ -22780,6 +22777,54 @@ function layerStarterQuickActionId(actionId: string): LayerStarterId | null {
     default:
       return null;
   }
+}
+
+function quickActionPatternStackMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const stack = patternStackOptionForQuickAction(project, action);
+  if (!stack) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  return {
+    id: "pattern-stack",
+    label: "Pattern stack",
+    value: `Pattern ${project.selectedPattern} / ${stack.label} stack / ${pattern.bassNotes.length} 808 / ${pattern.chordEvents.length} chords / ${pattern.melodyNotes.length} synth / ${patternEventTotal(
+      pattern
+    )} events`
+  };
+}
+
+function patternStackOptionForQuickAction(project: ProjectState, action: QuickAction): PatternStackOption | null {
+  const options = createPatternStackOptions(project.key);
+  const directId = patternStackQuickActionId(action.id);
+  if (directId) {
+    return options.find((option) => option.id === directId) ?? null;
+  }
+
+  if (action.id === "pattern-stack") {
+    const currentPattern = activePattern(project);
+    const suggested = createPatternStackPreviewSummary(project.key, currentPattern, options);
+    return (
+      options.find((option) => action.title.includes(`${option.label} stack`) || action.detail.includes(`${option.label}:`)) ??
+      options.find((option) => option.id === suggested.stackId) ??
+      null
+    );
+  }
+
+  return null;
+}
+
+function patternStackQuickActionId(actionId: string): PatternStackId | null {
+  if (!actionId.startsWith("pattern-stack-pad-")) {
+    return null;
+  }
+
+  const stackId = actionId.slice("pattern-stack-pad-".length);
+  return stackId === "pocket" || stackId === "hook" || stackId === "lift" || stackId === "break" ? stackId : null;
 }
 
 function quickActionResultFollowup(
