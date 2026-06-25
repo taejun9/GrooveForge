@@ -339,9 +339,16 @@ const beatTermItems: BeatTermItem[] = [
   { id: "drums", term: "Drums", meaning: "Kick, clap/snare, hats, perc, timing, chance, and pocket.", target: "Groove" },
   { id: "bass-808", term: "808/Bass", meaning: "Synth low-end notes with glide, drive, decay, and kick duck.", target: "Low end" },
   { id: "chords", term: "Chords", meaning: "Harmony bed, cadence, voicing, rhythm, velocity, and chance.", target: "Harmony" },
+  { id: "style-profile", term: "Style Profile", meaning: "Editable genre direction for BPM, swing, bass role, melody role, and sound goals.", target: "Style" },
+  { id: "beat-blueprint", term: "Beat Blueprint", meaning: "Sample-free starter beat for a style that stays fully editable after Apply.", target: "Start" },
   { id: "sound", term: "Sound", meaning: "Preset, kit, focus, timbre, and A/B tone passes.", target: "Tone" },
   { id: "arrangement", term: "Arrangement", meaning: "Song sections, pattern blocks, energy, mutes, and transitions.", target: "Song" },
+  { id: "stem", term: "Stem", meaning: "A separate exported track group such as Drums, 808, Synth, or Chords.", target: "Mix" },
+  { id: "headroom", term: "Headroom", meaning: "Output space before clipping or limiting, checked before mix and export decisions.", target: "Mix" },
   { id: "mix-master", term: "Mix / Master", meaning: "Channel balance, space, headroom, dynamics, fades, and output.", target: "Finish" },
+  { id: "master-automation", term: "Master Automation", meaning: "Editable master volume fades that affect playback, full-mix WAV, and stem exports.", target: "Finish" },
+  { id: "beat-readiness", term: "Beat Readiness", meaning: "Local checks for drums, 808/bass, melody/chords, arrangement, and export signal.", target: "Guide" },
+  { id: "delivery-target", term: "Delivery Target", meaning: "Local release or handoff goal that shapes arrangement, mix, stem, and brief checks.", target: "Deliver" },
   { id: "handoff", term: "Handoff", meaning: "WAV, stems, MIDI, session notes, target, and delivery order.", target: "Deliver" }
 ];
 
