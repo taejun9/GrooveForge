@@ -21770,6 +21770,56 @@ function patternUseSelectedBlockPlacement(
   return `${placementLabel} / Block ${boundedIndex + 1} ${block.section} / ${rangeLabel} / ${barCountLabel(bars)}`;
 }
 
+function quickActionAudiblePatternFollowMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "pattern-follow-audible") {
+    return null;
+  }
+
+  const target = audiblePatternFollowQuickActionTarget(action) ?? project.selectedPattern;
+  const beforeEditPattern = audiblePatternFollowQuickActionBeforeEdit(action);
+  const targetPattern = project.patterns[target];
+  const eventCount = patternEventTotal(targetPattern);
+  const drumCount = drumHitCount(targetPattern);
+  const musicEvents = targetPattern.bassNotes.length + targetPattern.chordEvents.length + targetPattern.melodyNotes.length;
+  const arrangedBlocks = project.arrangement.filter((block) => block.pattern === target);
+  const arrangedBars = arrangedBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  const arrangementUse =
+    arrangedBlocks.length === 0
+      ? "not arranged"
+      : `${arrangedBlocks.length} block${arrangedBlocks.length === 1 ? "" : "s"} / ${barCountLabel(arrangedBars)}`;
+  const editContext = beforeEditPattern
+    ? `before edit Pattern ${beforeEditPattern} / current edit Pattern ${project.selectedPattern}`
+    : `current edit Pattern ${project.selectedPattern}`;
+
+  return {
+    id: "pattern-follow-audible",
+    label: "Audible pattern",
+    value: `follow audible edit focus / heard Pattern ${target} / ${eventCount} events / ${drumCount} drums / ${musicEvents} music / arrangement ${arrangementUse} / ${editContext}`
+  };
+}
+
+function audiblePatternFollowQuickActionTarget(action: QuickAction): PatternSlot | null {
+  if (action.id !== "pattern-follow-audible") {
+    return null;
+  }
+
+  const titleMatch = /audible Pattern ([ABC])/.exec(action.title);
+  const detailMatch = /Hearing Pattern ([ABC])/.exec(action.detail);
+  return patternSlotFromQuickActionValue(titleMatch?.[1] ?? detailMatch?.[1] ?? "");
+}
+
+function audiblePatternFollowQuickActionBeforeEdit(action: QuickAction): PatternSlot | null {
+  if (action.id !== "pattern-follow-audible") {
+    return null;
+  }
+
+  const detailMatch = /editing Pattern ([ABC])/.exec(action.detail);
+  return patternSlotFromQuickActionValue(detailMatch?.[1] ?? "");
+}
+
 function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -22184,11 +22234,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "pattern-follow-audible") {
-    return {
-      id: "pattern-follow-audible",
-      label: "Audible pattern",
-      value: `Editing Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
-    };
+    return (
+      quickActionAudiblePatternFollowMetricSnapshot(project, action) ?? {
+        id: "pattern-follow-audible",
+        label: "Audible pattern",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id.startsWith("pattern-cue-")) {
