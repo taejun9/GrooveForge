@@ -5439,7 +5439,7 @@ h2 {
 
 .quick-actions-guide-suggestion {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px 104px 74px;
+  grid-template-columns: minmax(0, 1fr) 96px 104px 128px;
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -5538,7 +5538,14 @@ h2 {
   color: #78f0c8;
 }
 
-.quick-actions-guide-suggestion > button {
+.quick-actions-guide-suggestion-pin-stack {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.quick-actions-guide-suggestion > button,
+.quick-actions-guide-suggestion-pin-stack > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5552,7 +5559,8 @@ h2 {
   font-size: 10px;
 }
 
-.quick-actions-guide-suggestion > button.selected {
+.quick-actions-guide-suggestion > button.selected,
+.quick-actions-guide-suggestion-pin-stack > button.selected {
   border-color: rgba(240, 195, 106, 0.38);
   color: #f4efe7;
   background: rgba(240, 195, 106, 0.12);
@@ -5570,11 +5578,13 @@ h2 {
   background: rgba(240, 195, 106, 0.14);
 }
 
-.quick-actions-guide-suggestion.warn > button {
+.quick-actions-guide-suggestion.warn > button,
+.quick-actions-guide-suggestion.warn .quick-actions-guide-suggestion-pin-stack > button {
   border-color: rgba(240, 195, 106, 0.24);
 }
 
-.quick-actions-guide-suggestion > button:disabled {
+.quick-actions-guide-suggestion > button:disabled,
+.quick-actions-guide-suggestion-pin-stack > button:disabled {
   cursor: not-allowed;
   opacity: 0.48;
 }
@@ -26276,7 +26286,7 @@ input[type="range"] {
   }
 
   .quick-actions-guide-suggestion {
-    grid-template-columns: minmax(0, 1fr) 92px 104px 70px;
+    grid-template-columns: minmax(0, 1fr) 92px 104px 124px;
   }
 
   .quick-actions-recents,

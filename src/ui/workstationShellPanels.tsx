@@ -773,6 +773,9 @@ export function QuickActions({
       ? recentActionSource.find((action) => action.id === "guide-bottleneck-focus") ?? null
       : null;
   const guideSuggestionPinned = guideSuggestionAction ? pinnedActionIds.includes(guideSuggestionAction.id) : false;
+  const guideBottleneckSuggestionPinned = guideBottleneckSuggestionAction
+    ? pinnedActionIds.includes(guideBottleneckSuggestionAction.id)
+    : false;
   const guideSuggestionSource = guideSuggestionAction ? guideSuggestionAction.detail.split(" / ")[0] || "Guide" : "Guide";
   const guideSuggestionReason = guideSuggestionAction
     ? quickActionGuideSuggestionReason(guideSuggestionAction.detail)
@@ -921,6 +924,9 @@ export function QuickActions({
                 <span data-testid="quick-actions-guide-suggestion-pin-state">
                   {guideSuggestionPinned ? "Pinned command" : "Not pinned"}
                 </span>
+                <span data-testid="quick-actions-guide-suggestion-bottleneck-pin-state">
+                  {guideBottleneckSuggestionPinned ? "Pinned bottleneck" : "Not pinned bottleneck"}
+                </span>
                 <span data-testid="quick-actions-guide-suggestion-bottleneck-action">
                   {guideBottleneckSuggestionLabel}
                 </span>
@@ -958,18 +964,41 @@ export function QuickActions({
               <ArrowRight size={14} aria-hidden="true" />
               <span>Bottleneck</span>
             </button>
-            <button
-              aria-label={`${guideSuggestionPinned ? "Unpin" : "Pin"} ${guideSuggestionAction.title}`}
-              aria-pressed={guideSuggestionPinned}
-              className={guideSuggestionPinned ? "selected" : ""}
-              data-testid={`quick-actions-guide-suggestion-${guideSuggestionPinned ? "unpin" : "pin"}`}
-              onClick={() => onTogglePin(guideSuggestionAction)}
-              title={`${guideSuggestionPinned ? "Unpin" : "Pin"} ${guideSuggestionAction.title}`}
-              type="button"
-            >
-              {guideSuggestionPinned ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}
-              <span>{guideSuggestionPinned ? "Unpin" : "Pin"}</span>
-            </button>
+            <div className="quick-actions-guide-suggestion-pin-stack" data-testid="quick-actions-guide-suggestion-pin-stack">
+              <button
+                aria-label={`${guideSuggestionPinned ? "Unpin" : "Pin"} ${guideSuggestionAction.title}`}
+                aria-pressed={guideSuggestionPinned}
+                className={guideSuggestionPinned ? "selected" : ""}
+                data-testid={`quick-actions-guide-suggestion-${guideSuggestionPinned ? "unpin" : "pin"}`}
+                onClick={() => onTogglePin(guideSuggestionAction)}
+                title={`${guideSuggestionPinned ? "Unpin" : "Pin"} ${guideSuggestionAction.title}`}
+                type="button"
+              >
+                {guideSuggestionPinned ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}
+                <span>{guideSuggestionPinned ? "Unpin guide" : "Pin guide"}</span>
+              </button>
+              <button
+                aria-label={`${guideBottleneckSuggestionPinned ? "Unpin" : "Pin"} Guide Bottleneck Focus`}
+                aria-pressed={guideBottleneckSuggestionPinned}
+                className={guideBottleneckSuggestionPinned ? "selected" : ""}
+                data-testid={`quick-actions-guide-suggestion-bottleneck-${guideBottleneckSuggestionPinned ? "unpin" : "pin"}`}
+                disabled={!guideBottleneckSuggestionAction}
+                onClick={() => {
+                  if (guideBottleneckSuggestionAction) {
+                    onTogglePin(guideBottleneckSuggestionAction);
+                  }
+                }}
+                title={
+                  guideBottleneckSuggestionAction
+                    ? `${guideBottleneckSuggestionPinned ? "Unpin" : "Pin"} ${guideBottleneckSuggestionAction.title}`
+                    : "Guide Bottleneck Focus unavailable"
+                }
+                type="button"
+              >
+                {guideBottleneckSuggestionPinned ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}
+                <span>{guideBottleneckSuggestionPinned ? "Unpin bottleneck" : "Pin bottleneck"}</span>
+              </button>
+            </div>
           </div>
         )}
         <div className="quick-actions-pinned" data-testid="quick-actions-pinned" aria-label="Pinned Quick Actions">
