@@ -22195,6 +22195,82 @@ function quickActionReviewQueueLaneLabel(action: QuickAction, item: ReviewQueueI
   return titleLabel && titleLabel !== "Focus Review Queue" ? titleLabel : item.area;
 }
 
+function quickActionExportPreflightMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const summary = createExportPreflightSummary(
+    project,
+    createBeatReadinessChecks(project, exportAnalysis),
+    exportAnalysis,
+    analyzeStemExports(project)
+  );
+  const card = quickActionExportPreflightCard(summary, action);
+  if (!card) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const actionLabel =
+    action.id === "export-preflight-focus" ? "focus priority export preflight" : "focus direct export preflight";
+  const laneLabel = quickActionExportPreflightLaneLabel(action, card);
+  const detailParts = quickActionExportPreflightDetailParts(action);
+  const contextLabel = detailParts.slice(2).join(" / ") || card.detail;
+  const postureLabel = summary.cards.map((item) => `${item.label} ${item.value}`).join(" / ");
+
+  return {
+    id: "export-preflight",
+    label: "Export preflight",
+    value: `${actionLabel} / card ${laneLabel} / destination ${card.focusLabel} panel / status ${card.value} / context ${contextLabel} / Pattern ${
+      project.selectedPattern
+    } / ${patternEventTotal(pattern)} events / ${patternUseLabel} / delivery ${postureLabel} / preflight ${
+      summary.headline
+    } / ${summary.detail} / metric ${exportPreflightFocusResultMetric(summary)} / ${
+      project.arrangement.length
+    } blocks / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionExportPreflightCard(summary: ExportPreflightSummary, action: QuickAction): ExportPreflightCard | null {
+  if (action.id === "export-preflight-focus") {
+    return activeExportPreflightQuickActionCard(summary);
+  }
+
+  const cardId = exportPreflightQuickActionCardId(action.id);
+  return cardId ? summary.cards.find((card) => card.id === cardId) ?? null : null;
+}
+
+function exportPreflightQuickActionCardId(actionId: string): ExportPreflightCardId | null {
+  if (!actionId.startsWith("export-preflight-card-")) {
+    return null;
+  }
+
+  const cardId = actionId.slice("export-preflight-card-".length);
+  return cardId === "readiness" ||
+    cardId === "mix" ||
+    cardId === "automation" ||
+    cardId === "deliverables" ||
+    cardId === "handoff"
+    ? cardId
+    : null;
+}
+
+function quickActionExportPreflightDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionExportPreflightLaneLabel(action: QuickAction, card: ExportPreflightCard): string {
+  const titleLabel = action.title.replace(/^Focus Export Preflight:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Export Preflight" ? titleLabel : card.label;
+}
+
 function quickActionGuideQuickStartMetricSnapshot(action: QuickAction): { id: string; label: string; value: string } | null {
   if (action.id !== "guide-quick-start" && action.id !== "guide-bottleneck-focus") {
     return null;
@@ -23861,21 +23937,11 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "export-preflight-focus") {
-    const exportAnalysis = analysis ?? analyzeExport(project);
-    return {
-      id: "export-preflight",
-      label: "Export preflight",
-      value: `${exportAnalysis.status} / ${activeDeliveryTarget(project).name}`
-    };
-  }
-
-  if (action.id.startsWith("export-preflight-card-")) {
-    return {
-      id: "export-preflight",
-      label: "Export preflight",
-      value: action.detail
-    };
+  if (action.id === "export-preflight-focus" || action.id.startsWith("export-preflight-card-")) {
+    const exportPreflightMetric = quickActionExportPreflightMetricSnapshot(project, action, analysis ?? undefined);
+    if (exportPreflightMetric) {
+      return exportPreflightMetric;
+    }
   }
 
   const directExportTarget = directExportQuickActionTarget(action.id);
