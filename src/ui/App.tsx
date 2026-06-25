@@ -21675,6 +21675,60 @@ function directExportQuickActionReceiptLabel(
   return "No export receipt yet";
 }
 
+function quickActionDeliveryTargetAlignMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "delivery-target-align") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const target = activeDeliveryTarget(project);
+  const preview = createDeliveryTargetAlignmentPreview(project, target);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, null);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionDeliveryTargetAlignDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || preview.detailTitle;
+
+  return {
+    id: "delivery-target-align",
+    label: "Target align",
+    value: [
+      `action ${action.title}`,
+      "destination Deliver panel",
+      `target ${target.name}`,
+      `fit ${preview.statusLabel}`,
+      `context ${contextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `length ${preview.lengthLabel}`,
+      `master ${preview.masterLabel}`,
+      `mix ${preview.mixLabel}`,
+      `stems ${preview.stemLabel}`,
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `next ${preview.tone === "good" ? "Export Preflight" : "Align Delivery Target"}`
+    ].join(" / ")
+  };
+}
+
+function quickActionDeliveryTargetAlignDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function quickActionHandoffNextExportMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -23851,6 +23905,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "delivery-target-align") {
+    const deliveryTargetAlignMetric = quickActionDeliveryTargetAlignMetricSnapshot(project, action, analysis ?? undefined);
+    if (deliveryTargetAlignMetric) {
+      return deliveryTargetAlignMetric;
+    }
+
     return {
       id: "delivery-target",
       label: "Delivery target",
