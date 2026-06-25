@@ -22129,6 +22129,72 @@ function quickActionFinishChecklistLaneLabel(action: QuickAction, card: FinishCh
   return titleLabel && titleLabel !== "Focus Finish Checklist" ? titleLabel : card.label;
 }
 
+function quickActionReviewQueueMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const summary = createReviewQueueSummary(
+    project,
+    createBeatReadinessChecks(project, exportAnalysis),
+    exportAnalysis,
+    analyzeStemExports(project)
+  );
+  const item = quickActionReviewQueueItem(summary, action);
+  if (!item) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const actionLabel = action.id === "review-queue-focus" ? "focus priority review queue" : "focus direct review queue";
+  const laneLabel = quickActionReviewQueueLaneLabel(action, item);
+  const detailParts = quickActionReviewQueueDetailParts(action);
+  const contextLabel = detailParts.slice(2).join(" / ") || item.detail;
+  const postureLabel = summary.items.map((queueItem) => `${queueItem.area} ${queueItem.status}`).join(" / ");
+  const fix = createReviewFixOption(item, project, exportAnalysis);
+  const fixLabel = fix ? `${fix.label} available` : "no one-step fix";
+
+  return {
+    id: "review-queue",
+    label: "Review queue",
+    value: `${actionLabel} / issue ${laneLabel} / destination ${item.focusLabel} panel / status ${item.status} / context ${contextLabel} / Pattern ${
+      project.selectedPattern
+    } / ${patternEventTotal(pattern)} events / ${patternUseLabel} / queue ${postureLabel} / review ${
+      summary.headline
+    } / ${summary.detail} / fix ${fixLabel} / metric ${reviewQueueFocusResultMetric(summary)} / ${
+      project.arrangement.length
+    } blocks / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionReviewQueueItem(summary: ReviewQueueSummary, action: QuickAction): ReviewQueueItem | null {
+  if (action.id === "review-queue-focus") {
+    return summary.items[0] ?? null;
+  }
+
+  const itemId = reviewQueueQuickActionItemId(action.id);
+  return itemId ? summary.items.find((item) => item.id === itemId) ?? null : null;
+}
+
+function reviewQueueQuickActionItemId(actionId: string): string | null {
+  return actionId.startsWith("review-queue-item-") ? actionId.slice("review-queue-item-".length) : null;
+}
+
+function quickActionReviewQueueDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionReviewQueueLaneLabel(action: QuickAction, item: ReviewQueueItem): string {
+  const titleLabel = action.title.replace(/^Focus Review Queue:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Review Queue" ? titleLabel : item.area;
+}
+
 function quickActionGuideQuickStartMetricSnapshot(action: QuickAction): { id: string; label: string; value: string } | null {
   if (action.id !== "guide-quick-start" && action.id !== "guide-bottleneck-focus") {
     return null;
@@ -23778,20 +23844,11 @@ function quickActionResultMetricSnapshot(
     }
   }
 
-  if (action.id === "review-queue-focus") {
-    return {
-      id: "review-queue",
-      label: "Review queue",
-      value: `${project.selectedPattern} / ${barCountLabel(arrangementTotalBars(project))}`
-    };
-  }
-
-  if (action.id.startsWith("review-queue-item-")) {
-    return {
-      id: "review-queue",
-      label: "Review queue",
-      value: action.detail
-    };
+  if (action.id === "review-queue-focus" || action.id.startsWith("review-queue-item-")) {
+    const reviewQueueMetric = quickActionReviewQueueMetricSnapshot(project, action, analysis ?? undefined);
+    if (reviewQueueMetric) {
+      return reviewQueueMetric;
+    }
   }
 
   if (action.id === "review-fix" || action.id.startsWith("review-queue-fix-")) {
