@@ -432,6 +432,7 @@ export function GuideQuickStart({
     workflowNavigatorItems,
     workflowSpotlight
   });
+  const completionBottleneckItem = createGuideQuickStartCompletionBottleneckItem(completionBreakdownItems);
   const completionBottleneckLabel = createGuideQuickStartCompletionBottleneckLabel(completionBreakdownItems);
   const contextItems = createGuideQuickStartContextItems({
     firstBeatPathSummary,
@@ -453,6 +454,11 @@ export function GuideQuickStart({
     (decision.source === "path" && !nextStep) ||
     (decision.source === "session" && !sessionCard) ||
     (decision.source === "workflow" && !workflowSpotlightItem);
+  const bottleneckActionDisabled =
+    !completionBottleneckItem ||
+    (completionBottleneckItem.id === "path" && !nextStep) ||
+    (completionBottleneckItem.id === "session" && !sessionCard) ||
+    (completionBottleneckItem.id === "workflow" && !workflowSpotlightItem);
 
   function runGuideQuickStartPath(): void {
     if (nextStep) {
@@ -489,9 +495,24 @@ export function GuideQuickStart({
     }
   }
 
+  function runGuideQuickStartBottleneck(): void {
+    switch (completionBottleneckItem?.id) {
+      case "path":
+        runGuideQuickStartPath();
+        return;
+      case "session":
+        runGuideQuickStartSession();
+        return;
+      case "workflow":
+        runGuideQuickStartWorkflow();
+        return;
+    }
+  }
+
   useEffect(() => {
     setResult(null);
   }, [
+    completionBottleneckItem?.id,
     firstBeatPathSummary.countLabel,
     firstBeatPathSummary.nextStepId,
     sessionPassSummary.headline,
@@ -572,6 +593,24 @@ export function GuideQuickStart({
         >
           <span data-testid="guide-quick-start-completion-bottleneck-status">Lowest lane</span>
           <strong data-testid="guide-quick-start-completion-bottleneck-label">{completionBottleneckLabel}</strong>
+          <button
+            className="guide-quick-start-completion-bottleneck-focus"
+            data-guide-quick-start-completion-bottleneck-focus={completionBottleneckItem?.id ?? "none"}
+            data-testid="guide-quick-start-completion-bottleneck-focus"
+            disabled={bottleneckActionDisabled}
+            onClick={runGuideQuickStartBottleneck}
+            title={
+              completionBottleneckItem
+                ? `Focus ${guideQuickStartCompletionBreakdownName(completionBottleneckItem.id)} bottleneck: ${completionBottleneckItem.title}`
+                : "No Guide Quick Start bottleneck target"
+            }
+            type="button"
+          >
+            <ArrowRight size={13} aria-hidden="true" />
+            <span>
+              Focus {completionBottleneckItem ? guideQuickStartCompletionBreakdownName(completionBottleneckItem.id) : "lane"}
+            </span>
+          </button>
         </div>
         <div
           aria-label="Beat Completion Score breakdown"
@@ -748,11 +787,25 @@ export function createGuideQuickStartCompletionScore({
 export function createGuideQuickStartCompletionBottleneckLabel(
   breakdownItems: ReturnType<typeof createGuideQuickStartCompletionBreakdownItems>
 ): string {
-  if (breakdownItems.length === 0) {
+  const bottleneck = createGuideQuickStartCompletionBottleneckItem(breakdownItems);
+
+  if (!bottleneck) {
     return "Bottleneck: not scored";
   }
+  const scoreLabel = bottleneck.scoreLabel.replace(` ${bottleneck.id}`, "");
+  const metricLabel = bottleneck.metricLabel.split(" / ").join("; ");
 
-  const bottleneck = breakdownItems.reduce((selected, item) => {
+  return `Bottleneck ${guideQuickStartCompletionBreakdownName(bottleneck.id)}: ${scoreLabel} (${metricLabel})`;
+}
+
+function createGuideQuickStartCompletionBottleneckItem(
+  breakdownItems: ReturnType<typeof createGuideQuickStartCompletionBreakdownItems>
+): GuideQuickStartCompletionBreakdownItem | null {
+  if (breakdownItems.length === 0) {
+    return null;
+  }
+
+  return breakdownItems.reduce((selected, item) => {
     if (item.percent < selected.percent) {
       return item;
     }
@@ -761,10 +814,6 @@ export function createGuideQuickStartCompletionBottleneckLabel(
     }
     return selected;
   });
-  const scoreLabel = bottleneck.scoreLabel.replace(` ${bottleneck.id}`, "");
-  const metricLabel = bottleneck.metricLabel.split(" / ").join("; ");
-
-  return `Bottleneck ${guideQuickStartCompletionBreakdownName(bottleneck.id)}: ${scoreLabel} (${metricLabel})`;
 }
 
 function guideQuickStartCompletionBreakdownName(id: GuideQuickStartCompletionBreakdownItem["id"]): string {
