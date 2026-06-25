@@ -21916,31 +21916,14 @@ function quickActionResultMetricSnapshot(
     return { id: "song-form-priority", label: "Song Form Priority", value: action.detail };
   }
 
-  if (action.id === "section-locator-decision") {
-    return { id: "section-locator", label: "Section cue", value: action.detail };
-  }
-
-  if (action.id.startsWith("section-locator-")) {
-    const section = sectionLocatorActionSection(action.id);
-    if (section) {
-      const index = firstArrangementSectionIndex(project, section);
-      if (index !== null) {
-        const block = project.arrangement[index];
-        const startBar = arrangementStartBar(project, index) + 1;
-        const endBar = startBar + normalizeArrangementBars(block.bars) - 1;
-        const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
-        return {
-          id: "section-locator",
-          label: "Section cue",
-          value: `${section} Block ${index + 1} / Pattern ${block.pattern} / ${rangeLabel} / preview ${project.selectedPattern}`
-        };
-      }
-      return {
+  if (action.id === "section-locator-decision" || action.id.startsWith("section-locator-")) {
+    return (
+      quickActionSectionLocatorMetricSnapshot(project, action) ?? {
         id: "section-locator",
         label: "Section cue",
-        value: `${section} missing / edit Pattern ${project.selectedPattern}`
-      };
-    }
+        value: action.detail
+      }
+    );
   }
 
   if (action.id.startsWith("key-quick-")) {
@@ -32337,6 +32320,61 @@ function sectionLocatorTestId(section: ArrangementSection): string {
 
 function sectionLocatorActionSection(actionId: string): ArrangementSection | null {
   return arrangementSections.find((section) => actionId === `section-locator-${sectionLocatorTestId(section)}`) ?? null;
+}
+
+function quickActionSectionLocatorMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const section = sectionLocatorQuickActionSection(action);
+  if (!section) {
+    return null;
+  }
+
+  const actionLabel = action.id === "section-locator-decision" ? `${section} cue decision` : `${section} cue`;
+  const index = firstArrangementSectionIndex(project, section);
+  const totalBars = arrangementTotalBars(project);
+  if (index === null) {
+    return {
+      id: "section-locator",
+      label: "Section cue",
+      value: `${actionLabel} / ${section} missing / ${project.arrangement.length} blocks / ${barCountLabel(totalBars)}`
+    };
+  }
+
+  const block = project.arrangement[index];
+  const bars = normalizeArrangementBars(block.bars);
+  const startBar = arrangementStartBar(project, index) + 1;
+  const endBar = startBar + bars - 1;
+  const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+  const eventCount = patternEventTotal(project.patterns[block.pattern]);
+
+  return {
+    id: "section-locator",
+    label: "Section cue",
+    value: `${actionLabel} / Block ${index + 1} ${block.section} / Pattern ${
+      block.pattern
+    } / ${rangeLabel} / ${eventCount} events / ${project.arrangement.length} blocks / ${barCountLabel(totalBars)}`
+  };
+}
+
+function sectionLocatorQuickActionSection(action: QuickAction): ArrangementSection | null {
+  return sectionLocatorActionSection(action.id) ?? sectionLocatorDecisionActionSection(action);
+}
+
+function sectionLocatorDecisionActionSection(action: QuickAction): ArrangementSection | null {
+  if (action.id !== "section-locator-decision") {
+    return null;
+  }
+
+  return (
+    arrangementSections.find(
+      (section) =>
+        action.title.includes(`: ${section}:`) ||
+        action.title.includes(`${section}: Pattern`) ||
+        action.detail.includes(`${section}: Pattern`)
+    ) ?? null
+  );
 }
 
 function arrangementBlockJumpIndex(actionId: string): number | null {
