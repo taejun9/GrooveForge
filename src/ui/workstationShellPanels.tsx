@@ -35,6 +35,7 @@ import type {
   QuickActionResult,
   QuickActionScopeId,
   QuickActionScopeOption,
+  QuickActionScopeResult,
   QuickActionSpotlightSummary,
   SnapshotCompareFocusId,
   SnapshotCompareFocusItem,
@@ -731,6 +732,7 @@ export function QuickActions({
   recentResult,
   recents,
   scope,
+  scopeResult,
   scopeOptions,
   onClose,
   onInspectPinnedAction,
@@ -751,6 +753,7 @@ export function QuickActions({
   recentResult: QuickActionRecentResult | null;
   recents: QuickActionRecent[];
   scope: QuickActionScopeId;
+  scopeResult: QuickActionScopeResult | null;
   scopeOptions: QuickActionScopeOption[];
   onClose: () => void;
   onInspectPinnedAction: (actionId: string | null) => void;
@@ -891,6 +894,7 @@ export function QuickActions({
         <div className="quick-actions-count" data-testid="quick-actions-count">
           {actions.length} shown / {scopeOptions.find((option) => option.id === scope)?.count ?? 0} matching
         </div>
+        {scopeResult && <QuickActionScopeResultStrip result={scopeResult} />}
         <div
           aria-label={spotlight.detailTitle}
           className={`quick-actions-spotlight ${spotlight.tone}`}
@@ -1249,6 +1253,31 @@ export function QuickActions({
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function QuickActionScopeResultStrip({ result }: { result: QuickActionScopeResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`quick-actions-scope-result ${result.tone}`}
+      data-scope-result={result.scope}
+      data-testid="quick-actions-scope-result"
+    >
+      <div>
+        <span data-testid="quick-actions-scope-result-status">{result.status}</span>
+        <strong data-testid="quick-actions-scope-result-title">{result.title}</strong>
+        <small data-testid="quick-actions-scope-result-detail">{result.detail}</small>
+      </div>
+      <div>
+        <span data-testid="quick-actions-scope-result-metric-label">{result.metricLabel}</span>
+        <strong data-testid="quick-actions-scope-result-metric-value">{result.metricValue}</strong>
+      </div>
+      <div>
+        <span>Next check</span>
+        <strong data-testid="quick-actions-scope-result-next-check">{result.nextCheck}</strong>
+      </div>
     </div>
   );
 }

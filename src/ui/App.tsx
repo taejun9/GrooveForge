@@ -276,6 +276,7 @@ import type {
   QuickActionRecentResult,
   QuickActionScopeId,
   QuickActionScopeOption,
+  QuickActionScopeResult,
   QuickActionSpotlightSummary,
   QuickActionResultMetric,
   QuickActionResult,
@@ -1341,6 +1342,7 @@ export function App(): ReactElement {
   const [commandReferenceOpen, setCommandReferenceOpen] = useState(false);
   const [quickActionQuery, setQuickActionQuery] = useState("");
   const [quickActionScope, setQuickActionScope] = useState<QuickActionScopeId>("all");
+  const [quickActionScopeResult, setQuickActionScopeResult] = useState<QuickActionScopeResult | null>(null);
   const [quickActionRecents, setQuickActionRecents] = useState<QuickActionRecent[]>([]);
   const [quickActionPinnedIds, setQuickActionPinnedIds] = useState<string[]>([]);
   const [inspectedQuickActionPinnedId, setInspectedQuickActionPinnedId] = useState<string | null>(null);
@@ -7788,12 +7790,14 @@ export function App(): ReactElement {
     setCommandReferenceOpen(false);
     setQuickActionQuery("");
     setQuickActionScope("all");
+    setQuickActionScopeResult(null);
     setQuickActionsOpen(true);
   }
 
   function closeQuickActions(): void {
     setQuickActionsOpen(false);
     setQuickActionQuery("");
+    setQuickActionScopeResult(null);
   }
 
   function openCommandReference(): void {
@@ -7909,6 +7913,11 @@ export function App(): ReactElement {
     if (action && recent) {
       setQuickActionRecentResult(createQuickActionRecentResult(action, recent));
     }
+  }
+
+  function selectQuickActionScope(scopeId: QuickActionScopeId): void {
+    setQuickActionScope(scopeId);
+    setQuickActionScopeResult(createQuickActionScopeResult(scopeId, quickActions, quickActionQuery));
   }
 
   function checkProjectSafetyReadout(): void {
@@ -8458,13 +8467,14 @@ export function App(): ReactElement {
         recentResult={quickActionRecentResult}
         recents={quickActionRecents}
         scope={quickActionScope}
+        scopeResult={quickActionScopeResult}
         scopeOptions={quickActionScopeOptions}
         onClose={closeQuickActions}
         onQueryChange={setQuickActionQuery}
         onRun={runQuickAction}
         onInspectPinnedAction={inspectQuickActionPin}
         onInspectRecentAction={inspectQuickActionRecent}
-        onScopeChange={setQuickActionScope}
+        onScopeChange={selectQuickActionScope}
         onTogglePin={toggleQuickActionPin}
       />
       <CommandReferenceDialog open={commandReferenceOpen} onClose={closeCommandReference} />
@@ -21154,6 +21164,38 @@ function createQuickActionScopeOptions(actions: QuickAction[], query: string): Q
     ...definition,
     count: queryMatches.filter((action) => quickActionMatchesScope(action, definition.id)).length
   }));
+}
+
+function createQuickActionScopeResult(
+  scope: QuickActionScopeId,
+  actions: QuickAction[],
+  query: string
+): QuickActionScopeResult {
+  const scopeOptions = createQuickActionScopeOptions(actions, query);
+  const option = scopeOptions.find((candidate) => candidate.id === scope);
+  const filteredActions = filterQuickActions(actions, query, scope);
+  const firstRunnableAction = filteredActions.find((action) => !action.disabled);
+  const scopeLabel = option?.label ?? quickActionScopeLabel(scope);
+  const queryLabel = query.trim().length > 0 ? `search "${query.trim()}"` : "no search";
+  const matchingCount = option?.count ?? 0;
+  const enterTarget = firstRunnableAction ? firstRunnableAction.title : "No runnable Enter target";
+
+  return {
+    scope,
+    status: "Scope selected",
+    title: `${scopeLabel} commands`,
+    detail: `${queryLabel} / ${filteredActions.length} shown / ${matchingCount} matching`,
+    metricLabel: "Enter target",
+    metricValue: firstRunnableAction ? `${firstRunnableAction.group} / ${firstRunnableAction.title}` : "No runnable command",
+    nextCheck: firstRunnableAction
+      ? `Press Enter or click ${enterTarget} only if it is the next explicit move.`
+      : "Clear search or choose another scope before running a command.",
+    tone: firstRunnableAction ? "good" : "warn"
+  };
+}
+
+function quickActionScopeLabel(scope: QuickActionScopeId): string {
+  return quickActionScopeDefinitions.find((definition) => definition.id === scope)?.label ?? scope;
 }
 
 function createQuickActionSpotlightSummary(

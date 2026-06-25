@@ -1158,6 +1158,17 @@ export type QuickActionScopeOption = {
   count: number;
 };
 
+export type QuickActionScopeResult = {
+  scope: QuickActionScopeId;
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type QuickActionSpotlightSummary = {
   actionId: string | null;
   statusLabel: string;
