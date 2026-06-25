@@ -21675,6 +21675,86 @@ function directExportQuickActionReceiptLabel(
   return "No export receipt yet";
 }
 
+function quickActionDeliveryTargetSelectMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (!action.id.startsWith("delivery-target-set-")) {
+    return null;
+  }
+
+  const target = quickActionDeliveryTargetSelectTarget(project, action);
+  if (!target) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const selectedTarget = activeDeliveryTarget(project);
+  const preview = createDeliveryTargetAlignmentPreview(project, target);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, null);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionDeliveryTargetSelectDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || target.focus;
+  const nextCheck =
+    selectedTarget.id === target.id
+      ? isDeliveryTargetAligned(project, target)
+        ? "Export Preflight"
+        : "Align Delivery Target"
+      : "Set Delivery Target";
+
+  return {
+    id: "delivery-target",
+    label: "Delivery target",
+    value: [
+      `action ${action.title}`,
+      `selected ${selectedTarget.name}`,
+      `command target ${target.name}`,
+      `focus ${target.focus}`,
+      `context ${contextLabel}`,
+      `fit ${preview.statusLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `target length ${barCountLabel(target.targetBars)}`,
+      `template ${arrangementTemplateLabel(target.preferredTemplate)}`,
+      `master ${target.preferredMasterPreset}`,
+      `mix ${mixPostureLabel(target.mixPosture)}`,
+      `stems ${target.stemGoal}`,
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `next ${nextCheck}`
+    ].join(" / ")
+  };
+}
+
+function quickActionDeliveryTargetSelectTarget(project: ProjectState, action: QuickAction): DeliveryTarget | null {
+  if (!action.id.startsWith("delivery-target-set-")) {
+    return null;
+  }
+
+  const targetId = action.id.slice("delivery-target-set-".length);
+  if (targetId === "custom") {
+    return deliveryTargetForId("custom", project.customDeliveryTarget);
+  }
+
+  return deliveryTargets.find((target) => target.id === targetId) ?? null;
+}
+
+function quickActionDeliveryTargetSelectDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function quickActionDeliveryTargetAlignMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -23758,6 +23838,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("delivery-target-set-")) {
+    const deliveryTargetSelectMetric = quickActionDeliveryTargetSelectMetricSnapshot(project, action, analysis ?? undefined);
+    if (deliveryTargetSelectMetric) {
+      return deliveryTargetSelectMetric;
+    }
+
     const target = activeDeliveryTarget(project);
     return {
       id: "delivery-target",
