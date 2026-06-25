@@ -22645,7 +22645,13 @@ function quickActionResultMetricSnapshot(
     action.id === "arrangement-template" ||
     action.id.startsWith("arrangement-template-direct-")
   ) {
-    return { id: "song-length", label: "Song length", value: barCountLabel(arrangementTotalBars(project)) };
+    return (
+      quickActionArrangementTemplateMetricSnapshot(project, action) ?? {
+        id: "song-length",
+        label: "Song length",
+        value: barCountLabel(arrangementTotalBars(project))
+      }
+    );
   }
 
   if (action.id.startsWith("mix-") || action.id.startsWith("master-finish-") || action.id.startsWith("master-automation-")) {
@@ -22852,6 +22858,55 @@ function patternChainQuickActionId(actionId: string): PatternChainId | null {
 
   const chainId = actionId.slice("pattern-chain-".length);
   return patternChainIds.includes(chainId as PatternChainId) ? (chainId as PatternChainId) : null;
+}
+
+function quickActionArrangementTemplateMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const template = arrangementTemplateQuickActionTarget(action);
+  if (!template) {
+    return null;
+  }
+
+  const sectionFlow = compactSectionFlow(project.arrangement) || "empty";
+  const patternSpread = arrangementArcPreviewPatternLabel(project.arrangement);
+  const blockCount = project.arrangement.length;
+  const templateHookBlockCount = project.arrangement.filter((block) => block.section === "Hook").length;
+  const actionLabel =
+    action.id === "arrangement-template-decision"
+      ? `${arrangementTemplateLabel(template)} template decision`
+      : `${arrangementTemplateLabel(template)} template`;
+
+  return {
+    id: "arrangement-template",
+    label: "Arrangement template",
+    value: `${actionLabel} / ${sectionFlow} / ${patternSpread} / ${blockCount} blocks / ${templateHookBlockCount} hook blocks / ${barCountLabel(
+      arrangementTotalBars(project)
+    )}`
+  };
+}
+
+function arrangementTemplateQuickActionTarget(action: QuickAction): ArrangementTemplateId | null {
+  return arrangementTemplateQuickActionId(action.id) ?? arrangementTemplateQuickActionTextTarget(action);
+}
+
+function arrangementTemplateQuickActionTextTarget(action: QuickAction): ArrangementTemplateId | null {
+  const text = `${action.title} ${action.detail} ${action.keywords}`;
+  return (
+    arrangementTemplateIds.find((template) => text.includes(arrangementTemplateLabel(template))) ??
+    arrangementTemplateIds.find((template) => text.includes(template)) ??
+    null
+  );
+}
+
+function arrangementTemplateQuickActionId(actionId: string): ArrangementTemplateId | null {
+  if (!actionId.startsWith("arrangement-template-direct-")) {
+    return null;
+  }
+
+  const templateId = actionId.slice("arrangement-template-direct-".length);
+  return arrangementTemplateIds.includes(templateId as ArrangementTemplateId) ? (templateId as ArrangementTemplateId) : null;
 }
 
 function quickActionPatternStackMetricSnapshot(
