@@ -23878,13 +23878,57 @@ function quickActionLayerStarterMetricSnapshot(
     return null;
   }
 
+  const pattern = activePattern(project);
+  const laneLabel = quickActionLayerStarterLaneLabel(action, option);
+  const parts = quickActionLayerStarterDetailParts(action);
+  const statusLabel = parts[0] ?? option.status;
+  const detailLabel = parts.slice(1).join(" / ") || option.detail;
+  const actionLabel = action.id === "layer-starter" ? "start priority layer starter" : "start direct layer starter";
+  const drumCount = drumHitCount(pattern);
+  const musicEvents = pattern.bassNotes.length + pattern.chordEvents.length + pattern.melodyNotes.length;
+  const readyLayerCount = [
+    drumCount > 0,
+    pattern.bassNotes.length > 0,
+    pattern.chordEvents.length > 0,
+    pattern.melodyNotes.length > 0
+  ].filter(Boolean).length;
+
   return {
     id: "layer-starter",
     label: "Layer starter",
-    value: `Pattern ${project.selectedPattern} / ${option.label} ${option.countLabel} ${option.status} / ${patternEventTotal(
-      activePattern(project)
-    )} events`
+    value: `${actionLabel} / lane ${laneLabel} / target ${option.actionLabel} / context ${option.targetLabel} / status ${statusLabel} / detail ${detailLabel} / Pattern ${
+      project.selectedPattern
+    } / ${patternEventTotal(pattern)} events / ${drumCount} drum hits / ${musicEvents} music events / ${readyLayerCount}/4 layers / ${barCountLabel(
+      arrangementTotalBars(project)
+    )}`
   };
+}
+
+function quickActionLayerStarterDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionLayerStarterLaneLabel(action: QuickAction, option: LayerStarterOption): string {
+  const directId = layerStarterQuickActionId(action.id);
+  const directLabel = directId ? layerStarterLaneLabelFromQuickActionId(directId) : "";
+  const titleLabel = action.title.replace(/^Start\s+/, "").replace(/\slayer$/, "").replace(/\slayer ready$/, "").trim();
+  return directLabel || titleLabel || option.label || "starter lane unavailable";
+}
+
+function layerStarterLaneLabelFromQuickActionId(id: LayerStarterId): string {
+  switch (id) {
+    case "drums":
+      return "Drums";
+    case "bass":
+      return "808";
+    case "chords":
+      return "Chords";
+    case "melody":
+      return "Synth";
+  }
 }
 
 function layerStarterOptionForQuickAction(project: ProjectState, action: QuickAction): LayerStarterOption | null {
