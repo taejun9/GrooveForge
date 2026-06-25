@@ -22053,6 +22053,82 @@ function quickActionProductionSnapshotLaneLabel(action: QuickAction, metric: Pro
   return titleLabel && titleLabel !== "Focus Production Snapshot" ? titleLabel : metric.label;
 }
 
+function quickActionFinishChecklistMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const exportAnalysis = analyzeExport(project);
+  const summary = createFinishChecklistSummary(
+    project,
+    createBeatReadinessChecks(project, exportAnalysis),
+    exportAnalysis,
+    analyzeStemExports(project)
+  );
+  const card = quickActionFinishChecklistCard(summary, action);
+  if (!card) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const actionLabel =
+    action.id === "finish-checklist-focus" ? "focus priority finish checklist" : "focus direct finish checklist";
+  const laneLabel = quickActionFinishChecklistLaneLabel(action, card);
+  const detailParts = quickActionFinishChecklistDetailParts(action);
+  const contextLabel = detailParts.slice(2).join(" / ") || card.detail;
+  const postureLabel = summary.cards.map((item) => `${item.label} ${item.status}`).join(" / ");
+
+  return {
+    id: "finish-checklist",
+    label: "Finish checklist",
+    value: `${actionLabel} / card ${laneLabel} / destination ${card.focusLabel} panel / status ${card.status} / context ${contextLabel} / Pattern ${
+      project.selectedPattern
+    } / ${patternEventTotal(pattern)} events / ${patternUseLabel} / finish ${postureLabel} / readiness ${
+      summary.headline
+    } / ${summary.detail} / checklist ${finishChecklistFocusResultMetric(summary)} / ${
+      project.arrangement.length
+    } blocks / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionFinishChecklistCard(summary: FinishChecklistSummary, action: QuickAction): FinishChecklistCard | null {
+  if (action.id === "finish-checklist-focus") {
+    return activeFinishChecklistQuickActionCard(summary);
+  }
+
+  const cardId = finishChecklistQuickActionCardId(action.id);
+  return cardId ? summary.cards.find((card) => card.id === cardId) ?? null : null;
+}
+
+function finishChecklistQuickActionCardId(actionId: string): FinishChecklistCardId | null {
+  if (!actionId.startsWith("finish-checklist-card-")) {
+    return null;
+  }
+
+  const cardId = actionId.slice("finish-checklist-card-".length);
+  return cardId === "compose" ||
+    cardId === "arrange" ||
+    cardId === "mix" ||
+    cardId === "master" ||
+    cardId === "automation" ||
+    cardId === "handoff"
+    ? cardId
+    : null;
+}
+
+function quickActionFinishChecklistDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionFinishChecklistLaneLabel(action: QuickAction, card: FinishChecklistCard): string {
+  const titleLabel = action.title.replace(/^Focus Finish Checklist:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Finish Checklist" ? titleLabel : card.label;
+}
+
 function quickActionGuideQuickStartMetricSnapshot(action: QuickAction): { id: string; label: string; value: string } | null {
   if (action.id !== "guide-quick-start" && action.id !== "guide-bottleneck-focus") {
     return null;
@@ -23695,20 +23771,11 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "finish-checklist-focus") {
-    return {
-      id: "finish-checklist",
-      label: "Finish checklist",
-      value: `${activeDeliveryTarget(project).name} / ${analyzeExport(project).status}`
-    };
-  }
-
-  if (action.id.startsWith("finish-checklist-card-")) {
-    return {
-      id: "finish-checklist",
-      label: "Finish checklist",
-      value: action.detail
-    };
+  if (action.id === "finish-checklist-focus" || action.id.startsWith("finish-checklist-card-")) {
+    const finishChecklistMetric = quickActionFinishChecklistMetricSnapshot(project, action);
+    if (finishChecklistMetric) {
+      return finishChecklistMetric;
+    }
   }
 
   if (action.id === "review-queue-focus") {
