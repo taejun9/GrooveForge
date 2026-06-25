@@ -24129,6 +24129,125 @@ function quickActionReviewFixFollowup(
   };
 }
 
+function quickActionStyleInspectorMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "style-inspector-focus" && !action.id.startsWith("style-inspector-item-")) {
+    return null;
+  }
+
+  const profile = styleProfiles.find((candidate) => candidate.id === project.styleId) ?? styleProfiles[0];
+  if (!profile) {
+    return null;
+  }
+
+  const summary = createStyleInspectorSummary(project, profile, createPatternCompareSummaries(project));
+  const item = quickActionStyleInspectorItem(summary, project, action);
+  if (!item) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const detailParts = quickActionStyleInspectorDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || item.detail;
+
+  return {
+    id: "style-inspector",
+    label: "Style inspector",
+    value: [
+      quickActionStyleInspectorActionLabel(action),
+      `destination ${item.focusLabel} panel`,
+      `lane ${quickActionStyleInspectorLaneLabel(action, item)}`,
+      `context ${contextLabel}`,
+      `style ${summary.profile.name}`,
+      `BPM ${summary.bpm}`,
+      `swing ${summary.swing}`,
+      `bass ${summary.bass}`,
+      `melody ${summary.melody}`,
+      `sound ${summary.soundPreset}`,
+      `goals ${quickActionStyleInspectorGoalPosture(summary)}`,
+      `density ${quickActionStyleInspectorDensityPosture(summary)}`,
+      `selected ${quickActionArrangementSelectedBlockLabel(project, selectedArrangementIndex)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `metric ${styleInspectorFocusResultMetric(summary)}`,
+      `audition ${styleInspectorFocusResultAudition(item)}`,
+      `next ${styleInspectorFocusResultNextCheck(item)}`
+    ].join(" / ")
+  };
+}
+
+function quickActionStyleInspectorItem(
+  summary: StyleInspectorSummary,
+  project: ProjectState,
+  action: QuickAction
+): StyleInspectorFocusItem | null {
+  if (action.id === "style-inspector-focus") {
+    return activeStyleInspectorQuickActionItem(summary, project);
+  }
+
+  const focusId = quickActionStyleInspectorFocusId(action.id);
+  if (!focusId) {
+    return null;
+  }
+
+  return quickActionStyleInspectorItems(summary).find((item) => item.focusId === focusId) ?? null;
+}
+
+function quickActionStyleInspectorItems(summary: StyleInspectorSummary): StyleInspectorFocusItem[] {
+  return [...summary.metrics, ...summary.goals, ...summary.patterns];
+}
+
+function quickActionStyleInspectorFocusId(actionId: string): string | null {
+  if (!actionId.startsWith("style-inspector-item-")) {
+    return null;
+  }
+
+  return actionId.slice("style-inspector-item-".length);
+}
+
+function quickActionStyleInspectorDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionStyleInspectorActionLabel(action: QuickAction): string {
+  return action.id === "style-inspector-focus" ? "focus priority style inspector" : "focus direct style inspector";
+}
+
+function quickActionStyleInspectorLaneLabel(action: QuickAction, item: StyleInspectorFocusItem): string {
+  const titleLabel = action.title.replace(/^Focus Style Inspector:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Style Inspector" ? titleLabel : item.label;
+}
+
+function quickActionStyleInspectorGoalPosture(summary: StyleInspectorSummary): string {
+  const readyCount = summary.goals.filter((goal) => goal.tone === "good").length;
+  const reviewCount = summary.goals.filter((goal) => goal.tone === "warn").length;
+  const blockerCount = summary.goals.filter((goal) => goal.tone === "danger").length;
+  const goalPosture = summary.goals.map((goal) => `${goal.label} ${goal.current} -> ${goal.target}`).join(" / ");
+  return `${summary.goalHeadline} / ${readyCount}/${summary.goals.length} ready / ${workflowCountLabel(
+    reviewCount,
+    "review"
+  )} / ${workflowCountLabel(blockerCount, "blocker")} / ${goalPosture}`;
+}
+
+function quickActionStyleInspectorDensityPosture(summary: StyleInspectorSummary): string {
+  return summary.patterns
+    .map((pattern) => `Pattern ${pattern.slot} ${pattern.label} ${pattern.eventCount} events`)
+    .join(" / ");
+}
+
 function quickActionSongFormPriorityMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -26363,6 +26482,16 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "style-inspector-focus") {
+    const styleInspectorMetric = quickActionStyleInspectorMetricSnapshot(
+      project,
+      action,
+      selectedArrangementIndex,
+      analysis ?? undefined
+    );
+    if (styleInspectorMetric) {
+      return styleInspectorMetric;
+    }
+
     const styleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
     return {
       id: "style-inspector",
@@ -26372,6 +26501,16 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("style-inspector-item-")) {
+    const styleInspectorMetric = quickActionStyleInspectorMetricSnapshot(
+      project,
+      action,
+      selectedArrangementIndex,
+      analysis ?? undefined
+    );
+    if (styleInspectorMetric) {
+      return styleInspectorMetric;
+    }
+
     return {
       id: "style-inspector",
       label: "Style inspector",
