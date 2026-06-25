@@ -22630,9 +22630,17 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("pattern-chain-") || action.id === "chain-expand") {
+    return (
+      quickActionPatternChainMetricSnapshot(project, action) ?? {
+        id: "song-length",
+        label: "Song length",
+        value: barCountLabel(arrangementTotalBars(project))
+      }
+    );
+  }
+
   if (
-    action.id.startsWith("pattern-chain-") ||
-    action.id === "chain-expand" ||
     action.id === "arrangement-template-decision" ||
     action.id === "arrangement-template" ||
     action.id.startsWith("arrangement-template-direct-")
@@ -22785,6 +22793,65 @@ function layerStarterQuickActionId(actionId: string): LayerStarterId | null {
     default:
       return null;
   }
+}
+
+function quickActionPatternChainMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const actionLabel = patternChainQuickActionLabel(action);
+  if (!actionLabel) {
+    return null;
+  }
+
+  const sequence = patternChainReadout(project.arrangement) || "empty";
+  const blockCount = project.arrangement.length;
+  const hookBlockCount = project.arrangement.filter((block) => block.section === "Hook").length;
+  return {
+    id: "pattern-chain",
+    label: "Pattern chain",
+    value: `${actionLabel} / ${sequence} / ${blockCount} blocks / ${hookBlockCount} hook blocks / ${barCountLabel(
+      arrangementTotalBars(project)
+    )}`
+  };
+}
+
+function patternChainQuickActionLabel(action: QuickAction): string | null {
+  if (action.id === "chain-expand") {
+    return "Chain Expand";
+  }
+
+  if (action.id === "pattern-chain-decision") {
+    const decisionTarget = patternChainQuickActionDecisionTarget(action);
+    if (decisionTarget === "expand") {
+      return "Chain Expand decision";
+    }
+    if (decisionTarget) {
+      return `${patternChainLabel(decisionTarget)} chain decision`;
+    }
+    return "Pattern Chain decision";
+  }
+
+  const chain = patternChainQuickActionId(action.id);
+  return chain ? `${patternChainLabel(chain)} chain` : null;
+}
+
+function patternChainQuickActionDecisionTarget(action: QuickAction): PatternChainId | "expand" | null {
+  const text = `${action.title} ${action.detail}`;
+  if (text.includes("Chain Expand")) {
+    return "expand";
+  }
+
+  return patternChainIds.find((chain) => text.includes(patternChainLabel(chain))) ?? null;
+}
+
+function patternChainQuickActionId(actionId: string): PatternChainId | null {
+  if (!actionId.startsWith("pattern-chain-") || actionId === "pattern-chain-decision") {
+    return null;
+  }
+
+  const chainId = actionId.slice("pattern-chain-".length);
+  return patternChainIds.includes(chainId as PatternChainId) ? (chainId as PatternChainId) : null;
 }
 
 function quickActionPatternStackMetricSnapshot(
