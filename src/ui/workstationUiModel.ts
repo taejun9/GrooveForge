@@ -1113,6 +1113,7 @@ export type QuickAction = {
   group: string;
   keywords: string;
   disabled?: boolean;
+  resultTargetId?: string;
   run: () => void | Promise<void>;
 };
 

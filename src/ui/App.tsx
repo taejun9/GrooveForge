@@ -18119,6 +18119,7 @@ function createQuickActions({
       stemAuditionDecision.targetId ?? "none"
     } ${stemAuditionDecision.targetLabel} mixer compare beginner producer`,
     disabled: stemAuditionDecision.targetId === null,
+    resultTargetId: stemAuditionDecision.targetId ?? undefined,
     run: () => {
       if (stemAuditionDecision.targetId) {
         onApplyStemAudition(stemAuditionDecision.targetId);
@@ -20527,6 +20528,7 @@ function createQuickActions({
       group: "Mix",
       keywords: `stem audition solo mute full mix drums 808 bass synth chords ${pad.id} ${pad.label} ${pad.detail} mixer compare beginner producer`,
       disabled: pad.active,
+      resultTargetId: pad.id,
       run: () => onApplyStemAudition(pad.id)
     })),
     mixSnapshotDecisionAction,
@@ -25619,13 +25621,9 @@ function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id.startsWith("stem-audition-")) {
-    const readout = createStemAuditionReadoutSummary(project.mixer);
-    return {
-      id: "stem-audition",
-      label: "Audition",
-      value: `${readout.roleLabel} / ${readout.detailLabel}`
-    };
+  const stemAuditionMetric = quickActionStemAuditionMetricSnapshot(project, action, analysis ?? undefined);
+  if (stemAuditionMetric) {
+    return stemAuditionMetric;
   }
 
   const mixSnapshotTarget = mixSnapshotQuickActionTarget(action.id);
@@ -26527,6 +26525,166 @@ function quickActionMixBalancePadOption(project: ProjectState, action: QuickActi
     options.find((pad) => pad.id === createMixBalancePreviewSummary(project.mixer, options).padId) ??
     null
   );
+}
+
+function quickActionStemAuditionMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "stem-audition-decision" && !action.id.startsWith("stem-audition-")) {
+    return null;
+  }
+
+  const options = createStemAuditionPadOptions(project.mixer);
+  const readout = createStemAuditionReadoutSummary(project.mixer);
+  const decision = createStemAuditionDecisionSummary(options, readout);
+  const pad = quickActionStemAuditionPadOption(action, options, decision);
+  if (!pad) {
+    return null;
+  }
+
+  const transformed = applyStemAuditionPadToMixer(project.mixer, pad);
+  const targetReadout = createStemAuditionReadoutSummary(transformed);
+  const stemAnalyses = analyzeStemExports(project);
+  return {
+    id: action.id === "stem-audition-decision" ? "stem-audition-decision" : "stem-audition",
+    label: action.id === "stem-audition-decision" ? "Stem Audition Decision" : "Stem audition",
+    value: quickActionStemAuditionMetricValue(project, action, analysis, stemAnalyses, [
+      quickActionStemAuditionActionLabel(action),
+      `target ${quickActionStemAuditionTargetLabel(pad)}`,
+      `status ${quickActionStemAuditionStatusLabel(action, pad, decision)}`,
+      `context ${quickActionStemAuditionContextLabel(action, decision.detailLabel || pad.detail)}`,
+      `current ${readout.roleLabel} / ${readout.detailLabel}`,
+      `target audition ${targetReadout.roleLabel} / ${targetReadout.detailLabel}`,
+      `mixer ${quickActionStemAuditionMixerPosture(project.mixer)}`,
+      `moves ${pad.changedCount} mixer change${pad.changedCount === 1 ? "" : "s"}`
+    ], quickActionStemAuditionNextCheck(action, decision, pad))
+  };
+}
+
+function quickActionStemAuditionMetricValue(
+  project: ProjectState,
+  action: QuickAction,
+  analysis: ExportAnalysis | undefined,
+  stemAnalyses: StemExportAnalyses,
+  parts: string[],
+  nextCheck: string
+): string {
+  return [
+    ...parts,
+    ...quickActionStemAuditionProjectMetricParts(project, stemAnalyses, analysis),
+    `next ${nextCheck}`
+  ].join(" / ");
+}
+
+function quickActionStemAuditionProjectMetricParts(
+  project: ProjectState,
+  stemAnalyses: StemExportAnalyses,
+  analysis?: ExportAnalysis
+): string[] {
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+
+  return [
+    `Pattern ${project.selectedPattern}`,
+    `${drumHitCount(pattern)} drum hits`,
+    `${pattern.bassNotes.length} 808`,
+    `${pattern.melodyNotes.length} Synth`,
+    `${pattern.chordEvents.length} chords`,
+    `${patternEventTotal(pattern)} editable events`,
+    patternUseLabel,
+    `${project.arrangement.length} blocks`,
+    barCountLabel(arrangementTotalBars(project)),
+    `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+    `stems ${audibleStemCount}/${stemTrackIds.length} audible`
+  ];
+}
+
+function quickActionStemAuditionMixerPosture(mixer: MixerChannel[]): string {
+  return stemTrackIds
+    .map((trackId) => {
+      const channel = mixer.find((candidate) => candidate.id === trackId);
+      if (!channel) {
+        return `${stemTrackLabel(trackId)} missing`;
+      }
+      const state = channel.solo ? "solo" : channel.muted ? "muted" : "on";
+      return `${stemTrackLabel(trackId)} ${state}`;
+    })
+    .join(" / ");
+}
+
+function quickActionStemAuditionContextLabel(action: QuickAction, fallback: string): string {
+  return quickActionStemAuditionDetailParts(action).join(" / ") || fallback;
+}
+
+function quickActionStemAuditionDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionStemAuditionNextCheck(
+  action: QuickAction,
+  decision: StemAuditionDecisionSummary,
+  pad: StemAuditionPadOption
+): string {
+  if (action.id === "stem-audition-decision") {
+    return decision.nextCheckLabel.replace(/^Next:\s*/, "");
+  }
+
+  if (pad.trackId === null) {
+    return "compare Full Mix against the next solo stem before changing levels or balance";
+  }
+
+  return `compare ${pad.label} against Full Mix, then use Mix Balance or manual mixer controls only if the issue remains`;
+}
+
+function quickActionStemAuditionActionLabel(action: QuickAction): string {
+  if (action.id === "stem-audition-decision") {
+    return "run stem audition decision";
+  }
+  if (action.id.startsWith("stem-audition-")) {
+    return "apply direct stem audition";
+  }
+  return "run stem audition";
+}
+
+function quickActionStemAuditionTargetLabel(pad: StemAuditionPadOption): string {
+  return pad.trackId === null ? "Full Mix" : `${pad.label} stem`;
+}
+
+function quickActionStemAuditionStatusLabel(
+  action: QuickAction,
+  pad: StemAuditionPadOption,
+  decision: StemAuditionDecisionSummary
+): string {
+  if (action.id === "stem-audition-decision") {
+    return decision.statusLabel;
+  }
+  return pad.active ? "Audition aligned" : "Switch audition";
+}
+
+function quickActionStemAuditionPadOption(
+  action: QuickAction,
+  options: StemAuditionPadOption[],
+  decision: StemAuditionDecisionSummary
+): StemAuditionPadOption | null {
+  if (action.id === "stem-audition-decision") {
+    const targetId = action.resultTargetId ?? decision.targetId;
+    return targetId ? options.find((pad) => pad.id === targetId) ?? null : null;
+  }
+
+  if (!action.id.startsWith("stem-audition-")) {
+    return null;
+  }
+
+  const directId = action.resultTargetId ?? action.id.slice("stem-audition-".length);
+  return options.find((pad) => pad.id === directId) ?? null;
 }
 
 function quickActionLayerStarterMetricSnapshot(
