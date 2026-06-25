@@ -22297,6 +22297,82 @@ function grooveCompassLaneLabelFromQuickActionId(id: string): string {
   }
 }
 
+function quickActionPatternDnaMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "pattern-dna-focus" && !action.id.startsWith("pattern-dna-card-")) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const parts = quickActionPatternDnaDetailParts(action);
+  const laneLabel = quickActionPatternDnaLaneLabel(action);
+  const patternMetricLabel = parts[0] ?? `${patternEventTotal(pattern)} events`;
+  const destinationLabel = parts[1] ?? patternDnaDestinationLabelFromLane(laneLabel);
+  const detailLabel = parts.slice(2).join(" / ") || "current loop posture";
+  const actionLabel = action.id === "pattern-dna-focus" ? "focus active pattern dna" : "focus direct pattern dna";
+  const drumCount = drumHitCount(pattern);
+  const musicEvents = pattern.bassNotes.length + pattern.chordEvents.length + pattern.melodyNotes.length;
+  const readyLayerCount = [
+    drumCount > 0,
+    pattern.bassNotes.length > 0,
+    pattern.chordEvents.length > 0,
+    pattern.melodyNotes.length > 0
+  ].filter(Boolean).length;
+  const arrangedBlocks = project.arrangement.filter((block) => block.pattern === project.selectedPattern);
+  const arrangedBars = arrangedBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  const arrangementUse =
+    arrangedBlocks.length === 0
+      ? "not arranged"
+      : `${arrangedBlocks.length} block${arrangedBlocks.length === 1 ? "" : "s"} / ${barCountLabel(arrangedBars)}`;
+
+  return {
+    id: "pattern-dna",
+    label: "Pattern DNA",
+    value: `${actionLabel} / lane ${laneLabel} / destination ${destinationLabel} / metric ${patternMetricLabel} / detail ${detailLabel} / Pattern ${
+      project.selectedPattern
+    } / ${patternEventTotal(pattern)} events / ${drumCount} drum hits / ${musicEvents} music events / ${readyLayerCount}/4 layers / arrangement ${arrangementUse} / ${barCountLabel(
+      arrangementTotalBars(project)
+    )}`
+  };
+}
+
+function quickActionPatternDnaDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionPatternDnaLaneLabel(action: QuickAction): string {
+  const directId = action.id.startsWith("pattern-dna-card-") ? action.id.slice("pattern-dna-card-".length) : "";
+  const directLabel = directId ? patternDnaLaneLabelFromQuickActionId(directId) : "";
+  const titleLabel = action.title.replace(/^Focus Pattern DNA:\s*/, "").trim();
+  return directLabel || titleLabel || "loop-posture lane unavailable";
+}
+
+function patternDnaLaneLabelFromQuickActionId(id: string): string {
+  switch (id) {
+    case "layers":
+      return "Layers";
+    case "density":
+      return "Density";
+    case "dynamics":
+      return "Dynamics";
+    case "variation":
+      return "Variation";
+    case "arrangement":
+      return "Arrangement";
+    default:
+      return "";
+  }
+}
+
+function patternDnaDestinationLabelFromLane(label: string): string {
+  return label.toLowerCase() === "arrangement" ? "Arrange" : "Compose";
+}
+
 function quickActionAudiblePatternFollowMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -22961,19 +23037,23 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "pattern-dna-focus") {
-    return {
-      id: "pattern-dna",
-      label: "Pattern DNA",
-      value: `Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
-    };
+    return (
+      quickActionPatternDnaMetricSnapshot(project, action) ?? {
+        id: "pattern-dna",
+        label: "Pattern DNA",
+        value: `Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
+      }
+    );
   }
 
   if (action.id.startsWith("pattern-dna-card-")) {
-    return {
-      id: "pattern-dna",
-      label: "Pattern DNA",
-      value: action.detail
-    };
+    return (
+      quickActionPatternDnaMetricSnapshot(project, action) ?? {
+        id: "pattern-dna",
+        label: "Pattern DNA",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id === "layer-starter") {
