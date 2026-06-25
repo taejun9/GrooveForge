@@ -18091,6 +18091,7 @@ function createQuickActions({
     keywords: `Quick Actions Mix Snapshot Decision decision readout capture recall compare headroom balance master stems ${
       mixSnapshotComparison.decisionActionId
     } ${mixSnapshotComparison.decisionActionLabel} ${mixSnapshotComparison.decisionLabel} beginner producer`,
+    resultTargetId: mixSnapshotComparison.decisionActionId,
     run: () => {
       switch (mixSnapshotComparison.decisionActionId) {
         case "capture-a":
@@ -20540,6 +20541,7 @@ function createQuickActions({
         : "Capture current mix into A for A/B comparison.",
       group: "Mix",
       keywords: "mix snapshot capture a ab compare headroom balance master stems save slot producer beginner",
+      resultTargetId: "capture-a",
       run: () => onCaptureMixSnapshot("A")
     },
     {
@@ -20550,6 +20552,7 @@ function createQuickActions({
         : "Capture current mix into B for A/B comparison.",
       group: "Mix",
       keywords: "mix snapshot capture b ab compare headroom balance master stems save slot producer beginner",
+      resultTargetId: "capture-b",
       run: () => onCaptureMixSnapshot("B")
     },
     {
@@ -20561,6 +20564,7 @@ function createQuickActions({
       group: "Mix",
       keywords: "mix snapshot recall restore apply a ab compare headroom balance master stems choose pass producer beginner",
       disabled: !mixSnapshots.A,
+      resultTargetId: "recall-a",
       run: () => onRecallMixSnapshot("A")
     },
     {
@@ -20572,6 +20576,7 @@ function createQuickActions({
       group: "Mix",
       keywords: "mix snapshot recall restore apply b ab compare headroom balance master stems choose pass producer beginner",
       disabled: !mixSnapshots.B,
+      resultTargetId: "recall-b",
       run: () => onRecallMixSnapshot("B")
     },
     {
@@ -20584,6 +20589,7 @@ function createQuickActions({
       group: "Mix",
       keywords: "mix snapshot clear reset ab compare headroom balance master stems producer beginner",
       disabled: !mixSnapshots.A && !mixSnapshots.B,
+      resultTargetId: "clear",
       run: onClearMixSnapshots
     },
     {
@@ -21549,6 +21555,170 @@ function mixSnapshotQuickActionPosture(project: ProjectState, exportAnalysis: Ex
       ? `${audibleStemTracks(stemAnalyses).length}/${stemTrackIds.length} stems`
       : `${stemSpread.toFixed(1)} dB spread`;
   return `${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)} / ${project.masterPreset} / ${stemLabel}`;
+}
+
+type MixSnapshotResultTargetId = MixSnapshotQuickActionTarget["id"];
+
+function quickActionMixSnapshotMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const target = mixSnapshotQuickActionTarget(action.id);
+  if (!target) {
+    return null;
+  }
+
+  const resultTargetId = quickActionMixSnapshotResultTargetId(action, target);
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  return {
+    id: target.metricId,
+    label: quickActionMixSnapshotMetricLabel(target, resultTargetId),
+    value: quickActionMixSnapshotMetricValue(project, exportAnalysis, stemAnalyses, [
+      quickActionMixSnapshotActionLabel(action, resultTargetId),
+      `target ${quickActionMixSnapshotTargetLabel(resultTargetId)}`,
+      `context ${action.id === "mix-snapshot-decision" ? "decision" : "direct"}`,
+      `slot state ${quickActionMixSnapshotContextLabel(action)}`,
+      `current mix ${mixSnapshotQuickActionPosture(project, exportAnalysis)}`,
+      `master ${quickActionMixSnapshotMasterPosture(project)}`
+    ], quickActionMixSnapshotNextCheck(resultTargetId))
+  };
+}
+
+function quickActionMixSnapshotMetricValue(
+  project: ProjectState,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses,
+  parts: string[],
+  nextCheck: string
+): string {
+  return [
+    ...parts,
+    ...quickActionMixSnapshotProjectMetricParts(project, stemAnalyses, analysis),
+    `next ${nextCheck}`
+  ].join(" / ");
+}
+
+function quickActionMixSnapshotProjectMetricParts(
+  project: ProjectState,
+  stemAnalyses: StemExportAnalyses,
+  analysis: ExportAnalysis
+): string[] {
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const stemSpread = stemSpreadDb(stemAnalyses);
+  const stemLabel =
+    stemSpread === null
+      ? `${audibleStemTracks(stemAnalyses).length}/${stemTrackIds.length} audible stems`
+      : `${audibleStemTracks(stemAnalyses).length}/${stemTrackIds.length} audible stems / ${stemSpread.toFixed(1)} dB spread`;
+
+  return [
+    `Pattern ${project.selectedPattern}`,
+    `${drumHitCount(pattern)} drum hits`,
+    `${pattern.bassNotes.length} 808`,
+    `${pattern.melodyNotes.length} Synth`,
+    `${pattern.chordEvents.length} chords`,
+    `${patternEventTotal(pattern)} editable events`,
+    patternUseLabel,
+    `${project.arrangement.length} blocks`,
+    barCountLabel(arrangementTotalBars(project)),
+    `export ${analysis.status} / H ${formatDb(analysis.headroomDb)}`,
+    `stems ${stemLabel}`
+  ];
+}
+
+function quickActionMixSnapshotMasterPosture(project: ProjectState): string {
+  return `${project.masterPreset} / C ${formatDb(project.masterCeilingDb)} / O ${formatDb(masterChannelVolumeDb(project.mixer))}`;
+}
+
+function quickActionMixSnapshotResultTargetId(
+  action: QuickAction,
+  target: MixSnapshotQuickActionTarget
+): MixSnapshotResultTargetId {
+  switch (action.resultTargetId) {
+    case "capture-a":
+    case "capture-b":
+    case "recall-a":
+    case "recall-b":
+    case "clear":
+    case "decision":
+      return action.resultTargetId;
+    default:
+      return target.id;
+  }
+}
+
+function quickActionMixSnapshotMetricLabel(
+  target: MixSnapshotQuickActionTarget,
+  resultTargetId: MixSnapshotResultTargetId
+): string {
+  if (target.id !== "decision") {
+    return target.label;
+  }
+  return `Mix Snapshot Decision: ${quickActionMixSnapshotTargetLabel(resultTargetId)}`;
+}
+
+function quickActionMixSnapshotActionLabel(action: QuickAction, targetId: MixSnapshotResultTargetId): string {
+  if (action.id === "mix-snapshot-decision") {
+    return `run mix snapshot decision ${targetId}`;
+  }
+  if (targetId === "clear") {
+    return "clear mix snapshot slots";
+  }
+  if (targetId.startsWith("capture-")) {
+    return "capture mix snapshot";
+  }
+  if (targetId.startsWith("recall-")) {
+    return "recall mix snapshot";
+  }
+  return "run mix snapshot";
+}
+
+function quickActionMixSnapshotTargetLabel(targetId: MixSnapshotResultTargetId): string {
+  switch (targetId) {
+    case "capture-a":
+      return "Capture A";
+    case "capture-b":
+      return "Capture B";
+    case "recall-a":
+      return "Recall A";
+    case "recall-b":
+      return "Recall B";
+    case "clear":
+      return "Clear A/B";
+    case "decision":
+      return "Decision target";
+  }
+}
+
+function quickActionMixSnapshotContextLabel(action: QuickAction): string {
+  return quickActionMixSnapshotDetailParts(action).join(" / ") || action.title;
+}
+
+function quickActionMixSnapshotDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionMixSnapshotNextCheck(targetId: MixSnapshotResultTargetId): string {
+  switch (targetId) {
+    case "capture-a":
+      return "make one concrete mix or master change, then capture B before comparing";
+    case "capture-b":
+      return "compare A/B metrics, then recall a pass only after listening to Full Mix and core stems";
+    case "recall-a":
+      return "play Full Mix and core stems after recalling A before another Mix Balance or Mix Fix move";
+    case "recall-b":
+      return "play Full Mix and core stems after recalling B before another Mix Balance or Mix Fix move";
+    case "clear":
+      return "capture A again after the next concrete mix or master change";
+    case "decision":
+      return "follow the visible Mix Snapshot Decision Readout before changing slots";
+  }
 }
 
 function directExportQuickActionTarget(actionId: string): DirectExportQuickActionTarget | null {
@@ -25626,21 +25796,9 @@ function quickActionResultMetricSnapshot(
     return stemAuditionMetric;
   }
 
-  const mixSnapshotTarget = mixSnapshotQuickActionTarget(action.id);
-  if (mixSnapshotTarget) {
-    if (mixSnapshotTarget.id === "clear") {
-      return {
-        id: mixSnapshotTarget.metricId,
-        label: mixSnapshotTarget.label,
-        value: "Slots cleared / ready to recapture"
-      };
-    }
-    const exportAnalysis = analysis ?? analyzeExport(project);
-    return {
-      id: mixSnapshotTarget.metricId,
-      label: mixSnapshotTarget.label,
-      value: mixSnapshotQuickActionPosture(project, exportAnalysis)
-    };
+  const mixSnapshotMetric = quickActionMixSnapshotMetricSnapshot(project, action, analysis ?? undefined);
+  if (mixSnapshotMetric) {
+    return mixSnapshotMetric;
   }
 
   const soundSnapshotTarget = soundSnapshotQuickActionTarget(action.id);
