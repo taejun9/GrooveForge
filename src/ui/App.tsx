@@ -7808,21 +7808,21 @@ export function App(): ReactElement {
     try {
       void Promise.resolve(action.run())
         .then(() => {
-          const result = createQuickActionResult(action, beforeProject, projectRef.current, "complete");
+          const result = createQuickActionResult(action, beforeProject, projectRef.current, "complete", selectedArrangementIndex);
           setQuickActionResult(result);
           setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
         })
         .catch((error: unknown) => {
           console.error(error);
           setProjectStatus("Quick action failed");
-          const result = createQuickActionResult(action, beforeProject, projectRef.current, "failed");
+          const result = createQuickActionResult(action, beforeProject, projectRef.current, "failed", selectedArrangementIndex);
           setQuickActionResult(result);
           setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
         });
     } catch (error) {
       console.error(error);
       setProjectStatus("Quick action failed");
-      const result = createQuickActionResult(action, beforeProject, projectRef.current, "failed");
+      const result = createQuickActionResult(action, beforeProject, projectRef.current, "failed", selectedArrangementIndex);
       setQuickActionResult(result);
       setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
     }
@@ -21173,10 +21173,11 @@ function createQuickActionResult(
   action: QuickAction,
   beforeProject: ProjectState,
   afterProject: ProjectState,
-  outcome: "complete" | "failed"
+  outcome: "complete" | "failed",
+  selectedArrangementIndex = 0
 ): QuickActionResult {
-  const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action);
-  const afterMetric = quickActionResultMetricSnapshot(afterProject, action);
+  const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action, selectedArrangementIndex);
+  const afterMetric = quickActionResultMetricSnapshot(afterProject, action, selectedArrangementIndex);
   const nextMoveQuickAction = nextMoveQuickActionForProject(afterProject, action);
   const nextMoveQuickActionOnly = nextMoveQuickAction !== null;
   const blueprintPreviewCueOnly = action.id === "blueprint-preview-cue";
@@ -21562,9 +21563,85 @@ function patternCompareDecisionQuickActionPosture(project: ProjectState, action:
   return `Cue Pattern ${target} / edit Pattern ${project.selectedPattern} / ${eventLabel}`;
 }
 
+function quickActionPatternCueSwitchMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  mode: "cue" | "switch",
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  const target = patternCueSwitchQuickActionTarget(action, mode);
+  if (!target) {
+    return null;
+  }
+
+  const identity = patternCueSwitchMetricIdentity(mode);
+  const targetPattern = project.patterns[target];
+  const eventCount = patternEventTotal(targetPattern);
+  const drumCount = drumHitCount(targetPattern);
+  const musicEvents = targetPattern.bassNotes.length + targetPattern.chordEvents.length + targetPattern.melodyNotes.length;
+  const arrangedBlocks = project.arrangement.filter((block) => block.pattern === target);
+  const arrangedBars = arrangedBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  const arrangementUse =
+    arrangedBlocks.length === 0
+      ? "not arranged"
+      : `${arrangedBlocks.length} block${arrangedBlocks.length === 1 ? "" : "s"} / ${barCountLabel(arrangedBars)}`;
+  const selectedBlockPlacement = patternCueSwitchSelectedBlockPlacement(project, selectedArrangementIndex, target);
+
+  return {
+    id: identity.id,
+    label: identity.label,
+    value: `${identity.actionLabel} / Pattern ${target} / ${eventCount} events / ${drumCount} drums / ${musicEvents} music / arrangement ${arrangementUse} / ${selectedBlockPlacement} / edit Pattern ${project.selectedPattern}`
+  };
+}
+
+function patternCueSwitchQuickActionTarget(action: QuickAction, mode: "cue" | "switch"): PatternSlot | null {
+  const prefix = mode === "cue" ? "pattern-cue-" : "pattern-switch-";
+  if (!action.id.startsWith(prefix)) {
+    return null;
+  }
+
+  return patternSlotFromQuickActionValue(action.id.slice(prefix.length));
+}
+
+function patternCueSwitchMetricIdentity(mode: "cue" | "switch"): {
+  id: string;
+  label: string;
+  actionLabel: string;
+} {
+  if (mode === "cue") {
+    return {
+      id: "pattern-cue",
+      label: "Pattern cue",
+      actionLabel: "cue Pattern loop"
+    };
+  }
+
+  return {
+    id: "pattern-switch",
+    label: "Edit pattern",
+    actionLabel: "switch edit focus"
+  };
+}
+
+function patternCueSwitchSelectedBlockPlacement(
+  project: ProjectState,
+  selectedArrangementIndex: number,
+  target: PatternSlot
+): string {
+  if (project.arrangement.length === 0) {
+    return "selected block none";
+  }
+
+  const boundedIndex = Math.min(Math.max(0, selectedArrangementIndex), project.arrangement.length - 1);
+  const block = project.arrangement[boundedIndex];
+  const placementLabel = block.pattern === target ? "target in selected block" : `selected block uses Pattern ${block.pattern}`;
+  return `${placementLabel} / Block ${boundedIndex + 1} ${block.section} / ${barCountLabel(block.bars)}`;
+}
+
 function quickActionResultMetricSnapshot(
   project: ProjectState,
-  action: QuickAction
+  action: QuickAction,
+  selectedArrangementIndex = 0
 ): { id: string; label: string; value: string } {
   const analysis = action.group === "Mix" || action.group === "Export" ? analyzeExport(project) : null;
 
@@ -21965,12 +22042,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("pattern-switch-")) {
-    const usedSlots = usedPatternSlots(project).join("/") || project.selectedPattern;
-    return {
-      id: "pattern-switch",
-      label: "Edit pattern",
-      value: `Edit Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events / used ${usedSlots}`
-    };
+    return (
+      quickActionPatternCueSwitchMetricSnapshot(project, action, "switch", selectedArrangementIndex) ?? {
+        id: "pattern-switch",
+        label: "Edit pattern",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id === "pattern-follow-audible") {
@@ -21982,11 +22060,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("pattern-cue-")) {
-    return {
-      id: "pattern-cue",
-      label: "Pattern cue",
-      value: `Loop Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
-    };
+    return (
+      quickActionPatternCueSwitchMetricSnapshot(project, action, "cue", selectedArrangementIndex) ?? {
+        id: "pattern-cue",
+        label: "Pattern cue",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id === "pattern-compare-decision") {
