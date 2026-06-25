@@ -21879,37 +21879,23 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("arrangement-block-jump-")) {
-    const index = arrangementBlockJumpIndex(action.id);
-    if (index !== null) {
-      const block = project.arrangement[index];
-      if (block) {
-        const startBar = arrangementStartBar(project, index) + 1;
-        const endBar = startBar + normalizeArrangementBars(block.bars) - 1;
-        const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
-        return {
-          id: "arrangement-block-jump",
-          label: "Block jump",
-          value: `Block ${index + 1} ${block.section} / Pattern ${block.pattern} / ${rangeLabel} / preview ${project.selectedPattern}`
-        };
+    return (
+      quickActionArrangementBlockMetricSnapshot(project, action, "jump") ?? {
+        id: "arrangement-block-jump",
+        label: "Block jump",
+        value: action.detail
       }
-    }
+    );
   }
 
   if (action.id.startsWith("arrangement-block-cue-")) {
-    const index = arrangementBlockCueIndex(action.id);
-    if (index !== null) {
-      const block = project.arrangement[index];
-      if (block) {
-        const startBar = arrangementStartBar(project, index) + 1;
-        const endBar = startBar + normalizeArrangementBars(block.bars) - 1;
-        const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
-        return {
-          id: "arrangement-block-cue",
-          label: "Block cue",
-          value: `Block ${index + 1} ${block.section} / Pattern ${block.pattern} / ${rangeLabel} / preview ${project.selectedPattern}`
-        };
+    return (
+      quickActionArrangementBlockMetricSnapshot(project, action, "cue") ?? {
+        id: "arrangement-block-cue",
+        label: "Block cue",
+        value: action.detail
       }
-    }
+    );
   }
 
   if (action.id === "song-form-priority") {
@@ -32393,6 +32379,66 @@ function arrangementBlockCueIndex(actionId: string): number | null {
   }
   const index = Number(match[1]) - 1;
   return Number.isInteger(index) && index >= 0 ? index : null;
+}
+
+function quickActionArrangementBlockMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  mode: "jump" | "cue"
+): { id: string; label: string; value: string } | null {
+  const index = mode === "jump" ? arrangementBlockJumpIndex(action.id) : arrangementBlockCueIndex(action.id);
+  if (index === null) {
+    return null;
+  }
+
+  const identity = arrangementBlockMetricIdentity(mode);
+  const block = project.arrangement[index];
+  if (!block) {
+    return {
+      id: identity.id,
+      label: identity.label,
+      value: `${identity.actionLabel} / Block ${index + 1} missing / ${project.arrangement.length} blocks / ${barCountLabel(
+        arrangementTotalBars(project)
+      )}`
+    };
+  }
+
+  const bars = normalizeArrangementBars(block.bars);
+  const startBar = arrangementStartBar(project, index) + 1;
+  const endBar = startBar + bars - 1;
+  const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+  const eventCount = patternEventTotal(project.patterns[block.pattern]);
+  const totalBars = arrangementTotalBars(project);
+
+  return {
+    id: identity.id,
+    label: identity.label,
+    value: `${identity.actionLabel} / Block ${index + 1} ${block.section} / Pattern ${
+      block.pattern
+    } / ${rangeLabel} / ${barCountLabel(bars)} / ${eventCount} events / ${
+      project.arrangement.length
+    } blocks / ${barCountLabel(totalBars)}`
+  };
+}
+
+function arrangementBlockMetricIdentity(mode: "jump" | "cue"): {
+  id: string;
+  label: string;
+  actionLabel: string;
+} {
+  if (mode === "jump") {
+    return {
+      id: "arrangement-block-jump",
+      label: "Block jump",
+      actionLabel: "jump edit focus"
+    };
+  }
+
+  return {
+    id: "arrangement-block-cue",
+    label: "Block cue",
+    actionLabel: "cue Block loop"
+  };
 }
 
 function songFormSegmentTone(eventCount: number, energy: number, mutedTrackCount: number): MixCoachTone {
