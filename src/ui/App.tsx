@@ -21867,6 +21867,81 @@ function sessionPassLabelFromQuickActionId(id: string): string {
   }
 }
 
+function quickActionFirstBeatPathMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "first-beat-path-jump" && !action.id.startsWith("first-beat-path-step-")) {
+    return null;
+  }
+
+  const parts = quickActionFirstBeatPathDetailParts(action);
+  const stage = quickActionFirstBeatPathStage(action);
+  const pathContext = parts[0] ?? "path context unavailable";
+  const stageDetail = parts[1] ?? "stage detail unavailable";
+  const pathMetric = parts[2] ?? "path metric unavailable";
+  const actionLabel = action.id === "first-beat-path-jump" ? "jump current path step" : "jump direct path step";
+
+  return {
+    id: "first-beat-path",
+    label: "First Beat Path",
+    value: `${actionLabel} / stage ${stage.label} / destination ${stage.destination} / context ${pathContext} / detail ${stageDetail} / path ${pathMetric} / mode ${modeLabel(
+      project.mode
+    )} / Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionFirstBeatPathDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionFirstBeatPathStage(action: QuickAction): { label: string; destination: string } {
+  const directId = action.id.startsWith("first-beat-path-step-") ? action.id.slice("first-beat-path-step-".length) : "";
+  const titleLabel = action.title.replace(/^Jump First Beat Path:\s*/, "").trim();
+  const label = firstBeatPathStageLabelFromQuickActionValue(directId) || titleLabel || "stage unavailable";
+  return {
+    label,
+    destination: firstBeatPathStageDestination(label)
+  };
+}
+
+function firstBeatPathStageLabelFromQuickActionValue(value: string): string {
+  switch (value) {
+    case "setup":
+      return "Setup";
+    case "compose":
+      return "Compose";
+    case "arrange":
+      return "Arrange";
+    case "mix":
+      return "Mix";
+    case "deliver":
+      return "Deliver";
+    default:
+      return "";
+  }
+}
+
+function firstBeatPathStageDestination(label: string): string {
+  switch (label.toLowerCase()) {
+    case "setup":
+      return "Transport";
+    case "compose":
+      return "Compose";
+    case "arrange":
+      return "Arrange";
+    case "mix":
+      return "Mix";
+    case "deliver":
+      return "Deliver";
+    default:
+      return "destination unavailable";
+  }
+}
+
 function quickActionAudiblePatternFollowMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -22128,19 +22203,23 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "first-beat-path-jump") {
-    return {
-      id: "first-beat-path",
-      label: "First Beat Path",
-      value: action.detail
-    };
+    return (
+      quickActionFirstBeatPathMetricSnapshot(project, action) ?? {
+        id: "first-beat-path",
+        label: "First Beat Path",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id.startsWith("first-beat-path-step-")) {
-    return {
-      id: "first-beat-path",
-      label: "First Beat Path",
-      value: action.detail
-    };
+    return (
+      quickActionFirstBeatPathMetricSnapshot(project, action) ?? {
+        id: "first-beat-path",
+        label: "First Beat Path",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id === "midi-input-connect") {
