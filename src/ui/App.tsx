@@ -22177,6 +22177,63 @@ function quickActionUndoRedoNextCheck(action: QuickAction): string {
     : "Play the replayed Pattern and use Undo immediately if the edit breaks the current pass";
 }
 
+function quickActionProjectFileMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "save-project" && action.id !== "open-project") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const contextLabel = action.detail.trim() || action.title;
+
+  return {
+    id: "project-file",
+    label: quickActionProjectFileMetricLabel(action),
+    value: [
+      `action ${quickActionProjectFileActionLabel(action)}`,
+      `command ${action.title}`,
+      `file ${projectFileName(project)}`,
+      `safety ${quickActionProjectFileSafetyLabel(action)}`,
+      `context ${contextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `drums ${drumHitCount(pattern)} hits`,
+      `808 ${pattern.bassNotes.length} notes`,
+      `Synth ${pattern.melodyNotes.length} notes`,
+      `chords ${pattern.chordEvents.length} events`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `next ${quickActionProjectFileNextCheck(action)}`
+    ].join(" / ")
+  };
+}
+
+function quickActionProjectFileActionLabel(action: QuickAction): "Save" | "Open" {
+  return action.id === "save-project" ? "Save" : "Open";
+}
+
+function quickActionProjectFileMetricLabel(action: QuickAction): string {
+  return `${quickActionProjectFileActionLabel(action)} file`;
+}
+
+function quickActionProjectFileSafetyLabel(action: QuickAction): string {
+  return action.id === "save-project" ? "durable project copy" : "loaded project handoff";
+}
+
+function quickActionProjectFileNextCheck(action: QuickAction): string {
+  return action.id === "save-project"
+    ? "Keep composing, then save again after the next meaningful beat edit"
+    : "Play the loaded Pattern, confirm the beat, then save a durable copy after changes";
+}
+
 function quickActionSessionBriefStarterMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -24263,6 +24320,15 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "restore-local-draft" || action.id === "clear-local-draft") {
     return { id: "local-draft", label: "Draft recovery", value: `${projectEventTotal(project)} events` };
+  }
+
+  if (action.id === "save-project" || action.id === "open-project") {
+    const projectFileMetric = quickActionProjectFileMetricSnapshot(project, action, analysis ?? undefined);
+    if (projectFileMetric) {
+      return projectFileMetric;
+    }
+
+    return { id: "project-file", label: "Project file", value: `${projectEventTotal(project)} events` };
   }
 
   const blueprintMetric = quickActionBeatBlueprintMetricSnapshot(project, action);
