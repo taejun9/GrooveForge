@@ -22443,11 +22443,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("fill-")) {
-    return {
-      id: "pattern-events",
-      label: `Pattern ${project.selectedPattern}`,
-      value: `${patternEventTotal(activePattern(project))} events`
-    };
+    return (
+      quickActionPatternFillMetricSnapshot(project, action) ?? {
+        id: "pattern-events",
+        label: `Pattern ${project.selectedPattern}`,
+        value: `${patternEventTotal(activePattern(project))} events`
+      }
+    );
   }
 
   if (action.id === "arrangement-move" || action.id === "arrangement-move-decision") {
@@ -22861,6 +22863,45 @@ function patternVariationQuickActionPreset(actionId: string): PatternVariationPr
       return "hook";
     case "pattern-variation-breakdown":
       return "breakdown";
+    default:
+      return null;
+  }
+}
+
+function quickActionPatternFillMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const preset = patternFillQuickActionPreset(action.id);
+  if (!preset) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const presetLabel = patternFillPresetLabel(preset);
+  const drumHits = drumHitCount(pattern);
+  const bassNotes = pattern.bassNotes.length;
+  const chordEvents = pattern.chordEvents.length;
+  const melodyNotes = pattern.melodyNotes.length;
+  return {
+    id: "pattern-fill",
+    label: "Pattern fill",
+    value: `Pattern ${project.selectedPattern} / ${presetLabel} tail move / ${drumHits} drums / ${bassNotes} 808 / ${chordEvents} chords / ${melodyNotes} Synth / ${patternEventTotal(
+      pattern
+    )} events`
+  };
+}
+
+function patternFillQuickActionPreset(actionId: string): PatternFillPreset | null {
+  switch (actionId) {
+    case "fill-drums":
+      return "drum_fill";
+    case "fill-bass":
+      return "bass_pickup";
+    case "fill-melody":
+      return "melody_turn";
+    case "fill-clear-tail":
+      return "clear_tail";
     default:
       return null;
   }
