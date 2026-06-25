@@ -22485,11 +22485,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "arrangement-arc" || action.id === "arrangement-arc-decision" || action.id.startsWith("arrangement-arc-pad-")) {
-    return {
-      id: "song-arc",
-      label: "Song arc",
-      value: `${barCountLabel(arrangementTotalBars(project))} / ${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
-    };
+    return (
+      quickActionArrangementArcMetricSnapshot(project, action) ?? {
+        id: "song-arc",
+        label: "Song arc",
+        value: `${barCountLabel(arrangementTotalBars(project))} / ${Math.round(arrangementAverageEnergy(project) * 100)}% avg`
+      }
+    );
   }
 
   if (action.id === "mix-balance-decision") {
@@ -22907,6 +22909,54 @@ function arrangementTemplateQuickActionId(actionId: string): ArrangementTemplate
 
   const templateId = actionId.slice("arrangement-template-direct-".length);
   return arrangementTemplateIds.includes(templateId as ArrangementTemplateId) ? (templateId as ArrangementTemplateId) : null;
+}
+
+function quickActionArrangementArcMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const pad = arrangementArcQuickActionPad(action);
+  if (!pad) {
+    return null;
+  }
+
+  const sectionFlow = compactSectionFlow(project.arrangement) || "empty";
+  const patternSpread = arrangementArcPreviewPatternLabel(project.arrangement);
+  const averageEnergy = `${Math.round(arrangementAverageEnergy(project) * 100)}% avg`;
+  const energyRange = arrangementArcPreviewEnergyLabel(project.arrangement);
+  const mutePosture = arrangementArcPreviewMuteLabel(project.arrangement);
+  const blockCount = project.arrangement.length;
+  const actionLabel = action.id === "arrangement-arc-decision" ? `${pad.label} arc decision` : `${pad.label} arc`;
+
+  return {
+    id: "song-arc",
+    label: "Song arc",
+    value: `${actionLabel} / ${sectionFlow} / ${patternSpread} / ${averageEnergy} / ${energyRange} / ${mutePosture} / ${blockCount} blocks / ${barCountLabel(
+      arrangementTotalBars(project)
+    )}`
+  };
+}
+
+function arrangementArcQuickActionPad(action: QuickAction): ArrangementArcPadDefinition | null {
+  return arrangementArcQuickActionPadId(action.id) ?? arrangementArcQuickActionTextPad(action);
+}
+
+function arrangementArcQuickActionTextPad(action: QuickAction): ArrangementArcPadDefinition | null {
+  const text = `${action.title} ${action.detail} ${action.keywords}`;
+  return (
+    arrangementArcPadDefinitions.find((pad) => text.includes(pad.label)) ??
+    arrangementArcPadDefinitions.find((pad) => text.includes(pad.id)) ??
+    null
+  );
+}
+
+function arrangementArcQuickActionPadId(actionId: string): ArrangementArcPadDefinition | null {
+  if (!actionId.startsWith("arrangement-arc-pad-")) {
+    return null;
+  }
+
+  const padId = actionId.slice("arrangement-arc-pad-".length);
+  return arrangementArcPadDefinitions.find((pad) => pad.id === padId) ?? null;
 }
 
 function quickActionPatternStackMetricSnapshot(
