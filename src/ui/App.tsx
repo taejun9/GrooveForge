@@ -24129,6 +24129,200 @@ function quickActionReviewFixFollowup(
   };
 }
 
+function quickActionArrangementTransitionMapMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "arrangement-transition-map-focus" && !action.id.startsWith("arrangement-transition-map-transition-")) {
+    return null;
+  }
+
+  const summary = createArrangementTransitionMapSummary(project);
+  const transition = quickActionArrangementTransitionMapTransition(summary, action);
+  if (!transition) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const detailParts = quickActionArrangementTransitionDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || transition.detail;
+
+  return {
+    id: "arrangement-transition-map",
+    label: "Transition map",
+    value: [
+      quickActionArrangementTransitionMapActionLabel(action),
+      "destination Arrange panel",
+      `transition ${quickActionArrangementTransitionLaneLabel(action, transition)}`,
+      `status ${transition.status}`,
+      `context ${contextLabel}`,
+      `handoff ${transition.fromSection} -> ${transition.toSection}`,
+      `blocks ${transition.fromIndex + 1}->${transition.toIndex + 1}`,
+      quickActionArrangementTransitionBlockRangeLabel(project, transition),
+      `patterns ${transition.fromPattern}->${transition.toPattern}`,
+      transition.energyLabel,
+      transition.muteLabel,
+      `event density ${transition.detail}`,
+      `selected ${quickActionArrangementSelectedBlockLabel(project, selectedArrangementIndex)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `map ${quickActionArrangementTransitionMapPosture(summary)}`,
+      `metric ${arrangementTransitionMapFocusResultMetric(transition, summary)}`,
+      `audition ${arrangementTransitionMapFocusResultAudition(transition)}`,
+      `next ${arrangementTransitionMapFocusResultNextCheck(transition)}`
+    ].join(" / ")
+  };
+}
+
+function quickActionTransitionLoopMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "transition-loop-cue" && !action.id.startsWith("transition-loop-cue-")) {
+    return null;
+  }
+
+  const summary = createArrangementTransitionMapSummary(project);
+  const transitionId = quickActionArrangementTransitionId(action.id, "transition-loop-cue-");
+  const target = createArrangementTransitionLoopTarget(project, summary, transitionId, selectedArrangementIndex);
+  if (!target) {
+    return null;
+  }
+
+  const transition = target.transition;
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const detailParts = quickActionArrangementTransitionDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || arrangementTransitionLoopDetail(target);
+
+  return {
+    id: "transition-loop",
+    label: "Transition loop",
+    value: [
+      quickActionTransitionLoopActionLabel(action),
+      "destination Transport / Arrange handoff",
+      `transition ${quickActionArrangementTransitionLaneLabel(action, transition)}`,
+      `loop ${arrangementTransitionLoopDetail(target)}`,
+      `loop scope ${transportLoopStatus(project, "transition", selectedArrangementIndex, target)}`,
+      `status ${transition.status}`,
+      `context ${contextLabel}`,
+      `handoff ${transition.fromSection} -> ${transition.toSection}`,
+      `patterns ${transition.fromPattern}->${transition.toPattern}`,
+      transition.energyLabel,
+      transition.muteLabel,
+      `event density ${transition.detail}`,
+      `selected ${quickActionArrangementSelectedBlockLabel(project, selectedArrangementIndex)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `map ${quickActionArrangementTransitionMapPosture(summary)}`,
+      `audition ${arrangementTransitionMapFocusResultAudition(transition)}`,
+      `next ${arrangementTransitionMapFocusResultNextCheck(transition)}`
+    ].join(" / ")
+  };
+}
+
+function quickActionArrangementTransitionMapTransition(
+  summary: ArrangementTransitionMapSummary,
+  action: QuickAction
+): ArrangementTransitionMapTransition | null {
+  if (action.id === "arrangement-transition-map-focus") {
+    return activeArrangementTransitionMapQuickActionTransition(summary);
+  }
+
+  const transitionId = quickActionArrangementTransitionId(action.id, "arrangement-transition-map-transition-");
+  return transitionId === null ? null : summary.transitions.find((transition) => transition.id === transitionId) ?? null;
+}
+
+function quickActionArrangementTransitionId(actionId: string, prefix: string): ArrangementTransitionMapFocusId | null {
+  if (!actionId.startsWith(prefix)) {
+    return null;
+  }
+
+  const transitionId = Number(actionId.slice(prefix.length));
+  return Number.isInteger(transitionId) && transitionId >= 0 ? transitionId : null;
+}
+
+function quickActionArrangementTransitionDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionArrangementTransitionMapActionLabel(action: QuickAction): string {
+  return action.id === "arrangement-transition-map-focus" ? "focus priority transition map" : "focus direct transition map";
+}
+
+function quickActionTransitionLoopActionLabel(action: QuickAction): string {
+  return action.id === "transition-loop-cue" ? "cue priority transition loop" : "cue direct transition loop";
+}
+
+function quickActionArrangementTransitionLaneLabel(
+  action: QuickAction,
+  transition: ArrangementTransitionMapTransition
+): string {
+  const titleLabel = action.title
+    .replace(/^Focus Arrangement Transition:\s*/, "")
+    .replace(/^Cue Transition Loop:\s*/, "")
+    .trim();
+  return titleLabel && titleLabel !== "Focus Arrangement Transition" && titleLabel !== "Cue Transition Loop"
+    ? titleLabel
+    : transition.value;
+}
+
+function quickActionArrangementTransitionBlockRangeLabel(
+  project: ProjectState,
+  transition: ArrangementTransitionMapTransition
+): string {
+  const fromBlock = project.arrangement[transition.fromIndex];
+  const toBlock = project.arrangement[transition.toIndex];
+  if (!fromBlock || !toBlock) {
+    return "bars unavailable";
+  }
+
+  const startBar = arrangementStartBar(project, transition.fromIndex) + 1;
+  const endBar = arrangementStartBar(project, transition.toIndex) + normalizeArrangementBars(toBlock.bars);
+  const bars = normalizeArrangementBars(fromBlock.bars) + normalizeArrangementBars(toBlock.bars);
+  return `bars ${startBar}-${endBar} / ${barCountLabel(bars)}`;
+}
+
+function quickActionArrangementSelectedBlockLabel(project: ProjectState, selectedArrangementIndex: number): string {
+  const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0];
+  if (!selectedBlock) {
+    return "no selected block";
+  }
+
+  const selectedIndex = project.arrangement[selectedArrangementIndex] ? selectedArrangementIndex : 0;
+  return `Block ${selectedIndex + 1} ${selectedBlock.section} / Pattern ${selectedBlock.pattern} / ${barCountLabel(
+    normalizeArrangementBars(selectedBlock.bars)
+  )}`;
+}
+
+function quickActionArrangementTransitionMapPosture(summary: ArrangementTransitionMapSummary): string {
+  const readyCount = summary.transitions.filter((transition) => transition.tone === "good").length;
+  const reviewCount = summary.transitions.filter((transition) => transition.tone === "warn").length;
+  const blockerCount = summary.transitions.filter((transition) => transition.tone === "danger").length;
+  return `${summary.headline} / ${summary.detail} / ${readyCount}/${summary.transitions.length} ready / ${workflowCountLabel(
+    reviewCount,
+    "review"
+  )} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
 function quickActionExportPreflightMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -26304,6 +26498,16 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "arrangement-transition-map-focus") {
+    const transitionMetric = quickActionArrangementTransitionMapMetricSnapshot(
+      project,
+      action,
+      selectedArrangementIndex,
+      analysis ?? undefined
+    );
+    if (transitionMetric) {
+      return transitionMetric;
+    }
+
     const summary = createArrangementTransitionMapSummary(project);
     return {
       id: "arrangement-transition-map",
@@ -26313,6 +26517,16 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("arrangement-transition-map-transition-")) {
+    const transitionMetric = quickActionArrangementTransitionMapMetricSnapshot(
+      project,
+      action,
+      selectedArrangementIndex,
+      analysis ?? undefined
+    );
+    if (transitionMetric) {
+      return transitionMetric;
+    }
+
     return {
       id: "arrangement-transition-map",
       label: "Transition map",
@@ -26321,6 +26535,16 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "transition-loop-cue" || action.id.startsWith("transition-loop-cue-")) {
+    const transitionLoopMetric = quickActionTransitionLoopMetricSnapshot(
+      project,
+      action,
+      selectedArrangementIndex,
+      analysis ?? undefined
+    );
+    if (transitionLoopMetric) {
+      return transitionLoopMetric;
+    }
+
     return {
       id: "transition-loop",
       label: "Transition loop",
