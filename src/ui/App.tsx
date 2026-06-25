@@ -24277,13 +24277,56 @@ function quickActionPatternStackMetricSnapshot(
   }
 
   const pattern = activePattern(project);
+  const parts = quickActionPatternStackDetailParts(action);
+  const laneLabel = quickActionPatternStackLaneLabel(action, stack);
+  const actionLabel = action.id === "pattern-stack" ? "apply preview pattern stack" : "apply direct pattern stack";
+  const stackContext = parts[0] ?? stack.preview;
+  const detailLabel = parts.slice(1).join(" / ") || `${stack.bassCount} 808 / ${stack.chordCount} chords / ${stack.melodyCount} synth`;
+  const drumCount = drumHitCount(pattern);
+  const musicEvents = pattern.bassNotes.length + pattern.chordEvents.length + pattern.melodyNotes.length;
+  const readyLayerCount = [
+    drumCount > 0,
+    pattern.bassNotes.length > 0,
+    pattern.chordEvents.length > 0,
+    pattern.melodyNotes.length > 0
+  ].filter(Boolean).length;
+
   return {
     id: "pattern-stack",
     label: "Pattern stack",
-    value: `Pattern ${project.selectedPattern} / ${stack.label} stack / ${pattern.bassNotes.length} 808 / ${pattern.chordEvents.length} chords / ${pattern.melodyNotes.length} synth / ${patternEventTotal(
-      pattern
-    )} events`
+    value: `${actionLabel} / lane ${laneLabel} / stack ${stack.label} / context ${stackContext} / detail ${detailLabel} / Pattern ${
+      project.selectedPattern
+    } / ${patternEventTotal(pattern)} events / ${drumCount} drum hits / ${musicEvents} music events / ${pattern.bassNotes.length} 808 / ${
+      pattern.chordEvents.length
+    } chords / ${pattern.melodyNotes.length} synth / ${readyLayerCount}/4 layers / ${barCountLabel(arrangementTotalBars(project))}`
   };
+}
+
+function quickActionPatternStackDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionPatternStackLaneLabel(action: QuickAction, stack: PatternStackOption): string {
+  const directId = patternStackQuickActionId(action.id);
+  const directLabel = directId ? patternStackLaneLabelFromQuickActionId(directId) : "";
+  const titleLabel = action.title.replace(/^Apply\s+/, "").replace(/\sstack(?: already applied)?$/, "").trim();
+  return directLabel || titleLabel || stack.label || "stack lane unavailable";
+}
+
+function patternStackLaneLabelFromQuickActionId(id: PatternStackId): string {
+  switch (id) {
+    case "pocket":
+      return "Pocket";
+    case "hook":
+      return "Hook";
+    case "lift":
+      return "Lift";
+    case "break":
+      return "Break";
+  }
 }
 
 function patternStackOptionForQuickAction(project: ProjectState, action: QuickAction): PatternStackOption | null {
