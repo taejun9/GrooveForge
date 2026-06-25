@@ -5381,6 +5381,54 @@ h2 {
   white-space: nowrap;
 }
 
+.quick-actions-scope-result {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.85fr) minmax(0, 1.2fr);
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(120, 240, 200, 0.18);
+  border-radius: 7px;
+  background: rgba(120, 240, 200, 0.045);
+  padding: 8px;
+}
+
+.quick-actions-scope-result.warn {
+  border-color: rgba(240, 195, 106, 0.22);
+  background: rgba(240, 195, 106, 0.055);
+}
+
+.quick-actions-scope-result.danger {
+  border-color: rgba(255, 122, 79, 0.24);
+  background: rgba(255, 122, 79, 0.055);
+}
+
+.quick-actions-scope-result > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid rgba(244, 239, 231, 0.08);
+  border-radius: 6px;
+  background: rgba(17, 16, 15, 0.16);
+  padding: 7px;
+}
+
+.quick-actions-scope-result span,
+.quick-actions-scope-result small {
+  overflow: hidden;
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-scope-result strong {
+  overflow: hidden;
+  color: #f4efe7;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .quick-actions-spotlight {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.45fr) minmax(0, 1.35fr);
