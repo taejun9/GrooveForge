@@ -768,6 +768,10 @@ export function QuickActions({
     query.trim().length === 0 && (scope === "all" || scope === "project")
       ? recentActionSource.find((action) => action.id === "guide-quick-start") ?? null
       : null;
+  const guideBottleneckSuggestionAction =
+    query.trim().length === 0 && (scope === "all" || scope === "project")
+      ? recentActionSource.find((action) => action.id === "guide-bottleneck-focus") ?? null
+      : null;
   const guideSuggestionPinned = guideSuggestionAction ? pinnedActionIds.includes(guideSuggestionAction.id) : false;
   const guideSuggestionSource = guideSuggestionAction ? guideSuggestionAction.detail.split(" / ")[0] || "Guide" : "Guide";
   const guideSuggestionReason = guideSuggestionAction
@@ -791,6 +795,12 @@ export function QuickActions({
   const guideSuggestionAfterRun = guideSuggestionAction
     ? quickActionGuideSuggestionAfterRun(guideSuggestionAction.detail)
     : "After run: inspect the focused guide target before editing.";
+  const guideBottleneckSuggestionTarget = guideBottleneckSuggestionAction
+    ? quickActionGuideSuggestionTarget(guideBottleneckSuggestionAction.title, guideBottleneckSuggestionAction.detail)
+    : "Bottleneck command: unavailable";
+  const guideBottleneckSuggestionLabel = guideBottleneckSuggestionAction
+    ? `Bottleneck command: ${guideBottleneckSuggestionTarget.replace("Target: ", "")}`
+    : "Bottleneck command: unavailable";
 
   return (
     <div
@@ -899,6 +909,9 @@ export function QuickActions({
                 <span data-testid="quick-actions-guide-suggestion-pin-state">
                   {guideSuggestionPinned ? "Pinned command" : "Not pinned"}
                 </span>
+                <span data-testid="quick-actions-guide-suggestion-bottleneck-action">
+                  {guideBottleneckSuggestionLabel}
+                </span>
               </span>
             </div>
             <button
@@ -910,6 +923,25 @@ export function QuickActions({
             >
               <Target size={14} aria-hidden="true" />
               <span>Run guide</span>
+            </button>
+            <button
+              className="quick-actions-guide-suggestion-bottleneck-run"
+              data-testid="quick-actions-guide-suggestion-bottleneck-run"
+              disabled={!guideBottleneckSuggestionAction || guideBottleneckSuggestionAction.disabled}
+              onClick={() => {
+                if (guideBottleneckSuggestionAction) {
+                  onRun(guideBottleneckSuggestionAction);
+                }
+              }}
+              title={
+                guideBottleneckSuggestionAction
+                  ? `Run ${guideBottleneckSuggestionAction.title}: ${guideBottleneckSuggestionAction.detail}`
+                  : "Guide Bottleneck Focus unavailable"
+              }
+              type="button"
+            >
+              <ArrowRight size={14} aria-hidden="true" />
+              <span>Bottleneck</span>
             </button>
             <button
               aria-label={`${guideSuggestionPinned ? "Unpin" : "Pin"} ${guideSuggestionAction.title}`}

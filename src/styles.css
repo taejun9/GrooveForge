@@ -5439,7 +5439,7 @@ h2 {
 
 .quick-actions-guide-suggestion {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px 74px;
+  grid-template-columns: minmax(0, 1fr) 96px 104px 74px;
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -5551,6 +5551,18 @@ h2 {
   border-color: rgba(240, 195, 106, 0.38);
   color: #f4efe7;
   background: rgba(240, 195, 106, 0.12);
+}
+
+.quick-actions-guide-suggestion > button.quick-actions-guide-suggestion-bottleneck-run {
+  border-color: rgba(240, 195, 106, 0.3);
+  color: #f0c36a;
+  background: rgba(240, 195, 106, 0.08);
+}
+
+.quick-actions-guide-suggestion > button.quick-actions-guide-suggestion-bottleneck-run:hover:not(:disabled) {
+  border-color: rgba(240, 195, 106, 0.46);
+  color: #f4efe7;
+  background: rgba(240, 195, 106, 0.14);
 }
 
 .quick-actions-guide-suggestion.warn > button {
@@ -26259,7 +26271,7 @@ input[type="range"] {
   }
 
   .quick-actions-guide-suggestion {
-    grid-template-columns: minmax(0, 1fr) 92px 70px;
+    grid-template-columns: minmax(0, 1fr) 92px 104px 70px;
   }
 
   .quick-actions-recents,
