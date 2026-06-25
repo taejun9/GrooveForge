@@ -21835,6 +21835,73 @@ function quickActionBeatReadinessLaneLabel(action: QuickAction, check: BeatReadi
   return titleLabel && titleLabel !== "Focus Beat Readiness" ? titleLabel : check.label;
 }
 
+function quickActionListeningPassMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const exportAnalysis = analyzeExport(project);
+  const summary = createListeningPassSummary(
+    project,
+    createBeatReadinessChecks(project, exportAnalysis),
+    exportAnalysis,
+    analyzeStemExports(project)
+  );
+  const item = quickActionListeningPassItem(summary, action);
+  if (!item) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const parts = quickActionListeningPassDetailParts(action);
+  const cueLabel = parts.slice(2).join(" / ") || item.cue;
+  const actionLabel = action.id === "listening-pass-focus" ? "focus priority listening pass" : "focus direct listening pass";
+  const laneLabel = quickActionListeningPassLaneLabel(action, item);
+  const drumCount = drumHitCount(pattern);
+  const musicEvents = pattern.bassNotes.length + pattern.chordEvents.length + pattern.melodyNotes.length;
+
+  return {
+    id: "listening-pass",
+    label: "Listening pass",
+    value: `${actionLabel} / checkpoint ${laneLabel} / destination ${item.focusLabel} panel / status ${item.status} / context ${
+      item.detail
+    } / cue ${cueLabel} / metric ${item.metric} / Pattern ${project.selectedPattern} / ${patternEventTotal(
+      pattern
+    )} events / ${drumCount} drum hits / ${musicEvents} music events / readiness ${listeningPassFocusResultMetric(summary)} / ${
+      project.arrangement.length
+    } blocks / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function quickActionListeningPassItem(summary: ListeningPassSummary, action: QuickAction): ListeningPassItem | null {
+  if (action.id === "listening-pass-focus") {
+    return activeListeningPassQuickActionItem(summary);
+  }
+
+  const itemId = listeningPassQuickActionItemId(action.id);
+  return itemId ? summary.items.find((item) => item.id === itemId) ?? null : null;
+}
+
+function listeningPassQuickActionItemId(actionId: string): ListeningPassId | null {
+  if (!actionId.startsWith("listening-pass-checkpoint-")) {
+    return null;
+  }
+
+  const itemId = actionId.slice("listening-pass-checkpoint-".length);
+  return itemId === "composition" || itemId === "arrangement" || itemId === "mix" || itemId === "delivery" ? itemId : null;
+}
+
+function quickActionListeningPassDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionListeningPassLaneLabel(action: QuickAction, item: ListeningPassItem): string {
+  const titleLabel = action.title.replace(/^Focus Listening Pass:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Listening Pass" ? titleLabel : item.label;
+}
+
 function quickActionGuideQuickStartMetricSnapshot(action: QuickAction): { id: string; label: string; value: string } | null {
   if (action.id !== "guide-quick-start" && action.id !== "guide-bottleneck-focus") {
     return null;
@@ -23249,20 +23316,11 @@ function quickActionResultMetricSnapshot(
     }
   }
 
-  if (action.id === "listening-pass-focus") {
-    return {
-      id: "listening-pass",
-      label: "Listening pass",
-      value: `Pattern ${project.selectedPattern} / ${barCountLabel(arrangementTotalBars(project))}`
-    };
-  }
-
-  if (action.id.startsWith("listening-pass-checkpoint-")) {
-    return {
-      id: "listening-pass",
-      label: "Listening pass",
-      value: action.detail
-    };
+  if (action.id === "listening-pass-focus" || action.id.startsWith("listening-pass-checkpoint-")) {
+    const listeningMetric = quickActionListeningPassMetricSnapshot(project, action);
+    if (listeningMetric) {
+      return listeningMetric;
+    }
   }
 
   if (action.id === "beat-passport-focus") {
