@@ -77,7 +77,7 @@ type GuideQuickStartCompletionScore = {
   tone: MixCoachTone;
 };
 
-type GuideQuickStartCompletionBreakdownItem = {
+export type GuideQuickStartCompletionBreakdownItem = {
   id: "path" | "session" | "workflow";
   percent: number;
   statusLabel: string;
@@ -798,7 +798,7 @@ export function createGuideQuickStartCompletionBottleneckLabel(
   return `Bottleneck ${guideQuickStartCompletionBreakdownName(bottleneck.id)}: ${scoreLabel} (${metricLabel})`;
 }
 
-function createGuideQuickStartCompletionBottleneckItem(
+export function createGuideQuickStartCompletionBottleneckItem(
   breakdownItems: ReturnType<typeof createGuideQuickStartCompletionBreakdownItems>
 ): GuideQuickStartCompletionBreakdownItem | null {
   if (breakdownItems.length === 0) {

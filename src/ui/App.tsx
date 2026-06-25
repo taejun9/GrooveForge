@@ -693,6 +693,7 @@ import {
   ReferenceAlignmentReadout,
   SessionPass,
   WorkflowNavigator,
+  createGuideQuickStartCompletionBottleneckItem,
   createGuideQuickStartCompletionBottleneckLabel,
   createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
@@ -14259,6 +14260,76 @@ function activeGuideQuickStartQuickActionTarget({
   }, null);
 }
 
+function activeGuideQuickStartBottleneckQuickActionTarget({
+  bottleneckItem,
+  completionBottleneck,
+  completionBreakdown,
+  firstBeatPathStep,
+  firstBeatPathSummary,
+  sessionPassCard,
+  sessionPassSummary,
+  workflowSpotlight,
+  workflowSpotlightItem
+}: {
+  bottleneckItem: ReturnType<typeof createGuideQuickStartCompletionBottleneckItem>;
+  completionBottleneck: string;
+  completionBreakdown: string;
+  firstBeatPathStep: FirstBeatPathStep | null;
+  firstBeatPathSummary: FirstBeatPathSummary;
+  sessionPassCard: SessionPassCard;
+  sessionPassSummary: SessionPassSummary;
+  workflowSpotlight: ReturnType<typeof createWorkflowSpotlightSummary>;
+  workflowSpotlightItem: WorkflowNavigatorItem | null;
+}): GuideQuickStartQuickActionTarget | null {
+  if (!bottleneckItem) {
+    return null;
+  }
+
+  const bottleneckMetric = `${bottleneckItem.scoreLabel} / ${bottleneckItem.metricLabel}`;
+
+  switch (bottleneckItem.id) {
+    case "path":
+      if (!firstBeatPathStep) {
+        return null;
+      }
+      return {
+        source: "path",
+        title: `Guide Bottleneck Focus: ${firstBeatPathStep.label}`,
+        completionBottleneck,
+        detail: `Bottleneck Path / ${firstBeatPathStep.value} / ${firstBeatPathStep.detail}`,
+        completionBreakdown,
+        metricValue: `${bottleneckMetric} / ${firstBeatPathSummary.countLabel}`,
+        tone: bottleneckItem.tone,
+        keywords: `guide bottleneck focus lowest completion lane path first beat ${firstBeatPathStep.id} ${firstBeatPathStep.label} ${firstBeatPathStep.jumpLabel} ${firstBeatPathStep.detail} ${completionBreakdown} ${completionBottleneck}`
+      };
+    case "session":
+      return {
+        source: "session",
+        title: `Guide Bottleneck Focus: ${sessionPassCard.label}`,
+        completionBottleneck,
+        detail: `Bottleneck Session / ${sessionPassCard.value} / ${sessionPassCard.focusLabel}`,
+        completionBreakdown,
+        metricValue: `${bottleneckMetric} / ${sessionPassSummary.headline}`,
+        tone: bottleneckItem.tone,
+        keywords: `guide bottleneck focus lowest completion lane session pass ${sessionPassCard.id} ${sessionPassCard.label} ${sessionPassCard.value} ${sessionPassCard.focusLabel} ${completionBreakdown} ${completionBottleneck}`
+      };
+    case "workflow":
+      if (!workflowSpotlightItem) {
+        return null;
+      }
+      return {
+        source: "workflow",
+        title: `Guide Bottleneck Focus: ${workflowSpotlight.zoneLabel}`,
+        completionBottleneck,
+        detail: `Bottleneck Workflow / ${workflowSpotlight.statusLabel} / ${workflowSpotlight.detailLabel}`,
+        completionBreakdown,
+        metricValue: `${bottleneckMetric} / ${workflowSpotlight.countLabel}`,
+        tone: bottleneckItem.tone,
+        keywords: `guide bottleneck focus lowest completion lane workflow spotlight ${workflowSpotlightItem.id} ${workflowSpotlightItem.label} ${workflowSpotlightItem.value} ${workflowSpotlightItem.detail} ${completionBreakdown} ${completionBottleneck}`
+      };
+  }
+}
+
 function guideQuickStartCompletionBreakdownLabel(
   breakdownItems: ReturnType<typeof createGuideQuickStartCompletionBreakdownItems>
 ): string {
@@ -18021,11 +18092,25 @@ function createQuickActions({
     workflowSpotlight
   });
   const guideQuickStartCompletionBreakdown = guideQuickStartCompletionBreakdownLabel(guideQuickStartCompletionBreakdownItems);
+  const guideQuickStartCompletionBottleneckItem = createGuideQuickStartCompletionBottleneckItem(
+    guideQuickStartCompletionBreakdownItems
+  );
   const guideQuickStartCompletionBottleneck = createGuideQuickStartCompletionBottleneckLabel(guideQuickStartCompletionBreakdownItems);
   const guideQuickStartTarget = activeGuideQuickStartQuickActionTarget({
     completionBottleneck: guideQuickStartCompletionBottleneck,
     completionBreakdown: guideQuickStartCompletionBreakdown,
     completionScore: guideQuickStartCompletionScore,
+    firstBeatPathStep,
+    firstBeatPathSummary,
+    sessionPassCard,
+    sessionPassSummary,
+    workflowSpotlight,
+    workflowSpotlightItem
+  });
+  const guideQuickStartBottleneckTarget = activeGuideQuickStartBottleneckQuickActionTarget({
+    bottleneckItem: guideQuickStartCompletionBottleneckItem,
+    completionBottleneck: guideQuickStartCompletionBottleneck,
+    completionBreakdown: guideQuickStartCompletionBreakdown,
     firstBeatPathStep,
     firstBeatPathSummary,
     sessionPassCard,
@@ -19171,6 +19256,39 @@ function createQuickActions({
         }
 
         switch (guideQuickStartTarget.source) {
+          case "path":
+            if (firstBeatPathStep) {
+              onJumpFirstBeatPath(firstBeatPathStep);
+            }
+            break;
+          case "session":
+            onFocusSessionPass(sessionPassCard);
+            break;
+          case "workflow":
+            if (workflowSpotlightItem) {
+              onFocusWorkflowSpotlight(workflowSpotlightItem);
+            }
+            break;
+        }
+      }
+    },
+    {
+      id: "guide-bottleneck-focus",
+      title: guideQuickStartBottleneckTarget ? guideQuickStartBottleneckTarget.title : "Guide Bottleneck Focus",
+      detail: guideQuickStartBottleneckTarget
+        ? `${guideQuickStartBottleneckTarget.detail} / ${guideQuickStartBottleneckTarget.metricValue} / ${guideQuickStartBottleneckTarget.completionBreakdown} / ${guideQuickStartBottleneckTarget.completionBottleneck}`
+        : "No Guide Quick Start bottleneck focus target available.",
+      group: "Project",
+      keywords: `guide quick start bottleneck focus lowest lane completion path session workflow beginner producer direct beat workstation ${
+        guideQuickStartBottleneckTarget?.keywords ?? "none"
+      }`,
+      disabled: !guideQuickStartBottleneckTarget,
+      run: () => {
+        if (!guideQuickStartBottleneckTarget) {
+          return;
+        }
+
+        switch (guideQuickStartBottleneckTarget.source) {
           case "path":
             if (firstBeatPathStep) {
               onJumpFirstBeatPath(firstBeatPathStep);
@@ -20851,6 +20969,7 @@ function createQuickActionResult(
     action.id === "command-reference" ||
     action.id === "beat-terms-reference" ||
     action.id === "guide-quick-start" ||
+    action.id === "guide-bottleneck-focus" ||
     action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -21234,6 +21353,10 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "guide-quick-start") {
     return { id: "guide-quick-start", label: "Guide quick start", value: action.detail };
+  }
+
+  if (action.id === "guide-bottleneck-focus") {
+    return { id: "guide-bottleneck-focus", label: "Guide bottleneck", value: action.detail };
   }
 
   const nextMoveAction = nextMoveQuickActionForProject(project, action);
@@ -22529,6 +22652,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused guide target to inspect the current Path, Session Pass, or Workflow Spotlight lane before editing.",
       nextCheck: "Return to Guide Quick Start or run this command again after the target lane is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id === "guide-bottleneck-focus") {
+    return {
+      auditionCue: "Use the focused lowest completion lane to resolve the weakest Path, Session, or Workflow area before exporting.",
+      nextCheck: "Return to Guide Quick Start and confirm the bottleneck label or completion breakdown changed after the pass."
     };
   }
 

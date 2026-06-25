@@ -222,6 +222,12 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Path / session / workflow completion target"
       },
+      {
+        id: "guide-bottleneck-focus",
+        command: "Guide Bottleneck Focus",
+        shortcut: "Quick Actions",
+        target: "Lowest completion lane"
+      },
       { id: "first-beat-path", command: "First Beat Path", shortcut: "Quick Actions / Readout", target: "Setup / compose / arrange / mix / deliver" },
       { id: "beat-spine", command: "Beat Spine", shortcut: "Quick Actions / Readout", target: "Setup / drums / 808 / sound / finish" },
       { id: "mode-focus", command: "Mode Focus", shortcut: "Quick Actions / Readout", target: "Guided / Studio orientation" },
