@@ -22998,7 +22998,7 @@ function quickActionHandoffNextExportMetricSnapshot(
     id: "handoff-next-export",
     label: "Handoff next export",
     value: [
-      `action ${action.title}`,
+      "run handoff next export",
       "destination Deliver panel",
       `current next ${sendOrder.nextLabel}`,
       `deliverable ${deliverableLabel}`,
@@ -23006,20 +23006,63 @@ function quickActionHandoffNextExportMetricSnapshot(
       `file ${fileLabel}`,
       `context ${contextLabel}`,
       `Pattern ${project.selectedPattern}`,
-      `${patternEventTotal(pattern)} events`,
+      `${patternEventTotal(pattern)} editable events`,
       patternUseLabel,
-      `${project.arrangement.length} blocks`,
-      barCountLabel(arrangementTotalBars(project)),
       readinessLabel,
-      `sequence ${sendOrder.sequenceLabel}`,
-      `receipt ${handoffNextExportReceiptLabel(receipt, targetId)}`,
-      `package ${packageSummary.headline}`,
-      packageSummary.detail,
-      `target ${activeDeliveryTarget(project).name}`,
-      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4`,
-      `next ${receipt.itemId ? receipt.nextLabel : sendOrder.nextLabel}`
+      ...quickActionHandoffNextExportDeliveryMetricParts(
+        project,
+        packageSummary,
+        exportAnalysis,
+        stemAnalyses,
+        handoffPackItems,
+        sendOrder,
+        receipt,
+        targetId
+      ),
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project))
     ].join(" / ")
   };
+}
+
+function quickActionHandoffNextExportDeliveryMetricParts(
+  project: ProjectState,
+  packageSummary: HandoffPackageCheckSummary,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses,
+  handoffPackItems: HandoffPackItem[],
+  sendOrder: HandoffPackSendOrderSummary,
+  receipt: HandoffExportReceipt,
+  targetId: HandoffPackItem["id"] | null
+): string[] {
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
+  const readyCount = handoffPackItems.filter((item) => item.tone === "good").length;
+  const reviewCount = handoffPackItems.filter((item) => item.tone === "warn").length;
+  const blockerCount = handoffPackItems.filter((item) => item.tone === "danger").length;
+  const targetItem = targetId ? (handoffPackItems.find((item) => item.id === targetId) ?? null) : null;
+  const targetItemLabel = targetItem ? `${targetItem.label} ${targetItem.value} / ${targetItem.detail}` : "No next deliverable";
+
+  return [
+    `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
+    `wav ${mixWavFileName(project)} / ${analysis.status} / H ${formatDb(analysis.headroomDb)}`,
+    `stems ${audibleStemCount}/${target.stemGoal} target / ${audibleStemCount}/${stemTrackIds.length} audible / ${stemWavFileNames(
+      project
+    ).length} files`,
+    `midi ${midiFileName(project)} / ${barCountLabel(bars)}`,
+    `sheet ${handoffSheetFileName(project)} / brief ${sessionBriefFilledFields(project.sessionBrief)}/4 / ${briefStatus.value}`,
+    `receipt ${handoffNextExportReceiptLabel(receipt, targetId)} / ${receipt.nextLabel}`,
+    `send ${sendOrder.statusLabel} / ${sendOrder.nextLabel} / ${targetItemLabel}`,
+    `sequence ${sendOrder.sequenceLabel}`,
+    `checks ${readyCount}/${handoffPackItems.length} ready`,
+    workflowCountLabel(reviewCount, "review"),
+    workflowCountLabel(blockerCount, "blocker"),
+    `package ${packageSummary.headline}`,
+    packageSummary.detail,
+    `next ${receipt.itemId ? receipt.nextLabel : sendOrder.nextLabel}`
+  ];
 }
 
 function quickActionHandoffNextExportDetailParts(action: QuickAction): string[] {
