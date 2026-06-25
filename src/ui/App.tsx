@@ -24129,6 +24129,126 @@ function quickActionReviewFixFollowup(
   };
 }
 
+function quickActionArrangementMuteMapMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "arrangement-mute-map-focus" && !action.id.startsWith("arrangement-mute-map-lane-")) {
+    return null;
+  }
+
+  const summary = createArrangementMuteMapSummary(project);
+  const lane = quickActionArrangementMuteMapLane(summary, action);
+  if (!lane) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const transitionSummary = createArrangementTransitionMapSummary(project);
+  const detailParts = quickActionArrangementMuteMapDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || lane.detail;
+
+  return {
+    id: "arrangement-mute-map",
+    label: "Mute map",
+    value: [
+      quickActionArrangementMuteMapActionLabel(action),
+      "destination Arrange panel",
+      `lane ${quickActionArrangementMuteMapLaneLabel(action, lane)}`,
+      `status ${lane.status}`,
+      `context ${contextLabel}`,
+      `focused layer ${lane.label}`,
+      `mute posture ${lane.value} / ${lane.detail}`,
+      `sections ${quickActionArrangementMuteLaneSectionPosture(summary, lane.id)}`,
+      `map ${quickActionArrangementMuteMapPosture(summary)}`,
+      `selected ${quickActionArrangementSelectedBlockLabel(project, selectedArrangementIndex)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `transition map ${quickActionArrangementTransitionMapPosture(transitionSummary)}`,
+      `metric ${arrangementMuteMapFocusResultMetric(lane, summary)}`,
+      `audition ${arrangementMuteMapFocusResultAudition(lane)}`,
+      `next ${arrangementMuteMapFocusResultNextCheck(lane)}`
+    ].join(" / ")
+  };
+}
+
+function quickActionArrangementMuteMapLane(
+  summary: ArrangementMuteMapSummary,
+  action: QuickAction
+): ArrangementMuteMapLane | null {
+  if (action.id === "arrangement-mute-map-focus") {
+    return activeArrangementMuteMapQuickActionLane(summary);
+  }
+
+  const laneId = quickActionArrangementMuteMapLaneId(action.id);
+  return laneId ? summary.lanes.find((lane) => lane.id === laneId) ?? null : null;
+}
+
+function quickActionArrangementMuteMapLaneId(actionId: string): ArrangementMuteMapFocusId | null {
+  if (!actionId.startsWith("arrangement-mute-map-lane-")) {
+    return null;
+  }
+
+  const laneId = actionId.slice("arrangement-mute-map-lane-".length);
+  return arrangementMuteTrackIds.includes(laneId as ArrangementMuteTrack) ? (laneId as ArrangementMuteMapFocusId) : null;
+}
+
+function quickActionArrangementMuteMapDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionArrangementMuteMapActionLabel(action: QuickAction): string {
+  return action.id === "arrangement-mute-map-focus" ? "focus priority mute map" : "focus direct mute map";
+}
+
+function quickActionArrangementMuteMapLaneLabel(action: QuickAction, lane: ArrangementMuteMapLane): string {
+  const titleLabel = action.title
+    .replace(/^Focus Arrangement Mute Map:\s*/, "")
+    .replace(/^Focus Mute Map:\s*/, "")
+    .trim();
+  return titleLabel && titleLabel !== "Focus Arrangement Mute Map" && titleLabel !== "Focus Mute Map"
+    ? titleLabel
+    : lane.label;
+}
+
+function quickActionArrangementMuteLaneSectionPosture(
+  summary: ArrangementMuteMapSummary,
+  laneId: ArrangementMuteMapFocusId
+): string {
+  if (summary.segments.length === 0) {
+    return "no arrangement blocks";
+  }
+
+  return summary.segments
+    .map((segment) => {
+      const laneMuted = segment.mutedTracks.includes(laneId);
+      const barLabel = segment.startBar === segment.endBar ? `Bar ${segment.startBar}` : `Bars ${segment.startBar}-${segment.endBar}`;
+      return `Block ${segment.index + 1} ${segment.section} Pattern ${segment.pattern} ${barLabel} ${laneMuted ? "muted" : "live"}`;
+    })
+    .join(" / ");
+}
+
+function quickActionArrangementMuteMapPosture(summary: ArrangementMuteMapSummary): string {
+  const mappedCount = summary.lanes.filter((lane) => lane.mutedBlocks > 0).length;
+  const readyCount = summary.lanes.filter((lane) => lane.tone === "good").length;
+  const reviewCount = summary.lanes.filter((lane) => lane.tone === "warn").length;
+  const blockerCount = summary.lanes.filter((lane) => lane.tone === "danger").length;
+  return `${summary.headline} / ${summary.detail} / ${mappedCount}/${summary.lanes.length} lanes mapped / ${readyCount}/${
+    summary.lanes.length
+  } ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(blockerCount, "blocker")}`;
+}
+
 function quickActionArrangementTransitionMapMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -26481,6 +26601,16 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "arrangement-mute-map-focus") {
+    const muteMapMetric = quickActionArrangementMuteMapMetricSnapshot(
+      project,
+      action,
+      selectedArrangementIndex,
+      analysis ?? undefined
+    );
+    if (muteMapMetric) {
+      return muteMapMetric;
+    }
+
     const summary = createArrangementMuteMapSummary(project);
     return {
       id: "arrangement-mute-map",
@@ -26490,6 +26620,16 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("arrangement-mute-map-lane-")) {
+    const muteMapMetric = quickActionArrangementMuteMapMetricSnapshot(
+      project,
+      action,
+      selectedArrangementIndex,
+      analysis ?? undefined
+    );
+    if (muteMapMetric) {
+      return muteMapMetric;
+    }
+
     return {
       id: "arrangement-mute-map",
       label: "Mute map",
