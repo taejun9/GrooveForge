@@ -5483,6 +5483,7 @@ h2 {
 .quick-actions-guide-suggestion-reason,
 .quick-actions-guide-suggestion-breakdown,
 .quick-actions-guide-suggestion-bottleneck,
+.quick-actions-guide-suggestion-bottleneck-check,
 .quick-actions-guide-suggestion-next {
   display: -webkit-box;
   overflow: hidden;
@@ -5500,6 +5501,10 @@ h2 {
 
 .quick-actions-guide-suggestion-bottleneck {
   color: rgba(240, 195, 106, 0.82);
+}
+
+.quick-actions-guide-suggestion-bottleneck-check {
+  color: rgba(240, 195, 106, 0.76);
 }
 
 .quick-actions-guide-suggestion-meta {

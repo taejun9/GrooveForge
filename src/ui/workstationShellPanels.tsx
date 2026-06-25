@@ -801,6 +801,12 @@ export function QuickActions({
   const guideBottleneckSuggestionLabel = guideBottleneckSuggestionAction
     ? `Bottleneck command: ${guideBottleneckSuggestionTarget.replace("Target: ", "")}`
     : "Bottleneck command: unavailable";
+  const guideBottleneckSuggestionMetric = guideBottleneckSuggestionAction
+    ? quickActionGuideSuggestionMetric(guideBottleneckSuggestionAction.detail).replace("Metric: ", "Bottleneck metric: ")
+    : "Bottleneck metric: unavailable";
+  const guideBottleneckSuggestionCheck = guideBottleneckSuggestionAction
+    ? quickActionGuideSuggestionAfterRun(guideBottleneckSuggestionAction.detail).replace("After run: ", "Bottleneck check: ")
+    : "Bottleneck check: unavailable";
 
   return (
     <div
@@ -893,6 +899,12 @@ export function QuickActions({
               <small className="quick-actions-guide-suggestion-bottleneck" data-testid="quick-actions-guide-suggestion-bottleneck">
                 {guideSuggestionBottleneck}
               </small>
+              <small
+                className="quick-actions-guide-suggestion-bottleneck-check"
+                data-testid="quick-actions-guide-suggestion-bottleneck-check"
+              >
+                {guideBottleneckSuggestionCheck}
+              </small>
               <small className="quick-actions-guide-suggestion-next" data-testid="quick-actions-guide-suggestion-next">
                 {guideSuggestionAfterRun}
               </small>
@@ -911,6 +923,9 @@ export function QuickActions({
                 </span>
                 <span data-testid="quick-actions-guide-suggestion-bottleneck-action">
                   {guideBottleneckSuggestionLabel}
+                </span>
+                <span data-testid="quick-actions-guide-suggestion-bottleneck-metric">
+                  {guideBottleneckSuggestionMetric}
                 </span>
               </span>
             </div>
