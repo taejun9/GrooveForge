@@ -182,8 +182,8 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "open", command: "Open project", shortcut: "CmdOrCtrl+O", target: "Project file" },
       { id: "project-safety-readout", command: "Project Safety Readout", shortcut: "Readout", target: "Draft / file / unsaved edits" },
       { id: "project-file-result", command: "Project File Result", shortcut: "Result", target: "Save / open feedback" },
-      { id: "restore-draft", command: "Restore Draft", shortcut: "Quick Actions", target: "Local recovery" },
-      { id: "clear-draft", command: "Clear Draft", shortcut: "Quick Actions", target: "Local recovery" },
+      { id: "restore-draft", command: "Restore Draft", shortcut: "Quick Actions / Readout", target: "Local recovery" },
+      { id: "clear-draft", command: "Clear Draft", shortcut: "Quick Actions / Readout", target: "Local recovery" },
       { id: "undo", command: "Undo", shortcut: "CmdOrCtrl+Z", target: "Edit history" },
       { id: "redo", command: "Redo", shortcut: "Shift+CmdOrCtrl+Z / CmdOrCtrl+Y", target: "Edit history" }
     ]
