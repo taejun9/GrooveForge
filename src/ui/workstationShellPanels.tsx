@@ -29,6 +29,7 @@ import type {
   PatternCompareDecisionSummary,
   PatternCompareSummary,
   QuickAction,
+  QuickActionPinnedResult,
   QuickActionRecent,
   QuickActionResult,
   QuickActionScopeId,
@@ -723,6 +724,7 @@ export function QuickActions({
   inspectedRecentActionId,
   open,
   pinnedActionIds,
+  pinnedResult,
   query,
   recentActionSource,
   recents,
@@ -741,6 +743,7 @@ export function QuickActions({
   inspectedRecentActionId: string | null;
   open: boolean;
   pinnedActionIds: string[];
+  pinnedResult: QuickActionPinnedResult | null;
   query: string;
   recentActionSource: QuickAction[];
   recents: QuickActionRecent[];
@@ -1117,6 +1120,7 @@ export function QuickActions({
               </button>
             </div>
           )}
+          {pinnedResult && <QuickActionPinnedResultStrip result={pinnedResult} />}
         </div>
         <div className="quick-actions-recents" data-testid="quick-actions-recents" aria-label="Recent Quick Actions">
           <div className="quick-actions-recents-head">
@@ -1241,6 +1245,32 @@ export function QuickActions({
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function QuickActionPinnedResultStrip({ result }: { result: QuickActionPinnedResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`quick-actions-pinned-result ${result.tone}`}
+      data-pinned-result-action={result.actionId}
+      data-pinned-result-kind={result.kind}
+      data-testid="quick-actions-pinned-result"
+    >
+      <div>
+        <span data-testid="quick-actions-pinned-result-status">{result.status}</span>
+        <strong data-testid="quick-actions-pinned-result-title">{result.title}</strong>
+        <small data-testid="quick-actions-pinned-result-detail">{result.detail}</small>
+      </div>
+      <div>
+        <span data-testid="quick-actions-pinned-result-metric-label">{result.metricLabel}</span>
+        <strong data-testid="quick-actions-pinned-result-metric-value">{result.metricValue}</strong>
+      </div>
+      <div>
+        <span>Next check</span>
+        <strong data-testid="quick-actions-pinned-result-next-check">{result.nextCheck}</strong>
+      </div>
     </div>
   );
 }

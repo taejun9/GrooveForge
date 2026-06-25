@@ -270,6 +270,8 @@ import type {
   MasterAutomationResult,
   TransportLoopScope,
   QuickAction,
+  QuickActionPinnedResult,
+  QuickActionPinnedResultKind,
   QuickActionRecent,
   QuickActionScopeId,
   QuickActionScopeOption,
@@ -1341,6 +1343,7 @@ export function App(): ReactElement {
   const [quickActionRecents, setQuickActionRecents] = useState<QuickActionRecent[]>([]);
   const [quickActionPinnedIds, setQuickActionPinnedIds] = useState<string[]>([]);
   const [inspectedQuickActionPinnedId, setInspectedQuickActionPinnedId] = useState<string | null>(null);
+  const [quickActionPinnedResult, setQuickActionPinnedResult] = useState<QuickActionPinnedResult | null>(null);
   const [inspectedQuickActionRecentId, setInspectedQuickActionRecentId] = useState<string | null>(null);
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
@@ -7869,17 +7872,28 @@ export function App(): ReactElement {
   }
 
   function toggleQuickActionPin(action: QuickAction): void {
-    setQuickActionPinnedIds((pinnedIds) => {
-      const normalizedIds = normalizeQuickActionPinnedIds(pinnedIds, quickActions);
-      if (normalizedIds.includes(action.id)) {
-        return normalizedIds.filter((id) => id !== action.id);
-      }
-      return [action.id, ...normalizedIds].slice(0, maxQuickActionPins);
-    });
-    if (quickActionPinnedIds.includes(action.id)) {
+    const beforeIds = normalizeQuickActionPinnedIds(quickActionPinnedIds, quickActions);
+    const alreadyPinned = beforeIds.includes(action.id);
+    const afterIds = alreadyPinned ? beforeIds.filter((id) => id !== action.id) : [action.id, ...beforeIds].slice(0, maxQuickActionPins);
+    setQuickActionPinnedIds(afterIds);
+    setQuickActionPinnedResult(createQuickActionPinnedResult(alreadyPinned ? "unpin" : "pin", action, beforeIds, afterIds));
+    if (alreadyPinned) {
       setInspectedQuickActionPinnedId((inspectedId) => (inspectedId === action.id ? null : inspectedId));
     }
-    setProjectStatus(`Quick Action ${quickActionPinnedIds.includes(action.id) ? "unpinned" : "pinned"}: ${action.title}`);
+    setProjectStatus(`Quick Action ${alreadyPinned ? "unpinned" : "pinned"}: ${action.title}`);
+  }
+
+  function inspectQuickActionPin(actionId: string | null): void {
+    setInspectedQuickActionPinnedId(actionId);
+    if (!actionId) {
+      return;
+    }
+
+    const normalizedIds = normalizeQuickActionPinnedIds(quickActionPinnedIds, quickActions);
+    const action = quickActions.find((candidate) => candidate.id === actionId);
+    if (action) {
+      setQuickActionPinnedResult(createQuickActionPinnedResult("inspect", action, normalizedIds, normalizedIds));
+    }
   }
 
   function checkProjectSafetyReadout(): void {
@@ -8423,6 +8437,7 @@ export function App(): ReactElement {
         inspectedPinnedActionId={inspectedQuickActionPinnedId}
         inspectedRecentActionId={inspectedQuickActionRecentId}
         pinnedActionIds={quickActionPinnedIds}
+        pinnedResult={quickActionPinnedResult}
         query={quickActionQuery}
         recentActionSource={quickActions}
         recents={quickActionRecents}
@@ -8431,7 +8446,7 @@ export function App(): ReactElement {
         onClose={closeQuickActions}
         onQueryChange={setQuickActionQuery}
         onRun={runQuickAction}
-        onInspectPinnedAction={setInspectedQuickActionPinnedId}
+        onInspectPinnedAction={inspectQuickActionPin}
         onInspectRecentAction={setInspectedQuickActionRecentId}
         onScopeChange={setQuickActionScope}
         onTogglePin={toggleQuickActionPin}
@@ -21249,6 +21264,50 @@ function createQuickActionPinnedOptions(pinnedIds: string[], actions: QuickActio
     const action = actions.find((candidate) => candidate.id === id);
     return action ? [action] : [];
   });
+}
+
+function createQuickActionPinnedResult(
+  kind: QuickActionPinnedResultKind,
+  action: QuickAction,
+  beforeIds: string[],
+  afterIds: string[]
+): QuickActionPinnedResult {
+  const availableLabel = action.disabled ? "Unavailable now" : "Ready to run";
+  const status =
+    kind === "pin" ? "Pinned command" : kind === "unpin" ? "Unpinned command" : "Inspected pinned command";
+  const slotIndex = afterIds.indexOf(action.id);
+  const slotLabel = slotIndex >= 0 ? `slot ${slotIndex + 1}` : "removed";
+  const metricLabel = kind === "inspect" ? "Pinned command setup" : "Pin slots";
+  const metricValue =
+    kind === "unpin"
+      ? `${afterIds.length}/${maxQuickActionPins} pinned / removed from session row / before ${beforeIds.length}`
+      : `${afterIds.length}/${maxQuickActionPins} pinned / ${slotLabel} / ${availableLabel}`;
+  const nextCheck =
+    kind === "pin"
+      ? `Run ${action.title} from Pinned Commands only when it is the next explicit move.`
+      : kind === "unpin"
+        ? "Pin another visible command if this repeat path is still useful in this session."
+        : `Review ${quickActionPinnedResultTarget(action)}, then press Run only if it is the next explicit move.`;
+
+  return {
+    kind,
+    actionId: action.id,
+    status,
+    title: action.title,
+    detail: `${action.group} / ${action.detail}`,
+    metricLabel,
+    metricValue,
+    nextCheck,
+    tone: action.disabled ? "warn" : "good"
+  };
+}
+
+function quickActionPinnedResultTarget(action: QuickAction): string {
+  const detailTarget = action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean)[0];
+  return `target ${detailTarget ?? action.title}`;
 }
 
 type QuickActionInputSetupSnapshot = {
