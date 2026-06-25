@@ -22115,6 +22115,68 @@ function quickActionSelectedEventNextCheck(eventType: QuickActionSelectedEventTy
   }
 }
 
+function quickActionUndoRedoMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "undo" && action.id !== "redo") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const contextLabel = action.detail.trim() || action.title;
+
+  return {
+    id: "edit-history",
+    label: quickActionUndoRedoMetricLabel(action),
+    value: [
+      `action ${quickActionUndoRedoActionLabel(action)}`,
+      `command ${action.title}`,
+      `edit ${quickActionUndoRedoEditLabel(action)}`,
+      `context ${contextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `drums ${drumHitCount(pattern)} hits`,
+      `808 ${pattern.bassNotes.length} notes`,
+      `Synth ${pattern.melodyNotes.length} notes`,
+      `chords ${pattern.chordEvents.length} events`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `next ${quickActionUndoRedoNextCheck(action)}`
+    ].join(" / ")
+  };
+}
+
+function quickActionUndoRedoActionLabel(action: QuickAction): "Undo" | "Redo" {
+  return action.id === "undo" ? "Undo" : "Redo";
+}
+
+function quickActionUndoRedoMetricLabel(action: QuickAction): string {
+  return `${quickActionUndoRedoActionLabel(action)} history`;
+}
+
+function quickActionUndoRedoEditLabel(action: QuickAction): string {
+  const [, editLabel = ""] = action.title.split(/:\s(.+)/);
+  const normalizedEditLabel = editLabel.trim();
+  if (normalizedEditLabel) {
+    return normalizedEditLabel;
+  }
+
+  return action.id === "undo" ? "last project edit" : "last undone project edit";
+}
+
+function quickActionUndoRedoNextCheck(action: QuickAction): string {
+  return action.id === "undo"
+    ? "Play the restored Pattern and use Redo immediately if the edit went one step too far"
+    : "Play the replayed Pattern and use Undo immediately if the edit breaks the current pass";
+}
+
 function quickActionSessionBriefStarterMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -24234,6 +24296,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "undo" || action.id === "redo") {
+    const undoRedoMetric = quickActionUndoRedoMetricSnapshot(project, action, analysis ?? undefined);
+    if (undoRedoMetric) {
+      return undoRedoMetric;
+    }
+
     return {
       id: "edit-history",
       label: "Edit history",
