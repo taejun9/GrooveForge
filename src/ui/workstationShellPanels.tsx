@@ -314,6 +314,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "master-finish", command: "Master Finish", shortcut: "Quick Actions / Readout", target: "Output posture" },
       { id: "master-automation-decision", command: "Master Automation Decision", shortcut: "Quick Actions / Readout", target: "Suggested fade" },
       { id: "master-automation", command: "Master Automation", shortcut: "Quick Actions / Readout", target: "Fade in / out" },
+      { id: "finish-checklist", command: "Finish Checklist", shortcut: "Quick Actions / Readout", target: "Compose / arrange / mix / handoff" },
       { id: "handoff-pack", command: "Handoff Pack", shortcut: "Quick Actions / Readout", target: "WAV / stems / MIDI / sheet" }
     ]
   },
