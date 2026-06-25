@@ -21945,19 +21945,17 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "layer-starter") {
-    return {
-      id: "layer-starter",
-      label: "Layer starter",
-      value: `Pattern ${project.selectedPattern} / ${patternEventTotal(activePattern(project))} events`
-    };
+    const layerMetric = quickActionLayerStarterMetricSnapshot(project, action);
+    if (layerMetric) {
+      return layerMetric;
+    }
   }
 
   if (action.id.startsWith("layer-starter-")) {
-    return {
-      id: "layer-starter",
-      label: "Layer starter",
-      value: action.detail
-    };
+    const layerMetric = quickActionLayerStarterMetricSnapshot(project, action);
+    if (layerMetric) {
+      return layerMetric;
+    }
   }
 
   if (action.id === "pattern-stack") {
@@ -22732,6 +22730,56 @@ function beatBlueprintForPreviewQuickAction(project: ProjectState, action: Quick
   }
 
   return null;
+}
+
+function quickActionLayerStarterMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const option = layerStarterOptionForQuickAction(project, action);
+  if (!option) {
+    return null;
+  }
+
+  return {
+    id: "layer-starter",
+    label: "Layer starter",
+    value: `Pattern ${project.selectedPattern} / ${option.label} ${option.countLabel} ${option.status} / ${patternEventTotal(
+      activePattern(project)
+    )} events`
+  };
+}
+
+function layerStarterOptionForQuickAction(project: ProjectState, action: QuickAction): LayerStarterOption | null {
+  const options = createLayerStarterOptions(project);
+  const directId = layerStarterQuickActionId(action.id);
+  if (directId) {
+    return options.find((option) => option.id === directId) ?? null;
+  }
+
+  if (action.id === "layer-starter") {
+    return (
+      options.find((option) => action.title.includes(`${option.label} layer`) || action.detail.includes(`${option.label} `)) ??
+      activeLayerStarterQuickActionOption(options)
+    );
+  }
+
+  return null;
+}
+
+function layerStarterQuickActionId(actionId: string): LayerStarterId | null {
+  switch (actionId) {
+    case "layer-starter-drums":
+      return "drums";
+    case "layer-starter-bass":
+      return "bass";
+    case "layer-starter-chords":
+      return "chords";
+    case "layer-starter-melody":
+      return "melody";
+    default:
+      return null;
+  }
 }
 
 function quickActionResultFollowup(
