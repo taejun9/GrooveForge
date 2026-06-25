@@ -21176,8 +21176,8 @@ function createQuickActionResult(
   outcome: "complete" | "failed",
   selectedArrangementIndex = 0
 ): QuickActionResult {
-  const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action, selectedArrangementIndex);
-  const afterMetric = quickActionResultMetricSnapshot(afterProject, action, selectedArrangementIndex);
+  const beforeMetric = quickActionResultMetricSnapshot(beforeProject, action, selectedArrangementIndex, "before");
+  const afterMetric = quickActionResultMetricSnapshot(afterProject, action, selectedArrangementIndex, "after");
   const nextMoveQuickAction = nextMoveQuickActionForProject(afterProject, action);
   const nextMoveQuickActionOnly = nextMoveQuickAction !== null;
   const blueprintPreviewCueOnly = action.id === "blueprint-preview-cue";
@@ -21820,10 +21820,77 @@ function audiblePatternFollowQuickActionBeforeEdit(action: QuickAction): Pattern
   return patternSlotFromQuickActionValue(detailMatch?.[1] ?? "");
 }
 
+function quickActionAudibleArrangementFollowMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0,
+  phase: "before" | "after" = "after"
+): { id: string; label: string; value: string } | null {
+  const targetIndex = audibleArrangementFollowQuickActionTargetIndex(action);
+  if (targetIndex === null) {
+    return null;
+  }
+
+  const targetBlock = project.arrangement[targetIndex];
+  if (!targetBlock) {
+    return {
+      id: "arrangement-follow-audible",
+      label: "Audible block",
+      value: `follow audible block / Block ${targetIndex + 1} missing / ${project.arrangement.length} blocks / ${barCountLabel(
+        arrangementTotalBars(project)
+      )}`
+    };
+  }
+
+  const beforeEditIndex = audibleArrangementFollowQuickActionBeforeEditIndex(action);
+  const editIndex = phase === "after" ? targetIndex : beforeEditIndex ?? selectedArrangementIndex;
+  const boundedEditIndex = Math.min(Math.max(0, editIndex), Math.max(project.arrangement.length - 1, 0));
+  const editBlock = project.arrangement[boundedEditIndex] ?? null;
+  const bars = normalizeArrangementBars(targetBlock.bars);
+  const startBar = arrangementStartBar(project, targetIndex) + 1;
+  const endBar = startBar + bars - 1;
+  const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+  const eventCount = patternEventTotal(project.patterns[targetBlock.pattern]);
+  const beforeEditLabel = beforeEditIndex === null ? "before edit block unknown" : `before edit Block ${beforeEditIndex + 1}`;
+  const currentEditLabel = editBlock ? `current edit Block ${boundedEditIndex + 1} ${editBlock.section}` : "current edit block unavailable";
+
+  return {
+    id: "arrangement-follow-audible",
+    label: "Audible block",
+    value: `follow audible block / heard Block ${targetIndex + 1} ${targetBlock.section} / Pattern ${
+      targetBlock.pattern
+    } / ${rangeLabel} / ${eventCount} events / ${beforeEditLabel} / ${currentEditLabel} / ${
+      project.arrangement.length
+    } blocks / ${barCountLabel(arrangementTotalBars(project))}`
+  };
+}
+
+function audibleArrangementFollowQuickActionTargetIndex(action: QuickAction): number | null {
+  if (action.id !== "arrangement-follow-audible") {
+    return null;
+  }
+
+  const titleMatch = /audible Block (\d+)/.exec(action.title);
+  const detailMatch = /Hearing Block (\d+)/.exec(action.detail);
+  const blockNumber = Number(titleMatch?.[1] ?? detailMatch?.[1]);
+  return Number.isInteger(blockNumber) && blockNumber > 0 ? blockNumber - 1 : null;
+}
+
+function audibleArrangementFollowQuickActionBeforeEditIndex(action: QuickAction): number | null {
+  if (action.id !== "arrangement-follow-audible") {
+    return null;
+  }
+
+  const detailMatch = /while editing Block (\d+)/.exec(action.detail);
+  const blockNumber = Number(detailMatch?.[1]);
+  return Number.isInteger(blockNumber) && blockNumber > 0 ? blockNumber - 1 : null;
+}
+
 function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
-  selectedArrangementIndex = 0
+  selectedArrangementIndex = 0,
+  phase: "before" | "after" = "after"
 ): { id: string; label: string; value: string } {
   const analysis = action.group === "Mix" || action.group === "Export" ? analyzeExport(project) : null;
 
@@ -22129,12 +22196,13 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "arrangement-follow-audible") {
-    const usedSlots = usedPatternSlots(project).join("/") || project.selectedPattern;
-    return {
-      id: "arrangement-follow-audible",
-      label: "Audible block",
-      value: `Editing Pattern ${project.selectedPattern} / used ${usedSlots}`
-    };
+    return (
+      quickActionAudibleArrangementFollowMetricSnapshot(project, action, selectedArrangementIndex, phase) ?? {
+        id: "arrangement-follow-audible",
+        label: "Audible block",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id.startsWith("arrangement-block-jump-")) {
