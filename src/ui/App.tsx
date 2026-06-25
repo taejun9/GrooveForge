@@ -22078,24 +22078,67 @@ function quickActionDirectExportMetricSnapshot(
     id: target.metricId,
     label: target.label,
     value: [
-      `action ${action.title}`,
+      "run direct export",
       "destination Deliver panel",
       `deliverable ${handoffExportReceiptItemLabel(target.id)}`,
       `file ${directExportQuickActionFileLabel(project, target)}`,
       `Pattern ${project.selectedPattern}`,
-      `${patternEventTotal(pattern)} events`,
+      `${patternEventTotal(pattern)} editable events`,
       patternUseLabel,
-      `${project.arrangement.length} blocks`,
-      barCountLabel(arrangementTotalBars(project)),
       directExportQuickActionReadinessLabel(project, target, exportAnalysis, stemAnalyses),
       `handoff ${handoffItemLabel}`,
-      `target ${activeDeliveryTarget(project).name}`,
-      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4`,
-      `receipt ${directExportQuickActionReceiptLabel(target, receipt)}`,
-      `next ${sendOrder.nextLabel}`,
-      `package ${packageSummary.headline}`
+      ...quickActionDirectExportDeliveryMetricParts(
+        project,
+        target,
+        packageSummary,
+        exportAnalysis,
+        stemAnalyses,
+        handoffPackItems,
+        sendOrder,
+        receipt
+      ),
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project))
     ].join(" / ")
   };
+}
+
+function quickActionDirectExportDeliveryMetricParts(
+  project: ProjectState,
+  target: DirectExportQuickActionTarget,
+  packageSummary: HandoffPackageCheckSummary,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses,
+  handoffPackItems: HandoffPackItem[],
+  sendOrder: HandoffPackSendOrderSummary,
+  receipt: HandoffExportReceipt
+): string[] {
+  const deliveryTarget = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
+  const readyCount = handoffPackItems.filter((item) => item.tone === "good").length;
+  const reviewCount = handoffPackItems.filter((item) => item.tone === "warn").length;
+  const blockerCount = handoffPackItems.filter((item) => item.tone === "danger").length;
+
+  return [
+    `target ${deliveryTarget.name} / ${barCountLabel(deliveryTarget.targetBars)} / ${deliveryTarget.stemGoal} stems`,
+    `wav ${mixWavFileName(project)} / ${analysis.status} / H ${formatDb(analysis.headroomDb)}`,
+    `stems ${audibleStemCount}/${deliveryTarget.stemGoal} target / ${audibleStemCount}/${stemTrackIds.length} audible / ${stemWavFileNames(
+      project
+    ).join(" + ")}`,
+    `midi ${midiFileName(project)} / ${barCountLabel(bars)}`,
+    `sheet ${handoffSheetFileName(project)} / brief ${sessionBriefFilledFields(project.sessionBrief)}/4 / ${briefStatus.value}`,
+    `receipt ${directExportQuickActionReceiptLabel(target, receipt)} / ${receipt.nextLabel}`,
+    `send ${sendOrder.statusLabel} / ${sendOrder.nextLabel}`,
+    `sequence ${sendOrder.sequenceLabel}`,
+    `checks ${readyCount}/${handoffPackItems.length} ready`,
+    workflowCountLabel(reviewCount, "review"),
+    workflowCountLabel(blockerCount, "blocker"),
+    `package ${packageSummary.headline}`,
+    packageSummary.detail,
+    `next ${receipt.itemId === target.id ? receipt.nextLabel : sendOrder.nextLabel}`
+  ];
 }
 
 function directExportQuickActionFileLabel(project: ProjectState, target: DirectExportQuickActionTarget): string {
