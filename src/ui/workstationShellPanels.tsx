@@ -31,6 +31,7 @@ import type {
   QuickAction,
   QuickActionPinnedResult,
   QuickActionRecent,
+  QuickActionRecentResult,
   QuickActionResult,
   QuickActionScopeId,
   QuickActionScopeOption,
@@ -727,6 +728,7 @@ export function QuickActions({
   pinnedResult,
   query,
   recentActionSource,
+  recentResult,
   recents,
   scope,
   scopeOptions,
@@ -746,6 +748,7 @@ export function QuickActions({
   pinnedResult: QuickActionPinnedResult | null;
   query: string;
   recentActionSource: QuickAction[];
+  recentResult: QuickActionRecentResult | null;
   recents: QuickActionRecent[];
   scope: QuickActionScopeId;
   scopeOptions: QuickActionScopeOption[];
@@ -1204,6 +1207,7 @@ export function QuickActions({
               </button>
             </div>
           )}
+          {recentResult && <QuickActionRecentResultStrip result={recentResult} />}
         </div>
         <div className="quick-actions-list" data-testid="quick-actions-list">
           {actions.length === 0 ? (
@@ -1270,6 +1274,31 @@ function QuickActionPinnedResultStrip({ result }: { result: QuickActionPinnedRes
       <div>
         <span>Next check</span>
         <strong data-testid="quick-actions-pinned-result-next-check">{result.nextCheck}</strong>
+      </div>
+    </div>
+  );
+}
+
+function QuickActionRecentResultStrip({ result }: { result: QuickActionRecentResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`quick-actions-recent-result ${result.tone}`}
+      data-recent-result-action={result.actionId}
+      data-testid="quick-actions-recent-result"
+    >
+      <div>
+        <span data-testid="quick-actions-recent-result-status">{result.status}</span>
+        <strong data-testid="quick-actions-recent-result-title">{result.title}</strong>
+        <small data-testid="quick-actions-recent-result-detail">{result.detail}</small>
+      </div>
+      <div>
+        <span data-testid="quick-actions-recent-result-metric-label">{result.metricLabel}</span>
+        <strong data-testid="quick-actions-recent-result-metric-value">{result.metricValue}</strong>
+      </div>
+      <div>
+        <span>Next check</span>
+        <strong data-testid="quick-actions-recent-result-next-check">{result.nextCheck}</strong>
       </div>
     </div>
   );

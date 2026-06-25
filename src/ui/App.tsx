@@ -273,6 +273,7 @@ import type {
   QuickActionPinnedResult,
   QuickActionPinnedResultKind,
   QuickActionRecent,
+  QuickActionRecentResult,
   QuickActionScopeId,
   QuickActionScopeOption,
   QuickActionSpotlightSummary,
@@ -1345,6 +1346,7 @@ export function App(): ReactElement {
   const [inspectedQuickActionPinnedId, setInspectedQuickActionPinnedId] = useState<string | null>(null);
   const [quickActionPinnedResult, setQuickActionPinnedResult] = useState<QuickActionPinnedResult | null>(null);
   const [inspectedQuickActionRecentId, setInspectedQuickActionRecentId] = useState<string | null>(null);
+  const [quickActionRecentResult, setQuickActionRecentResult] = useState<QuickActionRecentResult | null>(null);
   const [composerActionResult, setComposerActionResult] = useState<ComposerActionResult | null>(null);
   const [nextMoveResult, setNextMoveResult] = useState<NextMoveResult | null>(null);
   const [quickActionResult, setQuickActionResult] = useState<QuickActionResult | null>(null);
@@ -7896,6 +7898,19 @@ export function App(): ReactElement {
     }
   }
 
+  function inspectQuickActionRecent(actionId: string | null): void {
+    setInspectedQuickActionRecentId(actionId);
+    if (!actionId) {
+      return;
+    }
+
+    const action = quickActions.find((candidate) => candidate.id === actionId);
+    const recent = quickActionRecents.find((candidate) => candidate.actionId === actionId);
+    if (action && recent) {
+      setQuickActionRecentResult(createQuickActionRecentResult(action, recent));
+    }
+  }
+
   function checkProjectSafetyReadout(): void {
     setProjectStatus(`Checked project safety: ${projectSafetyReadout.statusLabel}`);
   }
@@ -8440,6 +8455,7 @@ export function App(): ReactElement {
         pinnedResult={quickActionPinnedResult}
         query={quickActionQuery}
         recentActionSource={quickActions}
+        recentResult={quickActionRecentResult}
         recents={quickActionRecents}
         scope={quickActionScope}
         scopeOptions={quickActionScopeOptions}
@@ -8447,7 +8463,7 @@ export function App(): ReactElement {
         onQueryChange={setQuickActionQuery}
         onRun={runQuickAction}
         onInspectPinnedAction={inspectQuickActionPin}
-        onInspectRecentAction={setInspectedQuickActionRecentId}
+        onInspectRecentAction={inspectQuickActionRecent}
         onScopeChange={setQuickActionScope}
         onTogglePin={toggleQuickActionPin}
       />
@@ -21247,6 +21263,29 @@ function createQuickActionRecentOptions(
     const action = actions.find((candidate) => candidate.id === recent.actionId);
     return action ? [{ recent, action }] : [];
   });
+}
+
+function createQuickActionRecentResult(action: QuickAction, recent: QuickActionRecent): QuickActionRecentResult {
+  const availableLabel = action.disabled ? "Unavailable now" : "Ready to rerun";
+  const targetLabel = quickActionRecentResultTarget(action);
+  return {
+    actionId: action.id,
+    status: "Inspected recent command",
+    title: action.title,
+    detail: `${action.group} / ${action.detail}`,
+    metricLabel: "Last command result",
+    metricValue: `${recent.status} / ${availableLabel} / ${targetLabel}`,
+    nextCheck: `Rerun ${action.title} only if ${targetLabel} is still the next explicit move.`,
+    tone: action.disabled ? "warn" : recent.tone
+  };
+}
+
+function quickActionRecentResultTarget(action: QuickAction): string {
+  const detailTarget = action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean)[0];
+  return `target ${detailTarget ?? action.title}`;
 }
 
 function normalizeQuickActionPinnedIds(pinnedIds: string[], actions: QuickAction[]): string[] {
