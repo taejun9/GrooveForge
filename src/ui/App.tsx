@@ -20690,6 +20690,7 @@ function createQuickActions({
         masterAutomationReady && masterAutomationSuggestedPad ? "apply-suggested" : "aligned"
       } beginner producer`,
       disabled: !masterAutomationReady || !masterAutomationSuggestedPad,
+      resultTargetId: masterAutomationPreviewSummary.padId,
       run: () => {
         if (masterAutomationReady && masterAutomationSuggestedPad) {
           onApplyMasterAutomation(masterAutomationPreviewSummary.padId);
@@ -20709,6 +20710,7 @@ function createQuickActions({
       group: "Mix",
       keywords: `master automation current suggested fade lane fade in fade out intro outro realtime export wav stems ${masterAutomationPreviewSummary.padId} ${masterAutomationPreviewSummary.padLabel} beginner producer`,
       disabled: !masterAutomationReady || !masterAutomationSuggestedPad,
+      resultTargetId: masterAutomationPreviewSummary.padId,
       run: () => {
         if (masterAutomationReady && masterAutomationSuggestedPad) {
           onApplyMasterAutomation(masterAutomationPreviewSummary.padId);
@@ -20725,6 +20727,7 @@ function createQuickActions({
       group: "Mix",
       keywords: `master automation direct pad fade lane ${pad.id} ${pad.label} ${pad.detail} ${pad.preview} realtime export wav stems beginner producer`,
       disabled: pad.changedCount === 0,
+      resultTargetId: pad.id,
       run: () => {
         if (pad.changedCount > 0) {
           onApplyMasterAutomation(pad.id);
@@ -21628,6 +21631,144 @@ function masterAutomationQuickActionPosture(project: ProjectState): string {
   return `${masterAutomationPresetLabel(masterAutomationPresetForProject(project))} / ${masterAutomationEventCountLabel(
     project
   )} / ${barCountLabel(arrangementTotalBars(project))}`;
+}
+
+function quickActionMasterAutomationMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  actionPad: MasterAutomationPadDefinition | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "master-automation-decision" && action.id !== "master-automation" && !actionPad) {
+    return null;
+  }
+
+  const pad = quickActionMasterAutomationPadOption(action, actionPad);
+  if (!pad) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const targetProject = applyMasterAutomationPreset(project, pad.id);
+  const changedEvents = masterAutomationChangedCount(project, targetProject);
+  return {
+    id:
+      action.id === "master-automation-decision"
+        ? "master-automation-decision"
+        : action.id === "master-automation"
+          ? "master-automation"
+          : `master-automation-${pad.id}`,
+    label:
+      action.id === "master-automation-decision"
+        ? "Master Automation Decision"
+        : `${pad.label} Master Automation`,
+    value: quickActionMasterAutomationMetricValue(project, exportAnalysis, stemAnalyses, [
+      quickActionMasterAutomationActionLabel(action),
+      `target ${pad.label} / ${pad.detail}`,
+      `context ${quickActionMasterAutomationContextLabel(action)}`,
+      `current ${masterAutomationQuickActionPosture(project)}`,
+      `target ${masterAutomationPresetLabel(masterAutomationPresetForProject(targetProject))} / ${masterAutomationEventCountLabel(
+        targetProject
+      )} / ${masterAutomationRangeLabel(targetProject)}`,
+      `events ${changedEvents} automation event${changedEvents === 1 ? "" : "s"}`
+    ], quickActionMasterAutomationNextCheck(action, pad))
+  };
+}
+
+function quickActionMasterAutomationMetricValue(
+  project: ProjectState,
+  analysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses,
+  parts: string[],
+  nextCheck: string
+): string {
+  return [
+    ...parts,
+    ...quickActionMasterAutomationProjectMetricParts(project, stemAnalyses, analysis),
+    `next ${nextCheck}`
+  ].join(" / ");
+}
+
+function quickActionMasterAutomationProjectMetricParts(
+  project: ProjectState,
+  stemAnalyses: StemExportAnalyses,
+  analysis: ExportAnalysis
+): string[] {
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+
+  return [
+    `Pattern ${project.selectedPattern}`,
+    `${drumHitCount(pattern)} drum hits`,
+    `${pattern.bassNotes.length} 808`,
+    `${pattern.melodyNotes.length} Synth`,
+    `${pattern.chordEvents.length} chords`,
+    `${patternEventTotal(pattern)} editable events`,
+    patternUseLabel,
+    `${project.arrangement.length} blocks`,
+    barCountLabel(arrangementTotalBars(project)),
+    `export ${analysis.status} / H ${formatDb(analysis.headroomDb)}`,
+    `stems ${audibleStemCount}/${stemTrackIds.length} audible`,
+    `master ${masterFinishQuickActionPosture(project)}`
+  ];
+}
+
+function quickActionMasterAutomationPadOption(
+  action: QuickAction,
+  actionPad: MasterAutomationPadDefinition | null
+): MasterAutomationPadDefinition | null {
+  const targetId = quickActionMasterAutomationTargetId(action, actionPad);
+  return masterAutomationPadDefinitions.find((pad) => pad.id === targetId) ?? null;
+}
+
+function quickActionMasterAutomationTargetId(
+  action: QuickAction,
+  actionPad: MasterAutomationPadDefinition | null
+): MasterAutomationPadId {
+  if (isMasterAutomationPadId(action.resultTargetId)) {
+    return action.resultTargetId;
+  }
+  return actionPad?.id ?? suggestedMasterAutomationPad();
+}
+
+function isMasterAutomationPadId(value: string | undefined): value is MasterAutomationPadId {
+  return value === "none" || value === "fade_in" || value === "fade_out" || value === "intro_outro";
+}
+
+function quickActionMasterAutomationActionLabel(action: QuickAction): string {
+  if (action.id === "master-automation-decision") {
+    return "run master automation decision";
+  }
+  if (action.id === "master-automation") {
+    return "apply current master automation";
+  }
+  return "apply direct master automation";
+}
+
+function quickActionMasterAutomationContextLabel(action: QuickAction): string {
+  if (action.id === "master-automation-decision") {
+    return "decision";
+  }
+  if (action.id === "master-automation") {
+    return "current preview";
+  }
+  return "direct pad";
+}
+
+function quickActionMasterAutomationNextCheck(action: QuickAction, pad: MasterAutomationPadDefinition): string {
+  if (action.id === "master-automation-decision") {
+    return "play Song and inspect the visible Master Automation result before export";
+  }
+  if (pad.id === "none") {
+    return "play Song and confirm manual master level stays stable before export";
+  }
+  if (pad.id === "fade_out") {
+    return "play the final bar and export WAV/stems to confirm the fade renders";
+  }
+  return "play Song from the top and final bar, then export WAV/stems after the fade feels right";
 }
 
 function mixSnapshotQuickActionTarget(actionId: string): MixSnapshotQuickActionTarget | null {
@@ -25983,20 +26124,9 @@ function quickActionResultMetricSnapshot(
   }
 
   const masterAutomationPad = masterAutomationQuickActionPad(action.id);
-  if (action.id === "master-automation-decision") {
-    return {
-      id: "master-automation-decision",
-      label: "Master Automation Decision",
-      value: masterAutomationQuickActionPosture(project)
-    };
-  }
-
-  if (action.id === "master-automation" || masterAutomationPad) {
-    return {
-      id: masterAutomationPad ? `master-automation-${masterAutomationPad.id}` : "master-automation",
-      label: masterAutomationPad ? `${masterAutomationPad.label} Master Automation` : "Master Automation",
-      value: masterAutomationQuickActionPosture(project)
-    };
+  const masterAutomationMetric = quickActionMasterAutomationMetricSnapshot(project, action, masterAutomationPad, analysis ?? undefined);
+  if (masterAutomationMetric) {
+    return masterAutomationMetric;
   }
 
   const spaceFxMetric = quickActionSpaceFxMetricSnapshot(project, action, analysis ?? undefined);
