@@ -21675,6 +21675,124 @@ function directExportQuickActionReceiptLabel(
   return "No export receipt yet";
 }
 
+function quickActionHandoffNextExportMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "handoff-next-export") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const detailParts = quickActionHandoffNextExportDetailParts(action);
+  const targetItem = handoffNextExportTargetItem(handoffPackItems, sendOrder, receipt);
+  const targetId = targetItem?.id ?? receipt.itemId ?? sendOrder.nextItemId;
+  const directTarget = targetId ? handoffNextExportDirectTarget(targetId) : null;
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const deliverableLabel = targetId ? handoffExportReceiptItemLabel(targetId) : "No next deliverable";
+  const itemPosture = targetItem ? `${targetItem.value} / ${targetItem.detail}` : "Send order clear";
+  const statusLabel = receipt.itemId ? receipt.statusLabel : detailParts[0] ?? sendOrder.statusLabel;
+  const contextLabel = detailParts.slice(1).join(" / ") || itemPosture;
+  const fileLabel =
+    receipt.itemId && receipt.itemId === targetId
+      ? receipt.fileLabel
+      : directTarget
+        ? directExportQuickActionFileLabel(project, directTarget)
+        : "No file target";
+  const readinessLabel = directTarget
+    ? directExportQuickActionReadinessLabel(project, directTarget, exportAnalysis, stemAnalyses)
+    : "send order clear";
+
+  return {
+    id: "handoff-next-export",
+    label: "Handoff next export",
+    value: [
+      `action ${action.title}`,
+      "destination Deliver panel",
+      `current next ${sendOrder.nextLabel}`,
+      `deliverable ${deliverableLabel}`,
+      `status ${statusLabel}`,
+      `file ${fileLabel}`,
+      `context ${contextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      readinessLabel,
+      `sequence ${sendOrder.sequenceLabel}`,
+      `receipt ${handoffNextExportReceiptLabel(receipt, targetId)}`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `target ${activeDeliveryTarget(project).name}`,
+      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4`,
+      `next ${receipt.itemId ? receipt.nextLabel : sendOrder.nextLabel}`
+    ].join(" / ")
+  };
+}
+
+function quickActionHandoffNextExportDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function handoffNextExportTargetItem(
+  items: HandoffPackItem[],
+  sendOrder: HandoffPackSendOrderSummary,
+  receipt: HandoffExportReceipt
+): HandoffPackItem | null {
+  const targetId = receipt.itemId ?? sendOrder.nextItemId;
+  return targetId ? items.find((item) => item.id === targetId) ?? null : null;
+}
+
+function handoffNextExportDirectTarget(itemId: HandoffPackItem["id"]): DirectExportQuickActionTarget {
+  switch (itemId) {
+    case "wav":
+      return { id: "wav", label: "WAV Export", metricId: "handoff-next-wav" };
+    case "stems":
+      return { id: "stems", label: "Stem Export", metricId: "handoff-next-stems" };
+    case "midi":
+      return { id: "midi", label: "MIDI Export", metricId: "handoff-next-midi" };
+    case "sheet":
+      return { id: "sheet", label: "Handoff Sheet", metricId: "handoff-next-sheet" };
+  }
+}
+
+function handoffNextExportReceiptLabel(
+  receipt: HandoffExportReceipt,
+  targetId: HandoffPackItem["id"] | null
+): string {
+  if (receipt.itemId && receipt.itemId === targetId) {
+    return `${receipt.statusLabel} / ${receipt.fileLabel}`;
+  }
+
+  if (receipt.itemId) {
+    return `${receipt.statusLabel} ${handoffExportReceiptItemLabel(receipt.itemId)}`;
+  }
+
+  return "No export receipt yet";
+}
+
 function patternCompareDecisionQuickActionKind(action: QuickAction): PatternCompareDecisionSummary["action"] | null {
   if (action.id !== "pattern-compare-decision") {
     return null;
@@ -24417,6 +24535,16 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "handoff-next-export") {
     const exportAnalysis = analysis ?? analyzeExport(project);
+    const handoffNextExportMetric = quickActionHandoffNextExportMetricSnapshot(
+      project,
+      action,
+      handoffExportReceipt,
+      exportAnalysis
+    );
+    if (handoffNextExportMetric) {
+      return handoffNextExportMetric;
+    }
+
     const stemCount = audibleStemTracks(analyzeStemExports(project)).length;
     return {
       id: "handoff",
