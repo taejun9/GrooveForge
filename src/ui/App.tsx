@@ -1454,6 +1454,7 @@ export function App(): ReactElement {
   const [localDraftSavedAt, setLocalDraftSavedAt] = useState<string | null>(localDraftRecovery?.savedAt ?? null);
   const [localDraftWriteArmed, setLocalDraftWriteArmed] = useState(false);
   const projectRef = useRef<ProjectState>(starterProject);
+  const handoffExportReceiptRef = useRef<HandoffExportReceipt | null>(null);
   const tapTempoTimesRef = useRef<number[]>([]);
   const tapTempoCommitTimerRef = useRef<number | null>(null);
   const localDraftReadyRef = useRef(false);
@@ -6778,6 +6779,7 @@ export function App(): ReactElement {
   function recordHandoffExportReceipt(receipt: HandoffExportReceipt): void {
     setHandoffExportFormatResult(null);
     setHandoffPackageCheckResult(null);
+    handoffExportReceiptRef.current = receipt;
     setHandoffExportReceipt(receipt);
   }
 
@@ -7814,7 +7816,7 @@ export function App(): ReactElement {
             projectRef.current,
             "complete",
             selectedArrangementIndex,
-            handoffExportReceipt
+            handoffExportReceiptRef.current
           );
           setQuickActionResult(result);
           setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
@@ -7828,7 +7830,7 @@ export function App(): ReactElement {
             projectRef.current,
             "failed",
             selectedArrangementIndex,
-            handoffExportReceipt
+            handoffExportReceiptRef.current
           );
           setQuickActionResult(result);
           setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
@@ -7842,7 +7844,7 @@ export function App(): ReactElement {
         projectRef.current,
         "failed",
         selectedArrangementIndex,
-        handoffExportReceipt
+        handoffExportReceiptRef.current
       );
       setQuickActionResult(result);
       setQuickActionRecents((recents) => prependQuickActionRecent(recents, action, result));
@@ -21565,6 +21567,114 @@ function directExportQuickActionPosture(
   }
 }
 
+function quickActionDirectExportMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const target = directExportQuickActionTarget(action.id);
+  if (!target) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const handoffItem = handoffPackItems.find((item) => item.id === target.id) ?? null;
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const handoffItemLabel = handoffItem ? `${handoffItem.value} / ${handoffItem.detail}` : "handoff item unavailable";
+
+  return {
+    id: target.metricId,
+    label: target.label,
+    value: [
+      `action ${action.title}`,
+      "destination Deliver panel",
+      `deliverable ${handoffExportReceiptItemLabel(target.id)}`,
+      `file ${directExportQuickActionFileLabel(project, target)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      directExportQuickActionReadinessLabel(project, target, exportAnalysis, stemAnalyses),
+      `handoff ${handoffItemLabel}`,
+      `target ${activeDeliveryTarget(project).name}`,
+      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4`,
+      `receipt ${directExportQuickActionReceiptLabel(target, receipt)}`,
+      `next ${sendOrder.nextLabel}`,
+      `package ${packageSummary.headline}`
+    ].join(" / ")
+  };
+}
+
+function directExportQuickActionFileLabel(project: ProjectState, target: DirectExportQuickActionTarget): string {
+  switch (target.id) {
+    case "wav":
+      return mixWavFileName(project);
+    case "stems":
+      return `${stemWavFileNames(project).length} stem WAVs`;
+    case "midi":
+      return midiFileName(project);
+    case "sheet":
+      return handoffSheetFileName(project);
+  }
+}
+
+function directExportQuickActionReadinessLabel(
+  project: ProjectState,
+  target: DirectExportQuickActionTarget,
+  exportAnalysis: ExportAnalysis,
+  stemAnalyses: StemExportAnalyses
+): string {
+  switch (target.id) {
+    case "wav":
+      return `mix ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`;
+    case "stems": {
+      const audibleStems = audibleStemTracks(stemAnalyses);
+      const stemSpread = stemSpreadDb(stemAnalyses);
+      const spreadLabel = stemSpread === null ? "spread n/a" : `${stemSpread.toFixed(1)} dB spread`;
+      return `stems ${audibleStems.length}/${stemTrackIds.length} audible / ${spreadLabel}`;
+    }
+    case "midi":
+      return `midi ${barCountLabel(arrangementTotalBars(project))} / ${
+        usedPatternSlots(project).join("/") || project.selectedPattern
+      }`;
+    case "sheet":
+      return `sheet ${sessionBriefFilledFields(project.sessionBrief)}/4 brief / ${activeDeliveryTarget(project).name}`;
+  }
+}
+
+function directExportQuickActionReceiptLabel(
+  target: DirectExportQuickActionTarget,
+  receipt: HandoffExportReceipt
+): string {
+  if (receipt.itemId === target.id) {
+    return `${receipt.statusLabel} / ${receipt.fileLabel}`;
+  }
+
+  if (receipt.itemId) {
+    return `${receipt.statusLabel} ${handoffExportReceiptItemLabel(receipt.itemId)}`;
+  }
+
+  return "No export receipt yet";
+}
+
 function patternCompareDecisionQuickActionKind(action: QuickAction): PatternCompareDecisionSummary["action"] | null {
   if (action.id !== "pattern-compare-decision") {
     return null;
@@ -24288,6 +24398,16 @@ function quickActionResultMetricSnapshot(
   const directExportTarget = directExportQuickActionTarget(action.id);
   if (directExportTarget) {
     const exportAnalysis = analysis ?? analyzeExport(project);
+    const directExportMetric = quickActionDirectExportMetricSnapshot(
+      project,
+      action,
+      handoffExportReceipt,
+      exportAnalysis
+    );
+    if (directExportMetric) {
+      return directExportMetric;
+    }
+
     return {
       id: directExportTarget.metricId,
       label: directExportTarget.label,
