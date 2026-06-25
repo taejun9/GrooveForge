@@ -184,6 +184,8 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "project-file-result", command: "Project File Result", shortcut: "Result", target: "Save / open feedback" },
       { id: "restore-draft", command: "Restore Draft", shortcut: "Quick Actions / Readout", target: "Local recovery" },
       { id: "clear-draft", command: "Clear Draft", shortcut: "Quick Actions / Readout", target: "Local recovery" },
+      { id: "project-snapshots", command: "Project Snapshots", shortcut: "Quick Actions / Readout", target: "Local idea slots" },
+      { id: "snapshot-compare", command: "Snapshot Compare", shortcut: "Quick Actions / Readout", target: "Saved take comparison" },
       { id: "undo", command: "Undo", shortcut: "CmdOrCtrl+Z", target: "Edit history" },
       { id: "redo", command: "Redo", shortcut: "Shift+CmdOrCtrl+Z / CmdOrCtrl+Y", target: "Edit history" }
     ]
