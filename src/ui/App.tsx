@@ -21895,6 +21895,115 @@ function quickActionSessionBriefCompassLaneLabel(action: QuickAction, card: Sess
   return `${action.id === "session-brief-compass-focus" ? "active" : "direct"} ${card.label}`;
 }
 
+function quickActionReferenceAlignmentMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "reference-alignment-focus" && !action.id.startsWith("reference-alignment-card-")) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const checks = createBeatReadinessChecks(project, exportAnalysis);
+  const summary = createReferenceAlignmentSummary(project, checks, exportAnalysis, stemAnalyses);
+  const card = quickActionReferenceAlignmentCard(summary, action);
+  if (!card) {
+    return null;
+  }
+
+  const target = activeDeliveryTarget(project);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, null);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionReferenceAlignmentDetailParts(action);
+  const contextLabel = detailParts.slice(2).join(" / ") || card.detail || detailParts.join(" / ");
+  const audibleStems = audibleStemTracks(stemAnalyses);
+
+  return {
+    id: "reference-alignment",
+    label: "Reference alignment",
+    value: [
+      `action ${action.title}`,
+      `lane ${quickActionReferenceAlignmentLaneLabel(action, card)}`,
+      `destination ${referenceAlignmentDestinationLabel(card)}`,
+      `status ${card.value}`,
+      `context ${contextLabel}`,
+      `alignment ${summary.headline}`,
+      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4`,
+      `fields ${quickActionSessionBriefStarterFieldPosture(project.sessionBrief)}`,
+      `target ${target.name}`,
+      `target focus ${target.focus}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `stems ${audibleStems.length}/${target.stemGoal} audible`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `next ${card.nextCheck}`
+    ].join(" / ")
+  };
+}
+
+function quickActionReferenceAlignmentCard(
+  summary: ReferenceAlignmentSummary,
+  action: QuickAction
+): ReferenceAlignmentCard | null {
+  if (action.id === "reference-alignment-focus") {
+    return activeReferenceAlignmentQuickActionCard(summary);
+  }
+
+  const cardId = quickActionReferenceAlignmentCardId(action.id);
+  if (!cardId) {
+    return null;
+  }
+
+  return summary.cards.find((card) => card.id === cardId) ?? null;
+}
+
+function quickActionReferenceAlignmentCardId(actionId: string): ReferenceAlignmentCardId | null {
+  if (!actionId.startsWith("reference-alignment-card-")) {
+    return null;
+  }
+
+  return actionId.slice("reference-alignment-card-".length) as ReferenceAlignmentCardId;
+}
+
+function quickActionReferenceAlignmentDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function quickActionReferenceAlignmentLaneLabel(action: QuickAction, card: ReferenceAlignmentCard): string {
+  return `${action.id === "reference-alignment-focus" ? "active" : "direct"} ${card.label}`;
+}
+
+function referenceAlignmentDestinationLabel(card: ReferenceAlignmentCard): string {
+  switch (card.focusTarget) {
+    case "artist":
+      return "Session Brief / Artist field";
+    case "vibe":
+      return "Session Brief / Vibe field";
+    case "reference":
+      return "Session Brief / Reference field";
+    case "notes":
+      return "Session Brief / Notes field";
+    case "arrange":
+      return "Arrange panel";
+    case "master":
+      return "Master panel";
+    case "deliver":
+      return "Deliver panel";
+  }
+}
+
 function quickActionSessionBriefStarterMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -24068,6 +24177,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id === "reference-alignment-focus") {
+    const referenceAlignmentMetric = quickActionReferenceAlignmentMetricSnapshot(project, action, analysis ?? undefined);
+    if (referenceAlignmentMetric) {
+      return referenceAlignmentMetric;
+    }
+
     return {
       id: "reference-alignment",
       label: "Reference alignment",
@@ -24076,6 +24190,11 @@ function quickActionResultMetricSnapshot(
   }
 
   if (action.id.startsWith("reference-alignment-card-")) {
+    const referenceAlignmentMetric = quickActionReferenceAlignmentMetricSnapshot(project, action, analysis ?? undefined);
+    if (referenceAlignmentMetric) {
+      return referenceAlignmentMetric;
+    }
+
     return {
       id: "reference-alignment",
       label: "Reference alignment",
