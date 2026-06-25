@@ -25136,6 +25136,10 @@ function quickActionResultMetricSnapshot(
   const nextMoveAction = nextMoveQuickActionForProject(project, action);
   if (nextMoveAction) {
     const source = nextMoveQuickActionSource(action.id);
+    if (source === "beat-map") {
+      return quickActionBeatMapMetricSnapshot(project, action, nextMoveAction);
+    }
+
     const metric = nextMoveResultMetricSnapshot(project, nextMoveAction);
     return {
       id: `${source ?? "next-move"}-${metric.id}`,
@@ -29350,6 +29354,107 @@ function createNextMoveResult(
     nextCheck: followup.nextCheck,
     tone: changed ? "good" : action.tone
   };
+}
+
+function quickActionBeatMapMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  nextMoveAction: NextMoveAction
+): { id: string; label: string; value: string } {
+  const analysis = analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const checks = createBeatReadinessChecks(project, analysis);
+  const summary = createBeatMapSummary(project, checks, analysis, stemAnalyses);
+  const stage = beatMapStageForNextMoveAction(summary, nextMoveAction);
+  const target = activeDeliveryTarget(project);
+  const packageSummary = createHandoffPackageCheckSummary(project, analysis, stemAnalyses, null);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const stageReadyCount = summary.stages.filter((candidate) => candidate.tone === "good").length;
+  const stageReviewCount = summary.stages.filter((candidate) => candidate.tone === "warn").length;
+  const stageBlockerCount = summary.stages.filter((candidate) => candidate.tone === "danger").length;
+  const followup = nextMoveResultFollowup(nextMoveAction, project);
+
+  return {
+    id: "beat-map-result",
+    label: "Beat Map result",
+    value: [
+      `action ${action.title}`,
+      "destination Guide / Beat Map",
+      `stage ${stage.label} / ${stage.status} / ${stage.detail}`,
+      `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
+      `completion ${summary.headline} / ${stageReadyCount}/${summary.stages.length} stages ready / ${workflowCountLabel(
+        stageReviewCount,
+        "review"
+      )} / ${workflowCountLabel(stageBlockerCount, "blocker")}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${analysis.status} / H ${formatDb(analysis.headroomDb)}`,
+      `stems ${audibleStemCount}/${target.stemGoal} target`,
+      `package ${packageSummary.headline}`,
+      `route ${beatMapRouteLabel(nextMoveAction)}`,
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
+function beatMapStageForNextMoveAction(summary: BeatMapSummary, action: NextMoveAction): BeatMapStage {
+  const stageId = beatMapStageIdForNextMoveAction(action);
+  return (
+    summary.stages.find((candidate) => candidate.id === stageId) ??
+    summary.stages.find((candidate) => candidate.tone !== "good") ??
+    summary.stages[summary.stages.length - 1]
+  );
+}
+
+function beatMapStageIdForNextMoveAction(action: NextMoveAction): string {
+  switch (action.command.kind) {
+    case "blueprint":
+    case "patternFill":
+      return "compose";
+    case "arrangementMove":
+    case "patternChain":
+    case "chainExpand":
+    case "arrangementTemplate":
+      return "arrange";
+    case "deliveryTarget":
+      return "start";
+    case "masterFinish":
+    case "reviewMix":
+      return "polish";
+    case "snapshot":
+      return "deliver";
+  }
+}
+
+function beatMapRouteLabel(action: NextMoveAction): string {
+  switch (action.command.kind) {
+    case "blueprint":
+      return "Create / Beat Blueprint";
+    case "patternFill":
+      return "Create / Pattern Fill";
+    case "arrangementMove":
+      return "Arrange / Arrangement Move";
+    case "patternChain":
+      return "Arrange / Pattern Chain";
+    case "chainExpand":
+      return "Arrange / Chain Expand";
+    case "arrangementTemplate":
+      return "Arrange / Arrangement Template";
+    case "deliveryTarget":
+      return "Deliver / Delivery Target Align";
+    case "masterFinish":
+      return "Master / Master Finish";
+    case "snapshot":
+      return "Project / Save Snapshot";
+    case "reviewMix":
+      return "Mix / Mix Coach";
+  }
 }
 
 function nextMoveResultMetricSnapshot(
