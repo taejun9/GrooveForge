@@ -8013,7 +8013,7 @@ export function App(): ReactElement {
     onSelectPattern: selectPattern,
     onSelectStyle: selectStyle,
     onSwitchMode: switchProjectMode,
-    onUsePatternInSelectedBlock: usePatternInSelectedBlock,
+    onUsePatternInSelectedBlock: usePatternInSelectedBlockFromCompare,
     onSetKeyboardCaptureEnabled: setKeyboardCaptureEnabled,
     onSetKeyboardCaptureStepMode: setKeyboardCaptureStepMode,
     onSetKeyboardCaptureTarget: setKeyboardCaptureTarget,
