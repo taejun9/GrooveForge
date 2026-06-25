@@ -29761,6 +29761,50 @@ function nextMoveResultMetricSnapshot(
   project: ProjectState,
   action: NextMoveAction
 ): { id: string; label: string; value: string } {
+  const metric = nextMoveActionPostureMetricSnapshot(project, action);
+  const analysis = analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const checks = createBeatReadinessChecks(project, analysis);
+  const target = activeDeliveryTarget(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const readyCount = checks.filter((check) => check.tone === "good").length;
+  const reviewCount = checks.filter((check) => check.tone === "warn").length;
+  const blockerCount = checks.filter((check) => check.tone === "danger").length;
+  const followup = nextMoveResultFollowup(action, project);
+
+  return {
+    id: metric.id,
+    label: metric.label,
+    value: [
+      `action ${action.buttonLabel}`,
+      `command ${action.title}`,
+      `detail ${action.detail}`,
+      `route ${nextMoveRouteLabel(action)}`,
+      `posture ${metric.value}`,
+      `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
+      `readiness ${readyCount}/${checks.length} ready / ${workflowCountLabel(reviewCount, "review")} / ${workflowCountLabel(
+        blockerCount,
+        "blocker"
+      )}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${analysis.status} / H ${formatDb(analysis.headroomDb)}`,
+      `stems ${audibleStemCount}/${target.stemGoal} target`,
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
+function nextMoveActionPostureMetricSnapshot(
+  project: ProjectState,
+  action: NextMoveAction
+): { id: string; label: string; value: string } {
   switch (action.command.kind) {
     case "blueprint":
       return { id: "project-events", label: "Project events", value: `${projectEventTotal(project)} events` };
@@ -29795,6 +29839,10 @@ function nextMoveResultMetricSnapshot(
       return { id: "export", label: "Export", value: `${analysis.status} / ${formatDb(analysis.headroomDb)}` };
     }
   }
+}
+
+function nextMoveRouteLabel(action: NextMoveAction): string {
+  return beatMapRouteLabel(action);
 }
 
 function nextMoveResultFollowup(
