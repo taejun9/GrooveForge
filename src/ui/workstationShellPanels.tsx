@@ -241,7 +241,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "chord-move", command: "Chord Move", shortcut: "Quick Actions / Readout", target: "Pads / rhythm / voicing" },
       { id: "selected-event-tools", command: "Selected Event Tools", shortcut: "Quick Actions / Readout", target: "Drum / note / chord edits" },
       { id: "pattern-playback-readout", command: "Pattern Playback Readout", shortcut: "Quick Actions / Readout", target: "Edit vs heard Pattern" },
-      { id: "audible-pattern-follow", command: "Audible Pattern Follow", shortcut: "Quick Actions", target: "Heard Pattern" }
+      { id: "audible-pattern-follow", command: "Audible Pattern Follow", shortcut: "Quick Actions / Readout", target: "Heard Pattern" }
     ]
   },
   {
