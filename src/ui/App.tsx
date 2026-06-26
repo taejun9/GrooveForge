@@ -13145,6 +13145,7 @@ function ComposerGuide({
         <div className="composer-guide-focus-meta" data-testid="composer-guide-focus-meta">
           <span data-testid="composer-guide-focus-destination">{focusSummary.destinationLabel}</span>
           <small data-testid="composer-guide-focus-metric">{focusSummary.metricLabel}</small>
+          <small data-testid="composer-guide-focus-audition">{focusSummary.auditionCueLabel}</small>
           <small data-testid="composer-guide-focus-next-check">{focusSummary.nextCheckLabel}</small>
         </div>
         <button
@@ -35741,6 +35742,7 @@ function createComposerGuideFocusSummary(
       detailLabel: "No Composer Guide cards available",
       destinationLabel: "No target",
       metricLabel: "0/0 ready",
+      auditionCueLabel: "Audition unavailable",
       nextCheckLabel: "Guide card unavailable",
       detailTitle: "Composer Guide has no cards to focus.",
       tone: "good"
@@ -35751,6 +35753,7 @@ function createComposerGuideFocusSummary(
   const detailLabel = `${card.focusLabel} panel / ${card.detail}`;
   const destinationLabel = `${card.focusLabel} panel`;
   const metricLabel = composerGuideFocusResultMetric(summary);
+  const auditionCueLabel = composerGuideFocusResultAudition(card);
   const nextCheckLabel = composerGuideFocusResultNextCheck(card);
 
   return {
@@ -35760,8 +35763,9 @@ function createComposerGuideFocusSummary(
     detailLabel,
     destinationLabel,
     metricLabel,
+    auditionCueLabel,
     nextCheckLabel,
-    detailTitle: `${statusLabel} / ${card.label}: ${card.status} / ${detailLabel} / Guide metric: ${metricLabel} / Next check: ${nextCheckLabel}`,
+    detailTitle: `${statusLabel} / ${card.label}: ${card.status} / ${detailLabel} / Guide metric: ${metricLabel} / Audition: ${auditionCueLabel} / Next check: ${nextCheckLabel}`,
     tone: card.tone
   };
 }
