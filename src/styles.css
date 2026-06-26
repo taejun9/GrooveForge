@@ -4477,7 +4477,7 @@ h2 {
 .composer-guide-focus-readout {
   display: grid;
   grid-column: 2;
-  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr) minmax(0, 1.28fr);
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr) minmax(0, 1.28fr) minmax(96px, 0.5fr);
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -4513,6 +4513,45 @@ h2 {
 .composer-guide-focus-readout strong {
   color: #f4efe7;
   font-size: 12px;
+}
+
+.composer-guide-focus-readout button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 28px;
+  border: 1px solid rgba(175, 138, 255, 0.26);
+  border-radius: 6px;
+  background: rgba(175, 138, 255, 0.1);
+  color: #f4efe7;
+  padding: 5px 7px;
+}
+
+.composer-guide-focus-readout button:hover:not(:disabled) {
+  border-color: rgba(175, 138, 255, 0.42);
+  background: rgba(175, 138, 255, 0.15);
+}
+
+.composer-guide-focus-readout button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.composer-guide-focus-readout button svg {
+  flex: 0 0 auto;
+  color: currentColor;
+}
+
+.composer-guide-focus-readout button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #f4efe7;
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .composer-guide-grid {
