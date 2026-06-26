@@ -759,13 +759,62 @@ const commandReferenceSections: CommandReferenceSection[] = [
     id: "arrange-fast-path",
     title: "Arrange",
     items: [
-      { id: "pattern-chain", command: "Pattern Chain", shortcut: "Quick Actions / Readout", target: "8-bar sketch" },
-      { id: "chain-expand", command: "Chain Expand", shortcut: "Quick Actions / Readout", target: "16-bar outline" },
-      { id: "arrangement-template", command: "Arrangement Template", shortcut: "Quick Actions / Readout", target: "Song form" },
-      { id: "arrangement-arc", command: "Arrangement Arc", shortcut: "Quick Actions / Readout", target: "Energy shape" },
-      { id: "arrangement-focus", command: "Arrangement Focus", shortcut: "Quick Actions / Readout", target: "Selected block" },
-      { id: "arrangement-move", command: "Arrangement Move", shortcut: "Quick Actions / Readout", target: "Drop / build / hook lift" },
-      { id: "section-locator", command: "Section Locator", shortcut: "Quick Actions / Readout", target: "Intro / verse / hook" },
+      {
+        id: "pattern-chain",
+        command: "Pattern Chain",
+        shortcut: "Quick Actions / Readout",
+        target: "8-bar sketch",
+        context:
+          "Pattern Chain Preview, Preview Decision Readout, Priority Readout, Direct Pattern Chain Commands, Pattern A/B/C Sequence, Chain Expand Access, Result Feedback, Audition Cue, and Next Chain Check context before Pattern Chain commands run."
+      },
+      {
+        id: "chain-expand",
+        command: "Chain Expand",
+        shortcut: "Quick Actions / Readout",
+        target: "16-bar outline",
+        context:
+          "Pattern Chain Preview Expand Target, 16-Bar Song-Form Outline, Priority Readout Context, Quick Actions Chain Expand Command, Before/After Arrangement Sequence, Pattern Chain Result Feedback, Audition Cue, and Next Expand Check context before Chain Expand commands run."
+      },
+      {
+        id: "arrangement-template",
+        command: "Arrangement Template",
+        shortcut: "Quick Actions / Readout",
+        target: "Song form",
+        context:
+          "Arrangement Template Preview, Preview Decision Readout, Priority Readout, Current/Direct Template Commands, Section Flow Before/After, Result Feedback, Audition Cue, and Next Template Check context before Arrangement Template commands run."
+      },
+      {
+        id: "arrangement-arc",
+        command: "Arrangement Arc",
+        shortcut: "Quick Actions / Readout",
+        target: "Energy shape",
+        context:
+          "Arrangement Arc Preview, Preview Decision Readout, Priority Readout, Current/Direct Arc Commands, Section Energy Before/After, Result Feedback, Audition Cue, and Next Arc Check context before Arrangement Arc commands run."
+      },
+      {
+        id: "arrangement-focus",
+        command: "Arrangement Focus",
+        shortcut: "Quick Actions / Readout",
+        target: "Selected block",
+        context:
+          "Arrangement Focus Preview, Preview Decision Readout, Priority Readout, Current/Direct Focus Commands, Selected-Block Before/After, Result Feedback, Audition Cue, and Next Focus Check context before Arrangement Focus commands run."
+      },
+      {
+        id: "arrangement-move",
+        command: "Arrangement Move",
+        shortcut: "Quick Actions / Readout",
+        target: "Drop / build / hook lift",
+        context:
+          "Arrangement Move Preview Decision Readout, Priority Readout, Current Drop/Build/Hook Lift Move, Selected-Block Energy/Mute Before/After, Result Feedback, Audition Cue, and Next Move Check context before Arrangement Move commands run."
+      },
+      {
+        id: "section-locator",
+        command: "Section Locator",
+        shortcut: "Quick Actions / Readout",
+        target: "Intro / verse / hook",
+        context:
+          "Section Locator Cue Decision Readout, Priority Readout, Direct Intro/Verse/Hook/Bridge/Outro Cue Commands, Arrangement Block Cue Feedback, Section Cue Result, Audition Cue, and Next Section Check context before Section Locator commands run."
+      },
       {
         id: "song-form-overview",
         command: "Song Form Overview",
