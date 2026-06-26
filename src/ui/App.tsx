@@ -277,6 +277,7 @@ import type {
   QuickActionScopeId,
   QuickActionScopeOption,
   QuickActionScopeResult,
+  QuickActionSearchResult,
   QuickActionSpotlightSummary,
   QuickActionResultMetric,
   QuickActionResult,
@@ -1341,6 +1342,7 @@ export function App(): ReactElement {
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [commandReferenceOpen, setCommandReferenceOpen] = useState(false);
   const [quickActionQuery, setQuickActionQuery] = useState("");
+  const [quickActionSearchResult, setQuickActionSearchResult] = useState<QuickActionSearchResult | null>(null);
   const [quickActionScope, setQuickActionScope] = useState<QuickActionScopeId>("all");
   const [quickActionScopeResult, setQuickActionScopeResult] = useState<QuickActionScopeResult | null>(null);
   const [quickActionRecents, setQuickActionRecents] = useState<QuickActionRecent[]>([]);
@@ -7789,6 +7791,7 @@ export function App(): ReactElement {
   function openQuickActions(): void {
     setCommandReferenceOpen(false);
     setQuickActionQuery("");
+    setQuickActionSearchResult(null);
     setQuickActionScope("all");
     setQuickActionScopeResult(null);
     setQuickActionsOpen(true);
@@ -7797,6 +7800,7 @@ export function App(): ReactElement {
   function closeQuickActions(): void {
     setQuickActionsOpen(false);
     setQuickActionQuery("");
+    setQuickActionSearchResult(null);
     setQuickActionScopeResult(null);
   }
 
@@ -7915,9 +7919,17 @@ export function App(): ReactElement {
     }
   }
 
+  function updateQuickActionQuery(query: string): void {
+    setQuickActionQuery(query);
+    setQuickActionSearchResult(createQuickActionSearchResult(query, quickActionScope, quickActions));
+  }
+
   function selectQuickActionScope(scopeId: QuickActionScopeId): void {
     setQuickActionScope(scopeId);
     setQuickActionScopeResult(createQuickActionScopeResult(scopeId, quickActions, quickActionQuery));
+    if (quickActionSearchResult) {
+      setQuickActionSearchResult(createQuickActionSearchResult(quickActionQuery, scopeId, quickActions));
+    }
   }
 
   function checkProjectSafetyReadout(): void {
@@ -8466,11 +8478,12 @@ export function App(): ReactElement {
         recentActionSource={quickActions}
         recentResult={quickActionRecentResult}
         recents={quickActionRecents}
+        searchResult={quickActionSearchResult}
         scope={quickActionScope}
         scopeResult={quickActionScopeResult}
         scopeOptions={quickActionScopeOptions}
         onClose={closeQuickActions}
-        onQueryChange={setQuickActionQuery}
+        onQueryChange={updateQuickActionQuery}
         onRun={runQuickAction}
         onInspectPinnedAction={inspectQuickActionPin}
         onInspectRecentAction={inspectQuickActionRecent}
@@ -21196,6 +21209,37 @@ function createQuickActionScopeResult(
 
 function quickActionScopeLabel(scope: QuickActionScopeId): string {
   return quickActionScopeDefinitions.find((definition) => definition.id === scope)?.label ?? scope;
+}
+
+function createQuickActionSearchResult(
+  query: string,
+  scope: QuickActionScopeId,
+  actions: QuickAction[]
+): QuickActionSearchResult {
+  const trimmedQuery = query.trim();
+  const scopeOptions = createQuickActionScopeOptions(actions, query);
+  const scopeOption = scopeOptions.find((candidate) => candidate.id === scope);
+  const filteredActions = filterQuickActions(actions, query, scope);
+  const firstRunnableAction = filteredActions.find((action) => !action.disabled);
+  const scopeLabel = scopeOption?.label ?? quickActionScopeLabel(scope);
+  const matchingCount = scopeOption?.count ?? 0;
+  const queryLabel = trimmedQuery ? `"${trimmedQuery}"` : "empty search";
+  const status = trimmedQuery ? "Search updated" : "Search cleared";
+
+  return {
+    query: trimmedQuery,
+    status,
+    title: trimmedQuery ? `Search ${queryLabel}` : "Search cleared",
+    detail: `${scopeLabel} scope / ${filteredActions.length} shown / ${matchingCount} matching`,
+    metricLabel: "Enter target",
+    metricValue: firstRunnableAction ? `${firstRunnableAction.group} / ${firstRunnableAction.title}` : "No runnable command",
+    nextCheck: firstRunnableAction
+      ? `Press Enter or click ${firstRunnableAction.title} only if it is the next explicit move.`
+      : trimmedQuery
+        ? "Edit the search or switch scope before running a command."
+        : "Type a command term or use Scope Filters before running a command.",
+    tone: firstRunnableAction ? "good" : "warn"
+  };
 }
 
 function createQuickActionSpotlightSummary(
