@@ -470,7 +470,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Project key / event retarget",
         context:
-          "Project Key, Key Options, Pattern A/B/C Event Retarget, Before/After Result, Edit Pattern, Audition Cue, and Next Key Check context before Key Retarget commands run."
+          "Key Retarget Readout Command, Project Key, Key Options, Key Target Metric, Pattern A/B/C Event Retarget, Before/After Result, Edit Pattern, Audition Cue, and Next Key Check context before Key Retarget commands run."
       },
       {
         id: "style-quick-picks",
