@@ -13950,6 +13950,15 @@ function BeatSpine({
   onApply: (action: BeatSpineAction) => void;
   onJump: (card: BeatSpineCard) => void;
 }): ReactElement {
+  const decisionCard = summary.cards.find((card) => card.id === summary.nextCardId) ?? summary.cards[0] ?? null;
+  const decisionAction = decisionCard?.action ?? null;
+  const decisionActionLabel = decisionAction ? decisionAction.label : decisionCard ? `Jump ${decisionCard.focusLabel}` : "No action";
+  const decisionActionTitle = decisionAction
+    ? `${decisionAction.label}: ${decisionAction.detail}`
+    : decisionCard
+      ? `Jump to ${decisionCard.focusLabel}: ${decisionCard.detail}`
+      : "No Beat Spine decision action available.";
+
   return (
     <section className={`beat-spine ${summary.tone}`} data-testid="beat-spine" aria-label="Beat spine">
       <div className="beat-spine-heading">
@@ -13974,6 +13983,25 @@ function BeatSpine({
         <span data-testid="beat-spine-decision-status">{summary.decisionStatus}</span>
         <strong data-testid="beat-spine-decision-label">{summary.decisionLabel}</strong>
         <small data-testid="beat-spine-decision-detail">{summary.decisionDetail}</small>
+        <button
+          data-testid="beat-spine-decision-action"
+          disabled={!decisionCard}
+          onClick={() => {
+            if (!decisionCard) {
+              return;
+            }
+            if (decisionAction) {
+              onApply(decisionAction);
+              return;
+            }
+            onJump(decisionCard);
+          }}
+          title={decisionActionTitle}
+          type="button"
+        >
+          {decisionAction ? <Sparkles size={12} aria-hidden="true" /> : <ArrowRight size={12} aria-hidden="true" />}
+          <span data-testid="beat-spine-decision-action-label">{decisionActionLabel}</span>
+        </button>
       </div>
       <div className="beat-spine-grid" data-testid="beat-spine-grid">
         {summary.cards.map((card) => {
