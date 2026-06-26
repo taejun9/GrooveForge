@@ -295,7 +295,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Scale, Cadence, Chords, 808/Bass, Melody, and Selected Note/Chord harmony context with destination, key metric, audition cue, and next check before Key Compass commands run."
       },
-      { id: "groove-compass", command: "Groove Compass", shortcut: "Quick Actions / Readout", target: "Pocket / timing / anchors" },
+      {
+        id: "groove-compass",
+        command: "Groove Compass",
+        shortcut: "Quick Actions / Readout",
+        target: "Density / anchors / hats / timing / chance / pocket / selected drum",
+        context:
+          "Density, Anchors, Hat Motion, Timing, Chance, Pocket Balance, and Selected Drum context with destination, groove metric, audition cue, cue action, and next check before Groove Compass commands run."
+      },
       {
         id: "listening-pass",
         command: "Listening Pass",
