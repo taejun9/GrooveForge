@@ -941,12 +941,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Section Locator Cue Decision Readout, Priority Readout, Direct Intro/Verse/Hook/Bridge/Outro Cue Commands, Arrangement Block Cue Feedback, Section Cue Result, Audition Cue, and Next Section Check context before Section Locator commands run."
       },
       {
-        id: "song-form-overview",
-        command: "Song Form Overview",
+        id: "song-form-overview-readout",
+        command: "Song Form Overview Readout",
         shortcut: "Quick Actions / Readout",
-        target: "Section flow / Pattern A/B/C / energy / mutes / transitions",
+        target: "Current song-form priority preview",
         context:
-          "Section Flow, Pattern A/B/C Usage, Bar Ranges, Energy, Muted Tracks, Transition Posture, Priority Action, Action Route, Audition Cue, and Next Check context before Song Form Overview commands run."
+          "Song Form Overview Readout Action, Section Flow, Pattern A/B/C Usage, Bar Ranges, Energy, Muted Tracks, Transition Posture, Priority Metric, Target Block, Selected Pattern, Editable Event Count, Audition Cue, and Next Song-Form Check context before Song Form Priority commands run."
+      },
+      {
+        id: "song-form-priority",
+        command: "Song Form Priority",
+        shortcut: "Quick Actions / Readout",
+        target: "Current priority block",
+        context:
+          "Song Form Priority command, Section Flow, Pattern A/B/C Usage, Bar Ranges, Energy, Muted Tracks, Transition Posture, Priority Action, Action Route, Audition Cue, and Next Check context before Song Form Priority commands run."
       },
       {
         id: "arrangement-mute-map",

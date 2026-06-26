@@ -1191,6 +1191,7 @@ export function createQuickActions({
   onFocusArrangementFocusReadout,
   onFocusArrangementMoveReadout,
   onFocusArrangementTemplateReadout,
+  onFocusSongFormOverviewReadout,
   onCueArrangementTransition,
   onCueHookLoop,
   onCueToplineLoop,
@@ -1512,6 +1513,7 @@ export function createQuickActions({
   onFocusArrangementFocusReadout: () => void;
   onFocusArrangementMoveReadout: () => void;
   onFocusArrangementTemplateReadout: () => void;
+  onFocusSongFormOverviewReadout: () => void;
   onCueArrangementTransition: (transition: ArrangementTransitionMapTransition) => void;
   onCueHookLoop: (card?: HookReadinessFocusItem) => void;
   onCueToplineLoop: (card?: ToplineSpaceFocusItem) => void;
@@ -1861,6 +1863,19 @@ export function createQuickActions({
     onRunNextMove
   );
   const songFormPrioritySummary = createSongFormPrioritySummary(songFormOverviewSummary);
+  const songFormOverviewReadoutAction: QuickAction = {
+    id: "song-form-overview-readout-action",
+    title:
+      songFormPrioritySummary.targetIndex === null
+        ? "Review Song Form Overview"
+        : `Review Song Form Overview: ${songFormPrioritySummary.targetLabel}`,
+    detail: `${songFormPrioritySummary.statusLabel} / ${songFormPrioritySummary.metricLabel} / ${songFormPrioritySummary.reasonLabel} / ${songFormPrioritySummary.nextCheckLabel}`,
+    group: "Arrange",
+    keywords: `Quick Actions Song Form Overview Readout review full song form section flow pattern usage priority metric block bar range energy mute transition arrangement ${
+      songFormPrioritySummary.metricId ?? "none"
+    } ${songFormPrioritySummary.targetLabel} ${songFormPrioritySummary.statusLabel} beginner producer`,
+    run: onFocusSongFormOverviewReadout
+  };
   const songFormPriorityAction: QuickAction = {
     id: "song-form-priority",
     title:
@@ -4642,6 +4657,7 @@ export function createQuickActions({
       run: () => onApplyPatternFill("clear_tail")
     },
     ...arrangementBlockJumpActions,
+    songFormOverviewReadoutAction,
     songFormPriorityAction,
     ...structureLensCommandActions,
     arrangementPlaybackReadoutAction,
@@ -6097,6 +6113,7 @@ export function createQuickActionResult(
     action.id === "handoff-export-receipt-focus" ||
     action.id === "handoff-export-format-focus" ||
     action.id.startsWith("handoff-export-format-") ||
+    action.id === "song-form-overview-readout-action" ||
     action.id === "song-form-priority" ||
     action.id.startsWith("arrangement-block-cue-") ||
     action.id.startsWith("arrangement-block-jump-") ||
@@ -9418,14 +9435,35 @@ export function quickActionSongFormPriorityMetricSnapshot(
   selectedArrangementIndex = 0,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
-  if (action.id !== "song-form-priority") {
+  if (action.id !== "song-form-priority" && action.id !== "song-form-overview-readout-action") {
     return null;
   }
 
+  const isReadout = action.id === "song-form-overview-readout-action";
   const summary = createSongFormOverviewSummary(project, selectedArrangementIndex);
   const priority = createSongFormPrioritySummary(summary);
   if (priority.targetIndex === null) {
-    return null;
+    const pattern = activePattern(project);
+    const usedSlots = usedPatternSlots(project);
+
+    return {
+      id: "song-form-overview-readout",
+      label: "Song Form Overview Readout",
+      value: [
+        "review song form overview",
+        "destination Arrange panel",
+        `metric ${priority.metricLabel}`,
+        `status ${priority.statusLabel}`,
+        `context ${priority.reasonLabel}`,
+        `edit Pattern ${project.selectedPattern}`,
+        `${patternEventTotal(pattern)} editable events`,
+        `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+        `${project.arrangement.length} blocks`,
+        barCountLabel(arrangementTotalBars(project)),
+        `song form ${quickActionSongFormPriorityPosture(summary)}`,
+        `next ${priority.nextCheckLabel}`
+      ].join(" / ")
+    };
   }
 
   const target = summary.segments.find((segment) => segment.index === priority.targetIndex) ?? null;
@@ -9443,10 +9481,10 @@ export function quickActionSongFormPriorityMetricSnapshot(
   const contextLabel = detailParts.join(" / ") || priority.reasonLabel;
 
   return {
-    id: "song-form-priority",
-    label: "Song Form Priority",
+    id: isReadout ? "song-form-overview-readout" : "song-form-priority",
+    label: isReadout ? "Song Form Overview Readout" : "Song Form Priority",
     value: [
-      "open priority song form",
+      isReadout ? "review song form overview" : "open priority song form",
       "destination Arrange panel",
       `metric ${quickActionSongFormPriorityMetricLabel(priority, metric)}`,
       `status ${priority.statusLabel}`,
@@ -9493,8 +9531,8 @@ export function quickActionSongFormPriorityTargetLabel(
   priority: SongFormPrioritySummary,
   segment: SongFormSegment
 ): string {
-  const titleLabel = action.title.replace(/^Open Song Form Priority:\s*/, "").trim();
-  return titleLabel && titleLabel !== "Open Song Form Priority"
+  const titleLabel = action.title.replace(/^(Open Song Form Priority|Review Song Form Overview):\s*/, "").trim();
+  return titleLabel && titleLabel !== "Open Song Form Priority" && titleLabel !== "Review Song Form Overview"
     ? titleLabel
     : `${priority.targetLabel} ${segment.section}`;
 }
@@ -12872,7 +12910,7 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
-  if (action.id === "song-form-priority") {
+  if (action.id === "song-form-overview-readout-action" || action.id === "song-form-priority") {
     const songFormMetric = quickActionSongFormPriorityMetricSnapshot(
       project,
       action,
@@ -12883,7 +12921,9 @@ export function quickActionResultMetricSnapshot(
       return songFormMetric;
     }
 
-    return { id: "song-form-priority", label: "Song Form Priority", value: action.detail };
+    return action.id === "song-form-overview-readout-action"
+      ? { id: "song-form-overview-readout", label: "Song Form Overview Readout", value: action.detail }
+      : { id: "song-form-priority", label: "Song Form Priority", value: action.detail };
   }
 
   if (action.id === "section-locator-decision" || action.id.startsWith("section-locator-")) {
@@ -16370,6 +16410,13 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Play Block loop; hear the cued ${section} block against its assigned Pattern before changing the arrangement.`,
       nextCheck: "Use Song Form Overview, Arrangement Playback Readout, or Arrangement Focus before editing nearby blocks."
+    };
+  }
+
+  if (action.id === "song-form-overview-readout-action") {
+    return {
+      auditionCue: "Review Song Form Overview before changing section order, Pattern A/B/C assignments, energy, or muted-track posture.",
+      nextCheck: "Open Song Form Priority only after the readout target is the block you want to inspect."
     };
   }
 
