@@ -458,7 +458,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "arrangement-focus", command: "Arrangement Focus", shortcut: "Quick Actions / Readout", target: "Selected block" },
       { id: "arrangement-move", command: "Arrangement Move", shortcut: "Quick Actions / Readout", target: "Drop / build / hook lift" },
       { id: "section-locator", command: "Section Locator", shortcut: "Quick Actions / Readout", target: "Intro / verse / hook" },
-      { id: "song-form-overview", command: "Song Form Overview", shortcut: "Quick Actions / Readout", target: "Sections / patterns" },
+      {
+        id: "song-form-overview",
+        command: "Song Form Overview",
+        shortcut: "Quick Actions / Readout",
+        target: "Section flow / Pattern A/B/C / energy / mutes / transitions",
+        context:
+          "Section Flow, Pattern A/B/C Usage, Bar Ranges, Energy, Muted Tracks, Transition Posture, Priority Action, Action Route, Audition Cue, and Next Check context before Song Form Overview commands run."
+      },
       { id: "arrangement-mute-map", command: "Arrangement Mute Map", shortcut: "Quick Actions / Readout", target: "Layer dropouts" },
       { id: "arrangement-transition-map", command: "Arrangement Transition Map", shortcut: "Quick Actions / Readout", target: "Section handoffs" },
       { id: "arrangement-playback-readout", command: "Arrangement Playback Readout", shortcut: "Quick Actions / Readout", target: "Edit vs heard Block" },
