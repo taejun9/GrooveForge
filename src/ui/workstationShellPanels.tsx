@@ -459,10 +459,38 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Style Direction, BPM Range, Swing Default, Bass/Melody Roles, Sound Preset, Pattern/Arrangement Fit, Result Feedback, Audition Cue, and Next Style Check context before Style Quick Picks commands run."
       },
-      { id: "keyboard-capture", command: "Keyboard Capture", shortcut: "Quick Actions / Readout", target: "808 / Synth notes" },
-      { id: "capture-step-mode", command: "Capture Step Mode", shortcut: "Quick Actions / Readout", target: "Next / Replace" },
-      { id: "midi-input", command: "MIDI Input", shortcut: "Quick Actions / Readout", target: "Controller notes" },
-      { id: "editor-audition", command: "Editor Audition", shortcut: "Quick Actions / Readout", target: "Selected events" },
+      {
+        id: "keyboard-capture",
+        command: "Keyboard Capture",
+        shortcut: "Quick Actions / Readout",
+        target: "808 / Synth notes",
+        context:
+          "Keyboard Capture Armed State, 808/Synth Target, Degree Key Map, Octave/Length/Velocity/Glide Defaults, Capture Result Feedback, Audition Cue, and Next Input Check context before Keyboard Capture commands run."
+      },
+      {
+        id: "capture-step-mode",
+        command: "Capture Step Mode",
+        shortcut: "Quick Actions / Readout",
+        target: "Next / Replace",
+        context:
+          "Next/Replace Placement Mode, Selected Pattern, Selected Step, Capture Defaults, Input Result Feedback, Audition Cue, and Next Placement Check context before Capture Step Mode commands run."
+      },
+      {
+        id: "midi-input",
+        command: "MIDI Input",
+        shortcut: "Quick Actions / Readout",
+        target: "Controller notes",
+        context:
+          "Web MIDI Permission, MIDI Armed State, MIDI Input Status, Selected 808/Synth Target, Capture Defaults, Input Result Feedback, Audition Cue, and Next MIDI Check context before MIDI Input commands run."
+      },
+      {
+        id: "editor-audition",
+        command: "Editor Audition",
+        shortcut: "Quick Actions / Readout",
+        target: "Selected events",
+        context:
+          "Selected Drum/808/Synth/Chord Event, Selected Pattern, One-Shot Audition Route, Runtime Fallback, Audition Result Feedback, and Next Listening Check context before Editor Audition commands run."
+      },
       { id: "blueprints", command: "Beat Blueprints", shortcut: "Quick Actions / Readout", target: "Sample-free starts" },
       { id: "style-inspector", command: "Style Inspector", shortcut: "Quick Actions / Readout", target: "Genre fit / goals / density" },
       { id: "composer-actions", command: "Composer Actions", shortcut: "Quick Actions / Readout", target: "Guided writing moves" },
