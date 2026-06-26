@@ -1237,6 +1237,7 @@ export function createQuickActions({
   onFocusStemAuditionReadout,
   onApplySoundFocus,
   onApplySoundPreset,
+  onFocusSoundPresetReadout,
   onCaptureSoundSnapshot,
   onRecallSoundSnapshot,
   onClearSoundSnapshots,
@@ -1547,6 +1548,7 @@ export function createQuickActions({
   onFocusStemAuditionReadout: () => void;
   onApplySoundFocus: (pad: SoundFocusPadId) => void;
   onApplySoundPreset: (preset: SoundPresetTarget) => void;
+  onFocusSoundPresetReadout: () => void;
   onCaptureSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
   onRecallSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
   onClearSoundSnapshots: () => void;
@@ -4260,6 +4262,19 @@ export function createQuickActions({
     ...studioToneResetActions,
     ...soundSnapshotActions,
     {
+      id: "sound-preset-readout-action",
+      title: `Review Sound Preset: ${soundPresetPreviewSummary.presetLabel}`,
+      detail: `${soundPresetPreviewSummary.statusLabel} / ${soundPresetPreviewSummary.toneLabel} / ${soundPresetPreviewSummary.changeLabel}`,
+      group: "Create",
+      keywords: `Quick Actions Sound Preset Readout review full tone design preview apply posture drums 808 bass duck sidechain synth chords ${
+        soundPresetPreviewSummary.presetId
+      } ${soundPresetPreviewSummary.presetLabel} ${soundPresetPreviewSummary.statusLabel} ${
+        soundPresetPreviewSummary.toneLabel
+      } beginner producer manual sound design`,
+      resultTargetId: soundPresetPreviewSummary.presetId,
+      run: onFocusSoundPresetReadout
+    },
+    {
       id: "sound-preset-decision",
       title: soundPresetReady
         ? `Run Sound Preset Decision: Apply ${soundPresetPreviewSummary.presetLabel}`
@@ -5947,6 +5962,7 @@ export function createQuickActionResult(
     action.id.startsWith("pattern-switch-") ||
     action.id === "pattern-follow-audible" ||
     action.id === "arrangement-follow-audible" ||
+    action.id === "sound-preset-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -13884,7 +13900,12 @@ export function quickActionSoundDecisionMetricSnapshot(
     return quickActionStudioToneMetricSnapshot(project, action, analysis);
   }
 
-  if (action.id === "sound-preset-decision" || action.id === "sound-preset" || action.id.startsWith("sound-preset-pad-")) {
+  if (
+    action.id === "sound-preset-readout-action" ||
+    action.id === "sound-preset-decision" ||
+    action.id === "sound-preset" ||
+    action.id.startsWith("sound-preset-pad-")
+  ) {
     return quickActionSoundPresetMetricSnapshot(project, action, analysis);
   }
 
@@ -13904,6 +13925,22 @@ export function quickActionSoundPresetMetricSnapshot(
   action: QuickAction,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
+  if (action.id === "sound-preset-readout-action") {
+    const target = quickActionSoundPresetTarget(project, action) ?? defaultSoundPresetPreview(project);
+    const summary = createSoundPresetPreviewSummary(project.sound, target);
+    return {
+      id: "sound-preset-readout",
+      label: "Sound Preset Readout",
+      value: quickActionSoundMetricValue(project, action, analysis, [
+        quickActionSoundActionLabel(action),
+        `preview ${summary.presetLabel}`,
+        `status ${summary.statusLabel}`,
+        `target ${summary.toneLabel}`,
+        `moves ${summary.changeLabel}`
+      ])
+    };
+  }
+
   const target = quickActionSoundPresetTarget(project, action);
   if (!target) {
     return null;
@@ -14069,6 +14106,10 @@ export function quickActionSoundDecisionDetailParts(action: QuickAction): string
 }
 
 export function quickActionSoundDecisionNextCheck(action: QuickAction): string {
+  if (action.id === "sound-preset-readout-action") {
+    return "loop drums, 808, Synth, and Chords before applying a full-tone preset or trimming sound controls manually";
+  }
+
   if (action.id === "sound-preset-decision" || action.id === "sound-preset" || action.id.startsWith("sound-preset-pad-")) {
     return "loop drums, 808, Synth, and Chords together before trimming with Sound Focus or Studio controls";
   }
@@ -14093,6 +14134,9 @@ export function quickActionSoundDecisionNextCheck(action: QuickAction): string {
 }
 
 export function quickActionSoundActionLabel(action: QuickAction): string {
+  if (action.id === "sound-preset-readout-action") {
+    return "review sound preset readout";
+  }
   if (action.id === "sound-preset-decision") {
     return "run sound preset decision";
   }
@@ -14141,7 +14185,7 @@ export function quickActionSoundPresetTarget(project: ProjectState, action: Quic
     return directTarget;
   }
 
-  if (action.id !== "sound-preset-decision" && action.id !== "sound-preset") {
+  if (action.id !== "sound-preset-readout-action" && action.id !== "sound-preset-decision" && action.id !== "sound-preset") {
     return null;
   }
 
@@ -16227,6 +16271,13 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, Synth, and Chords after the Studio tone reset.`,
       nextCheck: "Capture a new Studio Tone baseline only if the reset or manual trim now fits the beat."
+    };
+  }
+
+  if (action.id === "sound-preset-readout-action") {
+    return {
+      auditionCue: `Use the Sound Preset readout before applying a full-tone preset, then loop Pattern ${project.selectedPattern}.`,
+      nextCheck: "Apply Sound Preset only when the preview target fits the beat; otherwise trim Drum Kit, Sound Focus, or Studio tone manually."
     };
   }
 

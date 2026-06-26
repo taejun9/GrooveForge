@@ -7498,6 +7498,13 @@ export function App(): ReactElement {
     setProjectStatus(`Timbre Check ${soundTimbreCheckSummary.statusLabel}: ${soundTimbreCheckSummary.balanceLabel}`);
   }
 
+  function focusSoundPresetReadout(): void {
+    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Sound Preset ${soundPresetPreviewSummary.statusLabel}: ${soundPresetPreviewSummary.presetLabel} / ${soundPresetPreviewSummary.toneLabel}`
+    );
+  }
+
   function focusFinishChecklistCard(card: FinishChecklistCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -8169,6 +8176,7 @@ export function App(): ReactElement {
     onFocusStemAuditionReadout: focusStemAuditionReadout,
     onApplySoundFocus: applySoundFocusPad,
     onApplySoundPreset: applySoundPreset,
+    onFocusSoundPresetReadout: focusSoundPresetReadout,
     onCaptureSoundSnapshot: captureSoundSnapshot,
     onRecallSoundSnapshot: recallSoundSnapshot,
     onClearSoundSnapshots: clearSoundSnapshots,
