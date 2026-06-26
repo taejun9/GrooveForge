@@ -735,6 +735,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Drum Kit Preview, Explicit Pad Apply Path, Current/Direct Built-In Kit Commands, Before/After Kick/Clap/Hat Tone, Drum Rack Posture, Result Feedback, Audition Cue, and Next Kit Check context before Drum Kit commands run."
       },
       {
+        id: "sound-focus-readout",
+        command: "Sound Focus Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current tone-focus preview",
+        context:
+          "Current 808/Synth/Chords Tone-Focus Preview Target, Editable Sound Posture, Selected Pattern, Export Readiness, Audition Cue, and Next Manual Tone-Focus Check context before Sound Focus commands run."
+      },
+      {
         id: "sound-focus-decision",
         command: "Sound Focus Decision",
         shortcut: "Quick Actions / Readout",

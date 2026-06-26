@@ -1237,6 +1237,7 @@ export function createQuickActions({
   onApplyStemAudition,
   onFocusStemAuditionReadout,
   onApplySoundFocus,
+  onFocusSoundFocusReadout,
   onApplySoundPreset,
   onFocusSoundPresetReadout,
   onCaptureSoundSnapshot,
@@ -1549,6 +1550,7 @@ export function createQuickActions({
   onApplyStemAudition: (pad: StemAuditionPadId) => void;
   onFocusStemAuditionReadout: () => void;
   onApplySoundFocus: (pad: SoundFocusPadId) => void;
+  onFocusSoundFocusReadout: () => void;
   onApplySoundPreset: (preset: SoundPresetTarget) => void;
   onFocusSoundPresetReadout: () => void;
   onCaptureSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
@@ -4209,6 +4211,19 @@ export function createQuickActions({
     },
     ...drumKitPadActions,
     {
+      id: "sound-focus-readout-action",
+      title: `Review Sound Focus: ${soundFocusPreviewSummary.padLabel}`,
+      detail: `${soundFocusPreviewSummary.statusLabel} / ${soundFocusPreviewSummary.focusLabel} / ${soundFocusPreviewSummary.parameterLabel}`,
+      group: "Create",
+      keywords: `Quick Actions Sound Focus Readout review tone focus preview apply posture kick drums 808 bass duck sidechain synth chords ${
+        soundFocusPreviewSummary.padId
+      } ${soundFocusPreviewSummary.padLabel} ${soundFocusPreviewSummary.statusLabel} ${
+        soundFocusPreviewSummary.parameterLabel
+      } beginner producer manual sound focus`,
+      resultTargetId: soundFocusPreviewSummary.padId,
+      run: onFocusSoundFocusReadout
+    },
+    {
       id: "sound-focus-decision",
       title: soundFocusReady
         ? `Run Sound Focus Decision: Apply ${soundFocusPreviewSummary.padLabel}`
@@ -5979,6 +5994,7 @@ export function createQuickActionResult(
     action.id === "arrangement-follow-audible" ||
     action.id === "sound-preset-readout-action" ||
     action.id === "drum-kit-readout-action" ||
+    action.id === "sound-focus-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -13934,7 +13950,12 @@ export function quickActionSoundDecisionMetricSnapshot(
     return quickActionDrumKitMetricSnapshot(project, action, analysis);
   }
 
-  if (action.id === "sound-focus-decision" || action.id === "sound-focus" || action.id.startsWith("sound-focus-pad-")) {
+  if (
+    action.id === "sound-focus-readout-action" ||
+    action.id === "sound-focus-decision" ||
+    action.id === "sound-focus" ||
+    action.id.startsWith("sound-focus-pad-")
+  ) {
     return quickActionSoundFocusMetricSnapshot(project, action, analysis);
   }
 
@@ -14034,6 +14055,21 @@ export function quickActionSoundFocusMetricSnapshot(
 
   const changedParameters = soundFocusChangedParameters(project.sound, pad);
   const changedLabel = soundFocusChangedParameterLabel(changedParameters);
+  if (action.id === "sound-focus-readout-action") {
+    return {
+      id: "sound-focus-readout",
+      label: "Sound Focus Readout",
+      value: quickActionSoundMetricValue(project, action, analysis, [
+        quickActionSoundActionLabel(action),
+        `preview ${pad.label} focus`,
+        `status ${pad.changedCount === 0 ? "Sound aligned" : "Suggested focus"}`,
+        `focus ${pad.detail} tone posture`,
+        `parameters ${soundFocusPreviewParameterLabel(pad)}`,
+        `moves ${pad.changedCount} tone move${pad.changedCount === 1 ? "" : "s"} / ${changedLabel}`
+      ])
+    };
+  }
+
   return {
     id: action.id === "sound-focus-decision" ? "sound-focus-decision" : "sound-focus",
     label: action.id === "sound-focus-decision" ? "Sound Focus Decision" : "Sound focus",
@@ -14158,6 +14194,10 @@ export function quickActionSoundDecisionNextCheck(action: QuickAction): string {
     return "loop kick, clap, hat, and 808 balance before changing another kit or drum rack control";
   }
 
+  if (action.id === "sound-focus-readout-action") {
+    return "loop the focused 808, Synth, or Chords tone against the full Pattern before applying a focus pad manually";
+  }
+
   if (action.id === "sound-focus-decision" || action.id === "sound-focus" || action.id.startsWith("sound-focus-pad-")) {
     return "loop the focused tone against the full Pattern before changing another focus lane";
   }
@@ -14197,6 +14237,9 @@ export function quickActionSoundActionLabel(action: QuickAction): string {
   }
   if (action.id.startsWith("drum-kit-pad-")) {
     return "apply direct drum kit";
+  }
+  if (action.id === "sound-focus-readout-action") {
+    return "review sound focus readout";
   }
   if (action.id === "sound-focus-decision") {
     return "run sound focus decision";
@@ -14278,7 +14321,7 @@ export function quickActionSoundFocusPadOption(project: ProjectState, action: Qu
     return options.find((pad) => pad.id === directId) ?? null;
   }
 
-  if (action.id !== "sound-focus-decision" && action.id !== "sound-focus") {
+  if (action.id !== "sound-focus-readout-action" && action.id !== "sound-focus-decision" && action.id !== "sound-focus") {
     return null;
   }
 
@@ -16356,6 +16399,13 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; hear kick, clap, hat, and 808 balance after the kit change.`,
       nextCheck: "Use the Drum Kit Result plus Studio tone and drum rack mixer controls for manual trim."
+    };
+  }
+
+  if (action.id === "sound-focus-readout-action") {
+    return {
+      auditionCue: `Use the Sound Focus readout before applying a tone-focus pad, then loop Pattern ${project.selectedPattern}.`,
+      nextCheck: "Apply Sound Focus only when the preview target fits the beat; otherwise trim 808, Synth, Chords, or Studio tone controls manually."
     };
   }
 
