@@ -972,6 +972,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Current Fade Posture, Automation Target, Editable Fade Event Range, Direct Fade Pad Routes, Playback/Export Gain Scope, Result Feedback, Audition Cue, and Export/Manual-Trim Next Check context before Master Automation commands run."
       },
       {
+        id: "export-meter",
+        command: "Export Meter",
+        shortcut: "Readout",
+        target: "Peak / RMS / dynamics / headroom / limiter",
+        context:
+          "Peak, RMS, Dynamics, Headroom, Limiter Activity, Master Ceiling, Arrangement Duration, Mix Coach Follow-Up, Export Preflight Route, Audition Cue, and Manual-Trim Next Check context before Export Meter review."
+      },
+      {
         id: "finish-checklist",
         command: "Finish Checklist",
         shortcut: "Quick Actions / Readout",
