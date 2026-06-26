@@ -8074,6 +8074,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusPatternFillReadout(): void {
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Pattern Fill Readout ${patternFillSuggestionSummary.patternLabel}: ${patternFillSuggestionSummary.presetLabel} suggestion / preview ${patternFillPreviewSummary.presetLabel} / ${patternFillPreviewSummary.moveLabel} / direct fill unchanged`
+    );
+  }
+
   function focusPatternUseReadout(): void {
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8271,6 +8278,7 @@ export function App(): ReactElement {
     patternChainPreviewSummary,
     patternStackOptions,
     patternStackPreviewSummary,
+    patternFillPreviewPreset,
     patternVariationPreviewPreset,
     patternDnaSummary,
     patternPlaybackReadout,
@@ -8382,6 +8390,7 @@ export function App(): ReactElement {
     onApplyPatternFill: applyPatternFill,
     onApplyPatternVariation: applyPatternVariation,
     onApplyPatternStack: applyPatternStack,
+    onFocusPatternFillReadout: focusPatternFillReadout,
     onFocusPatternCloneReadout: focusPatternCloneReadout,
     onFocusPatternVariationReadout: focusPatternVariationReadout,
     onCopySelectedPattern: copySelectedPattern,
