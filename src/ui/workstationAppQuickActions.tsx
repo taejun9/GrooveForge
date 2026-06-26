@@ -1134,6 +1134,7 @@ export function createQuickActions({
   patternChainPreviewSummary,
   patternStackOptions,
   patternStackPreviewSummary,
+  patternVariationPreviewPreset,
   patternDnaSummary,
   patternPlaybackReadout,
   playingPattern,
@@ -1242,6 +1243,7 @@ export function createQuickActions({
   onFocusPatternCloneReadout,
   onApplyPatternFill,
   onApplyPatternVariation,
+  onFocusPatternVariationReadout,
   onApplyPatternStack,
   onCopySelectedPattern,
   onClearSelectedPattern,
@@ -1465,6 +1467,7 @@ export function createQuickActions({
   patternChainPreviewSummary: PatternChainPreviewSummary;
   patternStackOptions: PatternStackOption[];
   patternStackPreviewSummary: PatternStackPreviewSummary;
+  patternVariationPreviewPreset: PatternVariationPreset;
   patternDnaSummary: PatternDnaSummary;
   patternPlaybackReadout: PatternPlaybackReadoutSummary;
   playingPattern: PatternSlot | null;
@@ -1573,6 +1576,7 @@ export function createQuickActions({
   onFocusPatternCloneReadout: () => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
   onApplyPatternVariation: (preset: PatternVariationPreset) => void;
+  onFocusPatternVariationReadout: () => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
   onCopySelectedPattern: (target: PatternSlot) => void;
   onClearSelectedPattern: () => void;
@@ -3588,6 +3592,20 @@ export function createQuickActions({
     keywords: `Quick Actions Pattern Copy Clear Readout review selected Pattern ${project.selectedPattern} copy targets ${patternCopyClearReadoutTargets} clear risk source target a b c duplicate reset beginner producer`,
     run: onFocusPatternCopyClearReadout
   };
+  const patternVariationReadoutSuggestion = createPatternVariationSuggestionSummary(project.selectedPattern, activePattern(project));
+  const patternVariationReadoutPreview = createPatternVariationPreviewSummary(
+    project.selectedPattern,
+    activePattern(project),
+    patternVariationPreviewPreset
+  );
+  const patternVariationReadoutAction: QuickAction = {
+    id: "pattern-variation-readout-action",
+    title: `Review Pattern Variation Readout: Pattern ${project.selectedPattern}`,
+    detail: `${patternVariationReadoutSuggestion.presetLabel} suggestion / preview ${patternVariationReadoutPreview.presetLabel} / ${patternVariationReadoutPreview.moveLabel} / direct variation preflight`,
+    group: "Create",
+    keywords: `Quick Actions Pattern Variation Readout review selected Pattern ${project.selectedPattern} ${patternVariationReadoutSuggestion.presetLabel} ${patternVariationReadoutPreview.presetLabel} ${patternVariationReadoutPreview.moveLabel} subtle hook break layer change arrangement beginner producer`,
+    run: onFocusPatternVariationReadout
+  };
   const patternChainActions: QuickAction[] = patternChainIds.map((chain) => {
     const arrangement = createPatternChain(chain);
     const chainLabel = patternChainLabel(chain);
@@ -4755,6 +4773,7 @@ export function createQuickActions({
     },
     blueprintPreviewDecisionAction,
     ...blueprintActions,
+    patternVariationReadoutAction,
     ...patternVariationPresetIds.map((preset): QuickAction => {
       const label = patternVariationPresetLabel(preset);
       return {
@@ -6316,6 +6335,7 @@ export function createQuickActionResult(
     action.id === "arrangement-focus-readout-action" ||
     action.id === "arrangement-move-readout-action" ||
     action.id === "pattern-clone-readout-action" ||
+    action.id === "pattern-variation-readout-action" ||
     action.id === "pattern-copy-clear-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
@@ -14205,6 +14225,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "pattern-variation-readout-action") {
+    return (
+      quickActionPatternVariationReadoutMetricSnapshot(project, action) ?? {
+        id: "pattern-variation-readout",
+        label: "Pattern Variation Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id.startsWith("pattern-clone-")) {
     return (
       quickActionPatternCloneMetricSnapshot(project, action) ?? {
@@ -16471,6 +16501,67 @@ export function patternCloneQuickActionPreset(value: string): PatternVariationPr
   return value === "hook" || value === "breakdown" ? value : null;
 }
 
+export function quickActionPatternVariationReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "pattern-variation-readout-action") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const suggestion = createPatternVariationSuggestionSummary(project.selectedPattern, pattern);
+  const previewPreset = patternVariationReadoutQuickActionPreviewPreset(action) ?? suggestion.preset;
+  const preview = createPatternVariationPreviewSummary(project.selectedPattern, pattern, previewPreset);
+  const drumHits = drumHitCount(pattern);
+  const bassNotes = pattern.bassNotes.length;
+  const chordEvents = pattern.chordEvents.length;
+  const melodyNotes = pattern.melodyNotes.length;
+  const musicEvents = bassNotes + chordEvents + melodyNotes;
+  const arrangementUse = patternArrangementUseLabel(project, project.selectedPattern);
+
+  return {
+    id: "pattern-variation-readout",
+    label: "Pattern Variation Readout",
+    value: [
+      "review pattern variation",
+      `selected Pattern ${project.selectedPattern}`,
+      `${suggestion.presetLabel} suggestion`,
+      `preview ${preview.presetLabel}`,
+      `${preview.moveLabel}`,
+      `${patternEventTotal(pattern)} events`,
+      `${drumHits} drums`,
+      `${bassNotes} 808`,
+      `${chordEvents} chords`,
+      `${melodyNotes} synth`,
+      `${musicEvents} music`,
+      `arrangement ${arrangementUse}`,
+      "variation unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+export function patternVariationReadoutQuickActionPreviewPreset(action: QuickAction): PatternVariationPreset | null {
+  if (action.id !== "pattern-variation-readout-action") {
+    return null;
+  }
+
+  const text = `${action.title} ${action.detail}`;
+  if (/\bSubtle target\b/.test(text)) {
+    return "subtle";
+  }
+  if (/\bHook target\b/.test(text)) {
+    return "hook";
+  }
+  if (/\bBreak target\b/.test(text)) {
+    return "breakdown";
+  }
+
+  return null;
+}
+
 export function quickActionPatternVariationMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -17185,6 +17276,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the applied style's drums, 808, harmony, melody, and swing before arranging.`,
       nextCheck: "Use Style Inspector, current-style starter preview, and manual Pattern editors to refine the new style direction."
+    };
+  }
+
+  if (action.id === "pattern-variation-readout-action") {
+    return {
+      auditionCue:
+        "Review the selected Pattern event posture, suggested variation, preview target, layer-change count, and arrangement usage before applying a variation.",
+      nextCheck: "Run a direct Pattern Variation command only when the selected Pattern should be rewritten by that variation."
     };
   }
 

@@ -625,6 +625,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Selected Pattern Variation Suggestion, Subtle/Hook/Break Target, Pattern Variation Preview, Direct Variation Commands, Pattern Variation Result Feedback, Audition Cue, and Next Variation Check context before Pattern Variation commands run."
       },
       {
+        id: "pattern-variation-readout",
+        command: "Pattern Variation Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Selected Pattern variation preflight",
+        context:
+          "Pattern Variation Readout Action, Selected Pattern A/B/C, Suggested Subtle/Hook/Break Move, Current Preview Preset, Selected Pattern Event Count, Drum/Music Posture, Layer-Change Posture, Arrangement Usage, Audition Cue, and Next Pattern Variation Check context before direct Pattern Variation commands run."
+      },
+      {
         id: "pattern-fill",
         command: "Pattern Fill",
         shortcut: "Quick Actions / Readout",
