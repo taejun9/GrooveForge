@@ -246,7 +246,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Setup, Drums, 808/Bass, Harmony, Melody, Sound, Arrange, and Finish context with destination/action, beat-core metric, scope, audition cue, and next check before Beat Spine commands run."
       },
-      { id: "mode-focus", command: "Mode Focus", shortcut: "Quick Actions / Readout", target: "Guided / Studio orientation" },
+      {
+        id: "mode-focus",
+        command: "Mode Focus",
+        shortcut: "Quick Actions / Readout",
+        target: "Guided / Studio orientation jump",
+        context:
+          "Guided and Studio orientation context with destination, mode metric, local context, audition cue, and next check before Mode Focus commands run."
+      },
       { id: "mode-switch", command: "Mode Switch", shortcut: "Quick Actions", target: "Guided / Studio mode" },
       {
         id: "session-pass",
