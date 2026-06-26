@@ -237,7 +237,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         target: "Lowest completion lane / destination",
         context: "Bottleneck metric, current context, audition cue, next check, completion breakdown, and bottleneck posture before focus."
       },
-      { id: "first-beat-path", command: "First Beat Path", shortcut: "Quick Actions / Readout", target: "Setup / compose / arrange / mix / deliver" },
+      {
+        id: "first-beat-path",
+        command: "First Beat Path",
+        shortcut: "Quick Actions / Readout",
+        target: "Setup / compose / arrange / mix / deliver",
+        context:
+          "Setup, Compose, Arrange, Mix, and Deliver path context with destination, path metric, audition cue, and next check before First Beat Path commands run."
+      },
       {
         id: "beat-spine",
         command: "Beat Spine",
