@@ -7693,6 +7693,26 @@ export function App(): ReactElement {
     );
   }
 
+  function focusDirectExportsReadout(): void {
+    const currentItems = createHandoffPackItems({
+      analysis: exportAnalysis,
+      project,
+      stemAnalyses,
+      onExportHandoffSheet: handleExportHandoffSheet,
+      onExportMidi: handleExportMidi,
+      onExportStems: handleExportStems,
+      onExportWav: handleExportWav
+    });
+    const currentReceipt = handoffExportReceipt ?? emptyHandoffExportReceipt();
+    const currentSendOrder = createHandoffPackSendOrderSummary(project, currentItems);
+    const readyCount = currentItems.filter((item) => item.tone === "good").length;
+
+    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Direct Exports Readout: ${readyCount}/${currentItems.length} ready / ${currentSendOrder.nextLabel} / ${currentReceipt.statusLabel}`
+    );
+  }
+
   function focusHandoffPackageCheckCard(card: HandoffPackageCheckCard): void {
     setHandoffPackageCheckFocusId(card.focusId);
     deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -8541,6 +8561,7 @@ export function App(): ReactElement {
     onExportMidi: handleExportMidi,
     onExportStems: handleExportStems,
     onExportWav: handleExportWav,
+    onFocusDirectExportsReadout: focusDirectExportsReadout,
     onJumpFirstBeatPath: jumpToFirstBeatPathStep,
     onJumpBeatSpine: jumpToBeatSpineTarget,
     onFocusBeatPassport: focusBeatPassportMetric,

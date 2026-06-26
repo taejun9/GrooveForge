@@ -1325,6 +1325,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         target: "WAV / stems / MIDI / sheet",
         context:
           "Explicit WAV/Stem/MIDI/Handoff Sheet Commands, Deliverable/File Context, Delivery Target, Direct Export Result Metrics, Latest Export Receipt, Package Readiness, Send Order Next Step, Audition Cue, and Next Handoff Check context before Direct Exports commands run."
+      },
+      {
+        id: "direct-exports-readout",
+        command: "Direct Exports Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Export preflight / no render",
+        context:
+          "Direct Exports Readout Action, WAV/Stem/MIDI/Handoff Sheet File Context, Delivery Target, Export Readiness, Package Readiness, Latest Export Receipt, Send Order Next Step, Selected Pattern A/B/C, Arrangement Length, Audition Cue, and Next Direct Export Check context before explicit Direct Export commands run."
       }
     ]
   }
