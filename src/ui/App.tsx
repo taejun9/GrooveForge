@@ -7137,6 +7137,15 @@ export function App(): ReactElement {
     );
   }
 
+  function focusArrangementMoveReadout(): void {
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      arrangementMovePrioritySummary.presetId !== "none"
+        ? `Arrangement Move ${arrangementMovePrioritySummary.statusLabel}: ${arrangementMovePrioritySummary.presetLabel} / ${arrangementMovePrioritySummary.scopeLabel} / ${arrangementMovePrioritySummary.impactLabel}`
+        : "Arrangement Move: select an arrangement block before applying a move."
+    );
+  }
+
   function focusMasterOutputRole(): void {
     const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -8231,6 +8240,7 @@ export function App(): ReactElement {
     onFocusChainExpandReadout: focusChainExpandReadout,
     onFocusArrangementArcReadout: focusArrangementArcReadout,
     onFocusArrangementFocusReadout: focusArrangementFocusReadout,
+    onFocusArrangementMoveReadout: focusArrangementMoveReadout,
     onFocusArrangementTemplateReadout: focusArrangementTemplateReadout,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternClone: cloneSelectedPatternVariation,
