@@ -1187,6 +1187,7 @@ export function createQuickActions({
   onApplyArrangementArc,
   onApplyArrangementFocus,
   onApplyArrangementTemplate,
+  onFocusArrangementTemplateReadout,
   onCueArrangementTransition,
   onCueHookLoop,
   onCueToplineLoop,
@@ -1503,6 +1504,7 @@ export function createQuickActions({
   onApplyArrangementArc: (pad: ArrangementArcPadId) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
+  onFocusArrangementTemplateReadout: () => void;
   onCueArrangementTransition: (transition: ArrangementTransitionMapTransition) => void;
   onCueHookLoop: (card?: HookReadinessFocusItem) => void;
   onCueToplineLoop: (card?: ToplineSpaceFocusItem) => void;
@@ -4791,6 +4793,16 @@ export function createQuickActions({
       run: onExpandPatternChain
     },
     {
+      id: "arrangement-template-readout-action",
+      title: `Review Arrangement Template: ${arrangementTemplatePreviewSummary.templateLabel}`,
+      detail: `${arrangementTemplatePreviewSummary.statusLabel} / ${arrangementTemplatePreviewSummary.sectionLabel} / ${arrangementTemplatePreviewSummary.patternLabel} / ${arrangementTemplatePreviewSummary.moveLabel}`,
+      group: "Arrange",
+      keywords: `Quick Actions Arrangement Template Readout review song form template preview decision priority pattern a b c section flow hook blocks selected pattern editable events ${
+        arrangementTemplateId ?? "aligned"
+      } ${arrangementTemplatePreviewSummary.templateLabel} ${arrangementTemplatePreviewSummary.statusLabel} beginner producer`,
+      run: onFocusArrangementTemplateReadout
+    },
+    {
       id: "arrangement-template-decision",
       title: arrangementTemplateDecision.disabled
         ? "Run Arrangement Template Decision"
@@ -6034,6 +6046,7 @@ export function createQuickActionResult(
     action.id === "sound-snapshot-readout-action" ||
     action.id === "pattern-chain-readout-action" ||
     action.id === "chain-expand-readout-action" ||
+    action.id === "arrangement-template-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -13727,6 +13740,7 @@ export function quickActionResultMetricSnapshot(
   }
 
   if (
+    action.id === "arrangement-template-readout-action" ||
     action.id === "arrangement-template-decision" ||
     action.id === "arrangement-template" ||
     action.id.startsWith("arrangement-template-direct-")
@@ -15176,6 +15190,24 @@ export function quickActionArrangementTemplateMetricSnapshot(
   project: ProjectState,
   action: QuickAction
 ): { id: string; label: string; value: string } | null {
+  if (action.id === "arrangement-template-readout-action") {
+    const pattern = activePattern(project);
+    const preview = createArrangementTemplatePreviewSummary(project.arrangement);
+    const targetArrangement = preview.templateId === "aligned" ? project.arrangement : createArrangementTemplate(preview.templateId);
+    const sectionFlow = compactSectionFlow(targetArrangement) || "empty";
+    const patternSpread = arrangementArcPreviewPatternLabel(targetArrangement);
+    const hookBlockCount = targetArrangement.filter((block) => block.section === "Hook").length;
+    return {
+      id: "arrangement-template-readout",
+      label: "Arrangement Template Readout",
+      value: `review arrangement template readout / ${preview.statusLabel} / ${preview.templateLabel} / ${sectionFlow} / ${patternSpread} / Pattern ${
+        project.selectedPattern
+      } / ${patternEventTotal(pattern)} editable events / ${targetArrangement.length} template blocks / ${hookBlockCount} hook blocks / ${barCountLabel(
+        arrangementTotalBars({ ...project, arrangement: targetArrangement })
+      )}`
+    };
+  }
+
   const template = arrangementTemplateQuickActionTarget(action);
   if (!template) {
     return null;
@@ -16819,6 +16851,14 @@ export function quickActionResultFollowup(
         action.id === "pattern-chain-decision"
           ? "Return to Pattern Chain Preview Decision before running another chain or expand move."
           : `${barCountLabel(arrangementTotalBars(project))} arranged; use the Pattern Chain Result and Song Form Overview before mix decisions.`
+    };
+  }
+
+  if (action.id === "arrangement-template-readout-action") {
+    return {
+      auditionCue: "Play Song loop and scan whether the current song-form template supports the section order and Pattern A/B/C spread.",
+      nextCheck:
+        "Apply Arrangement Template only after the readout template, hook placement, and Pattern spread support the beat."
     };
   }
 
