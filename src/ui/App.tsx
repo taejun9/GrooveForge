@@ -15014,6 +15014,17 @@ function modeFocusJumpResultNextCheck(card: ModeFocusCard, summary: ModeFocusSum
   }
 }
 
+function modeFocusCommandDetail(card: ModeFocusCard, summary: ModeFocusSummary): string {
+  return [
+    card.value,
+    `Destination ${card.focusLabel}`,
+    `Mode ${modeFocusJumpResultMetric(summary)}`,
+    `Context ${card.detail}`,
+    `Audition ${modeFocusJumpResultAudition(card, summary)}`,
+    `Next ${modeFocusJumpResultNextCheck(card, summary)}`
+  ].join(" / ");
+}
+
 function activeBeatSpineQuickActionCard(summary: BeatSpineSummary): BeatSpineCard | null {
   return summary.cards.find((card) => card.id === summary.nextCardId) ?? summary.cards[0] ?? null;
 }
@@ -18556,7 +18567,7 @@ function createQuickActions({
   const modeFocusActions: QuickAction[] = modeFocusSummary.cards.map((card) => ({
     id: `mode-focus-card-${card.id}`,
     title: `Jump Mode Focus: ${card.label}`,
-    detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
+    detail: modeFocusCommandDetail(card, modeFocusSummary),
     group: "Project",
     keywords: `mode focus jump card guided studio orientation stage writing check scan issue handoff ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
     run: () => onFocusModeFocus(card)
@@ -20069,7 +20080,7 @@ function createQuickActions({
     {
       id: "mode-focus-jump",
       title: modeFocusCard ? `Jump Mode Focus: ${modeFocusCard.label}` : "Jump Mode Focus",
-      detail: modeFocusCard ? `${modeFocusCard.value} / ${modeFocusCard.focusLabel}` : "No Mode Focus card available.",
+      detail: modeFocusCard ? modeFocusCommandDetail(modeFocusCard, modeFocusSummary) : "No Mode Focus card available.",
       group: "Project",
       keywords: `mode focus jump guided studio orientation stage issue session handoff ${modeFocusCard?.id ?? "none"} ${modeFocusCard?.focusLabel ?? "none"} beginner producer`,
       disabled: !modeFocusCard,
@@ -26244,6 +26255,8 @@ function firstBeatPathStageDestination(label: string): string {
   }
 }
 
+const MODE_FOCUS_DETAIL_LABEL_PREFIXES = ["Destination ", "Mode ", "Context ", "Audition ", "Next "] as const;
+
 function quickActionModeFocusMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -26254,15 +26267,18 @@ function quickActionModeFocusMetricSnapshot(
 
   const parts = quickActionModeFocusDetailParts(action);
   const cardLabel = quickActionModeFocusCardLabel(action);
-  const contextLabel = parts[0] ?? "orientation context unavailable";
-  const destinationLabel = parts[1] ?? "destination unavailable";
-  const detailLabel = parts.slice(2).join(" / ") || "current orientation card";
+  const routeLabel = quickActionModeFocusRouteLabel(parts);
+  const destinationLabel = quickActionModeFocusDetailSegment(parts, "Destination ", "Destination unavailable");
+  const modeMetricLabel = quickActionModeFocusDetailSegment(parts, "Mode ", `Mode ${modeLabel(project.mode)}`);
+  const contextLabel = quickActionModeFocusDetailSegment(parts, "Context ", "Context unavailable");
+  const auditionLabel = quickActionModeFocusDetailSegment(parts, "Audition ", "Audition unavailable");
+  const nextCheckLabel = quickActionModeFocusDetailSegment(parts, "Next ", "Next unavailable");
   const actionLabel = action.id === "mode-focus-jump" ? "jump active mode focus" : "jump direct mode focus";
 
   return {
     id: "mode-focus",
     label: "Mode focus",
-    value: `${actionLabel} / card ${cardLabel} / destination ${destinationLabel} / context ${contextLabel} / detail ${detailLabel} / mode ${modeLabel(
+    value: `${actionLabel} / card ${cardLabel} / route ${routeLabel} / ${destinationLabel} / ${modeMetricLabel} / ${contextLabel} / ${auditionLabel} / ${nextCheckLabel} / mode ${modeLabel(
       project.mode
     )} / Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events / ${barCountLabel(arrangementTotalBars(project))}`
   };
@@ -26273,6 +26289,25 @@ function quickActionModeFocusDetailParts(action: QuickAction): string[] {
     .split(" / ")
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+function quickActionModeFocusRouteLabel(parts: string[]): string {
+  const firstLabeledIndex = parts.findIndex((part) => MODE_FOCUS_DETAIL_LABEL_PREFIXES.some((prefix) => part.startsWith(prefix)));
+  if (firstLabeledIndex <= 0) {
+    return parts[0] ?? "Mode Focus";
+  }
+  return parts.slice(0, firstLabeledIndex).join(" / ");
+}
+
+function quickActionModeFocusDetailSegment(parts: string[], prefix: string, fallback: string): string {
+  const start = parts.findIndex((part) => part.startsWith(prefix));
+  if (start === -1) {
+    return fallback;
+  }
+  const end = parts.findIndex(
+    (part, index) => index > start && MODE_FOCUS_DETAIL_LABEL_PREFIXES.some((labelPrefix) => part.startsWith(labelPrefix))
+  );
+  return parts.slice(start, end === -1 ? parts.length : end).join(" / ");
 }
 
 function quickActionModeFocusCardLabel(action: QuickAction): string {
