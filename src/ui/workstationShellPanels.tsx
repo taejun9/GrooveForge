@@ -321,7 +321,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Hook Section, Motif, Contrast, Mix Support, and Handoff hook-quality context with destination, hook metric, audition cue, loop/fix cue, and next check before Hook Readiness commands run."
       },
-      { id: "topline-space", command: "Topline Space", shortcut: "Quick Actions / Readout", target: "Pocket / lead room / artist context" },
+      {
+        id: "topline-space",
+        command: "Topline Space",
+        shortcut: "Quick Actions / Readout",
+        target: "Rhythm pocket / lead room / vocal window / mix headroom / artist cue",
+        context:
+          "Rhythm Pocket, Lead Room, Vocal Window, Mix Headroom, and Artist Cue context with destination, topline metric, audition cue, loop/fix cue, and next check before Topline Space commands run."
+      },
       {
         id: "beat-readiness",
         command: "Beat Readiness",
