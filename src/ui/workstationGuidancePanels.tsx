@@ -122,6 +122,7 @@ export function createModeSwitchButtonContext({
     active ? `${label} mode already active` : `Switch to ${label} mode`,
     `Destination ${modeSwitchDestinationLabel(mode)}`,
     `Current ${modeLabel(projectMode)}`,
+    `Target ${label}`,
     `Mode ${modeLabel(projectMode)} -> ${label}`,
     `Context ${modeSwitchDetail(mode, modeFocusSummary, sessionPassSummary, firstBeatPathSummary)}`,
     `Audition ${modeSwitchAuditionCue(mode)}`,
