@@ -8622,6 +8622,7 @@ export function App(): ReactElement {
       <BeatSpine
         jumpResult={beatSpineJumpResult}
         result={beatSpineResult}
+        selectedPattern={project.selectedPattern}
         summary={beatSpineSummary}
         onApply={applyBeatSpineAction}
         onJump={jumpToBeatSpineTarget}
@@ -13979,27 +13980,55 @@ function beatSpineJumpResultNextCheck(card: BeatSpineCard): string {
   return "Return to Beat Spine after the focused panel is checked.";
 }
 
+function beatSpineJumpButtonContext(card: BeatSpineCard, summary: BeatSpineSummary): string {
+  return [
+    `Jump to ${card.focusLabel}: ${card.detail}`,
+    `Destination ${beatSpineTargetLabel(card.target)}`,
+    `Beat core ${summary.countLabel} / ${card.value}`,
+    `Audition ${beatSpineJumpResultAudition(card)}`,
+    `Next ${beatSpineJumpResultNextCheck(card)}`
+  ].join(" / ");
+}
+
+function beatSpineApplyButtonContext(
+  action: BeatSpineAction,
+  card: BeatSpineCard,
+  summary: BeatSpineSummary,
+  selectedPattern: PatternSlot
+): string {
+  return [
+    `Apply ${action.label}: ${action.detail}`,
+    `Card ${card.label}: ${card.value}`,
+    `Beat core ${summary.countLabel}`,
+    `Scope ${beatSpineApplyResultScope(action.id, selectedPattern)}`,
+    `Audition ${beatSpineApplyResultAudition(action.id, selectedPattern)}`,
+    `Next ${beatSpineApplyResultNextCheck(action.id)}`
+  ].join(" / ");
+}
+
 function BeatSpine({
   jumpResult,
   onApply,
   onJump,
   result,
+  selectedPattern,
   summary
 }: {
   summary: BeatSpineSummary;
   jumpResult: BeatSpineJumpResult | null;
   result: BeatSpineApplyResult | null;
+  selectedPattern: PatternSlot;
   onApply: (action: BeatSpineAction) => void;
   onJump: (card: BeatSpineCard) => void;
 }): ReactElement {
   const decisionCard = summary.cards.find((card) => card.id === summary.nextCardId) ?? summary.cards[0] ?? null;
   const decisionAction = decisionCard?.action ?? null;
   const decisionActionLabel = decisionAction ? decisionAction.label : decisionCard ? `Jump ${decisionCard.focusLabel}` : "No action";
-  const decisionActionTitle = decisionAction
-    ? `${decisionAction.label}: ${decisionAction.detail}`
-    : decisionCard
-      ? `Jump to ${decisionCard.focusLabel}: ${decisionCard.detail}`
-      : "No Beat Spine decision action available.";
+  const decisionActionContext = decisionCard
+    ? decisionAction
+      ? beatSpineApplyButtonContext(decisionAction, decisionCard, summary, selectedPattern)
+      : beatSpineJumpButtonContext(decisionCard, summary)
+    : "No Beat Spine decision action available.";
 
   return (
     <section className={`beat-spine ${summary.tone}`} data-testid="beat-spine" aria-label="Beat spine">
@@ -14026,6 +14055,7 @@ function BeatSpine({
         <strong data-testid="beat-spine-decision-label">{summary.decisionLabel}</strong>
         <small data-testid="beat-spine-decision-detail">{summary.decisionDetail}</small>
         <button
+          aria-label={decisionActionContext}
           data-testid="beat-spine-decision-action"
           disabled={!decisionCard}
           onClick={() => {
@@ -14038,7 +14068,7 @@ function BeatSpine({
             }
             onJump(decisionCard);
           }}
-          title={decisionActionTitle}
+          title={decisionActionContext}
           type="button"
         >
           {decisionAction ? <Sparkles size={12} aria-hidden="true" /> : <ArrowRight size={12} aria-hidden="true" />}
@@ -14049,6 +14079,10 @@ function BeatSpine({
         {summary.cards.map((card) => {
           const next = card.id === summary.nextCardId;
           const action = card.action;
+          const jumpButtonContext = beatSpineJumpButtonContext(card, summary);
+          const applyButtonContext = action
+            ? beatSpineApplyButtonContext(action, card, summary, selectedPattern)
+            : null;
           return (
             <div
               className={["beat-spine-card", card.tone, next ? "next" : ""].filter(Boolean).join(" ")}
@@ -14062,9 +14096,10 @@ function BeatSpine({
               <small>{card.detail}</small>
               <div className={["beat-spine-card-actions", action ? "" : "single"].filter(Boolean).join(" ")}>
                 <button
+                  aria-label={jumpButtonContext}
                   data-testid={`beat-spine-jump-${card.id}`}
                   onClick={() => onJump(card)}
-                  title={`Jump to ${card.focusLabel}: ${card.detail}`}
+                  title={jumpButtonContext}
                   type="button"
                 >
                   <ArrowRight size={12} aria-hidden="true" />
@@ -14072,10 +14107,11 @@ function BeatSpine({
                 </button>
                 {action && (
                   <button
+                    aria-label={applyButtonContext ?? `${action.label}: ${action.detail}`}
                     className="primary"
                     data-testid={`beat-spine-apply-${card.id}`}
                     onClick={() => onApply(action)}
-                    title={`${action.label}: ${action.detail}`}
+                    title={applyButtonContext ?? `${action.label}: ${action.detail}`}
                     type="button"
                   >
                     <Sparkles size={12} aria-hidden="true" />
