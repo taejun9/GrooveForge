@@ -829,12 +829,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
     title: "Arrange",
     items: [
       {
+        id: "pattern-chain-readout",
+        command: "Pattern Chain Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current 8-bar chain preview",
+        context:
+          "Pattern Chain Readout Action, Current Preview Recommendation, Pattern A/B/C Sequence, Section Flow, Energy Posture, Move Count, Arrangement Length, Audition Cue, and Next Manual Chain Check context before Pattern Chain commands run."
+      },
+      {
         id: "pattern-chain",
         command: "Pattern Chain",
-        shortcut: "Quick Actions / Readout",
+        shortcut: "Quick Actions / Decision",
         target: "8-bar sketch",
         context:
-          "Pattern Chain Preview, Preview Decision Readout, Priority Readout, Direct Pattern Chain Commands, Pattern A/B/C Sequence, Chain Expand Access, Result Feedback, Audition Cue, and Next Chain Check context before Pattern Chain commands run."
+          "Pattern Chain Preview Decision, Priority Readout, Direct Pattern Chain Commands, Pattern A/B/C Sequence, Chain Expand Access, Result Feedback, Audition Cue, and Next Chain Check context before Pattern Chain commands run."
       },
       {
         id: "chain-expand",
