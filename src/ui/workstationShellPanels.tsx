@@ -437,6 +437,10 @@ function commandReferenceItemMatchesQuery(section: CommandReferenceSection, item
   return commandReferenceMatchesQuery([section.title, item.command, item.shortcut, item.target, item.context ?? ""], query);
 }
 
+function commandReferenceItemLabel(section: CommandReferenceSection, item: CommandReferenceItem): string {
+  return `${section.title}: ${item.command} / ${item.shortcut} / ${item.target}${item.context ? ` / ${item.context}` : ""}`;
+}
+
 function beatTermMatchesQuery(item: BeatTermItem, query: string): boolean {
   return commandReferenceMatchesQuery([item.term, item.meaning, item.target], query);
 }
@@ -1771,24 +1775,34 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
                   <span>{section.title}</span>
                   <strong>{section.items.length}</strong>
                 </div>
-                <div className="command-reference-items">
-                  {section.items.map((item) => (
-                    <div className="command-reference-item" data-testid={`command-reference-item-${item.id}`} key={item.id}>
-                      <kbd>{item.shortcut}</kbd>
-                      <strong>{item.command}</strong>
-                      <div className="command-reference-item-target" data-testid={`command-reference-item-${item.id}-target`}>
-                        <small>{item.target}</small>
-                        {item.context ? (
-                          <small
-                            className="command-reference-item-context"
-                            data-testid={`command-reference-item-${item.id}-context`}
-                          >
-                            {item.context}
-                          </small>
-                        ) : null}
+                <div className="command-reference-items" role="list">
+                  {section.items.map((item) => {
+                    const itemLabel = commandReferenceItemLabel(section, item);
+                    return (
+                      <div
+                        aria-label={itemLabel}
+                        className="command-reference-item"
+                        data-testid={`command-reference-item-${item.id}`}
+                        key={item.id}
+                        role="listitem"
+                        title={itemLabel}
+                      >
+                        <kbd>{item.shortcut}</kbd>
+                        <strong>{item.command}</strong>
+                        <div className="command-reference-item-target" data-testid={`command-reference-item-${item.id}-target`}>
+                          <small>{item.target}</small>
+                          {item.context ? (
+                            <small
+                              className="command-reference-item-context"
+                              data-testid={`command-reference-item-${item.id}-context`}
+                            >
+                              {item.context}
+                            </small>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))}
