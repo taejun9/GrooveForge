@@ -687,6 +687,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
     title: "Sound",
     items: [
       {
+        id: "sound-preset-readout",
+        command: "Sound Preset Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current full-tone preset preview",
+        context:
+          "Current Full-Tone Preset Preview Target, Editable Sound Posture, Selected Pattern, Export Readiness, Audition Cue, and Next Manual Sound-Design Check context before Sound Preset commands run."
+      },
+      {
         id: "sound-preset-decision",
         command: "Sound Preset Decision",
         shortcut: "Quick Actions / Readout",
