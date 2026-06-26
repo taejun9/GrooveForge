@@ -537,6 +537,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Style-Aware Writing Moves, Route, Scope, Impact, Undo Posture, Direct Composer Action Commands, Result Feedback, Audition Cue, and Next Composer-Action Check context before Composer Actions commands run."
       },
       {
+        id: "composer-actions-readout",
+        command: "Composer Actions Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current writing move preflight",
+        context:
+          "Composer Actions Readout Action, Current Style-Aware Writing Move, Writing Area, Route, Scope, Impact, Undo Posture, Selected Pattern A/B/C, Selected Pattern Event Count, Drum/808/Harmony/Melody Posture, Arrangement Usage, Export Readiness, Audition Cue, and Next Composer Actions Check context before direct Composer Action commands run."
+      },
+      {
         id: "style-goal-cues",
         command: "Style Goal Cues",
         shortcut: "Quick Actions / Readout",
