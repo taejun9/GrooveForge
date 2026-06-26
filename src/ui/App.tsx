@@ -18244,14 +18244,19 @@ function createQuickActions({
     }
   }));
   const composerGuideCard = activeComposerGuideQuickActionCard(composerGuideSummary);
-  const composerGuideActions: QuickAction[] = composerGuideSummary.cards.map((card) => ({
-    id: `composer-guide-card-${card.id}`,
-    title: `Focus Composer Guide: ${card.label}`,
-    detail: `${card.status} / ${card.focusLabel} / ${card.detail}`,
-    group: "Create",
-    keywords: `composer guide focus card writing lane ${card.id} ${card.label} ${card.status} ${card.focusLabel} ${card.detail} drums 808 bass harmony melody arrange finish beginner producer`,
-    run: () => onFocusComposerGuide(card)
-  }));
+  const composerGuideCardDetail = composerGuideCard ? composerGuideFocusCommandDetail(composerGuideCard, composerGuideSummary) : "";
+  const composerGuideActions: QuickAction[] = composerGuideSummary.cards.map((card) => {
+    const commandDetail = composerGuideFocusCommandDetail(card, composerGuideSummary);
+    const action: QuickAction = {
+      id: `composer-guide-card-${card.id}`,
+      title: `Focus Composer Guide: ${card.label}`,
+      detail: commandDetail,
+      group: "Create",
+      keywords: `composer guide focus card writing lane ${card.id} ${card.label} ${card.status} ${card.focusLabel} ${card.detail} ${commandDetail} drums 808 bass harmony melody arrange finish beginner producer`,
+      run: () => onFocusComposerGuide(card)
+    };
+    return action;
+  });
   const composerActionCommands: QuickAction[] = composerActionsSummary.actions.map((action) => ({
     id: `composer-action-${action.id}`,
     title: `Run Composer Action: ${action.buttonLabel}`,
@@ -19996,9 +20001,11 @@ function createQuickActions({
     {
       id: "composer-guide-focus",
       title: composerGuideCard ? `Focus Composer Guide: ${composerGuideCard.label}` : "Focus Composer Guide",
-      detail: composerGuideCard ? `${composerGuideCard.status} / ${composerGuideCard.focusLabel}` : "No Composer Guide card available.",
+      detail: composerGuideCard ? composerGuideCardDetail : "No Composer Guide card available.",
       group: "Create",
-      keywords: `composer guide focus writing next layer inspect ${composerGuideCard?.id ?? "none"} ${composerGuideCard?.focusLabel ?? "none"} beginner producer`,
+      keywords: `composer guide focus writing next layer inspect ${composerGuideCard?.id ?? "none"} ${composerGuideCard?.focusLabel ?? "none"} ${
+        composerGuideCardDetail || "no guide card"
+      } beginner producer`,
       disabled: !composerGuideCard,
       run: () => {
         if (composerGuideCard) {
@@ -26199,13 +26206,16 @@ function quickActionComposerGuideMetricSnapshot(
   const laneLabel = quickActionComposerGuideLaneLabel(action);
   const statusLabel = parts[0] ?? "guide status unavailable";
   const destinationLabel = parts[1] ?? composerGuideDestinationLabelFromLane(laneLabel);
-  const detailLabel = parts.slice(2).join(" / ") || "current writing lane";
+  const metricLabel = parts[2] ?? "guide metric unavailable";
+  const auditionLabel = parts[3] ?? "audition unavailable";
+  const nextCheckLabel = parts[4] ?? "next check unavailable";
+  const detailLabel = parts.slice(5).join(" / ") || "current writing lane";
   const actionLabel = action.id === "composer-guide-focus" ? "focus active composer guide" : "focus direct composer guide";
 
   return {
     id: "composer-guide",
     label: "Composer guide",
-    value: `${actionLabel} / lane ${laneLabel} / destination ${destinationLabel} / status ${statusLabel} / detail ${detailLabel} / mode ${modeLabel(
+    value: `${actionLabel} / lane ${laneLabel} / destination ${destinationLabel} / status ${statusLabel} / metric ${metricLabel} / audition ${auditionLabel} / next ${nextCheckLabel} / detail ${detailLabel} / mode ${modeLabel(
       project.mode
     )} / Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events / ${barCountLabel(arrangementTotalBars(project))}`
   };
@@ -35777,11 +35787,30 @@ function createComposerGuideFocusSummary(
 }
 
 function composerGuideFocusActionLabel(card: ComposerGuideCard, summary: ComposerGuideSummary): string {
-  const destinationLabel = `${card.focusLabel} panel`;
-  const metricLabel = composerGuideFocusResultMetric(summary);
-  const auditionCueLabel = composerGuideFocusResultAudition(card);
-  const nextCheckLabel = composerGuideFocusResultNextCheck(card);
+  const { destinationLabel, metricLabel, auditionCueLabel, nextCheckLabel } = composerGuideFocusActionContext(card, summary);
   return `Focus ${card.focusLabel}: ${card.status} / ${destinationLabel} / ${metricLabel} / ${auditionCueLabel} / ${nextCheckLabel}`;
+}
+
+function composerGuideFocusCommandDetail(card: ComposerGuideCard, summary: ComposerGuideSummary): string {
+  const { destinationLabel, metricLabel, auditionCueLabel, nextCheckLabel } = composerGuideFocusActionContext(card, summary);
+  return `${card.status} / ${destinationLabel} / ${metricLabel} / ${auditionCueLabel} / ${nextCheckLabel} / ${card.detail}`;
+}
+
+function composerGuideFocusActionContext(
+  card: ComposerGuideCard,
+  summary: ComposerGuideSummary
+): {
+  destinationLabel: string;
+  metricLabel: string;
+  auditionCueLabel: string;
+  nextCheckLabel: string;
+} {
+  return {
+    destinationLabel: `${card.focusLabel} panel`,
+    metricLabel: composerGuideFocusResultMetric(summary),
+    auditionCueLabel: composerGuideFocusResultAudition(card),
+    nextCheckLabel: composerGuideFocusResultNextCheck(card)
+  };
 }
 
 function createComposerGuideFocusResult(
