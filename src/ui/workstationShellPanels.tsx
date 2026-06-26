@@ -381,7 +381,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Compose, Arrange, Mix, and Deliver workflow-zone context with destination, readiness metric, zone context, audition cue, jump action, and next check before Workflow Navigator commands run."
       },
-      { id: "workflow-spotlight", command: "Workflow Spotlight", shortcut: "Quick Actions / Readout", target: "Current command target" },
+      {
+        id: "workflow-spotlight",
+        command: "Workflow Spotlight",
+        shortcut: "Quick Actions / Readout",
+        target: "Current command target",
+        context:
+          "Current Command Target, Derived Workflow Zone, Decision Readout, Visible Jump Route, Workflow Navigator Counts, Search Spotlight Relation, Pinned Command Context, Jump Result Feedback, Audition Cue, and Next Workflow Check context before Workflow Spotlight commands run."
+      },
       {
         id: "beat-map",
         command: "Beat Map",
