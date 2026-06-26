@@ -1197,6 +1197,7 @@ export function createQuickActions({
   onCueToplineLoop,
   onApplyHookFix,
   onApplyToplineFix,
+  onFocusArrangementMuteMapReadout,
   onFocusArrangementMuteMap,
   onFocusArrangementPlaybackReadout,
   onFocusArrangementTransitionMap,
@@ -1519,6 +1520,7 @@ export function createQuickActions({
   onCueToplineLoop: (card?: ToplineSpaceFocusItem) => void;
   onApplyHookFix: (card?: HookReadinessCard) => void;
   onApplyToplineFix: (card?: ToplineSpaceCard) => void;
+  onFocusArrangementMuteMapReadout: () => void;
   onFocusArrangementMuteMap: (lane: ArrangementMuteMapLane) => void;
   onFocusArrangementPlaybackReadout: () => void;
   onFocusArrangementTransitionMap: (transition: ArrangementTransitionMapTransition) => void;
@@ -4775,6 +4777,21 @@ export function createQuickActions({
     },
     ...arrangementFocusPresetActions,
     {
+      id: "arrangement-mute-map-readout-action",
+      title: arrangementMuteMapLane
+        ? `Review Arrangement Mute Map: ${arrangementMuteMapLane.label}`
+        : "Review Arrangement Mute Map",
+      detail: arrangementMuteMapLane
+        ? `${arrangementMuteMapLane.value} / ${arrangementMuteMapLane.status} / ${arrangementMuteMapLane.detail}`
+        : "No Arrangement Mute Map lane available.",
+      group: "Arrange",
+      keywords: `Quick Actions Arrangement Mute Map Readout review layer dropouts mutes section drop build space priority lane selected pattern editable events ${
+        arrangementMuteMapLane?.id ?? "none"
+      } ${arrangementMuteMapLane?.label ?? "none"} beginner producer`,
+      disabled: !arrangementMuteMapLane,
+      run: onFocusArrangementMuteMapReadout
+    },
+    {
       id: "arrangement-mute-map-focus",
       title: arrangementMuteMapLane ? `Focus Mute Map: ${arrangementMuteMapLane.label}` : "Focus Arrangement Mute Map",
       detail: arrangementMuteMapLane
@@ -6095,6 +6112,7 @@ export function createQuickActionResult(
     action.id.startsWith("snapshot-compare-metric-") ||
     action.id === "topline-space-focus" ||
     action.id.startsWith("topline-space-card-") ||
+    action.id === "arrangement-mute-map-readout-action" ||
     action.id === "arrangement-mute-map-focus" ||
     action.id.startsWith("arrangement-mute-map-lane-") ||
     action.id === "arrangement-transition-map-focus" ||
@@ -9566,10 +9584,15 @@ export function quickActionArrangementMuteMapMetricSnapshot(
   selectedArrangementIndex = 0,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
-  if (action.id !== "arrangement-mute-map-focus" && !action.id.startsWith("arrangement-mute-map-lane-")) {
+  if (
+    action.id !== "arrangement-mute-map-readout-action" &&
+    action.id !== "arrangement-mute-map-focus" &&
+    !action.id.startsWith("arrangement-mute-map-lane-")
+  ) {
     return null;
   }
 
+  const isReadout = action.id === "arrangement-mute-map-readout-action";
   const summary = createArrangementMuteMapSummary(project);
   const lane = quickActionArrangementMuteMapLane(summary, action);
   if (!lane) {
@@ -9584,8 +9607,8 @@ export function quickActionArrangementMuteMapMetricSnapshot(
   const contextLabel = detailParts.join(" / ") || lane.detail;
 
   return {
-    id: "arrangement-mute-map",
-    label: "Mute map",
+    id: isReadout ? "arrangement-mute-map-readout" : "arrangement-mute-map",
+    label: isReadout ? "Mute map readout" : "Mute map",
     value: [
       quickActionArrangementMuteMapActionLabel(action),
       "destination Arrange panel",
@@ -9615,7 +9638,7 @@ export function quickActionArrangementMuteMapLane(
   summary: ArrangementMuteMapSummary,
   action: QuickAction
 ): ArrangementMuteMapLane | null {
-  if (action.id === "arrangement-mute-map-focus") {
+  if (action.id === "arrangement-mute-map-readout-action" || action.id === "arrangement-mute-map-focus") {
     return activeArrangementMuteMapQuickActionLane(summary);
   }
 
@@ -9640,15 +9663,23 @@ export function quickActionArrangementMuteMapDetailParts(action: QuickAction): s
 }
 
 export function quickActionArrangementMuteMapActionLabel(action: QuickAction): string {
+  if (action.id === "arrangement-mute-map-readout-action") {
+    return "review priority mute map";
+  }
+
   return action.id === "arrangement-mute-map-focus" ? "focus priority mute map" : "focus direct mute map";
 }
 
 export function quickActionArrangementMuteMapLaneLabel(action: QuickAction, lane: ArrangementMuteMapLane): string {
   const titleLabel = action.title
+    .replace(/^Review Arrangement Mute Map:\s*/, "")
     .replace(/^Focus Arrangement Mute Map:\s*/, "")
     .replace(/^Focus Mute Map:\s*/, "")
     .trim();
-  return titleLabel && titleLabel !== "Focus Arrangement Mute Map" && titleLabel !== "Focus Mute Map"
+  return titleLabel &&
+    titleLabel !== "Review Arrangement Mute Map" &&
+    titleLabel !== "Focus Arrangement Mute Map" &&
+    titleLabel !== "Focus Mute Map"
     ? titleLabel
     : lane.label;
 }
@@ -13352,7 +13383,7 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "arrangement-mute-map-focus") {
+  if (action.id === "arrangement-mute-map-readout-action" || action.id === "arrangement-mute-map-focus") {
     const muteMapMetric = quickActionArrangementMuteMapMetricSnapshot(
       project,
       action,
@@ -13364,11 +13395,17 @@ export function quickActionResultMetricSnapshot(
     }
 
     const summary = createArrangementMuteMapSummary(project);
-    return {
-      id: "arrangement-mute-map",
-      label: "Mute map",
-      value: `${summary.headline} / ${summary.detail}`
-    };
+    return action.id === "arrangement-mute-map-readout-action"
+      ? {
+          id: "arrangement-mute-map-readout",
+          label: "Mute map readout",
+          value: `${summary.headline} / ${summary.detail}`
+        }
+      : {
+          id: "arrangement-mute-map",
+          label: "Mute map",
+          value: `${summary.headline} / ${summary.detail}`
+        };
   }
 
   if (action.id.startsWith("arrangement-mute-map-lane-")) {
@@ -16886,6 +16923,13 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Topline Space card before trimming melody, arranging the hook, checking mix space, or filling brief context.",
       nextCheck: "Return to Topline Space when you need another direct vocal pocket, lead room, arrangement, mix, or brief focus."
+    };
+  }
+
+  if (action.id === "arrangement-mute-map-readout-action") {
+    return {
+      auditionCue: "Review the Arrangement Mute Map priority lane, section mute/live posture, and selected-block context before focusing a lane.",
+      nextCheck: "Focus Arrangement Mute Map only after the readout lane is the layer you want to inspect."
     };
   }
 

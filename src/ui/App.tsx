@@ -7442,6 +7442,16 @@ export function App(): ReactElement {
     setProjectStatus(`Mute Map ${lane.label}: ${lane.value}`);
   }
 
+  function focusArrangementMuteMapReadout(): void {
+    const lane = activeArrangementMuteMapQuickActionLane(arrangementMuteMapSummary);
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      lane
+        ? `Arrangement Mute Map ${lane.status}: ${lane.label} / ${lane.value} / ${lane.detail}`
+        : `Arrangement Mute Map: ${arrangementMuteMapSummary.headline} / ${arrangementMuteMapSummary.detail}`
+    );
+  }
+
   function focusArrangementTransitionMapTransition(transition: ArrangementTransitionMapTransition): void {
     setArrangementTransitionMapFocusId(transition.id);
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -8222,6 +8232,7 @@ export function App(): ReactElement {
     onApplyHookFix: applyHookFix,
     onApplyToplineFix: applyToplineFix,
     onApplyReviewFix: applyReviewFix,
+    onFocusArrangementMuteMapReadout: focusArrangementMuteMapReadout,
     onFocusArrangementMuteMap: focusArrangementMuteMapLane,
     onFocusArrangementPlaybackReadout: focusArrangementPlaybackReadout,
     onFocusArrangementTransitionMap: focusArrangementTransitionMapTransition,
