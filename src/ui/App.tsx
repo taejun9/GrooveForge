@@ -14657,9 +14657,13 @@ type GuideQuickStartQuickActionTarget = {
   source: "path" | "session" | "workflow";
   title: string;
   completionBottleneck: string;
+  context: string;
+  destination: string;
   detail: string;
   completionBreakdown: string;
   metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
   tone: MixCoachTone;
   keywords: string;
 };
@@ -14692,9 +14696,13 @@ function activeGuideQuickStartQuickActionTarget({
       source: "path",
       title: `Guide Quick Start: ${firstBeatPathStep.label}`,
       completionBottleneck,
+      context: firstBeatPathStep.detail,
+      destination: firstBeatPathStep.jumpLabel,
       detail: `First Beat Path / ${firstBeatPathStep.value} / ${firstBeatPathStep.detail}`,
       completionBreakdown,
       metricValue: `${firstBeatPathSummary.countLabel} / ${firstBeatPathStep.value} / ${completionScore.statusLabel}: ${completionScore.scoreLabel}`,
+      auditionCue: "Use the focused First Beat Path panel before changing the beat.",
+      nextCheck: "Return to Guide Quick Start after the step is ready or intentionally deferred.",
       tone: firstBeatPathStep.tone,
       keywords: `${firstBeatPathStep.id} ${firstBeatPathStep.label} ${firstBeatPathStep.jumpLabel} ${firstBeatPathStep.detail} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel} ${completionBreakdown} ${completionBottleneck}`
     });
@@ -14704,9 +14712,13 @@ function activeGuideQuickStartQuickActionTarget({
     source: "session",
     title: `Guide Quick Start: ${sessionPassCard.label}`,
     completionBottleneck,
+    context: sessionPassCard.detail,
+    destination: sessionPassCard.focusLabel,
     detail: `Session Pass / ${sessionPassCard.value} / ${sessionPassCard.focusLabel}`,
     completionBreakdown,
     metricValue: `${sessionPassSummary.headline} / ${sessionPassCard.detail} / ${completionScore.statusLabel}: ${completionScore.scoreLabel}`,
+    auditionCue: "Use the focused Session Pass panel before changing the beat.",
+    nextCheck: "Return to Guide Quick Start for the next guided or studio pass target.",
     tone: sessionPassCard.tone,
     keywords: `${sessionPassCard.id} ${sessionPassCard.label} ${sessionPassCard.value} ${sessionPassCard.focusLabel} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel} ${completionBreakdown} ${completionBottleneck}`
   });
@@ -14716,9 +14728,13 @@ function activeGuideQuickStartQuickActionTarget({
       source: "workflow",
       title: `Guide Quick Start: ${workflowSpotlight.zoneLabel}`,
       completionBottleneck,
+      context: workflowSpotlightItem.detail,
+      destination: workflowSpotlightItem.label,
       detail: `Workflow Spotlight / ${workflowSpotlight.statusLabel} / ${workflowSpotlight.detailLabel}`,
       completionBreakdown,
       metricValue: `${workflowSpotlight.countLabel} / ${workflowSpotlightItem.detail} / ${completionScore.statusLabel}: ${completionScore.scoreLabel}`,
+      auditionCue: "Use the highlighted Workflow Spotlight zone before changing project data.",
+      nextCheck: "Return to Guide Quick Start after the zone looks ready or needs another pass.",
       tone: workflowSpotlight.tone,
       keywords: `${workflowSpotlightItem.id} ${workflowSpotlightItem.label} ${workflowSpotlightItem.value} ${workflowSpotlightItem.detail} ${completionScore.statusLabel} ${completionScore.scoreLabel} ${completionScore.metricLabel} ${completionBreakdown} ${completionBottleneck}`
     });
@@ -14768,9 +14784,13 @@ function activeGuideQuickStartBottleneckQuickActionTarget({
         source: "path",
         title: `Guide Bottleneck Focus: ${firstBeatPathStep.label}`,
         completionBottleneck,
+        context: firstBeatPathStep.detail,
+        destination: firstBeatPathStep.jumpLabel,
         detail: `Bottleneck Path / ${firstBeatPathStep.value} / ${firstBeatPathStep.detail}`,
         completionBreakdown,
         metricValue: `${bottleneckMetric} / ${firstBeatPathSummary.countLabel}`,
+        auditionCue: "Use the focused First Beat Path bottleneck before changing the beat.",
+        nextCheck: "Return to Guide Quick Start and confirm the path score or bottleneck label changed.",
         tone: bottleneckItem.tone,
         keywords: `guide bottleneck focus lowest completion lane path first beat ${firstBeatPathStep.id} ${firstBeatPathStep.label} ${firstBeatPathStep.jumpLabel} ${firstBeatPathStep.detail} ${completionBreakdown} ${completionBottleneck}`
       };
@@ -14779,9 +14799,13 @@ function activeGuideQuickStartBottleneckQuickActionTarget({
         source: "session",
         title: `Guide Bottleneck Focus: ${sessionPassCard.label}`,
         completionBottleneck,
+        context: sessionPassCard.detail,
+        destination: sessionPassCard.focusLabel,
         detail: `Bottleneck Session / ${sessionPassCard.value} / ${sessionPassCard.focusLabel}`,
         completionBreakdown,
         metricValue: `${bottleneckMetric} / ${sessionPassSummary.headline}`,
+        auditionCue: "Use the focused Session Pass bottleneck before changing the beat.",
+        nextCheck: "Return to Guide Quick Start and confirm the session score or bottleneck label changed.",
         tone: bottleneckItem.tone,
         keywords: `guide bottleneck focus lowest completion lane session pass ${sessionPassCard.id} ${sessionPassCard.label} ${sessionPassCard.value} ${sessionPassCard.focusLabel} ${completionBreakdown} ${completionBottleneck}`
       };
@@ -14793,9 +14817,13 @@ function activeGuideQuickStartBottleneckQuickActionTarget({
         source: "workflow",
         title: `Guide Bottleneck Focus: ${workflowSpotlight.zoneLabel}`,
         completionBottleneck,
+        context: workflowSpotlightItem.detail,
+        destination: workflowSpotlightItem.label,
         detail: `Bottleneck Workflow / ${workflowSpotlight.statusLabel} / ${workflowSpotlight.detailLabel}`,
         completionBreakdown,
         metricValue: `${bottleneckMetric} / ${workflowSpotlight.countLabel}`,
+        auditionCue: "Use the highlighted Workflow Spotlight bottleneck before changing project data.",
+        nextCheck: "Return to Guide Quick Start and confirm the workflow score or bottleneck label changed.",
         tone: bottleneckItem.tone,
         keywords: `guide bottleneck focus lowest completion lane workflow spotlight ${workflowSpotlightItem.id} ${workflowSpotlightItem.label} ${workflowSpotlightItem.value} ${workflowSpotlightItem.detail} ${completionBreakdown} ${completionBottleneck}`
       };
@@ -14809,6 +14837,19 @@ function guideQuickStartCompletionBreakdownLabel(
     .map((item) => `${guideQuickStartCompletionBreakdownName(item.id)} ${item.scoreLabel.replace(` ${item.id}`, "")}`)
     .join("; ");
   return `Breakdown ${summary}`;
+}
+
+function guideQuickStartCommandDetail(target: GuideQuickStartQuickActionTarget): string {
+  return [
+    target.detail,
+    `Destination ${target.destination}`,
+    `Metric ${target.metricValue}`,
+    `Context ${target.context}`,
+    `Audition ${target.auditionCue}`,
+    `Next ${target.nextCheck}`,
+    target.completionBreakdown,
+    target.completionBottleneck
+  ].join(" / ");
 }
 
 function guideQuickStartCompletionBreakdownName(id: "path" | "session" | "workflow"): string {
@@ -19888,7 +19929,7 @@ function createQuickActions({
       id: "guide-quick-start",
       title: guideQuickStartTarget ? guideQuickStartTarget.title : "Guide Quick Start",
       detail: guideQuickStartTarget
-        ? `${guideQuickStartTarget.detail} / ${guideQuickStartTarget.metricValue} / ${guideQuickStartTarget.completionBreakdown} / ${guideQuickStartTarget.completionBottleneck}`
+        ? guideQuickStartCommandDetail(guideQuickStartTarget)
         : "No Guide Quick Start target available.",
       group: "Project",
       keywords: `guide quick start one command current next path session workflow spotlight first beat pass beginner producer direct beat workstation ${
@@ -19921,7 +19962,7 @@ function createQuickActions({
       id: "guide-bottleneck-focus",
       title: guideQuickStartBottleneckTarget ? guideQuickStartBottleneckTarget.title : "Guide Bottleneck Focus",
       detail: guideQuickStartBottleneckTarget
-        ? `${guideQuickStartBottleneckTarget.detail} / ${guideQuickStartBottleneckTarget.metricValue} / ${guideQuickStartBottleneckTarget.completionBreakdown} / ${guideQuickStartBottleneckTarget.completionBottleneck}`
+        ? guideQuickStartCommandDetail(guideQuickStartBottleneckTarget)
         : "No Guide Quick Start bottleneck focus target available.",
       group: "Project",
       keywords: `guide quick start bottleneck focus lowest lane completion path session workflow beginner producer direct beat workstation ${
@@ -25946,6 +25987,16 @@ function quickActionHandoffExportFormatLaneLabel(action: QuickAction, metric: Ha
   return titleLabel && titleLabel !== "Focus Export Format" ? titleLabel : metric.label;
 }
 
+const GUIDE_QUICK_START_DETAIL_LABEL_PREFIXES = [
+  "Destination ",
+  "Metric ",
+  "Context ",
+  "Audition ",
+  "Next ",
+  "Breakdown ",
+  "Bottleneck "
+] as const;
+
 function quickActionGuideQuickStartMetricSnapshot(action: QuickAction): { id: string; label: string; value: string } | null {
   if (action.id !== "guide-quick-start" && action.id !== "guide-bottleneck-focus") {
     return null;
@@ -25960,21 +26011,21 @@ function quickActionGuideQuickStartMetricSnapshot(action: QuickAction): { id: st
     };
   }
 
-  const metaIndex = parts.findIndex((part) => part.startsWith("Breakdown ") || part.startsWith("Bottleneck "));
-  const detailEnd = metaIndex === -1 ? parts.length : metaIndex;
-  const contextEnd = Math.min(detailEnd, 3);
-  const routeLabel = parts[0] ?? "Guide";
-  const contextLabel = parts.slice(1, contextEnd).join(" / ") || "context unavailable";
-  const metricLabel = parts.slice(contextEnd, detailEnd).join(" / ") || "metric unavailable";
-  const breakdownLabel = parts.find((part) => part.startsWith("Breakdown ")) ?? "Breakdown unavailable";
-  const bottleneckLabel = parts.find((part) => part.startsWith("Bottleneck ")) ?? "Bottleneck unavailable";
+  const routeLabel = quickActionGuideQuickStartRouteLabel(parts);
+  const destinationLabel = quickActionGuideQuickStartDetailSegment(parts, "Destination ", "Destination unavailable");
+  const metricLabel = quickActionGuideQuickStartDetailSegment(parts, "Metric ", "Metric unavailable");
+  const contextLabel = quickActionGuideQuickStartDetailSegment(parts, "Context ", "Context unavailable");
+  const auditionLabel = quickActionGuideQuickStartDetailSegment(parts, "Audition ", "Audition unavailable");
+  const nextCheckLabel = quickActionGuideQuickStartDetailSegment(parts, "Next ", "Next unavailable");
+  const breakdownLabel = quickActionGuideQuickStartDetailSegment(parts, "Breakdown ", "Breakdown unavailable");
+  const bottleneckLabel = quickActionGuideQuickStartDetailSegment(parts, "Bottleneck ", "Bottleneck unavailable");
   const actionLabel = action.id === "guide-bottleneck-focus" ? "focus guide bottleneck" : "run guide quick start";
   const targetLabel = quickActionGuideQuickStartTargetLabel(action);
 
   return {
     id: action.id,
     label: action.id === "guide-bottleneck-focus" ? "Guide bottleneck" : "Guide quick start",
-    value: `${actionLabel} / target ${targetLabel} / route ${routeLabel} / context ${contextLabel} / completion ${metricLabel} / ${breakdownLabel} / ${bottleneckLabel}`
+    value: `${actionLabel} / target ${targetLabel} / route ${routeLabel} / ${destinationLabel} / ${metricLabel} / ${contextLabel} / ${auditionLabel} / ${nextCheckLabel} / ${breakdownLabel} / ${bottleneckLabel}`
   };
 }
 
@@ -25983,6 +26034,28 @@ function quickActionGuideQuickStartDetailParts(action: QuickAction): string[] {
     .split(" / ")
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+function quickActionGuideQuickStartRouteLabel(parts: string[]): string {
+  const firstLabeledIndex = parts.findIndex((part) =>
+    GUIDE_QUICK_START_DETAIL_LABEL_PREFIXES.some((prefix) => part.startsWith(prefix))
+  );
+  if (firstLabeledIndex <= 0) {
+    return parts[0] ?? "Guide";
+  }
+  return parts.slice(0, firstLabeledIndex).join(" / ");
+}
+
+function quickActionGuideQuickStartDetailSegment(parts: string[], prefix: string, fallback: string): string {
+  const start = parts.findIndex((part) => part.startsWith(prefix));
+  if (start === -1) {
+    return fallback;
+  }
+  const end = parts.findIndex(
+    (part, index) =>
+      index > start && GUIDE_QUICK_START_DETAIL_LABEL_PREFIXES.some((labelPrefix) => part.startsWith(labelPrefix))
+  );
+  return parts.slice(start, end === -1 ? parts.length : end).join(" / ");
 }
 
 function quickActionGuideQuickStartTargetLabel(action: QuickAction): string {
