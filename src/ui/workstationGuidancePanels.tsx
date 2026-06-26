@@ -1173,6 +1173,9 @@ export function FirstBeatPath({
   result: FirstBeatPathJumpResult | null;
   onJump: (step: FirstBeatPathStep) => void;
 }): ReactElement {
+  const nextStep = summary.steps.find((step) => step.id === summary.nextStepId) ?? summary.steps[0] ?? null;
+  const checkHint = nextStep ? firstBeatPathCheckHint(nextStep, summary) : null;
+
   return (
     <section className={`first-beat-path ${summary.tone}`} data-testid="first-beat-path" aria-label="First beat path">
       <div className="first-beat-path-heading">
@@ -1197,6 +1200,16 @@ export function FirstBeatPath({
         <span data-testid="first-beat-path-decision-status">{summary.decisionStatus}</span>
         <strong data-testid="first-beat-path-decision-label">{summary.decisionLabel}</strong>
         <small data-testid="first-beat-path-decision-detail">{summary.decisionDetail}</small>
+        {checkHint && (
+          <em
+            className="first-beat-path-check-hint"
+            data-first-beat-path-check={checkHint.stepId}
+            data-testid="first-beat-path-check-hint"
+            title={checkHint.title}
+          >
+            {checkHint.label}
+          </em>
+        )}
       </div>
       <div className="first-beat-path-steps" data-testid="first-beat-path-steps">
         {summary.steps.map((step) => {
@@ -1222,6 +1235,32 @@ export function FirstBeatPath({
       {result && <FirstBeatPathJumpResultStrip result={result} />}
     </section>
   );
+}
+
+function firstBeatPathCheckHint(
+  step: FirstBeatPathStep,
+  summary: FirstBeatPathSummary
+): { stepId: FirstBeatPathStepId; label: string; title: string } {
+  const label = (() => {
+    switch (step.id) {
+      case "setup":
+        return "Next check: tempo, key, style, and loop before writing events.";
+      case "compose":
+        return "Next check: write drums, 808/bass, chords, and melody as editable events.";
+      case "arrange":
+        return "Next check: place Pattern A/B/C into sections with hook contrast.";
+      case "mix":
+        return "Next check: balance stems and headroom after the beat layers exist.";
+      case "deliver":
+        return "Next check: run preflight, then export or hand off explicitly.";
+    }
+  })();
+
+  return {
+    stepId: step.id,
+    label,
+    title: `${step.label}: ${step.detail} / ${summary.countLabel}`
+  };
 }
 
 function FirstBeatPathJumpResultStrip({ result }: { result: FirstBeatPathJumpResult }): ReactElement {
