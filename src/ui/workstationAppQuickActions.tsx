@@ -1200,6 +1200,7 @@ export function createQuickActions({
   onFocusArrangementMuteMapReadout,
   onFocusArrangementMuteMap,
   onFocusArrangementPlaybackReadout,
+  onFocusAudibleArrangementFollowReadout,
   onFocusArrangementTransitionMapReadout,
   onFocusArrangementTransitionMap,
   onApplyBasslinePad,
@@ -1524,6 +1525,7 @@ export function createQuickActions({
   onFocusArrangementMuteMapReadout: () => void;
   onFocusArrangementMuteMap: (lane: ArrangementMuteMapLane) => void;
   onFocusArrangementPlaybackReadout: () => void;
+  onFocusAudibleArrangementFollowReadout: () => void;
   onFocusArrangementTransitionMapReadout: () => void;
   onFocusArrangementTransitionMap: (transition: ArrangementTransitionMapTransition) => void;
   onApplyBasslinePad: (pad: BasslinePadId) => void;
@@ -1840,6 +1842,34 @@ export function createQuickActions({
       arrangementPlaybackReadout.roleLabel
     } ${arrangementPlaybackDetailLabel} ${transportLoopScope} song form beginner producer direct beat workstation`,
     run: onFocusArrangementPlaybackReadout
+  };
+  const audibleArrangementFollowReadoutAction: QuickAction = {
+    id: "audible-arrangement-follow-readout-action",
+    title: audibleArrangementFollowBlock
+      ? `Review Audible Arrangement Follow Readout: Block ${audibleArrangementFollowBlockNumber}`
+      : editingAudibleArrangementBlock
+        ? `Review Audible Arrangement Follow Readout: aligned Block ${selectedBlockNumber || selectedArrangementIndex + 1}`
+        : "Review Audible Arrangement Follow Readout",
+    detail: audibleArrangementFollowBlock
+      ? `Hearing Block ${audibleArrangementFollowBlockNumber} ${audibleArrangementFollowBlock.section} Pattern ${
+          audibleArrangementFollowBlock.pattern
+        } while editing ${selectedBlockLabel} / ${arrangementPlaybackReadout.statusLabel} / ${arrangementPlaybackDetailLabel} / ${
+          transportLoopLabel(transportLoopScope)
+        } loop / ${project.bpm} BPM`
+      : editingAudibleArrangementBlock
+        ? `Already editing audible ${selectedBlockLabel} / ${arrangementPlaybackReadout.statusLabel} / ${
+            arrangementPlaybackDetailLabel
+          } / ${transportLoopLabel(transportLoopScope)} loop / ${project.bpm} BPM`
+        : `No audible arrangement block / ${arrangementPlaybackReadout.statusLabel} / ${arrangementPlaybackDetailLabel} / ${
+            transportLoopLabel(transportLoopScope)
+          } loop / ${project.bpm} BPM`,
+    group: "Arrange",
+    keywords: `Quick Actions Audible Arrangement Follow Readout review edit heard audible block alignment arrangement playback Pattern ${
+      audibleArrangementFollowBlock?.pattern ?? project.selectedPattern
+    } ${playingArrangementIndex !== null ? playingArrangementIndex + 1 : "idle"} ${
+      selectedArrangementIndex + 1
+    } ${transportLoopScope} beginner producer`,
+    run: onFocusAudibleArrangementFollowReadout
   };
   const audibleArrangementFollowAction: QuickAction = {
     id: "arrangement-follow-audible",
@@ -4665,6 +4695,7 @@ export function createQuickActions({
     songFormPriorityAction,
     ...structureLensCommandActions,
     arrangementPlaybackReadoutAction,
+    audibleArrangementFollowReadoutAction,
     audibleArrangementFollowAction,
     ...selectedBlockActions,
     ...patternUseActions,
@@ -6122,6 +6153,7 @@ export function createQuickActionResult(
     action.id.startsWith("pattern-dna-card-") ||
     action.id === "pattern-playback-readout-action" ||
     action.id === "arrangement-playback-readout-action" ||
+    action.id === "audible-arrangement-follow-readout-action" ||
     action.id.startsWith("mode-focus-card-") ||
     action.id === "beat-passport-focus" ||
     action.id.startsWith("beat-passport-metric-") ||
@@ -11788,6 +11820,68 @@ export function quickActionArrangementPlaybackBlockLabel(
   return `${role} Block ${index + 1} ${block.section} / Pattern ${block.pattern} / ${rangeLabel} / ${barCountLabel(bars)}`;
 }
 
+export function quickActionAudibleArrangementFollowReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "audible-arrangement-follow-readout-action") {
+    return null;
+  }
+
+  const selectedIndex = Math.min(Math.max(0, selectedArrangementIndex), Math.max(project.arrangement.length - 1, 0));
+  const selectedBlock = project.arrangement[selectedIndex] ?? null;
+  const targetIndex = audibleArrangementFollowReadoutQuickActionTargetIndex(action);
+  const targetBlock = targetIndex !== null ? project.arrangement[targetIndex] ?? null : null;
+  const detailParts = quickActionArrangementPlaybackReadoutDetailParts(action);
+  const statusLabel = detailParts[1] ?? detailParts[0] ?? "Arrangement playback";
+  const playbackDetail = detailParts[2] ?? selectedBlock?.pattern ?? "No arrangement block";
+  const loopLabel = detailParts.find((part) => /\s+loop$/.test(part))?.replace(/\s+loop$/, "") || "current loop";
+  const usedSlots = usedPatternSlots(project);
+  const selectedLabel = selectedBlock
+    ? quickActionArrangementPlaybackBlockLabel(project, selectedIndex, selectedBlock, "selected")
+    : "selected block unavailable";
+  const targetLabel = targetBlock
+    ? quickActionArrangementPlaybackBlockLabel(project, targetIndex ?? 0, targetBlock, "heard")
+    : action.detail.startsWith("Already editing audible")
+      ? "heard block matches selected edit block"
+      : "heard block idle";
+  const targetEventCount = targetBlock ? patternEventTotal(project.patterns[targetBlock.pattern]) : null;
+  const selectedEventCount = selectedBlock ? patternEventTotal(project.patterns[selectedBlock.pattern]) : 0;
+
+  return {
+    id: "audible-arrangement-follow-readout",
+    label: "Audible follow readout",
+    value: [
+      "review audible arrangement follow",
+      statusLabel,
+      playbackDetail,
+      `loop ${loopLabel}`,
+      selectedLabel,
+      targetLabel,
+      `${selectedEventCount} selected-block events`,
+      targetEventCount === null ? "audible events unchanged" : `${targetEventCount} audible-block events`,
+      usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "follow unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+export function audibleArrangementFollowReadoutQuickActionTargetIndex(action: QuickAction): number | null {
+  if (action.id !== "audible-arrangement-follow-readout-action") {
+    return null;
+  }
+
+  const titleMatch = /Block (\d+)/.exec(action.title);
+  const detailMatch = /Hearing Block (\d+)/.exec(action.detail);
+  const blockNumber = Number(detailMatch?.[1] ?? titleMatch?.[1]);
+  return Number.isInteger(blockNumber) && blockNumber > 0 ? blockNumber - 1 : null;
+}
+
 export function quickActionAudibleArrangementFollowMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -12939,6 +13033,16 @@ export function quickActionResultMetricSnapshot(
       quickActionAudibleArrangementFollowMetricSnapshot(project, action, selectedArrangementIndex, phase) ?? {
         id: "arrangement-follow-audible",
         label: "Audible block",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "audible-arrangement-follow-readout-action") {
+    return (
+      quickActionAudibleArrangementFollowReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "audible-arrangement-follow-readout",
+        label: "Audible follow readout",
         value: action.detail
       }
     );
@@ -16609,6 +16713,14 @@ export function quickActionResultFollowup(
       auditionCue:
         "Keep Song playback running only if you need live context; edit the selected block after confirming it is the audible section.",
       nextCheck: "Use Arrangement Playback Readout and Song Form Overview to confirm Editing and Hearing match before changing arrangement details."
+    };
+  }
+
+  if (action.id === "audible-arrangement-follow-readout-action") {
+    return {
+      auditionCue:
+        "Review whether the heard arrangement block should become the explicit editing block before running Audible Arrangement Follow.",
+      nextCheck: "Run Audible Arrangement Follow only when the audible block is the section you want to edit now."
     };
   }
 
