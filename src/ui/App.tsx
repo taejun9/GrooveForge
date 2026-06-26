@@ -1933,6 +1933,12 @@ export function App(): ReactElement {
     selectedNote?.track === "melody"
       ? currentPattern.melodyNotes.find((note) => note.step === selectedNote.step && note.pitch === selectedNote.pitch)
       : undefined;
+  const selectedCaptureNoteActive = Boolean(
+    selectedNote && (selectedNote.track === "bass" ? selectedBassNote : selectedMelodyNote)
+  );
+  const selectedCaptureNoteLabel = selectedNote
+    ? `${selectedNote.track === "bass" ? "808" : "Synth"} ${selectedNote.pitch}.${selectedNote.step + 1}`
+    : "No selected note";
   const selectedDrumActive = selectedDrumStep
     ? currentPattern.drumPattern[selectedDrumStep.lane][selectedDrumStep.step]
     : false;
@@ -7899,7 +7905,10 @@ export function App(): ReactElement {
       midiStatusLabel: midiCaptureSummary.statusLabel,
       midiDetailLabel: midiCaptureSummary.detailLabel,
       midiSelectedInputId,
-      midiLastNoteLabel
+      midiLastNoteLabel,
+      selectedNote,
+      selectedNoteActive: selectedCaptureNoteActive,
+      selectedNoteLabel: selectedCaptureNoteLabel
     });
     closeQuickActions();
     try {
@@ -8122,6 +8131,19 @@ export function App(): ReactElement {
     );
   }
 
+  function focusCaptureStepModeReadout(): void {
+    const targetLabel = keyboardCaptureTarget === "bass" ? "808" : "Synth";
+    const selectedLabel = selectedNote
+      ? `${selectedCaptureNoteLabel}${selectedCaptureNoteActive ? "" : " inactive"}`
+      : "No selected note";
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Capture Step Mode ${quickActionCaptureStepModeLabel(
+        keyboardCaptureStepMode
+      )}: ${targetLabel} / ${selectedLabel} / Step ${keyboardCaptureNextStep + 1}`
+    );
+  }
+
   const quickActions = createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
@@ -8289,6 +8311,7 @@ export function App(): ReactElement {
     onFocusSwingFeelReadout: focusSwingFeelReadout,
     onFocusKeyRetargetReadout: focusKeyRetargetReadout,
     onFocusKeyboardCaptureReadout: focusKeyboardCaptureReadout,
+    onFocusCaptureStepModeReadout: focusCaptureStepModeReadout,
     onFocusStyleDirectionReadout: focusStyleDirectionReadout,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onCueBlueprintPreview: cueBeatBlueprintPreview,
@@ -17954,6 +17977,7 @@ function createQuickActions({
   onFocusSwingFeelReadout,
   onFocusKeyRetargetReadout,
   onFocusKeyboardCaptureReadout,
+  onFocusCaptureStepModeReadout,
   onFocusStyleDirectionReadout,
   onPreviewBlueprint,
   onCueBlueprintPreview,
@@ -18245,6 +18269,7 @@ function createQuickActions({
   onFocusSwingFeelReadout: () => void;
   onFocusKeyRetargetReadout: () => void;
   onFocusKeyboardCaptureReadout: () => void;
+  onFocusCaptureStepModeReadout: () => void;
   onFocusStyleDirectionReadout: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onCueBlueprintPreview: (scope: Extract<TransportLoopScope, "arrangement" | "pattern">) => void;
@@ -19152,6 +19177,28 @@ function createQuickActions({
       onDuplicateSelectedChordToStep,
       onDeleteSelectedChord
     });
+  const captureStepSelectedLabel = selectedNote
+    ? `${selectedNoteLabel}${selectedNoteActive ? "" : " inactive"}`
+    : "No selected note";
+  const captureStepPlacementLabel =
+    keyboardCaptureStepMode === "replace-selected" && selectedNoteActive && selectedNote?.track === keyboardCaptureTarget
+      ? `will replace ${selectedNoteLabel}`
+      : keyboardCaptureStepMode === "replace-selected"
+        ? `needs selected ${keyboardCaptureTargetLabel} step`
+        : `fills next empty ${keyboardCaptureTargetLabel} step`;
+  const captureStepModeReadoutAction: QuickAction = {
+    id: "capture-step-mode-readout-action",
+    title: `Review Capture Step Mode: ${quickActionCaptureStepModeLabel(keyboardCaptureStepMode)}`,
+    detail: `${quickActionCaptureStepModeLabel(
+      keyboardCaptureStepMode
+    )} / Target ${keyboardCaptureTargetLabel} / ${captureStepPlacementLabel} / ${captureStepSelectedLabel} / ${keyboardCaptureDefaultSummary(
+      keyboardCaptureTarget,
+      activeCaptureDefaults
+    )} / Pattern ${project.selectedPattern}`,
+    group: "Create",
+    keywords: `capture step mode readout review placement input posture next empty replace selected selected step note ${keyboardCaptureStepMode} ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} ${captureStepPlacementLabel} ${captureStepSelectedLabel} ${keyboardCaptureDefaultDetail} midi ${midiCaptureStatus} pattern ${project.selectedPattern} beginner producer direct composition sample free`,
+    run: onFocusCaptureStepModeReadout
+  };
   const captureStepModeActions = createCaptureStepModeActions({
     keyboardCaptureStepMode,
     keyboardCaptureTarget,
@@ -20227,6 +20274,7 @@ function createQuickActions({
     patternPlaybackReadoutAction,
     audiblePatternFollowAction,
     keyboardCaptureReadoutAction,
+    captureStepModeReadoutAction,
     {
       id: "midi-input-connect",
       title: midiInputConnectTitle,
@@ -22295,6 +22343,9 @@ type QuickActionInputSetupSnapshot = {
   midiDetailLabel: string;
   midiSelectedInputId: string;
   midiLastNoteLabel: string;
+  selectedNote: SelectedNote | null;
+  selectedNoteActive: boolean;
+  selectedNoteLabel: string;
 };
 
 type QuickActionInputSetupResultState = {
@@ -22305,6 +22356,7 @@ type QuickActionInputSetupResultState = {
 function isInputSetupQuickAction(action: QuickAction): boolean {
   return (
     action.id === "keyboard-capture-readout-action" ||
+    action.id === "capture-step-mode-readout-action" ||
     action.id === "keyboard-capture-toggle" ||
     action.id === "midi-input-connect" ||
     action.id === "midi-input-arm" ||
@@ -22332,7 +22384,8 @@ function createQuickActionInputSetupResultState(
 function cloneQuickActionInputSetupSnapshot(snapshot: QuickActionInputSetupSnapshot): QuickActionInputSetupSnapshot {
   return {
     ...snapshot,
-    keyboardCaptureDefaults: cloneKeyboardCaptureDefaults(snapshot.keyboardCaptureDefaults)
+    keyboardCaptureDefaults: cloneKeyboardCaptureDefaults(snapshot.keyboardCaptureDefaults),
+    selectedNote: snapshot.selectedNote ? { ...snapshot.selectedNote } : null
   };
 }
 
@@ -22456,6 +22509,7 @@ function createQuickActionResult(
     action.id === "swing-feel-readout-action" ||
     action.id === "key-retarget-readout-action" ||
     action.id === "keyboard-capture-readout-action" ||
+    action.id === "capture-step-mode-readout-action" ||
     action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -28163,6 +28217,61 @@ function quickActionKeyboardCaptureReadoutMetricSnapshot(
   };
 }
 
+function quickActionCaptureStepModeReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  inputSetupResult: QuickActionInputSetupResultState | null,
+  phase: "before" | "after",
+  selectedArrangementIndex = 0,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "capture-step-mode-readout-action" || !inputSetupResult) {
+    return null;
+  }
+
+  const snapshot = phase === "before" ? inputSetupResult.before : inputSetupResult.after;
+  const target = snapshot.keyboardCaptureTarget;
+  const defaults = snapshot.keyboardCaptureDefaults[target];
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+
+  return {
+    id: "capture-step-mode-readout",
+    label: "Capture Step Mode",
+    value: [
+      "review capture step mode",
+      `placement ${quickActionCaptureStepModeLabel(snapshot.keyboardCaptureStepMode)}`,
+      `next capture ${quickActionCaptureStepCandidateLabel(project, snapshot)}`,
+      `selected note ${quickActionCaptureStepSelectedNoteLabel(snapshot)}`,
+      `target ${quickActionInputTargetLabel(target)}`,
+      `keyboard ${snapshot.keyboardCaptureEnabled ? "Armed" : "Off"}`,
+      `midi ${snapshot.midiCaptureArmed ? "Armed" : "Disarmed"} / ${snapshot.midiStatusLabel} / ${
+        snapshot.connectedMidiInputCount
+      }/${snapshot.midiInputCount} inputs / selected ${snapshot.midiSelectedInputId}`,
+      `defaults ${keyboardCaptureDefaultSummary(target, defaults)}`,
+      `degree map ${quickActionInputPitchMapLabel(project, snapshot)}`,
+      `selected ${quickActionArrangementSelectedBlockLabel(project, selectedArrangementIndex)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `808 ${pattern.bassNotes.length} notes`,
+      `Synth ${pattern.melodyNotes.length} notes`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `last MIDI ${snapshot.midiLastNoteLabel}`,
+      "placement unchanged",
+      "notes unchanged",
+      "MIDI permission unchanged",
+      "Pattern A/B/C unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
 function keyboardCaptureDefaultSummary(target: NoteTrack, defaults: KeyboardCaptureDefaults): string {
   const base = `oct ${defaults.octave} / len ${defaults.length} steps / vel ${percentLabel(defaults.velocity)}`;
   return target === "bass" ? `${base} / glide ${defaults.glide ? "On" : "Off"}` : base;
@@ -28264,6 +28373,39 @@ function quickActionInputPitchMapLabel(project: ProjectState, snapshot: QuickAct
   }
 
   return lanes.length === 1 ? lanes[0] : `${lanes[0]}-${lanes[lanes.length - 1]}`;
+}
+
+function quickActionCaptureStepSelectedNoteLabel(snapshot: QuickActionInputSetupSnapshot): string {
+  if (!snapshot.selectedNote) {
+    return "none";
+  }
+
+  const targetLabel = snapshot.selectedNote.track === "bass" ? "808" : "Synth";
+  return `${targetLabel} ${snapshot.selectedNote.pitch}.${snapshot.selectedNote.step + 1} ${
+    snapshot.selectedNoteActive ? "active" : "inactive"
+  }`;
+}
+
+function quickActionCaptureStepCandidateLabel(
+  project: ProjectState,
+  snapshot: QuickActionInputSetupSnapshot
+): string {
+  const pattern = activePattern(project);
+  const step = resolveKeyboardCaptureStep(
+    pattern,
+    snapshot.keyboardCaptureTarget,
+    snapshot.selectedNote,
+    snapshot.keyboardCaptureStepMode
+  );
+  const targetLabel = quickActionInputTargetLabel(snapshot.keyboardCaptureTarget);
+  if (snapshot.keyboardCaptureStepMode === "replace-selected") {
+    if (snapshot.selectedNote?.track === snapshot.keyboardCaptureTarget && snapshot.selectedNoteActive) {
+      return `step ${snapshot.selectedNote.step + 1} replacing ${snapshot.selectedNoteLabel}`;
+    }
+    return `step ${step + 1} fallback; select active ${targetLabel} note to replace`;
+  }
+
+  return `step ${step + 1} next empty ${targetLabel}`;
 }
 
 function quickActionResultMetricSnapshot(
@@ -28554,6 +28696,23 @@ function quickActionResultMetricSnapshot(
       ) ?? {
         id: "keyboard-capture-readout",
         label: "Keyboard Capture",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "capture-step-mode-readout-action") {
+    return (
+      quickActionCaptureStepModeReadoutMetricSnapshot(
+        project,
+        action,
+        inputSetupResult,
+        phase,
+        selectedArrangementIndex,
+        analysis ?? undefined
+      ) ?? {
+        id: "capture-step-mode-readout",
+        label: "Capture Step Mode",
         value: action.detail
       }
     );
@@ -31625,6 +31784,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the Keyboard Capture readout before pressing mapped desktop keys, arming MIDI, changing capture defaults, arranging, or exporting.",
       nextCheck: "Toggle Keyboard Capture, switch 808/Synth target, or adjust Capture Step Mode only when the readout matches the next note-entry move."
+    };
+  }
+
+  if (action.id === "capture-step-mode-readout-action") {
+    return {
+      auditionCue: "Use the Capture Step Mode readout before pressing mapped desktop keys or MIDI notes that should land on a specific 808/Synth step.",
+      nextCheck: "Switch between Next empty and Replace selected only when the readout matches the intended note-entry placement."
     };
   }
 
