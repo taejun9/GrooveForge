@@ -780,6 +780,7 @@ export function QuickActions({
   const firstRunnableAction = actions.find((action) => !action.disabled);
   const spotlight = createQuickActionSpotlightSummary(actions, firstRunnableAction, scope, scopeOptions, query);
   const searchRecovery = createQuickActionSearchRecovery(query, scope, scopeOptions, actions.length);
+  const searchHints = createQuickActionSearchHints(query, scope, recentActionSource);
   const pinnedActions = createQuickActionPinnedOptions(pinnedActionIds, recentActionSource);
   const recentActions = createQuickActionRecentOptions(recents, recentActionSource);
   const inspectedPinnedAction = pinnedActions.find((action) => action.id === inspectedPinnedActionId) ?? null;
@@ -887,6 +888,24 @@ export function QuickActions({
           type="search"
           value={query}
         />
+        {searchHints.length > 0 && (
+          <div className="quick-actions-search-hints" data-testid="quick-actions-search-hints">
+            <span data-testid="quick-actions-search-hints-label">Search hints</span>
+            {searchHints.map((hint) => (
+              <button
+                data-search-hint={hint.term}
+                data-testid={`quick-actions-search-hint-${hint.term}`}
+                key={hint.term}
+                onClick={() => onQueryChange(hint.term)}
+                title={`${hint.label}: ${hint.detail}`}
+                type="button"
+              >
+                <strong>{hint.label}</strong>
+                <small data-testid={`quick-actions-search-hint-count-${hint.term}`}>{hint.detail}</small>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="quick-actions-scope-bar" data-testid="quick-actions-scope-bar" aria-label="Quick Action scopes">
           {scopeOptions.map((option) => (
             <button
@@ -1275,6 +1294,83 @@ export function QuickActions({
       </section>
     </div>
   );
+}
+
+type QuickActionSearchHint = {
+  term: string;
+  label: string;
+  count: number;
+  detail: string;
+};
+
+const quickActionSearchHintTerms: Record<QuickActionScopeId, string[]> = {
+  all: ["guide", "blueprint", "export", "mix"],
+  transport: ["play", "loop", "tempo", "metronome"],
+  compose: ["blueprint", "drum", "808", "melody"],
+  arrange: ["block", "section", "pattern", "arrange"],
+  mix: ["mix", "headroom", "balance", "snapshot"],
+  master: ["master", "finish", "fade", "limiter"],
+  project: ["save", "draft", "snapshot", "handoff"],
+  export: ["wav", "stems", "midi", "handoff"]
+};
+
+function createQuickActionSearchHints(
+  query: string,
+  scope: QuickActionScopeId,
+  actions: QuickAction[]
+): QuickActionSearchHint[] {
+  if (query.trim().length > 0) {
+    return [];
+  }
+
+  return quickActionSearchHintTerms[scope]
+    .map((term) => {
+      const count = actions.filter((action) => quickActionHintMatchesScope(action, scope) && quickActionHintMatchesTerm(action, term)).length;
+      return {
+        term,
+        label: term,
+        count,
+        detail: `${count} match${count === 1 ? "" : "es"}`
+      };
+    })
+    .filter((hint) => hint.count > 0)
+    .slice(0, 4);
+}
+
+function quickActionHintMatchesScope(action: QuickAction, scope: QuickActionScopeId): boolean {
+  switch (scope) {
+    case "all":
+      return true;
+    case "transport":
+      return action.group === "Transport";
+    case "compose":
+      return action.group === "Create";
+    case "arrange":
+      return action.group === "Arrange";
+    case "mix":
+      return action.group === "Mix" && action.id !== "master-finish" && !action.id.startsWith("master-finish-");
+    case "master":
+      return action.id === "master-finish" || action.id.startsWith("master-finish-") || action.title.toLowerCase().includes("master");
+    case "project":
+      return action.group === "Project" || action.group === "Edit";
+    case "export":
+      return action.group === "Export";
+  }
+}
+
+function quickActionHintMatchesTerm(action: QuickAction, term: string): boolean {
+  const normalizedTerm = term.trim().toLowerCase();
+  if (!normalizedTerm) {
+    return false;
+  }
+  return quickActionHintTokens(action).some((token) => token.startsWith(normalizedTerm));
+}
+
+function quickActionHintTokens(action: QuickAction): string[] {
+  return `${action.group} ${action.title} ${action.detail} ${action.keywords}`
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
 }
 
 function QuickActionSearchRecoveryResultStrip({ result }: { result: QuickActionSearchRecoveryResult }): ReactElement {
