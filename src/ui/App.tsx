@@ -7109,6 +7109,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusMasterAutomationReadout(): void {
+    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    setProjectStatus(
+      `Master Automation ${masterAutomationPreviewSummary.statusLabel}: ${masterAutomationPreviewSummary.padLabel} / ${masterAutomationPreviewSummary.rangeLabel}`
+    );
+  }
+
   function focusExportMeter(): void {
     const currentProject = projectRef.current;
     const analysis = analyzeExport(currentProject);
@@ -8136,6 +8143,7 @@ export function App(): ReactElement {
     onApplyGrooveFeel: applyGrooveFeel,
     onApplyLayerStarter: applyLayerStarter,
     onApplyMasterAutomation: applyMasterAutomationPad,
+    onFocusMasterAutomationReadout: focusMasterAutomationReadout,
     onApplyMasterFinish: applyMasterFinishPad,
     onFocusMasterFinishReadout: focusMasterFinishReadout,
     onApplyMelodyMotif: applyMelodyMotif,
