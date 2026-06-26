@@ -8024,6 +8024,19 @@ export function App(): ReactElement {
     );
   }
 
+  function focusSelectedArrangementBlockReadout(): void {
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      selectedArrangementBlock && selectedArrangementBlockRole
+        ? `Selected Arrangement Block Readout Block ${selectedArrangementIndex + 1}: ${
+            selectedArrangementBlockRole.roleLabel
+          } / ${selectedArrangementBlock.section} Pattern ${selectedArrangementBlock.pattern} / ${
+            selectedArrangementBlockRole.timelineLabel
+          } / ${selectedArrangementBlockRole.detailLabel}`
+        : "Selected Arrangement Block Readout: no selected arrangement block"
+    );
+  }
+
   function focusAudibleArrangementFollowReadout(): void {
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8251,6 +8264,7 @@ export function App(): ReactElement {
     onApplyReviewFix: applyReviewFix,
     onFocusArrangementMuteMapReadout: focusArrangementMuteMapReadout,
     onFocusArrangementMuteMap: focusArrangementMuteMapLane,
+    onFocusSelectedArrangementBlockReadout: focusSelectedArrangementBlockReadout,
     onFocusArrangementPlaybackReadout: focusArrangementPlaybackReadout,
     onFocusAudibleArrangementFollowReadout: focusAudibleArrangementFollowReadout,
     onFocusArrangementTransitionMapReadout: focusArrangementTransitionMapReadout,
