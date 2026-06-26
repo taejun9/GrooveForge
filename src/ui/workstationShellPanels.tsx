@@ -238,7 +238,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context: "Bottleneck metric, current context, audition cue, next check, completion breakdown, and bottleneck posture before focus."
       },
       { id: "first-beat-path", command: "First Beat Path", shortcut: "Quick Actions / Readout", target: "Setup / compose / arrange / mix / deliver" },
-      { id: "beat-spine", command: "Beat Spine", shortcut: "Quick Actions / Readout", target: "Setup / drums / 808 / sound / finish" },
+      {
+        id: "beat-spine",
+        command: "Beat Spine",
+        shortcut: "Quick Actions / Readout",
+        target: "Jump / apply core axis",
+        context:
+          "Setup, Drums, 808/Bass, Harmony, Melody, Sound, Arrange, and Finish context with destination/action, beat-core metric, scope, audition cue, and next check before Beat Spine commands run."
+      },
       { id: "mode-focus", command: "Mode Focus", shortcut: "Quick Actions / Readout", target: "Guided / Studio orientation" },
       { id: "mode-switch", command: "Mode Switch", shortcut: "Quick Actions", target: "Guided / Studio mode" },
       { id: "session-pass", command: "Session Pass", shortcut: "Quick Actions / Readout", target: "Setup / risk / delivery" },
