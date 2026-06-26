@@ -7089,6 +7089,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusSpaceFxReadout(): void {
+    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Space FX ${spaceFxPreviewSummary.statusLabel}: ${spaceFxPreviewSummary.padLabel} / ${spaceFxPreviewSummary.sendLabel}`
+    );
+  }
+
   function focusMasterOutputRole(): void {
     const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -8133,6 +8140,7 @@ export function App(): ReactElement {
     onRecallMixSnapshot: recallMixSnapshot,
     onClearMixSnapshots: clearMixSnapshots,
     onFocusMixSnapshotReadout: focusMixSnapshotReadout,
+    onFocusSpaceFxReadout: focusSpaceFxReadout,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternClone: cloneSelectedPatternVariation,
     onApplyPatternFill: applyPatternFill,
