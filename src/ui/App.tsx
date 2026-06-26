@@ -13302,6 +13302,7 @@ function ComposerActionResultStrip({ result }: { result: ComposerActionResult })
       </div>
       <div className="composer-action-result-meta">
         <span data-testid="composer-action-result-status">{result.status}</span>
+        <span data-testid="composer-action-result-route">{result.route}</span>
         <span data-testid="composer-action-result-scope">{result.scope}</span>
         <span data-testid="composer-action-result-impact">{result.impact}</span>
         <span data-testid="composer-action-result-safety">{result.safety}</span>
@@ -36224,6 +36225,7 @@ function createComposerActionResult(
     title: `${action.buttonLabel} ${changed ? "applied" : "already current"}`,
     status: changed ? "Applied" : "Already current",
     detail: `${action.label} / ${action.scope}`,
+    route: quickActionComposerActionRouteLabel(action, action.area),
     scope: action.scope,
     impact: action.impact,
     safety: action.safety,
