@@ -593,6 +593,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Pattern Cue Readout Action, Target Pattern A/B/C, Current Edit Pattern, Selected-Block Placement, Pattern Loop Scope, Target Pattern Event Count, Arrangement Usage, Audition Cue, and Next Pattern Cue Check context before direct Pattern Cue commands run."
       },
       {
+        id: "pattern-switch-readout",
+        command: "Pattern Switch Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Pattern A/B/C edit-focus preview",
+        context:
+          "Pattern Switch Readout Action, Target Pattern A/B/C, Current Edit Pattern, Selected-Block Placement, Target Pattern Event Count, Arrangement Usage, Audition Cue, and Next Pattern Switch Check context before direct Pattern Switch commands run."
+      },
+      {
         id: "pattern-use-readout",
         command: "Pattern Use Readout",
         shortcut: "Quick Actions / Readout",
