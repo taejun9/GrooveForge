@@ -980,6 +980,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Peak, RMS, Dynamics, Headroom, Limiter Activity, Master Ceiling, Arrangement Duration, Mix Coach Follow-Up, Export Preflight Route, Audition Cue, and Manual-Trim Next Check context before Export Meter review."
       },
       {
+        id: "master-output-role",
+        command: "Master Output Role",
+        shortcut: "Readout",
+        target: "Preset / export status / ceiling / output gain / headroom",
+        context:
+          "Master Preset, Export Status, Master Ceiling, Output Gain, Headroom, Limiter Activity, Export Meter Review, Mix Coach Follow-Up, Handoff Sheet Context, Audition Cue, and Manual-Trim Next Check context before Master Output Role review."
+      },
+      {
         id: "finish-checklist",
         command: "Finish Checklist",
         shortcut: "Quick Actions / Readout",
