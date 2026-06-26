@@ -8031,6 +8031,13 @@ export function App(): ReactElement {
     setProjectStatus(`Checked project safety: ${projectSafetyReadout.statusLabel}`);
   }
 
+  function focusTransportPositionReadout(): void {
+    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Transport Position ${transportPositionReadout.statusLabel}: ${transportPositionReadout.roleLabel} / ${transportPositionReadout.detailLabel}`
+    );
+  }
+
   function focusLoopScopeReadout(): void {
     const currentLoopStatus = transportLoopStatus(
       project,
@@ -8153,6 +8160,7 @@ export function App(): ReactElement {
     styleInspectorSummary,
     beatBlueprintPreviewId,
     transportLoopScope,
+    transportPositionReadout,
     toplineLoopCueTarget,
     toplineSpaceSummary,
     workflowNavigatorItems,
@@ -8310,6 +8318,7 @@ export function App(): ReactElement {
     onFocusListeningPass: focusListeningPassItem,
     onFocusLoopScope: focusLoopScopeReadout,
     onFocusMetronomeReadout: focusMetronomeReadout,
+    onFocusTransportPositionReadout: focusTransportPositionReadout,
     onFocusMixCoach: focusMixCoachCheck,
     onFocusExportMeter: focusExportMeter,
     onFocusMasterOutputRole: focusMasterOutputRole,
@@ -17802,6 +17811,7 @@ function createQuickActions({
   styleInspectorSummary,
   beatBlueprintPreviewId,
   transportLoopScope,
+  transportPositionReadout,
   toplineLoopCueTarget,
   toplineSpaceSummary,
   workflowNavigatorItems,
@@ -17958,6 +17968,7 @@ function createQuickActions({
   onFocusListeningPass,
   onFocusLoopScope,
   onFocusMetronomeReadout,
+  onFocusTransportPositionReadout,
   onFocusMixCoach,
   onFocusExportMeter,
   onFocusMasterOutputRole,
@@ -18080,6 +18091,7 @@ function createQuickActions({
   styleInspectorSummary: StyleInspectorSummary;
   beatBlueprintPreviewId: BeatBlueprintId;
   transportLoopScope: TransportLoopScope;
+  transportPositionReadout: TransportPositionReadoutSummary;
   toplineLoopCueTarget: ToplineLoopCueTarget;
   toplineSpaceSummary: ToplineSpaceSummary;
   workflowNavigatorItems: WorkflowNavigatorItem[];
@@ -18236,6 +18248,7 @@ function createQuickActions({
   onFocusListeningPass: (item: ListeningPassItem) => void;
   onFocusLoopScope: () => void;
   onFocusMetronomeReadout: () => void;
+  onFocusTransportPositionReadout: () => void;
   onFocusMixCoach: (check: MixCoachCheck) => void;
   onFocusExportMeter: () => void;
   onFocusMasterOutputRole: () => void;
@@ -19793,8 +19806,25 @@ function createQuickActions({
   const patternChainDecisionSummary = createPatternChainPreviewDecision(patternChainPreviewSummary);
   const loopScopeStatus = transportLoopStatus(project, transportLoopScope, selectedArrangementIndex, arrangementTransitionLoopTarget);
   const selectedLoopBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0] ?? null;
+  const transportPositionDetailLabel = transportPositionReadout.detailLabel.split(" / ").join(" + ");
 
   return [
+    {
+      id: "transport-position-readout-action",
+      title: `Review Transport Position: ${transportPositionReadout.roleLabel}`,
+      detail: `${transportPositionReadout.statusLabel} / ${transportPositionReadout.roleLabel} / ${
+        transportPositionDetailLabel
+      } / ${transportLoopLabel(transportLoopScope)} loop / Pattern ${project.selectedPattern} / ${project.bpm} BPM`,
+      group: "Transport",
+      keywords: `transport position readout bar beat step status playback cue loop scope ${
+        transportLoopScope
+      } ${transportPositionReadout.statusLabel} ${transportPositionReadout.roleLabel} ${
+        transportPositionDetailLabel
+      } Pattern ${project.selectedPattern} ${
+        selectedLoopBlock ? `${selectedLoopBlock.section} ${selectedLoopBlock.pattern}` : "no block"
+      } beginner producer direct beat workstation`,
+      run: onFocusTransportPositionReadout
+    },
     {
       id: "loop-scope",
       title: `Review Loop Scope: ${transportLoopLabel(transportLoopScope)}`,
@@ -22197,6 +22227,7 @@ function createQuickActionResult(
     action.id === "beat-terms-reference" ||
     action.id === "guide-quick-start" ||
     action.id === "guide-bottleneck-focus" ||
+    action.id === "transport-position-readout-action" ||
     action.id === "loop-scope" ||
     action.id === "metronome-readout" ||
     action.id === "timbre-check" ||
@@ -26254,6 +26285,60 @@ function quickActionHandoffExportFormatLaneLabel(action: QuickAction, metric: Ha
   return titleLabel && titleLabel !== "Focus Export Format" ? titleLabel : metric.label;
 }
 
+function quickActionTransportPositionMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "transport-position-readout-action") {
+    return null;
+  }
+
+  const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0] ?? null;
+  const blockLabel = selectedBlock
+    ? `Block ${Math.min(selectedArrangementIndex + 1, project.arrangement.length)} ${selectedBlock.section} / Pattern ${
+        selectedBlock.pattern
+      } / ${barCountLabel(selectedBlock.bars)}`
+    : "No selected block";
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionTransportPositionDetailParts(action);
+  const statusLabel = detailParts[0] ?? "Transport position";
+  const fallbackRoleLabel = action.title.replace(/^Review Transport Position:\s*/, "").trim() || "Bar/Beat/Step";
+  const roleLabel = detailParts[1] ?? fallbackRoleLabel;
+  const detailLabel = detailParts[2] ?? "Current playback or cued position";
+  const loopLabel = detailParts[3]?.replace(/\s+loop$/, "") || "current loop";
+
+  return {
+    id: "transport-position-readout",
+    label: "Transport Position",
+    value: [
+      "review transport position",
+      statusLabel,
+      roleLabel,
+      detailLabel,
+      `loop ${loopLabel}`,
+      `selected ${blockLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(activePattern(project))} editable events`,
+      patternUseLabel,
+      `${project.bpm} BPM`,
+      project.metronomeEnabled ? "metronome on" : "metronome off",
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+function quickActionTransportPositionDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function quickActionLoopScopeMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -27486,6 +27571,16 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "command-reference" || action.id === "beat-terms-reference") {
     return { id: "command-reference", label: "Reference", value: "Desktop / Project / Guide / Create / Sound / Arrange / Mix / Finish / Deliver / Beat Terms" };
+  }
+
+  if (action.id === "transport-position-readout-action") {
+    return (
+      quickActionTransportPositionMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "transport-position-readout",
+        label: "Transport Position",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id === "loop-scope") {
@@ -30580,6 +30675,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "No audio changed; this command only checks the current file, draft, snapshot, and beat-state safety posture.",
       nextCheck: quickActionProjectSafetyNextCheck(action)
+    };
+  }
+
+  if (action.id === "transport-position-readout-action") {
+    return {
+      auditionCue: "Use the Bar/Beat/Step readout to confirm the exact playback or cued position before judging timing.",
+      nextCheck: "Use Loop Scope, Pattern Playback, or Arrangement Playback readouts next when the position points at the wrong musical area."
     };
   }
 

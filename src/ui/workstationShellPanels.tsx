@@ -196,7 +196,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "reference", command: "Command Reference", shortcut: "? / CmdOrCtrl+/", target: "Help" },
       { id: "actions", command: "Quick Actions", shortcut: "CmdOrCtrl+K", target: "Command palette" },
       { id: "playback", command: "Play / Stop", shortcut: "Space", target: "Selected loop" },
-      { id: "transport-position", command: "Transport Position Readout", shortcut: "Readout", target: "Bar / beat / loop scope" },
+      {
+        id: "transport-position",
+        command: "Transport Position Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Bar / beat / loop scope",
+        context:
+          "Current Bar/Beat/Step, section, Pattern, loop scope, selected block, BPM, local result metric, audition cue, and next position check before playback or timing edits."
+      },
       {
         id: "loop-scope",
         command: "Loop Scope",
