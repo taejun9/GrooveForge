@@ -1212,6 +1212,7 @@ export function createQuickActions({
   onApplyLayerStarter,
   onApplyMasterAutomation,
   onApplyMasterFinish,
+  onFocusMasterFinishReadout,
   onApplyMelodyMotif,
   onApplyMelodyAccent,
   onApplyMelodyContour,
@@ -1520,6 +1521,7 @@ export function createQuickActions({
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
   onApplyMasterAutomation: (pad: MasterAutomationPadId) => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
+  onFocusMasterFinishReadout: () => void;
   onApplyMelodyMotif: (motif: MelodyMotifId) => void;
   onApplyMelodyAccent: (accent: MelodyAccentId) => void;
   onApplyMelodyContour: (contour: MelodyContourId) => void;
@@ -5054,6 +5056,19 @@ export function createQuickActions({
       run: () => onApplyMixFix("low_end")
     },
     {
+      id: "master-finish-readout-action",
+      title: `Review Master Finish: ${masterFinishPreviewSummary.padLabel}`,
+      detail: `${masterFinishPreviewSummary.statusLabel} / ${masterFinishPreviewSummary.presetLabel} / ${masterFinishPreviewSummary.ceilingLabel} / ${masterFinishPreviewSummary.outputLabel} / ${masterFinishPreviewSummary.changeLabel}`,
+      group: "Mix",
+      keywords: `Quick Actions Master Finish Readout review final output preview apply posture ceiling output demo vocal store club export meter stems ${
+        masterFinishPreviewSummary.padId
+      } ${masterFinishPreviewSummary.padLabel} ${masterFinishPreviewSummary.statusLabel} ${
+        masterFinishPreviewSummary.presetLabel
+      } beginner producer manual trim`,
+      resultTargetId: masterFinishPreviewSummary.padId,
+      run: onFocusMasterFinishReadout
+    },
+    {
       id: "master-finish-decision",
       title: masterFinishReady
         ? `Run Master Finish Decision: Apply ${masterFinishPreviewSummary.padLabel}`
@@ -5920,6 +5935,7 @@ export function createQuickActionResult(
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
+    action.id === "master-finish-readout-action" ||
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-focus" ||
@@ -6091,6 +6107,31 @@ export function quickActionMasterFinishMetricSnapshot(
   actionPad: MasterFinishPadDefinition | null,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
+  if (action.id === "master-finish-readout-action") {
+    const options = createMasterFinishPadOptions(project);
+    const preview = createMasterFinishPreviewSummary(project, options);
+    const pad = options.find((candidate) => candidate.id === preview.padId) ?? options[0];
+    if (!pad) {
+      return null;
+    }
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const stemAnalyses = analyzeStemExports(project);
+    const targetProject = applyMasterFinishPadToProject(project, pad);
+    const changedMoves = masterFinishChangedCount(project, targetProject);
+    return {
+      id: "master-finish-readout",
+      label: "Master Finish Readout",
+      value: quickActionMasterFinishMetricValue(project, exportAnalysis, stemAnalyses, [
+        quickActionMasterFinishActionLabel(action),
+        `preview ${preview.padLabel}`,
+        `status ${preview.statusLabel}`,
+        `current ${masterFinishQuickActionPosture(project)}`,
+        `target ${pad.preset} / ${formatDb(pad.ceilingDb)} ceiling / ${formatDb(pad.masterVolumeDb)} output`,
+        `moves ${changedMoves} finish move${changedMoves === 1 ? "" : "s"}`
+      ], quickActionMasterFinishNextCheck(action, pad))
+    };
+  }
+
   if (action.id !== "master-finish-decision" && action.id !== "master-finish" && !actionPad) {
     return null;
   }
@@ -6190,6 +6231,9 @@ export function isMasterFinishPadId(value: string | undefined): value is MasterF
 }
 
 export function quickActionMasterFinishActionLabel(action: QuickAction): string {
+  if (action.id === "master-finish-readout-action") {
+    return "review master finish readout";
+  }
   if (action.id === "master-finish-decision") {
     return "run master finish decision";
   }
@@ -6200,6 +6244,9 @@ export function quickActionMasterFinishActionLabel(action: QuickAction): string 
 }
 
 export function quickActionMasterFinishContextLabel(action: QuickAction): string {
+  if (action.id === "master-finish-readout-action") {
+    return "readout";
+  }
   if (action.id === "master-finish-decision") {
     return "decision";
   }
@@ -6210,6 +6257,9 @@ export function quickActionMasterFinishContextLabel(action: QuickAction): string
 }
 
 export function quickActionMasterFinishNextCheck(action: QuickAction, pad: MasterFinishPadDefinition): string {
+  if (action.id === "master-finish-readout-action") {
+    return "play Full Mix, inspect Export meter and stems, then apply Master Finish only if the preview fits";
+  }
   if (action.id === "master-finish-decision") {
     return "play Full Mix and inspect Export meter before another output posture move";
   }
@@ -16656,6 +16706,13 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Play Full Mix and read Master Output Role beside Export Meter before Master Finish or delivery export.",
       nextCheck: "Use Master Finish, Mix Coach, or manual ceiling/output trim only if role, headroom, or limiter posture does not fit the delivery target."
+    };
+  }
+
+  if (action.id === "master-finish-readout-action") {
+    return {
+      auditionCue: "Use the Master Finish readout before applying an output pad, then play Full Mix and inspect Export meter.",
+      nextCheck: "Apply Master Finish only when the preview target fits the delivery goal; otherwise trim ceiling or output manually."
     };
   }
 
