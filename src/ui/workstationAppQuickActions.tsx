@@ -1222,6 +1222,7 @@ export function createQuickActions({
   onRecallMixSnapshot,
   onClearMixSnapshots,
   onFocusMixSnapshotReadout,
+  onFocusSpaceFxReadout,
   onApplyPatternChain,
   onApplyPatternClone,
   onApplyPatternFill,
@@ -1529,6 +1530,7 @@ export function createQuickActions({
   onRecallMixSnapshot: (slot: MixSnapshotSlotId) => void;
   onClearMixSnapshots: () => void;
   onFocusMixSnapshotReadout: () => void;
+  onFocusSpaceFxReadout: () => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternClone: (target: PatternSlot, preset: PatternVariationPreset) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
@@ -2917,6 +2919,18 @@ export function createQuickActions({
   const masterAutomationReady = masterAutomationPreviewSummary.changedEvents > 0;
   const masterFinishReady = masterFinishPreviewSummary.changedMoves > 0;
   const spaceFxReady = spaceFxPreviewSummary.changedSends > 0;
+  const spaceFxReadoutAction: QuickAction = {
+    id: "space-fx-readout-action",
+    title: `Review Space FX: ${spaceFxPreviewSummary.padLabel}`,
+    detail: `${spaceFxPreviewSummary.statusLabel} / ${spaceFxPreviewSummary.sendLabel} / ${spaceFxPreviewSummary.focusLabel} / ${spaceFxPreviewSummary.changeLabel}`,
+    group: "Mix",
+    keywords: `Quick Actions Space FX Readout review dry room wide wash send ambience reverb preview apply posture drums 808 synth chords ${
+      spaceFxPreviewSummary.padId
+    } ${spaceFxPreviewSummary.padLabel} ${spaceFxPreviewSummary.statusLabel} ${spaceFxPreviewSummary.sendLabel} ${
+      spaceFxPreviewSummary.focusLabel
+    } beginner producer manual space sliders`,
+    run: onFocusSpaceFxReadout
+  };
   const mixBalancePadActions: QuickAction[] = mixBalancePadOptions.map((pad) => ({
     id: `mix-balance-pad-${pad.id}`,
     title: pad.changedCount > 0 ? `Apply ${pad.label} Mix Balance` : `${pad.label} Mix Balance already applied`,
@@ -4885,6 +4899,7 @@ export function createQuickActions({
       }
     },
     ...mixBalancePadActions,
+    spaceFxReadoutAction,
     {
       id: "space-fx-decision",
       title: spaceFxReady ? `Run Space FX Decision: Apply ${spaceFxPreviewSummary.padLabel}` : "Run Space FX Decision: Aligned",
@@ -5904,6 +5919,7 @@ export function createQuickActionResult(
     action.id === "arrangement-follow-audible" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
+    action.id === "space-fx-readout-action" ||
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-focus" ||
@@ -14090,6 +14106,30 @@ export function quickActionSpaceFxMetricSnapshot(
   action: QuickAction,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
+  if (action.id === "space-fx-readout-action") {
+    const options = createSpaceFxPadOptions(project.mixer);
+    const preview = createSpaceFxPreviewSummary(project.mixer, options);
+    const pad = options.find((candidate) => candidate.id === preview.padId) ?? options[0];
+    if (!pad) {
+      return null;
+    }
+    const transformed = applySpaceFxPadToMixer(project.mixer, pad);
+    const changedSends = spaceFxChangedSendCount(project.mixer, transformed);
+    return {
+      id: "space-fx-readout",
+      label: "Space FX Readout",
+      value: quickActionSpaceFxMetricValue(project, action, analysis, [
+        quickActionSpaceFxActionLabel(action),
+        `preview ${preview.padLabel} space`,
+        `status ${preview.statusLabel}`,
+        `target sends ${preview.sendLabel}`,
+        `current sends ${quickActionSpaceFxSendPosture(project.mixer)}`,
+        `focus ${preview.focusLabel}`,
+        `moves ${changedSends} send${changedSends === 1 ? "" : "s"}`
+      ])
+    };
+  }
+
   const pad = quickActionSpaceFxPadOption(project, action);
   if (!pad) {
     return null;
@@ -14163,6 +14203,10 @@ export function quickActionSpaceFxDetailParts(action: QuickAction): string[] {
 }
 
 export function quickActionSpaceFxNextCheck(action: QuickAction): string {
+  if (action.id === "space-fx-readout-action") {
+    return "play Full Mix and core stems before applying a Space FX pad or trimming Space sliders manually";
+  }
+
   if (action.id === "space-fx-decision") {
     return "play Full Mix and follow the visible Space FX Preview Decision before another shared-send move";
   }
@@ -14175,6 +14219,9 @@ export function quickActionSpaceFxNextCheck(action: QuickAction): string {
 }
 
 export function quickActionSpaceFxActionLabel(action: QuickAction): string {
+  if (action.id === "space-fx-readout-action") {
+    return "review space fx readout";
+  }
   if (action.id === "space-fx-decision") {
     return "run space fx decision";
   }
@@ -16673,6 +16720,13 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Confirm the downloaded deliverable outside the app, then return to Handoff Pack before exporting the next item.",
       nextCheck: "Use Handoff Export Receipt, Manifest Audit, and Send Order to verify the next WAV, stems, MIDI, or sheet step."
+    };
+  }
+
+  if (action.id === "space-fx-readout-action") {
+    return {
+      auditionCue: "Use the Space FX readout before applying a shared-send pad, then play Full Mix and core stems.",
+      nextCheck: "Apply Space FX only when the preview target matches what you hear; otherwise trim dry, room, wide, or wash manually."
     };
   }
 
