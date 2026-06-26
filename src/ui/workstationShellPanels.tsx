@@ -145,6 +145,7 @@ type CommandReferenceItem = {
   command: string;
   shortcut: string;
   target: string;
+  context?: string;
 };
 
 type CommandReferenceSection = {
@@ -226,13 +227,15 @@ const commandReferenceSections: CommandReferenceSection[] = [
         id: "guide-quick-start",
         command: "Guide Quick Start",
         shortcut: "Quick Actions / Readout",
-        target: "Path / session / workflow completion target"
+        target: "Destination / metric / next check",
+        context: "Path, Session, and Workflow context with audition cue, completion breakdown, and bottleneck posture before Run Guide."
       },
       {
         id: "guide-bottleneck-focus",
         command: "Guide Bottleneck Focus",
         shortcut: "Quick Actions",
-        target: "Lowest completion lane"
+        target: "Lowest completion lane / destination",
+        context: "Bottleneck metric, current context, audition cue, next check, completion breakdown, and bottleneck posture before focus."
       },
       { id: "first-beat-path", command: "First Beat Path", shortcut: "Quick Actions / Readout", target: "Setup / compose / arrange / mix / deliver" },
       { id: "beat-spine", command: "Beat Spine", shortcut: "Quick Actions / Readout", target: "Setup / drums / 808 / sound / finish" },
@@ -431,7 +434,7 @@ function commandReferenceMatchesQuery(values: string[], query: string): boolean 
 }
 
 function commandReferenceItemMatchesQuery(section: CommandReferenceSection, item: CommandReferenceItem, query: string): boolean {
-  return commandReferenceMatchesQuery([section.title, item.command, item.shortcut, item.target], query);
+  return commandReferenceMatchesQuery([section.title, item.command, item.shortcut, item.target, item.context ?? ""], query);
 }
 
 function beatTermMatchesQuery(item: BeatTermItem, query: string): boolean {
@@ -450,7 +453,7 @@ function createCommandReferenceSearchSpotlight(
   if (firstSection && firstCommand) {
     const status = hasSearchQuery ? "Top command match" : "First visible command";
     const detail = `${firstSection.title} / ${firstCommand.shortcut}`;
-    const context = firstCommand.target;
+    const context = firstCommand.context ? `${firstCommand.target} / ${firstCommand.context}` : firstCommand.target;
 
     return {
       id: `command-${firstCommand.id}`,
@@ -1773,7 +1776,17 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
                     <div className="command-reference-item" data-testid={`command-reference-item-${item.id}`} key={item.id}>
                       <kbd>{item.shortcut}</kbd>
                       <strong>{item.command}</strong>
-                      <small>{item.target}</small>
+                      <div className="command-reference-item-target" data-testid={`command-reference-item-${item.id}-target`}>
+                        <small>{item.target}</small>
+                        {item.context ? (
+                          <small
+                            className="command-reference-item-context"
+                            data-testid={`command-reference-item-${item.id}-context`}
+                          >
+                            {item.context}
+                          </small>
+                        ) : null}
+                      </div>
                     </div>
                   ))}
                 </div>
