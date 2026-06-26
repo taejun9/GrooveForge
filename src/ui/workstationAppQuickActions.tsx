@@ -1360,6 +1360,7 @@ export function createQuickActions({
   onExportMidi,
   onExportStems,
   onExportWav,
+  onFocusDirectExportsReadout,
   onJumpFirstBeatPath,
   onJumpBeatSpine,
   onFocusBeatPassport,
@@ -1698,6 +1699,7 @@ export function createQuickActions({
   onExportMidi: () => void;
   onExportStems: () => void;
   onExportWav: () => void;
+  onFocusDirectExportsReadout: () => void;
   onJumpFirstBeatPath: (step: FirstBeatPathStep) => void;
   onJumpBeatSpine: (card: BeatSpineCard) => void;
   onFocusBeatPassport: (metric: BeatPassportFocusItem) => void;
@@ -3338,6 +3340,23 @@ export function createQuickActions({
     ? (handoffPackItems.find((item) => item.id === handoffSendOrder.nextItemId) ?? null)
     : null;
   const handoffExportFormatSummary = createHandoffExportFormatSummary(project, exportAnalysis, stemAnalyses, handoffPackItems);
+  const directExportsReadoutAction: QuickAction = {
+    id: "direct-exports-readout-action",
+    title: "Review Direct Exports Readout",
+    detail: [
+      `${handoffReadyCount}/${handoffPackItems.length} deliverables ready`,
+      `WAV ${mixWavFileName(project)} / ${exportAnalysis.status}`,
+      `stems ${audibleStemTracks(stemAnalyses).length}/${stemTrackIds.length} audible`,
+      `MIDI ${midiFileName(project)} / ${barCountLabel(arrangementTotalBars(project))}`,
+      `sheet ${handoffSheetFileName(project)} / brief ${sessionBriefFilledFields(project.sessionBrief)}/4`,
+      `send ${handoffSendOrder.nextLabel}`,
+      "direct export preflight"
+    ].join(" / "),
+    group: "Export",
+    keywords:
+      "direct exports readout review export wav stems midi handoff sheet deliverable file delivery target package readiness receipt send order export preflight no render no download sample free beginner producer",
+    run: onFocusDirectExportsReadout
+  };
   const handoffExportFormatMetric = handoffExportFormatFocusMetric(handoffExportFormatSummary);
   const handoffExportFormatActions: QuickAction[] = handoffExportFormatSummary.metrics.map((metric) => ({
     id: `handoff-export-format-${metric.id}`,
@@ -5694,6 +5713,7 @@ export function createQuickActions({
         }
       }
     },
+    directExportsReadoutAction,
     {
       id: "export-wav",
       title: "Export WAV",
@@ -6431,7 +6451,8 @@ export function createQuickActionResult(
     action.id.startsWith("review-queue-item-") ||
     action.id.startsWith("finish-checklist-card-") ||
     action.id === "export-preflight-focus" ||
-    action.id.startsWith("export-preflight-card-");
+    action.id.startsWith("export-preflight-card-") ||
+    action.id === "direct-exports-readout-action";
   const inputSetupOnly = isInputSetupQuickAction(action);
   const blockClipboardOnly =
     action.id === "selected-block-copy" ||
@@ -7289,6 +7310,74 @@ export function quickActionDirectExportMetricSnapshot(
       ),
       `${project.arrangement.length} blocks`,
       barCountLabel(arrangementTotalBars(project))
+    ].join(" / ")
+  };
+}
+
+export function quickActionDirectExportsReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "direct-exports-readout-action") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const directTargets = ["export-wav", "export-stems", "export-midi", "export-handoff-sheet"]
+    .map(directExportQuickActionTarget)
+    .filter((target): target is DirectExportQuickActionTarget => target !== null);
+  const targetPosture = directTargets.map((target) =>
+    [
+      handoffExportReceiptItemLabel(target.id),
+      directExportQuickActionFileLabel(project, target),
+      directExportQuickActionReadinessLabel(project, target, exportAnalysis, stemAnalyses),
+      directExportQuickActionReceiptLabel(target, receipt)
+    ].join(" / ")
+  );
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "direct-exports-readout",
+    label: "Direct Exports Readout",
+    value: [
+      "review direct exports",
+      ...targetPosture,
+      `target ${activeDeliveryTarget(project).name} / ${barCountLabel(activeDeliveryTarget(project).targetBars)} / ${
+        activeDeliveryTarget(project).stemGoal
+      } stems`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `send ${sendOrder.statusLabel} / ${sendOrder.nextLabel}`,
+      `sequence ${sendOrder.sequenceLabel}`,
+      `receipt ${receipt.statusLabel} / ${receipt.fileLabel} / ${receipt.nextLabel}`,
+      "export unchanged",
+      "receipt unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
     ].join(" / ")
   };
 }
@@ -14316,6 +14405,16 @@ export function quickActionResultMetricSnapshot(
     }
   }
 
+  if (action.id === "direct-exports-readout-action") {
+    return (
+      quickActionDirectExportsReadoutMetricSnapshot(project, action, handoffExportReceipt, analysis ?? undefined) ?? {
+        id: "direct-exports-readout",
+        label: "Direct Exports Readout",
+        value: action.detail
+      }
+    );
+  }
+
   const directExportTarget = directExportQuickActionTarget(action.id);
   if (directExportTarget) {
     const exportAnalysis = analysis ?? analyzeExport(project);
@@ -18617,6 +18716,14 @@ export function quickActionResultFollowup(
         ? masterAutomationAuditionCue(masterAutomationPad.id)
         : "Play Song from the top and final bar; confirm the master fade supports the arrangement.",
       nextCheck: "Export WAV/stems after the fade feels right to confirm realtime and render behavior match."
+    };
+  }
+
+  if (action.id === "direct-exports-readout-action") {
+    return {
+      auditionCue: "Review WAV, stem, MIDI, and Handoff Sheet posture before exporting files.",
+      nextCheck:
+        "Run one explicit export only after the delivery target, filenames, package readiness, and send order match the handoff need."
     };
   }
 
