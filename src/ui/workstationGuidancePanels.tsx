@@ -318,6 +318,7 @@ export function ModeFocus({
 }): ReactElement {
   const activeCard = summary.cards.find((card) => card.id === summary.activeCardId) ?? null;
   const decisionActionDisabled = activeCard === null;
+  const decisionActionContext = activeCard ? modeFocusButtonContext(activeCard, summary) : summary.decisionTitle;
 
   return (
     <section className={`mode-focus ${summary.tone}`} data-testid="mode-focus" aria-label="Mode focus">
@@ -339,6 +340,7 @@ export function ModeFocus({
         <strong data-testid="mode-focus-decision-label">{summary.decisionLabel}</strong>
         <small data-testid="mode-focus-decision-detail">{summary.decisionDetail}</small>
         <button
+          aria-label={decisionActionContext}
           className="mode-focus-decision-action"
           data-mode-focus-decision-action={activeCard?.id ?? "none"}
           data-testid="mode-focus-decision-run"
@@ -348,7 +350,7 @@ export function ModeFocus({
               onFocus(activeCard);
             }
           }}
-          title={activeCard ? `Jump to ${activeCard.focusLabel}: ${activeCard.value}` : summary.decisionTitle}
+          title={decisionActionContext}
           type="button"
         >
           <ArrowRight size={13} aria-hidden="true" />
@@ -356,27 +358,102 @@ export function ModeFocus({
         </button>
       </div>
       <div className="mode-focus-grid" data-testid="mode-focus-grid">
-        {summary.cards.map((card) => (
-          <div className={`mode-focus-card ${card.tone}`} data-testid={`mode-focus-${card.id}`} key={card.id}>
-            <span>{card.label}</span>
-            <strong>{card.value}</strong>
-            <button
-              className="mode-focus-jump"
-              data-testid={`mode-focus-jump-${card.id}`}
-              onClick={() => onFocus(card)}
-              title={`Jump to ${card.focusLabel}: ${card.value}`}
-              type="button"
-            >
-              <ArrowRight size={13} aria-hidden="true" />
-              <span>{card.focusLabel}</span>
-            </button>
-            <small>{card.detail}</small>
-          </div>
-        ))}
+        {summary.cards.map((card) => {
+          const buttonContext = modeFocusButtonContext(card, summary);
+          return (
+            <div className={`mode-focus-card ${card.tone}`} data-testid={`mode-focus-${card.id}`} key={card.id}>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <button
+                aria-label={buttonContext}
+                className="mode-focus-jump"
+                data-testid={`mode-focus-jump-${card.id}`}
+                onClick={() => onFocus(card)}
+                title={buttonContext}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{card.focusLabel}</span>
+              </button>
+              <small>{card.detail}</small>
+            </div>
+          );
+        })}
       </div>
       {result && <ModeFocusJumpResultStrip result={result} />}
     </section>
   );
+}
+
+function modeFocusButtonContext(card: ModeFocusCard, summary: ModeFocusSummary): string {
+  return [
+    `Jump to ${card.focusLabel}: ${card.value}`,
+    `Destination ${card.focusLabel}`,
+    `Mode ${modeFocusButtonMetric(summary)}`,
+    `Context ${card.detail}`,
+    `Audition ${modeFocusButtonAuditionCue(card, summary)}`,
+    `Next ${modeFocusButtonNextCheck(card, summary)}`
+  ].join(" / ");
+}
+
+function modeFocusButtonMetric(summary: ModeFocusSummary): string {
+  const readyCount = summary.cards.filter((card) => card.tone === "good").length;
+  const reviewCount = summary.cards.filter((card) => card.tone === "warn").length;
+  const blockerCount = summary.cards.filter((card) => card.tone === "danger").length;
+  const modeLabel = summary.mode === "guided" ? "Guided" : "Studio";
+  return `${modeLabel} / ${readyCount}/${summary.cards.length} ready / ${reviewCount} review / ${blockerCount} blocker`;
+}
+
+function modeFocusButtonAuditionCue(card: ModeFocusCard, summary: ModeFocusSummary): string {
+  if (summary.mode === "guided") {
+    switch (card.id) {
+      case "stage":
+        return "Use the focused workstation panel to move the current beat-making stage forward.";
+      case "focus":
+        return "Use the focused writing lane for drums, 808/bass, harmony, melody, arrangement, or finish work.";
+      case "check":
+        return "Use the local check target before changing mix, master, handoff, or export decisions.";
+      default:
+        return "Use the Guided focus card as the next direct beat-making checkpoint.";
+    }
+  }
+
+  switch (card.id) {
+    case "session":
+      return "Use the focused studio pass to inspect mix, finish, and session readiness.";
+    case "issue":
+      return "Use the focused issue panel before choosing an explicit review fix.";
+    case "handoff":
+      return "Use the focused handoff target before WAV, stems, MIDI, or sheet export.";
+    default:
+      return "Use the Studio focus card as the next producer-level session checkpoint.";
+  }
+}
+
+function modeFocusButtonNextCheck(card: ModeFocusCard, summary: ModeFocusSummary): string {
+  if (summary.mode === "guided") {
+    switch (card.id) {
+      case "stage":
+        return "Return to Mode Focus after the current stage is ready or intentionally deferred.";
+      case "focus":
+        return "Return after the writing lane has a usable musical event or a clear reason to defer.";
+      case "check":
+        return "Return after the local check no longer blocks the first beat path.";
+      default:
+        return "Return to Mode Focus for the next Guided orientation card.";
+    }
+  }
+
+  switch (card.id) {
+    case "session":
+      return "Return after the session scan is ready for the selected delivery target.";
+    case "issue":
+      return "Return after the top studio issue is reviewed or fixed explicitly.";
+    case "handoff":
+      return "Return after handoff context and deliverables match the selected target.";
+    default:
+      return "Return to Mode Focus for the next Studio orientation card.";
+  }
 }
 
 export function GuideQuickStart({
