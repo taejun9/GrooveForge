@@ -893,12 +893,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Arrangement Arc Preview Decision, Priority Readout, Current/Direct Arc Commands, Section Energy Before/After, Result Feedback, Audition Cue, and Next Arc Check context before Arrangement Arc commands run."
       },
       {
+        id: "arrangement-focus-readout",
+        command: "Arrangement Focus Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current selected-block focus preview",
+        context:
+          "Arrangement Focus Readout Action, Selected Block Focus Suggestion, Section Role, Pattern A/B/C Assignment, Bar Length, Energy, Mute Posture, Selected Pattern, Editable Event Count, Block Count, Bar Count, Audition Cue, and Next Manual Focus Check context before Arrangement Focus commands run."
+      },
+      {
         id: "arrangement-focus",
         command: "Arrangement Focus",
-        shortcut: "Quick Actions / Readout",
+        shortcut: "Quick Actions / Decision",
         target: "Selected block",
         context:
-          "Arrangement Focus Preview, Preview Decision Readout, Priority Readout, Current/Direct Focus Commands, Selected-Block Before/After, Result Feedback, Audition Cue, and Next Focus Check context before Arrangement Focus commands run."
+          "Arrangement Focus Preview Decision, Priority Readout, Current/Direct Focus Commands, Selected-Block Before/After, Result Feedback, Audition Cue, and Next Focus Check context before Arrangement Focus commands run."
       },
       {
         id: "arrangement-move",
