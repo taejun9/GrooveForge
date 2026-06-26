@@ -706,6 +706,7 @@ import {
   createGuideQuickStartCompletionBottleneckLabel,
   createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
+  createModeSwitchButtonContext,
   createModeSwitchQuickActions,
   createModeSwitchResult,
   createWorkflowSpotlightSummary,
@@ -8275,6 +8276,20 @@ export function App(): ReactElement {
   }, [quickActionPinnedIds]);
   const quickActionScopeOptions = createQuickActionScopeOptions(quickActions, quickActionQuery);
   const filteredQuickActions = filterQuickActions(quickActions, quickActionQuery, quickActionScope);
+  const guidedModeContext = createModeSwitchButtonContext({
+    firstBeatPathSummary,
+    mode: "guided",
+    modeFocusSummary,
+    projectMode: project.mode,
+    sessionPassSummary
+  });
+  const studioModeContext = createModeSwitchButtonContext({
+    firstBeatPathSummary,
+    mode: "studio",
+    modeFocusSummary,
+    projectMode: project.mode,
+    sessionPassSummary
+  });
 
   return (
     <main className="app-shell">
@@ -8567,16 +8582,20 @@ export function App(): ReactElement {
         />
         <div className="segmented">
           <button
+            aria-label={guidedModeContext}
             className={project.mode === "guided" ? "selected" : ""}
             data-testid="mode-guided"
+            title={guidedModeContext}
             type="button"
             onClick={() => switchProjectMode("guided")}
           >
             Guided
           </button>
           <button
+            aria-label={studioModeContext}
             className={project.mode === "studio" ? "selected" : ""}
             data-testid="mode-studio"
+            title={studioModeContext}
             type="button"
             onClick={() => switchProjectMode("studio")}
           >
