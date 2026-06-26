@@ -997,12 +997,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Edit-vs-Heard Block, Selected Block, Audible Block, Pattern A/B/C, Bar Context, Arrangement Playback Readout Command, Local Result Metric, Follow Action, Audition Cue, and Next Check context before Arrangement Playback Readout commands run."
       },
       {
+        id: "audible-arrangement-follow-readout",
+        command: "Audible Arrangement Follow Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Heard block / edit alignment preview",
+        context:
+          "Audible Arrangement Follow Readout Action, Heard Block, Current Edit Block, Pattern Assignment, Bar Range, Loop Scope, Local Result Metric, Audition Cue, and Next Follow Check context before Audible Arrangement Follow commands run."
+      },
+      {
         id: "audible-arrangement-follow",
         command: "Audible Arrangement Follow",
         shortcut: "Quick Actions / Readout",
         target: "Heard block / explicit follow / edit alignment",
         context:
-          "Heard Block, Current Edit Block, Pattern Assignment, Bar Range, Follow Route, Follow Result, Audition Cue, and Next Check context before Audible Arrangement Follow commands run."
+          "Heard Block, Current Edit Block, Pattern Assignment, Bar Range, Follow Route, Follow Result, Audition Cue, and Next Check context after explicit Audible Arrangement Follow commands run."
       }
     ]
   },

@@ -8024,6 +8024,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusAudibleArrangementFollowReadout(): void {
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Audible Arrangement Follow Readout ${arrangementPlaybackReadout.statusLabel}: ${arrangementPlaybackReadout.roleLabel} / ${arrangementPlaybackReadout.detailLabel}`
+    );
+  }
+
   function focusTransportPositionReadout(): void {
     transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8245,6 +8252,7 @@ export function App(): ReactElement {
     onFocusArrangementMuteMapReadout: focusArrangementMuteMapReadout,
     onFocusArrangementMuteMap: focusArrangementMuteMapLane,
     onFocusArrangementPlaybackReadout: focusArrangementPlaybackReadout,
+    onFocusAudibleArrangementFollowReadout: focusAudibleArrangementFollowReadout,
     onFocusArrangementTransitionMapReadout: focusArrangementTransitionMapReadout,
     onFocusArrangementTransitionMap: focusArrangementTransitionMapTransition,
     onApplyBasslinePad: applyBasslinePad,
