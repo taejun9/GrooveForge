@@ -7121,6 +7121,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusArrangementArcReadout(): void {
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Arrangement Arc ${arrangementArcPreviewSummary.statusLabel}: ${arrangementArcPreviewSummary.padLabel} / ${arrangementArcPreviewSummary.energyLabel} / ${arrangementArcPreviewSummary.muteLabel}`
+    );
+  }
+
   function focusMasterOutputRole(): void {
     const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -8213,6 +8220,7 @@ export function App(): ReactElement {
     onFocusSpaceFxReadout: focusSpaceFxReadout,
     onFocusPatternChainReadout: focusPatternChainReadout,
     onFocusChainExpandReadout: focusChainExpandReadout,
+    onFocusArrangementArcReadout: focusArrangementArcReadout,
     onFocusArrangementTemplateReadout: focusArrangementTemplateReadout,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternClone: cloneSelectedPatternVariation,

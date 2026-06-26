@@ -877,12 +877,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Arrangement Template Preview Decision, Priority Readout, Current/Direct Template Commands, Section Flow Before/After, Result Feedback, Audition Cue, and Next Template Check context before Arrangement Template commands run."
       },
       {
+        id: "arrangement-arc-readout",
+        command: "Arrangement Arc Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current full-song energy arc preview",
+        context:
+          "Arrangement Arc Readout Action, Suggested Full-Song Energy Arc, Section Flow, Pattern A/B/C Spread, Average Energy, Energy Range, Mute Posture, Block Count, Bar Count, Audition Cue, and Next Manual Arc Check context before Arrangement Arc commands run."
+      },
+      {
         id: "arrangement-arc",
         command: "Arrangement Arc",
-        shortcut: "Quick Actions / Readout",
+        shortcut: "Quick Actions / Decision",
         target: "Energy shape",
         context:
-          "Arrangement Arc Preview, Preview Decision Readout, Priority Readout, Current/Direct Arc Commands, Section Energy Before/After, Result Feedback, Audition Cue, and Next Arc Check context before Arrangement Arc commands run."
+          "Arrangement Arc Preview Decision, Priority Readout, Current/Direct Arc Commands, Section Energy Before/After, Result Feedback, Audition Cue, and Next Arc Check context before Arrangement Arc commands run."
       },
       {
         id: "arrangement-focus",

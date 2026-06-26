@@ -1187,6 +1187,7 @@ export function createQuickActions({
   onApplyArrangementArc,
   onApplyArrangementFocus,
   onApplyArrangementTemplate,
+  onFocusArrangementArcReadout,
   onFocusArrangementTemplateReadout,
   onCueArrangementTransition,
   onCueHookLoop,
@@ -1504,6 +1505,7 @@ export function createQuickActions({
   onApplyArrangementArc: (pad: ArrangementArcPadId) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
+  onFocusArrangementArcReadout: () => void;
   onFocusArrangementTemplateReadout: () => void;
   onCueArrangementTransition: (transition: ArrangementTransitionMapTransition) => void;
   onCueHookLoop: (card?: HookReadinessFocusItem) => void;
@@ -4840,6 +4842,16 @@ export function createQuickActions({
     },
     ...arrangementTemplateActions,
     {
+      id: "arrangement-arc-readout-action",
+      title: `Review Arrangement Arc: ${arrangementArcPreviewSummary.padLabel}`,
+      detail: `${arrangementArcPreviewSummary.statusLabel} / ${arrangementArcPreviewSummary.sectionLabel} / ${arrangementArcPreviewSummary.patternLabel} / ${arrangementArcPreviewSummary.energyLabel} / ${arrangementArcPreviewSummary.muteLabel} / ${arrangementArcPreviewSummary.moveLabel}`,
+      group: "Arrange",
+      keywords: `Quick Actions Arrangement Arc Readout review full song energy section pattern mute hook lift break rise selected pattern editable events ${
+        arrangementArcPreviewSummary.padId
+      } ${arrangementArcPreviewSummary.padLabel} ${arrangementArcPreviewSummary.statusLabel} beginner producer`,
+      run: onFocusArrangementArcReadout
+    },
+    {
       id: "arrangement-arc-decision",
       title: arrangementArcDecisionSummary.disabled
         ? "Run Arrangement Arc Decision"
@@ -6047,6 +6059,7 @@ export function createQuickActionResult(
     action.id === "pattern-chain-readout-action" ||
     action.id === "chain-expand-readout-action" ||
     action.id === "arrangement-template-readout-action" ||
+    action.id === "arrangement-arc-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -13597,7 +13610,12 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
-  if (action.id === "arrangement-arc" || action.id === "arrangement-arc-decision" || action.id.startsWith("arrangement-arc-pad-")) {
+  if (
+    action.id === "arrangement-arc-readout-action" ||
+    action.id === "arrangement-arc" ||
+    action.id === "arrangement-arc-decision" ||
+    action.id.startsWith("arrangement-arc-pad-")
+  ) {
     return (
       quickActionArrangementArcMetricSnapshot(project, action) ?? {
         id: "song-arc",
@@ -15328,6 +15346,27 @@ export function quickActionArrangementArcMetricSnapshot(
   project: ProjectState,
   action: QuickAction
 ): { id: string; label: string; value: string } | null {
+  if (action.id === "arrangement-arc-readout-action") {
+    const pattern = activePattern(project);
+    const pad = arrangementArcQuickActionPad(action);
+    const targetProject = pad ? applyArrangementArcPadToProject(project, pad, 0) : project;
+    const targetArrangement = targetProject.arrangement;
+    const sectionFlow = compactSectionFlow(targetArrangement) || "empty";
+    const patternSpread = arrangementArcPreviewPatternLabel(targetArrangement);
+    const averageEnergy = `${Math.round(arrangementAverageEnergy({ ...project, arrangement: targetArrangement }) * 100)}% avg`;
+    const energyRange = arrangementArcPreviewEnergyLabel(targetArrangement);
+    const mutePosture = arrangementArcPreviewMuteLabel(targetArrangement);
+    return {
+      id: "arrangement-arc-readout",
+      label: "Arrangement Arc Readout",
+      value: `review arrangement arc readout / ${action.detail} / target ${sectionFlow} / ${patternSpread} / ${averageEnergy} / ${energyRange} / ${mutePosture} / Pattern ${
+        project.selectedPattern
+      } / ${patternEventTotal(pattern)} editable events / ${targetArrangement.length} arc blocks / ${barCountLabel(
+        arrangementTotalBars({ ...project, arrangement: targetArrangement })
+      )}`
+    };
+  }
+
   const pad = arrangementArcQuickActionPad(action);
   if (!pad) {
     return null;
@@ -16931,6 +16970,13 @@ export function quickActionResultFollowup(
         action.id === "arrangement-focus-decision"
           ? "Return to Arrangement Focus Preview Decision before running another selected-block focus move."
           : "Use the Arrangement Focus Result, Arrangement Playback Readout, and Song Form Overview before changing nearby blocks."
+    };
+  }
+
+  if (action.id === "arrangement-arc-readout-action") {
+    return {
+      auditionCue: "Play Song loop and scan whether the current full-song arc supports the hook lift, break, and outro movement.",
+      nextCheck: "Apply Arrangement Arc only after the readout energy path supports the section flow and Pattern spread."
     };
   }
 
