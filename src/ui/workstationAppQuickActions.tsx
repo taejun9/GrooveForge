@@ -1247,6 +1247,7 @@ export function createQuickActions({
   onApplyPatternVariation,
   onFocusPatternVariationReadout,
   onApplyPatternStack,
+  onFocusPatternStackReadout,
   onCopySelectedPattern,
   onClearSelectedPattern,
   onFocusPatternCopyClearReadout,
@@ -1582,6 +1583,7 @@ export function createQuickActions({
   onApplyPatternVariation: (preset: PatternVariationPreset) => void;
   onFocusPatternVariationReadout: () => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
+  onFocusPatternStackReadout: () => void;
   onCopySelectedPattern: (target: PatternSlot) => void;
   onClearSelectedPattern: () => void;
   onFocusPatternCopyClearReadout: () => void;
@@ -3071,6 +3073,14 @@ export function createQuickActions({
     patternStackPreviewSummary.stackId === "none" || patternStackPreviewSummary.statusLabel === "Stack aligned"
       ? null
       : patternStackPreviewSummary.stackId;
+  const patternStackReadoutAction: QuickAction = {
+    id: "pattern-stack-readout-action",
+    title: `Review Pattern Stack Readout: Pattern ${project.selectedPattern}`,
+    detail: `${patternStackPreviewSummary.statusLabel} / preview ${patternStackPreviewSummary.stackLabel} / ${patternStackPreviewSummary.moveLabel} / direct stack preflight`,
+    group: "Create",
+    keywords: `Quick Actions Pattern Stack Readout review selected Pattern ${project.selectedPattern} ${patternStackPreviewSummary.statusLabel} ${patternStackPreviewSummary.stackLabel} ${patternStackPreviewSummary.moveLabel} 808 chord synth posture arrangement beginner producer`,
+    run: onFocusPatternStackReadout
+  };
   const patternStackActions: QuickAction[] = patternStackOptions.map((stack) => {
     const moves = patternStackMoveCount(project.key, selectedPatternData, stack);
     const aligned = moves.total === 0;
@@ -4295,6 +4305,7 @@ export function createQuickActions({
       keywords: `pattern clear reset empty edit result ${project.selectedPattern} a b c loop variation beginner producer`,
       run: onClearSelectedPattern
     },
+    patternStackReadoutAction,
     {
       id: "pattern-stack",
       title: patternStackId ? `Apply ${patternStackPreviewSummary.stackLabel}` : "Apply Pattern Stack",
@@ -6355,6 +6366,7 @@ export function createQuickActionResult(
     action.id === "arrangement-focus-readout-action" ||
     action.id === "arrangement-move-readout-action" ||
     action.id === "pattern-clone-readout-action" ||
+    action.id === "pattern-stack-readout-action" ||
     action.id === "pattern-variation-readout-action" ||
     action.id === "pattern-fill-readout-action" ||
     action.id === "pattern-copy-clear-readout-action" ||
@@ -13743,6 +13755,16 @@ export function quickActionResultMetricSnapshot(
     }
   }
 
+  if (action.id === "pattern-stack-readout-action") {
+    return (
+      quickActionPatternStackReadoutMetricSnapshot(project, action) ?? {
+        id: "pattern-stack-readout",
+        label: "Pattern Stack Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id === "pattern-stack") {
     const stackMetric = quickActionPatternStackMetricSnapshot(project, action);
     if (stackMetric) {
@@ -16239,6 +16261,71 @@ export function quickActionPatternStackMetricSnapshot(
   };
 }
 
+export function quickActionPatternStackReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "pattern-stack-readout-action") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const options = createPatternStackOptions(project.key);
+  const preview = createPatternStackPreviewSummary(project.key, pattern, options);
+  const stack =
+    patternStackReadoutQuickActionOption(action, options) ??
+    options.find((option) => option.id === preview.stackId) ??
+    options[0] ??
+    null;
+  const drumHits = drumHitCount(pattern);
+  const bassNotes = pattern.bassNotes.length;
+  const chordEvents = pattern.chordEvents.length;
+  const melodyNotes = pattern.melodyNotes.length;
+  const musicEvents = bassNotes + chordEvents + melodyNotes;
+  const readyLayerCount = [drumHits > 0, bassNotes > 0, chordEvents > 0, melodyNotes > 0].filter(Boolean).length;
+  const arrangementUse = patternArrangementUseLabel(project, project.selectedPattern);
+
+  return {
+    id: "pattern-stack-readout",
+    label: "Pattern Stack Readout",
+    value: [
+      "review pattern stack",
+      `selected Pattern ${project.selectedPattern}`,
+      preview.statusLabel,
+      `preview ${preview.stackLabel}`,
+      preview.moveLabel,
+      stack ? `stack ${stack.label}` : "stack unavailable",
+      `${patternEventTotal(pattern)} events`,
+      `${drumHits} drums`,
+      `${bassNotes} 808`,
+      `${chordEvents} chords`,
+      `${melodyNotes} synth`,
+      `${musicEvents} music`,
+      `${readyLayerCount}/4 layers`,
+      `arrangement ${arrangementUse}`,
+      "stack unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+export function patternStackReadoutQuickActionOption(
+  action: QuickAction,
+  options: PatternStackOption[]
+): PatternStackOption | null {
+  if (action.id !== "pattern-stack-readout-action") {
+    return null;
+  }
+
+  const text = `${action.title} ${action.detail} ${action.keywords}`;
+  return (
+    options.find((option) => text.includes(`${option.label}:`) || text.includes(` ${option.id} `)) ??
+    options.find((option) => text.includes(option.label)) ??
+    null
+  );
+}
+
 export function quickActionPatternStackDetailParts(action: QuickAction): string[] {
   return action.detail
     .split(" / ")
@@ -17586,6 +17673,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; compare the cloned variation against the source Pattern before arranging it.`,
       nextCheck: "Use Pattern Compare, Pattern DNA, and selected-note/chord/drum tools to refine the cloned variation."
+    };
+  }
+
+  if (action.id === "pattern-stack-readout-action") {
+    return {
+      auditionCue:
+        "Review the selected Pattern 808/chord/Synth posture, suggested stack, preview target, arrangement usage, and layer readiness before applying a stack.",
+      nextCheck: "Run a direct Pattern Stack command only when the selected Pattern 808/chord/Synth layers should be rewritten by that stack."
     };
   }
 

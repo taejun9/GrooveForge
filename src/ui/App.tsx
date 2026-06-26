@@ -8081,6 +8081,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusPatternStackReadout(): void {
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Pattern Stack Readout Pattern ${project.selectedPattern}: ${patternStackPreviewSummary.statusLabel} / preview ${patternStackPreviewSummary.stackLabel} / ${patternStackPreviewSummary.moveLabel} / direct stack unchanged`
+    );
+  }
+
   function focusPatternUseReadout(): void {
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8392,6 +8399,7 @@ export function App(): ReactElement {
     onApplyPatternStack: applyPatternStack,
     onFocusPatternFillReadout: focusPatternFillReadout,
     onFocusPatternCloneReadout: focusPatternCloneReadout,
+    onFocusPatternStackReadout: focusPatternStackReadout,
     onFocusPatternVariationReadout: focusPatternVariationReadout,
     onCopySelectedPattern: copySelectedPattern,
     onClearSelectedPattern: clearSelectedPattern,
