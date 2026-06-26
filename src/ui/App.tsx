@@ -8090,6 +8090,13 @@ export function App(): ReactElement {
     setProjectStatus(`Tempo Nudge ${project.bpm} BPM: ${tempoNudgeRouteSummary(project.bpm)}`);
   }
 
+  function focusSwingFeelReadout(): void {
+    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Swing Feel ${percentLabel(normalizeSwingFeelValue(project.swing))}: ${swingFeelRouteSummary(project)}`
+    );
+  }
+
   const quickActions = createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
@@ -8254,6 +8261,7 @@ export function App(): ReactElement {
     onTapTempo: tapProjectTempo,
     onFocusTapTempoReadout: focusTapTempoReadout,
     onFocusTempoNudgeReadout: focusTempoNudgeReadout,
+    onFocusSwingFeelReadout: focusSwingFeelReadout,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onCueBlueprintPreview: cueBeatBlueprintPreview,
     onRequestMidiInputAccess: requestMidiInputAccess,
@@ -17911,6 +17919,7 @@ function createQuickActions({
   onTapTempo,
   onFocusTapTempoReadout,
   onFocusTempoNudgeReadout,
+  onFocusSwingFeelReadout,
   onPreviewBlueprint,
   onCueBlueprintPreview,
   onRequestMidiInputAccess,
@@ -18198,6 +18207,7 @@ function createQuickActions({
   onTapTempo: () => void;
   onFocusTapTempoReadout: () => void;
   onFocusTempoNudgeReadout: () => void;
+  onFocusSwingFeelReadout: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onCueBlueprintPreview: (scope: Extract<TransportLoopScope, "arrangement" | "pattern">) => void;
   onRequestMidiInputAccess: () => Promise<void>;
@@ -19886,6 +19896,8 @@ function createQuickActions({
   const transportPositionDetailLabel = transportPositionReadout.detailLabel.split(" / ").join(" + ");
   const tapTempoDetailLabel = tapTempoReadout.detailLabel.split(" / ").join(" + ");
   const tempoNudgeRouteLabel = tempoNudgeRouteSummary(project.bpm);
+  const currentSwingLabel = percentLabel(normalizeSwingFeelValue(project.swing));
+  const swingFeelRouteLabel = swingFeelRouteSummary(project);
 
   return [
     {
@@ -19961,6 +19973,20 @@ function createQuickActions({
         project.selectedPattern
       } ${selectedLoopBlock ? `${selectedLoopBlock.section} ${selectedLoopBlock.pattern}` : "no block"} beginner producer direct beat workstation`,
       run: onFocusTempoNudgeReadout
+    },
+    {
+      id: "swing-feel-readout-action",
+      title: `Review Swing Feel: ${currentSwingLabel}`,
+      detail: `Current ${currentSwingLabel} / ${swingFeelRouteLabel} / ${transportLoopLabel(
+        transportLoopScope
+      )} loop / Pattern ${project.selectedPattern}`,
+      group: "Transport",
+      keywords: `swing feel readout groove timing shuffle pocket routes current style default ${
+        swingFeelRouteLabel
+      } ${project.metronomeEnabled ? "metronome on" : "metronome off"} ${transportLoopScope} Pattern ${
+        project.selectedPattern
+      } ${selectedLoopBlock ? `${selectedLoopBlock.section} ${selectedLoopBlock.pattern}` : "no block"} beginner producer direct beat workstation`,
+      run: onFocusSwingFeelReadout
     },
     {
       id: "toggle-playback",
@@ -22343,6 +22369,7 @@ function createQuickActionResult(
     action.id === "metronome-readout" ||
     action.id === "tap-tempo-readout-action" ||
     action.id === "tempo-nudge-readout-action" ||
+    action.id === "swing-feel-readout-action" ||
     action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -26661,6 +26688,53 @@ function transportLoopLabelFromActionDetail(detail: string): string {
   return loopPart?.replace(/\s+loop$/, "") || "current";
 }
 
+function quickActionSwingFeelReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "swing-feel-readout-action") {
+    return null;
+  }
+
+  const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0] ?? null;
+  const blockLabel = selectedBlock
+    ? `Block ${Math.min(selectedArrangementIndex + 1, project.arrangement.length)} ${selectedBlock.section} / Pattern ${
+        selectedBlock.pattern
+      } / ${barCountLabel(selectedBlock.bars)}`
+    : "No selected block";
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const style = getStyle(project);
+
+  return {
+    id: "swing-feel-readout",
+    label: "Swing Feel",
+    value: [
+      "review swing feel",
+      `${percentLabel(normalizeSwingFeelValue(project.swing))} current`,
+      `${style.name} default ${percentLabel(normalizeSwingFeelValue(style.defaultSwing))}`,
+      swingFeelRouteSummary(project),
+      `loop ${transportLoopLabelFromActionDetail(action.detail)}`,
+      project.metronomeEnabled ? "metronome on" : "metronome off",
+      `selected ${blockLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(activePattern(project))} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "swing unchanged",
+      "project data unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+function swingFeelRouteSummary(project: ProjectState): string {
+  return swingFeelPads.map((pad) => `${pad.label} ${percentLabel(swingFeelPadSwing(pad, project))}`).join(" / ");
+}
+
 const GUIDE_QUICK_START_DETAIL_LABEL_PREFIXES = [
   "Destination ",
   "Metric ",
@@ -28410,6 +28484,16 @@ function quickActionResultMetricSnapshot(
       label: "Tempo",
       value: `${project.bpm} BPM`
     };
+  }
+
+  if (action.id === "swing-feel-readout-action") {
+    return (
+      quickActionSwingFeelReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "swing-feel-readout",
+        label: "Swing Feel",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id.startsWith("swing-feel-")) {
@@ -31476,6 +31560,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the tempo supports the groove pocket, 808 movement, and melody timing.`,
       nextCheck: "Use Tap Tempo, Tempo Nudge Pads, Style Inspector BPM range, and transport playback to refine the final BPM."
+    };
+  }
+
+  if (action.id === "swing-feel-readout-action") {
+    return {
+      auditionCue: "Use the Swing Feel readout before changing groove timing, programming drums, arranging sections, recording MIDI, or exporting.",
+      nextCheck: "Run a Swing Feel command only when one of the Straight, Tight, Laid, Loose, or style-default targets should become the project swing."
     };
   }
 
