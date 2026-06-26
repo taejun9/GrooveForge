@@ -628,7 +628,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
     id: "deliver-fast-path",
     title: "Deliver",
     items: [
-      { id: "delivery-target-alignment", command: "Delivery Target Alignment", shortcut: "Quick Actions / Readout", target: "Target fit / length / mix" },
+      {
+        id: "delivery-target-alignment",
+        command: "Delivery Target Alignment",
+        shortcut: "Quick Actions / Readout",
+        target: "Target fit / alignment preview route",
+        context:
+          "Selected Target, Target Fit, Target Length, Arrangement Length, Master Posture, Mix Posture, Stem Expectation, Session Brief Context, Package Readiness, Audition Cue, and Next Delivery Check context before Delivery Target Alignment commands run."
+      },
       { id: "export-preflight", command: "Export Preflight", shortcut: "Quick Actions / Readout", target: "Readiness / mix / handoff risk" },
       { id: "export-format-readout", command: "Export Format Readout", shortcut: "Quick Actions / Readout", target: "WAV / stems / MIDI / sheet" },
       { id: "handoff-send-order", command: "Handoff Send Order", shortcut: "Quick Actions / Readout", target: "WAV -> stems -> MIDI -> sheet" },
