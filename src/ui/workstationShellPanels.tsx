@@ -636,7 +636,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Selected Target, Target Fit, Target Length, Arrangement Length, Master Posture, Mix Posture, Stem Expectation, Session Brief Context, Package Readiness, Audition Cue, and Next Delivery Check context before Delivery Target Alignment commands run."
       },
-      { id: "export-preflight", command: "Export Preflight", shortcut: "Quick Actions / Readout", target: "Readiness / mix / handoff risk" },
+      {
+        id: "export-preflight",
+        command: "Export Preflight",
+        shortcut: "Quick Actions / Readout",
+        target: "Readiness / mix / handoff risk",
+        context:
+          "Selected Delivery Target, Export Readiness, Mix/Master Risk, Master Automation Posture, WAV/Stem/MIDI Deliverables, Session Brief/Handoff Sheet Context, Package Readiness, Priority Readout, Audition Cue, and Next Export Preflight Check context before Export Preflight commands run."
+      },
       { id: "export-format-readout", command: "Export Format Readout", shortcut: "Quick Actions / Readout", target: "WAV / stems / MIDI / sheet" },
       { id: "handoff-send-order", command: "Handoff Send Order", shortcut: "Quick Actions / Readout", target: "WAV -> stems -> MIDI -> sheet" },
       { id: "handoff-manifest-audit", command: "Handoff Manifest Audit", shortcut: "Quick Actions / Readout", target: "Planned files / readiness" },
