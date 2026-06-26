@@ -1330,6 +1330,7 @@ export function SessionPass({
 }): ReactElement {
   const activeCard = summary.cards.find((card) => card.id === summary.activeCardId) ?? null;
   const decisionActionDisabled = activeCard === null;
+  const decisionActionContext = activeCard ? sessionPassButtonContext(activeCard, summary) : summary.decisionTitle;
 
   return (
     <section className={`session-pass ${summary.tone}`} data-testid="session-pass" aria-label="Session pass">
@@ -1351,6 +1352,7 @@ export function SessionPass({
         <strong data-testid="session-pass-decision-label">{summary.decisionLabel}</strong>
         <small data-testid="session-pass-decision-detail">{summary.decisionDetail}</small>
         <button
+          aria-label={decisionActionContext}
           className="session-pass-decision-action"
           data-session-pass-decision-action={activeCard?.id ?? "none"}
           data-testid="session-pass-decision-run"
@@ -1360,7 +1362,7 @@ export function SessionPass({
               onFocus(activeCard);
             }
           }}
-          title={activeCard ? `Focus ${activeCard.focusLabel}: ${activeCard.value}` : summary.decisionTitle}
+          title={decisionActionContext}
           type="button"
         >
           <ArrowRight size={13} aria-hidden="true" />
@@ -1368,27 +1370,75 @@ export function SessionPass({
         </button>
       </div>
       <div className="session-pass-grid" data-testid="session-pass-grid">
-        {summary.cards.map((card) => (
-          <div className={`session-pass-card ${card.tone}`} data-testid={`session-pass-${card.id}`} key={card.id}>
-            <span>{card.label}</span>
-            <strong>{card.value}</strong>
-            <button
-              className="session-pass-focus"
-              data-testid={`session-pass-focus-${card.id}`}
-              onClick={() => onFocus(card)}
-              title={`Focus ${card.focusLabel}: ${card.value}`}
-              type="button"
-            >
-              <ArrowRight size={13} aria-hidden="true" />
-              <span>{card.focusLabel}</span>
-            </button>
-            <small>{card.detail}</small>
-          </div>
-        ))}
+        {summary.cards.map((card) => {
+          const buttonContext = sessionPassButtonContext(card, summary);
+          return (
+            <div className={`session-pass-card ${card.tone}`} data-testid={`session-pass-${card.id}`} key={card.id}>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <button
+                aria-label={buttonContext}
+                className="session-pass-focus"
+                data-testid={`session-pass-focus-${card.id}`}
+                onClick={() => onFocus(card)}
+                title={buttonContext}
+                type="button"
+              >
+                <ArrowRight size={13} aria-hidden="true" />
+                <span>{card.focusLabel}</span>
+              </button>
+              <small>{card.detail}</small>
+            </div>
+          );
+        })}
       </div>
       {result && <SessionPassFocusResultStrip result={result} />}
     </section>
   );
+}
+
+function sessionPassButtonContext(card: SessionPassCard, summary: SessionPassSummary): string {
+  return [
+    `Focus ${card.focusLabel}: ${card.value}`,
+    `Destination ${card.focusLabel}`,
+    `Session ${sessionPassButtonMetric(summary)}`,
+    `Context ${card.detail}`,
+    `Audition ${sessionPassButtonAuditionCue(card)}`,
+    `Next ${sessionPassButtonNextCheck(card)}`
+  ].join(" / ");
+}
+
+function sessionPassButtonMetric(summary: SessionPassSummary): string {
+  const readyCount = summary.cards.filter((card) => card.tone === "good").length;
+  const reviewCount = summary.cards.filter((card) => card.tone === "warn").length;
+  const blockerCount = summary.cards.filter((card) => card.tone === "danger").length;
+  return `${readyCount}/${summary.cards.length} ready / ${reviewCount} review / ${blockerCount} blocker`;
+}
+
+function sessionPassButtonAuditionCue(card: SessionPassCard): string {
+  switch (card.id) {
+    case "guided":
+      return "Use First Beat Path and Beat Spine to move through the next direct beat-making step.";
+    case "studio":
+      return "Use Review Queue, Production Snapshot, and Workflow Navigator before choosing a fix.";
+    case "finish":
+      return "Use Finish Checklist, Mix Coach, and Master controls before final moves.";
+    case "deliver":
+      return "Use Export Preflight and Handoff Pack before explicit WAV, stems, MIDI, or sheet export.";
+  }
+}
+
+function sessionPassButtonNextCheck(card: SessionPassCard): string {
+  switch (card.id) {
+    case "guided":
+      return "Return after the guided step is ready or intentionally deferred.";
+    case "studio":
+      return "Return after the top studio issue is reviewed or fixed explicitly.";
+    case "finish":
+      return "Return after compose, arrange, mix, master, automation, and handoff checks are ready.";
+    case "deliver":
+      return "Return after deliverables and handoff context match the selected target.";
+  }
 }
 
 function SessionPassFocusResultStrip({ result }: { result: SessionPassFocusResult }): ReactElement {
