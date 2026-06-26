@@ -531,15 +531,78 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Drums, 808/Bass, Harmony, and Melody Goal Actions, Composer Action Route, Style Goal Action Result, Audition Cue, and Next Writing Check context before Style Goal Actions commands run."
       },
-      { id: "layer-starter", command: "Layer Starter", shortcut: "Quick Actions / Readout", target: "Drums / 808 / Chords / Synth" },
-      { id: "pattern-stack", command: "Pattern Stack", shortcut: "Quick Actions / Readout", target: "808 / chords / synth sketch" },
-      { id: "pattern-compare", command: "Pattern Compare", shortcut: "Quick Actions / Readout", target: "Cue / use Pattern A/B/C" },
-      { id: "pattern-compare-decision", command: "Pattern Compare Decision", shortcut: "Quick Actions / Readout", target: "Current Cue / Use recommendation" },
-      { id: "pattern-dna", command: "Pattern DNA", shortcut: "Quick Actions / Readout", target: "Layers / density / variation" },
-      { id: "pattern-variation", command: "Pattern Variation", shortcut: "Quick Actions / Readout", target: "Hook / breakdown variation" },
-      { id: "pattern-fill", command: "Pattern Fill", shortcut: "Quick Actions / Readout", target: "Tail moves" },
-      { id: "pattern-clone", command: "Pattern Clone", shortcut: "Quick Actions / Readout", target: "Clone to A/B/C" },
-      { id: "pattern-copy-clear", command: "Pattern Copy / Clear", shortcut: "Quick Actions / Readout", target: "Copy / reset Patterns" },
+      {
+        id: "layer-starter",
+        command: "Layer Starter",
+        shortcut: "Quick Actions / Readout",
+        target: "Drums / 808 / Chords / Synth",
+        context:
+          "Selected Pattern Layer Readiness, Drums/808/Chords/Synth Priority, Visible Priority Action, Direct Layer Starter Commands, Layer Starter Result Feedback, Audition Cue, and Next Layer Check context before Layer Starter commands run."
+      },
+      {
+        id: "pattern-stack",
+        command: "Pattern Stack",
+        shortcut: "Quick Actions / Readout",
+        target: "808 / chords / synth sketch",
+        context:
+          "Selected Pattern 808/Chord/Synth Posture, Pattern Stack Preview, Suggested Stack, Direct Stack Pad Commands, Pattern Stack Result Feedback, Audition Cue, and Next Stack Check context before Pattern Stack commands run."
+      },
+      {
+        id: "pattern-compare",
+        command: "Pattern Compare",
+        shortcut: "Quick Actions / Readout",
+        target: "Cue / use Pattern A/B/C",
+        context:
+          "Pattern A/B/C Cue/Use Cards, Selected/Cued Pattern, Selected-Block Placement, Direct Pattern Cue/Switch/Use Commands, Pattern Compare Result Feedback, Audition Cue, and Next Pattern Check context before Pattern Compare commands run."
+      },
+      {
+        id: "pattern-compare-decision",
+        command: "Pattern Compare Decision",
+        shortcut: "Quick Actions / Readout",
+        target: "Current Cue / Use recommendation",
+        context:
+          "Cue/Use Recommendation, Selected Pattern A/B/C, Selected-Block Placement, Visible Readout Action, Pattern Compare Decision Command, Pattern Compare Result Feedback, Audition Cue, and Next Decision Check context before Pattern Compare Decision commands run."
+      },
+      {
+        id: "pattern-dna",
+        command: "Pattern DNA",
+        shortcut: "Quick Actions / Readout",
+        target: "Layers / density / variation",
+        context:
+          "Selected Pattern Layers, Density, Dynamics, Variation, Arrangement Use, Focus Readout, Direct Pattern DNA Card Commands, Focus Result Feedback, Audition Cue, and Next Loop Check context before Pattern DNA commands run."
+      },
+      {
+        id: "pattern-variation",
+        command: "Pattern Variation",
+        shortcut: "Quick Actions / Readout",
+        target: "Hook / breakdown variation",
+        context:
+          "Selected Pattern Variation Suggestion, Subtle/Hook/Break Target, Pattern Variation Preview, Direct Variation Commands, Pattern Variation Result Feedback, Audition Cue, and Next Variation Check context before Pattern Variation commands run."
+      },
+      {
+        id: "pattern-fill",
+        command: "Pattern Fill",
+        shortcut: "Quick Actions / Readout",
+        target: "Tail moves",
+        context:
+          "Selected Pattern Tail-Move Suggestion, Drum Fill/808 Pickup/Melody Turn/Clear Tail Target, Pattern Fill Preview, Direct Fill Commands, Pattern Fill Result Feedback, Audition Cue, and Next Tail Check context before Pattern Fill commands run."
+      },
+      {
+        id: "pattern-clone",
+        command: "Pattern Clone",
+        shortcut: "Quick Actions / Readout",
+        target: "Clone to A/B/C",
+        context:
+          "Selected Pattern Clone Suggestion, Safest Target Slot, Hook/Breakdown Variation, Direct Clone-to-A/B/C Commands, Pattern Clone Result Feedback, Audition Cue, and Next Clone Check context before Pattern Clone commands run."
+      },
+      {
+        id: "pattern-copy-clear",
+        command: "Pattern Copy / Clear",
+        shortcut: "Quick Actions / Readout",
+        target: "Copy / reset Patterns",
+        context:
+          "Selected Pattern Copy/Clear Commands, Source/Target Pattern, Selected-Pattern Clear, Pattern Edit Result Feedback, Audition Cue, and Next Pattern Edit Check context before Pattern Copy/Clear commands run."
+      },
       { id: "drum-move", command: "Drum Move", shortcut: "Quick Actions / Readout", target: "Foundation / feel / accent" },
       { id: "808-move", command: "808 Move", shortcut: "Quick Actions / Readout", target: "Bassline / glide / contour" },
       { id: "melody-move", command: "Melody Move", shortcut: "Quick Actions / Readout", target: "Motif / accent / contour" },
