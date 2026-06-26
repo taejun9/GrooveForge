@@ -294,7 +294,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
       { id: "production-snapshot", command: "Production Snapshot", shortcut: "Quick Actions / Readout", target: "Target / form / mix / handoff" },
       { id: "hook-readiness", command: "Hook Readiness", shortcut: "Quick Actions / Readout", target: "Hook / motif / contrast" },
       { id: "topline-space", command: "Topline Space", shortcut: "Quick Actions / Readout", target: "Pocket / lead room / artist context" },
-      { id: "beat-readiness", command: "Beat Readiness", shortcut: "Quick Actions / Readout", target: "Drums / 808 / melody / export" },
+      {
+        id: "beat-readiness",
+        command: "Beat Readiness",
+        shortcut: "Quick Actions / Readout",
+        target: "Drums / 808 / melody-chords / arrangement / export",
+        context:
+          "Drums, 808/Bass, Melody/Chords, Arrangement, and Export readiness context with destination, readiness metric, audition cue, and next check before Beat Readiness commands run."
+      },
       { id: "review-queue", command: "Review Queue", shortcut: "Quick Actions / Readout", target: "Issues / focus / fixes" },
       { id: "workflow-navigator", command: "Workflow Navigator", shortcut: "Quick Actions / Readout", target: "Stage jumps" },
       { id: "workflow-spotlight", command: "Workflow Spotlight", shortcut: "Quick Actions / Readout", target: "Current command target" },
