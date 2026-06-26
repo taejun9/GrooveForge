@@ -102,6 +102,33 @@ export function modeLabel(mode: ProjectState["mode"]): string {
   return mode === "guided" ? "Guided" : "Studio";
 }
 
+export function createModeSwitchButtonContext({
+  firstBeatPathSummary,
+  mode,
+  modeFocusSummary,
+  projectMode,
+  sessionPassSummary
+}: {
+  firstBeatPathSummary: FirstBeatPathSummary;
+  mode: ProjectState["mode"];
+  modeFocusSummary: ModeFocusSummary;
+  projectMode: ProjectState["mode"];
+  sessionPassSummary: SessionPassSummary;
+}): string {
+  const label = modeLabel(mode);
+  const active = projectMode === mode;
+
+  return [
+    active ? `${label} mode already active` : `Switch to ${label} mode`,
+    `Destination ${modeSwitchDestinationLabel(mode)}`,
+    `Current ${modeLabel(projectMode)}`,
+    `Mode ${modeLabel(projectMode)} -> ${label}`,
+    `Context ${modeSwitchDetail(mode, modeFocusSummary, sessionPassSummary, firstBeatPathSummary)}`,
+    `Audition ${modeSwitchAuditionCue(mode)}`,
+    `Next ${modeSwitchNextCheck(mode, modeFocusSummary, sessionPassSummary, firstBeatPathSummary)}`
+  ].join(" / ");
+}
+
 export function createModeSwitchResult(
   mode: ProjectState["mode"],
   beforeProject: ProjectState,
@@ -113,10 +140,6 @@ export function createModeSwitchResult(
 ): ModeSwitchResult {
   const label = modeLabel(mode);
   const activePass = sessionPass.cards.find((card) => card.id === mode) ?? sessionPass.cards[0] ?? null;
-  const focusLine = modeFocus.cards
-    .slice(0, 2)
-    .map((card) => `${card.label}: ${card.value}`)
-    .join(" / ");
   const resultTone = changed
     ? modeSwitchWeakestTone([modeFocus.tone, sessionPass.tone, firstBeatPath.tone, activePass?.tone ?? "good"])
     : "warn";
@@ -125,10 +148,7 @@ export function createModeSwitchResult(
     mode,
     title: `${label} mode ${changed ? "active" : "already active"}`,
     status: changed ? "Switched" : "Held",
-    detail:
-      mode === "guided"
-        ? `${firstBeatPath.headline} / ${activePass?.detail ?? sessionPass.detail}`
-        : `${modeFocus.headline} / ${activePass?.detail ?? sessionPass.detail}`,
+    detail: modeSwitchDetail(mode, modeFocus, sessionPass, firstBeatPath),
     metric: {
       id: "mode-switch",
       label: "Mode",
@@ -136,13 +156,49 @@ export function createModeSwitchResult(
       after: modeLabel(afterProject.mode),
       tone: changed ? "good" : "warn"
     },
-    auditionCue:
-      mode === "guided"
-        ? "Use First Beat Path to move through setup, compose, arrange, mix, and deliver."
-        : "Use Mode Focus, Review Queue, and Export Preflight for faster producer-level scans.",
-    nextCheck: `${mode === "guided" ? firstBeatPath.countLabel : modeFocus.detail} / ${focusLine || sessionPass.headline}`,
+    auditionCue: modeSwitchAuditionCue(mode),
+    nextCheck: modeSwitchNextCheck(mode, modeFocus, sessionPass, firstBeatPath),
     tone: resultTone
   };
+}
+
+function modeSwitchDestinationLabel(mode: ProjectState["mode"]): string {
+  return mode === "guided" ? "Guided first-beat workflow" : "Studio producer scan workflow";
+}
+
+function modeSwitchDetail(
+  mode: ProjectState["mode"],
+  modeFocus: ModeFocusSummary,
+  sessionPass: SessionPassSummary,
+  firstBeatPath: FirstBeatPathSummary
+): string {
+  const activePass = sessionPass.cards.find((card) => card.id === mode) ?? sessionPass.cards[0] ?? null;
+
+  return mode === "guided"
+    ? `${firstBeatPath.headline} / ${activePass?.detail ?? sessionPass.detail}`
+    : `${modeFocus.headline} / ${activePass?.detail ?? sessionPass.detail}`;
+}
+
+function modeSwitchAuditionCue(mode: ProjectState["mode"]): string {
+  return mode === "guided"
+    ? "Use First Beat Path to move through setup, compose, arrange, mix, and deliver."
+    : "Use Mode Focus, Review Queue, and Export Preflight for faster producer-level scans.";
+}
+
+function modeSwitchNextCheck(
+  mode: ProjectState["mode"],
+  modeFocus: ModeFocusSummary,
+  sessionPass: SessionPassSummary,
+  firstBeatPath: FirstBeatPathSummary
+): string {
+  const focusLine = modeFocus.cards
+    .slice(0, 2)
+    .map((card) => `${card.label}: ${card.value}`)
+    .join(" / ");
+
+  return `${mode === "guided" ? firstBeatPath.countLabel : modeFocus.detail} / ${
+    focusLine || sessionPass.headline
+  }`;
 }
 
 export function ModeSwitchResultStrip({ result }: { result: ModeSwitchResult }): ReactElement {
@@ -285,15 +341,13 @@ export function createModeSwitchQuickActions({
   return modeSwitchDefinitions.map(({ mode, id }) => {
     const label = modeLabel(mode);
     const active = projectMode === mode;
-    const passCard = sessionPassSummary.cards.find((card) => card.id === mode);
-    const detail =
-      mode === "guided"
-        ? `${firstBeatPathSummary.headline} / ${passCard?.value ?? sessionPassSummary.headline} / ${
-            passCard?.detail ?? sessionPassSummary.detail
-          }`
-        : `${modeFocusSummary.headline} / ${passCard?.value ?? sessionPassSummary.headline} / ${
-            passCard?.detail ?? sessionPassSummary.detail
-          }`;
+    const detail = createModeSwitchButtonContext({
+      firstBeatPathSummary,
+      mode,
+      modeFocusSummary,
+      projectMode,
+      sessionPassSummary
+    });
 
     return {
       id,
