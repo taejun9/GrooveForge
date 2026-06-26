@@ -1191,6 +1191,17 @@ export type QuickActionSearchRecoveryResult = {
   tone: MixCoachTone;
 };
 
+export type QuickActionSearchHintResult = {
+  term: string;
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type QuickActionSpotlightSummary = {
   actionId: string | null;
   statusLabel: string;

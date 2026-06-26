@@ -36,6 +36,7 @@ import type {
   QuickActionScopeId,
   QuickActionScopeOption,
   QuickActionScopeResult,
+  QuickActionSearchHintResult,
   QuickActionSearchRecoveryResult,
   QuickActionSearchResult,
   QuickActionSpotlightSummary,
@@ -733,12 +734,14 @@ export function QuickActions({
   recentActionSource,
   recentResult,
   recents,
+  searchHintResult,
   searchRecoveryResult,
   searchResult,
   scope,
   scopeResult,
   scopeOptions,
   onClose,
+  onApplySearchHint,
   onInspectPinnedAction,
   onInspectRecentAction,
   onQueryChange,
@@ -758,12 +761,14 @@ export function QuickActions({
   recentActionSource: QuickAction[];
   recentResult: QuickActionRecentResult | null;
   recents: QuickActionRecent[];
+  searchHintResult: QuickActionSearchHintResult | null;
   searchRecoveryResult: QuickActionSearchRecoveryResult | null;
   searchResult: QuickActionSearchResult | null;
   scope: QuickActionScopeId;
   scopeResult: QuickActionScopeResult | null;
   scopeOptions: QuickActionScopeOption[];
   onClose: () => void;
+  onApplySearchHint: (term: string) => void;
   onInspectPinnedAction: (actionId: string | null) => void;
   onInspectRecentAction: (actionId: string | null) => void;
   onQueryChange: (query: string) => void;
@@ -896,7 +901,7 @@ export function QuickActions({
                 data-search-hint={hint.term}
                 data-testid={`quick-actions-search-hint-${hint.term}`}
                 key={hint.term}
-                onClick={() => onQueryChange(hint.term)}
+                onClick={() => onApplySearchHint(hint.term)}
                 title={`${hint.label}: ${hint.detail}`}
                 type="button"
               >
@@ -925,6 +930,7 @@ export function QuickActions({
           {actions.length} shown / {scopeOptions.find((option) => option.id === scope)?.count ?? 0} matching
         </div>
         {searchResult && <QuickActionSearchResultStrip result={searchResult} />}
+        {searchHintResult && <QuickActionSearchHintResultStrip result={searchHintResult} />}
         {searchRecoveryResult && <QuickActionSearchRecoveryResultStrip result={searchRecoveryResult} />}
         {scopeResult && <QuickActionScopeResultStrip result={scopeResult} />}
         <div
@@ -1292,6 +1298,31 @@ export function QuickActions({
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function QuickActionSearchHintResultStrip({ result }: { result: QuickActionSearchHintResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`quick-actions-search-hint-result ${result.tone}`}
+      data-search-hint-result={result.term || "empty"}
+      data-testid="quick-actions-search-hint-result"
+    >
+      <div>
+        <span data-testid="quick-actions-search-hint-result-status">{result.status}</span>
+        <strong data-testid="quick-actions-search-hint-result-title">{result.title}</strong>
+        <small data-testid="quick-actions-search-hint-result-detail">{result.detail}</small>
+      </div>
+      <div>
+        <span data-testid="quick-actions-search-hint-result-metric-label">{result.metricLabel}</span>
+        <strong data-testid="quick-actions-search-hint-result-metric-value">{result.metricValue}</strong>
+      </div>
+      <div>
+        <span>Next check</span>
+        <strong data-testid="quick-actions-search-hint-result-next-check">{result.nextCheck}</strong>
+      </div>
     </div>
   );
 }
