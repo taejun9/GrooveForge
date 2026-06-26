@@ -665,17 +665,94 @@ const commandReferenceSections: CommandReferenceSection[] = [
     id: "sound-fast-path",
     title: "Sound",
     items: [
-      { id: "sound-preset-decision", command: "Sound Preset Decision", shortcut: "Quick Actions / Readout", target: "Suggested full-tone preset" },
-      { id: "sound-preset", command: "Sound Preset", shortcut: "Quick Actions / Readout", target: "Full-tone presets" },
-      { id: "drum-kit-decision", command: "Drum Kit Decision", shortcut: "Quick Actions / Readout", target: "Suggested drum kit" },
-      { id: "drum-kit", command: "Drum Kit", shortcut: "Quick Actions / Readout", target: "Kick / clap / hat tone" },
-      { id: "sound-focus-decision", command: "Sound Focus Decision", shortcut: "Quick Actions / Readout", target: "Suggested tone focus" },
-      { id: "sound-focus", command: "Sound Focus", shortcut: "Quick Actions / Readout", target: "808 / Synth / Chords" },
-      { id: "timbre-check", command: "Timbre Check", shortcut: "Quick Actions / Readout", target: "Drums / 808 / air / width" },
-      { id: "sound-snapshot-decision", command: "Sound Snapshot A/B Decision", shortcut: "Quick Actions / Readout", target: "Capture / recall recommendation" },
-      { id: "sound-snapshot-ab", command: "Sound Snapshot A/B", shortcut: "Quick Actions / Readout", target: "Tone-pass compare" },
-      { id: "space-fx-decision", command: "Space FX Decision", shortcut: "Quick Actions / Readout", target: "Suggested send space" },
-      { id: "space-fx", command: "Space FX", shortcut: "Quick Actions / Readout", target: "Dry / room / wide / wash" }
+      {
+        id: "sound-preset-decision",
+        command: "Sound Preset Decision",
+        shortcut: "Quick Actions / Readout",
+        target: "Suggested full-tone preset",
+        context:
+          "Sound Preset Preview Decision Readout, Suggested Full-Tone Preset, Current/Direct Sound Preset Commands, Before/After Tone Posture, Result Metrics, Audition Cue, and Next Tone Check context before Sound Preset Decision commands run."
+      },
+      {
+        id: "sound-preset",
+        command: "Sound Preset",
+        shortcut: "Quick Actions / Readout",
+        target: "Full-tone presets",
+        context:
+          "Sound Preset Preview, Explicit Apply Path, Current/Direct Full-Tone Preset Commands, Before/After Drums/808/Duck/Synth/Chords Posture, Result Feedback, Audition Cue, and Next Tone Check context before Sound Preset commands run."
+      },
+      {
+        id: "drum-kit-decision",
+        command: "Drum Kit Decision",
+        shortcut: "Quick Actions / Readout",
+        target: "Suggested drum kit",
+        context:
+          "Drum Kit Preview Decision Readout, Suggested Built-In Kick/Clap/Hat Kit, Current/Direct Drum Kit Commands, Drum Rack Posture, Result Metrics, Audition Cue, and Next Kit Check context before Drum Kit Decision commands run."
+      },
+      {
+        id: "drum-kit",
+        command: "Drum Kit",
+        shortcut: "Quick Actions / Readout",
+        target: "Kick / clap / hat tone",
+        context:
+          "Drum Kit Preview, Explicit Pad Apply Path, Current/Direct Built-In Kit Commands, Before/After Kick/Clap/Hat Tone, Drum Rack Posture, Result Feedback, Audition Cue, and Next Kit Check context before Drum Kit commands run."
+      },
+      {
+        id: "sound-focus-decision",
+        command: "Sound Focus Decision",
+        shortcut: "Quick Actions / Readout",
+        target: "Suggested tone focus",
+        context:
+          "Sound Focus Preview Decision Readout, Suggested 808/Synth/Chords Tone-Focus Target, Current/Direct Sound Focus Commands, Before/After Tone Posture, Result Metrics, Audition Cue, and Next Focus Check context before Sound Focus Decision commands run."
+      },
+      {
+        id: "sound-focus",
+        command: "Sound Focus",
+        shortcut: "Quick Actions / Readout",
+        target: "808 / Synth / Chords",
+        context:
+          "Sound Focus Preview, Explicit Pad Apply Path, Current/Direct 808/Synth/Chords Focus Commands, Before/After Tone Posture, Result Feedback, Audition Cue, and Next Focus Check context before Sound Focus commands run."
+      },
+      {
+        id: "timbre-check",
+        command: "Timbre Check",
+        shortcut: "Quick Actions / Readout",
+        target: "Drums / 808 / air / width",
+        context:
+          "Timbre Check Drums/808/Air/Width/Warmth Balance, Focus Suggestion, Existing Sound Focus Apply Route, Result Metric, Audition Cue, and Next Tone Check context before Timbre Check commands run."
+      },
+      {
+        id: "sound-snapshot-decision",
+        command: "Sound Snapshot A/B Decision",
+        shortcut: "Quick Actions / Readout",
+        target: "Capture / recall recommendation",
+        context:
+          "Sound Snapshot A/B Readout Action, Capture/Recall Recommendation, A/B Slot State, Capture/Recall/Clear Commands, Tone-Pass Comparison Metrics, Audition Cue, and Next Snapshot Check context before Sound Snapshot A/B Decision commands run."
+      },
+      {
+        id: "sound-snapshot-ab",
+        command: "Sound Snapshot A/B",
+        shortcut: "Quick Actions / Readout",
+        target: "Tone-pass compare",
+        context:
+          "Sound Snapshot A/B Comparison, A/B Slot State, Capture/Recall/Clear Commands, Preset/Drum/808/Synth/Chords Comparison, Result Feedback, Audition Cue, and Next Snapshot Check context before Sound Snapshot A/B commands run."
+      },
+      {
+        id: "space-fx-decision",
+        command: "Space FX Decision",
+        shortcut: "Quick Actions / Readout",
+        target: "Suggested send space",
+        context:
+          "Space FX Preview Decision Readout, Suggested Dry/Room/Wide/Wash Send Posture, Current/Direct Space FX Commands, Result Metrics, Audition Cue, and Next Space Check context before Space FX Decision commands run."
+      },
+      {
+        id: "space-fx",
+        command: "Space FX",
+        shortcut: "Quick Actions / Readout",
+        target: "Dry / room / wide / wash",
+        context:
+          "Space FX Preview, Dry/Room/Wide/Wash Pad Posture, Current/Direct Space FX Commands, Send-Change Preview, Result Feedback, Audition Cue, and Next Space Check context before Space FX commands run."
+      }
     ]
   },
   {
