@@ -614,7 +614,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Compose, Arrange, Mix, Master, Master Automation, Handoff Readiness, Priority Readout, Direct Checklist Card Routes, Focus Result, Audition Cue, and Export/Manual-Trim Next Check context before Finish Checklist commands run."
       },
-      { id: "handoff-pack", command: "Handoff Pack", shortcut: "Quick Actions / Readout", target: "WAV / stems / MIDI / sheet" }
+      {
+        id: "handoff-pack",
+        command: "Handoff Pack",
+        shortcut: "Quick Actions / Readout",
+        target: "Deliverable set / send-order route",
+        context:
+          "WAV, Stems, MIDI, Handoff Sheet, Handoff Route, Manifest Readiness, Latest Export Receipt, Export Format, Package Check, Send Order, Next Export, Audition Cue, and Next Delivery Check context before Handoff Pack commands run."
+      }
     ]
   },
   {
