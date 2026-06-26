@@ -772,6 +772,7 @@ export function QuickActions({
 
   const firstRunnableAction = actions.find((action) => !action.disabled);
   const spotlight = createQuickActionSpotlightSummary(actions, firstRunnableAction, scope, scopeOptions, query);
+  const searchRecovery = createQuickActionSearchRecovery(query, scope, scopeOptions, actions.length);
   const pinnedActions = createQuickActionPinnedOptions(pinnedActionIds, recentActionSource);
   const recentActions = createQuickActionRecentOptions(recents, recentActionSource);
   const inspectedPinnedAction = pinnedActions.find((action) => action.id === inspectedPinnedActionId) ?? null;
@@ -1220,7 +1221,14 @@ export function QuickActions({
         <div className="quick-actions-list" data-testid="quick-actions-list">
           {actions.length === 0 ? (
             <div className="quick-action-empty" data-testid="quick-actions-empty">
-              No matching actions
+              {searchRecovery && (
+                <QuickActionSearchRecoveryCard
+                  recovery={searchRecovery}
+                  onClearSearch={() => onQueryChange("")}
+                  onSwitchScope={(scopeId) => onScopeChange(scopeId)}
+                />
+              )}
+              <span>No matching actions</span>
             </div>
           ) : (
             actions.map((action) => {
@@ -1257,6 +1265,108 @@ export function QuickActions({
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+type QuickActionSearchRecovery = {
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  nextCheck: string;
+  query: string;
+  suggestedScope: QuickActionScopeOption | null;
+};
+
+function createQuickActionSearchRecovery(
+  query: string,
+  scope: QuickActionScopeId,
+  scopeOptions: QuickActionScopeOption[],
+  shownCount: number
+): QuickActionSearchRecovery | null {
+  if (shownCount > 0) {
+    return null;
+  }
+
+  const trimmedQuery = query.trim();
+  const currentScope = scopeOptions.find((option) => option.id === scope);
+  const suggestedScope =
+    scopeOptions
+      .filter((option) => option.id !== scope && option.count > 0)
+      .sort((left, right) => right.count - left.count)[0] ?? null;
+  const scopeLabel = currentScope?.label ?? scope;
+  const searchLabel = trimmedQuery ? `"${trimmedQuery}"` : "empty search";
+
+  return {
+    status: "No match recovery",
+    title: trimmedQuery ? `Recover search ${searchLabel}` : `Recover ${scopeLabel} scope`,
+    detail: `${scopeLabel} scope / ${searchLabel} / 0 shown`,
+    metricLabel: suggestedScope ? "Best scope" : "Recovery",
+    metricValue: suggestedScope ? `${suggestedScope.label} / ${suggestedScope.count} matching` : "Clear search",
+    nextCheck: suggestedScope
+      ? `Switch to ${suggestedScope.label} or clear search before running a command.`
+      : trimmedQuery
+        ? "Clear search, then use Scope Filters before running a command."
+        : "Choose another scope before running a command.",
+    query: trimmedQuery,
+    suggestedScope
+  };
+}
+
+function QuickActionSearchRecoveryCard({
+  recovery,
+  onClearSearch,
+  onSwitchScope
+}: {
+  recovery: QuickActionSearchRecovery;
+  onClearSearch: () => void;
+  onSwitchScope: (scope: QuickActionScopeId) => void;
+}): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className="quick-actions-search-recovery"
+      data-search-recovery={recovery.query || "empty"}
+      data-testid="quick-actions-search-recovery"
+    >
+      <div>
+        <span data-testid="quick-actions-search-recovery-status">{recovery.status}</span>
+        <strong data-testid="quick-actions-search-recovery-title">{recovery.title}</strong>
+        <small data-testid="quick-actions-search-recovery-detail">{recovery.detail}</small>
+      </div>
+      <div>
+        <span data-testid="quick-actions-search-recovery-metric-label">{recovery.metricLabel}</span>
+        <strong data-testid="quick-actions-search-recovery-metric-value">{recovery.metricValue}</strong>
+        <small data-testid="quick-actions-search-recovery-next-check">{recovery.nextCheck}</small>
+      </div>
+      <div className="quick-actions-search-recovery-actions">
+        <button
+          data-testid="quick-actions-search-recovery-clear"
+          disabled={recovery.query.length === 0}
+          onClick={onClearSearch}
+          title="Clear Quick Actions search"
+          type="button"
+        >
+          <X size={14} aria-hidden="true" />
+          <span>Clear</span>
+        </button>
+        <button
+          data-testid="quick-actions-search-recovery-scope"
+          disabled={!recovery.suggestedScope}
+          onClick={() => {
+            if (recovery.suggestedScope) {
+              onSwitchScope(recovery.suggestedScope.id);
+            }
+          }}
+          title={recovery.suggestedScope ? `Switch to ${recovery.suggestedScope.label} scope` : "No matching scope"}
+          type="button"
+        >
+          <Target size={14} aria-hidden="true" />
+          <span>{recovery.suggestedScope ? recovery.suggestedScope.label : "Scope"}</span>
+        </button>
+      </div>
     </div>
   );
 }
