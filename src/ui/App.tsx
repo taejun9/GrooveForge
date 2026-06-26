@@ -7518,6 +7518,19 @@ export function App(): ReactElement {
     setProjectStatus(`Guide ${card.label}: ${card.status}`);
   }
 
+  function focusComposerActionsReadout(): void {
+    const action = composerActionsSummary.actions[0] ?? null;
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      action
+        ? `Composer Actions Readout ${action.label}: ${quickActionComposerActionAreaLabel(action.area)} / ${quickActionComposerActionRouteLabel(
+            action,
+            action.area
+          )} / ${action.scope} / ${action.impact} / ${action.safety}`
+        : `Composer Actions Readout: ${composerActionsSummary.headline} / direct writing unchanged`
+    );
+  }
+
   function focusKeyCompassItem(item: KeyCompassFocusItem): void {
     const targetRefs: Record<KeyCompassFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current
@@ -8533,6 +8546,7 @@ export function App(): ReactElement {
     onFocusBeatPassport: focusBeatPassportMetric,
     onFocusBeatReadiness: focusBeatReadinessCheck,
     onFocusComposerGuide: focusComposerGuideCard,
+    onFocusComposerActionsReadout: focusComposerActionsReadout,
     onRunComposerAction: runComposerAction,
     onRunNextMove: runNextMove,
     onFocusExportPreflight: focusExportPreflightCard,

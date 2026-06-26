@@ -1365,6 +1365,7 @@ export function createQuickActions({
   onFocusBeatPassport,
   onFocusBeatReadiness,
   onFocusComposerGuide,
+  onFocusComposerActionsReadout,
   onRunComposerAction,
   onRunNextMove,
   onFocusExportPreflight,
@@ -1702,6 +1703,7 @@ export function createQuickActions({
   onFocusBeatPassport: (metric: BeatPassportFocusItem) => void;
   onFocusBeatReadiness: (check: BeatReadinessCheck) => void;
   onFocusComposerGuide: (card: ComposerGuideCard) => void;
+  onFocusComposerActionsReadout: () => void;
   onRunComposerAction: (action: ComposerAction) => void;
   onRunNextMove: (action: NextMoveAction) => void;
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
@@ -2041,6 +2043,33 @@ export function createQuickActions({
     };
     return action;
   });
+  const composerActionsReadoutMove = composerActionsSummary.actions[0] ?? null;
+  const composerActionsReadoutDetail = composerActionsReadoutMove
+    ? [
+        composerActionsSummary.headline,
+        composerActionsReadoutMove.label,
+        quickActionComposerActionAreaLabel(composerActionsReadoutMove.area),
+        `Route ${quickActionComposerActionRouteLabel(composerActionsReadoutMove, composerActionsReadoutMove.area)}`,
+        composerActionsReadoutMove.scope,
+        composerActionsReadoutMove.impact,
+        composerActionsReadoutMove.safety,
+        `Pattern ${project.selectedPattern}`,
+        `${patternEventTotal(activePattern(project))} editable events`,
+        "direct composer-action preflight"
+      ].join(" / ")
+    : `${composerActionsSummary.headline} / no Composer Action move available / direct composer-action preflight`;
+  const composerActionsReadoutAction: QuickAction = {
+    id: "composer-actions-readout-action",
+    title: composerActionsReadoutMove
+      ? `Review Composer Actions Readout: ${composerActionsReadoutMove.buttonLabel}`
+      : "Review Composer Actions Readout",
+    detail: composerActionsReadoutDetail,
+    group: "Create",
+    keywords: `composer actions readout review current style aware writing move route scope impact undo posture selected pattern pattern a b c drums 808 harmony melody arrangement export readiness audition next direct composer-action preflight sample free beginner producer ${
+      composerActionsReadoutMove?.id ?? "none"
+    } ${composerActionsReadoutMove?.label ?? "none"} ${composerActionsReadoutMove?.area ?? "none"}`,
+    run: onFocusComposerActionsReadout
+  };
   const composerActionCommands: QuickAction[] = composerActionsSummary.actions.map((action) => {
     const commandDetail = composerActionQuickActionDetail(action, project);
     return {
@@ -4233,6 +4262,7 @@ export function createQuickActions({
       }
     },
     ...composerGuideActions,
+    composerActionsReadoutAction,
     ...composerActionCommands,
     {
       id: "style-inspector-focus",
@@ -6314,6 +6344,7 @@ export function createQuickActionResult(
     action.id.startsWith("first-beat-path-step-") ||
     action.id === "composer-guide-focus" ||
     action.id.startsWith("composer-guide-card-") ||
+    action.id === "composer-actions-readout-action" ||
     action.id.startsWith("beat-spine-card-jump-") ||
     action.id === "style-inspector-focus" ||
     action.id.startsWith("style-inspector-item-") ||
@@ -9694,6 +9725,60 @@ export function quickActionComposerActionMetricSnapshot(
       `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
       `style goals ${styleSummary ? quickActionStyleInspectorGoalPosture(styleSummary) : "style goals unavailable"}`,
       `composer ${summary.headline} / ${summary.detail}`,
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
+export function quickActionComposerActionsReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "composer-actions-readout-action") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const checks = createBeatReadinessChecks(project, exportAnalysis);
+  const summary = createComposerActionsSummary(project, checks, exportAnalysis, stemAnalyses);
+  const composerAction = summary.actions[0] ?? null;
+  const followup = quickActionResultFollowup(action, project, "complete");
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const target = activeDeliveryTarget(project);
+
+  return {
+    id: "composer-actions-readout",
+    label: "Composer Actions Readout",
+    value: [
+      "review composer actions",
+      `move ${composerAction?.label ?? summary.headline}`,
+      `area ${composerAction ? quickActionComposerActionAreaLabel(composerAction.area) : "no writing area"}`,
+      `route ${composerAction ? quickActionComposerActionRouteLabel(composerAction, composerAction.area) : "no route"}`,
+      `scope ${composerAction?.scope ?? "read-only composer-action check"}`,
+      `impact ${composerAction?.impact ?? "no project change"}`,
+      `undo ${composerAction?.safety ?? "no undo entry needed"}`,
+      `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `drums ${drumHitCount(pattern)} hits`,
+      `808 ${pattern.bassNotes.length} notes`,
+      `harmony ${pattern.chordEvents.length} chords`,
+      `melody ${pattern.melodyNotes.length} notes`,
+      `selected ${quickActionArrangementSelectedBlockLabel(project, selectedArrangementIndex)}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `composer ${summary.headline} / ${summary.detail}`,
+      "action unchanged",
+      "playback unchanged",
+      "export unchanged",
+      "sampler scope unchanged",
       `audition ${followup.auditionCue}`,
       `next ${followup.nextCheck}`
     ].join(" / ")
@@ -13314,6 +13399,16 @@ export function quickActionResultMetricSnapshot(
       quickActionComposerGuideMetricSnapshot(project, action) ?? {
         id: "composer-guide",
         label: "Composer guide",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "composer-actions-readout-action") {
+    return (
+      quickActionComposerActionsReadoutMetricSnapshot(project, action, selectedArrangementIndex, analysis ?? undefined) ?? {
+        id: "composer-actions-readout",
+        label: "Composer Actions Readout",
         value: action.detail
       }
     );
@@ -17338,6 +17433,14 @@ export function quickActionResultFollowup(
           nextCheck: "Read Style Goal Action Result before exporting."
         };
     }
+  }
+
+  if (action.id === "composer-actions-readout-action") {
+    return {
+      auditionCue:
+        "Review the current style-aware writing move, route, scope, impact, undo posture, and selected Pattern posture before running a Composer Action.",
+      nextCheck: "Run a direct Composer Action only when that local writing move should change the beat."
+    };
   }
 
   const composerQuickActionArea = composerActionQuickActionArea(action.id);
