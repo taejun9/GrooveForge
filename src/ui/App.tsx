@@ -8674,7 +8674,12 @@ export function App(): ReactElement {
         onFocus={focusComposerGuideCard}
       />
 
-      <ComposerActions summary={composerActionsSummary} result={composerActionResult} onRun={runComposerAction} />
+      <ComposerActions
+        project={project}
+        summary={composerActionsSummary}
+        result={composerActionResult}
+        onRun={runComposerAction}
+      />
 
       <BeatBlueprints
         isPlaying={isPlaying}
@@ -13230,10 +13235,12 @@ function ComposerGuideFocusResultStrip({ result }: { result: ComposerGuideFocusR
 }
 
 function ComposerActions({
+  project,
   summary,
   result,
   onRun
 }: {
+  project: ProjectState;
   summary: ComposerActionsSummary;
   result: ComposerActionResult | null;
   onRun: (action: ComposerAction) => void;
@@ -13250,29 +13257,37 @@ function ComposerActions({
       </div>
       {result && <ComposerActionResultStrip result={result} />}
       <div className="composer-actions-grid" data-testid="composer-actions-grid">
-        {summary.actions.map((action) => (
-          <button
-            className={action.tone}
-            data-testid={`composer-action-${action.id}`}
-            key={action.id}
-            onClick={() => onRun(action)}
-            title={action.label}
-            type="button"
-          >
-            {composerActionIcon(action)}
-            <span>
-              <strong>{action.buttonLabel}</strong>
-              <small>{action.detail}</small>
-              <em data-testid={`composer-action-preview-${action.id}`}>
-                {action.scope} / {action.impact}
-              </em>
-              <i>{action.safety}</i>
-            </span>
-          </button>
-        ))}
+        {summary.actions.map((action) => {
+          const actionContext = composerActionButtonContext(action, project);
+          return (
+            <button
+              aria-label={actionContext}
+              className={action.tone}
+              data-testid={`composer-action-${action.id}`}
+              key={action.id}
+              onClick={() => onRun(action)}
+              title={actionContext}
+              type="button"
+            >
+              {composerActionIcon(action)}
+              <span>
+                <strong>{action.buttonLabel}</strong>
+                <small>{action.detail}</small>
+                <em data-testid={`composer-action-preview-${action.id}`}>
+                  {action.scope} / {action.impact}
+                </em>
+                <i>{action.safety}</i>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </section>
   );
+}
+
+function composerActionButtonContext(action: ComposerAction, project: ProjectState): string {
+  return `${action.buttonLabel}: ${composerActionQuickActionDetail(action, project)}`;
 }
 
 function ComposerActionResultStrip({ result }: { result: ComposerActionResult }): ReactElement {
