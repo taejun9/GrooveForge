@@ -248,7 +248,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
       },
       { id: "mode-focus", command: "Mode Focus", shortcut: "Quick Actions / Readout", target: "Guided / Studio orientation" },
       { id: "mode-switch", command: "Mode Switch", shortcut: "Quick Actions", target: "Guided / Studio mode" },
-      { id: "session-pass", command: "Session Pass", shortcut: "Quick Actions / Readout", target: "Setup / risk / delivery" },
+      {
+        id: "session-pass",
+        command: "Session Pass",
+        shortcut: "Quick Actions / Readout",
+        target: "Guided / Studio / Finish / Delivery focus",
+        context:
+          "Guided, Studio, Finish, and Delivery context with destination, session metric, pass context, audition cue, and next check before Session Pass commands run."
+      },
       { id: "session-brief-compass", command: "Session Brief Compass", shortcut: "Quick Actions / Readout", target: "Direction / reference / handoff" },
       { id: "reference-alignment", command: "Reference Alignment", shortcut: "Quick Actions / Readout", target: "Reference / form / mix / handoff" },
       { id: "composer-guide", command: "Composer Guide", shortcut: "Quick Actions / Readout", target: "Drums / 808 / harmony / melody" },
