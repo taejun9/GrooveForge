@@ -7260,6 +7260,12 @@ export function App(): ReactElement {
     return check;
   }
 
+  function focusMasterOutputRole(): void {
+    const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
+    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    setProjectStatus(`Master Output Role: ${summary.roleLabel} / ${summary.detailLabel}`);
+  }
+
   function runNextMove(action: NextMoveAction): void {
     const beforeProject = projectRef.current;
     switch (action.command.kind) {
@@ -8240,6 +8246,7 @@ export function App(): ReactElement {
     onFocusKeyCompass: focusKeyCompassItem,
     onFocusListeningPass: focusListeningPassItem,
     onFocusMixCoach: focusMixCoachCheck,
+    onFocusMasterOutputRole: focusMasterOutputRole,
     onFocusModeFocus: focusModeFocusCard,
     onFocusPatternDna: focusPatternDnaCard,
     onFocusProductionSnapshot: focusProductionSnapshotMetric,
@@ -17883,6 +17890,7 @@ function createQuickActions({
   onFocusKeyCompass,
   onFocusListeningPass,
   onFocusMixCoach,
+  onFocusMasterOutputRole,
   onFocusModeFocus,
   onFocusPatternDna,
   onFocusProductionSnapshot,
@@ -18156,6 +18164,7 @@ function createQuickActions({
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
   onFocusListeningPass: (item: ListeningPassItem) => void;
   onFocusMixCoach: (check: MixCoachCheck) => void;
+  onFocusMasterOutputRole: () => void;
   onFocusModeFocus: (card: ModeFocusCard) => void;
   onFocusPatternDna: (card: PatternDnaCard) => void;
   onFocusProductionSnapshot: (metric: ProductionSnapshotFocusItem) => void;
@@ -18195,6 +18204,7 @@ function createQuickActions({
   );
   const blueprintPreviewCue = createBeatBlueprintPreviewCue(blueprintPreviewSummary, styleMatchPreviewSummary, styleMatchPreviewed);
   const blueprintPreviewCueActive = transportLoopScope === blueprintPreviewCue.actionLoopScope;
+  const masterOutputRoleSummary = createMasterOutputRoleSummary(project, exportAnalysis);
   const localDraftRecoveryDetail = localDraftRecovery
     ? `${localDraftRecovery.project.title} / ${formatLocalDraftSavedAt(localDraftRecovery.savedAt)} / ${projectEventTotal(
         localDraftRecovery.project
@@ -21169,6 +21179,14 @@ function createQuickActions({
       }
     })),
     {
+      id: "master-output-role",
+      title: `Review Master Output Role: ${masterOutputRoleSummary.roleLabel}`,
+      detail: `${masterOutputRoleSummary.statusLabel} / ${masterOutputRoleSummary.levelLabel} / ${masterOutputRoleSummary.detailLabel}`,
+      group: "Mix",
+      keywords: `master output role readout final output posture preset export status ceiling output gain headroom limiter export meter mix coach handoff sheet ${project.masterPreset} ${exportAnalysis.status} ${masterOutputRoleSummary.roleLabel} beginner producer`,
+      run: onFocusMasterOutputRole
+    },
+    {
       id: "mix-headroom",
       title: "Mix Fix Headroom",
       detail: "Set a vocal-safe ceiling and reduce master gain.",
@@ -21748,12 +21766,14 @@ function quickActionMatchesScope(action: QuickAction, scope: QuickActionScopeId)
     case "mix":
       return (
         action.group === "Mix" &&
+        action.id !== "master-output-role" &&
         action.id !== "master-finish" &&
         !action.id.startsWith("master-finish-") &&
         composerActionQuickActionArea(action.id) !== "finish"
       );
     case "master":
       return (
+        action.id === "master-output-role" ||
         action.id === "master-finish" ||
         action.id.startsWith("master-finish-") ||
         composerActionQuickActionArea(action.id) === "finish"
@@ -28442,6 +28462,16 @@ function quickActionResultMetricSnapshot(
     return masterFinishMetric;
   }
 
+  if (action.id === "master-output-role") {
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const summary = createMasterOutputRoleSummary(project, exportAnalysis);
+    return {
+      id: "master-output-role",
+      label: "Master Output Role",
+      value: `${summary.roleLabel} / ${summary.statusLabel} / ${summary.levelLabel} / ${summary.detailLabel}`
+    };
+  }
+
   const masterAutomationPad = masterAutomationQuickActionPad(action.id);
   const masterAutomationMetric = quickActionMasterAutomationMetricSnapshot(project, action, masterAutomationPad, analysis ?? undefined);
   if (masterAutomationMetric) {
@@ -31324,6 +31354,13 @@ function quickActionResultFollowup(
   }
 
   const masterFinishPad = masterFinishQuickActionPad(action.id);
+  if (action.id === "master-output-role") {
+    return {
+      auditionCue: "Play Full Mix and read Master Output Role beside Export Meter before Master Finish or delivery export.",
+      nextCheck: "Use Master Finish, Mix Coach, or manual ceiling/output trim only if role, headroom, or limiter posture does not fit the delivery target."
+    };
+  }
+
   if (action.id === "master-finish-decision") {
     return {
       auditionCue: "Play Full Mix and follow the visible Master Finish Preview Decision before another output posture move.",
