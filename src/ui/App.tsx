@@ -7459,6 +7459,16 @@ export function App(): ReactElement {
     setProjectStatus(`Transition ${transition.fromIndex + 1}->${transition.toIndex + 1}: ${transition.status}`);
   }
 
+  function focusArrangementTransitionMapReadout(): void {
+    const transition = activeArrangementTransitionMapQuickActionTransition(arrangementTransitionMapSummary);
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      transition
+        ? `Arrangement Transition Map ${transition.status}: ${transition.value} / ${transition.energyLabel} / ${transition.patternLabel}`
+        : `Arrangement Transition Map: ${arrangementTransitionMapSummary.headline} / ${arrangementTransitionMapSummary.detail}`
+    );
+  }
+
   function focusModeFocusCard(card: ModeFocusCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -8235,6 +8245,7 @@ export function App(): ReactElement {
     onFocusArrangementMuteMapReadout: focusArrangementMuteMapReadout,
     onFocusArrangementMuteMap: focusArrangementMuteMapLane,
     onFocusArrangementPlaybackReadout: focusArrangementPlaybackReadout,
+    onFocusArrangementTransitionMapReadout: focusArrangementTransitionMapReadout,
     onFocusArrangementTransitionMap: focusArrangementTransitionMapTransition,
     onApplyBasslinePad: applyBasslinePad,
     onApplyBassGlidePad: applyBassGlidePad,
