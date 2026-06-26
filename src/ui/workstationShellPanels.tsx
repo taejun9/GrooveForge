@@ -585,6 +585,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Cue/Use Recommendation, Selected Pattern A/B/C, Selected-Block Placement, Visible Readout Action, Pattern Compare Decision Command, Pattern Compare Result Feedback, Audition Cue, and Next Decision Check context before Pattern Compare Decision commands run."
       },
       {
+        id: "pattern-cue-readout",
+        command: "Pattern Cue Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Pattern A/B/C audition preview",
+        context:
+          "Pattern Cue Readout Action, Target Pattern A/B/C, Current Edit Pattern, Selected-Block Placement, Pattern Loop Scope, Target Pattern Event Count, Arrangement Usage, Audition Cue, and Next Pattern Cue Check context before direct Pattern Cue commands run."
+      },
+      {
         id: "pattern-use-readout",
         command: "Pattern Use Readout",
         shortcut: "Quick Actions / Readout",

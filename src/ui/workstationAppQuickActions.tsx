@@ -1377,6 +1377,7 @@ export function createQuickActions({
   onFocusMasterOutputRole,
   onFocusModeFocus,
   onFocusPatternDna,
+  onFocusPatternCueReadout,
   onFocusPatternPlaybackReadout,
   onFocusPatternUseReadout,
   onFocusProductionSnapshot,
@@ -1704,6 +1705,7 @@ export function createQuickActions({
   onFocusMasterOutputRole: () => void;
   onFocusModeFocus: (card: ModeFocusCard) => void;
   onFocusPatternDna: (card: PatternDnaCard) => void;
+  onFocusPatternCueReadout: () => void;
   onFocusPatternPlaybackReadout: () => void;
   onFocusPatternUseReadout: () => void;
   onFocusProductionSnapshot: (metric: ProductionSnapshotFocusItem) => void;
@@ -3399,6 +3401,24 @@ export function createQuickActions({
       .join(" ")} ${styleDirectionPatternSummary(project)} beginner producer direct beat workstation sample free`,
     run: onFocusStyleDirectionReadout
   };
+  const patternCueReadoutTarget =
+    patternCompareDecisionSummary.action === "cue" ? patternCompareDecisionSummary.target : project.selectedPattern;
+  const patternCueReadoutEventCount = patternEventTotal(project.patterns[patternCueReadoutTarget]);
+  const patternCueReadoutPlacement = patternCueSwitchSelectedBlockPlacement(
+    project,
+    selectedArrangementIndex,
+    patternCueReadoutTarget
+  );
+  const patternCueReadoutAction: QuickAction = {
+    id: "pattern-cue-readout-action",
+    title: `Review Pattern Cue Readout: Pattern ${patternCueReadoutTarget}`,
+    detail: `${patternCompareDecisionSummary.statusLabel} / ${patternCueReadoutPlacement} / ${patternCueReadoutEventCount} events / ${transportLoopLabel(
+      transportLoopScope
+    )} loop / edit Pattern ${project.selectedPattern}`,
+    group: "Transport",
+    keywords: `Quick Actions Pattern Cue Readout review audition loop target Pattern ${patternCueReadoutTarget} current edit Pattern ${project.selectedPattern} selected block placement arrangement compare cue switch a b c beginner producer`,
+    run: onFocusPatternCueReadout
+  };
   const patternCueActions: QuickAction[] = patternSlots.map((pattern) => {
     const cued = pattern === project.selectedPattern && transportLoopScope === "pattern";
     const eventCount = patternEventTotal(project.patterns[pattern]);
@@ -3808,6 +3828,7 @@ export function createQuickActions({
     ...tempoNudgeActions,
     ...swingFeelActions,
     patternCompareDecisionAction,
+    patternCueReadoutAction,
     ...patternCueActions,
     ...patternSwitchActions,
     patternPlaybackReadoutAction,
@@ -6234,6 +6255,7 @@ export function createQuickActionResult(
     action.id.startsWith("arrangement-block-cue-") ||
     action.id.startsWith("arrangement-block-jump-") ||
     action.id.startsWith("section-locator-") ||
+    action.id === "pattern-cue-readout-action" ||
     action.id.startsWith("pattern-cue-") ||
     action.id.startsWith("pattern-switch-") ||
     action.id === "pattern-use-readout-action" ||
@@ -8632,6 +8654,57 @@ export function patternCompareDecisionSelectedBlockPlacement(
   const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
   const placementLabel = block.pattern === target ? "target in selected block" : `selected block uses Pattern ${block.pattern}`;
   return `${placementLabel} / Block ${boundedIndex + 1} ${block.section} / ${rangeLabel} / ${barCountLabel(bars)}`;
+}
+
+export function quickActionPatternCueReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  const target = patternCueReadoutQuickActionTarget(action);
+  if (!target) {
+    return null;
+  }
+
+  const targetPattern = project.patterns[target];
+  const eventCount = patternEventTotal(targetPattern);
+  const drumCount = drumHitCount(targetPattern);
+  const musicEvents = targetPattern.bassNotes.length + targetPattern.chordEvents.length + targetPattern.melodyNotes.length;
+  const arrangedBlocks = project.arrangement.filter((block) => block.pattern === target);
+  const arrangedBars = arrangedBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  const arrangementUse =
+    arrangedBlocks.length === 0
+      ? "not arranged"
+      : `${arrangedBlocks.length} block${arrangedBlocks.length === 1 ? "" : "s"} / ${barCountLabel(arrangedBars)}`;
+  const selectedBlockPlacement = patternCueSwitchSelectedBlockPlacement(project, selectedArrangementIndex, target);
+
+  return {
+    id: "pattern-cue-readout",
+    label: "Pattern Cue Readout",
+    value: [
+      "review pattern cue",
+      `target Pattern ${target}`,
+      selectedBlockPlacement,
+      `${eventCount} events`,
+      `${drumCount} drums`,
+      `${musicEvents} music`,
+      `arrangement ${arrangementUse}`,
+      `edit Pattern ${project.selectedPattern}`,
+      "loop unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+export function patternCueReadoutQuickActionTarget(action: QuickAction): PatternSlot | null {
+  if (action.id !== "pattern-cue-readout-action") {
+    return null;
+  }
+
+  const match = /Pattern ([ABC])/.exec(`${action.title} ${action.detail}`);
+  const slot = match?.[1];
+  return slot === "A" || slot === "B" || slot === "C" ? slot : null;
 }
 
 export function quickActionPatternCueSwitchMetricSnapshot(
@@ -13389,6 +13462,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "pattern-cue-readout-action") {
+    return (
+      quickActionPatternCueReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "pattern-cue-readout",
+        label: "Pattern Cue Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id.startsWith("pattern-cue-")) {
     return (
       quickActionPatternCueSwitchMetricSnapshot(project, action, "cue", selectedArrangementIndex) ?? {
@@ -16910,6 +16993,14 @@ export function quickActionResultFollowup(
       auditionCue:
         "Use the edit-vs-heard Arrangement readout before changing section order, block details, Pattern placement, or arrangement energy.",
       nextCheck: "Run Audible Arrangement Follow only when the heard block should become the explicit editing block."
+    };
+  }
+
+  if (action.id === "pattern-cue-readout-action") {
+    return {
+      auditionCue:
+        "Review the target Pattern's event posture, selected-block placement, and arrangement usage before cueing the Pattern loop.",
+      nextCheck: "Run a direct Pattern Cue command only when that Pattern should become the audition loop."
     };
   }
 
