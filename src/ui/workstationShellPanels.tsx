@@ -491,11 +491,46 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Selected Drum/808/Synth/Chord Event, Selected Pattern, One-Shot Audition Route, Runtime Fallback, Audition Result Feedback, and Next Listening Check context before Editor Audition commands run."
       },
-      { id: "blueprints", command: "Beat Blueprints", shortcut: "Quick Actions / Readout", target: "Sample-free starts" },
-      { id: "style-inspector", command: "Style Inspector", shortcut: "Quick Actions / Readout", target: "Genre fit / goals / density" },
-      { id: "composer-actions", command: "Composer Actions", shortcut: "Quick Actions / Readout", target: "Guided writing moves" },
-      { id: "style-goal-cues", command: "Style Goal Cues", shortcut: "Quick Actions / Readout", target: "Pattern / Song loop" },
-      { id: "style-goal-actions", command: "Style Goal Actions", shortcut: "Quick Actions / Readout", target: "Drums / 808 / Harmony / Melody" },
+      {
+        id: "blueprints",
+        command: "Beat Blueprints",
+        shortcut: "Quick Actions / Readout",
+        target: "Sample-free starts",
+        context:
+          "Sample-Free Style Starts, Current-Style Match, Preview Decision, Preview Listening Cue, Direct Preview/Apply Commands, Blueprint Result Feedback, Audition Cue, and Next Preview/Apply Check context before Beat Blueprints commands run."
+      },
+      {
+        id: "style-inspector",
+        command: "Style Inspector",
+        shortcut: "Quick Actions / Readout",
+        target: "Genre fit / goals / density",
+        context:
+          "Genre Fit, BPM/Swing, Bass/Melody Roles, Sound Preset, Style Goal Progress, Pattern Density, Focus Result Feedback, Audition Cue, and Next Style Check context before Style Inspector commands run."
+      },
+      {
+        id: "composer-actions",
+        command: "Composer Actions",
+        shortcut: "Quick Actions / Readout",
+        target: "Guided writing moves",
+        context:
+          "Style-Aware Writing Moves, Route, Scope, Impact, Undo Posture, Direct Composer Action Commands, Result Feedback, Audition Cue, and Next Composer-Action Check context before Composer Actions commands run."
+      },
+      {
+        id: "style-goal-cues",
+        command: "Style Goal Cues",
+        shortcut: "Quick Actions / Readout",
+        target: "Pattern / Song loop",
+        context:
+          "Pattern/Song Loop Cue, Style Goal Progress, Cue Result Feedback, Matching Result Action, Audition Cue, and Next Style-Goal Check context before Style Goal Cues commands run."
+      },
+      {
+        id: "style-goal-actions",
+        command: "Style Goal Actions",
+        shortcut: "Quick Actions / Readout",
+        target: "Drums / 808 / Harmony / Melody",
+        context:
+          "Drums, 808/Bass, Harmony, and Melody Goal Actions, Composer Action Route, Style Goal Action Result, Audition Cue, and Next Writing Check context before Style Goal Actions commands run."
+      },
       { id: "layer-starter", command: "Layer Starter", shortcut: "Quick Actions / Readout", target: "Drums / 808 / Chords / Synth" },
       { id: "pattern-stack", command: "Pattern Stack", shortcut: "Quick Actions / Readout", target: "808 / chords / synth sketch" },
       { id: "pattern-compare", command: "Pattern Compare", shortcut: "Quick Actions / Readout", target: "Cue / use Pattern A/B/C" },
