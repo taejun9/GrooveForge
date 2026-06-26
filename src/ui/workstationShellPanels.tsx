@@ -359,7 +359,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Issue Priority, Focus/Fix Actions, Queue Readiness, and Review Fix Preview context with destination, review metric, audition cue, fix action, and next check before Review Queue commands run."
       },
-      { id: "workflow-navigator", command: "Workflow Navigator", shortcut: "Quick Actions / Readout", target: "Stage jumps" },
+      {
+        id: "workflow-navigator",
+        command: "Workflow Navigator",
+        shortcut: "Quick Actions / Readout",
+        target: "Compose / arrange / mix / deliver workflow zones",
+        context:
+          "Compose, Arrange, Mix, and Deliver workflow-zone context with destination, readiness metric, zone context, audition cue, jump action, and next check before Workflow Navigator commands run."
+      },
       { id: "workflow-spotlight", command: "Workflow Spotlight", shortcut: "Quick Actions / Readout", target: "Current command target" },
       { id: "beat-map", command: "Beat Map", shortcut: "Quick Actions / Readout", target: "Workflow / producer metrics" },
       { id: "structure-lens", command: "Structure Lens", shortcut: "Quick Actions / Readout", target: "Arrangement shape actions" },
