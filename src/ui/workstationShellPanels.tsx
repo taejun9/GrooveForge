@@ -743,6 +743,22 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Timbre Check Drums/808/Air/Width/Warmth Balance, Focus Suggestion, Existing Sound Focus Apply Route, Result Metric, Audition Cue, and Next Tone Check context before Timbre Check commands run."
       },
       {
+        id: "studio-tone-baseline",
+        command: "Studio Tone Baseline",
+        shortcut: "Quick Actions / Readout",
+        target: "Manual tone baseline",
+        context:
+          "Studio Tone Capture Baseline Command, UI-Local Baseline Source, Current Drums/808/Duck/Synth/Chords Posture, Result Metric, Audition Cue, and Next Manual Tone Check context before Studio Tone Baseline commands run."
+      },
+      {
+        id: "studio-tone-drift",
+        command: "Studio Tone Drift",
+        shortcut: "Quick Actions / Readout",
+        target: "Largest tone drift",
+        context:
+          "Studio Tone Drift Summary, Reset Largest Drift Command, Direct Per-Control Reset Commands, Baseline Source, Before/After Control Delta, Result Metric, Audition Cue, and Next Manual Tone Check context before Studio Tone Drift commands run."
+      },
+      {
         id: "sound-snapshot-decision",
         command: "Sound Snapshot A/B Decision",
         shortcut: "Quick Actions / Readout",

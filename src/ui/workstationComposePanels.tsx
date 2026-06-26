@@ -2,65 +2,12 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Drum, ListChecks, Musi
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { BassNote, ChordEvent, ChordProgressionPreset, ChordQuality, DrumLane, MelodyNote, NoteTrack, PatternSlot, PatternVariationPreset, ProjectState, SoundDesign } from "../domain/workstation";
-import { chordInversions, chordInversionLabel, chordProgressionPresetIds, chordProgressionPresetLabel, chordQualities, drumStepProbability, drumStepTimingMs, drumStepVelocity, hatRepeatCount, maxDrumTimingMs, minDrumTimingMs, normalizeChordInversion, normalizeDrumProbability, normalizeDrumTimingMs, normalizeDrumVelocity, normalizeEventProbability, normalizeHatRepeat, scalePitchNames, soundPresetDesign, soundPresetIds, soundPresetLabel, steps } from "../domain/workstation";
+import { chordInversions, chordInversionLabel, chordProgressionPresetIds, chordProgressionPresetLabel, chordQualities, drumStepProbability, drumStepTimingMs, drumStepVelocity, hatRepeatCount, maxDrumTimingMs, minDrumTimingMs, normalizeChordInversion, normalizeDrumProbability, normalizeDrumTimingMs, normalizeDrumVelocity, normalizeEventProbability, normalizeHatRepeat, scalePitchNames, soundPresetIds, soundPresetLabel, steps } from "../domain/workstation";
 import type { BassContourId, BassContourOption, BassGlidePadId, BassGlidePadOption, BassMovePreviewSummary, BassMoveResult, BasslinePadId, BasslinePadOption, ChordClipboard, ChordHarmonicSummary, ChordMovePreviewSummary, ChordMoveResult, ChordPadId, ChordPadOption, ChordRhythmId, ChordRhythmOption, ChordVoicingId, ChordVoicingOption, DrumAccentId, DrumAccentOption, DrumClipboard, DrumFoundationId, DrumFoundationOption, DrumKitPadId, DrumKitPadOption, DrumKitPreviewDecisionSummary, DrumKitPreviewSummary, DrumKitResult, DrumMovePreviewSummary, DrumMoveResult, DrumPocketSummary, GrooveFeelId, GrooveFeelOption, KeyboardCaptureDefaults, KeyboardCaptureKeyMapItem, KeyboardCaptureStepMode, MelodyAccentId, MelodyAccentOption, MelodyContourId, MelodyContourOption, MelodyMovePreviewSummary, MelodyMoveResult, MelodyMotifId, MelodyMotifOption, MidiCaptureStatus, MidiCaptureSummary, MidiInputOption, NoteClipboard, NoteDegreeSummary, NoteView, PatternClonePadOption, PatternCloneSuggestionSummary, PatternCloneResult, PatternFillPreviewSummary, PatternFillSuggestionSummary, PatternFillResult, PatternStackId, PatternStackOption, PatternStackPreviewSummary, PatternStackResult, PatternVariationPreviewSummary, PatternVariationSuggestionSummary, PatternVariationResult, SelectedDrumStep, SelectedNote, SoundFocusPadId, SoundFocusPadOption, SoundFocusPreviewDecisionSummary, SoundFocusPreviewSummary, SoundFocusResult, SoundPresetPreviewDecisionSummary, SoundPresetPreviewSummary, SoundPresetResult, SoundPresetTarget, SoundSnapshot, SoundSnapshotComparisonSummary, SoundSnapshotSlotId, SoundSnapshotSlotMap, SoundTimbreCheckSummary, SwingFeelResult } from "./workstationUiModel";
 import { drumLabels, keyboardCaptureKeyLabels } from "./workstationUiModel";
 import { chanceBadgeLabel, clampStepStart, compactChanceBadgeLabel, nextEmptyChordStep, percentLabel, pitchParts, timingLabel, trackOctaveRange } from "./workstationPatternTools";
-
-type SoundControlParameter = Exclude<keyof SoundDesign, "preset">;
-
-type StudioToneResetResult = {
-  id: string;
-  label: string;
-  beforeLabel: string;
-  baselineLabel: string;
-  baselineSourceLabel: string;
-  deltaLabel: string;
-  nextCheck: string;
-};
-
-type StudioToneBaseline = {
-  sound: SoundDesign;
-  sourceLabel: string;
-};
-
-type StudioToneBaselineResult = {
-  sourceLabel: string;
-  toneLabel: string;
-  nextCheck: string;
-};
-
-type StudioToneDriftSummary = {
-  changedCount: number;
-  totalCount: number;
-  postureLabel: string;
-  largestLabel: string;
-  directionLabel: string;
-  nextCheck: string;
-  resetTarget: StudioToneDriftResetTarget | null;
-};
-
-type StudioToneDriftResetTarget = {
-  id: string;
-  label: string;
-  parameter: SoundControlParameter;
-  beforeValue: number;
-  baselineValue: number;
-  deltaLabel: string;
-};
-
-const studioToneControls: Array<{ id: string; label: string; parameter: SoundControlParameter }> = [
-  { id: "kick-punch", label: "Kick punch", parameter: "kickPunch" },
-  { id: "snare-snap", label: "Snare snap", parameter: "snareSnap" },
-  { id: "hat-brightness", label: "Hat bright", parameter: "hatBrightness" },
-  { id: "bass-drive", label: "808 drive", parameter: "bassDrive" },
-  { id: "bass-decay", label: "808 decay", parameter: "bassDecay" },
-  { id: "sidechain-duck", label: "Kick duck", parameter: "sidechainDuck" },
-  { id: "synth-brightness", label: "Synth bright", parameter: "synthBrightness" },
-  { id: "synth-release", label: "Synth release", parameter: "synthRelease" },
-  { id: "chord-warmth", label: "Chord warm", parameter: "chordWarmth" },
-  { id: "chord-width", label: "Chord width", parameter: "chordWidth" }
-];
+import type { StudioToneBaseline, StudioToneBaselineResult, StudioToneDriftSummary, StudioToneResetResult } from "./studioToneTools";
+import { studioToneControls, studioToneResetNextCheck } from "./studioToneTools";
 
 export function DrumStepInspector({
   selectedStep,
@@ -1607,6 +1554,10 @@ export function SoundDesigner({
   sound,
   soundSnapshots,
   soundSnapshotSummary,
+  studioToneBaseline,
+  studioToneBaselineResult,
+  studioToneDrift,
+  studioToneResetResult,
   timbreCheck,
   onApplyPreset,
   onDrumKitPad,
@@ -1614,7 +1565,10 @@ export function SoundDesigner({
   onCaptureSoundSnapshot,
   onRecallSoundSnapshot,
   onClearSoundSnapshots,
+  onCaptureStudioToneBaseline,
   onPreviewPreset,
+  onResetLargestStudioToneDrift,
+  onStudioToneResetResult,
   onChange
 }: {
   drumKitPads: DrumKitPadOption[];
@@ -1630,6 +1584,10 @@ export function SoundDesigner({
   sound: SoundDesign;
   soundSnapshots: SoundSnapshotSlotMap;
   soundSnapshotSummary: SoundSnapshotComparisonSummary;
+  studioToneBaseline: StudioToneBaseline;
+  studioToneBaselineResult: StudioToneBaselineResult | null;
+  studioToneDrift: StudioToneDriftSummary;
+  studioToneResetResult: StudioToneResetResult | null;
   timbreCheck: SoundTimbreCheckSummary;
   onApplyPreset: (preset?: SoundPresetTarget) => void;
   onDrumKitPad: (pad: DrumKitPadId) => void;
@@ -1637,52 +1595,14 @@ export function SoundDesigner({
   onCaptureSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
   onRecallSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
   onClearSoundSnapshots: () => void;
+  onCaptureStudioToneBaseline: () => void;
   onPreviewPreset: (preset: SoundPresetTarget) => void;
+  onResetLargestStudioToneDrift: () => void;
+  onStudioToneResetResult: (result: StudioToneResetResult) => void;
   onChange: (update: Partial<Omit<SoundDesign, "preset">>) => void;
 }): ReactElement {
-  const [studioToneBaseline, setStudioToneBaseline] = useState<StudioToneBaseline>(() => createStudioToneBaseline(sound));
-  const [studioToneBaselineResult, setStudioToneBaselineResult] = useState<StudioToneBaselineResult | null>(null);
-  const [studioToneResetResult, setStudioToneResetResult] = useState<StudioToneResetResult | null>(null);
   const presetBaseline = studioToneBaseline.sound;
-  const studioToneDrift = createStudioToneDriftSummary(sound, presetBaseline);
   const presetDecision = createSoundPresetPreviewDecision(presetPreview);
-
-  useEffect(() => {
-    if (sound.preset !== "custom") {
-      setStudioToneBaseline(createStudioToneBaseline(sound));
-      setStudioToneBaselineResult(null);
-      setStudioToneResetResult(null);
-    }
-  }, [sound.preset]);
-
-  function captureStudioToneBaseline(): void {
-    const baseline = createCapturedStudioToneBaseline(sound);
-    setStudioToneBaseline(baseline);
-    setStudioToneResetResult(null);
-    setStudioToneBaselineResult({
-      sourceLabel: baseline.sourceLabel,
-      toneLabel: studioToneBaselineSummaryLabel(baseline.sound),
-      nextCheck: "Adjust one tone control, then use Reset to compare against this captured baseline."
-    });
-  }
-
-  function resetLargestStudioToneDrift(): void {
-    const target = studioToneDrift.resetTarget;
-    if (!target) {
-      return;
-    }
-
-    setStudioToneResetResult({
-      id: target.id,
-      label: target.label,
-      beforeLabel: percentLabel(target.beforeValue),
-      baselineLabel: percentLabel(target.baselineValue),
-      baselineSourceLabel: studioToneBaseline.sourceLabel,
-      deltaLabel: `${target.deltaLabel} -> 0`,
-      nextCheck: studioToneResetNextCheck(target.label)
-    });
-    onChange({ [target.parameter]: target.baselineValue } as Partial<Omit<SoundDesign, "preset">>);
-  }
 
   return (
     <div className="sound-designer">
@@ -1731,7 +1651,7 @@ export function SoundDesigner({
             <strong data-testid="studio-tone-baseline-source-label">{studioToneBaseline.sourceLabel}</strong>
             <button
               data-testid="studio-tone-baseline-capture"
-              onClick={captureStudioToneBaseline}
+              onClick={onCaptureStudioToneBaseline}
               title="Capture current Studio tone as the reset baseline"
               type="button"
             >
@@ -1740,7 +1660,7 @@ export function SoundDesigner({
             </button>
           </div>
           {studioToneBaselineResult && <StudioToneBaselineResultStrip result={studioToneBaselineResult} />}
-          <StudioToneDriftSummaryStrip summary={studioToneDrift} onResetLargest={resetLargestStudioToneDrift} />
+          <StudioToneDriftSummaryStrip summary={studioToneDrift} onResetLargest={onResetLargestStudioToneDrift} />
           <div className="sound-control-grid">
             {studioToneControls.map((control) => (
               <SoundControl
@@ -1751,7 +1671,7 @@ export function SoundDesigner({
                 label={control.label}
                 value={sound[control.parameter]}
                 onChange={(value) => onChange({ [control.parameter]: value } as Partial<Omit<SoundDesign, "preset">>)}
-                onResetResult={setStudioToneResetResult}
+                onResetResult={onStudioToneResetResult}
               />
             ))}
           </div>
@@ -2615,81 +2535,6 @@ function StudioToneDriftSummaryStrip({
       <p data-testid="studio-tone-drift-next-check">{summary.nextCheck}</p>
     </div>
   );
-}
-
-function studioToneResetNextCheck(label: string): string {
-  if (label.includes("808")) {
-    return "Replay the 808 against the kick and confirm the low-end pocket.";
-  }
-  if (label.includes("Kick") || label.includes("Snare") || label.includes("Hat")) {
-    return "Replay the drum loop and confirm the groove still cuts through.";
-  }
-  if (label.includes("Synth") || label.includes("Chord")) {
-    return "Replay the harmony layers and confirm the top-end balance.";
-  }
-  return "Replay the beat and confirm the tone matches the preset target.";
-}
-
-function createStudioToneBaseline(sound: SoundDesign): StudioToneBaseline {
-  if (sound.preset === "custom") {
-    return { sound: { ...sound }, sourceLabel: "Initial custom tone" };
-  }
-
-  return { sound: { ...soundPresetDesign(sound.preset) }, sourceLabel: `${soundPresetLabel(sound.preset)} preset` };
-}
-
-function createCapturedStudioToneBaseline(sound: SoundDesign): StudioToneBaseline {
-  return { sound: { ...sound }, sourceLabel: "Captured Studio tone" };
-}
-
-function studioToneBaselineSummaryLabel(sound: SoundDesign): string {
-  return `Kick ${percentLabel(sound.kickPunch)} | 808 ${percentLabel(sound.bassDrive)} | Synth ${percentLabel(sound.synthBrightness)} | Chord ${percentLabel(sound.chordWarmth)}`;
-}
-
-function createStudioToneDriftSummary(sound: SoundDesign, baseline: SoundDesign): StudioToneDriftSummary {
-  const deltas = studioToneControls.map((control) => {
-    const currentPercent = Math.round(sound[control.parameter] * 100);
-    const baselinePercent = Math.round(baseline[control.parameter] * 100);
-    return {
-      ...control,
-      deltaPercent: currentPercent - baselinePercent
-    };
-  });
-  const changed = deltas.filter((delta) => delta.deltaPercent !== 0);
-  const largest = deltas.reduce((currentLargest, delta) =>
-    Math.abs(delta.deltaPercent) > Math.abs(currentLargest.deltaPercent) ? delta : currentLargest
-  );
-
-  if (changed.length === 0) {
-    return {
-      changedCount: 0,
-      totalCount: studioToneControls.length,
-      postureLabel: "Tone matches baseline",
-      largestLabel: "Largest 0",
-      directionLabel: "No drift",
-      nextCheck: "Capture a new baseline after you shape a sound worth keeping.",
-      resetTarget: null
-    };
-  }
-
-  const direction = largest.deltaPercent > 0 ? "above" : "below";
-  const deltaLabel = `Delta ${largest.deltaPercent > 0 ? "+" : ""}${largest.deltaPercent}`;
-  return {
-    changedCount: changed.length,
-    totalCount: studioToneControls.length,
-    postureLabel: changed.length >= 4 ? "Tone has broad changes" : "Tone has focused changes",
-    largestLabel: `${largest.label} ${largest.deltaPercent > 0 ? "+" : ""}${largest.deltaPercent}`,
-    directionLabel: `${largest.label} is ${direction} baseline`,
-    nextCheck: `Audition ${largest.label.toLowerCase()} first, then reset or capture if the move works.`,
-    resetTarget: {
-      id: largest.id,
-      label: largest.label,
-      parameter: largest.parameter,
-      beforeValue: sound[largest.parameter],
-      baselineValue: baseline[largest.parameter],
-      deltaLabel
-    }
-  };
 }
 
 export function ChordEditor({
