@@ -486,7 +486,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "808 / Synth notes",
         context:
-          "Keyboard Capture Armed State, 808/Synth Target, Degree Key Map, Octave/Length/Velocity/Glide Defaults, Capture Result Feedback, Audition Cue, and Next Input Check context before Keyboard Capture commands run."
+          "Keyboard Capture Readout Command, Keyboard Capture Armed State, 808/Synth Target, Degree Key Map, Octave/Length/Velocity/Glide Defaults, Input Readiness Metric, Capture Result Feedback, Audition Cue, and Next Input Check context before Keyboard Capture commands run."
       },
       {
         id: "capture-step-mode",
