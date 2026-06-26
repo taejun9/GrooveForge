@@ -1227,6 +1227,7 @@ export function createQuickActions({
   onFocusMixSnapshotReadout,
   onFocusSpaceFxReadout,
   onFocusPatternChainReadout,
+  onFocusChainExpandReadout,
   onApplyPatternChain,
   onApplyPatternClone,
   onApplyPatternFill,
@@ -1542,6 +1543,7 @@ export function createQuickActions({
   onFocusMixSnapshotReadout: () => void;
   onFocusSpaceFxReadout: () => void;
   onFocusPatternChainReadout: () => void;
+  onFocusChainExpandReadout: () => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternClone: (target: PatternSlot, preset: PatternVariationPreset) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
@@ -4746,6 +4748,16 @@ export function createQuickActions({
       run: onFocusPatternChainReadout
     },
     {
+      id: "chain-expand-readout-action",
+      title: "Review Chain Expand",
+      detail: `${patternChainPreviewSummary.statusLabel} / ${patternChainPreviewSummary.sequenceLabel} / target ${barCountLabel(16)} outline / ${patternChainPreviewSummary.moveLabel}`,
+      group: "Arrange",
+      keywords: `Quick Actions Chain Expand Readout review arrangement song form outline preview decision priority pattern a b c intro verse hook bridge outro 16 bar ${
+        patternChainPreviewSummary.actionId
+      } ${patternChainPreviewSummary.sequenceLabel} beginner producer`,
+      run: onFocusChainExpandReadout
+    },
+    {
       id: "pattern-chain-decision",
       title: patternChainDecisionSummary.disabled
         ? "Run Pattern Chain Decision"
@@ -6021,6 +6033,7 @@ export function createQuickActionResult(
     action.id === "sound-focus-readout-action" ||
     action.id === "sound-snapshot-readout-action" ||
     action.id === "pattern-chain-readout-action" ||
+    action.id === "chain-expand-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -13703,7 +13716,7 @@ export function quickActionResultMetricSnapshot(
     return spaceFxMetric;
   }
 
-  if (action.id.startsWith("pattern-chain-") || action.id === "chain-expand") {
+  if (action.id.startsWith("pattern-chain-") || action.id === "chain-expand-readout-action" || action.id === "chain-expand") {
     return (
       quickActionPatternChainMetricSnapshot(project, action) ?? {
         id: "song-length",
@@ -14997,6 +15010,24 @@ export function quickActionPatternChainMetricSnapshot(
         project.selectedPattern
       } / ${patternEventTotal(pattern)} editable events / ${project.arrangement.length} blocks / ${hookBlockCount} hook blocks / ${barCountLabel(
         arrangementTotalBars(project)
+      )}`
+    };
+  }
+
+  if (action.id === "chain-expand-readout-action") {
+    const pattern = activePattern(project);
+    const currentSequence = patternChainReadout(project.arrangement) || "empty";
+    const outline = expandPatternChainArrangement(project.arrangement);
+    const outlineSequence = patternChainReadout(outline) || "empty";
+    const hookBlockCount = outline.filter((block) => block.section === "Hook").length;
+    const detail = quickActionPatternChainReadoutDetail(action);
+    return {
+      id: "chain-expand-readout",
+      label: "Chain Expand Readout",
+      value: `review chain expand readout / ${detail} / current ${currentSequence} / target ${outlineSequence} / Pattern ${
+        project.selectedPattern
+      } / ${patternEventTotal(pattern)} editable events / ${outline.length} outline blocks / ${hookBlockCount} hook blocks / ${barCountLabel(
+        arrangementTotalBars({ ...project, arrangement: outline })
       )}`
     };
   }
@@ -16758,6 +16789,13 @@ export function quickActionResultFollowup(
         nextCheck: "Return to Workflow Navigator when you need another direct workstation zone jump."
       }
     );
+  }
+
+  if (action.id === "chain-expand-readout-action") {
+    return {
+      auditionCue: "Play Song loop and scan whether the current Pattern A/B/C chain is ready to become a 16-bar outline.",
+      nextCheck: "Run Chain Expand only after the readout outline supports the intro, verse, hook, bridge, hook, and outro flow."
+    };
   }
 
   if (action.id === "chain-expand") {
