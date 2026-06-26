@@ -8031,6 +8031,18 @@ export function App(): ReactElement {
     setProjectStatus(`Checked project safety: ${projectSafetyReadout.statusLabel}`);
   }
 
+  function focusLoopScopeReadout(): void {
+    const currentLoopStatus = transportLoopStatus(
+      project,
+      transportLoopScope,
+      selectedArrangementIndex,
+      arrangementTransitionLoopTarget
+    );
+
+    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Loop Scope ${transportLoopLabel(transportLoopScope)}: ${currentLoopStatus}`);
+  }
+
   const quickActions = createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
@@ -8282,6 +8294,7 @@ export function App(): ReactElement {
     onFocusHookReadiness: focusHookReadinessCard,
     onFocusKeyCompass: focusKeyCompassItem,
     onFocusListeningPass: focusListeningPassItem,
+    onFocusLoopScope: focusLoopScopeReadout,
     onFocusMixCoach: focusMixCoachCheck,
     onFocusExportMeter: focusExportMeter,
     onFocusMasterOutputRole: focusMasterOutputRole,
@@ -17928,6 +17941,7 @@ function createQuickActions({
   onFocusHookReadiness,
   onFocusKeyCompass,
   onFocusListeningPass,
+  onFocusLoopScope,
   onFocusMixCoach,
   onFocusExportMeter,
   onFocusMasterOutputRole,
@@ -18204,6 +18218,7 @@ function createQuickActions({
   onFocusHookReadiness: (card: HookReadinessFocusItem) => void;
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
   onFocusListeningPass: (item: ListeningPassItem) => void;
+  onFocusLoopScope: () => void;
   onFocusMixCoach: (check: MixCoachCheck) => void;
   onFocusExportMeter: () => void;
   onFocusMasterOutputRole: () => void;
@@ -19759,8 +19774,24 @@ function createQuickActions({
     };
   });
   const patternChainDecisionSummary = createPatternChainPreviewDecision(patternChainPreviewSummary);
+  const loopScopeStatus = transportLoopStatus(project, transportLoopScope, selectedArrangementIndex, arrangementTransitionLoopTarget);
+  const selectedLoopBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0] ?? null;
 
   return [
+    {
+      id: "loop-scope",
+      title: `Review Loop Scope: ${transportLoopLabel(transportLoopScope)}`,
+      detail: `${loopScopeStatus} / Pattern ${project.selectedPattern} / ${project.bpm} BPM / ${
+        project.metronomeEnabled ? "Click on" : "Click off"
+      }`,
+      group: "Transport",
+      keywords: `loop scope readout song block turn pattern transport audition playback ${
+        transportLoopScope
+      } ${loopScopeStatus} Pattern ${project.selectedPattern} ${
+        selectedLoopBlock ? `${selectedLoopBlock.section} ${selectedLoopBlock.pattern}` : "no block"
+      } metronome ${project.metronomeEnabled ? "on" : "off"} beginner producer direct beat workstation`,
+      run: onFocusLoopScope
+    },
     {
       id: "toggle-playback",
       title: isPlaying ? "Stop playback" : `Play ${transportLoopLabel(transportLoopScope)} loop`,
@@ -22135,6 +22166,7 @@ function createQuickActionResult(
     action.id === "beat-terms-reference" ||
     action.id === "guide-quick-start" ||
     action.id === "guide-bottleneck-focus" ||
+    action.id === "loop-scope" ||
     action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -26190,6 +26222,55 @@ function quickActionHandoffExportFormatLaneLabel(action: QuickAction, metric: Ha
   return titleLabel && titleLabel !== "Focus Export Format" ? titleLabel : metric.label;
 }
 
+function quickActionLoopScopeMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "loop-scope") {
+    return null;
+  }
+
+  const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0] ?? null;
+  const blockLabel = selectedBlock
+    ? `Block ${Math.min(selectedArrangementIndex + 1, project.arrangement.length)} ${selectedBlock.section} / Pattern ${
+        selectedBlock.pattern
+      } / ${barCountLabel(selectedBlock.bars)}`
+    : "No selected block";
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionLoopScopeDetailParts(action);
+  const loopContext = detailParts[0] ?? action.detail;
+  const scopeLabel = action.title.replace(/^Review Loop Scope:\s*/, "").trim() || "Loop";
+
+  return {
+    id: "loop-scope",
+    label: "Loop Scope",
+    value: [
+      "review transport loop",
+      `scope ${scopeLabel}`,
+      `context ${loopContext}`,
+      `selected ${blockLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(activePattern(project))} editable events`,
+      patternUseLabel,
+      `${project.bpm} BPM`,
+      project.metronomeEnabled ? "metronome on" : "metronome off",
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+function quickActionLoopScopeDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 const GUIDE_QUICK_START_DETAIL_LABEL_PREFIXES = [
   "Destination ",
   "Metric ",
@@ -27324,6 +27405,16 @@ function quickActionResultMetricSnapshot(
 
   if (action.id === "command-reference" || action.id === "beat-terms-reference") {
     return { id: "command-reference", label: "Reference", value: "Desktop / Project / Guide / Create / Sound / Arrange / Mix / Finish / Deliver / Beat Terms" };
+  }
+
+  if (action.id === "loop-scope") {
+    return (
+      quickActionLoopScopeMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "loop-scope",
+        label: "Loop Scope",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id === "guide-quick-start") {
@@ -30398,6 +30489,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "No audio changed; this command only checks the current file, draft, snapshot, and beat-state safety posture.",
       nextCheck: quickActionProjectSafetyNextCheck(action)
+    };
+  }
+
+  if (action.id === "loop-scope") {
+    return {
+      auditionCue: "Press Play only after the Loop Scope readout matches the Song, Block, Turn, or Pattern area you want to judge.",
+      nextCheck: "Use Song for arrangement, Block or Turn for section handoffs, and Pattern for drums, 808, chords, or melody edits."
     };
   }
 
