@@ -866,7 +866,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Edit block / heard block / Pattern A/B/C / bar context",
         context:
-          "Edit-vs-Heard Block, Selected Block, Audible Block, Pattern A/B/C, Bar Context, Follow Action, Audition Cue, and Next Check context before Arrangement Playback Readout commands run."
+          "Edit-vs-Heard Block, Selected Block, Audible Block, Pattern A/B/C, Bar Context, Arrangement Playback Readout Command, Local Result Metric, Follow Action, Audition Cue, and Next Check context before Arrangement Playback Readout commands run."
       },
       {
         id: "audible-arrangement-follow",

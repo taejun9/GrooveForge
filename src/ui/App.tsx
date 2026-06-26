@@ -8038,6 +8038,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusArrangementPlaybackReadout(): void {
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Arrangement Playback ${arrangementPlaybackReadout.statusLabel}: ${arrangementPlaybackReadout.roleLabel} / ${arrangementPlaybackReadout.detailLabel}`
+    );
+  }
+
   function focusTransportPositionReadout(): void {
     transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8075,6 +8082,7 @@ export function App(): ReactElement {
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
     arrangementMuteMapSummary,
+    arrangementPlaybackReadout,
     arrangementTransitionMapSummary,
     arrangementTransitionLoopTarget,
     arrangementTemplatePreviewSummary,
@@ -8183,6 +8191,7 @@ export function App(): ReactElement {
     onApplyToplineFix: applyToplineFix,
     onApplyReviewFix: applyReviewFix,
     onFocusArrangementMuteMap: focusArrangementMuteMapLane,
+    onFocusArrangementPlaybackReadout: focusArrangementPlaybackReadout,
     onFocusArrangementTransitionMap: focusArrangementTransitionMapTransition,
     onApplyBasslinePad: applyBasslinePad,
     onApplyBassGlidePad: applyBassGlidePad,
@@ -17728,6 +17737,7 @@ function createQuickActions({
   arrangementArcPadOptions,
   arrangementArcPreviewSummary,
   arrangementMuteMapSummary,
+  arrangementPlaybackReadout,
   arrangementTransitionMapSummary,
   arrangementTransitionLoopTarget,
   arrangementTemplatePreviewSummary,
@@ -17835,6 +17845,7 @@ function createQuickActions({
   onApplyHookFix,
   onApplyToplineFix,
   onFocusArrangementMuteMap,
+  onFocusArrangementPlaybackReadout,
   onFocusArrangementTransitionMap,
   onApplyBasslinePad,
   onApplyBassGlidePad,
@@ -18010,6 +18021,7 @@ function createQuickActions({
   arrangementArcPadOptions: ArrangementArcPadOption[];
   arrangementArcPreviewSummary: ArrangementArcPreviewSummary;
   arrangementMuteMapSummary: ArrangementMuteMapSummary;
+  arrangementPlaybackReadout: ArrangementPlaybackReadoutSummary;
   arrangementTransitionMapSummary: ArrangementTransitionMapSummary;
   arrangementTransitionLoopTarget: ArrangementTransitionLoopTarget | null;
   arrangementTemplatePreviewSummary: ArrangementTemplatePreviewSummary;
@@ -18117,6 +18129,7 @@ function createQuickActions({
   onApplyHookFix: (card?: HookReadinessCard) => void;
   onApplyToplineFix: (card?: ToplineSpaceCard) => void;
   onFocusArrangementMuteMap: (lane: ArrangementMuteMapLane) => void;
+  onFocusArrangementPlaybackReadout: () => void;
   onFocusArrangementTransitionMap: (transition: ArrangementTransitionMapTransition) => void;
   onApplyBasslinePad: (pad: BasslinePadId) => void;
   onApplyBassGlidePad: (pad: BassGlidePadId) => void;
@@ -18393,6 +18406,21 @@ function createQuickActions({
   const audibleArrangementFollowBlockNumber = audibleArrangementFollowTarget !== null ? audibleArrangementFollowTarget + 1 : 0;
   const editingAudibleArrangementBlock =
     playingArrangementIndex !== null && playingArrangementIndex === selectedArrangementIndex;
+  const arrangementPlaybackDetailLabel = arrangementPlaybackReadout.detailLabel.split(" / ").join(" + ");
+  const arrangementPlaybackReadoutAction: QuickAction = {
+    id: "arrangement-playback-readout-action",
+    title: `Review Arrangement Playback: ${arrangementPlaybackReadout.roleLabel}`,
+    detail: `${arrangementPlaybackReadout.statusLabel} / ${arrangementPlaybackReadout.roleLabel} / ${
+      arrangementPlaybackDetailLabel
+    } / ${transportLoopLabel(transportLoopScope)} loop / ${selectedBlockLabel} / ${project.bpm} BPM`,
+    group: "Arrange",
+    keywords: `arrangement playback readout edit heard audible hearing selected current block ${
+      playingArrangementIndex !== null ? playingArrangementIndex + 1 : "idle"
+    } ${selectedArrangementIndex + 1} ${arrangementPlaybackReadout.statusLabel} ${
+      arrangementPlaybackReadout.roleLabel
+    } ${arrangementPlaybackDetailLabel} ${transportLoopScope} song form beginner producer direct beat workstation`,
+    run: onFocusArrangementPlaybackReadout
+  };
   const audibleArrangementFollowAction: QuickAction = {
     id: "arrangement-follow-audible",
     title: audibleArrangementFollowBlock
@@ -20894,6 +20922,7 @@ function createQuickActions({
     ...arrangementBlockJumpActions,
     songFormPriorityAction,
     ...structureLensCommandActions,
+    arrangementPlaybackReadoutAction,
     audibleArrangementFollowAction,
     ...selectedBlockActions,
     ...patternUseActions,
@@ -22284,6 +22313,7 @@ function createQuickActionResult(
     action.id === "pattern-dna-focus" ||
     action.id.startsWith("pattern-dna-card-") ||
     action.id === "pattern-playback-readout-action" ||
+    action.id === "arrangement-playback-readout-action" ||
     action.id.startsWith("mode-focus-card-") ||
     action.id === "beat-passport-focus" ||
     action.id.startsWith("beat-passport-metric-") ||
@@ -27308,6 +27338,92 @@ function audiblePatternFollowQuickActionBeforeEdit(action: QuickAction): Pattern
   return patternSlotFromQuickActionValue(detailMatch?.[1] ?? "");
 }
 
+function quickActionArrangementPlaybackReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "arrangement-playback-readout-action") {
+    return null;
+  }
+
+  const selectedIndex = Math.min(Math.max(0, selectedArrangementIndex), Math.max(project.arrangement.length - 1, 0));
+  const selectedBlock = project.arrangement[selectedIndex] ?? null;
+  const heardIndex = arrangementPlaybackReadoutQuickActionHeardIndex(action);
+  const heardBlock = heardIndex !== null ? project.arrangement[heardIndex] ?? null : null;
+  const detailParts = quickActionArrangementPlaybackReadoutDetailParts(action);
+  const statusLabel = detailParts[0] ?? "Arrangement playback";
+  const fallbackRoleLabel =
+    action.title.replace(/^Review Arrangement Playback:\s*/, "").trim() ||
+    (selectedBlock ? `Editing Block ${selectedIndex + 1} ${selectedBlock.section}` : "No block");
+  const roleLabel = detailParts[1] ?? fallbackRoleLabel;
+  const detailLabel = detailParts[2] ?? (selectedBlock ? `Pattern ${selectedBlock.pattern}` : "No arrangement block");
+  const loopLabel = detailParts[3]?.replace(/\s+loop$/, "") || "current loop";
+  const selectedLabel = selectedBlock
+    ? quickActionArrangementPlaybackBlockLabel(project, selectedIndex, selectedBlock, "selected")
+    : "selected block unavailable";
+  const heardLabel = heardBlock
+    ? quickActionArrangementPlaybackBlockLabel(project, heardIndex ?? 0, heardBlock, "heard")
+    : "heard block idle";
+  const selectedEventCount = selectedBlock ? patternEventTotal(project.patterns[selectedBlock.pattern]) : 0;
+  const heardEventCount = heardBlock ? patternEventTotal(project.patterns[heardBlock.pattern]) : null;
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+
+  return {
+    id: "arrangement-playback-readout",
+    label: "Arrangement Playback",
+    value: [
+      "review arrangement playback",
+      statusLabel,
+      roleLabel,
+      detailLabel,
+      `loop ${loopLabel}`,
+      selectedLabel,
+      heardLabel,
+      `${selectedEventCount} selected-block events`,
+      heardEventCount === null ? "heard events idle" : `${heardEventCount} heard-block events`,
+      patternUseLabel,
+      `${project.bpm} BPM`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "follow unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+function quickActionArrangementPlaybackReadoutDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function arrangementPlaybackReadoutQuickActionHeardIndex(action: QuickAction): number | null {
+  if (action.id !== "arrangement-playback-readout-action") {
+    return null;
+  }
+
+  const detailMatch = /Hearing Block (\d+)/.exec(action.detail);
+  const blockNumber = Number(detailMatch?.[1]);
+  return Number.isInteger(blockNumber) && blockNumber > 0 ? blockNumber - 1 : null;
+}
+
+function quickActionArrangementPlaybackBlockLabel(
+  project: ProjectState,
+  index: number,
+  block: ArrangementBlock,
+  role: "selected" | "heard"
+): string {
+  const bars = normalizeArrangementBars(block.bars);
+  const startBar = arrangementStartBar(project, index) + 1;
+  const endBar = startBar + bars - 1;
+  const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+  return `${role} Block ${index + 1} ${block.section} / Pattern ${block.pattern} / ${rangeLabel} / ${barCountLabel(bars)}`;
+}
+
 function quickActionAudibleArrangementFollowMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -28141,6 +28257,16 @@ function quickActionResultMetricSnapshot(
       quickActionAudibleArrangementFollowMetricSnapshot(project, action, selectedArrangementIndex, phase) ?? {
         id: "arrangement-follow-audible",
         label: "Audible block",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "arrangement-playback-readout-action") {
+    return (
+      quickActionArrangementPlaybackReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "arrangement-playback-readout",
+        label: "Arrangement Playback",
         value: action.detail
       }
     );
@@ -31297,6 +31423,14 @@ function quickActionResultFollowup(
       auditionCue:
         "Keep Song playback running only if you need live context; edit the selected block after confirming it is the audible section.",
       nextCheck: "Use Arrangement Playback Readout and Song Form Overview to confirm Editing and Hearing match before changing arrangement details."
+    };
+  }
+
+  if (action.id === "arrangement-playback-readout-action") {
+    return {
+      auditionCue:
+        "Use the edit-vs-heard Arrangement readout before changing section order, block details, Pattern placement, or arrangement energy.",
+      nextCheck: "Run Audible Arrangement Follow only when the heard block should become the explicit editing block."
     };
   }
 
