@@ -13120,6 +13120,9 @@ function ComposerGuide({
   onFocus: (card: ComposerGuideCard) => void;
 }): ReactElement {
   const focusSummary = createComposerGuideFocusSummary(summary, focusedCardId);
+  const focusCard = focusSummary.cardId
+    ? summary.cards.find((card) => card.id === focusSummary.cardId) ?? null
+    : null;
 
   return (
     <section className={`composer-guide ${summary.tone}`} data-testid="composer-guide" aria-label="Composer guide">
@@ -13139,6 +13142,20 @@ function ComposerGuide({
         <span data-testid="composer-guide-focus-status">{focusSummary.statusLabel}</span>
         <strong data-testid="composer-guide-focus-label">{focusSummary.areaLabel}</strong>
         <small data-testid="composer-guide-focus-detail">{focusSummary.detailLabel}</small>
+        <button
+          data-testid="composer-guide-focus-action"
+          disabled={!focusCard}
+          onClick={() => {
+            if (focusCard) {
+              onFocus(focusCard);
+            }
+          }}
+          title={focusCard ? `Focus ${focusCard.focusLabel}: ${focusCard.status}` : "No Composer Guide focus target."}
+          type="button"
+        >
+          <ArrowRight size={13} aria-hidden="true" />
+          <span data-testid="composer-guide-focus-action-label">{focusCard ? focusCard.focusLabel : "No target"}</span>
+        </button>
       </div>
       <div className="composer-guide-grid" data-testid="composer-guide-grid">
         {summary.cards.map((card) => {
