@@ -419,11 +419,46 @@ const commandReferenceSections: CommandReferenceSection[] = [
     id: "compose-fast-path",
     title: "Create",
     items: [
-      { id: "tap-tempo", command: "Tap Tempo", shortcut: "Quick Actions / Readout", target: "Tap pulse / BPM" },
-      { id: "tempo-nudge", command: "Tempo Nudge", shortcut: "Quick Actions / Readout", target: "-1 / +1 / half / double BPM" },
-      { id: "swing-feel", command: "Swing Feel", shortcut: "Quick Actions / Readout", target: "Straight / Tight / Laid / Loose" },
-      { id: "key-retarget", command: "Key Retarget", shortcut: "Quick Actions / Readout", target: "Project key / event retarget" },
-      { id: "style-quick-picks", command: "Style Quick Picks", shortcut: "Quick Actions / Readout", target: "Style direction" },
+      {
+        id: "tap-tempo",
+        command: "Tap Tempo",
+        shortcut: "Quick Actions / Readout",
+        target: "Tap pulse / BPM",
+        context:
+          "Tap Pulse, BPM Estimate, Delayed Commit, Manual BPM Boundaries, Result Feedback, Audition Cue, and Next Tempo Check context before Tap Tempo commands run."
+      },
+      {
+        id: "tempo-nudge",
+        command: "Tempo Nudge",
+        shortcut: "Quick Actions / Readout",
+        target: "-1 / +1 / half / double BPM",
+        context:
+          "Current BPM, -1/+1/Half/Double Routes, Bounded Tempo Result, Tap Reset, Result Feedback, Audition Cue, and Next Tempo Check context before Tempo Nudge commands run."
+      },
+      {
+        id: "swing-feel",
+        command: "Swing Feel",
+        shortcut: "Quick Actions / Readout",
+        target: "Straight / Tight / Laid / Loose",
+        context:
+          "Straight, Tight, Laid, Loose, Style Default, Current Swing, Result Feedback, Audition Cue, and Next Groove Check context before Swing Feel commands run."
+      },
+      {
+        id: "key-retarget",
+        command: "Key Retarget",
+        shortcut: "Quick Actions / Readout",
+        target: "Project key / event retarget",
+        context:
+          "Project Key, Key Options, Pattern A/B/C Event Retarget, Before/After Result, Edit Pattern, Audition Cue, and Next Key Check context before Key Retarget commands run."
+      },
+      {
+        id: "style-quick-picks",
+        command: "Style Quick Picks",
+        shortcut: "Quick Actions / Readout",
+        target: "Style direction",
+        context:
+          "Style Direction, BPM Range, Swing Default, Bass/Melody Roles, Sound Preset, Pattern/Arrangement Fit, Result Feedback, Audition Cue, and Next Style Check context before Style Quick Picks commands run."
+      },
       { id: "keyboard-capture", command: "Keyboard Capture", shortcut: "Quick Actions / Readout", target: "808 / Synth notes" },
       { id: "capture-step-mode", command: "Capture Step Mode", shortcut: "Quick Actions / Readout", target: "Next / Replace" },
       { id: "midi-input", command: "MIDI Input", shortcut: "Quick Actions / Readout", target: "Controller notes" },
