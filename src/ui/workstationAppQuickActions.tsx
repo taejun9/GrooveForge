@@ -1222,6 +1222,7 @@ export function createQuickActions({
   onFocusDrumKitReadout,
   onApplyGrooveFeel,
   onApplyLayerStarter,
+  onFocusLayerStarterReadout,
   onApplyMasterAutomation,
   onFocusMasterAutomationReadout,
   onApplyMasterFinish,
@@ -1558,6 +1559,7 @@ export function createQuickActions({
   onFocusDrumKitReadout: () => void;
   onApplyGrooveFeel: (feel: GrooveFeelId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
+  onFocusLayerStarterReadout: () => void;
   onApplyMasterAutomation: (pad: MasterAutomationPadId) => void;
   onFocusMasterAutomationReadout: () => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
@@ -2129,6 +2131,21 @@ export function createQuickActions({
     run: () => onFocusKeyCompass(item)
   }));
   const layerStarterOption = activeLayerStarterQuickActionOption(layerStarterOptions);
+  const layerStarterReadiness = layerStarterOptions.map((option) => `${option.label} ${option.status}`).join(" / ");
+  const layerStarterReadoutAction: QuickAction = {
+    id: "layer-starter-readout-action",
+    title: layerStarterOption
+      ? `Review Layer Starter Readout: ${layerStarterOption.label}`
+      : "Review Layer Starter Readout: Layers ready",
+    detail: layerStarterOption
+      ? `${layerStarterOption.status} / priority ${layerStarterOption.label} / ${layerStarterOption.detail} / direct starter preflight`
+      : "Layers ready / no missing or thin starter / direct starter preflight",
+    group: "Create",
+    keywords: `Quick Actions Layer Starter Readout review selected Pattern ${project.selectedPattern} ${layerStarterReadiness} priority ${
+      layerStarterOption?.label ?? "ready"
+    } drums 808 chords synth readiness arrangement beginner producer`,
+    run: onFocusLayerStarterReadout
+  };
   const layerStarterActions: QuickAction[] = layerStarterOptions.map((option) => ({
     id: `layer-starter-${option.id}`,
     title: option.tone === "good" ? `${option.label} layer ready` : `Start ${option.label} layer`,
@@ -4279,6 +4296,7 @@ export function createQuickActions({
       }
     },
     ...patternDnaActions,
+    layerStarterReadoutAction,
     {
       id: "layer-starter",
       title: layerStarterOption ? `Start ${layerStarterOption.label} layer` : "Start missing layer",
@@ -6365,6 +6383,7 @@ export function createQuickActionResult(
     action.id === "arrangement-arc-readout-action" ||
     action.id === "arrangement-focus-readout-action" ||
     action.id === "arrangement-move-readout-action" ||
+    action.id === "layer-starter-readout-action" ||
     action.id === "pattern-clone-readout-action" ||
     action.id === "pattern-stack-readout-action" ||
     action.id === "pattern-variation-readout-action" ||
@@ -13755,6 +13774,16 @@ export function quickActionResultMetricSnapshot(
     }
   }
 
+  if (action.id === "layer-starter-readout-action") {
+    return (
+      quickActionLayerStarterReadoutMetricSnapshot(project, action) ?? {
+        id: "layer-starter-readout",
+        label: "Layer Starter Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id === "pattern-stack-readout-action") {
     return (
       quickActionPatternStackReadoutMetricSnapshot(project, action) ?? {
@@ -15714,6 +15743,64 @@ export function quickActionLayerStarterMetricSnapshot(
   };
 }
 
+export function quickActionLayerStarterReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "layer-starter-readout-action") {
+    return null;
+  }
+
+  const options = createLayerStarterOptions(project);
+  const option =
+    layerStarterReadoutQuickActionOption(action, options) ?? activeLayerStarterQuickActionOption(options) ?? options[0] ?? null;
+  const pattern = activePattern(project);
+  const drumHits = drumHitCount(pattern);
+  const bassNotes = pattern.bassNotes.length;
+  const chordEvents = pattern.chordEvents.length;
+  const melodyNotes = pattern.melodyNotes.length;
+  const musicEvents = bassNotes + chordEvents + melodyNotes;
+  const readyLayerCount = [drumHits > 0, bassNotes > 0, chordEvents > 0, melodyNotes > 0].filter(Boolean).length;
+  const readiness = options.map((item) => `${item.label} ${item.status}`).join(" / ");
+  const arrangementUse = patternArrangementUseLabel(project, project.selectedPattern);
+
+  return {
+    id: "layer-starter-readout",
+    label: "Layer Starter Readout",
+    value: [
+      "review layer starter",
+      `selected Pattern ${project.selectedPattern}`,
+      option ? `priority ${option.label}` : "priority unavailable",
+      option?.status ?? "layers unavailable",
+      option?.detail ?? "no starter detail",
+      `readiness ${readiness}`,
+      `${patternEventTotal(pattern)} events`,
+      `${drumHits} drums`,
+      `${bassNotes} 808`,
+      `${chordEvents} chords`,
+      `${melodyNotes} synth`,
+      `${musicEvents} music`,
+      `${readyLayerCount}/4 layers`,
+      `arrangement ${arrangementUse}`,
+      "starter unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+export function layerStarterReadoutQuickActionOption(
+  action: QuickAction,
+  options: LayerStarterOption[]
+): LayerStarterOption | null {
+  if (action.id !== "layer-starter-readout-action") {
+    return null;
+  }
+
+  const text = `${action.title} ${action.detail} ${action.keywords}`;
+  return options.find((option) => text.includes(` ${option.label} `) || text.includes(option.id)) ?? null;
+}
+
 export function quickActionLayerStarterDetailParts(action: QuickAction): string[] {
   return action.detail
     .split(" / ")
@@ -17659,6 +17746,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the starter layer supports the groove, 808, harmony, and melody balance.`,
       nextCheck: "Return to Layer Starter or Pattern DNA after the selected layer is no longer missing or thin."
+    };
+  }
+
+  if (action.id === "layer-starter-readout-action") {
+    return {
+      auditionCue:
+        "Review the selected Pattern Drums/808/Chords/Synth readiness, priority layer, event posture, and arrangement usage before starting a layer.",
+      nextCheck: "Run a direct Layer Starter command only when the selected Pattern needs that missing or thin layer started."
     };
   }
 

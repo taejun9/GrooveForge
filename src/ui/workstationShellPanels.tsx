@@ -561,6 +561,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Selected Pattern Layer Readiness, Drums/808/Chords/Synth Priority, Visible Priority Action, Direct Layer Starter Commands, Layer Starter Result Feedback, Audition Cue, and Next Layer Check context before Layer Starter commands run."
       },
       {
+        id: "layer-starter-readout",
+        command: "Layer Starter Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Selected Pattern layer-start preflight",
+        context:
+          "Layer Starter Readout Action, Selected Pattern A/B/C, Drums/808/Chords/Synth Readiness, Priority Missing or Thin Layer, Selected Pattern Event Count, Drum/Music Posture, Arrangement Usage, Audition Cue, and Next Layer Starter Check context before direct Layer Starter commands run."
+      },
+      {
         id: "pattern-stack",
         command: "Pattern Stack",
         shortcut: "Quick Actions / Readout",

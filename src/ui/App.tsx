@@ -8088,6 +8088,16 @@ export function App(): ReactElement {
     );
   }
 
+  function focusLayerStarterReadout(): void {
+    const priorityLayer = layerStarterOptions.find((option) => option.tone !== "good") ?? layerStarterOptions[0] ?? null;
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      priorityLayer
+        ? `Layer Starter Readout Pattern ${project.selectedPattern}: ${priorityLayer.status} / priority ${priorityLayer.label} / ${priorityLayer.detail} / direct starter unchanged`
+        : `Layer Starter Readout Pattern ${project.selectedPattern}: no layer starter options / direct starter unchanged`
+    );
+  }
+
   function focusPatternUseReadout(): void {
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8369,6 +8379,7 @@ export function App(): ReactElement {
     onFocusDrumKitReadout: focusDrumKitReadout,
     onApplyGrooveFeel: applyGrooveFeel,
     onApplyLayerStarter: applyLayerStarter,
+    onFocusLayerStarterReadout: focusLayerStarterReadout,
     onApplyMasterAutomation: applyMasterAutomationPad,
     onFocusMasterAutomationReadout: focusMasterAutomationReadout,
     onApplyMasterFinish: applyMasterFinishPad,
