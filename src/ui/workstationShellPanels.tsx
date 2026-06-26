@@ -36,6 +36,7 @@ import type {
   QuickActionScopeId,
   QuickActionScopeOption,
   QuickActionScopeResult,
+  QuickActionSearchResult,
   QuickActionSpotlightSummary,
   SnapshotCompareFocusId,
   SnapshotCompareFocusItem,
@@ -731,6 +732,7 @@ export function QuickActions({
   recentActionSource,
   recentResult,
   recents,
+  searchResult,
   scope,
   scopeResult,
   scopeOptions,
@@ -752,6 +754,7 @@ export function QuickActions({
   recentActionSource: QuickAction[];
   recentResult: QuickActionRecentResult | null;
   recents: QuickActionRecent[];
+  searchResult: QuickActionSearchResult | null;
   scope: QuickActionScopeId;
   scopeResult: QuickActionScopeResult | null;
   scopeOptions: QuickActionScopeOption[];
@@ -894,6 +897,7 @@ export function QuickActions({
         <div className="quick-actions-count" data-testid="quick-actions-count">
           {actions.length} shown / {scopeOptions.find((option) => option.id === scope)?.count ?? 0} matching
         </div>
+        {searchResult && <QuickActionSearchResultStrip result={searchResult} />}
         {scopeResult && <QuickActionScopeResultStrip result={scopeResult} />}
         <div
           aria-label={spotlight.detailTitle}
@@ -1253,6 +1257,31 @@ export function QuickActions({
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function QuickActionSearchResultStrip({ result }: { result: QuickActionSearchResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`quick-actions-search-result ${result.tone}`}
+      data-search-result={result.query || "empty"}
+      data-testid="quick-actions-search-result"
+    >
+      <div>
+        <span data-testid="quick-actions-search-result-status">{result.status}</span>
+        <strong data-testid="quick-actions-search-result-title">{result.title}</strong>
+        <small data-testid="quick-actions-search-result-detail">{result.detail}</small>
+      </div>
+      <div>
+        <span data-testid="quick-actions-search-result-metric-label">{result.metricLabel}</span>
+        <strong data-testid="quick-actions-search-result-metric-value">{result.metricValue}</strong>
+      </div>
+      <div>
+        <span>Next check</span>
+        <strong data-testid="quick-actions-search-result-next-check">{result.nextCheck}</strong>
+      </div>
     </div>
   );
 }
