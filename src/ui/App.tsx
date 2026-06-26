@@ -1921,6 +1921,10 @@ export function App(): ReactElement {
     midiInputOptions,
     midiLastNoteLabel
   );
+  const midiSelectedInputLabel =
+    midiSelectedInputId === "all"
+      ? "All connected inputs"
+      : midiInputOptions.find((input) => input.id === midiSelectedInputId)?.label ?? midiSelectedInputId;
   const chordRootOptions = useMemo(
     () => mergeChordRoots(scalePitchNames(project.key), currentPattern.chordEvents.map((event) => event.root)),
     [currentPattern.chordEvents, project.key]
@@ -7905,6 +7909,7 @@ export function App(): ReactElement {
       midiStatusLabel: midiCaptureSummary.statusLabel,
       midiDetailLabel: midiCaptureSummary.detailLabel,
       midiSelectedInputId,
+      midiSelectedInputLabel,
       midiLastNoteLabel,
       selectedNote,
       selectedNoteActive: selectedCaptureNoteActive,
@@ -8144,6 +8149,15 @@ export function App(): ReactElement {
     );
   }
 
+  function focusMidiInputReadout(): void {
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `MIDI Input ${midiCaptureSummary.statusLabel}: ${midiCaptureArmed ? "Armed" : "Disarmed"} / ${
+        keyboardCaptureTarget === "bass" ? "808" : "Synth"
+      } / ${midiSelectedInputLabel} / ${midiLastNoteLabel}`
+    );
+  }
+
   const quickActions = createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
@@ -8187,6 +8201,9 @@ export function App(): ReactElement {
     midiCaptureStatus,
     midiCaptureSummary,
     midiInputOptions,
+    midiLastNoteLabel,
+    midiSelectedInputId,
+    midiSelectedInputLabel,
     mixBalancePadOptions,
     mixBalancePreviewSummary,
     mixSnapshotComparison,
@@ -8312,6 +8329,7 @@ export function App(): ReactElement {
     onFocusKeyRetargetReadout: focusKeyRetargetReadout,
     onFocusKeyboardCaptureReadout: focusKeyboardCaptureReadout,
     onFocusCaptureStepModeReadout: focusCaptureStepModeReadout,
+    onFocusMidiInputReadout: focusMidiInputReadout,
     onFocusStyleDirectionReadout: focusStyleDirectionReadout,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onCueBlueprintPreview: cueBeatBlueprintPreview,
@@ -17854,6 +17872,9 @@ function createQuickActions({
   midiCaptureStatus,
   midiCaptureSummary,
   midiInputOptions,
+  midiLastNoteLabel,
+  midiSelectedInputId,
+  midiSelectedInputLabel,
   mixBalancePadOptions,
   mixBalancePreviewSummary,
   mixSnapshotComparison,
@@ -17978,6 +17999,7 @@ function createQuickActions({
   onFocusKeyRetargetReadout,
   onFocusKeyboardCaptureReadout,
   onFocusCaptureStepModeReadout,
+  onFocusMidiInputReadout,
   onFocusStyleDirectionReadout,
   onPreviewBlueprint,
   onCueBlueprintPreview,
@@ -18146,6 +18168,9 @@ function createQuickActions({
   midiCaptureStatus: MidiCaptureStatus;
   midiCaptureSummary: MidiCaptureSummary;
   midiInputOptions: MidiInputOption[];
+  midiLastNoteLabel: string;
+  midiSelectedInputId: string;
+  midiSelectedInputLabel: string;
   mixBalancePadOptions: MixBalancePadOption[];
   mixBalancePreviewSummary: MixBalancePreviewSummary;
   mixSnapshotComparison: MixSnapshotComparisonSummary;
@@ -18270,6 +18295,7 @@ function createQuickActions({
   onFocusKeyRetargetReadout: () => void;
   onFocusKeyboardCaptureReadout: () => void;
   onFocusCaptureStepModeReadout: () => void;
+  onFocusMidiInputReadout: () => void;
   onFocusStyleDirectionReadout: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onCueBlueprintPreview: (scope: Extract<TransportLoopScope, "arrangement" | "pattern">) => void;
@@ -19198,6 +19224,20 @@ function createQuickActions({
     group: "Create",
     keywords: `capture step mode readout review placement input posture next empty replace selected selected step note ${keyboardCaptureStepMode} ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} ${captureStepPlacementLabel} ${captureStepSelectedLabel} ${keyboardCaptureDefaultDetail} midi ${midiCaptureStatus} pattern ${project.selectedPattern} beginner producer direct composition sample free`,
     run: onFocusCaptureStepModeReadout
+  };
+  const midiInputReadoutAction: QuickAction = {
+    id: "midi-input-readout-action",
+    title: `Review MIDI Input: ${midiCaptureSummary.statusLabel}`,
+    detail: `${midiCaptureSummary.statusLabel} / ${midiCaptureArmed ? "Armed" : "Disarmed"} / ${connectedMidiInputCount}/${
+      midiInputOptions.length
+    } inputs / selected ${midiSelectedInputLabel} / latest ${midiLastNoteLabel} / Target ${keyboardCaptureTargetLabel} / ${quickActionCaptureStepModeLabel(
+      keyboardCaptureStepMode
+    )} / ${keyboardCaptureDefaultSummary(keyboardCaptureTarget, activeCaptureDefaults)} / Pattern ${project.selectedPattern}`,
+    group: "Create",
+    keywords: `midi input readout review controller keyboard web midi permission status ${midiCaptureStatus} ${midiCaptureSummary.statusLabel} armed ${midiCaptureArmed} selected ${midiSelectedInputId} ${midiSelectedInputLabel} latest ${midiLastNoteLabel} target ${keyboardCaptureTarget} ${keyboardCaptureTargetLabel} ${keyboardCaptureDefaultDetail} ${quickActionCaptureStepModeLabel(
+      keyboardCaptureStepMode
+    )} beginner producer direct composition sample free`,
+    run: onFocusMidiInputReadout
   };
   const captureStepModeActions = createCaptureStepModeActions({
     keyboardCaptureStepMode,
@@ -20275,6 +20315,7 @@ function createQuickActions({
     audiblePatternFollowAction,
     keyboardCaptureReadoutAction,
     captureStepModeReadoutAction,
+    midiInputReadoutAction,
     {
       id: "midi-input-connect",
       title: midiInputConnectTitle,
@@ -22342,6 +22383,7 @@ type QuickActionInputSetupSnapshot = {
   midiStatusLabel: string;
   midiDetailLabel: string;
   midiSelectedInputId: string;
+  midiSelectedInputLabel: string;
   midiLastNoteLabel: string;
   selectedNote: SelectedNote | null;
   selectedNoteActive: boolean;
@@ -22357,6 +22399,7 @@ function isInputSetupQuickAction(action: QuickAction): boolean {
   return (
     action.id === "keyboard-capture-readout-action" ||
     action.id === "capture-step-mode-readout-action" ||
+    action.id === "midi-input-readout-action" ||
     action.id === "keyboard-capture-toggle" ||
     action.id === "midi-input-connect" ||
     action.id === "midi-input-arm" ||
@@ -22510,6 +22553,7 @@ function createQuickActionResult(
     action.id === "key-retarget-readout-action" ||
     action.id === "keyboard-capture-readout-action" ||
     action.id === "capture-step-mode-readout-action" ||
+    action.id === "midi-input-readout-action" ||
     action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -28272,6 +28316,62 @@ function quickActionCaptureStepModeReadoutMetricSnapshot(
   };
 }
 
+function quickActionMidiInputReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  inputSetupResult: QuickActionInputSetupResultState | null,
+  phase: "before" | "after",
+  selectedArrangementIndex = 0,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "midi-input-readout-action" || !inputSetupResult) {
+    return null;
+  }
+
+  const snapshot = phase === "before" ? inputSetupResult.before : inputSetupResult.after;
+  const target = snapshot.keyboardCaptureTarget;
+  const defaults = snapshot.keyboardCaptureDefaults[target];
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+
+  return {
+    id: "midi-input-readout",
+    label: "MIDI Input",
+    value: [
+      "review midi input",
+      `support ${quickActionMidiInputSupportLabel(snapshot)}`,
+      `status ${snapshot.midiCaptureStatus} / ${snapshot.midiStatusLabel}`,
+      `armed ${snapshot.midiCaptureArmed ? "Armed" : "Disarmed"}`,
+      `inputs ${snapshot.connectedMidiInputCount}/${snapshot.midiInputCount} connected`,
+      `selected ${snapshot.midiSelectedInputLabel} (${snapshot.midiSelectedInputId})`,
+      `last MIDI ${snapshot.midiLastNoteLabel}`,
+      `target ${quickActionInputTargetLabel(target)}`,
+      `placement ${quickActionCaptureStepModeLabel(snapshot.keyboardCaptureStepMode)}`,
+      `degree map ${quickActionInputPitchMapLabel(project, snapshot)}`,
+      `defaults ${keyboardCaptureDefaultSummary(target, defaults)}`,
+      `keyboard ${snapshot.keyboardCaptureEnabled ? "Armed" : "Off"}`,
+      `selected ${quickActionArrangementSelectedBlockLabel(project, selectedArrangementIndex)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `808 ${pattern.bassNotes.length} notes`,
+      `Synth ${pattern.melodyNotes.length} notes`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      "MIDI permission unchanged",
+      "MIDI arm unchanged",
+      "capture target unchanged",
+      "notes unchanged",
+      "Pattern A/B/C unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
 function keyboardCaptureDefaultSummary(target: NoteTrack, defaults: KeyboardCaptureDefaults): string {
   const base = `oct ${defaults.octave} / len ${defaults.length} steps / vel ${percentLabel(defaults.velocity)}`;
   return target === "bass" ? `${base} / glide ${defaults.glide ? "On" : "Off"}` : base;
@@ -28342,7 +28442,7 @@ function quickActionInputSetupMetricSnapshot(
 }
 
 function quickActionInputSetupRouteLabel(action: QuickAction): string {
-  if (action.id === "midi-input-connect" || action.id === "midi-input-arm") {
+  if (action.id === "midi-input-readout-action" || action.id === "midi-input-connect" || action.id === "midi-input-arm") {
     return "Create / MIDI Input";
   }
   if (action.id.startsWith("capture-target-")) {
@@ -28373,6 +28473,19 @@ function quickActionInputPitchMapLabel(project: ProjectState, snapshot: QuickAct
   }
 
   return lanes.length === 1 ? lanes[0] : `${lanes[0]}-${lanes[lanes.length - 1]}`;
+}
+
+function quickActionMidiInputSupportLabel(snapshot: QuickActionInputSetupSnapshot): string {
+  if (snapshot.midiCaptureStatus === "unsupported") {
+    return "Unsupported";
+  }
+  if (snapshot.midiCaptureStatus === "denied") {
+    return "Permission denied";
+  }
+  if (snapshot.midiCaptureStatus === "requesting") {
+    return "Permission pending";
+  }
+  return "Available";
 }
 
 function quickActionCaptureStepSelectedNoteLabel(snapshot: QuickActionInputSetupSnapshot): string {
@@ -28713,6 +28826,23 @@ function quickActionResultMetricSnapshot(
       ) ?? {
         id: "capture-step-mode-readout",
         label: "Capture Step Mode",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "midi-input-readout-action") {
+    return (
+      quickActionMidiInputReadoutMetricSnapshot(
+        project,
+        action,
+        inputSetupResult,
+        phase,
+        selectedArrangementIndex,
+        analysis ?? undefined
+      ) ?? {
+        id: "midi-input-readout",
+        label: "MIDI Input",
         value: action.detail
       }
     );
@@ -31777,6 +31907,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Arm Web MIDI Input in the Compose panel, then play a controller note into the selected 808 or Synth target.",
       nextCheck: "Check the Web MIDI status, input selector, latest-note readout, and Keyboard Capture defaults before recording the next phrase."
+    };
+  }
+
+  if (action.id === "midi-input-readout-action") {
+    return {
+      auditionCue: "Use the MIDI Input readout before connecting, arming, or playing a controller into the selected 808/Synth target.",
+      nextCheck: "Connect or arm MIDI only when support, selected input, target, placement mode, and capture defaults match the next controller phrase."
     };
   }
 
