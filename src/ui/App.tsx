@@ -7075,6 +7075,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusMixSnapshotReadout(): void {
+    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Mix Snapshot A/B ${mixSnapshotComparison.statusLabel}: ${mixSnapshotComparison.winnerLabel} / Decision ${mixSnapshotComparison.decisionActionLabel}`
+    );
+  }
+
   function focusMasterOutputRole(): void {
     const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -8117,6 +8124,7 @@ export function App(): ReactElement {
     onCaptureMixSnapshot: captureMixSnapshot,
     onRecallMixSnapshot: recallMixSnapshot,
     onClearMixSnapshots: clearMixSnapshots,
+    onFocusMixSnapshotReadout: focusMixSnapshotReadout,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternClone: cloneSelectedPatternVariation,
     onApplyPatternFill: applyPatternFill,
