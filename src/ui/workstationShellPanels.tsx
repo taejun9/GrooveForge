@@ -574,8 +574,22 @@ const commandReferenceSections: CommandReferenceSection[] = [
     id: "finish-fast-path",
     title: "Finish",
     items: [
-      { id: "master-finish-decision", command: "Master Finish Decision", shortcut: "Quick Actions / Readout", target: "Suggested output posture" },
-      { id: "master-finish", command: "Master Finish", shortcut: "Quick Actions / Readout", target: "Output posture" },
+      {
+        id: "master-finish-decision",
+        command: "Master Finish Decision",
+        shortcut: "Quick Actions / Readout",
+        target: "Suggested output posture / finish apply route",
+        context:
+          "Suggested Output Posture, Current Finish Target, Preset, Ceiling, Output Gain, Direct Finish Pad Route, Audition Cue, and Export/Manual-Trim Next Check context before Master Finish Decision commands run."
+      },
+      {
+        id: "master-finish",
+        command: "Master Finish",
+        shortcut: "Quick Actions / Readout",
+        target: "Current output posture / direct finish pads",
+        context:
+          "Current Output Posture, Preset, Ceiling, Output Gain, Direct Finish Pad Routes, Result Feedback, Audition Cue, and Export/Manual-Trim Next Check context before Master Finish commands run."
+      },
       { id: "master-automation-decision", command: "Master Automation Decision", shortcut: "Quick Actions / Readout", target: "Suggested fade" },
       { id: "master-automation", command: "Master Automation", shortcut: "Quick Actions / Readout", target: "Fade in / out" },
       { id: "finish-checklist", command: "Finish Checklist", shortcut: "Quick Actions / Readout", target: "Compose / arrange / mix / handoff" },
