@@ -289,7 +289,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
       },
       { id: "key-compass", command: "Key Compass", shortcut: "Quick Actions / Readout", target: "Scale / cadence / chords" },
       { id: "groove-compass", command: "Groove Compass", shortcut: "Quick Actions / Readout", target: "Pocket / timing / anchors" },
-      { id: "listening-pass", command: "Listening Pass", shortcut: "Quick Actions / Readout", target: "Compose / arrange / mix / deliver" },
+      {
+        id: "listening-pass",
+        command: "Listening Pass",
+        shortcut: "Quick Actions / Readout",
+        target: "Composition / arrangement / mix / delivery audition",
+        context:
+          "Composition, Arrangement, Mix, and Delivery audition checkpoint context with destination, listening metric, audition cue, and next check before Listening Pass commands run."
+      },
       { id: "beat-passport", command: "Beat Passport", shortcut: "Quick Actions / Readout", target: "Identity / readiness / export" },
       { id: "production-snapshot", command: "Production Snapshot", shortcut: "Quick Actions / Readout", target: "Target / form / mix / handoff" },
       { id: "hook-readiness", command: "Hook Readiness", shortcut: "Quick Actions / Readout", target: "Hook / motif / contrast" },
