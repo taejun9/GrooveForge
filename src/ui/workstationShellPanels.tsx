@@ -287,7 +287,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Drums, 808/Bass, Harmony, Melody, Arrange, and Finish writing focus context with destination, guide metric, audition cue, and next check before Composer Guide commands run."
       },
-      { id: "key-compass", command: "Key Compass", shortcut: "Quick Actions / Readout", target: "Scale / cadence / chords" },
+      {
+        id: "key-compass",
+        command: "Key Compass",
+        shortcut: "Quick Actions / Readout",
+        target: "Scale / cadence / chords / 808-bass / melody / selected focus",
+        context:
+          "Scale, Cadence, Chords, 808/Bass, Melody, and Selected Note/Chord harmony context with destination, key metric, audition cue, and next check before Key Compass commands run."
+      },
       { id: "groove-compass", command: "Groove Compass", shortcut: "Quick Actions / Readout", target: "Pocket / timing / anchors" },
       {
         id: "listening-pass",
