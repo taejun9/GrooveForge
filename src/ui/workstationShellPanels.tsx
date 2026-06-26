@@ -1001,7 +1001,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Deliverable set / send-order route",
         context:
-          "WAV, Stems, MIDI, Handoff Sheet, Handoff Route, Manifest Readiness, Latest Export Receipt, Export Format, Package Check, Send Order, Next Export, Audition Cue, and Next Delivery Check context before Handoff Pack commands run."
+          "WAV, Stems, MIDI, Handoff Sheet, Handoff Route, Manifest Readiness, Latest Export Receipt, Export Format, Package Check, Send Order, Next Export, Review Handoff Pack command, local result metric, Audition Cue, and Next Delivery Check context before Handoff Pack commands run."
       }
     ]
   },
