@@ -7102,6 +7102,13 @@ export function App(): ReactElement {
     setProjectStatus(`Master Output Role: ${summary.roleLabel} / ${summary.detailLabel}`);
   }
 
+  function focusMasterFinishReadout(): void {
+    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    setProjectStatus(
+      `Master Finish ${masterFinishPreviewSummary.statusLabel}: ${masterFinishPreviewSummary.padLabel} / ${masterFinishPreviewSummary.outputLabel}`
+    );
+  }
+
   function focusExportMeter(): void {
     const currentProject = projectRef.current;
     const analysis = analyzeExport(currentProject);
@@ -8130,6 +8137,7 @@ export function App(): ReactElement {
     onApplyLayerStarter: applyLayerStarter,
     onApplyMasterAutomation: applyMasterAutomationPad,
     onApplyMasterFinish: applyMasterFinishPad,
+    onFocusMasterFinishReadout: focusMasterFinishReadout,
     onApplyMelodyMotif: applyMelodyMotif,
     onApplyMelodyAccent: applyMelodyAccent,
     onApplyMelodyContour: applyMelodyContour,
