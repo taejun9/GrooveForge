@@ -35,6 +35,9 @@ REQUIRED_PATHS = [
     "src/ui/workstationShellPanels.tsx",
     "src/ui/workstationSnapshotCompare.ts",
     "src/ui/workstationAnalysis.ts",
+    "src/ui/workstationAppHelpers.tsx",
+    "src/ui/workstationAppQuickActions.tsx",
+    "src/ui/workstationAppDerivations.tsx",
     "src/audio/midi.ts",
     "src/domain/workstation.ts",
     "src/audio/render.ts",
@@ -66,6 +69,9 @@ APP_UI_SURFACE_FILES = [
     "src/ui/workstationShellPanels.tsx",
     "src/ui/workstationSnapshotCompare.ts",
     "src/ui/workstationAnalysis.ts",
+    "src/ui/workstationAppHelpers.tsx",
+    "src/ui/workstationAppQuickActions.tsx",
+    "src/ui/workstationAppDerivations.tsx",
 ]
 
 TEXT_EXPECTATIONS = {
@@ -129,7 +135,7 @@ TEXT_EXPECTATIONS = {
         "Lead summaries with what users create directly: drums, 808/bass, melody/chords, sound design, arrangement, mix/master, and export.",
         "Treat built-in one-shot drum sounds and any later sample 808 source as internal sound-source choices, not as the main workflow.",
         "Keep mixing and mastering as distinct stages in docs and UI plans",
-        "Production builds use Vite 8 / Rolldown code splitting groups for `react-vendor`, `icons-vendor`, `vendor`, `audio-engine`, `workstation-core`, `workstation-ui-model`, `workstation-editor-audition`, `workstation-selected-actions`, `workstation-pattern-tools`, `workstation-mix-panels`, `workstation-compose-panels`, `workstation-guidance-panels`, `workstation-shell-panels`, `workstation-snapshot-compare`, and `workstation-analysis` while preserving `dist` output and sourcemaps",
+        "Production builds use Vite 8 / Rolldown code splitting groups for `react-vendor`, `icons-vendor`, `vendor`, `audio-engine`, `workstation-core`, `workstation-ui-model`, `workstation-editor-audition`, `workstation-selected-actions`, `workstation-pattern-tools`, `workstation-mix-panels`, `workstation-compose-panels`, `workstation-guidance-panels`, `workstation-shell-panels`, `workstation-snapshot-compare`, `workstation-analysis`, `workstation-app-helpers`, `workstation-app-quick-actions`, and `workstation-app-derivations` while preserving `dist` output and sourcemaps",
         "not by raising `chunkSizeWarningLimit`",
         "Runtime smoke validation that builds sample-free 8-bar beats from every supported style profile and every Beat Blueprint using real domain data, verifies full-mix and stem export analysis, verifies WAV headers and file names, and verifies arrangement MIDI bytes without writing media artifacts.",
         "local project save/load",
@@ -1360,7 +1366,8 @@ TEXT_EXPECTATIONS = {
         "Production build hygiene work must preserve `outDir: \"dist\"` and `sourcemap: true`",
         "use Vite 8 / Rolldown `build.rolldownOptions.output.codeSplitting.groups` for real chunk separation",
         "must not hide large-chunk warnings by setting `chunkSizeWarningLimit`",
-        "UI chunk work may split pure model data, helper utilities, shared analysis helpers, read-only derivation modules, and render-only panels out of `src/ui/App.tsx`",
+        "UI chunk work may split pure model data, helper utilities, quick-action result/metric utilities, shared analysis helpers, read-only derivation modules, and render-only panels out of `src/ui/App.tsx`",
+        "app helper/derivation code",
         "Snapshot Compare derivation code",
         "must not alter app UI behavior, project schema, playback, audio rendering, WAV/stem/MIDI export, Handoff behavior, local draft behavior, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.",
         "Brief correction and sampling-audit work must prove the product can no longer be summarized as a sampling app, sample-chopping tool, sample-pack workflow, or sampler setup surface.",
@@ -2742,6 +2749,9 @@ TEXT_EXPECTATIONS = {
         "workstation-shell-panels",
         "workstation-snapshot-compare",
         "workstation-analysis",
+        "workstation-app-helpers",
+        "workstation-app-quick-actions",
+        "workstation-app-derivations",
         "eligible modules split when present",
         "do not stay in one large client chunk",
     ],
@@ -2766,6 +2776,9 @@ TEXT_EXPECTATIONS = {
         "workstation-shell-panels",
         "workstation-snapshot-compare",
         "workstation-analysis",
+        "workstation-app-helpers",
+        "workstation-app-quick-actions",
+        "workstation-app-derivations",
         "node_modules",
         "src[\\\\/]audio",
         "src[\\\\/]domain",
@@ -2780,6 +2793,9 @@ TEXT_EXPECTATIONS = {
         "src[\\\\/]ui[\\\\/]workstationShellPanels",
         "src[\\\\/]ui[\\\\/]workstationSnapshotCompare",
         "src[\\\\/]ui[\\\\/]workstationAnalysis",
+        "src[\\\\/]ui[\\\\/]workstationAppHelpers",
+        "src[\\\\/]ui[\\\\/]workstationAppQuickActions",
+        "src[\\\\/]ui[\\\\/]workstationAppDerivations",
     ],
     "harness/scripts/run_qa.py": [
         '".worktree/"',
@@ -13725,6 +13741,16 @@ def check_build_chunk_config(errors: list[str]) -> None:
     vite_text = (ROOT / "vite.config.ts").read_text(encoding="utf-8")
     if "chunkSizeWarningLimit" in vite_text:
         errors.append("vite.config.ts must use real chunk splitting instead of chunkSizeWarningLimit")
+    for expected in (
+        "workstation-app-helpers",
+        "workstation-app-quick-actions",
+        "workstation-app-derivations",
+        "workstationAppHelpers",
+        "workstationAppQuickActions",
+        "workstationAppDerivations",
+    ):
+        if expected not in vite_text:
+            errors.append(f"vite.config.ts must keep the {expected} build chunk split")
 
 
 def check_domain_sampling_boundaries(errors: list[str]) -> None:
