@@ -482,8 +482,22 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Section Handoff, Pattern A/B/C, Energy Change, Muted-Layer Change, Event Density, Priority Handoff, Focus/Cue Route, Audition Cue, and Next Check context before Arrangement Transition Map commands run."
       },
-      { id: "arrangement-playback-readout", command: "Arrangement Playback Readout", shortcut: "Quick Actions / Readout", target: "Edit vs heard Block" },
-      { id: "audible-arrangement-follow", command: "Audible Arrangement Follow", shortcut: "Quick Actions / Readout", target: "Heard Block" }
+      {
+        id: "arrangement-playback-readout",
+        command: "Arrangement Playback Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Edit block / heard block / Pattern A/B/C / bar context",
+        context:
+          "Edit-vs-Heard Block, Selected Block, Audible Block, Pattern A/B/C, Bar Context, Follow Action, Audition Cue, and Next Check context before Arrangement Playback Readout commands run."
+      },
+      {
+        id: "audible-arrangement-follow",
+        command: "Audible Arrangement Follow",
+        shortcut: "Quick Actions / Readout",
+        target: "Heard block / explicit follow / edit alignment",
+        context:
+          "Heard Block, Current Edit Block, Pattern Assignment, Bar Range, Follow Route, Follow Result, Audition Cue, and Next Check context before Audible Arrangement Follow commands run."
+      }
     ]
   },
   {
