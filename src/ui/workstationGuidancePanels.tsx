@@ -590,6 +590,64 @@ export function GuideQuickStart({
     (completionBottleneckItem.id === "path" && !nextStep) ||
     (completionBottleneckItem.id === "session" && !sessionCard) ||
     (completionBottleneckItem.id === "workflow" && !workflowSpotlightItem);
+  const pathButtonContext = nextStep
+    ? guideQuickStartButtonContext({
+        source: "path",
+        nextStep,
+        sessionCard,
+        firstBeatPathSummary,
+        sessionPassSummary,
+        workflowSpotlight,
+        workflowSpotlightItem
+      })
+    : "No First Beat Path target";
+  const sessionButtonContext = sessionCard
+    ? guideQuickStartButtonContext({
+        source: "session",
+        nextStep,
+        sessionCard,
+        firstBeatPathSummary,
+        sessionPassSummary,
+        workflowSpotlight,
+        workflowSpotlightItem
+      })
+    : "No Session Pass target";
+  const workflowButtonContext = workflowSpotlightItem
+    ? guideQuickStartButtonContext({
+        source: "workflow",
+        nextStep,
+        sessionCard,
+        firstBeatPathSummary,
+        sessionPassSummary,
+        workflowSpotlight,
+        workflowSpotlightItem
+      })
+    : "No Workflow Spotlight target";
+  const decisionActionContext = !decisionActionDisabled
+    ? guideQuickStartButtonContext({
+        source: decision.source,
+        nextStep,
+        sessionCard,
+        firstBeatPathSummary,
+        sessionPassSummary,
+        workflowSpotlight,
+        workflowSpotlightItem,
+        prefix: `Run ${guideQuickStartSourceLabel(decision.source)} decision`
+      })
+    : decision.title;
+  const bottleneckActionContext =
+    completionBottleneckItem && !bottleneckActionDisabled
+      ? guideQuickStartButtonContext({
+          source: completionBottleneckItem.id,
+          nextStep,
+          sessionCard,
+          firstBeatPathSummary,
+          sessionPassSummary,
+          workflowSpotlight,
+          workflowSpotlightItem,
+          prefix: `Focus ${guideQuickStartCompletionBreakdownName(completionBottleneckItem.id)} bottleneck`
+        })
+      : "No Guide Quick Start bottleneck target";
 
   function runGuideQuickStartPath(): void {
     if (nextStep) {
@@ -681,12 +739,13 @@ export function GuideQuickStart({
           <small data-testid="guide-quick-start-decision-metric">{decision.metricLabel}</small>
           <small data-testid="guide-quick-start-decision-detail">{decision.detailLabel}</small>
           <button
+            aria-label={decisionActionContext}
             className="guide-quick-start-decision-action"
             data-guide-quick-start-decision-action={decision.source}
             data-testid="guide-quick-start-decision-run"
             disabled={decisionActionDisabled}
             onClick={runGuideQuickStartDecision}
-            title={decision.title}
+            title={decisionActionContext}
             type="button"
           >
             <ArrowRight size={13} aria-hidden="true" />
@@ -730,11 +789,8 @@ export function GuideQuickStart({
             data-testid="guide-quick-start-completion-bottleneck-focus"
             disabled={bottleneckActionDisabled}
             onClick={runGuideQuickStartBottleneck}
-            title={
-              completionBottleneckItem
-                ? `Focus ${guideQuickStartCompletionBreakdownName(completionBottleneckItem.id)} bottleneck: ${completionBottleneckItem.title}`
-                : "No Guide Quick Start bottleneck target"
-            }
+            aria-label={bottleneckActionContext}
+            title={bottleneckActionContext}
             type="button"
           >
             <ArrowRight size={13} aria-hidden="true" />
@@ -785,7 +841,8 @@ export function GuideQuickStart({
             data-testid="guide-quick-start-path"
             disabled={!nextStep}
             onClick={runGuideQuickStartPath}
-            title={nextStep ? `Jump to ${nextStep.jumpLabel}: ${nextStep.detail}` : "No First Beat Path target"}
+            aria-label={pathButtonContext}
+            title={pathButtonContext}
             type="button"
           >
             <Target size={14} aria-hidden="true" />
@@ -798,7 +855,8 @@ export function GuideQuickStart({
             data-testid="guide-quick-start-session"
             disabled={!sessionCard}
             onClick={runGuideQuickStartSession}
-            title={sessionCard ? `Focus ${sessionCard.focusLabel}: ${sessionCard.value}` : "No Session Pass target"}
+            aria-label={sessionButtonContext}
+            title={sessionButtonContext}
             type="button"
           >
             <ArrowRight size={14} aria-hidden="true" />
@@ -811,7 +869,8 @@ export function GuideQuickStart({
             data-testid="guide-quick-start-workflow"
             disabled={!workflowSpotlightItem}
             onClick={runGuideQuickStartWorkflow}
-            title={workflowSpotlight.detailTitle}
+            aria-label={workflowButtonContext}
+            title={workflowButtonContext}
             type="button"
           >
             <ArrowRight size={14} aria-hidden="true" />
@@ -824,6 +883,105 @@ export function GuideQuickStart({
       {result && <GuideQuickStartResultStrip result={result} />}
     </section>
   );
+}
+
+function guideQuickStartButtonContext({
+  firstBeatPathSummary,
+  nextStep,
+  prefix,
+  sessionCard,
+  sessionPassSummary,
+  source,
+  workflowSpotlight,
+  workflowSpotlightItem
+}: {
+  source: GuideQuickStartDecision["source"];
+  nextStep: FirstBeatPathStep | null;
+  sessionCard: SessionPassCard | null;
+  firstBeatPathSummary: FirstBeatPathSummary;
+  sessionPassSummary: SessionPassSummary;
+  workflowSpotlight: WorkflowSpotlightSummary;
+  workflowSpotlightItem: WorkflowNavigatorItem | null;
+  prefix?: string;
+}): string {
+  switch (source) {
+    case "path": {
+      const label = nextStep ? `${nextStep.label}: ${nextStep.value}` : firstBeatPathSummary.headline;
+      const destination = nextStep?.jumpLabel ?? "First Beat Path";
+      const detail = nextStep?.detail ?? firstBeatPathSummary.detail;
+
+      return guideQuickStartButtonContextLine({
+        prefix: prefix ?? `Run Path: ${label}`,
+        destination,
+        metric: firstBeatPathSummary.countLabel,
+        detail,
+        auditionCue: "Use the focused workstation area to handle this direct beat-making step.",
+        nextCheck: "Return to Guide Quick Start after the step is ready or intentionally deferred."
+      });
+    }
+    case "session": {
+      const label = sessionCard ? `${sessionCard.label}: ${sessionCard.value}` : sessionPassSummary.headline;
+      const destination = sessionCard?.focusLabel ?? "Session Pass";
+      const detail = sessionCard?.detail ?? sessionPassSummary.detail;
+
+      return guideQuickStartButtonContextLine({
+        prefix: prefix ?? `Run Session: ${label}`,
+        destination,
+        metric: sessionCard ? `${sessionPassSummary.headline} / ${sessionCard.value}` : sessionPassSummary.headline,
+        detail,
+        auditionCue: "Use the focused panel to inspect this session pass before changing the beat.",
+        nextCheck: "Return to Guide Quick Start for the next guided or studio pass target."
+      });
+    }
+    case "workflow": {
+      const detail = workflowSpotlightItem?.detail ?? workflowSpotlight.detailLabel;
+
+      return guideQuickStartButtonContextLine({
+        prefix: prefix ?? `Run Workflow: ${workflowSpotlight.zoneLabel}`,
+        destination: workflowSpotlightItem?.label ?? workflowSpotlight.zoneLabel,
+        metric: workflowSpotlight.countLabel,
+        detail,
+        auditionCue: "Use the highlighted workstation zone to resolve the current workflow target.",
+        nextCheck: "Return to Guide Quick Start after the zone looks ready or needs another pass."
+      });
+    }
+  }
+}
+
+function guideQuickStartButtonContextLine({
+  auditionCue,
+  destination,
+  detail,
+  metric,
+  nextCheck,
+  prefix
+}: {
+  prefix: string;
+  destination: string;
+  metric: string;
+  detail: string;
+  auditionCue: string;
+  nextCheck: string;
+}): string {
+  return [
+    prefix,
+    `Destination ${destination}`,
+    `Metric ${metric}`,
+    `Context ${detail}`,
+    `Audition ${auditionCue}`,
+    `Next ${nextCheck}`
+  ].join(" / ");
+}
+
+function guideQuickStartSourceLabel(source: GuideQuickStartDecision["source"]): string {
+  switch (source) {
+    case "path":
+      return "Path";
+    case "session":
+      return "Session";
+    case "workflow":
+      return "Workflow";
+  }
 }
 
 function createGuideQuickStartPriority({
