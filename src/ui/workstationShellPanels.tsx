@@ -279,7 +279,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
       },
       { id: "session-brief-compass", command: "Session Brief Compass", shortcut: "Quick Actions / Readout", target: "Direction / reference / handoff" },
       { id: "reference-alignment", command: "Reference Alignment", shortcut: "Quick Actions / Readout", target: "Reference / form / mix / handoff" },
-      { id: "composer-guide", command: "Composer Guide", shortcut: "Quick Actions / Readout", target: "Drums / 808 / harmony / melody" },
+      {
+        id: "composer-guide",
+        command: "Composer Guide",
+        shortcut: "Quick Actions / Readout",
+        target: "Drums / 808 / harmony / melody / arrange / finish",
+        context:
+          "Drums, 808/Bass, Harmony, Melody, Arrange, and Finish writing focus context with destination, guide metric, audition cue, and next check before Composer Guide commands run."
+      },
       { id: "key-compass", command: "Key Compass", shortcut: "Quick Actions / Readout", target: "Scale / cadence / chords" },
       { id: "groove-compass", command: "Groove Compass", shortcut: "Quick Actions / Readout", target: "Pocket / timing / anchors" },
       { id: "listening-pass", command: "Listening Pass", shortcut: "Quick Actions / Readout", target: "Compose / arrange / mix / deliver" },
