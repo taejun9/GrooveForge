@@ -7156,6 +7156,16 @@ export function App(): ReactElement {
     );
   }
 
+  function focusSongFormOverviewReadout(): void {
+    const priority = createSongFormPrioritySummary(songFormOverviewSummary);
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      priority.targetIndex === null
+        ? `Song Form Overview ${priority.statusLabel}: ${priority.reasonLabel}`
+        : `Song Form Overview ${priority.statusLabel}: ${priority.metricLabel} / ${priority.targetLabel} / ${priority.nextCheckLabel}`
+    );
+  }
+
   function focusMasterOutputRole(): void {
     const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -8253,6 +8263,7 @@ export function App(): ReactElement {
     onFocusArrangementMoveReadout: focusArrangementMoveReadout,
     onFocusArrangementTemplateReadout: focusArrangementTemplateReadout,
     onFocusSectionLocatorReadout: focusSectionLocatorReadout,
+    onFocusSongFormOverviewReadout: focusSongFormOverviewReadout,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternClone: cloneSelectedPatternVariation,
     onApplyPatternFill: applyPatternFill,
