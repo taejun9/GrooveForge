@@ -544,8 +544,22 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Headroom, Balance, Master Output, Stem-Pass Comparison, A/B Slot State, Capture/Recall/Clear Commands, Audition Cue, and Next Check context before Mix Snapshot A/B commands run."
       },
-      { id: "mix-balance-decision", command: "Mix Balance Decision", shortcut: "Quick Actions / Readout", target: "Suggested rough balance" },
-      { id: "mix-balance", command: "Mix Balance", shortcut: "Quick Actions / Readout", target: "Rough balance pads" },
+      {
+        id: "mix-balance-decision",
+        command: "Mix Balance Decision",
+        shortcut: "Quick Actions / Readout",
+        target: "Suggested rough-balance preview / apply route",
+        context:
+          "Suggested Rough-Balance Target, Preview/Apply Posture, Editable Channel Scope, Drums/808/Synth/Chords Channel Posture, Direct Pad Route, Audition Cue, and Next Check context before Mix Balance Decision commands run."
+      },
+      {
+        id: "mix-balance",
+        command: "Mix Balance",
+        shortcut: "Quick Actions / Readout",
+        target: "Current rough-balance target / direct balance pads",
+        context:
+          "Current Rough-Balance Target, Direct Balance Pad Routes, Editable Channel Scope, Drums/808/Synth/Chords Channel Posture, Result Feedback, Audition Cue, and Next Check context before Mix Balance commands run."
+      },
       { id: "mix-coach", command: "Mix Coach", shortcut: "Quick Actions / Readout", target: "Headroom / balance" }
     ]
   },
