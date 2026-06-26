@@ -446,7 +446,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Tap pulse / BPM",
         context:
-          "Tap Pulse, BPM Estimate, Delayed Commit, Manual BPM Boundaries, Result Feedback, Audition Cue, and Next Tempo Check context before Tap Tempo commands run."
+          "Tap Pulse, Tap Tempo Readout Command, BPM Estimate, Delayed Commit, Manual BPM Boundaries, Local Result Metric, Result Feedback, Audition Cue, and Next Tempo Check context before Tap Tempo commands run."
       },
       {
         id: "tempo-nudge",

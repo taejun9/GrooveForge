@@ -8078,6 +8078,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusTapTempoReadout(): void {
+    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Tap Tempo ${tapTempoReadout.statusLabel}: ${tapTempoReadout.roleLabel} / ${tapTempoReadout.detailLabel}`
+    );
+  }
+
   const quickActions = createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
@@ -8174,6 +8181,7 @@ export function App(): ReactElement {
     stemAuditionPadOptions,
     structureLensActions,
     styleInspectorSummary,
+    tapTempoReadout,
     beatBlueprintPreviewId,
     transportLoopScope,
     transportPositionReadout,
@@ -8239,6 +8247,7 @@ export function App(): ReactElement {
     onApplySwingFeel: applySwingFeelPad,
     onToggleMetronome: toggleMetronome,
     onTapTempo: tapProjectTempo,
+    onFocusTapTempoReadout: focusTapTempoReadout,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onCueBlueprintPreview: cueBeatBlueprintPreview,
     onRequestMidiInputAccess: requestMidiInputAccess,
@@ -17829,6 +17838,7 @@ function createQuickActions({
   stemAuditionPadOptions,
   structureLensActions,
   styleInspectorSummary,
+  tapTempoReadout,
   beatBlueprintPreviewId,
   transportLoopScope,
   transportPositionReadout,
@@ -17893,6 +17903,7 @@ function createQuickActions({
   onApplySwingFeel,
   onToggleMetronome,
   onTapTempo,
+  onFocusTapTempoReadout,
   onPreviewBlueprint,
   onCueBlueprintPreview,
   onRequestMidiInputAccess,
@@ -18113,6 +18124,7 @@ function createQuickActions({
   stemAuditionPadOptions: StemAuditionPadOption[];
   structureLensActions: NextMoveAction[];
   styleInspectorSummary: StyleInspectorSummary;
+  tapTempoReadout: TapTempoReadoutSummary;
   beatBlueprintPreviewId: BeatBlueprintId;
   transportLoopScope: TransportLoopScope;
   transportPositionReadout: TransportPositionReadoutSummary;
@@ -18177,6 +18189,7 @@ function createQuickActions({
   onApplySwingFeel: (pad: SwingFeelPadId) => void;
   onToggleMetronome: () => void;
   onTapTempo: () => void;
+  onFocusTapTempoReadout: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onCueBlueprintPreview: (scope: Extract<TransportLoopScope, "arrangement" | "pattern">) => void;
   onRequestMidiInputAccess: () => Promise<void>;
@@ -19863,6 +19876,7 @@ function createQuickActions({
   const loopScopeStatus = transportLoopStatus(project, transportLoopScope, selectedArrangementIndex, arrangementTransitionLoopTarget);
   const selectedLoopBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0] ?? null;
   const transportPositionDetailLabel = transportPositionReadout.detailLabel.split(" / ").join(" + ");
+  const tapTempoDetailLabel = tapTempoReadout.detailLabel.split(" / ").join(" + ");
 
   return [
     {
@@ -19908,6 +19922,22 @@ function createQuickActions({
         selectedLoopBlock ? `${selectedLoopBlock.section} ${selectedLoopBlock.pattern}` : "no block"
       } beginner producer direct beat workstation`,
       run: onFocusMetronomeReadout
+    },
+    {
+      id: "tap-tempo-readout-action",
+      title: `Review Tap Tempo: ${tapTempoReadout.roleLabel}`,
+      detail: `${tapTempoReadout.statusLabel} / ${tapTempoReadout.roleLabel} / ${tapTempoDetailLabel} / ${transportLoopLabel(
+        transportLoopScope
+      )} loop / Pattern ${project.selectedPattern} / ${project.bpm} BPM`,
+      group: "Transport",
+      keywords: `tap tempo readout bpm pulse estimate delayed commit timing transport ${
+        tapTempoReadout.statusLabel
+      } ${tapTempoReadout.roleLabel} ${tapTempoDetailLabel} ${
+        project.metronomeEnabled ? "metronome on" : "metronome off"
+      } ${transportLoopScope} Pattern ${project.selectedPattern} ${
+        selectedLoopBlock ? `${selectedLoopBlock.section} ${selectedLoopBlock.pattern}` : "no block"
+      } beginner producer direct beat workstation`,
+      run: onFocusTapTempoReadout
     },
     {
       id: "toggle-playback",
@@ -22288,6 +22318,7 @@ function createQuickActionResult(
     action.id === "transport-position-readout-action" ||
     action.id === "loop-scope" ||
     action.id === "metronome-readout" ||
+    action.id === "tap-tempo-readout-action" ||
     action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -26497,6 +26528,62 @@ function quickActionMetronomeReadoutDetailParts(action: QuickAction): string[] {
     .filter(Boolean);
 }
 
+function quickActionTapTempoReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "tap-tempo-readout-action") {
+    return null;
+  }
+
+  const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0] ?? null;
+  const blockLabel = selectedBlock
+    ? `Block ${Math.min(selectedArrangementIndex + 1, project.arrangement.length)} ${selectedBlock.section} / Pattern ${
+        selectedBlock.pattern
+      } / ${barCountLabel(selectedBlock.bars)}`
+    : "No selected block";
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionTapTempoReadoutDetailParts(action);
+  const statusLabel = detailParts[0] ?? "Tap BPM";
+  const fallbackRoleLabel = action.title.replace(/^Review Tap Tempo:\s*/, "").trim() || `${project.bpm} BPM`;
+  const roleLabel = detailParts[1] ?? fallbackRoleLabel;
+  const detailLabel = detailParts[2] ?? "Tap tempo posture";
+  const loopLabel = detailParts[3]?.replace(/\s+loop$/, "") || "current loop";
+
+  return {
+    id: "tap-tempo-readout",
+    label: "Tap Tempo",
+    value: [
+      "review tap tempo",
+      statusLabel,
+      roleLabel,
+      detailLabel,
+      `loop ${loopLabel}`,
+      `${project.bpm} BPM`,
+      project.metronomeEnabled ? "metronome on" : "metronome off",
+      `selected ${blockLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(activePattern(project))} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "tap history unchanged",
+      "tempo unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+function quickActionTapTempoReadoutDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 const GUIDE_QUICK_START_DETAIL_LABEL_PREFIXES = [
   "Destination ",
   "Metric ",
@@ -27803,6 +27890,16 @@ function quickActionResultMetricSnapshot(
       quickActionMetronomeReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
         id: "metronome-readout",
         label: "Metronome",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "tap-tempo-readout-action") {
+    return (
+      quickActionTapTempoReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "tap-tempo-readout",
+        label: "Tap Tempo",
         value: action.detail
       }
     );
@@ -31299,6 +31396,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play the current loop and use the click only as a timing reference.",
       nextCheck: "Confirm the grid feel while programming, then export WAV/stems knowing the metronome stays out of rendered audio."
+    };
+  }
+
+  if (action.id === "tap-tempo-readout-action") {
+    return {
+      auditionCue: "Use the Tap Tempo readout before adding tap pulses, nudging BPM, arranging sections, recording MIDI, or exporting.",
+      nextCheck: "Run Tap Tempo only when you want the current pulse estimate to become an explicit project BPM change."
     };
   }
 
