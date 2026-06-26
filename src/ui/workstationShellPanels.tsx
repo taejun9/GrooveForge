@@ -925,9 +925,17 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Arrangement Move Preview Decision, Priority Readout, Current Drop/Build/Hook Lift Move, Selected-Block Energy/Mute Before/After, Result Feedback, Audition Cue, and Next Move Check context before Arrangement Move commands run."
       },
       {
+        id: "section-locator-readout",
+        command: "Section Locator Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current section cue preview",
+        context:
+          "Section Locator Readout Action, Current Section Cue Recommendation, Target Section, Pattern A/B/C Assignment, Bar Range, Selected Pattern, Editable Event Count, Block Count, Bar Count, Audition Cue, and Next Manual Section Check context before Section Locator cue commands run."
+      },
+      {
         id: "section-locator",
         command: "Section Locator",
-        shortcut: "Quick Actions / Readout",
+        shortcut: "Quick Actions / Cue",
         target: "Intro / verse / hook",
         context:
           "Section Locator Cue Decision Readout, Priority Readout, Direct Intro/Verse/Hook/Bridge/Outro Cue Commands, Arrangement Block Cue Feedback, Section Cue Result, Audition Cue, and Next Section Check context before Section Locator commands run."

@@ -16826,6 +16826,51 @@ export function quickActionSectionLocatorMetricSnapshot(
   project: ProjectState,
   action: QuickAction
 ): { id: string; label: string; value: string } | null {
+  if (action.id === "section-locator-readout-action") {
+    const section = sectionLocatorDecisionActionSection(action);
+    const pattern = activePattern(project);
+    if (!section) {
+      return {
+        id: "section-locator-readout",
+        label: "Section Locator Readout",
+        value: `section locator readout / no section target / Pattern ${project.selectedPattern} / ${patternEventTotal(
+          pattern
+        )} editable events / ${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`
+      };
+    }
+
+    const index = firstArrangementSectionIndex(project, section);
+    const totalBars = arrangementTotalBars(project);
+    if (index === null) {
+      return {
+        id: "section-locator-readout",
+        label: "Section Locator Readout",
+        value: `review section locator readout / ${section} missing / selected Pattern ${
+          project.selectedPattern
+        } / ${patternEventTotal(pattern)} editable events / ${project.arrangement.length} blocks / ${barCountLabel(
+          totalBars
+        )}`
+      };
+    }
+
+    const block = project.arrangement[index];
+    const bars = normalizeArrangementBars(block.bars);
+    const startBar = arrangementStartBar(project, index) + 1;
+    const endBar = startBar + bars - 1;
+    const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+    const eventCount = patternEventTotal(project.patterns[block.pattern]);
+
+    return {
+      id: "section-locator-readout",
+      label: "Section Locator Readout",
+      value: `review section locator readout / ${action.detail} / target ${section} / Block ${index + 1} ${
+        block.section
+      } / Pattern ${block.pattern} / ${rangeLabel} / ${eventCount} block events / selected Pattern ${
+        project.selectedPattern
+      } / ${patternEventTotal(pattern)} editable events / ${project.arrangement.length} blocks / ${barCountLabel(totalBars)}`
+    };
+  }
+
   const section = sectionLocatorQuickActionSection(action);
   if (!section) {
     return null;
@@ -16863,7 +16908,7 @@ export function sectionLocatorQuickActionSection(action: QuickAction): Arrangeme
 }
 
 export function sectionLocatorDecisionActionSection(action: QuickAction): ArrangementSection | null {
-  if (action.id !== "section-locator-decision") {
+  if (action.id !== "section-locator-decision" && action.id !== "section-locator-readout-action") {
     return null;
   }
 
@@ -17046,4 +17091,3 @@ export function structureArcSignal(project: ProjectState): StructureLensSignal {
     tone
   };
 }
-
