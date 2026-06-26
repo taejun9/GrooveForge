@@ -641,6 +641,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Selected Pattern Tail-Move Suggestion, Drum Fill/808 Pickup/Melody Turn/Clear Tail Target, Pattern Fill Preview, Direct Fill Commands, Pattern Fill Result Feedback, Audition Cue, and Next Tail Check context before Pattern Fill commands run."
       },
       {
+        id: "pattern-fill-readout",
+        command: "Pattern Fill Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Selected Pattern fill preflight",
+        context:
+          "Pattern Fill Readout Action, Selected Pattern A/B/C, Suggested Drum Fill/808 Pickup/Melody Turn/Clear Tail Move, Current Preview Preset, Selected Pattern Event Count, Drum/Music Posture, Tail-Change Posture, Arrangement Usage, Audition Cue, and Next Pattern Fill Check context before direct Pattern Fill commands run."
+      },
+      {
         id: "pattern-clone",
         command: "Pattern Clone",
         shortcut: "Quick Actions / Readout",

@@ -1134,6 +1134,7 @@ export function createQuickActions({
   patternChainPreviewSummary,
   patternStackOptions,
   patternStackPreviewSummary,
+  patternFillPreviewPreset,
   patternVariationPreviewPreset,
   patternDnaSummary,
   patternPlaybackReadout,
@@ -1242,6 +1243,7 @@ export function createQuickActions({
   onApplyPatternClone,
   onFocusPatternCloneReadout,
   onApplyPatternFill,
+  onFocusPatternFillReadout,
   onApplyPatternVariation,
   onFocusPatternVariationReadout,
   onApplyPatternStack,
@@ -1467,6 +1469,7 @@ export function createQuickActions({
   patternChainPreviewSummary: PatternChainPreviewSummary;
   patternStackOptions: PatternStackOption[];
   patternStackPreviewSummary: PatternStackPreviewSummary;
+  patternFillPreviewPreset: PatternFillPreset;
   patternVariationPreviewPreset: PatternVariationPreset;
   patternDnaSummary: PatternDnaSummary;
   patternPlaybackReadout: PatternPlaybackReadoutSummary;
@@ -1575,6 +1578,7 @@ export function createQuickActions({
   onApplyPatternClone: (target: PatternSlot, preset: PatternVariationPreset) => void;
   onFocusPatternCloneReadout: () => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
+  onFocusPatternFillReadout: () => void;
   onApplyPatternVariation: (preset: PatternVariationPreset) => void;
   onFocusPatternVariationReadout: () => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
@@ -3606,6 +3610,21 @@ export function createQuickActions({
     keywords: `Quick Actions Pattern Variation Readout review selected Pattern ${project.selectedPattern} ${patternVariationReadoutSuggestion.presetLabel} ${patternVariationReadoutPreview.presetLabel} ${patternVariationReadoutPreview.moveLabel} subtle hook break layer change arrangement beginner producer`,
     run: onFocusPatternVariationReadout
   };
+  const patternFillReadoutSuggestion = createPatternFillSuggestionSummary(project.selectedPattern, activePattern(project), project.key);
+  const patternFillReadoutPreview = createPatternFillPreviewSummary(
+    project.selectedPattern,
+    activePattern(project),
+    patternFillPreviewPreset,
+    project.key
+  );
+  const patternFillReadoutAction: QuickAction = {
+    id: "pattern-fill-readout-action",
+    title: `Review Pattern Fill Readout: Pattern ${project.selectedPattern}`,
+    detail: `${patternFillReadoutSuggestion.presetLabel} suggestion / preview ${patternFillReadoutPreview.presetLabel} / ${patternFillReadoutPreview.moveLabel} / direct fill preflight`,
+    group: "Create",
+    keywords: `Quick Actions Pattern Fill Readout review selected Pattern ${project.selectedPattern} ${patternFillReadoutSuggestion.presetLabel} ${patternFillReadoutPreview.presetLabel} ${patternFillReadoutPreview.moveLabel} drum fill 808 pickup melody turn clear tail arrangement beginner producer`,
+    run: onFocusPatternFillReadout
+  };
   const patternChainActions: QuickAction[] = patternChainIds.map((chain) => {
     const arrangement = createPatternChain(chain);
     const chainLabel = patternChainLabel(chain);
@@ -4785,6 +4804,7 @@ export function createQuickActions({
         run: () => onApplyPatternVariation(preset)
       };
     }),
+    patternFillReadoutAction,
     {
       id: "fill-drums",
       title: "Apply Drum Fill",
@@ -6336,6 +6356,7 @@ export function createQuickActionResult(
     action.id === "arrangement-move-readout-action" ||
     action.id === "pattern-clone-readout-action" ||
     action.id === "pattern-variation-readout-action" ||
+    action.id === "pattern-fill-readout-action" ||
     action.id === "pattern-copy-clear-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
@@ -14255,6 +14276,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "pattern-fill-readout-action") {
+    return (
+      quickActionPatternFillReadoutMetricSnapshot(project, action) ?? {
+        id: "pattern-fill-readout",
+        label: "Pattern Fill Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id.startsWith("fill-")) {
     return (
       quickActionPatternFillMetricSnapshot(project, action) ?? {
@@ -16562,6 +16593,70 @@ export function patternVariationReadoutQuickActionPreviewPreset(action: QuickAct
   return null;
 }
 
+export function quickActionPatternFillReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "pattern-fill-readout-action") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const suggestion = createPatternFillSuggestionSummary(project.selectedPattern, pattern, project.key);
+  const previewPreset = patternFillReadoutQuickActionPreviewPreset(action) ?? suggestion.preset;
+  const preview = createPatternFillPreviewSummary(project.selectedPattern, pattern, previewPreset, project.key);
+  const drumHits = drumHitCount(pattern);
+  const bassNotes = pattern.bassNotes.length;
+  const chordEvents = pattern.chordEvents.length;
+  const melodyNotes = pattern.melodyNotes.length;
+  const musicEvents = bassNotes + chordEvents + melodyNotes;
+  const arrangementUse = patternArrangementUseLabel(project, project.selectedPattern);
+
+  return {
+    id: "pattern-fill-readout",
+    label: "Pattern Fill Readout",
+    value: [
+      "review pattern fill",
+      `selected Pattern ${project.selectedPattern}`,
+      `${suggestion.presetLabel} suggestion`,
+      `preview ${preview.presetLabel}`,
+      `${preview.moveLabel}`,
+      `${patternEventTotal(pattern)} events`,
+      `${drumHits} drums`,
+      `${bassNotes} 808`,
+      `${chordEvents} chords`,
+      `${melodyNotes} synth`,
+      `${musicEvents} music`,
+      `arrangement ${arrangementUse}`,
+      "fill unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+export function patternFillReadoutQuickActionPreviewPreset(action: QuickAction): PatternFillPreset | null {
+  if (action.id !== "pattern-fill-readout-action") {
+    return null;
+  }
+
+  const text = `${action.title} ${action.detail}`;
+  if (/\bDrum Fill target\b/.test(text)) {
+    return "drum_fill";
+  }
+  if (/\b808 Pickup target\b/.test(text)) {
+    return "bass_pickup";
+  }
+  if (/\bMelody Turn target\b/.test(text)) {
+    return "melody_turn";
+  }
+  if (/\bClear Tail target\b/.test(text)) {
+    return "clear_tail";
+  }
+
+  return null;
+}
+
 export function quickActionPatternVariationMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -17299,6 +17394,14 @@ export function quickActionResultFollowup(
       auditionCue:
         "Review the selected Pattern clone source, suggested target, variation, target overwrite risk, and arrangement usage before cloning Pattern data.",
       nextCheck: "Run a direct Pattern Clone command only when that target Pattern slot should be overwritten by the clone."
+    };
+  }
+
+  if (action.id === "pattern-fill-readout-action") {
+    return {
+      auditionCue:
+        "Review the selected Pattern event posture, suggested fill, preview target, tail-change count, and arrangement usage before applying a fill.",
+      nextCheck: "Run a direct Pattern Fill command only when the selected Pattern tail should be rewritten by that move."
     };
   }
 
