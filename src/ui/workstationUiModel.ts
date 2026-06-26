@@ -3295,6 +3295,7 @@ export type ComposerActionResult = {
   title: string;
   status: string;
   detail: string;
+  route: string;
   scope: string;
   impact: string;
   safety: string;
