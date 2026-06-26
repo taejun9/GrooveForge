@@ -686,6 +686,8 @@ import {
   beatReadinessPriorityCheck,
   layerStarterPriorityOption
 } from "./workstationUiModel";
+import type { StudioToneBaseline, StudioToneDriftResetTarget, StudioToneDriftSummary } from "./studioToneTools";
+import { studioToneControls } from "./studioToneTools";
 import type { SnapshotCompareProjectProfile } from "./workstationSnapshotCompare";
 import {
   activeSnapshotCompareQuickActionItem,
@@ -1164,6 +1166,8 @@ export function createQuickActions({
   soundSnapshotComparison,
   soundSnapshots,
   soundTimbreCheckSummary,
+  studioToneBaseline,
+  studioToneDrift,
   spaceFxPadOptions,
   spaceFxPreviewSummary,
   stemAnalyses,
@@ -1229,6 +1233,9 @@ export function createQuickActions({
   onCaptureSoundSnapshot,
   onRecallSoundSnapshot,
   onClearSoundSnapshots,
+  onCaptureStudioToneBaseline,
+  onResetLargestStudioToneDrift,
+  onResetStudioToneControl,
   onFocusTimbreCheck,
   onExpandPatternChain,
   onApplyProjectKey,
@@ -1462,6 +1469,8 @@ export function createQuickActions({
   soundSnapshotComparison: SoundSnapshotComparisonSummary;
   soundSnapshots: SoundSnapshotSlotMap;
   soundTimbreCheckSummary: SoundTimbreCheckSummary;
+  studioToneBaseline: StudioToneBaseline;
+  studioToneDrift: StudioToneDriftSummary;
   spaceFxPadOptions: SpaceFxPadOption[];
   spaceFxPreviewSummary: SpaceFxPreviewSummary;
   stemAnalyses: StemExportAnalyses;
@@ -1527,6 +1536,9 @@ export function createQuickActions({
   onCaptureSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
   onRecallSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
   onClearSoundSnapshots: () => void;
+  onCaptureStudioToneBaseline: () => void;
+  onResetLargestStudioToneDrift: () => void;
+  onResetStudioToneControl: (target: StudioToneDriftResetTarget) => void;
   onFocusTimbreCheck: () => void;
   onExpandPatternChain: () => void;
   onApplyProjectKey: (key: string) => void;
@@ -2902,6 +2914,38 @@ export function createQuickActions({
   });
   const soundFocusReady = soundFocusPreviewSummary.changedMoves > 0;
   const soundPresetReady = soundPresetPreviewSummary.statusLabel !== "Preset aligned";
+  const studioToneDriftTarget = studioToneDrift.resetTarget;
+  const studioToneResetActions: QuickAction[] = studioToneControls.map((control) => {
+    const currentPercent = Math.round(project.sound[control.parameter] * 100);
+    const baselinePercent = Math.round(studioToneBaseline.sound[control.parameter] * 100);
+    const deltaPercent = currentPercent - baselinePercent;
+    const deltaLabel = deltaPercent === 0 ? "Delta 0" : `Delta ${deltaPercent > 0 ? "+" : ""}${deltaPercent}`;
+    const disabled = deltaPercent === 0;
+    const target: StudioToneDriftResetTarget = {
+      id: control.id,
+      label: control.label,
+      parameter: control.parameter,
+      beforeValue: project.sound[control.parameter],
+      baselineValue: studioToneBaseline.sound[control.parameter],
+      deltaLabel
+    };
+
+    return {
+      id: `studio-tone-reset-${control.id}`,
+      title: disabled ? `${control.label} matches Studio Tone baseline` : `Reset Studio Tone ${control.label}`,
+      detail: `${percentLabel(project.sound[control.parameter])} -> ${percentLabel(
+        studioToneBaseline.sound[control.parameter]
+      )} / ${deltaLabel} / ${studioToneBaseline.sourceLabel}`,
+      group: "Create",
+      keywords: `studio tone reset direct baseline drift sound design ${control.id} ${control.label} ${deltaLabel} ${studioToneBaseline.sourceLabel} drums 808 bass synth chords beginner producer`,
+      disabled,
+      run: () => {
+        if (!disabled) {
+          onResetStudioToneControl(target);
+        }
+      }
+    };
+  });
   const directDrumKitPadOptions = createDrumKitPadOptions(project);
   const directSoundFocusPadOptions = createSoundFocusPadOptions(project.sound);
   const soundPresetActions: QuickAction[] = soundPresetIds.map((preset) => {
@@ -4128,6 +4172,30 @@ export function createQuickActions({
       keywords: `Quick Actions Timbre Check readout balance tone drums 808 air width warmth sound focus studio ${soundTimbreCheckSummary.statusLabel} ${soundTimbreCheckSummary.headline} beginner producer`,
       run: onFocusTimbreCheck
     },
+    {
+      id: "studio-tone-baseline",
+      title: `Capture Studio Tone Baseline: ${studioToneBaseline.sourceLabel}`,
+      detail: `${quickActionSoundDesignPosture(project.sound)} / ${studioToneDrift.changedCount}/${studioToneDrift.totalCount} drift controls`,
+      group: "Create",
+      keywords: `Quick Actions Studio Tone Baseline capture current tone reset baseline sound design drums 808 bass synth chords ${studioToneBaseline.sourceLabel} ${studioToneDrift.postureLabel} beginner producer`,
+      run: onCaptureStudioToneBaseline
+    },
+    {
+      id: "studio-tone-drift",
+      title: studioToneDriftTarget
+        ? `Reset Largest Studio Tone Drift: ${studioToneDriftTarget.label}`
+        : "Reset Largest Studio Tone Drift",
+      detail: `${studioToneDrift.postureLabel} / ${studioToneDrift.largestLabel} / ${studioToneDrift.directionLabel}`,
+      group: "Create",
+      keywords: `Quick Actions Studio Tone Drift reset largest baseline manual tone sound design ${studioToneDrift.largestLabel} ${studioToneDrift.directionLabel} ${studioToneBaseline.sourceLabel} beginner producer`,
+      disabled: !studioToneDriftTarget,
+      run: () => {
+        if (studioToneDriftTarget) {
+          onResetLargestStudioToneDrift();
+        }
+      }
+    },
+    ...studioToneResetActions,
     ...soundSnapshotActions,
     {
       id: "sound-preset-decision",
@@ -5818,6 +5886,7 @@ export function createQuickActionResult(
   const uiLocal =
     (action.id.startsWith("mix-snapshot-") && !mixSnapshotRecallOnly) ||
     (action.id.startsWith("sound-snapshot-") && !soundSnapshotRecallOnly) ||
+    action.id === "studio-tone-baseline" ||
     inputSetupOnly ||
     auditionOnly ||
     tapTempoPulseOnly ||
@@ -13625,6 +13694,10 @@ export function quickActionSoundDecisionMetricSnapshot(
     return quickActionTimbreCheckMetricSnapshot(project, action, analysis);
   }
 
+  if (action.id === "studio-tone-baseline" || action.id === "studio-tone-drift" || action.id.startsWith("studio-tone-reset-")) {
+    return quickActionStudioToneMetricSnapshot(project, action, analysis);
+  }
+
   if (action.id === "sound-preset-decision" || action.id === "sound-preset" || action.id.startsWith("sound-preset-pad-")) {
     return quickActionSoundPresetMetricSnapshot(project, action, analysis);
   }
@@ -13736,6 +13809,23 @@ export function quickActionTimbreCheckMetricSnapshot(
   };
 }
 
+export function quickActionStudioToneMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } {
+  const detailParts = quickActionSoundDecisionDetailParts(action);
+  return {
+    id: action.id === "studio-tone-baseline" ? "studio-tone-baseline" : "studio-tone-drift",
+    label: action.id === "studio-tone-baseline" ? "Studio Tone Baseline" : "Studio Tone Drift",
+    value: quickActionSoundMetricValue(project, action, analysis, [
+      quickActionSoundActionLabel(action),
+      `context ${detailParts.join(" / ") || action.title}`,
+      `manual tone ${quickActionSoundDesignPosture(project.sound)}`
+    ], quickActionSoundDecisionNextCheck(action))
+  };
+}
+
 export function quickActionSoundMetricValue(
   project: ProjectState,
   action: QuickAction,
@@ -13805,6 +13895,14 @@ export function quickActionSoundDecisionNextCheck(action: QuickAction): string {
     return "loop the focused tone against the full Pattern before changing another focus lane";
   }
 
+  if (action.id === "studio-tone-baseline") {
+    return "adjust one Studio tone control, then use Studio Tone Drift or Sound Snapshot A/B to compare the move";
+  }
+
+  if (action.id === "studio-tone-drift" || action.id.startsWith("studio-tone-reset-")) {
+    return "loop drums, 808, Synth, and Chords before capturing a new Studio Tone baseline";
+  }
+
   return "inspect Timbre Check before changing preset, kit, focus, or Studio tone controls";
 }
 
@@ -13838,6 +13936,15 @@ export function quickActionSoundActionLabel(action: QuickAction): string {
   }
   if (action.id === "timbre-check") {
     return "check timbre balance";
+  }
+  if (action.id === "studio-tone-baseline") {
+    return "capture Studio Tone baseline";
+  }
+  if (action.id === "studio-tone-drift") {
+    return "reset largest Studio Tone drift";
+  }
+  if (action.id.startsWith("studio-tone-reset-")) {
+    return "reset Studio Tone control";
   }
   return "run sound action";
 }
@@ -15832,6 +15939,20 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; inspect Timbre Check before changing preset, kit, focus, or Studio tone controls.`,
       nextCheck: timbre.nextCheck
+    };
+  }
+
+  if (action.id === "studio-tone-baseline") {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; adjust one Studio tone control against the captured baseline.`,
+      nextCheck: "Use Studio Tone Drift or Sound Snapshot A/B after a concrete manual tone change."
+    };
+  }
+
+  if (action.id === "studio-tone-drift" || action.id.startsWith("studio-tone-reset-")) {
+    return {
+      auditionCue: `Loop Pattern ${project.selectedPattern}; hear drums, 808, Synth, and Chords after the Studio tone reset.`,
+      nextCheck: "Capture a new Studio Tone baseline only if the reset or manual trim now fits the beat."
     };
   }
 

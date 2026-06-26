@@ -1044,6 +1044,14 @@ import {
 import type {
   SoundTimbreScore
 } from "./workstationAppDerivations";
+import type { StudioToneBaseline, StudioToneBaselineResult, StudioToneResetResult } from "./studioToneTools";
+import {
+  createCapturedStudioToneBaseline,
+  createStudioToneBaseline,
+  createStudioToneBaselineResult,
+  createStudioToneDriftSummary,
+  createStudioToneResetResult
+} from "./studioToneTools";
 
 export function App(): ReactElement {
   const [project, setProject] = useState<ProjectState>(starterProject);
@@ -1135,6 +1143,11 @@ export function App(): ReactElement {
   const [soundFocusResult, setSoundFocusResult] = useState<SoundFocusResult | null>(null);
   const [drumKitResult, setDrumKitResult] = useState<DrumKitResult | null>(null);
   const [soundSnapshots, setSoundSnapshots] = useState<SoundSnapshotSlotMap>({ A: null, B: null });
+  const [studioToneBaseline, setStudioToneBaseline] = useState<StudioToneBaseline>(() =>
+    createStudioToneBaseline(starterProject.sound)
+  );
+  const [studioToneBaselineResult, setStudioToneBaselineResult] = useState<StudioToneBaselineResult | null>(null);
+  const [studioToneResetResult, setStudioToneResetResult] = useState<StudioToneResetResult | null>(null);
   const [masterFinishResult, setMasterFinishResult] = useState<MasterFinishResult | null>(null);
   const [masterAutomationResult, setMasterAutomationResult] = useState<MasterAutomationResult | null>(null);
   const [mixBalanceResult, setMixBalanceResult] = useState<MixBalanceResult | null>(null);
@@ -1392,6 +1405,10 @@ export function App(): ReactElement {
   );
   const soundTimbreCheckSummary = useMemo(() => createSoundTimbreCheckSummary(project.sound), [project.sound]);
   const soundSnapshotComparison = useMemo(() => createSoundSnapshotComparison(soundSnapshots), [soundSnapshots]);
+  const studioToneDrift = useMemo(
+    () => createStudioToneDriftSummary(project.sound, studioToneBaseline.sound),
+    [project.sound, studioToneBaseline.sound]
+  );
   const drumKitPadOptions = useMemo(() => createDrumKitPadOptions(project), [project]);
   const drumKitPreviewSummary = useMemo(
     () => createDrumKitPreviewSummary(drumKitPadOptions),
@@ -1830,6 +1847,14 @@ export function App(): ReactElement {
     selectedChord,
     editorAuditionResult
   });
+
+  useEffect(() => {
+    if (project.sound.preset !== "custom") {
+      setStudioToneBaseline(createStudioToneBaseline(project.sound));
+      setStudioToneBaselineResult(null);
+      setStudioToneResetResult(null);
+    }
+  }, [project.sound.preset]);
 
   useEffect(() => {
     setEditorAuditionResult(null);
@@ -4131,7 +4156,7 @@ export function App(): ReactElement {
     }
   }
 
-  function updateSoundDesign(update: Partial<Omit<SoundDesign, "preset">>): void {
+  function updateSoundDesign(update: Partial<Omit<SoundDesign, "preset">>, status = "Unsaved changes"): void {
     updateProject((current) => ({
       ...current,
       sound: {
@@ -4139,7 +4164,30 @@ export function App(): ReactElement {
         ...Object.fromEntries(Object.entries(update).map(([key, value]) => [key, clampUnit(value)])),
         preset: "custom"
       }
-    }));
+    }), status);
+  }
+
+  function captureStudioToneBaseline(): void {
+    const baseline = createCapturedStudioToneBaseline(projectRef.current.sound);
+    setStudioToneBaseline(baseline);
+    setStudioToneResetResult(null);
+    setStudioToneBaselineResult(createStudioToneBaselineResult(baseline));
+    setProjectStatus(`Captured Studio Tone baseline: ${baseline.sourceLabel}`);
+  }
+
+  function resetLargestStudioToneDrift(): void {
+    const summary = createStudioToneDriftSummary(projectRef.current.sound, studioToneBaseline.sound);
+    const target = summary.resetTarget;
+    if (!target) {
+      setProjectStatus("Studio Tone already matches baseline");
+      return;
+    }
+
+    setStudioToneResetResult(createStudioToneResetResult(target, studioToneBaseline.sourceLabel));
+    updateSoundDesign(
+      { [target.parameter]: target.baselineValue } as Partial<Omit<SoundDesign, "preset">>,
+      `Reset Studio Tone ${target.label} to ${studioToneBaseline.sourceLabel}`
+    );
   }
 
   function captureSoundSnapshot(slot: SoundSnapshotSlotId): void {
@@ -8007,6 +8055,8 @@ export function App(): ReactElement {
     soundSnapshotComparison,
     soundSnapshots,
     soundTimbreCheckSummary,
+    studioToneBaseline,
+    studioToneDrift,
     spaceFxPadOptions,
     spaceFxPreviewSummary,
     stemAnalyses,
@@ -8073,6 +8123,15 @@ export function App(): ReactElement {
     onCaptureSoundSnapshot: captureSoundSnapshot,
     onRecallSoundSnapshot: recallSoundSnapshot,
     onClearSoundSnapshots: clearSoundSnapshots,
+    onCaptureStudioToneBaseline: captureStudioToneBaseline,
+    onResetLargestStudioToneDrift: resetLargestStudioToneDrift,
+    onResetStudioToneControl: (target) => {
+      setStudioToneResetResult(createStudioToneResetResult(target, studioToneBaseline.sourceLabel));
+      updateSoundDesign(
+        { [target.parameter]: target.baselineValue } as Partial<Omit<SoundDesign, "preset">>,
+        `Reset Studio Tone ${target.label} to ${studioToneBaseline.sourceLabel}`
+      );
+    },
     onFocusTimbreCheck: focusTimbreCheck,
     onExpandPatternChain: expandPatternChain,
     onApplyProjectKey: applyProjectKey,
@@ -9246,6 +9305,10 @@ export function App(): ReactElement {
             sound={project.sound}
             soundSnapshots={soundSnapshots}
             soundSnapshotSummary={soundSnapshotComparison}
+            studioToneBaseline={studioToneBaseline}
+            studioToneBaselineResult={studioToneBaselineResult}
+            studioToneDrift={studioToneDrift}
+            studioToneResetResult={studioToneResetResult}
             timbreCheck={soundTimbreCheckSummary}
             onChange={updateSoundDesign}
             onApplyPreset={applySoundPreset}
@@ -9254,7 +9317,10 @@ export function App(): ReactElement {
             onCaptureSoundSnapshot={captureSoundSnapshot}
             onRecallSoundSnapshot={recallSoundSnapshot}
             onClearSoundSnapshots={clearSoundSnapshots}
+            onCaptureStudioToneBaseline={captureStudioToneBaseline}
             onPreviewPreset={previewSoundPreset}
+            onResetLargestStudioToneDrift={resetLargestStudioToneDrift}
+            onStudioToneResetResult={setStudioToneResetResult}
           />
           <ChordEditor
             chordPads={chordPadOptions}
