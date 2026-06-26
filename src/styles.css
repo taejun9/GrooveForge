@@ -6182,9 +6182,74 @@ h2 {
 
 .quick-action-empty {
   display: grid;
-  align-items: center;
+  gap: 8px;
+  align-items: stretch;
   color: rgba(244, 239, 231, 0.58);
   font-size: 12px;
+}
+
+.quick-action-empty > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-search-recovery {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) minmax(156px, 0.48fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.quick-actions-search-recovery > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.quick-actions-search-recovery span,
+.quick-actions-search-recovery small {
+  overflow: hidden;
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-search-recovery strong {
+  overflow: hidden;
+  color: #f4efe7;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-search-recovery-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.quick-actions-search-recovery-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(130, 215, 255, 0.06);
+  color: #f4efe7;
+  cursor: pointer;
+  padding: 7px 8px;
+}
+
+.quick-actions-search-recovery-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.quick-actions-search-recovery-actions button span {
+  color: inherit;
 }
 
 .quick-action-row {
@@ -26489,6 +26554,14 @@ input[type="range"] {
     gap: 4px 8px;
   }
 
+  .quick-actions-search-recovery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quick-actions-search-recovery-actions {
+    grid-column: 1 / -1;
+  }
+
   .quick-actions-guide-suggestion {
     grid-template-columns: minmax(0, 1fr) 92px 104px 124px;
   }
@@ -27450,6 +27523,10 @@ input[type="range"] {
   .quick-actions-spotlight {
     grid-template-columns: 1fr;
     gap: 3px;
+  }
+
+  .quick-actions-search-recovery {
+    grid-template-columns: 1fr;
   }
 
   .quick-actions-guide-suggestion {
