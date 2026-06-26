@@ -7266,6 +7266,13 @@ export function App(): ReactElement {
     setProjectStatus(`Master Output Role: ${summary.roleLabel} / ${summary.detailLabel}`);
   }
 
+  function focusExportMeter(): void {
+    const currentProject = projectRef.current;
+    const analysis = analyzeExport(currentProject);
+    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    setProjectStatus(`Export Meter: ${analysis.status} / ${formatDb(analysis.headroomDb)} headroom`);
+  }
+
   function runNextMove(action: NextMoveAction): void {
     const beforeProject = projectRef.current;
     switch (action.command.kind) {
@@ -8246,6 +8253,7 @@ export function App(): ReactElement {
     onFocusKeyCompass: focusKeyCompassItem,
     onFocusListeningPass: focusListeningPassItem,
     onFocusMixCoach: focusMixCoachCheck,
+    onFocusExportMeter: focusExportMeter,
     onFocusMasterOutputRole: focusMasterOutputRole,
     onFocusModeFocus: focusModeFocusCard,
     onFocusPatternDna: focusPatternDnaCard,
@@ -17890,6 +17898,7 @@ function createQuickActions({
   onFocusKeyCompass,
   onFocusListeningPass,
   onFocusMixCoach,
+  onFocusExportMeter,
   onFocusMasterOutputRole,
   onFocusModeFocus,
   onFocusPatternDna,
@@ -18164,6 +18173,7 @@ function createQuickActions({
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
   onFocusListeningPass: (item: ListeningPassItem) => void;
   onFocusMixCoach: (check: MixCoachCheck) => void;
+  onFocusExportMeter: () => void;
   onFocusMasterOutputRole: () => void;
   onFocusModeFocus: (card: ModeFocusCard) => void;
   onFocusPatternDna: (card: PatternDnaCard) => void;
@@ -21179,6 +21189,18 @@ function createQuickActions({
       }
     })),
     {
+      id: "export-meter",
+      title: `Review Export Meter: ${exportAnalysis.status}`,
+      detail: `${formatDb(exportAnalysis.peakDb)} peak / ${formatDb(exportAnalysis.rmsDb)} RMS / ${formatDb(
+        exportDynamicsDb(exportAnalysis)
+      )} dynamics / ${formatDb(exportAnalysis.headroomDb)} headroom / ${
+        exportAnalysis.limitedSamples > 0 ? `limiter ${formatPercent(exportAnalysis.limitedPercent)}` : "limiter clear"
+      }`,
+      group: "Export",
+      keywords: `export meter review readout peak rms dynamics headroom limiter master ceiling arrangement duration mix coach preflight wav render final output ${exportAnalysis.status} beginner producer`,
+      run: onFocusExportMeter
+    },
+    {
       id: "master-output-role",
       title: `Review Master Output Role: ${masterOutputRoleSummary.roleLabel}`,
       detail: `${masterOutputRoleSummary.statusLabel} / ${masterOutputRoleSummary.levelLabel} / ${masterOutputRoleSummary.detailLabel}`,
@@ -21766,6 +21788,7 @@ function quickActionMatchesScope(action: QuickAction, scope: QuickActionScopeId)
     case "mix":
       return (
         action.group === "Mix" &&
+        action.id !== "export-meter" &&
         action.id !== "master-output-role" &&
         action.id !== "master-finish" &&
         !action.id.startsWith("master-finish-") &&
@@ -21773,6 +21796,7 @@ function quickActionMatchesScope(action: QuickAction, scope: QuickActionScopeId)
       );
     case "master":
       return (
+        action.id === "export-meter" ||
         action.id === "master-output-role" ||
         action.id === "master-finish" ||
         action.id.startsWith("master-finish-") ||
@@ -28472,6 +28496,23 @@ function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "export-meter") {
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const limitedLabel =
+      exportAnalysis.limitedSamples > 0 ? `limiter ${formatPercent(exportAnalysis.limitedPercent)}` : "limiter clear";
+    return {
+      id: "export-meter",
+      label: "Export Meter",
+      value: `${exportAnalysis.status} / ${formatDb(exportAnalysis.peakDb)} peak / ${formatDb(
+        exportAnalysis.rmsDb
+      )} RMS / ${formatDb(exportDynamicsDb(exportAnalysis))} dynamics / ${formatDb(
+        exportAnalysis.headroomDb
+      )} headroom / ${limitedLabel} / ${formatDb(project.masterCeilingDb)} ceiling / ${formatExportDuration(
+        exportAnalysis.durationSeconds
+      )}`
+    };
+  }
+
   const masterAutomationPad = masterAutomationQuickActionPad(action.id);
   const masterAutomationMetric = quickActionMasterAutomationMetricSnapshot(project, action, masterAutomationPad, analysis ?? undefined);
   if (masterAutomationMetric) {
@@ -31354,6 +31395,13 @@ function quickActionResultFollowup(
   }
 
   const masterFinishPad = masterFinishQuickActionPad(action.id);
+  if (action.id === "export-meter") {
+    return {
+      auditionCue: "Play Full Mix and read peak, RMS, dynamics, headroom, and limiter before Master Finish or delivery export.",
+      nextCheck: "Use Mix Coach, Master Output Role, or manual ceiling/output trim only if the meter conflicts with the delivery target."
+    };
+  }
+
   if (action.id === "master-output-role") {
     return {
       auditionCue: "Play Full Mix and read Master Output Role beside Export Meter before Master Finish or delivery export.",
