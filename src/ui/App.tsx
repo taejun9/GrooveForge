@@ -7068,6 +7068,13 @@ export function App(): ReactElement {
     return check;
   }
 
+  function focusStemAuditionReadout(): void {
+    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Stem Audition ${stemAuditionReadout.statusLabel}: ${stemAuditionReadout.roleLabel} / ${stemAuditionReadout.detailLabel} / Decision ${stemAuditionDecision.targetLabel}`
+    );
+  }
+
   function focusMasterOutputRole(): void {
     const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -8062,6 +8069,7 @@ export function App(): ReactElement {
     stemAnalyses,
     stemAuditionDecision,
     stemAuditionPadOptions,
+    stemAuditionReadout,
     structureLensActions,
     styleInspectorSummary,
     tapTempoReadout,
@@ -8118,6 +8126,7 @@ export function App(): ReactElement {
     onClearSelectedPattern: clearSelectedPattern,
     onApplySpaceFx: applySpaceFxPad,
     onApplyStemAudition: applyStemAuditionPad,
+    onFocusStemAuditionReadout: focusStemAuditionReadout,
     onApplySoundFocus: applySoundFocusPad,
     onApplySoundPreset: applySoundPreset,
     onCaptureSoundSnapshot: captureSoundSnapshot,

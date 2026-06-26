@@ -1173,6 +1173,7 @@ export function createQuickActions({
   stemAnalyses,
   stemAuditionDecision,
   stemAuditionPadOptions,
+  stemAuditionReadout,
   structureLensActions,
   styleInspectorSummary,
   tapTempoReadout,
@@ -1228,6 +1229,7 @@ export function createQuickActions({
   onClearSelectedPattern,
   onApplySpaceFx,
   onApplyStemAudition,
+  onFocusStemAuditionReadout,
   onApplySoundFocus,
   onApplySoundPreset,
   onCaptureSoundSnapshot,
@@ -1476,6 +1478,7 @@ export function createQuickActions({
   stemAnalyses: StemExportAnalyses;
   stemAuditionDecision: StemAuditionDecisionSummary;
   stemAuditionPadOptions: StemAuditionPadOption[];
+  stemAuditionReadout: StemAuditionReadoutSummary;
   structureLensActions: NextMoveAction[];
   styleInspectorSummary: StyleInspectorSummary;
   tapTempoReadout: TapTempoReadoutSummary;
@@ -1531,6 +1534,7 @@ export function createQuickActions({
   onClearSelectedPattern: () => void;
   onApplySpaceFx: (pad: SpaceFxPadId) => void;
   onApplyStemAudition: (pad: StemAuditionPadId) => void;
+  onFocusStemAuditionReadout: () => void;
   onApplySoundFocus: (pad: SoundFocusPadId) => void;
   onApplySoundPreset: (preset: SoundPresetTarget) => void;
   onCaptureSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
@@ -2074,6 +2078,18 @@ export function createQuickActions({
         onApplyStemAudition(stemAuditionDecision.targetId);
       }
     }
+  };
+  const stemAuditionReadoutAction: QuickAction = {
+    id: "stem-audition-readout-action",
+    title: `Review Stem Audition: ${stemAuditionReadout.roleLabel}`,
+    detail: `${stemAuditionReadout.statusLabel} / ${stemAuditionReadout.detailLabel} / Decision ${stemAuditionDecision.targetLabel} / ${stemAuditionDecision.nextCheckLabel}`,
+    group: "Mix",
+    keywords: `Quick Actions Stem Audition Readout readout review full mix soloed stem manual audition solo mute mixer ${
+      stemAuditionReadout.roleLabel
+    } ${stemAuditionReadout.statusLabel} ${stemAuditionReadout.detailLabel} ${stemAuditionDecision.targetLabel} ${
+      stemAuditionDecision.nextCheckLabel
+    } drums 808 bass synth chords beginner producer direct composition sample free`,
+    run: onFocusStemAuditionReadout
   };
   const bassMoveTarget = activeBassMoveQuickActionTarget(project, bassMovePreviewSummary);
   const chordMoveTarget = activeChordMoveQuickActionTarget(project, selectedChord, chordMovePreviewSummary);
@@ -4731,6 +4747,7 @@ export function createQuickActions({
       }
     },
     ...mixCoachActions,
+    stemAuditionReadoutAction,
     stemAuditionDecisionAction,
     ...stemAuditionPadOptions.map((pad): QuickAction => ({
       id: `stem-audition-${pad.id}`,
@@ -5792,6 +5809,7 @@ export function createQuickActionResult(
     action.id === "capture-step-mode-readout-action" ||
     action.id === "midi-input-readout-action" ||
     action.id === "editor-audition-readout-action" ||
+    action.id === "stem-audition-readout-action" ||
     action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -14275,6 +14293,24 @@ export function quickActionStemAuditionMetricSnapshot(
   action: QuickAction,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
+  if (action.id === "stem-audition-readout-action") {
+    const options = createStemAuditionPadOptions(project.mixer);
+    const readout = createStemAuditionReadoutSummary(project.mixer);
+    const decision = createStemAuditionDecisionSummary(options, readout);
+    const stemAnalyses = analyzeStemExports(project);
+    return {
+      id: "stem-audition-readout",
+      label: "Stem Audition Readout",
+      value: quickActionStemAuditionMetricValue(project, action, analysis, stemAnalyses, [
+        quickActionStemAuditionActionLabel(action),
+        `current ${readout.roleLabel} / ${readout.detailLabel}`,
+        `status ${readout.statusLabel}`,
+        `decision ${decision.targetLabel} / ${decision.detailLabel}`,
+        `mixer ${quickActionStemAuditionMixerPosture(project.mixer)}`
+      ], decision.nextCheckLabel.replace(/^Next:\s*/, ""))
+    };
+  }
+
   if (action.id !== "stem-audition-decision" && !action.id.startsWith("stem-audition-")) {
     return null;
   }
@@ -14388,6 +14424,9 @@ export function quickActionStemAuditionNextCheck(
 }
 
 export function quickActionStemAuditionActionLabel(action: QuickAction): string {
+  if (action.id === "stem-audition-readout-action") {
+    return "review stem audition readout";
+  }
   if (action.id === "stem-audition-decision") {
     return "run stem audition decision";
   }
@@ -14417,6 +14456,10 @@ export function quickActionStemAuditionPadOption(
   options: StemAuditionPadOption[],
   decision: StemAuditionDecisionSummary
 ): StemAuditionPadOption | null {
+  if (action.id === "stem-audition-readout-action") {
+    return null;
+  }
+
   if (action.id === "stem-audition-decision") {
     const targetId = action.resultTargetId ?? decision.targetId;
     return targetId ? options.find((pad) => pad.id === targetId) ?? null : null;
@@ -16375,6 +16418,13 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Read the focused Mix Coach card, then play Full Mix or the matching stem before applying a Mix Fix.",
       nextCheck: "Use Headroom, Stem Balance, or Low End Mix Fix only after the focused check matches what you hear."
+    };
+  }
+
+  if (action.id === "stem-audition-readout-action") {
+    return {
+      auditionCue: "Use the Stem Audition Readout before pressing Play or changing solo/mute, then listen to the current loop.",
+      nextCheck: "Run Stem Audition Decision or a direct Full Mix/stem audition only when the readout points at the comparison you need."
     };
   }
 
