@@ -351,7 +351,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Drums, 808/Bass, Melody/Chords, Arrangement, and Export readiness context with destination, readiness metric, audition cue, and next check before Beat Readiness commands run."
       },
-      { id: "review-queue", command: "Review Queue", shortcut: "Quick Actions / Readout", target: "Issues / focus / fixes" },
+      {
+        id: "review-queue",
+        command: "Review Queue",
+        shortcut: "Quick Actions / Readout",
+        target: "Composition / arrangement / mix-master / target / handoff issues",
+        context:
+          "Issue Priority, Focus/Fix Actions, Queue Readiness, and Review Fix Preview context with destination, review metric, audition cue, fix action, and next check before Review Queue commands run."
+      },
       { id: "workflow-navigator", command: "Workflow Navigator", shortcut: "Quick Actions / Readout", target: "Stage jumps" },
       { id: "workflow-spotlight", command: "Workflow Spotlight", shortcut: "Quick Actions / Readout", target: "Current command target" },
       { id: "beat-map", command: "Beat Map", shortcut: "Quick Actions / Readout", target: "Workflow / producer metrics" },
