@@ -924,6 +924,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         target: "Priority mix metric / focus diagnostics",
         context:
           "Priority Mix Metric, Headroom, Balance, Limiter, Dynamics, Stem-Spread Diagnostics, Focus Route, Audition Cue, and Next Check context before Mix Coach commands run."
+      },
+      {
+        id: "mix-fix",
+        command: "Mix Fix",
+        shortcut: "Quick Actions / Readout",
+        target: "Headroom / stem balance / low-end apply route",
+        context:
+          "Mix Coach Priority, Mix Fix Preview, Headroom/Stem Balance/Low End Apply Routes, Result Feedback, Editable Mixer/Master Scope, Audition Cue, and Manual-Trim Next Check context before Mix Fix commands run."
       }
     ]
   },
