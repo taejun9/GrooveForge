@@ -7113,6 +7113,14 @@ export function App(): ReactElement {
     );
   }
 
+  function focusArrangementTemplateReadout(): void {
+    const summary = createArrangementTemplatePreviewSummary(projectRef.current.arrangement);
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Arrangement Template ${summary.statusLabel}: ${summary.templateLabel} / ${summary.sectionLabel} / ${summary.patternLabel}`
+    );
+  }
+
   function focusMasterOutputRole(): void {
     const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -8205,6 +8213,7 @@ export function App(): ReactElement {
     onFocusSpaceFxReadout: focusSpaceFxReadout,
     onFocusPatternChainReadout: focusPatternChainReadout,
     onFocusChainExpandReadout: focusChainExpandReadout,
+    onFocusArrangementTemplateReadout: focusArrangementTemplateReadout,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternClone: cloneSelectedPatternVariation,
     onApplyPatternFill: applyPatternFill,
