@@ -590,8 +590,22 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Current Output Posture, Preset, Ceiling, Output Gain, Direct Finish Pad Routes, Result Feedback, Audition Cue, and Export/Manual-Trim Next Check context before Master Finish commands run."
       },
-      { id: "master-automation-decision", command: "Master Automation Decision", shortcut: "Quick Actions / Readout", target: "Suggested fade" },
-      { id: "master-automation", command: "Master Automation", shortcut: "Quick Actions / Readout", target: "Fade in / out" },
+      {
+        id: "master-automation-decision",
+        command: "Master Automation Decision",
+        shortcut: "Quick Actions / Readout",
+        target: "Suggested fade posture / automation apply route",
+        context:
+          "Suggested Fade Posture, Current Automation Target, Editable Fade Event Range, Direct Fade Pad Route, Playback/Export Gain Scope, Audition Cue, and Export/Manual-Trim Next Check context before Master Automation Decision commands run."
+      },
+      {
+        id: "master-automation",
+        command: "Master Automation",
+        shortcut: "Quick Actions / Readout",
+        target: "Current fade posture / direct fade pads",
+        context:
+          "Current Fade Posture, Automation Target, Editable Fade Event Range, Direct Fade Pad Routes, Playback/Export Gain Scope, Result Feedback, Audition Cue, and Export/Manual-Trim Next Check context before Master Automation commands run."
+      },
       { id: "finish-checklist", command: "Finish Checklist", shortcut: "Quick Actions / Readout", target: "Compose / arrange / mix / handoff" },
       { id: "handoff-pack", command: "Handoff Pack", shortcut: "Quick Actions / Readout", target: "WAV / stems / MIDI / sheet" }
     ]
