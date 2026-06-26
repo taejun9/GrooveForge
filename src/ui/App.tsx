@@ -7505,6 +7505,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusDrumKitReadout(): void {
+    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Drum Kit ${drumKitPreviewSummary.statusLabel}: ${drumKitPreviewSummary.kitLabel} / ${drumKitPreviewSummary.rackLabel}`
+    );
+  }
+
   function focusFinishChecklistCard(card: FinishChecklistCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -8147,6 +8154,7 @@ export function App(): ReactElement {
     onApplyDrumAccent: applyDrumAccent,
     onApplyDrumFoundation: applyDrumFoundation,
     onApplyDrumKit: applyDrumKitPad,
+    onFocusDrumKitReadout: focusDrumKitReadout,
     onApplyGrooveFeel: applyGrooveFeel,
     onApplyLayerStarter: applyLayerStarter,
     onApplyMasterAutomation: applyMasterAutomationPad,
