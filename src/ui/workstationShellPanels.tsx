@@ -466,8 +466,22 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Section Flow, Pattern A/B/C Usage, Bar Ranges, Energy, Muted Tracks, Transition Posture, Priority Action, Action Route, Audition Cue, and Next Check context before Song Form Overview commands run."
       },
-      { id: "arrangement-mute-map", command: "Arrangement Mute Map", shortcut: "Quick Actions / Readout", target: "Layer dropouts" },
-      { id: "arrangement-transition-map", command: "Arrangement Transition Map", shortcut: "Quick Actions / Readout", target: "Section handoffs" },
+      {
+        id: "arrangement-mute-map",
+        command: "Arrangement Mute Map",
+        shortcut: "Quick Actions / Readout",
+        target: "Layer dropouts / mute-live posture / priority lane",
+        context:
+          "Layer Dropout, Section Mute/Live Posture, Priority Lane, Focus Route, Audition Cue, and Next Check context before Arrangement Mute Map commands run."
+      },
+      {
+        id: "arrangement-transition-map",
+        command: "Arrangement Transition Map",
+        shortcut: "Quick Actions / Readout",
+        target: "Section handoffs / energy / mutes / transition cue",
+        context:
+          "Section Handoff, Pattern A/B/C, Energy Change, Muted-Layer Change, Event Density, Priority Handoff, Focus/Cue Route, Audition Cue, and Next Check context before Arrangement Transition Map commands run."
+      },
       { id: "arrangement-playback-readout", command: "Arrangement Playback Readout", shortcut: "Quick Actions / Readout", target: "Edit vs heard Block" },
       { id: "audible-arrangement-follow", command: "Audible Arrangement Follow", shortcut: "Quick Actions / Readout", target: "Heard Block" }
     ]
