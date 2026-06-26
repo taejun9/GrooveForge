@@ -36,6 +36,7 @@ import type {
   QuickActionScopeId,
   QuickActionScopeOption,
   QuickActionScopeResult,
+  QuickActionSearchRecoveryResult,
   QuickActionSearchResult,
   QuickActionSpotlightSummary,
   SnapshotCompareFocusId,
@@ -732,6 +733,7 @@ export function QuickActions({
   recentActionSource,
   recentResult,
   recents,
+  searchRecoveryResult,
   searchResult,
   scope,
   scopeResult,
@@ -740,6 +742,8 @@ export function QuickActions({
   onInspectPinnedAction,
   onInspectRecentAction,
   onQueryChange,
+  onRecoverSearchClear,
+  onRecoverSearchScope,
   onRun,
   onScopeChange,
   onTogglePin
@@ -754,6 +758,7 @@ export function QuickActions({
   recentActionSource: QuickAction[];
   recentResult: QuickActionRecentResult | null;
   recents: QuickActionRecent[];
+  searchRecoveryResult: QuickActionSearchRecoveryResult | null;
   searchResult: QuickActionSearchResult | null;
   scope: QuickActionScopeId;
   scopeResult: QuickActionScopeResult | null;
@@ -762,6 +767,8 @@ export function QuickActions({
   onInspectPinnedAction: (actionId: string | null) => void;
   onInspectRecentAction: (actionId: string | null) => void;
   onQueryChange: (query: string) => void;
+  onRecoverSearchClear: () => void;
+  onRecoverSearchScope: (scope: QuickActionScopeId) => void;
   onRun: (action: QuickAction) => void;
   onScopeChange: (scope: QuickActionScopeId) => void;
   onTogglePin: (action: QuickAction) => void;
@@ -899,6 +906,7 @@ export function QuickActions({
           {actions.length} shown / {scopeOptions.find((option) => option.id === scope)?.count ?? 0} matching
         </div>
         {searchResult && <QuickActionSearchResultStrip result={searchResult} />}
+        {searchRecoveryResult && <QuickActionSearchRecoveryResultStrip result={searchRecoveryResult} />}
         {scopeResult && <QuickActionScopeResultStrip result={scopeResult} />}
         <div
           aria-label={spotlight.detailTitle}
@@ -1224,8 +1232,8 @@ export function QuickActions({
               {searchRecovery && (
                 <QuickActionSearchRecoveryCard
                   recovery={searchRecovery}
-                  onClearSearch={() => onQueryChange("")}
-                  onSwitchScope={(scopeId) => onScopeChange(scopeId)}
+                  onClearSearch={onRecoverSearchClear}
+                  onSwitchScope={onRecoverSearchScope}
                 />
               )}
               <span>No matching actions</span>
@@ -1265,6 +1273,31 @@ export function QuickActions({
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function QuickActionSearchRecoveryResultStrip({ result }: { result: QuickActionSearchRecoveryResult }): ReactElement {
+  return (
+    <div
+      aria-live="polite"
+      className={`quick-actions-search-recovery-result ${result.tone}`}
+      data-search-recovery-result={result.action}
+      data-testid="quick-actions-search-recovery-result"
+    >
+      <div>
+        <span data-testid="quick-actions-search-recovery-result-status">{result.status}</span>
+        <strong data-testid="quick-actions-search-recovery-result-title">{result.title}</strong>
+        <small data-testid="quick-actions-search-recovery-result-detail">{result.detail}</small>
+      </div>
+      <div>
+        <span data-testid="quick-actions-search-recovery-result-metric-label">{result.metricLabel}</span>
+        <strong data-testid="quick-actions-search-recovery-result-metric-value">{result.metricValue}</strong>
+      </div>
+      <div>
+        <span>Next check</span>
+        <strong data-testid="quick-actions-search-recovery-result-next-check">{result.nextCheck}</strong>
+      </div>
     </div>
   );
 }
