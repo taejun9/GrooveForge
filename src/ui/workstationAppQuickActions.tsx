@@ -1244,6 +1244,7 @@ export function createQuickActions({
   onApplyPatternStack,
   onCopySelectedPattern,
   onClearSelectedPattern,
+  onFocusPatternCopyClearReadout,
   onApplySpaceFx,
   onApplyStemAudition,
   onFocusStemAuditionReadout,
@@ -1573,6 +1574,7 @@ export function createQuickActions({
   onApplyPatternStack: (stack: PatternStackId) => void;
   onCopySelectedPattern: (target: PatternSlot) => void;
   onClearSelectedPattern: () => void;
+  onFocusPatternCopyClearReadout: () => void;
   onApplySpaceFx: (pad: SpaceFxPadId) => void;
   onApplyStemAudition: (pad: StemAuditionPadId) => void;
   onFocusStemAuditionReadout: () => void;
@@ -3565,6 +3567,16 @@ export function createQuickActions({
         run: () => onCopySelectedPattern(target)
       };
     });
+  const patternCopyClearReadoutTargets = patternSlots.filter((target) => target !== project.selectedPattern).join(", ");
+  const patternCopyClearReadoutEventCount = patternEventTotal(project.patterns[project.selectedPattern]);
+  const patternCopyClearReadoutAction: QuickAction = {
+    id: "pattern-copy-clear-readout-action",
+    title: `Review Pattern Copy/Clear Readout: Pattern ${project.selectedPattern}`,
+    detail: `${patternCopyClearReadoutEventCount} selected events / copy targets ${patternCopyClearReadoutTargets} / clear keeps arrangement assignments`,
+    group: "Create",
+    keywords: `Quick Actions Pattern Copy Clear Readout review selected Pattern ${project.selectedPattern} copy targets ${patternCopyClearReadoutTargets} clear risk source target a b c duplicate reset beginner producer`,
+    run: onFocusPatternCopyClearReadout
+  };
   const patternChainActions: QuickAction[] = patternChainIds.map((chain) => {
     const arrangement = createPatternChain(chain);
     const chainLabel = patternChainLabel(chain);
@@ -4224,6 +4236,7 @@ export function createQuickActions({
     },
     ...layerStarterActions,
     ...patternCloneActions,
+    patternCopyClearReadoutAction,
     ...patternCopyActions,
     {
       id: "pattern-clear",
@@ -6290,6 +6303,7 @@ export function createQuickActionResult(
     action.id === "arrangement-arc-readout-action" ||
     action.id === "arrangement-focus-readout-action" ||
     action.id === "arrangement-move-readout-action" ||
+    action.id === "pattern-copy-clear-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -13593,6 +13607,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "pattern-copy-clear-readout-action") {
+    return (
+      quickActionPatternCopyClearReadoutMetricSnapshot(project, action) ?? {
+        id: "pattern-copy-clear-readout",
+        label: "Pattern Copy/Clear Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id.startsWith("pattern-copy-") || action.id === "pattern-clear") {
     return (
       quickActionPatternEditMetricSnapshot(project, action) ?? {
@@ -16193,6 +16217,58 @@ export type PatternEditQuickActionRoute = {
   target: PatternSlot;
 };
 
+export function quickActionPatternCopyClearReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const source = patternCopyClearReadoutQuickActionSource(action);
+  if (!source) {
+    return null;
+  }
+
+  const sourcePattern = project.patterns[source];
+  const eventCount = patternEventTotal(sourcePattern);
+  const drumCount = drumHitCount(sourcePattern);
+  const musicEvents = sourcePattern.bassNotes.length + sourcePattern.chordEvents.length + sourcePattern.melodyNotes.length;
+  const copyTargets = patternSlots.filter((target) => target !== source);
+  const arrangedBlocks = project.arrangement.filter((block) => block.pattern === source);
+  const arrangedBars = arrangedBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  const arrangementUse =
+    arrangedBlocks.length === 0
+      ? "not arranged"
+      : `${arrangedBlocks.length} block${arrangedBlocks.length === 1 ? "" : "s"} / ${barCountLabel(arrangedBars)}`;
+
+  return {
+    id: "pattern-copy-clear-readout",
+    label: "Pattern Copy/Clear Readout",
+    value: [
+      "review pattern copy clear",
+      `selected Pattern ${source}`,
+      `copy targets ${copyTargets.join(", ")}`,
+      `${eventCount} events`,
+      `${drumCount} drums`,
+      `${musicEvents} music`,
+      `arrangement ${arrangementUse}`,
+      "clear risk reviewed",
+      `edit Pattern ${project.selectedPattern}`,
+      "copy unchanged",
+      "clear unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+export function patternCopyClearReadoutQuickActionSource(action: QuickAction): PatternSlot | null {
+  if (action.id !== "pattern-copy-clear-readout-action") {
+    return null;
+  }
+
+  const match = /Pattern ([ABC])/.exec(`${action.title} ${action.detail}`);
+  const slot = match?.[1];
+  return slot === "A" || slot === "B" || slot === "C" ? slot : null;
+}
+
 export function quickActionPatternEditMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -17127,6 +17203,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Play Block loop; confirm the selected arrangement block now works with Pattern ${project.selectedPattern}.`,
       nextCheck: "Scan Song Form Overview, Pattern Compare, and Arrangement Playback Readout before placing the next variation."
+    };
+  }
+
+  if (action.id === "pattern-copy-clear-readout-action") {
+    return {
+      auditionCue:
+        "Review the selected Pattern event posture, copy targets, arrangement usage, and clear risk before copying or clearing Pattern data.",
+      nextCheck: "Run a direct Pattern Copy or Clear command only when that Pattern edit should mutate the A/B/C loop."
     };
   }
 

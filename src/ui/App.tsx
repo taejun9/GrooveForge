@@ -8050,6 +8050,16 @@ export function App(): ReactElement {
     );
   }
 
+  function focusPatternCopyClearReadout(): void {
+    const copyTargets = patternSlots.filter((pattern) => pattern !== project.selectedPattern).join(", ");
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Pattern Copy/Clear Readout Pattern ${project.selectedPattern}: ${patternEventCount(
+        activePattern(project)
+      )} events / copy targets ${copyTargets} / clear keeps arrangement assignments unchanged`
+    );
+  }
+
   function focusPatternUseReadout(): void {
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8359,6 +8369,7 @@ export function App(): ReactElement {
     onApplyPatternStack: applyPatternStack,
     onCopySelectedPattern: copySelectedPattern,
     onClearSelectedPattern: clearSelectedPattern,
+    onFocusPatternCopyClearReadout: focusPatternCopyClearReadout,
     onApplySpaceFx: applySpaceFxPad,
     onApplyStemAudition: applyStemAuditionPad,
     onFocusStemAuditionReadout: focusStemAuditionReadout,
