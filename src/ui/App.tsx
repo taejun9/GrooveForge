@@ -18257,14 +18257,17 @@ function createQuickActions({
     };
     return action;
   });
-  const composerActionCommands: QuickAction[] = composerActionsSummary.actions.map((action) => ({
-    id: `composer-action-${action.id}`,
-    title: `Run Composer Action: ${action.buttonLabel}`,
-    detail: `${action.label} / ${action.scope} / ${action.impact} / ${action.safety}`,
-    group: composerActionQuickActionGroup(action),
-    keywords: `composer action direct writing move style aware ${action.id} ${action.area} ${action.label} ${action.buttonLabel} ${action.detail} ${action.scope} ${action.impact} ${action.safety} drums 808 bass harmony melody arrange finish sample free beginner producer`,
-    run: () => onRunComposerAction(action)
-  }));
+  const composerActionCommands: QuickAction[] = composerActionsSummary.actions.map((action) => {
+    const commandDetail = composerActionQuickActionDetail(action, project);
+    return {
+      id: `composer-action-${action.id}`,
+      title: `Run Composer Action: ${action.buttonLabel}`,
+      detail: commandDetail,
+      group: composerActionQuickActionGroup(action),
+      keywords: `composer action direct writing move style aware ${action.id} ${action.area} ${action.label} ${action.buttonLabel} ${action.detail} ${commandDetail} ${action.scope} ${action.impact} ${action.safety} drums 808 bass harmony melody arrange finish sample free beginner producer`,
+      run: () => onRunComposerAction(action)
+    };
+  });
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
   const exportPreflightActions: QuickAction[] = exportPreflightSummary.cards.map((card) => ({
     id: `export-preflight-card-${card.id}`,
@@ -21306,6 +21309,20 @@ function composerActionQuickActionGroup(action: ComposerAction): string {
     return "Mix";
   }
   return "Create";
+}
+
+function composerActionQuickActionDetail(action: ComposerAction, project: ProjectState): string {
+  const followup = composerActionFollowupCues(action, project);
+  return [
+    action.label,
+    action.scope,
+    action.impact,
+    action.safety,
+    action.detail,
+    `Route ${quickActionComposerActionRouteLabel(action, action.area)}`,
+    `Audition ${followup.auditionCue}`,
+    `Next ${followup.nextCheck}`
+  ].join(" / ");
 }
 
 function composerActionQuickActionArea(actionId: string): ComposerActionArea | null {
