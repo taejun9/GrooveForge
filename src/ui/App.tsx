@@ -7082,6 +7082,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusMixBalanceReadout(): void {
+    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Mix Balance ${mixBalancePreviewSummary.statusLabel}: ${mixBalancePreviewSummary.padLabel} / ${mixBalancePreviewSummary.channelLabel}`
+    );
+  }
+
   function focusMasterOutputRole(): void {
     const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -8121,6 +8128,7 @@ export function App(): ReactElement {
     onApplyMelodyContour: applyMelodyContour,
     onApplyMixBalance: applyMixBalancePad,
     onApplyMixFix: applyMixFixPreset,
+    onFocusMixBalanceReadout: focusMixBalanceReadout,
     onCaptureMixSnapshot: captureMixSnapshot,
     onRecallMixSnapshot: recallMixSnapshot,
     onClearMixSnapshots: clearMixSnapshots,

@@ -1217,6 +1217,7 @@ export function createQuickActions({
   onApplyMelodyContour,
   onApplyMixBalance,
   onApplyMixFix,
+  onFocusMixBalanceReadout,
   onCaptureMixSnapshot,
   onRecallMixSnapshot,
   onClearMixSnapshots,
@@ -1523,6 +1524,7 @@ export function createQuickActions({
   onApplyMelodyContour: (contour: MelodyContourId) => void;
   onApplyMixBalance: (pad: MixBalancePadId) => void;
   onApplyMixFix: (preset: MixFixPreset) => void;
+  onFocusMixBalanceReadout: () => void;
   onCaptureMixSnapshot: (slot: MixSnapshotSlotId) => void;
   onRecallMixSnapshot: (slot: MixSnapshotSlotId) => void;
   onClearMixSnapshots: () => void;
@@ -2074,6 +2076,18 @@ export function createQuickActions({
       mixSnapshotComparison.decisionActionLabel
     } producer beginner mix review`,
     run: onFocusMixSnapshotReadout
+  };
+  const mixBalanceReadoutAction: QuickAction = {
+    id: "mix-balance-readout-action",
+    title: `Review Mix Balance: ${mixBalancePreviewSummary.padLabel}`,
+    detail: `${mixBalancePreviewSummary.statusLabel} / ${mixBalancePreviewSummary.channelLabel} / ${mixBalancePreviewSummary.auditionLabel} / ${mixBalancePreviewSummary.moveLabel}`,
+    group: "Mix",
+    keywords: `Quick Actions Mix Balance Readout review rough levels preview apply posture drums 808 bass synth chords stem audition ${
+      mixBalancePreviewSummary.padId
+    } ${mixBalancePreviewSummary.padLabel} ${mixBalancePreviewSummary.statusLabel} ${mixBalancePreviewSummary.channelLabel} ${
+      mixBalancePreviewSummary.auditionLabel
+    } beginner producer manual trim`,
+    run: onFocusMixBalanceReadout
   };
   const stemAuditionDecisionAction: QuickAction = {
     id: "stem-audition-decision",
@@ -4837,6 +4851,7 @@ export function createQuickActions({
       resultTargetId: "clear",
       run: onClearMixSnapshots
     },
+    mixBalanceReadoutAction,
     {
       id: "mix-balance-decision",
       title: mixBalanceReady ? `Run Mix Balance Decision: Apply ${mixBalancePreviewSummary.padLabel}` : "Run Mix Balance Decision: Aligned",
@@ -5888,6 +5903,7 @@ export function createQuickActionResult(
     action.id === "pattern-follow-audible" ||
     action.id === "arrangement-follow-audible" ||
     action.id === "mix-snapshot-readout-action" ||
+    action.id === "mix-balance-readout-action" ||
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-focus" ||
@@ -14196,6 +14212,31 @@ export function quickActionMixBalanceMetricSnapshot(
   action: QuickAction,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
+  if (action.id === "mix-balance-readout-action") {
+    const options = createMixBalancePadOptions(project.mixer);
+    const preview = createMixBalancePreviewSummary(project.mixer, options);
+    const pad = options.find((candidate) => candidate.id === preview.padId) ?? options[0];
+    if (!pad) {
+      return null;
+    }
+    const transformed = applyMixBalancePadToMixer(project.mixer, pad);
+    const changedControls = mixBalanceChangedControlCount(project.mixer, transformed);
+    const stemAnalyses = analyzeStemExports(project);
+    return {
+      id: "mix-balance-readout",
+      label: "Mix Balance Readout",
+      value: quickActionMixBalanceMetricValue(project, action, analysis, stemAnalyses, [
+        quickActionMixBalanceActionLabel(action),
+        `preview ${preview.padLabel} balance`,
+        `status ${preview.statusLabel}`,
+        `target channels ${preview.channelLabel}`,
+        `current channels ${quickActionMixBalanceChannelPosture(project.mixer)}`,
+        `audition ${preview.auditionLabel}`,
+        `moves ${preview.changedChannels} channels / ${changedControls} controls`
+      ])
+    };
+  }
+
   const pad = quickActionMixBalancePadOption(project, action);
   if (!pad) {
     return null;
@@ -14279,6 +14320,10 @@ export function quickActionMixBalanceDetailParts(action: QuickAction): string[] 
 }
 
 export function quickActionMixBalanceNextCheck(action: QuickAction): string {
+  if (action.id === "mix-balance-readout-action") {
+    return "play Full Mix and core stems before applying a rough-balance pad or trimming manually";
+  }
+
   if (action.id === "mix-balance-decision") {
     return "play Full Mix and follow the visible Mix Balance Preview Decision before another rough-balance move";
   }
@@ -14291,6 +14336,9 @@ export function quickActionMixBalanceNextCheck(action: QuickAction): string {
 }
 
 export function quickActionMixBalanceActionLabel(action: QuickAction): string {
+  if (action.id === "mix-balance-readout-action") {
+    return "review mix balance readout";
+  }
   if (action.id === "mix-balance-decision") {
     return "run mix balance decision";
   }
@@ -16431,6 +16479,13 @@ export function quickActionResultFollowup(
         action.id === "arrangement-arc-decision"
           ? "Return to Arrangement Arc Preview Decision before running another full-song arc move."
           : `${Math.round(arrangementAverageEnergy(project) * 100)}% average energy; scan Song Form Overview before detailed block edits.`
+    };
+  }
+
+  if (action.id === "mix-balance-readout-action") {
+    return {
+      auditionCue: "Use the Mix Balance readout before applying a rough-balance pad, then play Full Mix and core stems.",
+      nextCheck: "Apply Mix Balance only when the preview target matches what you hear; otherwise trim manually in the Mixer."
     };
   }
 
