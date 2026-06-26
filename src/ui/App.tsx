@@ -8060,6 +8060,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusPatternCloneReadout(): void {
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Pattern Clone Readout ${patternCloneSuggestionSummary.routeLabel}: ${patternCloneSuggestionSummary.presetLabel} suggestion / ${patternCloneSuggestionSummary.detailLabel} / ${patternCloneSuggestionSummary.moveLabel} / direct clone unchanged`
+    );
+  }
+
   function focusPatternUseReadout(): void {
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8367,6 +8374,7 @@ export function App(): ReactElement {
     onApplyPatternFill: applyPatternFill,
     onApplyPatternVariation: applyPatternVariation,
     onApplyPatternStack: applyPatternStack,
+    onFocusPatternCloneReadout: focusPatternCloneReadout,
     onCopySelectedPattern: copySelectedPattern,
     onClearSelectedPattern: clearSelectedPattern,
     onFocusPatternCopyClearReadout: focusPatternCopyClearReadout,
