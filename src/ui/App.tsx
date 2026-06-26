@@ -1463,6 +1463,8 @@ export function App(): ReactElement {
       ),
     [patternCompareSummaries, project.selectedPattern, selectedArrangementBlock?.pattern]
   );
+  const patternUseReadoutTarget =
+    patternCompareDecisionSummary.action === "use" ? patternCompareDecisionSummary.target : project.selectedPattern;
   const audibleArrangementFollowTarget =
     playingArrangementIndex !== null && playingArrangementIndex !== selectedArrangementIndex ? playingArrangementIndex : null;
   const audibleArrangementFollowBlock =
@@ -8017,6 +8019,17 @@ export function App(): ReactElement {
     );
   }
 
+  function focusPatternUseReadout(): void {
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      selectedArrangementBlock
+        ? `Pattern Use Readout Pattern ${patternUseReadoutTarget}: Block ${selectedArrangementIndex + 1} ${
+            selectedArrangementBlock.section
+          } currently Pattern ${selectedArrangementBlock.pattern} / ${patternCompareDecisionSummary.detailLabel}`
+        : `Pattern Use Readout Pattern ${patternUseReadoutTarget}: select an arrangement block before assigning`
+    );
+  }
+
   function focusArrangementPlaybackReadout(): void {
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8454,6 +8467,7 @@ export function App(): ReactElement {
     onFocusModeFocus: focusModeFocusCard,
     onFocusPatternDna: focusPatternDnaCard,
     onFocusPatternPlaybackReadout: focusPatternPlaybackReadout,
+    onFocusPatternUseReadout: focusPatternUseReadout,
     onFocusProductionSnapshot: focusProductionSnapshotMetric,
     onFocusReferenceAlignment: focusReferenceAlignmentCard,
     onFocusSnapshotCompare: focusSnapshotCompareMetric,
