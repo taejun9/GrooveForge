@@ -1214,14 +1214,16 @@ export function FirstBeatPath({
       <div className="first-beat-path-steps" data-testid="first-beat-path-steps">
         {summary.steps.map((step) => {
           const next = step.id === summary.nextStepId;
+          const buttonContext = firstBeatPathButtonContext(step, summary);
           return (
             <button
+              aria-label={buttonContext}
               className={["first-beat-path-step", step.tone, next ? "next" : ""].filter(Boolean).join(" ")}
               data-next={next ? "true" : "false"}
               data-testid={`first-beat-path-${step.id}`}
               key={step.id}
               onClick={() => onJump(step)}
-              title={`Jump to ${step.jumpLabel}: ${step.detail}`}
+              title={buttonContext}
               type="button"
             >
               {firstBeatPathIcon(step.id)}
@@ -1235,6 +1237,30 @@ export function FirstBeatPath({
       {result && <FirstBeatPathJumpResultStrip result={result} />}
     </section>
   );
+}
+
+function firstBeatPathButtonContext(step: FirstBeatPathStep, summary: FirstBeatPathSummary): string {
+  return [
+    `Jump to ${step.jumpLabel}: ${step.detail}`,
+    `Path ${summary.countLabel}`,
+    `Audition ${firstBeatPathButtonAuditionCue(step)}`,
+    firstBeatPathCheckHint(step, summary).label
+  ].join(" / ");
+}
+
+function firstBeatPathButtonAuditionCue(step: FirstBeatPathStep): string {
+  switch (step.id) {
+    case "setup":
+      return "Use Transport loop to confirm tempo, key, style, and the 8-bar writing range.";
+    case "compose":
+      return "Loop the selected Pattern while editing drums, 808/bass, chords, and melody.";
+    case "arrange":
+      return "Use Song or Block playback to hear section flow and hook contrast.";
+    case "mix":
+      return "Use stem and full-mix listening before choosing a mix move.";
+    case "deliver":
+      return "Read Export Preflight and Handoff posture before exporting.";
+  }
 }
 
 function firstBeatPathCheckHint(
