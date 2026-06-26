@@ -957,12 +957,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Song Form Priority command, Section Flow, Pattern A/B/C Usage, Bar Ranges, Energy, Muted Tracks, Transition Posture, Priority Action, Action Route, Audition Cue, and Next Check context before Song Form Priority commands run."
       },
       {
+        id: "arrangement-mute-map-readout",
+        command: "Arrangement Mute Map Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current mute-map priority lane",
+        context:
+          "Arrangement Mute Map Readout Action, Priority Lane, Section Mute/Live Posture, Selected Block, Selected Pattern, Editable Event Count, Pattern A/B/C Usage, Arrangement Length, Transition Posture, Audition Cue, and Next Mute-Map Check context before Arrangement Mute Map focus commands run."
+      },
+      {
         id: "arrangement-mute-map",
         command: "Arrangement Mute Map",
         shortcut: "Quick Actions / Readout",
         target: "Layer dropouts / mute-live posture / priority lane",
         context:
-          "Layer Dropout, Section Mute/Live Posture, Priority Lane, Focus Route, Audition Cue, and Next Check context before Arrangement Mute Map commands run."
+          "Layer Dropout, Section Mute/Live Posture, Priority Lane, Focus Route, Focus Result, Audition Cue, and Next Check context before Arrangement Mute Map focus commands run."
       },
       {
         id: "arrangement-transition-map",
