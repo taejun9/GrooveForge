@@ -84,6 +84,21 @@ export default defineConfig({
               name: "workstation-analysis",
               test: /src[\\/]ui[\\/]workstationAnalysis\.ts$/,
               priority: 2
+            },
+            {
+              name: "workstation-app-helpers",
+              test: /src[\\/]ui[\\/]workstationAppHelpers\.tsx$/,
+              priority: 2
+            },
+            {
+              name: "workstation-app-quick-actions",
+              test: /src[\\/]ui[\\/]workstationAppQuickActions\.tsx$/,
+              priority: 2
+            },
+            {
+              name: "workstation-app-derivations",
+              test: /src[\\/]ui[\\/]workstationAppDerivations\.tsx$/,
+              priority: 2
             }
           ]
         }
