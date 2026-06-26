@@ -8031,6 +8031,13 @@ export function App(): ReactElement {
     setProjectStatus(`Checked project safety: ${projectSafetyReadout.statusLabel}`);
   }
 
+  function focusPatternPlaybackReadout(): void {
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Pattern Playback ${patternPlaybackReadout.statusLabel}: ${patternPlaybackReadout.roleLabel} / ${patternPlaybackReadout.detailLabel}`
+    );
+  }
+
   function focusTransportPositionReadout(): void {
     transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8121,6 +8128,7 @@ export function App(): ReactElement {
     patternStackOptions,
     patternStackPreviewSummary,
     patternDnaSummary,
+    patternPlaybackReadout,
     playingPattern,
     playbackMode,
     project,
@@ -8324,6 +8332,7 @@ export function App(): ReactElement {
     onFocusMasterOutputRole: focusMasterOutputRole,
     onFocusModeFocus: focusModeFocusCard,
     onFocusPatternDna: focusPatternDnaCard,
+    onFocusPatternPlaybackReadout: focusPatternPlaybackReadout,
     onFocusProductionSnapshot: focusProductionSnapshotMetric,
     onFocusReferenceAlignment: focusReferenceAlignmentCard,
     onFocusSnapshotCompare: focusSnapshotCompareMetric,
@@ -17772,6 +17781,7 @@ function createQuickActions({
   patternStackOptions,
   patternStackPreviewSummary,
   patternDnaSummary,
+  patternPlaybackReadout,
   playingPattern,
   playingArrangementIndex,
   playbackMode,
@@ -17974,6 +17984,7 @@ function createQuickActions({
   onFocusMasterOutputRole,
   onFocusModeFocus,
   onFocusPatternDna,
+  onFocusPatternPlaybackReadout,
   onFocusProductionSnapshot,
   onFocusReferenceAlignment,
   onFocusSnapshotCompare,
@@ -18052,6 +18063,7 @@ function createQuickActions({
   patternStackOptions: PatternStackOption[];
   patternStackPreviewSummary: PatternStackPreviewSummary;
   patternDnaSummary: PatternDnaSummary;
+  patternPlaybackReadout: PatternPlaybackReadoutSummary;
   playingPattern: PatternSlot | null;
   playingArrangementIndex: number | null;
   playbackMode: PlaybackMode;
@@ -18254,6 +18266,7 @@ function createQuickActions({
   onFocusMasterOutputRole: () => void;
   onFocusModeFocus: (card: ModeFocusCard) => void;
   onFocusPatternDna: (card: PatternDnaCard) => void;
+  onFocusPatternPlaybackReadout: () => void;
   onFocusProductionSnapshot: (metric: ProductionSnapshotFocusItem) => void;
   onFocusReferenceAlignment: (card: ReferenceAlignmentCard) => void;
   onFocusSnapshotCompare: (item: SnapshotCompareFocusItem) => void;
@@ -19732,6 +19745,21 @@ function createQuickActions({
       run: () => onSelectPattern(pattern)
     };
   });
+  const patternPlaybackDetailLabel = patternPlaybackReadout.detailLabel.split(" / ").join(" + ");
+  const patternPlaybackReadoutAction: QuickAction = {
+    id: "pattern-playback-readout-action",
+    title: `Review Pattern Playback: ${patternPlaybackReadout.roleLabel}`,
+    detail: `${patternPlaybackReadout.statusLabel} / ${patternPlaybackReadout.roleLabel} / ${patternPlaybackDetailLabel} / ${
+      transportLoopLabel(transportLoopScope)
+    } loop / Pattern ${project.selectedPattern} / ${project.bpm} BPM`,
+    group: "Create",
+    keywords: `pattern playback readout edit heard audible hearing selected current ${
+      playingPattern ?? "idle"
+    } ${project.selectedPattern} ${patternPlaybackReadout.statusLabel} ${patternPlaybackReadout.roleLabel} ${
+      patternPlaybackDetailLabel
+    } ${transportLoopScope} beginner producer direct beat workstation`,
+    run: onFocusPatternPlaybackReadout
+  };
   const audiblePatternFollowTarget = playingPattern && playingPattern !== project.selectedPattern ? playingPattern : null;
   const audiblePatternFollowAction: QuickAction = {
     id: "pattern-follow-audible",
@@ -20009,6 +20037,7 @@ function createQuickActions({
     patternCompareDecisionAction,
     ...patternCueActions,
     ...patternSwitchActions,
+    patternPlaybackReadoutAction,
     audiblePatternFollowAction,
     {
       id: "midi-input-connect",
@@ -22254,6 +22283,7 @@ function createQuickActionResult(
     action.id.startsWith("groove-compass-card-") ||
     action.id === "pattern-dna-focus" ||
     action.id.startsWith("pattern-dna-card-") ||
+    action.id === "pattern-playback-readout-action" ||
     action.id.startsWith("mode-focus-card-") ||
     action.id === "beat-passport-focus" ||
     action.id.startsWith("beat-passport-metric-") ||
@@ -27169,6 +27199,65 @@ function patternDnaDestinationLabelFromLane(label: string): string {
   return label.toLowerCase() === "arrangement" ? "Arrange" : "Compose";
 }
 
+function quickActionPatternPlaybackReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "pattern-playback-readout-action") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0] ?? null;
+  const blockLabel = selectedBlock
+    ? `Block ${Math.min(selectedArrangementIndex + 1, project.arrangement.length)} ${selectedBlock.section} / Pattern ${
+        selectedBlock.pattern
+      } / ${barCountLabel(selectedBlock.bars)}`
+    : "No selected block";
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionPatternPlaybackReadoutDetailParts(action);
+  const statusLabel = detailParts[0] ?? "Pattern playback";
+  const fallbackRoleLabel = action.title.replace(/^Review Pattern Playback:\s*/, "").trim() || `Editing Pattern ${project.selectedPattern}`;
+  const roleLabel = detailParts[1] ?? fallbackRoleLabel;
+  const detailLabel = detailParts[2] ?? `${patternEventTotal(pattern)} events`;
+  const loopLabel = detailParts[3]?.replace(/\s+loop$/, "") || "current loop";
+  const drumCount = drumHitCount(pattern);
+  const musicEvents = pattern.bassNotes.length + pattern.chordEvents.length + pattern.melodyNotes.length;
+
+  return {
+    id: "pattern-playback-readout",
+    label: "Pattern Playback",
+    value: [
+      "review pattern playback",
+      statusLabel,
+      roleLabel,
+      detailLabel,
+      `loop ${loopLabel}`,
+      `selected ${blockLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `${drumCount} drum hits`,
+      `${musicEvents} music events`,
+      patternUseLabel,
+      `${project.bpm} BPM`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "follow unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+function quickActionPatternPlaybackReadoutDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function quickActionAudiblePatternFollowMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -28188,6 +28277,16 @@ function quickActionResultMetricSnapshot(
       quickActionAudiblePatternFollowMetricSnapshot(project, action) ?? {
         id: "pattern-follow-audible",
         label: "Audible pattern",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "pattern-playback-readout-action") {
+    return (
+      quickActionPatternPlaybackReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "pattern-playback-readout",
+        label: "Pattern Playback",
         value: action.detail
       }
     );
@@ -31176,6 +31275,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm this variation's drums, 808, chords, and Synth before editing.`,
       nextCheck: "Use Pattern Compare, Pattern DNA, Pattern Clone, or Pattern Chain when the selected variation should feed the arrangement."
+    };
+  }
+
+  if (action.id === "pattern-playback-readout-action") {
+    return {
+      auditionCue: "Use the edit-vs-heard Pattern readout before changing notes, drums, chords, melody, or arrangement assignments.",
+      nextCheck: "Run Audible Pattern Follow only when the heard Pattern should become the explicit editing Pattern."
     };
   }
 
