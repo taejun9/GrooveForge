@@ -13144,6 +13144,7 @@ function ComposerGuide({
         <small data-testid="composer-guide-focus-detail">{focusSummary.detailLabel}</small>
         <div className="composer-guide-focus-meta" data-testid="composer-guide-focus-meta">
           <span data-testid="composer-guide-focus-destination">{focusSummary.destinationLabel}</span>
+          <small data-testid="composer-guide-focus-metric">{focusSummary.metricLabel}</small>
           <small data-testid="composer-guide-focus-next-check">{focusSummary.nextCheckLabel}</small>
         </div>
         <button
@@ -35739,6 +35740,7 @@ function createComposerGuideFocusSummary(
       areaLabel: "No guide cards",
       detailLabel: "No Composer Guide cards available",
       destinationLabel: "No target",
+      metricLabel: "0/0 ready",
       nextCheckLabel: "Guide card unavailable",
       detailTitle: "Composer Guide has no cards to focus.",
       tone: "good"
@@ -35748,6 +35750,7 @@ function createComposerGuideFocusSummary(
   const statusLabel = focusedCard ? "Focused Guide" : card.tone === "good" ? "Guide clear" : "Top Guide Focus";
   const detailLabel = `${card.focusLabel} panel / ${card.detail}`;
   const destinationLabel = `${card.focusLabel} panel`;
+  const metricLabel = composerGuideFocusResultMetric(summary);
   const nextCheckLabel = composerGuideFocusResultNextCheck(card);
 
   return {
@@ -35756,8 +35759,9 @@ function createComposerGuideFocusSummary(
     areaLabel: `${card.label}: ${card.status}`,
     detailLabel,
     destinationLabel,
+    metricLabel,
     nextCheckLabel,
-    detailTitle: `${statusLabel} / ${card.label}: ${card.status} / ${detailLabel} / Next check: ${nextCheckLabel}`,
+    detailTitle: `${statusLabel} / ${card.label}: ${card.status} / ${detailLabel} / Guide metric: ${metricLabel} / Next check: ${nextCheckLabel}`,
     tone: card.tone
   };
 }
