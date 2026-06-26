@@ -462,7 +462,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Straight / Tight / Laid / Loose",
         context:
-          "Straight, Tight, Laid, Loose, Style Default, Current Swing, Result Feedback, Audition Cue, and Next Groove Check context before Swing Feel commands run."
+          "Swing Feel Readout Command, Straight, Tight, Laid, Loose, Style Default, Current Swing, Target Metric, Result Feedback, Audition Cue, and Next Groove Check context before Swing Feel commands run."
       },
       {
         id: "key-retarget",
