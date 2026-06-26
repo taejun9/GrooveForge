@@ -13167,6 +13167,7 @@ function ComposerGuide({
       <div className="composer-guide-grid" data-testid="composer-guide-grid">
         {summary.cards.map((card) => {
           const focused = focusedCardId !== null && card.id === focusedCardId;
+          const cardActionLabel = composerGuideFocusActionLabel(card, summary);
           return (
             <div
               className={["composer-guide-card", card.tone, focused ? "focused" : ""].filter(Boolean).join(" ")}
@@ -13177,11 +13178,12 @@ function ComposerGuide({
               <span>{card.label}</span>
               <strong>{card.status}</strong>
               <button
+                aria-label={cardActionLabel}
                 aria-pressed={focused}
                 className="composer-guide-focus-button"
                 data-testid={`composer-guide-focus-${card.id}`}
                 onClick={() => onFocus(card)}
-                title={`Focus ${card.focusLabel}: ${card.status}`}
+                title={cardActionLabel}
                 type="button"
               >
                 <ArrowRight size={13} aria-hidden="true" />
@@ -35757,7 +35759,7 @@ function createComposerGuideFocusSummary(
   const metricLabel = composerGuideFocusResultMetric(summary);
   const auditionCueLabel = composerGuideFocusResultAudition(card);
   const nextCheckLabel = composerGuideFocusResultNextCheck(card);
-  const actionLabel = `Focus ${card.focusLabel}: ${card.status} / ${destinationLabel} / ${metricLabel} / ${auditionCueLabel} / ${nextCheckLabel}`;
+  const actionLabel = composerGuideFocusActionLabel(card, summary);
 
   return {
     cardId: card.id,
@@ -35772,6 +35774,14 @@ function createComposerGuideFocusSummary(
     detailTitle: `${statusLabel} / ${card.label}: ${card.status} / ${detailLabel} / Guide metric: ${metricLabel} / Audition: ${auditionCueLabel} / Next check: ${nextCheckLabel}`,
     tone: card.tone
   };
+}
+
+function composerGuideFocusActionLabel(card: ComposerGuideCard, summary: ComposerGuideSummary): string {
+  const destinationLabel = `${card.focusLabel} panel`;
+  const metricLabel = composerGuideFocusResultMetric(summary);
+  const auditionCueLabel = composerGuideFocusResultAudition(card);
+  const nextCheckLabel = composerGuideFocusResultNextCheck(card);
+  return `Focus ${card.focusLabel}: ${card.status} / ${destinationLabel} / ${metricLabel} / ${auditionCueLabel} / ${nextCheckLabel}`;
 }
 
 function createComposerGuideFocusResult(
