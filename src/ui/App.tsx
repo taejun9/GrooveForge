@@ -7128,6 +7128,15 @@ export function App(): ReactElement {
     );
   }
 
+  function focusArrangementFocusReadout(): void {
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      arrangementFocusPreviewSummary
+        ? `Arrangement Focus ${arrangementFocusPreviewSummary.statusLabel}: ${arrangementFocusPreviewSummary.presetLabel} / ${arrangementFocusPreviewSummary.blockLabel} / ${arrangementFocusPreviewSummary.sectionLabel}`
+        : "Arrangement Focus: select an arrangement block before applying a focus preset."
+    );
+  }
+
   function focusMasterOutputRole(): void {
     const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -8221,6 +8230,7 @@ export function App(): ReactElement {
     onFocusPatternChainReadout: focusPatternChainReadout,
     onFocusChainExpandReadout: focusChainExpandReadout,
     onFocusArrangementArcReadout: focusArrangementArcReadout,
+    onFocusArrangementFocusReadout: focusArrangementFocusReadout,
     onFocusArrangementTemplateReadout: focusArrangementTemplateReadout,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternClone: cloneSelectedPatternVariation,

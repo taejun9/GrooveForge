@@ -1188,6 +1188,7 @@ export function createQuickActions({
   onApplyArrangementFocus,
   onApplyArrangementTemplate,
   onFocusArrangementArcReadout,
+  onFocusArrangementFocusReadout,
   onFocusArrangementTemplateReadout,
   onCueArrangementTransition,
   onCueHookLoop,
@@ -1506,6 +1507,7 @@ export function createQuickActions({
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
   onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
   onFocusArrangementArcReadout: () => void;
+  onFocusArrangementFocusReadout: () => void;
   onFocusArrangementTemplateReadout: () => void;
   onCueArrangementTransition: (transition: ArrangementTransitionMapTransition) => void;
   onCueHookLoop: (card?: HookReadinessFocusItem) => void;
@@ -4663,6 +4665,19 @@ export function createQuickActions({
       }
     },
     {
+      id: "arrangement-focus-readout-action",
+      title: arrangementFocusPreviewSummary ? `Review Arrangement Focus: ${arrangementFocusPreviewSummary.presetLabel}` : "Review Arrangement Focus",
+      detail: arrangementFocusPreviewSummary
+        ? `${arrangementFocusPreviewSummary.statusLabel} / ${arrangementFocusPreviewSummary.blockLabel} / ${arrangementFocusPreviewSummary.sectionLabel} / ${arrangementFocusPreviewSummary.energyLabel} / ${arrangementFocusPreviewSummary.muteLabel} / ${arrangementFocusPreviewSummary.moveLabel}`
+        : "No arrangement block selected.",
+      group: "Arrange",
+      keywords: `Quick Actions Arrangement Focus Readout review selected block section pattern bar length energy mute intro verse hook bridge outro selected pattern editable events ${
+        arrangementFocusPreviewSummary?.presetId ?? "none"
+      } ${arrangementFocusPreviewSummary?.presetLabel ?? "none"} ${arrangementFocusPreviewSummary?.statusLabel ?? "none"} beginner producer`,
+      disabled: !arrangementFocusPreviewSummary,
+      run: onFocusArrangementFocusReadout
+    },
+    {
       id: "arrangement-focus",
       title:
         arrangementFocusReady && arrangementFocusPreviewSummary
@@ -6060,6 +6075,7 @@ export function createQuickActionResult(
     action.id === "chain-expand-readout-action" ||
     action.id === "arrangement-template-readout-action" ||
     action.id === "arrangement-arc-readout-action" ||
+    action.id === "arrangement-focus-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -13597,6 +13613,7 @@ export function quickActionResultMetricSnapshot(
   }
 
   if (
+    action.id === "arrangement-focus-readout-action" ||
     action.id === "arrangement-focus" ||
     action.id === "arrangement-focus-decision" ||
     action.id.startsWith("arrangement-focus-preset-")
@@ -15282,6 +15299,33 @@ export function quickActionArrangementFocusMetricSnapshot(
 
   const blockIndex = arrangementFocusQuickActionBlockIndex(project, action);
   const block = project.arrangement[blockIndex] ?? project.arrangement[0];
+  if (action.id === "arrangement-focus-readout-action") {
+    const pattern = activePattern(project);
+    if (!block) {
+      return {
+        id: "arrangement-focus-readout",
+        label: "Arrangement Focus Readout",
+        value: `${preset.label} focus readout / no selected block / Pattern ${project.selectedPattern} / ${patternEventTotal(
+          pattern
+        )} editable events / 0 blocks / ${barCountLabel(arrangementTotalBars(project))}`
+      };
+    }
+
+    const blockNumber = Math.min(blockIndex + 1, Math.max(project.arrangement.length, 1));
+    const changedFields = arrangementFocusChangedFieldCount(block, preset);
+    return {
+      id: "arrangement-focus-readout",
+      label: "Arrangement Focus Readout",
+      value: `review arrangement focus readout / ${action.detail} / target ${preset.label} / Block ${blockNumber} ${
+        block.section
+      } / Pattern ${block.pattern} / ${barCountLabel(block.bars)} / Energy ${percentLabel(block.energy)} / ${arrangementFocusPreviewMuteLabel(
+        block.mutedTracks
+      )} / ${changedFields} field${changedFields === 1 ? "" : "s"} / selected Pattern ${
+        project.selectedPattern
+      } / ${patternEventTotal(pattern)} editable events / ${project.arrangement.length} blocks / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
   if (!block) {
     return {
       id: "arrangement-focus",
@@ -16970,6 +17014,13 @@ export function quickActionResultFollowup(
         action.id === "arrangement-focus-decision"
           ? "Return to Arrangement Focus Preview Decision before running another selected-block focus move."
           : "Use the Arrangement Focus Result, Arrangement Playback Readout, and Song Form Overview before changing nearby blocks."
+    };
+  }
+
+  if (action.id === "arrangement-focus-readout-action") {
+    return {
+      auditionCue: "Play Block loop and confirm the selected block role, Pattern assignment, energy, and mutes before applying a focus preset.",
+      nextCheck: "Apply Arrangement Focus only after the readout block posture matches the section role you want."
     };
   }
 
