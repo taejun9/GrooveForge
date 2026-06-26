@@ -502,7 +502,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Controller notes",
         context:
-          "Web MIDI Permission, MIDI Armed State, MIDI Input Status, Selected 808/Synth Target, Capture Defaults, Input Result Feedback, Audition Cue, and Next MIDI Check context before MIDI Input commands run."
+          "MIDI Input Readout Command, Web MIDI Support, Web MIDI Permission, MIDI Armed State, MIDI Input Status, Selected MIDI Input, Latest MIDI Note, Selected 808/Synth Target, Capture Defaults, MIDI Status Metric, Input Result Feedback, Audition Cue, and Next MIDI Check context before MIDI Input commands run."
       },
       {
         id: "editor-audition",
