@@ -4477,7 +4477,7 @@ h2 {
 .composer-guide-focus-readout {
   display: grid;
   grid-column: 2;
-  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1fr) minmax(0, 1.28fr) minmax(96px, 0.5fr);
+  grid-template-columns: minmax(0, 0.62fr) minmax(0, 0.9fr) minmax(0, 1.08fr) minmax(0, 1.12fr) minmax(96px, 0.5fr);
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -4513,6 +4513,25 @@ h2 {
 .composer-guide-focus-readout strong {
   color: #f4efe7;
   font-size: 12px;
+}
+
+.composer-guide-focus-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.composer-guide-focus-meta span,
+.composer-guide-focus-meta small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-guide-focus-meta span {
+  color: #f4efe7;
+  font-weight: 800;
 }
 
 .composer-guide-focus-readout button {
