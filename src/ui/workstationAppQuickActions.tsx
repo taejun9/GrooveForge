@@ -1211,6 +1211,7 @@ export function createQuickActions({
   onApplyGrooveFeel,
   onApplyLayerStarter,
   onApplyMasterAutomation,
+  onFocusMasterAutomationReadout,
   onApplyMasterFinish,
   onFocusMasterFinishReadout,
   onApplyMelodyMotif,
@@ -1520,6 +1521,7 @@ export function createQuickActions({
   onApplyGrooveFeel: (feel: GrooveFeelId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
   onApplyMasterAutomation: (pad: MasterAutomationPadId) => void;
+  onFocusMasterAutomationReadout: () => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
   onFocusMasterFinishReadout: () => void;
   onApplyMelodyMotif: (motif: MelodyMotifId) => void;
@@ -4951,6 +4953,19 @@ export function createQuickActions({
       }
     })),
     {
+      id: "master-automation-readout-action",
+      title: `Review Master Automation: ${masterAutomationPreviewSummary.padLabel}`,
+      detail: `${masterAutomationPreviewSummary.statusLabel} / ${masterAutomationPreviewSummary.eventLabel} / ${masterAutomationPreviewSummary.rangeLabel} / ${masterAutomationPreviewSummary.changeLabel}`,
+      group: "Mix",
+      keywords: `Quick Actions Master Automation Readout review fade lane preview apply posture none fade in fade out intro outro realtime export wav stems ${
+        masterAutomationPreviewSummary.padId
+      } ${masterAutomationPreviewSummary.padLabel} ${masterAutomationPreviewSummary.statusLabel} ${
+        masterAutomationPreviewSummary.eventLabel
+      } beginner producer manual automation`,
+      resultTargetId: masterAutomationPreviewSummary.padId,
+      run: onFocusMasterAutomationReadout
+    },
+    {
       id: "master-automation-decision",
       title:
         masterAutomationReady && masterAutomationSuggestedPad
@@ -5936,6 +5951,7 @@ export function createQuickActionResult(
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
     action.id === "master-finish-readout-action" ||
+    action.id === "master-automation-readout-action" ||
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-focus" ||
@@ -6284,6 +6300,33 @@ export function quickActionMasterAutomationMetricSnapshot(
   actionPad: MasterAutomationPadDefinition | null,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
+  if (action.id === "master-automation-readout-action") {
+    const options = createMasterAutomationPadOptions(project);
+    const preview = createMasterAutomationPreviewSummary(project, options);
+    const pad = options.find((candidate) => candidate.id === preview.padId) ?? options[0];
+    if (!pad) {
+      return null;
+    }
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const stemAnalyses = analyzeStemExports(project);
+    const targetProject = applyMasterAutomationPreset(project, pad.id);
+    const changedEvents = masterAutomationChangedCount(project, targetProject);
+    return {
+      id: "master-automation-readout",
+      label: "Master Automation Readout",
+      value: quickActionMasterAutomationMetricValue(project, exportAnalysis, stemAnalyses, [
+        quickActionMasterAutomationActionLabel(action),
+        `preview ${preview.padLabel}`,
+        `status ${preview.statusLabel}`,
+        `current ${masterAutomationQuickActionPosture(project)}`,
+        `target ${masterAutomationPresetLabel(masterAutomationPresetForProject(targetProject))} / ${masterAutomationEventCountLabel(
+          targetProject
+        )} / ${masterAutomationRangeLabel(targetProject)}`,
+        `events ${changedEvents} automation event${changedEvents === 1 ? "" : "s"}`
+      ], quickActionMasterAutomationNextCheck(action, pad))
+    };
+  }
+
   if (action.id !== "master-automation-decision" && action.id !== "master-automation" && !actionPad) {
     return null;
   }
@@ -6384,6 +6427,9 @@ export function isMasterAutomationPadId(value: string | undefined): value is Mas
 }
 
 export function quickActionMasterAutomationActionLabel(action: QuickAction): string {
+  if (action.id === "master-automation-readout-action") {
+    return "review master automation readout";
+  }
   if (action.id === "master-automation-decision") {
     return "run master automation decision";
   }
@@ -6394,6 +6440,9 @@ export function quickActionMasterAutomationActionLabel(action: QuickAction): str
 }
 
 export function quickActionMasterAutomationContextLabel(action: QuickAction): string {
+  if (action.id === "master-automation-readout-action") {
+    return "readout";
+  }
   if (action.id === "master-automation-decision") {
     return "decision";
   }
@@ -6404,6 +6453,9 @@ export function quickActionMasterAutomationContextLabel(action: QuickAction): st
 }
 
 export function quickActionMasterAutomationNextCheck(action: QuickAction, pad: MasterAutomationPadDefinition): string {
+  if (action.id === "master-automation-readout-action") {
+    return "play Song from the top and final bar, then apply Master Automation only if the fade preview fits";
+  }
   if (action.id === "master-automation-decision") {
     return "play Song and inspect the visible Master Automation result before export";
   }
@@ -16731,6 +16783,13 @@ export function quickActionResultFollowup(
   }
 
   const masterAutomationPad = masterAutomationQuickActionPad(action.id);
+  if (action.id === "master-automation-readout-action") {
+    return {
+      auditionCue: "Use the Master Automation readout before applying a fade lane, then play Song from the top and final bar.",
+      nextCheck: "Apply Master Automation only when the fade preview supports the arrangement; otherwise leave automation manual."
+    };
+  }
+
   if (action.id === "master-automation-decision") {
     return {
       auditionCue: "Play Song and follow the visible Master Automation Preview Decision before another fade-lane move.",
