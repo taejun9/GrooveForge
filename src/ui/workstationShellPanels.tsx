@@ -783,12 +783,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Studio Tone Drift Summary, Reset Largest Drift Command, Direct Per-Control Reset Commands, Baseline Source, Before/After Control Delta, Result Metric, Audition Cue, and Next Manual Tone Check context before Studio Tone Drift commands run."
       },
       {
+        id: "sound-snapshot-readout",
+        command: "Sound Snapshot A/B Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current A/B tone-pass state",
+        context:
+          "Sound Snapshot A/B Readout Action, Capture/Recall Recommendation, A/B Slot State, Tone-Pass Comparison Metrics, Current Sound Posture, Audition Cue, and Next Manual Snapshot Check context before Sound Snapshot commands run."
+      },
+      {
         id: "sound-snapshot-decision",
         command: "Sound Snapshot A/B Decision",
-        shortcut: "Quick Actions / Readout",
+        shortcut: "Quick Actions / Decision",
         target: "Capture / recall recommendation",
         context:
-          "Sound Snapshot A/B Readout Action, Capture/Recall Recommendation, A/B Slot State, Capture/Recall/Clear Commands, Tone-Pass Comparison Metrics, Audition Cue, and Next Snapshot Check context before Sound Snapshot A/B Decision commands run."
+          "Sound Snapshot A/B Decision Recommendation, Explicit Capture/Recall Route, A/B Slot State, Capture/Recall/Clear Commands, Tone-Pass Comparison Metrics, Audition Cue, and Next Snapshot Check context before Sound Snapshot A/B Decision commands run."
       },
       {
         id: "sound-snapshot-ab",

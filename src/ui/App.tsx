@@ -7519,6 +7519,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusSoundSnapshotReadout(): void {
+    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Sound Snapshot A/B ${soundSnapshotComparison.statusLabel}: ${soundSnapshotComparison.actionLabel} / ${soundSnapshotComparison.winnerLabel}`
+    );
+  }
+
   function focusFinishChecklistCard(card: FinishChecklistCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -8196,6 +8203,7 @@ export function App(): ReactElement {
     onCaptureSoundSnapshot: captureSoundSnapshot,
     onRecallSoundSnapshot: recallSoundSnapshot,
     onClearSoundSnapshots: clearSoundSnapshots,
+    onFocusSoundSnapshotReadout: focusSoundSnapshotReadout,
     onCaptureStudioToneBaseline: captureStudioToneBaseline,
     onResetLargestStudioToneDrift: resetLargestStudioToneDrift,
     onResetStudioToneControl: (target) => {
