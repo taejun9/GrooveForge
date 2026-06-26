@@ -1189,6 +1189,7 @@ export function createQuickActions({
   onApplyArrangementTemplate,
   onFocusArrangementArcReadout,
   onFocusArrangementFocusReadout,
+  onFocusArrangementMoveReadout,
   onFocusArrangementTemplateReadout,
   onCueArrangementTransition,
   onCueHookLoop,
@@ -1508,6 +1509,7 @@ export function createQuickActions({
   onApplyArrangementTemplate: (template: ArrangementTemplateId) => void;
   onFocusArrangementArcReadout: () => void;
   onFocusArrangementFocusReadout: () => void;
+  onFocusArrangementMoveReadout: () => void;
   onFocusArrangementTemplateReadout: () => void;
   onCueArrangementTransition: (transition: ArrangementTransitionMapTransition) => void;
   onCueHookLoop: (card?: HookReadinessFocusItem) => void;
@@ -4630,6 +4632,25 @@ export function createQuickActions({
     ...selectedBlockActions,
     ...patternUseActions,
     {
+      id: "arrangement-move-readout-action",
+      title:
+        arrangementMoveQuickActionPrioritySummary.presetId !== "none"
+          ? `Review Arrangement Move: ${arrangementMoveQuickActionPrioritySummary.presetLabel}`
+          : "Review Arrangement Move",
+      detail:
+        arrangementMoveQuickActionPrioritySummary.presetId !== "none"
+          ? `${arrangementMoveQuickActionPrioritySummary.statusLabel} / ${arrangementMoveQuickActionPrioritySummary.scopeLabel} / ${arrangementMoveQuickActionPrioritySummary.impactLabel} / ${arrangementMoveQuickActionPrioritySummary.nextCheckLabel}`
+          : arrangementMoveQuickActionPrioritySummary.reasonLabel,
+      group: "Arrange",
+      keywords: `Quick Actions Arrangement Move Readout review selected block section pattern bar length energy mute drop build hook lift reset selected pattern editable events ${
+        arrangementMoveQuickActionPrioritySummary.presetId
+      } ${arrangementMoveQuickActionPrioritySummary.presetLabel} ${
+        arrangementMoveQuickActionPrioritySummary.statusLabel
+      } beginner producer`,
+      disabled: arrangementMoveQuickActionPrioritySummary.presetId === "none",
+      run: onFocusArrangementMoveReadout
+    },
+    {
       id: "arrangement-move-decision",
       title: arrangementMoveDecisionSummary.disabled
         ? "Run Arrangement Move Decision"
@@ -6076,6 +6097,7 @@ export function createQuickActionResult(
     action.id === "arrangement-template-readout-action" ||
     action.id === "arrangement-arc-readout-action" ||
     action.id === "arrangement-focus-readout-action" ||
+    action.id === "arrangement-move-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -13592,7 +13614,11 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
-  if (action.id === "arrangement-move" || action.id === "arrangement-move-decision") {
+  if (
+    action.id === "arrangement-move-readout-action" ||
+    action.id === "arrangement-move" ||
+    action.id === "arrangement-move-decision"
+  ) {
     return (
       quickActionArrangementMoveMetricSnapshot(project, action) ?? {
         id: "arrangement-move",
@@ -15148,6 +15174,47 @@ export function quickActionArrangementMoveMetricSnapshot(
   project: ProjectState,
   action: QuickAction
 ): { id: string; label: string; value: string } | null {
+  if (action.id === "arrangement-move-readout-action") {
+    const blockIndex = arrangementMoveQuickActionBlockIndex(project, action);
+    const block = project.arrangement[blockIndex] ?? project.arrangement[0];
+    const pattern = activePattern(project);
+    const preset = arrangementMoveQuickActionPreset(action) ?? selectedArrangementMoveQuickActionPreset(block);
+    if (!block || !preset) {
+      return {
+        id: "arrangement-move-readout",
+        label: "Arrangement Move Readout",
+        value: `move readout / no selected block / Pattern ${project.selectedPattern} / ${patternEventTotal(
+          pattern
+        )} editable events / 0 blocks / ${barCountLabel(arrangementTotalBars(project))}`
+      };
+    }
+
+    const targetBlock = applyArrangementMovePreset(block, preset);
+    const energy = normalizeArrangementEnergy(block.energy);
+    const targetEnergy = normalizeArrangementEnergy(targetBlock.energy);
+    const mutedTracks = normalizeArrangementMutedTracks(block.mutedTracks);
+    const targetMutedTracks = normalizeArrangementMutedTracks(targetBlock.mutedTracks);
+    const changedFields =
+      (energy === targetEnergy ? 0 : 1) + (mutedTracks.join(",") === targetMutedTracks.join(",") ? 0 : 1);
+    const blockNumber = Math.min(blockIndex + 1, Math.max(project.arrangement.length, 1));
+
+    return {
+      id: "arrangement-move-readout",
+      label: "Arrangement Move Readout",
+      value: `review arrangement move readout / ${action.detail} / target ${arrangementMovePresetLabel(
+        preset
+      )} / Block ${blockNumber} ${block.section} / Pattern ${block.pattern} / ${barCountLabel(
+        block.bars
+      )} / Energy ${percentLabel(energy)} / ${arrangementFocusPreviewMuteLabel(
+        mutedTracks
+      )} / ${changedFields} field${changedFields === 1 ? "" : "s"} / selected Pattern ${
+        project.selectedPattern
+      } / ${patternEventTotal(pattern)} editable events / ${project.arrangement.length} blocks / ${barCountLabel(
+        arrangementTotalBars(project)
+      )}`
+    };
+  }
+
   const preset = arrangementMoveQuickActionPreset(action);
   if (!preset) {
     return null;
@@ -16956,6 +17023,13 @@ export function quickActionResultFollowup(
         action.id === "arrangement-template-decision"
           ? "Return to Arrangement Template Preview Decision before running another song-form template move."
           : `${barCountLabel(arrangementTotalBars(project))} arranged; scan Song Form Overview before mix decisions.`
+    };
+  }
+
+  if (action.id === "arrangement-move-readout-action") {
+    return {
+      auditionCue: "Play Block loop and confirm the selected block energy and mute contrast before applying a Drop, Build, or Hook Lift move.",
+      nextCheck: "Apply Arrangement Move only after the readout posture supports the section role and surrounding song form."
     };
   }
 
