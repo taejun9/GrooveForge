@@ -1239,6 +1239,7 @@ export function createQuickActions({
   onFocusChainExpandReadout,
   onApplyPatternChain,
   onApplyPatternClone,
+  onFocusPatternCloneReadout,
   onApplyPatternFill,
   onApplyPatternVariation,
   onApplyPatternStack,
@@ -1569,6 +1570,7 @@ export function createQuickActions({
   onFocusChainExpandReadout: () => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternClone: (target: PatternSlot, preset: PatternVariationPreset) => void;
+  onFocusPatternCloneReadout: () => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
   onApplyPatternVariation: (preset: PatternVariationPreset) => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
@@ -3552,6 +3554,15 @@ export function createQuickActions({
     keywords: `pattern clone variation copy ${clone.source} ${clone.target} ${clone.preset} ${clone.preview} a b c hook breakdown beginner producer`,
     run: () => onApplyPatternClone(clone.target, clone.preset)
   }));
+  const patternCloneReadoutSummary = createPatternCloneSuggestionSummary(project.selectedPattern, project.patterns);
+  const patternCloneReadoutAction: QuickAction = {
+    id: "pattern-clone-readout-action",
+    title: `Review Pattern Clone Readout: ${patternCloneReadoutSummary.routeLabel}`,
+    detail: `${patternCloneReadoutSummary.presetLabel} suggestion / ${patternCloneReadoutSummary.detailLabel} / ${patternCloneReadoutSummary.moveLabel} / target overwrite preflight`,
+    group: "Create",
+    keywords: `Quick Actions Pattern Clone Readout review ${patternCloneReadoutSummary.source} ${patternCloneReadoutSummary.target} ${patternCloneReadoutSummary.preset} ${patternCloneReadoutSummary.presetLabel} safest target overwrite risk clone variation hook breakdown beginner producer`,
+    run: onFocusPatternCloneReadout
+  };
   const patternCopyActions: QuickAction[] = patternSlots
     .filter((target) => target !== project.selectedPattern)
     .map((target) => {
@@ -4235,6 +4246,7 @@ export function createQuickActions({
       }
     },
     ...layerStarterActions,
+    patternCloneReadoutAction,
     ...patternCloneActions,
     patternCopyClearReadoutAction,
     ...patternCopyActions,
@@ -6303,6 +6315,7 @@ export function createQuickActionResult(
     action.id === "arrangement-arc-readout-action" ||
     action.id === "arrangement-focus-readout-action" ||
     action.id === "arrangement-move-readout-action" ||
+    action.id === "pattern-clone-readout-action" ||
     action.id === "pattern-copy-clear-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
@@ -14182,6 +14195,16 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "pattern-clone-readout-action") {
+    return (
+      quickActionPatternCloneReadoutMetricSnapshot(project, action) ?? {
+        id: "pattern-clone-readout",
+        label: "Pattern Clone Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id.startsWith("pattern-clone-")) {
     return (
       quickActionPatternCloneMetricSnapshot(project, action) ?? {
@@ -16269,6 +16292,78 @@ export function patternCopyClearReadoutQuickActionSource(action: QuickAction): P
   return slot === "A" || slot === "B" || slot === "C" ? slot : null;
 }
 
+export function quickActionPatternCloneReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const route = patternCloneReadoutQuickActionRoute(action) ?? createPatternCloneSuggestionSummary(project.selectedPattern, project.patterns);
+  if (action.id !== "pattern-clone-readout-action") {
+    return null;
+  }
+
+  const sourcePattern = project.patterns[route.source];
+  const targetPattern = project.patterns[route.target];
+  const sourceEvents = patternEventTotal(sourcePattern);
+  const targetEvents = patternEventTotal(targetPattern);
+  const sourceDrums = drumHitCount(sourcePattern);
+  const sourceMusicEvents = sourcePattern.bassNotes.length + sourcePattern.chordEvents.length + sourcePattern.melodyNotes.length;
+  const targetDrums = drumHitCount(targetPattern);
+  const targetMusicEvents = targetPattern.bassNotes.length + targetPattern.chordEvents.length + targetPattern.melodyNotes.length;
+  const sourceArrangement = patternArrangementUseLabel(project, route.source);
+  const targetArrangement = patternArrangementUseLabel(project, route.target);
+  const overwriteRisk = targetEvents === 0 ? "target empty" : `target has ${targetEvents} existing events`;
+
+  return {
+    id: "pattern-clone-readout",
+    label: "Pattern Clone Readout",
+    value: [
+      "review pattern clone",
+      `Pattern ${route.source} -> ${route.target}`,
+      `${patternVariationPresetLabel(route.preset)} suggestion`,
+      `source ${sourceEvents} events`,
+      `${sourceDrums} source drums`,
+      `${sourceMusicEvents} source music`,
+      `target ${targetEvents} events`,
+      `${targetDrums} target drums`,
+      `${targetMusicEvents} target music`,
+      `source arrangement ${sourceArrangement}`,
+      `target arrangement ${targetArrangement}`,
+      `overwrite risk ${overwriteRisk}`,
+      `edit Pattern ${project.selectedPattern}`,
+      "clone unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+export function patternCloneReadoutQuickActionRoute(
+  action: QuickAction
+): { source: PatternSlot; target: PatternSlot; preset: PatternVariationPreset } | null {
+  if (action.id !== "pattern-clone-readout-action") {
+    return null;
+  }
+
+  const text = `${action.title} ${action.detail}`;
+  const routeMatch = /Pattern ([ABC]) -> ([ABC])/.exec(text);
+  const source = routeMatch ? patternSlotFromQuickActionValue(routeMatch[1]) : null;
+  const target = routeMatch ? patternSlotFromQuickActionValue(routeMatch[2]) : null;
+  const preset = /\bHook\b/.test(text) ? "hook" : /\bBreak\b/.test(text) ? "breakdown" : null;
+  if (!source || !target || !preset) {
+    return null;
+  }
+
+  return { source, target, preset };
+}
+
+export function patternArrangementUseLabel(project: ProjectState, pattern: PatternSlot): string {
+  const arrangedBlocks = project.arrangement.filter((block) => block.pattern === pattern);
+  const arrangedBars = arrangedBlocks.reduce((total, block) => total + normalizeArrangementBars(block.bars), 0);
+  return arrangedBlocks.length === 0
+    ? "not arranged"
+    : `${arrangedBlocks.length} block${arrangedBlocks.length === 1 ? "" : "s"} / ${barCountLabel(arrangedBars)}`;
+}
+
 export function quickActionPatternEditMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -17097,6 +17192,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the applied variation's drums, 808, chords, and Synth before arranging.`,
       nextCheck: "Use Pattern Compare, Pattern DNA, Pattern Clone, or Pattern Chain when the variation should feed the arrangement."
+    };
+  }
+
+  if (action.id === "pattern-clone-readout-action") {
+    return {
+      auditionCue:
+        "Review the selected Pattern clone source, suggested target, variation, target overwrite risk, and arrangement usage before cloning Pattern data.",
+      nextCheck: "Run a direct Pattern Clone command only when that target Pattern slot should be overwritten by the clone."
     };
   }
 

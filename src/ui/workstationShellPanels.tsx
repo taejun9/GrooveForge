@@ -641,6 +641,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Selected Pattern Clone Suggestion, Safest Target Slot, Hook/Breakdown Variation, Direct Clone-to-A/B/C Commands, Pattern Clone Result Feedback, Audition Cue, and Next Clone Check context before Pattern Clone commands run."
       },
       {
+        id: "pattern-clone-readout",
+        command: "Pattern Clone Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Selected Pattern clone preflight",
+        context:
+          "Pattern Clone Readout Action, Selected Pattern A/B/C, Safest Target Slot, Suggested Hook/Break Variation, Source and Target Event Counts, Source/Target Arrangement Usage, Overwrite Risk, Audition Cue, and Next Pattern Clone Check context before direct Pattern Clone commands run."
+      },
+      {
         id: "pattern-copy-clear-readout",
         command: "Pattern Copy/Clear Readout",
         shortcut: "Quick Actions / Readout",
