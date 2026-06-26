@@ -205,7 +205,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Current Song, Block, Turn, or Pattern loop-scope context with selected Pattern, selected block, BPM, metronome state, local result metric, audition cue, and next loop check before playback."
       },
-      { id: "metronome", command: "Metronome", shortcut: "Quick Actions / Readout", target: "Realtime click / grid" },
+      {
+        id: "metronome",
+        command: "Metronome",
+        shortcut: "Quick Actions / Readout",
+        target: "Realtime click / grid",
+        context:
+          "Current click on/off state, BPM, loop scope, selected Pattern, selected block, local result metric, audition cue, and export-clean posture before playback or timing edits."
+      },
       { id: "patterns", command: "Pattern A/B/C", shortcut: "1 / 2 / 3", target: "Edit focus" },
       { id: "delete", command: "Delete selected event", shortcut: "Backspace / Delete", target: "Selected event" }
     ]

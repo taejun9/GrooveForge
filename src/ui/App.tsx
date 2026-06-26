@@ -8043,6 +8043,20 @@ export function App(): ReactElement {
     setProjectStatus(`Loop Scope ${transportLoopLabel(transportLoopScope)}: ${currentLoopStatus}`);
   }
 
+  function focusMetronomeReadout(): void {
+    const currentLoopStatus = transportLoopStatus(
+      project,
+      transportLoopScope,
+      selectedArrangementIndex,
+      arrangementTransitionLoopTarget
+    );
+
+    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Metronome ${project.metronomeEnabled ? "on" : "off"}: ${project.bpm} BPM / ${currentLoopStatus}`
+    );
+  }
+
   const quickActions = createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
@@ -8295,6 +8309,7 @@ export function App(): ReactElement {
     onFocusKeyCompass: focusKeyCompassItem,
     onFocusListeningPass: focusListeningPassItem,
     onFocusLoopScope: focusLoopScopeReadout,
+    onFocusMetronomeReadout: focusMetronomeReadout,
     onFocusMixCoach: focusMixCoachCheck,
     onFocusExportMeter: focusExportMeter,
     onFocusMasterOutputRole: focusMasterOutputRole,
@@ -17942,6 +17957,7 @@ function createQuickActions({
   onFocusKeyCompass,
   onFocusListeningPass,
   onFocusLoopScope,
+  onFocusMetronomeReadout,
   onFocusMixCoach,
   onFocusExportMeter,
   onFocusMasterOutputRole,
@@ -18219,6 +18235,7 @@ function createQuickActions({
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
   onFocusListeningPass: (item: ListeningPassItem) => void;
   onFocusLoopScope: () => void;
+  onFocusMetronomeReadout: () => void;
   onFocusMixCoach: (check: MixCoachCheck) => void;
   onFocusExportMeter: () => void;
   onFocusMasterOutputRole: () => void;
@@ -19791,6 +19808,20 @@ function createQuickActions({
         selectedLoopBlock ? `${selectedLoopBlock.section} ${selectedLoopBlock.pattern}` : "no block"
       } metronome ${project.metronomeEnabled ? "on" : "off"} beginner producer direct beat workstation`,
       run: onFocusLoopScope
+    },
+    {
+      id: "metronome-readout",
+      title: `Review Metronome: ${project.metronomeEnabled ? "Click on" : "Click off"}`,
+      detail: `${project.metronomeEnabled ? "Click on" : "Click off"} / ${project.bpm} BPM / ${transportLoopLabel(
+        transportLoopScope
+      )} loop / Pattern ${project.selectedPattern}`,
+      group: "Transport",
+      keywords: `metronome readout click grid bpm transport timing realtime export clean ${
+        project.metronomeEnabled ? "on enabled" : "off disabled"
+      } ${transportLoopScope} ${loopScopeStatus} Pattern ${project.selectedPattern} ${
+        selectedLoopBlock ? `${selectedLoopBlock.section} ${selectedLoopBlock.pattern}` : "no block"
+      } beginner producer direct beat workstation`,
+      run: onFocusMetronomeReadout
     },
     {
       id: "toggle-playback",
@@ -22167,6 +22198,7 @@ function createQuickActionResult(
     action.id === "guide-quick-start" ||
     action.id === "guide-bottleneck-focus" ||
     action.id === "loop-scope" ||
+    action.id === "metronome-readout" ||
     action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -26271,6 +26303,55 @@ function quickActionLoopScopeDetailParts(action: QuickAction): string[] {
     .filter(Boolean);
 }
 
+function quickActionMetronomeReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "metronome-readout") {
+    return null;
+  }
+
+  const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0] ?? null;
+  const blockLabel = selectedBlock
+    ? `Block ${Math.min(selectedArrangementIndex + 1, project.arrangement.length)} ${selectedBlock.section} / Pattern ${
+        selectedBlock.pattern
+      } / ${barCountLabel(selectedBlock.bars)}`
+    : "No selected block";
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionMetronomeReadoutDetailParts(action);
+  const clickLabel = project.metronomeEnabled ? "click on" : "click off";
+  const loopLabel = detailParts[2]?.replace(/\s+loop$/, "") || "current loop";
+
+  return {
+    id: "metronome-readout",
+    label: "Metronome",
+    value: [
+      "review timing grid",
+      clickLabel,
+      `${project.bpm} BPM`,
+      `loop ${loopLabel}`,
+      `selected ${blockLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(activePattern(project))} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "realtime click only",
+      "exports stay clean",
+      "playback unchanged"
+    ].join(" / ")
+  };
+}
+
+function quickActionMetronomeReadoutDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 const GUIDE_QUICK_START_DETAIL_LABEL_PREFIXES = [
   "Destination ",
   "Metric ",
@@ -27412,6 +27493,16 @@ function quickActionResultMetricSnapshot(
       quickActionLoopScopeMetricSnapshot(project, action, selectedArrangementIndex) ?? {
         id: "loop-scope",
         label: "Loop Scope",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "metronome-readout") {
+    return (
+      quickActionMetronomeReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "metronome-readout",
+        label: "Metronome",
         value: action.detail
       }
     );
@@ -30496,6 +30587,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Press Play only after the Loop Scope readout matches the Song, Block, Turn, or Pattern area you want to judge.",
       nextCheck: "Use Song for arrangement, Block or Turn for section handoffs, and Pattern for drums, 808, chords, or melody edits."
+    };
+  }
+
+  if (action.id === "metronome-readout") {
+    return {
+      auditionCue: "Press Play only after BPM, click state, and loop scope match the timing pass you want to judge.",
+      nextCheck: "Use the Metronome toggle only when you need a realtime timing reference; WAV and stem exports stay click-free."
     };
   }
 
