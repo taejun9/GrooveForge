@@ -494,7 +494,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Next / Replace",
         context:
-          "Next/Replace Placement Mode, Selected Pattern, Selected Step, Capture Defaults, Input Result Feedback, Audition Cue, and Next Placement Check context before Capture Step Mode commands run."
+          "Capture Step Mode Readout Command, Next/Replace Placement Mode, Selected Pattern, Selected Step, Capture Defaults, Placement Metric, Input Result Feedback, Audition Cue, and Next Placement Check context before Capture Step Mode commands run."
       },
       {
         id: "midi-input",
