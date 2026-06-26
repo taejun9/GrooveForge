@@ -8097,6 +8097,11 @@ export function App(): ReactElement {
     );
   }
 
+  function focusKeyRetargetReadout(): void {
+    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Key Retarget ${project.key}: ${keyRetargetPatternSummary(project)}`);
+  }
+
   const quickActions = createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
@@ -8262,6 +8267,7 @@ export function App(): ReactElement {
     onFocusTapTempoReadout: focusTapTempoReadout,
     onFocusTempoNudgeReadout: focusTempoNudgeReadout,
     onFocusSwingFeelReadout: focusSwingFeelReadout,
+    onFocusKeyRetargetReadout: focusKeyRetargetReadout,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onCueBlueprintPreview: cueBeatBlueprintPreview,
     onRequestMidiInputAccess: requestMidiInputAccess,
@@ -17920,6 +17926,7 @@ function createQuickActions({
   onFocusTapTempoReadout,
   onFocusTempoNudgeReadout,
   onFocusSwingFeelReadout,
+  onFocusKeyRetargetReadout,
   onPreviewBlueprint,
   onCueBlueprintPreview,
   onRequestMidiInputAccess,
@@ -18208,6 +18215,7 @@ function createQuickActions({
   onFocusTapTempoReadout: () => void;
   onFocusTempoNudgeReadout: () => void;
   onFocusSwingFeelReadout: () => void;
+  onFocusKeyRetargetReadout: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onCueBlueprintPreview: (scope: Extract<TransportLoopScope, "arrangement" | "pattern">) => void;
   onRequestMidiInputAccess: () => Promise<void>;
@@ -19749,6 +19757,18 @@ function createQuickActions({
       run: () => onApplyProjectKey(key)
     };
   });
+  const keyRetargetReadoutAction: QuickAction = {
+    id: "key-retarget-readout-action",
+    title: `Review Key Retarget: ${project.key}`,
+    detail: `Current ${project.key} / ${keyRetargetOptionSummary(project.key)} / ${keyRetargetPatternSummary(
+      project
+    )} / Pattern ${project.selectedPattern}`,
+    group: "Create",
+    keywords: `key retarget readout transpose scale harmony 808 bass melody chords current ${project.key} options ${keys.join(
+      " "
+    )} ${keyRetargetPatternSummary(project)} Pattern ${project.selectedPattern} beginner producer direct beat workstation`,
+    run: onFocusKeyRetargetReadout
+  };
   const styleQuickActions: QuickAction[] = styleProfiles.map((profile) => {
     const selected = profile.id === project.styleId;
     return {
@@ -20454,6 +20474,7 @@ function createQuickActions({
     ...styleGoalCueCommands,
     ...styleGoalActionCommands,
     ...styleQuickActions,
+    keyRetargetReadoutAction,
     ...keyQuickActions,
     {
       id: "key-compass-focus",
@@ -22370,6 +22391,7 @@ function createQuickActionResult(
     action.id === "tap-tempo-readout-action" ||
     action.id === "tempo-nudge-readout-action" ||
     action.id === "swing-feel-readout-action" ||
+    action.id === "key-retarget-readout-action" ||
     action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -26735,6 +26757,64 @@ function swingFeelRouteSummary(project: ProjectState): string {
   return swingFeelPads.map((pad) => `${pad.label} ${percentLabel(swingFeelPadSwing(pad, project))}`).join(" / ");
 }
 
+function quickActionKeyRetargetReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "key-retarget-readout-action") {
+    return null;
+  }
+
+  const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0] ?? null;
+  const blockLabel = selectedBlock
+    ? `Block ${Math.min(selectedArrangementIndex + 1, project.arrangement.length)} ${selectedBlock.section} / Pattern ${
+        selectedBlock.pattern
+      } / ${barCountLabel(selectedBlock.bars)}`
+    : "No selected block";
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+
+  return {
+    id: "key-retarget-readout",
+    label: "Key Retarget",
+    value: [
+      "review key retarget",
+      `current key ${project.key}`,
+      keyRetargetOptionSummary(project.key),
+      keyRetargetPatternSummary(project),
+      `${keyRetargetableProjectEventTotal(project)} retargetable note/chord events`,
+      `selected ${blockLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(activePattern(project))} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "key unchanged",
+      "Pattern A/B/C unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+function keyRetargetOptionSummary(currentKey: string): string {
+  const targets = keys.filter((key) => key !== currentKey);
+  return `${keys.length} key options / ${targets.length} targets: ${targets.join(", ")}`;
+}
+
+function keyRetargetPatternSummary(project: ProjectState): string {
+  return patternSlots.map((slot) => `Pattern ${slot} ${keyRetargetablePatternEventTotal(project.patterns[slot])}`).join(" / ");
+}
+
+function keyRetargetableProjectEventTotal(project: ProjectState): number {
+  return patternSlots.reduce((total, slot) => total + keyRetargetablePatternEventTotal(project.patterns[slot]), 0);
+}
+
+function keyRetargetablePatternEventTotal(pattern: ProjectState["patterns"][PatternSlot]): number {
+  return pattern.bassNotes.length + pattern.melodyNotes.length + pattern.chordEvents.length;
+}
+
 const GUIDE_QUICK_START_DETAIL_LABEL_PREFIXES = [
   "Destination ",
   "Metric ",
@@ -28579,6 +28659,16 @@ function quickActionResultMetricSnapshot(
       quickActionSectionLocatorMetricSnapshot(project, action) ?? {
         id: "section-locator",
         label: "Section cue",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "key-retarget-readout-action") {
+    return (
+      quickActionKeyRetargetReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "key-retarget-readout",
+        label: "Key Retarget",
         value: action.detail
       }
     );
@@ -31648,6 +31738,13 @@ function quickActionResultFollowup(
         styleGoalCueGoal
       )} cue on Pattern ${project.selectedPattern} before applying a writing move.`,
       nextCheck: "Run the matching Style Goal Action only if the cued loop still needs that layer."
+    };
+  }
+
+  if (action.id === "key-retarget-readout-action") {
+    return {
+      auditionCue: "Use the Key Retarget readout before changing project key, editing notes or chords, arranging sections, recording MIDI, or exporting.",
+      nextCheck: "Run a Key Retarget command only when one of the listed key targets should rewrite Pattern A/B/C bass, melody, and chord roots."
     };
   }
 
