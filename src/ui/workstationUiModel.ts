@@ -3230,6 +3230,7 @@ export type ComposerGuideFocusSummary = {
   metricLabel: string;
   auditionCueLabel: string;
   nextCheckLabel: string;
+  actionLabel: string;
   detailTitle: string;
   tone: MixCoachTone;
 };

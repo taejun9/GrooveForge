@@ -13149,6 +13149,7 @@ function ComposerGuide({
           <small data-testid="composer-guide-focus-next-check">{focusSummary.nextCheckLabel}</small>
         </div>
         <button
+          aria-label={focusSummary.actionLabel}
           data-testid="composer-guide-focus-action"
           disabled={!focusCard}
           onClick={() => {
@@ -13156,7 +13157,7 @@ function ComposerGuide({
               onFocus(focusCard);
             }
           }}
-          title={focusCard ? `Focus ${focusCard.focusLabel}: ${focusCard.status}` : "No Composer Guide focus target."}
+          title={focusSummary.actionLabel}
           type="button"
         >
           <ArrowRight size={13} aria-hidden="true" />
@@ -35744,6 +35745,7 @@ function createComposerGuideFocusSummary(
       metricLabel: "0/0 ready",
       auditionCueLabel: "Audition unavailable",
       nextCheckLabel: "Guide card unavailable",
+      actionLabel: "No Composer Guide focus target.",
       detailTitle: "Composer Guide has no cards to focus.",
       tone: "good"
     };
@@ -35755,6 +35757,7 @@ function createComposerGuideFocusSummary(
   const metricLabel = composerGuideFocusResultMetric(summary);
   const auditionCueLabel = composerGuideFocusResultAudition(card);
   const nextCheckLabel = composerGuideFocusResultNextCheck(card);
+  const actionLabel = `Focus ${card.focusLabel}: ${card.status} / ${destinationLabel} / ${metricLabel} / ${auditionCueLabel} / ${nextCheckLabel}`;
 
   return {
     cardId: card.id,
@@ -35765,6 +35768,7 @@ function createComposerGuideFocusSummary(
     metricLabel,
     auditionCueLabel,
     nextCheckLabel,
+    actionLabel,
     detailTitle: `${statusLabel} / ${card.label}: ${card.status} / ${detailLabel} / Guide metric: ${metricLabel} / Audition: ${auditionCueLabel} / Next check: ${nextCheckLabel}`,
     tone: card.tone
   };
