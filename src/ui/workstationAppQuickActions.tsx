@@ -1200,6 +1200,7 @@ export function createQuickActions({
   onFocusArrangementMuteMapReadout,
   onFocusArrangementMuteMap,
   onFocusArrangementPlaybackReadout,
+  onFocusArrangementTransitionMapReadout,
   onFocusArrangementTransitionMap,
   onApplyBasslinePad,
   onApplyBassGlidePad,
@@ -1523,6 +1524,7 @@ export function createQuickActions({
   onFocusArrangementMuteMapReadout: () => void;
   onFocusArrangementMuteMap: (lane: ArrangementMuteMapLane) => void;
   onFocusArrangementPlaybackReadout: () => void;
+  onFocusArrangementTransitionMapReadout: () => void;
   onFocusArrangementTransitionMap: (transition: ArrangementTransitionMapTransition) => void;
   onApplyBasslinePad: (pad: BasslinePadId) => void;
   onApplyBassGlidePad: (pad: BassGlidePadId) => void;
@@ -4808,6 +4810,23 @@ export function createQuickActions({
     },
     ...arrangementMuteMapActions,
     {
+      id: "arrangement-transition-map-readout-action",
+      title: arrangementTransition
+        ? `Review Arrangement Transition Map: ${arrangementTransition.value}`
+        : "Review Arrangement Transition Map",
+      detail: arrangementTransition
+        ? `${arrangementTransition.status} / ${arrangementTransition.energyLabel} / ${arrangementTransition.patternLabel} / ${
+            arrangementTransition.muteLabel
+          } / ${arrangementTransition.detail} / ${loopScopeStatus}`
+        : "No Arrangement Transition Map transition available.",
+      group: "Arrange",
+      keywords: `Quick Actions Arrangement Transition Map Readout review handoff section transition pattern energy mute event density loop scope priority transition ${
+        arrangementTransition?.fromSection ?? "none"
+      } ${arrangementTransition?.toSection ?? "none"} beginner producer`,
+      disabled: !arrangementTransition,
+      run: onFocusArrangementTransitionMapReadout
+    },
+    {
       id: "arrangement-transition-map-focus",
       title: arrangementTransition
         ? `Focus Transition: ${arrangementTransition.value}`
@@ -6115,6 +6134,7 @@ export function createQuickActionResult(
     action.id === "arrangement-mute-map-readout-action" ||
     action.id === "arrangement-mute-map-focus" ||
     action.id.startsWith("arrangement-mute-map-lane-") ||
+    action.id === "arrangement-transition-map-readout-action" ||
     action.id === "arrangement-transition-map-focus" ||
     action.id.startsWith("arrangement-transition-map-transition-") ||
     action.id === "transition-loop-cue" ||
@@ -9717,10 +9737,15 @@ export function quickActionArrangementTransitionMapMetricSnapshot(
   selectedArrangementIndex = 0,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
-  if (action.id !== "arrangement-transition-map-focus" && !action.id.startsWith("arrangement-transition-map-transition-")) {
+  if (
+    action.id !== "arrangement-transition-map-readout-action" &&
+    action.id !== "arrangement-transition-map-focus" &&
+    !action.id.startsWith("arrangement-transition-map-transition-")
+  ) {
     return null;
   }
 
+  const isReadout = action.id === "arrangement-transition-map-readout-action";
   const summary = createArrangementTransitionMapSummary(project);
   const transition = quickActionArrangementTransitionMapTransition(summary, action);
   if (!transition) {
@@ -9734,8 +9759,8 @@ export function quickActionArrangementTransitionMapMetricSnapshot(
   const contextLabel = detailParts.join(" / ") || transition.detail;
 
   return {
-    id: "arrangement-transition-map",
-    label: "Transition map",
+    id: isReadout ? "arrangement-transition-map-readout" : "arrangement-transition-map",
+    label: isReadout ? "Transition map readout" : "Transition map",
     value: [
       quickActionArrangementTransitionMapActionLabel(action),
       "destination Arrange panel",
@@ -9822,7 +9847,7 @@ export function quickActionArrangementTransitionMapTransition(
   summary: ArrangementTransitionMapSummary,
   action: QuickAction
 ): ArrangementTransitionMapTransition | null {
-  if (action.id === "arrangement-transition-map-focus") {
+  if (action.id === "arrangement-transition-map-readout-action" || action.id === "arrangement-transition-map-focus") {
     return activeArrangementTransitionMapQuickActionTransition(summary);
   }
 
@@ -9847,6 +9872,10 @@ export function quickActionArrangementTransitionDetailParts(action: QuickAction)
 }
 
 export function quickActionArrangementTransitionMapActionLabel(action: QuickAction): string {
+  if (action.id === "arrangement-transition-map-readout-action") {
+    return "review priority transition map";
+  }
+
   return action.id === "arrangement-transition-map-focus" ? "focus priority transition map" : "focus direct transition map";
 }
 
@@ -9859,10 +9888,14 @@ export function quickActionArrangementTransitionLaneLabel(
   transition: ArrangementTransitionMapTransition
 ): string {
   const titleLabel = action.title
+    .replace(/^Review Arrangement Transition Map:\s*/, "")
     .replace(/^Focus Arrangement Transition:\s*/, "")
     .replace(/^Cue Transition Loop:\s*/, "")
     .trim();
-  return titleLabel && titleLabel !== "Focus Arrangement Transition" && titleLabel !== "Cue Transition Loop"
+  return titleLabel &&
+    titleLabel !== "Review Arrangement Transition Map" &&
+    titleLabel !== "Focus Arrangement Transition" &&
+    titleLabel !== "Cue Transition Loop"
     ? titleLabel
     : transition.value;
 }
@@ -13426,7 +13459,7 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "arrangement-transition-map-focus") {
+  if (action.id === "arrangement-transition-map-readout-action" || action.id === "arrangement-transition-map-focus") {
     const transitionMetric = quickActionArrangementTransitionMapMetricSnapshot(
       project,
       action,
@@ -13438,11 +13471,17 @@ export function quickActionResultMetricSnapshot(
     }
 
     const summary = createArrangementTransitionMapSummary(project);
-    return {
-      id: "arrangement-transition-map",
-      label: "Transition map",
-      value: `${summary.headline} / ${summary.detail}`
-    };
+    return action.id === "arrangement-transition-map-readout-action"
+      ? {
+          id: "arrangement-transition-map-readout",
+          label: "Transition map readout",
+          value: `${summary.headline} / ${summary.detail}`
+        }
+      : {
+          id: "arrangement-transition-map",
+          label: "Transition map",
+          value: `${summary.headline} / ${summary.detail}`
+        };
   }
 
   if (action.id.startsWith("arrangement-transition-map-transition-")) {
@@ -16944,6 +16983,13 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Play Song loop and follow the focused Mute Map lane through each section before editing block mutes.",
       nextCheck: "Use the selected-block mute buttons only when the lane needs more drop, build, or hook contrast."
+    };
+  }
+
+  if (action.id === "arrangement-transition-map-readout-action") {
+    return {
+      auditionCue: "Review the Arrangement Transition Map priority handoff, Pattern change, energy movement, muted-layer change, and loop context before focusing or cueing it.",
+      nextCheck: "Focus or cue the Arrangement Transition Map only after the readout handoff is the boundary you want to inspect."
     };
   }
 

@@ -973,12 +973,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Layer Dropout, Section Mute/Live Posture, Priority Lane, Focus Route, Focus Result, Audition Cue, and Next Check context before Arrangement Mute Map focus commands run."
       },
       {
+        id: "arrangement-transition-map-readout",
+        command: "Arrangement Transition Map Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current transition priority handoff",
+        context:
+          "Arrangement Transition Map Readout Action, Section Handoff, Pattern A/B/C, Energy Change, Muted-Layer Change, Event Density, Selected Block, Arrangement Length, Loop Scope, Audition Cue, and Next Transition-Map Check context before Arrangement Transition Map focus or cue commands run."
+      },
+      {
         id: "arrangement-transition-map",
         command: "Arrangement Transition Map",
         shortcut: "Quick Actions / Readout",
         target: "Section handoffs / energy / mutes / transition cue",
         context:
-          "Section Handoff, Pattern A/B/C, Energy Change, Muted-Layer Change, Event Density, Priority Handoff, Focus/Cue Route, Audition Cue, and Next Check context before Arrangement Transition Map commands run."
+          "Section Handoff, Pattern A/B/C, Energy Change, Muted-Layer Change, Event Density, Priority Handoff, Focus/Cue Route, Focus Result, Cue Result, Audition Cue, and Next Check context before Arrangement Transition Map focus or cue commands run."
       },
       {
         id: "arrangement-playback-readout",
