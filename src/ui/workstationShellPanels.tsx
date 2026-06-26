@@ -297,7 +297,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Composition, Arrangement, Mix, and Delivery audition checkpoint context with destination, listening metric, audition cue, and next check before Listening Pass commands run."
       },
-      { id: "beat-passport", command: "Beat Passport", shortcut: "Quick Actions / Readout", target: "Identity / readiness / export" },
+      {
+        id: "beat-passport",
+        command: "Beat Passport",
+        shortcut: "Quick Actions / Readout",
+        target: "Target / length / Pattern A-B-C / readiness / export / stems / master",
+        context:
+          "Target, Length, Pattern A/B/C, Readiness, Export, Stems, and Master identity context with destination, passport metric, audition cue, and next check before Beat Passport commands run."
+      },
       { id: "production-snapshot", command: "Production Snapshot", shortcut: "Quick Actions / Readout", target: "Target / form / mix / handoff" },
       { id: "hook-readiness", command: "Hook Readiness", shortcut: "Quick Actions / Readout", target: "Hook / motif / contrast" },
       { id: "topline-space", command: "Topline Space", shortcut: "Quick Actions / Readout", target: "Pocket / lead room / artist context" },
