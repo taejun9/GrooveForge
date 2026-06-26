@@ -5381,6 +5381,58 @@ h2 {
   white-space: nowrap;
 }
 
+.quick-actions-search-hints {
+  display: grid;
+  grid-template-columns: 92px repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+}
+
+.quick-actions-search-hints > span {
+  overflow: hidden;
+  color: rgba(244, 239, 231, 0.56);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-search-hints button {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid rgba(130, 215, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(130, 215, 255, 0.045);
+  color: #f4efe7;
+  cursor: pointer;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.quick-actions-search-hints button:hover {
+  border-color: rgba(130, 215, 255, 0.34);
+  background: rgba(130, 215, 255, 0.075);
+}
+
+.quick-actions-search-hints button strong,
+.quick-actions-search-hints button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-actions-search-hints button strong {
+  color: #f4efe7;
+  font-size: 11px;
+}
+
+.quick-actions-search-hints button small {
+  color: rgba(244, 239, 231, 0.58);
+  font-size: 10px;
+}
+
 .quick-actions-search-result {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.85fr) minmax(0, 1.2fr);
@@ -26602,6 +26654,10 @@ input[type="range"] {
     gap: 4px 8px;
   }
 
+  .quick-actions-search-hints {
+    grid-template-columns: 84px repeat(2, minmax(0, 1fr));
+  }
+
   .quick-actions-search-recovery {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -27571,6 +27627,10 @@ input[type="range"] {
   .quick-actions-spotlight {
     grid-template-columns: 1fr;
     gap: 3px;
+  }
+
+  .quick-actions-search-hints {
+    grid-template-columns: 1fr;
   }
 
   .quick-actions-search-recovery {
