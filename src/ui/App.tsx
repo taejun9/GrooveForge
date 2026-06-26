@@ -8085,6 +8085,11 @@ export function App(): ReactElement {
     );
   }
 
+  function focusTempoNudgeReadout(): void {
+    transportPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(`Tempo Nudge ${project.bpm} BPM: ${tempoNudgeRouteSummary(project.bpm)}`);
+  }
+
   const quickActions = createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
@@ -8248,6 +8253,7 @@ export function App(): ReactElement {
     onToggleMetronome: toggleMetronome,
     onTapTempo: tapProjectTempo,
     onFocusTapTempoReadout: focusTapTempoReadout,
+    onFocusTempoNudgeReadout: focusTempoNudgeReadout,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onCueBlueprintPreview: cueBeatBlueprintPreview,
     onRequestMidiInputAccess: requestMidiInputAccess,
@@ -17904,6 +17910,7 @@ function createQuickActions({
   onToggleMetronome,
   onTapTempo,
   onFocusTapTempoReadout,
+  onFocusTempoNudgeReadout,
   onPreviewBlueprint,
   onCueBlueprintPreview,
   onRequestMidiInputAccess,
@@ -18190,6 +18197,7 @@ function createQuickActions({
   onToggleMetronome: () => void;
   onTapTempo: () => void;
   onFocusTapTempoReadout: () => void;
+  onFocusTempoNudgeReadout: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onCueBlueprintPreview: (scope: Extract<TransportLoopScope, "arrangement" | "pattern">) => void;
   onRequestMidiInputAccess: () => Promise<void>;
@@ -19877,6 +19885,7 @@ function createQuickActions({
   const selectedLoopBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0] ?? null;
   const transportPositionDetailLabel = transportPositionReadout.detailLabel.split(" / ").join(" + ");
   const tapTempoDetailLabel = tapTempoReadout.detailLabel.split(" / ").join(" + ");
+  const tempoNudgeRouteLabel = tempoNudgeRouteSummary(project.bpm);
 
   return [
     {
@@ -19938,6 +19947,20 @@ function createQuickActions({
         selectedLoopBlock ? `${selectedLoopBlock.section} ${selectedLoopBlock.pattern}` : "no block"
       } beginner producer direct beat workstation`,
       run: onFocusTapTempoReadout
+    },
+    {
+      id: "tempo-nudge-readout-action",
+      title: `Review Tempo Nudge: ${project.bpm} BPM`,
+      detail: `Current ${project.bpm} BPM / ${tempoNudgeRouteLabel} / ${transportLoopLabel(
+        transportLoopScope
+      )} loop / Pattern ${project.selectedPattern}`,
+      group: "Transport",
+      keywords: `tempo nudge readout bpm routes current bounded -1 +1 half double transport timing ${
+        tempoNudgeRouteLabel
+      } ${project.metronomeEnabled ? "metronome on" : "metronome off"} ${transportLoopScope} Pattern ${
+        project.selectedPattern
+      } ${selectedLoopBlock ? `${selectedLoopBlock.section} ${selectedLoopBlock.pattern}` : "no block"} beginner producer direct beat workstation`,
+      run: onFocusTempoNudgeReadout
     },
     {
       id: "toggle-playback",
@@ -22319,6 +22342,7 @@ function createQuickActionResult(
     action.id === "loop-scope" ||
     action.id === "metronome-readout" ||
     action.id === "tap-tempo-readout-action" ||
+    action.id === "tempo-nudge-readout-action" ||
     action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -26584,6 +26608,59 @@ function quickActionTapTempoReadoutDetailParts(action: QuickAction): string[] {
     .filter(Boolean);
 }
 
+function quickActionTempoNudgeReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "tempo-nudge-readout-action") {
+    return null;
+  }
+
+  const selectedBlock = project.arrangement[selectedArrangementIndex] ?? project.arrangement[0] ?? null;
+  const blockLabel = selectedBlock
+    ? `Block ${Math.min(selectedArrangementIndex + 1, project.arrangement.length)} ${selectedBlock.section} / Pattern ${
+        selectedBlock.pattern
+      } / ${barCountLabel(selectedBlock.bars)}`
+    : "No selected block";
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+
+  return {
+    id: "tempo-nudge-readout",
+    label: "Tempo Nudge",
+    value: [
+      "review tempo nudge",
+      `${project.bpm} BPM current`,
+      tempoNudgeRouteSummary(project.bpm),
+      `loop ${transportLoopLabelFromActionDetail(action.detail)}`,
+      project.metronomeEnabled ? "metronome on" : "metronome off",
+      `selected ${blockLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(activePattern(project))} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "tap history unchanged",
+      "tempo unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+function tempoNudgeRouteSummary(bpm: number): string {
+  return tempoNudgePads.map((pad) => `${pad.label} ${tempoNudgePadBpm(bpm, pad.id)} BPM`).join(" / ");
+}
+
+function transportLoopLabelFromActionDetail(detail: string): string {
+  const loopPart = detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .find((part) => part.endsWith(" loop"));
+  return loopPart?.replace(/\s+loop$/, "") || "current";
+}
+
 const GUIDE_QUICK_START_DETAIL_LABEL_PREFIXES = [
   "Destination ",
   "Metric ",
@@ -28312,6 +28389,16 @@ function quickActionResultMetricSnapshot(
       quickActionKeyCompassMetricSnapshot(project, action) ?? {
         id: "key-compass",
         label: "Key compass",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "tempo-nudge-readout-action") {
+    return (
+      quickActionTempoNudgeReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "tempo-nudge-readout",
+        label: "Tempo Nudge",
         value: action.detail
       }
     );
@@ -31375,6 +31462,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Key Compass card to inspect that harmony lane before editing notes or chords.",
       nextCheck: "Return to Key Compass when you need another direct scale, cadence, chord, 808/bass, melody, or selected focus."
+    };
+  }
+
+  if (action.id === "tempo-nudge-readout-action") {
+    return {
+      auditionCue: "Use the Tempo Nudge readout before changing BPM, arranging sections, recording MIDI, or exporting.",
+      nextCheck: "Run a Tempo Nudge command only when one of the bounded -1, +1, half-time, or double-time routes should become the project BPM."
     };
   }
 

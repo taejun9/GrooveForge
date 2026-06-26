@@ -454,7 +454,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "-1 / +1 / half / double BPM",
         context:
-          "Current BPM, -1/+1/Half/Double Routes, Bounded Tempo Result, Tap Reset, Result Feedback, Audition Cue, and Next Tempo Check context before Tempo Nudge commands run."
+          "Current BPM, Tempo Nudge Readout Command, -1/+1/Half/Double Routes, Route Metric, Bounded Tempo Result, Tap Reset, Result Feedback, Audition Cue, and Next Tempo Check context before Tempo Nudge commands run."
       },
       {
         id: "swing-feel",
