@@ -478,7 +478,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Style direction",
         context:
-          "Style Direction, BPM Range, Swing Default, Bass/Melody Roles, Sound Preset, Pattern/Arrangement Fit, Result Feedback, Audition Cue, and Next Style Check context before Style Quick Picks commands run."
+          "Style Direction Readout Command, Style Direction, Style Targets, BPM Range, Swing Default, Bass/Melody Roles, Sound Preset, Pattern/Arrangement Fit, Style Target Metric, Result Feedback, Audition Cue, and Next Style Check context before Style Quick Picks commands run."
       },
       {
         id: "keyboard-capture",

@@ -1479,6 +1479,7 @@ export function App(): ReactElement {
   const controllerRef = useRef<PlaybackController | null>(null);
   const auditionControllerRef = useRef<PlaybackController | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const styleInspectorRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
   const composePanelRef = useRef<HTMLElement | null>(null);
   const soundPanelRef = useRef<HTMLElement | null>(null);
@@ -7636,6 +7637,13 @@ export function App(): ReactElement {
     setProjectStatus(`Style ${item.label}: ${item.value}`);
   }
 
+  function focusStyleDirectionReadout(): void {
+    styleInspectorRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Style Direction ${style.name}: ${styleDirectionCurrentSummary(project)} / ${styleDirectionTargetSummary(project.styleId)}`
+    );
+  }
+
   function focusTimbreCheck(): void {
     soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(`Timbre Check ${soundTimbreCheckSummary.statusLabel}: ${soundTimbreCheckSummary.balanceLabel}`);
@@ -8268,6 +8276,7 @@ export function App(): ReactElement {
     onFocusTempoNudgeReadout: focusTempoNudgeReadout,
     onFocusSwingFeelReadout: focusSwingFeelReadout,
     onFocusKeyRetargetReadout: focusKeyRetargetReadout,
+    onFocusStyleDirectionReadout: focusStyleDirectionReadout,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
     onCueBlueprintPreview: cueBeatBlueprintPreview,
     onRequestMidiInputAccess: requestMidiInputAccess,
@@ -8790,6 +8799,7 @@ export function App(): ReactElement {
         focusedItemId={styleInspectorFocusId}
         isPlaying={isPlaying}
         result={styleInspectorResult}
+        innerRef={styleInspectorRef}
         onCueGoal={cueStyleGoal}
         onSelectStyle={selectStyle}
         onFocus={focusStyleInspectorItem}
@@ -10285,6 +10295,7 @@ function StyleInspector({
   composerActionsSummary,
   cueResult,
   focusedItemId,
+  innerRef,
   isPlaying,
   result,
   onCueGoal,
@@ -10298,6 +10309,7 @@ function StyleInspector({
   composerActionsSummary: ComposerActionsSummary;
   cueResult: StyleGoalCueResult | null;
   focusedItemId: StyleInspectorFocusId | null;
+  innerRef: Ref<HTMLElement>;
   isPlaying: boolean;
   result: StyleInspectorFocusResult | null;
   onCueGoal: (goal: StyleGoalCard) => void;
@@ -10325,6 +10337,7 @@ function StyleInspector({
         .filter(Boolean)
         .join(" ")}
       data-testid="style-inspector"
+      ref={innerRef}
       style={{ "--style-color": summary.profile.color } as CSSProperties}
     >
       <div className="style-inspector-heading">
@@ -17927,6 +17940,7 @@ function createQuickActions({
   onFocusTempoNudgeReadout,
   onFocusSwingFeelReadout,
   onFocusKeyRetargetReadout,
+  onFocusStyleDirectionReadout,
   onPreviewBlueprint,
   onCueBlueprintPreview,
   onRequestMidiInputAccess,
@@ -18216,6 +18230,7 @@ function createQuickActions({
   onFocusTempoNudgeReadout: () => void;
   onFocusSwingFeelReadout: () => void;
   onFocusKeyRetargetReadout: () => void;
+  onFocusStyleDirectionReadout: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
   onCueBlueprintPreview: (scope: Extract<TransportLoopScope, "arrangement" | "pattern">) => void;
   onRequestMidiInputAccess: () => Promise<void>;
@@ -19784,6 +19799,18 @@ function createQuickActions({
       run: () => onSelectStyle(profile.id)
     };
   });
+  const styleDirectionReadoutAction: QuickAction = {
+    id: "style-direction-readout-action",
+    title: `Review Style Direction: ${currentStyleName}`,
+    detail: `${styleDirectionCurrentSummary(project)} / ${styleDirectionTargetSummary(
+      project.styleId
+    )} / loop ${transportLoopLabel(transportLoopScope)} / Pattern ${project.selectedPattern}`,
+    group: "Create",
+    keywords: `style direction readout genre quick picks current ${currentStyleName} options ${styleProfiles
+      .map((profile) => `${profile.name} ${profile.id} ${profile.bassStyle} ${profile.melodyStyle}`)
+      .join(" ")} ${styleDirectionPatternSummary(project)} beginner producer direct beat workstation sample free`,
+    run: onFocusStyleDirectionReadout
+  };
   const patternCueActions: QuickAction[] = patternSlots.map((pattern) => {
     const cued = pattern === project.selectedPattern && transportLoopScope === "pattern";
     const eventCount = patternEventTotal(project.patterns[pattern]);
@@ -20473,6 +20500,7 @@ function createQuickActions({
     ...styleInspectorActions,
     ...styleGoalCueCommands,
     ...styleGoalActionCommands,
+    styleDirectionReadoutAction,
     ...styleQuickActions,
     keyRetargetReadoutAction,
     ...keyQuickActions,
@@ -22406,6 +22434,7 @@ function createQuickActionResult(
     action.id.startsWith("beat-spine-card-jump-") ||
     action.id === "style-inspector-focus" ||
     action.id.startsWith("style-inspector-item-") ||
+    action.id === "style-direction-readout-action" ||
     action.id === "beat-readiness-focus" ||
     action.id.startsWith("beat-readiness-check-") ||
     action.id === "listening-pass-focus" ||
@@ -26815,6 +26844,73 @@ function keyRetargetablePatternEventTotal(pattern: ProjectState["patterns"][Patt
   return pattern.bassNotes.length + pattern.melodyNotes.length + pattern.chordEvents.length;
 }
 
+function quickActionStyleDirectionReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "style-direction-readout-action") {
+    return null;
+  }
+
+  const profile = getStyle(project);
+  const summary = createStyleInspectorSummary(project, profile, createPatternCompareSummaries(project));
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const loopLabel =
+    quickActionStyleDirectionReadoutDetailParts(action).find((part) => part.startsWith("loop ")) ?? "loop current";
+
+  return {
+    id: "style-direction-readout",
+    label: "Style Direction",
+    value: [
+      "review style direction",
+      styleDirectionCurrentSummary(project),
+      styleDirectionTargetSummary(project.styleId),
+      `roles ${bassStyleRoleLabel(profile.bassStyle)} / ${melodyStyleRoleLabel(profile.melodyStyle)}`,
+      `sound ${soundPresetLabel(styleSoundPreset(profile.id))}`,
+      `goals ${quickActionStyleInspectorGoalPosture(summary)}`,
+      `density ${quickActionStyleInspectorDensityPosture(summary)}`,
+      loopLabel,
+      project.metronomeEnabled ? "metronome on" : "metronome off",
+      `selected ${quickActionArrangementSelectedBlockLabel(project, selectedArrangementIndex)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(activePattern(project))} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "style unchanged",
+      "BPM/swing unchanged",
+      "Pattern A/B/C unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
+function quickActionStyleDirectionReadoutDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function styleDirectionCurrentSummary(project: ProjectState): string {
+  const profile = getStyle(project);
+  return `${profile.name} current / ${project.bpm} BPM active / ${profile.bpmRange[0]}-${profile.bpmRange[1]} BPM range / ${percentLabel(
+    project.swing
+  )} swing active / ${percentLabel(profile.defaultSwing)} default`;
+}
+
+function styleDirectionTargetSummary(currentStyleId: StyleId): string {
+  const targets = styleProfiles.filter((profile) => profile.id !== currentStyleId);
+  return `${styleProfiles.length} style options / ${targets.length} targets: ${targets.map((profile) => profile.name).join(", ")}`;
+}
+
+function styleDirectionPatternSummary(project: ProjectState): string {
+  return patternSlots.map((slot) => `Pattern ${slot} ${patternEventTotal(project.patterns[slot])}`).join(" / ");
+}
+
 const GUIDE_QUICK_START_DETAIL_LABEL_PREFIXES = [
   "Destination ",
   "Metric ",
@@ -28680,6 +28776,16 @@ function quickActionResultMetricSnapshot(
       label: "Key retarget",
       value: `Key ${project.key} / ${projectEventTotal(project)} events / edit Pattern ${project.selectedPattern}`
     };
+  }
+
+  if (action.id === "style-direction-readout-action") {
+    return (
+      quickActionStyleDirectionReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "style-direction-readout",
+        label: "Style Direction",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id === "style-inspector-focus") {
@@ -31766,6 +31872,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Style Inspector lane to inspect genre fit before changing style or writing parts.",
       nextCheck: "Return to Style Inspector when you need another direct BPM, swing, bass, melody, sound, goal, or density focus."
+    };
+  }
+
+  if (action.id === "style-direction-readout-action") {
+    return {
+      auditionCue: "Use the Style Direction readout before applying a different style, writing parts, arranging, recording MIDI, or exporting.",
+      nextCheck: "Run a Style Quick Pick only when one of the listed style targets should reset BPM, swing, and direct-composition direction."
     };
   }
 
