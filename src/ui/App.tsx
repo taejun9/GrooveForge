@@ -18337,7 +18337,7 @@ function createQuickActions({
   const beatSpineCardJumpActions: QuickAction[] = beatSpineSummary.cards.map((card) => ({
     id: `beat-spine-card-jump-${card.id}`,
     title: `Jump Beat Spine: ${card.label}`,
-    detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
+    detail: beatSpineJumpButtonContext(card, beatSpineSummary),
     group: "Project",
     keywords: `beat spine direct card jump core setup drums 808 bass harmony melody sound arrange finish ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
     run: () => onJumpBeatSpine(card)
@@ -18345,7 +18345,9 @@ function createQuickActions({
   const beatSpineCardApplyActions: QuickAction[] = beatSpineSummary.cards.map((card) => ({
     id: `beat-spine-card-apply-${card.id}`,
     title: card.action ? `Apply Beat Spine: ${card.label}` : `${card.label} Beat Spine apply unavailable`,
-    detail: card.action ? `${card.action.label} / ${card.action.detail}` : `${card.label} has no direct Beat Spine apply action.`,
+    detail: card.action
+      ? beatSpineApplyButtonContext(card.action, card, beatSpineSummary, project.selectedPattern)
+      : `${card.label} has no direct Beat Spine apply action.`,
     group: "Create",
     keywords: `beat spine direct card apply core setup drums 808 bass harmony melody sound arrange finish ${card.id} ${card.label} ${card.action?.label ?? "none"} sample free beginner producer`,
     disabled: !card.action,
@@ -20086,7 +20088,7 @@ function createQuickActions({
     {
       id: "beat-spine-jump",
       title: beatSpineCard ? `Jump Beat Spine: ${beatSpineCard.label}` : "Jump Beat Spine",
-      detail: beatSpineCard ? `${beatSpineCard.value} / ${beatSpineCard.focusLabel}` : "No Beat Spine card available.",
+      detail: beatSpineCard ? beatSpineJumpButtonContext(beatSpineCard, beatSpineSummary) : "No Beat Spine card available.",
       group: "Project",
       keywords: `beat spine jump core setup drums 808 bass harmony melody sound arrange finish ${beatSpineCard?.id ?? "none"} ${beatSpineCard?.focusLabel ?? "none"} beginner producer`,
       disabled: !beatSpineCard,
@@ -20101,7 +20103,7 @@ function createQuickActions({
       id: "beat-spine-apply",
       title: beatSpineApplyCard?.action ? `Apply Beat Spine: ${beatSpineApplyCard.label}` : "Apply Beat Spine",
       detail: beatSpineApplyCard?.action
-        ? `${beatSpineApplyCard.action.label} / ${beatSpineApplyCard.action.detail}`
+        ? beatSpineApplyButtonContext(beatSpineApplyCard.action, beatSpineApplyCard, beatSpineSummary, project.selectedPattern)
         : "No Beat Spine action available.",
       group: "Create",
       keywords: `beat spine apply core action setup drums 808 bass harmony melody sound arrange finish ${beatSpineApplyCard?.id ?? "none"} ${beatSpineApplyCard?.action?.label ?? "none"} beginner producer sample free`,
@@ -26262,6 +26264,8 @@ function modeFocusCardLabelFromQuickActionId(id: string): string {
   }
 }
 
+const BEAT_SPINE_DETAIL_LABEL_PREFIXES = ["Destination ", "Beat core ", "Card ", "Scope ", "Audition ", "Next "] as const;
+
 function quickActionBeatSpineMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -26288,22 +26292,29 @@ function quickActionBeatSpineMetricSnapshot(
   )} events / ${barCountLabel(arrangementTotalBars(project))}`;
 
   if (isJump) {
-    const contextLabel = parts[0] ?? "core context unavailable";
-    const destinationLabel = parts[1] ?? beatSpineDestinationLabelFromCardLabel(cardLabel);
-    const detailLabel = parts.slice(2).join(" / ") || "current core card";
+    const routeLabel = quickActionBeatSpineRouteLabel(parts);
+    const destinationLabel =
+      quickActionBeatSpineDetailSegment(parts, "Destination ", "") || beatSpineDestinationLabelFromCardLabel(cardLabel);
+    const metricLabel = quickActionBeatSpineDetailSegment(parts, "Beat core ", "Beat core unavailable");
+    const auditionLabel = quickActionBeatSpineDetailSegment(parts, "Audition ", "Audition unavailable");
+    const nextCheckLabel = quickActionBeatSpineDetailSegment(parts, "Next ", "Next unavailable");
     return {
       id: "beat-spine",
       label: "Beat spine",
-      value: `${actionLabel} / card ${cardLabel} / destination ${destinationLabel} / context ${contextLabel} / detail ${detailLabel} / ${projectContext}`
+      value: `${actionLabel} / card ${cardLabel} / route ${routeLabel} / ${destinationLabel} / ${metricLabel} / ${auditionLabel} / ${nextCheckLabel} / ${projectContext}`
     };
   }
 
-  const moveLabel = parts[0] ?? "apply move unavailable";
-  const contextLabel = parts.slice(1).join(" / ") || "apply context unavailable";
+  const moveLabel = quickActionBeatSpineRouteLabel(parts);
+  const targetCardLabel = quickActionBeatSpineDetailSegment(parts, "Card ", `Card ${cardLabel}`);
+  const metricLabel = quickActionBeatSpineDetailSegment(parts, "Beat core ", "Beat core unavailable");
+  const scopeLabel = quickActionBeatSpineDetailSegment(parts, "Scope ", "Scope unavailable");
+  const auditionLabel = quickActionBeatSpineDetailSegment(parts, "Audition ", "Audition unavailable");
+  const nextCheckLabel = quickActionBeatSpineDetailSegment(parts, "Next ", "Next unavailable");
   return {
     id: "beat-spine",
     label: "Beat spine",
-    value: `${actionLabel} / card ${cardLabel} / move ${moveLabel} / context ${contextLabel} / ${projectContext}`
+    value: `${actionLabel} / card ${cardLabel} / move ${moveLabel} / ${targetCardLabel} / ${metricLabel} / ${scopeLabel} / ${auditionLabel} / ${nextCheckLabel} / ${projectContext}`
   };
 }
 
@@ -26312,6 +26323,27 @@ function quickActionBeatSpineDetailParts(action: QuickAction): string[] {
     .split(" / ")
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+function quickActionBeatSpineRouteLabel(parts: string[]): string {
+  const firstLabeledIndex = parts.findIndex((part) =>
+    BEAT_SPINE_DETAIL_LABEL_PREFIXES.some((prefix) => part.startsWith(prefix))
+  );
+  if (firstLabeledIndex <= 0) {
+    return parts[0] ?? "Beat Spine";
+  }
+  return parts.slice(0, firstLabeledIndex).join(" / ");
+}
+
+function quickActionBeatSpineDetailSegment(parts: string[], prefix: string, fallback: string): string {
+  const start = parts.findIndex((part) => part.startsWith(prefix));
+  if (start === -1) {
+    return fallback;
+  }
+  const end = parts.findIndex(
+    (part, index) => index > start && BEAT_SPINE_DETAIL_LABEL_PREFIXES.some((labelPrefix) => part.startsWith(labelPrefix))
+  );
+  return parts.slice(start, end === -1 ? parts.length : end).join(" / ");
 }
 
 function quickActionBeatSpineCardLabel(action: QuickAction): string {
