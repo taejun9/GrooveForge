@@ -368,7 +368,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Compose, Arrange, Mix, and Deliver workflow-zone context with destination, readiness metric, zone context, audition cue, jump action, and next check before Workflow Navigator commands run."
       },
       { id: "workflow-spotlight", command: "Workflow Spotlight", shortcut: "Quick Actions / Readout", target: "Current command target" },
-      { id: "beat-map", command: "Beat Map", shortcut: "Quick Actions / Readout", target: "Workflow / producer metrics" },
+      {
+        id: "beat-map",
+        command: "Beat Map",
+        shortcut: "Quick Actions / Readout",
+        target: "Workflow stages / song-pattern / export-stem / producer overview",
+        context:
+          "Start, Compose, Arrange, Polish, Deliver, Song/Pattern Metrics, Export/Stems, Delivery Target, Completion Posture, Action Route, Audition Cue, and Next Check context before Beat Map commands run."
+      },
       { id: "structure-lens", command: "Structure Lens", shortcut: "Quick Actions / Readout", target: "Arrangement shape actions" },
       {
         id: "next-move",
