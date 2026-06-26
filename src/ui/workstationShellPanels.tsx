@@ -510,7 +510,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Selected events",
         context:
-          "Selected Drum/808/Synth/Chord Event, Selected Pattern, One-Shot Audition Route, Runtime Fallback, Audition Result Feedback, and Next Listening Check context before Editor Audition commands run."
+          "Editor Audition Readout Command, Selected Drum/808/Synth/Chord Event, Selected Pattern, Selected Block, One-Shot Audition Route, Runtime Fallback Posture, Selected Event Metric, Audition Result Feedback, Audition Cue, and Next Listening Check context before Editor Audition commands run."
       },
       {
         id: "blueprints",

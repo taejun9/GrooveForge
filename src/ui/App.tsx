@@ -2081,6 +2081,20 @@ export function App(): ReactElement {
     selectedDrumStep && selectedDrumStep.lane === "hat" && selectedDrumActive
       ? hatRepeatCount(currentPattern, selectedDrumStep.step)
       : 1;
+  const editorAuditionReadout = createEditorAuditionReadoutSummary({
+    project,
+    selectedDrumStep,
+    selectedDrumActive,
+    selectedDrumVelocity,
+    selectedDrumTiming,
+    selectedDrumProbability,
+    selectedHatRepeat,
+    selectedNote,
+    selectedBassNote,
+    selectedMelodyNote,
+    selectedChord,
+    editorAuditionResult
+  });
 
   useEffect(() => {
     setEditorAuditionResult(null);
@@ -8158,6 +8172,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusEditorAuditionReadout(): void {
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Editor Audition ${editorAuditionReadout.statusLabel}: ${editorAuditionReadout.targetLabel} / ${editorAuditionReadout.metricLabel} ${editorAuditionReadout.metricValue}`
+    );
+  }
+
   const quickActions = createQuickActions({
     arrangementArcPadOptions,
     arrangementArcPreviewSummary,
@@ -8180,6 +8201,7 @@ export function App(): ReactElement {
     composerActionsSummary,
     drumKitPreviewSummary,
     drumMovePreviewSummary,
+    editorAuditionReadout,
     firstBeatPathSummary,
     finishChecklistSummary,
     grooveCompassSummary,
@@ -8329,6 +8351,7 @@ export function App(): ReactElement {
     onFocusKeyRetargetReadout: focusKeyRetargetReadout,
     onFocusKeyboardCaptureReadout: focusKeyboardCaptureReadout,
     onFocusCaptureStepModeReadout: focusCaptureStepModeReadout,
+    onFocusEditorAuditionReadout: focusEditorAuditionReadout,
     onFocusMidiInputReadout: focusMidiInputReadout,
     onFocusStyleDirectionReadout: focusStyleDirectionReadout,
     onPreviewBlueprint: previewQuickActionBeatBlueprint,
@@ -17851,6 +17874,7 @@ function createQuickActions({
   composerActionsSummary,
   drumKitPreviewSummary,
   drumMovePreviewSummary,
+  editorAuditionReadout,
   firstBeatPathSummary,
   finishChecklistSummary,
   grooveCompassSummary,
@@ -17999,6 +18023,7 @@ function createQuickActions({
   onFocusKeyRetargetReadout,
   onFocusKeyboardCaptureReadout,
   onFocusCaptureStepModeReadout,
+  onFocusEditorAuditionReadout,
   onFocusMidiInputReadout,
   onFocusStyleDirectionReadout,
   onPreviewBlueprint,
@@ -18147,6 +18172,7 @@ function createQuickActions({
   composerActionsSummary: ComposerActionsSummary;
   drumKitPreviewSummary: DrumKitPreviewSummary;
   drumMovePreviewSummary: DrumMovePreviewSummary;
+  editorAuditionReadout: EditorAuditionReadoutSummary;
   firstBeatPathSummary: FirstBeatPathSummary;
   finishChecklistSummary: FinishChecklistSummary;
   grooveCompassSummary: GrooveCompassSummary;
@@ -18295,6 +18321,7 @@ function createQuickActions({
   onFocusKeyRetargetReadout: () => void;
   onFocusKeyboardCaptureReadout: () => void;
   onFocusCaptureStepModeReadout: () => void;
+  onFocusEditorAuditionReadout: () => void;
   onFocusMidiInputReadout: () => void;
   onFocusStyleDirectionReadout: () => void;
   onPreviewBlueprint: (blueprintId: BeatBlueprintId) => void;
@@ -19238,6 +19265,14 @@ function createQuickActions({
       keyboardCaptureStepMode
     )} beginner producer direct composition sample free`,
     run: onFocusMidiInputReadout
+  };
+  const editorAuditionReadoutAction: QuickAction = {
+    id: "editor-audition-readout-action",
+    title: `Review Editor Audition: ${editorAuditionReadout.statusLabel}`,
+    detail: `${editorAuditionReadout.targetLabel} / ${editorAuditionReadout.routeLabel} / ${editorAuditionReadout.metricLabel} ${editorAuditionReadout.metricValue} / ${editorAuditionReadout.runtimeLabel} / Pattern ${project.selectedPattern}`,
+    group: "Create",
+    keywords: `editor audition readout review selected event one shot listen preview runtime fallback drum 808 bass synth chord ${editorAuditionReadout.statusLabel} ${editorAuditionReadout.targetTypeLabel} ${editorAuditionReadout.targetLabel} ${editorAuditionReadout.keywords} beginner producer direct composition sample free`,
+    run: onFocusEditorAuditionReadout
   };
   const captureStepModeActions = createCaptureStepModeActions({
     keyboardCaptureStepMode,
@@ -20316,6 +20351,7 @@ function createQuickActions({
     keyboardCaptureReadoutAction,
     captureStepModeReadoutAction,
     midiInputReadoutAction,
+    editorAuditionReadoutAction,
     {
       id: "midi-input-connect",
       title: midiInputConnectTitle,
@@ -22554,6 +22590,7 @@ function createQuickActionResult(
     action.id === "keyboard-capture-readout-action" ||
     action.id === "capture-step-mode-readout-action" ||
     action.id === "midi-input-readout-action" ||
+    action.id === "editor-audition-readout-action" ||
     action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -23921,6 +23958,207 @@ function quickActionSelectedEventNextCheck(eventType: QuickActionSelectedEventTy
     case "chord":
       return "Loop Pattern, then continue selected-chord edits or use Chord Move for broader harmonic shaping";
   }
+}
+
+type EditorAuditionReadoutSummary = {
+  selected: boolean;
+  statusLabel: string;
+  targetTypeLabel: string;
+  targetLabel: string;
+  routeLabel: string;
+  metricLabel: string;
+  metricValue: string;
+  runtimeLabel: string;
+  detailLabel: string;
+  keywords: string;
+};
+
+function createEditorAuditionReadoutSummary({
+  project,
+  selectedDrumStep,
+  selectedDrumActive,
+  selectedDrumVelocity,
+  selectedDrumTiming,
+  selectedDrumProbability,
+  selectedHatRepeat,
+  selectedNote,
+  selectedBassNote,
+  selectedMelodyNote,
+  selectedChord,
+  editorAuditionResult
+}: {
+  project: ProjectState;
+  selectedDrumStep: SelectedDrumStep | null;
+  selectedDrumActive: boolean;
+  selectedDrumVelocity: number | undefined;
+  selectedDrumTiming: number;
+  selectedDrumProbability: number | undefined;
+  selectedHatRepeat: number;
+  selectedNote: SelectedNote | null;
+  selectedBassNote: BassNote | undefined;
+  selectedMelodyNote: MelodyNote | undefined;
+  selectedChord: ChordEvent | undefined;
+  editorAuditionResult: EditorAuditionResult | null;
+}): EditorAuditionReadoutSummary {
+  const runtimeLabel = editorAuditionResult
+    ? `${editorAuditionResult.status}: ${editorAuditionResult.title}`
+    : "No audition result yet";
+
+  if (selectedDrumStep && selectedDrumActive) {
+    const velocity = selectedDrumVelocity ?? defaultDrumVelocity(selectedDrumStep.lane, selectedDrumStep.step);
+    const probability = selectedDrumProbability ?? 1;
+    const repeatLabel = selectedDrumStep.lane === "hat" ? `x${selectedHatRepeat}` : "single";
+
+    return {
+      selected: true,
+      statusLabel: "Ready",
+      targetTypeLabel: "Drum hit",
+      targetLabel: `${drumLabels[selectedDrumStep.lane]} step ${selectedDrumStep.step + 1}`,
+      routeLabel: "selected drum hit -> one-shot drum rack",
+      metricLabel: "Pocket",
+      metricValue: `${timingLabel(selectedDrumTiming)} / ${percentLabel(velocity)} velocity / ${percentLabel(
+        probability
+      )} chance / ${repeatLabel}`,
+      runtimeLabel,
+      detailLabel: `Pattern ${project.selectedPattern} / selected drum event ready / ${runtimeLabel}`,
+      keywords: `drum hit ${selectedDrumStep.lane} step ${selectedDrumStep.step + 1} velocity chance timing ${repeatLabel}`
+    };
+  }
+
+  const note = selectedNote?.track === "bass" ? selectedBassNote : selectedMelodyNote;
+  if (selectedNote && note) {
+    const trackLabel = selectedNote.track === "bass" ? "808" : "Synth";
+    const articulation = selectedNote.track === "bass" ? (selectedBassNote?.glide ? "glide" : "no glide") : "melody";
+
+    return {
+      selected: true,
+      statusLabel: "Ready",
+      targetTypeLabel: `${trackLabel} note`,
+      targetLabel: `${trackLabel} ${note.pitch} step ${note.step + 1}`,
+      routeLabel: `selected ${trackLabel} note -> one-shot ${trackLabel} device`,
+      metricLabel: "Pitch",
+      metricValue: `${note.pitch} / len ${note.length} / ${percentLabel(note.velocity)} velocity / ${percentLabel(
+        normalizeEventProbability(note.probability)
+      )} chance / ${articulation}`,
+      runtimeLabel,
+      detailLabel: `Pattern ${project.selectedPattern} / selected ${trackLabel} note ready / ${runtimeLabel}`,
+      keywords: `${trackLabel} note ${note.pitch} step ${note.step + 1} length velocity chance ${articulation}`
+    };
+  }
+
+  if (selectedChord) {
+    return {
+      selected: true,
+      statusLabel: "Ready",
+      targetTypeLabel: "Chord event",
+      targetLabel: `Chord ${selectedChord.root}${selectedChord.quality} step ${selectedChord.step + 1}`,
+      routeLabel: "selected chord event -> one-shot chord device",
+      metricLabel: "Voicing",
+      metricValue: `${chordInversionLabel(normalizeChordInversion(selectedChord.inversion))} / len ${
+        selectedChord.length
+      } / ${percentLabel(selectedChord.velocity)} velocity / ${percentLabel(
+        normalizeEventProbability(selectedChord.probability)
+      )} chance`,
+      runtimeLabel,
+      detailLabel: `Pattern ${project.selectedPattern} / selected chord event ready / ${runtimeLabel}`,
+      keywords: `chord ${selectedChord.root}${selectedChord.quality} step ${selectedChord.step + 1} inversion length velocity chance`
+    };
+  }
+
+  if (selectedDrumStep) {
+    return {
+      selected: false,
+      statusLabel: "Inactive target",
+      targetTypeLabel: "Drum hit",
+      targetLabel: `${drumLabels[selectedDrumStep.lane]} step ${selectedDrumStep.step + 1}`,
+      routeLabel: "select an active drum hit before one-shot audition",
+      metricLabel: "Selection",
+      metricValue: "inactive drum hit",
+      runtimeLabel,
+      detailLabel: `Pattern ${project.selectedPattern} / inactive drum target / ${runtimeLabel}`,
+      keywords: `inactive drum ${selectedDrumStep.lane} step ${selectedDrumStep.step + 1}`
+    };
+  }
+
+  if (selectedNote) {
+    const trackLabel = selectedNote.track === "bass" ? "808" : "Synth";
+
+    return {
+      selected: false,
+      statusLabel: "Inactive target",
+      targetTypeLabel: `${trackLabel} note`,
+      targetLabel: `${trackLabel} ${selectedNote.pitch} step ${selectedNote.step + 1}`,
+      routeLabel: `select an active ${trackLabel} note before one-shot audition`,
+      metricLabel: "Selection",
+      metricValue: "inactive note",
+      runtimeLabel,
+      detailLabel: `Pattern ${project.selectedPattern} / inactive ${trackLabel} target / ${runtimeLabel}`,
+      keywords: `inactive ${trackLabel} note ${selectedNote.pitch} step ${selectedNote.step + 1}`
+    };
+  }
+
+  return {
+    selected: false,
+    statusLabel: "No target",
+    targetTypeLabel: "Selected event",
+    targetLabel: "No selected event",
+    routeLabel: "select a drum, 808, Synth, or chord event before one-shot audition",
+    metricLabel: "Selection",
+    metricValue: "none",
+    runtimeLabel,
+    detailLabel: `Pattern ${project.selectedPattern} / no selected audition target / ${runtimeLabel}`,
+    keywords: "no selected event drum 808 synth chord"
+  };
+}
+
+function quickActionEditorAuditionReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "editor-audition-readout-action") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const detailParts = quickActionSelectedEventDetailParts(action);
+  const targetLabel = detailParts[0] ?? action.title;
+  const routeLabel = detailParts[1] ?? "one-shot route";
+  const metricLabel = detailParts[2] ?? "event metric";
+  const runtimeLabel = detailParts[3] ?? "runtime fallback";
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+
+  return {
+    id: "editor-audition-readout",
+    label: "Editor Audition",
+    value: [
+      "review editor audition",
+      `target ${targetLabel}`,
+      `route ${routeLabel}`,
+      `metric ${metricLabel}`,
+      `runtime ${runtimeLabel}`,
+      `selected ${quickActionArrangementSelectedBlockLabel(project, selectedArrangementIndex)}`,
+      `Pattern ${project.selectedPattern}`,
+      `drums ${drumHitCount(pattern)} hits`,
+      `808 ${pattern.bassNotes.length} notes`,
+      `Synth ${pattern.melodyNotes.length} notes`,
+      `chords ${pattern.chordEvents.length} events`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      "one-shot unchanged",
+      "audio unchanged",
+      "selection unchanged",
+      "events unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
 }
 
 function quickActionUndoRedoMetricSnapshot(
@@ -28848,6 +29086,16 @@ function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "editor-audition-readout-action") {
+    return (
+      quickActionEditorAuditionReadoutMetricSnapshot(project, action, selectedArrangementIndex, analysis ?? undefined) ?? {
+        id: "editor-audition-readout",
+        label: "Editor Audition",
+        value: action.detail
+      }
+    );
+  }
+
   const inputSetupMetric = quickActionInputSetupMetricSnapshot(
     project,
     action,
@@ -31928,6 +32176,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Use the Capture Step Mode readout before pressing mapped desktop keys or MIDI notes that should land on a specific 808/Synth step.",
       nextCheck: "Switch between Next empty and Replace selected only when the readout matches the intended note-entry placement."
+    };
+  }
+
+  if (action.id === "editor-audition-readout-action") {
+    return {
+      auditionCue: "Use the Editor Audition readout before firing a one-shot selected drum, 808, Synth, or chord audition.",
+      nextCheck: "Run the matching selected-event audition only after the target, route, runtime posture, and next listening check match the edit."
     };
   }
 
