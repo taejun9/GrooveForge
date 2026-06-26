@@ -7096,6 +7096,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusPatternChainReadout(): void {
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Pattern Chain ${patternChainPreviewSummary.statusLabel}: ${patternChainPreviewSummary.actionLabel} / ${patternChainPreviewSummary.sequenceLabel}`
+    );
+  }
+
   function focusMasterOutputRole(): void {
     const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -8186,6 +8193,7 @@ export function App(): ReactElement {
     onClearMixSnapshots: clearMixSnapshots,
     onFocusMixSnapshotReadout: focusMixSnapshotReadout,
     onFocusSpaceFxReadout: focusSpaceFxReadout,
+    onFocusPatternChainReadout: focusPatternChainReadout,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternClone: cloneSelectedPatternVariation,
     onApplyPatternFill: applyPatternFill,

@@ -1226,6 +1226,7 @@ export function createQuickActions({
   onClearMixSnapshots,
   onFocusMixSnapshotReadout,
   onFocusSpaceFxReadout,
+  onFocusPatternChainReadout,
   onApplyPatternChain,
   onApplyPatternClone,
   onApplyPatternFill,
@@ -1540,6 +1541,7 @@ export function createQuickActions({
   onClearMixSnapshots: () => void;
   onFocusMixSnapshotReadout: () => void;
   onFocusSpaceFxReadout: () => void;
+  onFocusPatternChainReadout: () => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternClone: (target: PatternSlot, preset: PatternVariationPreset) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
@@ -4734,6 +4736,16 @@ export function createQuickActions({
     },
     ...arrangementTransitionMapActions,
     {
+      id: "pattern-chain-readout-action",
+      title: `Review Pattern Chain: ${patternChainPreviewSummary.actionLabel}`,
+      detail: `${patternChainPreviewSummary.statusLabel} / ${patternChainPreviewSummary.sequenceLabel} / ${patternChainPreviewSummary.sectionLabel} / ${patternChainPreviewSummary.moveLabel}`,
+      group: "Arrange",
+      keywords: `Quick Actions Pattern Chain Readout review arrangement structure preview decision priority pattern a b c sequence hook section energy ${
+        patternChainPreviewSummary.actionId
+      } ${patternChainPreviewSummary.actionLabel} ${patternChainPreviewSummary.sequenceLabel} beginner producer`,
+      run: onFocusPatternChainReadout
+    },
+    {
       id: "pattern-chain-decision",
       title: patternChainDecisionSummary.disabled
         ? "Run Pattern Chain Decision"
@@ -6008,6 +6020,7 @@ export function createQuickActionResult(
     action.id === "drum-kit-readout-action" ||
     action.id === "sound-focus-readout-action" ||
     action.id === "sound-snapshot-readout-action" ||
+    action.id === "pattern-chain-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -14972,6 +14985,22 @@ export function quickActionPatternChainMetricSnapshot(
   project: ProjectState,
   action: QuickAction
 ): { id: string; label: string; value: string } | null {
+  if (action.id === "pattern-chain-readout-action") {
+    const pattern = activePattern(project);
+    const sequence = patternChainReadout(project.arrangement) || "empty";
+    const hookBlockCount = project.arrangement.filter((block) => block.section === "Hook").length;
+    const detail = quickActionPatternChainReadoutDetail(action);
+    return {
+      id: "pattern-chain-readout",
+      label: "Pattern Chain Readout",
+      value: `review pattern chain readout / ${detail} / current ${sequence} / Pattern ${
+        project.selectedPattern
+      } / ${patternEventTotal(pattern)} editable events / ${project.arrangement.length} blocks / ${hookBlockCount} hook blocks / ${barCountLabel(
+        arrangementTotalBars(project)
+      )}`
+    };
+  }
+
   const actionLabel = patternChainQuickActionLabel(action);
   if (!actionLabel) {
     return null;
@@ -14987,6 +15016,14 @@ export function quickActionPatternChainMetricSnapshot(
       arrangementTotalBars(project)
     )}`
   };
+}
+
+export function quickActionPatternChainReadoutDetail(action: QuickAction): string {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" / ");
 }
 
 export function patternChainQuickActionLabel(action: QuickAction): string | null {
@@ -16727,6 +16764,13 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Play Song loop; scan intro, verse, hook, bridge, hook, and outro flow.",
       nextCheck: `${barCountLabel(arrangementTotalBars(project))} now; compare the song form against ${target.name}.`
+    };
+  }
+
+  if (action.id === "pattern-chain-readout-action") {
+    return {
+      auditionCue: "Play Song loop or Block loop and compare Pattern A/B/C contrast before applying a chain.",
+      nextCheck: "Apply Pattern Chain or Chain Expand only after the readout sequence supports the hook and section flow."
     };
   }
 
