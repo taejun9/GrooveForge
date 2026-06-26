@@ -7146,6 +7146,16 @@ export function App(): ReactElement {
     );
   }
 
+  function focusSectionLocatorReadout(): void {
+    const summary = createSectionLocatorCueDecisionSummary(sectionLocatorPads, isPlaying);
+    arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      summary.section
+        ? `Section Locator ${summary.statusLabel}: ${summary.sectionLabel} / ${summary.metricLabel} / ${summary.detailLabel}`
+        : "Section Locator: add an arrangement section before cueing."
+    );
+  }
+
   function focusMasterOutputRole(): void {
     const summary = createMasterOutputRoleSummary(projectRef.current, analyzeExport(projectRef.current));
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
@@ -8242,6 +8252,7 @@ export function App(): ReactElement {
     onFocusArrangementFocusReadout: focusArrangementFocusReadout,
     onFocusArrangementMoveReadout: focusArrangementMoveReadout,
     onFocusArrangementTemplateReadout: focusArrangementTemplateReadout,
+    onFocusSectionLocatorReadout: focusSectionLocatorReadout,
     onApplyPatternChain: applyPatternChain,
     onApplyPatternClone: cloneSelectedPatternVariation,
     onApplyPatternFill: applyPatternFill,

@@ -1274,6 +1274,7 @@ export function createQuickActions({
   onRequestMidiInputAccess,
   onCueArrangementBlock,
   onCueSectionLocator,
+  onFocusSectionLocatorReadout,
   onCueGrooveCompass,
   onCueStyleGoal,
   onCuePattern,
@@ -1594,6 +1595,7 @@ export function createQuickActions({
   onRequestMidiInputAccess: () => Promise<void>;
   onCueArrangementBlock: (index: number) => void;
   onCueSectionLocator: (section: ArrangementSection) => void;
+  onFocusSectionLocatorReadout: () => void;
   onCueGrooveCompass: () => void;
   onCueStyleGoal: (goal: StyleGoalCard) => void;
   onCuePattern: (pattern: PatternSlot) => void;
@@ -3659,6 +3661,21 @@ export function createQuickActions({
     ...hookReadinessFixActions,
     ...toplineSpaceCueActions,
     ...toplineSpaceFixActions,
+    {
+      id: "section-locator-readout-action",
+      title: sectionLocatorCueDecision.section
+        ? `Review Section Locator: ${sectionLocatorCueDecision.sectionLabel}`
+        : "Review Section Locator",
+      detail: sectionLocatorCueDecision.section
+        ? `${sectionLocatorCueDecision.statusLabel} / ${sectionLocatorCueDecision.metricLabel} / ${sectionLocatorCueDecision.detailLabel}`
+        : sectionLocatorCueDecision.detailLabel,
+      group: "Transport",
+      keywords: `Quick Actions Section Locator Readout review cue suggestion arrangement block loop transport intro verse hook bridge outro selected pattern editable events ${
+        sectionLocatorCueDecision.section ? sectionLocatorTestId(sectionLocatorCueDecision.section) : "none"
+      } ${sectionLocatorCueDecision.sectionLabel} ${sectionLocatorCueDecision.actionId} beginner producer`,
+      disabled: !sectionLocatorCueDecision.section,
+      run: onFocusSectionLocatorReadout
+    },
     {
       id: "section-locator-decision",
       title: sectionLocatorCueDecision.disabled
@@ -16331,6 +16348,13 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Run Tap tempo pulse repeatedly in time with the groove, then pause briefly so the existing Tap Tempo commit can apply the averaged BPM.",
       nextCheck: "Check the Tap Tempo readout and project BPM before locking arrangement, metronome, or export timing."
+    };
+  }
+
+  if (action.id === "section-locator-readout-action") {
+    return {
+      auditionCue: "Review the suggested section block, Pattern assignment, bar range, and event count before changing the Block loop cue.",
+      nextCheck: "Cue Section Locator only after the readout target is the section you want to audition."
     };
   }
 
