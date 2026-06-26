@@ -3228,6 +3228,7 @@ export type ComposerGuideFocusSummary = {
   detailLabel: string;
   destinationLabel: string;
   metricLabel: string;
+  auditionCueLabel: string;
   nextCheckLabel: string;
   detailTitle: string;
   tone: MixCoachTone;
