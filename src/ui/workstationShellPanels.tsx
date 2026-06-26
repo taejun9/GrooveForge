@@ -684,7 +684,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "File-Set Readiness, Send Order Status, Latest Export Receipt, Session Brief Context, Package Priority, Focus Route, Direct Package Result Metrics, Audition Cue, and Next Package Check context before Handoff Package Check commands run."
       },
-      { id: "handoff-next-export", command: "Handoff Next Export", shortcut: "Quick Actions / Readout", target: "Next deliverable" },
+      {
+        id: "handoff-next-export",
+        command: "Handoff Next Export",
+        shortcut: "Quick Actions / Readout",
+        target: "Next deliverable",
+        context:
+          "Current Next WAV/Stem/MIDI/Handoff Sheet Deliverable, Explicit Export Route, Deliverable/File Context, Delivery Target, Package Readiness, Send Order Status, Latest Export Receipt, Audition Cue, and Next Handoff Step context before Handoff Next Export commands run."
+      },
       { id: "direct-exports", command: "Direct Exports", shortcut: "Quick Actions / Readout", target: "WAV / stems / MIDI / sheet" }
     ]
   }
