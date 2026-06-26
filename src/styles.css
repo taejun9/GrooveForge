@@ -4534,6 +4534,11 @@ h2 {
   font-weight: 800;
 }
 
+.composer-guide-focus-meta small:first-of-type {
+  color: rgba(175, 138, 255, 0.84);
+  font-weight: 700;
+}
+
 .composer-guide-focus-readout button {
   display: flex;
   align-items: center;
