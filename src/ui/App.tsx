@@ -7512,6 +7512,13 @@ export function App(): ReactElement {
     );
   }
 
+  function focusSoundFocusReadout(): void {
+    soundPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Sound Focus ${soundFocusPreviewSummary.statusLabel}: ${soundFocusPreviewSummary.padLabel} / ${soundFocusPreviewSummary.parameterLabel}`
+    );
+  }
+
   function focusFinishChecklistCard(card: FinishChecklistCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -8183,6 +8190,7 @@ export function App(): ReactElement {
     onApplyStemAudition: applyStemAuditionPad,
     onFocusStemAuditionReadout: focusStemAuditionReadout,
     onApplySoundFocus: applySoundFocusPad,
+    onFocusSoundFocusReadout: focusSoundFocusReadout,
     onApplySoundPreset: applySoundPreset,
     onFocusSoundPresetReadout: focusSoundPresetReadout,
     onCaptureSoundSnapshot: captureSoundSnapshot,
