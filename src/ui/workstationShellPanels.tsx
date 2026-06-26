@@ -606,7 +606,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Current Fade Posture, Automation Target, Editable Fade Event Range, Direct Fade Pad Routes, Playback/Export Gain Scope, Result Feedback, Audition Cue, and Export/Manual-Trim Next Check context before Master Automation commands run."
       },
-      { id: "finish-checklist", command: "Finish Checklist", shortcut: "Quick Actions / Readout", target: "Compose / arrange / mix / handoff" },
+      {
+        id: "finish-checklist",
+        command: "Finish Checklist",
+        shortcut: "Quick Actions / Readout",
+        target: "Finish readiness / priority focus route",
+        context:
+          "Compose, Arrange, Mix, Master, Master Automation, Handoff Readiness, Priority Readout, Direct Checklist Card Routes, Focus Result, Audition Cue, and Export/Manual-Trim Next Check context before Finish Checklist commands run."
+      },
       { id: "handoff-pack", command: "Handoff Pack", shortcut: "Quick Actions / Readout", target: "WAV / stems / MIDI / sheet" }
     ]
   },
