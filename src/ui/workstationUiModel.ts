@@ -1180,6 +1180,17 @@ export type QuickActionSearchResult = {
   tone: MixCoachTone;
 };
 
+export type QuickActionSearchRecoveryResult = {
+  action: "clear" | "scope";
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type QuickActionSpotlightSummary = {
   actionId: string | null;
   statusLabel: string;
