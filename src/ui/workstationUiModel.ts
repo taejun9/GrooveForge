@@ -3226,6 +3226,8 @@ export type ComposerGuideFocusSummary = {
   statusLabel: string;
   areaLabel: string;
   detailLabel: string;
+  destinationLabel: string;
+  nextCheckLabel: string;
   detailTitle: string;
   tone: MixCoachTone;
 };
