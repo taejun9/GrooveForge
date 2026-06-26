@@ -4448,6 +4448,19 @@ export type BeatSpineApplyResult = {
   tone: MixCoachTone;
 };
 
+export type BeatSpineJumpResult = {
+  cardId: BeatSpineCardId;
+  title: string;
+  status: string;
+  detail: string;
+  destination: string;
+  metricLabel: string;
+  metricValue: string;
+  auditionCue: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
 export type SelectedDrumStep = {
   lane: DrumLane;
   step: number;

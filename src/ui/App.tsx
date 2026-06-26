@@ -615,6 +615,7 @@ import type {
   BeatSpineSummary,
   BeatSpineApplyResultMetric,
   BeatSpineApplyResult,
+  BeatSpineJumpResult,
   EditorAuditionResult,
   InputCaptureResult,
   SelectedEventDeleteResult,
@@ -1371,6 +1372,7 @@ export function App(): ReactElement {
   const [styleGoalCueResult, setStyleGoalCueResult] = useState<StyleGoalCueResult | null>(null);
   const [beatBlueprintResult, setBeatBlueprintResult] = useState<BeatBlueprintResult | null>(null);
   const [beatSpineResult, setBeatSpineResult] = useState<BeatSpineApplyResult | null>(null);
+  const [beatSpineJumpResult, setBeatSpineJumpResult] = useState<BeatSpineJumpResult | null>(null);
   const [layerStarterResult, setLayerStarterResult] = useState<LayerStarterResult | null>(null);
   const [patternCompareResult, setPatternCompareResult] = useState<PatternCompareResult | null>(null);
   const [patternCloneResult, setPatternCloneResult] = useState<PatternCloneResult | null>(null);
@@ -2438,6 +2440,7 @@ export function App(): ReactElement {
     setStyleGoalCueResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
+    setBeatSpineJumpResult(null);
     setLayerStarterResult(null);
     setPatternCompareResult(null);
     setPatternCloneResult(null);
@@ -2515,6 +2518,7 @@ export function App(): ReactElement {
       setStyleGoalCueResult(null);
       setBeatBlueprintResult(null);
       setBeatSpineResult(null);
+      setBeatSpineJumpResult(null);
       setLayerStarterResult(null);
       setPatternCompareResult(null);
       setPatternCloneResult(null);
@@ -2686,6 +2690,7 @@ export function App(): ReactElement {
     setSwingFeelResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
+    setBeatSpineJumpResult(null);
     setLayerStarterResult(null);
     setPatternCloneResult(null);
     setPatternEditResult(null);
@@ -2769,6 +2774,7 @@ export function App(): ReactElement {
     setSwingFeelResult(null);
     setBeatBlueprintResult(null);
     setBeatSpineResult(null);
+    setBeatSpineJumpResult(null);
     setLayerStarterResult(null);
     setPatternCloneResult(null);
     setPatternEditResult(null);
@@ -7385,6 +7391,8 @@ export function App(): ReactElement {
     };
 
     targetRefs[card.target]?.scrollIntoView({ block: "start", behavior: "auto" });
+    setBeatSpineJumpResult(createBeatSpineJumpResult(card, beatSpineSummary));
+    setBeatSpineResult(null);
     setProjectStatus(`Beat Spine ${card.label}: ${card.value}`);
   }
 
@@ -7415,6 +7423,7 @@ export function App(): ReactElement {
         applyMasterFinishPad(suggestedMasterFinishPad(projectRef.current), { showResult: true });
         break;
     }
+    setBeatSpineJumpResult(null);
     setBeatSpineResult(createBeatSpineApplyResult(action, beforeProject, projectRef.current));
   }
 
@@ -8611,6 +8620,7 @@ export function App(): ReactElement {
       <FirstBeatPath result={firstBeatPathResult} summary={firstBeatPathSummary} onJump={jumpToFirstBeatPathStep} />
 
       <BeatSpine
+        jumpResult={beatSpineJumpResult}
         result={beatSpineResult}
         summary={beatSpineSummary}
         onApply={applyBeatSpineAction}
@@ -13862,13 +13872,80 @@ function beatSpineApplyResultNextCheck(actionId: BeatSpineActionId): string {
   }
 }
 
+function createBeatSpineJumpResult(card: BeatSpineCard, summary: BeatSpineSummary): BeatSpineJumpResult {
+  return {
+    cardId: card.id,
+    title: `${card.label} jump ready`,
+    status: "Jumped",
+    detail: `${card.focusLabel}: ${card.detail}`,
+    destination: beatSpineTargetLabel(card.target),
+    metricLabel: "Beat core",
+    metricValue: `${summary.countLabel} / ${card.value}`,
+    auditionCue: beatSpineJumpResultAudition(card),
+    nextCheck: beatSpineJumpResultNextCheck(card),
+    tone: card.tone
+  };
+}
+
+function beatSpineTargetLabel(target: BeatSpineTarget): string {
+  switch (target) {
+    case "transport":
+      return "Transport";
+    case "compose":
+      return "Compose";
+    case "sound":
+      return "Sound";
+    case "arrange":
+      return "Arrange";
+    case "mix":
+      return "Mix";
+    case "master":
+      return "Master";
+    case "deliver":
+      return "Deliver";
+  }
+}
+
+function beatSpineJumpResultAudition(card: BeatSpineCard): string {
+  switch (card.id) {
+    case "setup":
+      return "Confirm tempo, key, style, delivery target, and loop scope before editing beat events.";
+    case "drums":
+      return "Loop the selected Pattern and check kick, clap, hat, and perc anchors before applying a drum move.";
+    case "bass":
+      return "Loop drums with 808/Bass and check the low-end pocket before applying a bass move.";
+    case "harmony":
+      return "Loop the hook or selected Pattern and check whether chords support the beat direction.";
+    case "melody":
+      return "Loop the Synth lane with drums and 808/Bass, then check motif space and repetition.";
+    case "sound":
+      return "Play the hook or full mix and inspect built-in tone design before applying a preset.";
+    case "arrange":
+      return "Play Song loop and inspect Pattern A/B/C section flow before changing the form.";
+    case "finish":
+      return "Play Full Mix and inspect master or delivery readiness before exporting.";
+  }
+}
+
+function beatSpineJumpResultNextCheck(card: BeatSpineCard): string {
+  if (card.action) {
+    return `If the axis still needs work, apply ${card.action.label} or edit ${card.label} manually.`;
+  }
+  if (card.id === "setup") {
+    return "After setup is aligned, continue to Drums, 808/Bass, Harmony, and Melody.";
+  }
+  return "Return to Beat Spine after the focused panel is checked.";
+}
+
 function BeatSpine({
+  jumpResult,
   onApply,
   onJump,
   result,
   summary
 }: {
   summary: BeatSpineSummary;
+  jumpResult: BeatSpineJumpResult | null;
   result: BeatSpineApplyResult | null;
   onApply: (action: BeatSpineAction) => void;
   onJump: (card: BeatSpineCard) => void;
@@ -13940,8 +14017,46 @@ function BeatSpine({
           );
         })}
       </div>
+      {jumpResult && <BeatSpineJumpResultStrip result={jumpResult} />}
       {result && <BeatSpineResultStrip result={result} />}
     </section>
+  );
+}
+
+function BeatSpineJumpResultStrip({ result }: { result: BeatSpineJumpResult }): ReactElement {
+  return (
+    <div
+      className={`beat-spine-result beat-spine-jump-result ${result.tone}`}
+      data-result-beat-spine-jump={result.cardId}
+      data-testid="beat-spine-jump-result"
+      aria-live="polite"
+    >
+      <div className="beat-spine-result-main">
+        <ArrowRight size={14} aria-hidden="true" />
+        <span>
+          <strong data-testid="beat-spine-jump-result-title">{result.title}</strong>
+          <small data-testid="beat-spine-jump-result-detail">{result.detail}</small>
+        </span>
+      </div>
+      <div className="beat-spine-result-meta" data-testid="beat-spine-jump-result-destination">
+        <span data-testid="beat-spine-jump-result-status">{result.status}</span>
+        <span>{result.destination}</span>
+      </div>
+      <div className="beat-spine-result-metric" data-testid="beat-spine-jump-result-metric">
+        <span>{result.metricLabel}</span>
+        <strong data-testid="beat-spine-jump-result-value">{result.metricValue}</strong>
+      </div>
+      <div className="beat-spine-result-followup" data-testid="beat-spine-jump-result-followup">
+        <span>
+          <b>Audition</b>
+          <em data-testid="beat-spine-jump-result-audition">{result.auditionCue}</em>
+        </span>
+        <span>
+          <b>Next check</b>
+          <em data-testid="beat-spine-jump-result-next-check">{result.nextCheck}</em>
+        </span>
+      </div>
+    </div>
   );
 }
 
