@@ -18231,9 +18231,9 @@ function createQuickActions({
   const firstBeatPathActions: QuickAction[] = firstBeatPathSummary.steps.map((step) => ({
     id: `first-beat-path-step-${step.id}`,
     title: `Jump First Beat Path: ${step.label}`,
-    detail: `${step.value} / ${step.detail} / ${firstBeatPathSummary.countLabel}`,
+    detail: firstBeatPathCommandDetail(step, firstBeatPathSummary),
     group: "Project",
-    keywords: `first beat path direct step jump setup compose arrange mix deliver ${step.id} ${step.label} ${step.value} ${step.jumpLabel} ${step.detail} beginner producer`,
+    keywords: `first beat path direct step jump setup compose arrange mix deliver ${step.id} ${step.label} ${step.value} ${step.jumpLabel} ${firstBeatPathCommandDetail(step, firstBeatPathSummary)} beginner producer`,
     run: () => onJumpFirstBeatPath(step)
   }));
   const beatSpineCard = activeBeatSpineQuickActionCard(beatSpineSummary);
@@ -19975,10 +19975,10 @@ function createQuickActions({
       id: "first-beat-path-jump",
       title: firstBeatPathStep ? `Jump First Beat Path: ${firstBeatPathStep.label}` : "Jump First Beat Path",
       detail: firstBeatPathStep
-        ? `${firstBeatPathStep.value} / ${firstBeatPathStep.detail} / ${firstBeatPathSummary.countLabel}`
+        ? firstBeatPathCommandDetail(firstBeatPathStep, firstBeatPathSummary)
         : "No First Beat Path step available.",
       group: "Project",
-      keywords: `first beat path next step jump setup compose arrange mix deliver beginner producer ${firstBeatPathStep?.id ?? "none"} ${firstBeatPathStep?.jumpLabel ?? "none"}`,
+      keywords: `first beat path next step jump setup compose arrange mix deliver beginner producer ${firstBeatPathStep?.id ?? "none"} ${firstBeatPathStep ? firstBeatPathCommandDetail(firstBeatPathStep, firstBeatPathSummary) : "none"}`,
       disabled: !firstBeatPathStep,
       run: () => {
         if (firstBeatPathStep) {
@@ -26001,15 +26001,29 @@ function quickActionFirstBeatPathMetricSnapshot(
   const pathContext = parts[0] ?? "path context unavailable";
   const stageDetail = parts[1] ?? "stage detail unavailable";
   const pathMetric = parts[2] ?? "path metric unavailable";
+  const destinationContext = parts[3] ?? `Destination ${stage.destination}`;
+  const auditionContext = parts[4] ?? "Audition context unavailable";
+  const nextContext = parts[5] ?? "Next check unavailable";
   const actionLabel = action.id === "first-beat-path-jump" ? "jump current path step" : "jump direct path step";
 
   return {
     id: "first-beat-path",
     label: "First Beat Path",
-    value: `${actionLabel} / stage ${stage.label} / destination ${stage.destination} / context ${pathContext} / detail ${stageDetail} / path ${pathMetric} / mode ${modeLabel(
+    value: `${actionLabel} / stage ${stage.label} / destination ${stage.destination} / context ${pathContext} / detail ${stageDetail} / path ${pathMetric} / command detail ${destinationContext} / ${auditionContext} / ${nextContext} / mode ${modeLabel(
       project.mode
     )} / Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events / ${barCountLabel(arrangementTotalBars(project))}`
   };
+}
+
+function firstBeatPathCommandDetail(step: FirstBeatPathStep, summary: FirstBeatPathSummary): string {
+  return [
+    step.value,
+    step.detail,
+    summary.countLabel,
+    `Destination ${step.jumpLabel}`,
+    `Audition ${firstBeatPathJumpAuditionCue(step)}`,
+    `Next ${firstBeatPathJumpNextCheck(step, summary)}`
+  ].join(" / ");
 }
 
 function quickActionFirstBeatPathDetailParts(action: QuickAction): string[] {
