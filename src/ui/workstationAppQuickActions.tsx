@@ -1220,6 +1220,7 @@ export function createQuickActions({
   onCaptureMixSnapshot,
   onRecallMixSnapshot,
   onClearMixSnapshots,
+  onFocusMixSnapshotReadout,
   onApplyPatternChain,
   onApplyPatternClone,
   onApplyPatternFill,
@@ -1525,6 +1526,7 @@ export function createQuickActions({
   onCaptureMixSnapshot: (slot: MixSnapshotSlotId) => void;
   onRecallMixSnapshot: (slot: MixSnapshotSlotId) => void;
   onClearMixSnapshots: () => void;
+  onFocusMixSnapshotReadout: () => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
   onApplyPatternClone: (target: PatternSlot, preset: PatternVariationPreset) => void;
   onApplyPatternFill: (preset: PatternFillPreset) => void;
@@ -2060,6 +2062,18 @@ export function createQuickActions({
           return;
       }
     }
+  };
+  const mixSnapshotReadoutAction: QuickAction = {
+    id: "mix-snapshot-readout-action",
+    title: `Review Mix Snapshot A/B: ${mixSnapshotComparison.statusLabel}`,
+    detail: `${mixSnapshotComparison.winnerLabel} / ${mixSnapshotComparison.detailLabel} / Decision ${mixSnapshotComparison.decisionActionLabel} / ${mixSnapshotComparison.decisionDetail}`,
+    group: "Mix",
+    keywords: `Quick Actions Mix Snapshot A/B Readout review readout compare capture recall clear headroom balance master stems ${
+      mixSnapshotComparison.statusLabel
+    } ${mixSnapshotComparison.winnerLabel} ${mixSnapshotComparison.detailLabel} ${mixSnapshotComparison.decisionActionId} ${
+      mixSnapshotComparison.decisionActionLabel
+    } producer beginner mix review`,
+    run: onFocusMixSnapshotReadout
   };
   const stemAuditionDecisionAction: QuickAction = {
     id: "stem-audition-decision",
@@ -4762,6 +4776,7 @@ export function createQuickActions({
       resultTargetId: pad.id,
       run: () => onApplyStemAudition(pad.id)
     })),
+    mixSnapshotReadoutAction,
     mixSnapshotDecisionAction,
     {
       id: "mix-snapshot-capture-a",
@@ -5872,6 +5887,7 @@ export function createQuickActionResult(
     action.id.startsWith("pattern-switch-") ||
     action.id === "pattern-follow-audible" ||
     action.id === "arrangement-follow-audible" ||
+    action.id === "mix-snapshot-readout-action" ||
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-focus" ||
@@ -6392,6 +6408,21 @@ export function quickActionMixSnapshotMetricSnapshot(
   action: QuickAction,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
+  if (action.id === "mix-snapshot-readout-action") {
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const stemAnalyses = analyzeStemExports(project);
+    return {
+      id: "mix-snapshot-readout",
+      label: "Mix Snapshot A/B Readout",
+      value: quickActionMixSnapshotMetricValue(project, exportAnalysis, stemAnalyses, [
+        quickActionMixSnapshotActionLabel(action, "decision"),
+        `readout ${quickActionMixSnapshotContextLabel(action)}`,
+        `current mix ${mixSnapshotQuickActionPosture(project, exportAnalysis)}`,
+        `master ${quickActionMixSnapshotMasterPosture(project)}`
+      ], "capture or recall only after listening to Full Mix and the core stems")
+    };
+  }
+
   const target = mixSnapshotQuickActionTarget(action.id);
   if (!target) {
     return null;
@@ -6489,6 +6520,9 @@ export function quickActionMixSnapshotMetricLabel(
 }
 
 export function quickActionMixSnapshotActionLabel(action: QuickAction, targetId: MixSnapshotResultTargetId): string {
+  if (action.id === "mix-snapshot-readout-action") {
+    return "review mix snapshot readout";
+  }
   if (action.id === "mix-snapshot-decision") {
     return `run mix snapshot decision ${targetId}`;
   }
@@ -16432,6 +16466,13 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Play the current loop and compare the selected stem against the Full Mix before changing levels.",
       nextCheck: "Use the Stem Audition Readout, Mix Balance Pads, and manual mixer controls to trim the lane you heard."
+    };
+  }
+
+  if (action.id === "mix-snapshot-readout-action") {
+    return {
+      auditionCue: "Use the Mix Snapshot A/B readout before capturing, recalling, or clearing a mix pass, then play Full Mix and core stems.",
+      nextCheck: "Capture or recall only after one concrete mix/master change creates an A/B decision worth committing."
     };
   }
 
