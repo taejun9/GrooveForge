@@ -1199,6 +1199,7 @@ export function createQuickActions({
   onApplyToplineFix,
   onFocusArrangementMuteMapReadout,
   onFocusArrangementMuteMap,
+  onFocusSelectedArrangementBlockReadout,
   onFocusArrangementPlaybackReadout,
   onFocusAudibleArrangementFollowReadout,
   onFocusArrangementTransitionMapReadout,
@@ -1524,6 +1525,7 @@ export function createQuickActions({
   onApplyToplineFix: (card?: ToplineSpaceCard) => void;
   onFocusArrangementMuteMapReadout: () => void;
   onFocusArrangementMuteMap: (lane: ArrangementMuteMapLane) => void;
+  onFocusSelectedArrangementBlockReadout: () => void;
   onFocusArrangementPlaybackReadout: () => void;
   onFocusAudibleArrangementFollowReadout: () => void;
   onFocusArrangementTransitionMapReadout: () => void;
@@ -1777,6 +1779,12 @@ export function createQuickActions({
   const selectedBlockLabel = selectedBlock
     ? `Block ${selectedBlockNumber} ${selectedBlock.section} Pattern ${selectedBlock.pattern} / ${barCountLabel(selectedBlockBars)}`
     : "No selected block";
+  const selectedBlockRoleSummary = selectedArrangementBlockRoleSummary(project, selectedArrangementIndex);
+  const selectedBlockEnergyLabel = selectedBlock ? percentLabel(normalizeArrangementEnergy(selectedBlock.energy)) : "No energy";
+  const selectedBlockMuteLabel = selectedBlock
+    ? arrangementFocusPreviewMuteLabel(normalizeArrangementMutedTracks(selectedBlock.mutedTracks))
+    : "No mute posture";
+  const selectedBlockEventCount = selectedBlock ? patternEventTotal(project.patterns[selectedBlock.pattern]) : 0;
   const selectedBlockSplitAfter = selectedBlock ? clampSplitAfterBars(splitAfterBars, selectedBlockBars) : 1;
   const nextArrangementBlock = project.arrangement[selectedArrangementIndex + 1] ?? null;
   const nextArrangementBlockBars = nextArrangementBlock ? normalizeArrangementBars(nextArrangementBlock.bars) : 0;
@@ -1784,6 +1792,23 @@ export function createQuickActions({
   const arrangementBlockClipboardLabel = arrangementBlockClipboard
     ? `${arrangementBlockClipboard.section} Pattern ${arrangementBlockClipboard.pattern} / ${barCountLabel(normalizeArrangementBars(arrangementBlockClipboard.bars))}`
     : "Clipboard empty";
+  const selectedArrangementBlockReadoutAction: QuickAction = {
+    id: "selected-arrangement-block-readout-action",
+    title: selectedBlock
+      ? `Review Selected Arrangement Block Readout: Block ${selectedBlockNumber} ${selectedBlock.section}`
+      : "Review Selected Arrangement Block Readout",
+    detail:
+      selectedBlock && selectedBlockRoleSummary
+        ? `${selectedBlockRoleSummary.roleLabel} / Pattern ${selectedBlock.pattern} / ${selectedBlockRoleSummary.timelineLabel} / ${barCountLabel(
+            selectedBlockBars
+          )} / ${selectedBlockEnergyLabel} energy / ${selectedBlockMuteLabel} / ${selectedBlockEventCount} events`
+        : "No selected arrangement block",
+    group: "Arrange",
+    keywords: `Quick Actions Selected Arrangement Block Readout review selected block role section Pattern ${
+      selectedBlock?.pattern ?? project.selectedPattern
+    } ${selectedBlock?.section ?? "none"} bar range bar length energy mute posture editable events arrangement block jump cue beginner producer`,
+    run: onFocusSelectedArrangementBlockReadout
+  };
   const arrangementBlockJumpActions: QuickAction[] = project.arrangement.map((block, index) => {
     const blockNumber = index + 1;
     const bars = normalizeArrangementBars(block.bars);
@@ -4690,6 +4715,7 @@ export function createQuickActions({
       keywords: "clear tail pattern fill cleanup transition reset drums 808 melody chords",
       run: () => onApplyPatternFill("clear_tail")
     },
+    selectedArrangementBlockReadoutAction,
     ...arrangementBlockJumpActions,
     songFormOverviewReadoutAction,
     songFormPriorityAction,
@@ -6152,6 +6178,7 @@ export function createQuickActionResult(
     action.id === "pattern-dna-focus" ||
     action.id.startsWith("pattern-dna-card-") ||
     action.id === "pattern-playback-readout-action" ||
+    action.id === "selected-arrangement-block-readout-action" ||
     action.id === "arrangement-playback-readout-action" ||
     action.id === "audible-arrangement-follow-readout-action" ||
     action.id.startsWith("mode-focus-card-") ||
@@ -11820,6 +11847,61 @@ export function quickActionArrangementPlaybackBlockLabel(
   return `${role} Block ${index + 1} ${block.section} / Pattern ${block.pattern} / ${rangeLabel} / ${barCountLabel(bars)}`;
 }
 
+export function quickActionSelectedArrangementBlockReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "selected-arrangement-block-readout-action") {
+    return null;
+  }
+
+  const selectedIndex = Math.min(Math.max(0, selectedArrangementIndex), Math.max(project.arrangement.length - 1, 0));
+  const block = project.arrangement[selectedIndex] ?? null;
+  if (!block) {
+    return {
+      id: "selected-arrangement-block-readout",
+      label: "Selected arrangement block",
+      value: `review selected arrangement block / no selected block / ${project.arrangement.length} blocks / ${barCountLabel(
+        arrangementTotalBars(project)
+      )} / jump unchanged / cue unchanged / export unchanged`
+    };
+  }
+
+  const bars = normalizeArrangementBars(block.bars);
+  const startBar = arrangementStartBar(project, selectedIndex) + 1;
+  const endBar = startBar + bars - 1;
+  const rangeLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+  const energy = normalizeArrangementEnergy(block.energy);
+  const mutedTracks = normalizeArrangementMutedTracks(block.mutedTracks);
+  const roleSummary = selectedArrangementBlockRoleSummary(project, selectedIndex);
+  const usedSlots = usedPatternSlots(project);
+  const eventCount = patternEventTotal(project.patterns[block.pattern]);
+
+  return {
+    id: "selected-arrangement-block-readout",
+    label: "Selected arrangement block",
+    value: [
+      "review selected arrangement block",
+      `Block ${selectedIndex + 1} ${block.section}`,
+      roleSummary?.roleLabel ?? "section role",
+      `Pattern ${block.pattern}`,
+      rangeLabel,
+      barCountLabel(bars),
+      `${percentLabel(energy)} energy`,
+      arrangementFocusPreviewMuteLabel(mutedTracks),
+      `${eventCount} editable events`,
+      usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "jump unchanged",
+      "cue unchanged",
+      "playback unchanged",
+      "export unchanged"
+    ].join(" / ")
+  };
+}
+
 export function quickActionAudibleArrangementFollowReadoutMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -13033,6 +13115,16 @@ export function quickActionResultMetricSnapshot(
       quickActionAudibleArrangementFollowMetricSnapshot(project, action, selectedArrangementIndex, phase) ?? {
         id: "arrangement-follow-audible",
         label: "Audible block",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "selected-arrangement-block-readout-action") {
+    return (
+      quickActionSelectedArrangementBlockReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "selected-arrangement-block-readout",
+        label: "Selected arrangement block",
         value: action.detail
       }
     );
@@ -16721,6 +16813,14 @@ export function quickActionResultFollowup(
       auditionCue:
         "Review whether the heard arrangement block should become the explicit editing block before running Audible Arrangement Follow.",
       nextCheck: "Run Audible Arrangement Follow only when the audible block is the section you want to edit now."
+    };
+  }
+
+  if (action.id === "selected-arrangement-block-readout-action") {
+    return {
+      auditionCue:
+        "Review the selected block role, Pattern, bar range, energy, mute posture, and event count before jumping or cueing another arrangement block.",
+      nextCheck: "Run Arrangement Block Jump or Cue only when the next block should become the explicit edit or audition target."
     };
   }
 
