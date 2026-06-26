@@ -376,7 +376,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Start, Compose, Arrange, Polish, Deliver, Song/Pattern Metrics, Export/Stems, Delivery Target, Completion Posture, Action Route, Audition Cue, and Next Check context before Beat Map commands run."
       },
-      { id: "structure-lens", command: "Structure Lens", shortcut: "Quick Actions / Readout", target: "Arrangement shape actions" },
+      {
+        id: "structure-lens",
+        command: "Structure Lens",
+        shortcut: "Quick Actions / Readout",
+        target: "Target fit / section coverage / hook contrast / energy arc",
+        context:
+          "Target Fit, Section Coverage, Hook Contrast, Energy Arc, Arrangement Action, Action Route, Audition Cue, and Next Check context before Structure Lens commands run."
+      },
       {
         id: "next-move",
         command: "Next Move",
