@@ -14921,6 +14921,17 @@ function sessionPassFocusResultNextCheck(card: SessionPassCard): string {
   }
 }
 
+function sessionPassCommandDetail(card: SessionPassCard, summary: SessionPassSummary): string {
+  return [
+    card.value,
+    `Destination ${card.focusLabel}`,
+    `Session ${sessionPassFocusResultMetric(summary)}`,
+    `Context ${card.detail}`,
+    `Audition ${sessionPassFocusResultAudition(card)}`,
+    `Next ${sessionPassFocusResultNextCheck(card)}`
+  ].join(" / ");
+}
+
 function activeFirstBeatPathQuickActionStep(summary: FirstBeatPathSummary): FirstBeatPathStep | null {
   return summary.steps.find((step) => step.id === summary.nextStepId) ?? summary.steps.find((step) => step.tone !== "good") ?? summary.steps[0] ?? null;
 }
@@ -18675,7 +18686,7 @@ function createQuickActions({
   const sessionPassActions: QuickAction[] = sessionPassSummary.cards.map((card) => ({
     id: `session-pass-card-${card.id}`,
     title: `Focus Session Pass: ${card.label}`,
-    detail: `${card.value} / ${card.focusLabel} / ${card.detail}`,
+    detail: sessionPassCommandDetail(card, sessionPassSummary),
     group: "Project",
     keywords: `session pass focus card guided studio finish deliver delivery workflow ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
     run: () => onFocusSessionPass(card)
@@ -20013,7 +20024,7 @@ function createQuickActions({
     {
       id: "session-pass-focus",
       title: `Focus ${sessionPassCard.label}`,
-      detail: `${sessionPassCard.value} / ${sessionPassCard.focusLabel}`,
+      detail: sessionPassCommandDetail(sessionPassCard, sessionPassSummary),
       group: "Project",
       keywords: `session pass focus guided studio next workflow ${sessionPassCard.id} ${sessionPassCard.focusLabel} beginner producer`,
       run: () => onFocusSessionPass(sessionPassCard)
@@ -26065,6 +26076,8 @@ function quickActionGuideQuickStartTargetLabel(action: QuickAction): string {
   return label || "target unavailable";
 }
 
+const SESSION_PASS_DETAIL_LABEL_PREFIXES = ["Destination ", "Session ", "Context ", "Audition ", "Next "] as const;
+
 function quickActionSessionPassMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -26075,15 +26088,18 @@ function quickActionSessionPassMetricSnapshot(
 
   const parts = quickActionSessionPassDetailParts(action);
   const passLabel = quickActionSessionPassLabel(action);
-  const sessionLabel = parts[0] ?? `${modeLabel(project.mode)} mode`;
-  const destinationLabel = parts[1] ?? "destination unavailable";
-  const contextLabel = parts.slice(2).join(" / ") || "current decision target";
+  const routeLabel = quickActionSessionPassRouteLabel(parts);
+  const destinationLabel = quickActionSessionPassDetailSegment(parts, "Destination ", "Destination unavailable");
+  const sessionLabel = quickActionSessionPassDetailSegment(parts, "Session ", parts[0] ?? `${modeLabel(project.mode)} mode`);
+  const contextLabel = quickActionSessionPassDetailSegment(parts, "Context ", "Context unavailable");
+  const auditionLabel = quickActionSessionPassDetailSegment(parts, "Audition ", "Audition unavailable");
+  const nextCheckLabel = quickActionSessionPassDetailSegment(parts, "Next ", "Next unavailable");
   const actionLabel = action.id === "session-pass-focus" ? "focus active session pass" : "focus direct session pass";
 
   return {
     id: "session-pass",
     label: "Session pass",
-    value: `${actionLabel} / pass ${passLabel} / destination ${destinationLabel} / session ${sessionLabel} / context ${contextLabel} / mode ${modeLabel(
+    value: `${actionLabel} / pass ${passLabel} / route ${routeLabel} / ${destinationLabel} / ${sessionLabel} / ${contextLabel} / ${auditionLabel} / ${nextCheckLabel} / mode ${modeLabel(
       project.mode
     )} / Pattern ${project.selectedPattern} / ${projectEventTotal(project)} events / ${barCountLabel(arrangementTotalBars(project))}`
   };
@@ -26094,6 +26110,27 @@ function quickActionSessionPassDetailParts(action: QuickAction): string[] {
     .split(" / ")
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+function quickActionSessionPassRouteLabel(parts: string[]): string {
+  const firstLabeledIndex = parts.findIndex((part) =>
+    SESSION_PASS_DETAIL_LABEL_PREFIXES.some((prefix) => part.startsWith(prefix))
+  );
+  if (firstLabeledIndex <= 0) {
+    return parts[0] ?? "Session Pass";
+  }
+  return parts.slice(0, firstLabeledIndex).join(" / ");
+}
+
+function quickActionSessionPassDetailSegment(parts: string[], prefix: string, fallback: string): string {
+  const start = parts.findIndex((part) => part.startsWith(prefix));
+  if (start === -1) {
+    return fallback;
+  }
+  const end = parts.findIndex(
+    (part, index) => index > start && SESSION_PASS_DETAIL_LABEL_PREFIXES.some((labelPrefix) => part.startsWith(labelPrefix))
+  );
+  return parts.slice(start, end === -1 ? parts.length : end).join(" / ");
 }
 
 function quickActionSessionPassLabel(action: QuickAction): string {
