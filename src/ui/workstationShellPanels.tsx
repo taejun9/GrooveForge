@@ -603,13 +603,62 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Selected Pattern Copy/Clear Commands, Source/Target Pattern, Selected-Pattern Clear, Pattern Edit Result Feedback, Audition Cue, and Next Pattern Edit Check context before Pattern Copy/Clear commands run."
       },
-      { id: "drum-move", command: "Drum Move", shortcut: "Quick Actions / Readout", target: "Foundation / feel / accent" },
-      { id: "808-move", command: "808 Move", shortcut: "Quick Actions / Readout", target: "Bassline / glide / contour" },
-      { id: "melody-move", command: "Melody Move", shortcut: "Quick Actions / Readout", target: "Motif / accent / contour" },
-      { id: "chord-move", command: "Chord Move", shortcut: "Quick Actions / Readout", target: "Pads / rhythm / voicing" },
-      { id: "selected-event-tools", command: "Selected Event Tools", shortcut: "Quick Actions / Readout", target: "Drum / note / chord edits" },
-      { id: "pattern-playback-readout", command: "Pattern Playback Readout", shortcut: "Quick Actions / Readout", target: "Edit vs heard Pattern" },
-      { id: "audible-pattern-follow", command: "Audible Pattern Follow", shortcut: "Quick Actions / Readout", target: "Heard Pattern" }
+      {
+        id: "drum-move",
+        command: "Drum Move",
+        shortcut: "Quick Actions / Readout",
+        target: "Foundation / feel / accent",
+        context:
+          "Drum Foundation/Groove Feel/Drum Accent Preview, Current Drum Move Target, Direct Drum Move Command, Drum Move Result Feedback, Selected Pattern, Audition Cue, and Next Drum Check context before Drum Move commands run."
+      },
+      {
+        id: "808-move",
+        command: "808 Move",
+        shortcut: "Quick Actions / Readout",
+        target: "Bassline / glide / contour",
+        context:
+          "808 Bassline/Glide/Contour Preview, Current 808 Move Target, Direct 808 Move Command, 808 Move Result Feedback, Selected Pattern, Audition Cue, and Next Bass Check context before 808 Move commands run."
+      },
+      {
+        id: "melody-move",
+        command: "Melody Move",
+        shortcut: "Quick Actions / Readout",
+        target: "Motif / accent / contour",
+        context:
+          "Melody Motif/Accent/Contour Preview, Current Melody Move Target, Direct Melody Move Command, Melody Move Result Feedback, Selected Pattern, Audition Cue, and Next Melody Check context before Melody Move commands run."
+      },
+      {
+        id: "chord-move",
+        command: "Chord Move",
+        shortcut: "Quick Actions / Readout",
+        target: "Pads / rhythm / voicing",
+        context:
+          "Chord Pads/Rhythm/Voicing Preview, Current Chord Move Target, Direct Chord Move Command, Chord Move Result Feedback, Selected Pattern, Audition Cue, and Next Harmony Check context before Chord Move commands run."
+      },
+      {
+        id: "selected-event-tools",
+        command: "Selected Event Tools",
+        shortcut: "Quick Actions / Readout",
+        target: "Drum / note / chord edits",
+        context:
+          "Selected Drum Pocket, Selected Note Degree/Role, Selected Chord Harmonic Readout, Direct Selected-Event Edit/Reset/Velocity/Audition Commands, Delete Feedback, Audition Cue, and Next Manual Edit Check context before Selected Event Tools commands run."
+      },
+      {
+        id: "pattern-playback-readout",
+        command: "Pattern Playback Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Edit vs heard Pattern",
+        context:
+          "Edit-vs-Heard Pattern Readout, Selected Editing Pattern, Audible Pattern, Event-Count Context, Audible Pattern Follow Action, Follow Command, Audition Cue, and Next Listening Check context before Pattern Playback Readout commands run."
+      },
+      {
+        id: "audible-pattern-follow",
+        command: "Audible Pattern Follow",
+        shortcut: "Quick Actions / Readout",
+        target: "Heard Pattern",
+        context:
+          "Pattern Playback Readout Context, Heard Pattern Target, Explicit Follow Action, Audible Pattern Follow Command, Follow Result Feedback, Audition Cue, and Next Edit-Focus Check context before Audible Pattern Follow commands run."
+      }
     ]
   },
   {
