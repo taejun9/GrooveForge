@@ -845,12 +845,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Pattern Chain Preview Decision, Priority Readout, Direct Pattern Chain Commands, Pattern A/B/C Sequence, Chain Expand Access, Result Feedback, Audition Cue, and Next Chain Check context before Pattern Chain commands run."
       },
       {
+        id: "chain-expand-readout",
+        command: "Chain Expand Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current 16-bar outline preview",
+        context:
+          "Chain Expand Readout Action, Current Pattern A/B/C Sequence, Target 16-Bar Song-Form Outline, Intro/Verse/Hook/Bridge/Outro Flow, Outline Block Count, Hook Count, Bar Count, Audition Cue, and Next Manual Expand Check context before Chain Expand commands run."
+      },
+      {
         id: "chain-expand",
         command: "Chain Expand",
-        shortcut: "Quick Actions / Readout",
+        shortcut: "Quick Actions / Decision",
         target: "16-bar outline",
         context:
-          "Pattern Chain Preview Expand Target, 16-Bar Song-Form Outline, Priority Readout Context, Quick Actions Chain Expand Command, Before/After Arrangement Sequence, Pattern Chain Result Feedback, Audition Cue, and Next Expand Check context before Chain Expand commands run."
+          "Pattern Chain Preview Expand Target, 16-Bar Song-Form Outline Decision, Priority Readout Context, Quick Actions Chain Expand Command, Before/After Arrangement Sequence, Pattern Chain Result Feedback, Audition Cue, and Next Expand Check context before Chain Expand commands run."
       },
       {
         id: "arrangement-template",
