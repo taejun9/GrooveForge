@@ -711,6 +711,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Sound Preset Preview, Explicit Apply Path, Current/Direct Full-Tone Preset Commands, Before/After Drums/808/Duck/Synth/Chords Posture, Result Feedback, Audition Cue, and Next Tone Check context before Sound Preset commands run."
       },
       {
+        id: "drum-kit-readout",
+        command: "Drum Kit Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current built-in drum kit preview",
+        context:
+          "Current Built-In Kick/Clap/Hat Kit Preview Target, Drum Rack Posture, Selected Pattern, Export Readiness, Audition Cue, and Next Manual Drum-Kit Check context before Drum Kit commands run."
+      },
+      {
         id: "drum-kit-decision",
         command: "Drum Kit Decision",
         shortcut: "Quick Actions / Readout",

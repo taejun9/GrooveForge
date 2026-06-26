@@ -1208,6 +1208,7 @@ export function createQuickActions({
   onApplyDrumAccent,
   onApplyDrumFoundation,
   onApplyDrumKit,
+  onFocusDrumKitReadout,
   onApplyGrooveFeel,
   onApplyLayerStarter,
   onApplyMasterAutomation,
@@ -1519,6 +1520,7 @@ export function createQuickActions({
   onApplyDrumAccent: (accent: DrumAccentId) => void;
   onApplyDrumFoundation: (foundation: DrumFoundationId) => void;
   onApplyDrumKit: (pad: DrumKitPadId) => void;
+  onFocusDrumKitReadout: () => void;
   onApplyGrooveFeel: (feel: GrooveFeelId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
   onApplyMasterAutomation: (pad: MasterAutomationPadId) => void;
@@ -4161,6 +4163,19 @@ export function createQuickActions({
       }
     },
     {
+      id: "drum-kit-readout-action",
+      title: `Review Drum Kit: ${drumKitPreviewSummary.kitLabel}`,
+      detail: `${drumKitPreviewSummary.statusLabel} / ${drumKitPreviewSummary.drumLabel} / ${drumKitPreviewSummary.rackLabel}`,
+      group: "Create",
+      keywords: `Quick Actions Drum Kit Readout review built in kit preview apply posture kick clap snare hat rack punch clean knock dust air ${
+        drumKitPreviewSummary.padId
+      } ${drumKitPreviewSummary.kitLabel} ${drumKitPreviewSummary.statusLabel} ${
+        drumKitPreviewSummary.rackLabel
+      } beginner producer manual drum tone`,
+      resultTargetId: drumKitPreviewSummary.padId,
+      run: onFocusDrumKitReadout
+    },
+    {
       id: "drum-kit-decision",
       title: drumKitReady ? `Run Drum Kit Decision: Apply ${drumKitPreviewSummary.kitLabel}` : "Run Drum Kit Decision: Aligned",
       detail: drumKitReady
@@ -5963,6 +5978,7 @@ export function createQuickActionResult(
     action.id === "pattern-follow-audible" ||
     action.id === "arrangement-follow-audible" ||
     action.id === "sound-preset-readout-action" ||
+    action.id === "drum-kit-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -13909,7 +13925,12 @@ export function quickActionSoundDecisionMetricSnapshot(
     return quickActionSoundPresetMetricSnapshot(project, action, analysis);
   }
 
-  if (action.id === "drum-kit-decision" || action.id === "drum-kit" || action.id.startsWith("drum-kit-pad-")) {
+  if (
+    action.id === "drum-kit-readout-action" ||
+    action.id === "drum-kit-decision" ||
+    action.id === "drum-kit" ||
+    action.id.startsWith("drum-kit-pad-")
+  ) {
     return quickActionDrumKitMetricSnapshot(project, action, analysis);
   }
 
@@ -13969,6 +13990,21 @@ export function quickActionDrumKitMetricSnapshot(
   const pad = quickActionDrumKitPadOption(project, action);
   if (!pad) {
     return null;
+  }
+
+  if (action.id === "drum-kit-readout-action") {
+    return {
+      id: "drum-kit-readout",
+      label: "Drum Kit Readout",
+      value: quickActionSoundMetricValue(project, action, analysis, [
+        quickActionSoundActionLabel(action),
+        `preview ${pad.label} kit`,
+        `status ${pad.changedCount === 0 ? "Kit aligned" : "Suggested kit"}`,
+        `drums ${drumKitPreviewDrumLabel(pad)}`,
+        `rack ${drumKitPreviewRackLabel(pad)}`,
+        `moves ${pad.changedCount} kit move${pad.changedCount === 1 ? "" : "s"}`
+      ])
+    };
   }
 
   return {
@@ -14114,6 +14150,10 @@ export function quickActionSoundDecisionNextCheck(action: QuickAction): string {
     return "loop drums, 808, Synth, and Chords together before trimming with Sound Focus or Studio controls";
   }
 
+  if (action.id === "drum-kit-readout-action") {
+    return "loop kick, clap, hat, and 808 before applying a built-in kit or trimming drum rack controls manually";
+  }
+
   if (action.id === "drum-kit-decision" || action.id === "drum-kit" || action.id.startsWith("drum-kit-pad-")) {
     return "loop kick, clap, hat, and 808 balance before changing another kit or drum rack control";
   }
@@ -14145,6 +14185,9 @@ export function quickActionSoundActionLabel(action: QuickAction): string {
   }
   if (action.id.startsWith("sound-preset-pad-")) {
     return "apply direct sound preset";
+  }
+  if (action.id === "drum-kit-readout-action") {
+    return "review drum kit readout";
   }
   if (action.id === "drum-kit-decision") {
     return "run drum kit decision";
@@ -14216,7 +14259,7 @@ export function quickActionDrumKitPadOption(project: ProjectState, action: Quick
     return options.find((pad) => pad.id === directId) ?? null;
   }
 
-  if (action.id !== "drum-kit-decision" && action.id !== "drum-kit") {
+  if (action.id !== "drum-kit-readout-action" && action.id !== "drum-kit-decision" && action.id !== "drum-kit") {
     return null;
   }
 
@@ -16299,6 +16342,13 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; follow the visible Drum Kit Preview Decision before another built-in kit move.`,
       nextCheck: "Use the Drum Kit Result plus Studio tone and drum rack mixer controls for manual trim."
+    };
+  }
+
+  if (action.id === "drum-kit-readout-action") {
+    return {
+      auditionCue: `Use the Drum Kit readout before applying a built-in kit, then loop Pattern ${project.selectedPattern}.`,
+      nextCheck: "Apply Drum Kit only when the preview target fits the groove; otherwise trim kick, clap, hat, or drum rack controls manually."
     };
   }
 
