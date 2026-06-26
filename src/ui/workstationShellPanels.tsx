@@ -313,7 +313,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Target, Form, Pattern A/B/C, Mix, and Handoff session-scan context with destination, snapshot metric, audition cue, and next check before Production Snapshot commands run."
       },
-      { id: "hook-readiness", command: "Hook Readiness", shortcut: "Quick Actions / Readout", target: "Hook / motif / contrast" },
+      {
+        id: "hook-readiness",
+        command: "Hook Readiness",
+        shortcut: "Quick Actions / Readout",
+        target: "Hook section / motif / contrast / mix support / handoff",
+        context:
+          "Hook Section, Motif, Contrast, Mix Support, and Handoff hook-quality context with destination, hook metric, audition cue, loop/fix cue, and next check before Hook Readiness commands run."
+      },
       { id: "topline-space", command: "Topline Space", shortcut: "Quick Actions / Readout", target: "Pocket / lead room / artist context" },
       {
         id: "beat-readiness",
