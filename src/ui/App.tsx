@@ -7671,6 +7671,35 @@ export function App(): ReactElement {
     setProjectStatus(`Preflight ${card.label}: ${card.value}`);
   }
 
+  function focusHandoffPack(): void {
+    const currentItems = createHandoffPackItems({
+      analysis: exportAnalysis,
+      project,
+      stemAnalyses,
+      onExportHandoffSheet: handleExportHandoffSheet,
+      onExportMidi: handleExportMidi,
+      onExportStems: handleExportStems,
+      onExportWav: handleExportWav
+    });
+    const currentTone = weakestTone(currentItems.map((item) => item.tone));
+    const currentRoute = createHandoffPackRouteSummary(project, stemAnalyses, currentItems, currentTone);
+    const currentSendOrder = createHandoffPackSendOrderSummary(project, currentItems);
+    const currentReceipt = handoffExportReceipt ?? emptyHandoffExportReceipt();
+    const currentManifest = createHandoffFileManifest(project, stemAnalyses, currentItems);
+    const currentAudit = createHandoffManifestAudit(
+      project,
+      currentItems,
+      currentManifest,
+      currentReceipt,
+      currentSendOrder
+    );
+
+    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Handoff Pack ${currentRoute.statusLabel}: ${currentRoute.detailLabel} / ${currentAudit.statusLabel} / ${currentSendOrder.nextLabel}`
+    );
+  }
+
   function focusHandoffPackageCheckCard(card: HandoffPackageCheckCard): void {
     setHandoffPackageCheckFocusId(card.focusId);
     deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -8247,6 +8276,7 @@ export function App(): ReactElement {
     onFocusFinishChecklist: focusFinishChecklistCard,
     onFocusGrooveCompass: focusGrooveCompassItem,
     onFocusHandoffExportFormat: focusHandoffExportFormatMetric,
+    onFocusHandoffPack: focusHandoffPack,
     onFocusHandoffManifestAudit: focusHandoffManifestAudit,
     onFocusHandoffPackageCheck: focusHandoffPackageCheckCard,
     onFocusHookReadiness: focusHookReadinessCard,
@@ -17892,6 +17922,7 @@ function createQuickActions({
   onFocusFinishChecklist,
   onFocusGrooveCompass,
   onFocusHandoffExportFormat,
+  onFocusHandoffPack,
   onFocusHandoffManifestAudit,
   onFocusHandoffPackageCheck,
   onFocusHookReadiness,
@@ -18167,6 +18198,7 @@ function createQuickActions({
   onFocusFinishChecklist: (card: FinishChecklistCard) => void;
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
   onFocusHandoffExportFormat: (metric: HandoffExportFormatMetric) => void;
+  onFocusHandoffPack: () => void;
   onFocusHandoffManifestAudit: () => void;
   onFocusHandoffPackageCheck: (card: HandoffPackageCheckCard) => void;
   onFocusHookReadiness: (card: HookReadinessFocusItem) => void;
@@ -19489,6 +19521,9 @@ function createQuickActions({
     onExportStems,
     onExportWav
   });
+  const handoffReadyCount = handoffPackItems.filter((item) => item.tone === "good").length;
+  const handoffTone = weakestTone(handoffPackItems.map((item) => item.tone));
+  const handoffRouteSummary = createHandoffPackRouteSummary(project, stemAnalyses, handoffPackItems, handoffTone);
   const handoffSendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
   const handoffReceipt = handoffExportReceipt ?? emptyHandoffExportReceipt();
   const handoffFileManifest = createHandoffFileManifest(project, stemAnalyses, handoffPackItems);
@@ -21288,6 +21323,18 @@ function createQuickActions({
       }
     })),
     {
+      id: "handoff-pack",
+      title: `Review Handoff Pack: ${handoffRouteSummary.statusLabel}`,
+      detail: `${handoffRouteSummary.routeLabel} / ${handoffManifestAudit.statusLabel} / ${handoffSendOrder.nextLabel} / ${handoffReceipt.statusLabel}`,
+      group: "Export",
+      keywords: `handoff pack review readout deliver package wav stems midi sheet route manifest receipt export format package check send order next export ${
+        handoffRouteSummary.routeLabel
+      } ${handoffManifestAudit.statusLabel} ${handoffSendOrder.nextLabel} ${handoffReceipt.statusLabel} ${
+        handoffReadyCount
+      }/${handoffPackItems.length} beginner producer`,
+      run: onFocusHandoffPack
+    },
+    {
       id: "handoff-export-format-focus",
       title: handoffExportFormatMetric
         ? `Focus Export Format: ${handoffExportFormatMetric.label}`
@@ -22131,6 +22178,7 @@ function createQuickActionResult(
     action.id.startsWith("hook-readiness-cue-") ||
     action.id === "topline-loop-cue" ||
     action.id.startsWith("topline-space-cue-") ||
+    action.id === "handoff-pack" ||
     action.id === "handoff-package-check-focus" ||
     action.id.startsWith("handoff-package-check-card-") ||
     action.id === "handoff-manifest-audit-focus" ||
@@ -25764,6 +25812,93 @@ function quickActionExportPreflightLaneLabel(action: QuickAction, card: ExportPr
   return titleLabel && titleLabel !== "Focus Export Preflight" ? titleLabel : card.label;
 }
 
+function quickActionHandoffPackMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "handoff-pack") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const readyCount = handoffPackItems.filter((item) => item.tone === "good").length;
+  const reviewCount = handoffPackItems.filter((item) => item.tone === "warn").length;
+  const blockerCount = handoffPackItems.filter((item) => item.tone === "danger").length;
+  const routeTone = weakestTone(handoffPackItems.map((item) => item.tone));
+  const routeSummary = createHandoffPackRouteSummary(project, stemAnalyses, handoffPackItems, routeTone);
+  const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const manifest = createHandoffFileManifest(project, stemAnalyses, handoffPackItems);
+  const manifestAudit = createHandoffManifestAudit(project, handoffPackItems, manifest, receipt, sendOrder);
+  const formatSummary = createHandoffExportFormatSummary(project, exportAnalysis, stemAnalyses, handoffPackItems);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const itemPosture = handoffPackItems.map((item) => `${item.buttonLabel} ${item.value}`).join(" / ");
+  const manifestPosture = manifestAudit.checks.map((check) => `${check.label} ${check.statusLabel}`).join(" / ");
+  const formatPosture = formatSummary.metrics.map((metric) => `${metric.label} ${metric.value}`).join(" / ");
+  const nextItem = sendOrder.nextItemId
+    ? (handoffPackItems.find((item) => item.id === sendOrder.nextItemId) ?? null)
+    : null;
+  const nextItemLabel = nextItem ? `${nextItem.label} ${nextItem.value} / ${nextItem.detail}` : "All deliverables ready";
+
+  return {
+    id: "handoff-pack",
+    label: "Handoff Pack",
+    value: [
+      "review package readout",
+      "destination Deliver / Handoff Pack",
+      `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
+      `route ${routeSummary.routeLabel} / ${routeSummary.statusLabel} / ${routeSummary.detailLabel}`,
+      `items ${itemPosture}`,
+      `wav ${mixWavFileName(project)} / ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `stems ${audibleStemCount}/${target.stemGoal} target / ${audibleStemCount}/${stemTrackIds.length} audible / ${stemWavFileNames(
+        project
+      ).length} files`,
+      `midi ${midiFileName(project)} / ${barCountLabel(bars)}`,
+      `sheet ${handoffSheetFileName(project)} / brief ${sessionBriefFilledFields(project.sessionBrief)}/4 / ${
+        briefStatus.value
+      }`,
+      `manifest ${manifestAudit.statusLabel} / ${manifestAudit.detailLabel}`,
+      `planned ${manifestPosture}`,
+      `receipt ${receipt.statusLabel} / ${receipt.fileLabel} / ${receipt.nextLabel}`,
+      `format ${formatSummary.statusLabel} / ${formatSummary.titleLabel} / ${formatSummary.durationLabel}`,
+      `formats ${formatPosture}`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `send ${sendOrder.statusLabel} / ${sendOrder.nextLabel} / ${nextItemLabel}`,
+      `sequence ${sendOrder.sequenceLabel}`,
+      `checks ${readyCount}/${handoffPackItems.length} ready`,
+      workflowCountLabel(reviewCount, "review"),
+      workflowCountLabel(blockerCount, "blocker"),
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(bars),
+      `next ${sendOrder.nextLabel}`
+    ].join(" / ")
+  };
+}
+
 function quickActionHandoffExportReceiptMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -28163,6 +28298,24 @@ function quickActionResultMetricSnapshot(
     return {
       id: "transition-loop",
       label: "Transition loop",
+      value: action.detail
+    };
+  }
+
+  if (action.id === "handoff-pack") {
+    const handoffPackMetric = quickActionHandoffPackMetricSnapshot(
+      project,
+      action,
+      handoffExportReceipt,
+      analysis ?? undefined
+    );
+    if (handoffPackMetric) {
+      return handoffPackMetric;
+    }
+
+    return {
+      id: "handoff-pack",
+      label: "Handoff Pack",
       value: action.detail
     };
   }
@@ -31085,6 +31238,13 @@ function quickActionResultFollowup(
     return {
       auditionCue: "Play Turn loop and listen only to the cued two-block handoff before editing fills, energy, or mutes.",
       nextCheck: "Return to Transition Map or Arrangement Focus after the loop to decide whether the boundary needs a Pattern, layer, or energy change."
+    };
+  }
+
+  if (action.id === "handoff-pack") {
+    return {
+      auditionCue: "Read Handoff Pack before sending so WAV, stems, MIDI, Handoff Sheet, route, manifest, receipt, format, and send order agree.",
+      nextCheck: "Run Handoff Next Export or an explicit deliverable export only after the current package readout points to that item."
     };
   }
 
