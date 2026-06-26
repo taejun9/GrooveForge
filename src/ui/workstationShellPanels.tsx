@@ -560,7 +560,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Current Rough-Balance Target, Direct Balance Pad Routes, Editable Channel Scope, Drums/808/Synth/Chords Channel Posture, Result Feedback, Audition Cue, and Next Check context before Mix Balance commands run."
       },
-      { id: "mix-coach", command: "Mix Coach", shortcut: "Quick Actions / Readout", target: "Headroom / balance" }
+      {
+        id: "mix-coach",
+        command: "Mix Coach",
+        shortcut: "Quick Actions / Readout",
+        target: "Priority mix metric / focus diagnostics",
+        context:
+          "Priority Mix Metric, Headroom, Balance, Limiter, Dynamics, Stem-Spread Diagnostics, Focus Route, Audition Cue, and Next Check context before Mix Coach commands run."
+      }
     ]
   },
   {
