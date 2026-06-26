@@ -504,9 +504,30 @@ const commandReferenceSections: CommandReferenceSection[] = [
     id: "mix-fast-path",
     title: "Mix",
     items: [
-      { id: "stem-audition-readout", command: "Stem Audition Readout", shortcut: "Quick Actions / Readout", target: "Full Mix / stems" },
-      { id: "stem-audition-decision", command: "Stem Audition Decision", shortcut: "Quick Actions / Readout", target: "Next mix audition" },
-      { id: "stem-audition", command: "Stem Audition", shortcut: "Quick Actions / Readout", target: "Full Mix / Drums / 808 / Synth / Chords" },
+      {
+        id: "stem-audition-readout",
+        command: "Stem Audition Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Full Mix / stem posture / solo-mute state",
+        context:
+          "Full Mix, Soloed Stem, Manual Audition State, Mixer Solo/Mute Posture, Decision Target, Audition Cue, and Next Check context before Stem Audition Readout commands run."
+      },
+      {
+        id: "stem-audition-decision",
+        command: "Stem Audition Decision",
+        shortcut: "Quick Actions / Readout",
+        target: "Next full-mix or stem comparison",
+        context:
+          "Next Full Mix or Stem Target, Decision Action, Direct Stem Routes, Current Audition Posture, Audition Cue, and Next Check context before Stem Audition Decision commands run."
+      },
+      {
+        id: "stem-audition",
+        command: "Stem Audition",
+        shortcut: "Quick Actions / Readout",
+        target: "Full Mix / Drums / 808 / Synth / Chords audition",
+        context:
+          "Full Mix, Drums, 808/Bass, Synth, and Chords audition routes with current posture, mixer solo/mute state, result feedback, audition cue, and next check before Stem Audition commands run."
+      },
       { id: "mix-snapshot-decision", command: "Mix Snapshot A/B Decision", shortcut: "Quick Actions / Readout", target: "Capture / recall recommendation" },
       { id: "mix-snapshot-ab", command: "Mix Snapshot A/B", shortcut: "Quick Actions / Readout", target: "Headroom / balance compare" },
       { id: "mix-balance-decision", command: "Mix Balance Decision", shortcut: "Quick Actions / Readout", target: "Suggested rough balance" },
