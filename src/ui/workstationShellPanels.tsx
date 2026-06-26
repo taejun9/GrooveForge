@@ -277,7 +277,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Guided, Studio, Finish, and Delivery context with destination, session metric, pass context, audition cue, and next check before Session Pass commands run."
       },
-      { id: "session-brief-compass", command: "Session Brief Compass", shortcut: "Quick Actions / Readout", target: "Direction / reference / handoff" },
+      {
+        id: "session-brief-compass",
+        command: "Session Brief Compass",
+        shortcut: "Quick Actions / Readout",
+        target: "Direction / reference / handoff",
+        context:
+          "Direction, Reference, Artist/Vocal Context, Handoff Readiness Cards, Brief Compass Focus Route, Direct Brief Card Commands, Focus Result Feedback, Delivery Target, Export Readiness, Package Readiness, Audition Cue, and Next Brief/Handoff Check context before Session Brief Compass commands run."
+      },
       { id: "reference-alignment", command: "Reference Alignment", shortcut: "Quick Actions / Readout", target: "Reference / form / mix / handoff" },
       {
         id: "composer-guide",
