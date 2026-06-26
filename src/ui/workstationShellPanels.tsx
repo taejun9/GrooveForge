@@ -254,7 +254,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context:
           "Guided and Studio orientation context with destination, mode metric, local context, audition cue, and next check before Mode Focus commands run."
       },
-      { id: "mode-switch", command: "Mode Switch", shortcut: "Quick Actions", target: "Guided / Studio mode" },
+      {
+        id: "mode-switch",
+        command: "Mode Switch",
+        shortcut: "Quick Actions",
+        target: "Guided / Studio workflow switch",
+        context:
+          "Guided and Studio switch context with destination, current mode, target mode, transition, audition cue, and next check before Mode Switch commands run."
+      },
       {
         id: "session-pass",
         command: "Session Pass",
