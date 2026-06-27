@@ -761,6 +761,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Melody Motif/Accent/Contour Preview, Current Melody Move Target, Direct Melody Move Command, Melody Move Result Feedback, Selected Pattern, Audition Cue, and Next Melody Check context before Melody Move commands run."
       },
       {
+        id: "melody-move-route-readout",
+        command: "Melody Move Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Motif / accent / contour route / no edit",
+        context:
+          "Melody Move Route Readout Action, Selected Pattern A/B/C, Melody Motif/Accent/Contour Preview, Current Melody Move Target, Existing Melody Move Route, Direct Melody Move Command, Move Count, Synth Note/Rhythm/Range/Velocity/Chance Posture, Arrangement Usage, Audition Cue, and Next Melody Route Check context before Melody Move commands run."
+      },
+      {
         id: "chord-move",
         command: "Chord Move",
         shortcut: "Quick Actions / Readout",
