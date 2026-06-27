@@ -50,6 +50,7 @@ python3 harness/scripts/run_quality_gate.py
 npm run harness:smoke
 npm run typecheck
 npm run build
+npm run desktop:smoke
 npm run qa
 npm run verify
 ```
@@ -65,6 +66,8 @@ npm run desktop
 P0 scheduler work must prove stable play/stop/loop behavior, BPM changes, current-step feedback, and separation between UI timing and audio timing.
 
 Runtime smoke work must execute the real local TypeScript domain, render, and MIDI modules through `npm run harness:smoke`; construct sample-free 8-bar beats from every supported `styleProfiles` entry and every Beat Blueprint using existing project data; verify non-silent full-mix plus drum, 808, synth, and chord stem analysis for each case; verify WAV RIFF/WAVE headers, WAV/stem file names, Standard MIDI header, and MIDI file name; avoid writing media artifacts; and avoid browser, Electron, network, imported audio, sampling, remote AI, accounts, analytics, or cloud sync dependencies.
+
+Desktop entry smoke work must run after `npm run build` through `npm run desktop:smoke`; verify built `dist/index.html`, renderer assets, `dist-electron/main.js`, and `dist-electron/preload.js`; prove the production Electron main entry loads `dist/index.html` with `loadFile`, uses the compiled preload, preserves `nodeIntegration: false`, `contextIsolation: true`, and `sandbox: true`, denies new-window navigation through the shell boundary, registers local project file handlers and native command menus, and exposes only the bounded context-isolated `grooveforge` bridge with validated native menu commands; and avoid launching GUI windows, network calls, installer/signing/notarization, auto-update, remote services, sampling, imported audio, accounts, analytics, or cloud sync.
 
 Production build hygiene work must preserve `outDir: "dist"` and `sourcemap: true`, use Vite 8 / Rolldown `build.rolldownOptions.output.codeSplitting.groups` for real chunk separation, and must not hide large-chunk warnings by setting `chunkSizeWarningLimit`. UI chunk work may split pure model data, helper utilities, quick-action route-label helpers, quick-action command-palette helpers, quick-action result/metric utilities, shared analysis helpers, read-only derivation modules, and render-only panels out of `src/ui/App.tsx`, including render-only Guided/Studio workflow panels, Snapshot Compare derivation code, app helper/derivation code, and Quick Actions route-label/palette helper code, but must not alter app UI behavior, project schema, playback, audio rendering, WAV/stem/MIDI export, Handoff behavior, local draft behavior, sampling, imported audio, remote AI, accounts, analytics, or cloud sync.
 
