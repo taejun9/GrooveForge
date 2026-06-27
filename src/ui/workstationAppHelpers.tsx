@@ -8149,17 +8149,19 @@ export function ArrangementTransitionMapFocusResultStrip({
 
 export function NextMove({
   actions,
+  sectionRef,
   result,
   onRun
 }: {
   actions: NextMoveAction[];
+  sectionRef?: Ref<HTMLElement>;
   result: NextMoveResult | null;
   onRun: (action: NextMoveAction) => void;
 }): ReactElement {
   const [primaryAction, ...secondaryActions] = actions;
 
   return (
-    <section className={`next-move ${primaryAction.tone}`} data-testid="next-move" aria-label="Next move">
+    <section ref={sectionRef} className={`next-move ${primaryAction.tone}`} data-testid="next-move" aria-label="Next move">
       <div className="next-move-heading">
         <div>
           <Sparkles size={17} aria-hidden="true" />

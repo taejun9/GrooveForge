@@ -533,12 +533,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Target Fit, Section Coverage, Hook Contrast, Energy Arc, Arrangement Action, Structure Lens Route Readout posture, Action Route, Audition Cue, and Next Check context before Structure Lens commands run."
       },
       {
+        id: "next-move-route-readout",
+        command: "Next Move Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Recommendation / route / readiness / export / stems route",
+        context:
+          "Next Move Route Readout Action, current recommended action route, direct Next Move action command, Next Move action unchanged, Beat Map unchanged, Structure Lens unchanged, selected Pattern, Delivery Target, readiness/export/stem posture, action route, audition cue, and next move-route check before Next Move actions, Beat Map actions, Structure Lens actions, Workflow Navigator jump, Workflow Spotlight focus, playback, edit, or export commands run."
+      },
+      {
         id: "next-move",
         command: "Next Move",
         shortcut: "Quick Actions / Readout",
         target: "Recommendation / route / readiness / export / stems",
         context:
-          "Recommended Action, Route, Before/After Posture, Delivery Target, Readiness, Export/Stems, Audition Cue, and Next Check context before Next Move commands run."
+          "Recommended Action, Route, Before/After Posture, Delivery Target, Readiness, Export/Stems, Next Move Route Readout posture, Audition Cue, and Next Check context before Next Move commands run."
       }
     ]
   },
