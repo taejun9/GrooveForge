@@ -8144,6 +8144,23 @@ export function App(): ReactElement {
     );
   }
 
+  function focusDrumMoveRouteReadout(): void {
+    const target = activeDrumMoveQuickActionTarget(project, drumMovePreviewSummary);
+    const routeLabel = target
+      ? target.kind === "Foundation"
+        ? "Drum Foundation route"
+        : target.kind === "Feel"
+          ? "Groove Feel route"
+          : "Drum Accent route"
+      : "no drum route";
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      target
+        ? `Drum Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command drum-move / ${drumMovePreviewSummary.moveLabel} / direct drum move unchanged`
+        : `Drum Move Route Readout Pattern ${project.selectedPattern}: ${drumMovePreviewSummary.statusLabel} / no drum move route needed / ${drumMovePreviewSummary.moveLabel} / direct drum move unchanged`
+    );
+  }
+
   function focusLayerStarterReadout(): void {
     const priorityLayer = layerStarterOptions.find((option) => option.tone !== "good") ?? layerStarterOptions[0] ?? null;
     composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -8433,6 +8450,7 @@ export function App(): ReactElement {
     onApplyDrumFoundation: applyDrumFoundation,
     onApplyDrumKit: applyDrumKitPad,
     onFocusDrumKitReadout: focusDrumKitReadout,
+    onFocusDrumMoveRouteReadout: focusDrumMoveRouteReadout,
     onApplyGrooveFeel: applyGrooveFeel,
     onApplyLayerStarter: applyLayerStarter,
     onFocusLayerStarterReadout: focusLayerStarterReadout,
