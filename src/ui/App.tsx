@@ -1042,6 +1042,7 @@ import {
   drumKitRouteLabel,
   exportPreflightRouteLabel,
   finishChecklistRouteLabel,
+  grooveCompassRouteLabel,
   keyCompassRouteLabel,
   listeningPassRouteLabel,
   masterAutomationRouteLabel,
@@ -1256,6 +1257,7 @@ export function App(): ReactElement {
   const sessionPassPanelRef = useRef<HTMLElement | null>(null);
   const composerGuidePanelRef = useRef<HTMLElement | null>(null);
   const keyCompassPanelRef = useRef<HTMLElement | null>(null);
+  const grooveCompassPanelRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
@@ -7724,6 +7726,20 @@ export function App(): ReactElement {
     setProjectStatus(`Groove ${item.label}: ${item.value}`);
   }
 
+  function focusGrooveCompassRouteReadout(): void {
+    const item = activeGrooveCompassQuickActionItem(grooveCompassSummary);
+    grooveCompassPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+
+    setProjectStatus(
+      item
+        ? `Groove Compass Route Readout Pattern ${project.selectedPattern}: ${grooveCompassRouteLabel(
+            item,
+            grooveCompassSummary
+          )} / ${item.value} / direct groove-compass-card-${item.id} unchanged / ${item.focusLabel} panel`
+        : "Groove Compass Route Readout: no pocket lane available"
+    );
+  }
+
   function focusPatternDnaCard(card: PatternDnaCard): void {
     const targetRefs: Record<PatternDnaFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -8930,6 +8946,7 @@ export function App(): ReactElement {
     onFocusFinishChecklist: focusFinishChecklistCard,
     onFocusFinishChecklistRouteReadout: focusFinishChecklistRouteReadout,
     onFocusGrooveCompass: focusGrooveCompassItem,
+    onFocusGrooveCompassRouteReadout: focusGrooveCompassRouteReadout,
     onFocusHandoffExportFormat: focusHandoffExportFormatMetric,
     onFocusHandoffPack: focusHandoffPack,
     onFocusHandoffManifestAudit: focusHandoffManifestAudit,
@@ -9402,6 +9419,7 @@ export function App(): ReactElement {
         onCue={cueGrooveCompass}
         onFocus={focusGrooveCompassItem}
         result={grooveCompassResult}
+        sectionRef={grooveCompassPanelRef}
         selectedPattern={project.selectedPattern}
         summary={grooveCompassSummary}
       />

@@ -355,12 +355,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Scale, Cadence, Chords, 808/Bass, Melody, and Selected Note/Chord harmony context with Key Compass Route Readout, destination, key metric, direct Key Compass card command, audition cue, and next check before Key Compass commands run."
       },
       {
+        id: "groove-compass-route-readout",
+        command: "Groove Compass Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Density / anchors / hats / timing / chance / pocket / selected drum route",
+        context:
+          "Groove Compass Route Readout Action, selected Pattern A/B/C, current density, anchors, hat motion, timing, chance, pocket balance, or selected drum lane, existing Groove Compass route, direct Groove Compass card command, editable event counts, drum hit count, groove metric, audition cue, and next pocket-route check before Groove Compass focus, cue, playback, edit, or export commands run."
+      },
+      {
         id: "groove-compass",
         command: "Groove Compass",
         shortcut: "Quick Actions / Readout",
         target: "Density / anchors / hats / timing / chance / pocket / selected drum",
         context:
-          "Density, Anchors, Hat Motion, Timing, Chance, Pocket Balance, and Selected Drum context with destination, groove metric, audition cue, cue action, and next check before Groove Compass commands run."
+          "Density, Anchors, Hat Motion, Timing, Chance, Pocket Balance, and Selected Drum context with Groove Compass Route Readout, destination, groove metric, direct Groove Compass card command, audition cue, cue action, and next check before Groove Compass commands run."
       },
       {
         id: "listening-pass",
