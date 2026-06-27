@@ -777,7 +777,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Anchor / lift / break / switchup roles",
         context:
-          "Pattern Contrast Readout Action, Role Map Readout, Section Fit Readout, Section Fit Cue, Section Fit Use, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
+          "Pattern Contrast Readout Action, Role Map Readout, Section Fit Readout, Section Fit Decision, Section Fit Cue, Section Fit Use, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
       },
       {
         id: "pattern-cue-readout",
@@ -2021,6 +2021,15 @@ export function PatternContrastReadout({
     sectionFitAlreadyMatches ||
     selectedBlockPattern === null ||
     selectedBlockPattern === sectionFitUseSlot.slot;
+  const sectionFitDecisionAction = sectionFitAlreadyMatches ? "cue" : sectionFitUseSlot ? "use" : "review";
+  const sectionFitDecisionDisabled =
+    sectionFitDecisionAction === "cue"
+      ? sectionFitCueUnavailable
+      : sectionFitDecisionAction === "use"
+        ? sectionFitUseUnavailable
+        : true;
+  const sectionFitDecisionLabel =
+    sectionFitDecisionAction === "cue" ? "Cue fit" : sectionFitDecisionAction === "use" ? "Use role" : "Review";
   return (
     <div
       className={`pattern-contrast-readout ${summary.tone}`}
@@ -2163,6 +2172,30 @@ export function PatternContrastReadout({
           <div className="pattern-contrast-section-fit-followup">
             <span data-testid="pattern-contrast-section-fit-detail">{sectionFit.detailLabel}</span>
             <small data-testid="pattern-contrast-section-fit-next-check">{sectionFit.nextCheck}</small>
+            <button
+              className={`pattern-contrast-section-fit-decision ${sectionFitDecisionAction}`}
+              data-testid="pattern-contrast-section-fit-decision"
+              disabled={sectionFitDecisionDisabled}
+              onClick={() => {
+                if (sectionFitDecisionAction === "cue" && !sectionFitCueUnavailable) {
+                  onCueSectionFitBlock?.();
+                }
+                if (sectionFitDecisionAction === "use" && !sectionFitUseUnavailable && sectionFitUseSlot) {
+                  onUseSectionFitRole?.(sectionFitUseSlot.slot);
+                }
+              }}
+              title={
+                sectionFitDecisionAction === "cue" && sectionFitSelectedItem
+                  ? `Decision: cue Block ${sectionFitSelectedItem.index + 1} because its section role already fits.`
+                  : sectionFitDecisionAction === "use" && sectionFitUseSlot && sectionFitSelectedItem
+                    ? `Decision: use ${sectionFitUseSlot.roleLabel} Pattern ${sectionFitUseSlot.slot} for Block ${sectionFitSelectedItem.index + 1}.`
+                    : "Decision unavailable until an expected Section Fit role exists."
+              }
+              type="button"
+            >
+              {sectionFitDecisionAction === "use" ? <ArrowRight size={12} aria-hidden="true" /> : <Play size={12} aria-hidden="true" />}
+              <span>{sectionFitDecisionLabel}</span>
+            </button>
             <button
               className={`pattern-contrast-section-fit-cue ${sectionFitCueActive ? "selected" : ""}`}
               data-testid="pattern-contrast-section-fit-cue"

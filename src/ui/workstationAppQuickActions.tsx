@@ -4694,6 +4694,42 @@ export function createQuickActions({
       }
     }
   };
+  const patternContrastSectionFitDecisionKind = patternContrastSectionFitAlreadyMatches
+    ? "cue"
+    : patternContrastSectionFitUseSlot
+      ? "use"
+      : "review";
+  const patternContrastSectionFitDecisionAction: QuickAction = {
+    id: "pattern-contrast-section-fit-decision",
+    title:
+      patternContrastSectionFitDecisionKind === "cue" && patternContrastSectionFitCueItem
+        ? `Section Fit Decision: Cue Block ${patternContrastSectionFitCueItem.index + 1}`
+        : patternContrastSectionFitDecisionKind === "use" && patternContrastSectionFitUseSlot
+          ? `Section Fit Decision: Use ${patternContrastSectionFitUseSlot.roleLabel} Pattern ${patternContrastSectionFitUseSlot.slot}`
+          : "Section Fit Decision: Review roles",
+    detail:
+      patternContrastSectionFitDecisionKind === "cue" && patternContrastSectionFitCueItem
+        ? `${patternContrastSectionFitCueItem.sectionLabel} already fits ${patternContrastSectionFitCueItem.expectedLabel} / cue Block loop`
+        : patternContrastSectionFitDecisionKind === "use" && patternContrastSectionFitUseSlot && patternContrastSectionFitCueItem
+          ? `${selectedBlockLabel} -> ${patternContrastSectionFitUseSlot.roleLabel} Pattern ${patternContrastSectionFitUseSlot.slot} / expects ${patternContrastSectionFitCueItem.expectedLabel}`
+          : "No safe Section Fit cue or use action is available yet.",
+    group: patternContrastSectionFitDecisionKind === "cue" ? "Transport" : "Arrange",
+    keywords: `Quick Actions Pattern Contrast Section Fit Decision next move selected block cue use review arrangement expected role intro verse hook bridge outro anchor lift break switchup ${patternContrastSectionFitSummary.statusLabel} ${patternContrastSectionFitSummary.metricLabel} beginner producer direct beat workstation sample free`,
+    disabled:
+      patternContrastSectionFitDecisionKind === "cue"
+        ? isPlaying || !patternContrastSectionFitCueItem
+        : patternContrastSectionFitDecisionKind === "use"
+          ? Boolean(patternContrastSectionFitUseAction.disabled)
+          : true,
+    run: () => {
+      if (patternContrastSectionFitDecisionKind === "cue" && patternContrastSectionFitCueItem) {
+        onCueArrangementBlock(patternContrastSectionFitCueItem.index);
+      }
+      if (patternContrastSectionFitDecisionKind === "use" && patternContrastSectionFitUseSlot) {
+        onUsePatternInSelectedBlock(patternContrastSectionFitUseSlot.slot);
+      }
+    }
+  };
   const patternContrastCueActions: QuickAction[] = patternContrastCueRoles.map((role) => {
     const slot = patternContrastCueSlot(patternContrastSummary, role);
     const roleLabel = patternContrastCueRoleLabel(role);
@@ -5190,6 +5226,7 @@ export function createQuickActions({
     patternContrastReadoutAction,
     patternContrastRoleMapReadoutAction,
     patternContrastSectionFitReadoutAction,
+    patternContrastSectionFitDecisionAction,
     patternContrastSectionFitCueAction,
     patternContrastSectionFitUseAction,
     ...patternContrastCueActions,
@@ -10683,6 +10720,31 @@ export function quickActionPatternContrastSectionFitUseMetricSnapshot(
     value: selectedItem
       ? `Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} now uses ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / expects ${selectedItem.expectedLabel} / ${selectedItem.fitLabel} / Pattern events unchanged / selected block assignment explicit / export unchanged`
       : "No arrangement block available / Pattern events unchanged / arrangement unchanged / export unchanged"
+  };
+}
+
+export function quickActionPatternContrastSectionFitDecisionMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "pattern-contrast-section-fit-decision") {
+    return null;
+  }
+
+  const sectionFit = createPatternContrastSectionFitSummary(
+    createPatternContrastSummary(createPatternCompareSummaries(project)),
+    project.arrangement,
+    selectedArrangementIndex
+  );
+  const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
+
+  return {
+    id: "pattern-contrast-section-fit-decision",
+    label: "Section Fit Decision",
+    value: selectedItem
+      ? `${action.title} / Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} / expects ${selectedItem.expectedLabel} / now ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / ${selectedItem.fitLabel} / Pattern events unchanged / export unchanged`
+      : `${action.title} / no arrangement block available / Pattern events unchanged / arrangement unchanged / export unchanged`
   };
 }
 
@@ -17609,6 +17671,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "pattern-contrast-section-fit-decision") {
+    return (
+      quickActionPatternContrastSectionFitDecisionMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "pattern-contrast-section-fit-decision",
+        label: "Section Fit Decision",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id === "pattern-contrast-section-fit-cue-selected-block") {
     return (
       quickActionPatternContrastSectionFitCueMetricSnapshot(project, action, selectedArrangementIndex) ?? {
@@ -22657,6 +22729,21 @@ export function quickActionResultFollowup(
     return {
       auditionCue: sectionFit.auditionCue,
       nextCheck: sectionFit.nextCheck
+    };
+  }
+
+  if (action.id === "pattern-contrast-section-fit-decision") {
+    const sectionFit = createPatternContrastSectionFitSummary(
+      createPatternContrastSummary(createPatternCompareSummaries(project)),
+      project.arrangement,
+      0
+    );
+    const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
+    return {
+      auditionCue: selectedItem
+        ? `Play Block loop; confirm the Decision result for ${selectedItem.sectionLabel} against its expected ${selectedItem.expectedLabel} role.`
+        : "Create an arrangement block before running a Section Fit Decision.",
+      nextCheck: "Read Section Fit again, then keep the block cued or use Role Map before making another role placement."
     };
   }
 
