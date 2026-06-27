@@ -360,7 +360,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Target / form / Pattern A-B-C / mix / handoff",
         context:
-          "Target, Form, Pattern A/B/C, Mix, and Handoff session-scan context with destination, snapshot metric, audition cue, and next check before Production Snapshot commands run."
+          "Target, Form, Pattern A/B/C, Mix, and Handoff session-scan context with route readout, direct metric command, destination, snapshot metric, audition cue, and next check before Production Snapshot focus, playback, edit, or export commands run."
       },
       {
         id: "hook-readiness",

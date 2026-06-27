@@ -1410,6 +1410,7 @@ export function createQuickActions({
   onFocusPatternSwitchReadout,
   onFocusPatternUseReadout,
   onFocusProductionSnapshot,
+  onFocusProductionSnapshotRouteReadout,
   onFocusReferenceAlignment,
   onFocusSnapshotCompare,
   onFocusReviewQueue,
@@ -1767,6 +1768,7 @@ export function createQuickActions({
   onFocusPatternSwitchReadout: () => void;
   onFocusPatternUseReadout: () => void;
   onFocusProductionSnapshot: (metric: ProductionSnapshotFocusItem) => void;
+  onFocusProductionSnapshotRouteReadout: () => void;
   onFocusReferenceAlignment: (card: ReferenceAlignmentCard) => void;
   onFocusSnapshotCompare: (item: SnapshotCompareFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
@@ -2587,6 +2589,24 @@ export function createQuickActions({
     keywords: `production snapshot focus metric session scan ${metric.id} ${metric.label} ${metric.value} ${metric.focusLabel} ${metric.detail} target form patterns mix handoff beginner producer`,
     run: () => onFocusProductionSnapshot(metric)
   }));
+  const productionSnapshotRouteReadoutAction: QuickAction = {
+    id: "production-snapshot-route-readout-action",
+    title: productionSnapshotMetric
+      ? `Review Production Snapshot Route: ${productionSnapshotMetric.label}`
+      : "Review Production Snapshot Route",
+    detail: productionSnapshotMetric
+      ? `${productionSnapshotRouteLabel(productionSnapshotMetric)} / ${productionSnapshotMetric.value} / direct production-snapshot-metric-${productionSnapshotMetric.id} unchanged / ${productionSnapshotMetric.focusLabel} panel`
+      : "No Production Snapshot metric available.",
+    group: "Project",
+    keywords: `Quick Actions Production Snapshot Route Readout review route session scan metric direct production snapshot command no edit target form patterns mix handoff ${
+      productionSnapshotMetric?.id ?? "none"
+    } ${productionSnapshotMetric?.label ?? "none"} ${productionSnapshotMetric?.value ?? "none"} ${
+      productionSnapshotMetric?.focusLabel ?? "none"
+    } beginner producer sample free`,
+    disabled: !productionSnapshotMetric,
+    resultTargetId: productionSnapshotMetric?.id,
+    run: onFocusProductionSnapshotRouteReadout
+  };
   const snapshotCompareItem = activeSnapshotCompareQuickActionItem(snapshotCompareSummary);
   const snapshotCompareActions: QuickAction[] = snapshotCompareDirectMetricItems(snapshotCompareSummary).map((item) => ({
     id: `snapshot-compare-metric-${item.metricId}`,
@@ -5325,6 +5345,7 @@ export function createQuickActions({
       }
     },
     ...beatPassportActions,
+    productionSnapshotRouteReadoutAction,
     {
       id: "production-snapshot-focus",
       title: productionSnapshotMetric ? `Focus Production Snapshot: ${productionSnapshotMetric.label}` : "Focus Production Snapshot",
@@ -7067,6 +7088,7 @@ export function createQuickActionResult(
     action.id === "beat-passport-route-readout-action" ||
     action.id === "beat-passport-focus" ||
     action.id.startsWith("beat-passport-metric-") ||
+    action.id === "production-snapshot-route-readout-action" ||
     action.id === "production-snapshot-focus" ||
     action.id.startsWith("production-snapshot-metric-") ||
     action.id === "snapshot-compare-focus" ||
@@ -10416,17 +10438,26 @@ export function quickActionProductionSnapshotMetricSnapshot(
   const pattern = activePattern(project);
   const usedSlots = usedPatternSlots(project);
   const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
-  const actionLabel =
-    action.id === "production-snapshot-focus" ? "focus priority production snapshot" : "focus direct production snapshot";
+  const isRouteReadout = action.id === "production-snapshot-route-readout-action";
+  const actionLabel = isRouteReadout
+    ? "review production snapshot route readout"
+    : action.id === "production-snapshot-focus"
+      ? "focus priority production snapshot"
+      : "focus direct production snapshot";
+  const directMetricLabel = `direct production-snapshot-metric-${metric.id} unchanged`;
   const laneLabel = quickActionProductionSnapshotLaneLabel(action, metric);
   const detailParts = quickActionProductionSnapshotDetailParts(action);
   const contextLabel = detailParts.slice(2).join(" / ") || metric.detail;
   const postureLabel = summary.metrics.map((item) => `${item.label} ${item.value}`).join(" / ");
 
   return {
-    id: "production-snapshot",
-    label: "Production snapshot",
-    value: `${actionLabel} / metric ${laneLabel} / destination ${metric.focusLabel} panel / status ${metric.value} / context ${contextLabel} / Pattern ${
+    id: isRouteReadout ? "production-snapshot-route-readout" : "production-snapshot",
+    label: isRouteReadout ? "Production Snapshot Route Readout" : "Production snapshot",
+    value: `${actionLabel} / route ${productionSnapshotRouteLabel(
+      metric
+    )} / metric ${laneLabel} / ${directMetricLabel} / destination ${
+      metric.focusLabel
+    } panel / status ${metric.value} / context ${contextLabel} / Pattern ${
       project.selectedPattern
     } / ${patternEventTotal(pattern)} events / ${patternUseLabel} / posture ${postureLabel} / session ${
       summary.headline
@@ -10440,7 +10471,7 @@ export function quickActionProductionSnapshotMetric(
   summary: ProductionSnapshotSummary,
   action: QuickAction
 ): ProductionSnapshotMetric | null {
-  if (action.id === "production-snapshot-focus") {
+  if (action.id === "production-snapshot-route-readout-action" || action.id === "production-snapshot-focus") {
     return activeProductionSnapshotQuickActionMetric(summary);
   }
 
@@ -10471,8 +10502,28 @@ export function quickActionProductionSnapshotDetailParts(action: QuickAction): s
 }
 
 export function quickActionProductionSnapshotLaneLabel(action: QuickAction, metric: ProductionSnapshotMetric): string {
-  const titleLabel = action.title.replace(/^Focus Production Snapshot:\s*/, "").trim();
-  return titleLabel && titleLabel !== "Focus Production Snapshot" ? titleLabel : metric.label;
+  const titleLabel = action.title
+    .replace(/^Focus Production Snapshot:\s*/, "")
+    .replace(/^Review Production Snapshot Route:\s*/, "")
+    .trim();
+  return titleLabel && titleLabel !== "Focus Production Snapshot" && titleLabel !== "Review Production Snapshot Route"
+    ? titleLabel
+    : metric.label;
+}
+
+export function productionSnapshotRouteLabel(metric: ProductionSnapshotMetric): string {
+  switch (metric.id) {
+    case "target":
+      return "Target route";
+    case "form":
+      return "Form route";
+    case "patterns":
+      return "Pattern A/B/C route";
+    case "mix":
+      return "Mix route";
+    case "handoff":
+      return "Handoff route";
+  }
 }
 
 export function quickActionFinishChecklistMetricSnapshot(
@@ -15955,7 +16006,11 @@ export function quickActionResultMetricSnapshot(
     }
   }
 
-  if (action.id === "production-snapshot-focus" || action.id.startsWith("production-snapshot-metric-")) {
+  if (
+    action.id === "production-snapshot-route-readout-action" ||
+    action.id === "production-snapshot-focus" ||
+    action.id.startsWith("production-snapshot-metric-")
+  ) {
     const productionSnapshotMetric = quickActionProductionSnapshotMetricSnapshot(project, action);
     if (productionSnapshotMetric) {
       return productionSnapshotMetric;
@@ -20909,6 +20964,15 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Beat Passport metric to inspect that identity lane before changing the beat.",
       nextCheck: "Return to Beat Passport when you need another direct target, length, Pattern, readiness, export, stem, or master focus."
+    };
+  }
+
+  if (action.id === "production-snapshot-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the Production Snapshot route, then audition Pattern A/B/C, Song, Full Mix, or the matching handoff area before focusing a session metric.",
+      nextCheck:
+        "Use Production Snapshot focus only when the named target, form, Pattern, mix, or handoff route matches the session question; otherwise leave playback and project data unchanged."
     };
   }
 
