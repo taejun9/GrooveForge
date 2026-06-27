@@ -132,6 +132,7 @@ function checkElectronMainContract() {
   checkIncludes(source, "contextIsolation: true", label);
   checkIncludes(source, "sandbox: true", label);
   checkIncludes(source, "backgroundThrottling: !isLaunchSmoke", label);
+  checkIncludes(source, "paintWhenInitiallyHidden: true", label);
   checkIncludes(source, 'void win.loadFile(path.join(__dirname, "../dist/index.html"))', label);
   checkIncludes(source, "win.webContents.setWindowOpenHandler", label);
   checkIncludes(source, 'return { action: "deny" }', label);

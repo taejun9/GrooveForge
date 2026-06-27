@@ -310,7 +310,17 @@ function launchSmokeVisualFailures(evidence: LaunchSmokeVisualEvidence): string[
   return failures;
 }
 
+async function waitForLaunchSmokePaint(win: BrowserWindow): Promise<void> {
+  await win.webContents.executeJavaScript(`
+    new Promise((resolve) => {
+      const afterPaint = () => window.setTimeout(resolve, 80);
+      window.requestAnimationFrame(() => window.requestAnimationFrame(afterPaint));
+    });
+  `);
+}
+
 async function collectLaunchSmokeVisualEvidence(win: BrowserWindow): Promise<LaunchSmokeVisualEvidence> {
+  await waitForLaunchSmokePaint(win);
   const screenshot = await win.webContents.capturePage();
   const { width, height } = screenshot.getSize();
   const pngBytes = screenshot.toPNG().byteLength;
@@ -498,11 +508,15 @@ function installLaunchSmoke(win: BrowserWindow): void {
 
               const visualFailures = launchSmokeVisualFailures(visualEvidence);
               if (visualFailures.length > 0) {
-                fail("Production desktop visual launch smoke failed.", {
-                  evidence,
-                  visualEvidence,
-                  failures: visualFailures
-                });
+                if (Date.now() >= deadline) {
+                  fail("Production desktop visual launch smoke failed.", {
+                    evidence,
+                    visualEvidence,
+                    failures: visualFailures
+                  });
+                } else {
+                  setTimeout(() => poll(deadline), 100);
+                }
                 return;
               }
 
@@ -532,7 +546,7 @@ function installLaunchSmoke(win: BrowserWindow): void {
       });
   };
 
-  win.webContents.once("dom-ready", () => {
+  win.once("ready-to-show", () => {
     poll(Date.now() + launchSmokeTimeoutMs - 1000);
   });
 }
@@ -545,6 +559,7 @@ function createWindow(): void {
     minHeight: 760,
     title: "GrooveForge",
     backgroundColor: "#0f1115",
+    paintWhenInitiallyHidden: true,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
