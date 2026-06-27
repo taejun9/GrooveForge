@@ -7340,6 +7340,7 @@ export function HookReadiness({
   onCue,
   onFix,
   onFocus,
+  sectionRef,
   summary
 }: {
   cueTarget: HookLoopCueTarget | null;
@@ -7351,6 +7352,7 @@ export function HookReadiness({
   onCue: (card?: HookReadinessFocusItem) => void;
   onFix: (card?: HookReadinessCard) => void;
   onFocus: (card: HookReadinessFocusItem) => void;
+  sectionRef?: Ref<HTMLElement>;
   summary: HookReadinessSummary;
 }): ReactElement {
   const focusSummary = createHookReadinessFocusSummary(summary, focusedCardId);
@@ -7359,7 +7361,7 @@ export function HookReadiness({
   const priorityActionDisabled = priorityCard === null;
 
   return (
-    <section className={`hook-readiness ${summary.tone}`} data-testid="hook-readiness" aria-label="Hook readiness">
+    <section className={`hook-readiness ${summary.tone}`} data-testid="hook-readiness" aria-label="Hook readiness" ref={sectionRef}>
       <div className="hook-readiness-heading">
         <div>
           <Target size={17} aria-hidden="true" />
