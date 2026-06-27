@@ -1059,7 +1059,8 @@ import {
   spaceFxRouteLabel,
   stemAuditionRouteLabel,
   toplineSpaceRouteLabel,
-  workflowNavigatorRouteLabel
+  workflowNavigatorRouteLabel,
+  workflowSpotlightRouteLabel
 } from "./workstationAppQuickActions";
 import type {
   EditorAuditionReadoutSummary, MixSnapshotResultTargetId, NextMoveQuickActionSource, PatternEditQuickActionRoute, QuickActionInputSetupResultState, QuickActionInputSetupSnapshot, QuickActionSelectedEventType, SoundSnapshotQuickActionTarget
@@ -7424,6 +7425,21 @@ export function App(): ReactElement {
     );
   }
 
+  function focusWorkflowSpotlightRouteReadout(): void {
+    const spotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
+    const item = spotlight.zoneId ? workflowNavigatorItems.find((candidate) => candidate.id === spotlight.zoneId) ?? null : null;
+    workflowNavigatorPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      item
+        ? `Workflow Spotlight Route Readout Pattern ${project.selectedPattern}: ${workflowSpotlightRouteLabel(
+            spotlight,
+            item,
+            workflowNavigatorItems
+          )} / ${spotlight.statusLabel} / direct workflow-spotlight-focus unchanged / workflow navigator jump unchanged / Guide panel`
+        : "Workflow Spotlight Route Readout: no spotlight route available"
+    );
+  }
+
   function focusBeatReadinessCheck(check: BeatReadinessCheck): void {
     const targetRefs: Record<BeatReadinessFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -9041,6 +9057,7 @@ export function App(): ReactElement {
     onFocusToplineSpace: focusToplineSpaceCard,
     onFocusToplineSpaceRouteReadout: focusToplineSpaceRouteReadout,
     onFocusWorkflowNavigatorRouteReadout: focusWorkflowNavigatorRouteReadout,
+    onFocusWorkflowSpotlightRouteReadout: focusWorkflowSpotlightRouteReadout,
     onFocusWorkflowSpotlight: jumpToWorkflowNavigatorItem,
     onJumpWorkflowZone: jumpToWorkflowNavigatorItem,
     onOpenCommandReference: openCommandReference,

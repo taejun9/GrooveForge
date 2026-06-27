@@ -113,6 +113,8 @@ function quickActionGuideSuggestionAfterRun(detail: string): string {
       return "After run: review the focused pass before choosing a fix.";
     case "Workflow Spotlight":
       return "After run: check the highlighted workflow zone before changing the beat.";
+    case "Workflow Spotlight Route Readout":
+      return "After run: inspect the highlighted workflow route before focusing or jumping.";
     default:
       return "After run: inspect the focused guide target before editing.";
   }
@@ -483,12 +485,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Compose, Arrange, Mix, and Deliver workflow-zone context with Workflow Navigator Route Readout posture, destination, direct zone command, readiness metric, zone context, audition cue, jump action, and next check before Workflow Navigator commands run."
       },
       {
+        id: "workflow-spotlight-route-readout",
+        command: "Workflow Spotlight Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Current workflow spotlight route",
+        context:
+          "Workflow Spotlight Route Readout Action, current derived Compose, Arrange, Mix, or Deliver spotlight route, direct Workflow Spotlight focus command, Workflow Navigator jump unchanged, selected Pattern, Delivery Target, Workflow Navigator counts, Beat Map posture, export/stem readiness, audition cue, and next spotlight-route check before Workflow Spotlight focus, Workflow Navigator jump, Beat Map, Structure Lens, Next Move, playback, edit, or export commands run."
+      },
+      {
         id: "workflow-spotlight",
         command: "Workflow Spotlight",
         shortcut: "Quick Actions / Readout",
         target: "Current command target",
         context:
-          "Current Command Target, Derived Workflow Zone, Decision Readout, Visible Jump Route, Workflow Navigator Counts, Search Spotlight Relation, Pinned Command Context, Jump Result Feedback, Audition Cue, and Next Workflow Check context before Workflow Spotlight commands run."
+          "Current Command Target, Workflow Spotlight Route Readout posture, Derived Workflow Zone, Decision Readout, Visible Jump Route, Workflow Navigator Counts, Search Spotlight Relation, Pinned Command Context, Jump Result Feedback, Audition Cue, and Next Workflow Check context before Workflow Spotlight commands run."
       },
       {
         id: "beat-map",

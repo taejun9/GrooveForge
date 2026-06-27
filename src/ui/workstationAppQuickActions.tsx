@@ -1428,6 +1428,7 @@ export function createQuickActions({
   onFocusToplineSpace,
   onFocusToplineSpaceRouteReadout,
   onFocusWorkflowNavigatorRouteReadout,
+  onFocusWorkflowSpotlightRouteReadout,
   onFocusWorkflowSpotlight,
   onJumpWorkflowZone,
   onOpenCommandReference,
@@ -1796,6 +1797,7 @@ export function createQuickActions({
   onFocusToplineSpace: (card: ToplineSpaceFocusItem) => void;
   onFocusToplineSpaceRouteReadout: () => void;
   onFocusWorkflowNavigatorRouteReadout: () => void;
+  onFocusWorkflowSpotlightRouteReadout: () => void;
   onFocusWorkflowSpotlight: (item: WorkflowNavigatorItem) => void;
   onJumpWorkflowZone: (item: WorkflowNavigatorItem) => void;
   onOpenCommandReference: () => void;
@@ -3103,6 +3105,37 @@ export function createQuickActions({
     disabled: !workflowSpotlightItem,
     resultTargetId: workflowSpotlightItem?.id,
     run: onFocusWorkflowNavigatorRouteReadout
+  };
+  const workflowSpotlightRouteReadoutAction: QuickAction = {
+    id: "workflow-spotlight-route-readout-action",
+    title: workflowSpotlightItem
+      ? `Review Workflow Spotlight Route: ${workflowSpotlightItem.label}`
+      : "Review Workflow Spotlight Route",
+    detail: workflowSpotlightItem
+      ? [
+          workflowSpotlight.statusLabel,
+          workflowSpotlight.zoneLabel,
+          workflowSpotlight.detailLabel,
+          workflowSpotlight.decisionStatus,
+          workflowSpotlight.decisionDetail,
+          workflowSpotlight.countLabel,
+          workflowSpotlightItem.value,
+          workflowSpotlightItem.detail,
+          `Route ${workflowSpotlightRouteLabel(workflowSpotlight, workflowSpotlightItem, workflowNavigatorItems)}`,
+          "Direct workflow-spotlight-focus unchanged",
+          "Workflow Navigator jump unchanged",
+          "Readout only"
+        ].join(" / ")
+      : "No Workflow Spotlight route available.",
+    group: "Project",
+    keywords: `Quick Actions Workflow Spotlight Route Readout review spotlight route direct workflow-spotlight-focus ${
+      workflowSpotlight.zoneId ?? "none"
+    } compose arrange mix deliver guide workflow navigator beat map structure lens next move selected pattern target export stems ${
+      workflowSpotlightItem?.label ?? "none"
+    } ${workflowSpotlightItem?.value ?? "none"} ${workflowSpotlightItem?.detail ?? "none"} no jump no edit no playback no export sample free beginner producer`,
+    disabled: !workflowSpotlightItem,
+    resultTargetId: workflowSpotlightItem?.id,
+    run: onFocusWorkflowSpotlightRouteReadout
   };
   const deliveryTarget = activeDeliveryTarget(project);
   const deliveryTargetAlignmentPreview = createDeliveryTargetAlignmentPreview(project, deliveryTarget);
@@ -5741,6 +5774,7 @@ export function createQuickActions({
     },
     ...exportPreflightActions,
     workflowNavigatorRouteReadoutAction,
+    workflowSpotlightRouteReadoutAction,
     {
       id: "workflow-spotlight-focus",
       title: `Focus ${workflowSpotlight.zoneLabel}`,
@@ -7457,6 +7491,7 @@ export function createQuickActionResult(
     action.id === "master-automation-readout-action" ||
     action.id === "master-automation-route-readout-action" ||
     action.id === "workflow-navigator-route-readout-action" ||
+    action.id === "workflow-spotlight-route-readout-action" ||
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-route-readout-action" ||
@@ -15417,24 +15452,28 @@ export function quickActionWorkflowSpotlightMetricSnapshot(
   action: QuickAction,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
-  if (action.id !== "workflow-spotlight-focus") {
+  const isRouteReadout = action.id === "workflow-spotlight-route-readout-action";
+  if (!isRouteReadout && action.id !== "workflow-spotlight-focus") {
     return null;
   }
 
-  const { item, spotlight, exportAnalysis, stemAnalyses } = quickActionWorkflowSpotlightContext(project, analysis);
+  const { item, items, spotlight, exportAnalysis, stemAnalyses } = quickActionWorkflowSpotlightContext(project, analysis);
   const target = activeDeliveryTarget(project);
   const pattern = activePattern(project);
   const usedSlots = usedPatternSlots(project);
   const audibleStemCount = audibleStemTracks(stemAnalyses).length;
   const auditionCue = item ? workflowNavigatorJumpAuditionCue(item) : "Inspect Workflow Navigator before choosing another zone.";
   const nextCheck = item ? workflowNavigatorJumpNextCheck(item) : "Return to Workflow Navigator after zones are available.";
+  const routeLabel = item ? workflowSpotlightRouteLabel(spotlight, item, items) : `${spotlight.zoneLabel} route unavailable`;
 
   return {
-    id: "workflow-spotlight",
-    label: "Workflow spotlight",
+    id: isRouteReadout ? "workflow-spotlight-route-readout" : "workflow-spotlight",
+    label: isRouteReadout ? "Workflow Spotlight Route Readout" : "Workflow spotlight",
     value: [
-      `command ${action.title}`,
+      `command ${isRouteReadout ? "review workflow spotlight route readout" : action.title}`,
       `detail ${action.detail}`,
+      `route ${routeLabel}`,
+      isRouteReadout ? "direct workflow-spotlight-focus unchanged" : "direct workflow-spotlight-focus",
       `destination Guide / Workflow Spotlight / ${spotlight.zoneLabel}`,
       `spotlight ${spotlight.statusLabel} / ${spotlight.detailLabel}`,
       `decision ${spotlight.decisionStatus} / ${spotlight.decisionDetail}`,
@@ -15448,10 +15487,21 @@ export function quickActionWorkflowSpotlightMetricSnapshot(
       barCountLabel(arrangementTotalBars(project)),
       `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
       `stems ${audibleStemCount}/${target.stemGoal} target`,
+      isRouteReadout ? "readout only / workflow spotlight focus unchanged / workflow navigator jump unchanged" : "focus command",
       `audition ${auditionCue}`,
       `next ${nextCheck}`
     ].join(" / ")
   };
+}
+
+export function workflowSpotlightRouteLabel(
+  spotlight: ReturnType<typeof createWorkflowSpotlightSummary>,
+  item: WorkflowNavigatorItem,
+  items: WorkflowNavigatorItem[]
+): string {
+  const routeIndex = items.findIndex((candidate) => candidate.id === item.id);
+  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${items.length}` : `1/${items.length}`;
+  return `${spotlight.zoneLabel} ${routePosition} to ${item.label} zone via workflow-spotlight-focus`;
 }
 
 export function quickActionWorkflowSpotlightFollowup(
@@ -15459,13 +15509,23 @@ export function quickActionWorkflowSpotlightFollowup(
   action: QuickAction,
   analysis?: ExportAnalysis
 ): { auditionCue: string; nextCheck: string } | null {
-  if (action.id !== "workflow-spotlight-focus") {
+  const isRouteReadout = action.id === "workflow-spotlight-route-readout-action";
+  if (!isRouteReadout && action.id !== "workflow-spotlight-focus") {
     return null;
   }
 
   const { item } = quickActionWorkflowSpotlightContext(project, analysis);
   if (!item) {
     return null;
+  }
+
+  if (isRouteReadout) {
+    return {
+      auditionCue:
+        "Read the Workflow Spotlight route, then inspect the highlighted Compose, Arrange, Mix, or Deliver zone before focusing or jumping.",
+      nextCheck:
+        "Use Workflow Spotlight focus only when the named route matches the current bottleneck; otherwise leave playback and project data unchanged."
+    };
   }
 
   return {
@@ -17431,15 +17491,15 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "workflow-spotlight-focus") {
+  if (action.id === "workflow-spotlight-route-readout-action" || action.id === "workflow-spotlight-focus") {
     const workflowSpotlightMetric = quickActionWorkflowSpotlightMetricSnapshot(project, action, analysis ?? undefined);
     if (workflowSpotlightMetric) {
       return workflowSpotlightMetric;
     }
 
     return {
-      id: "workflow-spotlight",
-      label: "Workflow spotlight",
+      id: action.id === "workflow-spotlight-route-readout-action" ? "workflow-spotlight-route-readout" : "workflow-spotlight",
+      label: action.id === "workflow-spotlight-route-readout-action" ? "Workflow Spotlight Route Readout" : "Workflow spotlight",
       value: `${project.selectedPattern} / ${barCountLabel(arrangementTotalBars(project))}`
     };
   }
@@ -22339,6 +22399,17 @@ export function quickActionResultFollowup(
       auditionCue: "Use the focused Export Preflight card to inspect that delivery-risk lane before exporting.",
       nextCheck: "Return to Export Preflight when you need another direct readiness, mix, deliverable, or handoff focus."
     };
+  }
+
+  if (action.id === "workflow-spotlight-route-readout-action") {
+    return (
+      quickActionWorkflowSpotlightFollowup(project, action, analysis) ?? {
+        auditionCue:
+          "Read the Workflow Spotlight route, then inspect the highlighted Compose, Arrange, Mix, or Deliver zone before focusing or jumping.",
+        nextCheck:
+          "Use Workflow Spotlight focus only when the named route matches the current bottleneck; otherwise leave playback and project data unchanged."
+      }
+    );
   }
 
   if (action.id === "workflow-spotlight-focus") {
