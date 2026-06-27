@@ -1232,6 +1232,7 @@ export function createQuickActions({
   onApplyMelodyMotif,
   onApplyMelodyAccent,
   onApplyMelodyContour,
+  onFocusMelodyMoveRouteReadout,
   onApplyMixBalance,
   onApplyMixFix,
   onFocusMixBalanceReadout,
@@ -1574,6 +1575,7 @@ export function createQuickActions({
   onApplyMelodyMotif: (motif: MelodyMotifId) => void;
   onApplyMelodyAccent: (accent: MelodyAccentId) => void;
   onApplyMelodyContour: (contour: MelodyContourId) => void;
+  onFocusMelodyMoveRouteReadout: () => void;
   onApplyMixBalance: (pad: MixBalancePadId) => void;
   onApplyMixFix: (preset: MixFixPreset) => void;
   onFocusMixBalanceReadout: () => void;
@@ -2354,6 +2356,28 @@ export function createQuickActions({
       drumMovePreviewSummary.feelLabel
     } ${drumMovePreviewSummary.accentLabel} ${drumMovePreviewSummary.moveLabel} rhythm pocket foundation feel accent velocity chance timing hats percussion beginner producer sample free`,
     run: onFocusDrumMoveRouteReadout
+  };
+  const melodyMoveRouteReadoutAction: QuickAction = {
+    id: "melody-move-route-readout-action",
+    title: melodyMoveTarget
+      ? `Review Melody Move Route Readout: ${melodyMoveTarget.label} ${melodyMoveTarget.kind}`
+      : "Review Melody Move Route Readout: Melody aligned",
+    detail: melodyMoveTarget
+      ? `${melodyMovePreviewSummary.phraseLabel} / route ${melodyMoveRouteLabel(
+          melodyMoveTarget
+        )} / direct command melody-move / ${melodyMovePreviewSummary.moveLabel} / melody route preflight`
+      : `${melodyMovePreviewSummary.statusLabel} / no melody move route needed / ${melodyMovePreviewSummary.moveLabel} / melody route preflight`,
+    group: "Create",
+    keywords: `Quick Actions Melody Move Route Readout review selected Pattern ${
+      project.selectedPattern
+    } route direct melody synth command melody-move ${
+      melodyMoveTarget
+        ? `${melodyMoveTarget.kind} ${melodyMoveRouteLabel(melodyMoveTarget)} ${melodyMoveTarget.label}`
+        : "melody aligned"
+    } ${melodyMovePreviewSummary.statusLabel} ${melodyMovePreviewSummary.motifLabel} ${
+      melodyMovePreviewSummary.accentLabel
+    } ${melodyMovePreviewSummary.contourLabel} ${melodyMovePreviewSummary.moveLabel} synth hook phrase motif accent contour rhythm density chance range beginner producer sample free`,
+    run: onFocusMelodyMoveRouteReadout
   };
   const modeFocusCard = activeModeFocusQuickActionCard(modeFocusSummary);
   const modeFocusActions: QuickAction[] = modeFocusSummary.cards.map((card) => ({
@@ -4791,6 +4815,7 @@ export function createQuickActions({
         }
       }
     },
+    melodyMoveRouteReadoutAction,
     {
       id: "melody-move",
       title: melodyMoveTarget ? `Apply ${melodyMoveTarget.label} Melody ${melodyMoveTarget.kind}` : "Apply Melody Move",
@@ -6826,6 +6851,7 @@ export function createQuickActionResult(
     action.id === "pattern-copy-clear-readout-action" ||
     action.id === "drum-move-route-readout-action" ||
     action.id === "808-move-route-readout-action" ||
+    action.id === "melody-move-route-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -15308,6 +15334,16 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "melody-move-route-readout-action") {
+    return (
+      quickActionMelodyMoveRouteReadoutMetricSnapshot(project, action) ?? {
+        id: "melody-move-route-readout",
+        label: "Melody Move Route Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id === "melody-move") {
     const melodyNotes = activePattern(project).melodyNotes;
     return {
@@ -18196,6 +18232,71 @@ export function bassMoveRouteLabel(target: BassMoveQuickActionTarget): string {
   }
 }
 
+export function melodyMoveRouteLabel(target: MelodyMoveQuickActionTarget): string {
+  switch (target.kind) {
+    case "Motif":
+      return "Melody Motif route";
+    case "Accent":
+      return "Melody Accent route";
+    case "Contour":
+      return "Melody Contour route";
+  }
+}
+
+export function quickActionMelodyMoveRouteReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "melody-move-route-readout-action") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const notes = pattern.melodyNotes;
+  const preview = createMelodyMovePreviewSummary(
+    project.key,
+    notes,
+    createMelodyMotifOptions(project.key),
+    createMelodyAccentOptions(notes),
+    createMelodyContourOptions(project.key, notes)
+  );
+  const target = activeMelodyMoveQuickActionTarget(project, preview);
+  const arrangementUse = patternArrangementUseLabel(project, project.selectedPattern);
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "melody-move-route-readout",
+    label: "Melody Move Route Readout",
+    value: [
+      "review melody move route",
+      `selected Pattern ${project.selectedPattern}`,
+      preview.statusLabel,
+      `preview ${preview.phraseLabel}`,
+      `motif ${preview.motifLabel}`,
+      `accent ${preview.accentLabel}`,
+      `contour ${preview.contourLabel}`,
+      preview.moveLabel,
+      target ? `target ${target.label} ${target.kind}` : "target unavailable",
+      target ? `route ${melodyMoveRouteLabel(target)}` : "route unavailable",
+      "direct command melody-move",
+      `${patternEventTotal(pattern)} events`,
+      melodyNoteCountLabel(notes),
+      melodyRhythmLabel(notes),
+      melodyRangeLabel(notes),
+      melodyVelocityLabel(notes),
+      melodyChanceLabel(notes),
+      `arrangement ${arrangementUse}`,
+      "melody route unchanged",
+      "melody unchanged",
+      "playback unchanged",
+      "export unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
 export function quickActionBassMoveRouteReadoutMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -19680,6 +19781,15 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; check kick-to-808 lock, slides, and low-end contour.`,
       nextCheck: "Use the 808 Move Result plus selected-note degree/role and 808 edit tools for manual corrections."
+    };
+  }
+
+  if (action.id === "melody-move-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the melody route and loop the selected Pattern before choosing the existing Melody Move command.",
+      nextCheck:
+        "Use Melody Move only when the named Motif, Accent, or Contour route should reshape the selected Pattern Synth phrase; otherwise use selected-note tools."
     };
   }
 

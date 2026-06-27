@@ -8178,6 +8178,23 @@ export function App(): ReactElement {
     );
   }
 
+  function focusMelodyMoveRouteReadout(): void {
+    const target = activeMelodyMoveQuickActionTarget(project, melodyMovePreviewSummary);
+    const routeLabel = target
+      ? target.kind === "Motif"
+        ? "Melody Motif route"
+        : target.kind === "Accent"
+          ? "Melody Accent route"
+          : "Melody Contour route"
+      : "no melody route";
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      target
+        ? `Melody Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command melody-move / ${melodyMovePreviewSummary.moveLabel} / direct melody move unchanged`
+        : `Melody Move Route Readout Pattern ${project.selectedPattern}: ${melodyMovePreviewSummary.statusLabel} / no melody move route needed / ${melodyMovePreviewSummary.moveLabel} / direct melody move unchanged`
+    );
+  }
+
   function focusLayerStarterReadout(): void {
     const priorityLayer = layerStarterOptions.find((option) => option.tone !== "good") ?? layerStarterOptions[0] ?? null;
     composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -8479,6 +8496,7 @@ export function App(): ReactElement {
     onApplyMelodyMotif: applyMelodyMotif,
     onApplyMelodyAccent: applyMelodyAccent,
     onApplyMelodyContour: applyMelodyContour,
+    onFocusMelodyMoveRouteReadout: focusMelodyMoveRouteReadout,
     onApplyMixBalance: applyMixBalancePad,
     onApplyMixFix: applyMixFixPreset,
     onFocusMixBalanceReadout: focusMixBalanceReadout,
