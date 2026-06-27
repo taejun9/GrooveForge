@@ -13,7 +13,7 @@ import {
   Undo2,
   X
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode, type Ref } from "react";
 import type { PatternSlot, ProjectState } from "../domain/workstation";
 import { arrangementTotalBars, maxProjectSnapshotNameLength, maxProjectSnapshots, projectSnapshotSummary } from "../domain/workstation";
 import type { PlaybackMode } from "../audio/scheduler";
@@ -385,6 +385,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         target: "Drums / 808 / melody-chords / arrangement / export",
         context:
           "Drums, 808/Bass, Melody/Chords, Arrangement, and Export readiness context with destination, readiness metric, audition cue, and next check before Beat Readiness commands run."
+      },
+      {
+        id: "beat-readiness-route-readout",
+        command: "Beat Readiness Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Drums / 808-bass / melody-chords / arrangement / export route",
+        context:
+          "Beat Readiness Route Readout Action, Selected Pattern A/B/C, Current Priority Readiness Lane, Existing Beat Readiness Check Route, Direct Beat Readiness Check Command, Editable Event Counts, Drum/Music Layer Posture, Arrangement Length, Export Readiness, Ready/Review/Blocker Counts, Audition Cue, and Next Readiness Route Check context before Beat Readiness focus or edit commands run."
       },
       {
         id: "review-queue",
@@ -3280,11 +3288,13 @@ function SnapshotCompareFocusResultStrip({ result }: { result: SnapshotCompareFo
 export function BeatReadiness({
   checks,
   focusedCheckId,
+  sectionRef,
   result,
   onFocus
 }: {
   checks: BeatReadinessCheck[];
   focusedCheckId: BeatReadinessCheckId | null;
+  sectionRef?: Ref<HTMLElement>;
   result: BeatReadinessFocusResult | null;
   onFocus: (check: BeatReadinessCheck) => void;
 }): ReactElement {
@@ -3297,6 +3307,7 @@ export function BeatReadiness({
       aria-label="Beat readiness"
       className={["beat-readiness", result ? "has-result" : ""].filter(Boolean).join(" ")}
       data-testid="beat-readiness"
+      ref={sectionRef}
     >
       <div className="beat-readiness-heading">
         <span>Beat Readiness</span>

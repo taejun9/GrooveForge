@@ -6444,7 +6444,11 @@ export function beatReadinessCardActionId(check: BeatReadinessCheck): string {
 }
 
 export function beatReadinessQuickActionCheck(project: ProjectState, actionId: string): BeatReadinessCheck | null {
-  if (actionId !== "beat-readiness-focus" && !actionId.startsWith("beat-readiness-check-")) {
+  if (
+    actionId !== "beat-readiness-route-readout-action" &&
+    actionId !== "beat-readiness-focus" &&
+    !actionId.startsWith("beat-readiness-check-")
+  ) {
     return null;
   }
 
@@ -6456,11 +6460,15 @@ export function beatReadinessQuickActionCheckFromChecks(
   checks: BeatReadinessCheck[],
   actionId: string
 ): BeatReadinessCheck | null {
-  if (actionId !== "beat-readiness-focus" && !actionId.startsWith("beat-readiness-check-")) {
+  if (
+    actionId !== "beat-readiness-route-readout-action" &&
+    actionId !== "beat-readiness-focus" &&
+    !actionId.startsWith("beat-readiness-check-")
+  ) {
     return null;
   }
 
-  if (actionId === "beat-readiness-focus") {
+  if (actionId === "beat-readiness-route-readout-action" || actionId === "beat-readiness-focus") {
     return activeBeatReadinessQuickActionCheck(checks);
   }
 
