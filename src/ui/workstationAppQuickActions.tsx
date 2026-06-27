@@ -3499,6 +3499,33 @@ export function createQuickActions({
     } ${handoffManifestAudit.statusLabel} sample free beginner producer`,
     run: onFocusHandoffPack
   };
+  const handoffSendReadinessStatus = handoffSendReadinessLabel(
+    handoffPackItems,
+    handoffPackageCheckSummary,
+    handoffManifestAudit,
+    handoffReceipt
+  );
+  const handoffSendReadinessGate = handoffSendReadinessGateLabel(
+    handoffPackageCheckSummary,
+    handoffManifestAudit,
+    handoffReceipt
+  );
+  const handoffSendReadinessReadoutAction: QuickAction = {
+    id: "handoff-send-readiness-readout-action",
+    title: `Review Handoff Send Readiness Readout: ${handoffSendReadinessStatus}`,
+    detail: [
+      handoffSendReadinessStatus,
+      handoffSendReadinessGate,
+      `package ${handoffPackageCheckSummary.headline}`,
+      `manifest ${handoffManifestAudit.statusLabel}`,
+      `receipt ${handoffReceipt.statusLabel}`,
+      `send ${handoffSendOrder.nextLabel}`,
+      "send readiness preflight"
+    ].join(" / "),
+    group: "Export",
+    keywords: `handoff send readiness readout review send no-send ready package manifest receipt send order final check no render no download ${handoffSendReadinessStatus} ${handoffSendReadinessGate} ${handoffPackageCheckSummary.headline} sample free beginner producer`,
+    run: onFocusHandoffPack
+  };
   const handoffBlockerReadoutAction: QuickAction = {
     id: "handoff-blocker-readout-action",
     title: handoffBlockerItem
@@ -5865,6 +5892,7 @@ export function createQuickActions({
     handoffDeliveryTargetReadoutAction,
     handoffSessionBriefReadoutAction,
     handoffFinalCheckReadoutAction,
+    handoffSendReadinessReadoutAction,
     handoffBlockerReadoutAction,
     handoffBlockerRouteReadoutAction,
     handoffExportFormatReadoutAction,
@@ -6665,6 +6693,7 @@ export function createQuickActionResult(
     action.id === "handoff-delivery-target-readout-action" ||
     action.id === "handoff-session-brief-readout-action" ||
     action.id === "handoff-final-check-readout-action" ||
+    action.id === "handoff-send-readiness-readout-action" ||
     action.id === "handoff-blocker-readout-action" ||
     action.id === "handoff-blocker-route-readout-action" ||
     action.id === "handoff-package-check-focus" ||
@@ -11354,6 +11383,140 @@ export function quickActionHandoffFinalCheckDetailParts(action: QuickAction): st
     .filter(Boolean);
 }
 
+export function handoffSendReadinessLabel(
+  items: HandoffPackItem[],
+  packageSummary: HandoffPackageCheckSummary,
+  manifestAudit: HandoffManifestAuditSummary,
+  receipt: HandoffExportReceipt
+): string {
+  const receiptTone = receipt.itemId ? receipt.tone : "warn";
+  const tone = weakestTone([...items.map((item) => item.tone), packageSummary.tone, manifestAudit.tone, receiptTone]);
+  return tone === "good" ? "Send ready" : tone === "warn" ? "Review before send" : "Do not send";
+}
+
+export function handoffSendReadinessGateLabel(
+  packageSummary: HandoffPackageCheckSummary,
+  manifestAudit: HandoffManifestAuditSummary,
+  receipt: HandoffExportReceipt
+): string {
+  const activeCard = activeHandoffPackageCheckQuickActionCard(packageSummary);
+
+  if (packageSummary.tone === "danger") {
+    return `${activeCard?.label ?? "Package"} blocked`;
+  }
+
+  if (manifestAudit.tone === "danger") {
+    return "Manifest blocked";
+  }
+
+  if (!receipt.itemId) {
+    return "No export receipt";
+  }
+
+  if (packageSummary.tone === "warn") {
+    return `${activeCard?.label ?? "Package"} needs review`;
+  }
+
+  if (manifestAudit.tone === "warn") {
+    return "Manifest needs review";
+  }
+
+  return "All send gates clear";
+}
+
+export function quickActionHandoffSendReadinessReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "handoff-send-readiness-readout-action") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const readyCount = handoffPackItems.filter((item) => item.tone === "good").length;
+  const reviewCount = handoffPackItems.filter((item) => item.tone === "warn").length;
+  const blockerCount = handoffPackItems.filter((item) => item.tone === "danger").length;
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const manifest = createHandoffFileManifest(project, stemAnalyses, handoffPackItems);
+  const manifestAudit = createHandoffManifestAudit(project, handoffPackItems, manifest, receipt, sendOrder);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const readinessLabel = handoffSendReadinessLabel(handoffPackItems, packageSummary, manifestAudit, receipt);
+  const gateLabel = handoffSendReadinessGateLabel(packageSummary, manifestAudit, receipt);
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const itemPosture = handoffPackItems.map((item) => `${item.buttonLabel} ${item.value}`).join(" / ");
+  const packageCards = packageSummary.cards.map((card) => `${card.label} ${card.status}`).join(" / ");
+  const detailParts = quickActionHandoffSendReadinessDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || `${readinessLabel} / ${gateLabel}`;
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "handoff-send-readiness-readout",
+    label: "Handoff Send Readiness Readout",
+    value: [
+      "review handoff send readiness",
+      "destination Deliver / Handoff Pack",
+      `readiness ${readinessLabel}`,
+      `gate ${gateLabel}`,
+      `checks ${readyCount}/${handoffPackItems.length} ready`,
+      workflowCountLabel(reviewCount, "review"),
+      workflowCountLabel(blockerCount, "blocker"),
+      `target ${target.name} / ${target.focus}`,
+      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4 / ${briefStatus.value}`,
+      `sheet ${handoffSheetFileName(project)}`,
+      `wav ${mixWavFileName(project)} / ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `stems ${audibleStemCount}/${target.stemGoal} target / ${audibleStemCount}/${stemTrackIds.length} audible`,
+      `midi ${midiFileName(project)} / ${barCountLabel(bars)}`,
+      `items ${itemPosture}`,
+      `cards ${packageCards}`,
+      `manifest ${manifestAudit.statusLabel} / ${manifestAudit.detailLabel}`,
+      `receipt ${receipt.statusLabel} / ${receipt.fileLabel}`,
+      `send ${sendOrder.statusLabel} / ${sendOrder.nextLabel}`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(bars),
+      "send readiness unchanged",
+      "export unchanged",
+      "receipt unchanged",
+      "package unchanged",
+      "sampler scope unchanged",
+      `context ${contextLabel}`,
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
+export function quickActionHandoffSendReadinessDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 export function quickActionHandoffBlockerReadoutMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -15321,6 +15484,16 @@ export function quickActionResultMetricSnapshot(
       quickActionHandoffFinalCheckReadoutMetricSnapshot(project, action, handoffExportReceipt, analysis ?? undefined) ?? {
         id: "handoff-final-check-readout",
         label: "Handoff Final Check Readout",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "handoff-send-readiness-readout-action") {
+    return (
+      quickActionHandoffSendReadinessReadoutMetricSnapshot(project, action, handoffExportReceipt, analysis ?? undefined) ?? {
+        id: "handoff-send-readiness-readout",
+        label: "Handoff Send Readiness Readout",
         value: action.detail
       }
     );
@@ -19390,6 +19563,14 @@ export function quickActionResultFollowup(
       auditionCue: "Read the final handoff posture and confirm target, brief, format, manifest, receipt, send order, and package state agree.",
       nextCheck:
         "If any blocker or review lane remains, use the matching Handoff readout; otherwise run only the explicit export you intend to deliver."
+    };
+  }
+
+  if (action.id === "handoff-send-readiness-readout-action") {
+    return {
+      auditionCue: "Read the send/no-send posture before choosing any explicit export, package, or handoff command.",
+      nextCheck:
+        "Use the named gate first; only send or package outside GrooveForge after send readiness, manifest, receipt, and send order agree."
     };
   }
 
