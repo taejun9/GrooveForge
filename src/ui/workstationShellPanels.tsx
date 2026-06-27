@@ -577,6 +577,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Layer Starter Readout Action, Selected Pattern A/B/C, Drums/808/Chords/Synth Readiness, Priority Missing or Thin Layer, Selected Pattern Event Count, Drum/Music Posture, Arrangement Usage, Audition Cue, and Next Layer Starter Check context before direct Layer Starter commands run."
       },
       {
+        id: "layer-starter-route-readout",
+        command: "Layer Starter Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Missing layer starter route / no edit",
+        context:
+          "Layer Starter Route Readout Action, Selected Pattern A/B/C, Drums/808/Chords/Synth Readiness, Priority Missing or Thin Layer, Existing Direct Starter Route, Direct Layer Starter Command, Selected Pattern Event Count, Drum/Music Posture, Arrangement Usage, Audition Cue, and Next Layer Route Check context before direct Layer Starter commands run."
+      },
+      {
         id: "pattern-stack",
         command: "Pattern Stack",
         shortcut: "Quick Actions / Readout",

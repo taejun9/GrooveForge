@@ -2179,6 +2179,22 @@ export function createQuickActions({
     } drums 808 chords synth readiness arrangement beginner producer`,
     run: onFocusLayerStarterReadout
   };
+  const layerStarterRouteReadoutAction: QuickAction = {
+    id: "layer-starter-route-readout-action",
+    title: layerStarterOption
+      ? `Review Layer Starter Route Readout: ${layerStarterOption.label}`
+      : "Review Layer Starter Route Readout: Layers ready",
+    detail: layerStarterOption
+      ? `${layerStarterOption.status} / route ${layerStarterRouteLabel(layerStarterOption)} / ${layerStarterOption.detail} / starter route preflight`
+      : "Layers ready / no starter route needed / starter route preflight",
+    group: "Create",
+    keywords: `Quick Actions Layer Starter Route Readout review selected Pattern ${
+      project.selectedPattern
+    } route direct starter command ${layerStarterReadiness} priority ${layerStarterOption?.label ?? "ready"} ${
+      layerStarterOption ? layerStarterRouteLabel(layerStarterOption) : "ready"
+    } drums 808 chords synth readiness arrangement beginner producer sample free`,
+    run: onFocusLayerStarterReadout
+  };
   const layerStarterActions: QuickAction[] = layerStarterOptions.map((option) => ({
     id: `layer-starter-${option.id}`,
     title: option.tone === "good" ? `${option.label} layer ready` : `Start ${option.label} layer`,
@@ -4617,6 +4633,7 @@ export function createQuickActions({
     },
     ...patternDnaActions,
     layerStarterReadoutAction,
+    layerStarterRouteReadoutAction,
     {
       id: "layer-starter",
       title: layerStarterOption ? `Start ${layerStarterOption.label} layer` : "Start missing layer",
@@ -6730,6 +6747,7 @@ export function createQuickActionResult(
     action.id === "arrangement-focus-readout-action" ||
     action.id === "arrangement-move-readout-action" ||
     action.id === "layer-starter-readout-action" ||
+    action.id === "layer-starter-route-readout-action" ||
     action.id === "pattern-clone-readout-action" ||
     action.id === "pattern-stack-readout-action" ||
     action.id === "pattern-variation-readout-action" ||
@@ -15135,6 +15153,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "layer-starter-route-readout-action") {
+    return (
+      quickActionLayerStarterRouteReadoutMetricSnapshot(project, action) ?? {
+        id: "layer-starter-route-readout",
+        label: "Layer Starter Route Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id === "pattern-stack-readout-action") {
     return (
       quickActionPatternStackReadoutMetricSnapshot(project, action) ?? {
@@ -17234,6 +17262,73 @@ export function quickActionLayerStarterReadoutMetricSnapshot(
   };
 }
 
+export function layerStarterRouteLabel(option: LayerStarterOption): string {
+  switch (option.id) {
+    case "drums":
+      return "Drum Foundation Layer Starter";
+    case "bass":
+      return "808 Bassline Layer Starter";
+    case "chords":
+      return "Chord Progression Layer Starter";
+    case "melody":
+      return "Melody Motif Layer Starter";
+  }
+}
+
+export function quickActionLayerStarterRouteReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "layer-starter-route-readout-action") {
+    return null;
+  }
+
+  const options = createLayerStarterOptions(project);
+  const option = activeLayerStarterQuickActionOption(options) ?? options[0] ?? null;
+  const pattern = activePattern(project);
+  const drumHits = drumHitCount(pattern);
+  const bassNotes = pattern.bassNotes.length;
+  const chordEvents = pattern.chordEvents.length;
+  const melodyNotes = pattern.melodyNotes.length;
+  const musicEvents = bassNotes + chordEvents + melodyNotes;
+  const readyLayerCount = [drumHits > 0, bassNotes > 0, chordEvents > 0, melodyNotes > 0].filter(Boolean).length;
+  const readiness = options.map((item) => `${item.label} ${item.status}`).join(" / ");
+  const arrangementUse = patternArrangementUseLabel(project, project.selectedPattern);
+  const routeLabel = option ? layerStarterRouteLabel(option) : "No starter route";
+  const directCommand = option ? `layer-starter-${option.id}` : "none";
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "layer-starter-route-readout",
+    label: "Layer Starter Route Readout",
+    value: [
+      "review layer starter route",
+      `selected Pattern ${project.selectedPattern}`,
+      option ? `priority ${option.label}` : "priority unavailable",
+      option?.status ?? "layers unavailable",
+      `route ${routeLabel}`,
+      `direct command ${directCommand}`,
+      option?.detail ?? "no starter detail",
+      `readiness ${readiness}`,
+      `${patternEventTotal(pattern)} events`,
+      `${drumHits} drums`,
+      `${bassNotes} 808`,
+      `${chordEvents} chords`,
+      `${melodyNotes} synth`,
+      `${musicEvents} music`,
+      `${readyLayerCount}/4 layers`,
+      `arrangement ${arrangementUse}`,
+      "starter route unchanged",
+      "starter unchanged",
+      "playback unchanged",
+      "export unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
 export function layerStarterReadoutQuickActionOption(
   action: QuickAction,
   options: LayerStarterOption[]
@@ -19207,6 +19302,15 @@ export function quickActionResultFollowup(
       auditionCue:
         "Review the selected Pattern Drums/808/Chords/Synth readiness, priority layer, event posture, and arrangement usage before starting a layer.",
       nextCheck: "Run a direct Layer Starter command only when the selected Pattern needs that missing or thin layer started."
+    };
+  }
+
+  if (action.id === "layer-starter-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the starter route and loop the selected Pattern before choosing a direct layer-start command.",
+      nextCheck:
+        "Use only the named Layer Starter route when that layer is still missing or thin; otherwise return to Pattern DNA or Composer Actions."
     };
   }
 
