@@ -777,6 +777,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Chord Pads/Rhythm/Voicing Preview, Current Chord Move Target, Direct Chord Move Command, Chord Move Result Feedback, Selected Pattern, Audition Cue, and Next Harmony Check context before Chord Move commands run."
       },
       {
+        id: "chord-move-route-readout",
+        command: "Chord Move Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Pads / rhythm / voicing route / no edit",
+        context:
+          "Chord Move Route Readout Action, Selected Pattern A/B/C, Chord Pads/Rhythm/Voicing Preview, Current Chord Move Target, Existing Chord Move Route, Direct Chord Move Command, Move Count, Chord Count/Harmony/Inversion/Rhythm/Velocity/Chance Posture, Arrangement Usage, Audition Cue, and Next Harmony Route Check context before Chord Move commands run."
+      },
+      {
         id: "selected-event-tools",
         command: "Selected Event Tools",
         shortcut: "Quick Actions / Readout",
