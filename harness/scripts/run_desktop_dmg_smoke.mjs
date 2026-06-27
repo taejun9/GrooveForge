@@ -92,6 +92,18 @@ async function detachMountIfNeeded() {
   await runCommand("hdiutil", ["detach", dmgMount, "-force"]).catch(() => undefined);
 }
 
+async function readCodeSignatureDetails(appPath) {
+  try {
+    const display = await runCommand("codesign", ["--display", "--verbose=4", appPath]);
+    return `${display.stdout}\n${display.stderr}`;
+  } catch (error) {
+    fail(
+      "Could not read app code signature details; run npm run desktop:adhoc-sign-smoke before DMG smoke.",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
 async function createDmg() {
   check(existsSync(packagedApp), "packaged GrooveForge.app should exist; run npm run desktop:package-smoke first");
   check(existsSync(path.join(packagedApp, "Contents", "Resources", "GrooveForge.icns")), "packaged app should include GrooveForge.icns before DMG creation");
@@ -123,13 +135,13 @@ async function createDmg() {
 }
 
 async function checkDmgFile() {
-  check(existsSync(dmgPath), "local unsigned GrooveForge DMG should exist");
+  check(existsSync(dmgPath), "local GrooveForge DMG should exist");
   const dmgStats = await stat(dmgPath);
-  check(dmgStats.size > 10000000, `local unsigned GrooveForge DMG should be substantial, got ${dmgStats.size} bytes`);
+  check(dmgStats.size > 10000000, `local GrooveForge DMG should be substantial, got ${dmgStats.size} bytes`);
 
   const imageInfo = await runCommand("hdiutil", ["imageinfo", dmgPath]);
   check(imageInfo.stdout.includes("Format: UDZO"), "DMG imageinfo should report UDZO format");
-  check(path.basename(dmgPath).startsWith(`${appName}-${packageJson.version}`), "local unsigned GrooveForge DMG file name should include app name and version");
+  check(path.basename(dmgPath).startsWith(`${appName}-${packageJson.version}`), "local GrooveForge DMG file name should include app name and version");
   return dmgStats.size;
 }
 
@@ -162,6 +174,10 @@ async function checkMountedDmg() {
     check(!existsSync(path.join(appPath, "Contents", "Resources", "electron.icns")), "mounted app should not contain electron.icns");
     check(existsSync(path.join(appPath, "Contents", "Resources", "app", "dist", "index.html")), "mounted app should include packaged dist/index.html");
     check(existsSync(path.join(appPath, "Contents", "Resources", "app", "dist-electron", "main.js")), "mounted app should include packaged dist-electron/main.js");
+    const signatureDetails = await readCodeSignatureDetails(appPath);
+    check(signatureDetails.includes(`Identifier=${bundleId}`), `mounted app ad-hoc signature should preserve ${bundleId}`);
+    check(signatureDetails.includes("Signature=adhoc"), "mounted app should retain ad-hoc signature");
+    check(!signatureDetails.includes("Authority=Developer ID"), "mounted app should not claim Developer ID authority");
   } finally {
     await detachMountIfNeeded();
   }
@@ -169,7 +185,7 @@ async function checkMountedDmg() {
 
 if (process.platform !== "darwin") {
   console.log("GrooveForge desktop DMG smoke skipped.");
-  console.log(`- Scope: macOS unsigned DMG smoke is not available on ${process.platform}`);
+  console.log(`- Scope: macOS DMG smoke is not available on ${process.platform}`);
   process.exit(0);
 }
 
@@ -184,7 +200,7 @@ if (failures.length > 0) {
 }
 
 console.log("GrooveForge desktop DMG smoke passed.");
-console.log("- Scope: local unsigned macOS DMG creation, image metadata, mounted contents, and branded app payload");
+console.log("- Scope: local macOS DMG creation, image metadata, mounted contents, and ad-hoc signed branded app payload");
 console.log(`- DMG: ${path.relative(root, dmgPath)} (${dmgBytes} bytes)`);
 console.log(`- Contents: ${appName}.app plus Applications shortcut`);
-console.log("- Not claimed: code signing, notarization, auto-update, app-store submission, or external distribution-channel QA");
+console.log("- Not claimed: Developer ID signing, notarization, auto-update, app-store submission, or external distribution-channel QA");
