@@ -1384,6 +1384,7 @@ export function createQuickActions({
   onRunComposerAction,
   onRunNextMove,
   onFocusExportPreflight,
+  onFocusExportPreflightRouteReadout,
   onFocusFinishChecklist,
   onFocusGrooveCompass,
   onFocusHandoffExportFormat,
@@ -1737,6 +1738,7 @@ export function createQuickActions({
   onRunComposerAction: (action: ComposerAction) => void;
   onRunNextMove: (action: NextMoveAction) => void;
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
+  onFocusExportPreflightRouteReadout: () => void;
   onFocusFinishChecklist: (card: FinishChecklistCard) => void;
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
   onFocusHandoffExportFormat: (metric: HandoffExportFormatMetric) => void;
@@ -2112,6 +2114,24 @@ export function createQuickActions({
     };
   });
   const exportPreflightCard = activeExportPreflightQuickActionCard(exportPreflightSummary);
+  const exportPreflightRouteReadoutAction: QuickAction = {
+    id: "export-preflight-route-readout-action",
+    title: exportPreflightCard
+      ? `Review Export Preflight Route: ${exportPreflightCard.label}`
+      : "Review Export Preflight Route",
+    detail: exportPreflightCard
+      ? `${exportPreflightRouteLabel(exportPreflightCard)} / ${exportPreflightCard.value} / direct export-preflight-card-${exportPreflightCard.id} unchanged / ${exportPreflightCard.focusLabel} panel`
+      : "No Export Preflight card available.",
+    group: "Export",
+    keywords: `Quick Actions Export Preflight Route Readout review route preflight delivery risk direct export preflight focus command no export readiness mix master automation deliverables handoff ${
+      exportPreflightCard?.id ?? "none"
+    } ${exportPreflightCard?.label ?? "none"} ${exportPreflightCard?.value ?? "none"} ${
+      exportPreflightCard?.focusLabel ?? "none"
+    } beginner producer`,
+    disabled: !exportPreflightCard,
+    resultTargetId: exportPreflightCard?.id,
+    run: onFocusExportPreflightRouteReadout
+  };
   const exportPreflightActions: QuickAction[] = exportPreflightSummary.cards.map((card) => ({
     id: `export-preflight-card-${card.id}`,
     title: `Focus Export Preflight: ${card.label}`,
@@ -5346,6 +5366,7 @@ export function createQuickActions({
     },
     ...reviewQueueActions,
     ...reviewQueueFixActions,
+    exportPreflightRouteReadoutAction,
     {
       id: "export-preflight-focus",
       title: exportPreflightCard ? `Focus Export Preflight: ${exportPreflightCard.label}` : "Focus Export Preflight",
@@ -7069,6 +7090,7 @@ export function createQuickActionResult(
     action.id === "review-queue-focus" ||
     action.id.startsWith("review-queue-item-") ||
     action.id.startsWith("finish-checklist-card-") ||
+    action.id === "export-preflight-route-readout-action" ||
     action.id === "export-preflight-focus" ||
     action.id.startsWith("export-preflight-card-") ||
     action.id === "direct-exports-readout-action" ||
@@ -11370,17 +11392,30 @@ export function quickActionExportPreflightMetricSnapshot(
   const usedSlots = usedPatternSlots(project);
   const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
   const actionLabel =
-    action.id === "export-preflight-focus" ? "focus priority export preflight" : "focus direct export preflight";
+    action.id === "export-preflight-route-readout-action"
+      ? "review export preflight route readout"
+      : action.id === "export-preflight-focus"
+        ? "focus priority export preflight"
+        : "focus direct export preflight";
   const laneLabel = quickActionExportPreflightLaneLabel(action, card);
   const detailParts = quickActionExportPreflightDetailParts(action);
   const contextLabel = detailParts.slice(2).join(" / ") || card.detail;
   const postureLabel = summary.cards.map((item) => `${item.label} ${item.value}`).join(" / ");
+  const routeParts =
+    action.id === "export-preflight-route-readout-action"
+      ? [
+          `route ${exportPreflightRouteLabel(card)}`,
+          `direct command export-preflight-card-${card.id}`,
+          "export preflight unchanged"
+        ]
+      : [];
 
   return {
-    id: "export-preflight",
-    label: "Export preflight",
+    id: action.id === "export-preflight-route-readout-action" ? "export-preflight-route-readout" : "export-preflight",
+    label: action.id === "export-preflight-route-readout-action" ? "Export Preflight Route Readout" : "Export preflight",
     value: [
       actionLabel,
+      ...routeParts,
       `card ${laneLabel}`,
       `destination ${card.focusLabel} panel`,
       `status ${card.value}`,
@@ -11425,7 +11460,7 @@ export function quickActionExportPreflightDeliveryMetricParts(
 }
 
 export function quickActionExportPreflightCard(summary: ExportPreflightSummary, action: QuickAction): ExportPreflightCard | null {
-  if (action.id === "export-preflight-focus") {
+  if (action.id === "export-preflight-route-readout-action" || action.id === "export-preflight-focus") {
     return activeExportPreflightQuickActionCard(summary);
   }
 
@@ -11456,8 +11491,25 @@ export function quickActionExportPreflightDetailParts(action: QuickAction): stri
 }
 
 export function quickActionExportPreflightLaneLabel(action: QuickAction, card: ExportPreflightCard): string {
-  const titleLabel = action.title.replace(/^Focus Export Preflight:\s*/, "").trim();
-  return titleLabel && titleLabel !== "Focus Export Preflight" ? titleLabel : card.label;
+  const titleLabel = action.title.replace(/^Focus Export Preflight:\s*/, "").replace(/^Review Export Preflight Route:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Export Preflight" && titleLabel !== "Review Export Preflight Route"
+    ? titleLabel
+    : card.label;
+}
+
+export function exportPreflightRouteLabel(card: ExportPreflightFocusItem): string {
+  switch (card.focusId) {
+    case "readiness":
+      return "Readiness route";
+    case "mix":
+      return "Mix/master route";
+    case "automation":
+      return "Master Automation route";
+    case "deliverables":
+      return "Deliverables route";
+    case "handoff":
+      return "Handoff route";
+  }
 }
 
 export function quickActionHandoffPackMetricSnapshot(
@@ -16171,7 +16223,11 @@ export function quickActionResultMetricSnapshot(
     }
   }
 
-  if (action.id === "export-preflight-focus" || action.id.startsWith("export-preflight-card-")) {
+  if (
+    action.id === "export-preflight-route-readout-action" ||
+    action.id === "export-preflight-focus" ||
+    action.id.startsWith("export-preflight-card-")
+  ) {
     const exportPreflightMetric = quickActionExportPreflightMetricSnapshot(project, action, analysis ?? undefined);
     if (exportPreflightMetric) {
       return exportPreflightMetric;
@@ -21003,6 +21059,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Export Preflight card to inspect the current delivery risk before exporting.",
       nextCheck: "Return to Export Preflight after the focused readiness, mix, deliverable, or handoff item looks clear."
+    };
+  }
+
+  if (action.id === "export-preflight-route-readout-action") {
+    return {
+      auditionCue: `Read the Export Preflight route and play Pattern ${project.selectedPattern} or Full Mix before focusing a card or exporting files.`,
+      nextCheck:
+        "Use Export Preflight focus only when the named readiness, mix/master, automation, deliverables, or handoff route matches the delivery risk; otherwise leave export state unchanged."
     };
   }
 
