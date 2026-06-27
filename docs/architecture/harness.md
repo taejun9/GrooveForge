@@ -56,10 +56,13 @@ python3 harness/scripts/run_quality_gate.py
 npm run harness:smoke
 npm run typecheck
 npm run build
+npm run desktop:smoke
 npm run qa
 npm run verify
 ```
 
-These commands validate the base structure, documentation rules, runtime sample-free all-style export smoke, TypeScript contracts, and production build. `npm run verify` runs the strict quality gate, runtime smoke, typecheck, and build.
+These commands validate the base structure, documentation rules, runtime sample-free all-style export smoke, TypeScript contracts, production build, and Electron desktop entry contract. `npm run verify` runs the strict quality gate, runtime smoke, typecheck, build, and desktop entry smoke.
+
+`npm run desktop:smoke` runs after build artifacts exist. It checks that `dist-electron/main.js` and `dist-electron/preload.js` were built, the production Electron main entry loads `dist/index.html` through `loadFile`, the compiled preload exposes the bounded `grooveforge` desktop bridge, native menu commands stay validated, and core BrowserWindow security settings remain enabled.
 
 Production build validation depends on Vite 8 / Rolldown output code splitting, not warning suppression. `vite.config.ts` keeps `outDir: "dist"` and `sourcemap: true`, then uses `build.rolldownOptions.output.codeSplitting.groups` for `react-vendor`, `icons-vendor`, remaining `vendor`, `audio-engine`, `workstation-core`, `workstation-ui-model`, `workstation-editor-audition`, `workstation-selected-actions`, `workstation-pattern-tools`, `workstation-mix-panels`, `workstation-compose-panels`, `workstation-guidance-panels`, `workstation-shell-panels`, `workstation-snapshot-compare`, `workstation-analysis`, `workstation-app-helpers`, `workstation-app-quick-action-route-labels`, `workstation-app-quick-action-palette`, `workstation-app-quick-actions`, and `workstation-app-derivations` paths so eligible modules split when present and stable dependencies plus audio engine, workstation UI helper code, quick-action route-label helpers, quick-action command-palette helpers, quick-action result/metric code, editor audition code, selected-event action code, render-only mix/master panels, render-only compose/editor panels, render-only Guided/Studio workflow panels, render-only shell panels, Snapshot Compare derivation code, app derivation code, and shared analysis helpers do not stay in one large client chunk.
