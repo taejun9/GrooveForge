@@ -8195,6 +8195,23 @@ export function App(): ReactElement {
     );
   }
 
+  function focusChordMoveRouteReadout(): void {
+    const target = activeChordMoveQuickActionTarget(project, selectedChord, chordMovePreviewSummary);
+    const routeLabel = target
+      ? target.kind === "Pad"
+        ? "Chord Pads route"
+        : target.kind === "Rhythm"
+          ? "Chord Rhythm route"
+          : "Chord Voicing route"
+      : "no chord route";
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      target
+        ? `Chord Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command chord-move / ${chordMovePreviewSummary.moveLabel} / direct chord move unchanged`
+        : `Chord Move Route Readout Pattern ${project.selectedPattern}: ${chordMovePreviewSummary.statusLabel} / ${chordMovePreviewSummary.selectedLabel} / no chord move route needed / ${chordMovePreviewSummary.moveLabel} / direct chord move unchanged`
+    );
+  }
+
   function focusLayerStarterReadout(): void {
     const priorityLayer = layerStarterOptions.find((option) => option.tone !== "good") ?? layerStarterOptions[0] ?? null;
     composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -8479,6 +8496,7 @@ export function App(): ReactElement {
     onApplyChordPad: applyChordPad,
     onApplyChordRhythm: applyChordRhythm,
     onApplyChordVoicing: applyChordVoicingPad,
+    onFocusChordMoveRouteReadout: focusChordMoveRouteReadout,
     onAlignDeliveryTarget: alignDeliveryTarget,
     onSelectDeliveryTarget: selectDeliveryTarget,
     onApplyDrumAccent: applyDrumAccent,

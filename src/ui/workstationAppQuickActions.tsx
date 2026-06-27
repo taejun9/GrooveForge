@@ -1215,6 +1215,7 @@ export function createQuickActions({
   onApplyChordPad,
   onApplyChordRhythm,
   onApplyChordVoicing,
+  onFocusChordMoveRouteReadout,
   onAlignDeliveryTarget,
   onSelectDeliveryTarget,
   onApplyDrumAccent,
@@ -1558,6 +1559,7 @@ export function createQuickActions({
   onApplyChordPad: (pad: ChordPadId) => void;
   onApplyChordRhythm: (rhythm: ChordRhythmId) => void;
   onApplyChordVoicing: (voicing: ChordVoicingId) => void;
+  onFocusChordMoveRouteReadout: () => void;
   onAlignDeliveryTarget: (target: DeliveryTargetId) => void;
   onSelectDeliveryTarget: (target: DeliveryTargetId) => void;
   onApplyDrumAccent: (accent: DrumAccentId) => void;
@@ -2378,6 +2380,30 @@ export function createQuickActions({
       melodyMovePreviewSummary.accentLabel
     } ${melodyMovePreviewSummary.contourLabel} ${melodyMovePreviewSummary.moveLabel} synth hook phrase motif accent contour rhythm density chance range beginner producer sample free`,
     run: onFocusMelodyMoveRouteReadout
+  };
+  const chordMoveRouteReadoutAction: QuickAction = {
+    id: "chord-move-route-readout-action",
+    title: chordMoveTarget
+      ? `Review Chord Move Route Readout: ${chordMoveTarget.label} ${chordMoveTarget.kind}`
+      : `Review Chord Move Route Readout: ${chordMovePreviewSummary.statusLabel}`,
+    detail: chordMoveTarget
+      ? `${chordMovePreviewSummary.selectedLabel} / route ${chordMoveRouteLabel(
+          chordMoveTarget
+        )} / direct command chord-move / ${chordMovePreviewSummary.moveLabel} / harmony route preflight`
+      : `${chordMovePreviewSummary.statusLabel} / ${chordMovePreviewSummary.selectedLabel} / no chord move route needed / ${chordMovePreviewSummary.moveLabel} / harmony route preflight`,
+    group: "Create",
+    keywords: `Quick Actions Chord Move Route Readout review selected Pattern ${
+      project.selectedPattern
+    } route direct chord harmony command chord-move ${
+      chordMoveTarget
+        ? `${chordMoveTarget.kind} ${chordMoveRouteLabel(chordMoveTarget)} ${chordMoveTarget.label}`
+        : "chord route unavailable"
+    } ${chordMovePreviewSummary.statusLabel} ${chordMovePreviewSummary.selectedLabel} ${
+      chordMovePreviewSummary.harmonicLabel
+    } ${chordMovePreviewSummary.rhythmLabel} ${chordMovePreviewSummary.voicingLabel} ${
+      chordMovePreviewSummary.moveLabel
+    } chord pads rhythm voicing inversion color chance velocity beginner producer sample free`,
+    run: onFocusChordMoveRouteReadout
   };
   const modeFocusCard = activeModeFocusQuickActionCard(modeFocusSummary);
   const modeFocusActions: QuickAction[] = modeFocusSummary.cards.map((card) => ({
@@ -4838,6 +4864,7 @@ export function createQuickActions({
         }
       }
     },
+    chordMoveRouteReadoutAction,
     {
       id: "chord-move",
       title: chordMoveTarget ? `Apply ${chordMoveTarget.label} Chord ${chordMoveTarget.kind}` : "Apply Chord Move",
@@ -6852,6 +6879,7 @@ export function createQuickActionResult(
     action.id === "drum-move-route-readout-action" ||
     action.id === "808-move-route-readout-action" ||
     action.id === "melody-move-route-readout-action" ||
+    action.id === "chord-move-route-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -15353,6 +15381,16 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "chord-move-route-readout-action") {
+    return (
+      quickActionChordMoveRouteReadoutMetricSnapshot(project, action) ?? {
+        id: "chord-move-route-readout",
+        label: "Chord Move Route Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id === "chord-move") {
     const chordEvents = activePattern(project).chordEvents;
     return {
@@ -18243,6 +18281,58 @@ export function melodyMoveRouteLabel(target: MelodyMoveQuickActionTarget): strin
   }
 }
 
+export function chordMoveRouteLabel(target: ChordMoveQuickActionTarget): string {
+  switch (target.kind) {
+    case "Pad":
+      return "Chord Pads route";
+    case "Rhythm":
+      return "Chord Rhythm route";
+    case "Voicing":
+      return "Chord Voicing route";
+  }
+}
+
+export function quickActionChordMoveRouteReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "chord-move-route-readout-action") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const chords = pattern.chordEvents;
+  const arrangementUse = patternArrangementUseLabel(project, project.selectedPattern);
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "chord-move-route-readout",
+    label: "Chord Move Route Readout",
+    value: [
+      "review chord move route",
+      `selected Pattern ${project.selectedPattern}`,
+      action.title.replace(/^Review Chord Move Route Readout:\s*/, "target "),
+      action.detail,
+      "direct command chord-move",
+      `${patternEventTotal(pattern)} events`,
+      chordCountLabel(chords),
+      chordHarmonyLabel(chords),
+      chordInversionSummaryLabel(chords),
+      chordRhythmSummaryLabel(chords),
+      chordVelocityLabel(chords),
+      chordChanceLabel(chords),
+      `arrangement ${arrangementUse}`,
+      "chord route unchanged",
+      "chords unchanged",
+      "playback unchanged",
+      "export unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
 export function quickActionMelodyMoveRouteReadoutMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -19797,6 +19887,15 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; check Synth phrase shape against chords, 808, and drums.`,
       nextCheck: "Use the Melody Move Result plus selected-note degree/role and melody edit tools for manual corrections."
+    };
+  }
+
+  if (action.id === "chord-move-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the chord route and loop the selected Pattern before choosing the existing Chord Move command.",
+      nextCheck:
+        "Use Chord Move only when the named Pads, Rhythm, or Voicing route should reshape the selected Pattern harmony; otherwise use selected-chord tools."
     };
   }
 
