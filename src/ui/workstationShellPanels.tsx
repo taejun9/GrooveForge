@@ -1247,6 +1247,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         target: "Deliverable set / send-order route",
         context:
           "WAV, Stems, MIDI, Handoff Sheet, Handoff Route, Manifest Readiness, Latest Export Receipt, Export Format, Package Check, Send Order, Next Export, Review Handoff Pack command, local result metric, Audition Cue, and Next Delivery Check context before Handoff Pack commands run."
+      },
+      {
+        id: "handoff-route-readout",
+        command: "Handoff Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Route preflight / no render",
+        context:
+          "Handoff Route Readout Action, Handoff Route Label, Route Status, Route Detail, Route File Context, Delivery Target, Deliverable Readiness, Package Posture, Manifest Status, Latest Export Receipt, Send Order, Selected Pattern A/B/C, Arrangement Length, Audition Cue, and Next Route Check context before sending files or running export commands."
       }
     ]
   },
