@@ -1243,6 +1243,7 @@ export function createQuickActions({
   onClearMixSnapshots,
   onFocusMixSnapshotReadout,
   onFocusSpaceFxReadout,
+  onFocusSpaceFxRouteReadout,
   onFocusPatternChainReadout,
   onFocusChainExpandReadout,
   onApplyPatternChain,
@@ -1590,6 +1591,7 @@ export function createQuickActions({
   onClearMixSnapshots: () => void;
   onFocusMixSnapshotReadout: () => void;
   onFocusSpaceFxReadout: () => void;
+  onFocusSpaceFxRouteReadout: () => void;
   onFocusPatternChainReadout: () => void;
   onFocusChainExpandReadout: () => void;
   onApplyPatternChain: (chain: PatternChainId) => void;
@@ -3205,6 +3207,10 @@ export function createQuickActions({
   const masterAutomationReady = masterAutomationPreviewSummary.changedEvents > 0;
   const masterFinishReady = masterFinishPreviewSummary.changedMoves > 0;
   const spaceFxReady = spaceFxPreviewSummary.changedSends > 0;
+  const spaceFxPreviewPad = spaceFxPadOptions.find((pad) => pad.id === spaceFxPreviewSummary.padId) ?? spaceFxPadOptions[0];
+  const spaceFxRouteTarget = spaceFxPreviewPad
+    ? spaceFxRouteLabel(project.mixer, applySpaceFxPadToMixer(project.mixer, spaceFxPreviewPad))
+    : "No Space FX route needed";
   const spaceFxReadoutAction: QuickAction = {
     id: "space-fx-readout-action",
     title: `Review Space FX: ${spaceFxPreviewSummary.padLabel}`,
@@ -3216,6 +3222,16 @@ export function createQuickActions({
       spaceFxPreviewSummary.focusLabel
     } beginner producer manual space sliders`,
     run: onFocusSpaceFxReadout
+  };
+  const spaceFxRouteReadoutAction: QuickAction = {
+    id: "space-fx-route-readout-action",
+    title: `Review Space FX Route: ${spaceFxPreviewSummary.padLabel}`,
+    detail: `${spaceFxRouteTarget} / ${spaceFxPreviewSummary.statusLabel} / ${spaceFxPreviewSummary.changeLabel} / direct Space FX unchanged`,
+    group: "Mix",
+    keywords: `Quick Actions Space FX Route Readout review route preflight dry room wide wash send ambience reverb direct space fx command no apply drums 808 synth chords ${
+      spaceFxPreviewSummary.padId
+    } ${spaceFxPreviewSummary.padLabel} ${spaceFxRouteTarget} ${spaceFxPreviewSummary.sendLabel} space fx route preflight beginner producer manual space sliders`,
+    run: onFocusSpaceFxRouteReadout
   };
   const mixBalancePadActions: QuickAction[] = mixBalancePadOptions.map((pad) => ({
     id: `mix-balance-pad-${pad.id}`,
@@ -5843,6 +5859,7 @@ export function createQuickActions({
     },
     ...mixBalancePadActions,
     spaceFxReadoutAction,
+    spaceFxRouteReadoutAction,
     {
       id: "space-fx-decision",
       title: spaceFxReady ? `Run Space FX Decision: Apply ${spaceFxPreviewSummary.padLabel}` : "Run Space FX Decision: Aligned",
@@ -6948,6 +6965,7 @@ export function createQuickActionResult(
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
+    action.id === "space-fx-route-readout-action" ||
     action.id === "master-finish-readout-action" ||
     action.id === "master-automation-readout-action" ||
     action.id === "workflow-spotlight-focus" ||
@@ -17099,6 +17117,32 @@ export function quickActionSpaceFxMetricSnapshot(
     };
   }
 
+  if (action.id === "space-fx-route-readout-action") {
+    const options = createSpaceFxPadOptions(project.mixer);
+    const preview = createSpaceFxPreviewSummary(project.mixer, options);
+    const pad = options.find((candidate) => candidate.id === preview.padId) ?? options[0];
+    if (!pad) {
+      return null;
+    }
+    const transformed = applySpaceFxPadToMixer(project.mixer, pad);
+    const changedSends = spaceFxChangedSendCount(project.mixer, transformed);
+    return {
+      id: "space-fx-route-readout",
+      label: "Space FX Route Readout",
+      value: quickActionSpaceFxMetricValue(project, action, analysis, [
+        quickActionSpaceFxActionLabel(action),
+        `route ${spaceFxRouteLabel(project.mixer, transformed)}`,
+        "direct command space-fx",
+        `target ${preview.padLabel}`,
+        `status ${preview.statusLabel}`,
+        `target sends ${preview.sendLabel}`,
+        `current sends ${quickActionSpaceFxSendPosture(project.mixer)}`,
+        `moves ${changedSends} send${changedSends === 1 ? "" : "s"}`,
+        "space fx unchanged"
+      ])
+    };
+  }
+
   const pad = quickActionSpaceFxPadOption(project, action);
   if (!pad) {
     return null;
@@ -17160,6 +17204,24 @@ export function quickActionSpaceFxSendPosture(mixer: MixerChannel[]): string {
   )} / Ch ${spaceFxTrackPosture(mixer, "chord")}`;
 }
 
+export function spaceFxRouteLabel(before: MixerChannel[], after: MixerChannel[]): string {
+  const routes: string[] = [];
+  if (spaceFxTrackPosture(before, "drum_rack") !== spaceFxTrackPosture(after, "drum_rack")) {
+    routes.push("Drums");
+  }
+  if (spaceFxTrackPosture(before, "bass_808") !== spaceFxTrackPosture(after, "bass_808")) {
+    routes.push("808");
+  }
+  if (spaceFxTrackPosture(before, "synth") !== spaceFxTrackPosture(after, "synth")) {
+    routes.push("Synth");
+  }
+  if (spaceFxTrackPosture(before, "chord") !== spaceFxTrackPosture(after, "chord")) {
+    routes.push("Chords");
+  }
+
+  return routes.length === 0 ? "No Space FX route needed" : `${routes.join(" / ")} route`;
+}
+
 export function quickActionSpaceFxContextLabel(action: QuickAction, fallback: string): string {
   return quickActionSpaceFxDetailParts(action).join(" / ") || fallback;
 }
@@ -17174,6 +17236,10 @@ export function quickActionSpaceFxDetailParts(action: QuickAction): string[] {
 export function quickActionSpaceFxNextCheck(action: QuickAction): string {
   if (action.id === "space-fx-readout-action") {
     return "play Full Mix and core stems before applying a Space FX pad or trimming Space sliders manually";
+  }
+
+  if (action.id === "space-fx-route-readout-action") {
+    return "read the Drums, 808, Synth, and Chords send route before choosing the existing Space FX command";
   }
 
   if (action.id === "space-fx-decision") {
@@ -17191,6 +17257,9 @@ export function quickActionSpaceFxActionLabel(action: QuickAction): string {
   if (action.id === "space-fx-readout-action") {
     return "review space fx readout";
   }
+  if (action.id === "space-fx-route-readout-action") {
+    return "review space fx route readout";
+  }
   if (action.id === "space-fx-decision") {
     return "run space fx decision";
   }
@@ -17206,12 +17275,22 @@ export function quickActionSpaceFxActionLabel(action: QuickAction): string {
 export function quickActionSpaceFxPadOption(project: ProjectState, action: QuickAction): SpaceFxPadOption | null {
   const options = createSpaceFxPadOptions(project.mixer);
   const directId =
-    action.id.startsWith("space-fx-") && action.id !== "space-fx-decision" ? action.id.slice("space-fx-".length) : null;
+    action.id.startsWith("space-fx-") &&
+    action.id !== "space-fx-readout-action" &&
+    action.id !== "space-fx-route-readout-action" &&
+    action.id !== "space-fx-decision"
+      ? action.id.slice("space-fx-".length)
+      : null;
   if (directId) {
     return options.find((pad) => pad.id === directId) ?? null;
   }
 
-  if (action.id !== "space-fx-decision" && action.id !== "space-fx") {
+  if (
+    action.id !== "space-fx-readout-action" &&
+    action.id !== "space-fx-route-readout-action" &&
+    action.id !== "space-fx-decision" &&
+    action.id !== "space-fx"
+  ) {
     return null;
   }
 
@@ -20988,6 +21067,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the Space FX readout before applying a shared-send pad, then play Full Mix and core stems.",
       nextCheck: "Apply Space FX only when the preview target matches what you hear; otherwise trim dry, room, wide, or wash manually."
+    };
+  }
+
+  if (action.id === "space-fx-route-readout-action") {
+    return {
+      auditionCue: `Read the Space FX route and loop Pattern ${project.selectedPattern} before choosing the existing Space FX command.`,
+      nextCheck:
+        "Use Space FX only when the named Drums, 808, Synth, or Chords send route should reshape the beat space; otherwise trim Space sliders manually."
     };
   }
 
