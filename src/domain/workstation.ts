@@ -3062,7 +3062,8 @@ function normalizeProjectState(value: unknown): ProjectState | null {
     const legacyPattern = normalizePatternData({
       drumPattern: value.drumPattern,
       bassNotes: value.bassNotes,
-      melodyNotes: value.melodyNotes
+      melodyNotes: value.melodyNotes,
+      chordEvents: value.chordEvents
     });
     return {
       title: value.title,

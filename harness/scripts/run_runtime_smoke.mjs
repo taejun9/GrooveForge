@@ -65,6 +65,32 @@ function blueprintSmokeProject(blueprint) {
   };
 }
 
+function legacySinglePatternProjectFile() {
+  const pattern = workstation.createStylePatternSet("rnb", smokeKey).A;
+  return {
+    app: "GrooveForge",
+    fileVersion: workstation.projectFileVersion,
+    savedAt: "2026-06-28T00:00:00.000Z",
+    project: {
+      title: "Legacy Chord Migration Smoke Beat",
+      mode: "guided",
+      bpm: 96,
+      key: smokeKey,
+      styleId: "rnb",
+      selectedPattern: "A",
+      swing: 0.58,
+      drumPattern: pattern.drumPattern,
+      bassNotes: pattern.bassNotes,
+      melodyNotes: pattern.melodyNotes,
+      chordEvents: pattern.chordEvents,
+      mixer: cloneMixerForSmoke(),
+      arrangement: workstation.createPatternChain("eight_bar").map(({ section, pattern, energy }) => ({ section, pattern, energy })),
+      masterCeilingDb: workstation.masterPresetCeilingDb("Headroom for Vocal"),
+      masterPreset: "Headroom for Vocal"
+    }
+  };
+}
+
 function projectSlug(project) {
   return project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "grooveforge";
 }
@@ -155,6 +181,47 @@ function validateProjectFileRoundTrip(project, label) {
   return roundTrippedProject;
 }
 
+function validateLegacyProjectMigration() {
+  const label = "legacy:single-pattern-chord-events";
+  const legacyFile = legacySinglePatternProjectFile();
+  const legacyPattern = {
+    drumPattern: legacyFile.project.drumPattern,
+    bassNotes: legacyFile.project.bassNotes,
+    melodyNotes: legacyFile.project.melodyNotes,
+    chordEvents: legacyFile.project.chordEvents
+  };
+  const contents = `${JSON.stringify(legacyFile, null, 2)}\n`;
+  let migratedProject = null;
+
+  try {
+    migratedProject = workstation.parseProjectFile(contents);
+  } catch (error) {
+    failures.push(`${label} should parse through parseProjectFile: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+
+  check(migratedProject.title === legacyFile.project.title, `${label} should preserve title`);
+  check(migratedProject.styleId === legacyFile.project.styleId, `${label} should preserve style`);
+  check(migratedProject.key === legacyFile.project.key, `${label} should preserve key`);
+  check(migratedProject.deliveryTarget === "vocal_session", `${label} should migrate missing delivery target to the safe default`);
+  check(stableJson(migratedProject.sessionBrief) === stableJson({ artist: "", vibe: "", reference: "", notes: "" }), `${label} should migrate missing Session Brief to empty fields`);
+  check(migratedProject.metronomeEnabled === false, `${label} should migrate missing metronome toggle to false`);
+  check(migratedProject.snapshots.length === 0, `${label} should migrate without snapshots`);
+  check(migratedProject.arrangement.every((block) => block.bars === 1), `${label} should migrate missing arrangement bars to one bar`);
+  check(migratedProject.arrangement.every((block) => Array.isArray(block.mutedTracks) && block.mutedTracks.length === 0), `${label} should migrate missing arrangement mute maps to empty arrays`);
+
+  for (const slot of workstation.patternSlots) {
+    const pattern = migratedProject.patterns[slot];
+    check(stableJson(pattern.drumPattern) === stableJson(legacyPattern.drumPattern), `${label} Pattern ${slot} should preserve legacy drums`);
+    check(stableJson(pattern.bassNotes) === stableJson(legacyPattern.bassNotes), `${label} Pattern ${slot} should preserve legacy 808/bass notes`);
+    check(stableJson(pattern.melodyNotes) === stableJson(legacyPattern.melodyNotes), `${label} Pattern ${slot} should preserve legacy Synth melody notes`);
+    check(stableJson(pattern.chordEvents) === stableJson(legacyPattern.chordEvents), `${label} Pattern ${slot} should preserve legacy chord events`);
+    check(pattern.chordEvents.length > 0, `${label} Pattern ${slot} should contain migrated chord events`);
+  }
+
+  return migratedProject;
+}
+
 async function validateProjectExportSmoke(smokeCase) {
   const { label, expectedStyleId } = smokeCase;
   const project = validateProjectFileRoundTrip(smokeCase.project, label);
@@ -241,6 +308,15 @@ const styleCases = workstation.styleProfiles.map((profile) => ({
   expectedStyleId: profile.id
 }));
 const smokeCases = [...blueprintCases, ...styleCases];
+const legacyMigrationProject = validateLegacyProjectMigration();
+if (legacyMigrationProject) {
+  smokeCases.push({
+    kind: "legacy",
+    label: "legacy:single-pattern-chord-events",
+    project: legacyMigrationProject,
+    expectedStyleId: legacyMigrationProject.styleId
+  });
+}
 const summaries = [];
 
 for (const smokeCase of smokeCases) {
@@ -259,6 +335,7 @@ console.log("GrooveForge runtime smoke passed.");
 console.log(`- Scope: ${smokeScope}`);
 console.log(`- Blueprints: ${blueprintCases.length}/${workstation.beatBlueprints.length} sample-free 8-bar starts`);
 console.log(`- Styles: ${styleCases.length}/${workstation.styleProfiles.length} supported style profiles`);
+console.log(`- Legacy migrations: ${legacyMigrationProject ? 1 : 0}/1 single-pattern chord-event project preserved`);
 console.log(`- Project roundtrips: ${summaries.length}/${smokeCases.length} .grooveforge.json save/load checks before export`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
