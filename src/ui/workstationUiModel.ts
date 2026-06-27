@@ -1417,6 +1417,7 @@ export type PatternContrastSectionFitItem = {
   expectedRoles: PatternContrastRole[];
   expectedLabel: string;
   styleBasisLabel: string;
+  reasonLabel: string;
   fitLabel: string;
   barLabel: string;
   detailLabel: string;

@@ -10660,7 +10660,7 @@ export function quickActionPatternContrastSectionFitMetricSnapshot(
   );
   const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
   const fitSequence = sectionFit.items
-    .map((item) => `${item.sectionLabel}:${item.fitLabel} ${item.roleLabel} ${item.pattern}`)
+    .map((item) => `${item.sectionLabel}:${item.fitLabel} ${item.roleLabel} ${item.pattern} (${item.reasonLabel})`)
     .join(" / ");
 
   return {
@@ -10668,7 +10668,7 @@ export function quickActionPatternContrastSectionFitMetricSnapshot(
     label: "Pattern Section Fit",
     value: `${sectionFit.statusLabel} / ${sectionFit.metricLabel} / ${
       selectedItem
-        ? `selected Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} and has ${selectedItem.roleLabel} Pattern ${selectedItem.pattern}`
+        ? `selected Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} because ${selectedItem.reasonLabel} and has ${selectedItem.roleLabel} Pattern ${selectedItem.pattern}`
         : "no selected block"
     } / ${fitSequence || "no arrangement blocks"} / style-aware expectations / arrangement unchanged / playback unchanged / export unchanged`
   };
@@ -10695,7 +10695,7 @@ export function quickActionPatternContrastSectionFitCueMetricSnapshot(
     id: "pattern-contrast-section-fit-cue",
     label: "Section Fit Cue",
     value: selectedItem
-      ? `Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} cued as Block loop / ${selectedItem.fitLabel} / expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} / ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / Pattern data unchanged / arrangement unchanged / export unchanged`
+      ? `Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} cued as Block loop / ${selectedItem.fitLabel} / expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} / reason ${selectedItem.reasonLabel} / ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / Pattern data unchanged / arrangement unchanged / export unchanged`
       : "No arrangement block available / Pattern data unchanged / arrangement unchanged / export unchanged"
   };
 }
@@ -10721,7 +10721,7 @@ export function quickActionPatternContrastSectionFitUseMetricSnapshot(
     id: "pattern-contrast-section-fit-use",
     label: "Section Fit Use",
     value: selectedItem
-      ? `Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} now uses ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} / ${selectedItem.fitLabel} / Pattern events unchanged / selected block assignment explicit / export unchanged`
+      ? `Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} now uses ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} / reason ${selectedItem.reasonLabel} / ${selectedItem.fitLabel} / Pattern events unchanged / selected block assignment explicit / export unchanged`
       : "No arrangement block available / Pattern events unchanged / arrangement unchanged / export unchanged"
   };
 }
@@ -10747,7 +10747,7 @@ export function quickActionPatternContrastSectionFitDecisionMetricSnapshot(
     id: "pattern-contrast-section-fit-decision",
     label: "Section Fit Decision",
     value: selectedItem
-      ? `${action.title} / Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} / expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} / now ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / ${selectedItem.fitLabel} / Pattern events unchanged / export unchanged`
+      ? `${action.title} / Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} / expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} / reason ${selectedItem.reasonLabel} / now ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / ${selectedItem.fitLabel} / Pattern events unchanged / export unchanged`
       : `${action.title} / no arrangement block available / Pattern events unchanged / arrangement unchanged / export unchanged`
   };
 }
@@ -22747,7 +22747,7 @@ export function quickActionResultFollowup(
     const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
     return {
       auditionCue: selectedItem
-        ? `Play Block loop; confirm the Decision result for ${selectedItem.sectionLabel} against its ${sectionFit.styleBasisLabel} ${selectedItem.expectedLabel} role.`
+        ? `Play Block loop; confirm the Decision result for ${selectedItem.sectionLabel} against its ${sectionFit.styleBasisLabel} ${selectedItem.expectedLabel} role because ${selectedItem.reasonLabel}.`
         : "Create an arrangement block before running a Section Fit Decision.",
       nextCheck: `Read Section Fit again, then keep the block cued or use Role Map before making another ${sectionFit.styleBasisLabel} placement.`
     };
@@ -22763,7 +22763,7 @@ export function quickActionResultFollowup(
     const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
     return {
       auditionCue: selectedItem
-        ? `Play Block loop; hear whether ${selectedItem.sectionLabel} works as ${selectedItem.roleLabel} against its ${sectionFit.styleBasisLabel} ${selectedItem.expectedLabel} role.`
+        ? `Play Block loop; hear whether ${selectedItem.sectionLabel} works as ${selectedItem.roleLabel} against its ${sectionFit.styleBasisLabel} ${selectedItem.expectedLabel} role because ${selectedItem.reasonLabel}.`
         : "Create an arrangement block before cueing Section Fit.",
       nextCheck: `Compare the cued Block loop with Song loop, then use Role Map or Pattern Use only if the section needs a different ${sectionFit.styleBasisLabel} role.`
     };
@@ -22779,7 +22779,7 @@ export function quickActionResultFollowup(
     const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
     return {
       auditionCue: selectedItem
-        ? `Play Block loop; confirm ${selectedItem.sectionLabel} now supports its ${sectionFit.styleBasisLabel} ${selectedItem.expectedLabel} role with Pattern ${selectedItem.pattern}.`
+        ? `Play Block loop; confirm ${selectedItem.sectionLabel} now supports its ${sectionFit.styleBasisLabel} ${selectedItem.expectedLabel} role with Pattern ${selectedItem.pattern} because ${selectedItem.reasonLabel}.`
         : "Create an arrangement block before using Section Fit.",
       nextCheck: "Read Section Fit again, then cue the block or Song loop before making another role placement."
     };
