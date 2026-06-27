@@ -2166,6 +2166,7 @@ export function PatternContrastReadout({
                 <span>{item.sectionLabel}</span>
                 <strong>{item.fitLabel}</strong>
                 <small>{item.styleBasisLabel}: {item.expectedLabel} / {item.roleLabel} Pattern {item.pattern}</small>
+                <em>{item.reasonLabel}</em>
               </div>
             ))}
           </div>

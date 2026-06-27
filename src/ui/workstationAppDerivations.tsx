@@ -2770,6 +2770,107 @@ const patternContrastStyleSectionRoleExpectations: Record<StyleId, Record<Arrang
   }
 };
 
+const patternContrastStyleSectionReasonLabels: Record<StyleId, Record<ArrangementSection, string>> = {
+  trap: {
+    Intro: "Set a sparse bounce before the pocket lands",
+    Verse: "Hold the main 808 pocket steady",
+    Hook: "Lift or flip the bounce for payoff",
+    Bridge: "Pull energy back before the return",
+    Outro: "Tag the beat with a break or anchor"
+  },
+  drill: {
+    Intro: "Open with space before the slide arrives",
+    Verse: "Keep the sliding 808 pocket grounded",
+    Hook: "Push a sharper lift or switchup",
+    Bridge: "Break tension before the hook returns",
+    Outro: "Exit on a cold break or anchor"
+  },
+  boom_bap: {
+    Intro: "Establish the loop and drum character",
+    Verse: "Keep the sample pocket easy to rap over",
+    Hook: "Lift the loop without crowding the drums",
+    Bridge: "Strip back for a crate-dig pause",
+    Outro: "Let the anchor loop resolve"
+  },
+  lofi: {
+    Intro: "Set the texture before the full pocket",
+    Verse: "Keep the warm groove stable",
+    Hook: "Lift gently without breaking the mood",
+    Bridge: "Drop into a soft breakdown",
+    Outro: "Fade through the anchor or break"
+  },
+  house: {
+    Intro: "Cue the DJ-friendly build space",
+    Verse: "Hold the groove before the lift",
+    Hook: "Open the drop or switchup energy",
+    Bridge: "Break down before the next drop",
+    Outro: "Leave a clean DJ exit"
+  },
+  rnb: {
+    Intro: "Set the chord pocket and vocal space",
+    Verse: "Keep the groove supportive for topline",
+    Hook: "Lift harmony without crowding vocals",
+    Bridge: "Switch emotion before the final hook",
+    Outro: "Resolve on the pocket or a soft break"
+  },
+  k_hiphop_rnb: {
+    Intro: "Set the melodic pocket and mood",
+    Verse: "Keep rap and vocal space stable",
+    Hook: "Lift the topline-friendly motif",
+    Bridge: "Flip emotion before the hook returns",
+    Outro: "Resolve with anchor or soft break"
+  },
+  afrobeats: {
+    Intro: "Set percussion color before the groove",
+    Verse: "Hold the rolling pocket for vocal space",
+    Hook: "Lift or switch the dance response",
+    Bridge: "Break the groove before the return",
+    Outro: "Exit through rhythm or anchor"
+  },
+  amapiano: {
+    Intro: "Build space before log-drum weight",
+    Verse: "Keep the rolling groove locked",
+    Hook: "Lift or switch the log-drum payoff",
+    Bridge: "Break down before the next lift",
+    Outro: "Leave room for a clean dance exit"
+  },
+  reggaeton: {
+    Intro: "Set dembow identity before the vocal",
+    Verse: "Keep the dembow pocket steady",
+    Hook: "Lift or switch the chant response",
+    Bridge: "Break tension before the hook returns",
+    Outro: "Resolve on dembow or a break"
+  },
+  jersey: {
+    Intro: "Cue bounce space before chops hit",
+    Verse: "Hold the club bounce foundation",
+    Hook: "Lift or switch the chop energy",
+    Bridge: "Break the bounce before the next hit",
+    Outro: "Leave a clean club exit"
+  },
+  phonk: {
+    Intro: "Set the dark loop and drift",
+    Verse: "Keep the cowbell pocket grounded",
+    Hook: "Lift or switch the aggression",
+    Bridge: "Break the drive before it returns",
+    Outro: "Resolve with anchor or dark break"
+  },
+  garage: {
+    Intro: "Open with shuffle space",
+    Verse: "Hold the skipping groove foundation",
+    Hook: "Lift or switch the shuffle energy",
+    Bridge: "Break down before the next swing",
+    Outro: "Leave a clean club exit"
+  },
+  experimental: {
+    Intro: "State the rule before bending it",
+    Verse: "Anchor or switch the pulse deliberately",
+    Hook: "Make the strongest contrast obvious",
+    Bridge: "Break form without losing intent",
+    Outro: "Resolve or distort the anchor"
+  }
+};
+
 function patternContrastSectionExpectedRoles(styleId: StyleId, section: ArrangementSection): PatternContrastRole[] {
   return patternContrastStyleSectionRoleExpectations[styleId]?.[section] ?? patternContrastSectionRoleExpectations[section];
 }
@@ -2777,6 +2878,10 @@ function patternContrastSectionExpectedRoles(styleId: StyleId, section: Arrangem
 function patternContrastSectionStyleBasisLabel(styleId: StyleId): string {
   const styleName = styleProfiles.find((profile) => profile.id === styleId)?.name ?? styleId;
   return `${styleName} style fit`;
+}
+
+function patternContrastSectionReasonLabel(styleId: StyleId, section: ArrangementSection): string {
+  return patternContrastStyleSectionReasonLabels[styleId]?.[section] ?? "Match section energy to the current style.";
 }
 
 export function createPatternContrastSectionFitSummary(
@@ -2790,6 +2895,7 @@ export function createPatternContrastSectionFitSummary(
   const items = roleMap.blocks.map((block) => {
     const expectedRoles = patternContrastSectionExpectedRoles(styleId, block.sectionLabel as ArrangementSection);
     const expectedLabel = expectedRoles.map(patternContrastRoleLabel).join("/");
+    const reasonLabel = patternContrastSectionReasonLabel(styleId, block.sectionLabel as ArrangementSection);
     const fit = block.role !== "blank" && expectedRoles.includes(block.role);
     const fitLabel = block.role === "blank" ? "Role missing" : fit ? "Section fit" : "Check section role";
     const tone: MixCoachTone = fit ? "good" : "warn";
@@ -2803,9 +2909,10 @@ export function createPatternContrastSectionFitSummary(
       expectedRoles,
       expectedLabel,
       styleBasisLabel,
+      reasonLabel,
       fitLabel,
       barLabel: block.barLabel,
-      detailLabel: `${block.sectionLabel} expects ${expectedLabel} for ${styleBasisLabel}; Pattern ${block.pattern} is ${block.roleLabel}; ${block.barLabel}.`,
+      detailLabel: `${block.sectionLabel} expects ${expectedLabel} for ${styleBasisLabel}; ${reasonLabel}; Pattern ${block.pattern} is ${block.roleLabel}; ${block.barLabel}.`,
       selected: block.selected,
       tone
     };
@@ -2832,12 +2939,14 @@ export function createPatternContrastSectionFitSummary(
       : `${fitCount}/${blockCount} sections match ${styleBasisLabel} roles`;
   const metricLabel = `${fitCount} fit / ${watchCount} watch / ${missingCount} missing / ${styleBasisLabel}`;
   const detailLabel = selectedItem
-    ? `Selected Block ${selectedItem.index + 1}: ${selectedItem.sectionLabel} expects ${selectedItem.expectedLabel} for ${styleBasisLabel}; Pattern ${selectedItem.pattern} is ${selectedItem.roleLabel}`
+    ? `Selected Block ${selectedItem.index + 1}: ${selectedItem.sectionLabel} expects ${selectedItem.expectedLabel} for ${styleBasisLabel}; ${selectedItem.reasonLabel}; Pattern ${selectedItem.pattern} is ${selectedItem.roleLabel}`
     : "Create arrangement blocks before checking section fit.";
   const auditionCue =
     blockCount === 0
       ? "Create an arrangement block, then return to Pattern Contrast Section Fit."
-      : `Loop ${selectedItem?.sectionLabel ?? "the selected section"} as Block and compare its ${selectedItem?.roleLabel ?? "role"} against the ${styleBasisLabel} expectation.`;
+      : `Loop ${selectedItem?.sectionLabel ?? "the selected section"} as Block and compare its ${
+          selectedItem?.roleLabel ?? "role"
+        } against the ${styleBasisLabel} expectation: ${selectedItem?.reasonLabel ?? "match section energy to the style"}.`;
   const nextCheck =
     statusLabel === "Section fit ready"
       ? "Scan Role Map and Song Form Overview before making another arrangement move."

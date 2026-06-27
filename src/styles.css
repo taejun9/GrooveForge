@@ -15245,7 +15245,8 @@ h2 {
 .pattern-contrast-section-fit-use span,
 .pattern-contrast-section-fit-item span,
 .pattern-contrast-section-fit-item strong,
-.pattern-contrast-section-fit-item small {
+.pattern-contrast-section-fit-item small,
+.pattern-contrast-section-fit-item em {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -15320,6 +15321,12 @@ h2 {
 .pattern-contrast-section-fit-item small {
   color: rgba(244, 239, 231, 0.58);
   font-size: 9px;
+}
+
+.pattern-contrast-section-fit-item em {
+  color: rgba(244, 239, 231, 0.46);
+  font-size: 9px;
+  font-style: normal;
 }
 
 .pattern-contrast-section-fit-decision,
