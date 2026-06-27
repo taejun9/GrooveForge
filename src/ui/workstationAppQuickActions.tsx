@@ -1102,6 +1102,17 @@ function patternContrastCueQuickActionRole(action: QuickAction): PatternContrast
   return patternContrastCueRoles.includes(role as PatternContrastCueRole) ? (role as PatternContrastCueRole) : null;
 }
 
+function patternContrastUseQuickActionRole(action: QuickAction): PatternContrastCueRole | null {
+  const role = action.id.replace("pattern-contrast-use-", "");
+  return patternContrastCueRoles.includes(role as PatternContrastCueRole) ? (role as PatternContrastCueRole) : null;
+}
+
+function patternContrastQuickActionTargetPattern(action: QuickAction): PatternSlot | null {
+  const match = /Pattern ([ABC])/.exec(`${action.title} ${action.detail}`);
+  const slot = match?.[1];
+  return slot === "A" || slot === "B" || slot === "C" ? slot : null;
+}
+
 export function createQuickActions({
   arrangementArcPadOptions,
   arrangementArcPreviewSummary,
@@ -4619,6 +4630,34 @@ export function createQuickActions({
       }
     };
   });
+  const patternContrastUseActions: QuickAction[] = patternContrastCueRoles.map((role) => {
+    const slot = patternContrastCueSlot(patternContrastSummary, role);
+    const roleLabel = patternContrastCueRoleLabel(role);
+    const selectedBlockAlreadyUsesSlot = Boolean(slot && selectedBlock?.pattern === slot.slot);
+    return {
+      id: `pattern-contrast-use-${role}`,
+      title: slot
+        ? selectedBlockAlreadyUsesSlot
+          ? `${roleLabel} already in selected block`
+          : `Use ${roleLabel}: Pattern ${slot.slot}`
+        : `Use ${roleLabel}: unavailable`,
+      detail: slot
+        ? selectedBlock
+          ? selectedBlockAlreadyUsesSlot
+            ? `${selectedBlockLabel} already uses ${slot.roleLabel} Pattern ${slot.slot} / ${slot.detailLabel}`
+            : `${selectedBlockLabel} -> ${slot.roleLabel} Pattern ${slot.slot} / ${slot.detailLabel}`
+          : `${slot.roleLabel} Pattern ${slot.slot} / select an arrangement block first`
+        : `${roleLabel} role unavailable / ${patternContrastSummary.statusLabel} / ${patternContrastSummary.detailLabel}`,
+      group: "Arrange",
+      keywords: `Pattern Contrast use ${roleLabel} ${role} Pattern ${slot?.slot ?? "none"} selected block arrangement assign anchor lift break switchup A B C role audition direct beat workstation sample free beginner producer`,
+      disabled: !slot || !selectedBlock || selectedBlockAlreadyUsesSlot,
+      run: () => {
+        if (slot && selectedBlock && selectedBlock.pattern !== slot.slot) {
+          onUsePatternInSelectedBlock(slot.slot);
+        }
+      }
+    };
+  });
   const patternSwitchReadoutTarget = patternCompareDecisionSummary.target;
   const patternSwitchReadoutEventCount = patternEventTotal(project.patterns[patternSwitchReadoutTarget]);
   const patternSwitchReadoutPlacement = patternCueSwitchSelectedBlockPlacement(
@@ -5067,6 +5106,7 @@ export function createQuickActions({
     patternCompareDecisionAction,
     patternContrastReadoutAction,
     ...patternContrastCueActions,
+    ...patternContrastUseActions,
     patternCueReadoutAction,
     ...patternCueActions,
     patternSwitchReadoutAction,
@@ -10478,6 +10518,42 @@ export function quickActionPatternContrastCueMetricSnapshot(
     id: "pattern-contrast-cue",
     label: "Pattern Contrast Cue",
     value: `cue ${roleLabel} / Pattern ${slot.slot} / ${slot.detailLabel} / ${summary.contrastLabel} / Pattern loop via existing cue / Pattern data unchanged / export unchanged`
+  };
+}
+
+export function quickActionPatternContrastUseMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  const role = patternContrastUseQuickActionRole(action);
+  if (!role) {
+    return null;
+  }
+
+  const roleLabel = patternContrastCueRoleLabel(role);
+  const summary = createPatternContrastSummary(createPatternCompareSummaries(project));
+  const slot = patternContrastCueSlot(summary, role);
+  const target = patternContrastQuickActionTargetPattern(action) ?? slot?.slot ?? null;
+
+  if (!target) {
+    return {
+      id: "pattern-contrast-use",
+      label: "Pattern Contrast Use",
+      value: `${roleLabel} role unavailable / ${summary.statusLabel} / selected block unchanged / Pattern data unchanged / export unchanged`
+    };
+  }
+
+  const targetPattern = project.patterns[target];
+  const eventCount = patternEventTotal(targetPattern);
+  const drumCount = drumHitCount(targetPattern);
+  const musicEvents = targetPattern.bassNotes.length + targetPattern.chordEvents.length + targetPattern.melodyNotes.length;
+  const selectedBlockPlacement = patternUseSelectedBlockPlacement(project, selectedArrangementIndex, target);
+
+  return {
+    id: "pattern-contrast-use",
+    label: "Pattern Contrast Use",
+    value: `use ${roleLabel} / Pattern ${target} / ${selectedBlockPlacement} / ${eventCount} events / ${drumCount} drums / ${musicEvents} music / selected block via existing Pattern Use / Pattern data unchanged / export unchanged`
   };
 }
 
@@ -17330,6 +17406,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id.startsWith("pattern-contrast-use-")) {
+    return (
+      quickActionPatternContrastUseMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "pattern-contrast-use",
+        label: "Pattern Contrast Use",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id === "pattern-use-readout-action") {
     return (
       quickActionPatternUseReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
@@ -22328,6 +22414,16 @@ export function quickActionResultFollowup(
         : `Play Pattern loop only after a ${roleLabel} role exists in Pattern Contrast.`,
       nextCheck:
         "Read Pattern Compare Result, then use Pattern Switch for edits or Pattern Use when that role should support the selected arrangement block."
+    };
+  }
+
+  if (action.id.startsWith("pattern-contrast-use-")) {
+    const role = patternContrastUseQuickActionRole(action);
+    const target = patternContrastQuickActionTargetPattern(action) ?? project.selectedPattern;
+    const roleLabel = role ? patternContrastCueRoleLabel(role) : "Contrast";
+    return {
+      auditionCue: `Play Block loop; confirm ${roleLabel} Pattern ${target} now supports the selected arrangement block.`,
+      nextCheck: "Scan Song Form Overview, Arrangement Playback Readout, and Pattern Contrast before placing another role."
     };
   }
 

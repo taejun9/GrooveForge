@@ -775,7 +775,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Anchor / lift / break / switchup roles",
         context:
-          "Pattern Contrast Readout Action, role cue commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
+          "Pattern Contrast Readout Action, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
       },
       {
         id: "pattern-cue-readout",
@@ -1981,10 +1981,14 @@ export function PatternCompareDecision({
 
 export function PatternContrastReadout({
   summary,
-  onCuePattern
+  onCuePattern,
+  onUsePattern,
+  selectedBlockPattern
 }: {
   summary: PatternContrastSummary;
   onCuePattern?: (pattern: PatternSlot) => void;
+  onUsePattern?: (pattern: PatternSlot) => void;
+  selectedBlockPattern?: PatternSlot | null;
 }): ReactElement {
   return (
     <div
@@ -2002,6 +2006,9 @@ export function PatternContrastReadout({
       <div className="pattern-contrast-grid" aria-label="Pattern contrast roles">
         {summary.slots.map((slot) => {
           const cueDisabled = !onCuePattern || slot.role === "blank";
+          const noSelectedBlock = selectedBlockPattern === null;
+          const selectedBlockAlreadyUsesSlot = selectedBlockPattern === slot.slot;
+          const useDisabled = !onUsePattern || slot.role === "blank" || noSelectedBlock || selectedBlockAlreadyUsesSlot;
           return (
             <div
               className={`pattern-contrast-slot ${slot.tone}`}
@@ -2012,25 +2019,52 @@ export function PatternContrastReadout({
               <span>Pattern {slot.slot}</span>
               <strong>{slot.roleLabel}</strong>
               <small>{slot.detailLabel}</small>
-              <button
-                className="pattern-contrast-cue"
-                data-testid={`pattern-contrast-cue-${slot.slot}`}
-                disabled={cueDisabled}
-                onClick={() => {
-                  if (onCuePattern && slot.role !== "blank") {
-                    onCuePattern(slot.slot);
+              <div className="pattern-contrast-actions">
+                <button
+                  className="pattern-contrast-cue"
+                  data-testid={`pattern-contrast-cue-${slot.slot}`}
+                  disabled={cueDisabled}
+                  onClick={() => {
+                    if (onCuePattern && slot.role !== "blank") {
+                      onCuePattern(slot.slot);
+                    }
+                  }}
+                  title={
+                    cueDisabled
+                      ? `Pattern ${slot.slot} has no contrast role to cue.`
+                      : `Cue ${slot.roleLabel} Pattern ${slot.slot} as Pattern loop.`
                   }
-                }}
-                title={
-                  cueDisabled
-                    ? `Pattern ${slot.slot} has no contrast role to cue.`
-                    : `Cue ${slot.roleLabel} Pattern ${slot.slot} as Pattern loop.`
-                }
-                type="button"
-              >
-                <Play size={12} aria-hidden="true" />
-                <span>Cue</span>
-              </button>
+                  type="button"
+                >
+                  <Play size={12} aria-hidden="true" />
+                  <span>Cue</span>
+                </button>
+                <button
+                  className="pattern-contrast-use"
+                  data-testid={`pattern-contrast-use-${slot.slot}`}
+                  disabled={useDisabled}
+                  onClick={() => {
+                    if (onUsePattern && slot.role !== "blank" && !noSelectedBlock && !selectedBlockAlreadyUsesSlot) {
+                      onUsePattern(slot.slot);
+                    }
+                  }}
+                  title={
+                    !onUsePattern
+                      ? `Pattern ${slot.slot} cannot be used from this readout.`
+                      : slot.role === "blank"
+                        ? `Pattern ${slot.slot} has no contrast role to use.`
+                        : noSelectedBlock
+                          ? "Select an arrangement block before using a role."
+                          : selectedBlockAlreadyUsesSlot
+                            ? `Selected block already uses ${slot.roleLabel} Pattern ${slot.slot}.`
+                            : `Use ${slot.roleLabel} Pattern ${slot.slot} in the selected block.`
+                  }
+                  type="button"
+                >
+                  <ArrowRight size={12} aria-hidden="true" />
+                  <span>Use</span>
+                </button>
+              </div>
             </div>
           );
         })}
