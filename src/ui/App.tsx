@@ -9931,6 +9931,7 @@ export function App(): ReactElement {
             selectedBlockPattern={selectedArrangementBlock?.pattern ?? null}
             onCuePattern={cuePatternFromCompare}
             onCueSectionFitBlock={() => cueArrangementBlock(selectedArrangementIndex)}
+            onCueSectionFitPriorityBlock={cueArrangementBlock}
             onUsePattern={usePatternInSelectedBlockFromCompare}
             onUseSectionFitRole={usePatternInSelectedBlockFromCompare}
             sectionFitCueActive={transportLoopScope === "block" && project.arrangement.length > 0}

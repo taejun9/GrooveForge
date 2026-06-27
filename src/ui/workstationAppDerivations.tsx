@@ -2922,6 +2922,10 @@ export function createPatternContrastSectionFitSummary(
   const missingCount = items.filter((item) => item.role === "blank").length;
   const watchCount = blockCount - fitCount;
   const selectedItem = items.find((item) => item.selected) ?? items[0] ?? null;
+  const priorityItem =
+    items.find((item) => item.role === "blank") ??
+    items.find((item) => item.fitLabel !== "Section fit") ??
+    selectedItem;
   const statusLabel =
     blockCount === 0
       ? "Fit unavailable"
@@ -2941,12 +2945,20 @@ export function createPatternContrastSectionFitSummary(
   const detailLabel = selectedItem
     ? `Selected Block ${selectedItem.index + 1}: ${selectedItem.sectionLabel} expects ${selectedItem.expectedLabel} for ${styleBasisLabel}; ${selectedItem.reasonLabel}; Pattern ${selectedItem.pattern} is ${selectedItem.roleLabel}`
     : "Create arrangement blocks before checking section fit.";
+  const priorityLabel = priorityItem
+    ? `Priority Block ${priorityItem.index + 1}: ${priorityItem.sectionLabel} / ${priorityItem.fitLabel}`
+    : "Priority unavailable";
+  const priorityDetailLabel = priorityItem
+    ? `${priorityItem.sectionLabel} expects ${priorityItem.expectedLabel} for ${styleBasisLabel}; ${priorityItem.reasonLabel}; Pattern ${priorityItem.pattern} is ${priorityItem.roleLabel}.`
+    : "Create arrangement blocks before cueing a Section Fit priority.";
   const auditionCue =
     blockCount === 0
       ? "Create an arrangement block, then return to Pattern Contrast Section Fit."
-      : `Loop ${selectedItem?.sectionLabel ?? "the selected section"} as Block and compare its ${
-          selectedItem?.roleLabel ?? "role"
-        } against the ${styleBasisLabel} expectation: ${selectedItem?.reasonLabel ?? "match section energy to the style"}.`;
+      : `Loop Priority Block ${priorityItem ? priorityItem.index + 1 : selectedItem?.index + 1} as Block and compare its ${
+          priorityItem?.roleLabel ?? selectedItem?.roleLabel ?? "role"
+        } against the ${styleBasisLabel} expectation: ${
+          priorityItem?.reasonLabel ?? selectedItem?.reasonLabel ?? "match section energy to the style"
+        }.`;
   const nextCheck =
     statusLabel === "Section fit ready"
       ? "Scan Role Map and Song Form Overview before making another arrangement move."
@@ -2959,8 +2971,11 @@ export function createPatternContrastSectionFitSummary(
     detailLabel,
     auditionCue,
     nextCheck,
-    detailTitle: `${statusLabel}: ${headline}; ${metricLabel}; ${detailLabel}.`,
+    detailTitle: `${statusLabel}: ${headline}; ${metricLabel}; ${detailLabel}; ${priorityLabel}.`,
     styleBasisLabel,
+    priorityItem,
+    priorityLabel,
+    priorityDetailLabel,
     tone,
     items
   };

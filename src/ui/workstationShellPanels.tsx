@@ -777,7 +777,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Anchor / lift / break / switchup roles",
         context:
-          "Pattern Contrast Readout Action, Role Map Readout, Section Fit Readout, Section Fit Decision, Section Fit Cue, Section Fit Use, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
+          "Pattern Contrast Readout Action, Role Map Readout, Section Fit Readout, Section Fit Priority Cue, Section Fit Decision, Section Fit Cue, Section Fit Use, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
       },
       {
         id: "pattern-cue-readout",
@@ -1987,6 +1987,7 @@ export function PatternContrastReadout({
   summary,
   onCuePattern,
   onCueSectionFitBlock,
+  onCueSectionFitPriorityBlock,
   onUsePattern,
   onUseSectionFitRole,
   sectionFitCueActive = false,
@@ -1998,6 +1999,7 @@ export function PatternContrastReadout({
   summary: PatternContrastSummary;
   onCuePattern?: (pattern: PatternSlot) => void;
   onCueSectionFitBlock?: () => void;
+  onCueSectionFitPriorityBlock?: (index: number) => void;
   onUsePattern?: (pattern: PatternSlot) => void;
   onUseSectionFitRole?: (pattern: PatternSlot) => void;
   sectionFitCueActive?: boolean;
@@ -2030,6 +2032,8 @@ export function PatternContrastReadout({
         : true;
   const sectionFitDecisionLabel =
     sectionFitDecisionAction === "cue" ? "Cue fit" : sectionFitDecisionAction === "use" ? "Use role" : "Review";
+  const sectionFitPriorityItem = sectionFit?.priorityItem ?? null;
+  const sectionFitPriorityCueUnavailable = !onCueSectionFitPriorityBlock || !sectionFitPriorityItem || sectionFitCueDisabled;
   return (
     <div
       className={`pattern-contrast-readout ${summary.tone}`}
@@ -2173,6 +2177,26 @@ export function PatternContrastReadout({
           <div className="pattern-contrast-section-fit-followup">
             <span data-testid="pattern-contrast-section-fit-detail">{sectionFit.detailLabel}</span>
             <small data-testid="pattern-contrast-section-fit-next-check">{sectionFit.nextCheck}</small>
+            <small data-testid="pattern-contrast-section-fit-priority">{sectionFit.priorityLabel} / {sectionFit.priorityDetailLabel}</small>
+            <button
+              className="pattern-contrast-section-fit-priority-cue"
+              data-testid="pattern-contrast-section-fit-priority-cue"
+              disabled={sectionFitPriorityCueUnavailable}
+              onClick={() => {
+                if (!sectionFitPriorityCueUnavailable && sectionFitPriorityItem) {
+                  onCueSectionFitPriorityBlock?.(sectionFitPriorityItem.index);
+                }
+              }}
+              title={
+                sectionFitPriorityItem
+                  ? `Cue Priority Block ${sectionFitPriorityItem.index + 1}: ${sectionFitPriorityItem.sectionLabel} / ${sectionFitPriorityItem.fitLabel}.`
+                  : "Create an arrangement block before cueing Section Fit priority."
+              }
+              type="button"
+            >
+              <Play size={12} aria-hidden="true" />
+              <span>Priority cue</span>
+            </button>
             <button
               className={`pattern-contrast-section-fit-decision ${sectionFitDecisionAction}`}
               data-testid="pattern-contrast-section-fit-decision"

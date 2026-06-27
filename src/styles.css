@@ -15225,7 +15225,7 @@ h2 {
 .pattern-contrast-section-fit-heading,
 .pattern-contrast-section-fit-followup {
   display: grid;
-  grid-template-columns: minmax(112px, 0.28fr) minmax(170px, 0.48fr) minmax(0, 1fr) max-content max-content max-content;
+  grid-template-columns: minmax(112px, 0.28fr) minmax(170px, 0.48fr) minmax(0, 1fr) max-content max-content max-content max-content;
   gap: 6px;
   align-items: center;
   min-width: 0;
@@ -15240,6 +15240,7 @@ h2 {
 .pattern-contrast-section-fit-heading small,
 .pattern-contrast-section-fit-followup span,
 .pattern-contrast-section-fit-followup small,
+.pattern-contrast-section-fit-priority-cue span,
 .pattern-contrast-section-fit-decision span,
 .pattern-contrast-section-fit-cue span,
 .pattern-contrast-section-fit-use span,
@@ -15329,6 +15330,7 @@ h2 {
   font-style: normal;
 }
 
+.pattern-contrast-section-fit-priority-cue,
 .pattern-contrast-section-fit-decision,
 .pattern-contrast-section-fit-cue,
 .pattern-contrast-section-fit-use {
@@ -15346,6 +15348,12 @@ h2 {
   gap: 5px;
   padding: 5px 8px;
   white-space: nowrap;
+}
+
+.pattern-contrast-section-fit-priority-cue {
+  border-color: rgba(244, 239, 231, 0.26);
+  background: rgba(244, 239, 231, 0.06);
+  color: #f4efe7;
 }
 
 .pattern-contrast-section-fit-decision {
@@ -15366,6 +15374,11 @@ h2 {
   background: rgba(120, 240, 200, 0.15);
 }
 
+.pattern-contrast-section-fit-priority-cue:hover:not(:disabled) {
+  border-color: rgba(244, 239, 231, 0.48);
+  background: rgba(244, 239, 231, 0.12);
+}
+
 .pattern-contrast-section-fit-decision:hover:not(:disabled) {
   border-color: rgba(255, 205, 112, 0.6);
   background: rgba(255, 205, 112, 0.15);
@@ -15376,6 +15389,7 @@ h2 {
   background: rgba(138, 168, 255, 0.15);
 }
 
+.pattern-contrast-section-fit-priority-cue:disabled,
 .pattern-contrast-section-fit-decision:disabled,
 .pattern-contrast-section-fit-cue:disabled,
 .pattern-contrast-section-fit-use:disabled {

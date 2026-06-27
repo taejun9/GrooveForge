@@ -4640,6 +4640,24 @@ export function createQuickActions({
   };
   const patternContrastSectionFitCueItem =
     patternContrastSectionFitSummary.items.find((item) => item.selected) ?? patternContrastSectionFitSummary.items[0] ?? null;
+  const patternContrastSectionFitPriorityItem = patternContrastSectionFitSummary.priorityItem;
+  const patternContrastSectionFitPriorityCueAction: QuickAction = {
+    id: "pattern-contrast-section-fit-priority-cue",
+    title: patternContrastSectionFitPriorityItem
+      ? `Cue Section Fit Priority: Block ${patternContrastSectionFitPriorityItem.index + 1}`
+      : "Cue Section Fit Priority",
+    detail: patternContrastSectionFitPriorityItem
+      ? `${patternContrastSectionFitPriorityItem.fitLabel} / ${patternContrastSectionFitPriorityItem.sectionLabel} expects ${patternContrastSectionFitPriorityItem.expectedLabel} for ${patternContrastSectionFitPriorityItem.styleBasisLabel} / ${patternContrastSectionFitPriorityItem.reasonLabel}`
+      : "Create an arrangement block before cueing Section Fit priority.",
+    group: "Transport",
+    keywords: `Quick Actions Pattern Contrast Section Fit Priority Cue audition priority block loop listen expected role intro verse hook bridge outro anchor lift break switchup ${patternContrastSectionFitSummary.statusLabel} ${patternContrastSectionFitSummary.priorityLabel} ${patternContrastSectionFitPriorityItem?.sectionLabel ?? "no section"} beginner producer direct beat workstation sample free`,
+    disabled: isPlaying || !patternContrastSectionFitPriorityItem,
+    run: () => {
+      if (patternContrastSectionFitPriorityItem) {
+        onCueArrangementBlock(patternContrastSectionFitPriorityItem.index);
+      }
+    }
+  };
   const patternContrastSectionFitCueAction: QuickAction = {
     id: "pattern-contrast-section-fit-cue-selected-block",
     title: patternContrastSectionFitCueItem
@@ -5226,6 +5244,7 @@ export function createQuickActions({
     patternContrastReadoutAction,
     patternContrastRoleMapReadoutAction,
     patternContrastSectionFitReadoutAction,
+    patternContrastSectionFitPriorityCueAction,
     patternContrastSectionFitDecisionAction,
     patternContrastSectionFitCueAction,
     patternContrastSectionFitUseAction,
@@ -10696,6 +10715,32 @@ export function quickActionPatternContrastSectionFitCueMetricSnapshot(
     label: "Section Fit Cue",
     value: selectedItem
       ? `Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} cued as Block loop / ${selectedItem.fitLabel} / expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} / reason ${selectedItem.reasonLabel} / ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / Pattern data unchanged / arrangement unchanged / export unchanged`
+      : "No arrangement block available / Pattern data unchanged / arrangement unchanged / export unchanged"
+  };
+}
+
+export function quickActionPatternContrastSectionFitPriorityCueMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "pattern-contrast-section-fit-priority-cue") {
+    return null;
+  }
+
+  const sectionFit = createPatternContrastSectionFitSummary(
+    createPatternContrastSummary(createPatternCompareSummaries(project)),
+    project.arrangement,
+    selectedArrangementIndex,
+    project.styleId
+  );
+  const priorityItem = sectionFit.priorityItem;
+
+  return {
+    id: "pattern-contrast-section-fit-priority-cue",
+    label: "Section Fit Priority Cue",
+    value: priorityItem
+      ? `Priority Block ${priorityItem.index + 1} ${priorityItem.sectionLabel} cued as Block loop / ${priorityItem.fitLabel} / expects ${priorityItem.expectedLabel} for ${sectionFit.styleBasisLabel} / reason ${priorityItem.reasonLabel} / ${priorityItem.roleLabel} Pattern ${priorityItem.pattern} / Pattern data unchanged / arrangement unchanged / export unchanged`
       : "No arrangement block available / Pattern data unchanged / arrangement unchanged / export unchanged"
   };
 }
@@ -17685,6 +17730,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "pattern-contrast-section-fit-priority-cue") {
+    return (
+      quickActionPatternContrastSectionFitPriorityCueMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "pattern-contrast-section-fit-priority-cue",
+        label: "Section Fit Priority Cue",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id === "pattern-contrast-section-fit-cue-selected-block") {
     return (
       quickActionPatternContrastSectionFitCueMetricSnapshot(project, action, selectedArrangementIndex) ?? {
@@ -22750,6 +22805,22 @@ export function quickActionResultFollowup(
         ? `Play Block loop; confirm the Decision result for ${selectedItem.sectionLabel} against its ${sectionFit.styleBasisLabel} ${selectedItem.expectedLabel} role because ${selectedItem.reasonLabel}.`
         : "Create an arrangement block before running a Section Fit Decision.",
       nextCheck: `Read Section Fit again, then keep the block cued or use Role Map before making another ${sectionFit.styleBasisLabel} placement.`
+    };
+  }
+
+  if (action.id === "pattern-contrast-section-fit-priority-cue") {
+    const sectionFit = createPatternContrastSectionFitSummary(
+      createPatternContrastSummary(createPatternCompareSummaries(project)),
+      project.arrangement,
+      0,
+      project.styleId
+    );
+    const priorityItem = sectionFit.priorityItem;
+    return {
+      auditionCue: priorityItem
+        ? `Play Block loop; hear Priority Block ${priorityItem.index + 1} ${priorityItem.sectionLabel} against its ${sectionFit.styleBasisLabel} ${priorityItem.expectedLabel} role because ${priorityItem.reasonLabel}.`
+        : "Create an arrangement block before cueing Section Fit priority.",
+      nextCheck: "After the Priority Cue, use Section Fit Decision only if the section still needs a cue or role placement."
     };
   }
 

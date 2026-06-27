@@ -1434,6 +1434,9 @@ export type PatternContrastSectionFitSummary = {
   nextCheck: string;
   detailTitle: string;
   styleBasisLabel: string;
+  priorityItem: PatternContrastSectionFitItem | null;
+  priorityLabel: string;
+  priorityDetailLabel: string;
   tone: MixCoachTone;
   items: PatternContrastSectionFitItem[];
 };
