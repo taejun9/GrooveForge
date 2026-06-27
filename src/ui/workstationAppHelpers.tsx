@@ -4132,17 +4132,19 @@ export function KeyCompass({
   focusedCardId,
   onFocus,
   result,
+  sectionRef,
   summary
 }: {
   focusedCardId: KeyCompassFocusId | null;
   onFocus: (item: KeyCompassFocusItem) => void;
   result: KeyCompassFocusResult | null;
+  sectionRef?: Ref<HTMLElement>;
   summary: KeyCompassSummary;
 }): ReactElement {
   const focusSummary = createKeyCompassFocusSummary(summary, focusedCardId);
 
   return (
-    <section className={`key-compass ${summary.tone}`} data-testid="key-compass" aria-label="Key compass">
+    <section className={`key-compass ${summary.tone}`} data-testid="key-compass" aria-label="Key compass" ref={sectionRef}>
       <div className="key-compass-heading">
         <div>
           <Music2 size={17} aria-hidden="true" />
