@@ -7543,6 +7543,7 @@ export function ToplineSpace({
   onCue,
   onFix,
   onFocus,
+  sectionRef,
   summary
 }: {
   cueTarget: ToplineLoopCueTarget;
@@ -7554,6 +7555,7 @@ export function ToplineSpace({
   onCue: (card?: ToplineSpaceFocusItem) => void;
   onFix: (card?: ToplineSpaceCard) => void;
   onFocus: (card: ToplineSpaceFocusItem) => void;
+  sectionRef?: Ref<HTMLElement>;
   summary: ToplineSpaceSummary;
 }): ReactElement {
   const focusSummary = createToplineSpaceFocusSummary(summary, focusedCardId);
@@ -7562,7 +7564,7 @@ export function ToplineSpace({
   const priorityActionDisabled = priorityCard === null;
 
   return (
-    <section className={`topline-space ${summary.tone}`} data-testid="topline-space" aria-label="Topline space">
+    <section className={`topline-space ${summary.tone}`} data-testid="topline-space" aria-label="Topline space" ref={sectionRef}>
       <div className="topline-space-heading">
         <div>
           <Mic2 size={17} aria-hidden="true" />

@@ -1057,7 +1057,8 @@ import {
   soundFocusRouteLabel,
   soundPresetRouteLabel,
   spaceFxRouteLabel,
-  stemAuditionRouteLabel
+  stemAuditionRouteLabel,
+  toplineSpaceRouteLabel
 } from "./workstationAppQuickActions";
 import type {
   EditorAuditionReadoutSummary, MixSnapshotResultTargetId, NextMoveQuickActionSource, PatternEditQuickActionRoute, QuickActionInputSetupResultState, QuickActionInputSetupSnapshot, QuickActionSelectedEventType, SoundSnapshotQuickActionTarget
@@ -1263,6 +1264,7 @@ export function App(): ReactElement {
   const grooveCompassPanelRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
   const hookReadinessPanelRef = useRef<HTMLElement | null>(null);
+  const toplineSpacePanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
   const composePanelRef = useRef<HTMLElement | null>(null);
@@ -7604,6 +7606,19 @@ export function App(): ReactElement {
     setProjectStatus(`Topline ${card.label}: ${card.value}`);
   }
 
+  function focusToplineSpaceRouteReadout(): void {
+    const card = activeToplineSpaceQuickActionCard(toplineSpaceSummary);
+    toplineSpacePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      card
+        ? `Topline Space Route Readout Pattern ${project.selectedPattern}: ${toplineSpaceRouteLabel(
+            card,
+            toplineSpaceSummary
+          )} / ${card.value} / direct topline-space-card-${card.id} unchanged / topline loop unchanged / topline fix unchanged / ${card.focusLabel} panel`
+        : "Topline Space Route Readout: no priority topline card available"
+    );
+  }
+
   function focusArrangementMuteMapLane(lane: ArrangementMuteMapLane): void {
     setArrangementMuteMapFocusId(lane.id);
     arrangePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -9008,6 +9023,7 @@ export function App(): ReactElement {
     onFocusSessionPassRouteReadout: focusSessionPassRouteReadout,
     onFocusStyleInspector: focusStyleInspectorItem,
     onFocusToplineSpace: focusToplineSpaceCard,
+    onFocusToplineSpaceRouteReadout: focusToplineSpaceRouteReadout,
     onFocusWorkflowSpotlight: jumpToWorkflowNavigatorItem,
     onJumpWorkflowZone: jumpToWorkflowNavigatorItem,
     onOpenCommandReference: openCommandReference,
@@ -9603,6 +9619,7 @@ export function App(): ReactElement {
         onCue={cueToplineLoop}
         onFix={applyToplineFix}
         onFocus={focusToplineSpaceCard}
+        sectionRef={toplineSpacePanelRef}
         summary={toplineSpaceSummary}
       />
 

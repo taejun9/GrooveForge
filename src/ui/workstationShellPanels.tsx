@@ -419,12 +419,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Hook Section, Motif, Contrast, Mix Support, and Handoff hook-quality context with Route Readout posture, destination, hook metric, audition cue, loop/fix cue, direct card command, local Focus Result feedback, and next check before Hook Readiness commands run."
       },
       {
+        id: "topline-space-route-readout",
+        command: "Topline Space Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Rhythm pocket / lead room / vocal window / mix headroom / artist cue route",
+        context:
+          "Topline Space Route Readout Action, current rhythm pocket, lead density, vocal window, mix headroom, or artist cue lane, existing Topline Space route, direct Topline Space card command, topline loop and topline fix unchanged, selected Pattern, hook/window posture, export/stem/package readiness, audition cue, and next topline-route check before Topline Space focus, cue, fix, playback, edit, or export commands run."
+      },
+      {
         id: "topline-space",
         command: "Topline Space",
         shortcut: "Quick Actions / Readout",
         target: "Rhythm pocket / lead room / vocal window / mix headroom / artist cue",
         context:
-          "Rhythm Pocket, Lead Room, Vocal Window, Mix Headroom, and Artist Cue context with destination, topline metric, audition cue, loop/fix cue, and next check before Topline Space commands run."
+          "Rhythm Pocket, Lead Room, Vocal Window, Mix Headroom, and Artist Cue context with Route Readout posture, destination, topline metric, audition cue, loop/fix cue, direct card command, local Focus Result feedback, and next check before Topline Space commands run."
       },
       {
         id: "beat-readiness",
