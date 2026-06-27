@@ -1416,6 +1416,7 @@ export type PatternContrastSectionFitItem = {
   roleLabel: string;
   expectedRoles: PatternContrastRole[];
   expectedLabel: string;
+  styleBasisLabel: string;
   fitLabel: string;
   barLabel: string;
   detailLabel: string;
@@ -1431,6 +1432,7 @@ export type PatternContrastSectionFitSummary = {
   auditionCue: string;
   nextCheck: string;
   detailTitle: string;
+  styleBasisLabel: string;
   tone: MixCoachTone;
   items: PatternContrastSectionFitItem[];
 };

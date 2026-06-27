@@ -2675,14 +2675,120 @@ const patternContrastSectionRoleExpectations: Record<ArrangementSection, Pattern
   Outro: ["break", "anchor"]
 };
 
+const patternContrastStyleSectionRoleExpectations: Record<StyleId, Record<ArrangementSection, PatternContrastRole[]>> = {
+  trap: patternContrastSectionRoleExpectations,
+  drill: {
+    Intro: ["break", "anchor"],
+    Verse: ["anchor"],
+    Hook: ["lift", "switchup"],
+    Bridge: ["break", "switchup"],
+    Outro: ["break", "anchor"]
+  },
+  boom_bap: {
+    Intro: ["anchor", "break"],
+    Verse: ["anchor", "lift"],
+    Hook: ["lift"],
+    Bridge: ["break"],
+    Outro: ["anchor", "break"]
+  },
+  lofi: {
+    Intro: ["anchor", "break"],
+    Verse: ["anchor"],
+    Hook: ["lift", "anchor"],
+    Bridge: ["break"],
+    Outro: ["break", "anchor"]
+  },
+  house: {
+    Intro: ["break", "anchor"],
+    Verse: ["anchor", "lift"],
+    Hook: ["lift", "switchup"],
+    Bridge: ["break", "switchup"],
+    Outro: ["break"]
+  },
+  rnb: {
+    Intro: ["anchor", "break"],
+    Verse: ["anchor", "lift"],
+    Hook: ["lift"],
+    Bridge: ["break", "switchup"],
+    Outro: ["anchor", "break"]
+  },
+  k_hiphop_rnb: {
+    Intro: ["anchor", "break"],
+    Verse: ["anchor", "lift"],
+    Hook: ["lift", "switchup"],
+    Bridge: ["break", "switchup"],
+    Outro: ["anchor", "break"]
+  },
+  afrobeats: {
+    Intro: ["anchor", "break"],
+    Verse: ["anchor", "lift"],
+    Hook: ["lift", "switchup"],
+    Bridge: ["break", "switchup"],
+    Outro: ["break", "anchor"]
+  },
+  amapiano: {
+    Intro: ["break", "anchor"],
+    Verse: ["anchor", "lift"],
+    Hook: ["lift", "switchup"],
+    Bridge: ["break", "switchup"],
+    Outro: ["break"]
+  },
+  reggaeton: {
+    Intro: ["anchor", "break"],
+    Verse: ["anchor", "lift"],
+    Hook: ["lift", "switchup"],
+    Bridge: ["break", "switchup"],
+    Outro: ["break", "anchor"]
+  },
+  jersey: {
+    Intro: ["break", "anchor"],
+    Verse: ["anchor", "lift"],
+    Hook: ["lift", "switchup"],
+    Bridge: ["break", "switchup"],
+    Outro: ["break"]
+  },
+  phonk: {
+    Intro: ["anchor", "break"],
+    Verse: ["anchor"],
+    Hook: ["lift", "switchup"],
+    Bridge: ["break", "switchup"],
+    Outro: ["break", "anchor"]
+  },
+  garage: {
+    Intro: ["break", "anchor"],
+    Verse: ["anchor", "lift"],
+    Hook: ["lift", "switchup"],
+    Bridge: ["break", "switchup"],
+    Outro: ["break"]
+  },
+  experimental: {
+    Intro: ["anchor", "break", "switchup"],
+    Verse: ["anchor", "switchup"],
+    Hook: ["lift", "switchup"],
+    Bridge: ["break", "switchup"],
+    Outro: ["break", "anchor", "switchup"]
+  }
+};
+
+function patternContrastSectionExpectedRoles(styleId: StyleId, section: ArrangementSection): PatternContrastRole[] {
+  return patternContrastStyleSectionRoleExpectations[styleId]?.[section] ?? patternContrastSectionRoleExpectations[section];
+}
+
+function patternContrastSectionStyleBasisLabel(styleId: StyleId): string {
+  const styleName = styleProfiles.find((profile) => profile.id === styleId)?.name ?? styleId;
+  return `${styleName} style fit`;
+}
+
 export function createPatternContrastSectionFitSummary(
   summary: PatternContrastSummary,
   arrangement: ArrangementBlock[],
-  selectedArrangementIndex: number
+  selectedArrangementIndex: number,
+  styleId: StyleId = "trap"
 ): PatternContrastSectionFitSummary {
   const roleMap = createPatternContrastRoleMapSummary(summary, arrangement, selectedArrangementIndex);
+  const styleBasisLabel = patternContrastSectionStyleBasisLabel(styleId);
   const items = roleMap.blocks.map((block) => {
-    const expectedRoles = patternContrastSectionRoleExpectations[block.sectionLabel as ArrangementSection] ?? ["anchor"];
+    const expectedRoles = patternContrastSectionExpectedRoles(styleId, block.sectionLabel as ArrangementSection);
     const expectedLabel = expectedRoles.map(patternContrastRoleLabel).join("/");
     const fit = block.role !== "blank" && expectedRoles.includes(block.role);
     const fitLabel = block.role === "blank" ? "Role missing" : fit ? "Section fit" : "Check section role";
@@ -2696,9 +2802,10 @@ export function createPatternContrastSectionFitSummary(
       roleLabel: block.roleLabel,
       expectedRoles,
       expectedLabel,
+      styleBasisLabel,
       fitLabel,
       barLabel: block.barLabel,
-      detailLabel: `${block.sectionLabel} expects ${expectedLabel}; Pattern ${block.pattern} is ${block.roleLabel}; ${block.barLabel}.`,
+      detailLabel: `${block.sectionLabel} expects ${expectedLabel} for ${styleBasisLabel}; Pattern ${block.pattern} is ${block.roleLabel}; ${block.barLabel}.`,
       selected: block.selected,
       tone
     };
@@ -2722,19 +2829,19 @@ export function createPatternContrastSectionFitSummary(
   const headline =
     blockCount === 0
       ? "No arrangement blocks to compare"
-      : `${fitCount}/${blockCount} sections match expected roles`;
-  const metricLabel = `${fitCount} fit / ${watchCount} watch / ${missingCount} missing`;
+      : `${fitCount}/${blockCount} sections match ${styleBasisLabel} roles`;
+  const metricLabel = `${fitCount} fit / ${watchCount} watch / ${missingCount} missing / ${styleBasisLabel}`;
   const detailLabel = selectedItem
-    ? `Selected Block ${selectedItem.index + 1}: ${selectedItem.sectionLabel} expects ${selectedItem.expectedLabel}; Pattern ${selectedItem.pattern} is ${selectedItem.roleLabel}`
+    ? `Selected Block ${selectedItem.index + 1}: ${selectedItem.sectionLabel} expects ${selectedItem.expectedLabel} for ${styleBasisLabel}; Pattern ${selectedItem.pattern} is ${selectedItem.roleLabel}`
     : "Create arrangement blocks before checking section fit.";
   const auditionCue =
     blockCount === 0
       ? "Create an arrangement block, then return to Pattern Contrast Section Fit."
-      : `Loop ${selectedItem?.sectionLabel ?? "the selected section"} as Block and compare its ${selectedItem?.roleLabel ?? "role"} against the Song loop.`;
+      : `Loop ${selectedItem?.sectionLabel ?? "the selected section"} as Block and compare its ${selectedItem?.roleLabel ?? "role"} against the ${styleBasisLabel} expectation.`;
   const nextCheck =
     statusLabel === "Section fit ready"
       ? "Scan Role Map and Song Form Overview before making another arrangement move."
-      : "Use Role Map, Pattern Use, or Pattern Chain only when the selected section needs a different role.";
+      : `Use Role Map, Pattern Use, or Pattern Chain only when the selected section needs a different ${styleBasisLabel} role.`;
 
   return {
     statusLabel,
@@ -2744,6 +2851,7 @@ export function createPatternContrastSectionFitSummary(
     auditionCue,
     nextCheck,
     detailTitle: `${statusLabel}: ${headline}; ${metricLabel}; ${detailLabel}.`,
+    styleBasisLabel,
     tone,
     items
   };

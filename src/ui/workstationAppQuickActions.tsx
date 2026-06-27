@@ -4633,7 +4633,7 @@ export function createQuickActions({
   const patternContrastSectionFitReadoutAction: QuickAction = {
     id: "pattern-contrast-section-fit-readout-action",
     title: `Review Pattern Section Fit: ${patternContrastSectionFitSummary.statusLabel}`,
-    detail: `${patternContrastSectionFitSummary.metricLabel} / ${patternContrastSectionFitSummary.detailLabel}`,
+    detail: `${patternContrastSectionFitSummary.styleBasisLabel} / ${patternContrastSectionFitSummary.metricLabel} / ${patternContrastSectionFitSummary.detailLabel}`,
     group: "Arrange",
     keywords: `Quick Actions Pattern Contrast Section Fit Readout arrangement section fit expected roles intro verse hook bridge outro anchor lift break switchup selected block ${patternContrastSectionFitSummary.statusLabel} ${patternContrastSectionFitSummary.headline} ${patternContrastSectionFitSummary.metricLabel} ${patternContrastSectionFitSummary.detailLabel} beginner producer direct beat workstation sample free`,
     run: onFocusPatternContrastSectionFitReadout
@@ -4646,7 +4646,7 @@ export function createQuickActions({
       ? `Cue Section Fit Block ${patternContrastSectionFitCueItem.index + 1}: ${patternContrastSectionFitCueItem.sectionLabel}`
       : "Cue Section Fit Block",
     detail: patternContrastSectionFitCueItem
-      ? `${patternContrastSectionFitCueItem.fitLabel} / expects ${patternContrastSectionFitCueItem.expectedLabel} / ${patternContrastSectionFitCueItem.roleLabel} Pattern ${patternContrastSectionFitCueItem.pattern} / Block loop`
+      ? `${patternContrastSectionFitCueItem.fitLabel} / expects ${patternContrastSectionFitCueItem.expectedLabel} for ${patternContrastSectionFitCueItem.styleBasisLabel} / ${patternContrastSectionFitCueItem.roleLabel} Pattern ${patternContrastSectionFitCueItem.pattern} / Block loop`
       : "Create an arrangement block before cueing Section Fit.",
     group: "Transport",
     keywords: `Quick Actions Pattern Contrast Section Fit Cue selected block audition loop transport expected roles intro verse hook bridge outro anchor lift break switchup ${patternContrastSectionFitSummary.statusLabel} ${patternContrastSectionFitSummary.metricLabel} ${patternContrastSectionFitCueItem?.sectionLabel ?? "no section"} beginner producer direct beat workstation sample free`,
@@ -4678,7 +4678,7 @@ export function createQuickActions({
         : "Use Section Fit Role",
     detail:
       patternContrastSectionFitUseSlot && patternContrastSectionFitCueItem
-        ? `${selectedBlockLabel} -> ${patternContrastSectionFitUseSlot.roleLabel} Pattern ${patternContrastSectionFitUseSlot.slot} / expects ${patternContrastSectionFitCueItem.expectedLabel}`
+        ? `${selectedBlockLabel} -> ${patternContrastSectionFitUseSlot.roleLabel} Pattern ${patternContrastSectionFitUseSlot.slot} / expects ${patternContrastSectionFitCueItem.expectedLabel} for ${patternContrastSectionFitCueItem.styleBasisLabel}`
         : "No expected Pattern Contrast role is available for this selected section.",
     group: "Arrange",
     keywords: `Quick Actions Pattern Contrast Section Fit Use selected block arrangement expected role assign use intro verse hook bridge outro anchor lift break switchup ${patternContrastSectionFitSummary.statusLabel} ${patternContrastSectionFitSummary.metricLabel} ${patternContrastSectionFitUseSlot?.roleLabel ?? "no role"} beginner producer direct beat workstation sample free`,
@@ -4709,9 +4709,9 @@ export function createQuickActions({
           : "Section Fit Decision: Review roles",
     detail:
       patternContrastSectionFitDecisionKind === "cue" && patternContrastSectionFitCueItem
-        ? `${patternContrastSectionFitCueItem.sectionLabel} already fits ${patternContrastSectionFitCueItem.expectedLabel} / cue Block loop`
+        ? `${patternContrastSectionFitCueItem.sectionLabel} already fits ${patternContrastSectionFitCueItem.expectedLabel} for ${patternContrastSectionFitCueItem.styleBasisLabel} / cue Block loop`
         : patternContrastSectionFitDecisionKind === "use" && patternContrastSectionFitUseSlot && patternContrastSectionFitCueItem
-          ? `${selectedBlockLabel} -> ${patternContrastSectionFitUseSlot.roleLabel} Pattern ${patternContrastSectionFitUseSlot.slot} / expects ${patternContrastSectionFitCueItem.expectedLabel}`
+          ? `${selectedBlockLabel} -> ${patternContrastSectionFitUseSlot.roleLabel} Pattern ${patternContrastSectionFitUseSlot.slot} / expects ${patternContrastSectionFitCueItem.expectedLabel} for ${patternContrastSectionFitCueItem.styleBasisLabel}`
           : "No safe Section Fit cue or use action is available yet.",
     group: patternContrastSectionFitDecisionKind === "cue" ? "Transport" : "Arrange",
     keywords: `Quick Actions Pattern Contrast Section Fit Decision next move selected block cue use review arrangement expected role intro verse hook bridge outro anchor lift break switchup ${patternContrastSectionFitSummary.statusLabel} ${patternContrastSectionFitSummary.metricLabel} beginner producer direct beat workstation sample free`,
@@ -10655,7 +10655,8 @@ export function quickActionPatternContrastSectionFitMetricSnapshot(
   const sectionFit = createPatternContrastSectionFitSummary(
     createPatternContrastSummary(createPatternCompareSummaries(project)),
     project.arrangement,
-    selectedArrangementIndex
+    selectedArrangementIndex,
+    project.styleId
   );
   const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
   const fitSequence = sectionFit.items
@@ -10667,9 +10668,9 @@ export function quickActionPatternContrastSectionFitMetricSnapshot(
     label: "Pattern Section Fit",
     value: `${sectionFit.statusLabel} / ${sectionFit.metricLabel} / ${
       selectedItem
-        ? `selected Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} expects ${selectedItem.expectedLabel} and has ${selectedItem.roleLabel} Pattern ${selectedItem.pattern}`
+        ? `selected Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} and has ${selectedItem.roleLabel} Pattern ${selectedItem.pattern}`
         : "no selected block"
-    } / ${fitSequence || "no arrangement blocks"} / arrangement unchanged / playback unchanged / export unchanged`
+    } / ${fitSequence || "no arrangement blocks"} / style-aware expectations / arrangement unchanged / playback unchanged / export unchanged`
   };
 }
 
@@ -10685,7 +10686,8 @@ export function quickActionPatternContrastSectionFitCueMetricSnapshot(
   const sectionFit = createPatternContrastSectionFitSummary(
     createPatternContrastSummary(createPatternCompareSummaries(project)),
     project.arrangement,
-    selectedArrangementIndex
+    selectedArrangementIndex,
+    project.styleId
   );
   const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
 
@@ -10693,7 +10695,7 @@ export function quickActionPatternContrastSectionFitCueMetricSnapshot(
     id: "pattern-contrast-section-fit-cue",
     label: "Section Fit Cue",
     value: selectedItem
-      ? `Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} cued as Block loop / ${selectedItem.fitLabel} / expects ${selectedItem.expectedLabel} / ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / Pattern data unchanged / arrangement unchanged / export unchanged`
+      ? `Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} cued as Block loop / ${selectedItem.fitLabel} / expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} / ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / Pattern data unchanged / arrangement unchanged / export unchanged`
       : "No arrangement block available / Pattern data unchanged / arrangement unchanged / export unchanged"
   };
 }
@@ -10710,7 +10712,8 @@ export function quickActionPatternContrastSectionFitUseMetricSnapshot(
   const sectionFit = createPatternContrastSectionFitSummary(
     createPatternContrastSummary(createPatternCompareSummaries(project)),
     project.arrangement,
-    selectedArrangementIndex
+    selectedArrangementIndex,
+    project.styleId
   );
   const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
 
@@ -10718,7 +10721,7 @@ export function quickActionPatternContrastSectionFitUseMetricSnapshot(
     id: "pattern-contrast-section-fit-use",
     label: "Section Fit Use",
     value: selectedItem
-      ? `Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} now uses ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / expects ${selectedItem.expectedLabel} / ${selectedItem.fitLabel} / Pattern events unchanged / selected block assignment explicit / export unchanged`
+      ? `Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} now uses ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} / ${selectedItem.fitLabel} / Pattern events unchanged / selected block assignment explicit / export unchanged`
       : "No arrangement block available / Pattern events unchanged / arrangement unchanged / export unchanged"
   };
 }
@@ -10735,7 +10738,8 @@ export function quickActionPatternContrastSectionFitDecisionMetricSnapshot(
   const sectionFit = createPatternContrastSectionFitSummary(
     createPatternContrastSummary(createPatternCompareSummaries(project)),
     project.arrangement,
-    selectedArrangementIndex
+    selectedArrangementIndex,
+    project.styleId
   );
   const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
 
@@ -10743,7 +10747,7 @@ export function quickActionPatternContrastSectionFitDecisionMetricSnapshot(
     id: "pattern-contrast-section-fit-decision",
     label: "Section Fit Decision",
     value: selectedItem
-      ? `${action.title} / Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} / expects ${selectedItem.expectedLabel} / now ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / ${selectedItem.fitLabel} / Pattern events unchanged / export unchanged`
+      ? `${action.title} / Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} / expects ${selectedItem.expectedLabel} for ${sectionFit.styleBasisLabel} / now ${selectedItem.roleLabel} Pattern ${selectedItem.pattern} / ${selectedItem.fitLabel} / Pattern events unchanged / export unchanged`
       : `${action.title} / no arrangement block available / Pattern events unchanged / arrangement unchanged / export unchanged`
   };
 }
@@ -22724,7 +22728,8 @@ export function quickActionResultFollowup(
     const sectionFit = createPatternContrastSectionFitSummary(
       createPatternContrastSummary(createPatternCompareSummaries(project)),
       project.arrangement,
-      0
+      0,
+      project.styleId
     );
     return {
       auditionCue: sectionFit.auditionCue,
@@ -22736,14 +22741,15 @@ export function quickActionResultFollowup(
     const sectionFit = createPatternContrastSectionFitSummary(
       createPatternContrastSummary(createPatternCompareSummaries(project)),
       project.arrangement,
-      0
+      0,
+      project.styleId
     );
     const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
     return {
       auditionCue: selectedItem
-        ? `Play Block loop; confirm the Decision result for ${selectedItem.sectionLabel} against its expected ${selectedItem.expectedLabel} role.`
+        ? `Play Block loop; confirm the Decision result for ${selectedItem.sectionLabel} against its ${sectionFit.styleBasisLabel} ${selectedItem.expectedLabel} role.`
         : "Create an arrangement block before running a Section Fit Decision.",
-      nextCheck: "Read Section Fit again, then keep the block cued or use Role Map before making another role placement."
+      nextCheck: `Read Section Fit again, then keep the block cued or use Role Map before making another ${sectionFit.styleBasisLabel} placement.`
     };
   }
 
@@ -22751,14 +22757,15 @@ export function quickActionResultFollowup(
     const sectionFit = createPatternContrastSectionFitSummary(
       createPatternContrastSummary(createPatternCompareSummaries(project)),
       project.arrangement,
-      0
+      0,
+      project.styleId
     );
     const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
     return {
       auditionCue: selectedItem
-        ? `Play Block loop; hear whether ${selectedItem.sectionLabel} works as ${selectedItem.roleLabel} against its expected ${selectedItem.expectedLabel} role.`
+        ? `Play Block loop; hear whether ${selectedItem.sectionLabel} works as ${selectedItem.roleLabel} against its ${sectionFit.styleBasisLabel} ${selectedItem.expectedLabel} role.`
         : "Create an arrangement block before cueing Section Fit.",
-      nextCheck: "Compare the cued Block loop with Song loop, then use Role Map or Pattern Use only if the section needs a different role."
+      nextCheck: `Compare the cued Block loop with Song loop, then use Role Map or Pattern Use only if the section needs a different ${sectionFit.styleBasisLabel} role.`
     };
   }
 
@@ -22766,12 +22773,13 @@ export function quickActionResultFollowup(
     const sectionFit = createPatternContrastSectionFitSummary(
       createPatternContrastSummary(createPatternCompareSummaries(project)),
       project.arrangement,
-      0
+      0,
+      project.styleId
     );
     const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
     return {
       auditionCue: selectedItem
-        ? `Play Block loop; confirm ${selectedItem.sectionLabel} now supports its expected ${selectedItem.expectedLabel} role with Pattern ${selectedItem.pattern}.`
+        ? `Play Block loop; confirm ${selectedItem.sectionLabel} now supports its ${sectionFit.styleBasisLabel} ${selectedItem.expectedLabel} role with Pattern ${selectedItem.pattern}.`
         : "Create an arrangement block before using Section Fit.",
       nextCheck: "Read Section Fit again, then cue the block or Song loop before making another role placement."
     };
