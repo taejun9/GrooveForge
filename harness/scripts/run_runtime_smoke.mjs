@@ -27,9 +27,10 @@ function checkWavBytes(bytes, label) {
 const workstation = await import("../../src/domain/workstation.ts");
 const render = await import("../../src/audio/render.ts");
 const midi = await import("../../src/audio/midi.ts");
+const handoff = await import("../../src/audio/handoff.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
-const smokeScope = "sample-free all-style 8-bar beats with local project-file roundtrips without writing media artifacts";
+const smokeScope = "sample-free all-style 8-bar beats with local project-file roundtrips and Handoff Sheet checks without writing media artifacts";
 
 function cloneMixerForSmoke() {
   return workstation.starterProject.mixer.map((channel) => ({
@@ -222,6 +223,81 @@ function validateLegacyProjectMigration() {
   return migratedProject;
 }
 
+function validateHandoffSheet(project, label, analysis, stemAnalyses) {
+  const sheetFileName = handoff.handoffSheetFileName(project);
+  const sheet = handoff.createHandoffSheet(project, analysis, stemAnalyses);
+  const styleName = workstation.styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const target = workstation.activeDeliveryTarget(project);
+  const bars = workstation.arrangementTotalBars(project);
+  const arrangementLines = sheet.split("\n").filter((line) => /^\d+\. /.test(line));
+  const stemLines = render.stemTrackIds.map((track) => ({
+    track,
+    label: render.stemTrackLabel(track),
+    line: sheet.split("\n").find((line) => line.startsWith(`${render.stemTrackLabel(track)}:`)) ?? ""
+  }));
+
+  check(sheetFileName.endsWith("-handoff.txt"), `${label} Handoff Sheet file name should end in -handoff.txt`);
+  check(sheetFileName.includes(projectSlug(project)), `${label} Handoff Sheet file name should use the project slug`);
+  check(sheet.endsWith("\n"), `${label} Handoff Sheet should end with a newline`);
+  check(sheet.length > 1000, `${label} Handoff Sheet should contain a full delivery summary`);
+  check(!sheet.match(/undefined|NaN/), `${label} Handoff Sheet contains undefined or NaN text`);
+  check(!sheet.match(/AudioClipEvent|sampler|sample import|audio clip/i), `${label} Handoff Sheet contains sampling or audio-clip language`);
+
+  for (const section of [
+    "GrooveForge Handoff Sheet",
+    "Project",
+    "Delivery Target",
+    "Session Brief",
+    "Arrangement Blocks",
+    "Export Meter",
+    "Stem Meter",
+    "Notes"
+  ]) {
+    check(sheet.includes(section), `${label} Handoff Sheet missing ${section} section`);
+  }
+
+  check(sheet.includes(`Title: ${project.title}`), `${label} Handoff Sheet should include the project title`);
+  check(sheet.includes(`Style: ${styleName}`), `${label} Handoff Sheet should include the style name`);
+  check(sheet.includes(`BPM: ${project.bpm}`), `${label} Handoff Sheet should include BPM`);
+  check(sheet.includes(`Key: ${project.key}`), `${label} Handoff Sheet should include key`);
+  check(sheet.includes(`Selected Pattern: ${project.selectedPattern}`), `${label} Handoff Sheet should include selected Pattern`);
+  check(sheet.includes(`Arrangement: ${bars} bars`), `${label} Handoff Sheet should include arrangement length`);
+  check(sheet.includes(`Name: ${target.name}`), `${label} Handoff Sheet should include Delivery Target name`);
+  check(sheet.includes(`Focus: ${target.focus}`), `${label} Handoff Sheet should include Delivery Target focus`);
+  check(sheet.includes(`Target Stems: ${target.stemGoal}`), `${label} Handoff Sheet should include target stem goal`);
+  check(sheet.includes(`Master Preset: ${project.masterPreset}`), `${label} Handoff Sheet should include master preset`);
+  check(sheet.includes("Artist:"), `${label} Handoff Sheet should include Session Brief artist`);
+  check(sheet.includes("Vibe:"), `${label} Handoff Sheet should include Session Brief vibe`);
+  check(sheet.includes("Reference:"), `${label} Handoff Sheet should include Session Brief reference`);
+  check(sheet.includes("Notes:"), `${label} Handoff Sheet should include Session Brief notes`);
+
+  check(arrangementLines.length === project.arrangement.length, `${label} Handoff Sheet arrangement block count should match project arrangement`);
+  project.arrangement.forEach((block, index) => {
+    const line = arrangementLines[index] ?? "";
+    check(line.includes(`${index + 1}. ${block.section}`), `${label} Handoff Sheet arrangement block ${index + 1} should include section`);
+    check(line.includes(`Pattern ${block.pattern}`), `${label} Handoff Sheet arrangement block ${index + 1} should include Pattern`);
+  });
+
+  check(sheet.includes(`Status: ${analysis.status}`), `${label} Handoff Sheet should include export status`);
+  check(sheet.includes("Duration:"), `${label} Handoff Sheet should include export duration`);
+  check(sheet.includes("Peak:"), `${label} Handoff Sheet should include export peak`);
+  check(sheet.includes("RMS:"), `${label} Handoff Sheet should include export RMS`);
+  check(sheet.includes("Dynamics:"), `${label} Handoff Sheet should include export dynamics`);
+  check(sheet.includes("Headroom:"), `${label} Handoff Sheet should include export headroom`);
+  check(sheet.includes("Limiter Activity:"), `${label} Handoff Sheet should include limiter activity`);
+
+  for (const { track, label: stemLabel, line } of stemLines) {
+    check(line.includes(stemLabel), `${label} Handoff Sheet should include ${track} stem label`);
+    check(line.includes("Audible"), `${label} Handoff Sheet ${track} stem should be audible`);
+    check(line.includes("Peak") && line.includes("RMS") && line.includes("Headroom"), `${label} Handoff Sheet ${track} stem should include meter data`);
+  }
+
+  return {
+    sheetFileName,
+    sheetBytes: sheet.length
+  };
+}
+
 async function validateProjectExportSmoke(smokeCase) {
   const { label, expectedStyleId } = smokeCase;
   const project = validateProjectFileRoundTrip(smokeCase.project, label);
@@ -274,6 +350,7 @@ async function validateProjectExportSmoke(smokeCase) {
   check(midiBytes.byteLength > 128, `${label} MIDI file is too small`);
   check(ascii(midiBytes, 0, 4) === "MThd", `${label} MIDI file missing MThd header`);
   check(midi.midiFileName(project).endsWith(".mid"), `${label} MIDI file name should end in .mid`);
+  const handoffSummary = validateHandoffSheet(project, label, mixAnalysis, stemAnalyses);
 
   return {
     label,
@@ -283,7 +360,9 @@ async function validateProjectExportSmoke(smokeCase) {
     projectFileBytes: workstation.serializeProjectFile(project).length,
     mixFileName,
     midiFileName: midi.midiFileName(project),
-    midiBytes: midiBytes.byteLength
+    midiBytes: midiBytes.byteLength,
+    handoffSheetFileName: handoffSummary.sheetFileName,
+    handoffSheetBytes: handoffSummary.sheetBytes
   };
 }
 
@@ -337,7 +416,8 @@ console.log(`- Blueprints: ${blueprintCases.length}/${workstation.beatBlueprints
 console.log(`- Styles: ${styleCases.length}/${workstation.styleProfiles.length} supported style profiles`);
 console.log(`- Legacy migrations: ${legacyMigrationProject ? 1 : 0}/1 single-pattern chord-event project preserved`);
 console.log(`- Project roundtrips: ${summaries.length}/${smokeCases.length} .grooveforge.json save/load checks before export`);
+console.log(`- Handoff sheets: ${summaries.length}/${smokeCases.length} text deliverables verified`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
-  console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes)`);
+  console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);
 }
