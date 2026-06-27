@@ -83,8 +83,8 @@ function checkBuiltArtifacts() {
     "dist-electron/main.js is missing; run npm run build before desktop smoke"
   );
   check(
-    existsSync(path.join(root, "dist-electron/preload.js")),
-    "dist-electron/preload.js is missing; run npm run build before desktop smoke"
+    existsSync(path.join(root, "dist-electron/preload.cjs")),
+    "dist-electron/preload.cjs is missing; run npm run build before desktop smoke"
   );
 
   const assetDir = path.join(root, "dist/assets");
@@ -127,10 +127,11 @@ function checkElectronMainContract() {
   const label = "electron/main.ts";
 
   checkIncludes(source, "const isDev = process.env.VITE_DEV_SERVER_URL !== undefined", label);
-  checkIncludes(source, 'preload: path.join(__dirname, "preload.js")', label);
+  checkIncludes(source, 'preload: path.join(__dirname, "preload.cjs")', label);
   checkIncludes(source, "nodeIntegration: false", label);
   checkIncludes(source, "contextIsolation: true", label);
   checkIncludes(source, "sandbox: true", label);
+  checkIncludes(source, "backgroundThrottling: !isLaunchSmoke", label);
   checkIncludes(source, 'void win.loadFile(path.join(__dirname, "../dist/index.html"))', label);
   checkIncludes(source, "win.webContents.setWindowOpenHandler", label);
   checkIncludes(source, 'return { action: "deny" }', label);
@@ -144,13 +145,13 @@ function checkElectronMainContract() {
     checkIncludes(source, `"${command}"`, label);
   }
   checkIncludes(built, "../dist/index.html", "dist-electron/main.js");
-  checkIncludes(built, "preload.js", "dist-electron/main.js");
+  checkIncludes(built, "preload.cjs", "dist-electron/main.js");
 }
 
 function checkPreloadContract() {
-  const source = readText("electron/preload.ts");
-  const built = readText("dist-electron/preload.js");
-  const label = "electron/preload.ts";
+  const source = readText("electron/preload.cts");
+  const built = readText("dist-electron/preload.cjs");
+  const label = "electron/preload.cts";
 
   checkIncludes(source, 'contextBridge.exposeInMainWorld("grooveforge"', label);
   checkIncludes(source, 'appKind: "desktop"', label);
@@ -164,11 +165,11 @@ function checkPreloadContract() {
     checkIncludes(source, `"${command}"`, label);
   }
 
-  checkIncludes(built, "grooveforge", "dist-electron/preload.js");
-  checkIncludes(built, "desktop", "dist-electron/preload.js");
-  checkIncludes(built, "grooveforge:save-project", "dist-electron/preload.js");
-  checkIncludes(built, "grooveforge:open-project", "dist-electron/preload.js");
-  checkIncludes(built, "grooveforge:menu-command", "dist-electron/preload.js");
+  checkIncludes(built, "grooveforge", "dist-electron/preload.cjs");
+  checkIncludes(built, "desktop", "dist-electron/preload.cjs");
+  checkIncludes(built, "grooveforge:save-project", "dist-electron/preload.cjs");
+  checkIncludes(built, "grooveforge:open-project", "dist-electron/preload.cjs");
+  checkIncludes(built, "grooveforge:menu-command", "dist-electron/preload.cjs");
 }
 
 function checkRendererNativeMenuContract() {
@@ -197,7 +198,8 @@ function checkRendererNativeMenuContract() {
 function checkRendererEntryContract() {
   const index = readText("dist/index.html");
   checkIncludes(index, '<div id="root"></div>', "dist/index.html");
-  check(index.includes("/assets/") || index.includes("./assets/"), "dist/index.html should reference built renderer assets");
+  check(index.includes("./assets/"), "dist/index.html should reference built renderer assets with file-load-safe relative paths");
+  check(!index.includes('src="/assets/') && !index.includes('href="/assets/'), "dist/index.html should not use root-relative asset paths");
 }
 
 checkBuiltArtifacts();
