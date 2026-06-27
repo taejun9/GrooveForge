@@ -1037,6 +1037,7 @@ import {
 } from "./workstationAppQuickActions";
 import {
   drumKitRouteLabel,
+  masterFinishRouteLabel,
   mixBalanceRouteLabel,
   mixSnapshotRouteLabel,
   soundFocusRouteLabel,
@@ -7243,6 +7244,16 @@ export function App(): ReactElement {
     );
   }
 
+  function focusMasterFinishRouteReadout(): void {
+    const directCommand = `master-finish-${masterFinishPreviewSummary.padId}`;
+    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    setProjectStatus(
+      `Master Finish Route Readout Pattern ${project.selectedPattern}: ${masterFinishRouteLabel(
+        masterFinishPreviewSummary.padId
+      )} / ${masterFinishPreviewSummary.statusLabel} / ${masterFinishPreviewSummary.presetLabel} / ${masterFinishPreviewSummary.outputLabel} / direct ${directCommand} unchanged`
+    );
+  }
+
   function focusMasterAutomationReadout(): void {
     masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
     setProjectStatus(
@@ -8603,6 +8614,7 @@ export function App(): ReactElement {
     onFocusMasterAutomationReadout: focusMasterAutomationReadout,
     onApplyMasterFinish: applyMasterFinishPad,
     onFocusMasterFinishReadout: focusMasterFinishReadout,
+    onFocusMasterFinishRouteReadout: focusMasterFinishRouteReadout,
     onApplyMelodyMotif: applyMelodyMotif,
     onApplyMelodyAccent: applyMelodyAccent,
     onApplyMelodyContour: applyMelodyContour,
