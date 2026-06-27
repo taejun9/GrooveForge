@@ -3402,6 +3402,23 @@ export function createQuickActions({
     keywords: `handoff package check focus card send files order receipt context archive ${card.id} ${card.label} ${card.value} ${card.status} ${card.detail} beginner producer`,
     run: () => onFocusHandoffPackageCheck(card)
   }));
+  const handoffManifestAuditReadoutAction: QuickAction = {
+    id: "handoff-manifest-audit-readout-action",
+    title: `Review Handoff Manifest Audit Readout: ${handoffManifestAudit.statusLabel}`,
+    detail: [
+      handoffManifestAudit.statusLabel,
+      handoffManifestAudit.detailLabel,
+      handoffManifestAudit.receiptLabel,
+      handoffManifestAudit.nextLabel,
+      `package ${handoffPackageCheckSummary.headline}`,
+      "manifest preflight"
+    ].join(" / "),
+    group: "Export",
+    keywords: `handoff manifest audit readout review planned files readiness receipt next missing step no render no download package readiness delivery target ${handoffManifestAudit.statusLabel} ${handoffManifestAudit.checks
+      .map((check) => `${check.id} ${check.statusLabel}`)
+      .join(" ")} sample free beginner producer`,
+    run: onFocusHandoffManifestAudit
+  };
   const handoffSendOrderReadoutAction: QuickAction = {
     id: "handoff-send-order-readout-action",
     title: `Review Handoff Send Order Readout: ${handoffSendOrder.nextLabel}`,
@@ -5712,6 +5729,7 @@ export function createQuickActions({
       } ${handoffManifestAudit.checks.map((check) => `${check.id} ${check.statusLabel}`).join(" ")} beginner producer`,
       run: onFocusHandoffManifestAudit
     },
+    handoffManifestAuditReadoutAction,
     {
       id: "handoff-send-order-focus",
       title: handoffSendOrderCard
@@ -6478,6 +6496,7 @@ export function createQuickActionResult(
     action.id === "handoff-package-check-focus" ||
     action.id.startsWith("handoff-package-check-card-") ||
     action.id === "handoff-manifest-audit-focus" ||
+    action.id === "handoff-manifest-audit-readout-action" ||
     action.id === "handoff-send-order-focus" ||
     action.id === "handoff-send-order-readout-action" ||
     action.id === "handoff-export-receipt-focus" ||
@@ -11023,7 +11042,8 @@ export function quickActionHandoffManifestAuditMetricSnapshot(
   exportReceipt: HandoffExportReceipt | null,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
-  if (action.id !== "handoff-manifest-audit-focus") {
+  const isReadout = action.id === "handoff-manifest-audit-readout-action";
+  if (action.id !== "handoff-manifest-audit-focus" && !isReadout) {
     return null;
   }
 
@@ -11043,38 +11063,54 @@ export function quickActionHandoffManifestAuditMetricSnapshot(
   const receipt = exportReceipt ?? emptyHandoffExportReceipt();
   const manifest = createHandoffFileManifest(project, stemAnalyses, handoffPackItems);
   const summary = createHandoffManifestAudit(project, handoffPackItems, manifest, receipt, sendOrder);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
   const pattern = activePattern(project);
   const usedSlots = usedPatternSlots(project);
   const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
   const detailParts = quickActionHandoffManifestAuditDetailParts(action);
-  const contextLabel = detailParts[0] ?? summary.detailLabel;
-  const receiptLabel = detailParts[1] ?? summary.receiptLabel;
-  const nextLabel = detailParts[2] ?? summary.nextLabel;
+  const statusLabel = isReadout ? (detailParts[0] ?? summary.statusLabel) : summary.statusLabel;
+  const contextLabel = (isReadout ? detailParts[1] : detailParts[0]) ?? summary.detailLabel;
+  const receiptLabel = (isReadout ? detailParts[2] : detailParts[1]) ?? summary.receiptLabel;
+  const nextLabel = (isReadout ? detailParts[3] : detailParts[2]) ?? summary.nextLabel;
   const manifestPosture = summary.checks.map((check) => `${check.label} ${check.statusLabel}`).join(" / ");
   const readyCount = summary.checks.filter((check) => check.tone === "good").length;
   const reviewCount = summary.checks.filter((check) => check.tone === "warn").length;
   const blockerCount = summary.checks.filter((check) => check.tone === "danger").length;
+  const followup = quickActionResultFollowup(action, project, "complete");
 
   return {
-    id: "handoff-manifest-audit",
-    label: "Handoff manifest",
+    id: isReadout ? "handoff-manifest-audit-readout" : "handoff-manifest-audit",
+    label: isReadout ? "Handoff Manifest Audit Readout" : "Handoff manifest",
     value: [
-      "focus manifest audit",
+      isReadout ? "review manifest audit" : "focus manifest audit",
       "destination Deliver panel",
-      `status ${summary.statusLabel}`,
+      `status ${statusLabel}`,
       `context ${contextLabel}`,
+      `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
       `Pattern ${project.selectedPattern}`,
-      `${patternEventTotal(pattern)} events`,
+      `${patternEventTotal(pattern)} editable events`,
       patternUseLabel,
       `manifest ${manifestPosture}`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
       `receipt ${receiptLabel}`,
       `file ${receipt.fileLabel}`,
       `next ${nextLabel}`,
+      `send ${sendOrder.statusLabel}`,
+      `sequence ${sendOrder.sequenceLabel}`,
       `checks ${readyCount}/${summary.checks.length} clear`,
       workflowCountLabel(reviewCount, "review"),
       workflowCountLabel(blockerCount, "blocker"),
       `${project.arrangement.length} blocks`,
-      barCountLabel(arrangementTotalBars(project))
+      barCountLabel(bars),
+      "manifest unchanged",
+      "export unchanged",
+      "receipt unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
     ].join(" / ")
   };
 }
@@ -14538,7 +14574,7 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "handoff-manifest-audit-focus") {
+  if (action.id === "handoff-manifest-audit-focus" || action.id === "handoff-manifest-audit-readout-action") {
     const handoffManifestMetric = quickActionHandoffManifestAuditMetricSnapshot(
       project,
       action,
@@ -14550,8 +14586,8 @@ export function quickActionResultMetricSnapshot(
     }
 
     return {
-      id: "handoff-manifest-audit",
-      label: "Handoff manifest",
+      id: action.id === "handoff-manifest-audit-readout-action" ? "handoff-manifest-audit-readout" : "handoff-manifest-audit",
+      label: action.id === "handoff-manifest-audit-readout-action" ? "Handoff Manifest Audit Readout" : "Handoff manifest",
       value: action.detail
     };
   }
@@ -18526,6 +18562,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Read Handoff Send Order before running Handoff Next Export so the next WAV, stems, MIDI, or Handoff Sheet step is deliberate.",
       nextCheck: "If the next step is correct, run Handoff Next Export or the matching explicit export button."
+    };
+  }
+
+  if (action.id === "handoff-manifest-audit-readout-action") {
+    return {
+      auditionCue: "Review planned file readiness and latest receipt before sending the beat package.",
+      nextCheck:
+        "Run the specific missing export only after Manifest Audit, receipt, send order, and delivery target agree."
     };
   }
 
