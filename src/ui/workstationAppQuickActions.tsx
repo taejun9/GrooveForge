@@ -3521,6 +3521,31 @@ export function createQuickActions({
     } ${handoffBlockerItem?.label ?? "clear"} sample free beginner producer`,
     run: onFocusHandoffPack
   };
+  const handoffBlockerRouteReadoutAction: QuickAction = {
+    id: "handoff-blocker-route-readout-action",
+    title: handoffBlockerItem
+      ? `Review Handoff Blocker Route Readout: ${handoffBlockerItem.buttonLabel}`
+      : "Review Handoff Blocker Route Readout: Clear",
+    detail: [
+      handoffBlockerItem
+        ? `${handoffBlockerItem.buttonLabel} route / ${handoffBlockerRouteLabel(handoffBlockerItem)}`
+        : "no blocker route",
+      handoffBlockerItem
+        ? `${handoffBlockerItem.label}: ${handoffBlockerItem.value} / ${handoffBlockerItem.detail}`
+        : "all deliverable routes clear",
+      workflowCountLabel(handoffReviewCount, "review"),
+      workflowCountLabel(handoffBlockerCount, "blocker"),
+      `manifest ${handoffManifestAudit.statusLabel}`,
+      `receipt ${handoffReceipt.statusLabel}`,
+      `send ${handoffSendOrder.nextLabel}`,
+      "blocker route preflight"
+    ].join(" / "),
+    group: "Export",
+    keywords: `handoff blocker route readout review danger warn blocked review lane deliverable wav stems midi sheet package manifest receipt send order next route command no render no download ${
+      handoffBlockerItem?.id ?? "clear"
+    } ${handoffBlockerItem?.label ?? "clear"} ${handoffBlockerRouteLabel(handoffBlockerItem)} sample free beginner producer`,
+    run: onFocusHandoffPack
+  };
   const handoffExportFormatReadoutAction: QuickAction = {
     id: "handoff-export-format-readout-action",
     title: `Review Handoff Export Format Readout: ${handoffExportFormatSummary.statusLabel}`,
@@ -5841,6 +5866,7 @@ export function createQuickActions({
     handoffSessionBriefReadoutAction,
     handoffFinalCheckReadoutAction,
     handoffBlockerReadoutAction,
+    handoffBlockerRouteReadoutAction,
     handoffExportFormatReadoutAction,
     {
       id: "handoff-export-format-focus",
@@ -6640,6 +6666,7 @@ export function createQuickActionResult(
     action.id === "handoff-session-brief-readout-action" ||
     action.id === "handoff-final-check-readout-action" ||
     action.id === "handoff-blocker-readout-action" ||
+    action.id === "handoff-blocker-route-readout-action" ||
     action.id === "handoff-package-check-focus" ||
     action.id === "handoff-package-check-readout-action" ||
     action.id.startsWith("handoff-package-check-card-") ||
@@ -11423,6 +11450,119 @@ export function quickActionHandoffBlockerDetailParts(action: QuickAction): strin
     .filter(Boolean);
 }
 
+export function handoffBlockerRouteLabel(item: HandoffPackItem | null): string {
+  switch (item?.id) {
+    case "wav":
+      return "Explicit WAV export or Handoff Next Export";
+    case "stems":
+      return "Explicit Stems export or Stem Audition check";
+    case "midi":
+      return "Explicit MIDI export or Arrangement check";
+    case "sheet":
+      return "Session Brief or Handoff Sheet context check";
+    default:
+      return "No blocker route";
+  }
+}
+
+export function quickActionHandoffBlockerRouteReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "handoff-blocker-route-readout-action") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const readyCount = handoffPackItems.filter((item) => item.tone === "good").length;
+  const reviewCount = handoffPackItems.filter((item) => item.tone === "warn").length;
+  const blockerCount = handoffPackItems.filter((item) => item.tone === "danger").length;
+  const blockerItem =
+    handoffPackItems.find((item) => item.tone === "danger") ??
+    handoffPackItems.find((item) => item.tone === "warn") ??
+    null;
+  const routeLabel = handoffBlockerRouteLabel(blockerItem);
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const manifest = createHandoffFileManifest(project, stemAnalyses, handoffPackItems);
+  const manifestAudit = createHandoffManifestAudit(project, handoffPackItems, manifest, receipt, sendOrder);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const itemPosture = handoffPackItems.map((item) => `${item.buttonLabel} ${item.value}`).join(" / ");
+  const detailParts = quickActionHandoffBlockerRouteDetailParts(action);
+  const blockerLevel = blockerItem ? (blockerItem.tone === "danger" ? "blocker" : "review") : "clear";
+  const blockerLabel = blockerItem ? `${blockerItem.label} ${blockerItem.value} / ${blockerItem.detail}` : "No blocker lanes";
+  const contextLabel = detailParts.join(" / ") || `${blockerLevel} / ${blockerLabel} / ${routeLabel}`;
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "handoff-blocker-route-readout",
+    label: "Handoff Blocker Route Readout",
+    value: [
+      "review handoff blocker route",
+      "destination Deliver / Handoff Pack",
+      `priority ${blockerLevel}`,
+      `lane ${blockerLabel}`,
+      `route ${routeLabel}`,
+      `button ${blockerItem?.buttonLabel ?? "none"}`,
+      `checks ${readyCount}/${handoffPackItems.length} ready`,
+      workflowCountLabel(reviewCount, "review"),
+      workflowCountLabel(blockerCount, "blocker"),
+      `target ${target.name} / ${target.focus}`,
+      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4 / ${briefStatus.value}`,
+      `sheet ${handoffSheetFileName(project)}`,
+      `wav ${mixWavFileName(project)} / ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `stems ${audibleStemCount}/${target.stemGoal} target / ${audibleStemCount}/${stemTrackIds.length} audible`,
+      `midi ${midiFileName(project)} / ${barCountLabel(bars)}`,
+      `items ${itemPosture}`,
+      `manifest ${manifestAudit.statusLabel} / ${manifestAudit.detailLabel}`,
+      `receipt ${receipt.statusLabel} / ${receipt.fileLabel}`,
+      `send ${sendOrder.statusLabel} / ${sendOrder.nextLabel}`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(bars),
+      "blocker route unchanged",
+      "export unchanged",
+      "receipt unchanged",
+      "package unchanged",
+      "sampler scope unchanged",
+      `context ${contextLabel}`,
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
+export function quickActionHandoffBlockerRouteDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 export function quickActionHandoffExportReceiptMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -15191,6 +15331,16 @@ export function quickActionResultMetricSnapshot(
       quickActionHandoffBlockerReadoutMetricSnapshot(project, action, handoffExportReceipt, analysis ?? undefined) ?? {
         id: "handoff-blocker-readout",
         label: "Handoff Blocker Readout",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "handoff-blocker-route-readout-action") {
+    return (
+      quickActionHandoffBlockerRouteReadoutMetricSnapshot(project, action, handoffExportReceipt, analysis ?? undefined) ?? {
+        id: "handoff-blocker-route-readout",
+        label: "Handoff Blocker Route Readout",
         value: action.detail
       }
     );
@@ -19248,6 +19398,14 @@ export function quickActionResultFollowup(
       auditionCue: "Read the current blocker or review lane before choosing the next explicit export or handoff check.",
       nextCheck:
         "Use the named Handoff Pack lane or matching explicit export only after the blocker context matches the deliverable you intend to fix."
+    };
+  }
+
+  if (action.id === "handoff-blocker-route-readout-action") {
+    return {
+      auditionCue: "Read the blocker route before choosing the next explicit export, Session Brief, or handoff check.",
+      nextCheck:
+        "Use only the named existing lane or command family; avoid Handoff Next Export until blocker route and deliverable intent agree."
     };
   }
 
