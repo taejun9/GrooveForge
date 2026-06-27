@@ -1279,6 +1279,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Handoff Delivery Target Readout Action, Selected Delivery Target, Target Focus, Target Length, Current Arrangement Length, Stem Goal, Audible Stems, Session Brief/Handoff Sheet Context, Package Posture, Export Readiness, Selected Pattern A/B/C, Arrangement Blocks, Audition Cue, and Next Target Check context before Delivery Target Align, explicit export, or handoff commands run."
       },
       {
+        id: "handoff-session-brief-readout",
+        command: "Handoff Session Brief Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Session brief handoff preflight / no render",
+        context:
+          "Handoff Session Brief Readout Action, Session Brief Filled Fields, Brief Status, Artist, Vibe, Reference, Notes, Handoff Sheet Filename, Delivery Target, Package Posture, Export Readiness, Selected Pattern A/B/C, Arrangement Blocks, Audition Cue, and Next Context Check before Brief Compass, Session Brief Starter, explicit export, or handoff commands run."
+      },
+      {
         id: "export-preflight",
         command: "Export Preflight",
         shortcut: "Quick Actions / Readout",
