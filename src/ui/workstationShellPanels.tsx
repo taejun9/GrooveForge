@@ -1295,6 +1295,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Handoff Final Check Readout Action, Final Ready/Review/Blocker Counts, Delivery Target, Session Brief/Handoff Sheet Context, WAV/Stem/MIDI/Export Format Posture, Manifest Status, Latest Export Receipt, Send Order, Package Posture, Selected Pattern A/B/C, Arrangement Blocks, Audition Cue, and Next Delivery Check before Handoff Next Export, explicit export, or handoff commands run."
       },
       {
+        id: "handoff-send-readiness-readout",
+        command: "Handoff Send Readiness Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Handoff send/no-send readiness / no render",
+        context:
+          "Handoff Send Readiness Readout Action, Send Ready/Review/Do-Not-Send Posture, Current Gate, Ready/Review/Blocker Counts, Delivery Target, Session Brief/Handoff Sheet Context, WAV/Stem/MIDI Posture, Package Check Cards, Manifest Status, Latest Export Receipt, Send Order, Selected Pattern A/B/C, Arrangement Blocks, Audition Cue, and Next Send Readiness Check before Handoff Next Export, explicit export, package creation, send, or handoff commands run."
+      },
+      {
         id: "handoff-blocker-readout",
         command: "Handoff Blocker Readout",
         shortcut: "Quick Actions / Readout",
