@@ -1222,6 +1222,7 @@ export function createQuickActions({
   onApplyDrumFoundation,
   onApplyDrumKit,
   onFocusDrumKitReadout,
+  onFocusDrumKitRouteReadout,
   onFocusDrumMoveRouteReadout,
   onApplyGrooveFeel,
   onApplyLayerStarter,
@@ -1567,6 +1568,7 @@ export function createQuickActions({
   onApplyDrumFoundation: (foundation: DrumFoundationId) => void;
   onApplyDrumKit: (pad: DrumKitPadId) => void;
   onFocusDrumKitReadout: () => void;
+  onFocusDrumKitRouteReadout: () => void;
   onFocusDrumMoveRouteReadout: () => void;
   onApplyGrooveFeel: (feel: GrooveFeelId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
@@ -3318,6 +3320,11 @@ export function createQuickActions({
     };
   });
   const directDrumKitPadOptions = createDrumKitPadOptions(project);
+  const drumKitRoutePad =
+    directDrumKitPadOptions.find((pad) => pad.id === drumKitPreviewSummary.padId) ??
+    directDrumKitPadOptions[0] ??
+    null;
+  const drumKitRouteTarget = drumKitRoutePad ? drumKitRouteLabel(drumKitRoutePad) : "No kit route needed";
   const directSoundFocusPadOptions = createSoundFocusPadOptions(project.sound);
   const soundFocusRoutePad =
     directSoundFocusPadOptions.find((pad) => pad.id === soundFocusPreviewSummary.padId) ??
@@ -4909,6 +4916,19 @@ export function createQuickActions({
       } beginner producer manual drum tone`,
       resultTargetId: drumKitPreviewSummary.padId,
       run: onFocusDrumKitReadout
+    },
+    {
+      id: "drum-kit-route-readout-action",
+      title: `Review Drum Kit Route: ${drumKitPreviewSummary.kitLabel}`,
+      detail: `${drumKitRouteTarget} / ${drumKitPreviewSummary.statusLabel} / ${drumKitPreviewSummary.moveLabel} / direct Drum Kit unchanged`,
+      group: "Create",
+      keywords: `Quick Actions Drum Kit Route Readout review route preflight built in kit preview direct drum kit command no apply kick clap snare hat rack ${
+        drumKitPreviewSummary.padId
+      } ${drumKitPreviewSummary.kitLabel} ${drumKitRouteTarget} ${
+        drumKitPreviewSummary.rackLabel
+      } drum kit route preflight beginner producer manual drum tone`,
+      resultTargetId: drumKitPreviewSummary.padId,
+      run: onFocusDrumKitRouteReadout
     },
     {
       id: "drum-kit-decision",
@@ -6883,6 +6903,7 @@ export function createQuickActionResult(
     action.id === "arrangement-follow-audible" ||
     action.id === "sound-preset-readout-action" ||
     action.id === "drum-kit-readout-action" ||
+    action.id === "drum-kit-route-readout-action" ||
     action.id === "sound-focus-readout-action" ||
     action.id === "sound-focus-route-readout-action" ||
     action.id === "sound-snapshot-readout-action" ||
@@ -16484,6 +16505,7 @@ export function quickActionSoundDecisionMetricSnapshot(
 
   if (
     action.id === "drum-kit-readout-action" ||
+    action.id === "drum-kit-route-readout-action" ||
     action.id === "drum-kit-decision" ||
     action.id === "drum-kit" ||
     action.id.startsWith("drum-kit-pad-")
@@ -16569,6 +16591,10 @@ export function soundFocusRouteLabel(parameters: SoundFocusParameter[]): string 
   return `${routes.join(" / ")} route`;
 }
 
+export function drumKitRouteLabel(pad: DrumKitPadOption): string {
+  return `${pad.label} kit route (${pad.detail})`;
+}
+
 export function quickActionDrumKitMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -16590,6 +16616,24 @@ export function quickActionDrumKitMetricSnapshot(
         `drums ${drumKitPreviewDrumLabel(pad)}`,
         `rack ${drumKitPreviewRackLabel(pad)}`,
         `moves ${pad.changedCount} kit move${pad.changedCount === 1 ? "" : "s"}`
+      ])
+    };
+  }
+
+  if (action.id === "drum-kit-route-readout-action") {
+    return {
+      id: "drum-kit-route-readout",
+      label: "Drum Kit Route Readout",
+      value: quickActionSoundMetricValue(project, action, analysis, [
+        quickActionSoundActionLabel(action),
+        `route ${drumKitRouteLabel(pad)}`,
+        "direct command drum-kit",
+        `target ${pad.label} kit`,
+        `status ${pad.changedCount === 0 ? "Kit aligned" : "Suggested kit"}`,
+        `drums ${drumKitPreviewDrumLabel(pad)}`,
+        `rack ${drumKitPreviewRackLabel(pad)}`,
+        `moves ${pad.changedCount} kit move${pad.changedCount === 1 ? "" : "s"}`,
+        "drum kit unchanged"
       ])
     };
   }
@@ -16775,6 +16819,10 @@ export function quickActionSoundDecisionNextCheck(action: QuickAction): string {
     return "loop kick, clap, hat, and 808 before applying a built-in kit or trimming drum rack controls manually";
   }
 
+  if (action.id === "drum-kit-route-readout-action") {
+    return "read the built-in kick, clap, and hat kit route before choosing the existing Drum Kit command";
+  }
+
   if (action.id === "drum-kit-decision" || action.id === "drum-kit" || action.id.startsWith("drum-kit-pad-")) {
     return "loop kick, clap, hat, and 808 balance before changing another kit or drum rack control";
   }
@@ -16821,6 +16869,9 @@ export function quickActionSoundActionLabel(action: QuickAction): string {
   }
   if (action.id === "drum-kit-readout-action") {
     return "review drum kit readout";
+  }
+  if (action.id === "drum-kit-route-readout-action") {
+    return "review drum kit route readout";
   }
   if (action.id === "drum-kit-decision") {
     return "run drum kit decision";
@@ -16901,7 +16952,12 @@ export function quickActionDrumKitPadOption(project: ProjectState, action: Quick
     return options.find((pad) => pad.id === directId) ?? null;
   }
 
-  if (action.id !== "drum-kit-readout-action" && action.id !== "drum-kit-decision" && action.id !== "drum-kit") {
+  if (
+    action.id !== "drum-kit-readout-action" &&
+    action.id !== "drum-kit-route-readout-action" &&
+    action.id !== "drum-kit-decision" &&
+    action.id !== "drum-kit"
+  ) {
     return null;
   }
 
@@ -20054,6 +20110,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Use the Drum Kit readout before applying a built-in kit, then loop Pattern ${project.selectedPattern}.`,
       nextCheck: "Apply Drum Kit only when the preview target fits the groove; otherwise trim kick, clap, hat, or drum rack controls manually."
+    };
+  }
+
+  if (action.id === "drum-kit-route-readout-action") {
+    return {
+      auditionCue: `Read the Drum Kit route and loop Pattern ${project.selectedPattern} before choosing the existing Drum Kit command.`,
+      nextCheck:
+        "Use Drum Kit only when the named kick, clap, or hat kit route should reshape the local drum tone; otherwise trim drum rack or Studio tone controls manually."
     };
   }
 

@@ -847,6 +847,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Current Built-In Kick/Clap/Hat Kit Preview Target, Drum Rack Posture, Selected Pattern, Export Readiness, Audition Cue, and Next Manual Drum-Kit Check context before Drum Kit commands run."
       },
       {
+        id: "drum-kit-route-readout",
+        command: "Drum Kit Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Kick / clap / hat kit route",
+        context:
+          "Drum Kit Route Readout Action, Selected Pattern A/B/C, Current Built-In Kick/Clap/Hat Kit Preview Target, Existing Drum Kit Route, Direct Drum Kit Command, Kick/Clap/Hat Tone Posture, Drum Rack Posture, Arrangement Usage, Audition Cue, and Next Kit Route Check context before Drum Kit commands run."
+      },
+      {
         id: "drum-kit-decision",
         command: "Drum Kit Decision",
         shortcut: "Quick Actions / Readout",
