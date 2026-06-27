@@ -54,6 +54,7 @@ If an answer only exists in chat, move it into an exec plan, meeting note, revie
 python3 harness/scripts/run_qa.py
 python3 harness/scripts/run_quality_gate.py
 npm run renderer:smoke
+npm run workflow:smoke
 npm run harness:smoke
 npm run typecheck
 npm run build
@@ -63,11 +64,13 @@ npm run verify
 npm run release:check
 ```
 
-These commands validate the base structure, documentation rules, first-run React renderer surface, runtime first-run starter project smoke, sample-free all-style export, legacy chord-event migration, `.grooveforge.json` roundtrip smoke, Handoff Sheet text deliverable smoke, mocked browser download-path smoke, TypeScript contracts, production build, and Electron desktop entry plus native menu bridge contract. `npm run verify` runs the strict quality gate, renderer smoke, runtime smoke, typecheck, build, and desktop entry smoke. `npm run release:check` is the release-readiness gate and runs both `npm run qa` and `npm run verify`.
+These commands validate the base structure, documentation rules, first-run React renderer surface, first-session workflow smoke, runtime first-run starter project smoke, sample-free all-style export, legacy chord-event migration, `.grooveforge.json` roundtrip smoke, Handoff Sheet text deliverable smoke, mocked browser download-path smoke, TypeScript contracts, production build, and Electron desktop entry plus native menu bridge contract. `npm run verify` runs the strict quality gate, renderer smoke, workflow smoke, runtime smoke, typecheck, build, and desktop entry smoke. `npm run release:check` is the release-readiness gate and runs both `npm run qa` and `npm run verify`.
 
 Release readiness evidence is maintained in `docs/release/readiness.md`. It maps the current professional-producer, beginner, direct-composition, all-style, local export, privacy, and desktop-readiness requirements to source/docs evidence and automated gates.
 
 `npm run renderer:smoke` uses Vite SSR to server-render the actual first-run React `App` without binding localhost. It verifies the default starter transport, beginner guide path, producer scan path, direct compose/sound/arrange/mix/master/export panels, Handoff surface, and sampling-free first-run copy while avoiding browser automation, Electron windows, network calls, imported audio, and sampler scope.
+
+`npm run workflow:smoke` starts from `starterProject` and creates two concrete local first-session projects: a beginner guided first beat and a producer fast-pass beat. It verifies setup changes, event density across drums/808/melody/chords, arrangement, delivery target, mix/master posture, `.grooveforge.json` save/load, export and stem analysis, MIDI bytes, Handoff Sheet sections, and sampling-free output without writing media artifacts.
 
 `npm run desktop:smoke` runs after build artifacts exist. It checks that `dist-electron/main.js` and `dist-electron/preload.js` were built, the production Electron main entry loads `dist/index.html` through `loadFile`, the compiled preload exposes the bounded `grooveforge` desktop bridge, native menu commands stay validated, the renderer `NativeMenuCommand` declaration and `handleNativeMenuCommand` switch cover every allowlisted command through existing workstation handlers, and core BrowserWindow security settings remain enabled.
 
