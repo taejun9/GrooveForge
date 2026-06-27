@@ -1397,8 +1397,8 @@ export function App(): ReactElement {
     [patternContrastSummary, project.arrangement, selectedArrangementIndex]
   );
   const patternContrastSectionFitSummary = useMemo(
-    () => createPatternContrastSectionFitSummary(patternContrastSummary, project.arrangement, selectedArrangementIndex),
-    [patternContrastSummary, project.arrangement, selectedArrangementIndex]
+    () => createPatternContrastSectionFitSummary(patternContrastSummary, project.arrangement, selectedArrangementIndex, project.styleId),
+    [patternContrastSummary, project.arrangement, selectedArrangementIndex, project.styleId]
   );
   const patternDnaSummary = useMemo(() => createPatternDnaSummary(project), [project]);
   const layerStarterOptions = useMemo(() => createLayerStarterOptions(project), [project]);
