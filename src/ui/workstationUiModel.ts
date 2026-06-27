@@ -1384,6 +1384,30 @@ export type PatternContrastSummary = {
   slots: PatternContrastSlotSummary[];
 };
 
+export type PatternContrastRoleMapBlock = {
+  index: number;
+  sectionLabel: string;
+  pattern: PatternSlot;
+  role: PatternContrastRole;
+  roleLabel: string;
+  barLabel: string;
+  detailLabel: string;
+  selected: boolean;
+  tone: MixCoachTone;
+};
+
+export type PatternContrastRoleMapSummary = {
+  statusLabel: string;
+  headline: string;
+  metricLabel: string;
+  detailLabel: string;
+  auditionCue: string;
+  nextCheck: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+  blocks: PatternContrastRoleMapBlock[];
+};
+
 export type PatternCompareResultMetric = {
   id: "pattern" | "events" | "block";
   label: string;

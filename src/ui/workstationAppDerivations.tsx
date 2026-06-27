@@ -291,6 +291,7 @@ import type {
   PatternCompareDecisionSummary,
   PatternCompareSummary,
   PatternContrastRole,
+  PatternContrastRoleMapSummary,
   PatternContrastSlotSummary,
   PatternContrastSummary,
   PatternClonePadOption,
@@ -2581,6 +2582,87 @@ export function createPatternContrastSummary(summaries: PatternCompareSummary[])
     detailTitle: `${statusLabel}: ${headline}; ${contrastLabel}; ${metricLabel}; ${detailLabel}.`,
     tone,
     slots
+  };
+}
+
+export function createPatternContrastRoleMapSummary(
+  summary: PatternContrastSummary,
+  arrangement: ArrangementBlock[],
+  selectedArrangementIndex: number
+): PatternContrastRoleMapSummary {
+  const roleByPattern = new Map<PatternSlot, PatternContrastSlotSummary>(
+    summary.slots.map((slot) => [slot.slot, slot])
+  );
+  let startBar = 1;
+  const blocks = arrangement.map((block, index) => {
+    const bars = normalizeArrangementBars(block.bars);
+    const endBar = startBar + bars - 1;
+    const barLabel = startBar === endBar ? `Bar ${startBar}` : `Bars ${startBar}-${endBar}`;
+    const slot = roleByPattern.get(block.pattern);
+    const role = slot?.role ?? "blank";
+    const roleLabel = slot?.roleLabel ?? "Blank";
+    const selected = index === selectedArrangementIndex;
+    const tone: MixCoachTone = role === "blank" ? "warn" : selected ? "good" : "good";
+    const mapBlock = {
+      index,
+      sectionLabel: block.section,
+      pattern: block.pattern,
+      role,
+      roleLabel,
+      barLabel,
+      detailLabel: `${block.section} / Pattern ${block.pattern} / ${roleLabel} / ${barLabel} / ${barCountLabel(bars)}`,
+      selected,
+      tone
+    };
+    startBar = endBar + 1;
+    return mapBlock;
+  });
+  const placedRoles = new Set(blocks.filter((block) => block.role !== "blank").map((block) => block.role));
+  const blankBlocks = blocks.filter((block) => block.role === "blank").length;
+  const roleCoverage = placedRoles.size;
+  const blockCount = blocks.length;
+  const selectedBlock = blocks.find((block) => block.selected) ?? blocks[0] ?? null;
+  const statusLabel =
+    blockCount === 0
+      ? "Map unavailable"
+      : blankBlocks > 0
+        ? "Role gap"
+        : roleCoverage >= 3
+          ? "Role map ready"
+          : roleCoverage >= 2
+            ? "Role map partial"
+            : "Role map thin";
+  const tone: MixCoachTone = statusLabel === "Role map ready" ? "good" : "warn";
+  const headline =
+    blockCount === 0
+      ? "No arrangement blocks"
+      : `${roleCoverage}/4 roles placed across ${blockCount} block${blockCount === 1 ? "" : "s"}`;
+  const patternUseCounts = patternSlots
+    .map((slot) => `${slot}:${blocks.filter((block) => block.pattern === slot).length}`)
+    .join(" ");
+  const metricLabel = `${blockCount} blocks / ${roleCoverage}/4 roles / ${patternUseCounts}`;
+  const detailLabel = selectedBlock
+    ? `Selected Block ${selectedBlock.index + 1}: ${selectedBlock.roleLabel} Pattern ${selectedBlock.pattern} / ${selectedBlock.sectionLabel} / ${selectedBlock.barLabel}`
+    : "Create arrangement blocks before mapping roles.";
+  const auditionCue =
+    blockCount === 0
+      ? "Create an arrangement block, then return to Pattern Contrast Role Map."
+      : `Play Block loop on ${selectedBlock?.roleLabel ?? "the selected role"} and compare it against the full Song loop.`;
+  const nextCheck =
+    statusLabel === "Role map ready"
+      ? "Scan Song Form Overview and Arrangement Playback before placing another role."
+      : "Use Pattern Contrast Use only when a selected block should take a named role.";
+
+  return {
+    statusLabel,
+    headline,
+    metricLabel,
+    detailLabel,
+    auditionCue,
+    nextCheck,
+    detailTitle: `${statusLabel}: ${headline}; ${metricLabel}; ${detailLabel}.`,
+    tone,
+    blocks
   };
 }
 
