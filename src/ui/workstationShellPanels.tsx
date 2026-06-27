@@ -601,6 +601,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Pattern Stack Readout Action, Selected Pattern A/B/C, Suggested 808/Chord/Synth Stack, Current Preview Target, Move Count, Selected Pattern Event Count, Drum/Music Posture, Layer Readiness, Arrangement Usage, Audition Cue, and Next Pattern Stack Check context before direct Pattern Stack commands run."
       },
       {
+        id: "pattern-stack-route-readout",
+        command: "Pattern Stack Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Suggested stack route / no edit",
+        context:
+          "Pattern Stack Route Readout Action, Selected Pattern A/B/C, Suggested 808/Chord/Synth Stack, Current Preview Target, Existing Pattern Stack Route, Preview Pattern Stack Command, Direct Pattern Stack Pad Command, Move Count, Selected Pattern Event Count, Drum/Music Posture, Layer Readiness, Arrangement Usage, Audition Cue, and Next Stack Route Check context before direct Pattern Stack commands run."
+      },
+      {
         id: "pattern-compare",
         command: "Pattern Compare",
         shortcut: "Quick Actions / Readout",
