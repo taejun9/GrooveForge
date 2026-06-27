@@ -53,6 +53,7 @@ npm run build
 npm run desktop:smoke
 npm run qa
 npm run verify
+npm run release:check
 ```
 
 Desktop app manual check:
@@ -64,6 +65,8 @@ npm run desktop
 ## Product QA Gates
 
 P0 scheduler work must prove stable play/stop/loop behavior, BPM changes, current-step feedback, and separation between UI timing and audio timing.
+
+Release-readiness work must keep `npm run release:check` as the single final local gate and ensure it runs both `npm run qa` and `npm run verify` so base/documentation rules, runtime export smoke, typecheck, production build, and desktop entry smoke stay tied together before completion reports.
 
 Runtime smoke work must execute the real local TypeScript domain, render, MIDI, Handoff Sheet, and browser download helper modules through `npm run harness:smoke`; construct sample-free 8-bar beats from every supported `styleProfiles` entry and every Beat Blueprint using existing project data; migrate a legacy single-pattern project with top-level `chordEvents` into Pattern A/B/C without losing harmonic events; roundtrip every smoke project through `serializeProjectFile` and `parseProjectFile` before export checks; verify local `.grooveforge.json` metadata, project file names, Pattern A/B/C event data, arrangement, mixer, sound design, non-silent full-mix plus drum, 808, synth, and chord stem analysis for each case; verify WAV RIFF/WAVE headers, WAV/stem file names, Standard MIDI header, MIDI file name, Handoff Sheet file name, required Handoff Sheet sections, project identity, Delivery Target, Session Brief, arrangement blocks, export meter, and stem meter content; verify mocked browser download Blob URL creation, anchor download filenames, click calls, URL revocation, file MIME types, and non-empty Blob payloads for project JSON, mix WAV, stem WAVs, MIDI, and Handoff Sheet files; avoid writing media artifacts; and avoid browser, Electron, network, imported audio, sampling, remote AI, accounts, analytics, or cloud sync dependencies.
 

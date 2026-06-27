@@ -59,9 +59,10 @@ npm run build
 npm run desktop:smoke
 npm run qa
 npm run verify
+npm run release:check
 ```
 
-These commands validate the base structure, documentation rules, runtime sample-free all-style export, legacy chord-event migration, `.grooveforge.json` roundtrip smoke, Handoff Sheet text deliverable smoke, mocked browser download-path smoke, TypeScript contracts, production build, and Electron desktop entry plus native menu bridge contract. `npm run verify` runs the strict quality gate, runtime smoke, typecheck, build, and desktop entry smoke.
+These commands validate the base structure, documentation rules, runtime sample-free all-style export, legacy chord-event migration, `.grooveforge.json` roundtrip smoke, Handoff Sheet text deliverable smoke, mocked browser download-path smoke, TypeScript contracts, production build, and Electron desktop entry plus native menu bridge contract. `npm run verify` runs the strict quality gate, runtime smoke, typecheck, build, and desktop entry smoke. `npm run release:check` is the release-readiness gate and runs both `npm run qa` and `npm run verify`.
 
 `npm run desktop:smoke` runs after build artifacts exist. It checks that `dist-electron/main.js` and `dist-electron/preload.js` were built, the production Electron main entry loads `dist/index.html` through `loadFile`, the compiled preload exposes the bounded `grooveforge` desktop bridge, native menu commands stay validated, the renderer `NativeMenuCommand` declaration and `handleNativeMenuCommand` switch cover every allowlisted command through existing workstation handlers, and core BrowserWindow security settings remain enabled.
 
