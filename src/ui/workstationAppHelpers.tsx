@@ -4237,6 +4237,7 @@ export function GrooveCompass({
   onCue,
   onFocus,
   result,
+  sectionRef,
   selectedPattern,
   summary
 }: {
@@ -4246,13 +4247,14 @@ export function GrooveCompass({
   onCue: () => void;
   onFocus: (item: GrooveCompassFocusItem) => void;
   result: GrooveCompassFocusResult | null;
+  sectionRef?: Ref<HTMLElement>;
   selectedPattern: PatternSlot;
   summary: GrooveCompassSummary;
 }): ReactElement {
   const focusSummary = createGrooveCompassFocusSummary(summary, focusedCardId);
 
   return (
-    <section className={`groove-compass ${summary.tone}`} data-testid="groove-compass" aria-label="Groove compass">
+    <section className={`groove-compass ${summary.tone}`} data-testid="groove-compass" aria-label="Groove compass" ref={sectionRef}>
       <div className="groove-compass-heading">
         <div>
           <Drum size={17} aria-hidden="true" />

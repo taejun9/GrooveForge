@@ -1067,7 +1067,7 @@ import type {
 } from "./workstationAppDerivations";
 
 import {
-  activeArrangementMuteMapQuickActionLane, activeArrangementTransitionMapQuickActionTransition, activeBassMoveQuickActionTarget, activeBeatPassportQuickActionMetric, activeBeatReadinessQuickActionCheck, activeBeatSpineQuickActionApplyCard, activeBeatSpineQuickActionCard, activeChordMoveQuickActionTarget, activeComposerGuideQuickActionCard, activeDrumMoveQuickActionTarget, activeExportPreflightQuickActionCard, activeFinishChecklistQuickActionCard, activeFirstBeatPathQuickActionStep, activeGrooveCompassQuickActionItem, activeGuideQuickStartBottleneckQuickActionTarget, activeGuideQuickStartQuickActionTarget, activeHandoffPackageCheckQuickActionCard, activeHookReadinessQuickActionCard, activeKeyCompassQuickActionItem, activeLayerStarterQuickActionOption, activeListeningPassQuickActionItem, activeMelodyMoveQuickActionTarget, activeModeFocusQuickActionCard, activePatternDnaQuickActionCard, activeProductionSnapshotQuickActionMetric, activeReviewFixItem, activeSessionPassQuickActionCard, activeStyleInspectorQuickActionItem, activeToplineSpaceQuickActionCard, applySessionBriefStarter, arrangementAverageEnergy, arrangementMuteMapFocusResultAudition, arrangementMuteMapFocusResultMetric, arrangementMuteMapFocusResultNextCheck, arrangementTransitionLoopDetail, arrangementTransitionMapFocusResultAudition, arrangementTransitionMapFocusResultMetric, arrangementTransitionMapFocusResultNextCheck, beatBlueprintStyleLabel, beatPassportFocusResultMetric, beatReadinessCardActionId, beatReadinessQuickActionCheckFromChecks, beatSpineApplyButtonContext, beatSpineJumpButtonContext, chordMotionLabel, compactSectionFlow, compactSessionBriefValue, composerActionForStyleGoal, composerActionQuickActionArea, composerActionQuickActionDetail, composerActionQuickActionGroup, composerGuideFocusCommandDetail, composerGuideFocusResultAudition, composerGuideFocusResultMetric, composerGuideFocusResultNextCheck, createArrangementMovePreviewDecision, createArrangementMovePrioritySummary, createArrangementMuteMapSummary, createArrangementTransitionLoopTarget, createArrangementTransitionMapSummary, createBeatBlueprintPreviewCue, createBeatBlueprintPreviewDecision, createBeatBlueprintPreviewSummary, createBeatMapActions, createBeatMapSummary, createBeatPassportSummary, createComposerActionsSummary, createDeliveryTargetAlignmentPreview, createExportPreflightSummary, createFinishChecklistSummary, createHandoffExportFormatFocusResult, createHandoffExportFormatSummary, createHandoffFileManifest, createHandoffManifestAudit, createHandoffPackageCheckSummary, createHandoffPackItems, createHandoffPackRouteSummary, createHandoffPackSendOrderSummary, createHookFixOption, createHookLoopCueTarget, createHookReadinessSummary, createProductionSnapshotSummary, createReviewFixOption, createReviewQueueSummary, createSectionLocatorCueDecisionSummary, createSelectedBlockEditPreviewDecision, createSelectedBlockEditPrioritySummary, createSessionBriefStarterBrief, createSongFormOverviewSummary, createSongFormPrioritySummary, createStructureLensActions, createToplineFixOption, createToplineLoopCueTarget, createToplineSpaceSummary, createWorkflowNavigatorItems, deliveryTargetMasterLabel, emptyHandoffExportReceipt, exportPreflightFocusResultMetric, exportPreflightFocusResultNextCheck, finishChecklistFocusResultMetric, firstBeatPathJumpAuditionCue, firstBeatPathJumpNextCheck, formatExportDuration, guideQuickStartCommandDetail, guideQuickStartCompletionBreakdownLabel, handoffExportFormatFocusMetric, handoffPackageCheckFocusResultMetric, handoffPackageCheckFocusResultNextCheck, hookLoopCueDetail, isArrangementMovePresetApplied, isDeliveryTargetAligned, keyCompassFocusResultAudition, keyCompassFocusResultMetric, keyCompassFocusResultNextCheck, mixPostureLabel, modeFocusCommandDetail, nextMoveResultFollowup, nextMoveResultMetricSnapshot, normalizeSwingFeelValue, patternEventTotal, productionSnapshotFocusResultMetric, projectEventTotal, quickActionArrangementBlockMetricSnapshot, quickActionBeatMapMetricSnapshot, quickActionComposerActionAreaLabel, quickActionComposerActionMetricLabel, quickActionComposerActionMoveLabel, quickActionComposerActionRouteLabel, quickActionSectionLocatorMetricSnapshot, quickActionSelectedBlockMetricSnapshot, quickActionStructureLensMetricSnapshot, reviewFixScopeLabel, reviewQueueFocusResultMetric, sectionLocatorActionSection, sectionLocatorTestId, selectedArrangementMoveQuickActionPreset, sessionBriefChangedFieldCount, sessionBriefCompassDestinationLabel, sessionBriefCompassFocusLabel, sessionBriefFieldLabel, sessionBriefFields, sessionBriefFilledFields, sessionBriefStarterPadDefinitions, sessionBriefStatus, sessionPassCommandDetail, sessionPassFocusResultAudition, sessionPassFocusResultMetric, sessionPassFocusResultNextCheck, styleGoalActionQuickActionArea, styleGoalCueLabel, styleGoalCueQuickActionGoal, suggestedMasterFinishPad, swingFeelPadDetail, swingFeelPadSwing, toplineLoopCueDetail, workflowCountLabel, workflowNavigatorJumpAuditionCue, workflowNavigatorJumpMetricValue, workflowNavigatorJumpNextCheck
+  activeArrangementMuteMapQuickActionLane, activeArrangementTransitionMapQuickActionTransition, activeBassMoveQuickActionTarget, activeBeatPassportQuickActionMetric, activeBeatReadinessQuickActionCheck, activeBeatSpineQuickActionApplyCard, activeBeatSpineQuickActionCard, activeChordMoveQuickActionTarget, activeComposerGuideQuickActionCard, activeDrumMoveQuickActionTarget, activeExportPreflightQuickActionCard, activeFinishChecklistQuickActionCard, activeFirstBeatPathQuickActionStep, activeGrooveCompassQuickActionItem, activeGuideQuickStartBottleneckQuickActionTarget, activeGuideQuickStartQuickActionTarget, activeHandoffPackageCheckQuickActionCard, activeHookReadinessQuickActionCard, activeKeyCompassQuickActionItem, activeLayerStarterQuickActionOption, activeListeningPassQuickActionItem, activeMelodyMoveQuickActionTarget, activeModeFocusQuickActionCard, activePatternDnaQuickActionCard, activeProductionSnapshotQuickActionMetric, activeReviewFixItem, activeSessionPassQuickActionCard, activeStyleInspectorQuickActionItem, activeToplineSpaceQuickActionCard, applySessionBriefStarter, arrangementAverageEnergy, arrangementMuteMapFocusResultAudition, arrangementMuteMapFocusResultMetric, arrangementMuteMapFocusResultNextCheck, arrangementTransitionLoopDetail, arrangementTransitionMapFocusResultAudition, arrangementTransitionMapFocusResultMetric, arrangementTransitionMapFocusResultNextCheck, beatBlueprintStyleLabel, beatPassportFocusResultMetric, beatReadinessCardActionId, beatReadinessQuickActionCheckFromChecks, beatSpineApplyButtonContext, beatSpineJumpButtonContext, chordMotionLabel, compactSectionFlow, compactSessionBriefValue, composerActionForStyleGoal, composerActionQuickActionArea, composerActionQuickActionDetail, composerActionQuickActionGroup, composerGuideFocusCommandDetail, composerGuideFocusResultAudition, composerGuideFocusResultMetric, composerGuideFocusResultNextCheck, createArrangementMovePreviewDecision, createArrangementMovePrioritySummary, createArrangementMuteMapSummary, createArrangementTransitionLoopTarget, createArrangementTransitionMapSummary, createBeatBlueprintPreviewCue, createBeatBlueprintPreviewDecision, createBeatBlueprintPreviewSummary, createBeatMapActions, createBeatMapSummary, createBeatPassportSummary, createComposerActionsSummary, createDeliveryTargetAlignmentPreview, createExportPreflightSummary, createFinishChecklistSummary, createHandoffExportFormatFocusResult, createHandoffExportFormatSummary, createHandoffFileManifest, createHandoffManifestAudit, createHandoffPackageCheckSummary, createHandoffPackItems, createHandoffPackRouteSummary, createHandoffPackSendOrderSummary, createHookFixOption, createHookLoopCueTarget, createHookReadinessSummary, createProductionSnapshotSummary, createReviewFixOption, createReviewQueueSummary, createSectionLocatorCueDecisionSummary, createSelectedBlockEditPreviewDecision, createSelectedBlockEditPrioritySummary, createSessionBriefStarterBrief, createSongFormOverviewSummary, createSongFormPrioritySummary, createStructureLensActions, createToplineFixOption, createToplineLoopCueTarget, createToplineSpaceSummary, createWorkflowNavigatorItems, deliveryTargetMasterLabel, emptyHandoffExportReceipt, exportPreflightFocusResultMetric, exportPreflightFocusResultNextCheck, finishChecklistFocusResultMetric, firstBeatPathJumpAuditionCue, firstBeatPathJumpNextCheck, formatExportDuration, grooveCompassFocusResultAudition, grooveCompassFocusResultMetric, grooveCompassFocusResultNextCheck, guideQuickStartCommandDetail, guideQuickStartCompletionBreakdownLabel, handoffExportFormatFocusMetric, handoffPackageCheckFocusResultMetric, handoffPackageCheckFocusResultNextCheck, hookLoopCueDetail, isArrangementMovePresetApplied, isDeliveryTargetAligned, keyCompassFocusResultAudition, keyCompassFocusResultMetric, keyCompassFocusResultNextCheck, mixPostureLabel, modeFocusCommandDetail, nextMoveResultFollowup, nextMoveResultMetricSnapshot, normalizeSwingFeelValue, patternEventTotal, productionSnapshotFocusResultMetric, projectEventTotal, quickActionArrangementBlockMetricSnapshot, quickActionBeatMapMetricSnapshot, quickActionComposerActionAreaLabel, quickActionComposerActionMetricLabel, quickActionComposerActionMoveLabel, quickActionComposerActionRouteLabel, quickActionSectionLocatorMetricSnapshot, quickActionSelectedBlockMetricSnapshot, quickActionStructureLensMetricSnapshot, reviewFixScopeLabel, reviewQueueFocusResultMetric, sectionLocatorActionSection, sectionLocatorTestId, selectedArrangementMoveQuickActionPreset, sessionBriefChangedFieldCount, sessionBriefCompassDestinationLabel, sessionBriefCompassFocusLabel, sessionBriefFieldLabel, sessionBriefFields, sessionBriefFilledFields, sessionBriefStarterPadDefinitions, sessionBriefStatus, sessionPassCommandDetail, sessionPassFocusResultAudition, sessionPassFocusResultMetric, sessionPassFocusResultNextCheck, styleGoalActionQuickActionArea, styleGoalCueLabel, styleGoalCueQuickActionGoal, suggestedMasterFinishPad, swingFeelPadDetail, swingFeelPadSwing, toplineLoopCueDetail, workflowCountLabel, workflowNavigatorJumpAuditionCue, workflowNavigatorJumpMetricValue, workflowNavigatorJumpNextCheck
 } from "./workstationAppHelpers";
 import type {
   ArrangementTransitionLoopTarget, BeatBlueprintPreviewCue, BeatBlueprintPreviewDecision, HookLoopCueTarget, ToplineLoopCueTarget
@@ -1391,6 +1391,7 @@ export function createQuickActions({
   onFocusFinishChecklist,
   onFocusFinishChecklistRouteReadout,
   onFocusGrooveCompass,
+  onFocusGrooveCompassRouteReadout,
   onFocusHandoffExportFormat,
   onFocusHandoffPack,
   onFocusHandoffManifestAudit,
@@ -1754,6 +1755,7 @@ export function createQuickActions({
   onFocusFinishChecklist: (card: FinishChecklistCard) => void;
   onFocusFinishChecklistRouteReadout: () => void;
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
+  onFocusGrooveCompassRouteReadout: () => void;
   onFocusHandoffExportFormat: (metric: HandoffExportFormatMetric) => void;
   onFocusHandoffPack: () => void;
   onFocusHandoffManifestAudit: () => void;
@@ -2249,6 +2251,33 @@ export function createQuickActions({
     run: onFocusFinishChecklistRouteReadout
   };
   const grooveCompassItem = activeGrooveCompassQuickActionItem(grooveCompassSummary);
+  const grooveCompassRouteReadoutDetail = grooveCompassItem
+    ? [
+        grooveCompassItem.value,
+        `${grooveCompassItem.focusLabel} panel`,
+        grooveCompassFocusResultMetric(grooveCompassSummary),
+        grooveCompassFocusResultAudition(grooveCompassItem),
+        grooveCompassFocusResultNextCheck(grooveCompassItem),
+        grooveCompassItem.detail,
+        `Route ${grooveCompassRouteLabel(grooveCompassItem, grooveCompassSummary)}`,
+        `Direct groove-compass-card-${grooveCompassItem.id} unchanged`,
+        "Readout only"
+      ].join(" / ")
+    : "No Groove Compass card available.";
+  const grooveCompassRouteReadoutAction: QuickAction = {
+    id: "groove-compass-route-readout-action",
+    title: grooveCompassItem ? `Review Groove Compass Route: ${grooveCompassItem.label}` : "Review Groove Compass Route",
+    detail: grooveCompassRouteReadoutDetail,
+    group: "Create",
+    keywords: `Quick Actions Groove Compass Route Readout review pocket route direct groove-compass-card-${
+      grooveCompassItem?.id ?? "none"
+    } ${grooveCompassItem?.label ?? "none"} ${grooveCompassItem?.value ?? "no groove card"} ${
+      grooveCompassItem?.focusLabel ?? "none"
+    } density anchors hats timing chance pocket selected drum Pattern ${project.selectedPattern} beginner producer`,
+    disabled: !grooveCompassItem,
+    resultTargetId: grooveCompassItem?.id,
+    run: onFocusGrooveCompassRouteReadout
+  };
   const grooveCompassActions: QuickAction[] = grooveCompassSummary.cards.map((item) => ({
     id: `groove-compass-card-${item.id}`,
     title: `Focus Groove Compass: ${item.label}`,
@@ -5039,6 +5068,7 @@ export function createQuickActions({
       }
     },
     ...keyCompassActions,
+    grooveCompassRouteReadoutAction,
     {
       id: "groove-compass-focus",
       title: grooveCompassItem ? `Focus Groove Compass: ${grooveCompassItem.label}` : "Focus Groove Compass",
@@ -7200,6 +7230,7 @@ export function createQuickActionResult(
     action.id === "key-compass-route-readout-action" ||
     action.id === "key-compass-focus" ||
     action.id.startsWith("key-compass-card-") ||
+    action.id === "groove-compass-route-readout-action" ||
     action.id === "groove-compass-focus" ||
     action.id.startsWith("groove-compass-card-") ||
     action.id === "pattern-dna-focus" ||
@@ -14176,23 +14207,43 @@ export function quickActionGrooveCompassMetricSnapshot(
   project: ProjectState,
   action: QuickAction
 ): { id: string; label: string; value: string } | null {
-  if (action.id !== "groove-compass-focus" && !action.id.startsWith("groove-compass-card-")) {
+  const isRouteReadout = action.id === "groove-compass-route-readout-action";
+  if (!isRouteReadout && action.id !== "groove-compass-focus" && !action.id.startsWith("groove-compass-card-")) {
     return null;
   }
 
   const pattern = activePattern(project);
   const parts = quickActionGrooveCompassDetailParts(action);
   const laneLabel = quickActionGrooveCompassLaneLabel(action);
-  const grooveMetricLabel = parts[0] ?? `${drumHitCount(pattern)} drum hits`;
+  const grooveMetricLabel = isRouteReadout
+    ? parts[2] ?? parts[0] ?? `${drumHitCount(pattern)} drum hits`
+    : parts[0] ?? `${drumHitCount(pattern)} drum hits`;
   const destinationLabel = parts[1] ?? "Compose";
-  const detailLabel = parts.slice(2).join(" / ") || "current pocket lane";
-  const actionLabel =
-    action.id === "groove-compass-focus" ? "focus active groove compass" : "focus direct groove compass";
+  const auditionLabel = isRouteReadout ? parts[3] ?? "audition unavailable" : "focus audition after route";
+  const nextCheckLabel = isRouteReadout ? parts[4] ?? "next check unavailable" : "return after pocket lane changes";
+  const detailLabel = parts.slice(isRouteReadout ? 5 : 2).join(" / ") || "current pocket lane";
+  const routeLabel = quickActionGrooveCompassRouteLabel(parts, laneLabel);
+  const directCardId = isRouteReadout
+    ? action.resultTargetId ?? ""
+    : action.id.startsWith("groove-compass-card-")
+      ? action.id.slice("groove-compass-card-".length)
+      : "";
+  const directCardLabel =
+    isRouteReadout && directCardId
+      ? `direct groove-compass-card-${directCardId} unchanged`
+      : directCardId
+        ? `direct groove-compass-card-${directCardId}`
+        : "active groove compass command";
+  const actionLabel = isRouteReadout
+    ? "review groove compass route readout"
+    : action.id === "groove-compass-focus"
+      ? "focus active groove compass"
+      : "focus direct groove compass";
 
   return {
     id: "groove-compass",
     label: "Groove compass",
-    value: `${actionLabel} / lane ${laneLabel} / destination ${destinationLabel} / metric ${grooveMetricLabel} / detail ${detailLabel} / Pattern ${
+    value: `${actionLabel} / lane ${laneLabel} / route ${routeLabel} / ${directCardLabel} / destination ${destinationLabel} / metric ${grooveMetricLabel} / audition ${auditionLabel} / next ${nextCheckLabel} / detail ${detailLabel} / Pattern ${
       project.selectedPattern
     } / ${projectEventTotal(project)} events / ${drumHitCount(pattern)} drum hits / ${barCountLabel(arrangementTotalBars(project))}`
   };
@@ -14206,10 +14257,22 @@ export function quickActionGrooveCompassDetailParts(action: QuickAction): string
 }
 
 export function quickActionGrooveCompassLaneLabel(action: QuickAction): string {
-  const directId = action.id.startsWith("groove-compass-card-") ? action.id.slice("groove-compass-card-".length) : "";
+  const directId = action.id.startsWith("groove-compass-card-")
+    ? action.id.slice("groove-compass-card-".length)
+    : action.id === "groove-compass-route-readout-action"
+      ? action.resultTargetId ?? ""
+      : "";
   const directLabel = directId ? grooveCompassLaneLabelFromQuickActionId(directId) : "";
-  const titleLabel = action.title.replace(/^Focus Groove Compass:\s*/, "").trim();
+  const titleLabel = action.title.replace(/^Review Groove Compass Route:\s*/, "").replace(/^Focus Groove Compass:\s*/, "").trim();
   return directLabel || titleLabel || "pocket lane unavailable";
+}
+
+export function quickActionGrooveCompassRouteLabel(parts: string[], laneLabel: string): string {
+  const routePart = parts.find((part) => part.startsWith("Route "));
+  if (routePart) {
+    return routePart.replace(/^Route\s+/, "");
+  }
+  return `${laneLabel} to Compose`;
 }
 
 export function grooveCompassLaneLabelFromQuickActionId(id: string): string {
@@ -14231,6 +14294,12 @@ export function grooveCompassLaneLabelFromQuickActionId(id: string): string {
     default:
       return "";
   }
+}
+
+export function grooveCompassRouteLabel(item: GrooveCompassCard, summary: GrooveCompassSummary): string {
+  const routeIndex = summary.cards.findIndex((candidate) => candidate.id === item.id);
+  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${summary.cards.length}` : `1/${summary.cards.length}`;
+  return `${item.label} ${routePosition} to ${item.focusLabel}`;
 }
 
 export function quickActionPatternDnaMetricSnapshot(
@@ -16073,7 +16142,7 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "groove-compass-focus") {
+  if (action.id === "groove-compass-route-readout-action" || action.id === "groove-compass-focus") {
     return (
       quickActionGrooveCompassMetricSnapshot(project, action) ?? {
         id: "groove-compass",
@@ -20952,6 +21021,15 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; confirm the cleared slot is silent before writing a new loop.`,
       nextCheck: "Use Layer Starter, Drum Foundation, Keyboard Capture, or manual editors to rebuild the cleared Pattern."
+    };
+  }
+
+  if (action.id === "groove-compass-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the Groove Compass route, then inspect the matching density, anchors, hats, timing, chance, pocket, or selected-drum lane before focusing, cueing, or editing drums.",
+      nextCheck:
+        "Use Groove Compass focus or cue only when the named pocket route matches the drum question; otherwise leave playback and project data unchanged."
     };
   }
 
