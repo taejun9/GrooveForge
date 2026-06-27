@@ -4708,7 +4708,7 @@ export function createQuickActions({
     title: `Review Pattern Variation Readout: Pattern ${project.selectedPattern}`,
     detail: `${patternVariationReadoutSuggestion.presetLabel} suggestion / preview ${patternVariationReadoutPreview.presetLabel} / ${patternVariationReadoutPreview.moveLabel} / direct variation preflight`,
     group: "Create",
-    keywords: `Quick Actions Pattern Variation Readout review selected Pattern ${project.selectedPattern} ${patternVariationReadoutSuggestion.presetLabel} ${patternVariationReadoutPreview.presetLabel} ${patternVariationReadoutPreview.moveLabel} subtle hook break layer change arrangement beginner producer`,
+    keywords: `Quick Actions Pattern Variation Readout review selected Pattern ${project.selectedPattern} ${patternVariationReadoutSuggestion.presetLabel} ${patternVariationReadoutPreview.presetLabel} ${patternVariationReadoutPreview.moveLabel} subtle hook break switchup layer change arrangement transition drop beginner producer`,
     run: onFocusPatternVariationReadout
   };
   const patternFillReadoutSuggestion = createPatternFillSuggestionSummary(project.selectedPattern, activePattern(project), project.key);
@@ -6004,7 +6004,7 @@ export function createQuickActions({
         title: `Apply ${label} Variation`,
         detail: `Apply ${label} variation to Pattern ${project.selectedPattern}.`,
         group: "Create",
-        keywords: `pattern variation ${preset} ${label} subtle hook break drums 808 melody chords beginner producer`,
+        keywords: `pattern variation ${preset} ${label} subtle hook break switchup transition drop drums 808 melody chords beginner producer`,
         run: () => onApplyPatternVariation(preset)
       };
     }),
@@ -21173,6 +21173,9 @@ export function patternVariationReadoutQuickActionPreviewPreset(action: QuickAct
   if (/\bBreak target\b/.test(text)) {
     return "breakdown";
   }
+  if (/\bSwitchup target\b/.test(text)) {
+    return "switchup";
+  }
 
   return null;
 }
@@ -21273,6 +21276,8 @@ export function patternVariationQuickActionPreset(actionId: string): PatternVari
       return "hook";
     case "pattern-variation-breakdown":
       return "breakdown";
+    case "pattern-variation-switchup":
+      return "switchup";
     default:
       return null;
   }
