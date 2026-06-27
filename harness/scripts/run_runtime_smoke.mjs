@@ -29,7 +29,7 @@ const render = await import("../../src/audio/render.ts");
 const midi = await import("../../src/audio/midi.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
-const smokeScope = "sample-free all-style 8-bar beats without writing media artifacts";
+const smokeScope = "sample-free all-style 8-bar beats with local project-file roundtrips without writing media artifacts";
 
 function cloneMixerForSmoke() {
   return workstation.starterProject.mixer.map((channel) => ({
@@ -69,8 +69,95 @@ function projectSlug(project) {
   return project.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "grooveforge";
 }
 
+function safeJsonParse(text, label) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    failures.push(`${label} project file should be valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
+function stableJson(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function projectEventCounts(project) {
+  return workstation.patternSlots.map((slot) => {
+    const pattern = project.patterns[slot];
+    const drumHits = workstation.drumLanes.reduce(
+      (total, lane) => total + pattern.drumPattern[lane].filter(Boolean).length,
+      0
+    );
+    return {
+      slot,
+      drumHits,
+      bassNotes: pattern.bassNotes.length,
+      melodyNotes: pattern.melodyNotes.length,
+      chordEvents: pattern.chordEvents.length
+    };
+  });
+}
+
+function validateProjectFileRoundTrip(project, label) {
+  const projectFileContents = workstation.serializeProjectFile(project);
+  const projectFile = safeJsonParse(projectFileContents, label);
+  check(projectFileContents.endsWith("\n"), `${label} project file should end with a newline`);
+  check(!projectFileContents.match(/AudioClipEvent|sampler|sample import|audio clip/i), `${label} project file contains sampling or audio-clip language`);
+
+  if (projectFile && typeof projectFile === "object") {
+    check(projectFile.app === "GrooveForge", `${label} project file should identify GrooveForge`);
+    check(projectFile.fileVersion === workstation.projectFileVersion, `${label} project file should use version ${workstation.projectFileVersion}`);
+    check(typeof projectFile.savedAt === "string" && Number.isFinite(Date.parse(projectFile.savedAt)), `${label} project file savedAt should be an ISO date`);
+    check(projectFile.project && typeof projectFile.project === "object", `${label} project file should contain project data`);
+  }
+
+  let roundTrippedProject = project;
+  try {
+    roundTrippedProject = workstation.parseProjectFile(projectFileContents);
+  } catch (error) {
+    failures.push(`${label} project file should parse through parseProjectFile: ${error instanceof Error ? error.message : String(error)}`);
+    return project;
+  }
+
+  const bareProjectContents = JSON.stringify(projectFile?.project ?? project);
+  let bareRoundTrippedProject = roundTrippedProject;
+  try {
+    bareRoundTrippedProject = workstation.parseProjectFile(bareProjectContents);
+  } catch (error) {
+    failures.push(`${label} bare project data should parse through parseProjectFile: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  check(roundTrippedProject.title === project.title, `${label} roundtrip should preserve title`);
+  check(roundTrippedProject.styleId === project.styleId, `${label} roundtrip should preserve style`);
+  check(roundTrippedProject.key === project.key, `${label} roundtrip should preserve key`);
+  check(roundTrippedProject.bpm === project.bpm, `${label} roundtrip should preserve BPM`);
+  check(roundTrippedProject.selectedPattern === project.selectedPattern, `${label} roundtrip should preserve selected Pattern`);
+  check(workstation.projectFileName(roundTrippedProject) === workstation.projectFileName(project), `${label} roundtrip should preserve project file name`);
+  check(workstation.arrangementTotalBars(roundTrippedProject) === workstation.arrangementTotalBars(project), `${label} roundtrip should preserve arrangement bars`);
+  check(roundTrippedProject.arrangement.length === project.arrangement.length, `${label} roundtrip should preserve arrangement block count`);
+  check(stableJson(projectEventCounts(roundTrippedProject)) === stableJson(projectEventCounts(project)), `${label} roundtrip should preserve Pattern A/B/C event counts`);
+  check(stableJson(roundTrippedProject.patterns) === stableJson(project.patterns), `${label} roundtrip should preserve Pattern A/B/C event data`);
+  check(stableJson(roundTrippedProject.mixer) === stableJson(project.mixer), `${label} roundtrip should preserve mixer state`);
+  check(stableJson(roundTrippedProject.sound) === stableJson(project.sound), `${label} roundtrip should preserve sound design state`);
+  check(stableJson(roundTrippedProject.arrangement) === stableJson(project.arrangement), `${label} roundtrip should preserve arrangement data`);
+  check(stableJson(bareRoundTrippedProject) === stableJson(roundTrippedProject), `${label} wrapped and bare project parsing should match`);
+
+  return roundTrippedProject;
+}
+
 async function validateProjectExportSmoke(smokeCase) {
-  const { label, project, expectedStyleId } = smokeCase;
+  const { label, expectedStyleId } = smokeCase;
+  const project = validateProjectFileRoundTrip(smokeCase.project, label);
   const bars = workstation.arrangementTotalBars(project);
   const expectedDuration = bars * workstation.stepsPerBar * workstation.projectStepDurationSeconds(project);
 
@@ -125,6 +212,8 @@ async function validateProjectExportSmoke(smokeCase) {
     label,
     status: mixAnalysis.status,
     durationSeconds: mixAnalysis.durationSeconds,
+    projectFileName: workstation.projectFileName(project),
+    projectFileBytes: workstation.serializeProjectFile(project).length,
     mixFileName,
     midiFileName: midi.midiFileName(project),
     midiBytes: midiBytes.byteLength
@@ -170,7 +259,8 @@ console.log("GrooveForge runtime smoke passed.");
 console.log(`- Scope: ${smokeScope}`);
 console.log(`- Blueprints: ${blueprintCases.length}/${workstation.beatBlueprints.length} sample-free 8-bar starts`);
 console.log(`- Styles: ${styleCases.length}/${workstation.styleProfiles.length} supported style profiles`);
+console.log(`- Project roundtrips: ${summaries.length}/${smokeCases.length} .grooveforge.json save/load checks before export`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
-  console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes)`);
+  console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes)`);
 }
