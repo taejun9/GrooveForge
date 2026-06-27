@@ -1262,6 +1262,7 @@ export function createQuickActions({
   onApplySpaceFx,
   onApplyStemAudition,
   onFocusStemAuditionReadout,
+  onFocusStemAuditionRouteReadout,
   onApplySoundFocus,
   onFocusSoundFocusReadout,
   onFocusSoundFocusRouteReadout,
@@ -1611,6 +1612,7 @@ export function createQuickActions({
   onApplySpaceFx: (pad: SpaceFxPadId) => void;
   onApplyStemAudition: (pad: StemAuditionPadId) => void;
   onFocusStemAuditionReadout: () => void;
+  onFocusStemAuditionRouteReadout: () => void;
   onApplySoundFocus: (pad: SoundFocusPadId) => void;
   onFocusSoundFocusReadout: () => void;
   onFocusSoundFocusRouteReadout: () => void;
@@ -2341,6 +2343,25 @@ export function createQuickActions({
       stemAuditionDecision.nextCheckLabel
     } drums 808 bass synth chords beginner producer direct composition sample free`,
     run: onFocusStemAuditionReadout
+  };
+  const stemAuditionRoutePad = stemAuditionDecision.targetId
+    ? stemAuditionPadOptions.find((pad) => pad.id === stemAuditionDecision.targetId) ?? null
+    : null;
+  const stemAuditionRouteTarget = stemAuditionRoutePad
+    ? stemAuditionRouteLabel(stemAuditionRoutePad)
+    : "No Stem Audition route available";
+  const stemAuditionRouteCommand = stemAuditionRoutePad ? `stem-audition-${stemAuditionRoutePad.id}` : "stem-audition";
+  const stemAuditionRouteReadoutAction: QuickAction = {
+    id: "stem-audition-route-readout-action",
+    title: `Review Stem Audition Route: ${stemAuditionDecision.targetLabel}`,
+    detail: `${stemAuditionRouteTarget} / ${stemAuditionReadout.roleLabel} / ${stemAuditionDecision.statusLabel} / direct ${stemAuditionRouteCommand} unchanged`,
+    group: "Mix",
+    keywords: `Quick Actions Stem Audition Route Readout review route preflight full mix drums 808 bass synth chords solo mute direct stem audition command no apply ${
+      stemAuditionDecision.targetId ?? "none"
+    } ${stemAuditionDecision.targetLabel} ${stemAuditionRouteTarget} ${
+      stemAuditionReadout.roleLabel
+    } stem audition route preflight beginner producer direct composition sample free`,
+    run: onFocusStemAuditionRouteReadout
   };
   const bassMoveTarget = activeBassMoveQuickActionTarget(project, bassMovePreviewSummary);
   const chordMoveTarget = activeChordMoveQuickActionTarget(project, selectedChord, chordMovePreviewSummary);
@@ -5768,6 +5789,7 @@ export function createQuickActions({
     },
     ...mixCoachActions,
     stemAuditionReadoutAction,
+    stemAuditionRouteReadoutAction,
     stemAuditionDecisionAction,
     ...stemAuditionPadOptions.map((pad): QuickAction => ({
       id: `stem-audition-${pad.id}`,
@@ -6875,6 +6897,7 @@ export function createQuickActionResult(
     action.id === "midi-input-readout-action" ||
     action.id === "editor-audition-readout-action" ||
     action.id === "stem-audition-readout-action" ||
+    action.id === "stem-audition-route-readout-action" ||
     action.id === "timbre-check" ||
     action.id === "session-pass-focus" ||
     action.id.startsWith("session-pass-card-") ||
@@ -17566,6 +17589,34 @@ export function quickActionStemAuditionMetricSnapshot(
     };
   }
 
+  if (action.id === "stem-audition-route-readout-action") {
+    const options = createStemAuditionPadOptions(project.mixer);
+    const readout = createStemAuditionReadoutSummary(project.mixer);
+    const decision = createStemAuditionDecisionSummary(options, readout);
+    const pad = decision.targetId ? options.find((candidate) => candidate.id === decision.targetId) ?? null : null;
+    if (!pad) {
+      return null;
+    }
+    const transformed = applyStemAuditionPadToMixer(project.mixer, pad);
+    const targetReadout = createStemAuditionReadoutSummary(transformed);
+    const stemAnalyses = analyzeStemExports(project);
+    return {
+      id: "stem-audition-route-readout",
+      label: "Stem Audition Route Readout",
+      value: quickActionStemAuditionMetricValue(project, action, analysis, stemAnalyses, [
+        quickActionStemAuditionActionLabel(action),
+        `route ${stemAuditionRouteLabel(pad)}`,
+        `direct command stem-audition-${pad.id}`,
+        `current ${readout.roleLabel} / ${readout.detailLabel}`,
+        `decision ${decision.targetLabel} / ${decision.detailLabel}`,
+        `target audition ${targetReadout.roleLabel} / ${targetReadout.detailLabel}`,
+        `mixer ${quickActionStemAuditionMixerPosture(project.mixer)}`,
+        `moves ${pad.changedCount} mixer change${pad.changedCount === 1 ? "" : "s"}`,
+        "stem audition unchanged"
+      ], quickActionStemAuditionNextCheck(action, decision, pad))
+    };
+  }
+
   if (action.id !== "stem-audition-decision" && !action.id.startsWith("stem-audition-")) {
     return null;
   }
@@ -17651,6 +17702,10 @@ export function quickActionStemAuditionMixerPosture(mixer: MixerChannel[]): stri
     .join(" / ");
 }
 
+export function stemAuditionRouteLabel(pad: StemAuditionPadOption): string {
+  return pad.trackId === null ? "Full Mix route" : `${pad.label} stem route`;
+}
+
 export function quickActionStemAuditionContextLabel(action: QuickAction, fallback: string): string {
   return quickActionStemAuditionDetailParts(action).join(" / ") || fallback;
 }
@@ -17667,6 +17722,10 @@ export function quickActionStemAuditionNextCheck(
   decision: StemAuditionDecisionSummary,
   pad: StemAuditionPadOption
 ): string {
+  if (action.id === "stem-audition-route-readout-action") {
+    return "read the Full Mix, Drums, 808, Synth, or Chords audition route before choosing the existing Stem Audition command";
+  }
+
   if (action.id === "stem-audition-decision") {
     return decision.nextCheckLabel.replace(/^Next:\s*/, "");
   }
@@ -17681,6 +17740,9 @@ export function quickActionStemAuditionNextCheck(
 export function quickActionStemAuditionActionLabel(action: QuickAction): string {
   if (action.id === "stem-audition-readout-action") {
     return "review stem audition readout";
+  }
+  if (action.id === "stem-audition-route-readout-action") {
+    return "review stem audition route readout";
   }
   if (action.id === "stem-audition-decision") {
     return "run stem audition decision";
@@ -17711,7 +17773,7 @@ export function quickActionStemAuditionPadOption(
   options: StemAuditionPadOption[],
   decision: StemAuditionDecisionSummary
 ): StemAuditionPadOption | null {
-  if (action.id === "stem-audition-readout-action") {
+  if (action.id === "stem-audition-readout-action" || action.id === "stem-audition-route-readout-action") {
     return null;
   }
 
@@ -20951,6 +21013,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the Stem Audition Readout before pressing Play or changing solo/mute, then listen to the current loop.",
       nextCheck: "Run Stem Audition Decision or a direct Full Mix/stem audition only when the readout points at the comparison you need."
+    };
+  }
+
+  if (action.id === "stem-audition-route-readout-action") {
+    return {
+      auditionCue: `Read the Stem Audition route and loop Pattern ${project.selectedPattern} before choosing the existing Stem Audition command.`,
+      nextCheck:
+        "Use Stem Audition only when the named Full Mix, Drums, 808, Synth, or Chords route matches the comparison you need; otherwise leave solo/mute unchanged and trim manually."
     };
   }
 

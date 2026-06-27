@@ -1040,7 +1040,8 @@ import {
   mixBalanceRouteLabel,
   soundFocusRouteLabel,
   soundPresetRouteLabel,
-  spaceFxRouteLabel
+  spaceFxRouteLabel,
+  stemAuditionRouteLabel
 } from "./workstationAppQuickActions";
 import type {
   EditorAuditionReadoutSummary, MixSnapshotResultTargetId, NextMoveQuickActionSource, PatternEditQuickActionRoute, QuickActionInputSetupResultState, QuickActionInputSetupSnapshot, QuickActionSelectedEventType, SoundSnapshotQuickActionTarget
@@ -7087,6 +7088,18 @@ export function App(): ReactElement {
     );
   }
 
+  function focusStemAuditionRouteReadout(): void {
+    const pad = stemAuditionDecision.targetId
+      ? stemAuditionPadOptions.find((option) => option.id === stemAuditionDecision.targetId) ?? null
+      : null;
+    const routeLabel = pad ? stemAuditionRouteLabel(pad) : "No Stem Audition route available";
+    const directCommand = pad ? `stem-audition-${pad.id}` : "stem-audition";
+    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Stem Audition Route Readout Pattern ${project.selectedPattern}: ${routeLabel} / ${stemAuditionReadout.roleLabel} / Decision ${stemAuditionDecision.targetLabel} / direct ${directCommand} unchanged`
+    );
+  }
+
   function focusMixSnapshotReadout(): void {
     mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8616,6 +8629,7 @@ export function App(): ReactElement {
     onApplySpaceFx: applySpaceFxPad,
     onApplyStemAudition: applyStemAuditionPad,
     onFocusStemAuditionReadout: focusStemAuditionReadout,
+    onFocusStemAuditionRouteReadout: focusStemAuditionRouteReadout,
     onApplySoundFocus: applySoundFocusPad,
     onFocusSoundFocusReadout: focusSoundFocusReadout,
     onFocusSoundFocusRouteReadout: focusSoundFocusRouteReadout,
