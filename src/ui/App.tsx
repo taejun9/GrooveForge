@@ -1037,6 +1037,7 @@ import {
 } from "./workstationAppQuickActions";
 import {
   drumKitRouteLabel,
+  masterAutomationRouteLabel,
   masterFinishRouteLabel,
   mixBalanceRouteLabel,
   mixSnapshotRouteLabel,
@@ -7261,6 +7262,16 @@ export function App(): ReactElement {
     );
   }
 
+  function focusMasterAutomationRouteReadout(): void {
+    const directCommand = `master-automation-${masterAutomationPreviewSummary.padId}`;
+    masterPanelRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    setProjectStatus(
+      `Master Automation Route Readout Pattern ${project.selectedPattern}: ${masterAutomationRouteLabel(
+        masterAutomationPreviewSummary.padId
+      )} / ${masterAutomationPreviewSummary.statusLabel} / ${masterAutomationPreviewSummary.eventLabel} / ${masterAutomationPreviewSummary.rangeLabel} / direct ${directCommand} unchanged`
+    );
+  }
+
   function focusExportMeter(): void {
     const currentProject = projectRef.current;
     const analysis = analyzeExport(currentProject);
@@ -8612,6 +8623,7 @@ export function App(): ReactElement {
     onFocusLayerStarterReadout: focusLayerStarterReadout,
     onApplyMasterAutomation: applyMasterAutomationPad,
     onFocusMasterAutomationReadout: focusMasterAutomationReadout,
+    onFocusMasterAutomationRouteReadout: focusMasterAutomationRouteReadout,
     onApplyMasterFinish: applyMasterFinishPad,
     onFocusMasterFinishReadout: focusMasterFinishReadout,
     onFocusMasterFinishRouteReadout: focusMasterFinishRouteReadout,

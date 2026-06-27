@@ -1313,6 +1313,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Current Output Posture, Preset, Ceiling, Output Gain, Direct Finish Pad Routes, Result Feedback, Audition Cue, and Export/Manual-Trim Next Check context before Master Finish commands run."
       },
       {
+        id: "master-automation-route-readout",
+        command: "Master Automation Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "None / fade-in / fade-out / intro-outro route",
+        context:
+          "Master Automation Route Readout Action, Selected Pattern A/B/C, Current Automation Target, Existing None/Fade-In/Fade-Out/Intro-Outro Route, Direct Master Automation Command, Current Automation Posture, Target Fade Events, Playback/Export Gain Scope, Export Readiness, Stem Readiness, Audition Cue, and Next Automation Route Check context before Master Automation commands run."
+      },
+      {
         id: "master-automation-decision",
         command: "Master Automation Decision",
         shortcut: "Quick Actions / Readout",
