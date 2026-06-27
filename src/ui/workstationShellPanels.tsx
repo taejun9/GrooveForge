@@ -777,7 +777,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Anchor / lift / break / switchup roles",
         context:
-          "Pattern Contrast Readout Action, Role Map Readout, Section Fit Readout, Section Fit Cue, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
+          "Pattern Contrast Readout Action, Role Map Readout, Section Fit Readout, Section Fit Cue, Section Fit Use, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
       },
       {
         id: "pattern-cue-readout",
@@ -1988,6 +1988,7 @@ export function PatternContrastReadout({
   onCuePattern,
   onCueSectionFitBlock,
   onUsePattern,
+  onUseSectionFitRole,
   sectionFitCueActive = false,
   sectionFitCueDisabled = false,
   selectedBlockPattern
@@ -1998,12 +1999,28 @@ export function PatternContrastReadout({
   onCuePattern?: (pattern: PatternSlot) => void;
   onCueSectionFitBlock?: () => void;
   onUsePattern?: (pattern: PatternSlot) => void;
+  onUseSectionFitRole?: (pattern: PatternSlot) => void;
   sectionFitCueActive?: boolean;
   sectionFitCueDisabled?: boolean;
   selectedBlockPattern?: PatternSlot | null;
 }): ReactElement {
   const sectionFitSelectedItem = sectionFit?.items.find((item) => item.selected) ?? sectionFit?.items[0] ?? null;
+  const sectionFitUseSlot = sectionFitSelectedItem
+    ? summary.slots.find((slot) => slot.role !== "blank" && sectionFitSelectedItem.expectedRoles.includes(slot.role)) ?? null
+    : null;
+  const sectionFitAlreadyMatches = Boolean(
+    sectionFitSelectedItem &&
+      sectionFitSelectedItem.role !== "blank" &&
+      sectionFitSelectedItem.expectedRoles.includes(sectionFitSelectedItem.role)
+  );
   const sectionFitCueUnavailable = !onCueSectionFitBlock || !sectionFitSelectedItem || sectionFitCueDisabled;
+  const sectionFitUseUnavailable =
+    !onUseSectionFitRole ||
+    !sectionFitSelectedItem ||
+    !sectionFitUseSlot ||
+    sectionFitAlreadyMatches ||
+    selectedBlockPattern === null ||
+    selectedBlockPattern === sectionFitUseSlot.slot;
   return (
     <div
       className={`pattern-contrast-readout ${summary.tone}`}
@@ -2164,6 +2181,27 @@ export function PatternContrastReadout({
             >
               <Play size={12} aria-hidden="true" />
               <span>{sectionFitCueActive ? "Cued" : "Cue block"}</span>
+            </button>
+            <button
+              className="pattern-contrast-section-fit-use"
+              data-testid="pattern-contrast-section-fit-use"
+              disabled={sectionFitUseUnavailable}
+              onClick={() => {
+                if (!sectionFitUseUnavailable && sectionFitUseSlot) {
+                  onUseSectionFitRole?.(sectionFitUseSlot.slot);
+                }
+              }}
+              title={
+                sectionFitAlreadyMatches
+                  ? "Selected section already matches its expected Pattern Contrast role."
+                  : sectionFitUseSlot && sectionFitSelectedItem
+                    ? `Use ${sectionFitUseSlot.roleLabel} Pattern ${sectionFitUseSlot.slot} in Block ${sectionFitSelectedItem.index + 1}.`
+                    : "No expected Pattern Contrast role is available for this section."
+              }
+              type="button"
+            >
+              <ArrowRight size={12} aria-hidden="true" />
+              <span>{sectionFitAlreadyMatches ? "Role fit" : "Use role"}</span>
             </button>
           </div>
         </div>
