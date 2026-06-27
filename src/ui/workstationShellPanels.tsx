@@ -777,7 +777,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Anchor / lift / break / switchup roles",
         context:
-          "Pattern Contrast Readout Action, Role Map Readout, Section Fit Readout, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
+          "Pattern Contrast Readout Action, Role Map Readout, Section Fit Readout, Section Fit Cue, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
       },
       {
         id: "pattern-cue-readout",
@@ -1986,16 +1986,24 @@ export function PatternContrastReadout({
   sectionFit,
   summary,
   onCuePattern,
+  onCueSectionFitBlock,
   onUsePattern,
+  sectionFitCueActive = false,
+  sectionFitCueDisabled = false,
   selectedBlockPattern
 }: {
   roleMap?: PatternContrastRoleMapSummary;
   sectionFit?: PatternContrastSectionFitSummary;
   summary: PatternContrastSummary;
   onCuePattern?: (pattern: PatternSlot) => void;
+  onCueSectionFitBlock?: () => void;
   onUsePattern?: (pattern: PatternSlot) => void;
+  sectionFitCueActive?: boolean;
+  sectionFitCueDisabled?: boolean;
   selectedBlockPattern?: PatternSlot | null;
 }): ReactElement {
+  const sectionFitSelectedItem = sectionFit?.items.find((item) => item.selected) ?? sectionFit?.items[0] ?? null;
+  const sectionFitCueUnavailable = !onCueSectionFitBlock || !sectionFitSelectedItem || sectionFitCueDisabled;
   return (
     <div
       className={`pattern-contrast-readout ${summary.tone}`}
@@ -2138,6 +2146,25 @@ export function PatternContrastReadout({
           <div className="pattern-contrast-section-fit-followup">
             <span data-testid="pattern-contrast-section-fit-detail">{sectionFit.detailLabel}</span>
             <small data-testid="pattern-contrast-section-fit-next-check">{sectionFit.nextCheck}</small>
+            <button
+              className={`pattern-contrast-section-fit-cue ${sectionFitCueActive ? "selected" : ""}`}
+              data-testid="pattern-contrast-section-fit-cue"
+              disabled={sectionFitCueUnavailable}
+              onClick={() => {
+                if (!sectionFitCueUnavailable) {
+                  onCueSectionFitBlock?.();
+                }
+              }}
+              title={
+                sectionFitSelectedItem
+                  ? `Cue Block ${sectionFitSelectedItem.index + 1} ${sectionFitSelectedItem.sectionLabel} as Block loop for Section Fit.`
+                  : "Select an arrangement block before cueing Section Fit."
+              }
+              type="button"
+            >
+              <Play size={12} aria-hidden="true" />
+              <span>{sectionFitCueActive ? "Cued" : "Cue block"}</span>
+            </button>
           </div>
         </div>
       )}

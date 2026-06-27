@@ -9930,7 +9930,10 @@ export function App(): ReactElement {
             summary={patternContrastSummary}
             selectedBlockPattern={selectedArrangementBlock?.pattern ?? null}
             onCuePattern={cuePatternFromCompare}
+            onCueSectionFitBlock={() => cueArrangementBlock(selectedArrangementIndex)}
             onUsePattern={usePatternInSelectedBlockFromCompare}
+            sectionFitCueActive={transportLoopScope === "block" && project.arrangement.length > 0}
+            sectionFitCueDisabled={isPlaying || project.arrangement.length === 0}
           />
           {patternCompareResult && <PatternCompareResultStrip result={patternCompareResult} />}
           <PatternDna
