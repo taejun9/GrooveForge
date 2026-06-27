@@ -3402,6 +3402,28 @@ export function createQuickActions({
     keywords: `handoff package check focus card send files order receipt context archive ${card.id} ${card.label} ${card.value} ${card.status} ${card.detail} beginner producer`,
     run: () => onFocusHandoffPackageCheck(card)
   }));
+  const handoffPackageCheckReadoutAction: QuickAction = {
+    id: "handoff-package-check-readout-action",
+    title: `Review Handoff Package Check Readout: ${handoffPackageCheckSummary.headline}`,
+    detail: [
+      handoffPackageCheckSummary.headline,
+      handoffPackageCheckSummary.detail,
+      `priority ${handoffPackageCheckCard?.label ?? "package clear"}`,
+      `receipt ${handoffReceipt.statusLabel}`,
+      `send ${handoffSendOrder.statusLabel}`,
+      "package preflight"
+    ].join(" / "),
+    group: "Export",
+    keywords: `handoff package check readout review file set send order latest receipt session brief delivery target package priority no render no download ${
+      handoffPackageCheckCard?.id ?? "clear"
+    } ${handoffPackageCheckSummary.headline} sample free beginner producer`,
+    disabled: !handoffPackageCheckCard,
+    run: () => {
+      if (handoffPackageCheckCard) {
+        onFocusHandoffPackageCheck(handoffPackageCheckCard);
+      }
+    }
+  };
   const handoffManifestAuditReadoutAction: QuickAction = {
     id: "handoff-manifest-audit-readout-action",
     title: `Review Handoff Manifest Audit Readout: ${handoffManifestAudit.statusLabel}`,
@@ -5784,6 +5806,7 @@ export function createQuickActions({
         }
       }
     },
+    handoffPackageCheckReadoutAction,
     ...handoffPackageCheckActions,
     handoffNextExportReadoutAction,
     {
@@ -6494,6 +6517,7 @@ export function createQuickActionResult(
     action.id.startsWith("topline-space-cue-") ||
     action.id === "handoff-pack" ||
     action.id === "handoff-package-check-focus" ||
+    action.id === "handoff-package-check-readout-action" ||
     action.id.startsWith("handoff-package-check-card-") ||
     action.id === "handoff-manifest-audit-focus" ||
     action.id === "handoff-manifest-audit-readout-action" ||
@@ -8808,7 +8832,8 @@ export function quickActionHandoffPackageCheckMetricSnapshot(
   exportReceipt: HandoffExportReceipt | null,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
-  if (action.id !== "handoff-package-check-focus" && !action.id.startsWith("handoff-package-check-card-")) {
+  const isReadout = action.id === "handoff-package-check-readout-action";
+  if (action.id !== "handoff-package-check-focus" && !isReadout && !action.id.startsWith("handoff-package-check-card-")) {
     return null;
   }
 
@@ -8836,16 +8861,18 @@ export function quickActionHandoffPackageCheckMetricSnapshot(
   });
   const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
   const detailParts = quickActionHandoffPackageCheckDetailParts(action);
-  const contextLabel = detailParts.slice(2).join(" / ") || card.detail;
+  const statusLabel = isReadout ? (detailParts[0] ?? summary.headline) : card.status;
+  const contextLabel = isReadout ? detailParts.slice(1).join(" / ") || summary.detail : detailParts.slice(2).join(" / ") || card.detail;
+  const followup = quickActionResultFollowup(action, project, "complete");
 
   return {
-    id: "handoff-package-check",
-    label: "Handoff package",
+    id: isReadout ? "handoff-package-check-readout" : "handoff-package-check",
+    label: isReadout ? "Handoff Package Check Readout" : "Handoff package",
     value: [
       quickActionHandoffPackageCheckActionLabel(action),
       `lane ${quickActionHandoffPackageCheckLaneLabel(action, card)}`,
       `destination ${card.focusLabel} panel`,
-      `status ${card.status}`,
+      `status ${statusLabel}`,
       `context ${contextLabel}`,
       `Pattern ${project.selectedPattern}`,
       `${patternEventTotal(pattern)} editable events`,
@@ -8867,7 +8894,13 @@ export function quickActionHandoffPackageCheckMetricSnapshot(
         card
       ),
       `${project.arrangement.length} blocks`,
-      barCountLabel(arrangementTotalBars(project))
+      barCountLabel(arrangementTotalBars(project)),
+      "package check unchanged",
+      "export unchanged",
+      "receipt unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
     ].join(" / ")
   };
 }
@@ -8914,6 +8947,10 @@ export function quickActionHandoffPackageCheckDeliveryMetricParts(
 }
 
 export function quickActionHandoffPackageCheckActionLabel(action: QuickAction): string {
+  if (action.id === "handoff-package-check-readout-action") {
+    return "review handoff package check";
+  }
+
   return action.id === "handoff-package-check-focus" ? "focus priority handoff package" : "focus direct handoff package";
 }
 
@@ -8921,7 +8958,7 @@ export function quickActionHandoffPackageCheckCard(
   summary: HandoffPackageCheckSummary,
   action: QuickAction
 ): HandoffPackageCheckCard | null {
-  if (action.id === "handoff-package-check-focus") {
+  if (action.id === "handoff-package-check-focus" || action.id === "handoff-package-check-readout-action") {
     return activeHandoffPackageCheckQuickActionCard(summary);
   }
 
@@ -8946,6 +8983,10 @@ export function quickActionHandoffPackageCheckDetailParts(action: QuickAction): 
 }
 
 export function quickActionHandoffPackageCheckLaneLabel(action: QuickAction, card: HandoffPackageCheckCard): string {
+  if (action.id === "handoff-package-check-readout-action") {
+    return card.label;
+  }
+
   const titleLabel = action.title.replace(/^Focus Handoff Package:\s*/, "").trim();
   return titleLabel && titleLabel !== "Focus Handoff Package" ? titleLabel : card.label;
 }
@@ -14520,7 +14561,11 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "handoff-package-check-focus" || action.id.startsWith("handoff-package-check-card-")) {
+  if (
+    action.id === "handoff-package-check-focus" ||
+    action.id === "handoff-package-check-readout-action" ||
+    action.id.startsWith("handoff-package-check-card-")
+  ) {
     const handoffPackageMetric = quickActionHandoffPackageCheckMetricSnapshot(
       project,
       action,
@@ -14532,8 +14577,8 @@ export function quickActionResultMetricSnapshot(
     }
 
     return {
-      id: "handoff-package-check",
-      label: "Handoff package",
+      id: action.id === "handoff-package-check-readout-action" ? "handoff-package-check-readout" : "handoff-package-check",
+      label: action.id === "handoff-package-check-readout-action" ? "Handoff Package Check Readout" : "Handoff package",
       value: action.detail
     };
   }
@@ -18525,6 +18570,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Handoff Package Check card to inspect file set, export order, latest receipt, or session context before sending.",
       nextCheck: "Return to Handoff Package Check after the focused package lane is ready or intentionally deferred."
+    };
+  }
+
+  if (action.id === "handoff-package-check-readout-action") {
+    return {
+      auditionCue: "Review file set, send order, latest receipt, and session context before sending the beat package.",
+      nextCheck:
+        "Run Handoff Next Export or the matching explicit export only after the package priority, receipt, send order, and delivery target agree."
     };
   }
 
