@@ -290,6 +290,9 @@ import type {
   PatternCompareResult,
   PatternCompareDecisionSummary,
   PatternCompareSummary,
+  PatternContrastRole,
+  PatternContrastSlotSummary,
+  PatternContrastSummary,
   PatternClonePadOption,
   PatternCloneResult,
   PatternEditResult,
@@ -2508,6 +2511,143 @@ export function createPatternCompareSummaries(project: ProjectState): PatternCom
       arrangedBars
     };
   });
+}
+
+export function createPatternContrastSummary(summaries: PatternCompareSummary[]): PatternContrastSummary {
+  const orderedSummaries = patternSlots
+    .map((slot) => summaries.find((summary) => summary.slot === slot))
+    .filter((summary): summary is PatternCompareSummary => Boolean(summary));
+  const activeSummaries = orderedSummaries.filter((summary) => summary.eventCount > 0);
+  const totals = orderedSummaries.map((summary) => summary.eventCount);
+  const drumTotals = orderedSummaries.map((summary) => summary.drumHits);
+  const musicTotals = orderedSummaries.map((summary) => summary.bassNotes + summary.chordEvents + summary.melodyNotes);
+  const maxEvents = totals.length > 0 ? Math.max(...totals) : 0;
+  const minEvents = totals.length > 0 ? Math.min(...totals) : 0;
+  const eventSpread = maxEvents - minEvents;
+  const drumSpread = drumTotals.length > 0 ? Math.max(...drumTotals) - Math.min(...drumTotals) : 0;
+  const musicSpread = musicTotals.length > 0 ? Math.max(...musicTotals) - Math.min(...musicTotals) : 0;
+  const arrangedPatterns = orderedSummaries.filter((summary) => summary.arrangedBlocks > 0).length;
+  const strongest = [...orderedSummaries].sort(
+    (first, second) =>
+      second.eventCount - first.eventCount ||
+      second.arrangedBars - first.arrangedBars ||
+      patternSlots.indexOf(first.slot) - patternSlots.indexOf(second.slot)
+  )[0];
+  const thinnest = [...orderedSummaries].sort(
+    (first, second) =>
+      first.eventCount - second.eventCount ||
+      first.arrangedBars - second.arrangedBars ||
+      patternSlots.indexOf(first.slot) - patternSlots.indexOf(second.slot)
+  )[0];
+  const statusLabel =
+    activeSummaries.length < 2 ? "Build contrast" : eventSpread >= 12 || drumSpread >= 8 || musicSpread >= 6 ? "Contrast ready" : "Contrast thin";
+  const tone: MixCoachTone = activeSummaries.length < 2 ? "warn" : statusLabel === "Contrast ready" ? "good" : "warn";
+  const contrastLabel = `${eventSpread} event spread`;
+  const metricLabel = `${activeSummaries.length}/3 active / ${arrangedPatterns}/3 arranged / D${drumSpread} M${musicSpread}`;
+  const headline =
+    statusLabel === "Contrast ready"
+      ? `${strongest ? `Pattern ${strongest.slot}` : "A/B/C"} carries the lift`
+      : activeSummaries.length < 2
+        ? "Add or clone another Pattern"
+        : "Make one Pattern more different";
+  const detailLabel =
+    statusLabel === "Contrast ready"
+      ? `${strongest ? `Lift ${strongest.slot}` : "Lift ready"} / ${thinnest ? `Break ${thinnest.slot}` : "break ready"}`
+      : activeSummaries.length < 2
+        ? "Use Pattern Clone, Stack, Variation, or manual layers to create a second loop"
+        : "Use Hook, Break, Switchup, Fill, or selected-event edits to widen A/B/C contrast";
+  const slots = orderedSummaries.map((summary) =>
+    createPatternContrastSlotSummary(summary, strongest?.slot ?? "A", thinnest?.slot ?? "A", statusLabel)
+  );
+  const auditionCue =
+    statusLabel === "Contrast ready"
+      ? `Cue Pattern ${strongest?.slot ?? "A"} against Pattern ${thinnest?.slot ?? "A"} and hear whether the section lift is obvious.`
+      : "Loop Pattern A/B/C one at a time and make one loop clearly denser, sparser, or more transitional.";
+  const nextCheck =
+    statusLabel === "Contrast ready"
+      ? "Use Pattern Compare, Pattern Chain, or Arrangement Template to place the contrast intentionally."
+      : activeSummaries.length < 2
+        ? "Create a second Pattern before arranging the song form."
+        : "Apply a variation, fill, or manual layer edit, then return to Pattern Contrast.";
+
+  return {
+    statusLabel,
+    headline,
+    contrastLabel,
+    metricLabel,
+    detailLabel,
+    auditionCue,
+    nextCheck,
+    detailTitle: `${statusLabel}: ${headline}; ${contrastLabel}; ${metricLabel}; ${detailLabel}.`,
+    tone,
+    slots
+  };
+}
+
+function createPatternContrastSlotSummary(
+  summary: PatternCompareSummary,
+  strongestSlot: PatternSlot,
+  thinnestSlot: PatternSlot,
+  statusLabel: string
+): PatternContrastSlotSummary {
+  const musicEvents = summary.bassNotes + summary.chordEvents + summary.melodyNotes;
+  const role = patternContrastRole(summary, strongestSlot, thinnestSlot, statusLabel);
+  const roleLabel = patternContrastRoleLabel(role);
+  const eventLabel = `${summary.eventCount} events`;
+  const layerLabel = `${summary.drumHits} drums / ${musicEvents} music`;
+  const arrangementLabel =
+    summary.arrangedBlocks === 0
+      ? "not arranged"
+      : `${summary.arrangedBlocks} block${summary.arrangedBlocks === 1 ? "" : "s"} / ${barCountLabel(summary.arrangedBars)}`;
+  const tone: MixCoachTone = role === "blank" ? "warn" : role === "anchor" && statusLabel !== "Contrast ready" ? "warn" : "good";
+
+  return {
+    slot: summary.slot,
+    role,
+    roleLabel,
+    eventLabel,
+    layerLabel,
+    arrangementLabel,
+    detailLabel: `${eventLabel} / ${layerLabel} / ${arrangementLabel}`,
+    tone
+  };
+}
+
+function patternContrastRole(
+  summary: PatternCompareSummary,
+  strongestSlot: PatternSlot,
+  thinnestSlot: PatternSlot,
+  statusLabel: string
+): PatternContrastRole {
+  const musicEvents = summary.bassNotes + summary.chordEvents + summary.melodyNotes;
+  if (summary.eventCount === 0) {
+    return "blank";
+  }
+  if (statusLabel === "Contrast ready" && summary.slot === strongestSlot) {
+    return "lift";
+  }
+  if (statusLabel === "Contrast ready" && summary.slot === thinnestSlot) {
+    return "break";
+  }
+  if (summary.drumHits >= 14 && musicEvents >= 8) {
+    return "switchup";
+  }
+  return "anchor";
+}
+
+function patternContrastRoleLabel(role: PatternContrastRole): string {
+  switch (role) {
+    case "anchor":
+      return "Anchor";
+    case "lift":
+      return "Lift";
+    case "break":
+      return "Break";
+    case "switchup":
+      return "Switchup";
+    case "blank":
+      return "Blank";
+  }
 }
 
 export function createPatternCompareDecisionSummary(

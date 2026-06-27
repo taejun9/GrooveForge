@@ -1358,6 +1358,32 @@ export type PatternCompareDecisionSummary = {
   tone: MixCoachTone;
 };
 
+export type PatternContrastRole = "anchor" | "lift" | "break" | "switchup" | "blank";
+
+export type PatternContrastSlotSummary = {
+  slot: PatternSlot;
+  role: PatternContrastRole;
+  roleLabel: string;
+  eventLabel: string;
+  layerLabel: string;
+  arrangementLabel: string;
+  detailLabel: string;
+  tone: MixCoachTone;
+};
+
+export type PatternContrastSummary = {
+  statusLabel: string;
+  headline: string;
+  contrastLabel: string;
+  metricLabel: string;
+  detailLabel: string;
+  auditionCue: string;
+  nextCheck: string;
+  detailTitle: string;
+  tone: MixCoachTone;
+  slots: PatternContrastSlotSummary[];
+};
+
 export type PatternCompareResultMetric = {
   id: "pattern" | "events" | "block";
   label: string;

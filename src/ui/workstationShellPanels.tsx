@@ -28,6 +28,7 @@ import type {
   LocalDraftRecovery,
   PatternCompareDecisionSummary,
   PatternCompareSummary,
+  PatternContrastSummary,
   QuickAction,
   QuickActionPinnedResult,
   QuickActionRecent,
@@ -767,6 +768,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         target: "Current Cue / Use recommendation",
         context:
           "Cue/Use Recommendation, Selected Pattern A/B/C, Selected-Block Placement, Visible Readout Action, Pattern Compare Decision Command, Pattern Compare Result Feedback, Audition Cue, and Next Decision Check context before Pattern Compare Decision commands run."
+      },
+      {
+        id: "pattern-contrast-readout",
+        command: "Pattern Contrast",
+        shortcut: "Quick Actions / Readout",
+        target: "Anchor / lift / break / switchup roles",
+        context:
+          "Pattern Contrast Readout Action, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
       },
       {
         id: "pattern-cue-readout",
@@ -1966,6 +1975,37 @@ export function PatternCompareDecision({
         <Icon size={13} aria-hidden="true" />
         {runLabel}
       </button>
+    </div>
+  );
+}
+
+export function PatternContrastReadout({ summary }: { summary: PatternContrastSummary }): ReactElement {
+  return (
+    <div
+      className={`pattern-contrast-readout ${summary.tone}`}
+      data-pattern-contrast={summary.statusLabel}
+      data-testid="pattern-contrast-readout"
+      title={summary.detailTitle}
+    >
+      <div className="pattern-contrast-main">
+        <span data-testid="pattern-contrast-status">{summary.statusLabel}</span>
+        <strong data-testid="pattern-contrast-headline">{summary.headline}</strong>
+        <small data-testid="pattern-contrast-detail">{summary.detailLabel}</small>
+        <small data-testid="pattern-contrast-metric">{summary.contrastLabel} / {summary.metricLabel}</small>
+      </div>
+      <div className="pattern-contrast-grid" aria-label="Pattern contrast roles">
+        {summary.slots.map((slot) => (
+          <div className={`pattern-contrast-slot ${slot.tone}`} data-testid={`pattern-contrast-${slot.slot}`} key={slot.slot}>
+            <span>Pattern {slot.slot}</span>
+            <strong>{slot.roleLabel}</strong>
+            <small>{slot.detailLabel}</small>
+          </div>
+        ))}
+      </div>
+      <div className="pattern-contrast-followup">
+        <span data-testid="pattern-contrast-audition">{summary.auditionCue}</span>
+        <small data-testid="pattern-contrast-next-check">{summary.nextCheck}</small>
+      </div>
     </div>
   );
 }

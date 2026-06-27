@@ -290,6 +290,7 @@ import type {
   PatternCompareResult,
   PatternCompareDecisionSummary,
   PatternCompareSummary,
+  PatternContrastSummary,
   PatternClonePadOption,
   PatternCloneResult,
   PatternEditResult,
@@ -1042,7 +1043,7 @@ import {
   createListeningPassSummary, createMasterAutomationPadOptions, createMasterAutomationPreviewSummary, createMasterAutomationResult, createMasterAutomationResultMetric, createMasterFinishPadOptions, createMasterFinishPreviewSummary, createMasterFinishResult,
   createMasterFinishResultMetric, createMasterOutputRoleSummary, createMixBalancePadOptions, createMixBalancePreviewSummary, createMixBalanceResult, createMixBalanceResultMetric, createMixCoachChecks, createMixCoachFocusResult,
   createMixCoachFocusSummary, createMixFixActions, createMixFixPreviewSummary, createMixFixResult, createMixFixResultMetric, createMixSnapshot, createPatternChainPreviewDecision, createPatternChainPreviewSummary,
-  createPatternChainPrioritySummary, createPatternChainResult, createPatternChainResultMetric, createPatternCompareDecisionSummary, createPatternCompareResult, createPatternCompareResultMetric, createPatternCompareSummaries, createPatternDnaFocusResult,
+  createPatternChainPrioritySummary, createPatternChainResult, createPatternChainResultMetric, createPatternCompareDecisionSummary, createPatternCompareResult, createPatternCompareResultMetric, createPatternCompareSummaries, createPatternContrastSummary, createPatternDnaFocusResult,
   createPatternDnaFocusSummary, createPatternDnaSummary, createPatternDynamicsCard, createSoundFocusPadOptions, createSoundFocusPreviewSummary, createSoundFocusResult, createSoundFocusResultMetric, createSoundPresetPreviewSummary,
   createSoundPresetResult, createSoundPresetResultMetric, createSoundSnapshot, createSoundSnapshotComparison, createSoundTimbreCheckSummary, createSpaceFxPadOptions, createSpaceFxPreviewSummary, createSpaceFxResult,
   createSpaceFxResultMetric, createStemAuditionDecisionSummary, createStemAuditionPadOptions, createStemAuditionReadoutSummary, createStyleGoalCard, createStyleGoalCards, createStyleInspectorFocusResult, createStyleInspectorFocusSummary,
@@ -1132,6 +1133,7 @@ export function createQuickActions({
   modeFocusSummary,
   patternCloneOptions,
   patternCompareDecisionSummary,
+  patternContrastSummary,
   patternChainPreviewSummary,
   patternStackOptions,
   patternStackPreviewSummary,
@@ -1262,6 +1264,7 @@ export function createQuickActions({
   onFocusPatternFillReadout,
   onApplyPatternVariation,
   onFocusPatternVariationReadout,
+  onFocusPatternContrastReadout,
   onApplyPatternStack,
   onFocusPatternStackReadout,
   onCopySelectedPattern,
@@ -1510,6 +1513,7 @@ export function createQuickActions({
   modeFocusSummary: ModeFocusSummary;
   patternCloneOptions: PatternClonePadOption[];
   patternCompareDecisionSummary: PatternCompareDecisionSummary;
+  patternContrastSummary: PatternContrastSummary;
   patternChainPreviewSummary: PatternChainPreviewSummary;
   patternStackOptions: PatternStackOption[];
   patternStackPreviewSummary: PatternStackPreviewSummary;
@@ -1640,6 +1644,7 @@ export function createQuickActions({
   onFocusPatternFillReadout: () => void;
   onApplyPatternVariation: (preset: PatternVariationPreset) => void;
   onFocusPatternVariationReadout: () => void;
+  onFocusPatternContrastReadout: () => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
   onFocusPatternStackReadout: () => void;
   onCopySelectedPattern: (target: PatternSlot) => void;
@@ -4560,6 +4565,14 @@ export function createQuickActions({
     disabled: patternCompareDecisionSummary.action === "use" && !selectedBlock,
     run: () => onRunPatternCompareDecision(patternCompareDecisionSummary.action, patternCompareDecisionSummary.target)
   };
+  const patternContrastReadoutAction: QuickAction = {
+    id: "pattern-contrast-readout-action",
+    title: `Review Pattern Contrast: ${patternContrastSummary.statusLabel}`,
+    detail: `${patternContrastSummary.contrastLabel} / ${patternContrastSummary.metricLabel} / ${patternContrastSummary.detailLabel}`,
+    group: "Create",
+    keywords: `Quick Actions Pattern Contrast Readout review Pattern A B C roles anchor lift break switchup contrast ${patternContrastSummary.statusLabel} ${patternContrastSummary.headline} ${patternContrastSummary.contrastLabel} ${patternContrastSummary.metricLabel} ${patternContrastSummary.detailLabel} beginner producer direct beat workstation sample free`,
+    run: onFocusPatternContrastReadout
+  };
   const patternSwitchReadoutTarget = patternCompareDecisionSummary.target;
   const patternSwitchReadoutEventCount = patternEventTotal(project.patterns[patternSwitchReadoutTarget]);
   const patternSwitchReadoutPlacement = patternCueSwitchSelectedBlockPlacement(
@@ -5006,6 +5019,7 @@ export function createQuickActions({
     ...tempoNudgeActions,
     ...swingFeelActions,
     patternCompareDecisionAction,
+    patternContrastReadoutAction,
     patternCueReadoutAction,
     ...patternCueActions,
     patternSwitchReadoutAction,
@@ -10371,6 +10385,24 @@ export function quickActionPatternCompareDecisionMetricSnapshot(
     id: "pattern-compare-decision",
     label: identity.label,
     value: `${identity.actionLabel} / Pattern ${target} / ${eventCount} events / ${drumCount} drums / ${musicEvents} music / ${selectedBlockPlacement} / arrangement ${arrangementUse} / edit Pattern ${project.selectedPattern}`
+  };
+}
+
+export function quickActionPatternContrastReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "pattern-contrast-readout-action") {
+    return null;
+  }
+
+  const summary = createPatternContrastSummary(createPatternCompareSummaries(project));
+  const slotRoles = summary.slots.map((slot) => `Pattern ${slot.slot} ${slot.roleLabel}`).join(" / ");
+
+  return {
+    id: "pattern-contrast-readout",
+    label: "Pattern Contrast",
+    value: `${summary.statusLabel} / ${summary.contrastLabel} / ${summary.metricLabel} / ${slotRoles} / ${summary.detailLabel} / contrast unchanged / playback unchanged / export unchanged`
   };
 }
 
@@ -17203,6 +17235,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "pattern-contrast-readout-action") {
+    return (
+      quickActionPatternContrastReadoutMetricSnapshot(project, action) ?? {
+        id: "pattern-contrast-readout",
+        label: "Pattern Contrast",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id === "pattern-use-readout-action") {
     return (
       quickActionPatternUseReadoutMetricSnapshot(project, action, selectedArrangementIndex) ?? {
@@ -22179,6 +22221,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Play Pattern loop; compare recommended Pattern ${target}'s drums, 808, chords, and Synth before editing or arranging.`,
       nextCheck: "Read Pattern Compare Result, then use Pattern Switch for edits or Pattern Use when this loop should enter the song."
+    };
+  }
+
+  if (action.id === "pattern-contrast-readout-action") {
+    const summary = createPatternContrastSummary(createPatternCompareSummaries(project));
+    return {
+      auditionCue: summary.auditionCue,
+      nextCheck: summary.nextCheck
     };
   }
 
