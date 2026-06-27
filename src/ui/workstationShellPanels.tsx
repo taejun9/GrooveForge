@@ -1195,6 +1195,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Full Mix, Soloed Stem, Manual Audition State, Mixer Solo/Mute Posture, Decision Target, Audition Cue, and Next Check context before Stem Audition Readout commands run."
       },
       {
+        id: "stem-audition-route-readout",
+        command: "Stem Audition Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Full Mix / Drums / 808 / Synth / Chords audition route",
+        context:
+          "Stem Audition Route Readout Action, Selected Pattern A/B/C, Current Audition Posture, Existing Stem Audition Route, Direct Stem Audition Command, Mixer Solo/Mute Posture, Stem Readiness, Audition Cue, and Next Stem Route Check context before Stem Audition commands run."
+      },
+      {
         id: "stem-audition-decision",
         command: "Stem Audition Decision",
         shortcut: "Quick Actions / Readout",
