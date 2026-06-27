@@ -47,6 +47,20 @@ type LaunchSmokeEvidence = {
   };
 };
 
+type LaunchSmokeVisualEvidence = {
+  bitmapBytes: number;
+  brightSamples: number;
+  darkSamples: number;
+  height: number;
+  maxColorDelta: number;
+  nonBackgroundSamples: number;
+  opaqueSamples: number;
+  pngBytes: number;
+  sampledPixels: number;
+  uniqueSampledColors: number;
+  width: number;
+};
+
 const projectFilters = [{ name: "GrooveForge Project", extensions: ["json"] }];
 
 function isSaveProjectPayload(value: unknown): value is SaveProjectPayload {
@@ -260,6 +274,104 @@ function launchSmokeFailures(evidence: LaunchSmokeEvidence): string[] {
   return failures;
 }
 
+function launchSmokeVisualFailures(evidence: LaunchSmokeVisualEvidence): string[] {
+  const failures: string[] = [];
+  const opaqueRatio = evidence.sampledPixels > 0 ? evidence.opaqueSamples / evidence.sampledPixels : 0;
+  const nonBackgroundRatio = evidence.sampledPixels > 0 ? evidence.nonBackgroundSamples / evidence.sampledPixels : 0;
+
+  if (evidence.width < 1180 || evidence.height < 760) {
+    failures.push(`screenshot should respect desktop minimums, got ${evidence.width}x${evidence.height}`);
+  }
+  if (evidence.pngBytes < 50000) {
+    failures.push(`screenshot PNG should be substantial, got ${evidence.pngBytes} bytes`);
+  }
+  if (evidence.bitmapBytes < evidence.width * evidence.height * 4) {
+    failures.push(`screenshot bitmap should include RGBA pixels, got ${evidence.bitmapBytes} bytes`);
+  }
+  if (evidence.sampledPixels < 1000) {
+    failures.push(`screenshot should sample at least 1000 pixels, got ${evidence.sampledPixels}`);
+  }
+  if (opaqueRatio < 0.95) {
+    failures.push(`screenshot should be mostly opaque, got ${(opaqueRatio * 100).toFixed(1)}% opaque samples`);
+  }
+  if (evidence.uniqueSampledColors < 24) {
+    failures.push(`screenshot should have visible color diversity, got ${evidence.uniqueSampledColors} sampled colors`);
+  }
+  if (nonBackgroundRatio < 0.04) {
+    failures.push(`screenshot should contain non-background UI pixels, got ${(nonBackgroundRatio * 100).toFixed(1)}%`);
+  }
+  if (evidence.maxColorDelta < 48) {
+    failures.push(`screenshot should have visible contrast, got max color delta ${evidence.maxColorDelta}`);
+  }
+  if (evidence.brightSamples < 20 || evidence.darkSamples < 20) {
+    failures.push(`screenshot should contain both bright and dark UI samples, got ${evidence.brightSamples} bright and ${evidence.darkSamples} dark`);
+  }
+
+  return failures;
+}
+
+async function collectLaunchSmokeVisualEvidence(win: BrowserWindow): Promise<LaunchSmokeVisualEvidence> {
+  const screenshot = await win.webContents.capturePage();
+  const { width, height } = screenshot.getSize();
+  const pngBytes = screenshot.toPNG().byteLength;
+  const bitmap = screenshot.toBitmap();
+  const totalPixels = Math.floor(bitmap.byteLength / 4);
+  const targetSamples = Math.min(12000, totalPixels);
+  const stride = Math.max(1, Math.floor(totalPixels / Math.max(1, targetSamples)));
+  const base0 = bitmap[0] ?? 0;
+  const base1 = bitmap[1] ?? 0;
+  const base2 = bitmap[2] ?? 0;
+  const sampledColors = new Set<string>();
+  let sampledPixels = 0;
+  let opaqueSamples = 0;
+  let nonBackgroundSamples = 0;
+  let brightSamples = 0;
+  let darkSamples = 0;
+  let maxColorDelta = 0;
+
+  for (let pixel = 0; pixel < totalPixels; pixel += stride) {
+    const offset = pixel * 4;
+    const c0 = bitmap[offset] ?? 0;
+    const c1 = bitmap[offset + 1] ?? 0;
+    const c2 = bitmap[offset + 2] ?? 0;
+    const alpha = bitmap[offset + 3] ?? 255;
+    const colorDelta = Math.abs(c0 - base0) + Math.abs(c1 - base1) + Math.abs(c2 - base2);
+    const colorSum = c0 + c1 + c2;
+
+    sampledPixels += 1;
+    if (alpha >= 240) {
+      opaqueSamples += 1;
+    }
+    if (colorDelta > 24) {
+      nonBackgroundSamples += 1;
+    }
+    if (colorSum > 420) {
+      brightSamples += 1;
+    }
+    if (colorSum < 120) {
+      darkSamples += 1;
+    }
+    if (colorDelta > maxColorDelta) {
+      maxColorDelta = colorDelta;
+    }
+    sampledColors.add(`${c0 >> 4}:${c1 >> 4}:${c2 >> 4}`);
+  }
+
+  return {
+    bitmapBytes: bitmap.byteLength,
+    brightSamples,
+    darkSamples,
+    height,
+    maxColorDelta,
+    nonBackgroundSamples,
+    opaqueSamples,
+    pngBytes,
+    sampledPixels,
+    uniqueSampledColors: sampledColors.size,
+    width
+  };
+}
+
 async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmokeEvidence> {
   const evidence = await win.webContents.executeJavaScript(`
     (() => {
@@ -378,11 +490,32 @@ function installLaunchSmoke(win: BrowserWindow): void {
 
         const failures = launchSmokeFailures(evidence);
         if (failures.length === 0) {
-          finished = true;
-          clearTimeout(timeout);
-          console.log(`${launchSmokeResultPrefix}${JSON.stringify({ ok: true, evidence })}`);
-          app.exit(0);
-          return;
+          return collectLaunchSmokeVisualEvidence(win)
+            .then((visualEvidence) => {
+              if (finished) {
+                return;
+              }
+
+              const visualFailures = launchSmokeVisualFailures(visualEvidence);
+              if (visualFailures.length > 0) {
+                fail("Production desktop visual launch smoke failed.", {
+                  evidence,
+                  visualEvidence,
+                  failures: visualFailures
+                });
+                return;
+              }
+
+              finished = true;
+              clearTimeout(timeout);
+              console.log(`${launchSmokeResultPrefix}${JSON.stringify({ ok: true, evidence: { ...evidence, visual: visualEvidence } })}`);
+              app.exit(0);
+            })
+            .catch((error: unknown) => {
+              fail("Production desktop screenshot capture failed.", {
+                error: error instanceof Error ? error.message : String(error)
+              });
+            });
         }
 
         if (Date.now() >= deadline) {

@@ -96,6 +96,18 @@ function checkResult(result) {
 
   const missingTestIds = expectedLiveTestIds.filter((testId) => evidence?.testIds?.[testId] !== true);
   check(missingTestIds.length === 0, `live desktop renderer is missing test ids: ${missingTestIds.join(", ")}`);
+
+  const visual = evidence?.visual;
+  check(visual && typeof visual === "object", "live desktop launch smoke should include screenshot visual evidence");
+  check(visual?.width >= 1180 && visual?.height >= 760, "live desktop screenshot should respect minimum viewport dimensions");
+  check(visual?.pngBytes > 50000, "live desktop screenshot PNG should be substantial");
+  check(visual?.bitmapBytes >= visual?.width * visual?.height * 4, "live desktop screenshot should include full RGBA bitmap bytes");
+  check(visual?.sampledPixels >= 1000, "live desktop screenshot should sample enough pixels");
+  check(visual?.opaqueSamples / visual?.sampledPixels >= 0.95, "live desktop screenshot should be mostly opaque");
+  check(visual?.uniqueSampledColors >= 24, "live desktop screenshot should have visible color diversity");
+  check(visual?.nonBackgroundSamples / visual?.sampledPixels >= 0.04, "live desktop screenshot should contain non-background UI pixels");
+  check(visual?.maxColorDelta >= 48, "live desktop screenshot should have visible contrast");
+  check(visual?.brightSamples >= 20 && visual?.darkSamples >= 20, "live desktop screenshot should contain both bright and dark UI samples");
 }
 
 function resolveElectronBinary() {
@@ -196,6 +208,9 @@ child.on("exit", (code, signal) => {
     `- Renderer: ${result.evidence.title}, ${result.evidence.viewport.width}x${result.evidence.viewport.height}, ${result.evidence.bodyTextLength} text characters, ${Object.keys(
       result.evidence.testIds
     ).length} required test ids`
+  );
+  console.log(
+    `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors, ${result.evidence.visual.nonBackgroundSamples}/${result.evidence.visual.sampledPixels} non-background samples`
   );
   console.log("- Beginner path: Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator");
   console.log("- Producer path: Studio mode, Review Queue, Production Snapshot, Mix Coach, Sound/Mix Snapshot, Quick Actions, Command Reference");
