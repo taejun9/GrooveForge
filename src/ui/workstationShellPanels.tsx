@@ -959,6 +959,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Sound Snapshot A/B Comparison, A/B Slot State, Capture/Recall/Clear Commands, Preset/Drum/808/Synth/Chords Comparison, Result Feedback, Audition Cue, and Next Snapshot Check context before Sound Snapshot A/B commands run."
       },
       {
+        id: "space-fx-route-readout",
+        command: "Space FX Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Drums / 808 / Synth / Chords send route",
+        context:
+          "Space FX Route Readout Action, Selected Pattern A/B/C, Current Dry/Room/Wide/Wash Preview Target, Existing Space FX Send Route, Direct Space FX Command, Drums/808/Synth/Chords Send Posture, Editable Mixer Sends, Arrangement Usage, Audition Cue, and Next Space FX Route Check context before Space FX commands run."
+      },
+      {
         id: "space-fx-decision",
         command: "Space FX Decision",
         shortcut: "Quick Actions / Readout",
