@@ -3402,6 +3402,29 @@ export function createQuickActions({
     keywords: `handoff package check focus card send files order receipt context archive ${card.id} ${card.label} ${card.value} ${card.status} ${card.detail} beginner producer`,
     run: () => onFocusHandoffPackageCheck(card)
   }));
+  const handoffExportReceiptReadoutAction: QuickAction = {
+    id: "handoff-export-receipt-readout-action",
+    title: handoffExportReceiptCard
+      ? `Review Handoff Export Receipt Readout: ${handoffExportReceiptCard.value}`
+      : "Review Handoff Export Receipt Readout",
+    detail: [
+      handoffReceipt.statusLabel,
+      handoffReceipt.fileLabel,
+      handoffReceipt.detailLabel,
+      `package ${handoffPackageCheckSummary.headline}`,
+      `send ${handoffSendOrder.nextLabel}`,
+      "receipt preflight"
+    ].join(" / "),
+    group: "Export",
+    keywords: `handoff export receipt readout review latest downloaded file no render no download wav stems midi sheet deliverable package readiness send order delivery target ${
+      handoffReceipt.itemId ?? "none"
+    } ${handoffReceipt.statusLabel} sample free beginner producer`,
+    run: () => {
+      if (handoffExportReceiptCard) {
+        onFocusHandoffPackageCheck(handoffExportReceiptCard);
+      }
+    }
+  };
   const tempoNudgeActions: QuickAction[] = tempoNudgePads.map((pad) => {
     const nextBpm = tempoNudgePadBpm(project.bpm, pad.id);
     return {
@@ -5703,6 +5726,7 @@ export function createQuickActions({
         }
       }
     },
+    handoffExportReceiptReadoutAction,
     {
       id: "handoff-package-check-focus",
       title: handoffPackageCheckCard
@@ -6434,6 +6458,7 @@ export function createQuickActionResult(
     action.id === "handoff-manifest-audit-focus" ||
     action.id === "handoff-send-order-focus" ||
     action.id === "handoff-export-receipt-focus" ||
+    action.id === "handoff-export-receipt-readout-action" ||
     action.id === "handoff-export-format-focus" ||
     action.id.startsWith("handoff-export-format-") ||
     action.id === "song-form-overview-readout-action" ||
@@ -10793,14 +10818,28 @@ export function quickActionHandoffExportReceiptMetricSnapshot(
   exportReceipt: HandoffExportReceipt | null,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
-  if (action.id !== "handoff-export-receipt-focus") {
+  const isReadout = action.id === "handoff-export-receipt-readout-action";
+  if (action.id !== "handoff-export-receipt-focus" && !isReadout) {
     return null;
   }
 
   const exportAnalysis = analysis ?? analyzeExport(project);
   const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
   const receipt = exportReceipt ?? emptyHandoffExportReceipt();
   const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
   const pattern = activePattern(project);
   const usedSlots = usedPatternSlots(project);
   const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
@@ -10808,25 +10847,41 @@ export function quickActionHandoffExportReceiptMetricSnapshot(
   const statusLabel = detailParts[0] ?? receipt.statusLabel;
   const contextLabel = detailParts.slice(1).join(" / ") || `${receipt.fileLabel} / ${receipt.detailLabel}`;
   const deliverableLabel = receipt.itemId ? handoffExportReceiptItemLabel(receipt.itemId) : "No deliverable";
+  const directTarget = receipt.itemId ? handoffNextExportDirectTarget(receipt.itemId) : null;
+  const fileTargetLabel = directTarget ? directExportQuickActionFileLabel(project, directTarget) : "No file target";
+  const readinessLabel = directTarget
+    ? directExportQuickActionReadinessLabel(project, directTarget, exportAnalysis, stemAnalyses)
+    : "No receipt deliverable yet";
+  const followup = quickActionResultFollowup(action, project, "complete");
 
   return {
-    id: "handoff-export-receipt",
-    label: "Handoff receipt",
+    id: isReadout ? "handoff-export-receipt-readout" : "handoff-export-receipt",
+    label: isReadout ? "Handoff Export Receipt Readout" : "Handoff receipt",
     value: [
-      "focus export receipt",
+      isReadout ? "review export receipt" : "focus export receipt",
       "destination Deliver panel",
       `status ${statusLabel}`,
       `deliverable ${deliverableLabel}`,
       `file ${receipt.fileLabel}`,
+      `file target ${fileTargetLabel}`,
       `context ${contextLabel}`,
+      `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
+      readinessLabel,
       `next ${receipt.nextLabel}`,
       `Pattern ${project.selectedPattern}`,
-      `${patternEventTotal(pattern)} events`,
+      `${patternEventTotal(pattern)} editable events`,
       patternUseLabel,
+      `send ${sendOrder.statusLabel} / ${sendOrder.nextLabel}`,
+      `sequence ${sendOrder.sequenceLabel}`,
       `package ${packageSummary.headline}`,
       packageSummary.detail,
       `${project.arrangement.length} blocks`,
-      barCountLabel(arrangementTotalBars(project))
+      barCountLabel(bars),
+      "receipt unchanged",
+      "export unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
     ].join(" / ")
   };
 }
@@ -14413,7 +14468,7 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "handoff-export-receipt-focus") {
+  if (action.id === "handoff-export-receipt-focus" || action.id === "handoff-export-receipt-readout-action") {
     const handoffReceiptMetric = quickActionHandoffExportReceiptMetricSnapshot(
       project,
       action,
@@ -14425,8 +14480,8 @@ export function quickActionResultMetricSnapshot(
     }
 
     return {
-      id: "handoff-export-receipt",
-      label: "Handoff receipt",
+      id: action.id === "handoff-export-receipt-readout-action" ? "handoff-export-receipt-readout" : "handoff-export-receipt",
+      label: action.id === "handoff-export-receipt-readout-action" ? "Handoff Export Receipt Readout" : "Handoff receipt",
       value: action.detail
     };
   }
@@ -18414,6 +18469,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Read the latest Handoff Export Receipt before assuming a WAV, stems, MIDI, or Handoff Sheet deliverable is ready.",
       nextCheck: "If the receipt is empty or outdated, run Handoff Next Export or the explicit deliverable export you need."
+    };
+  }
+
+  if (action.id === "handoff-export-receipt-readout-action") {
+    return {
+      auditionCue: "Review the latest receipt file, package readiness, and send order before sending the beat package.",
+      nextCheck:
+        "Run Handoff Next Export or the matching explicit export only if the latest receipt does not match the deliverable you need."
     };
   }
 
