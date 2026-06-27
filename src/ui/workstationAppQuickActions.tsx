@@ -291,6 +291,7 @@ import type {
   PatternCompareDecisionSummary,
   PatternCompareSummary,
   PatternContrastRole,
+  PatternContrastRoleMapSummary,
   PatternContrastSummary,
   PatternClonePadOption,
   PatternCloneResult,
@@ -1065,6 +1066,7 @@ import {
   styleGoalPriorityLabel, styleInspectorFocusResultAudition, styleInspectorFocusResultDetail, styleInspectorFocusResultMetric, styleInspectorFocusResultNextCheck, styleInspectorFocusResultTitle, styleInspectorFocusResultTone, suggestedArrangementFocusPreset,
   suggestedMasterAutomationPad, transportLoopLabel, transportLoopStatus, usedPatternSlots, velocityLayerLabel
 } from "./workstationAppDerivations";
+import { createPatternContrastRoleMapSummary } from "./workstationAppDerivations";
 import type {
   SoundTimbreScore
 } from "./workstationAppDerivations";
@@ -1171,6 +1173,7 @@ export function createQuickActions({
   modeFocusSummary,
   patternCloneOptions,
   patternCompareDecisionSummary,
+  patternContrastRoleMapSummary,
   patternContrastSummary,
   patternChainPreviewSummary,
   patternStackOptions,
@@ -1303,6 +1306,7 @@ export function createQuickActions({
   onApplyPatternVariation,
   onFocusPatternVariationReadout,
   onFocusPatternContrastReadout,
+  onFocusPatternContrastRoleMapReadout,
   onApplyPatternStack,
   onFocusPatternStackReadout,
   onCopySelectedPattern,
@@ -1551,6 +1555,7 @@ export function createQuickActions({
   modeFocusSummary: ModeFocusSummary;
   patternCloneOptions: PatternClonePadOption[];
   patternCompareDecisionSummary: PatternCompareDecisionSummary;
+  patternContrastRoleMapSummary: PatternContrastRoleMapSummary;
   patternContrastSummary: PatternContrastSummary;
   patternChainPreviewSummary: PatternChainPreviewSummary;
   patternStackOptions: PatternStackOption[];
@@ -1683,6 +1688,7 @@ export function createQuickActions({
   onApplyPatternVariation: (preset: PatternVariationPreset) => void;
   onFocusPatternVariationReadout: () => void;
   onFocusPatternContrastReadout: () => void;
+  onFocusPatternContrastRoleMapReadout: () => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
   onFocusPatternStackReadout: () => void;
   onCopySelectedPattern: (target: PatternSlot) => void;
@@ -4611,6 +4617,14 @@ export function createQuickActions({
     keywords: `Quick Actions Pattern Contrast Readout review Pattern A B C roles anchor lift break switchup contrast ${patternContrastSummary.statusLabel} ${patternContrastSummary.headline} ${patternContrastSummary.contrastLabel} ${patternContrastSummary.metricLabel} ${patternContrastSummary.detailLabel} beginner producer direct beat workstation sample free`,
     run: onFocusPatternContrastReadout
   };
+  const patternContrastRoleMapReadoutAction: QuickAction = {
+    id: "pattern-contrast-role-map-readout-action",
+    title: `Review Pattern Role Map: ${patternContrastRoleMapSummary.statusLabel}`,
+    detail: `${patternContrastRoleMapSummary.metricLabel} / ${patternContrastRoleMapSummary.detailLabel}`,
+    group: "Arrange",
+    keywords: `Quick Actions Pattern Contrast Role Map Readout arrangement role map anchor lift break switchup selected block ${patternContrastRoleMapSummary.statusLabel} ${patternContrastRoleMapSummary.headline} ${patternContrastRoleMapSummary.metricLabel} ${patternContrastRoleMapSummary.detailLabel} beginner producer direct beat workstation sample free`,
+    run: onFocusPatternContrastRoleMapReadout
+  };
   const patternContrastCueActions: QuickAction[] = patternContrastCueRoles.map((role) => {
     const slot = patternContrastCueSlot(patternContrastSummary, role);
     const roleLabel = patternContrastCueRoleLabel(role);
@@ -5105,6 +5119,7 @@ export function createQuickActions({
     ...swingFeelActions,
     patternCompareDecisionAction,
     patternContrastReadoutAction,
+    patternContrastRoleMapReadoutAction,
     ...patternContrastCueActions,
     ...patternContrastUseActions,
     patternCueReadoutAction,
@@ -10490,6 +10505,32 @@ export function quickActionPatternContrastReadoutMetricSnapshot(
     id: "pattern-contrast-readout",
     label: "Pattern Contrast",
     value: `${summary.statusLabel} / ${summary.contrastLabel} / ${summary.metricLabel} / ${slotRoles} / ${summary.detailLabel} / contrast unchanged / playback unchanged / export unchanged`
+  };
+}
+
+export function quickActionPatternContrastRoleMapMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "pattern-contrast-role-map-readout-action") {
+    return null;
+  }
+
+  const roleMap = createPatternContrastRoleMapSummary(
+    createPatternContrastSummary(createPatternCompareSummaries(project)),
+    project.arrangement,
+    selectedArrangementIndex
+  );
+  const selectedBlock = roleMap.blocks.find((block) => block.selected) ?? roleMap.blocks[0] ?? null;
+  const roleSequence = roleMap.blocks.map((block) => `${block.sectionLabel}:${block.roleLabel} ${block.pattern}`).join(" / ");
+
+  return {
+    id: "pattern-contrast-role-map",
+    label: "Pattern Role Map",
+    value: `${roleMap.statusLabel} / ${roleMap.metricLabel} / ${
+      selectedBlock ? `selected Block ${selectedBlock.index + 1} ${selectedBlock.roleLabel} Pattern ${selectedBlock.pattern}` : "no selected block"
+    } / ${roleSequence || "no arrangement blocks"} / arrangement unchanged / playback unchanged / export unchanged`
   };
 }
 
@@ -17396,6 +17437,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "pattern-contrast-role-map-readout-action") {
+    return (
+      quickActionPatternContrastRoleMapMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "pattern-contrast-role-map",
+        label: "Pattern Role Map",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id.startsWith("pattern-contrast-cue-")) {
     return (
       quickActionPatternContrastCueMetricSnapshot(project, action) ?? {
@@ -22400,6 +22451,18 @@ export function quickActionResultFollowup(
     return {
       auditionCue: summary.auditionCue,
       nextCheck: summary.nextCheck
+    };
+  }
+
+  if (action.id === "pattern-contrast-role-map-readout-action") {
+    const roleMap = createPatternContrastRoleMapSummary(
+      createPatternContrastSummary(createPatternCompareSummaries(project)),
+      project.arrangement,
+      0
+    );
+    return {
+      auditionCue: roleMap.auditionCue,
+      nextCheck: roleMap.nextCheck
     };
   }
 

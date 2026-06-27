@@ -28,6 +28,7 @@ import type {
   LocalDraftRecovery,
   PatternCompareDecisionSummary,
   PatternCompareSummary,
+  PatternContrastRoleMapSummary,
   PatternContrastSummary,
   QuickAction,
   QuickActionPinnedResult,
@@ -775,7 +776,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Anchor / lift / break / switchup roles",
         context:
-          "Pattern Contrast Readout Action, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
+          "Pattern Contrast Readout Action, Role Map Readout, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
       },
       {
         id: "pattern-cue-readout",
@@ -1980,11 +1981,13 @@ export function PatternCompareDecision({
 }
 
 export function PatternContrastReadout({
+  roleMap,
   summary,
   onCuePattern,
   onUsePattern,
   selectedBlockPattern
 }: {
+  roleMap?: PatternContrastRoleMapSummary;
   summary: PatternContrastSummary;
   onCuePattern?: (pattern: PatternSlot) => void;
   onUsePattern?: (pattern: PatternSlot) => void;
@@ -2069,6 +2072,39 @@ export function PatternContrastReadout({
           );
         })}
       </div>
+      {roleMap && (
+        <div
+          className={`pattern-contrast-role-map ${roleMap.tone}`}
+          data-pattern-contrast-role-map={roleMap.statusLabel}
+          data-testid="pattern-contrast-role-map"
+          title={roleMap.detailTitle}
+        >
+          <div className="pattern-contrast-role-map-heading">
+            <span data-testid="pattern-contrast-role-map-status">{roleMap.statusLabel}</span>
+            <strong data-testid="pattern-contrast-role-map-headline">{roleMap.headline}</strong>
+            <small data-testid="pattern-contrast-role-map-metric">{roleMap.metricLabel}</small>
+          </div>
+          <div className="pattern-contrast-role-map-grid" aria-label="Pattern contrast role map">
+            {roleMap.blocks.map((block) => (
+              <div
+                className={`pattern-contrast-role-map-block ${block.tone} ${block.selected ? "selected" : ""}`}
+                data-pattern-contrast-map-role={block.role}
+                data-testid={`pattern-contrast-role-map-block-${block.index + 1}`}
+                key={`${block.index}-${block.pattern}`}
+                title={block.detailLabel}
+              >
+                <span>{block.sectionLabel}</span>
+                <strong>{block.roleLabel}</strong>
+                <small>Pattern {block.pattern} / {block.barLabel}</small>
+              </div>
+            ))}
+          </div>
+          <div className="pattern-contrast-role-map-followup">
+            <span data-testid="pattern-contrast-role-map-detail">{roleMap.detailLabel}</span>
+            <small data-testid="pattern-contrast-role-map-next-check">{roleMap.nextCheck}</small>
+          </div>
+        </div>
+      )}
       <div className="pattern-contrast-followup">
         <span data-testid="pattern-contrast-audition">{summary.auditionCue}</span>
         <small data-testid="pattern-contrast-next-check">{summary.nextCheck}</small>
