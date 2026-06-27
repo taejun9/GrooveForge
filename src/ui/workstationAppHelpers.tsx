@@ -3436,6 +3436,7 @@ export function SessionBriefPanel({
   referenceAlignment,
   referenceAlignmentResult,
   result,
+  sectionRef,
   starterPads,
   onApplyStarter,
   onChange,
@@ -3452,6 +3453,7 @@ export function SessionBriefPanel({
   referenceAlignment: ReferenceAlignmentSummary;
   referenceAlignmentResult: ReferenceAlignmentFocusResult | null;
   result: SessionBriefStarterResult | null;
+  sectionRef?: Ref<HTMLElement>;
   starterPads: SessionBriefStarterPadOption[];
   onApplyStarter: (pad: SessionBriefStarterPadId) => void;
   onChange: (field: keyof SessionBrief, value: string) => void;
@@ -3463,7 +3465,7 @@ export function SessionBriefPanel({
   const roleSummary = createSessionBriefRoleSummary(brief);
 
   return (
-    <section className="session-brief-row" data-testid="session-brief" aria-label="Session brief">
+    <section className="session-brief-row" data-testid="session-brief" aria-label="Session brief" ref={sectionRef}>
       <div className="session-brief-heading">
         <div>
           <Music2 size={17} aria-hidden="true" />

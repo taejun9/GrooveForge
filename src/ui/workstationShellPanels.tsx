@@ -315,12 +315,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Direction, Reference, Artist/Vocal Context, Handoff Readiness Cards, Brief Compass Focus Route, Direct Brief Card Commands, Focus Result Feedback, Delivery Target, Export Readiness, Package Readiness, Audition Cue, and Next Brief/Handoff Check context before Session Brief Compass commands run."
       },
       {
+        id: "reference-alignment-route-readout",
+        command: "Reference Alignment Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Reference / direction / form / mix / listen / handoff route",
+        context:
+          "Reference Alignment Route Readout Action, current written-reference fit, direction, form, mix, listen cue, or handoff lane, existing Reference Alignment route, direct Reference Alignment card command, delivery target, brief fields, export/stem/package readiness, audition cue, and next route check before Reference Alignment focus, playback, edit, or export commands run."
+      },
+      {
         id: "reference-alignment",
         command: "Reference Alignment",
         shortcut: "Quick Actions / Readout",
         target: "Reference / form / mix / handoff",
         context:
-          "Written Reference Fit, Direction, Arrangement Form, Mix Posture, Listen Cue, Handoff Readiness, Reference Alignment Focus Route, Direct Alignment Card Commands, Focus Result Feedback, Delivery Target, Export/Stem/Package Readiness, Audition Cue, and Next Listening/Handoff Check context before Reference Alignment commands run."
+          "Written Reference Fit, Direction, Arrangement Form, Mix Posture, Listen Cue, Handoff Readiness, Reference Alignment Route Readout context, Reference Alignment Focus Route, Direct Alignment Card Commands, Focus Result Feedback, Delivery Target, Export/Stem/Package Readiness, Audition Cue, and Next Listening/Handoff Check context before Reference Alignment commands run."
       },
       {
         id: "composer-guide-route-readout",
