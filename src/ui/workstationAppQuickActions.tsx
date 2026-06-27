@@ -3424,6 +3424,21 @@ export function createQuickActions({
       }
     }
   };
+  const handoffRouteReadoutAction: QuickAction = {
+    id: "handoff-route-readout-action",
+    title: `Review Handoff Route Readout: ${handoffRouteSummary.statusLabel}`,
+    detail: [
+      handoffRouteSummary.routeLabel,
+      handoffRouteSummary.detailLabel,
+      handoffRouteSummary.fileLabel,
+      `target ${activeDeliveryTarget(project).name}`,
+      `package ${handoffPackageCheckSummary.headline}`,
+      "route preflight"
+    ].join(" / "),
+    group: "Export",
+    keywords: `handoff route readout review deliver target route status package manifest receipt send order no render no download ${handoffRouteSummary.routeLabel} ${handoffRouteSummary.statusLabel} sample free beginner producer`,
+    run: onFocusHandoffPack
+  };
   const handoffManifestAuditReadoutAction: QuickAction = {
     id: "handoff-manifest-audit-readout-action",
     title: `Review Handoff Manifest Audit Readout: ${handoffManifestAudit.statusLabel}`,
@@ -5723,6 +5738,7 @@ export function createQuickActions({
       }/${handoffPackItems.length} beginner producer`,
       run: onFocusHandoffPack
     },
+    handoffRouteReadoutAction,
     {
       id: "handoff-export-format-focus",
       title: handoffExportFormatMetric
@@ -6516,6 +6532,7 @@ export function createQuickActionResult(
     action.id === "topline-loop-cue" ||
     action.id.startsWith("topline-space-cue-") ||
     action.id === "handoff-pack" ||
+    action.id === "handoff-route-readout-action" ||
     action.id === "handoff-package-check-focus" ||
     action.id === "handoff-package-check-readout-action" ||
     action.id.startsWith("handoff-package-check-card-") ||
@@ -10814,7 +10831,8 @@ export function quickActionHandoffPackMetricSnapshot(
   exportReceipt: HandoffExportReceipt | null,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
-  if (action.id !== "handoff-pack") {
+  const isRouteReadout = action.id === "handoff-route-readout-action";
+  if (action.id !== "handoff-pack" && !isRouteReadout) {
     return null;
   }
 
@@ -10855,15 +10873,21 @@ export function quickActionHandoffPackMetricSnapshot(
     ? (handoffPackItems.find((item) => item.id === sendOrder.nextItemId) ?? null)
     : null;
   const nextItemLabel = nextItem ? `${nextItem.label} ${nextItem.value} / ${nextItem.detail}` : "All deliverables ready";
+  const detailParts = quickActionHandoffRouteDetailParts(action);
+  const routeLabel = isRouteReadout ? (detailParts[0] ?? routeSummary.routeLabel) : routeSummary.routeLabel;
+  const routeDetail = isRouteReadout ? (detailParts[1] ?? routeSummary.detailLabel) : routeSummary.detailLabel;
+  const routeFile = isRouteReadout ? (detailParts[2] ?? routeSummary.fileLabel) : routeSummary.fileLabel;
+  const followup = quickActionResultFollowup(action, project, "complete");
 
   return {
-    id: "handoff-pack",
-    label: "Handoff Pack",
+    id: isRouteReadout ? "handoff-route-readout" : "handoff-pack",
+    label: isRouteReadout ? "Handoff Route Readout" : "Handoff Pack",
     value: [
-      "review package readout",
+      isRouteReadout ? "review handoff route" : "review package readout",
       "destination Deliver / Handoff Pack",
       `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
-      `route ${routeSummary.routeLabel} / ${routeSummary.statusLabel} / ${routeSummary.detailLabel}`,
+      `route ${routeLabel} / ${routeSummary.statusLabel} / ${routeDetail}`,
+      `route file ${routeFile}`,
       `items ${itemPosture}`,
       `wav ${mixWavFileName(project)} / ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
       `stems ${audibleStemCount}/${target.stemGoal} target / ${audibleStemCount}/${stemTrackIds.length} audible / ${stemWavFileNames(
@@ -10890,9 +10914,22 @@ export function quickActionHandoffPackMetricSnapshot(
       patternUseLabel,
       `${project.arrangement.length} blocks`,
       barCountLabel(bars),
-      `next ${sendOrder.nextLabel}`
+      `next ${sendOrder.nextLabel}`,
+      "route unchanged",
+      "export unchanged",
+      "receipt unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
     ].join(" / ")
   };
+}
+
+export function quickActionHandoffRouteDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 export function quickActionHandoffExportReceiptMetricSnapshot(
@@ -14543,7 +14580,7 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "handoff-pack") {
+  if (action.id === "handoff-pack" || action.id === "handoff-route-readout-action") {
     const handoffPackMetric = quickActionHandoffPackMetricSnapshot(
       project,
       action,
@@ -14555,8 +14592,8 @@ export function quickActionResultMetricSnapshot(
     }
 
     return {
-      id: "handoff-pack",
-      label: "Handoff Pack",
+      id: action.id === "handoff-route-readout-action" ? "handoff-route-readout" : "handoff-pack",
+      label: action.id === "handoff-route-readout-action" ? "Handoff Route Readout" : "Handoff Pack",
       value: action.detail
     };
   }
@@ -18563,6 +18600,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Read Handoff Pack before sending so WAV, stems, MIDI, Handoff Sheet, route, manifest, receipt, format, and send order agree.",
       nextCheck: "Run Handoff Next Export or an explicit deliverable export only after the current package readout points to that item."
+    };
+  }
+
+  if (action.id === "handoff-route-readout-action") {
+    return {
+      auditionCue: "Review the handoff route, delivery target, and package posture before sending the beat package.",
+      nextCheck:
+        "Run Handoff Next Export or the matching explicit export only after the route, receipt, package check, and send order agree."
     };
   }
 
