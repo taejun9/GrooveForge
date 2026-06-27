@@ -1261,6 +1261,7 @@ export function createQuickActions({
   onFocusStemAuditionReadout,
   onApplySoundFocus,
   onFocusSoundFocusReadout,
+  onFocusSoundFocusRouteReadout,
   onApplySoundPreset,
   onFocusSoundPresetReadout,
   onCaptureSoundSnapshot,
@@ -1605,6 +1606,7 @@ export function createQuickActions({
   onFocusStemAuditionReadout: () => void;
   onApplySoundFocus: (pad: SoundFocusPadId) => void;
   onFocusSoundFocusReadout: () => void;
+  onFocusSoundFocusRouteReadout: () => void;
   onApplySoundPreset: (preset: SoundPresetTarget) => void;
   onFocusSoundPresetReadout: () => void;
   onCaptureSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
@@ -3317,6 +3319,14 @@ export function createQuickActions({
   });
   const directDrumKitPadOptions = createDrumKitPadOptions(project);
   const directSoundFocusPadOptions = createSoundFocusPadOptions(project.sound);
+  const soundFocusRoutePad =
+    directSoundFocusPadOptions.find((pad) => pad.id === soundFocusPreviewSummary.padId) ??
+    directSoundFocusPadOptions[0] ??
+    null;
+  const soundFocusRouteParameters = soundFocusRoutePad
+    ? soundFocusChangedParameters(project.sound, soundFocusRoutePad)
+    : [];
+  const soundFocusRouteTarget = soundFocusRouteLabel(soundFocusRouteParameters);
   const soundPresetActions: QuickAction[] = soundPresetIds.map((preset) => {
     const targetSound = soundPresetDesign(preset);
     const moveCount = soundPresetChangedMoveCount(project.sound, targetSound);
@@ -4945,6 +4955,19 @@ export function createQuickActions({
       } beginner producer manual sound focus`,
       resultTargetId: soundFocusPreviewSummary.padId,
       run: onFocusSoundFocusReadout
+    },
+    {
+      id: "sound-focus-route-readout-action",
+      title: `Review Sound Focus Route: ${soundFocusPreviewSummary.padLabel}`,
+      detail: `${soundFocusRouteTarget} / ${soundFocusPreviewSummary.statusLabel} / ${soundFocusPreviewSummary.changeLabel} / direct Sound Focus unchanged`,
+      group: "Create",
+      keywords: `Quick Actions Sound Focus Route Readout review route preflight tone focus preview direct sound focus command no apply 808 synth chords drums ${
+        soundFocusPreviewSummary.padId
+      } ${soundFocusPreviewSummary.padLabel} ${soundFocusRouteTarget} ${
+        soundFocusPreviewSummary.parameterLabel
+      } sound route preflight beginner producer manual sound focus`,
+      resultTargetId: soundFocusPreviewSummary.padId,
+      run: onFocusSoundFocusRouteReadout
     },
     {
       id: "sound-focus-decision",
@@ -6861,6 +6884,7 @@ export function createQuickActionResult(
     action.id === "sound-preset-readout-action" ||
     action.id === "drum-kit-readout-action" ||
     action.id === "sound-focus-readout-action" ||
+    action.id === "sound-focus-route-readout-action" ||
     action.id === "sound-snapshot-readout-action" ||
     action.id === "pattern-chain-readout-action" ||
     action.id === "chain-expand-readout-action" ||
@@ -16469,6 +16493,7 @@ export function quickActionSoundDecisionMetricSnapshot(
 
   if (
     action.id === "sound-focus-readout-action" ||
+    action.id === "sound-focus-route-readout-action" ||
     action.id === "sound-focus-decision" ||
     action.id === "sound-focus" ||
     action.id.startsWith("sound-focus-pad-")
@@ -16518,6 +16543,30 @@ export function quickActionSoundPresetMetricSnapshot(
       `moves ${summary.changeLabel}`
     ])
   };
+}
+
+export function soundFocusRouteLabel(parameters: SoundFocusParameter[]): string {
+  if (parameters.length === 0) {
+    return "No tone route needed";
+  }
+
+  const includesAny = (targets: SoundFocusParameter[]): boolean =>
+    targets.some((parameter) => parameters.includes(parameter));
+  const routes: string[] = [];
+  if (includesAny(["bassDrive", "bassDecay", "sidechainDuck"])) {
+    routes.push("808");
+  }
+  if (includesAny(["synthBrightness", "synthRelease"])) {
+    routes.push("Synth");
+  }
+  if (includesAny(["chordWarmth", "chordWidth"])) {
+    routes.push("Chords");
+  }
+  if (includesAny(["kickPunch", "snareSnap", "hatBrightness"])) {
+    routes.push(routes.length > 0 ? "Drum support" : "Drums");
+  }
+
+  return `${routes.join(" / ")} route`;
 }
 
 export function quickActionDrumKitMetricSnapshot(
@@ -16572,6 +16621,7 @@ export function quickActionSoundFocusMetricSnapshot(
 
   const changedParameters = soundFocusChangedParameters(project.sound, pad);
   const changedLabel = soundFocusChangedParameterLabel(changedParameters);
+  const routeLabel = soundFocusRouteLabel(changedParameters);
   if (action.id === "sound-focus-readout-action") {
     return {
       id: "sound-focus-readout",
@@ -16583,6 +16633,24 @@ export function quickActionSoundFocusMetricSnapshot(
         `focus ${pad.detail} tone posture`,
         `parameters ${soundFocusPreviewParameterLabel(pad)}`,
         `moves ${pad.changedCount} tone move${pad.changedCount === 1 ? "" : "s"} / ${changedLabel}`
+      ])
+    };
+  }
+
+  if (action.id === "sound-focus-route-readout-action") {
+    return {
+      id: "sound-focus-route-readout",
+      label: "Sound Focus Route Readout",
+      value: quickActionSoundMetricValue(project, action, analysis, [
+        quickActionSoundActionLabel(action),
+        `route ${routeLabel}`,
+        `direct command sound-focus`,
+        `target ${pad.label} focus`,
+        `status ${pad.changedCount === 0 ? "Sound aligned" : "Suggested focus"}`,
+        `focus ${pad.detail} tone posture`,
+        `parameters ${soundFocusPreviewParameterLabel(pad)}`,
+        `moves ${pad.changedCount} tone move${pad.changedCount === 1 ? "" : "s"} / ${changedLabel}`,
+        "sound focus unchanged"
       ])
     };
   }
@@ -16715,6 +16783,10 @@ export function quickActionSoundDecisionNextCheck(action: QuickAction): string {
     return "loop the focused 808, Synth, or Chords tone against the full Pattern before applying a focus pad manually";
   }
 
+  if (action.id === "sound-focus-route-readout-action") {
+    return "read the 808, Synth, or Chords route before choosing the existing Sound Focus command";
+  }
+
   if (action.id === "sound-snapshot-readout-action") {
     return "loop Pattern A/B/C and compare the visible A/B tone-pass state before capturing, recalling, or clearing a Sound Snapshot";
   }
@@ -16764,6 +16836,9 @@ export function quickActionSoundActionLabel(action: QuickAction): string {
   }
   if (action.id === "sound-focus-readout-action") {
     return "review sound focus readout";
+  }
+  if (action.id === "sound-focus-route-readout-action") {
+    return "review sound focus route readout";
   }
   if (action.id === "sound-focus-decision") {
     return "run sound focus decision";
@@ -16845,7 +16920,12 @@ export function quickActionSoundFocusPadOption(project: ProjectState, action: Qu
     return options.find((pad) => pad.id === directId) ?? null;
   }
 
-  if (action.id !== "sound-focus-readout-action" && action.id !== "sound-focus-decision" && action.id !== "sound-focus") {
+  if (
+    action.id !== "sound-focus-readout-action" &&
+    action.id !== "sound-focus-route-readout-action" &&
+    action.id !== "sound-focus-decision" &&
+    action.id !== "sound-focus"
+  ) {
     return null;
   }
 
@@ -19988,6 +20068,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Use the Sound Focus readout before applying a tone-focus pad, then loop Pattern ${project.selectedPattern}.`,
       nextCheck: "Apply Sound Focus only when the preview target fits the beat; otherwise trim 808, Synth, Chords, or Studio tone controls manually."
+    };
+  }
+
+  if (action.id === "sound-focus-route-readout-action") {
+    return {
+      auditionCue: `Read the Sound Focus route and loop Pattern ${project.selectedPattern} before choosing the existing Sound Focus command.`,
+      nextCheck:
+        "Use Sound Focus only when the named 808, Synth, or Chords route should reshape the local tone; otherwise trim Studio tone controls manually."
     };
   }
 
