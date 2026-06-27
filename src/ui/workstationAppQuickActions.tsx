@@ -1361,6 +1361,7 @@ export function createQuickActions({
   onExportStems,
   onExportWav,
   onFocusDirectExportsReadout,
+  onFocusHandoffNextExportReadout,
   onJumpFirstBeatPath,
   onJumpBeatSpine,
   onFocusBeatPassport,
@@ -1700,6 +1701,7 @@ export function createQuickActions({
   onExportStems: () => void;
   onExportWav: () => void;
   onFocusDirectExportsReadout: () => void;
+  onFocusHandoffNextExportReadout: () => void;
   onJumpFirstBeatPath: (step: FirstBeatPathStep) => void;
   onJumpBeatSpine: (card: BeatSpineCard) => void;
   onFocusBeatPassport: (metric: BeatPassportFocusItem) => void;
@@ -3356,6 +3358,27 @@ export function createQuickActions({
     keywords:
       "direct exports readout review export wav stems midi handoff sheet deliverable file delivery target package readiness receipt send order export preflight no render no download sample free beginner producer",
     run: onFocusDirectExportsReadout
+  };
+  const handoffNextExportReadoutAction: QuickAction = {
+    id: "handoff-next-export-readout-action",
+    title: nextHandoffItem
+      ? `Review Handoff Next Export Readout: ${nextHandoffItem.buttonLabel}`
+      : "Review Handoff Next Export Readout",
+    detail: [
+      handoffSendOrder.statusLabel,
+      nextHandoffItem
+        ? `${nextHandoffItem.label}: ${nextHandoffItem.value} / ${nextHandoffItem.detail}`
+        : "send order clear",
+      `receipt ${handoffReceipt.statusLabel}`,
+      `package ${handoffPackageCheckSummary.headline}`,
+      handoffSendOrder.sequenceLabel,
+      "next export preflight"
+    ].join(" / "),
+    group: "Export",
+    keywords: `handoff next export readout review preflight no render no download current next deliverable wav stems midi sheet package readiness receipt send order delivery target ${
+      nextHandoffItem?.id ?? "complete"
+    } ${handoffSendOrder.sequenceLabel} sample free beginner producer`,
+    run: onFocusHandoffNextExportReadout
   };
   const handoffExportFormatMetric = handoffExportFormatFocusMetric(handoffExportFormatSummary);
   const handoffExportFormatActions: QuickAction[] = handoffExportFormatSummary.metrics.map((metric) => ({
@@ -5698,6 +5721,7 @@ export function createQuickActions({
       }
     },
     ...handoffPackageCheckActions,
+    handoffNextExportReadoutAction,
     {
       id: "handoff-next-export",
       title: nextHandoffItem ? `Export next handoff: ${nextHandoffItem.buttonLabel}` : "Export next handoff item",
@@ -6452,7 +6476,8 @@ export function createQuickActionResult(
     action.id.startsWith("finish-checklist-card-") ||
     action.id === "export-preflight-focus" ||
     action.id.startsWith("export-preflight-card-") ||
-    action.id === "direct-exports-readout-action";
+    action.id === "direct-exports-readout-action" ||
+    action.id === "handoff-next-export-readout-action";
   const inputSetupOnly = isInputSetupQuickAction(action);
   const blockClipboardOnly =
     action.id === "selected-block-copy" ||
@@ -8469,6 +8494,84 @@ export function quickActionSessionBriefStarterFieldPosture(brief: SessionBrief):
   return sessionBriefFields
     .map((field) => `${sessionBriefFieldLabel(field)} ${brief[field].trim() ? compactSessionBriefValue(brief[field]) : "empty"}`)
     .join(" / ");
+}
+
+export function quickActionHandoffNextExportReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "handoff-next-export-readout-action") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const targetItem = sendOrder.nextItemId
+    ? (handoffPackItems.find((item) => item.id === sendOrder.nextItemId) ?? null)
+    : null;
+  const targetId = targetItem?.id ?? sendOrder.nextItemId;
+  const directTarget = targetId ? handoffNextExportDirectTarget(targetId) : null;
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const deliverableLabel = targetId ? handoffExportReceiptItemLabel(targetId) : "No next deliverable";
+  const routeLabel = targetItem ? targetItem.buttonLabel : "No export route";
+  const contextLabel = targetItem ? `${targetItem.value} / ${targetItem.detail}` : "Send order clear";
+  const fileLabel = directTarget ? directExportQuickActionFileLabel(project, directTarget) : "No file target";
+  const readinessLabel = directTarget
+    ? directExportQuickActionReadinessLabel(project, directTarget, exportAnalysis, stemAnalyses)
+    : "send order clear";
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "handoff-next-export-readout",
+    label: "Handoff Next Export Readout",
+    value: [
+      "review handoff next export",
+      "destination Deliver panel",
+      `current next ${sendOrder.nextLabel}`,
+      `deliverable ${deliverableLabel}`,
+      `route ${routeLabel}`,
+      `file ${fileLabel}`,
+      `context ${contextLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      readinessLabel,
+      ...quickActionHandoffNextExportDeliveryMetricParts(
+        project,
+        packageSummary,
+        exportAnalysis,
+        stemAnalyses,
+        handoffPackItems,
+        sendOrder,
+        receipt,
+        targetId ?? null
+      ),
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "export unchanged",
+      "receipt unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
 }
 
 export function quickActionHandoffNextExportMetricSnapshot(
@@ -14415,6 +14518,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "handoff-next-export-readout-action") {
+    return (
+      quickActionHandoffNextExportReadoutMetricSnapshot(project, action, handoffExportReceipt, analysis ?? undefined) ?? {
+        id: "handoff-next-export-readout",
+        label: "Handoff Next Export Readout",
+        value: action.detail
+      }
+    );
+  }
+
   const directExportTarget = directExportQuickActionTarget(action.id);
   if (directExportTarget) {
     const exportAnalysis = analysis ?? analyzeExport(project);
@@ -18724,6 +18837,14 @@ export function quickActionResultFollowup(
       auditionCue: "Review WAV, stem, MIDI, and Handoff Sheet posture before exporting files.",
       nextCheck:
         "Run one explicit export only after the delivery target, filenames, package readiness, and send order match the handoff need."
+    };
+  }
+
+  if (action.id === "handoff-next-export-readout-action") {
+    return {
+      auditionCue: "Review Handoff Send Order and latest receipt before exporting the next WAV, stems, MIDI, or Handoff Sheet item.",
+      nextCheck:
+        "Run Handoff Next Export only after the next deliverable, file target, package readiness, and receipt posture match the handoff need."
     };
   }
 

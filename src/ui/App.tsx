@@ -7713,6 +7713,29 @@ export function App(): ReactElement {
     );
   }
 
+  function focusHandoffNextExportReadout(): void {
+    const currentItems = createHandoffPackItems({
+      analysis: exportAnalysis,
+      project,
+      stemAnalyses,
+      onExportHandoffSheet: handleExportHandoffSheet,
+      onExportMidi: handleExportMidi,
+      onExportStems: handleExportStems,
+      onExportWav: handleExportWav
+    });
+    const currentReceipt = handoffExportReceipt ?? emptyHandoffExportReceipt();
+    const currentSendOrder = createHandoffPackSendOrderSummary(project, currentItems);
+    const nextItem = currentSendOrder.nextItemId
+      ? (currentItems.find((item) => item.id === currentSendOrder.nextItemId) ?? null)
+      : null;
+    const nextLabel = nextItem ? `${nextItem.label} ${nextItem.value}` : "Send order clear";
+
+    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Handoff Next Export Readout: ${currentSendOrder.nextLabel} / ${nextLabel} / ${currentReceipt.statusLabel}`
+    );
+  }
+
   function focusHandoffPackageCheckCard(card: HandoffPackageCheckCard): void {
     setHandoffPackageCheckFocusId(card.focusId);
     deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -8562,6 +8585,7 @@ export function App(): ReactElement {
     onExportStems: handleExportStems,
     onExportWav: handleExportWav,
     onFocusDirectExportsReadout: focusDirectExportsReadout,
+    onFocusHandoffNextExportReadout: focusHandoffNextExportReadout,
     onJumpFirstBeatPath: jumpToFirstBeatPathStep,
     onJumpBeatSpine: jumpToBeatSpineTarget,
     onFocusBeatPassport: focusBeatPassportMetric,
