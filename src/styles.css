@@ -15225,7 +15225,7 @@ h2 {
 .pattern-contrast-section-fit-heading,
 .pattern-contrast-section-fit-followup {
   display: grid;
-  grid-template-columns: minmax(112px, 0.28fr) minmax(170px, 0.48fr) minmax(0, 1fr) max-content max-content;
+  grid-template-columns: minmax(112px, 0.28fr) minmax(170px, 0.48fr) minmax(0, 1fr) max-content max-content max-content;
   gap: 6px;
   align-items: center;
   min-width: 0;
@@ -15240,6 +15240,7 @@ h2 {
 .pattern-contrast-section-fit-heading small,
 .pattern-contrast-section-fit-followup span,
 .pattern-contrast-section-fit-followup small,
+.pattern-contrast-section-fit-decision span,
 .pattern-contrast-section-fit-cue span,
 .pattern-contrast-section-fit-use span,
 .pattern-contrast-section-fit-item span,
@@ -15321,6 +15322,7 @@ h2 {
   font-size: 9px;
 }
 
+.pattern-contrast-section-fit-decision,
 .pattern-contrast-section-fit-cue,
 .pattern-contrast-section-fit-use {
   display: inline-flex;
@@ -15339,6 +15341,12 @@ h2 {
   white-space: nowrap;
 }
 
+.pattern-contrast-section-fit-decision {
+  border-color: rgba(255, 205, 112, 0.34);
+  background: rgba(255, 205, 112, 0.08);
+  color: #ffcd70;
+}
+
 .pattern-contrast-section-fit-use {
   border-color: rgba(138, 168, 255, 0.32);
   background: rgba(138, 168, 255, 0.08);
@@ -15351,11 +15359,17 @@ h2 {
   background: rgba(120, 240, 200, 0.15);
 }
 
+.pattern-contrast-section-fit-decision:hover:not(:disabled) {
+  border-color: rgba(255, 205, 112, 0.6);
+  background: rgba(255, 205, 112, 0.15);
+}
+
 .pattern-contrast-section-fit-use:hover:not(:disabled) {
   border-color: rgba(138, 168, 255, 0.58);
   background: rgba(138, 168, 255, 0.15);
 }
 
+.pattern-contrast-section-fit-decision:disabled,
 .pattern-contrast-section-fit-cue:disabled,
 .pattern-contrast-section-fit-use:disabled {
   cursor: not-allowed;
