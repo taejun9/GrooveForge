@@ -291,12 +291,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Guided and Studio switch context with destination, current mode, target mode, transition, audition cue, and next check before Mode Switch commands run."
       },
       {
+        id: "session-pass-route-readout",
+        command: "Session Pass Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Guided / Studio / Finish / Delivery route",
+        context:
+          "Session Pass Route Readout Action, current Guided, Studio, Finish, or Delivery pass route, destination, direct Session Pass card command, session metric, mode, selected Pattern, editable event counts, audition cue, and next session-route check before Session Pass focus, playback, edit, or export commands run."
+      },
+      {
         id: "session-pass",
         command: "Session Pass",
         shortcut: "Quick Actions / Readout",
         target: "Guided / Studio / Finish / Delivery focus",
         context:
-          "Guided, Studio, Finish, and Delivery context with destination, session metric, pass context, audition cue, and next check before Session Pass commands run."
+          "Guided, Studio, Finish, and Delivery context with destination, session metric, pass context, audition cue, next check, Session Pass Route Readout context, and direct Session Pass card command before Session Pass commands run."
       },
       {
         id: "session-brief-compass",
