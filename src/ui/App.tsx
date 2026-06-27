@@ -1265,6 +1265,7 @@ export function App(): ReactElement {
   const keyCompassPanelRef = useRef<HTMLElement | null>(null);
   const grooveCompassPanelRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
+  const beatMapPanelRef = useRef<HTMLElement | null>(null);
   const hookReadinessPanelRef = useRef<HTMLElement | null>(null);
   const toplineSpacePanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
@@ -7440,6 +7441,22 @@ export function App(): ReactElement {
     );
   }
 
+  function focusBeatMapRouteReadout(): void {
+    const action = beatMapActions[0] ?? null;
+    const stage = action
+      ? beatMapStageForNextMoveAction(beatMapSummary, action)
+      : (beatMapSummary.stages.find((candidate) => candidate.tone !== "good") ??
+        beatMapSummary.stages[beatMapSummary.stages.length - 1]);
+    beatMapPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      action
+        ? `Beat Map Route Readout Pattern ${project.selectedPattern}: ${stage.label} / ${stage.status} / ${beatMapRouteLabel(
+            action
+          )} / direct beat-map-action-${action.id} unchanged / Beat Map action unchanged / Structure Lens unchanged / Next Move unchanged / Guide panel`
+        : "Beat Map Route Readout: no Beat Map route available"
+    );
+  }
+
   function focusBeatReadinessCheck(check: BeatReadinessCheck): void {
     const targetRefs: Record<BeatReadinessFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -9005,6 +9022,7 @@ export function App(): ReactElement {
     onExportWav: handleExportWav,
     onFocusDirectExportsReadout: focusDirectExportsReadout,
     onFocusHandoffNextExportReadout: focusHandoffNextExportReadout,
+    onFocusBeatMapRouteReadout: focusBeatMapRouteReadout,
     onJumpFirstBeatPath: jumpToFirstBeatPathStep,
     onJumpBeatSpine: jumpToBeatSpineTarget,
     onFocusBeatPassport: focusBeatPassportMetric,
@@ -9626,7 +9644,12 @@ export function App(): ReactElement {
         onFocus={focusListeningPassItem}
       />
 
-      <BeatMap summary={beatMapSummary} actions={beatMapActions} onRun={runNextMove} />
+      <BeatMap
+        actions={beatMapActions}
+        onRun={runNextMove}
+        sectionRef={beatMapPanelRef}
+        summary={beatMapSummary}
+      />
 
       <StructureLens summary={structureLensSummary} actions={structureLensActions} onRun={runNextMove} />
 

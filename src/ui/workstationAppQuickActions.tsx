@@ -1067,7 +1067,7 @@ import type {
 } from "./workstationAppDerivations";
 
 import {
-  activeArrangementMuteMapQuickActionLane, activeArrangementTransitionMapQuickActionTransition, activeBassMoveQuickActionTarget, activeBeatPassportQuickActionMetric, activeBeatReadinessQuickActionCheck, activeBeatSpineQuickActionApplyCard, activeBeatSpineQuickActionCard, activeChordMoveQuickActionTarget, activeComposerGuideQuickActionCard, activeDrumMoveQuickActionTarget, activeExportPreflightQuickActionCard, activeFinishChecklistQuickActionCard, activeFirstBeatPathQuickActionStep, activeGrooveCompassQuickActionItem, activeGuideQuickStartBottleneckQuickActionTarget, activeGuideQuickStartQuickActionTarget, activeHandoffPackageCheckQuickActionCard, activeHookReadinessQuickActionCard, activeKeyCompassQuickActionItem, activeLayerStarterQuickActionOption, activeListeningPassQuickActionItem, activeMelodyMoveQuickActionTarget, activeModeFocusQuickActionCard, activePatternDnaQuickActionCard, activeProductionSnapshotQuickActionMetric, activeReviewFixItem, activeSessionPassQuickActionCard, activeStyleInspectorQuickActionItem, activeToplineSpaceQuickActionCard, applySessionBriefStarter, arrangementAverageEnergy, arrangementMuteMapFocusResultAudition, arrangementMuteMapFocusResultMetric, arrangementMuteMapFocusResultNextCheck, arrangementTransitionLoopDetail, arrangementTransitionMapFocusResultAudition, arrangementTransitionMapFocusResultMetric, arrangementTransitionMapFocusResultNextCheck, beatBlueprintStyleLabel, beatPassportFocusResultMetric, beatReadinessCardActionId, beatReadinessQuickActionCheckFromChecks, beatSpineApplyButtonContext, beatSpineJumpButtonContext, chordMotionLabel, compactSectionFlow, compactSessionBriefValue, composerActionForStyleGoal, composerActionQuickActionArea, composerActionQuickActionDetail, composerActionQuickActionGroup, composerGuideFocusCommandDetail, composerGuideFocusResultAudition, composerGuideFocusResultMetric, composerGuideFocusResultNextCheck, createArrangementMovePreviewDecision, createArrangementMovePrioritySummary, createArrangementMuteMapSummary, createArrangementTransitionLoopTarget, createArrangementTransitionMapSummary, createBeatBlueprintPreviewCue, createBeatBlueprintPreviewDecision, createBeatBlueprintPreviewSummary, createBeatMapActions, createBeatMapSummary, createBeatPassportSummary, createComposerActionsSummary, createDeliveryTargetAlignmentPreview, createExportPreflightSummary, createFinishChecklistSummary, createHandoffExportFormatFocusResult, createHandoffExportFormatSummary, createHandoffFileManifest, createHandoffManifestAudit, createHandoffPackageCheckSummary, createHandoffPackItems, createHandoffPackRouteSummary, createHandoffPackSendOrderSummary, createHookFixOption, createHookLoopCueTarget, createHookReadinessSummary, createProductionSnapshotSummary, createReviewFixOption, createReviewQueueSummary, createSectionLocatorCueDecisionSummary, createSelectedBlockEditPreviewDecision, createSelectedBlockEditPrioritySummary, createSessionBriefStarterBrief, createSongFormOverviewSummary, createSongFormPrioritySummary, createStructureLensActions, createToplineFixOption, createToplineLoopCueTarget, createToplineSpaceSummary, createWorkflowNavigatorItems, deliveryTargetMasterLabel, emptyHandoffExportReceipt, exportPreflightFocusResultMetric, exportPreflightFocusResultNextCheck, finishChecklistFocusResultMetric, firstBeatPathJumpAuditionCue, firstBeatPathJumpNextCheck, formatExportDuration, grooveCompassFocusResultAudition, grooveCompassFocusResultMetric, grooveCompassFocusResultNextCheck, guideQuickStartCommandDetail, guideQuickStartCompletionBreakdownLabel, handoffExportFormatFocusMetric, handoffPackageCheckFocusResultMetric, handoffPackageCheckFocusResultNextCheck, hookLoopCueDetail, hookReadinessFocusResultNextCheck, isArrangementMovePresetApplied, isDeliveryTargetAligned, keyCompassFocusResultAudition, keyCompassFocusResultMetric, keyCompassFocusResultNextCheck, mixPostureLabel, modeFocusCommandDetail, nextMoveResultFollowup, nextMoveResultMetricSnapshot, normalizeSwingFeelValue, patternEventTotal, productionSnapshotFocusResultMetric, projectEventTotal, quickActionArrangementBlockMetricSnapshot, quickActionBeatMapMetricSnapshot, quickActionComposerActionAreaLabel, quickActionComposerActionMetricLabel, quickActionComposerActionMoveLabel, quickActionComposerActionRouteLabel, quickActionSectionLocatorMetricSnapshot, quickActionSelectedBlockMetricSnapshot, quickActionStructureLensMetricSnapshot, reviewFixScopeLabel, reviewQueueFocusResultMetric, sectionLocatorActionSection, sectionLocatorTestId, selectedArrangementMoveQuickActionPreset, sessionBriefChangedFieldCount, sessionBriefCompassDestinationLabel, sessionBriefCompassFocusLabel, sessionBriefFieldLabel, sessionBriefFields, sessionBriefFilledFields, sessionBriefStarterPadDefinitions, sessionBriefStatus, sessionPassCommandDetail, sessionPassFocusResultAudition, sessionPassFocusResultMetric, sessionPassFocusResultNextCheck, styleGoalActionQuickActionArea, styleGoalCueLabel, styleGoalCueQuickActionGoal, suggestedMasterFinishPad, swingFeelPadDetail, swingFeelPadSwing, toplineLoopCueDetail, toplineSpaceFocusResultNextCheck, workflowCountLabel, workflowNavigatorJumpAuditionCue, workflowNavigatorJumpMetricValue, workflowNavigatorJumpNextCheck
+  activeArrangementMuteMapQuickActionLane, activeArrangementTransitionMapQuickActionTransition, activeBassMoveQuickActionTarget, activeBeatPassportQuickActionMetric, activeBeatReadinessQuickActionCheck, activeBeatSpineQuickActionApplyCard, activeBeatSpineQuickActionCard, activeChordMoveQuickActionTarget, activeComposerGuideQuickActionCard, activeDrumMoveQuickActionTarget, activeExportPreflightQuickActionCard, activeFinishChecklistQuickActionCard, activeFirstBeatPathQuickActionStep, activeGrooveCompassQuickActionItem, activeGuideQuickStartBottleneckQuickActionTarget, activeGuideQuickStartQuickActionTarget, activeHandoffPackageCheckQuickActionCard, activeHookReadinessQuickActionCard, activeKeyCompassQuickActionItem, activeLayerStarterQuickActionOption, activeListeningPassQuickActionItem, activeMelodyMoveQuickActionTarget, activeModeFocusQuickActionCard, activePatternDnaQuickActionCard, activeProductionSnapshotQuickActionMetric, activeReviewFixItem, activeSessionPassQuickActionCard, activeStyleInspectorQuickActionItem, activeToplineSpaceQuickActionCard, applySessionBriefStarter, arrangementAverageEnergy, arrangementMuteMapFocusResultAudition, arrangementMuteMapFocusResultMetric, arrangementMuteMapFocusResultNextCheck, arrangementTransitionLoopDetail, arrangementTransitionMapFocusResultAudition, arrangementTransitionMapFocusResultMetric, arrangementTransitionMapFocusResultNextCheck, beatBlueprintStyleLabel, beatMapRouteLabel, beatMapStageForNextMoveAction, beatPassportFocusResultMetric, beatReadinessCardActionId, beatReadinessQuickActionCheckFromChecks, beatSpineApplyButtonContext, beatSpineJumpButtonContext, chordMotionLabel, compactSectionFlow, compactSessionBriefValue, composerActionForStyleGoal, composerActionQuickActionArea, composerActionQuickActionDetail, composerActionQuickActionGroup, composerGuideFocusCommandDetail, composerGuideFocusResultAudition, composerGuideFocusResultMetric, composerGuideFocusResultNextCheck, createArrangementMovePreviewDecision, createArrangementMovePrioritySummary, createArrangementMuteMapSummary, createArrangementTransitionLoopTarget, createArrangementTransitionMapSummary, createBeatBlueprintPreviewCue, createBeatBlueprintPreviewDecision, createBeatBlueprintPreviewSummary, createBeatMapActions, createBeatMapSummary, createBeatPassportSummary, createComposerActionsSummary, createDeliveryTargetAlignmentPreview, createExportPreflightSummary, createFinishChecklistSummary, createHandoffExportFormatFocusResult, createHandoffExportFormatSummary, createHandoffFileManifest, createHandoffManifestAudit, createHandoffPackageCheckSummary, createHandoffPackItems, createHandoffPackRouteSummary, createHandoffPackSendOrderSummary, createHookFixOption, createHookLoopCueTarget, createHookReadinessSummary, createProductionSnapshotSummary, createReviewFixOption, createReviewQueueSummary, createSectionLocatorCueDecisionSummary, createSelectedBlockEditPreviewDecision, createSelectedBlockEditPrioritySummary, createSessionBriefStarterBrief, createSongFormOverviewSummary, createSongFormPrioritySummary, createStructureLensActions, createToplineFixOption, createToplineLoopCueTarget, createToplineSpaceSummary, createWorkflowNavigatorItems, deliveryTargetMasterLabel, emptyHandoffExportReceipt, exportPreflightFocusResultMetric, exportPreflightFocusResultNextCheck, finishChecklistFocusResultMetric, firstBeatPathJumpAuditionCue, firstBeatPathJumpNextCheck, formatExportDuration, grooveCompassFocusResultAudition, grooveCompassFocusResultMetric, grooveCompassFocusResultNextCheck, guideQuickStartCommandDetail, guideQuickStartCompletionBreakdownLabel, handoffExportFormatFocusMetric, handoffPackageCheckFocusResultMetric, handoffPackageCheckFocusResultNextCheck, hookLoopCueDetail, hookReadinessFocusResultNextCheck, isArrangementMovePresetApplied, isDeliveryTargetAligned, keyCompassFocusResultAudition, keyCompassFocusResultMetric, keyCompassFocusResultNextCheck, mixPostureLabel, modeFocusCommandDetail, nextMoveResultFollowup, nextMoveResultMetricSnapshot, normalizeSwingFeelValue, patternEventTotal, productionSnapshotFocusResultMetric, projectEventTotal, quickActionArrangementBlockMetricSnapshot, quickActionBeatMapMetricSnapshot, quickActionComposerActionAreaLabel, quickActionComposerActionMetricLabel, quickActionComposerActionMoveLabel, quickActionComposerActionRouteLabel, quickActionSectionLocatorMetricSnapshot, quickActionSelectedBlockMetricSnapshot, quickActionStructureLensMetricSnapshot, reviewFixScopeLabel, reviewQueueFocusResultMetric, sectionLocatorActionSection, sectionLocatorTestId, selectedArrangementMoveQuickActionPreset, sessionBriefChangedFieldCount, sessionBriefCompassDestinationLabel, sessionBriefCompassFocusLabel, sessionBriefFieldLabel, sessionBriefFields, sessionBriefFilledFields, sessionBriefStarterPadDefinitions, sessionBriefStatus, sessionPassCommandDetail, sessionPassFocusResultAudition, sessionPassFocusResultMetric, sessionPassFocusResultNextCheck, styleGoalActionQuickActionArea, styleGoalCueLabel, styleGoalCueQuickActionGoal, suggestedMasterFinishPad, swingFeelPadDetail, swingFeelPadSwing, toplineLoopCueDetail, toplineSpaceFocusResultNextCheck, workflowCountLabel, workflowNavigatorJumpAuditionCue, workflowNavigatorJumpMetricValue, workflowNavigatorJumpNextCheck
 } from "./workstationAppHelpers";
 import type {
   ArrangementTransitionLoopTarget, BeatBlueprintPreviewCue, BeatBlueprintPreviewDecision, HookLoopCueTarget, ToplineLoopCueTarget
@@ -1375,6 +1375,7 @@ export function createQuickActions({
   onExportWav,
   onFocusDirectExportsReadout,
   onFocusHandoffNextExportReadout,
+  onFocusBeatMapRouteReadout,
   onJumpFirstBeatPath,
   onJumpBeatSpine,
   onFocusBeatPassport,
@@ -1744,6 +1745,7 @@ export function createQuickActions({
   onExportWav: () => void;
   onFocusDirectExportsReadout: () => void;
   onFocusHandoffNextExportReadout: () => void;
+  onFocusBeatMapRouteReadout: () => void;
   onJumpFirstBeatPath: (step: FirstBeatPathStep) => void;
   onJumpBeatSpine: (card: BeatSpineCard) => void;
   onFocusBeatPassport: (metric: BeatPassportFocusItem) => void;
@@ -2000,6 +2002,38 @@ export function createQuickActions({
     } ${selectedArrangementIndex + 1} ${audibleArrangementFollowBlock?.section ?? "none"} song form beginner producer`,
     disabled: !audibleArrangementFollowBlock,
     run: onFollowAudibleArrangementBlock
+  };
+  const beatMapRouteReadoutSummary = createBeatMapSummary(project, beatReadinessChecks, exportAnalysis, stemAnalyses);
+  const beatMapRouteReadoutActionTarget = beatMapActions[0] ?? null;
+  const beatMapRouteReadoutStage = beatMapRouteReadoutActionTarget
+    ? beatMapStageForNextMoveAction(beatMapRouteReadoutSummary, beatMapRouteReadoutActionTarget)
+    : (beatMapRouteReadoutSummary.stages.find((stage) => stage.tone !== "good") ??
+      beatMapRouteReadoutSummary.stages[beatMapRouteReadoutSummary.stages.length - 1]);
+  const beatMapRouteReadoutAction: QuickAction = {
+    id: "beat-map-route-readout-action",
+    title: beatMapRouteReadoutActionTarget
+      ? `Review Beat Map Route: ${beatMapRouteReadoutStage.label}`
+      : "Review Beat Map Route",
+    detail: beatMapRouteReadoutActionTarget
+      ? [
+          beatMapRouteReadoutSummary.headline,
+          beatMapRouteReadoutSummary.detail,
+          `${beatMapRouteReadoutStage.label} / ${beatMapRouteReadoutStage.status} / ${beatMapRouteReadoutStage.detail}`,
+          `Route ${beatMapRouteLabel(beatMapRouteReadoutActionTarget)}`,
+          `Direct beat-map-action-${beatMapRouteReadoutActionTarget.id} unchanged`,
+          "Beat Map action unchanged",
+          "Structure Lens unchanged",
+          "Next Move unchanged",
+          "Readout only"
+        ].join(" / ")
+      : "No Beat Map route available.",
+    group: "Project",
+    keywords: `Quick Actions Beat Map Route Readout review beat map route direct beat-map-action-${
+      beatMapRouteReadoutActionTarget?.id ?? "none"
+    } start compose arrange polish deliver workflow overview selected pattern target export stems package next move structure lens no action no edit no playback no export sample free beginner producer`,
+    disabled: !beatMapRouteReadoutActionTarget,
+    resultTargetId: beatMapRouteReadoutActionTarget?.id,
+    run: onFocusBeatMapRouteReadout
   };
   const beatMapCommandActions = createNextMoveSourceQuickActions("beat-map", beatMapActions, onRunNextMove);
   const structureLensCommandActions = createNextMoveSourceQuickActions(
@@ -5045,6 +5079,7 @@ export function createQuickActions({
         }
       }
     },
+    beatMapRouteReadoutAction,
     ...beatMapCommandActions,
     {
       id: "beat-terms-reference",
@@ -7490,6 +7525,7 @@ export function createQuickActionResult(
     action.id === "master-finish-route-readout-action" ||
     action.id === "master-automation-readout-action" ||
     action.id === "master-automation-route-readout-action" ||
+    action.id === "beat-map-route-readout-action" ||
     action.id === "workflow-navigator-route-readout-action" ||
     action.id === "workflow-spotlight-route-readout-action" ||
     action.id === "workflow-spotlight-focus" ||
@@ -15846,6 +15882,72 @@ export function quickActionCaptureStepCandidateLabel(
   return `step ${step + 1} next empty ${targetLabel}`;
 }
 
+export function beatMapRouteReadoutActionForProject(project: ProjectState, action?: QuickAction) {
+  const exportAnalysis = analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const checks = createBeatReadinessChecks(project, exportAnalysis);
+  const summary = createBeatMapSummary(project, checks, exportAnalysis, stemAnalyses);
+  const actions = createBeatMapActions(project, checks, exportAnalysis, stemAnalyses);
+  const targetId = action?.resultTargetId;
+  const nextMoveAction = (targetId ? actions.find((candidate) => candidate.id === targetId) : null) ?? actions[0] ?? null;
+  return { nextMoveAction, summary, exportAnalysis, stemAnalyses };
+}
+
+export function quickActionBeatMapRouteReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "beat-map-route-readout-action") {
+    return null;
+  }
+
+  const { nextMoveAction, summary, exportAnalysis, stemAnalyses } = beatMapRouteReadoutActionForProject(project, action);
+  if (!nextMoveAction) {
+    return null;
+  }
+
+  const stage = beatMapStageForNextMoveAction(summary, nextMoveAction);
+  const target = activeDeliveryTarget(project);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, null);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const stageReadyCount = summary.stages.filter((candidate) => candidate.tone === "good").length;
+  const stageReviewCount = summary.stages.filter((candidate) => candidate.tone === "warn").length;
+  const stageBlockerCount = summary.stages.filter((candidate) => candidate.tone === "danger").length;
+  const followup = nextMoveResultFollowup(nextMoveAction, project);
+
+  return {
+    id: "beat-map-route-readout",
+    label: "Beat Map Route Readout",
+    value: [
+      "command review beat map route readout",
+      `detail ${action.detail}`,
+      `route ${beatMapRouteLabel(nextMoveAction)}`,
+      `direct beat-map-action-${nextMoveAction.id} unchanged`,
+      "Beat Map action unchanged / Structure Lens unchanged / Next Move unchanged",
+      "destination Guide / Beat Map",
+      `stage ${stage.label} / ${stage.status} / ${stage.detail}`,
+      `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
+      `completion ${summary.headline} / ${stageReadyCount}/${summary.stages.length} stages ready / ${workflowCountLabel(
+        stageReviewCount,
+        "review"
+      )} / ${workflowCountLabel(stageBlockerCount, "blocker")}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      `patterns ${usedSlots.length}/3 ${usedSlots.join("/") || project.selectedPattern}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `stems ${audibleStemCount}/${target.stemGoal} target`,
+      `package ${packageSummary.headline}`,
+      "readout only",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
 export function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -15933,6 +16035,16 @@ export function quickActionResultMetricSnapshot(
       quickActionGuideQuickStartMetricSnapshot(action) ?? {
         id: "guide-bottleneck-focus",
         label: "Guide bottleneck",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "beat-map-route-readout-action") {
+    return (
+      quickActionBeatMapRouteReadoutMetricSnapshot(project, action) ?? {
+        id: "beat-map-route-readout",
+        label: "Beat Map Route Readout",
         value: action.detail
       }
     );
@@ -20843,6 +20955,15 @@ export function quickActionResultFollowup(
   const analysis = analyzeExport(project);
   const target = activeDeliveryTarget(project);
   const pattern = activePattern(project);
+
+  if (action.id === "beat-map-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the Beat Map route, then audition the current Pattern or Full Mix before running Beat Map, Structure Lens, or Next Move actions.",
+      nextCheck:
+        "Use Beat Map actions only when the named Start, Compose, Arrange, Polish, or Deliver route matches the beat-making question; otherwise leave playback and project data unchanged."
+    };
+  }
 
   const nextMoveAction = nextMoveQuickActionForProject(project, action);
   if (nextMoveAction) {
