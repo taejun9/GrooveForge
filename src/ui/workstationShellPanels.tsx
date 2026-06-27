@@ -823,6 +823,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Current Full-Tone Preset Preview Target, Editable Sound Posture, Selected Pattern, Export Readiness, Audition Cue, and Next Manual Sound-Design Check context before Sound Preset commands run."
       },
       {
+        id: "sound-preset-route-readout",
+        command: "Sound Preset Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Drums / 808 / Duck / Synth / Chords route",
+        context:
+          "Sound Preset Route Readout Action, Selected Pattern A/B/C, Current Full-Tone Preset Preview Target, Existing Sound Preset Route, Direct Sound Preset Command, Drums/808/Duck/Synth/Chords Tone Posture, Editable Sound Posture, Arrangement Usage, Audition Cue, and Next Sound Preset Route Check context before Sound Preset commands run."
+      },
+      {
         id: "sound-preset-decision",
         command: "Sound Preset Decision",
         shortcut: "Quick Actions / Readout",
