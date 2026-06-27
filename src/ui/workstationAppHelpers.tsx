@@ -3949,11 +3949,13 @@ export type ProductionSnapshotPriority = {
 export function ProductionSnapshot({
   focusedMetricId,
   result,
+  sectionRef,
   onFocus,
   summary
 }: {
   focusedMetricId: ProductionSnapshotFocusId | null;
   result: ProductionSnapshotFocusResult | null;
+  sectionRef?: Ref<HTMLElement>;
   onFocus: (metric: ProductionSnapshotFocusItem) => void;
   summary: ProductionSnapshotSummary;
 }): ReactElement {
@@ -3967,6 +3969,7 @@ export function ProductionSnapshot({
       aria-label="Production snapshot"
       className={["production-snapshot", summary.tone, result ? "has-result" : ""].filter(Boolean).join(" ")}
       data-testid="production-snapshot"
+      ref={sectionRef}
     >
       <div className="production-snapshot-heading">
         <div>

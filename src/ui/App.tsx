@@ -1045,6 +1045,7 @@ import {
   masterFinishRouteLabel,
   mixBalanceRouteLabel,
   mixSnapshotRouteLabel,
+  productionSnapshotRouteLabel,
   soundFocusRouteLabel,
   soundPresetRouteLabel,
   spaceFxRouteLabel,
@@ -1244,6 +1245,7 @@ export function App(): ReactElement {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const styleInspectorRef = useRef<HTMLElement | null>(null);
   const beatPassportPanelRef = useRef<HTMLElement | null>(null);
+  const productionSnapshotPanelRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
@@ -7507,6 +7509,16 @@ export function App(): ReactElement {
     setProjectStatus(`Snapshot ${metric.label}: ${metric.value}`);
   }
 
+  function focusProductionSnapshotRouteReadout(): void {
+    const metric = activeProductionSnapshotQuickActionMetric(productionSnapshotSummary);
+    productionSnapshotPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      metric
+        ? `Production Snapshot Route Readout Pattern ${project.selectedPattern}: ${productionSnapshotRouteLabel(metric)} / ${metric.value} / direct production-snapshot-metric-${metric.id} unchanged / ${metric.focusLabel} panel`
+        : "Production Snapshot Route Readout: no priority metric available"
+    );
+  }
+
   function focusSnapshotCompareMetric(item: SnapshotCompareFocusItem): void {
     const targetRefs: Record<SnapshotCompareFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -8870,6 +8882,7 @@ export function App(): ReactElement {
     onFocusPatternSwitchReadout: focusPatternSwitchReadout,
     onFocusPatternUseReadout: focusPatternUseReadout,
     onFocusProductionSnapshot: focusProductionSnapshotMetric,
+    onFocusProductionSnapshotRouteReadout: focusProductionSnapshotRouteReadout,
     onFocusReferenceAlignment: focusReferenceAlignmentCard,
     onFocusSnapshotCompare: focusSnapshotCompareMetric,
     onFocusReviewQueue: focusReviewQueueItem,
@@ -9383,6 +9396,7 @@ export function App(): ReactElement {
       <ProductionSnapshot
         focusedMetricId={productionSnapshotFocusId}
         result={productionSnapshotResult}
+        sectionRef={productionSnapshotPanelRef}
         summary={productionSnapshotSummary}
         onFocus={focusProductionSnapshotMetric}
       />
