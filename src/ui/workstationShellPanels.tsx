@@ -403,12 +403,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Target, Form, Pattern A/B/C, Mix, and Handoff session-scan context with route readout, direct metric command, destination, snapshot metric, audition cue, and next check before Production Snapshot focus, playback, edit, or export commands run."
       },
       {
+        id: "hook-readiness-route-readout",
+        command: "Hook Readiness Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Hook section / motif / contrast / mix support / handoff route",
+        context:
+          "Hook Readiness Route Readout Action, current hook section, motif density, contrast, mix support, or handoff lane, existing Hook Readiness route, direct Hook Readiness card command, hook loop and hook fix unchanged, selected Pattern, arrangement hook posture, export/stem/package readiness, audition cue, and next hook-route check before Hook Readiness focus, cue, fix, playback, edit, or export commands run."
+      },
+      {
         id: "hook-readiness",
         command: "Hook Readiness",
         shortcut: "Quick Actions / Readout",
         target: "Hook section / motif / contrast / mix support / handoff",
         context:
-          "Hook Section, Motif, Contrast, Mix Support, and Handoff hook-quality context with destination, hook metric, audition cue, loop/fix cue, and next check before Hook Readiness commands run."
+          "Hook Section, Motif, Contrast, Mix Support, and Handoff hook-quality context with Route Readout posture, destination, hook metric, audition cue, loop/fix cue, direct card command, local Focus Result feedback, and next check before Hook Readiness commands run."
       },
       {
         id: "topline-space",

@@ -1043,6 +1043,7 @@ import {
   exportPreflightRouteLabel,
   finishChecklistRouteLabel,
   grooveCompassRouteLabel,
+  hookReadinessRouteLabel,
   keyCompassRouteLabel,
   listeningPassRouteLabel,
   masterAutomationRouteLabel,
@@ -1261,6 +1262,7 @@ export function App(): ReactElement {
   const keyCompassPanelRef = useRef<HTMLElement | null>(null);
   const grooveCompassPanelRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
+  const hookReadinessPanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
   const composePanelRef = useRef<HTMLElement | null>(null);
@@ -7574,6 +7576,19 @@ export function App(): ReactElement {
     setProjectStatus(`Hook ${card.label}: ${card.value}`);
   }
 
+  function focusHookReadinessRouteReadout(): void {
+    const card = activeHookReadinessQuickActionCard(hookReadinessSummary);
+    hookReadinessPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      card
+        ? `Hook Readiness Route Readout Pattern ${project.selectedPattern}: ${hookReadinessRouteLabel(
+            card,
+            hookReadinessSummary
+          )} / ${card.value} / direct hook-readiness-card-${card.id} unchanged / hook loop unchanged / hook fix unchanged / ${card.focusLabel} panel`
+        : "Hook Readiness Route Readout: no priority hook card available"
+    );
+  }
+
   function focusToplineSpaceCard(card: ToplineSpaceFocusItem): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -8965,6 +8980,7 @@ export function App(): ReactElement {
     onFocusHandoffManifestAudit: focusHandoffManifestAudit,
     onFocusHandoffPackageCheck: focusHandoffPackageCheckCard,
     onFocusHookReadiness: focusHookReadinessCard,
+    onFocusHookReadinessRouteReadout: focusHookReadinessRouteReadout,
     onFocusKeyCompass: focusKeyCompassItem,
     onFocusKeyCompassRouteReadout: focusKeyCompassRouteReadout,
     onFocusListeningPass: focusListeningPassItem,
@@ -9569,6 +9585,7 @@ export function App(): ReactElement {
         onCue={cueHookLoop}
         onFix={applyHookFix}
         onFocus={focusHookReadinessCard}
+        sectionRef={hookReadinessPanelRef}
         summary={hookReadinessSummary}
       />
 
