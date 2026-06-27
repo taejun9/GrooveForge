@@ -1552,6 +1552,10 @@ export function suggestedPatternVariationPreset(pattern: PatternData): PatternVa
     return "hook";
   }
 
+  if (totalEvents >= 28 && totalEvents <= 44 && drumHits >= 14 && musicEvents >= 8) {
+    return "switchup";
+  }
+
   if (totalEvents > 44 || drumHits > 26) {
     return "breakdown";
   }
@@ -1691,6 +1695,8 @@ function patternVariationAuditionCue(preset: PatternVariationPreset, pattern: Pa
       return `Loop Pattern ${pattern}; confirm the hook lift across drums, 808, chords, and Synth.`;
     case "breakdown":
       return `Loop Pattern ${pattern}; check the breakdown space before placing it in a section change.`;
+    case "switchup":
+      return `Loop Pattern ${pattern}; check the switchup lift, tail roll, and 808 pickup before placing it before a hook or drop.`;
   }
 }
 
@@ -1702,6 +1708,8 @@ function patternVariationNextCheck(preset: PatternVariationPreset, pattern: Patt
       return `${activeDrumHitCount(pattern)} drum hits and ${patternMusicEventCount(pattern)} music events now; compare Pattern A/B/C before making it the hook.`;
     case "breakdown":
       return `${patternEventTotal(pattern)} Pattern events now; use Pattern Chain or Arrangement Focus to place the break intentionally.`;
+    case "switchup":
+      return `${activeDrumHitCount(pattern)} drum hits and ${patternMusicEventCount(pattern)} music events now; cue the next Pattern and confirm the transition has enough lift.`;
   }
 }
 

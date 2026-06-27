@@ -39,7 +39,7 @@ export const drumGroovePresetIds = ["tight", "pocket", "push", "reset"] as const
 export type DrumGroovePreset = (typeof drumGroovePresetIds)[number];
 export const chordProgressionPresetIds = ["moody", "lift", "bounce", "sparse"] as const;
 export type ChordProgressionPreset = (typeof chordProgressionPresetIds)[number];
-export const patternVariationPresetIds = ["subtle", "hook", "breakdown"] as const;
+export const patternVariationPresetIds = ["subtle", "hook", "breakdown", "switchup"] as const;
 export type PatternVariationPreset = (typeof patternVariationPresetIds)[number];
 export const patternFillPresetIds = ["drum_fill", "bass_pickup", "melody_turn", "clear_tail"] as const;
 export type PatternFillPreset = (typeof patternFillPresetIds)[number];
@@ -385,7 +385,8 @@ export const chordProgressionPresetLabels: Record<ChordProgressionPreset, string
 export const patternVariationPresetLabels: Record<PatternVariationPreset, string> = {
   subtle: "Subtle",
   hook: "Hook",
-  breakdown: "Break"
+  breakdown: "Break",
+  switchup: "Switchup"
 };
 export const patternFillPresetLabels: Record<PatternFillPreset, string> = {
   drum_fill: "Drum Fill",
@@ -1743,6 +1744,10 @@ export function createPatternVariation(pattern: PatternData, preset: PatternVari
     applyHookVariation(variation);
     return applyDrumGroovePreset(variation, "push");
   }
+  if (preset === "switchup") {
+    applySwitchupVariation(variation);
+    return applyDrumGroovePreset(variation, "push");
+  }
   applyBreakdownVariation(variation);
   return applyDrumGroovePreset(variation, "tight");
 }
@@ -1839,6 +1844,72 @@ function applyBreakdownVariation(pattern: PatternData): void {
     ...event,
     velocity: Math.max(0.28, event.velocity - 0.12),
     probability: index <= 1 ? 1 : 0.72
+  }));
+}
+
+function applySwitchupVariation(pattern: PatternData): void {
+  [0, 3, 8, 11, 14].forEach((step) =>
+    setDrumStep(pattern, "kick", step, true, step === 0 || step === 8 ? 1 : 0.84, step === 14 ? 0.9 : 1, step === 14 ? -8 : 0)
+  );
+  [4, 10, 12].forEach((step) => setDrumStep(pattern, "clap", step, true, step === 10 ? 0.58 : 0.94, step === 10 ? 0.72 : 1, 2));
+  [0, 2, 4, 6, 7, 8, 10, 12, 13, 14, 15].forEach((step) =>
+    setDrumStep(
+      pattern,
+      "hat",
+      step,
+      true,
+      step === 15 ? 0.82 : step % 4 === 0 ? 0.72 : 0.6,
+      step === 7 || step === 13 ? 0.88 : 1,
+      step === 15 ? -12 : step % 2 === 0 ? -5 : 6,
+      step === 15 ? 4 : step === 7 || step === 13 ? 2 : 1
+    )
+  );
+  [1, 5, 11, 15].forEach((step) => setDrumStep(pattern, "perc", step, true, step === 15 ? 0.72 : 0.6, step === 15 ? 0.86 : 0.74, step % 2 === 0 ? -6 : 8));
+
+  const existingBass = pattern.bassNotes.map((note, index) => ({
+    ...note,
+    length: clampEventLength(index % 2 === 0 ? note.length + 1 : note.length, note.step),
+    velocity: Math.min(1, normalizeNoteVelocity(note.velocity) + 0.08),
+    glide: note.glide || index === pattern.bassNotes.length - 1,
+    probability: 1
+  }));
+  const bassPickup = existingBass[0]
+    ? [
+        {
+          ...existingBass[0],
+          step: 14,
+          length: 1,
+          velocity: Math.min(1, existingBass[0].velocity + 0.1),
+          glide: true,
+          probability: 1
+        }
+      ]
+    : [];
+  pattern.bassNotes = sortBassNotes([...existingBass.filter((note) => note.step !== 14), ...bassPickup]);
+
+  const existingMelody = pattern.melodyNotes.map((note, index) => ({
+    ...note,
+    length: clampEventLength(index % 3 === 0 ? note.length + 1 : note.length, note.step),
+    velocity: Math.min(1, normalizeNoteVelocity(note.velocity, 0.68) + (index % 2 === 0 ? 0.1 : 0.04)),
+    probability: index % 4 === 1 ? 0.84 : 1
+  }));
+  const melodyAnswer = existingMelody[0]
+    ? [
+        {
+          ...existingMelody[0],
+          step: 15,
+          length: 1,
+          velocity: Math.min(1, existingMelody[0].velocity + 0.08),
+          probability: 0.92
+        }
+      ]
+    : [];
+  pattern.melodyNotes = sortMelodyNotes([...existingMelody.filter((note) => note.step !== 15), ...melodyAnswer]);
+
+  pattern.chordEvents = pattern.chordEvents.map((event, index) => ({
+    ...event,
+    velocity: Math.min(1, normalizeNoteVelocity(event.velocity, 0.62) + (index === 0 ? 0.1 : 0.06)),
+    probability: index % 3 === 2 ? 0.86 : 1
   }));
 }
 
