@@ -3326,6 +3326,8 @@ export function createQuickActions({
     onExportWav
   });
   const handoffReadyCount = handoffPackItems.filter((item) => item.tone === "good").length;
+  const handoffReviewCount = handoffPackItems.filter((item) => item.tone === "warn").length;
+  const handoffBlockerCount = handoffPackItems.filter((item) => item.tone === "danger").length;
   const handoffTone = weakestTone(handoffPackItems.map((item) => item.tone));
   const handoffRouteSummary = createHandoffPackRouteSummary(project, stemAnalyses, handoffPackItems, handoffTone);
   const handoffSendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
@@ -3472,6 +3474,25 @@ export function createQuickActions({
     keywords: `handoff session brief readout review artist vibe reference notes handoff sheet context delivery target package no render no download ${handoffBriefStatus.value} ${handoffSheetFileName(
       project
     )} sample free beginner producer`,
+    run: onFocusHandoffPack
+  };
+  const handoffFinalCheckReadoutAction: QuickAction = {
+    id: "handoff-final-check-readout-action",
+    title: `Review Handoff Final Check Readout: ${handoffReadyCount}/${handoffPackItems.length} ready`,
+    detail: [
+      `${handoffReadyCount}/${handoffPackItems.length} ready`,
+      workflowCountLabel(handoffReviewCount, "review"),
+      workflowCountLabel(handoffBlockerCount, "blocker"),
+      `manifest ${handoffManifestAudit.statusLabel}`,
+      `receipt ${handoffReceipt.statusLabel}`,
+      `send ${handoffSendOrder.nextLabel}`,
+      `package ${handoffPackageCheckSummary.headline}`,
+      "final send preflight"
+    ].join(" / "),
+    group: "Export",
+    keywords: `handoff final check readout review send no-send ready review blocker package manifest receipt send order route target brief export format no render no download ${
+      handoffSendOrder.nextLabel
+    } ${handoffManifestAudit.statusLabel} sample free beginner producer`,
     run: onFocusHandoffPack
   };
   const handoffExportFormatReadoutAction: QuickAction = {
@@ -5792,6 +5813,7 @@ export function createQuickActions({
     handoffRouteReadoutAction,
     handoffDeliveryTargetReadoutAction,
     handoffSessionBriefReadoutAction,
+    handoffFinalCheckReadoutAction,
     handoffExportFormatReadoutAction,
     {
       id: "handoff-export-format-focus",
@@ -6589,6 +6611,7 @@ export function createQuickActionResult(
     action.id === "handoff-route-readout-action" ||
     action.id === "handoff-delivery-target-readout-action" ||
     action.id === "handoff-session-brief-readout-action" ||
+    action.id === "handoff-final-check-readout-action" ||
     action.id === "handoff-package-check-focus" ||
     action.id === "handoff-package-check-readout-action" ||
     action.id.startsWith("handoff-package-check-card-") ||
@@ -11172,6 +11195,110 @@ export function quickActionHandoffSessionBriefDetailParts(action: QuickAction): 
     .filter(Boolean);
 }
 
+export function quickActionHandoffFinalCheckReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "handoff-final-check-readout-action") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const readyCount = handoffPackItems.filter((item) => item.tone === "good").length;
+  const reviewCount = handoffPackItems.filter((item) => item.tone === "warn").length;
+  const blockerCount = handoffPackItems.filter((item) => item.tone === "danger").length;
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const routeTone = weakestTone(handoffPackItems.map((item) => item.tone));
+  const routeSummary = createHandoffPackRouteSummary(project, stemAnalyses, handoffPackItems, routeTone);
+  const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const manifest = createHandoffFileManifest(project, stemAnalyses, handoffPackItems);
+  const manifestAudit = createHandoffManifestAudit(project, handoffPackItems, manifest, receipt, sendOrder);
+  const formatSummary = createHandoffExportFormatSummary(project, exportAnalysis, stemAnalyses, handoffPackItems);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const itemPosture = handoffPackItems.map((item) => `${item.buttonLabel} ${item.value}`).join(" / ");
+  const manifestPosture = manifestAudit.checks.map((check) => `${check.label} ${check.statusLabel}`).join(" / ");
+  const formatPosture = formatSummary.metrics.map((metric) => `${metric.label} ${metric.value}`).join(" / ");
+  const nextItem = sendOrder.nextItemId
+    ? (handoffPackItems.find((item) => item.id === sendOrder.nextItemId) ?? null)
+    : null;
+  const nextItemLabel = nextItem ? `${nextItem.label} ${nextItem.value} / ${nextItem.detail}` : "All deliverables ready";
+  const finalDecision =
+    blockerCount > 0 ? "blocked before send" : reviewCount > 0 ? "review before send" : "ready for explicit handoff";
+  const detailParts = quickActionHandoffFinalCheckDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || `${finalDecision} / ${sendOrder.nextLabel}`;
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "handoff-final-check-readout",
+    label: "Handoff Final Check Readout",
+    value: [
+      "review handoff final check",
+      "destination Deliver / Handoff Pack",
+      `final ${finalDecision}`,
+      `checks ${readyCount}/${handoffPackItems.length} ready`,
+      workflowCountLabel(reviewCount, "review"),
+      workflowCountLabel(blockerCount, "blocker"),
+      `target ${target.name} / ${target.focus} / ${barCountLabel(target.targetBars)}`,
+      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4 / ${briefStatus.value}`,
+      `sheet ${handoffSheetFileName(project)}`,
+      `route ${routeSummary.routeLabel} / ${routeSummary.statusLabel} / ${routeSummary.detailLabel}`,
+      `items ${itemPosture}`,
+      `wav ${mixWavFileName(project)} / ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `stems ${audibleStemCount}/${target.stemGoal} target / ${audibleStemCount}/${stemTrackIds.length} audible`,
+      `midi ${midiFileName(project)} / ${barCountLabel(bars)}`,
+      `format ${formatSummary.statusLabel} / ${formatSummary.titleLabel} / ${formatSummary.durationLabel}`,
+      `formats ${formatPosture}`,
+      `manifest ${manifestAudit.statusLabel} / ${manifestAudit.detailLabel}`,
+      `planned ${manifestPosture}`,
+      `receipt ${receipt.statusLabel} / ${receipt.fileLabel} / ${receipt.nextLabel}`,
+      `send ${sendOrder.statusLabel} / ${sendOrder.nextLabel} / ${nextItemLabel}`,
+      `sequence ${sendOrder.sequenceLabel}`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(bars),
+      "final check unchanged",
+      "export unchanged",
+      "receipt unchanged",
+      "package unchanged",
+      "sampler scope unchanged",
+      `context ${contextLabel}`,
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
+export function quickActionHandoffFinalCheckDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 export function quickActionHandoffExportReceiptMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -14920,6 +15047,16 @@ export function quickActionResultMetricSnapshot(
       quickActionHandoffSessionBriefReadoutMetricSnapshot(project, action, handoffExportReceipt, analysis ?? undefined) ?? {
         id: "handoff-session-brief-readout",
         label: "Handoff Session Brief Readout",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "handoff-final-check-readout-action") {
+    return (
+      quickActionHandoffFinalCheckReadoutMetricSnapshot(project, action, handoffExportReceipt, analysis ?? undefined) ?? {
+        id: "handoff-final-check-readout",
+        label: "Handoff Final Check Readout",
         value: action.detail
       }
     );
@@ -18961,6 +19098,14 @@ export function quickActionResultFollowup(
       auditionCue: "Review artist, vibe, reference, notes, and the Handoff Sheet filename before exporting or sending files.",
       nextCheck:
         "Use Brief Compass or Session Brief Starter only if context is missing; otherwise continue to Handoff Package Check or explicit export."
+    };
+  }
+
+  if (action.id === "handoff-final-check-readout-action") {
+    return {
+      auditionCue: "Read the final handoff posture and confirm target, brief, format, manifest, receipt, send order, and package state agree.",
+      nextCheck:
+        "If any blocker or review lane remains, use the matching Handoff readout; otherwise run only the explicit export you intend to deliver."
     };
   }
 
