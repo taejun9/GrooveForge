@@ -1335,6 +1335,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "File-Set Readiness, Send Order Status, Latest Export Receipt, Session Brief Context, Package Priority, Focus Route, Direct Package Result Metrics, Audition Cue, and Next Package Check context before Handoff Package Check commands run."
       },
       {
+        id: "handoff-package-check-readout",
+        command: "Handoff Package Check Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Send-package preflight / no render",
+        context:
+          "Handoff Package Check Readout Action, File-Set Readiness, Send Order Status, Latest Export Receipt, Session Brief Context, Delivery Target, Package Priority, Selected Pattern A/B/C, Arrangement Length, Audition Cue, and Next Package Check context before sending files or running export commands."
+      },
+      {
         id: "handoff-next-export",
         command: "Handoff Next Export",
         shortcut: "Quick Actions / Readout",
