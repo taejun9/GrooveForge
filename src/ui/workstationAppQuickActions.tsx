@@ -1415,6 +1415,7 @@ export function createQuickActions({
   onFocusReferenceAlignment,
   onFocusSnapshotCompare,
   onFocusReviewQueue,
+  onFocusReviewQueueRouteReadout,
   onApplyReviewFix,
   onFocusSessionPass,
   onFocusStyleInspector,
@@ -1774,6 +1775,7 @@ export function createQuickActions({
   onFocusReferenceAlignment: (card: ReferenceAlignmentCard) => void;
   onFocusSnapshotCompare: (item: SnapshotCompareFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
+  onFocusReviewQueueRouteReadout: () => void;
   onApplyReviewFix: (item?: ReviewQueueItem) => void;
   onFocusSessionPass: (card: SessionPassCard) => void;
   onFocusStyleInspector: (item: StyleInspectorFocusItem) => void;
@@ -2701,6 +2703,22 @@ export function createQuickActions({
   const reviewQueueItem = reviewQueueSummary.items[0] ?? null;
   const reviewFixItem = activeReviewFixItem(reviewQueueSummary);
   const reviewFixOption = reviewFixItem ? createReviewFixOption(reviewFixItem, project, exportAnalysis) : null;
+  const reviewQueueRouteReadoutAction: QuickAction = {
+    id: "review-queue-route-readout-action",
+    title: reviewQueueItem ? `Review Review Queue Route: ${reviewQueueItem.area}` : "Review Review Queue Route",
+    detail: reviewQueueItem
+      ? `${reviewQueueRouteLabel(reviewQueueItem)} / ${reviewQueueItem.status} / direct review-queue-item-${reviewQueueItem.id} unchanged / review-fix unchanged / ${reviewQueueItem.focusLabel} panel`
+      : "No Review Queue item available.",
+    group: "Project",
+    keywords: `Quick Actions Review Queue Route Readout review route production issue direct review queue command review fix no edit compose arrange mix master deliver ${
+      reviewQueueItem?.id ?? "none"
+    } ${reviewQueueItem?.area ?? "none"} ${reviewQueueItem?.status ?? "none"} ${
+      reviewQueueItem?.focusLabel ?? "none"
+    } beginner producer sample free`,
+    disabled: !reviewQueueItem,
+    resultTargetId: reviewQueueItem?.id,
+    run: onFocusReviewQueueRouteReadout
+  };
   const reviewQueueActions: QuickAction[] = reviewQueueSummary.items.map((item) => ({
     id: `review-queue-item-${item.id}`,
     title: `Focus Review Queue: ${item.area}`,
@@ -5445,6 +5463,7 @@ export function createQuickActions({
       }
     },
     ...finishChecklistActions,
+    reviewQueueRouteReadoutAction,
     {
       id: "review-queue-focus",
       title: reviewQueueItem ? `Focus Review Queue: ${reviewQueueItem.area}` : "Focus Review Queue",
@@ -7196,6 +7215,7 @@ export function createQuickActionResult(
     action.id === "master-automation-route-readout-action" ||
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
+    action.id === "review-queue-route-readout-action" ||
     action.id === "review-queue-focus" ||
     action.id.startsWith("review-queue-item-") ||
     action.id === "finish-checklist-route-readout-action" ||
@@ -10675,7 +10695,13 @@ export function quickActionReviewQueueMetricSnapshot(
   const pattern = activePattern(project);
   const usedSlots = usedPatternSlots(project);
   const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
-  const actionLabel = action.id === "review-queue-focus" ? "focus priority review queue" : "focus direct review queue";
+  const isRouteReadout = action.id === "review-queue-route-readout-action";
+  const actionLabel = isRouteReadout
+    ? "review queue route readout"
+    : action.id === "review-queue-focus"
+      ? "focus priority review queue"
+      : "focus direct review queue";
+  const directIssueLabel = `direct review-queue-item-${item.id} unchanged`;
   const laneLabel = quickActionReviewQueueLaneLabel(action, item);
   const detailParts = quickActionReviewQueueDetailParts(action);
   const contextLabel = detailParts.slice(2).join(" / ") || item.detail;
@@ -10684,9 +10710,13 @@ export function quickActionReviewQueueMetricSnapshot(
   const fixLabel = fix ? `${fix.label} available` : "no one-step fix";
 
   return {
-    id: "review-queue",
-    label: "Review queue",
-    value: `${actionLabel} / issue ${laneLabel} / destination ${item.focusLabel} panel / status ${item.status} / context ${contextLabel} / Pattern ${
+    id: isRouteReadout ? "review-queue-route-readout" : "review-queue",
+    label: isRouteReadout ? "Review Queue Route Readout" : "Review queue",
+    value: `${actionLabel} / route ${reviewQueueRouteLabel(
+      item
+    )} / issue ${laneLabel} / ${directIssueLabel} / review-fix unchanged / destination ${
+      item.focusLabel
+    } panel / status ${item.status} / context ${contextLabel} / Pattern ${
       project.selectedPattern
     } / ${patternEventTotal(pattern)} events / ${patternUseLabel} / queue ${postureLabel} / review ${
       summary.headline
@@ -10697,7 +10727,7 @@ export function quickActionReviewQueueMetricSnapshot(
 }
 
 export function quickActionReviewQueueItem(summary: ReviewQueueSummary, action: QuickAction): ReviewQueueItem | null {
-  if (action.id === "review-queue-focus") {
+  if (action.id === "review-queue-route-readout-action" || action.id === "review-queue-focus") {
     return summary.items[0] ?? null;
   }
 
@@ -10717,8 +10747,17 @@ export function quickActionReviewQueueDetailParts(action: QuickAction): string[]
 }
 
 export function quickActionReviewQueueLaneLabel(action: QuickAction, item: ReviewQueueItem): string {
-  const titleLabel = action.title.replace(/^Focus Review Queue:\s*/, "").trim();
-  return titleLabel && titleLabel !== "Focus Review Queue" ? titleLabel : item.area;
+  const titleLabel = action.title
+    .replace(/^Focus Review Queue:\s*/, "")
+    .replace(/^Review Review Queue Route:\s*/, "")
+    .trim();
+  return titleLabel && titleLabel !== "Focus Review Queue" && titleLabel !== "Review Review Queue Route"
+    ? titleLabel
+    : item.area;
+}
+
+export function reviewQueueRouteLabel(item: ReviewQueueItem): string {
+  return `${item.focusLabel} route`;
 }
 
 export function quickActionReviewFixMetricSnapshot(
@@ -16471,7 +16510,11 @@ export function quickActionResultMetricSnapshot(
     }
   }
 
-  if (action.id === "review-queue-focus" || action.id.startsWith("review-queue-item-")) {
+  if (
+    action.id === "review-queue-route-readout-action" ||
+    action.id === "review-queue-focus" ||
+    action.id.startsWith("review-queue-item-")
+  ) {
     const reviewQueueMetric = quickActionReviewQueueMetricSnapshot(project, action, analysis ?? undefined);
     if (reviewQueueMetric) {
       return reviewQueueMetric;
@@ -21338,6 +21381,15 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Finish Checklist card to inspect that finish-readiness lane before applying any move.",
       nextCheck: "Return to Finish Checklist when you need another direct Compose, Arrange, Mix, Master, or Handoff readiness focus."
+    };
+  }
+
+  if (action.id === "review-queue-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the Review Queue route, then audition the matching Compose, Arrange, Mix, Master, or Deliver area before focusing an issue or applying Review Fix.",
+      nextCheck:
+        "Use Review Queue focus or Review Fix only when the named route matches the production issue; otherwise leave playback, export, and project data unchanged."
     };
   }
 

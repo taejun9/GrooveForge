@@ -395,12 +395,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Beat Readiness Route Readout Action, Selected Pattern A/B/C, Current Priority Readiness Lane, Existing Beat Readiness Check Route, Direct Beat Readiness Check Command, Editable Event Counts, Drum/Music Layer Posture, Arrangement Length, Export Readiness, Ready/Review/Blocker Counts, Audition Cue, and Next Readiness Route Check context before Beat Readiness focus or edit commands run."
       },
       {
+        id: "review-queue-route-readout",
+        command: "Review Queue Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Compose / arrange / mix / master / deliver issue route",
+        context:
+          "Review Queue Route Readout Action, selected Pattern A/B/C, current top production issue, existing Review Queue issue route, direct Review Queue issue command, Review Fix command posture, queue readiness, fix availability, editable event counts, arrangement length, audition cue, and next review-route check before Review Queue focus, Review Fix, playback, edit, or export commands run."
+      },
+      {
         id: "review-queue",
         command: "Review Queue",
         shortcut: "Quick Actions / Readout",
         target: "Composition / arrangement / mix-master / target / handoff issues",
         context:
-          "Issue Priority, Focus/Fix Actions, Queue Readiness, and Review Fix Preview context with destination, review metric, audition cue, fix action, and next check before Review Queue commands run."
+          "Issue Priority, Review Queue Route Readout, Focus/Fix Actions, Queue Readiness, and Review Fix Preview context with destination, review metric, direct issue command, audition cue, fix action, and next check before Review Queue commands run."
       },
       {
         id: "workflow-navigator",
