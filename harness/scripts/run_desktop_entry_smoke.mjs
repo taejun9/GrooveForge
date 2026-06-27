@@ -6,6 +6,26 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const failures = [];
+const expectedNativeMenuCommands = [
+  "open-project",
+  "save-project",
+  "undo",
+  "redo",
+  "quick-actions",
+  "command-reference",
+  "toggle-playback",
+  "delete-selected-event"
+];
+const expectedRendererMenuHandlers = {
+  "open-project": "void handleOpenProject();",
+  "save-project": "void handleSaveProject();",
+  undo: "undoProject();",
+  redo: "redoProject();",
+  "quick-actions": "openQuickActions();",
+  "command-reference": "openCommandReference();",
+  "toggle-playback": "togglePlayback();",
+  "delete-selected-event": "deleteSelectedEvent();"
+};
 
 function check(condition, message) {
   if (!condition) {
@@ -38,6 +58,22 @@ function readJson(relativePath) {
 
 function checkIncludes(text, needle, label) {
   check(text.includes(needle), `${label} should include ${needle}`);
+}
+
+function textBetween(text, startNeedle, endNeedle, label) {
+  const start = text.indexOf(startNeedle);
+  if (start < 0) {
+    failures.push(`${label} should include ${startNeedle}`);
+    return "";
+  }
+
+  const end = text.indexOf(endNeedle, start);
+  if (end < 0) {
+    failures.push(`${label} should include ${endNeedle} after ${startNeedle}`);
+    return text.slice(start);
+  }
+
+  return text.slice(start, end);
 }
 
 function checkBuiltArtifacts() {
@@ -104,6 +140,9 @@ function checkElectronMainContract() {
   checkIncludes(source, 'label: "GrooveForge Local Workstation"', label);
   checkIncludes(source, 'filters: projectFilters', label);
   checkIncludes(source, 'properties: ["openFile"]', label);
+  for (const command of expectedNativeMenuCommands) {
+    checkIncludes(source, `"${command}"`, label);
+  }
   checkIncludes(built, "../dist/index.html", "dist-electron/main.js");
   checkIncludes(built, "preload.js", "dist-electron/main.js");
 }
@@ -112,16 +151,6 @@ function checkPreloadContract() {
   const source = readText("electron/preload.ts");
   const built = readText("dist-electron/preload.js");
   const label = "electron/preload.ts";
-  const expectedCommands = [
-    "open-project",
-    "save-project",
-    "undo",
-    "redo",
-    "quick-actions",
-    "command-reference",
-    "toggle-playback",
-    "delete-selected-event"
-  ];
 
   checkIncludes(source, 'contextBridge.exposeInMainWorld("grooveforge"', label);
   checkIncludes(source, 'appKind: "desktop"', label);
@@ -131,7 +160,7 @@ function checkPreloadContract() {
   checkIncludes(source, "isNativeMenuCommand(command)", label);
   checkIncludes(source, 'ipcRenderer.removeListener("grooveforge:menu-command", listener)', label);
 
-  for (const command of expectedCommands) {
+  for (const command of expectedNativeMenuCommands) {
     checkIncludes(source, `"${command}"`, label);
   }
 
@@ -140,6 +169,29 @@ function checkPreloadContract() {
   checkIncludes(built, "grooveforge:save-project", "dist-electron/preload.js");
   checkIncludes(built, "grooveforge:open-project", "dist-electron/preload.js");
   checkIncludes(built, "grooveforge:menu-command", "dist-electron/preload.js");
+}
+
+function checkRendererNativeMenuContract() {
+  const declarations = readText("src/vite-env.d.ts");
+  const appSource = readText("src/ui/App.tsx");
+  const typeLabel = "src/vite-env.d.ts";
+  const appLabel = "src/ui/App.tsx";
+  const nativeMenuHandler = textBetween(
+    appSource,
+    "function handleNativeMenuCommand(command: NativeMenuCommand): void {",
+    "function updateProject",
+    appLabel
+  );
+
+  checkIncludes(declarations, "type NativeMenuCommand =", typeLabel);
+  checkIncludes(declarations, "onMenuCommand?: (callback: (command: NativeMenuCommand) => void) => () => void;", typeLabel);
+  checkIncludes(appSource, "window.grooveforge?.onMenuCommand?.(handleNativeMenuCommand)", appLabel);
+
+  for (const command of expectedNativeMenuCommands) {
+    checkIncludes(declarations, `| "${command}"`, typeLabel);
+    checkIncludes(nativeMenuHandler, `case "${command}":`, `${appLabel} handleNativeMenuCommand`);
+    checkIncludes(nativeMenuHandler, expectedRendererMenuHandlers[command], `${appLabel} handleNativeMenuCommand`);
+  }
 }
 
 function checkRendererEntryContract() {
@@ -152,6 +204,7 @@ checkBuiltArtifacts();
 checkPackageScripts();
 checkElectronMainContract();
 checkPreloadContract();
+checkRendererNativeMenuContract();
 checkRendererEntryContract();
 
 if (failures.length > 0) {
@@ -163,6 +216,6 @@ if (failures.length > 0) {
 }
 
 console.log("GrooveForge desktop entry smoke passed.");
-console.log("- Scope: Electron production entry, preload bridge, renderer artifact contract");
+console.log("- Scope: Electron production entry, preload bridge, renderer menu handler, renderer artifact contract");
 console.log("- Entry: dist-electron/main.js -> dist/index.html");
 console.log("- Bridge: context-isolated GrooveForge desktop API with validated native menu commands");
