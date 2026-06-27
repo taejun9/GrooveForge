@@ -323,12 +323,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Written Reference Fit, Direction, Arrangement Form, Mix Posture, Listen Cue, Handoff Readiness, Reference Alignment Focus Route, Direct Alignment Card Commands, Focus Result Feedback, Delivery Target, Export/Stem/Package Readiness, Audition Cue, and Next Listening/Handoff Check context before Reference Alignment commands run."
       },
       {
+        id: "composer-guide-route-readout",
+        command: "Composer Guide Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Drums / 808 / harmony / melody / arrange / finish route",
+        context:
+          "Composer Guide Route Readout Action, selected Pattern A/B/C, current drums, 808/bass, harmony, melody, arrangement, or finish writing lane, existing Composer Guide route, direct Composer Guide card command, editable event counts, guide metric, audition cue, and next writing-route check before Composer Guide focus, playback, edit, or export commands run."
+      },
+      {
         id: "composer-guide",
         command: "Composer Guide",
         shortcut: "Quick Actions / Readout",
         target: "Drums / 808 / harmony / melody / arrange / finish",
         context:
-          "Drums, 808/Bass, Harmony, Melody, Arrange, and Finish writing focus context with destination, guide metric, audition cue, and next check before Composer Guide commands run."
+          "Drums, 808/Bass, Harmony, Melody, Arrange, and Finish writing focus context with Composer Guide Route Readout, destination, guide metric, direct Composer Guide card command, audition cue, and next check before Composer Guide commands run."
       },
       {
         id: "key-compass",
