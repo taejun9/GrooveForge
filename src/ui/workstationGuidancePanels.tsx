@@ -8,7 +8,7 @@ import {
   SlidersHorizontal,
   Target
 } from "lucide-react";
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement, type Ref } from "react";
 import type { ProjectState } from "../domain/workstation";
 import type {
   FirstBeatPathStepId,
@@ -1612,10 +1612,12 @@ function FirstBeatPathJumpResultStrip({ result }: { result: FirstBeatPathJumpRes
 export function SessionPass({
   onFocus,
   result,
+  sectionRef,
   summary
 }: {
   summary: SessionPassSummary;
   result: SessionPassFocusResult | null;
+  sectionRef?: Ref<HTMLElement>;
   onFocus: (card: SessionPassCard) => void;
 }): ReactElement {
   const activeCard = summary.cards.find((card) => card.id === summary.activeCardId) ?? null;
@@ -1623,7 +1625,12 @@ export function SessionPass({
   const decisionActionContext = activeCard ? sessionPassButtonContext(activeCard, summary) : summary.decisionTitle;
 
   return (
-    <section className={`session-pass ${summary.tone}`} data-testid="session-pass" aria-label="Session pass">
+    <section
+      ref={sectionRef}
+      className={`session-pass ${summary.tone}`}
+      data-testid="session-pass"
+      aria-label="Session pass"
+    >
       <div className="session-pass-heading">
         <div>
           <ListChecks size={16} aria-hidden="true" />

@@ -1048,6 +1048,7 @@ import {
   mixSnapshotRouteLabel,
   productionSnapshotRouteLabel,
   reviewQueueRouteLabel,
+  sessionPassRouteLabel,
   soundFocusRouteLabel,
   soundPresetRouteLabel,
   spaceFxRouteLabel,
@@ -1250,6 +1251,7 @@ export function App(): ReactElement {
   const productionSnapshotPanelRef = useRef<HTMLElement | null>(null);
   const finishChecklistPanelRef = useRef<HTMLElement | null>(null);
   const reviewQueuePanelRef = useRef<HTMLElement | null>(null);
+  const sessionPassPanelRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
@@ -7631,6 +7633,15 @@ export function App(): ReactElement {
     setProjectStatus(`Session Pass ${card.label}: ${card.value}`);
   }
 
+  function focusSessionPassRouteReadout(): void {
+    const card = activeSessionPassQuickActionCard(sessionPassSummary);
+    const routeLabel = sessionPassRouteLabel(card, sessionPassSummary);
+    sessionPassPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Session Pass Route Readout Pattern ${project.selectedPattern}: ${routeLabel} / ${card.value} / direct session-pass-card-${card.id} unchanged / ${card.focusLabel} panel`
+    );
+  }
+
   function focusComposerGuideCard(card: ComposerGuideCard): void {
     const targetRefs: Record<ReviewQueueFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -8913,6 +8924,7 @@ export function App(): ReactElement {
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusReviewQueueRouteReadout: focusReviewQueueRouteReadout,
     onFocusSessionPass: focusSessionPassCard,
+    onFocusSessionPassRouteReadout: focusSessionPassRouteReadout,
     onFocusStyleInspector: focusStyleInspectorItem,
     onFocusToplineSpace: focusToplineSpaceCard,
     onFocusWorkflowSpotlight: jumpToWorkflowNavigatorItem,
@@ -9313,7 +9325,12 @@ export function App(): ReactElement {
         onJump={jumpToBeatSpineTarget}
       />
 
-      <SessionPass result={sessionPassResult} summary={sessionPassSummary} onFocus={focusSessionPassCard} />
+      <SessionPass
+        result={sessionPassResult}
+        sectionRef={sessionPassPanelRef}
+        summary={sessionPassSummary}
+        onFocus={focusSessionPassCard}
+      />
 
       <WorkflowNavigator items={workflowNavigatorItems} result={workflowNavigatorResult} onJump={jumpToWorkflowNavigatorItem} />
 
