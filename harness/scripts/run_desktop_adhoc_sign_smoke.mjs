@@ -14,6 +14,12 @@ const packageRoot = path.join(root, "build", "desktop", `${appName}-${process.pl
 const packagedApp = path.join(packageRoot, `${appName}.app`);
 const executable = path.join(packagedApp, "Contents", "MacOS", appName);
 const appRoot = path.join(packagedApp, "Contents", "Resources", "app");
+const entitlementsPath = path.join(root, "harness", "fixtures", "macos-hardened-runtime-entitlements.plist");
+const requiredEntitlements = [
+  "com.apple.security.cs.allow-jit",
+  "com.apple.security.cs.allow-unsigned-executable-memory",
+  "com.apple.security.cs.disable-library-validation"
+];
 const timeoutMs = 120000;
 const failures = [];
 
@@ -100,9 +106,25 @@ function parseSmokeResult(output) {
   }
 }
 
+function signatureEvidence(details) {
+  const flagsLine = details
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.startsWith("CodeDirectory") && line.includes("flags="));
+
+  return {
+    identifier: details.match(/Identifier=([^\n]+)/)?.[1] ?? null,
+    flagsLine: flagsLine ?? null,
+    hasRuntimeFlag: /\bflags=[^\n]*\bruntime\b/.test(flagsLine ?? ""),
+    isAdHoc: details.includes("Signature=adhoc") || /\bflags=[^\n]*\badhoc\b/.test(flagsLine ?? ""),
+    hasDeveloperIdAuthority: details.includes("Authority=Developer ID")
+  };
+}
+
 async function checkPackagedAppPreflight() {
   check(existsSync(packagedApp), "packaged GrooveForge.app should exist; run npm run desktop:package-smoke first");
   check(existsSync(executable), "packaged GrooveForge executable should exist");
+  check(existsSync(entitlementsPath), "hardened runtime entitlements file should exist");
   check(existsSync(path.join(appRoot, "dist", "index.html")), "packaged app should include dist/index.html");
   check(existsSync(path.join(appRoot, "dist-electron", "main.js")), "packaged app should include dist-electron/main.js");
   check(existsSync(path.join(packagedApp, "Contents", "Resources", "GrooveForge.icns")), "packaged app should include GrooveForge.icns");
@@ -113,17 +135,32 @@ async function checkPackagedAppPreflight() {
     ? await readFile(path.join(packagedApp, "Contents", "Info.plist"), "utf8")
     : "";
   check(plist.includes(`<string>${bundleId}</string>`), `packaged app Info.plist should use ${bundleId}`);
+
+  const entitlements = existsSync(entitlementsPath) ? await readFile(entitlementsPath, "utf8") : "";
+  for (const entitlement of requiredEntitlements) {
+    check(entitlements.includes(entitlement), `hardened runtime entitlements should include ${entitlement}`);
+  }
 }
 
 async function adHocSignApp() {
-  await runCommand("codesign", ["--force", "--deep", "--sign", "-", packagedApp]);
+  await runCommand("codesign", ["--force", "--deep", "--options", "runtime", "--entitlements", entitlementsPath, "--sign", "-", packagedApp]);
   await runCommand("codesign", ["--verify", "--deep", "--strict", "--verbose=2", packagedApp]);
-  const display = await runCommand("codesign", ["--display", "--verbose=4", packagedApp]);
-  const details = `${display.stdout}\n${display.stderr}`;
-  check(details.includes(`Identifier=${bundleId}`), `ad-hoc signature should preserve ${bundleId}`);
-  check(details.includes("Signature=adhoc"), "ad-hoc signature details should report Signature=adhoc");
-  check(!details.includes("Authority=Developer ID"), "ad-hoc signature should not claim Developer ID authority");
-  return details;
+  const appDisplay = await runCommand("codesign", ["--display", "--verbose=4", packagedApp]);
+  const executableDisplay = await runCommand("codesign", ["--display", "--verbose=4", executable]);
+  const appEntitlements = await runCommand("codesign", ["--display", "--entitlements", ":-", packagedApp]);
+  const appSignature = signatureEvidence(`${appDisplay.stdout}\n${appDisplay.stderr}`);
+  const executableSignature = signatureEvidence(`${executableDisplay.stdout}\n${executableDisplay.stderr}`);
+  const entitlementDetails = `${appEntitlements.stdout}\n${appEntitlements.stderr}`;
+  check(appSignature.identifier === bundleId, `ad-hoc signature should preserve ${bundleId}`);
+  check(appSignature.isAdHoc, "ad-hoc signature details should report Signature=adhoc");
+  check(appSignature.hasRuntimeFlag, "ad-hoc app signature should include the hardened runtime flag");
+  check(executableSignature.hasRuntimeFlag, "ad-hoc executable signature should include the hardened runtime flag");
+  for (const entitlement of requiredEntitlements) {
+    check(entitlementDetails.includes(entitlement), `ad-hoc app signature should include ${entitlement}`);
+  }
+  check(!appSignature.hasDeveloperIdAuthority, "ad-hoc app signature should not claim Developer ID authority");
+  check(!executableSignature.hasDeveloperIdAuthority, "ad-hoc executable signature should not claim Developer ID authority");
+  return { appSignature, executableSignature };
 }
 
 async function launchSignedApp() {
@@ -212,7 +249,7 @@ if (failures.length > 0) {
   fail("Packaged app preflight failed.", failures.map((failure) => `- ${failure}`).join("\n"));
 }
 
-await adHocSignApp();
+const signature = await adHocSignApp();
 if (failures.length > 0) {
   fail("Ad-hoc signature validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
 }
@@ -224,8 +261,10 @@ if (failures.length > 0) {
 }
 
 console.log("GrooveForge desktop ad-hoc signing smoke passed.");
-console.log("- Scope: local macOS ad-hoc app signing, codesign verification, and signed app production launch smoke");
+console.log("- Scope: local macOS ad-hoc app signing with hardened runtime option, codesign verification, and signed app production launch smoke");
 console.log(`- App: ${path.relative(root, packagedApp)}`);
-console.log("- Signature: ad-hoc, Developer ID signing not claimed");
+console.log(`- Entitlements: ${path.relative(root, entitlementsPath)}`);
+console.log("- Signature: ad-hoc with hardened runtime option and Electron runtime entitlements, Developer ID signing not claimed");
+console.log(`- Runtime flags: app ${signature.appSignature.hasRuntimeFlag ? "yes" : "no"}, executable ${signature.executableSignature.hasRuntimeFlag ? "yes" : "no"}`);
 console.log(`- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors`);
 console.log("- Not claimed: Developer ID signing, notarization, Gatekeeper approval, auto-update, app-store submission, or external distribution-channel QA");

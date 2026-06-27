@@ -16,6 +16,11 @@ const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformAr
 const packagedApp = path.join(packageRoot, `${appName}.app`);
 const dmgPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}.dmg`);
 const manifestPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-manifest.json`);
+const requiredRuntimeEntitlements = [
+  "com.apple.security.cs.allow-jit",
+  "com.apple.security.cs.allow-unsigned-executable-memory",
+  "com.apple.security.cs.disable-library-validation"
+];
 const failures = [];
 const commandTimeoutMs = 60000;
 
@@ -156,6 +161,33 @@ async function readCodeSignatureDetails(appPath) {
   }
 }
 
+async function readCodeSignatureEntitlements(appPath) {
+  try {
+    const display = await runCommand("codesign", ["--display", "--entitlements", ":-", appPath]);
+    return `${display.stdout}\n${display.stderr}`;
+  } catch (error) {
+    fail(
+      "Could not read app code signature entitlements; run npm run desktop:adhoc-sign-smoke before release manifest smoke.",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
+function signatureEvidence(details) {
+  const flagsLine = details
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.startsWith("CodeDirectory") && line.includes("flags="));
+
+  return {
+    identifier: details.match(/Identifier=([^\n]+)/)?.[1] ?? null,
+    flagsLine: flagsLine ?? null,
+    hasRuntimeFlag: /\bflags=[^\n]*\bruntime\b/.test(flagsLine ?? ""),
+    isAdHoc: details.includes("Signature=adhoc") || /\bflags=[^\n]*\badhoc\b/.test(flagsLine ?? ""),
+    hasDeveloperIdAuthority: details.includes("Authority=Developer ID")
+  };
+}
+
 async function createManifest() {
   if (process.platform !== "darwin") {
     return {
@@ -184,7 +216,12 @@ async function createManifest() {
   const infoPlist = await readFile(infoPlistPath, "utf8");
   const appStats = countFilesAndBytes(packagedApp);
   const codeSignatureDetails = await readCodeSignatureDetails(packagedApp);
-  const isAdHocSigned = codeSignatureDetails.includes("Signature=adhoc");
+  const codeSignatureEntitlements = await readCodeSignatureEntitlements(packagedApp);
+  const signature = signatureEvidence(codeSignatureDetails);
+  const isAdHocSigned = signature.isAdHoc;
+  const runtimeEntitlements = Object.fromEntries(
+    requiredRuntimeEntitlements.map((entitlement) => [entitlement, codeSignatureEntitlements.includes(entitlement)])
+  );
 
   return {
     appName,
@@ -200,7 +237,11 @@ async function createManifest() {
       autoUpdateClaimed: false,
       externalDistributionChannelQaClaimed: false,
       signatureKind: isAdHocSigned ? "ad-hoc" : "unverified",
-      identifier: codeSignatureDetails.match(/Identifier=([^\n]+)/)?.[1] ?? null
+      identifier: signature.identifier,
+      hardenedRuntimeFlagPresent: signature.hasRuntimeFlag,
+      flagsLine: signature.flagsLine,
+      developerIdAuthorityPresent: signature.hasDeveloperIdAuthority,
+      runtimeEntitlements
     },
     appBundle: {
       path: relative(packagedApp),
@@ -243,6 +284,11 @@ function validateManifest(manifest) {
   check(manifest.signing.externalDistributionChannelQaClaimed === false, "release manifest should not claim external distribution-channel QA");
   check(manifest.signing.signatureKind === "ad-hoc", "release manifest should record ad-hoc signature kind");
   check(manifest.signing.identifier === bundleId, `release manifest signing identifier should use ${bundleId}`);
+  check(manifest.signing.hardenedRuntimeFlagPresent === true, "release manifest should record the local hardened runtime signing flag");
+  check(manifest.signing.developerIdAuthorityPresent === false, "release manifest should not record Developer ID authority");
+  for (const entitlement of requiredRuntimeEntitlements) {
+    check(manifest.signing.runtimeEntitlements?.[entitlement] === true, `release manifest should record ${entitlement}`);
+  }
   check(manifest.appBundle.bundleIdentifier === bundleId, `release manifest should use ${bundleId}`);
   check(manifest.appBundle.bundleName === appName, "release manifest should use GrooveForge bundle name");
   check(manifest.appBundle.bundleExecutable === appName, "release manifest should use GrooveForge executable");
@@ -278,8 +324,10 @@ if (manifest.skipped) {
 }
 
 console.log("GrooveForge desktop release manifest smoke passed.");
-console.log("- Scope: local release artifact manifest, SHA-256 checksums, bundle metadata, and ad-hoc signing claims");
+console.log("- Scope: local release artifact manifest, SHA-256 checksums, bundle metadata, ad-hoc signing, hardened runtime flag evidence, and runtime entitlement evidence");
 console.log(`- Manifest: ${relative(manifestPath)}`);
 console.log(`- DMG: ${manifest.dmg.path}, ${manifest.dmg.bytes} bytes, sha256 ${manifest.dmg.sha256.slice(0, 12)}...`);
 console.log(`- App payload: ${manifest.appBundle.files} files, ${manifest.appBundle.bytes} bytes, ${manifest.appBundle.bundleIdentifier}`);
+console.log(`- Hardened runtime flag: ${manifest.signing.hardenedRuntimeFlagPresent ? "yes" : "no"}`);
+console.log(`- Runtime entitlements: ${Object.entries(manifest.signing.runtimeEntitlements).filter(([, enabled]) => enabled).length}/${requiredRuntimeEntitlements.length}`);
 console.log("- Not claimed: Developer ID signing, notarization, auto-update, app-store submission, or external distribution-channel QA");
