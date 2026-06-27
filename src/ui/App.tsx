@@ -1038,6 +1038,7 @@ import {
 import {
   drumKitRouteLabel,
   mixBalanceRouteLabel,
+  mixSnapshotRouteLabel,
   soundFocusRouteLabel,
   soundPresetRouteLabel,
   spaceFxRouteLabel,
@@ -7107,6 +7108,16 @@ export function App(): ReactElement {
     );
   }
 
+  function focusMixSnapshotRouteReadout(): void {
+    const directCommand = `mix-snapshot-${mixSnapshotComparison.decisionActionId}`;
+    mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Mix Snapshot Route Readout Pattern ${project.selectedPattern}: ${mixSnapshotRouteLabel(
+        mixSnapshotComparison.decisionActionId
+      )} / ${mixSnapshotComparison.statusLabel} / Decision ${mixSnapshotComparison.decisionActionLabel} / direct ${directCommand} unchanged`
+    );
+  }
+
   function focusMixBalanceReadout(): void {
     mixPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
     setProjectStatus(
@@ -8604,6 +8615,7 @@ export function App(): ReactElement {
     onRecallMixSnapshot: recallMixSnapshot,
     onClearMixSnapshots: clearMixSnapshots,
     onFocusMixSnapshotReadout: focusMixSnapshotReadout,
+    onFocusMixSnapshotRouteReadout: focusMixSnapshotRouteReadout,
     onFocusSpaceFxReadout: focusSpaceFxReadout,
     onFocusSpaceFxRouteReadout: focusSpaceFxRouteReadout,
     onFocusPatternChainReadout: focusPatternChainReadout,
