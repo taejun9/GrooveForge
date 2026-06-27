@@ -1037,6 +1037,7 @@ import {
 } from "./workstationAppQuickActions";
 import {
   drumKitRouteLabel,
+  exportPreflightRouteLabel,
   masterAutomationRouteLabel,
   masterFinishRouteLabel,
   mixBalanceRouteLabel,
@@ -7777,6 +7778,18 @@ export function App(): ReactElement {
     setProjectStatus(`Preflight ${card.label}: ${card.value}`);
   }
 
+  function focusExportPreflightRouteReadout(): void {
+    const card = activeExportPreflightQuickActionCard(exportPreflightSummary);
+    deliverPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      card
+        ? `Export Preflight Route Readout Pattern ${project.selectedPattern}: ${exportPreflightRouteLabel(
+            card
+          )} / ${card.value} / direct export-preflight-card-${card.id} unchanged / ${card.focusLabel} panel`
+        : "Export Preflight Route Readout: no priority card available"
+    );
+  }
+
   function focusHandoffPack(): void {
     const currentItems = createHandoffPackItems({
       analysis: exportAnalysis,
@@ -8789,6 +8802,7 @@ export function App(): ReactElement {
     onRunComposerAction: runComposerAction,
     onRunNextMove: runNextMove,
     onFocusExportPreflight: focusExportPreflightCard,
+    onFocusExportPreflightRouteReadout: focusExportPreflightRouteReadout,
     onFocusFinishChecklist: focusFinishChecklistCard,
     onFocusGrooveCompass: focusGrooveCompassItem,
     onFocusHandoffExportFormat: focusHandoffExportFormatMetric,
