@@ -729,6 +729,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Drum Foundation/Groove Feel/Drum Accent Preview, Current Drum Move Target, Direct Drum Move Command, Drum Move Result Feedback, Selected Pattern, Audition Cue, and Next Drum Check context before Drum Move commands run."
       },
       {
+        id: "drum-move-route-readout",
+        command: "Drum Move Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Foundation / feel / accent route / no edit",
+        context:
+          "Drum Move Route Readout Action, Selected Pattern A/B/C, Drum Foundation/Groove Feel/Drum Accent Preview, Current Drum Move Target, Existing Drum Move Route, Direct Drum Move Command, Move Count, Drum Hit/Timing/Chance/Velocity Posture, Arrangement Usage, Audition Cue, and Next Drum Route Check context before Drum Move commands run."
+      },
+      {
         id: "808-move",
         command: "808 Move",
         shortcut: "Quick Actions / Readout",

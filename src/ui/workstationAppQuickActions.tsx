@@ -1220,6 +1220,7 @@ export function createQuickActions({
   onApplyDrumFoundation,
   onApplyDrumKit,
   onFocusDrumKitReadout,
+  onFocusDrumMoveRouteReadout,
   onApplyGrooveFeel,
   onApplyLayerStarter,
   onFocusLayerStarterReadout,
@@ -1560,6 +1561,7 @@ export function createQuickActions({
   onApplyDrumFoundation: (foundation: DrumFoundationId) => void;
   onApplyDrumKit: (pad: DrumKitPadId) => void;
   onFocusDrumKitReadout: () => void;
+  onFocusDrumMoveRouteReadout: () => void;
   onApplyGrooveFeel: (feel: GrooveFeelId) => void;
   onApplyLayerStarter: (starterId: LayerStarterId) => void;
   onFocusLayerStarterReadout: () => void;
@@ -2311,6 +2313,26 @@ export function createQuickActions({
   const chordMoveTarget = activeChordMoveQuickActionTarget(project, selectedChord, chordMovePreviewSummary);
   const drumMoveTarget = activeDrumMoveQuickActionTarget(project, drumMovePreviewSummary);
   const melodyMoveTarget = activeMelodyMoveQuickActionTarget(project, melodyMovePreviewSummary);
+  const drumMoveRouteReadoutAction: QuickAction = {
+    id: "drum-move-route-readout-action",
+    title: drumMoveTarget
+      ? `Review Drum Move Route Readout: ${drumMoveTarget.label} ${drumMoveTarget.kind}`
+      : "Review Drum Move Route Readout: Drums aligned",
+    detail: drumMoveTarget
+      ? `${drumMovePreviewSummary.patternLabel} / route ${drumMoveRouteLabel(
+          drumMoveTarget
+        )} / direct command drum-move / ${drumMovePreviewSummary.moveLabel} / drum route preflight`
+      : `${drumMovePreviewSummary.statusLabel} / no drum move route needed / ${drumMovePreviewSummary.moveLabel} / drum route preflight`,
+    group: "Create",
+    keywords: `Quick Actions Drum Move Route Readout review selected Pattern ${
+      project.selectedPattern
+    } route direct drum command drum-move ${
+      drumMoveTarget ? `${drumMoveTarget.kind} ${drumMoveRouteLabel(drumMoveTarget)} ${drumMoveTarget.label}` : "drums aligned"
+    } ${drumMovePreviewSummary.statusLabel} ${drumMovePreviewSummary.foundationLabel} ${
+      drumMovePreviewSummary.feelLabel
+    } ${drumMovePreviewSummary.accentLabel} ${drumMovePreviewSummary.moveLabel} rhythm pocket foundation feel accent velocity chance timing hats percussion beginner producer sample free`,
+    run: onFocusDrumMoveRouteReadout
+  };
   const modeFocusCard = activeModeFocusQuickActionCard(modeFocusSummary);
   const modeFocusActions: QuickAction[] = modeFocusSummary.cards.map((card) => ({
     id: `mode-focus-card-${card.id}`,
@@ -4701,6 +4723,7 @@ export function createQuickActions({
       }
     },
     ...patternStackActions,
+    drumMoveRouteReadoutAction,
     {
       id: "drum-move",
       title: drumMoveTarget ? `Apply ${drumMoveTarget.label} Drum ${drumMoveTarget.kind}` : "Apply Drum Move",
@@ -6778,6 +6801,7 @@ export function createQuickActionResult(
     action.id === "pattern-variation-readout-action" ||
     action.id === "pattern-fill-readout-action" ||
     action.id === "pattern-copy-clear-readout-action" ||
+    action.id === "drum-move-route-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -15222,6 +15246,16 @@ export function quickActionResultMetricSnapshot(
     }
   }
 
+  if (action.id === "drum-move-route-readout-action") {
+    return (
+      quickActionDrumMoveRouteReadoutMetricSnapshot(project, action) ?? {
+        id: "drum-move-route-readout",
+        label: "Drum Move Route Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id === "drum-move") {
     const pattern = activePattern(project);
     return {
@@ -18106,6 +18140,68 @@ export function patternStackQuickActionId(actionId: string): PatternStackId | nu
   return stackId === "pocket" || stackId === "hook" || stackId === "lift" || stackId === "break" ? stackId : null;
 }
 
+export function drumMoveRouteLabel(target: DrumMoveQuickActionTarget): string {
+  switch (target.kind) {
+    case "Foundation":
+      return "Drum Foundation route";
+    case "Feel":
+      return "Groove Feel route";
+    case "Accent":
+      return "Drum Accent route";
+  }
+}
+
+export function quickActionDrumMoveRouteReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "drum-move-route-readout-action") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const preview = createDrumMovePreviewSummary(
+    pattern,
+    createDrumFoundationOptions(),
+    createGrooveFeelOptions(),
+    createDrumAccentOptions()
+  );
+  const target = activeDrumMoveQuickActionTarget(project, preview);
+  const arrangementUse = patternArrangementUseLabel(project, project.selectedPattern);
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "drum-move-route-readout",
+    label: "Drum Move Route Readout",
+    value: [
+      "review drum move route",
+      `selected Pattern ${project.selectedPattern}`,
+      preview.statusLabel,
+      `preview ${preview.patternLabel}`,
+      `foundation ${preview.foundationLabel}`,
+      `feel ${preview.feelLabel}`,
+      `accent ${preview.accentLabel}`,
+      preview.moveLabel,
+      target ? `target ${target.label} ${target.kind}` : "target unavailable",
+      target ? `route ${drumMoveRouteLabel(target)}` : "route unavailable",
+      "direct command drum-move",
+      `${patternEventTotal(pattern)} events`,
+      `${activeDrumHitCount(pattern)} drum hits`,
+      drumAverageTimingLabel(pattern),
+      drumAverageChanceLabel(pattern),
+      drumAverageVelocityLabel(pattern),
+      `arrangement ${arrangementUse}`,
+      "drum route unchanged",
+      "drums unchanged",
+      "playback unchanged",
+      "export unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
 export type PatternEditQuickActionRoute = {
   action: "copy" | "clear";
   source: PatternSlot;
@@ -19460,6 +19556,15 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Loop Pattern ${project.selectedPattern}; check kick/clap anchors, hat pocket, and percussion motion.`,
       nextCheck: "Use the Drum Move Result plus selected-drum pocket and hit tools for manual corrections."
+    };
+  }
+
+  if (action.id === "drum-move-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the drum route and loop the selected Pattern before choosing the existing Drum Move command.",
+      nextCheck:
+        "Use Drum Move only when the named Foundation, Feel, or Accent route should reshape the selected Pattern drums; otherwise use selected-drum tools."
     };
   }
 
