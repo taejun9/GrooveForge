@@ -4347,11 +4347,13 @@ export function ComposerGuide({
   summary,
   focusedCardId,
   result,
+  sectionRef,
   onFocus
 }: {
   summary: ComposerGuideSummary;
   focusedCardId: ComposerGuideCardId | null;
   result: ComposerGuideFocusResult | null;
+  sectionRef?: Ref<HTMLElement>;
   onFocus: (card: ComposerGuideCard) => void;
 }): ReactElement {
   const focusSummary = createComposerGuideFocusSummary(summary, focusedCardId);
@@ -4360,7 +4362,12 @@ export function ComposerGuide({
     : null;
 
   return (
-    <section className={`composer-guide ${summary.tone}`} data-testid="composer-guide" aria-label="Composer guide">
+    <section
+      ref={sectionRef}
+      className={`composer-guide ${summary.tone}`}
+      data-testid="composer-guide"
+      aria-label="Composer guide"
+    >
       <div className="composer-guide-heading">
         <div>
           <ListChecks size={17} aria-hidden="true" />

@@ -1038,6 +1038,7 @@ import {
 import {
   beatPassportRouteLabel,
   beatReadinessRouteLabel,
+  composerGuideRouteLabel,
   drumKitRouteLabel,
   exportPreflightRouteLabel,
   finishChecklistRouteLabel,
@@ -1252,6 +1253,7 @@ export function App(): ReactElement {
   const finishChecklistPanelRef = useRef<HTMLElement | null>(null);
   const reviewQueuePanelRef = useRef<HTMLElement | null>(null);
   const sessionPassPanelRef = useRef<HTMLElement | null>(null);
+  const composerGuidePanelRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
@@ -7657,6 +7659,20 @@ export function App(): ReactElement {
     setProjectStatus(`Guide ${card.label}: ${card.status}`);
   }
 
+  function focusComposerGuideRouteReadout(): void {
+    const card = activeComposerGuideQuickActionCard(composerGuideSummary);
+    composerGuidePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+
+    setProjectStatus(
+      card
+        ? `Composer Guide Route Readout Pattern ${project.selectedPattern}: ${composerGuideRouteLabel(
+            card,
+            composerGuideSummary
+          )} / ${card.status} / direct composer-guide-card-${card.id} unchanged / ${card.focusLabel} panel`
+        : "Composer Guide Route Readout: no writing lane available"
+    );
+  }
+
   function focusComposerActionsReadout(): void {
     const action = composerActionsSummary.actions[0] ?? null;
     composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -8889,6 +8905,7 @@ export function App(): ReactElement {
     onFocusBeatReadiness: focusBeatReadinessCheck,
     onFocusBeatReadinessRouteReadout: focusBeatReadinessRouteReadout,
     onFocusComposerGuide: focusComposerGuideCard,
+    onFocusComposerGuideRouteReadout: focusComposerGuideRouteReadout,
     onFocusComposerActionsReadout: focusComposerActionsReadout,
     onRunComposerAction: runComposerAction,
     onRunNextMove: runNextMove,
@@ -9375,6 +9392,7 @@ export function App(): ReactElement {
         summary={composerGuideSummary}
         focusedCardId={composerGuideFocusId}
         result={composerGuideResult}
+        sectionRef={composerGuidePanelRef}
         onFocus={focusComposerGuideCard}
       />
 
