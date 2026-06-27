@@ -1051,6 +1051,7 @@ import {
   mixSnapshotRouteLabel,
   productionSnapshotRouteLabel,
   reviewQueueRouteLabel,
+  referenceAlignmentRouteLabel,
   sessionPassRouteLabel,
   soundFocusRouteLabel,
   soundPresetRouteLabel,
@@ -1256,6 +1257,7 @@ export function App(): ReactElement {
   const reviewQueuePanelRef = useRef<HTMLElement | null>(null);
   const sessionPassPanelRef = useRef<HTMLElement | null>(null);
   const composerGuidePanelRef = useRef<HTMLElement | null>(null);
+  const referenceAlignmentPanelRef = useRef<HTMLElement | null>(null);
   const keyCompassPanelRef = useRef<HTMLElement | null>(null);
   const grooveCompassPanelRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
@@ -7084,6 +7086,17 @@ export function App(): ReactElement {
     setProjectStatus(`Reference Alignment ${card.label}: ${card.value}`);
   }
 
+  function focusReferenceAlignmentRouteReadout(): void {
+    const card = activeReferenceAlignmentQuickActionCard(referenceAlignmentSummary);
+    referenceAlignmentPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      `Reference Alignment Route Readout Pattern ${project.selectedPattern}: ${referenceAlignmentRouteLabel(
+        card,
+        referenceAlignmentSummary
+      )} / ${card.value} / direct reference-alignment-card-${card.id} unchanged / ${card.focusLabel} panel`
+    );
+  }
+
   function focusMixCoachCheck(check: MixCoachCheck): void {
     const currentChecks = createMixCoachChecks(exportAnalysis, stemAnalyses);
     const currentCheck = currentChecks.find((candidate) => candidate.id === check.id) ?? check;
@@ -8971,6 +8984,7 @@ export function App(): ReactElement {
     onFocusProductionSnapshot: focusProductionSnapshotMetric,
     onFocusProductionSnapshotRouteReadout: focusProductionSnapshotRouteReadout,
     onFocusReferenceAlignment: focusReferenceAlignmentCard,
+    onFocusReferenceAlignmentRouteReadout: focusReferenceAlignmentRouteReadout,
     onFocusSnapshotCompare: focusSnapshotCompareMetric,
     onFocusReviewQueue: focusReviewQueueItem,
     onFocusReviewQueueRouteReadout: focusReviewQueueRouteReadout,
@@ -9468,6 +9482,7 @@ export function App(): ReactElement {
         referenceAlignment={referenceAlignmentSummary}
         referenceAlignmentResult={referenceAlignmentResult}
         result={sessionBriefStarterResult}
+        sectionRef={referenceAlignmentPanelRef}
         starterPads={sessionBriefStarterPads}
         fieldRefs={{
           artist: sessionBriefArtistRef,

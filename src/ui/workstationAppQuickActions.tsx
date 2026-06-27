@@ -1416,6 +1416,7 @@ export function createQuickActions({
   onFocusProductionSnapshot,
   onFocusProductionSnapshotRouteReadout,
   onFocusReferenceAlignment,
+  onFocusReferenceAlignmentRouteReadout,
   onFocusSnapshotCompare,
   onFocusReviewQueue,
   onFocusReviewQueueRouteReadout,
@@ -1780,6 +1781,7 @@ export function createQuickActions({
   onFocusProductionSnapshot: (metric: ProductionSnapshotFocusItem) => void;
   onFocusProductionSnapshotRouteReadout: () => void;
   onFocusReferenceAlignment: (card: ReferenceAlignmentCard) => void;
+  onFocusReferenceAlignmentRouteReadout: () => void;
   onFocusSnapshotCompare: (item: SnapshotCompareFocusItem) => void;
   onFocusReviewQueue: (item: ReviewQueueItem) => void;
   onFocusReviewQueueRouteReadout: () => void;
@@ -2875,6 +2877,25 @@ export function createQuickActions({
     keywords: `reference alignment listen cue ${card.id} ${card.label} ${card.value} ${card.focusLabel} arrange mix master handoff`,
     run: () => onFocusReferenceAlignment(card)
   }));
+  const referenceAlignmentRouteReadoutAction: QuickAction = {
+    id: "reference-alignment-route-readout-action",
+    title: `Review Reference Alignment Route: ${referenceAlignmentCard.label}`,
+    detail: [
+      referenceAlignmentCard.value,
+      `${referenceAlignmentCard.focusLabel} panel`,
+      referenceAlignmentSummary.headline,
+      referenceAlignmentSummary.detail,
+      referenceAlignmentCard.detail,
+      `Next ${referenceAlignmentCard.nextCheck}`,
+      `Route ${referenceAlignmentRouteLabel(referenceAlignmentCard, referenceAlignmentSummary)}`,
+      `Direct reference-alignment-card-${referenceAlignmentCard.id} unchanged`,
+      "Readout only"
+    ].join(" / "),
+    group: "Project",
+    keywords: `Quick Actions Reference Alignment Route Readout review written reference fit direction form mix listen cue handoff route direct reference-alignment-card-${referenceAlignmentCard.id} ${referenceAlignmentCard.id} ${referenceAlignmentCard.label} ${referenceAlignmentCard.value} ${referenceAlignmentCard.focusLabel} ${referenceAlignmentCard.detail} Session Brief Arrange Mix Master Deliver no audio import sample free beginner producer`,
+    resultTargetId: referenceAlignmentCard.id,
+    run: onFocusReferenceAlignmentRouteReadout
+  };
   const sessionBriefStarterActions: QuickAction[] = sessionBriefStarterPads.map((pad) => ({
     id: `session-brief-starter-${pad.id}`,
     title:
@@ -4928,6 +4949,7 @@ export function createQuickActions({
       run: () => onFocusSessionBriefCompass(sessionBriefCompassCard)
     },
     ...sessionBriefCompassActions,
+    referenceAlignmentRouteReadoutAction,
     {
       id: "reference-alignment-focus",
       title: `Focus Reference Alignment: ${referenceAlignmentCard.label}`,
@@ -7209,6 +7231,7 @@ export function createQuickActionResult(
     action.id.startsWith("session-pass-card-") ||
     action.id === "session-brief-compass-focus" ||
     action.id.startsWith("session-brief-compass-card-") ||
+    action.id === "reference-alignment-route-readout-action" ||
     action.id === "reference-alignment-focus" ||
     action.id.startsWith("reference-alignment-card-") ||
     action.id === "first-beat-path-jump" ||
@@ -8732,7 +8755,8 @@ export function quickActionReferenceAlignmentMetricSnapshot(
   action: QuickAction,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
-  if (action.id !== "reference-alignment-focus" && !action.id.startsWith("reference-alignment-card-")) {
+  const isRouteReadout = action.id === "reference-alignment-route-readout-action";
+  if (!isRouteReadout && action.id !== "reference-alignment-focus" && !action.id.startsWith("reference-alignment-card-")) {
     return null;
   }
 
@@ -8751,15 +8775,34 @@ export function quickActionReferenceAlignmentMetricSnapshot(
   const usedSlots = usedPatternSlots(project);
   const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
   const detailParts = quickActionReferenceAlignmentDetailParts(action);
-  const contextLabel = detailParts.slice(2).join(" / ") || card.detail || detailParts.join(" / ");
+  const contextLabel = isRouteReadout ? detailParts[4] ?? card.detail : detailParts.slice(2).join(" / ") || card.detail;
   const audibleStems = audibleStemTracks(stemAnalyses);
+  const routeLabel = quickActionReferenceAlignmentRouteLabel(detailParts, card, summary);
+  const directCardId = isRouteReadout
+    ? action.resultTargetId ?? ""
+    : action.id.startsWith("reference-alignment-card-")
+      ? action.id.slice("reference-alignment-card-".length)
+      : "";
+  const directCardLabel =
+    isRouteReadout && directCardId
+      ? `direct reference-alignment-card-${directCardId} unchanged`
+      : directCardId
+        ? `direct reference-alignment-card-${directCardId}`
+        : "active reference alignment command";
+  const actionLabel = isRouteReadout
+    ? "review reference alignment route readout"
+    : action.id === "reference-alignment-focus"
+      ? "focus active reference alignment"
+      : "focus direct reference alignment";
 
   return {
     id: "reference-alignment",
     label: "Reference alignment",
     value: [
-      `action ${action.title}`,
+      `action ${actionLabel}`,
       `lane ${quickActionReferenceAlignmentLaneLabel(action, card)}`,
+      `route ${routeLabel}`,
+      directCardLabel,
       `destination ${referenceAlignmentDestinationLabel(card)}`,
       `status ${card.value}`,
       `context ${contextLabel}`,
@@ -8777,6 +8820,7 @@ export function quickActionReferenceAlignmentMetricSnapshot(
       `stems ${audibleStems.length}/${target.stemGoal} audible`,
       `package ${packageSummary.headline}`,
       packageSummary.detail,
+      isRouteReadout ? "readout only" : "focus command",
       `next ${card.nextCheck}`
     ].join(" / ")
   };
@@ -8788,6 +8832,13 @@ export function quickActionReferenceAlignmentCard(
 ): ReferenceAlignmentCard | null {
   if (action.id === "reference-alignment-focus") {
     return activeReferenceAlignmentQuickActionCard(summary);
+  }
+
+  if (action.id === "reference-alignment-route-readout-action") {
+    return (
+      summary.cards.find((card) => card.id === (action.resultTargetId as ReferenceAlignmentCardId | undefined)) ??
+      activeReferenceAlignmentQuickActionCard(summary)
+    );
   }
 
   const cardId = quickActionReferenceAlignmentCardId(action.id);
@@ -8814,7 +8865,31 @@ export function quickActionReferenceAlignmentDetailParts(action: QuickAction): s
 }
 
 export function quickActionReferenceAlignmentLaneLabel(action: QuickAction, card: ReferenceAlignmentCard): string {
-  return `${action.id === "reference-alignment-focus" ? "active" : "direct"} ${card.label}`;
+  const laneType =
+    action.id === "reference-alignment-route-readout-action"
+      ? "route"
+      : action.id === "reference-alignment-focus"
+        ? "active"
+        : "direct";
+  return `${laneType} ${card.label}`;
+}
+
+export function quickActionReferenceAlignmentRouteLabel(
+  parts: string[],
+  card: ReferenceAlignmentCard,
+  summary: ReferenceAlignmentSummary
+): string {
+  const routePart = parts.find((part) => part.startsWith("Route "));
+  if (routePart) {
+    return routePart.replace(/^Route\s+/, "");
+  }
+  return referenceAlignmentRouteLabel(card, summary);
+}
+
+export function referenceAlignmentRouteLabel(card: ReferenceAlignmentCard, summary: ReferenceAlignmentSummary): string {
+  const routeIndex = summary.cards.findIndex((candidate) => candidate.id === card.id);
+  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${summary.cards.length}` : `1/${summary.cards.length}`;
+  return `${card.label} ${routePosition} to ${referenceAlignmentDestinationLabel(card)}`;
 }
 
 export function referenceAlignmentDestinationLabel(card: ReferenceAlignmentCard): string {
@@ -15456,6 +15531,19 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "reference-alignment-route-readout-action") {
+    const referenceAlignmentMetric = quickActionReferenceAlignmentMetricSnapshot(project, action, analysis ?? undefined);
+    if (referenceAlignmentMetric) {
+      return referenceAlignmentMetric;
+    }
+
+    return {
+      id: "reference-alignment",
+      label: "Reference alignment",
+      value: `${sessionBriefFilledFields(project.sessionBrief)}/4 brief fields`
+    };
+  }
+
   if (action.id === "reference-alignment-focus") {
     const referenceAlignmentMetric = quickActionReferenceAlignmentMetricSnapshot(project, action, analysis ?? undefined);
     if (referenceAlignmentMetric) {
@@ -20361,6 +20449,15 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Brief Compass lane to inspect direction, reference, artist context, or handoff readiness.",
       nextCheck: "Return to Brief Compass when you need another direct context or handoff focus."
+    };
+  }
+
+  if (action.id === "reference-alignment-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the Reference Alignment route, then inspect the matching Session Brief, Arrange, Mix, Master, or Deliver area before focusing or editing reference direction.",
+      nextCheck:
+        "Use Reference Alignment focus only when the named written-reference route matches the session question; otherwise leave playback and project data unchanged."
     };
   }
 
