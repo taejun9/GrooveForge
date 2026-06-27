@@ -1265,6 +1265,7 @@ export function createQuickActions({
   onFocusSoundFocusRouteReadout,
   onApplySoundPreset,
   onFocusSoundPresetReadout,
+  onFocusSoundPresetRouteReadout,
   onCaptureSoundSnapshot,
   onRecallSoundSnapshot,
   onClearSoundSnapshots,
@@ -1611,6 +1612,7 @@ export function createQuickActions({
   onFocusSoundFocusRouteReadout: () => void;
   onApplySoundPreset: (preset: SoundPresetTarget) => void;
   onFocusSoundPresetReadout: () => void;
+  onFocusSoundPresetRouteReadout: () => void;
   onCaptureSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
   onRecallSoundSnapshot: (slot: SoundSnapshotSlotId) => void;
   onClearSoundSnapshots: () => void;
@@ -3334,6 +3336,10 @@ export function createQuickActions({
     ? soundFocusChangedParameters(project.sound, soundFocusRoutePad)
     : [];
   const soundFocusRouteTarget = soundFocusRouteLabel(soundFocusRouteParameters);
+  const soundPresetRouteTarget = soundPresetRouteLabel(
+    project.sound,
+    soundPresetDesign(soundPresetPreviewSummary.presetId)
+  );
   const soundPresetActions: QuickAction[] = soundPresetIds.map((preset) => {
     const targetSound = soundPresetDesign(preset);
     const moveCount = soundPresetChangedMoveCount(project.sound, targetSound);
@@ -5069,6 +5075,19 @@ export function createQuickActions({
       } beginner producer manual sound design`,
       resultTargetId: soundPresetPreviewSummary.presetId,
       run: onFocusSoundPresetReadout
+    },
+    {
+      id: "sound-preset-route-readout-action",
+      title: `Review Sound Preset Route: ${soundPresetPreviewSummary.presetLabel}`,
+      detail: `${soundPresetRouteTarget} / ${soundPresetPreviewSummary.statusLabel} / ${soundPresetPreviewSummary.changeLabel} / direct Sound Preset unchanged`,
+      group: "Create",
+      keywords: `Quick Actions Sound Preset Route Readout review route preflight full tone preset preview direct sound preset command no apply drums 808 bass duck sidechain synth chords ${
+        soundPresetPreviewSummary.presetId
+      } ${soundPresetPreviewSummary.presetLabel} ${soundPresetRouteTarget} ${
+        soundPresetPreviewSummary.toneLabel
+      } sound preset route preflight beginner producer manual sound design`,
+      resultTargetId: soundPresetPreviewSummary.presetId,
+      run: onFocusSoundPresetRouteReadout
     },
     {
       id: "sound-preset-decision",
@@ -6902,6 +6921,7 @@ export function createQuickActionResult(
     action.id === "pattern-follow-audible" ||
     action.id === "arrangement-follow-audible" ||
     action.id === "sound-preset-readout-action" ||
+    action.id === "sound-preset-route-readout-action" ||
     action.id === "drum-kit-readout-action" ||
     action.id === "drum-kit-route-readout-action" ||
     action.id === "sound-focus-readout-action" ||
@@ -16496,6 +16516,7 @@ export function quickActionSoundDecisionMetricSnapshot(
 
   if (
     action.id === "sound-preset-readout-action" ||
+    action.id === "sound-preset-route-readout-action" ||
     action.id === "sound-preset-decision" ||
     action.id === "sound-preset" ||
     action.id.startsWith("sound-preset-pad-")
@@ -16547,6 +16568,26 @@ export function quickActionSoundPresetMetricSnapshot(
     };
   }
 
+  if (action.id === "sound-preset-route-readout-action") {
+    const target = quickActionSoundPresetTarget(project, action) ?? defaultSoundPresetPreview(project);
+    const targetSound = soundPresetDesign(target);
+    const summary = createSoundPresetPreviewSummary(project.sound, target);
+    return {
+      id: "sound-preset-route-readout",
+      label: "Sound Preset Route Readout",
+      value: quickActionSoundMetricValue(project, action, analysis, [
+        quickActionSoundActionLabel(action),
+        `route ${soundPresetRouteLabel(project.sound, targetSound)}`,
+        "direct command sound-preset",
+        `target ${summary.presetLabel}`,
+        `status ${summary.statusLabel}`,
+        `preview ${summary.toneLabel}`,
+        `moves ${summary.changeLabel}`,
+        "sound preset unchanged"
+      ])
+    };
+  }
+
   const target = quickActionSoundPresetTarget(project, action);
   if (!target) {
     return null;
@@ -16589,6 +16630,30 @@ export function soundFocusRouteLabel(parameters: SoundFocusParameter[]): string 
   }
 
   return `${routes.join(" / ")} route`;
+}
+
+export function soundPresetRouteLabel(before: SoundDesign, after: SoundDesign): string {
+  const routes: string[] = [];
+  if (before.kickPunch !== after.kickPunch || before.snareSnap !== after.snareSnap || before.hatBrightness !== after.hatBrightness) {
+    routes.push("Drums");
+  }
+  if (before.bassDrive !== after.bassDrive || before.bassDecay !== after.bassDecay) {
+    routes.push("808");
+  }
+  if (before.sidechainDuck !== after.sidechainDuck) {
+    routes.push("Duck");
+  }
+  if (before.synthBrightness !== after.synthBrightness || before.synthRelease !== after.synthRelease) {
+    routes.push("Synth");
+  }
+  if (before.chordWarmth !== after.chordWarmth || before.chordWidth !== after.chordWidth) {
+    routes.push("Chords");
+  }
+  if (routes.length === 0 && before.preset !== after.preset) {
+    routes.push("Preset identity");
+  }
+
+  return routes.length === 0 ? "No preset route needed" : `${routes.join(" / ")} route`;
 }
 
 export function drumKitRouteLabel(pad: DrumKitPadOption): string {
@@ -16811,6 +16876,10 @@ export function quickActionSoundDecisionNextCheck(action: QuickAction): string {
     return "loop drums, 808, Synth, and Chords before applying a full-tone preset or trimming sound controls manually";
   }
 
+  if (action.id === "sound-preset-route-readout-action") {
+    return "read the Drums, 808, Duck, Synth, and Chords route before choosing the existing Sound Preset command";
+  }
+
   if (action.id === "sound-preset-decision" || action.id === "sound-preset" || action.id.startsWith("sound-preset-pad-")) {
     return "loop drums, 808, Synth, and Chords together before trimming with Sound Focus or Studio controls";
   }
@@ -16857,6 +16926,9 @@ export function quickActionSoundDecisionNextCheck(action: QuickAction): string {
 export function quickActionSoundActionLabel(action: QuickAction): string {
   if (action.id === "sound-preset-readout-action") {
     return "review sound preset readout";
+  }
+  if (action.id === "sound-preset-route-readout-action") {
+    return "review sound preset route readout";
   }
   if (action.id === "sound-preset-decision") {
     return "run sound preset decision";
@@ -16921,7 +16993,12 @@ export function quickActionSoundPresetTarget(project: ProjectState, action: Quic
     return directTarget;
   }
 
-  if (action.id !== "sound-preset-readout-action" && action.id !== "sound-preset-decision" && action.id !== "sound-preset") {
+  if (
+    action.id !== "sound-preset-readout-action" &&
+    action.id !== "sound-preset-route-readout-action" &&
+    action.id !== "sound-preset-decision" &&
+    action.id !== "sound-preset"
+  ) {
     return null;
   }
 
@@ -20082,6 +20159,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: `Use the Sound Preset readout before applying a full-tone preset, then loop Pattern ${project.selectedPattern}.`,
       nextCheck: "Apply Sound Preset only when the preview target fits the beat; otherwise trim Drum Kit, Sound Focus, or Studio tone manually."
+    };
+  }
+
+  if (action.id === "sound-preset-route-readout-action") {
+    return {
+      auditionCue: `Read the Sound Preset route and loop Pattern ${project.selectedPattern} before choosing the existing Sound Preset command.`,
+      nextCheck:
+        "Use Sound Preset only when the named Drums, 808, Duck, Synth, or Chords route should reshape the full beat tone; otherwise trim Drum Kit, Sound Focus, or Studio tone manually."
     };
   }
 
