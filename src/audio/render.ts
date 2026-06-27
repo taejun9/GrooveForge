@@ -18,6 +18,7 @@ import {
   sidechainGainForStep,
 } from "../domain/workstation";
 import type { ArrangementBlock, ArrangementMuteTrack, ProjectState, SoundDesign, TrackType } from "../domain/workstation";
+import { downloadBlob } from "../platform/downloads";
 
 const sampleRate = 44100;
 const channels = 2;
@@ -626,12 +627,7 @@ export function stemWavFileNames(project: ProjectState): string[] {
 }
 
 function downloadWavBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, fileName);
 }
 
 export function createMixWavBlob(project: ProjectState): Blob {

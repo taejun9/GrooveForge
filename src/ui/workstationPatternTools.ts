@@ -5,6 +5,10 @@ import {
   handoffValue as audioHandoffValue
 } from "../audio/handoff";
 import {
+  downloadProjectFile as downloadBrowserProjectFile,
+  downloadTextFile as downloadBrowserTextFile
+} from "../platform/downloads";
+import {
   ArrangementBlock,
   ArrangementMovePreset,
   ArrangementMuteTrack,
@@ -4069,23 +4073,11 @@ export function isEditableShortcutTarget(target: EventTarget | null): boolean {
 }
 
 export function downloadProjectFile(contents: string, fileName: string): void {
-  const blob = new Blob([contents], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
+  downloadBrowserProjectFile(contents, fileName);
 }
 
 export function downloadTextFile(contents: string, fileName: string): void {
-  const blob = new Blob([contents], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
+  downloadBrowserTextFile(contents, fileName);
 }
 
 export function fileDisplayName(filePath?: string): string {

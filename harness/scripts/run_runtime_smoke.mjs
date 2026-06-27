@@ -28,9 +28,10 @@ const workstation = await import("../../src/domain/workstation.ts");
 const render = await import("../../src/audio/render.ts");
 const midi = await import("../../src/audio/midi.ts");
 const handoff = await import("../../src/audio/handoff.ts");
+const downloads = await import("../../src/platform/downloads.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
-const smokeScope = "sample-free all-style 8-bar beats with local project-file roundtrips and Handoff Sheet checks without writing media artifacts";
+const smokeScope = "sample-free all-style 8-bar beats with local project-file roundtrips, Handoff Sheet checks, and mocked download-path checks without writing media artifacts";
 
 function cloneMixerForSmoke() {
   return workstation.starterProject.mixer.map((channel) => ({
@@ -298,6 +299,108 @@ function validateHandoffSheet(project, label, analysis, stemAnalyses) {
   };
 }
 
+function installDownloadPathMock(label) {
+  const originalDocument = globalThis.document;
+  const originalCreateObjectURL = globalThis.URL.createObjectURL;
+  const originalRevokeObjectURL = globalThis.URL.revokeObjectURL;
+  const state = {
+    clicks: [],
+    urls: [],
+    revokedUrls: []
+  };
+
+  globalThis.URL.createObjectURL = (blob) => {
+    const url = `blob:grooveforge-smoke-${state.urls.length + 1}`;
+    state.urls.push({ url, blob });
+    return url;
+  };
+  globalThis.URL.revokeObjectURL = (url) => {
+    state.revokedUrls.push(url);
+  };
+  globalThis.document = {
+    createElement(tagName) {
+      check(tagName === "a", `${label} should create anchor elements for downloads`);
+      return {
+        href: "",
+        download: "",
+        click() {
+          state.clicks.push({
+            href: this.href,
+            download: this.download
+          });
+        }
+      };
+    }
+  };
+
+  return {
+    state,
+    restore() {
+      globalThis.URL.createObjectURL = originalCreateObjectURL;
+      globalThis.URL.revokeObjectURL = originalRevokeObjectURL;
+      if (originalDocument === undefined) {
+        delete globalThis.document;
+      } else {
+        globalThis.document = originalDocument;
+      }
+    }
+  };
+}
+
+function validateDownloadPathSmoke(project) {
+  const label = "download:path";
+  const analysis = render.analyzeExport(project);
+  const stemAnalyses = render.analyzeStemExports(project);
+  const mock = installDownloadPathMock(label);
+  let expectedDownloads = [];
+
+  try {
+    const projectFileName = workstation.projectFileName(project);
+    const projectFileContents = workstation.serializeProjectFile(project);
+    const mixFileName = render.mixWavFileName(project);
+    const handoffSheetFileName = handoff.handoffSheetFileName(project);
+    downloads.downloadProjectFile(projectFileContents, projectFileName);
+    render.exportWav(project);
+    const stemFileNames = render.exportStems(project);
+    const midiFileName = midi.exportMidi(project);
+    downloads.downloadTextFile(handoff.createHandoffSheet(project, analysis, stemAnalyses), handoffSheetFileName);
+    expectedDownloads = [
+      { fileName: projectFileName, mimeType: "application/json" },
+      { fileName: mixFileName, mimeType: "audio/wav" },
+      ...stemFileNames.map((fileName) => ({ fileName, mimeType: "audio/wav" })),
+      { fileName: midiFileName, mimeType: "audio/midi" },
+      { fileName: handoffSheetFileName, mimeType: "text/plain;charset=utf-8" }
+    ];
+  } catch (error) {
+    failures.push(`${label} should complete mocked local downloads: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    mock.restore();
+  }
+
+  check(mock.state.urls.length === expectedDownloads.length, `${label} should create one Blob URL per deliverable`);
+  check(mock.state.clicks.length === expectedDownloads.length, `${label} should click one anchor per deliverable`);
+  check(mock.state.revokedUrls.length === expectedDownloads.length, `${label} should revoke one Blob URL per deliverable`);
+
+  expectedDownloads.forEach((expected, index) => {
+    const createdUrl = mock.state.urls[index];
+    const click = mock.state.clicks[index];
+    check(Boolean(createdUrl), `${label} ${expected.fileName} should create a Blob URL`);
+    check(Boolean(click), `${label} ${expected.fileName} should click a download anchor`);
+    check(createdUrl?.blob instanceof Blob, `${label} ${expected.fileName} should use a Blob payload`);
+    check(createdUrl?.blob?.size > 0, `${label} ${expected.fileName} Blob should not be empty`);
+    check(createdUrl?.blob?.type === expected.mimeType, `${label} ${expected.fileName} should use ${expected.mimeType}`);
+    check(click?.download === expected.fileName, `${label} should set download file name ${expected.fileName}`);
+    check(click?.href === createdUrl?.url, `${label} ${expected.fileName} anchor href should match the Blob URL`);
+    check(mock.state.revokedUrls[index] === createdUrl?.url, `${label} ${expected.fileName} should revoke its Blob URL`);
+  });
+
+  return {
+    expected: expectedDownloads.length,
+    clicked: mock.state.clicks.length,
+    fileNames: expectedDownloads.map((download) => download.fileName)
+  };
+}
+
 async function validateProjectExportSmoke(smokeCase) {
   const { label, expectedStyleId } = smokeCase;
   const project = validateProjectFileRoundTrip(smokeCase.project, label);
@@ -401,6 +504,8 @@ const summaries = [];
 for (const smokeCase of smokeCases) {
   summaries.push(await validateProjectExportSmoke(smokeCase));
 }
+const downloadSmokeProject = workstation.parseProjectFile(workstation.serializeProjectFile(blueprintCases[0].project));
+const downloadSmokeSummary = validateDownloadPathSmoke(downloadSmokeProject);
 
 if (failures.length > 0) {
   console.error("GrooveForge runtime smoke failed:");
@@ -417,6 +522,7 @@ console.log(`- Styles: ${styleCases.length}/${workstation.styleProfiles.length} 
 console.log(`- Legacy migrations: ${legacyMigrationProject ? 1 : 0}/1 single-pattern chord-event project preserved`);
 console.log(`- Project roundtrips: ${summaries.length}/${smokeCases.length} .grooveforge.json save/load checks before export`);
 console.log(`- Handoff sheets: ${summaries.length}/${smokeCases.length} text deliverables verified`);
+console.log(`- Download path: ${downloadSmokeSummary.clicked}/${downloadSmokeSummary.expected} mocked Blob URL downloads verified (${downloadSmokeSummary.fileNames.join(", ")})`);
 console.log(`- Style coverage: ${supportedStyleIds.join(", ")}`);
 for (const summary of summaries) {
   console.log(`- ${summary.label}: ${summary.status}, ${summary.durationSeconds.toFixed(2)}s, ${summary.projectFileName} (${summary.projectFileBytes} bytes), ${summary.mixFileName}, ${summary.midiFileName} (${summary.midiBytes} bytes), ${summary.handoffSheetFileName} (${summary.handoffSheetBytes} bytes)`);

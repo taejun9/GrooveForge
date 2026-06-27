@@ -15,6 +15,7 @@ import {
   stepsPerBar
 } from "../domain/workstation";
 import type { ArrangementBlock, ArrangementMuteTrack, DrumLane, ProjectState } from "../domain/workstation";
+import { downloadBlob } from "../platform/downloads";
 
 const ticksPerQuarter = 480;
 const ticksPerStep = ticksPerQuarter / 4;
@@ -275,12 +276,7 @@ export function exportMidi(project: ProjectState): string {
   const payload = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(payload).set(bytes);
   const blob = new Blob([payload], { type: "audio/midi" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
   const fileName = midiFileName(project);
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, fileName);
   return fileName;
 }
