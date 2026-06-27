@@ -139,6 +139,15 @@ function checkElectronMainContract() {
   checkIncludes(source, "registerProjectFileHandlers();", label);
   checkIncludes(source, "Menu.setApplicationMenu(createNativeCommandMenu())", label);
   checkIncludes(source, "createWindow();", label);
+  checkIncludes(source, "autoUpdater", label);
+  checkIncludes(source, 'label: "Check for Updates..."', label);
+  checkIncludes(source, "GROOVEFORGE_UPDATE_FEED_URL", label);
+  checkIncludes(source, "GROOVEFORGE_UPDATE_CHANNEL", label);
+  checkIncludes(source, "autoUpdater.setFeedURL", label);
+  checkIncludes(source, "autoUpdater.checkForUpdates()", label);
+  checkIncludes(source, 'autoUpdater.on("update-downloaded"', label);
+  checkIncludes(source, "autoUpdater.quitAndInstall()", label);
+  checkIncludes(source, "No update feed was contacted.", label);
   checkIncludes(source, 'label: "GrooveForge Local Workstation"', label);
   checkIncludes(source, 'filters: projectFilters', label);
   checkIncludes(source, 'properties: ["openFile"]', label);

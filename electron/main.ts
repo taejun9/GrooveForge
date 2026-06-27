@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
+import { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import type { MenuItemConstructorOptions, OpenDialogOptions, SaveDialogOptions } from "electron";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -61,7 +61,18 @@ type LaunchSmokeVisualEvidence = {
   width: number;
 };
 
+type UpdateFeedConfig = {
+  channelKey: string | null;
+  feedKey: string | null;
+  feedUrl: string;
+  releaseChannel: string;
+};
+
 const projectFilters = [{ name: "GrooveForge Project", extensions: ["json"] }];
+const updateFeedUrlKeys = ["GROOVEFORGE_UPDATE_FEED_URL", "ELECTRON_UPDATE_FEED_URL", "UPDATE_FEED_URL"] as const;
+const updateChannelKeys = ["GROOVEFORGE_UPDATE_CHANNEL", "ELECTRON_UPDATE_CHANNEL", "UPDATE_CHANNEL"] as const;
+let updateHandlersRegistered = false;
+let updateCheckInProgress = false;
 
 function isSaveProjectPayload(value: unknown): value is SaveProjectPayload {
   return (
@@ -77,6 +88,128 @@ function isSaveProjectPayload(value: unknown): value is SaveProjectPayload {
 function sendMenuCommand(command: NativeMenuCommand): void {
   const targetWindow = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
   targetWindow?.webContents.send(menuCommandChannel, command);
+}
+
+function readFirstEnv(keys: readonly string[]): { key: string | null; value: string } {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (value && value.trim().length > 0) {
+      return { key, value: value.trim() };
+    }
+  }
+
+  return { key: null, value: "" };
+}
+
+function resolveUpdateFeedConfig(): UpdateFeedConfig {
+  const feed = readFirstEnv(updateFeedUrlKeys);
+  const channel = readFirstEnv(updateChannelKeys);
+  return {
+    channelKey: channel.key,
+    feedKey: feed.key,
+    feedUrl: feed.value,
+    releaseChannel: channel.value
+  };
+}
+
+function updateDialogWindow(): BrowserWindow | undefined {
+  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+}
+
+function showUpdateStatus(message: string, detail: string, buttons = ["OK"]): Promise<Electron.MessageBoxReturnValue> {
+  const options: Electron.MessageBoxOptions = {
+    type: "info",
+    buttons,
+    defaultId: 0,
+    cancelId: buttons.length - 1,
+    message,
+    detail
+  };
+  const targetWindow = updateDialogWindow();
+  return targetWindow ? dialog.showMessageBox(targetWindow, options) : dialog.showMessageBox(options);
+}
+
+function registerAutoUpdateHandlers(): void {
+  if (updateHandlersRegistered) {
+    return;
+  }
+
+  updateHandlersRegistered = true;
+
+  autoUpdater.on("checking-for-update", () => {
+    updateCheckInProgress = true;
+    void showUpdateStatus("Checking for Updates", "GrooveForge is checking the configured update feed.");
+  });
+
+  autoUpdater.on("update-available", () => {
+    void showUpdateStatus("Update Available", "GrooveForge found an update and will download it from the configured release feed.");
+  });
+
+  autoUpdater.on("update-not-available", () => {
+    updateCheckInProgress = false;
+    void showUpdateStatus("GrooveForge Is Up to Date", "No update is available on the configured release feed.");
+  });
+
+  autoUpdater.on("error", (error) => {
+    updateCheckInProgress = false;
+    void error;
+    void showUpdateStatus(
+      "Auto-Update Check Failed",
+      "GrooveForge could not complete the update check. Check the release feed configuration and signed update artifacts."
+    );
+  });
+
+  autoUpdater.on("update-downloaded", () => {
+    updateCheckInProgress = false;
+    void showUpdateStatus("Update Downloaded", "Install update now or keep working and install it after restart.", ["Install Update", "Later"]).then(
+      ({ response }) => {
+        if (response === 0) {
+          autoUpdater.quitAndInstall();
+        }
+      }
+    );
+  });
+}
+
+function checkForUpdates(): void {
+  if (isLaunchSmoke) {
+    void showUpdateStatus("Check for Updates", "Launch smoke mode keeps auto-update checks offline.");
+    return;
+  }
+
+  if (process.platform !== "darwin" && process.platform !== "win32") {
+    void showUpdateStatus("Auto-Update Not Supported", "GrooveForge automatic update checks currently target signed macOS or Windows desktop releases.");
+    return;
+  }
+
+  const updateFeed = resolveUpdateFeedConfig();
+  if (!updateFeed.feedUrl || !updateFeed.releaseChannel) {
+    void showUpdateStatus(
+      "Auto-Update Not Configured",
+      "Set GROOVEFORGE_UPDATE_FEED_URL and GROOVEFORGE_UPDATE_CHANNEL after a signed release provider is selected. No update feed was contacted."
+    );
+    return;
+  }
+
+  if (updateCheckInProgress) {
+    void showUpdateStatus("Update Check Already Running", "GrooveForge is already checking for updates.");
+    return;
+  }
+
+  registerAutoUpdateHandlers();
+  autoUpdater.setFeedURL({ url: updateFeed.feedUrl });
+  updateCheckInProgress = true;
+
+  try {
+    autoUpdater.checkForUpdates();
+  } catch (error) {
+    updateCheckInProgress = false;
+    void error;
+    void showUpdateStatus(
+      "Auto-Update Check Failed",
+      "GrooveForge could not start the update check. Check the release feed configuration and signed update artifacts."
+    );
+  }
 }
 
 function createRendererCommandMenuItem(label: string, accelerator: string, command: NativeMenuCommand): MenuItemConstructorOptions {
@@ -172,6 +305,11 @@ function createNativeCommandMenu(): Menu {
     {
       label: "Help",
       submenu: [
+        {
+          label: "Check for Updates...",
+          click: () => checkForUpdates()
+        },
+        { type: "separator" },
         createRendererCommandMenuItem("Command Reference", "CmdOrCtrl+/", "command-reference"),
         { type: "separator" },
         {

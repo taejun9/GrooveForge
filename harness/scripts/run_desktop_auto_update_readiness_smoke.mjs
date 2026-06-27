@@ -149,9 +149,10 @@ async function createReadinessSummary() {
 
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const dependencies = {
+    electronBuiltInAutoUpdaterAvailable: hasDependency("electron"),
     electronUpdaterPresent: hasDependency("electron-updater"),
     updateElectronAppPresent: hasDependency("update-electron-app"),
-    updaterDependencyPresent: hasDependency("electron-updater") || hasDependency("update-electron-app")
+    updaterDependencyPresent: hasDependency("electron") || hasDependency("electron-updater") || hasDependency("update-electron-app")
   };
   const provider = updateProviderSignals();
   const artifacts = updateArtifactSignals(manifest);
@@ -171,7 +172,7 @@ async function createReadinessSummary() {
   const blockers = [];
 
   if (!updaterIntegrationReady) {
-    blockers.push("No auto-update package/API integration with update checking is implemented.");
+    blockers.push("No Electron auto-update API integration with update checking is implemented.");
   }
   if (!providerReady) {
     blockers.push("No update provider, feed URL, and channel metadata are configured.");
