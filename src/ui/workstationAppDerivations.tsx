@@ -292,6 +292,7 @@ import type {
   PatternCompareSummary,
   PatternContrastRole,
   PatternContrastRoleMapSummary,
+  PatternContrastSectionFitSummary,
   PatternContrastSlotSummary,
   PatternContrastSummary,
   PatternClonePadOption,
@@ -2663,6 +2664,87 @@ export function createPatternContrastRoleMapSummary(
     detailTitle: `${statusLabel}: ${headline}; ${metricLabel}; ${detailLabel}.`,
     tone,
     blocks
+  };
+}
+
+const patternContrastSectionRoleExpectations: Record<ArrangementSection, PatternContrastRole[]> = {
+  Intro: ["anchor", "break"],
+  Verse: ["anchor"],
+  Hook: ["lift", "switchup"],
+  Bridge: ["break", "switchup"],
+  Outro: ["break", "anchor"]
+};
+
+export function createPatternContrastSectionFitSummary(
+  summary: PatternContrastSummary,
+  arrangement: ArrangementBlock[],
+  selectedArrangementIndex: number
+): PatternContrastSectionFitSummary {
+  const roleMap = createPatternContrastRoleMapSummary(summary, arrangement, selectedArrangementIndex);
+  const items = roleMap.blocks.map((block) => {
+    const expectedRoles = patternContrastSectionRoleExpectations[block.sectionLabel as ArrangementSection] ?? ["anchor"];
+    const expectedLabel = expectedRoles.map(patternContrastRoleLabel).join("/");
+    const fit = block.role !== "blank" && expectedRoles.includes(block.role);
+    const fitLabel = block.role === "blank" ? "Role missing" : fit ? "Section fit" : "Check section role";
+    const tone: MixCoachTone = fit ? "good" : "warn";
+
+    return {
+      index: block.index,
+      sectionLabel: block.sectionLabel,
+      pattern: block.pattern,
+      role: block.role,
+      roleLabel: block.roleLabel,
+      expectedLabel,
+      fitLabel,
+      barLabel: block.barLabel,
+      detailLabel: `${block.sectionLabel} expects ${expectedLabel}; Pattern ${block.pattern} is ${block.roleLabel}; ${block.barLabel}.`,
+      selected: block.selected,
+      tone
+    };
+  });
+  const blockCount = items.length;
+  const fitCount = items.filter((item) => item.fitLabel === "Section fit").length;
+  const missingCount = items.filter((item) => item.role === "blank").length;
+  const watchCount = blockCount - fitCount;
+  const selectedItem = items.find((item) => item.selected) ?? items[0] ?? null;
+  const statusLabel =
+    blockCount === 0
+      ? "Fit unavailable"
+      : missingCount > 0
+        ? "Section role gaps"
+        : fitCount === blockCount
+          ? "Section fit ready"
+          : fitCount >= Math.ceil(blockCount * 0.6)
+            ? "Section fit partial"
+            : "Section fit weak";
+  const tone: MixCoachTone = statusLabel === "Section fit ready" || statusLabel === "Section fit partial" ? "good" : "warn";
+  const headline =
+    blockCount === 0
+      ? "No arrangement blocks to compare"
+      : `${fitCount}/${blockCount} sections match expected roles`;
+  const metricLabel = `${fitCount} fit / ${watchCount} watch / ${missingCount} missing`;
+  const detailLabel = selectedItem
+    ? `Selected Block ${selectedItem.index + 1}: ${selectedItem.sectionLabel} expects ${selectedItem.expectedLabel}; Pattern ${selectedItem.pattern} is ${selectedItem.roleLabel}`
+    : "Create arrangement blocks before checking section fit.";
+  const auditionCue =
+    blockCount === 0
+      ? "Create an arrangement block, then return to Pattern Contrast Section Fit."
+      : `Loop ${selectedItem?.sectionLabel ?? "the selected section"} as Block and compare its ${selectedItem?.roleLabel ?? "role"} against the Song loop.`;
+  const nextCheck =
+    statusLabel === "Section fit ready"
+      ? "Scan Role Map and Song Form Overview before making another arrangement move."
+      : "Use Role Map, Pattern Use, or Pattern Chain only when the selected section needs a different role.";
+
+  return {
+    statusLabel,
+    headline,
+    metricLabel,
+    detailLabel,
+    auditionCue,
+    nextCheck,
+    detailTitle: `${statusLabel}: ${headline}; ${metricLabel}; ${detailLabel}.`,
+    tone,
+    items
   };
 }
 

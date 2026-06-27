@@ -292,6 +292,7 @@ import type {
   PatternCompareSummary,
   PatternContrastRole,
   PatternContrastRoleMapSummary,
+  PatternContrastSectionFitSummary,
   PatternContrastSummary,
   PatternClonePadOption,
   PatternCloneResult,
@@ -1066,7 +1067,7 @@ import {
   styleGoalPriorityLabel, styleInspectorFocusResultAudition, styleInspectorFocusResultDetail, styleInspectorFocusResultMetric, styleInspectorFocusResultNextCheck, styleInspectorFocusResultTitle, styleInspectorFocusResultTone, suggestedArrangementFocusPreset,
   suggestedMasterAutomationPad, transportLoopLabel, transportLoopStatus, usedPatternSlots, velocityLayerLabel
 } from "./workstationAppDerivations";
-import { createPatternContrastRoleMapSummary } from "./workstationAppDerivations";
+import { createPatternContrastRoleMapSummary, createPatternContrastSectionFitSummary } from "./workstationAppDerivations";
 import type {
   SoundTimbreScore
 } from "./workstationAppDerivations";
@@ -1174,6 +1175,7 @@ export function createQuickActions({
   patternCloneOptions,
   patternCompareDecisionSummary,
   patternContrastRoleMapSummary,
+  patternContrastSectionFitSummary,
   patternContrastSummary,
   patternChainPreviewSummary,
   patternStackOptions,
@@ -1307,6 +1309,7 @@ export function createQuickActions({
   onFocusPatternVariationReadout,
   onFocusPatternContrastReadout,
   onFocusPatternContrastRoleMapReadout,
+  onFocusPatternContrastSectionFitReadout,
   onApplyPatternStack,
   onFocusPatternStackReadout,
   onCopySelectedPattern,
@@ -1556,6 +1559,7 @@ export function createQuickActions({
   patternCloneOptions: PatternClonePadOption[];
   patternCompareDecisionSummary: PatternCompareDecisionSummary;
   patternContrastRoleMapSummary: PatternContrastRoleMapSummary;
+  patternContrastSectionFitSummary: PatternContrastSectionFitSummary;
   patternContrastSummary: PatternContrastSummary;
   patternChainPreviewSummary: PatternChainPreviewSummary;
   patternStackOptions: PatternStackOption[];
@@ -1689,6 +1693,7 @@ export function createQuickActions({
   onFocusPatternVariationReadout: () => void;
   onFocusPatternContrastReadout: () => void;
   onFocusPatternContrastRoleMapReadout: () => void;
+  onFocusPatternContrastSectionFitReadout: () => void;
   onApplyPatternStack: (stack: PatternStackId) => void;
   onFocusPatternStackReadout: () => void;
   onCopySelectedPattern: (target: PatternSlot) => void;
@@ -4625,6 +4630,14 @@ export function createQuickActions({
     keywords: `Quick Actions Pattern Contrast Role Map Readout arrangement role map anchor lift break switchup selected block ${patternContrastRoleMapSummary.statusLabel} ${patternContrastRoleMapSummary.headline} ${patternContrastRoleMapSummary.metricLabel} ${patternContrastRoleMapSummary.detailLabel} beginner producer direct beat workstation sample free`,
     run: onFocusPatternContrastRoleMapReadout
   };
+  const patternContrastSectionFitReadoutAction: QuickAction = {
+    id: "pattern-contrast-section-fit-readout-action",
+    title: `Review Pattern Section Fit: ${patternContrastSectionFitSummary.statusLabel}`,
+    detail: `${patternContrastSectionFitSummary.metricLabel} / ${patternContrastSectionFitSummary.detailLabel}`,
+    group: "Arrange",
+    keywords: `Quick Actions Pattern Contrast Section Fit Readout arrangement section fit expected roles intro verse hook bridge outro anchor lift break switchup selected block ${patternContrastSectionFitSummary.statusLabel} ${patternContrastSectionFitSummary.headline} ${patternContrastSectionFitSummary.metricLabel} ${patternContrastSectionFitSummary.detailLabel} beginner producer direct beat workstation sample free`,
+    run: onFocusPatternContrastSectionFitReadout
+  };
   const patternContrastCueActions: QuickAction[] = patternContrastCueRoles.map((role) => {
     const slot = patternContrastCueSlot(patternContrastSummary, role);
     const roleLabel = patternContrastCueRoleLabel(role);
@@ -5120,6 +5133,7 @@ export function createQuickActions({
     patternCompareDecisionAction,
     patternContrastReadoutAction,
     patternContrastRoleMapReadoutAction,
+    patternContrastSectionFitReadoutAction,
     ...patternContrastCueActions,
     ...patternContrastUseActions,
     patternCueReadoutAction,
@@ -10531,6 +10545,36 @@ export function quickActionPatternContrastRoleMapMetricSnapshot(
     value: `${roleMap.statusLabel} / ${roleMap.metricLabel} / ${
       selectedBlock ? `selected Block ${selectedBlock.index + 1} ${selectedBlock.roleLabel} Pattern ${selectedBlock.pattern}` : "no selected block"
     } / ${roleSequence || "no arrangement blocks"} / arrangement unchanged / playback unchanged / export unchanged`
+  };
+}
+
+export function quickActionPatternContrastSectionFitMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  selectedArrangementIndex = 0
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "pattern-contrast-section-fit-readout-action") {
+    return null;
+  }
+
+  const sectionFit = createPatternContrastSectionFitSummary(
+    createPatternContrastSummary(createPatternCompareSummaries(project)),
+    project.arrangement,
+    selectedArrangementIndex
+  );
+  const selectedItem = sectionFit.items.find((item) => item.selected) ?? sectionFit.items[0] ?? null;
+  const fitSequence = sectionFit.items
+    .map((item) => `${item.sectionLabel}:${item.fitLabel} ${item.roleLabel} ${item.pattern}`)
+    .join(" / ");
+
+  return {
+    id: "pattern-contrast-section-fit",
+    label: "Pattern Section Fit",
+    value: `${sectionFit.statusLabel} / ${sectionFit.metricLabel} / ${
+      selectedItem
+        ? `selected Block ${selectedItem.index + 1} ${selectedItem.sectionLabel} expects ${selectedItem.expectedLabel} and has ${selectedItem.roleLabel} Pattern ${selectedItem.pattern}`
+        : "no selected block"
+    } / ${fitSequence || "no arrangement blocks"} / arrangement unchanged / playback unchanged / export unchanged`
   };
 }
 
@@ -17447,6 +17491,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "pattern-contrast-section-fit-readout-action") {
+    return (
+      quickActionPatternContrastSectionFitMetricSnapshot(project, action, selectedArrangementIndex) ?? {
+        id: "pattern-contrast-section-fit",
+        label: "Pattern Section Fit",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id.startsWith("pattern-contrast-cue-")) {
     return (
       quickActionPatternContrastCueMetricSnapshot(project, action) ?? {
@@ -22463,6 +22517,18 @@ export function quickActionResultFollowup(
     return {
       auditionCue: roleMap.auditionCue,
       nextCheck: roleMap.nextCheck
+    };
+  }
+
+  if (action.id === "pattern-contrast-section-fit-readout-action") {
+    const sectionFit = createPatternContrastSectionFitSummary(
+      createPatternContrastSummary(createPatternCompareSummaries(project)),
+      project.arrangement,
+      0
+    );
+    return {
+      auditionCue: sectionFit.auditionCue,
+      nextCheck: sectionFit.nextCheck
     };
   }
 

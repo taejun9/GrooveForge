@@ -29,6 +29,7 @@ import type {
   PatternCompareDecisionSummary,
   PatternCompareSummary,
   PatternContrastRoleMapSummary,
+  PatternContrastSectionFitSummary,
   PatternContrastSummary,
   QuickAction,
   QuickActionPinnedResult,
@@ -776,7 +777,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Anchor / lift / break / switchup roles",
         context:
-          "Pattern Contrast Readout Action, Role Map Readout, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
+          "Pattern Contrast Readout Action, Role Map Readout, Section Fit Readout, role cue/use commands, Pattern A/B/C active slots, event spread, drum/music spread, arrangement usage, Anchor/Lift/Break/Switchup role labels, audition cue, and next contrast check context before Pattern Compare, Pattern Variation, Pattern Fill, or arrangement commands run."
       },
       {
         id: "pattern-cue-readout",
@@ -1982,12 +1983,14 @@ export function PatternCompareDecision({
 
 export function PatternContrastReadout({
   roleMap,
+  sectionFit,
   summary,
   onCuePattern,
   onUsePattern,
   selectedBlockPattern
 }: {
   roleMap?: PatternContrastRoleMapSummary;
+  sectionFit?: PatternContrastSectionFitSummary;
   summary: PatternContrastSummary;
   onCuePattern?: (pattern: PatternSlot) => void;
   onUsePattern?: (pattern: PatternSlot) => void;
@@ -2102,6 +2105,39 @@ export function PatternContrastReadout({
           <div className="pattern-contrast-role-map-followup">
             <span data-testid="pattern-contrast-role-map-detail">{roleMap.detailLabel}</span>
             <small data-testid="pattern-contrast-role-map-next-check">{roleMap.nextCheck}</small>
+          </div>
+        </div>
+      )}
+      {sectionFit && (
+        <div
+          className={`pattern-contrast-section-fit ${sectionFit.tone}`}
+          data-pattern-contrast-section-fit={sectionFit.statusLabel}
+          data-testid="pattern-contrast-section-fit"
+          title={sectionFit.detailTitle}
+        >
+          <div className="pattern-contrast-section-fit-heading">
+            <span data-testid="pattern-contrast-section-fit-status">{sectionFit.statusLabel}</span>
+            <strong data-testid="pattern-contrast-section-fit-headline">{sectionFit.headline}</strong>
+            <small data-testid="pattern-contrast-section-fit-metric">{sectionFit.metricLabel}</small>
+          </div>
+          <div className="pattern-contrast-section-fit-grid" aria-label="Pattern contrast section fit">
+            {sectionFit.items.map((item) => (
+              <div
+                className={`pattern-contrast-section-fit-item ${item.tone} ${item.selected ? "selected" : ""}`}
+                data-pattern-contrast-section-fit-role={item.role}
+                data-testid={`pattern-contrast-section-fit-item-${item.index + 1}`}
+                key={`${item.index}-${item.pattern}-${item.sectionLabel}`}
+                title={item.detailLabel}
+              >
+                <span>{item.sectionLabel}</span>
+                <strong>{item.fitLabel}</strong>
+                <small>Expected {item.expectedLabel} / {item.roleLabel} Pattern {item.pattern}</small>
+              </div>
+            ))}
+          </div>
+          <div className="pattern-contrast-section-fit-followup">
+            <span data-testid="pattern-contrast-section-fit-detail">{sectionFit.detailLabel}</span>
+            <small data-testid="pattern-contrast-section-fit-next-check">{sectionFit.nextCheck}</small>
           </div>
         </div>
       )}
