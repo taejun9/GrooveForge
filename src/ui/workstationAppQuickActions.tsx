@@ -3402,6 +3402,27 @@ export function createQuickActions({
     keywords: `handoff package check focus card send files order receipt context archive ${card.id} ${card.label} ${card.value} ${card.status} ${card.detail} beginner producer`,
     run: () => onFocusHandoffPackageCheck(card)
   }));
+  const handoffSendOrderReadoutAction: QuickAction = {
+    id: "handoff-send-order-readout-action",
+    title: `Review Handoff Send Order Readout: ${handoffSendOrder.nextLabel}`,
+    detail: [
+      handoffSendOrder.statusLabel,
+      handoffSendOrder.detailLabel,
+      handoffSendOrder.sequenceLabel,
+      `package ${handoffPackageCheckSummary.headline}`,
+      `receipt ${handoffReceipt.statusLabel}`,
+      "send order preflight"
+    ].join(" / "),
+    group: "Export",
+    keywords: `handoff send order readout review sequence wav stems midi sheet current next deliverable no render no download package readiness latest receipt delivery target ${
+      handoffSendOrder.nextItemId ?? "clear"
+    } ${handoffSendOrder.sequenceLabel} sample free beginner producer`,
+    run: () => {
+      if (handoffSendOrderCard) {
+        onFocusHandoffPackageCheck(handoffSendOrderCard);
+      }
+    }
+  };
   const handoffExportReceiptReadoutAction: QuickAction = {
     id: "handoff-export-receipt-readout-action",
     title: handoffExportReceiptCard
@@ -5708,6 +5729,7 @@ export function createQuickActions({
         }
       }
     },
+    handoffSendOrderReadoutAction,
     {
       id: "handoff-export-receipt-focus",
       title: handoffExportReceiptCard
@@ -6457,6 +6479,7 @@ export function createQuickActionResult(
     action.id.startsWith("handoff-package-check-card-") ||
     action.id === "handoff-manifest-audit-focus" ||
     action.id === "handoff-send-order-focus" ||
+    action.id === "handoff-send-order-readout-action" ||
     action.id === "handoff-export-receipt-focus" ||
     action.id === "handoff-export-receipt-readout-action" ||
     action.id === "handoff-export-format-focus" ||
@@ -10912,7 +10935,8 @@ export function quickActionHandoffSendOrderMetricSnapshot(
   exportReceipt: HandoffExportReceipt | null,
   analysis?: ExportAnalysis
 ): { id: string; label: string; value: string } | null {
-  if (action.id !== "handoff-send-order-focus") {
+  const isReadout = action.id === "handoff-send-order-readout-action";
+  if (action.id !== "handoff-send-order-focus" && !isReadout) {
     return null;
   }
 
@@ -10931,6 +10955,8 @@ export function quickActionHandoffSendOrderMetricSnapshot(
   const sendOrder = createHandoffPackSendOrderSummary(project, handoffPackItems);
   const receipt = exportReceipt ?? emptyHandoffExportReceipt();
   const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
   const pattern = activePattern(project);
   const usedSlots = usedPatternSlots(project);
   const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
@@ -10948,18 +10974,20 @@ export function quickActionHandoffSendOrderMetricSnapshot(
   const reviewCount = handoffPackItems.filter((item) => item.tone === "warn").length;
   const blockerCount = handoffPackItems.filter((item) => item.tone === "danger").length;
   const receiptLabel = receipt.itemId ? receipt.statusLabel : "No receipt yet";
+  const followup = quickActionResultFollowup(action, project, "complete");
 
   return {
-    id: "handoff-send-order",
-    label: "Handoff send order",
+    id: isReadout ? "handoff-send-order-readout" : "handoff-send-order",
+    label: isReadout ? "Handoff Send Order Readout" : "Handoff send order",
     value: [
-      "focus send order",
+      isReadout ? "review send order" : "focus send order",
       "destination Deliver panel",
       `next ${nextLabel}`,
       `status ${statusLabel}`,
       `context ${contextLabel}`,
+      `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
       `Pattern ${project.selectedPattern}`,
-      `${patternEventTotal(pattern)} events`,
+      `${patternEventTotal(pattern)} editable events`,
       patternUseLabel,
       `sequence ${sendOrder.sequenceLabel}`,
       `posture ${sequencePosture}`,
@@ -10971,7 +10999,13 @@ export function quickActionHandoffSendOrderMetricSnapshot(
       workflowCountLabel(reviewCount, "review"),
       workflowCountLabel(blockerCount, "blocker"),
       `${project.arrangement.length} blocks`,
-      barCountLabel(arrangementTotalBars(project))
+      barCountLabel(bars),
+      "send order unchanged",
+      "export unchanged",
+      "receipt unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
     ].join(" / ")
   };
 }
@@ -14486,7 +14520,7 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "handoff-send-order-focus") {
+  if (action.id === "handoff-send-order-focus" || action.id === "handoff-send-order-readout-action") {
     const handoffSendOrderMetric = quickActionHandoffSendOrderMetricSnapshot(
       project,
       action,
@@ -14498,8 +14532,8 @@ export function quickActionResultMetricSnapshot(
     }
 
     return {
-      id: "handoff-send-order",
-      label: "Handoff send order",
+      id: action.id === "handoff-send-order-readout-action" ? "handoff-send-order-readout" : "handoff-send-order",
+      label: action.id === "handoff-send-order-readout-action" ? "Handoff Send Order Readout" : "Handoff send order",
       value: action.detail
     };
   }
@@ -18477,6 +18511,14 @@ export function quickActionResultFollowup(
       auditionCue: "Review the latest receipt file, package readiness, and send order before sending the beat package.",
       nextCheck:
         "Run Handoff Next Export or the matching explicit export only if the latest receipt does not match the deliverable you need."
+    };
+  }
+
+  if (action.id === "handoff-send-order-readout-action") {
+    return {
+      auditionCue: "Review the delivery sequence and current next deliverable before running Handoff Next Export.",
+      nextCheck:
+        "Run Handoff Next Export only after the sequence, package readiness, latest receipt, and delivery target point to the same next item."
     };
   }
 
