@@ -1040,6 +1040,7 @@ import {
   beatReadinessRouteLabel,
   drumKitRouteLabel,
   exportPreflightRouteLabel,
+  finishChecklistRouteLabel,
   listeningPassRouteLabel,
   masterAutomationRouteLabel,
   masterFinishRouteLabel,
@@ -1246,6 +1247,7 @@ export function App(): ReactElement {
   const styleInspectorRef = useRef<HTMLElement | null>(null);
   const beatPassportPanelRef = useRef<HTMLElement | null>(null);
   const productionSnapshotPanelRef = useRef<HTMLElement | null>(null);
+  const finishChecklistPanelRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
@@ -7817,6 +7819,16 @@ export function App(): ReactElement {
     setProjectStatus(`Finish ${card.label}: ${card.status}`);
   }
 
+  function focusFinishChecklistRouteReadout(): void {
+    const card = activeFinishChecklistQuickActionCard(finishChecklistSummary);
+    finishChecklistPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      card
+        ? `Finish Checklist Route Readout Pattern ${project.selectedPattern}: ${finishChecklistRouteLabel(card)} / ${card.status} / direct finish-checklist-card-${card.id} unchanged / ${card.focusLabel} panel`
+        : "Finish Checklist Route Readout: no priority card available"
+    );
+  }
+
   function focusExportPreflightCard(card: ExportPreflightFocusItem): void {
     const targetRefs: Record<ExportPreflightFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -8860,6 +8872,7 @@ export function App(): ReactElement {
     onFocusExportPreflight: focusExportPreflightCard,
     onFocusExportPreflightRouteReadout: focusExportPreflightRouteReadout,
     onFocusFinishChecklist: focusFinishChecklistCard,
+    onFocusFinishChecklistRouteReadout: focusFinishChecklistRouteReadout,
     onFocusGrooveCompass: focusGrooveCompassItem,
     onFocusHandoffExportFormat: focusHandoffExportFormatMetric,
     onFocusHandoffPack: focusHandoffPack,
@@ -10735,6 +10748,7 @@ export function App(): ReactElement {
             summary={finishChecklistSummary}
             focusedCardId={finishChecklistFocusId}
             result={finishChecklistResult}
+            sectionRef={finishChecklistPanelRef}
             onFocus={focusFinishChecklistCard}
           />
           <ReviewQueue
