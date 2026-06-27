@@ -1209,6 +1209,7 @@ export function createQuickActions({
   onApplyBasslinePad,
   onApplyBassGlidePad,
   onApplyBassContour,
+  onFocusBassMoveRouteReadout,
   onApplyBeatSpine,
   onApplyBlueprint,
   onApplyChordPad,
@@ -1550,6 +1551,7 @@ export function createQuickActions({
   onApplyBasslinePad: (pad: BasslinePadId) => void;
   onApplyBassGlidePad: (pad: BassGlidePadId) => void;
   onApplyBassContour: (contour: BassContourId) => void;
+  onFocusBassMoveRouteReadout: () => void;
   onApplyBeatSpine: (action: BeatSpineAction) => void;
   onApplyBlueprint: (blueprintId: BeatBlueprintId) => void;
   onApplyChordPad: (pad: ChordPadId) => void;
@@ -2313,6 +2315,26 @@ export function createQuickActions({
   const chordMoveTarget = activeChordMoveQuickActionTarget(project, selectedChord, chordMovePreviewSummary);
   const drumMoveTarget = activeDrumMoveQuickActionTarget(project, drumMovePreviewSummary);
   const melodyMoveTarget = activeMelodyMoveQuickActionTarget(project, melodyMovePreviewSummary);
+  const bassMoveRouteReadoutAction: QuickAction = {
+    id: "808-move-route-readout-action",
+    title: bassMoveTarget
+      ? `Review 808 Move Route Readout: ${bassMoveTarget.label} ${bassMoveTarget.kind}`
+      : "Review 808 Move Route Readout: 808 aligned",
+    detail: bassMoveTarget
+      ? `${bassMovePreviewSummary.phraseLabel} / route ${bassMoveRouteLabel(
+          bassMoveTarget
+        )} / direct command 808-move / ${bassMovePreviewSummary.moveLabel} / 808 route preflight`
+      : `${bassMovePreviewSummary.statusLabel} / no 808 move route needed / ${bassMovePreviewSummary.moveLabel} / 808 route preflight`,
+    group: "Create",
+    keywords: `Quick Actions 808 Move Route Readout review selected Pattern ${
+      project.selectedPattern
+    } route direct 808 bass command 808-move ${
+      bassMoveTarget ? `${bassMoveTarget.kind} ${bassMoveRouteLabel(bassMoveTarget)} ${bassMoveTarget.label}` : "808 aligned"
+    } ${bassMovePreviewSummary.statusLabel} ${bassMovePreviewSummary.basslineLabel} ${
+      bassMovePreviewSummary.glideLabel
+    } ${bassMovePreviewSummary.contourLabel} ${bassMovePreviewSummary.moveLabel} low end bassline glide contour rhythm chance range beginner producer sample free`,
+    run: onFocusBassMoveRouteReadout
+  };
   const drumMoveRouteReadoutAction: QuickAction = {
     id: "drum-move-route-readout-action",
     title: drumMoveTarget
@@ -4746,6 +4768,7 @@ export function createQuickActions({
         }
       }
     },
+    bassMoveRouteReadoutAction,
     {
       id: "808-move",
       title: bassMoveTarget ? `Apply ${bassMoveTarget.label} 808 ${bassMoveTarget.kind}` : "Apply 808 Move",
@@ -6802,6 +6825,7 @@ export function createQuickActionResult(
     action.id === "pattern-fill-readout-action" ||
     action.id === "pattern-copy-clear-readout-action" ||
     action.id === "drum-move-route-readout-action" ||
+    action.id === "808-move-route-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -15265,6 +15289,16 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id === "808-move-route-readout-action") {
+    return (
+      quickActionBassMoveRouteReadoutMetricSnapshot(project, action) ?? {
+        id: "808-move-route-readout",
+        label: "808 Move Route Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id === "808-move") {
     const bassNotes = activePattern(project).bassNotes;
     return {
@@ -18151,6 +18185,71 @@ export function drumMoveRouteLabel(target: DrumMoveQuickActionTarget): string {
   }
 }
 
+export function bassMoveRouteLabel(target: BassMoveQuickActionTarget): string {
+  switch (target.kind) {
+    case "Bassline":
+      return "808 Bassline route";
+    case "Glide":
+      return "808 Glide route";
+    case "Contour":
+      return "808 Contour route";
+  }
+}
+
+export function quickActionBassMoveRouteReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "808-move-route-readout-action") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const notes = pattern.bassNotes;
+  const preview = createBassMovePreviewSummary(
+    project.key,
+    notes,
+    createBasslinePadOptions(project.key),
+    createBassGlidePadOptions(notes),
+    createBassContourOptions(project.key, notes)
+  );
+  const target = activeBassMoveQuickActionTarget(project, preview);
+  const arrangementUse = patternArrangementUseLabel(project, project.selectedPattern);
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "808-move-route-readout",
+    label: "808 Move Route Readout",
+    value: [
+      "review 808 move route",
+      `selected Pattern ${project.selectedPattern}`,
+      preview.statusLabel,
+      `preview ${preview.phraseLabel}`,
+      `bassline ${preview.basslineLabel}`,
+      `glide ${preview.glideLabel}`,
+      `contour ${preview.contourLabel}`,
+      preview.moveLabel,
+      target ? `target ${target.label} ${target.kind}` : "target unavailable",
+      target ? `route ${bassMoveRouteLabel(target)}` : "route unavailable",
+      "direct command 808-move",
+      `${patternEventTotal(pattern)} events`,
+      bassNoteCountLabel(notes),
+      bassRhythmLabel(notes),
+      bassGlideLabel(notes),
+      bassChanceLabel(notes),
+      bassRangeLabel(notes),
+      `arrangement ${arrangementUse}`,
+      "808 route unchanged",
+      "808 unchanged",
+      "playback unchanged",
+      "export unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
 export function quickActionDrumMoveRouteReadoutMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -19565,6 +19664,15 @@ export function quickActionResultFollowup(
         "Read the drum route and loop the selected Pattern before choosing the existing Drum Move command.",
       nextCheck:
         "Use Drum Move only when the named Foundation, Feel, or Accent route should reshape the selected Pattern drums; otherwise use selected-drum tools."
+    };
+  }
+
+  if (action.id === "808-move-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the 808 route and loop the selected Pattern before choosing the existing 808 Move command.",
+      nextCheck:
+        "Use 808 Move only when the named Bassline, Glide, or Contour route should reshape the selected Pattern low end; otherwise use selected-note tools."
     };
   }
 
