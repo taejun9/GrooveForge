@@ -1266,6 +1266,7 @@ export function App(): ReactElement {
   const grooveCompassPanelRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
   const beatMapPanelRef = useRef<HTMLElement | null>(null);
+  const structureLensPanelRef = useRef<HTMLElement | null>(null);
   const hookReadinessPanelRef = useRef<HTMLElement | null>(null);
   const toplineSpacePanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
@@ -7457,6 +7458,21 @@ export function App(): ReactElement {
     );
   }
 
+  function focusStructureLensRouteReadout(): void {
+    const action = structureLensActions[0] ?? null;
+    const signal = action
+      ? structureLensSignalForNextMoveAction(structureLensSummary, action)
+      : (structureLensSummary.signals.find((candidate) => candidate.tone !== "good") ?? structureLensSummary.signals[0]);
+    structureLensPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      action
+        ? `Structure Lens Route Readout Pattern ${project.selectedPattern}: ${signal.label} / ${signal.value} / ${structureLensRouteLabel(
+            action
+          )} / direct structure-lens-action-${action.id} unchanged / Structure Lens action unchanged / Beat Map unchanged / Next Move unchanged / Guide panel`
+        : "Structure Lens Route Readout: no Structure Lens route available"
+    );
+  }
+
   function focusBeatReadinessCheck(check: BeatReadinessCheck): void {
     const targetRefs: Record<BeatReadinessFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -9023,6 +9039,7 @@ export function App(): ReactElement {
     onFocusDirectExportsReadout: focusDirectExportsReadout,
     onFocusHandoffNextExportReadout: focusHandoffNextExportReadout,
     onFocusBeatMapRouteReadout: focusBeatMapRouteReadout,
+    onFocusStructureLensRouteReadout: focusStructureLensRouteReadout,
     onJumpFirstBeatPath: jumpToFirstBeatPathStep,
     onJumpBeatSpine: jumpToBeatSpineTarget,
     onFocusBeatPassport: focusBeatPassportMetric,
@@ -9651,7 +9668,12 @@ export function App(): ReactElement {
         summary={beatMapSummary}
       />
 
-      <StructureLens summary={structureLensSummary} actions={structureLensActions} onRun={runNextMove} />
+      <StructureLens
+        actions={structureLensActions}
+        onRun={runNextMove}
+        sectionRef={structureLensPanelRef}
+        summary={structureLensSummary}
+      />
 
       <HookReadiness
         cueTarget={hookLoopCueTarget}

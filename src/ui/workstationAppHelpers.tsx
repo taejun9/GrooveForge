@@ -7288,14 +7288,16 @@ export function BeatMap({
 export function StructureLens({
   actions,
   onRun,
+  sectionRef,
   summary
 }: {
   actions: NextMoveAction[];
   onRun: (action: NextMoveAction) => void;
+  sectionRef?: Ref<HTMLElement>;
   summary: StructureLensSummary;
 }): ReactElement {
   return (
-    <section className={`structure-lens ${summary.tone}`} data-testid="structure-lens" aria-label="Structure lens">
+    <section ref={sectionRef} className={`structure-lens ${summary.tone}`} data-testid="structure-lens" aria-label="Structure lens">
       <div className="structure-lens-heading">
         <div>
           <Waves size={17} aria-hidden="true" />
