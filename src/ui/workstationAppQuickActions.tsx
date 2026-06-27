@@ -1067,7 +1067,7 @@ import type {
 } from "./workstationAppDerivations";
 
 import {
-  activeArrangementMuteMapQuickActionLane, activeArrangementTransitionMapQuickActionTransition, activeBassMoveQuickActionTarget, activeBeatPassportQuickActionMetric, activeBeatReadinessQuickActionCheck, activeBeatSpineQuickActionApplyCard, activeBeatSpineQuickActionCard, activeChordMoveQuickActionTarget, activeComposerGuideQuickActionCard, activeDrumMoveQuickActionTarget, activeExportPreflightQuickActionCard, activeFinishChecklistQuickActionCard, activeFirstBeatPathQuickActionStep, activeGrooveCompassQuickActionItem, activeGuideQuickStartBottleneckQuickActionTarget, activeGuideQuickStartQuickActionTarget, activeHandoffPackageCheckQuickActionCard, activeHookReadinessQuickActionCard, activeKeyCompassQuickActionItem, activeLayerStarterQuickActionOption, activeListeningPassQuickActionItem, activeMelodyMoveQuickActionTarget, activeModeFocusQuickActionCard, activePatternDnaQuickActionCard, activeProductionSnapshotQuickActionMetric, activeReviewFixItem, activeSessionPassQuickActionCard, activeStyleInspectorQuickActionItem, activeToplineSpaceQuickActionCard, applySessionBriefStarter, arrangementAverageEnergy, arrangementMuteMapFocusResultAudition, arrangementMuteMapFocusResultMetric, arrangementMuteMapFocusResultNextCheck, arrangementTransitionLoopDetail, arrangementTransitionMapFocusResultAudition, arrangementTransitionMapFocusResultMetric, arrangementTransitionMapFocusResultNextCheck, beatBlueprintStyleLabel, beatPassportFocusResultMetric, beatReadinessCardActionId, beatReadinessQuickActionCheckFromChecks, beatSpineApplyButtonContext, beatSpineJumpButtonContext, chordMotionLabel, compactSectionFlow, compactSessionBriefValue, composerActionForStyleGoal, composerActionQuickActionArea, composerActionQuickActionDetail, composerActionQuickActionGroup, composerGuideFocusCommandDetail, composerGuideFocusResultAudition, composerGuideFocusResultMetric, composerGuideFocusResultNextCheck, createArrangementMovePreviewDecision, createArrangementMovePrioritySummary, createArrangementMuteMapSummary, createArrangementTransitionLoopTarget, createArrangementTransitionMapSummary, createBeatBlueprintPreviewCue, createBeatBlueprintPreviewDecision, createBeatBlueprintPreviewSummary, createBeatMapActions, createBeatMapSummary, createBeatPassportSummary, createComposerActionsSummary, createDeliveryTargetAlignmentPreview, createExportPreflightSummary, createFinishChecklistSummary, createHandoffExportFormatFocusResult, createHandoffExportFormatSummary, createHandoffFileManifest, createHandoffManifestAudit, createHandoffPackageCheckSummary, createHandoffPackItems, createHandoffPackRouteSummary, createHandoffPackSendOrderSummary, createHookFixOption, createHookLoopCueTarget, createHookReadinessSummary, createProductionSnapshotSummary, createReviewFixOption, createReviewQueueSummary, createSectionLocatorCueDecisionSummary, createSelectedBlockEditPreviewDecision, createSelectedBlockEditPrioritySummary, createSessionBriefStarterBrief, createSongFormOverviewSummary, createSongFormPrioritySummary, createStructureLensActions, createToplineFixOption, createToplineLoopCueTarget, createToplineSpaceSummary, createWorkflowNavigatorItems, deliveryTargetMasterLabel, emptyHandoffExportReceipt, exportPreflightFocusResultMetric, exportPreflightFocusResultNextCheck, finishChecklistFocusResultMetric, firstBeatPathJumpAuditionCue, firstBeatPathJumpNextCheck, formatExportDuration, grooveCompassFocusResultAudition, grooveCompassFocusResultMetric, grooveCompassFocusResultNextCheck, guideQuickStartCommandDetail, guideQuickStartCompletionBreakdownLabel, handoffExportFormatFocusMetric, handoffPackageCheckFocusResultMetric, handoffPackageCheckFocusResultNextCheck, hookLoopCueDetail, hookReadinessFocusResultNextCheck, isArrangementMovePresetApplied, isDeliveryTargetAligned, keyCompassFocusResultAudition, keyCompassFocusResultMetric, keyCompassFocusResultNextCheck, mixPostureLabel, modeFocusCommandDetail, nextMoveResultFollowup, nextMoveResultMetricSnapshot, normalizeSwingFeelValue, patternEventTotal, productionSnapshotFocusResultMetric, projectEventTotal, quickActionArrangementBlockMetricSnapshot, quickActionBeatMapMetricSnapshot, quickActionComposerActionAreaLabel, quickActionComposerActionMetricLabel, quickActionComposerActionMoveLabel, quickActionComposerActionRouteLabel, quickActionSectionLocatorMetricSnapshot, quickActionSelectedBlockMetricSnapshot, quickActionStructureLensMetricSnapshot, reviewFixScopeLabel, reviewQueueFocusResultMetric, sectionLocatorActionSection, sectionLocatorTestId, selectedArrangementMoveQuickActionPreset, sessionBriefChangedFieldCount, sessionBriefCompassDestinationLabel, sessionBriefCompassFocusLabel, sessionBriefFieldLabel, sessionBriefFields, sessionBriefFilledFields, sessionBriefStarterPadDefinitions, sessionBriefStatus, sessionPassCommandDetail, sessionPassFocusResultAudition, sessionPassFocusResultMetric, sessionPassFocusResultNextCheck, styleGoalActionQuickActionArea, styleGoalCueLabel, styleGoalCueQuickActionGoal, suggestedMasterFinishPad, swingFeelPadDetail, swingFeelPadSwing, toplineLoopCueDetail, workflowCountLabel, workflowNavigatorJumpAuditionCue, workflowNavigatorJumpMetricValue, workflowNavigatorJumpNextCheck
+  activeArrangementMuteMapQuickActionLane, activeArrangementTransitionMapQuickActionTransition, activeBassMoveQuickActionTarget, activeBeatPassportQuickActionMetric, activeBeatReadinessQuickActionCheck, activeBeatSpineQuickActionApplyCard, activeBeatSpineQuickActionCard, activeChordMoveQuickActionTarget, activeComposerGuideQuickActionCard, activeDrumMoveQuickActionTarget, activeExportPreflightQuickActionCard, activeFinishChecklistQuickActionCard, activeFirstBeatPathQuickActionStep, activeGrooveCompassQuickActionItem, activeGuideQuickStartBottleneckQuickActionTarget, activeGuideQuickStartQuickActionTarget, activeHandoffPackageCheckQuickActionCard, activeHookReadinessQuickActionCard, activeKeyCompassQuickActionItem, activeLayerStarterQuickActionOption, activeListeningPassQuickActionItem, activeMelodyMoveQuickActionTarget, activeModeFocusQuickActionCard, activePatternDnaQuickActionCard, activeProductionSnapshotQuickActionMetric, activeReviewFixItem, activeSessionPassQuickActionCard, activeStyleInspectorQuickActionItem, activeToplineSpaceQuickActionCard, applySessionBriefStarter, arrangementAverageEnergy, arrangementMuteMapFocusResultAudition, arrangementMuteMapFocusResultMetric, arrangementMuteMapFocusResultNextCheck, arrangementTransitionLoopDetail, arrangementTransitionMapFocusResultAudition, arrangementTransitionMapFocusResultMetric, arrangementTransitionMapFocusResultNextCheck, beatBlueprintStyleLabel, beatPassportFocusResultMetric, beatReadinessCardActionId, beatReadinessQuickActionCheckFromChecks, beatSpineApplyButtonContext, beatSpineJumpButtonContext, chordMotionLabel, compactSectionFlow, compactSessionBriefValue, composerActionForStyleGoal, composerActionQuickActionArea, composerActionQuickActionDetail, composerActionQuickActionGroup, composerGuideFocusCommandDetail, composerGuideFocusResultAudition, composerGuideFocusResultMetric, composerGuideFocusResultNextCheck, createArrangementMovePreviewDecision, createArrangementMovePrioritySummary, createArrangementMuteMapSummary, createArrangementTransitionLoopTarget, createArrangementTransitionMapSummary, createBeatBlueprintPreviewCue, createBeatBlueprintPreviewDecision, createBeatBlueprintPreviewSummary, createBeatMapActions, createBeatMapSummary, createBeatPassportSummary, createComposerActionsSummary, createDeliveryTargetAlignmentPreview, createExportPreflightSummary, createFinishChecklistSummary, createHandoffExportFormatFocusResult, createHandoffExportFormatSummary, createHandoffFileManifest, createHandoffManifestAudit, createHandoffPackageCheckSummary, createHandoffPackItems, createHandoffPackRouteSummary, createHandoffPackSendOrderSummary, createHookFixOption, createHookLoopCueTarget, createHookReadinessSummary, createProductionSnapshotSummary, createReviewFixOption, createReviewQueueSummary, createSectionLocatorCueDecisionSummary, createSelectedBlockEditPreviewDecision, createSelectedBlockEditPrioritySummary, createSessionBriefStarterBrief, createSongFormOverviewSummary, createSongFormPrioritySummary, createStructureLensActions, createToplineFixOption, createToplineLoopCueTarget, createToplineSpaceSummary, createWorkflowNavigatorItems, deliveryTargetMasterLabel, emptyHandoffExportReceipt, exportPreflightFocusResultMetric, exportPreflightFocusResultNextCheck, finishChecklistFocusResultMetric, firstBeatPathJumpAuditionCue, firstBeatPathJumpNextCheck, formatExportDuration, grooveCompassFocusResultAudition, grooveCompassFocusResultMetric, grooveCompassFocusResultNextCheck, guideQuickStartCommandDetail, guideQuickStartCompletionBreakdownLabel, handoffExportFormatFocusMetric, handoffPackageCheckFocusResultMetric, handoffPackageCheckFocusResultNextCheck, hookLoopCueDetail, hookReadinessFocusResultNextCheck, isArrangementMovePresetApplied, isDeliveryTargetAligned, keyCompassFocusResultAudition, keyCompassFocusResultMetric, keyCompassFocusResultNextCheck, mixPostureLabel, modeFocusCommandDetail, nextMoveResultFollowup, nextMoveResultMetricSnapshot, normalizeSwingFeelValue, patternEventTotal, productionSnapshotFocusResultMetric, projectEventTotal, quickActionArrangementBlockMetricSnapshot, quickActionBeatMapMetricSnapshot, quickActionComposerActionAreaLabel, quickActionComposerActionMetricLabel, quickActionComposerActionMoveLabel, quickActionComposerActionRouteLabel, quickActionSectionLocatorMetricSnapshot, quickActionSelectedBlockMetricSnapshot, quickActionStructureLensMetricSnapshot, reviewFixScopeLabel, reviewQueueFocusResultMetric, sectionLocatorActionSection, sectionLocatorTestId, selectedArrangementMoveQuickActionPreset, sessionBriefChangedFieldCount, sessionBriefCompassDestinationLabel, sessionBriefCompassFocusLabel, sessionBriefFieldLabel, sessionBriefFields, sessionBriefFilledFields, sessionBriefStarterPadDefinitions, sessionBriefStatus, sessionPassCommandDetail, sessionPassFocusResultAudition, sessionPassFocusResultMetric, sessionPassFocusResultNextCheck, styleGoalActionQuickActionArea, styleGoalCueLabel, styleGoalCueQuickActionGoal, suggestedMasterFinishPad, swingFeelPadDetail, swingFeelPadSwing, toplineLoopCueDetail, toplineSpaceFocusResultNextCheck, workflowCountLabel, workflowNavigatorJumpAuditionCue, workflowNavigatorJumpMetricValue, workflowNavigatorJumpNextCheck
 } from "./workstationAppHelpers";
 import type {
   ArrangementTransitionLoopTarget, BeatBlueprintPreviewCue, BeatBlueprintPreviewDecision, HookLoopCueTarget, ToplineLoopCueTarget
@@ -1426,6 +1426,7 @@ export function createQuickActions({
   onFocusSessionPassRouteReadout,
   onFocusStyleInspector,
   onFocusToplineSpace,
+  onFocusToplineSpaceRouteReadout,
   onFocusWorkflowSpotlight,
   onJumpWorkflowZone,
   onOpenCommandReference,
@@ -1792,6 +1793,7 @@ export function createQuickActions({
   onFocusSessionPassRouteReadout: () => void;
   onFocusStyleInspector: (item: StyleInspectorFocusItem) => void;
   onFocusToplineSpace: (card: ToplineSpaceFocusItem) => void;
+  onFocusToplineSpaceRouteReadout: () => void;
   onFocusWorkflowSpotlight: (item: WorkflowNavigatorItem) => void;
   onJumpWorkflowZone: (item: WorkflowNavigatorItem) => void;
   onOpenCommandReference: () => void;
@@ -2805,6 +2807,38 @@ export function createQuickActions({
     keywords: `topline space vocal pocket focus card singer rapper lead hook ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
     run: () => onFocusToplineSpace(card)
   }));
+  const toplineSpaceRouteReadoutAction: QuickAction = {
+    id: "topline-space-route-readout-action",
+    title: toplineSpaceCard ? `Review Topline Space Route: ${toplineSpaceCard.label}` : "Review Topline Space Route",
+    detail: toplineSpaceCard
+      ? [
+          toplineSpaceCard.value,
+          `${toplineSpaceCard.focusLabel} panel`,
+          toplineSpaceSummary.headline,
+          toplineSpaceSummary.detail,
+          toplineSpaceCard.detail,
+          `Status ${toplineSpaceCard.status}`,
+          `Cue ${toplineLoopCueDetail(toplineLoopCueTarget)}`,
+          `Fix ${toplineFixOption ? toplineFixOption.label : "No topline fix"}`,
+          `Route ${toplineSpaceRouteLabel(toplineSpaceCard, toplineSpaceSummary)}`,
+          `Direct topline-space-card-${toplineSpaceCard.id} unchanged`,
+          "Topline loop unchanged",
+          "Topline fix unchanged",
+          "Readout only"
+        ].join(" / ")
+      : "No Topline Space card available.",
+    group: "Project",
+    keywords: `Quick Actions Topline Space Route Readout review topline route direct topline-space-card-${
+      toplineSpaceCard?.id ?? "none"
+    } pocket lead arrangement mix brief vocal room artist cue ${toplineSpaceCard?.id ?? "none"} ${
+      toplineSpaceCard?.label ?? "none"
+    } ${toplineSpaceCard?.value ?? "none"} ${toplineSpaceCard?.focusLabel ?? "none"} ${
+      toplineSpaceCard?.detail ?? "none"
+    } no cue no fix no edit no vocal recording no lyrics sample free beginner producer`,
+    disabled: !toplineSpaceCard,
+    resultTargetId: toplineSpaceCard?.id,
+    run: onFocusToplineSpaceRouteReadout
+  };
   const toplineSpaceCueActions: QuickAction[] = toplineSpaceSummary.cards.map((card) => ({
     id: `topline-space-cue-${card.id}`,
     title: `Cue Topline Loop: ${card.label}`,
@@ -5600,6 +5634,7 @@ export function createQuickActions({
       }
     },
     ...hookReadinessActions,
+    toplineSpaceRouteReadoutAction,
     {
       id: "topline-space-focus",
       title: toplineSpaceCard ? `Focus Topline Space: ${toplineSpaceCard.label}` : "Focus Topline Space",
@@ -7307,6 +7342,7 @@ export function createQuickActionResult(
     action.id === "snapshot-compare-focus" ||
     action.id.startsWith("snapshot-compare-metric-") ||
     action.id === "hook-readiness-route-readout-action" ||
+    action.id === "topline-space-route-readout-action" ||
     action.id === "topline-space-focus" ||
     action.id.startsWith("topline-space-card-") ||
     action.id === "arrangement-mute-map-readout-action" ||
@@ -10654,6 +10690,167 @@ export function hookReadinessRouteLabel(card: HookReadinessCard, summary: HookRe
 
 export function hookReadinessDestinationLabel(card: HookReadinessCard): string {
   if (card.id === "handoff") {
+    return "Deliver panel / Session Brief";
+  }
+  return `${card.focusLabel} panel`;
+}
+
+export function quickActionToplineSpaceMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  const isRouteReadout = action.id === "topline-space-route-readout-action";
+  if (!isRouteReadout && action.id !== "topline-space-focus" && !action.id.startsWith("topline-space-card-")) {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const toplineSummary = createToplineSpaceSummary(
+    project,
+    createBeatReadinessChecks(project, exportAnalysis),
+    exportAnalysis,
+    stemAnalyses
+  );
+  const card = quickActionToplineSpaceCard(toplineSummary, action);
+  if (!card) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const target = activeDeliveryTarget(project);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, null);
+  const audibleStems = audibleStemTracks(stemAnalyses);
+  const toplineLoopTarget = createToplineLoopCueTarget(project);
+  const toplineFixOption = createToplineFixOption(card);
+  const detailParts = quickActionToplineSpaceDetailParts(action);
+  const contextLabel = isRouteReadout ? detailParts[4] ?? card.detail : detailParts.slice(2).join(" / ") || card.detail;
+  const routeLabel = quickActionToplineSpaceRouteLabel(detailParts, card, toplineSummary);
+  const directCardId = isRouteReadout
+    ? action.resultTargetId ?? ""
+    : action.id.startsWith("topline-space-card-")
+      ? action.id.slice("topline-space-card-".length)
+      : "";
+  const directCardLabel =
+    isRouteReadout && directCardId
+      ? `direct topline-space-card-${directCardId} unchanged`
+      : directCardId
+        ? `direct topline-space-card-${directCardId}`
+        : "active topline space command";
+  const actionLabel = isRouteReadout
+    ? "review topline space route readout"
+    : action.id === "topline-space-focus"
+      ? "focus active topline space"
+      : "focus direct topline space";
+  const readyCount = toplineSummary.cards.filter((candidate) => candidate.tone === "good").length;
+  const reviewCount = toplineSummary.cards.filter((candidate) => candidate.tone === "warn").length;
+  const blockerCount = toplineSummary.cards.filter((candidate) => candidate.tone === "danger").length;
+
+  return {
+    id: isRouteReadout ? "topline-space-route-readout" : "topline-space",
+    label: isRouteReadout ? "Topline Space Route Readout" : "Topline space",
+    value: [
+      `action ${actionLabel}`,
+      `lane ${quickActionToplineSpaceLaneLabel(action, card)}`,
+      `route ${routeLabel}`,
+      directCardLabel,
+      `destination ${toplineSpaceDestinationLabel(card)}`,
+      `status ${card.status}`,
+      `value ${card.value}`,
+      `context ${contextLabel}`,
+      `topline ${toplineSummary.headline}`,
+      toplineSummary.detail,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `stems ${audibleStems.length}/${target.stemGoal} target / ${audibleStems.length}/${stemTrackIds.length} audible`,
+      `target ${target.name}`,
+      `brief ${sessionBriefFilledFields(project.sessionBrief)}/4`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `topline loop ${toplineLoopCueDetail(toplineLoopTarget)}`,
+      `topline fix ${toplineFixOption.label}`,
+      isRouteReadout ? "readout only / topline loop unchanged / topline fix unchanged" : "focus command",
+      `${workflowCountLabel(readyCount, "ready")}`,
+      `${workflowCountLabel(reviewCount, "review")}`,
+      `${workflowCountLabel(blockerCount, "blocker")}`,
+      `next ${toplineSpaceFocusResultNextCheck(card)}`
+    ].join(" / ")
+  };
+}
+
+export function quickActionToplineSpaceCard(
+  summary: ToplineSpaceSummary,
+  action: QuickAction
+): ToplineSpaceCard | null {
+  if (action.id === "topline-space-focus") {
+    return activeToplineSpaceQuickActionCard(summary);
+  }
+
+  if (action.id === "topline-space-route-readout-action") {
+    return (
+      summary.cards.find((card) => card.id === (action.resultTargetId as ToplineSpaceCardId | undefined)) ??
+      activeToplineSpaceQuickActionCard(summary)
+    );
+  }
+
+  const cardId = quickActionToplineSpaceCardId(action.id);
+  if (!cardId) {
+    return null;
+  }
+
+  return summary.cards.find((card) => card.id === cardId) ?? null;
+}
+
+export function quickActionToplineSpaceCardId(actionId: string): ToplineSpaceCardId | null {
+  if (!actionId.startsWith("topline-space-card-")) {
+    return null;
+  }
+
+  return actionId.slice("topline-space-card-".length) as ToplineSpaceCardId;
+}
+
+export function quickActionToplineSpaceDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+export function quickActionToplineSpaceLaneLabel(action: QuickAction, card: ToplineSpaceCard): string {
+  const titleLabel = action.title.replace(/^Focus Topline Space:\s*/, "").replace(/^Review Topline Space Route:\s*/, "").trim();
+  if (titleLabel && titleLabel !== "Focus Topline Space" && titleLabel !== "Review Topline Space Route") {
+    return titleLabel;
+  }
+  return card.label;
+}
+
+export function quickActionToplineSpaceRouteLabel(
+  parts: string[],
+  card: ToplineSpaceCard,
+  summary: ToplineSpaceSummary
+): string {
+  const routePart = parts.find((part) => part.startsWith("Route "));
+  if (routePart) {
+    return routePart.replace(/^Route\s+/, "");
+  }
+  return toplineSpaceRouteLabel(card, summary);
+}
+
+export function toplineSpaceRouteLabel(card: ToplineSpaceCard, summary: ToplineSpaceSummary): string {
+  const routeIndex = summary.cards.findIndex((candidate) => candidate.id === card.id);
+  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${summary.cards.length}` : `1/${summary.cards.length}`;
+  return `${card.label} ${routePosition} to ${toplineSpaceDestinationLabel(card)}`;
+}
+
+export function toplineSpaceDestinationLabel(card: ToplineSpaceCard): string {
+  if (card.id === "brief") {
     return "Deliver panel / Session Brief";
   }
   return `${card.focusLabel} panel`;
@@ -16746,22 +16943,25 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "topline-space-focus") {
-    const exportAnalysis = analysis ?? analyzeExport(project);
-    const toplineSummary = createToplineSpaceSummary(
-      project,
-      createBeatReadinessChecks(project, exportAnalysis),
-      exportAnalysis,
-      analyzeStemExports(project)
-    );
+  if (action.id === "topline-space-route-readout-action" || action.id === "topline-space-focus") {
+    const toplineSpaceMetric = quickActionToplineSpaceMetricSnapshot(project, action, analysis ?? undefined);
+    if (toplineSpaceMetric) {
+      return toplineSpaceMetric;
+    }
+
     return {
       id: "topline-space",
       label: "Topline space",
-      value: `${toplineSummary.headline} / ${toplineSummary.detail}`
+      value: action.detail
     };
   }
 
   if (action.id.startsWith("topline-space-card-")) {
+    const toplineSpaceMetric = quickActionToplineSpaceMetricSnapshot(project, action, analysis ?? undefined);
+    if (toplineSpaceMetric) {
+      return toplineSpaceMetric;
+    }
+
     return {
       id: "topline-space",
       label: "Topline space",
@@ -21748,6 +21948,15 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Hook Readiness card before changing arrangement, motif, mix, or handoff details.",
       nextCheck: "Return to Hook Readiness when you need another direct hook section, motif, contrast, mix, or delivery focus."
+    };
+  }
+
+  if (action.id === "topline-space-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the Topline Space route, then inspect the matching Compose, Arrange, Mix, Master, Deliver, or Session Brief area before focusing, cueing, or applying a topline fix.",
+      nextCheck:
+        "Use Topline Space focus/cue/fix only when the named topline route matches the vocal or lead-room question; otherwise leave playback and project data unchanged."
     };
   }
 
