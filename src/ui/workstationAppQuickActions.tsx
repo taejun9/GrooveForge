@@ -1229,6 +1229,7 @@ export function createQuickActions({
   onFocusLayerStarterReadout,
   onApplyMasterAutomation,
   onFocusMasterAutomationReadout,
+  onFocusMasterAutomationRouteReadout,
   onApplyMasterFinish,
   onFocusMasterFinishReadout,
   onFocusMasterFinishRouteReadout,
@@ -1581,6 +1582,7 @@ export function createQuickActions({
   onFocusLayerStarterReadout: () => void;
   onApplyMasterAutomation: (pad: MasterAutomationPadId) => void;
   onFocusMasterAutomationReadout: () => void;
+  onFocusMasterAutomationRouteReadout: () => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
   onFocusMasterFinishReadout: () => void;
   onFocusMasterFinishRouteReadout: () => void;
@@ -5983,6 +5985,19 @@ export function createQuickActions({
       run: onFocusMasterAutomationReadout
     },
     {
+      id: "master-automation-route-readout-action",
+      title: `Review Master Automation Route: ${masterAutomationPreviewSummary.padLabel}`,
+      detail: `${masterAutomationRouteLabel(masterAutomationPreviewSummary.padId)} / ${masterAutomationPreviewSummary.statusLabel} / direct master-automation-${masterAutomationPreviewSummary.padId} unchanged / ${masterAutomationPreviewSummary.changeLabel}`,
+      group: "Mix",
+      keywords: `Quick Actions Master Automation Route Readout review route preflight fade lane direct master automation command no apply none fade in fade out intro outro realtime export wav stems ${
+        masterAutomationPreviewSummary.padId
+      } ${masterAutomationPreviewSummary.padLabel} ${masterAutomationPreviewSummary.statusLabel} ${
+        masterAutomationPreviewSummary.eventLabel
+      } ${masterAutomationPreviewSummary.rangeLabel} beginner producer manual automation`,
+      resultTargetId: masterAutomationPreviewSummary.padId,
+      run: onFocusMasterAutomationRouteReadout
+    },
+    {
       id: "master-automation-decision",
       title:
         masterAutomationReady && masterAutomationSuggestedPad
@@ -7048,6 +7063,7 @@ export function createQuickActionResult(
     action.id === "master-finish-readout-action" ||
     action.id === "master-finish-route-readout-action" ||
     action.id === "master-automation-readout-action" ||
+    action.id === "master-automation-route-readout-action" ||
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-focus" ||
@@ -7472,6 +7488,33 @@ export function quickActionMasterAutomationMetricSnapshot(
     };
   }
 
+  if (action.id === "master-automation-route-readout-action") {
+    const pad = quickActionMasterAutomationPadOption(action, actionPad);
+    if (!pad) {
+      return null;
+    }
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const stemAnalyses = analyzeStemExports(project);
+    const targetProject = applyMasterAutomationPreset(project, pad.id);
+    const changedEvents = masterAutomationChangedCount(project, targetProject);
+    return {
+      id: "master-automation-route-readout",
+      label: "Master Automation Route Readout",
+      value: quickActionMasterAutomationMetricValue(project, exportAnalysis, stemAnalyses, [
+        quickActionMasterAutomationActionLabel(action),
+        `route ${masterAutomationRouteLabel(pad.id)}`,
+        `direct command master-automation-${pad.id}`,
+        `context ${quickActionMasterAutomationContextLabel(action)}`,
+        `current ${masterAutomationQuickActionPosture(project)}`,
+        `target ${masterAutomationPresetLabel(masterAutomationPresetForProject(targetProject))} / ${masterAutomationEventCountLabel(
+          targetProject
+        )} / ${masterAutomationRangeLabel(targetProject)}`,
+        `events ${changedEvents} automation event${changedEvents === 1 ? "" : "s"}`,
+        "master automation unchanged"
+      ], quickActionMasterAutomationNextCheck(action, pad))
+    };
+  }
+
   if (action.id !== "master-automation-decision" && action.id !== "master-automation" && !actionPad) {
     return null;
   }
@@ -7575,6 +7618,9 @@ export function quickActionMasterAutomationActionLabel(action: QuickAction): str
   if (action.id === "master-automation-readout-action") {
     return "review master automation readout";
   }
+  if (action.id === "master-automation-route-readout-action") {
+    return "review master automation route readout";
+  }
   if (action.id === "master-automation-decision") {
     return "run master automation decision";
   }
@@ -7587,6 +7633,9 @@ export function quickActionMasterAutomationActionLabel(action: QuickAction): str
 export function quickActionMasterAutomationContextLabel(action: QuickAction): string {
   if (action.id === "master-automation-readout-action") {
     return "readout";
+  }
+  if (action.id === "master-automation-route-readout-action") {
+    return "route readout";
   }
   if (action.id === "master-automation-decision") {
     return "decision";
@@ -7601,6 +7650,9 @@ export function quickActionMasterAutomationNextCheck(action: QuickAction, pad: M
   if (action.id === "master-automation-readout-action") {
     return "play Song from the top and final bar, then apply Master Automation only if the fade preview fits";
   }
+  if (action.id === "master-automation-route-readout-action") {
+    return "use the named fade route only if it matches the arrangement delivery target, then play Song before applying";
+  }
   if (action.id === "master-automation-decision") {
     return "play Song and inspect the visible Master Automation result before export";
   }
@@ -7611,6 +7663,19 @@ export function quickActionMasterAutomationNextCheck(action: QuickAction, pad: M
     return "play the final bar and export WAV/stems to confirm the fade renders";
   }
   return "play Song from the top and final bar, then export WAV/stems after the fade feels right";
+}
+
+export function masterAutomationRouteLabel(targetId: MasterAutomationPadId): string {
+  switch (targetId) {
+    case "none":
+      return "No fade automation route";
+    case "fade_in":
+      return "Fade-in automation route";
+    case "fade_out":
+      return "Fade-out automation route";
+    case "intro_outro":
+      return "Intro/outro automation route";
+  }
 }
 
 export function mixSnapshotQuickActionTarget(actionId: string): MixSnapshotQuickActionTarget | null {
@@ -21302,6 +21367,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the Master Automation readout before applying a fade lane, then play Song from the top and final bar.",
       nextCheck: "Apply Master Automation only when the fade preview supports the arrangement; otherwise leave automation manual."
+    };
+  }
+
+  if (action.id === "master-automation-route-readout-action") {
+    return {
+      auditionCue: `Read the Master Automation route and play Pattern ${project.selectedPattern} or Song before choosing the existing Master Automation command.`,
+      nextCheck:
+        "Use Master Automation only when the named none, fade-in, fade-out, or intro/outro route matches the arrangement; otherwise leave automation events unchanged."
     };
   }
 
