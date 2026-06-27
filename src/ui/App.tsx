@@ -1267,6 +1267,7 @@ export function App(): ReactElement {
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
   const beatMapPanelRef = useRef<HTMLElement | null>(null);
   const structureLensPanelRef = useRef<HTMLElement | null>(null);
+  const nextMovePanelRef = useRef<HTMLElement | null>(null);
   const hookReadinessPanelRef = useRef<HTMLElement | null>(null);
   const toplineSpacePanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
@@ -7473,6 +7474,22 @@ export function App(): ReactElement {
     );
   }
 
+  function focusNextMoveRouteReadout(): void {
+    const action = nextMoveActions[0] ?? null;
+    const posture = action ? nextMoveActionPostureMetricSnapshot(projectRef.current, action) : null;
+    const followup = action ? nextMoveResultFollowup(action, projectRef.current) : null;
+    nextMovePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      action && posture && followup
+        ? `Next Move Route Readout Pattern ${project.selectedPattern}: ${action.buttonLabel} / ${posture.label}: ${
+            posture.value
+          } / ${nextMoveRouteLabel(
+            action
+          )} / direct next-move-action-${action.id} unchanged / Next Move action unchanged / Beat Map unchanged / Structure Lens unchanged / ${followup.nextCheck} / Guide panel`
+        : "Next Move Route Readout: no Next Move route available"
+    );
+  }
+
   function focusBeatReadinessCheck(check: BeatReadinessCheck): void {
     const targetRefs: Record<BeatReadinessFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -9040,6 +9057,7 @@ export function App(): ReactElement {
     onFocusHandoffNextExportReadout: focusHandoffNextExportReadout,
     onFocusBeatMapRouteReadout: focusBeatMapRouteReadout,
     onFocusStructureLensRouteReadout: focusStructureLensRouteReadout,
+    onFocusNextMoveRouteReadout: focusNextMoveRouteReadout,
     onJumpFirstBeatPath: jumpToFirstBeatPathStep,
     onJumpBeatSpine: jumpToBeatSpineTarget,
     onFocusBeatPassport: focusBeatPassportMetric,
@@ -9713,7 +9731,7 @@ export function App(): ReactElement {
         onSelectBlock={selectArrangementBlock}
       />
 
-      <NextMove actions={nextMoveActions} result={nextMoveResult} onRun={runNextMove} />
+      <NextMove actions={nextMoveActions} onRun={runNextMove} result={nextMoveResult} sectionRef={nextMovePanelRef} />
 
       <ProjectSnapshots
         nameDrafts={snapshotNameDrafts}
