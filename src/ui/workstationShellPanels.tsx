@@ -1287,6 +1287,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "WAV Format, Duration, Full-Mix File, Stem Count, Audible Stems, MIDI Scope, Handoff Sheet Context, Export Format Priority, Direct Metric Routes, Handoff Pack Follow-Up, Audition Cue, and Next Export Check context before Export Format Readout commands run."
       },
       {
+        id: "handoff-export-format-readout",
+        command: "Handoff Export Format Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Deliverable format preflight / no render",
+        context:
+          "Handoff Export Format Readout Action, WAV Format, Duration, Full-Mix File, Stem File Count, Audible Stems, MIDI Scope, Handoff Sheet Context, Delivery Target, Package Posture, Selected Pattern A/B/C, Arrangement Length, Audition Cue, and Next Export-Format Check context before explicit export commands run."
+      },
+      {
         id: "handoff-send-order",
         command: "Handoff Send Order",
         shortcut: "Quick Actions / Readout",
