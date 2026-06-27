@@ -3342,6 +3342,8 @@ export function createQuickActions({
     ? (handoffPackItems.find((item) => item.id === handoffSendOrder.nextItemId) ?? null)
     : null;
   const handoffExportFormatSummary = createHandoffExportFormatSummary(project, exportAnalysis, stemAnalyses, handoffPackItems);
+  const handoffBriefStatus = sessionBriefStatus(project.sessionBrief);
+  const handoffBriefFields = sessionBriefFilledFields(project.sessionBrief);
   const directExportsReadoutAction: QuickAction = {
     id: "direct-exports-readout-action",
     title: "Review Direct Exports Readout",
@@ -3452,6 +3454,24 @@ export function createQuickActions({
     ].join(" / "),
     group: "Export",
     keywords: `handoff delivery target readout review target focus length stem goal session brief package no render no download ${activeDeliveryTarget(project).name} ${activeDeliveryTarget(project).focus} sample free beginner producer`,
+    run: onFocusHandoffPack
+  };
+  const handoffSessionBriefReadoutAction: QuickAction = {
+    id: "handoff-session-brief-readout-action",
+    title: `Review Handoff Session Brief Readout: ${handoffBriefFields}/4 fields`,
+    detail: [
+      `${handoffBriefFields}/4 brief / ${handoffBriefStatus.value}`,
+      `artist ${project.sessionBrief.artist.trim() ? compactSessionBriefValue(project.sessionBrief.artist) : "empty"}`,
+      `vibe ${project.sessionBrief.vibe.trim() ? compactSessionBriefValue(project.sessionBrief.vibe) : "empty"}`,
+      `reference ${project.sessionBrief.reference.trim() ? compactSessionBriefValue(project.sessionBrief.reference) : "empty"}`,
+      `sheet ${handoffSheetFileName(project)}`,
+      `package ${handoffPackageCheckSummary.headline}`,
+      "brief preflight"
+    ].join(" / "),
+    group: "Export",
+    keywords: `handoff session brief readout review artist vibe reference notes handoff sheet context delivery target package no render no download ${handoffBriefStatus.value} ${handoffSheetFileName(
+      project
+    )} sample free beginner producer`,
     run: onFocusHandoffPack
   };
   const handoffExportFormatReadoutAction: QuickAction = {
@@ -5771,6 +5791,7 @@ export function createQuickActions({
     },
     handoffRouteReadoutAction,
     handoffDeliveryTargetReadoutAction,
+    handoffSessionBriefReadoutAction,
     handoffExportFormatReadoutAction,
     {
       id: "handoff-export-format-focus",
@@ -6567,6 +6588,7 @@ export function createQuickActionResult(
     action.id === "handoff-pack" ||
     action.id === "handoff-route-readout-action" ||
     action.id === "handoff-delivery-target-readout-action" ||
+    action.id === "handoff-session-brief-readout-action" ||
     action.id === "handoff-package-check-focus" ||
     action.id === "handoff-package-check-readout-action" ||
     action.id.startsWith("handoff-package-check-card-") ||
@@ -11054,6 +11076,102 @@ export function quickActionHandoffDeliveryTargetDetailParts(action: QuickAction)
     .filter(Boolean);
 }
 
+export function quickActionHandoffSessionBriefReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "handoff-session-brief-readout-action") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const target = activeDeliveryTarget(project);
+  const bars = arrangementTotalBars(project);
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const receipt = exportReceipt ?? emptyHandoffExportReceipt();
+  const briefStatus = sessionBriefStatus(project.sessionBrief);
+  const briefFields = sessionBriefFilledFields(project.sessionBrief);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionHandoffSessionBriefDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || `${briefFields}/4 brief / ${handoffSheetFileName(project)}`;
+  const sheetItem = handoffPackItems.find((item) => item.id === "sheet") ?? null;
+  const fieldPosture = quickActionSessionBriefStarterFieldPosture(project.sessionBrief);
+  const artist = project.sessionBrief.artist.trim()
+    ? compactSessionBriefValue(project.sessionBrief.artist)
+    : "empty";
+  const vibe = project.sessionBrief.vibe.trim()
+    ? compactSessionBriefValue(project.sessionBrief.vibe)
+    : "empty";
+  const reference = project.sessionBrief.reference.trim()
+    ? compactSessionBriefValue(project.sessionBrief.reference)
+    : "empty";
+  const notes = project.sessionBrief.notes.trim()
+    ? compactSessionBriefValue(project.sessionBrief.notes)
+    : "empty";
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "handoff-session-brief-readout",
+    label: "Handoff Session Brief Readout",
+    value: [
+      "review handoff session brief",
+      "destination Deliver / Handoff Pack",
+      `brief ${briefFields}/4 / ${briefStatus.value}`,
+      `brief detail ${briefStatus.detail}`,
+      `artist ${artist}`,
+      `vibe ${vibe}`,
+      `reference ${reference}`,
+      `notes ${notes}`,
+      `fields ${fieldPosture}`,
+      `sheet ${handoffSheetFileName(project)} / ${sheetItem?.value ?? `${briefFields}/4 brief`} / ${
+        sheetItem?.detail ?? target.name
+      }`,
+      `target ${target.name} / ${target.focus}`,
+      `stems ${audibleStemCount}/${target.stemGoal} target / ${audibleStemCount}/${stemTrackIds.length} audible`,
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `receipt ${receipt.statusLabel} / ${receipt.fileLabel}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(bars),
+      "brief unchanged",
+      "sheet unchanged",
+      "export unchanged",
+      "receipt unchanged",
+      "sampler scope unchanged",
+      `context ${contextLabel}`,
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
+export function quickActionHandoffSessionBriefDetailParts(action: QuickAction): string[] {
+  return action.detail
+    .split(" / ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 export function quickActionHandoffExportReceiptMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -14792,6 +14910,16 @@ export function quickActionResultMetricSnapshot(
       quickActionHandoffDeliveryTargetReadoutMetricSnapshot(project, action, handoffExportReceipt, analysis ?? undefined) ?? {
         id: "handoff-delivery-target-readout",
         label: "Handoff Delivery Target Readout",
+        value: action.detail
+      }
+    );
+  }
+
+  if (action.id === "handoff-session-brief-readout-action") {
+    return (
+      quickActionHandoffSessionBriefReadoutMetricSnapshot(project, action, handoffExportReceipt, analysis ?? undefined) ?? {
+        id: "handoff-session-brief-readout",
+        label: "Handoff Session Brief Readout",
         value: action.detail
       }
     );
@@ -18825,6 +18953,14 @@ export function quickActionResultFollowup(
       auditionCue: "Review the selected delivery target, target length, stem goal, and handoff context before exporting deliverables.",
       nextCheck:
         "Run Delivery Target Align or an explicit export only after target fit, package posture, and Session Brief context agree."
+    };
+  }
+
+  if (action.id === "handoff-session-brief-readout-action") {
+    return {
+      auditionCue: "Review artist, vibe, reference, notes, and the Handoff Sheet filename before exporting or sending files.",
+      nextCheck:
+        "Use Brief Compass or Session Brief Starter only if context is missing; otherwise continue to Handoff Package Check or explicit export."
     };
   }
 
