@@ -10,6 +10,8 @@ Record official documentation, platform docs, standards, laws, policies, or vend
 | W3C Web MIDI API | https://webaudio.github.io/web-midi-api/ | Browser MIDI devices, messages, permission gating, and System Exclusive boundary | 2026-06-17 | Web MIDI input capture for explicit local 808/Synth note entry |
 | MDN IndexedDB API | https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API | Browser local structured data and blob storage | 2026-06-15 | Local project and asset cache |
 | Electron Docs | https://www.electronjs.org/docs/latest/ | Cross-platform desktop app shell using JavaScript, HTML, and CSS | 2026-06-15 | Desktop MVP shell |
+| Apple Developer Documentation: Hardened Runtime | https://developer.apple.com/documentation/security/hardened-runtime | Apple hardened runtime documentation entry point | 2026-06-28 | macOS hardened runtime readiness evidence |
+| Apple Developer Documentation: Notarizing macOS software before distribution | https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution | Apple notarization documentation entry point | 2026-06-28 | macOS notarization readiness boundaries |
 | Vite Guide | https://vite.dev/guide/ | Dev server and production build tool for modern web projects | 2026-06-15 | Renderer build system |
 | React Docs | https://react.dev/learn | React UI implementation reference | 2026-06-15 | Workstation renderer UI |
 | TypeScript Docs | https://www.typescriptlang.org/docs/ | TypeScript language and tooling reference | 2026-06-15 | Typed project, event, and UI models |
