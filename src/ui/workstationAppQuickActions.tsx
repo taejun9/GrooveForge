@@ -3139,12 +3139,35 @@ export function createQuickActions({
     patternStackPreviewSummary.stackId === "none" || patternStackPreviewSummary.statusLabel === "Stack aligned"
       ? null
       : patternStackPreviewSummary.stackId;
+  const patternStackRouteOption = patternStackId
+    ? patternStackOptions.find((option) => option.id === patternStackId) ?? null
+    : null;
   const patternStackReadoutAction: QuickAction = {
     id: "pattern-stack-readout-action",
     title: `Review Pattern Stack Readout: Pattern ${project.selectedPattern}`,
     detail: `${patternStackPreviewSummary.statusLabel} / preview ${patternStackPreviewSummary.stackLabel} / ${patternStackPreviewSummary.moveLabel} / direct stack preflight`,
     group: "Create",
     keywords: `Quick Actions Pattern Stack Readout review selected Pattern ${project.selectedPattern} ${patternStackPreviewSummary.statusLabel} ${patternStackPreviewSummary.stackLabel} ${patternStackPreviewSummary.moveLabel} 808 chord synth posture arrangement beginner producer`,
+    run: onFocusPatternStackReadout
+  };
+  const patternStackRouteReadoutAction: QuickAction = {
+    id: "pattern-stack-route-readout-action",
+    title: patternStackRouteOption
+      ? `Review Pattern Stack Route Readout: ${patternStackRouteOption.label}`
+      : "Review Pattern Stack Route Readout: Stack aligned",
+    detail: patternStackRouteOption
+      ? `${patternStackPreviewSummary.statusLabel} / route ${patternStackRouteLabel(
+          patternStackRouteOption
+        )} / direct command pattern-stack-pad-${patternStackRouteOption.id} / ${patternStackPreviewSummary.moveLabel} / stack route preflight`
+      : `${patternStackPreviewSummary.statusLabel} / no direct stack route needed / ${patternStackPreviewSummary.moveLabel} / stack route preflight`,
+    group: "Create",
+    keywords: `Quick Actions Pattern Stack Route Readout review selected Pattern ${
+      project.selectedPattern
+    } route direct stack command pattern-stack ${
+      patternStackRouteOption ? `pattern-stack-pad-${patternStackRouteOption.id}` : "no-route"
+    } ${patternStackRouteOption ? patternStackRouteLabel(patternStackRouteOption) : "stack aligned"} ${
+      patternStackPreviewSummary.statusLabel
+    } ${patternStackPreviewSummary.stackLabel} ${patternStackPreviewSummary.moveLabel} 808 chord synth posture arrangement beginner producer sample free`,
     run: onFocusPatternStackReadout
   };
   const patternStackActions: QuickAction[] = patternStackOptions.map((stack) => {
@@ -4661,6 +4684,7 @@ export function createQuickActions({
       run: onClearSelectedPattern
     },
     patternStackReadoutAction,
+    patternStackRouteReadoutAction,
     {
       id: "pattern-stack",
       title: patternStackId ? `Apply ${patternStackPreviewSummary.stackLabel}` : "Apply Pattern Stack",
@@ -6750,6 +6774,7 @@ export function createQuickActionResult(
     action.id === "layer-starter-route-readout-action" ||
     action.id === "pattern-clone-readout-action" ||
     action.id === "pattern-stack-readout-action" ||
+    action.id === "pattern-stack-route-readout-action" ||
     action.id === "pattern-variation-readout-action" ||
     action.id === "pattern-fill-readout-action" ||
     action.id === "pattern-copy-clear-readout-action" ||
@@ -15173,6 +15198,16 @@ export function quickActionResultMetricSnapshot(
     );
   }
 
+  if (action.id === "pattern-stack-route-readout-action") {
+    return (
+      quickActionPatternStackRouteReadoutMetricSnapshot(project, action) ?? {
+        id: "pattern-stack-route-readout",
+        label: "Pattern Stack Route Readout",
+        value: action.detail
+      }
+    );
+  }
+
   if (action.id === "pattern-stack") {
     const stackMetric = quickActionPatternStackMetricSnapshot(project, action);
     if (stackMetric) {
@@ -17937,11 +17972,73 @@ export function quickActionPatternStackReadoutMetricSnapshot(
   };
 }
 
+export function patternStackRouteLabel(stack: PatternStackOption): string {
+  return `${stack.label} Pattern Stack Pad`;
+}
+
+export function quickActionPatternStackRouteReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "pattern-stack-route-readout-action") {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+  const options = createPatternStackOptions(project.key);
+  const preview = createPatternStackPreviewSummary(project.key, pattern, options);
+  const stack =
+    preview.stackId === "none" || preview.statusLabel === "Stack aligned"
+      ? null
+      : (options.find((option) => option.id === preview.stackId) ?? patternStackReadoutQuickActionOption(action, options));
+  const drumHits = drumHitCount(pattern);
+  const bassNotes = pattern.bassNotes.length;
+  const chordEvents = pattern.chordEvents.length;
+  const melodyNotes = pattern.melodyNotes.length;
+  const musicEvents = bassNotes + chordEvents + melodyNotes;
+  const readyLayerCount = [drumHits > 0, bassNotes > 0, chordEvents > 0, melodyNotes > 0].filter(Boolean).length;
+  const arrangementUse = patternArrangementUseLabel(project, project.selectedPattern);
+  const routeLabel = stack ? patternStackRouteLabel(stack) : "No stack route";
+  const directCommand = stack ? `pattern-stack-pad-${stack.id}` : "none";
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "pattern-stack-route-readout",
+    label: "Pattern Stack Route Readout",
+    value: [
+      "review pattern stack route",
+      `selected Pattern ${project.selectedPattern}`,
+      preview.statusLabel,
+      `preview ${preview.stackLabel}`,
+      preview.moveLabel,
+      stack ? `stack ${stack.label}` : "stack unavailable",
+      `route ${routeLabel}`,
+      "preview command pattern-stack",
+      `direct command ${directCommand}`,
+      `${patternEventTotal(pattern)} events`,
+      `${drumHits} drums`,
+      `${bassNotes} 808`,
+      `${chordEvents} chords`,
+      `${melodyNotes} synth`,
+      `${musicEvents} music`,
+      `${readyLayerCount}/4 layers`,
+      `arrangement ${arrangementUse}`,
+      "stack route unchanged",
+      "stack unchanged",
+      "playback unchanged",
+      "export unchanged",
+      "sampler scope unchanged",
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
 export function patternStackReadoutQuickActionOption(
   action: QuickAction,
   options: PatternStackOption[]
 ): PatternStackOption | null {
-  if (action.id !== "pattern-stack-readout-action") {
+  if (action.id !== "pattern-stack-readout-action" && action.id !== "pattern-stack-route-readout-action") {
     return null;
   }
 
@@ -19333,6 +19430,15 @@ export function quickActionResultFollowup(
       auditionCue:
         "Review the selected Pattern 808/chord/Synth posture, suggested stack, preview target, arrangement usage, and layer readiness before applying a stack.",
       nextCheck: "Run a direct Pattern Stack command only when the selected Pattern 808/chord/Synth layers should be rewritten by that stack."
+    };
+  }
+
+  if (action.id === "pattern-stack-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the stack route and loop the selected Pattern before choosing the preview Pattern Stack command or a direct stack pad.",
+      nextCheck:
+        "Use only the named Pattern Stack route when the selected Pattern 808/chord/Synth layers should be rewritten; otherwise return to Pattern DNA or selected-event tools."
     };
   }
 
