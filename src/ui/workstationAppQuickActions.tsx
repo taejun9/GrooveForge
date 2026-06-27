@@ -779,7 +779,8 @@ import {
   ProjectSnapshots,
   QuickActionResultStrip,
   QuickActions,
-  SnapshotCompare
+  SnapshotCompare,
+  createCommandReferenceRouteReadoutSummary
 } from "./workstationShellPanels";
 import {
   auditionSelectedChord as auditionSelectedChordEvent,
@@ -1434,6 +1435,7 @@ export function createQuickActions({
   onFocusWorkflowSpotlightRouteReadout,
   onFocusWorkflowSpotlight,
   onJumpWorkflowZone,
+  onFocusCommandReferenceRouteReadout,
   onOpenCommandReference,
   onOpenProject,
   onCheckProjectSafety,
@@ -1806,6 +1808,7 @@ export function createQuickActions({
   onFocusWorkflowSpotlightRouteReadout: () => void;
   onFocusWorkflowSpotlight: (item: WorkflowNavigatorItem) => void;
   onJumpWorkflowZone: (item: WorkflowNavigatorItem) => void;
+  onFocusCommandReferenceRouteReadout: () => void;
   onOpenCommandReference: () => void;
   onOpenProject: () => Promise<void>;
   onCheckProjectSafety: () => void;
@@ -1821,6 +1824,7 @@ export function createQuickActions({
   const suggestedBlueprint = suggestedBlueprintId(project);
   const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
+  const commandReferenceRouteSummary = createCommandReferenceRouteReadoutSummary();
   const previewBlueprint = beatBlueprints.find((blueprint) => blueprint.id === beatBlueprintPreviewId) ?? beatBlueprints[0];
   const styleMatchBlueprint = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint) ?? previewBlueprint;
   const blueprintPreviewSummary = createBeatBlueprintPreviewSummary(project, previewBlueprint);
@@ -5079,6 +5083,25 @@ export function createQuickActions({
       run: onClearLocalDraftRecovery
     },
     {
+      id: "command-reference-route-readout-action",
+      title: "Review Command Reference Route",
+      detail: [
+        `Route ${commandReferenceRouteSummary.routeLabel}`,
+        `${commandReferenceRouteSummary.filterCount} filters`,
+        `${commandReferenceRouteSummary.commandCount} command-map entries`,
+        `${commandReferenceRouteSummary.quickActionCommandCount} Quick Actions rows`,
+        `${commandReferenceRouteSummary.readoutCommandCount} readout rows`,
+        commandReferenceRouteSummary.searchRouteLabel,
+        "Command Reference open action unchanged",
+        "Quick Actions unchanged",
+        "Search Spotlight unchanged",
+        "Readout only"
+      ].join(" / "),
+      group: "Project",
+      keywords: `Quick Actions Command Reference Route Readout review command map route help filters search spotlight quick actions readout coverage direct command-reference unchanged no command run no edit no playback no export sample free beginner producer ${commandReferenceRouteSummary.routeLabel}`,
+      run: onFocusCommandReferenceRouteReadout
+    },
+    {
       id: "command-reference",
       title: "Command Reference",
       detail: "Desktop, Project, Guide, Create, Sound, Arrange, Mix, Finish, Deliver, and Beat Terms command map.",
@@ -7455,6 +7478,7 @@ export function createQuickActionResult(
     action.id.startsWith("style-goal-cue-") ||
     patternCompareDecisionCue;
   const focusOnly =
+    action.id === "command-reference-route-readout-action" ||
     action.id === "command-reference" ||
     action.id === "beat-terms-reference" ||
     action.id === "guide-quick-start" ||
@@ -16156,6 +16180,50 @@ export function quickActionNextMoveRouteReadoutMetricSnapshot(
   };
 }
 
+export function quickActionCommandReferenceRouteReadoutMetricSnapshot(project: ProjectState, action: QuickAction): {
+  id: string;
+  label: string;
+  value: string;
+} {
+  const summary = createCommandReferenceRouteReadoutSummary();
+  const target = activeDeliveryTarget(project);
+  const pattern = activePattern(project);
+  const exportAnalysis = analyzeExport(project);
+
+  return {
+    id: "command-reference-route-readout",
+    label: "Command Reference Route Readout",
+    value: [
+      "command review command reference route readout",
+      action.detail,
+      `route ${summary.routeLabel}`,
+      `${summary.filterCount} filters`,
+      `${summary.commandCount} command-map entries`,
+      `${summary.quickActionCommandCount} Quick Actions rows`,
+      `${summary.readoutCommandCount} readout rows`,
+      summary.searchRouteLabel,
+      "direct command-reference unchanged",
+      "Quick Actions unchanged",
+      "Search Spotlight unchanged",
+      "Command Reference filter unchanged",
+      "project data unchanged",
+      "playback unchanged",
+      "export unchanged",
+      `destination Help / Command Reference`,
+      `target ${target.name}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} selected-pattern events`,
+      `${projectEventTotal(project)} editable project events`,
+      `${project.arrangement.length} blocks`,
+      `${arrangementTotalBars(project)} bars`,
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      "readout only",
+      "audition scan the command-map category before running commands",
+      "next open Quick Actions only when the named command route matches the current beat-making question"
+    ].join(" / ")
+  };
+}
+
 export function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -16182,6 +16250,10 @@ export function quickActionResultMetricSnapshot(
     }
 
     return { id: "snapshots", label: "Snapshots", value: `${project.snapshots.length} slots` };
+  }
+
+  if (action.id === "command-reference-route-readout-action") {
+    return quickActionCommandReferenceRouteReadoutMetricSnapshot(project, action);
   }
 
   if (action.id === "command-reference" || action.id === "beat-terms-reference") {
@@ -21208,6 +21280,15 @@ export function quickActionResultFollowup(
         "Read the Next Move route, then audition the suggested Pattern, Block, or Full Mix before running the recommended action.",
       nextCheck:
         "Run Next Move only when the named recommended action and route match the current beat-making question; otherwise leave playback and project data unchanged."
+    };
+  }
+
+  if (action.id === "command-reference-route-readout-action") {
+    return {
+      auditionCue:
+        "Scan the Command Reference route and category count, then audition the relevant Pattern, Block, or Full Mix before running commands.",
+      nextCheck:
+        "Open Quick Actions or run a command only when the named command-map category matches the current beat-making question; otherwise leave playback and project data unchanged."
     };
   }
 

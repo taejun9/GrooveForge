@@ -195,7 +195,22 @@ const commandReferenceSections: CommandReferenceSection[] = [
     id: "desktop-shortcuts",
     title: "Desktop",
     items: [
-      { id: "reference", command: "Command Reference", shortcut: "? / CmdOrCtrl+/", target: "Help" },
+      {
+        id: "command-reference-route-readout",
+        command: "Command Reference Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Command map / filters / search / coverage",
+        context:
+          "Command Reference Route Readout Action, command-map filters, total command-map entries, Quick Actions rows, readout rows, Search Spotlight posture, direct Command Reference open action, Quick Actions unchanged, Command Reference filter unchanged, selected Pattern, Delivery Target, export posture, audition cue, and next command-map check before opening Command Reference, running Quick Actions, jumping panels, playback, edit, or export commands."
+      },
+      {
+        id: "reference",
+        command: "Command Reference",
+        shortcut: "? / CmdOrCtrl+/",
+        target: "Help",
+        context:
+          "Desktop, Project, Guide, Create, Sound, Arrange, Mix, Finish, Deliver, and Beat Terms command map with Command Reference Route Readout posture before command execution."
+      },
       { id: "actions", command: "Quick Actions", shortcut: "CmdOrCtrl+K", target: "Command palette" },
       { id: "playback", command: "Play / Stop", shortcut: "Space", target: "Selected loop" },
       {
@@ -1733,6 +1748,30 @@ function commandReferenceFilterCount(filterId: CommandReferenceFilterId): number
     return beatTermItems.length;
   }
   return commandReferenceSections.find((section) => section.id === filterId)?.items.length ?? 0;
+}
+
+export function createCommandReferenceRouteReadoutSummary(): {
+  commandCount: number;
+  filterCount: number;
+  quickActionCommandCount: number;
+  readoutCommandCount: number;
+  routeLabel: string;
+  searchRouteLabel: string;
+} {
+  const commandItems = commandReferenceSections.flatMap((section) => section.items);
+  const commandCount = commandItems.length + beatTermItems.length;
+  const quickActionCommandCount = commandItems.filter((item) => item.shortcut.includes("Quick Actions")).length;
+  const readoutCommandCount = commandItems.filter((item) => item.shortcut.includes("Readout")).length;
+  const routeLabel = commandReferenceFilterOptions.map((option) => option.label).join(" / ");
+
+  return {
+    commandCount,
+    filterCount: commandReferenceFilterOptions.length,
+    quickActionCommandCount,
+    readoutCommandCount,
+    routeLabel,
+    searchRouteLabel: "Command Reference filter / search / Search Spotlight / Quick Actions"
+  };
 }
 
 function commandReferenceMatchesQuery(values: string[], query: string): boolean {
