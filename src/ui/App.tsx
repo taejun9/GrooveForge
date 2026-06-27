@@ -1047,6 +1047,7 @@ import {
   mixBalanceRouteLabel,
   mixSnapshotRouteLabel,
   productionSnapshotRouteLabel,
+  reviewQueueRouteLabel,
   soundFocusRouteLabel,
   soundPresetRouteLabel,
   spaceFxRouteLabel,
@@ -1248,6 +1249,7 @@ export function App(): ReactElement {
   const beatPassportPanelRef = useRef<HTMLElement | null>(null);
   const productionSnapshotPanelRef = useRef<HTMLElement | null>(null);
   const finishChecklistPanelRef = useRef<HTMLElement | null>(null);
+  const reviewQueuePanelRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
@@ -7991,6 +7993,16 @@ export function App(): ReactElement {
     setProjectStatus(`Review ${item.area}: ${item.status}`);
   }
 
+  function focusReviewQueueRouteReadout(): void {
+    const item = reviewQueueSummary.items[0] ?? null;
+    reviewQueuePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      item
+        ? `Review Queue Route Readout Pattern ${project.selectedPattern}: ${reviewQueueRouteLabel(item)} / ${item.status} / direct review-queue-item-${item.id} unchanged / review-fix unchanged / ${item.focusLabel} panel`
+        : "Review Queue Route Readout: no priority issue available"
+    );
+  }
+
   function applyReviewFix(item?: ReviewQueueItem): void {
     const beforeProject = projectRef.current;
     const beforeAnalysis = analyzeExport(beforeProject);
@@ -8899,6 +8911,7 @@ export function App(): ReactElement {
     onFocusReferenceAlignment: focusReferenceAlignmentCard,
     onFocusSnapshotCompare: focusSnapshotCompareMetric,
     onFocusReviewQueue: focusReviewQueueItem,
+    onFocusReviewQueueRouteReadout: focusReviewQueueRouteReadout,
     onFocusSessionPass: focusSessionPassCard,
     onFocusStyleInspector: focusStyleInspectorItem,
     onFocusToplineSpace: focusToplineSpaceCard,
@@ -10757,6 +10770,7 @@ export function App(): ReactElement {
             result={reviewQueueResult}
             fixResult={reviewFixResult}
             project={project}
+            sectionRef={reviewQueuePanelRef}
             onFix={applyReviewFix}
             onFocus={focusReviewQueueItem}
           />

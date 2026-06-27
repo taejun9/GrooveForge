@@ -4781,6 +4781,7 @@ export function ReviewQueue({
   focusedItemId,
   result,
   project,
+  sectionRef,
   onFix,
   onFocus
 }: {
@@ -4789,6 +4790,7 @@ export function ReviewQueue({
   focusedItemId: string | null;
   result: ReviewQueueFocusResult | null;
   project: ProjectState;
+  sectionRef?: Ref<HTMLElement>;
   onFix: (item?: ReviewQueueItem) => void;
   onFocus: (item: ReviewQueueItem) => void;
 }): ReactElement {
@@ -4799,7 +4801,7 @@ export function ReviewQueue({
   const fixPreview = createReviewFixPreview(summary, focusedItemId, project, analyzeExport(project));
 
   return (
-    <section className={`review-queue ${summary.tone}`} data-testid="review-queue" aria-label="Review queue">
+    <section className={`review-queue ${summary.tone}`} data-testid="review-queue" aria-label="Review queue" ref={sectionRef}>
       <div className="review-queue-heading">
         <div>
           <ListChecks size={16} aria-hidden="true" />
