@@ -1388,6 +1388,7 @@ export function createQuickActions({
   onFocusExportPreflight,
   onFocusExportPreflightRouteReadout,
   onFocusFinishChecklist,
+  onFocusFinishChecklistRouteReadout,
   onFocusGrooveCompass,
   onFocusHandoffExportFormat,
   onFocusHandoffPack,
@@ -1746,6 +1747,7 @@ export function createQuickActions({
   onFocusExportPreflight: (card: ExportPreflightFocusItem) => void;
   onFocusExportPreflightRouteReadout: () => void;
   onFocusFinishChecklist: (card: FinishChecklistCard) => void;
+  onFocusFinishChecklistRouteReadout: () => void;
   onFocusGrooveCompass: (item: GrooveCompassFocusItem) => void;
   onFocusHandoffExportFormat: (metric: HandoffExportFormatMetric) => void;
   onFocusHandoffPack: () => void;
@@ -2193,6 +2195,24 @@ export function createQuickActions({
     keywords: `finish checklist focus card readiness ${card.id} ${card.label} ${card.status} ${card.focusLabel} ${card.detail} compose arrange mix master automation fade handoff deliver beginner producer`,
     run: () => onFocusFinishChecklist(card)
   }));
+  const finishChecklistRouteReadoutAction: QuickAction = {
+    id: "finish-checklist-route-readout-action",
+    title: finishChecklistCard
+      ? `Review Finish Checklist Route: ${finishChecklistCard.label}`
+      : "Review Finish Checklist Route",
+    detail: finishChecklistCard
+      ? `${finishChecklistRouteLabel(finishChecklistCard)} / ${finishChecklistCard.status} / direct finish-checklist-card-${finishChecklistCard.id} unchanged / ${finishChecklistCard.focusLabel} panel`
+      : "No Finish Checklist card available.",
+    group: "Project",
+    keywords: `Quick Actions Finish Checklist Route Readout review route finish readiness direct finish checklist command no edit compose arrange mix master automation handoff ${
+      finishChecklistCard?.id ?? "none"
+    } ${finishChecklistCard?.label ?? "none"} ${finishChecklistCard?.status ?? "none"} ${
+      finishChecklistCard?.focusLabel ?? "none"
+    } beginner producer sample free`,
+    disabled: !finishChecklistCard,
+    resultTargetId: finishChecklistCard?.id,
+    run: onFocusFinishChecklistRouteReadout
+  };
   const grooveCompassItem = activeGrooveCompassQuickActionItem(grooveCompassSummary);
   const grooveCompassActions: QuickAction[] = grooveCompassSummary.cards.map((item) => ({
     id: `groove-compass-card-${item.id}`,
@@ -5410,6 +5430,7 @@ export function createQuickActions({
       }
     },
     ...toplineSpaceActions,
+    finishChecklistRouteReadoutAction,
     {
       id: "finish-checklist-focus",
       title: finishChecklistCard ? `Focus Finish Checklist: ${finishChecklistCard.label}` : "Focus Finish Checklist",
@@ -7177,6 +7198,7 @@ export function createQuickActionResult(
     action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-focus" ||
     action.id.startsWith("review-queue-item-") ||
+    action.id === "finish-checklist-route-readout-action" ||
     action.id.startsWith("finish-checklist-card-") ||
     action.id === "export-preflight-route-readout-action" ||
     action.id === "export-preflight-focus" ||
@@ -10545,17 +10567,26 @@ export function quickActionFinishChecklistMetricSnapshot(
   const pattern = activePattern(project);
   const usedSlots = usedPatternSlots(project);
   const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
-  const actionLabel =
-    action.id === "finish-checklist-focus" ? "focus priority finish checklist" : "focus direct finish checklist";
+  const isRouteReadout = action.id === "finish-checklist-route-readout-action";
+  const actionLabel = isRouteReadout
+    ? "review finish checklist route readout"
+    : action.id === "finish-checklist-focus"
+      ? "focus priority finish checklist"
+      : "focus direct finish checklist";
+  const directCardLabel = `direct finish-checklist-card-${card.id} unchanged`;
   const laneLabel = quickActionFinishChecklistLaneLabel(action, card);
   const detailParts = quickActionFinishChecklistDetailParts(action);
   const contextLabel = detailParts.slice(2).join(" / ") || card.detail;
   const postureLabel = summary.cards.map((item) => `${item.label} ${item.status}`).join(" / ");
 
   return {
-    id: "finish-checklist",
-    label: "Finish checklist",
-    value: `${actionLabel} / card ${laneLabel} / destination ${card.focusLabel} panel / status ${card.status} / context ${contextLabel} / Pattern ${
+    id: isRouteReadout ? "finish-checklist-route-readout" : "finish-checklist",
+    label: isRouteReadout ? "Finish Checklist Route Readout" : "Finish checklist",
+    value: `${actionLabel} / route ${finishChecklistRouteLabel(
+      card
+    )} / card ${laneLabel} / ${directCardLabel} / destination ${card.focusLabel} panel / status ${
+      card.status
+    } / context ${contextLabel} / Pattern ${
       project.selectedPattern
     } / ${patternEventTotal(pattern)} events / ${patternUseLabel} / finish ${postureLabel} / readiness ${
       summary.headline
@@ -10566,7 +10597,7 @@ export function quickActionFinishChecklistMetricSnapshot(
 }
 
 export function quickActionFinishChecklistCard(summary: FinishChecklistSummary, action: QuickAction): FinishChecklistCard | null {
-  if (action.id === "finish-checklist-focus") {
+  if (action.id === "finish-checklist-route-readout-action" || action.id === "finish-checklist-focus") {
     return activeFinishChecklistQuickActionCard(summary);
   }
 
@@ -10598,8 +10629,30 @@ export function quickActionFinishChecklistDetailParts(action: QuickAction): stri
 }
 
 export function quickActionFinishChecklistLaneLabel(action: QuickAction, card: FinishChecklistCard): string {
-  const titleLabel = action.title.replace(/^Focus Finish Checklist:\s*/, "").trim();
-  return titleLabel && titleLabel !== "Focus Finish Checklist" ? titleLabel : card.label;
+  const titleLabel = action.title
+    .replace(/^Focus Finish Checklist:\s*/, "")
+    .replace(/^Review Finish Checklist Route:\s*/, "")
+    .trim();
+  return titleLabel && titleLabel !== "Focus Finish Checklist" && titleLabel !== "Review Finish Checklist Route"
+    ? titleLabel
+    : card.label;
+}
+
+export function finishChecklistRouteLabel(card: FinishChecklistCard): string {
+  switch (card.id) {
+    case "compose":
+      return "Compose route";
+    case "arrange":
+      return "Arrange route";
+    case "mix":
+      return "Mix route";
+    case "master":
+      return "Master route";
+    case "automation":
+      return "Master Automation route";
+    case "handoff":
+      return "Handoff route";
+  }
 }
 
 export function quickActionReviewQueueMetricSnapshot(
@@ -16407,7 +16460,11 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
-  if (action.id === "finish-checklist-focus" || action.id.startsWith("finish-checklist-card-")) {
+  if (
+    action.id === "finish-checklist-route-readout-action" ||
+    action.id === "finish-checklist-focus" ||
+    action.id.startsWith("finish-checklist-card-")
+  ) {
     const finishChecklistMetric = quickActionFinishChecklistMetricSnapshot(project, action);
     if (finishChecklistMetric) {
       return finishChecklistMetric;
@@ -21258,6 +21315,15 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the selected format metric to confirm the deliverable details before running an explicit export.",
       nextCheck: "Check Handoff Package Send Order before exporting files for delivery."
+    };
+  }
+
+  if (action.id === "finish-checklist-route-readout-action") {
+    return {
+      auditionCue:
+        "Read the Finish Checklist route, then audition Pattern A/B/C, Song, Full Mix, Master, or the matching Handoff area before focusing a finish card.",
+      nextCheck:
+        "Use Finish Checklist focus only when the named Compose, Arrange, Mix, Master, Master Automation, or Handoff route matches the finish question; otherwise leave playback and project data unchanged."
     };
   }
 

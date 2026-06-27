@@ -4595,11 +4595,13 @@ export function FinishChecklist({
   summary,
   focusedCardId,
   result,
+  sectionRef,
   onFocus
 }: {
   summary: FinishChecklistSummary;
   focusedCardId: FinishChecklistCardId | null;
   result: FinishChecklistFocusResult | null;
+  sectionRef?: Ref<HTMLElement>;
   onFocus: (card: FinishChecklistCard) => void;
 }): ReactElement {
   const focusSummary = createFinishChecklistFocusSummary(summary, focusedCardId);
@@ -4612,6 +4614,7 @@ export function FinishChecklist({
       className={["finish-checklist", summary.tone, result ? "has-result" : ""].filter(Boolean).join(" ")}
       data-testid="finish-checklist"
       aria-label="Finish checklist"
+      ref={sectionRef}
     >
       <div className="finish-checklist-heading">
         <div>

@@ -1366,7 +1366,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Finish readiness / priority focus route",
         context:
-          "Compose, Arrange, Mix, Master, Master Automation, Handoff Readiness, Priority Readout, Direct Checklist Card Routes, Focus Result, Audition Cue, and Export/Manual-Trim Next Check context before Finish Checklist commands run."
+          "Compose, Arrange, Mix, Master, Master Automation, and Handoff readiness context with route readout, direct checklist card command, destination, checklist metric, audition cue, and export/manual-trim next check before Finish Checklist focus, playback, edit, or export commands run."
       },
       {
         id: "handoff-pack",
