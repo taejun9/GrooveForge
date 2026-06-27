@@ -871,6 +871,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Current 808/Synth/Chords Tone-Focus Preview Target, Editable Sound Posture, Selected Pattern, Export Readiness, Audition Cue, and Next Manual Tone-Focus Check context before Sound Focus commands run."
       },
       {
+        id: "sound-focus-route-readout",
+        command: "Sound Focus Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "808 / Synth / Chords route",
+        context:
+          "Sound Focus Route Readout Action, Selected Pattern A/B/C, Current 808/Synth/Chords Tone-Focus Preview Target, Existing Sound Focus Route, Direct Sound Focus Command, Editable Sound Posture, Tone-Focus Parameter Posture, Arrangement Usage, Audition Cue, and Next Sound Route Check context before Sound Focus commands run."
+      },
+      {
         id: "sound-focus-decision",
         command: "Sound Focus Decision",
         shortcut: "Quick Actions / Readout",
