@@ -1042,6 +1042,7 @@ import {
   drumKitRouteLabel,
   exportPreflightRouteLabel,
   finishChecklistRouteLabel,
+  keyCompassRouteLabel,
   listeningPassRouteLabel,
   masterAutomationRouteLabel,
   masterFinishRouteLabel,
@@ -1254,6 +1255,7 @@ export function App(): ReactElement {
   const reviewQueuePanelRef = useRef<HTMLElement | null>(null);
   const sessionPassPanelRef = useRef<HTMLElement | null>(null);
   const composerGuidePanelRef = useRef<HTMLElement | null>(null);
+  const keyCompassPanelRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
@@ -7697,6 +7699,20 @@ export function App(): ReactElement {
     setProjectStatus(`Key ${item.label}: ${item.value}`);
   }
 
+  function focusKeyCompassRouteReadout(): void {
+    const item = activeKeyCompassQuickActionItem(keyCompassSummary);
+    keyCompassPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+
+    setProjectStatus(
+      item
+        ? `Key Compass Route Readout Pattern ${project.selectedPattern}: ${keyCompassRouteLabel(
+            item,
+            keyCompassSummary
+          )} / ${item.value} / direct key-compass-card-${item.id} unchanged / ${item.focusLabel} panel`
+        : "Key Compass Route Readout: no harmony lane available"
+    );
+  }
+
   function focusGrooveCompassItem(item: GrooveCompassFocusItem): void {
     const targetRefs: Record<GrooveCompassFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current
@@ -8920,6 +8936,7 @@ export function App(): ReactElement {
     onFocusHandoffPackageCheck: focusHandoffPackageCheckCard,
     onFocusHookReadiness: focusHookReadinessCard,
     onFocusKeyCompass: focusKeyCompassItem,
+    onFocusKeyCompassRouteReadout: focusKeyCompassRouteReadout,
     onFocusListeningPass: focusListeningPassItem,
     onFocusListeningPassRouteReadout: focusListeningPassRouteReadout,
     onFocusLoopScope: focusLoopScopeReadout,
@@ -9374,6 +9391,7 @@ export function App(): ReactElement {
         focusedCardId={keyCompassFocusId}
         onFocus={focusKeyCompassItem}
         result={keyCompassResult}
+        sectionRef={keyCompassPanelRef}
         summary={keyCompassSummary}
       />
 

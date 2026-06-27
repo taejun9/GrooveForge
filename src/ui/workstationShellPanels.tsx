@@ -339,12 +339,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Drums, 808/Bass, Harmony, Melody, Arrange, and Finish writing focus context with Composer Guide Route Readout, destination, guide metric, direct Composer Guide card command, audition cue, and next check before Composer Guide commands run."
       },
       {
+        id: "key-compass-route-readout",
+        command: "Key Compass Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Scale / cadence / chords / 808-bass / melody / selected focus route",
+        context:
+          "Key Compass Route Readout Action, selected Pattern A/B/C, current scale, cadence, chords, 808/bass, melody, or selected note/chord harmony lane, existing Key Compass route, direct Key Compass card command, current project key, editable event counts, key metric, audition cue, and next harmony-route check before Key Compass focus, key retargeting, playback, edit, or export commands run."
+      },
+      {
         id: "key-compass",
         command: "Key Compass",
         shortcut: "Quick Actions / Readout",
         target: "Scale / cadence / chords / 808-bass / melody / selected focus",
         context:
-          "Scale, Cadence, Chords, 808/Bass, Melody, and Selected Note/Chord harmony context with destination, key metric, audition cue, and next check before Key Compass commands run."
+          "Scale, Cadence, Chords, 808/Bass, Melody, and Selected Note/Chord harmony context with Key Compass Route Readout, destination, key metric, direct Key Compass card command, audition cue, and next check before Key Compass commands run."
       },
       {
         id: "groove-compass",
