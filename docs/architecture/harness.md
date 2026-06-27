@@ -62,7 +62,7 @@ npm run verify
 npm run release:check
 ```
 
-These commands validate the base structure, documentation rules, runtime sample-free all-style export, legacy chord-event migration, `.grooveforge.json` roundtrip smoke, Handoff Sheet text deliverable smoke, mocked browser download-path smoke, TypeScript contracts, production build, and Electron desktop entry plus native menu bridge contract. `npm run verify` runs the strict quality gate, runtime smoke, typecheck, build, and desktop entry smoke. `npm run release:check` is the release-readiness gate and runs both `npm run qa` and `npm run verify`.
+These commands validate the base structure, documentation rules, runtime first-run starter project smoke, sample-free all-style export, legacy chord-event migration, `.grooveforge.json` roundtrip smoke, Handoff Sheet text deliverable smoke, mocked browser download-path smoke, TypeScript contracts, production build, and Electron desktop entry plus native menu bridge contract. `npm run verify` runs the strict quality gate, runtime smoke, typecheck, build, and desktop entry smoke. `npm run release:check` is the release-readiness gate and runs both `npm run qa` and `npm run verify`.
 
 Release readiness evidence is maintained in `docs/release/readiness.md`. It maps the current professional-producer, beginner, direct-composition, all-style, local export, privacy, and desktop-readiness requirements to source/docs evidence and automated gates.
 

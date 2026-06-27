@@ -31,7 +31,7 @@ const handoff = await import("../../src/audio/handoff.ts");
 const downloads = await import("../../src/platform/downloads.ts");
 const coreTrackTypes = new Set(["drum_rack", "bass_808", "synth", "chord", "fx_return", "master"]);
 const smokeKey = "F minor";
-const smokeScope = "sample-free all-style 8-bar beats with local project-file roundtrips, Handoff Sheet checks, and mocked download-path checks without writing media artifacts";
+const smokeScope = "sample-free first-run starter project plus all-style 8-bar beats with local project-file roundtrips, Handoff Sheet checks, and mocked download-path checks without writing media artifacts";
 
 function cloneMixerForSmoke() {
   return workstation.starterProject.mixer.map((channel) => ({
@@ -402,14 +402,39 @@ function validateDownloadPathSmoke(project) {
 }
 
 async function validateProjectExportSmoke(smokeCase) {
-  const { label, expectedStyleId } = smokeCase;
+  const {
+    label,
+    expectedArrangementBlocks = 8,
+    expectedBars = 8,
+    expectedBpm = null,
+    expectedKey = null,
+    expectedMode = null,
+    expectedSelectedPattern = null,
+    expectedStyleId,
+    expectedTitle = null
+  } = smokeCase;
   const project = validateProjectFileRoundTrip(smokeCase.project, label);
   const bars = workstation.arrangementTotalBars(project);
   const expectedDuration = bars * workstation.stepsPerBar * workstation.projectStepDurationSeconds(project);
 
   check(project.styleId === expectedStyleId, `${label} should use ${expectedStyleId}, got ${project.styleId}`);
-  check(bars === 8, `${label} should be 8 bars, got ${bars}`);
-  check(project.arrangement.length === 8, `${label} should have 8 arrangement blocks, got ${project.arrangement.length}`);
+  if (expectedTitle) {
+    check(project.title === expectedTitle, `${label} should use title ${expectedTitle}, got ${project.title}`);
+  }
+  if (expectedMode) {
+    check(project.mode === expectedMode, `${label} should use ${expectedMode} mode, got ${project.mode}`);
+  }
+  if (expectedBpm) {
+    check(project.bpm === expectedBpm, `${label} should use ${expectedBpm} BPM, got ${project.bpm}`);
+  }
+  if (expectedKey) {
+    check(project.key === expectedKey, `${label} should use ${expectedKey}, got ${project.key}`);
+  }
+  if (expectedSelectedPattern) {
+    check(project.selectedPattern === expectedSelectedPattern, `${label} should use Pattern ${expectedSelectedPattern}, got ${project.selectedPattern}`);
+  }
+  check(bars === expectedBars, `${label} should be ${expectedBars} bars, got ${bars}`);
+  check(project.arrangement.length === expectedArrangementBlocks, `${label} should have ${expectedArrangementBlocks} arrangement blocks, got ${project.arrangement.length}`);
   check(project.mixer.every((channel) => coreTrackTypes.has(channel.id)), `${label} contains a non-core or sampling-oriented mixer track`);
   check(!JSON.stringify(project).match(/AudioClipEvent|sampler|sample import|audio clip/i), `${label} contains sampling or audio-clip language`);
 
@@ -429,7 +454,7 @@ async function validateProjectExportSmoke(smokeCase) {
   check(mixAnalysis.status !== "Silent", `${label} full mix analysis should not be silent`);
   check(mixAnalysis.channels === 2, `${label} full mix should be stereo, got ${mixAnalysis.channels} channels`);
   check(mixAnalysis.sampleRate === 44100, `${label} full mix sample rate should be 44100, got ${mixAnalysis.sampleRate}`);
-  check(Math.abs(mixAnalysis.durationSeconds - expectedDuration) < 0.05, `${label} full mix duration does not match the 8-bar arrangement`);
+  check(Math.abs(mixAnalysis.durationSeconds - expectedDuration) < 0.05, `${label} full mix duration does not match the ${expectedBars}-bar arrangement`);
   check(Number.isFinite(mixAnalysis.peakDb), `${label} full mix peak should be finite`);
   check(Number.isFinite(mixAnalysis.rmsDb), `${label} full mix RMS should be finite`);
 
@@ -445,7 +470,7 @@ async function validateProjectExportSmoke(smokeCase) {
     const analysis = stemAnalyses[track];
     check(stemNames[index]?.endsWith("-stem.wav"), `${label} ${track} stem file name should end in -stem.wav`);
     check(analysis.status !== "Silent", `${label} ${track} stem analysis should not be silent`);
-    check(Math.abs(analysis.durationSeconds - expectedDuration) < 0.05, `${label} ${track} stem duration does not match the 8-bar arrangement`);
+    check(Math.abs(analysis.durationSeconds - expectedDuration) < 0.05, `${label} ${track} stem duration does not match the ${expectedBars}-bar arrangement`);
     checkWavBytes(await blobBytes(render.createStemWavBlob(project, track)), `${label} ${track} stem`);
   }
 
@@ -483,13 +508,26 @@ const blueprintCases = workstation.beatBlueprints.map((blueprint) => ({
   project: blueprintSmokeProject(blueprint),
   expectedStyleId: blueprint.styleId
 }));
+const starterCase = {
+  kind: "starter",
+  label: "starter:first-run",
+  project: workstation.starterProject,
+  expectedArrangementBlocks: 8,
+  expectedBars: 26,
+  expectedBpm: 145,
+  expectedKey: smokeKey,
+  expectedMode: "guided",
+  expectedSelectedPattern: "A",
+  expectedStyleId: "trap",
+  expectedTitle: "Untitled Beat"
+};
 const styleCases = workstation.styleProfiles.map((profile) => ({
   kind: "style",
   label: `style:${profile.id}`,
   project: styleSmokeProject(profile),
   expectedStyleId: profile.id
 }));
-const smokeCases = [...blueprintCases, ...styleCases];
+const smokeCases = [starterCase, ...blueprintCases, ...styleCases];
 const legacyMigrationProject = validateLegacyProjectMigration();
 if (legacyMigrationProject) {
   smokeCases.push({
@@ -504,7 +542,7 @@ const summaries = [];
 for (const smokeCase of smokeCases) {
   summaries.push(await validateProjectExportSmoke(smokeCase));
 }
-const downloadSmokeProject = workstation.parseProjectFile(workstation.serializeProjectFile(blueprintCases[0].project));
+const downloadSmokeProject = workstation.parseProjectFile(workstation.serializeProjectFile(starterCase.project));
 const downloadSmokeSummary = validateDownloadPathSmoke(downloadSmokeProject);
 
 if (failures.length > 0) {
@@ -517,6 +555,7 @@ if (failures.length > 0) {
 
 console.log("GrooveForge runtime smoke passed.");
 console.log(`- Scope: ${smokeScope}`);
+console.log(`- Starter project: 1/1 first-run Guided ${starterCase.expectedBpm} BPM ${starterCase.expectedKey} ${starterCase.expectedStyleId} state`);
 console.log(`- Blueprints: ${blueprintCases.length}/${workstation.beatBlueprints.length} sample-free 8-bar starts`);
 console.log(`- Styles: ${styleCases.length}/${workstation.styleProfiles.length} supported style profiles`);
 console.log(`- Legacy migrations: ${legacyMigrationProject ? 1 : 0}/1 single-pattern chord-event project preserved`);
