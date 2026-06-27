@@ -1243,6 +1243,7 @@ export function createQuickActions({
   onRecallMixSnapshot,
   onClearMixSnapshots,
   onFocusMixSnapshotReadout,
+  onFocusMixSnapshotRouteReadout,
   onFocusSpaceFxReadout,
   onFocusSpaceFxRouteReadout,
   onFocusPatternChainReadout,
@@ -1593,6 +1594,7 @@ export function createQuickActions({
   onRecallMixSnapshot: (slot: MixSnapshotSlotId) => void;
   onClearMixSnapshots: () => void;
   onFocusMixSnapshotReadout: () => void;
+  onFocusMixSnapshotRouteReadout: () => void;
   onFocusSpaceFxReadout: () => void;
   onFocusSpaceFxRouteReadout: () => void;
   onFocusPatternChainReadout: () => void;
@@ -2284,6 +2286,20 @@ export function createQuickActions({
       mixSnapshotComparison.decisionActionLabel
     } producer beginner mix review`,
     run: onFocusMixSnapshotReadout
+  };
+  const mixSnapshotRouteCommand = `mix-snapshot-${mixSnapshotComparison.decisionActionId}`;
+  const mixSnapshotRouteReadoutAction: QuickAction = {
+    id: "mix-snapshot-route-readout-action",
+    title: `Review Mix Snapshot Route: ${mixSnapshotComparison.decisionActionLabel}`,
+    detail: `${mixSnapshotRouteLabel(mixSnapshotComparison.decisionActionId)} / ${mixSnapshotComparison.statusLabel} / ${mixSnapshotComparison.decisionLabel} / direct ${mixSnapshotRouteCommand} unchanged`,
+    group: "Mix",
+    keywords: `Quick Actions Mix Snapshot Route Readout review route preflight capture recall clear listen next ab headroom balance master stems ${
+      mixSnapshotComparison.decisionActionId
+    } ${mixSnapshotComparison.decisionActionLabel} ${mixSnapshotComparison.decisionLabel} ${
+      mixSnapshotComparison.statusLabel
+    } beginner producer mix snapshot route no apply`,
+    resultTargetId: mixSnapshotComparison.decisionActionId,
+    run: onFocusMixSnapshotRouteReadout
   };
   const mixBalancePreviewPad =
     mixBalancePadOptions.find((pad) => pad.id === mixBalancePreviewSummary.padId) ?? mixBalancePadOptions[0];
@@ -5805,6 +5821,7 @@ export function createQuickActions({
       run: () => onApplyStemAudition(pad.id)
     })),
     mixSnapshotReadoutAction,
+    mixSnapshotRouteReadoutAction,
     mixSnapshotDecisionAction,
     {
       id: "mix-snapshot-capture-a",
@@ -7006,6 +7023,7 @@ export function createQuickActionResult(
     action.id === "melody-move-route-readout-action" ||
     action.id === "chord-move-route-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
+    action.id === "mix-snapshot-route-readout-action" ||
     action.id === "mix-balance-readout-action" ||
     action.id === "mix-balance-route-readout-action" ||
     action.id === "space-fx-readout-action" ||
@@ -7621,6 +7639,28 @@ export function quickActionMixSnapshotMetricSnapshot(
     };
   }
 
+  if (action.id === "mix-snapshot-route-readout-action") {
+    const routeTargetId = quickActionMixSnapshotRouteTargetId(action);
+    if (!routeTargetId) {
+      return null;
+    }
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const stemAnalyses = analyzeStemExports(project);
+    return {
+      id: "mix-snapshot-route-readout",
+      label: "Mix Snapshot Route Readout",
+      value: quickActionMixSnapshotMetricValue(project, exportAnalysis, stemAnalyses, [
+        quickActionMixSnapshotActionLabel(action, routeTargetId),
+        `route ${mixSnapshotRouteLabel(routeTargetId)}`,
+        `direct command mix-snapshot-${routeTargetId}`,
+        `slot state ${quickActionMixSnapshotContextLabel(action)}`,
+        `current mix ${mixSnapshotQuickActionPosture(project, exportAnalysis)}`,
+        `master ${quickActionMixSnapshotMasterPosture(project)}`,
+        "mix snapshot unchanged"
+      ], "read the capture or recall route before choosing the existing Mix Snapshot command")
+    };
+  }
+
   const target = mixSnapshotQuickActionTarget(action.id);
   if (!target) {
     return null;
@@ -7707,6 +7747,20 @@ export function quickActionMixSnapshotResultTargetId(
   }
 }
 
+export function quickActionMixSnapshotRouteTargetId(
+  action: QuickAction
+): MixSnapshotComparisonSummary["decisionActionId"] | null {
+  switch (action.resultTargetId) {
+    case "capture-a":
+    case "capture-b":
+    case "recall-a":
+    case "recall-b":
+      return action.resultTargetId;
+    default:
+      return null;
+  }
+}
+
 export function quickActionMixSnapshotMetricLabel(
   target: MixSnapshotQuickActionTarget,
   resultTargetId: MixSnapshotResultTargetId
@@ -7720,6 +7774,9 @@ export function quickActionMixSnapshotMetricLabel(
 export function quickActionMixSnapshotActionLabel(action: QuickAction, targetId: MixSnapshotResultTargetId): string {
   if (action.id === "mix-snapshot-readout-action") {
     return "review mix snapshot readout";
+  }
+  if (action.id === "mix-snapshot-route-readout-action") {
+    return "review mix snapshot route readout";
   }
   if (action.id === "mix-snapshot-decision") {
     return `run mix snapshot decision ${targetId}`;
@@ -7750,6 +7807,19 @@ export function quickActionMixSnapshotTargetLabel(targetId: MixSnapshotResultTar
       return "Clear A/B";
     case "decision":
       return "Decision target";
+  }
+}
+
+export function mixSnapshotRouteLabel(targetId: MixSnapshotComparisonSummary["decisionActionId"]): string {
+  switch (targetId) {
+    case "capture-a":
+      return "Capture A route";
+    case "capture-b":
+      return "Capture B route";
+    case "recall-a":
+      return "Recall A route";
+    case "recall-b":
+      return "Recall B route";
   }
 }
 
@@ -21035,6 +21105,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the Mix Snapshot A/B readout before capturing, recalling, or clearing a mix pass, then play Full Mix and core stems.",
       nextCheck: "Capture or recall only after one concrete mix/master change creates an A/B decision worth committing."
+    };
+  }
+
+  if (action.id === "mix-snapshot-route-readout-action") {
+    return {
+      auditionCue: `Read the Mix Snapshot route and loop Pattern ${project.selectedPattern} before choosing the existing Mix Snapshot command.`,
+      nextCheck:
+        "Use Mix Snapshot Decision only when the named capture or recall route matches the A/B comparison you need; otherwise leave slots and mixer/master unchanged."
     };
   }
 

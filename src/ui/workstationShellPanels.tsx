@@ -1219,6 +1219,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Full Mix, Drums, 808/Bass, Synth, and Chords audition routes with current posture, mixer solo/mute state, result feedback, audition cue, and next check before Stem Audition commands run."
       },
       {
+        id: "mix-snapshot-route-readout",
+        command: "Mix Snapshot Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Capture / recall route",
+        context:
+          "Mix Snapshot Route Readout Action, Selected Pattern A/B/C, A/B Slot State, Existing Capture/Recall Route, Direct Mix Snapshot Command, Current Mix/Export Posture, Master Posture, Stem Readiness, Audition Cue, and Next Snapshot Route Check context before Mix Snapshot A/B commands run."
+      },
+      {
         id: "mix-snapshot-decision",
         command: "Mix Snapshot A/B Decision",
         shortcut: "Quick Actions / Readout",
