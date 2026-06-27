@@ -32,6 +32,126 @@ import {
   Waves,
   X
 } from "lucide-react";
+import {
+  beatPassportRouteLabel,
+  beatReadinessRouteLabel,
+  composerGuideRouteLabel,
+  drumKitRouteLabel,
+  exportPreflightRouteLabel,
+  finishChecklistRouteLabel,
+  grooveCompassRouteLabel,
+  hookReadinessDestinationLabel,
+  hookReadinessRouteLabel,
+  keyCompassRouteLabel,
+  listeningPassRouteLabel,
+  masterAutomationRouteLabel,
+  masterFinishRouteLabel,
+  mixBalanceRouteLabel,
+  mixSnapshotRouteLabel,
+  productionSnapshotRouteLabel,
+  referenceAlignmentDestinationLabel,
+  referenceAlignmentRouteLabel,
+  reviewQueueRouteLabel,
+  sessionPassRouteLabel,
+  soundFocusRouteLabel,
+  soundPresetRouteLabel,
+  spaceFxRouteLabel,
+  stemAuditionRouteLabel,
+  toplineSpaceDestinationLabel,
+  toplineSpaceRouteLabel,
+  workflowNavigatorDestinationLabel,
+  workflowNavigatorRouteLabel,
+  workflowSpotlightRouteLabel
+} from "./workstationAppQuickActionRouteLabels";
+import {
+  createNextMoveSourceQuickActions,
+  createQuickActionPinnedOptions,
+  createQuickActionPinnedResult,
+  createQuickActionRecentOptions,
+  createQuickActionRecentResult,
+  createQuickActionScopeOptions,
+  createQuickActionScopeResult,
+  createQuickActionSearchHintResult,
+  createQuickActionSearchRecoveryResult,
+  createQuickActionSearchResult,
+  createQuickActionSpotlightSummary,
+  filterQuickActions,
+  nextMoveQuickActionForProject,
+  nextMoveQuickActionSource,
+  nextMoveQuickActionSourceLabel,
+  nextMoveQuickActionTargetId,
+  nextMoveSourceQuickActionId,
+  normalizeQuickActionPinnedIds,
+  prependQuickActionRecent,
+  quickActionMatchesQuery,
+  quickActionMatchesScope,
+  quickActionPinnedResultTarget,
+  quickActionRecentResultTarget,
+  quickActionScopeDefinitions,
+  quickActionScopeLabel,
+  quickActionSearchTokens
+} from "./workstationAppQuickActionPalette";
+import type { NextMoveQuickActionSource } from "./workstationAppQuickActionPalette";
+export {
+  beatPassportRouteLabel,
+  beatReadinessRouteLabel,
+  composerGuideRouteLabel,
+  drumKitRouteLabel,
+  exportPreflightRouteLabel,
+  finishChecklistRouteLabel,
+  grooveCompassRouteLabel,
+  hookReadinessDestinationLabel,
+  hookReadinessRouteLabel,
+  keyCompassRouteLabel,
+  listeningPassRouteLabel,
+  masterAutomationRouteLabel,
+  masterFinishRouteLabel,
+  mixBalanceRouteLabel,
+  mixSnapshotRouteLabel,
+  productionSnapshotRouteLabel,
+  referenceAlignmentDestinationLabel,
+  referenceAlignmentRouteLabel,
+  reviewQueueRouteLabel,
+  sessionPassRouteLabel,
+  soundFocusRouteLabel,
+  soundPresetRouteLabel,
+  spaceFxRouteLabel,
+  stemAuditionRouteLabel,
+  toplineSpaceDestinationLabel,
+  toplineSpaceRouteLabel,
+  workflowNavigatorDestinationLabel,
+  workflowNavigatorRouteLabel,
+  workflowSpotlightRouteLabel
+} from "./workstationAppQuickActionRouteLabels";
+export {
+  createNextMoveSourceQuickActions,
+  createQuickActionPinnedOptions,
+  createQuickActionPinnedResult,
+  createQuickActionRecentOptions,
+  createQuickActionRecentResult,
+  createQuickActionScopeOptions,
+  createQuickActionScopeResult,
+  createQuickActionSearchHintResult,
+  createQuickActionSearchRecoveryResult,
+  createQuickActionSearchResult,
+  createQuickActionSpotlightSummary,
+  filterQuickActions,
+  nextMoveQuickActionForProject,
+  nextMoveQuickActionSource,
+  nextMoveQuickActionSourceLabel,
+  nextMoveQuickActionTargetId,
+  nextMoveSourceQuickActionId,
+  normalizeQuickActionPinnedIds,
+  prependQuickActionRecent,
+  quickActionMatchesQuery,
+  quickActionMatchesScope,
+  quickActionPinnedResultTarget,
+  quickActionRecentResultTarget,
+  quickActionScopeDefinitions,
+  quickActionScopeLabel,
+  quickActionSearchTokens
+} from "./workstationAppQuickActionPalette";
+export type { NextMoveQuickActionSource } from "./workstationAppQuickActionPalette";
 import type { ChangeEvent, CSSProperties, ReactElement, ReactNode, Ref } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { exportMidi, midiFileName } from "../audio/midi";
@@ -7166,425 +7286,6 @@ export function createQuickActions({
   ];
 }
 
-export type NextMoveQuickActionSource = "beat-map" | "structure-lens";
-
-export function createNextMoveSourceQuickActions(
-  source: NextMoveQuickActionSource,
-  actions: NextMoveAction[],
-  onRunNextMove: (action: NextMoveAction) => void
-): QuickAction[] {
-  const sourceLabel = nextMoveQuickActionSourceLabel(source);
-  const sourceGroup = source === "beat-map" ? "Project" : "Arrange";
-
-  return actions.map((action) => ({
-    id: nextMoveSourceQuickActionId(source, action.id),
-    title: `${sourceLabel}: ${action.buttonLabel}`,
-    detail: `${action.title} / ${action.detail}`,
-    group: sourceGroup,
-    keywords: `${sourceLabel} quick action workflow overview structure lens beat map next move ${action.id} ${action.buttonLabel} ${action.title} ${action.detail} ${action.command.kind} beginner producer direct beat composition`,
-    run: () => onRunNextMove(action)
-  }));
-}
-
-export function nextMoveSourceQuickActionId(source: NextMoveQuickActionSource, actionId: string): string {
-  return `${source}-action-${actionId}`;
-}
-
-export function nextMoveQuickActionSourceLabel(source: NextMoveQuickActionSource): string {
-  return source === "beat-map" ? "Beat Map" : "Structure Lens";
-}
-
-export function nextMoveQuickActionSource(actionId: string): NextMoveQuickActionSource | null {
-  if (actionId.startsWith("beat-map-action-")) {
-    return "beat-map";
-  }
-  if (actionId.startsWith("structure-lens-action-")) {
-    return "structure-lens";
-  }
-  return null;
-}
-
-export function nextMoveQuickActionTargetId(actionId: string, source: NextMoveQuickActionSource): string {
-  return actionId.slice(`${source}-action-`.length);
-}
-
-export function nextMoveQuickActionForProject(project: ProjectState, action: QuickAction): NextMoveAction | null {
-  const source = nextMoveQuickActionSource(action.id);
-  if (!source) {
-    return null;
-  }
-
-  const targetId = nextMoveQuickActionTargetId(action.id, source);
-  if (source === "structure-lens") {
-    return createStructureLensActions(project).find((candidate) => candidate.id === targetId) ?? null;
-  }
-
-  const analysis = analyzeExport(project);
-  const stemState = analyzeStemExports(project);
-  const checks = createBeatReadinessChecks(project, analysis);
-  return createBeatMapActions(project, checks, analysis, stemState).find((candidate) => candidate.id === targetId) ?? null;
-}
-
-
-
-
-
-
-
-
-export const quickActionScopeDefinitions: Array<Omit<QuickActionScopeOption, "count">> = [
-  { id: "all", label: "All" },
-  { id: "transport", label: "Transport" },
-  { id: "compose", label: "Compose" },
-  { id: "arrange", label: "Arrange" },
-  { id: "mix", label: "Mix" },
-  { id: "master", label: "Master" },
-  { id: "project", label: "Project" },
-  { id: "export", label: "Export" }
-];
-
-export function filterQuickActions(actions: QuickAction[], query: string, scope: QuickActionScopeId): QuickAction[] {
-  return actions
-    .filter((action) => quickActionMatchesQuery(action, query) && quickActionMatchesScope(action, scope))
-    .slice(0, 12);
-}
-
-export function createQuickActionScopeOptions(actions: QuickAction[], query: string): QuickActionScopeOption[] {
-  const queryMatches = actions.filter((action) => quickActionMatchesQuery(action, query));
-
-  return quickActionScopeDefinitions.map((definition) => ({
-    ...definition,
-    count: queryMatches.filter((action) => quickActionMatchesScope(action, definition.id)).length
-  }));
-}
-
-export function createQuickActionScopeResult(
-  scope: QuickActionScopeId,
-  actions: QuickAction[],
-  query: string
-): QuickActionScopeResult {
-  const scopeOptions = createQuickActionScopeOptions(actions, query);
-  const option = scopeOptions.find((candidate) => candidate.id === scope);
-  const filteredActions = filterQuickActions(actions, query, scope);
-  const firstRunnableAction = filteredActions.find((action) => !action.disabled);
-  const scopeLabel = option?.label ?? quickActionScopeLabel(scope);
-  const queryLabel = query.trim().length > 0 ? `search "${query.trim()}"` : "no search";
-  const matchingCount = option?.count ?? 0;
-  const enterTarget = firstRunnableAction ? firstRunnableAction.title : "No runnable Enter target";
-
-  return {
-    scope,
-    status: "Scope selected",
-    title: `${scopeLabel} commands`,
-    detail: `${queryLabel} / ${filteredActions.length} shown / ${matchingCount} matching`,
-    metricLabel: "Enter target",
-    metricValue: firstRunnableAction ? `${firstRunnableAction.group} / ${firstRunnableAction.title}` : "No runnable command",
-    nextCheck: firstRunnableAction
-      ? `Press Enter or click ${enterTarget} only if it is the next explicit move.`
-      : "Clear search or choose another scope before running a command.",
-    tone: firstRunnableAction ? "good" : "warn"
-  };
-}
-
-export function quickActionScopeLabel(scope: QuickActionScopeId): string {
-  return quickActionScopeDefinitions.find((definition) => definition.id === scope)?.label ?? scope;
-}
-
-export function createQuickActionSearchHintResult(
-  term: string,
-  scope: QuickActionScopeId,
-  actions: QuickAction[]
-): QuickActionSearchHintResult {
-  const normalizedTerm = term.trim();
-  const scopeOptions = createQuickActionScopeOptions(actions, normalizedTerm);
-  const scopeOption = scopeOptions.find((candidate) => candidate.id === scope);
-  const filteredActions = filterQuickActions(actions, normalizedTerm, scope);
-  const firstRunnableAction = filteredActions.find((candidate) => !candidate.disabled);
-  const scopeLabel = scopeOption?.label ?? quickActionScopeLabel(scope);
-  const matchingCount = scopeOption?.count ?? 0;
-  const queryLabel = normalizedTerm ? `"${normalizedTerm}"` : "empty search";
-
-  return {
-    term: normalizedTerm,
-    status: "Hint applied",
-    title: normalizedTerm ? `Search hint ${queryLabel}` : "Search hint cleared",
-    detail: `${scopeLabel} scope / ${filteredActions.length} shown / ${matchingCount} matching`,
-    metricLabel: "Enter target",
-    metricValue: firstRunnableAction ? `${firstRunnableAction.group} / ${firstRunnableAction.title}` : "No runnable command",
-    nextCheck: firstRunnableAction
-      ? `Press Enter or click ${firstRunnableAction.title} only if it is the next explicit move.`
-      : "Edit the search or use Scope Filters before running a command.",
-    tone: firstRunnableAction ? "good" : "warn"
-  };
-}
-
-export function createQuickActionSearchRecoveryResult(
-  action: QuickActionSearchRecoveryResult["action"],
-  previousQuery: string,
-  previousScope: QuickActionScopeId,
-  nextQuery: string,
-  nextScope: QuickActionScopeId,
-  actions: QuickAction[]
-): QuickActionSearchRecoveryResult {
-  const trimmedPreviousQuery = previousQuery.trim();
-  const trimmedNextQuery = nextQuery.trim();
-  const scopeOptions = createQuickActionScopeOptions(actions, nextQuery);
-  const scopeOption = scopeOptions.find((candidate) => candidate.id === nextScope);
-  const filteredActions = filterQuickActions(actions, nextQuery, nextScope);
-  const firstRunnableAction = filteredActions.find((candidate) => !candidate.disabled);
-  const previousScopeLabel = quickActionScopeLabel(previousScope);
-  const scopeLabel = scopeOption?.label ?? quickActionScopeLabel(nextScope);
-  const matchingCount = scopeOption?.count ?? 0;
-  const queryLabel = trimmedNextQuery ? `"${trimmedNextQuery}"` : "empty search";
-  const previousQueryLabel = trimmedPreviousQuery ? `"${trimmedPreviousQuery}"` : "empty search";
-
-  return {
-    action,
-    status: "Recovery applied",
-    title: action === "clear" ? "Search cleared" : `Scope switched to ${scopeLabel}`,
-    detail:
-      action === "clear"
-        ? `Cleared ${previousQueryLabel} / ${scopeLabel} scope / ${filteredActions.length} shown / ${matchingCount} matching`
-        : `${previousScopeLabel} to ${scopeLabel} / ${queryLabel} / ${filteredActions.length} shown / ${matchingCount} matching`,
-    metricLabel: "Enter target",
-    metricValue: firstRunnableAction ? `${firstRunnableAction.group} / ${firstRunnableAction.title}` : "No runnable command",
-    nextCheck: firstRunnableAction
-      ? `Press Enter or click ${firstRunnableAction.title} only if it is the next explicit move.`
-      : action === "clear"
-        ? "Type a command term or use Scope Filters before running a command."
-        : "Clear search or choose another scope before running a command.",
-    tone: firstRunnableAction ? "good" : "warn"
-  };
-}
-
-export function createQuickActionSearchResult(
-  query: string,
-  scope: QuickActionScopeId,
-  actions: QuickAction[]
-): QuickActionSearchResult {
-  const trimmedQuery = query.trim();
-  const scopeOptions = createQuickActionScopeOptions(actions, query);
-  const scopeOption = scopeOptions.find((candidate) => candidate.id === scope);
-  const filteredActions = filterQuickActions(actions, query, scope);
-  const firstRunnableAction = filteredActions.find((action) => !action.disabled);
-  const scopeLabel = scopeOption?.label ?? quickActionScopeLabel(scope);
-  const matchingCount = scopeOption?.count ?? 0;
-  const queryLabel = trimmedQuery ? `"${trimmedQuery}"` : "empty search";
-  const status = trimmedQuery ? "Search updated" : "Search cleared";
-
-  return {
-    query: trimmedQuery,
-    status,
-    title: trimmedQuery ? `Search ${queryLabel}` : "Search cleared",
-    detail: `${scopeLabel} scope / ${filteredActions.length} shown / ${matchingCount} matching`,
-    metricLabel: "Enter target",
-    metricValue: firstRunnableAction ? `${firstRunnableAction.group} / ${firstRunnableAction.title}` : "No runnable command",
-    nextCheck: firstRunnableAction
-      ? `Press Enter or click ${firstRunnableAction.title} only if it is the next explicit move.`
-      : trimmedQuery
-        ? "Edit the search or switch scope before running a command."
-        : "Type a command term or use Scope Filters before running a command.",
-    tone: firstRunnableAction ? "good" : "warn"
-  };
-}
-
-export function createQuickActionSpotlightSummary(
-  actions: QuickAction[],
-  firstRunnableAction: QuickAction | undefined,
-  scope: QuickActionScopeId,
-  scopeOptions: QuickActionScopeOption[],
-  query: string
-): QuickActionSpotlightSummary {
-  const scopeLabel = scopeOptions.find((option) => option.id === scope)?.label ?? "All";
-  const matchingCount = scopeOptions.find((option) => option.id === scope)?.count ?? 0;
-  const queryLabel = query.trim().length > 0 ? `Search "${query.trim()}"` : "No search";
-  const contextLabel = `${scopeLabel} scope / ${actions.length} shown / ${matchingCount} matching / ${queryLabel}`;
-
-  if (!firstRunnableAction) {
-    const detailLabel =
-      actions.length > 0 ? "Visible commands are disabled in the current state" : "No visible command matches the current scope and search";
-    return {
-      actionId: null,
-      statusLabel: "No Enter target",
-      titleLabel: "No command ready",
-      detailLabel,
-      contextLabel,
-      detailTitle: `No Enter target / ${detailLabel} / ${contextLabel}`,
-      tone: "warn"
-    };
-  }
-
-  const detailLabel = `${firstRunnableAction.group} / ${firstRunnableAction.detail}`;
-  return {
-    actionId: firstRunnableAction.id,
-    statusLabel: "Enter target",
-    titleLabel: firstRunnableAction.title,
-    detailLabel,
-    contextLabel,
-    detailTitle: `Enter target / ${firstRunnableAction.title} / ${detailLabel} / ${contextLabel}`,
-    tone: "good"
-  };
-}
-
-export function quickActionMatchesQuery(action: QuickAction, query: string): boolean {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) {
-    return true;
-  }
-
-  const terms = normalizedQuery.split(/\s+/);
-  const tokens = quickActionSearchTokens(action);
-  return terms.every((term) => tokens.some((token) => token.startsWith(term)));
-}
-
-export function quickActionMatchesScope(action: QuickAction, scope: QuickActionScopeId): boolean {
-  switch (scope) {
-    case "all":
-      return true;
-    case "transport":
-      return action.group === "Transport";
-    case "compose":
-      return action.group === "Create";
-    case "arrange":
-      return action.group === "Arrange";
-    case "mix":
-      return (
-        action.group === "Mix" &&
-        action.id !== "export-meter" &&
-        action.id !== "master-output-role" &&
-        action.id !== "master-finish" &&
-        !action.id.startsWith("master-finish-") &&
-        composerActionQuickActionArea(action.id) !== "finish"
-      );
-    case "master":
-      return (
-        action.id === "export-meter" ||
-        action.id === "master-output-role" ||
-        action.id === "master-finish" ||
-        action.id.startsWith("master-finish-") ||
-        composerActionQuickActionArea(action.id) === "finish"
-      );
-    case "project":
-      return action.group === "Project" || action.group === "Edit";
-    case "export":
-      return action.group === "Export";
-  }
-}
-
-export function quickActionSearchTokens(action: QuickAction): string[] {
-  return `${action.group} ${action.title} ${action.detail} ${action.keywords}`
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean);
-}
-
-export function prependQuickActionRecent(
-  recents: QuickActionRecent[],
-  action: QuickAction,
-  result: QuickActionResult
-): QuickActionRecent[] {
-  const nextRecent: QuickActionRecent = {
-    actionId: action.id,
-    status: result.status,
-    tone: result.tone
-  };
-  return [nextRecent, ...recents.filter((recent) => recent.actionId !== action.id)].slice(0, 4);
-}
-
-export function createQuickActionRecentOptions(
-  recents: QuickActionRecent[],
-  actions: QuickAction[]
-): Array<{ recent: QuickActionRecent; action: QuickAction }> {
-  return recents.flatMap((recent) => {
-    const action = actions.find((candidate) => candidate.id === recent.actionId);
-    return action ? [{ recent, action }] : [];
-  });
-}
-
-export function createQuickActionRecentResult(action: QuickAction, recent: QuickActionRecent): QuickActionRecentResult {
-  const availableLabel = action.disabled ? "Unavailable now" : "Ready to rerun";
-  const targetLabel = quickActionRecentResultTarget(action);
-  return {
-    actionId: action.id,
-    status: "Inspected recent command",
-    title: action.title,
-    detail: `${action.group} / ${action.detail}`,
-    metricLabel: "Last command result",
-    metricValue: `${recent.status} / ${availableLabel} / ${targetLabel}`,
-    nextCheck: `Rerun ${action.title} only if ${targetLabel} is still the next explicit move.`,
-    tone: action.disabled ? "warn" : recent.tone
-  };
-}
-
-export function quickActionRecentResultTarget(action: QuickAction): string {
-  const detailTarget = action.detail
-    .split(" / ")
-    .map((part) => part.trim())
-    .filter(Boolean)[0];
-  return `target ${detailTarget ?? action.title}`;
-}
-
-export function normalizeQuickActionPinnedIds(pinnedIds: string[], actions: QuickAction[]): string[] {
-  const actionIds = new Set(actions.map((action) => action.id));
-  const normalizedIds = pinnedIds.filter((id, index) => actionIds.has(id) && pinnedIds.indexOf(id) === index);
-  const boundedIds = normalizedIds.slice(0, maxQuickActionPins);
-  return pinnedIds.length === boundedIds.length && pinnedIds.every((id, index) => id === boundedIds[index])
-    ? pinnedIds
-    : boundedIds;
-}
-
-export function createQuickActionPinnedOptions(pinnedIds: string[], actions: QuickAction[]): QuickAction[] {
-  const normalizedIds = normalizeQuickActionPinnedIds(pinnedIds, actions);
-  return normalizedIds.flatMap((id) => {
-    const action = actions.find((candidate) => candidate.id === id);
-    return action ? [action] : [];
-  });
-}
-
-export function createQuickActionPinnedResult(
-  kind: QuickActionPinnedResultKind,
-  action: QuickAction,
-  beforeIds: string[],
-  afterIds: string[]
-): QuickActionPinnedResult {
-  const availableLabel = action.disabled ? "Unavailable now" : "Ready to run";
-  const status =
-    kind === "pin" ? "Pinned command" : kind === "unpin" ? "Unpinned command" : "Inspected pinned command";
-  const slotIndex = afterIds.indexOf(action.id);
-  const slotLabel = slotIndex >= 0 ? `slot ${slotIndex + 1}` : "removed";
-  const metricLabel = kind === "inspect" ? "Pinned command setup" : "Pin slots";
-  const metricValue =
-    kind === "unpin"
-      ? `${afterIds.length}/${maxQuickActionPins} pinned / removed from session row / before ${beforeIds.length}`
-      : `${afterIds.length}/${maxQuickActionPins} pinned / ${slotLabel} / ${availableLabel}`;
-  const nextCheck =
-    kind === "pin"
-      ? `Run ${action.title} from Pinned Commands only when it is the next explicit move.`
-      : kind === "unpin"
-        ? "Pin another visible command if this repeat path is still useful in this session."
-        : `Review ${quickActionPinnedResultTarget(action)}, then press Run only if it is the next explicit move.`;
-
-  return {
-    kind,
-    actionId: action.id,
-    status,
-    title: action.title,
-    detail: `${action.group} / ${action.detail}`,
-    metricLabel,
-    metricValue,
-    nextCheck,
-    tone: action.disabled ? "warn" : "good"
-  };
-}
-
-export function quickActionPinnedResultTarget(action: QuickAction): string {
-  const detailTarget = action.detail
-    .split(" / ")
-    .map((part) => part.trim())
-    .filter(Boolean)[0];
-  return `target ${detailTarget ?? action.title}`;
-}
-
 export type QuickActionInputSetupSnapshot = {
   keyboardCaptureEnabled: boolean;
   keyboardCaptureTarget: NoteTrack;
@@ -8281,19 +7982,6 @@ export function quickActionMasterFinishNextCheck(action: QuickAction, pad: Maste
   return "play Full Mix, inspect Export meter, then manually trim ceiling or output only if needed";
 }
 
-export function masterFinishRouteLabel(targetId: MasterFinishPadId): string {
-  switch (targetId) {
-    case "demo":
-      return "Demo finish route";
-    case "vocal":
-      return "Vocal finish route";
-    case "store":
-      return "Store finish route";
-    case "club":
-      return "Club finish route";
-  }
-}
-
 export function masterAutomationQuickActionPosture(project: ProjectState): string {
   return `${masterAutomationPresetLabel(masterAutomationPresetForProject(project))} / ${masterAutomationEventCountLabel(
     project
@@ -8508,19 +8196,6 @@ export function quickActionMasterAutomationNextCheck(action: QuickAction, pad: M
     return "play the final bar and export WAV/stems to confirm the fade renders";
   }
   return "play Song from the top and final bar, then export WAV/stems after the fade feels right";
-}
-
-export function masterAutomationRouteLabel(targetId: MasterAutomationPadId): string {
-  switch (targetId) {
-    case "none":
-      return "No fade automation route";
-    case "fade_in":
-      return "Fade-in automation route";
-    case "fade_out":
-      return "Fade-out automation route";
-    case "intro_outro":
-      return "Intro/outro automation route";
-  }
 }
 
 export function mixSnapshotQuickActionTarget(actionId: string): MixSnapshotQuickActionTarget | null {
@@ -8782,19 +8457,6 @@ export function quickActionMixSnapshotTargetLabel(targetId: MixSnapshotResultTar
       return "Clear A/B";
     case "decision":
       return "Decision target";
-  }
-}
-
-export function mixSnapshotRouteLabel(targetId: MixSnapshotComparisonSummary["decisionActionId"]): string {
-  switch (targetId) {
-    case "capture-a":
-      return "Capture A route";
-    case "capture-b":
-      return "Capture B route";
-    case "recall-a":
-      return "Recall A route";
-    case "recall-b":
-      return "Recall B route";
   }
 }
 
@@ -9439,31 +9101,6 @@ export function quickActionReferenceAlignmentRouteLabel(
     return routePart.replace(/^Route\s+/, "");
   }
   return referenceAlignmentRouteLabel(card, summary);
-}
-
-export function referenceAlignmentRouteLabel(card: ReferenceAlignmentCard, summary: ReferenceAlignmentSummary): string {
-  const routeIndex = summary.cards.findIndex((candidate) => candidate.id === card.id);
-  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${summary.cards.length}` : `1/${summary.cards.length}`;
-  return `${card.label} ${routePosition} to ${referenceAlignmentDestinationLabel(card)}`;
-}
-
-export function referenceAlignmentDestinationLabel(card: ReferenceAlignmentCard): string {
-  switch (card.focusTarget) {
-    case "artist":
-      return "Session Brief / Artist field";
-    case "vibe":
-      return "Session Brief / Vibe field";
-    case "reference":
-      return "Session Brief / Reference field";
-    case "notes":
-      return "Session Brief / Notes field";
-    case "arrange":
-      return "Arrange panel";
-    case "master":
-      return "Master panel";
-    case "deliver":
-      return "Deliver panel";
-  }
 }
 
 export function quickActionSelectedEventMetricSnapshot(
@@ -11248,21 +10885,6 @@ export function quickActionBeatReadinessLaneLabel(action: QuickAction, check: Be
   return titleLabel && titleLabel !== "Focus Beat Readiness" && titleLabel !== "Review Beat Readiness Route" ? titleLabel : check.label;
 }
 
-export function beatReadinessRouteLabel(check: BeatReadinessCheck): string {
-  switch (check.id) {
-    case "drums":
-      return "Drums route";
-    case "bass":
-      return "808/bass route";
-    case "harmony":
-      return "Melody/chords route";
-    case "arrangement":
-      return "Arrangement route";
-    case "export":
-      return "Export route";
-  }
-}
-
 export function quickActionHookReadinessMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -11406,19 +11028,6 @@ export function quickActionHookReadinessRouteLabel(
     return routePart.replace(/^Route\s+/, "");
   }
   return hookReadinessRouteLabel(card, summary);
-}
-
-export function hookReadinessRouteLabel(card: HookReadinessCard, summary: HookReadinessSummary): string {
-  const routeIndex = summary.cards.findIndex((candidate) => candidate.id === card.id);
-  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${summary.cards.length}` : `1/${summary.cards.length}`;
-  return `${card.label} ${routePosition} to ${hookReadinessDestinationLabel(card)}`;
-}
-
-export function hookReadinessDestinationLabel(card: HookReadinessCard): string {
-  if (card.id === "handoff") {
-    return "Deliver panel / Session Brief";
-  }
-  return `${card.focusLabel} panel`;
 }
 
 export function quickActionToplineSpaceMetricSnapshot(
@@ -11567,32 +11176,6 @@ export function quickActionToplineSpaceRouteLabel(
     return routePart.replace(/^Route\s+/, "");
   }
   return toplineSpaceRouteLabel(card, summary);
-}
-
-export function toplineSpaceRouteLabel(card: ToplineSpaceCard, summary: ToplineSpaceSummary): string {
-  const routeIndex = summary.cards.findIndex((candidate) => candidate.id === card.id);
-  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${summary.cards.length}` : `1/${summary.cards.length}`;
-  return `${card.label} ${routePosition} to ${toplineSpaceDestinationLabel(card)}`;
-}
-
-export function toplineSpaceDestinationLabel(card: ToplineSpaceCard): string {
-  if (card.id === "brief") {
-    return "Deliver panel / Session Brief";
-  }
-  return `${card.focusLabel} panel`;
-}
-
-export function listeningPassRouteLabel(item: ListeningPassItem): string {
-  switch (item.id) {
-    case "composition":
-      return "Composition route";
-    case "arrangement":
-      return "Arrangement route";
-    case "mix":
-      return "Mix route";
-    case "delivery":
-      return "Delivery route";
-  }
 }
 
 export function quickActionListeningPassMetricSnapshot(
@@ -11749,25 +11332,6 @@ export function quickActionBeatPassportLaneLabel(action: QuickAction, metric: Be
   return titleLabel && titleLabel !== "Focus Beat Passport" && titleLabel !== "Review Beat Passport Route" ? titleLabel : metric.label;
 }
 
-export function beatPassportRouteLabel(metric: BeatPassportMetric): string {
-  switch (metric.id) {
-    case "target":
-      return "Target route";
-    case "length":
-      return "Length route";
-    case "patterns":
-      return "Pattern A/B/C route";
-    case "readiness":
-      return "Readiness route";
-    case "export":
-      return "Export route";
-    case "stems":
-      return "Stems route";
-    case "master":
-      return "Master route";
-  }
-}
-
 export function quickActionProductionSnapshotMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -11860,21 +11424,6 @@ export function quickActionProductionSnapshotLaneLabel(action: QuickAction, metr
     : metric.label;
 }
 
-export function productionSnapshotRouteLabel(metric: ProductionSnapshotMetric): string {
-  switch (metric.id) {
-    case "target":
-      return "Target route";
-    case "form":
-      return "Form route";
-    case "patterns":
-      return "Pattern A/B/C route";
-    case "mix":
-      return "Mix route";
-    case "handoff":
-      return "Handoff route";
-  }
-}
-
 export function quickActionFinishChecklistMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -11965,23 +11514,6 @@ export function quickActionFinishChecklistLaneLabel(action: QuickAction, card: F
     : card.label;
 }
 
-export function finishChecklistRouteLabel(card: FinishChecklistCard): string {
-  switch (card.id) {
-    case "compose":
-      return "Compose route";
-    case "arrange":
-      return "Arrange route";
-    case "mix":
-      return "Mix route";
-    case "master":
-      return "Master route";
-    case "automation":
-      return "Master Automation route";
-    case "handoff":
-      return "Handoff route";
-  }
-}
-
 export function quickActionReviewQueueMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -12061,10 +11593,6 @@ export function quickActionReviewQueueLaneLabel(action: QuickAction, item: Revie
   return titleLabel && titleLabel !== "Focus Review Queue" && titleLabel !== "Review Review Queue Route"
     ? titleLabel
     : item.area;
-}
-
-export function reviewQueueRouteLabel(item: ReviewQueueItem): string {
-  return `${item.focusLabel} route`;
 }
 
 export function quickActionReviewFixMetricSnapshot(
@@ -13083,21 +12611,6 @@ export function quickActionExportPreflightLaneLabel(action: QuickAction, card: E
   return titleLabel && titleLabel !== "Focus Export Preflight" && titleLabel !== "Review Export Preflight Route"
     ? titleLabel
     : card.label;
-}
-
-export function exportPreflightRouteLabel(card: ExportPreflightFocusItem): string {
-  switch (card.focusId) {
-    case "readiness":
-      return "Readiness route";
-    case "mix":
-      return "Mix/master route";
-    case "automation":
-      return "Master Automation route";
-    case "deliverables":
-      return "Deliverables route";
-    case "handoff":
-      return "Handoff route";
-  }
 }
 
 export function quickActionHandoffPackMetricSnapshot(
@@ -14773,12 +14286,6 @@ export const SESSION_PASS_DETAIL_LABEL_PREFIXES = [
   "Readout "
 ] as const;
 
-export function sessionPassRouteLabel(card: SessionPassCard, summary: SessionPassSummary): string {
-  const routeIndex = summary.cards.findIndex((candidate) => candidate.id === card.id);
-  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${summary.cards.length}` : `1/${summary.cards.length}`;
-  return `${card.label} ${routePosition} to ${card.focusLabel}`;
-}
-
 export function quickActionSessionPassMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -15295,12 +14802,6 @@ export function composerGuideDestinationLabelFromLane(label: string): string {
   }
 }
 
-export function composerGuideRouteLabel(card: ComposerGuideCard, summary: ComposerGuideSummary): string {
-  const routeIndex = summary.cards.findIndex((candidate) => candidate.id === card.id);
-  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${summary.cards.length}` : `1/${summary.cards.length}`;
-  return `${card.label} ${routePosition} to ${card.focusLabel}`;
-}
-
 export function quickActionKeyCompassMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -15387,12 +14888,6 @@ export function keyCompassLaneLabelFromQuickActionId(id: string): string {
     default:
       return "";
   }
-}
-
-export function keyCompassRouteLabel(item: KeyCompassCard, summary: KeyCompassSummary): string {
-  const routeIndex = summary.cards.findIndex((candidate) => candidate.id === item.id);
-  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${summary.cards.length}` : `1/${summary.cards.length}`;
-  return `${item.label} ${routePosition} to ${item.focusLabel}`;
 }
 
 export function quickActionGrooveCompassMetricSnapshot(
@@ -15486,12 +14981,6 @@ export function grooveCompassLaneLabelFromQuickActionId(id: string): string {
     default:
       return "";
   }
-}
-
-export function grooveCompassRouteLabel(item: GrooveCompassCard, summary: GrooveCompassSummary): string {
-  const routeIndex = summary.cards.findIndex((candidate) => candidate.id === item.id);
-  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${summary.cards.length}` : `1/${summary.cards.length}`;
-  return `${item.label} ${routePosition} to ${item.focusLabel}`;
 }
 
 export function quickActionPatternDnaMetricSnapshot(
@@ -16035,16 +15524,6 @@ export function quickActionWorkflowNavigatorRouteReadoutZone(
   return createWorkflowSpotlightSummary(items).zoneId;
 }
 
-export function workflowNavigatorRouteLabel(item: WorkflowNavigatorItem, items: WorkflowNavigatorItem[]): string {
-  const routeIndex = items.findIndex((candidate) => candidate.id === item.id);
-  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${items.length}` : `1/${items.length}`;
-  return `${item.label} ${routePosition} to ${workflowNavigatorDestinationLabel(item)}`;
-}
-
-export function workflowNavigatorDestinationLabel(item: WorkflowNavigatorItem): string {
-  return `${item.label} zone`;
-}
-
 export function quickActionWorkflowNavigatorFollowup(
   project: ProjectState,
   action: QuickAction,
@@ -16149,16 +15628,6 @@ export function quickActionWorkflowSpotlightMetricSnapshot(
       `next ${nextCheck}`
     ].join(" / ")
   };
-}
-
-export function workflowSpotlightRouteLabel(
-  spotlight: ReturnType<typeof createWorkflowSpotlightSummary>,
-  item: WorkflowNavigatorItem,
-  items: WorkflowNavigatorItem[]
-): string {
-  const routeIndex = items.findIndex((candidate) => candidate.id === item.id);
-  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${items.length}` : `1/${items.length}`;
-  return `${spotlight.zoneLabel} ${routePosition} to ${item.label} zone via workflow-spotlight-focus`;
 }
 
 export function quickActionWorkflowSpotlightFollowup(
@@ -19202,58 +18671,6 @@ export function quickActionSoundPresetMetricSnapshot(
   };
 }
 
-export function soundFocusRouteLabel(parameters: SoundFocusParameter[]): string {
-  if (parameters.length === 0) {
-    return "No tone route needed";
-  }
-
-  const includesAny = (targets: SoundFocusParameter[]): boolean =>
-    targets.some((parameter) => parameters.includes(parameter));
-  const routes: string[] = [];
-  if (includesAny(["bassDrive", "bassDecay", "sidechainDuck"])) {
-    routes.push("808");
-  }
-  if (includesAny(["synthBrightness", "synthRelease"])) {
-    routes.push("Synth");
-  }
-  if (includesAny(["chordWarmth", "chordWidth"])) {
-    routes.push("Chords");
-  }
-  if (includesAny(["kickPunch", "snareSnap", "hatBrightness"])) {
-    routes.push(routes.length > 0 ? "Drum support" : "Drums");
-  }
-
-  return `${routes.join(" / ")} route`;
-}
-
-export function soundPresetRouteLabel(before: SoundDesign, after: SoundDesign): string {
-  const routes: string[] = [];
-  if (before.kickPunch !== after.kickPunch || before.snareSnap !== after.snareSnap || before.hatBrightness !== after.hatBrightness) {
-    routes.push("Drums");
-  }
-  if (before.bassDrive !== after.bassDrive || before.bassDecay !== after.bassDecay) {
-    routes.push("808");
-  }
-  if (before.sidechainDuck !== after.sidechainDuck) {
-    routes.push("Duck");
-  }
-  if (before.synthBrightness !== after.synthBrightness || before.synthRelease !== after.synthRelease) {
-    routes.push("Synth");
-  }
-  if (before.chordWarmth !== after.chordWarmth || before.chordWidth !== after.chordWidth) {
-    routes.push("Chords");
-  }
-  if (routes.length === 0 && before.preset !== after.preset) {
-    routes.push("Preset identity");
-  }
-
-  return routes.length === 0 ? "No preset route needed" : `${routes.join(" / ")} route`;
-}
-
-export function drumKitRouteLabel(pad: DrumKitPadOption): string {
-  return `${pad.label} kit route (${pad.detail})`;
-}
-
 export function quickActionDrumKitMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -19780,24 +19197,6 @@ export function quickActionSpaceFxSendPosture(mixer: MixerChannel[]): string {
   )} / Ch ${spaceFxTrackPosture(mixer, "chord")}`;
 }
 
-export function spaceFxRouteLabel(before: MixerChannel[], after: MixerChannel[]): string {
-  const routes: string[] = [];
-  if (spaceFxTrackPosture(before, "drum_rack") !== spaceFxTrackPosture(after, "drum_rack")) {
-    routes.push("Drums");
-  }
-  if (spaceFxTrackPosture(before, "bass_808") !== spaceFxTrackPosture(after, "bass_808")) {
-    routes.push("808");
-  }
-  if (spaceFxTrackPosture(before, "synth") !== spaceFxTrackPosture(after, "synth")) {
-    routes.push("Synth");
-  }
-  if (spaceFxTrackPosture(before, "chord") !== spaceFxTrackPosture(after, "chord")) {
-    routes.push("Chords");
-  }
-
-  return routes.length === 0 ? "No Space FX route needed" : `${routes.join(" / ")} route`;
-}
-
 export function quickActionSpaceFxContextLabel(action: QuickAction, fallback: string): string {
   return quickActionSpaceFxDetailParts(action).join(" / ") || fallback;
 }
@@ -20004,24 +19403,6 @@ export function quickActionMixBalanceChannelPosture(mixer: MixerChannel[]): stri
     mixer,
     "bass_808"
   )} / Sy ${mixBalanceChannelPosture(mixer, "synth")} / Ch ${mixBalanceChannelPosture(mixer, "chord")}`;
-}
-
-export function mixBalanceRouteLabel(before: MixerChannel[], after: MixerChannel[]): string {
-  const routes: string[] = [];
-  if (mixBalanceChannelPosture(before, "drum_rack") !== mixBalanceChannelPosture(after, "drum_rack")) {
-    routes.push("Drums");
-  }
-  if (mixBalanceChannelPosture(before, "bass_808") !== mixBalanceChannelPosture(after, "bass_808")) {
-    routes.push("808");
-  }
-  if (mixBalanceChannelPosture(before, "synth") !== mixBalanceChannelPosture(after, "synth")) {
-    routes.push("Synth");
-  }
-  if (mixBalanceChannelPosture(before, "chord") !== mixBalanceChannelPosture(after, "chord")) {
-    routes.push("Chords");
-  }
-
-  return routes.length === 0 ? "No Mix Balance route needed" : `${routes.join(" / ")} route`;
 }
 
 export function quickActionMixBalanceContextLabel(action: QuickAction, fallback: string): string {
@@ -20232,10 +19613,6 @@ export function quickActionStemAuditionMixerPosture(mixer: MixerChannel[]): stri
       return `${stemTrackLabel(trackId)} ${state}`;
     })
     .join(" / ");
-}
-
-export function stemAuditionRouteLabel(pad: StemAuditionPadOption): string {
-  return pad.trackId === null ? "Full Mix route" : `${pad.label} stem route`;
 }
 
 export function quickActionStemAuditionContextLabel(action: QuickAction, fallback: string): string {

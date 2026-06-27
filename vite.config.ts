@@ -91,6 +91,16 @@ export default defineConfig({
               priority: 2
             },
             {
+              name: "workstation-app-quick-action-route-labels",
+              test: /src[\\/]ui[\\/]workstationAppQuickActionRouteLabels\.ts$/,
+              priority: 2
+            },
+            {
+              name: "workstation-app-quick-action-palette",
+              test: /src[\\/]ui[\\/]workstationAppQuickActionPalette\.ts$/,
+              priority: 2
+            },
+            {
               name: "workstation-app-quick-actions",
               test: /src[\\/]ui[\\/]workstationAppQuickActions\.tsx$/,
               priority: 2
