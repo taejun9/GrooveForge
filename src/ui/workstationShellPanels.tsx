@@ -1227,6 +1227,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Headroom, Balance, Master Output, Stem-Pass Comparison, A/B Slot State, Capture/Recall/Clear Commands, Audition Cue, and Next Check context before Mix Snapshot A/B commands run."
       },
       {
+        id: "mix-balance-route-readout",
+        command: "Mix Balance Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Drums / 808 / Synth / Chords rough-balance route",
+        context:
+          "Mix Balance Route Readout Action, Selected Pattern A/B/C, Current Rough-Balance Preview Target, Existing Mix Balance Channel Route, Direct Mix Balance Command, Drums/808/Synth/Chords Channel Posture, Editable Mixer Controls, Stem Audition Context, Audition Cue, and Next Mix Balance Route Check context before Mix Balance commands run."
+      },
+      {
         id: "mix-balance-decision",
         command: "Mix Balance Decision",
         shortcut: "Quick Actions / Readout",

@@ -1238,6 +1238,7 @@ export function createQuickActions({
   onApplyMixBalance,
   onApplyMixFix,
   onFocusMixBalanceReadout,
+  onFocusMixBalanceRouteReadout,
   onCaptureMixSnapshot,
   onRecallMixSnapshot,
   onClearMixSnapshots,
@@ -1586,6 +1587,7 @@ export function createQuickActions({
   onApplyMixBalance: (pad: MixBalancePadId) => void;
   onApplyMixFix: (preset: MixFixPreset) => void;
   onFocusMixBalanceReadout: () => void;
+  onFocusMixBalanceRouteReadout: () => void;
   onCaptureMixSnapshot: (slot: MixSnapshotSlotId) => void;
   onRecallMixSnapshot: (slot: MixSnapshotSlotId) => void;
   onClearMixSnapshots: () => void;
@@ -2281,6 +2283,11 @@ export function createQuickActions({
     } producer beginner mix review`,
     run: onFocusMixSnapshotReadout
   };
+  const mixBalancePreviewPad =
+    mixBalancePadOptions.find((pad) => pad.id === mixBalancePreviewSummary.padId) ?? mixBalancePadOptions[0];
+  const mixBalanceRouteTarget = mixBalancePreviewPad
+    ? mixBalanceRouteLabel(project.mixer, applyMixBalancePadToMixer(project.mixer, mixBalancePreviewPad))
+    : "No Mix Balance route needed";
   const mixBalanceReadoutAction: QuickAction = {
     id: "mix-balance-readout-action",
     title: `Review Mix Balance: ${mixBalancePreviewSummary.padLabel}`,
@@ -2292,6 +2299,18 @@ export function createQuickActions({
       mixBalancePreviewSummary.auditionLabel
     } beginner producer manual trim`,
     run: onFocusMixBalanceReadout
+  };
+  const mixBalanceRouteReadoutAction: QuickAction = {
+    id: "mix-balance-route-readout-action",
+    title: `Review Mix Balance Route: ${mixBalancePreviewSummary.padLabel}`,
+    detail: `${mixBalanceRouteTarget} / ${mixBalancePreviewSummary.statusLabel} / ${mixBalancePreviewSummary.moveLabel} / direct Mix Balance unchanged`,
+    group: "Mix",
+    keywords: `Quick Actions Mix Balance Route Readout review route preflight rough balance direct mix balance command no apply drums 808 bass synth chords stem audition ${
+      mixBalancePreviewSummary.padId
+    } ${mixBalancePreviewSummary.padLabel} ${mixBalanceRouteTarget} ${
+      mixBalancePreviewSummary.channelLabel
+    } mix balance route preflight beginner producer manual trim`,
+    run: onFocusMixBalanceRouteReadout
   };
   const stemAuditionDecisionAction: QuickAction = {
     id: "stem-audition-decision",
@@ -5825,6 +5844,7 @@ export function createQuickActions({
       run: onClearMixSnapshots
     },
     mixBalanceReadoutAction,
+    mixBalanceRouteReadoutAction,
     {
       id: "mix-balance-decision",
       title: mixBalanceReady ? `Run Mix Balance Decision: Apply ${mixBalancePreviewSummary.padLabel}` : "Run Mix Balance Decision: Aligned",
@@ -6964,6 +6984,7 @@ export function createQuickActionResult(
     action.id === "chord-move-route-readout-action" ||
     action.id === "mix-snapshot-readout-action" ||
     action.id === "mix-balance-readout-action" ||
+    action.id === "mix-balance-route-readout-action" ||
     action.id === "space-fx-readout-action" ||
     action.id === "space-fx-route-readout-action" ||
     action.id === "master-finish-readout-action" ||
@@ -17332,6 +17353,33 @@ export function quickActionMixBalanceMetricSnapshot(
     };
   }
 
+  if (action.id === "mix-balance-route-readout-action") {
+    const options = createMixBalancePadOptions(project.mixer);
+    const preview = createMixBalancePreviewSummary(project.mixer, options);
+    const pad = options.find((candidate) => candidate.id === preview.padId) ?? options[0];
+    if (!pad) {
+      return null;
+    }
+    const transformed = applyMixBalancePadToMixer(project.mixer, pad);
+    const changedControls = mixBalanceChangedControlCount(project.mixer, transformed);
+    const stemAnalyses = analyzeStemExports(project);
+    return {
+      id: "mix-balance-route-readout",
+      label: "Mix Balance Route Readout",
+      value: quickActionMixBalanceMetricValue(project, action, analysis, stemAnalyses, [
+        quickActionMixBalanceActionLabel(action),
+        `route ${mixBalanceRouteLabel(project.mixer, transformed)}`,
+        "direct command mix-balance",
+        `target ${preview.padLabel}`,
+        `status ${preview.statusLabel}`,
+        `target channels ${preview.channelLabel}`,
+        `current channels ${quickActionMixBalanceChannelPosture(project.mixer)}`,
+        `moves ${preview.changedChannels} channels / ${changedControls} controls`,
+        "mix balance unchanged"
+      ])
+    };
+  }
+
   const pad = quickActionMixBalancePadOption(project, action);
   if (!pad) {
     return null;
@@ -17403,6 +17451,24 @@ export function quickActionMixBalanceChannelPosture(mixer: MixerChannel[]): stri
   )} / Sy ${mixBalanceChannelPosture(mixer, "synth")} / Ch ${mixBalanceChannelPosture(mixer, "chord")}`;
 }
 
+export function mixBalanceRouteLabel(before: MixerChannel[], after: MixerChannel[]): string {
+  const routes: string[] = [];
+  if (mixBalanceChannelPosture(before, "drum_rack") !== mixBalanceChannelPosture(after, "drum_rack")) {
+    routes.push("Drums");
+  }
+  if (mixBalanceChannelPosture(before, "bass_808") !== mixBalanceChannelPosture(after, "bass_808")) {
+    routes.push("808");
+  }
+  if (mixBalanceChannelPosture(before, "synth") !== mixBalanceChannelPosture(after, "synth")) {
+    routes.push("Synth");
+  }
+  if (mixBalanceChannelPosture(before, "chord") !== mixBalanceChannelPosture(after, "chord")) {
+    routes.push("Chords");
+  }
+
+  return routes.length === 0 ? "No Mix Balance route needed" : `${routes.join(" / ")} route`;
+}
+
 export function quickActionMixBalanceContextLabel(action: QuickAction, fallback: string): string {
   return quickActionMixBalanceDetailParts(action).join(" / ") || fallback;
 }
@@ -17419,6 +17485,10 @@ export function quickActionMixBalanceNextCheck(action: QuickAction): string {
     return "play Full Mix and core stems before applying a rough-balance pad or trimming manually";
   }
 
+  if (action.id === "mix-balance-route-readout-action") {
+    return "read the Drums, 808, Synth, and Chords rough-balance route before choosing the existing Mix Balance command";
+  }
+
   if (action.id === "mix-balance-decision") {
     return "play Full Mix and follow the visible Mix Balance Preview Decision before another rough-balance move";
   }
@@ -17433,6 +17503,9 @@ export function quickActionMixBalanceNextCheck(action: QuickAction): string {
 export function quickActionMixBalanceActionLabel(action: QuickAction): string {
   if (action.id === "mix-balance-readout-action") {
     return "review mix balance readout";
+  }
+  if (action.id === "mix-balance-route-readout-action") {
+    return "review mix balance route readout";
   }
   if (action.id === "mix-balance-decision") {
     return "run mix balance decision";
@@ -17453,7 +17526,12 @@ export function quickActionMixBalancePadOption(project: ProjectState, action: Qu
     return options.find((pad) => pad.id === directId) ?? null;
   }
 
-  if (action.id !== "mix-balance-decision" && action.id !== "mix-balance") {
+  if (
+    action.id !== "mix-balance-readout-action" &&
+    action.id !== "mix-balance-route-readout-action" &&
+    action.id !== "mix-balance-decision" &&
+    action.id !== "mix-balance"
+  ) {
     return null;
   }
 
@@ -20837,6 +20915,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the Mix Balance readout before applying a rough-balance pad, then play Full Mix and core stems.",
       nextCheck: "Apply Mix Balance only when the preview target matches what you hear; otherwise trim manually in the Mixer."
+    };
+  }
+
+  if (action.id === "mix-balance-route-readout-action") {
+    return {
+      auditionCue: `Read the Mix Balance route and loop Pattern ${project.selectedPattern} before choosing the existing Mix Balance command.`,
+      nextCheck:
+        "Use Mix Balance only when the named Drums, 808, Synth, or Chords channel route should reshape the rough balance; otherwise trim level, pan, EQ, Drive/Glue, or Space manually."
     };
   }
 
