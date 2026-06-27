@@ -3818,11 +3818,13 @@ export function ListeningPassFocusResultStrip({ result }: { result: ListeningPas
 export function BeatPassport({
   focusedMetricId,
   result,
+  sectionRef,
   onFocus,
   summary
 }: {
   focusedMetricId: BeatPassportFocusId | null;
   result: BeatPassportFocusResult | null;
+  sectionRef?: Ref<HTMLElement>;
   onFocus: (metric: BeatPassportFocusItem) => void;
   summary: BeatPassportSummary;
 }): ReactElement {
@@ -3834,6 +3836,7 @@ export function BeatPassport({
       aria-label="Beat passport"
       className={["beat-passport", summary.tone, result ? "has-result" : ""].filter(Boolean).join(" ")}
       data-testid="beat-passport"
+      ref={sectionRef}
     >
       <div className="beat-passport-heading">
         <div>

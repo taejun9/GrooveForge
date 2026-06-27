@@ -352,7 +352,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Target / length / Pattern A-B-C / readiness / export / stems / master",
         context:
-          "Target, Length, Pattern A/B/C, Readiness, Export, Stems, and Master identity context with destination, passport metric, audition cue, and next check before Beat Passport commands run."
+          "Target, Length, Pattern A/B/C, Readiness, Export, Stems, and Master identity context with route readout, direct metric command, destination, passport metric, audition cue, and next check before Beat Passport focus, playback, edit, or export commands run."
       },
       {
         id: "production-snapshot",

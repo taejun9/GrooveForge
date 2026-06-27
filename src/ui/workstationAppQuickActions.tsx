@@ -1378,6 +1378,7 @@ export function createQuickActions({
   onJumpFirstBeatPath,
   onJumpBeatSpine,
   onFocusBeatPassport,
+  onFocusBeatPassportRouteReadout,
   onFocusBeatReadiness,
   onFocusBeatReadinessRouteReadout,
   onFocusComposerGuide,
@@ -1734,6 +1735,7 @@ export function createQuickActions({
   onJumpFirstBeatPath: (step: FirstBeatPathStep) => void;
   onJumpBeatSpine: (card: BeatSpineCard) => void;
   onFocusBeatPassport: (metric: BeatPassportFocusItem) => void;
+  onFocusBeatPassportRouteReadout: () => void;
   onFocusBeatReadiness: (check: BeatReadinessCheck) => void;
   onFocusBeatReadinessRouteReadout: () => void;
   onFocusComposerGuide: (card: ComposerGuideCard) => void;
@@ -2051,6 +2053,22 @@ export function createQuickActions({
     keywords: `beat passport focus metric identity status ${metric.id} ${metric.label} ${metric.value} ${metric.focusLabel} ${metric.detail} target length patterns readiness export stems master beginner producer`,
     run: () => onFocusBeatPassport(metric)
   }));
+  const beatPassportRouteReadoutAction: QuickAction = {
+    id: "beat-passport-route-readout-action",
+    title: beatPassportMetric ? `Review Beat Passport Route: ${beatPassportMetric.label}` : "Review Beat Passport Route",
+    detail: beatPassportMetric
+      ? `${beatPassportRouteLabel(beatPassportMetric)} / ${beatPassportMetric.value} / direct beat-passport-metric-${beatPassportMetric.id} unchanged / ${beatPassportMetric.focusLabel} panel / ${beatPassportMetric.detail}`
+      : "No Beat Passport metric available.",
+    group: "Project",
+    keywords: `Quick Actions Beat Passport Route Readout review route identity metric direct beat passport command no edit target length patterns readiness export stems master ${
+      beatPassportMetric?.id ?? "none"
+    } ${beatPassportMetric?.label ?? "none"} ${beatPassportMetric?.value ?? "none"} ${
+      beatPassportMetric?.focusLabel ?? "none"
+    } beginner producer sample free`,
+    disabled: !beatPassportMetric,
+    resultTargetId: beatPassportMetric?.id,
+    run: onFocusBeatPassportRouteReadout
+  };
   const firstBeatPathStep = activeFirstBeatPathQuickActionStep(firstBeatPathSummary);
   const firstBeatPathActions: QuickAction[] = firstBeatPathSummary.steps.map((step) => ({
     id: `first-beat-path-step-${step.id}`,
@@ -5292,6 +5310,7 @@ export function createQuickActions({
       }
     },
     ...listeningPassActions,
+    beatPassportRouteReadoutAction,
     {
       id: "beat-passport-focus",
       title: beatPassportMetric ? `Focus Beat Passport: ${beatPassportMetric.label}` : "Focus Beat Passport",
@@ -7045,6 +7064,7 @@ export function createQuickActionResult(
     action.id === "arrangement-playback-readout-action" ||
     action.id === "audible-arrangement-follow-readout-action" ||
     action.id.startsWith("mode-focus-card-") ||
+    action.id === "beat-passport-route-readout-action" ||
     action.id === "beat-passport-focus" ||
     action.id.startsWith("beat-passport-metric-") ||
     action.id === "production-snapshot-focus" ||
@@ -10296,15 +10316,23 @@ export function quickActionBeatPassportMetricSnapshot(
   const pattern = activePattern(project);
   const usedSlots = usedPatternSlots(project);
   const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
-  const actionLabel = action.id === "beat-passport-focus" ? "focus priority beat passport" : "focus direct beat passport";
+  const isRouteReadout = action.id === "beat-passport-route-readout-action";
+  const actionLabel = isRouteReadout
+    ? "review beat passport route readout"
+    : action.id === "beat-passport-focus"
+      ? "focus priority beat passport"
+      : "focus direct beat passport";
+  const directMetricLabel = `direct beat-passport-metric-${metric.id} unchanged`;
   const laneLabel = quickActionBeatPassportLaneLabel(action, metric);
   const detailParts = quickActionBeatPassportDetailParts(action);
   const contextLabel = detailParts.slice(2).join(" / ") || metric.detail;
 
   return {
-    id: "beat-passport",
-    label: "Beat passport",
-    value: `${actionLabel} / metric ${laneLabel} / destination ${metric.focusLabel} panel / status ${metric.value} / context ${contextLabel} / Pattern ${
+    id: isRouteReadout ? "beat-passport-route-readout" : "beat-passport",
+    label: isRouteReadout ? "Beat Passport Route Readout" : "Beat passport",
+    value: `${actionLabel} / route ${beatPassportRouteLabel(metric)} / metric ${laneLabel} / ${directMetricLabel} / destination ${
+      metric.focusLabel
+    } panel / status ${metric.value} / context ${contextLabel} / Pattern ${
       project.selectedPattern
     } / ${patternEventTotal(pattern)} events / ${patternUseLabel} / identity ${summary.headline} / ${summary.detail} / passport ${beatPassportFocusResultMetric(
       summary
@@ -10313,7 +10341,7 @@ export function quickActionBeatPassportMetricSnapshot(
 }
 
 export function quickActionBeatPassportMetric(summary: BeatPassportSummary, action: QuickAction): BeatPassportMetric | null {
-  if (action.id === "beat-passport-focus") {
+  if (action.id === "beat-passport-route-readout-action" || action.id === "beat-passport-focus") {
     return activeBeatPassportQuickActionMetric(summary);
   }
 
@@ -10346,8 +10374,27 @@ export function quickActionBeatPassportDetailParts(action: QuickAction): string[
 }
 
 export function quickActionBeatPassportLaneLabel(action: QuickAction, metric: BeatPassportMetric): string {
-  const titleLabel = action.title.replace(/^Focus Beat Passport:\s*/, "").trim();
-  return titleLabel && titleLabel !== "Focus Beat Passport" ? titleLabel : metric.label;
+  const titleLabel = action.title.replace(/^Focus Beat Passport:\s*/, "").replace(/^Review Beat Passport Route:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Beat Passport" && titleLabel !== "Review Beat Passport Route" ? titleLabel : metric.label;
+}
+
+export function beatPassportRouteLabel(metric: BeatPassportMetric): string {
+  switch (metric.id) {
+    case "target":
+      return "Target route";
+    case "length":
+      return "Length route";
+    case "patterns":
+      return "Pattern A/B/C route";
+    case "readiness":
+      return "Readiness route";
+    case "export":
+      return "Export route";
+    case "stems":
+      return "Stems route";
+    case "master":
+      return "Master route";
+  }
 }
 
 export function quickActionProductionSnapshotMetricSnapshot(
@@ -15897,7 +15944,11 @@ export function quickActionResultMetricSnapshot(
     }
   }
 
-  if (action.id === "beat-passport-focus" || action.id.startsWith("beat-passport-metric-")) {
+  if (
+    action.id === "beat-passport-route-readout-action" ||
+    action.id === "beat-passport-focus" ||
+    action.id.startsWith("beat-passport-metric-")
+  ) {
     const passportMetric = quickActionBeatPassportMetricSnapshot(project, action);
     if (passportMetric) {
       return passportMetric;
@@ -20836,6 +20887,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused Listening Pass checkpoint to inspect that audition lane before changing the beat.",
       nextCheck: "Return to Listening Pass when you need another direct composition, arrangement, mix, or delivery listening focus."
+    };
+  }
+
+  if (action.id === "beat-passport-route-readout-action") {
+    return {
+      auditionCue: `Read the Beat Passport route, then audition Pattern ${project.selectedPattern}, Song, Full Mix, or the matching deliverable before focusing an identity metric.`,
+      nextCheck:
+        "Use Beat Passport focus only when the named target, length, Pattern, readiness, export, stems, or master route matches the identity question; otherwise leave playback and project data unchanged."
     };
   }
 
