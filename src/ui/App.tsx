@@ -777,7 +777,8 @@ import {
   ProjectSnapshots,
   QuickActionResultStrip,
   QuickActions,
-  SnapshotCompare
+  SnapshotCompare,
+  createCommandReferenceRouteReadoutSummary
 } from "./workstationShellPanels";
 import {
   auditionSelectedChord as auditionSelectedChordEvent,
@@ -8294,6 +8295,29 @@ export function App(): ReactElement {
     setCommandReferenceOpen(true);
   }
 
+  function focusCommandReferenceRouteReadout(): void {
+    const currentProject = projectRef.current;
+    const summary = createCommandReferenceRouteReadoutSummary();
+    const target = activeDeliveryTarget(currentProject);
+    const pattern = activePattern(currentProject);
+    const exportAnalysis = analyzeExport(currentProject);
+
+    setQuickActionsOpen(false);
+    setQuickActionQuery("");
+    setCommandReferenceOpen(true);
+    setProjectStatus(
+      `Command Reference Route Readout Pattern ${currentProject.selectedPattern}: ${summary.filterCount} filters / ${
+        summary.commandCount
+      } command-map entries / ${summary.quickActionCommandCount} Quick Actions rows / ${
+        summary.readoutCommandCount
+      } readout rows / ${summary.searchRouteLabel} / direct command-reference unchanged / Quick Actions unchanged / Search Spotlight unchanged / Command Reference filter unchanged / target ${
+        target.name
+      } / ${patternEventTotal(pattern)} selected-pattern events / ${projectEventTotal(currentProject)} editable project events / ${
+        currentProject.arrangement.length
+      } blocks / ${arrangementTotalBars(currentProject)} bars / export ${exportAnalysis.status} / Help panel`
+    );
+  }
+
   function closeCommandReference(): void {
     setCommandReferenceOpen(false);
   }
@@ -9113,6 +9137,7 @@ export function App(): ReactElement {
     onFocusWorkflowSpotlightRouteReadout: focusWorkflowSpotlightRouteReadout,
     onFocusWorkflowSpotlight: jumpToWorkflowNavigatorItem,
     onJumpWorkflowZone: jumpToWorkflowNavigatorItem,
+    onFocusCommandReferenceRouteReadout: focusCommandReferenceRouteReadout,
     onOpenCommandReference: openCommandReference,
     onOpenProject: handleOpenProject,
     onCheckProjectSafety: checkProjectSafetyReadout,
