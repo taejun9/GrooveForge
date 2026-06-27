@@ -3439,6 +3439,22 @@ export function createQuickActions({
     keywords: `handoff route readout review deliver target route status package manifest receipt send order no render no download ${handoffRouteSummary.routeLabel} ${handoffRouteSummary.statusLabel} sample free beginner producer`,
     run: onFocusHandoffPack
   };
+  const handoffExportFormatReadoutAction: QuickAction = {
+    id: "handoff-export-format-readout-action",
+    title: `Review Handoff Export Format Readout: ${handoffExportFormatSummary.statusLabel}`,
+    detail: [
+      handoffExportFormatSummary.statusLabel,
+      handoffExportFormatSummary.titleLabel,
+      handoffExportFormatSummary.durationLabel,
+      handoffExportFormatSummary.detailLabel,
+      `target ${activeDeliveryTarget(project).name}`,
+      `package ${handoffPackageCheckSummary.headline}`,
+      "format preflight"
+    ].join(" / "),
+    group: "Export",
+    keywords: `handoff export format readout review wav stems midi sheet sample rate channel duration full mix file delivery target package no render no download ${handoffExportFormatSummary.statusLabel} ${handoffExportFormatSummary.titleLabel} sample free beginner producer`,
+    run: onFocusHandoffPack
+  };
   const handoffManifestAuditReadoutAction: QuickAction = {
     id: "handoff-manifest-audit-readout-action",
     title: `Review Handoff Manifest Audit Readout: ${handoffManifestAudit.statusLabel}`,
@@ -5739,6 +5755,7 @@ export function createQuickActions({
       run: onFocusHandoffPack
     },
     handoffRouteReadoutAction,
+    handoffExportFormatReadoutAction,
     {
       id: "handoff-export-format-focus",
       title: handoffExportFormatMetric
@@ -11200,6 +11217,73 @@ export function quickActionHandoffManifestAuditDetailParts(action: QuickAction):
     .filter(Boolean);
 }
 
+export function quickActionHandoffExportFormatReadoutMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction,
+  exportReceipt: HandoffExportReceipt | null,
+  analysis?: ExportAnalysis
+): { id: string; label: string; value: string } | null {
+  if (action.id !== "handoff-export-format-readout-action") {
+    return null;
+  }
+
+  const exportAnalysis = analysis ?? analyzeExport(project);
+  const stemAnalyses = analyzeStemExports(project);
+  const noopExport = (): void => undefined;
+  const handoffPackItems = createHandoffPackItems({
+    analysis: exportAnalysis,
+    project,
+    stemAnalyses,
+    onExportHandoffSheet: noopExport,
+    onExportMidi: noopExport,
+    onExportStems: noopExport,
+    onExportWav: noopExport
+  });
+  const summary = createHandoffExportFormatSummary(project, exportAnalysis, stemAnalyses, handoffPackItems);
+  const packageSummary = createHandoffPackageCheckSummary(project, exportAnalysis, stemAnalyses, exportReceipt);
+  const target = activeDeliveryTarget(project);
+  const pattern = activePattern(project);
+  const usedSlots = usedPatternSlots(project);
+  const patternUseLabel = usedSlots.length > 0 ? `${usedSlots.join("/")} used` : `Pattern ${project.selectedPattern} only`;
+  const detailParts = quickActionHandoffExportFormatDetailParts(action);
+  const contextLabel = detailParts.join(" / ") || summary.detailTitle;
+  const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const formatPosture = summary.metrics.map((metric) => `${metric.label} ${metric.value}`).join(" / ");
+  const followup = quickActionResultFollowup(action, project, "complete");
+
+  return {
+    id: "handoff-export-format-readout",
+    label: "Handoff Export Format Readout",
+    value: [
+      "review handoff export format",
+      "destination Deliver panel",
+      `format ${summary.statusLabel}`,
+      `wav ${summary.titleLabel}`,
+      `duration ${summary.durationLabel}`,
+      `file ${mixWavFileName(project)}`,
+      `stems ${stemWavFileNames(project).length} files / ${audibleStemCount}/${stemTrackIds.length} audible`,
+      `midi ${midiFileName(project)} / ${barCountLabel(arrangementTotalBars(project))}`,
+      `sheet ${handoffSheetFileName(project)} / brief ${sessionBriefFilledFields(project.sessionBrief)}/4`,
+      `target ${target.name}`,
+      `package ${packageSummary.headline}`,
+      packageSummary.detail,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} editable events`,
+      patternUseLabel,
+      `formats ${formatPosture}`,
+      `${project.arrangement.length} blocks`,
+      barCountLabel(arrangementTotalBars(project)),
+      "export unchanged",
+      "receipt unchanged",
+      "format derivation unchanged",
+      "sampler scope unchanged",
+      `context ${contextLabel}`,
+      `audition ${followup.auditionCue}`,
+      `next ${followup.nextCheck}`
+    ].join(" / ")
+  };
+}
+
 export function quickActionHandoffExportFormatMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -14672,6 +14756,16 @@ export function quickActionResultMetricSnapshot(
       label: action.id === "handoff-manifest-audit-readout-action" ? "Handoff Manifest Audit Readout" : "Handoff manifest",
       value: action.detail
     };
+  }
+
+  if (action.id === "handoff-export-format-readout-action") {
+    return (
+      quickActionHandoffExportFormatReadoutMetricSnapshot(project, action, handoffExportReceipt, analysis ?? undefined) ?? {
+        id: "handoff-export-format-readout",
+        label: "Handoff Export Format Readout",
+        value: action.detail
+      }
+    );
   }
 
   if (action.id === "handoff-export-format-focus" || action.id.startsWith("handoff-export-format-")) {
@@ -18675,6 +18769,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Read Manifest Audit before sending files so planned WAV, stems, MIDI, and Handoff Sheet readiness match the latest receipt.",
       nextCheck: "If any file lane is not ready, use Handoff Send Order, Handoff Export Receipt, or the explicit deliverable export before sending."
+    };
+  }
+
+  if (action.id === "handoff-export-format-readout-action") {
+    return {
+      auditionCue: "Review WAV format, duration, stem count, MIDI scope, and Handoff Sheet context before exporting deliverables.",
+      nextCheck:
+        "Run the matching explicit export only after the format posture, package readiness, delivery target, and receipt context agree."
     };
   }
 
