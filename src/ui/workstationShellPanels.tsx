@@ -501,12 +501,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Current Command Target, Workflow Spotlight Route Readout posture, Derived Workflow Zone, Decision Readout, Visible Jump Route, Workflow Navigator Counts, Search Spotlight Relation, Pinned Command Context, Jump Result Feedback, Audition Cue, and Next Workflow Check context before Workflow Spotlight commands run."
       },
       {
+        id: "beat-map-route-readout",
+        command: "Beat Map Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Start / compose / arrange / polish / deliver route",
+        context:
+          "Beat Map Route Readout Action, current Start, Compose, Arrange, Polish, or Deliver Beat Map route, direct Beat Map action command, Beat Map action unchanged, Structure Lens unchanged, Next Move unchanged, selected Pattern, Delivery Target, completion posture, export/stem/package readiness, audition cue, and next beat-map-route check before Beat Map actions, Structure Lens actions, Next Move, Workflow Navigator jump, Workflow Spotlight focus, playback, edit, or export commands run."
+      },
+      {
         id: "beat-map",
         command: "Beat Map",
         shortcut: "Quick Actions / Readout",
         target: "Workflow stages / song-pattern / export-stem / producer overview",
         context:
-          "Start, Compose, Arrange, Polish, Deliver, Song/Pattern Metrics, Export/Stems, Delivery Target, Completion Posture, Action Route, Audition Cue, and Next Check context before Beat Map commands run."
+          "Start, Compose, Arrange, Polish, Deliver, Song/Pattern Metrics, Export/Stems, Delivery Target, Completion Posture, Beat Map Route Readout posture, Action Route, Audition Cue, and Next Check context before Beat Map commands run."
       },
       {
         id: "structure-lens",

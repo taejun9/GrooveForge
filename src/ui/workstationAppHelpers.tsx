@@ -7230,14 +7230,16 @@ export function HandoffPackageCheckFocusResultStrip({ result }: { result: Handof
 export function BeatMap({
   actions,
   onRun,
+  sectionRef,
   summary
 }: {
   actions: NextMoveAction[];
   onRun: (action: NextMoveAction) => void;
+  sectionRef?: Ref<HTMLElement>;
   summary: BeatMapSummary;
 }): ReactElement {
   return (
-    <section className={`beat-map ${summary.tone}`} data-testid="beat-map" aria-label="Beat map">
+    <section ref={sectionRef} className={`beat-map ${summary.tone}`} data-testid="beat-map" aria-label="Beat map">
       <div className="beat-map-heading">
         <div>
           <Music2 size={17} aria-hidden="true" />
