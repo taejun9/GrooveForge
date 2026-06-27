@@ -3690,11 +3690,13 @@ export function SessionBriefStarterResultStrip({ result }: { result: SessionBrie
 export function ListeningPass({
   focusedItemId,
   result,
+  sectionRef,
   onFocus,
   summary
 }: {
   focusedItemId: ListeningPassId | null;
   result: ListeningPassFocusResult | null;
+  sectionRef?: Ref<HTMLElement>;
   onFocus: (item: ListeningPassItem) => void;
   summary: ListeningPassSummary;
 }): ReactElement {
@@ -3706,6 +3708,7 @@ export function ListeningPass({
       aria-label="Listening pass"
       className={["listening-pass", summary.tone, result ? "has-result" : ""].filter(Boolean).join(" ")}
       data-testid="listening-pass"
+      ref={sectionRef}
     >
       <div className="listening-pass-heading">
         <div>

@@ -344,7 +344,7 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "Quick Actions / Readout",
         target: "Composition / arrangement / mix / delivery audition",
         context:
-          "Composition, Arrangement, Mix, and Delivery audition checkpoint context with destination, listening metric, audition cue, and next check before Listening Pass commands run."
+          "Composition, Arrangement, Mix, and Delivery audition checkpoint context with route readout, direct checkpoint command, destination, listening metric, audition cue, and next check before Listening Pass focus, playback, edit, or export commands run."
       },
       {
         id: "beat-passport",

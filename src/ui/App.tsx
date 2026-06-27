@@ -1039,6 +1039,7 @@ import {
   beatReadinessRouteLabel,
   drumKitRouteLabel,
   exportPreflightRouteLabel,
+  listeningPassRouteLabel,
   masterAutomationRouteLabel,
   masterFinishRouteLabel,
   mixBalanceRouteLabel,
@@ -1242,6 +1243,7 @@ export function App(): ReactElement {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const styleInspectorRef = useRef<HTMLElement | null>(null);
   const beatReadinessPanelRef = useRef<HTMLElement | null>(null);
+  const listeningPassPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
   const composePanelRef = useRef<HTMLElement | null>(null);
   const soundPanelRef = useRef<HTMLElement | null>(null);
@@ -7676,6 +7678,18 @@ export function App(): ReactElement {
     setProjectStatus(`Listening ${item.label}: ${item.status}`);
   }
 
+  function focusListeningPassRouteReadout(): void {
+    const item = activeListeningPassQuickActionItem(listeningPassSummary);
+    listeningPassPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      item
+        ? `Listening Pass Route Readout Pattern ${project.selectedPattern}: ${listeningPassRouteLabel(
+            item
+          )} / ${item.status} / direct listening-pass-checkpoint-${item.id} unchanged / ${item.focusLabel} panel`
+        : "Listening Pass Route Readout: no priority checkpoint available"
+    );
+  }
+
   function focusStyleInspectorItem(item: StyleInspectorFocusItem): void {
     const targetRefs: Record<StyleInspectorFocusTarget, HTMLElement | null> = {
       transport: transportPanelRef.current,
@@ -8827,6 +8841,7 @@ export function App(): ReactElement {
     onFocusHookReadiness: focusHookReadinessCard,
     onFocusKeyCompass: focusKeyCompassItem,
     onFocusListeningPass: focusListeningPassItem,
+    onFocusListeningPassRouteReadout: focusListeningPassRouteReadout,
     onFocusLoopScope: focusLoopScopeReadout,
     onFocusMetronomeReadout: focusMetronomeReadout,
     onFocusTransportPositionReadout: focusTransportPositionReadout,
@@ -9393,6 +9408,7 @@ export function App(): ReactElement {
       <ListeningPass
         focusedItemId={listeningPassFocusId}
         result={listeningPassResult}
+        sectionRef={listeningPassPanelRef}
         summary={listeningPassSummary}
         onFocus={focusListeningPassItem}
       />

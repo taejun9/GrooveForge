@@ -1395,6 +1395,7 @@ export function createQuickActions({
   onFocusHookReadiness,
   onFocusKeyCompass,
   onFocusListeningPass,
+  onFocusListeningPassRouteReadout,
   onFocusLoopScope,
   onFocusMetronomeReadout,
   onFocusTransportPositionReadout,
@@ -1750,6 +1751,7 @@ export function createQuickActions({
   onFocusHookReadiness: (card: HookReadinessFocusItem) => void;
   onFocusKeyCompass: (item: KeyCompassFocusItem) => void;
   onFocusListeningPass: (item: ListeningPassItem) => void;
+  onFocusListeningPassRouteReadout: () => void;
   onFocusLoopScope: () => void;
   onFocusMetronomeReadout: () => void;
   onFocusTransportPositionReadout: () => void;
@@ -2285,6 +2287,24 @@ export function createQuickActions({
     keywords: `listening pass focus checkpoint audition ${item.id} ${item.label} ${item.status} ${item.focusLabel} ${item.cue} composition arrangement mix delivery beginner producer`,
     run: () => onFocusListeningPass(item)
   }));
+  const listeningPassRouteReadoutAction: QuickAction = {
+    id: "listening-pass-route-readout-action",
+    title: listeningPassItem
+      ? `Review Listening Pass Route: ${listeningPassItem.label}`
+      : "Review Listening Pass Route",
+    detail: listeningPassItem
+      ? `${listeningPassRouteLabel(listeningPassItem)} / ${listeningPassItem.status} / direct listening-pass-checkpoint-${listeningPassItem.id} unchanged / ${listeningPassItem.focusLabel} panel / ${listeningPassItem.detail}`
+      : "No Listening Pass checkpoint available.",
+    group: "Project",
+    keywords: `Quick Actions Listening Pass Route Readout review route audition checkpoint selected Pattern ${
+      project.selectedPattern
+    } direct listening pass checkpoint command composition arrangement mix delivery ${listeningPassItem?.id ?? "none"} ${
+      listeningPassItem ? listeningPassRouteLabel(listeningPassItem) : "none"
+    } ${listeningPassItem?.focusLabel ?? "none"} ${listeningPassItem?.cue ?? "none"} beginner producer sample free`,
+    disabled: !listeningPassItem,
+    resultTargetId: listeningPassItem?.id,
+    run: onFocusListeningPassRouteReadout
+  };
   const mixCoachChecks = createMixCoachChecks(exportAnalysis, stemAnalyses);
   const mixCoachCheck = mixCoachFocusCheck(mixCoachChecks);
   const mixCoachActions: QuickAction[] = mixCoachChecks.map((check) => ({
@@ -5257,6 +5277,7 @@ export function createQuickActions({
       }
     },
     ...beatReadinessActions,
+    listeningPassRouteReadoutAction,
     {
       id: "listening-pass-focus",
       title: listeningPassItem ? `Focus Listening Pass: ${listeningPassItem.label}` : "Focus Listening Pass",
@@ -7010,6 +7031,7 @@ export function createQuickActionResult(
     action.id === "beat-readiness-route-readout-action" ||
     action.id === "beat-readiness-focus" ||
     action.id.startsWith("beat-readiness-check-") ||
+    action.id === "listening-pass-route-readout-action" ||
     action.id === "listening-pass-focus" ||
     action.id.startsWith("listening-pass-checkpoint-") ||
     action.id === "key-compass-focus" ||
@@ -10169,6 +10191,19 @@ export function beatReadinessRouteLabel(check: BeatReadinessCheck): string {
   }
 }
 
+export function listeningPassRouteLabel(item: ListeningPassItem): string {
+  switch (item.id) {
+    case "composition":
+      return "Composition route";
+    case "arrangement":
+      return "Arrangement route";
+    case "mix":
+      return "Mix route";
+    case "delivery":
+      return "Delivery route";
+  }
+}
+
 export function quickActionListeningPassMetricSnapshot(
   project: ProjectState,
   action: QuickAction
@@ -10188,15 +10223,21 @@ export function quickActionListeningPassMetricSnapshot(
   const pattern = activePattern(project);
   const parts = quickActionListeningPassDetailParts(action);
   const cueLabel = parts.slice(2).join(" / ") || item.cue;
-  const actionLabel = action.id === "listening-pass-focus" ? "focus priority listening pass" : "focus direct listening pass";
+  const isRouteReadout = action.id === "listening-pass-route-readout-action";
+  const actionLabel = isRouteReadout
+    ? "review listening pass route readout"
+    : action.id === "listening-pass-focus"
+      ? "focus priority listening pass"
+      : "focus direct listening pass";
+  const directCheckpointLabel = `direct listening-pass-checkpoint-${item.id} unchanged`;
   const laneLabel = quickActionListeningPassLaneLabel(action, item);
   const drumCount = drumHitCount(pattern);
   const musicEvents = pattern.bassNotes.length + pattern.chordEvents.length + pattern.melodyNotes.length;
 
   return {
-    id: "listening-pass",
-    label: "Listening pass",
-    value: `${actionLabel} / checkpoint ${laneLabel} / destination ${item.focusLabel} panel / status ${item.status} / context ${
+    id: isRouteReadout ? "listening-pass-route-readout" : "listening-pass",
+    label: isRouteReadout ? "Listening Pass Route Readout" : "Listening pass",
+    value: `${actionLabel} / route ${listeningPassRouteLabel(item)} / checkpoint ${laneLabel} / ${directCheckpointLabel} / destination ${item.focusLabel} panel / status ${item.status} / context ${
       item.detail
     } / cue ${cueLabel} / metric ${item.metric} / Pattern ${project.selectedPattern} / ${patternEventTotal(
       pattern
@@ -10207,7 +10248,7 @@ export function quickActionListeningPassMetricSnapshot(
 }
 
 export function quickActionListeningPassItem(summary: ListeningPassSummary, action: QuickAction): ListeningPassItem | null {
-  if (action.id === "listening-pass-focus") {
+  if (action.id === "listening-pass-route-readout-action" || action.id === "listening-pass-focus") {
     return activeListeningPassQuickActionItem(summary);
   }
 
@@ -10232,8 +10273,8 @@ export function quickActionListeningPassDetailParts(action: QuickAction): string
 }
 
 export function quickActionListeningPassLaneLabel(action: QuickAction, item: ListeningPassItem): string {
-  const titleLabel = action.title.replace(/^Focus Listening Pass:\s*/, "").trim();
-  return titleLabel && titleLabel !== "Focus Listening Pass" ? titleLabel : item.label;
+  const titleLabel = action.title.replace(/^Focus Listening Pass:\s*/, "").replace(/^Review Listening Pass Route:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Listening Pass" && titleLabel !== "Review Listening Pass Route" ? titleLabel : item.label;
 }
 
 export function quickActionBeatPassportMetricSnapshot(
@@ -15845,7 +15886,11 @@ export function quickActionResultMetricSnapshot(
     }
   }
 
-  if (action.id === "listening-pass-focus" || action.id.startsWith("listening-pass-checkpoint-")) {
+  if (
+    action.id === "listening-pass-route-readout-action" ||
+    action.id === "listening-pass-focus" ||
+    action.id.startsWith("listening-pass-checkpoint-")
+  ) {
     const listeningMetric = quickActionListeningPassMetricSnapshot(project, action);
     if (listeningMetric) {
       return listeningMetric;
@@ -20769,6 +20814,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the focused panel to inspect the readiness issue before changing project data.",
       nextCheck: "Return to Beat Readiness after the next explicit drums, 808, harmony, arrangement, or export move."
+    };
+  }
+
+  if (action.id === "listening-pass-route-readout-action") {
+    return {
+      auditionCue: `Read the Listening Pass route, then audition Pattern ${project.selectedPattern}, Song, Full Mix, or the matching stem before focusing a checkpoint.`,
+      nextCheck:
+        "Use Listening Pass focus only when the named composition, arrangement, mix, or delivery route matches the listening question; otherwise leave playback and project data unchanged."
     };
   }
 
