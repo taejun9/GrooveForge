@@ -1414,6 +1414,7 @@ export type PatternContrastSectionFitItem = {
   pattern: PatternSlot;
   role: PatternContrastRole;
   roleLabel: string;
+  expectedRoles: PatternContrastRole[];
   expectedLabel: string;
   fitLabel: string;
   barLabel: string;

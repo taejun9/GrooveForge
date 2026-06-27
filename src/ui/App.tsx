@@ -9932,6 +9932,7 @@ export function App(): ReactElement {
             onCuePattern={cuePatternFromCompare}
             onCueSectionFitBlock={() => cueArrangementBlock(selectedArrangementIndex)}
             onUsePattern={usePatternInSelectedBlockFromCompare}
+            onUseSectionFitRole={usePatternInSelectedBlockFromCompare}
             sectionFitCueActive={transportLoopScope === "block" && project.arrangement.length > 0}
             sectionFitCueDisabled={isPlaying || project.arrangement.length === 0}
           />

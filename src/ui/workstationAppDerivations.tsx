@@ -2694,6 +2694,7 @@ export function createPatternContrastSectionFitSummary(
       pattern: block.pattern,
       role: block.role,
       roleLabel: block.roleLabel,
+      expectedRoles,
       expectedLabel,
       fitLabel,
       barLabel: block.barLabel,
