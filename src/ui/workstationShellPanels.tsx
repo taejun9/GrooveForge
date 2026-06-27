@@ -745,6 +745,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "808 Bassline/Glide/Contour Preview, Current 808 Move Target, Direct 808 Move Command, 808 Move Result Feedback, Selected Pattern, Audition Cue, and Next Bass Check context before 808 Move commands run."
       },
       {
+        id: "808-move-route-readout",
+        command: "808 Move Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Bassline / glide / contour route / no edit",
+        context:
+          "808 Move Route Readout Action, Selected Pattern A/B/C, 808 Bassline/Glide/Contour Preview, Current 808 Move Target, Existing 808 Move Route, Direct 808 Move Command, Move Count, 808 Note/Rhythm/Glide/Chance/Range Posture, Arrangement Usage, Audition Cue, and Next 808 Route Check context before 808 Move commands run."
+      },
+      {
         id: "melody-move",
         command: "Melody Move",
         shortcut: "Quick Actions / Readout",

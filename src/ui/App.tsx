@@ -8161,6 +8161,23 @@ export function App(): ReactElement {
     );
   }
 
+  function focusBassMoveRouteReadout(): void {
+    const target = activeBassMoveQuickActionTarget(project, bassMovePreviewSummary);
+    const routeLabel = target
+      ? target.kind === "Bassline"
+        ? "808 Bassline route"
+        : target.kind === "Glide"
+          ? "808 Glide route"
+          : "808 Contour route"
+      : "no 808 route";
+    composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      target
+        ? `808 Move Route Readout Pattern ${project.selectedPattern}: route ${routeLabel} / target ${target.label} ${target.kind} / direct command 808-move / ${bassMovePreviewSummary.moveLabel} / direct 808 move unchanged`
+        : `808 Move Route Readout Pattern ${project.selectedPattern}: ${bassMovePreviewSummary.statusLabel} / no 808 move route needed / ${bassMovePreviewSummary.moveLabel} / direct 808 move unchanged`
+    );
+  }
+
   function focusLayerStarterReadout(): void {
     const priorityLayer = layerStarterOptions.find((option) => option.tone !== "good") ?? layerStarterOptions[0] ?? null;
     composePanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -8439,6 +8456,7 @@ export function App(): ReactElement {
     onApplyBasslinePad: applyBasslinePad,
     onApplyBassGlidePad: applyBassGlidePad,
     onApplyBassContour: applyBassContour,
+    onFocusBassMoveRouteReadout: focusBassMoveRouteReadout,
     onApplyBeatSpine: applyBeatSpineAction,
     onApplyBlueprint: applyQuickActionBeatBlueprint,
     onApplyChordPad: applyChordPad,
