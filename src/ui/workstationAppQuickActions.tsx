@@ -1379,6 +1379,7 @@ export function createQuickActions({
   onJumpBeatSpine,
   onFocusBeatPassport,
   onFocusBeatReadiness,
+  onFocusBeatReadinessRouteReadout,
   onFocusComposerGuide,
   onFocusComposerActionsReadout,
   onRunComposerAction,
@@ -1733,6 +1734,7 @@ export function createQuickActions({
   onJumpBeatSpine: (card: BeatSpineCard) => void;
   onFocusBeatPassport: (metric: BeatPassportFocusItem) => void;
   onFocusBeatReadiness: (check: BeatReadinessCheck) => void;
+  onFocusBeatReadinessRouteReadout: () => void;
   onFocusComposerGuide: (card: ComposerGuideCard) => void;
   onFocusComposerActionsReadout: () => void;
   onRunComposerAction: (action: ComposerAction) => void;
@@ -2011,6 +2013,26 @@ export function createQuickActions({
   };
   const beatPassportMetric = activeBeatPassportQuickActionMetric(beatPassportSummary);
   const beatReadinessCheck = activeBeatReadinessQuickActionCheck(beatReadinessChecks);
+  const beatReadinessRouteReadoutAction: QuickAction = {
+    id: "beat-readiness-route-readout-action",
+    title: beatReadinessCheck
+      ? `Review Beat Readiness Route: ${beatReadinessCheck.label}`
+      : "Review Beat Readiness Route",
+    detail: beatReadinessCheck
+      ? `${beatReadinessRouteLabel(beatReadinessCheck)} / ${beatReadinessCheck.status} / direct ${beatReadinessCardActionId(
+          beatReadinessCheck
+        )} unchanged / ${beatReadinessCheck.focusLabel} panel / ${beatReadinessCheck.detail}`
+      : "No Beat Readiness check available.",
+    group: "Project",
+    keywords: `Quick Actions Beat Readiness Route Readout review route readiness direct beat readiness focus command no edit drums 808 bass melody chords arrangement export ${
+      beatReadinessCheck?.id ?? "none"
+    } ${beatReadinessCheck?.label ?? "none"} ${beatReadinessCheck?.status ?? "none"} ${
+      beatReadinessCheck?.focusLabel ?? "none"
+    } beginner producer`,
+    disabled: !beatReadinessCheck,
+    resultTargetId: beatReadinessCheck?.id,
+    run: onFocusBeatReadinessRouteReadout
+  };
   const beatReadinessActions: QuickAction[] = beatReadinessChecks.map((check) => ({
     id: beatReadinessCardActionId(check),
     title: `Focus Beat Readiness: ${check.label}`,
@@ -5220,6 +5242,7 @@ export function createQuickActions({
       }
     },
     ...soundPresetActions,
+    beatReadinessRouteReadoutAction,
     {
       id: "beat-readiness-focus",
       title: beatReadinessCheck ? `Focus Beat Readiness: ${beatReadinessCheck.label}` : "Focus Beat Readiness",
@@ -6984,6 +7007,7 @@ export function createQuickActionResult(
     action.id === "style-inspector-focus" ||
     action.id.startsWith("style-inspector-item-") ||
     action.id === "style-direction-readout-action" ||
+    action.id === "beat-readiness-route-readout-action" ||
     action.id === "beat-readiness-focus" ||
     action.id.startsWith("beat-readiness-check-") ||
     action.id === "listening-pass-focus" ||
@@ -10077,8 +10101,17 @@ export function quickActionBeatReadinessMetricSnapshot(
   const pattern = activePattern(project);
   const parts = quickActionBeatReadinessDetailParts(action);
   const contextLabel = parts.slice(1).join(" / ") || check.detail;
-  const actionLabel = action.id === "beat-readiness-focus" ? "focus priority beat readiness" : "focus direct beat readiness";
+  const actionLabel =
+    action.id === "beat-readiness-route-readout-action"
+      ? "review beat readiness route readout"
+      : action.id === "beat-readiness-focus"
+        ? "focus priority beat readiness"
+        : "focus direct beat readiness";
   const laneLabel = quickActionBeatReadinessLaneLabel(action, check);
+  const routeParts =
+    action.id === "beat-readiness-route-readout-action"
+      ? [`route ${beatReadinessRouteLabel(check)}`, `direct command ${beatReadinessCardActionId(check)}`, "beat readiness unchanged"]
+      : [];
   const drumCount = drumHitCount(pattern);
   const musicEvents = pattern.bassNotes.length + pattern.chordEvents.length + pattern.melodyNotes.length;
   const readyLayerCount = [
@@ -10092,9 +10125,11 @@ export function quickActionBeatReadinessMetricSnapshot(
   const blockerCount = checks.filter((item) => item.tone === "danger").length;
 
   return {
-    id: "beat-readiness",
-    label: "Beat readiness",
-    value: `${actionLabel} / lane ${laneLabel} / destination ${check.focusLabel} panel / status ${check.status} / context ${contextLabel} / Pattern ${
+    id: action.id === "beat-readiness-route-readout-action" ? "beat-readiness-route-readout" : "beat-readiness",
+    label: action.id === "beat-readiness-route-readout-action" ? "Beat Readiness Route Readout" : "Beat readiness",
+    value: `${actionLabel} / ${routeParts.length > 0 ? `${routeParts.join(" / ")} / ` : ""}lane ${laneLabel} / destination ${
+      check.focusLabel
+    } panel / status ${check.status} / context ${contextLabel} / Pattern ${
       project.selectedPattern
     } / ${patternEventTotal(pattern)} events / ${drumCount} drum hits / ${musicEvents} music events / ${
       pattern.bassNotes.length
@@ -10115,8 +10150,23 @@ export function quickActionBeatReadinessDetailParts(action: QuickAction): string
 }
 
 export function quickActionBeatReadinessLaneLabel(action: QuickAction, check: BeatReadinessCheck): string {
-  const titleLabel = action.title.replace(/^Focus Beat Readiness:\s*/, "").trim();
-  return titleLabel && titleLabel !== "Focus Beat Readiness" ? titleLabel : check.label;
+  const titleLabel = action.title.replace(/^Focus Beat Readiness:\s*/, "").replace(/^Review Beat Readiness Route:\s*/, "").trim();
+  return titleLabel && titleLabel !== "Focus Beat Readiness" && titleLabel !== "Review Beat Readiness Route" ? titleLabel : check.label;
+}
+
+export function beatReadinessRouteLabel(check: BeatReadinessCheck): string {
+  switch (check.id) {
+    case "drums":
+      return "Drums route";
+    case "bass":
+      return "808/bass route";
+    case "harmony":
+      return "Melody/chords route";
+    case "arrangement":
+      return "Arrangement route";
+    case "export":
+      return "Export route";
+  }
 }
 
 export function quickActionListeningPassMetricSnapshot(
@@ -15784,7 +15834,11 @@ export function quickActionResultMetricSnapshot(
     return soundDecisionMetric;
   }
 
-  if (action.id === "beat-readiness-focus" || action.id.startsWith("beat-readiness-check-")) {
+  if (
+    action.id === "beat-readiness-route-readout-action" ||
+    action.id === "beat-readiness-focus" ||
+    action.id.startsWith("beat-readiness-check-")
+  ) {
     const readinessMetric = quickActionBeatReadinessMetricSnapshot(project, action);
     if (readinessMetric) {
       return readinessMetric;
@@ -20700,6 +20754,14 @@ export function quickActionResultFollowup(
       auditionCue: `Read the Sound Focus route and loop Pattern ${project.selectedPattern} before choosing the existing Sound Focus command.`,
       nextCheck:
         "Use Sound Focus only when the named 808, Synth, or Chords route should reshape the local tone; otherwise trim Studio tone controls manually."
+    };
+  }
+
+  if (action.id === "beat-readiness-route-readout-action") {
+    return {
+      auditionCue: `Read the Beat Readiness route, then loop Pattern ${project.selectedPattern} before focusing a readiness check or editing notes.`,
+      nextCheck:
+        "Use Beat Readiness focus only when the named drums, 808/bass, melody/chords, arrangement, or export route matches the next production blocker; otherwise leave the beat unchanged."
     };
   }
 
