@@ -1231,6 +1231,7 @@ export function createQuickActions({
   onFocusMasterAutomationReadout,
   onApplyMasterFinish,
   onFocusMasterFinishReadout,
+  onFocusMasterFinishRouteReadout,
   onApplyMelodyMotif,
   onApplyMelodyAccent,
   onApplyMelodyContour,
@@ -1582,6 +1583,7 @@ export function createQuickActions({
   onFocusMasterAutomationReadout: () => void;
   onApplyMasterFinish: (pad: MasterFinishPadId) => void;
   onFocusMasterFinishReadout: () => void;
+  onFocusMasterFinishRouteReadout: () => void;
   onApplyMelodyMotif: (motif: MelodyMotifId) => void;
   onApplyMelodyAccent: (accent: MelodyAccentId) => void;
   onApplyMelodyContour: (contour: MelodyContourId) => void;
@@ -6099,6 +6101,21 @@ export function createQuickActions({
       run: onFocusMasterFinishReadout
     },
     {
+      id: "master-finish-route-readout-action",
+      title: `Review Master Finish Route: ${masterFinishPreviewSummary.padLabel}`,
+      detail: `${masterFinishRouteLabel(masterFinishPreviewSummary.padId)} / ${masterFinishPreviewSummary.statusLabel} / direct master-finish-${masterFinishPreviewSummary.padId} unchanged / ${masterFinishPreviewSummary.changeLabel}`,
+      group: "Mix",
+      keywords: `Quick Actions Master Finish Route Readout review route preflight final output direct master finish command no apply demo vocal store club export meter stems ${
+        masterFinishPreviewSummary.padId
+      } ${masterFinishPreviewSummary.padLabel} ${masterFinishPreviewSummary.statusLabel} ${
+        masterFinishPreviewSummary.presetLabel
+      } ${masterFinishPreviewSummary.ceilingLabel} ${
+        masterFinishPreviewSummary.outputLabel
+      } beginner producer manual trim`,
+      resultTargetId: masterFinishPreviewSummary.padId,
+      run: onFocusMasterFinishRouteReadout
+    },
+    {
       id: "master-finish-decision",
       title: masterFinishReady
         ? `Run Master Finish Decision: Apply ${masterFinishPreviewSummary.padLabel}`
@@ -7029,6 +7046,7 @@ export function createQuickActionResult(
     action.id === "space-fx-readout-action" ||
     action.id === "space-fx-route-readout-action" ||
     action.id === "master-finish-readout-action" ||
+    action.id === "master-finish-route-readout-action" ||
     action.id === "master-automation-readout-action" ||
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
@@ -7228,6 +7246,31 @@ export function quickActionMasterFinishMetricSnapshot(
     };
   }
 
+  if (action.id === "master-finish-route-readout-action") {
+    const pad = quickActionMasterFinishPadOption(project, action, actionPad);
+    if (!pad) {
+      return null;
+    }
+    const exportAnalysis = analysis ?? analyzeExport(project);
+    const stemAnalyses = analyzeStemExports(project);
+    const targetProject = applyMasterFinishPadToProject(project, pad);
+    const changedMoves = masterFinishChangedCount(project, targetProject);
+    return {
+      id: "master-finish-route-readout",
+      label: "Master Finish Route Readout",
+      value: quickActionMasterFinishMetricValue(project, exportAnalysis, stemAnalyses, [
+        quickActionMasterFinishActionLabel(action),
+        `route ${masterFinishRouteLabel(pad.id)}`,
+        `direct command master-finish-${pad.id}`,
+        `context ${quickActionMasterFinishContextLabel(action)}`,
+        `current ${masterFinishQuickActionPosture(project)}`,
+        `target ${pad.preset} / ${formatDb(pad.ceilingDb)} ceiling / ${formatDb(pad.masterVolumeDb)} output`,
+        `moves ${changedMoves} finish move${changedMoves === 1 ? "" : "s"}`,
+        "master finish unchanged"
+      ], quickActionMasterFinishNextCheck(action, pad))
+    };
+  }
+
   if (action.id !== "master-finish-decision" && action.id !== "master-finish" && !actionPad) {
     return null;
   }
@@ -7330,6 +7373,9 @@ export function quickActionMasterFinishActionLabel(action: QuickAction): string 
   if (action.id === "master-finish-readout-action") {
     return "review master finish readout";
   }
+  if (action.id === "master-finish-route-readout-action") {
+    return "review master finish route readout";
+  }
   if (action.id === "master-finish-decision") {
     return "run master finish decision";
   }
@@ -7342,6 +7388,9 @@ export function quickActionMasterFinishActionLabel(action: QuickAction): string 
 export function quickActionMasterFinishContextLabel(action: QuickAction): string {
   if (action.id === "master-finish-readout-action") {
     return "readout";
+  }
+  if (action.id === "master-finish-route-readout-action") {
+    return "route readout";
   }
   if (action.id === "master-finish-decision") {
     return "decision";
@@ -7356,6 +7405,9 @@ export function quickActionMasterFinishNextCheck(action: QuickAction, pad: Maste
   if (action.id === "master-finish-readout-action") {
     return "play Full Mix, inspect Export meter and stems, then apply Master Finish only if the preview fits";
   }
+  if (action.id === "master-finish-route-readout-action") {
+    return "use the named finish route only if it matches the delivery target, then inspect Export meter before applying";
+  }
   if (action.id === "master-finish-decision") {
     return "play Full Mix and inspect Export meter before another output posture move";
   }
@@ -7366,6 +7418,19 @@ export function quickActionMasterFinishNextCheck(action: QuickAction, pad: Maste
     return "check limiter activity and low-end control before export";
   }
   return "play Full Mix, inspect Export meter, then manually trim ceiling or output only if needed";
+}
+
+export function masterFinishRouteLabel(targetId: MasterFinishPadId): string {
+  switch (targetId) {
+    case "demo":
+      return "Demo finish route";
+    case "vocal":
+      return "Vocal finish route";
+    case "store":
+      return "Store finish route";
+    case "club":
+      return "Club finish route";
+  }
 }
 
 export function masterAutomationQuickActionPosture(project: ProjectState): string {
@@ -21207,6 +21272,14 @@ export function quickActionResultFollowup(
     return {
       auditionCue: "Use the Master Finish readout before applying an output pad, then play Full Mix and inspect Export meter.",
       nextCheck: "Apply Master Finish only when the preview target fits the delivery goal; otherwise trim ceiling or output manually."
+    };
+  }
+
+  if (action.id === "master-finish-route-readout-action") {
+    return {
+      auditionCue: `Read the Master Finish route and play Pattern ${project.selectedPattern} or Full Mix before choosing the existing Master Finish command.`,
+      nextCheck:
+        "Use Master Finish only when the named demo, vocal, store, or club route matches the delivery target; otherwise leave master preset, ceiling, and output unchanged."
     };
   }
 

@@ -1289,6 +1289,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
     title: "Finish",
     items: [
       {
+        id: "master-finish-route-readout",
+        command: "Master Finish Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Demo / vocal / store / club finish route",
+        context:
+          "Master Finish Route Readout Action, Selected Pattern A/B/C, Current Finish Target, Existing Demo/Vocal/Store/Club Finish Route, Direct Master Finish Command, Current Master Posture, Target Preset, Ceiling, Output Gain, Export Readiness, Stem Readiness, Audition Cue, and Next Finish Route Check context before Master Finish commands run."
+      },
+      {
         id: "master-finish-decision",
         command: "Master Finish Decision",
         shortcut: "Quick Actions / Readout",
