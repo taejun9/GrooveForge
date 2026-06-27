@@ -1186,6 +1186,10 @@ export function createQuickActions({
   toplineLoopCueTarget,
   toplineSpaceSummary,
   workflowNavigatorItems,
+  quickActionRouteQuery,
+  quickActionRouteScope,
+  quickActionPinnedCount,
+  quickActionRecentCount,
   onApplyArrangementMove,
   onApplyArrangementArc,
   onApplyArrangementFocus,
@@ -1435,6 +1439,7 @@ export function createQuickActions({
   onFocusWorkflowSpotlightRouteReadout,
   onFocusWorkflowSpotlight,
   onJumpWorkflowZone,
+  onFocusQuickActionsRouteReadout,
   onFocusCommandReferenceRouteReadout,
   onOpenCommandReference,
   onOpenProject,
@@ -1559,6 +1564,10 @@ export function createQuickActions({
   toplineLoopCueTarget: ToplineLoopCueTarget;
   toplineSpaceSummary: ToplineSpaceSummary;
   workflowNavigatorItems: WorkflowNavigatorItem[];
+  quickActionRouteQuery: string;
+  quickActionRouteScope: QuickActionScopeId;
+  quickActionPinnedCount: number;
+  quickActionRecentCount: number;
   onApplyArrangementMove: (preset: ArrangementMovePreset) => void;
   onApplyArrangementArc: (pad: ArrangementArcPadId) => void;
   onApplyArrangementFocus: (preset: ArrangementFocusPresetId) => void;
@@ -1808,6 +1817,7 @@ export function createQuickActions({
   onFocusWorkflowSpotlightRouteReadout: () => void;
   onFocusWorkflowSpotlight: (item: WorkflowNavigatorItem) => void;
   onJumpWorkflowZone: (item: WorkflowNavigatorItem) => void;
+  onFocusQuickActionsRouteReadout: () => void;
   onFocusCommandReferenceRouteReadout: () => void;
   onOpenCommandReference: () => void;
   onOpenProject: () => Promise<void>;
@@ -1825,6 +1835,9 @@ export function createQuickActions({
   const suggestedBlueprintName = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint)?.name ?? "Beat Blueprint";
   const currentStyleName = styleProfiles.find((profile) => profile.id === project.styleId)?.name ?? project.styleId;
   const commandReferenceRouteSummary = createCommandReferenceRouteReadoutSummary();
+  const quickActionsRouteLabel = quickActionScopeDefinitions.map((definition) => definition.label).join(" / ");
+  const quickActionsRouteScopeLabel = quickActionScopeLabel(quickActionRouteScope);
+  const quickActionsRouteQueryLabel = quickActionRouteQuery.trim() ? `search "${quickActionRouteQuery.trim()}"` : "no search";
   const previewBlueprint = beatBlueprints.find((blueprint) => blueprint.id === beatBlueprintPreviewId) ?? beatBlueprints[0];
   const styleMatchBlueprint = beatBlueprints.find((blueprint) => blueprint.id === suggestedBlueprint) ?? previewBlueprint;
   const blueprintPreviewSummary = createBeatBlueprintPreviewSummary(project, previewBlueprint);
@@ -5083,6 +5096,25 @@ export function createQuickActions({
       run: onClearLocalDraftRecovery
     },
     {
+      id: "quick-actions-route-readout-action",
+      title: "Review Quick Actions Route",
+      detail: [
+        `Route ${quickActionsRouteLabel}`,
+        `${quickActionScopeDefinitions.length} scopes`,
+        `${quickActionsRouteScopeLabel} current scope`,
+        quickActionsRouteQueryLabel,
+        `${quickActionPinnedCount}/${maxQuickActionPins} pinned`,
+        `${quickActionRecentCount} recent`,
+        "Quick Actions open action unchanged",
+        "Command Reference unchanged",
+        "Search Spotlight unchanged",
+        "Readout only"
+      ].join(" / "),
+      group: "Project",
+      keywords: `Quick Actions Route Readout review command palette route scopes search spotlight pinned recent enter target command count direct quick actions unchanged command-reference unchanged no command run no edit no playback no export sample free beginner producer ${quickActionsRouteLabel}`,
+      run: onFocusQuickActionsRouteReadout
+    },
+    {
       id: "command-reference-route-readout-action",
       title: "Review Command Reference Route",
       detail: [
@@ -7478,6 +7510,7 @@ export function createQuickActionResult(
     action.id.startsWith("style-goal-cue-") ||
     patternCompareDecisionCue;
   const focusOnly =
+    action.id === "quick-actions-route-readout-action" ||
     action.id === "command-reference-route-readout-action" ||
     action.id === "command-reference" ||
     action.id === "beat-terms-reference" ||
@@ -16224,6 +16257,46 @@ export function quickActionCommandReferenceRouteReadoutMetricSnapshot(project: P
   };
 }
 
+export function quickActionQuickActionsRouteReadoutMetricSnapshot(project: ProjectState, action: QuickAction): {
+  id: string;
+  label: string;
+  value: string;
+} {
+  const target = activeDeliveryTarget(project);
+  const pattern = activePattern(project);
+  const exportAnalysis = analyzeExport(project);
+  const scopeRoute = quickActionScopeDefinitions.map((definition) => definition.label).join(" / ");
+
+  return {
+    id: "quick-actions-route-readout",
+    label: "Quick Actions Route Readout",
+    value: [
+      "command review quick actions route readout",
+      action.detail,
+      `route ${scopeRoute}`,
+      `${quickActionScopeDefinitions.length} scopes`,
+      "direct quick-actions-open unchanged",
+      "Command Reference unchanged",
+      "Search Spotlight unchanged",
+      "Quick Actions command execution unchanged",
+      "project data unchanged",
+      "playback unchanged",
+      "export unchanged",
+      "destination Command palette / Quick Actions",
+      `target ${target.name}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} selected-pattern events`,
+      `${projectEventTotal(project)} editable project events`,
+      `${project.arrangement.length} blocks`,
+      `${arrangementTotalBars(project)} bars`,
+      `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
+      "readout only",
+      "audition scan the command-palette scope before running commands",
+      "next run a Quick Action only when the named route matches the current beat-making question"
+    ].join(" / ")
+  };
+}
+
 export function quickActionResultMetricSnapshot(
   project: ProjectState,
   action: QuickAction,
@@ -16254,6 +16327,10 @@ export function quickActionResultMetricSnapshot(
 
   if (action.id === "command-reference-route-readout-action") {
     return quickActionCommandReferenceRouteReadoutMetricSnapshot(project, action);
+  }
+
+  if (action.id === "quick-actions-route-readout-action") {
+    return quickActionQuickActionsRouteReadoutMetricSnapshot(project, action);
   }
 
   if (action.id === "command-reference" || action.id === "beat-terms-reference") {
@@ -21289,6 +21366,15 @@ export function quickActionResultFollowup(
         "Scan the Command Reference route and category count, then audition the relevant Pattern, Block, or Full Mix before running commands.",
       nextCheck:
         "Open Quick Actions or run a command only when the named command-map category matches the current beat-making question; otherwise leave playback and project data unchanged."
+    };
+  }
+
+  if (action.id === "quick-actions-route-readout-action") {
+    return {
+      auditionCue:
+        "Scan the Quick Actions route, scope, search, pinned, and recent posture, then audition the relevant Pattern, Block, or Full Mix before running commands.",
+      nextCheck:
+        "Run a Quick Action only when the named command-palette route matches the current beat-making question; otherwise leave playback and project data unchanged."
     };
   }
 

@@ -8280,6 +8280,45 @@ export function App(): ReactElement {
     setQuickActionsOpen(true);
   }
 
+  function focusQuickActionsRouteReadout(): void {
+    const currentProject = projectRef.current;
+    const target = activeDeliveryTarget(currentProject);
+    const pattern = activePattern(currentProject);
+    const exportAnalysis = analyzeExport(currentProject);
+    const normalizedPinnedIds = normalizeQuickActionPinnedIds(quickActionPinnedIds, quickActions);
+    const currentScopeLabel = quickActionScopeLabel(quickActionScope);
+    const currentQueryLabel = quickActionQuery.trim() ? `search "${quickActionQuery.trim()}"` : "no search";
+    const currentScopeOptions = createQuickActionScopeOptions(quickActions, quickActionQuery);
+    const currentScopeOption = currentScopeOptions.find((option) => option.id === quickActionScope);
+    const currentFilteredActions = filterQuickActions(quickActions, quickActionQuery, quickActionScope);
+    const firstRunnableAction = currentFilteredActions.find((action) => !action.disabled);
+    const scopeRoute = quickActionScopeDefinitions.map((definition) => definition.label).join(" / ");
+
+    setCommandReferenceOpen(false);
+    setQuickActionQuery("");
+    setQuickActionSearchHintResult(null);
+    setQuickActionSearchResult(null);
+    setQuickActionSearchRecoveryResult(null);
+    setQuickActionScope("all");
+    setQuickActionScopeResult(null);
+    setQuickActionsOpen(true);
+    setProjectStatus(
+      `Quick Actions Route Readout Pattern ${currentProject.selectedPattern}: ${quickActions.length} actions / ${
+        quickActionScopeDefinitions.length
+      } scopes / route ${scopeRoute} / ${currentScopeLabel} current scope / ${currentQueryLabel} / ${
+        currentFilteredActions.length
+      } shown / ${currentScopeOption?.count ?? 0} matching / ${normalizedPinnedIds.length}/${maxQuickActionPins} pinned / ${
+        quickActionRecents.length
+      } recent / ${
+        firstRunnableAction ? `Enter target ${firstRunnableAction.title}` : "no Enter target"
+      } / direct quick-actions-open unchanged / Command Reference unchanged / Search Spotlight unchanged / target ${
+        target.name
+      } / ${patternEventTotal(pattern)} selected-pattern events / ${projectEventTotal(currentProject)} editable project events / ${
+        currentProject.arrangement.length
+      } blocks / ${arrangementTotalBars(currentProject)} bars / export ${exportAnalysis.status} / Command palette`
+    );
+  }
+
   function closeQuickActions(): void {
     setQuickActionsOpen(false);
     setQuickActionQuery("");
@@ -8882,6 +8921,10 @@ export function App(): ReactElement {
     toplineLoopCueTarget,
     toplineSpaceSummary,
     workflowNavigatorItems,
+    quickActionRouteQuery: quickActionQuery,
+    quickActionRouteScope: quickActionScope,
+    quickActionPinnedCount: Math.min(quickActionPinnedIds.length, maxQuickActionPins),
+    quickActionRecentCount: quickActionRecents.length,
     onApplyArrangementMove: applyArrangementMoveToSelected,
     onApplyArrangementArc: applyArrangementArcPad,
     onApplyArrangementFocus: applyArrangementFocusPreset,
@@ -9137,6 +9180,7 @@ export function App(): ReactElement {
     onFocusWorkflowSpotlightRouteReadout: focusWorkflowSpotlightRouteReadout,
     onFocusWorkflowSpotlight: jumpToWorkflowNavigatorItem,
     onJumpWorkflowZone: jumpToWorkflowNavigatorItem,
+    onFocusQuickActionsRouteReadout: focusQuickActionsRouteReadout,
     onFocusCommandReferenceRouteReadout: focusCommandReferenceRouteReadout,
     onOpenCommandReference: openCommandReference,
     onOpenProject: handleOpenProject,

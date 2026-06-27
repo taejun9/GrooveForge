@@ -196,6 +196,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
     title: "Desktop",
     items: [
       {
+        id: "quick-actions-route-readout",
+        command: "Quick Actions Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Command palette / scopes / search / pinned / recent",
+        context:
+          "Quick Actions Route Readout Action, command-palette route, action count, scope filters, search query posture, Search Spotlight posture, pinned commands, recent commands, direct Quick Actions open action, Command Reference unchanged, selected Pattern, Delivery Target, export posture, audition cue, and next command-palette check before running Quick Actions, opening Command Reference, jumping panels, playback, edit, or export commands."
+      },
+      {
         id: "command-reference-route-readout",
         command: "Command Reference Route Readout",
         shortcut: "Quick Actions / Readout",
@@ -209,9 +217,16 @@ const commandReferenceSections: CommandReferenceSection[] = [
         shortcut: "? / CmdOrCtrl+/",
         target: "Help",
         context:
-          "Desktop, Project, Guide, Create, Sound, Arrange, Mix, Finish, Deliver, and Beat Terms command map with Command Reference Route Readout posture before command execution."
+          "Desktop, Project, Guide, Create, Sound, Arrange, Mix, Finish, Deliver, and Beat Terms command map with Quick Actions Route Readout and Command Reference Route Readout posture before command execution."
       },
-      { id: "actions", command: "Quick Actions", shortcut: "CmdOrCtrl+K", target: "Command palette" },
+      {
+        id: "actions",
+        command: "Quick Actions",
+        shortcut: "CmdOrCtrl+K",
+        target: "Command palette",
+        context:
+          "Command palette with Quick Actions Route Readout posture for route, action count, scope filters, search query, Search Spotlight, pinned commands, recent commands, Enter target, and local result feedback before explicit command execution."
+      },
       { id: "playback", command: "Play / Stop", shortcut: "Space", target: "Selected loop" },
       {
         id: "transport-position",
