@@ -1303,6 +1303,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Handoff Blocker Readout Action, Highest-Priority Danger or Review Deliverable Lane, Ready/Review/Blocker Counts, Delivery Target, Session Brief/Handoff Sheet Context, Manifest Status, Latest Export Receipt, Send Order, Package Posture, Selected Pattern A/B/C, Arrangement Blocks, Audition Cue, and Next Blocker Check before Handoff Next Export, explicit export, or handoff commands run."
       },
       {
+        id: "handoff-blocker-route-readout",
+        command: "Handoff Blocker Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Handoff blocker route preflight / no render",
+        context:
+          "Handoff Blocker Route Readout Action, Highest-Priority Danger or Review Deliverable Lane, Existing Command Route, Ready/Review/Blocker Counts, Delivery Target, Session Brief/Handoff Sheet Context, Manifest Status, Latest Export Receipt, Send Order, Package Posture, Selected Pattern A/B/C, Arrangement Blocks, Audition Cue, and Next Blocker Route Check before Handoff Next Export, explicit export, Session Brief, or handoff commands run."
+      },
+      {
         id: "export-preflight",
         command: "Export Preflight",
         shortcut: "Quick Actions / Readout",
