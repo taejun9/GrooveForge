@@ -15028,7 +15028,15 @@ h2 {
   text-transform: uppercase;
 }
 
-.pattern-contrast-cue {
+.pattern-contrast-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+
+.pattern-contrast-cue,
+.pattern-contrast-use {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -15043,12 +15051,26 @@ h2 {
   font-weight: 900;
 }
 
-.pattern-contrast-cue svg {
+.pattern-contrast-use {
+  border-color: rgba(138, 168, 255, 0.24);
+  background: rgba(138, 168, 255, 0.08);
+}
+
+.pattern-contrast-cue svg,
+.pattern-contrast-use svg {
   flex: 0 0 auto;
+}
+
+.pattern-contrast-cue svg {
   color: #78f0c8;
 }
 
-.pattern-contrast-cue span {
+.pattern-contrast-use svg {
+  color: #8aa8ff;
+}
+
+.pattern-contrast-cue span,
+.pattern-contrast-use span {
   color: #f4efe7;
   font-size: 10px;
   font-weight: 900;
@@ -15060,7 +15082,13 @@ h2 {
   background: rgba(120, 240, 200, 0.14);
 }
 
-.pattern-contrast-cue:disabled {
+.pattern-contrast-use:hover:not(:disabled) {
+  border-color: rgba(138, 168, 255, 0.48);
+  background: rgba(138, 168, 255, 0.14);
+}
+
+.pattern-contrast-cue:disabled,
+.pattern-contrast-use:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }

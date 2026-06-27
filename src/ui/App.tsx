@@ -9897,7 +9897,12 @@ export function App(): ReactElement {
             onCue={cuePatternFromCompare}
             onUse={usePatternInSelectedBlockFromCompare}
           />
-          <PatternContrastReadout summary={patternContrastSummary} onCuePattern={cuePatternFromCompare} />
+          <PatternContrastReadout
+            summary={patternContrastSummary}
+            selectedBlockPattern={selectedArrangementBlock?.pattern ?? null}
+            onCuePattern={cuePatternFromCompare}
+            onUsePattern={usePatternInSelectedBlockFromCompare}
+          />
           {patternCompareResult && <PatternCompareResultStrip result={patternCompareResult} />}
           <PatternDna
             summary={patternDnaSummary}
