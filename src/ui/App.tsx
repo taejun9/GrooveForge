@@ -1058,7 +1058,8 @@ import {
   soundPresetRouteLabel,
   spaceFxRouteLabel,
   stemAuditionRouteLabel,
-  toplineSpaceRouteLabel
+  toplineSpaceRouteLabel,
+  workflowNavigatorRouteLabel
 } from "./workstationAppQuickActions";
 import type {
   EditorAuditionReadoutSummary, MixSnapshotResultTargetId, NextMoveQuickActionSource, PatternEditQuickActionRoute, QuickActionInputSetupResultState, QuickActionInputSetupSnapshot, QuickActionSelectedEventType, SoundSnapshotQuickActionTarget
@@ -1266,6 +1267,7 @@ export function App(): ReactElement {
   const hookReadinessPanelRef = useRef<HTMLElement | null>(null);
   const toplineSpacePanelRef = useRef<HTMLElement | null>(null);
   const listeningPassPanelRef = useRef<HTMLElement | null>(null);
+  const workflowNavigatorPanelRef = useRef<HTMLElement | null>(null);
   const transportPanelRef = useRef<HTMLElement | null>(null);
   const composePanelRef = useRef<HTMLElement | null>(null);
   const soundPanelRef = useRef<HTMLElement | null>(null);
@@ -7408,6 +7410,20 @@ export function App(): ReactElement {
     setProjectStatus(`Workflow ${item.label}: ${item.value}`);
   }
 
+  function focusWorkflowNavigatorRouteReadout(): void {
+    const spotlight = createWorkflowSpotlightSummary(workflowNavigatorItems);
+    const item = spotlight.zoneId ? workflowNavigatorItems.find((candidate) => candidate.id === spotlight.zoneId) ?? null : null;
+    workflowNavigatorPanelRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    setProjectStatus(
+      item
+        ? `Workflow Navigator Route Readout Pattern ${project.selectedPattern}: ${workflowNavigatorRouteLabel(
+            item,
+            workflowNavigatorItems
+          )} / ${item.value} / direct workflow-navigator-${item.id} unchanged / workflow jump unchanged / workflow spotlight unchanged / Guide panel`
+        : "Workflow Navigator Route Readout: no workflow zone available"
+    );
+  }
+
   function focusBeatReadinessCheck(check: BeatReadinessCheck): void {
     const targetRefs: Record<BeatReadinessFocusTarget, HTMLElement | null> = {
       compose: composePanelRef.current,
@@ -9024,6 +9040,7 @@ export function App(): ReactElement {
     onFocusStyleInspector: focusStyleInspectorItem,
     onFocusToplineSpace: focusToplineSpaceCard,
     onFocusToplineSpaceRouteReadout: focusToplineSpaceRouteReadout,
+    onFocusWorkflowNavigatorRouteReadout: focusWorkflowNavigatorRouteReadout,
     onFocusWorkflowSpotlight: jumpToWorkflowNavigatorItem,
     onJumpWorkflowZone: jumpToWorkflowNavigatorItem,
     onOpenCommandReference: openCommandReference,
@@ -9429,7 +9446,12 @@ export function App(): ReactElement {
         onFocus={focusSessionPassCard}
       />
 
-      <WorkflowNavigator items={workflowNavigatorItems} result={workflowNavigatorResult} onJump={jumpToWorkflowNavigatorItem} />
+      <WorkflowNavigator
+        items={workflowNavigatorItems}
+        result={workflowNavigatorResult}
+        sectionRef={workflowNavigatorPanelRef}
+        onJump={jumpToWorkflowNavigatorItem}
+      />
 
       {undoRedoResult && <UndoRedoResultStrip result={undoRedoResult} />}
       {quickActionResult && <QuickActionResultStrip result={quickActionResult} />}

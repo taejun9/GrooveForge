@@ -467,12 +467,20 @@ const commandReferenceSections: CommandReferenceSection[] = [
           "Issue Priority, Review Queue Route Readout, Focus/Fix Actions, Queue Readiness, and Review Fix Preview context with destination, review metric, direct issue command, audition cue, fix action, and next check before Review Queue commands run."
       },
       {
+        id: "workflow-navigator-route-readout",
+        command: "Workflow Navigator Route Readout",
+        shortcut: "Quick Actions / Readout",
+        target: "Compose / arrange / mix / deliver workflow route",
+        context:
+          "Workflow Navigator Route Readout Action, current Compose, Arrange, Mix, or Deliver workflow zone, existing Workflow Navigator route, direct Workflow Navigator zone command, workflow jump unchanged, Workflow Spotlight unchanged, selected Pattern, Delivery Target, Beat Map posture, export/stem readiness, audition cue, and next workflow-route check before Workflow Navigator jump, Workflow Spotlight focus, Beat Map, Structure Lens, Next Move, playback, edit, or export commands run."
+      },
+      {
         id: "workflow-navigator",
         command: "Workflow Navigator",
         shortcut: "Quick Actions / Readout",
         target: "Compose / arrange / mix / deliver workflow zones",
         context:
-          "Compose, Arrange, Mix, and Deliver workflow-zone context with destination, readiness metric, zone context, audition cue, jump action, and next check before Workflow Navigator commands run."
+          "Compose, Arrange, Mix, and Deliver workflow-zone context with Workflow Navigator Route Readout posture, destination, direct zone command, readiness metric, zone context, audition cue, jump action, and next check before Workflow Navigator commands run."
       },
       {
         id: "workflow-spotlight",

@@ -1427,6 +1427,7 @@ export function createQuickActions({
   onFocusStyleInspector,
   onFocusToplineSpace,
   onFocusToplineSpaceRouteReadout,
+  onFocusWorkflowNavigatorRouteReadout,
   onFocusWorkflowSpotlight,
   onJumpWorkflowZone,
   onOpenCommandReference,
@@ -1794,6 +1795,7 @@ export function createQuickActions({
   onFocusStyleInspector: (item: StyleInspectorFocusItem) => void;
   onFocusToplineSpace: (card: ToplineSpaceFocusItem) => void;
   onFocusToplineSpaceRouteReadout: () => void;
+  onFocusWorkflowNavigatorRouteReadout: () => void;
   onFocusWorkflowSpotlight: (item: WorkflowNavigatorItem) => void;
   onJumpWorkflowZone: (item: WorkflowNavigatorItem) => void;
   onOpenCommandReference: () => void;
@@ -3072,6 +3074,36 @@ export function createQuickActions({
     keywords: `workflow navigator jump ${item.id} ${item.label} ${item.value} ${item.detail} compose arrange mix deliver beginner producer`,
     run: () => onJumpWorkflowZone(item)
   }));
+  const workflowNavigatorRouteReadoutAction: QuickAction = {
+    id: "workflow-navigator-route-readout-action",
+    title: workflowSpotlightItem
+      ? `Review Workflow Navigator Route: ${workflowSpotlightItem.label}`
+      : "Review Workflow Navigator Route",
+    detail: workflowSpotlightItem
+      ? [
+          workflowSpotlight.statusLabel,
+          workflowSpotlight.zoneLabel,
+          workflowSpotlight.detailLabel,
+          workflowSpotlight.countLabel,
+          workflowSpotlightItem.value,
+          workflowSpotlightItem.detail,
+          `Route ${workflowNavigatorRouteLabel(workflowSpotlightItem, workflowNavigatorItems)}`,
+          `Direct workflow-navigator-${workflowSpotlightItem.id} unchanged`,
+          "Workflow jump unchanged",
+          "Workflow Spotlight unchanged",
+          "Readout only"
+        ].join(" / ")
+      : "No Workflow Navigator route available.",
+    group: "Project",
+    keywords: `Quick Actions Workflow Navigator Route Readout review workflow route direct workflow-navigator-${
+      workflowSpotlightItem?.id ?? "none"
+    } compose arrange mix deliver guide beat map structure lens next move selected pattern target export stems ${
+      workflowSpotlightItem?.label ?? "none"
+    } ${workflowSpotlightItem?.value ?? "none"} ${workflowSpotlightItem?.detail ?? "none"} no jump no edit no playback no export sample free beginner producer`,
+    disabled: !workflowSpotlightItem,
+    resultTargetId: workflowSpotlightItem?.id,
+    run: onFocusWorkflowNavigatorRouteReadout
+  };
   const deliveryTarget = activeDeliveryTarget(project);
   const deliveryTargetAlignmentPreview = createDeliveryTargetAlignmentPreview(project, deliveryTarget);
   const deliveryTargetAlignReady = !isDeliveryTargetAligned(project, deliveryTarget);
@@ -5708,6 +5740,7 @@ export function createQuickActions({
       }
     },
     ...exportPreflightActions,
+    workflowNavigatorRouteReadoutAction,
     {
       id: "workflow-spotlight-focus",
       title: `Focus ${workflowSpotlight.zoneLabel}`,
@@ -7423,6 +7456,7 @@ export function createQuickActionResult(
     action.id === "master-finish-route-readout-action" ||
     action.id === "master-automation-readout-action" ||
     action.id === "master-automation-route-readout-action" ||
+    action.id === "workflow-navigator-route-readout-action" ||
     action.id === "workflow-spotlight-focus" ||
     action.id.startsWith("workflow-navigator-") ||
     action.id === "review-queue-route-readout-action" ||
@@ -15226,20 +15260,29 @@ export function quickActionWorkflowNavigatorContext(
   project: ProjectState,
   action: QuickAction,
   analysis?: ExportAnalysis
-): { item: WorkflowNavigatorItem; items: WorkflowNavigatorItem[]; exportAnalysis: ExportAnalysis; stemAnalyses: StemExportAnalyses } | null {
-  const zone = workflowNavigatorZoneFromQuickAction(action.id);
-  if (!zone) {
-    return null;
-  }
-
+): {
+  item: WorkflowNavigatorItem;
+  items: WorkflowNavigatorItem[];
+  exportAnalysis: ExportAnalysis;
+  stemAnalyses: StemExportAnalyses;
+  isRouteReadout: boolean;
+} | null {
   const exportAnalysis = analysis ?? analyzeExport(project);
   const stemAnalyses = analyzeStemExports(project);
   const checks = createBeatReadinessChecks(project, exportAnalysis);
   const beatMap = createBeatMapSummary(project, checks, exportAnalysis, stemAnalyses);
   const exportPreflight = createExportPreflightSummary(project, checks, exportAnalysis, stemAnalyses);
   const items = createWorkflowNavigatorItems(project, beatMap, exportPreflight, exportAnalysis);
+  const isRouteReadout = action.id === "workflow-navigator-route-readout-action";
+  const zone = isRouteReadout
+    ? quickActionWorkflowNavigatorRouteReadoutZone(action, items)
+    : workflowNavigatorZoneFromQuickAction(action.id);
+  if (!zone) {
+    return null;
+  }
+
   const item = items.find((candidate) => candidate.id === zone);
-  return item ? { item, items, exportAnalysis, stemAnalyses } : null;
+  return item ? { item, items, exportAnalysis, stemAnalyses, isRouteReadout } : null;
 }
 
 export function quickActionWorkflowNavigatorMetricSnapshot(
@@ -15252,18 +15295,24 @@ export function quickActionWorkflowNavigatorMetricSnapshot(
     return null;
   }
 
-  const { item, items, exportAnalysis, stemAnalyses } = context;
+  const { item, items, exportAnalysis, stemAnalyses, isRouteReadout } = context;
   const target = activeDeliveryTarget(project);
   const pattern = activePattern(project);
   const usedSlots = usedPatternSlots(project);
   const audibleStemCount = audibleStemTracks(stemAnalyses).length;
+  const routeLabel = workflowNavigatorRouteLabel(item, items);
+  const directCommandLabel = isRouteReadout
+    ? `direct workflow-navigator-${item.id} unchanged`
+    : `direct workflow-navigator-${item.id}`;
 
   return {
-    id: "workflow-navigator",
-    label: "Workflow navigator",
+    id: isRouteReadout ? "workflow-navigator-route-readout" : "workflow-navigator",
+    label: isRouteReadout ? "Workflow Navigator Route Readout" : "Workflow navigator",
     value: [
-      `command ${action.title}`,
+      `command ${isRouteReadout ? "review workflow navigator route readout" : action.title}`,
       `detail ${action.detail}`,
+      `route ${routeLabel}`,
+      directCommandLabel,
       `destination Guide / Workflow Navigator / ${item.label}`,
       `zone ${item.label} / ${item.value} / ${item.detail}`,
       `target ${target.name} / ${barCountLabel(target.targetBars)} / ${target.stemGoal} stems`,
@@ -15275,10 +15324,33 @@ export function quickActionWorkflowNavigatorMetricSnapshot(
       barCountLabel(arrangementTotalBars(project)),
       `export ${exportAnalysis.status} / H ${formatDb(exportAnalysis.headroomDb)}`,
       `stems ${audibleStemCount}/${target.stemGoal} target`,
+      isRouteReadout ? "readout only / workflow jump unchanged / workflow spotlight unchanged" : "jump command",
       `audition ${workflowNavigatorJumpAuditionCue(item)}`,
       `next ${workflowNavigatorJumpNextCheck(item)}`
     ].join(" / ")
   };
+}
+
+export function quickActionWorkflowNavigatorRouteReadoutZone(
+  action: QuickAction,
+  items: WorkflowNavigatorItem[]
+): WorkflowZoneId | null {
+  const targetId = action.resultTargetId;
+  if (targetId === "compose" || targetId === "arrange" || targetId === "mix" || targetId === "deliver") {
+    return targetId;
+  }
+
+  return createWorkflowSpotlightSummary(items).zoneId;
+}
+
+export function workflowNavigatorRouteLabel(item: WorkflowNavigatorItem, items: WorkflowNavigatorItem[]): string {
+  const routeIndex = items.findIndex((candidate) => candidate.id === item.id);
+  const routePosition = routeIndex >= 0 ? `${routeIndex + 1}/${items.length}` : `1/${items.length}`;
+  return `${item.label} ${routePosition} to ${workflowNavigatorDestinationLabel(item)}`;
+}
+
+export function workflowNavigatorDestinationLabel(item: WorkflowNavigatorItem): string {
+  return `${item.label} zone`;
 }
 
 export function quickActionWorkflowNavigatorFollowup(
@@ -15289,6 +15361,15 @@ export function quickActionWorkflowNavigatorFollowup(
   const context = quickActionWorkflowNavigatorContext(project, action, analysis);
   if (!context) {
     return null;
+  }
+
+  if (context.isRouteReadout) {
+    return {
+      auditionCue:
+        "Read the Workflow Navigator route, then inspect Compose, Arrange, Mix, or Deliver before jumping zones or running workflow actions.",
+      nextCheck:
+        "Use Workflow Navigator jumps only when the named route matches the beat-making question; otherwise leave playback and project data unchanged."
+    };
   }
 
   return {
@@ -17360,6 +17441,19 @@ export function quickActionResultMetricSnapshot(
       id: "workflow-spotlight",
       label: "Workflow spotlight",
       value: `${project.selectedPattern} / ${barCountLabel(arrangementTotalBars(project))}`
+    };
+  }
+
+  if (action.id === "workflow-navigator-route-readout-action") {
+    const workflowNavigatorMetric = quickActionWorkflowNavigatorMetricSnapshot(project, action, analysis ?? undefined);
+    if (workflowNavigatorMetric) {
+      return workflowNavigatorMetric;
+    }
+
+    return {
+      id: "workflow-navigator-route-readout",
+      label: "Workflow Navigator Route Readout",
+      value: action.detail
     };
   }
 
@@ -22252,6 +22346,17 @@ export function quickActionResultFollowup(
       quickActionWorkflowSpotlightFollowup(project, action, analysis) ?? {
         auditionCue: "Use the focused workflow panel to inspect the highlighted blocker or review zone.",
         nextCheck: "Return to Workflow Spotlight after the zone looks ready and run the command again for the next jump."
+      }
+    );
+  }
+
+  if (action.id === "workflow-navigator-route-readout-action") {
+    return (
+      quickActionWorkflowNavigatorFollowup(project, action, analysis) ?? {
+        auditionCue:
+          "Read the Workflow Navigator route, then inspect Compose, Arrange, Mix, or Deliver before jumping zones or running workflow actions.",
+        nextCheck:
+          "Use Workflow Navigator jumps only when the named route matches the beat-making question; otherwise leave playback and project data unchanged."
       }
     );
   }

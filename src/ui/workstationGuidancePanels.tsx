@@ -1771,17 +1771,19 @@ function SessionPassFocusResultStrip({ result }: { result: SessionPassFocusResul
 export function WorkflowNavigator({
   items,
   onJump,
-  result
+  result,
+  sectionRef
 }: {
   items: WorkflowNavigatorItem[];
   result: WorkflowNavigatorJumpResult | null;
+  sectionRef?: Ref<HTMLElement>;
   onJump: (item: WorkflowNavigatorItem) => void;
 }): ReactElement {
   const spotlight = createWorkflowSpotlightSummary(items);
   const spotlightItem = spotlight.zoneId ? items.find((item) => item.id === spotlight.zoneId) ?? null : null;
 
   return (
-    <nav className="workflow-navigator" data-testid="workflow-navigator" aria-label="Workflow navigator">
+    <nav className="workflow-navigator" data-testid="workflow-navigator" aria-label="Workflow navigator" ref={sectionRef}>
       <div className="workflow-navigator-heading">
         <div>
           <ArrowRight size={16} aria-hidden="true" />
