@@ -132,10 +132,16 @@ function checkPackageScripts() {
     "run_desktop_installed_project_io_smoke.mjs",
     "package.json desktop:installed-project-io-smoke script"
   );
+  checkIncludes(
+    packageJson.scripts?.["desktop:pkg-payload-smoke"] ?? "",
+    "run_desktop_pkg_payload_smoke.mjs",
+    "package.json desktop:pkg-payload-smoke script"
+  );
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run build", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:project-io-smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:packaged-project-io-smoke", "package.json verify script");
+  checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:pkg-payload-smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:installed-project-io-smoke", "package.json verify script");
   check(
     (packageJson.scripts?.verify ?? "").indexOf("npm run build") < (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:smoke"),
@@ -154,6 +160,13 @@ function checkPackageScripts() {
       (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:packaged-project-io-smoke") <
         (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:adhoc-sign-smoke"),
     "package.json verify should run desktop:packaged-project-io-smoke after package smoke and before ad-hoc signing"
+  );
+  check(
+    (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:pkg-smoke") <
+      (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:pkg-payload-smoke") &&
+      (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:pkg-payload-smoke") <
+        (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:install-smoke"),
+    "package.json verify should run desktop:pkg-payload-smoke after pkg smoke and before install smoke"
   );
   check(
     (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:install-smoke") <
