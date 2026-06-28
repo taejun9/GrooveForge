@@ -117,11 +117,24 @@ function checkPackageScripts() {
   checkIncludes(packageJson.scripts?.build ?? "", "tsc -p tsconfig.electron.json", "package.json build script");
   checkIncludes(packageJson.scripts?.desktop ?? "", "electron .", "package.json desktop script");
   checkIncludes(packageJson.scripts?.["desktop:smoke"] ?? "", "run_desktop_entry_smoke.mjs", "package.json desktop:smoke script");
+  checkIncludes(
+    packageJson.scripts?.["desktop:project-io-smoke"] ?? "",
+    "run_desktop_project_io_smoke.mjs",
+    "package.json desktop:project-io-smoke script"
+  );
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run build", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:smoke", "package.json verify script");
+  checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:project-io-smoke", "package.json verify script");
   check(
     (packageJson.scripts?.verify ?? "").indexOf("npm run build") < (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:smoke"),
     "package.json verify should run desktop:smoke after npm run build"
+  );
+  check(
+    (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:launch-smoke") <
+      (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:project-io-smoke") &&
+      (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:project-io-smoke") <
+        (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:package-smoke"),
+    "package.json verify should run desktop:project-io-smoke after launch smoke and before package smoke"
   );
 }
 
@@ -137,7 +150,7 @@ function checkElectronMainContract() {
   checkIncludes(source, "nodeIntegration: false", label);
   checkIncludes(source, "contextIsolation: true", label);
   checkIncludes(source, "sandbox: true", label);
-  checkIncludes(source, "backgroundThrottling: !isLaunchSmoke", label);
+  checkIncludes(source, "backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke)", label);
   checkIncludes(source, "paintWhenInitiallyHidden: true", label);
   checkIncludes(source, 'void win.loadFile(path.join(__dirname, "../dist/index.html"))', label);
   checkIncludes(source, "win.webContents.setWindowOpenHandler", label);

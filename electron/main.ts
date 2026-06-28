@@ -9,8 +9,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
 const menuCommandChannel = "grooveforge:menu-command";
 const isLaunchSmoke = process.env.GROOVEFORGE_DESKTOP_LAUNCH_SMOKE === "1";
+const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1";
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
+const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
 const launchSmokeTimeoutMs = 60000;
+const projectIoSmokeTimeoutMs = 60000;
 
 type NativeMenuCommand =
   | "open-project"
@@ -60,6 +63,30 @@ type LaunchSmokeVisualEvidence = {
   sampledPixels: number;
   uniqueSampledColors: number;
   width: number;
+};
+
+type ProjectIoSmokeEvidence = {
+  appKind: unknown;
+  defaultName: string;
+  hasOpenProject: boolean;
+  hasPreloadBridge: boolean;
+  hasSaveProject: boolean;
+  location: string;
+  openResult: {
+    canceled: boolean;
+    contentsLength?: number;
+    contentsMatched?: boolean;
+    filePath?: string;
+  };
+  readyState: string;
+  samplingTextPresent: boolean;
+  saveResult: {
+    canceled: boolean;
+    filePath?: string;
+  };
+  sourceLength: number;
+  targetPath: string;
+  title: string;
 };
 
 const projectFilters = [{ name: "GrooveForge Project", extensions: ["json"] }];
@@ -307,7 +334,12 @@ function registerProjectFileHandlers(): void {
       defaultPath: payload.defaultName,
       filters: projectFilters
     };
-    const result = browserWindow ? await dialog.showSaveDialog(browserWindow, options) : await dialog.showSaveDialog(options);
+    const smokeFilePath = projectIoSmokePath();
+    const result = smokeFilePath
+      ? { canceled: false, filePath: smokeFilePath }
+      : browserWindow
+        ? await dialog.showSaveDialog(browserWindow, options)
+        : await dialog.showSaveDialog(options);
     if (result.canceled || !result.filePath) {
       return { canceled: true };
     }
@@ -323,7 +355,12 @@ function registerProjectFileHandlers(): void {
       filters: projectFilters,
       properties: ["openFile"]
     };
-    const result = browserWindow ? await dialog.showOpenDialog(browserWindow, options) : await dialog.showOpenDialog(options);
+    const smokeFilePath = projectIoSmokePath();
+    const result = smokeFilePath
+      ? { canceled: false, filePaths: [smokeFilePath] }
+      : browserWindow
+        ? await dialog.showOpenDialog(browserWindow, options)
+        : await dialog.showOpenDialog(options);
     const filePath = result.filePaths[0];
     if (result.canceled || !filePath) {
       return { canceled: true };
@@ -334,8 +371,18 @@ function registerProjectFileHandlers(): void {
   });
 }
 
+function projectIoSmokePath(): string | null {
+  const filePath = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_PATH;
+  return isProjectIoSmoke && filePath ? filePath : null;
+}
+
 function launchSmokeFailure(message: string, details: Record<string, unknown> = {}): void {
   console.error(`${launchSmokeResultPrefix}${JSON.stringify({ ok: false, message, ...details })}`);
+  app.exit(1);
+}
+
+function projectIoSmokeFailure(message: string, details: Record<string, unknown> = {}): void {
+  console.error(`${projectIoSmokeResultPrefix}${JSON.stringify({ ok: false, message, ...details })}`);
   app.exit(1);
 }
 
@@ -573,6 +620,93 @@ async function collectLaunchSmokeEvidence(win: BrowserWindow): Promise<LaunchSmo
   return evidence as LaunchSmokeEvidence;
 }
 
+async function collectProjectIoSmokeEvidence(win: BrowserWindow): Promise<ProjectIoSmokeEvidence> {
+  const sourcePath = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SOURCE_PATH;
+  const targetPath = projectIoSmokePath();
+  if (!sourcePath || !targetPath) {
+    throw new Error("Project IO smoke requires source and target path environment variables.");
+  }
+
+  const sourceContents = await readFile(sourcePath, "utf8");
+  const defaultName = path.basename(targetPath);
+  const evidence = await win.webContents.executeJavaScript(`
+    (async () => {
+      const sourceContents = ${JSON.stringify(sourceContents)};
+      const defaultName = ${JSON.stringify(defaultName)};
+      const targetPath = ${JSON.stringify(targetPath)};
+      const bridge = window.grooveforge;
+      const bodyText = document.body?.textContent ?? "";
+      const saveResult = await bridge?.saveProject?.(sourceContents, defaultName);
+      const openResult = await bridge?.openProject?.();
+      return {
+        appKind: bridge?.appKind ?? null,
+        defaultName,
+        hasOpenProject: typeof bridge?.openProject === "function",
+        hasPreloadBridge: Boolean(bridge),
+        hasSaveProject: typeof bridge?.saveProject === "function",
+        location: window.location.href,
+        openResult: {
+          canceled: openResult?.canceled === true,
+          contentsLength: typeof openResult?.contents === "string" ? openResult.contents.length : undefined,
+          contentsMatched: openResult?.contents === sourceContents,
+          filePath: openResult?.filePath
+        },
+        readyState: document.readyState,
+        samplingTextPresent: /AudioClipEvent|sample import|sample browser|chop pads|sampler track|audio clip/i.test(bodyText),
+        saveResult: {
+          canceled: saveResult?.canceled === true,
+          filePath: saveResult?.filePath
+        },
+        sourceLength: sourceContents.length,
+        targetPath,
+        title: document.title
+      };
+    })();
+  `);
+  return evidence as ProjectIoSmokeEvidence;
+}
+
+function projectIoSmokeFailures(evidence: ProjectIoSmokeEvidence): string[] {
+  const failures: string[] = [];
+  if (evidence.title !== "GrooveForge") {
+    failures.push(`document title should be GrooveForge, got ${evidence.title}`);
+  }
+  if (!evidence.location.startsWith("file:")) {
+    failures.push(`production renderer should load from file:, got ${evidence.location}`);
+  }
+  if (evidence.readyState !== "interactive" && evidence.readyState !== "complete") {
+    failures.push(`document readyState should be interactive or complete, got ${evidence.readyState}`);
+  }
+  if (evidence.appKind !== "desktop") {
+    failures.push(`preload appKind should be desktop, got ${String(evidence.appKind)}`);
+  }
+  if (!evidence.hasPreloadBridge || !evidence.hasSaveProject || !evidence.hasOpenProject) {
+    failures.push("preload bridge should expose appKind, saveProject, and openProject");
+  }
+  if (evidence.saveResult.canceled) {
+    failures.push("native saveProject should not be canceled in project IO smoke");
+  }
+  if (evidence.saveResult.filePath !== evidence.targetPath) {
+    failures.push("native saveProject should write to the smoke target path");
+  }
+  if (evidence.openResult.canceled) {
+    failures.push("native openProject should not be canceled in project IO smoke");
+  }
+  if (evidence.openResult.filePath !== evidence.targetPath) {
+    failures.push("native openProject should read from the smoke target path");
+  }
+  if (evidence.openResult.contentsLength !== evidence.sourceLength) {
+    failures.push("native openProject should return the same content length saved by saveProject");
+  }
+  if (evidence.openResult.contentsMatched !== true) {
+    failures.push("native openProject should return the exact saved project contents");
+  }
+  if (evidence.samplingTextPresent) {
+    failures.push("renderer should not expose sampling-first language in project IO smoke");
+  }
+  return failures;
+}
+
 function installLaunchSmoke(win: BrowserWindow): void {
   let finished = false;
   const timeout = setTimeout(() => {
@@ -659,6 +793,58 @@ function installLaunchSmoke(win: BrowserWindow): void {
   });
 }
 
+function installProjectIoSmoke(win: BrowserWindow): void {
+  let finished = false;
+  const timeout = setTimeout(() => {
+    if (!finished) {
+      finished = true;
+      projectIoSmokeFailure("Timed out before the production desktop renderer completed the project IO smoke.");
+    }
+  }, projectIoSmokeTimeoutMs);
+
+  const fail = (message: string, details: Record<string, unknown> = {}): void => {
+    if (finished) {
+      return;
+    }
+    finished = true;
+    clearTimeout(timeout);
+    projectIoSmokeFailure(message, details);
+  };
+
+  win.webContents.once("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    fail("Production renderer failed to load for project IO smoke.", { errorCode, errorDescription, validatedURL });
+  });
+
+  win.webContents.once("render-process-gone", (_event, details) => {
+    fail("Production renderer process exited before project IO smoke completed.", { reason: details.reason });
+  });
+
+  win.once("ready-to-show", () => {
+    void collectProjectIoSmokeEvidence(win)
+      .then((evidence) => {
+        if (finished) {
+          return;
+        }
+
+        const failures = projectIoSmokeFailures(evidence);
+        if (failures.length > 0) {
+          fail("Production desktop project IO smoke failed.", { evidence, failures });
+          return;
+        }
+
+        finished = true;
+        clearTimeout(timeout);
+        console.log(`${projectIoSmokeResultPrefix}${JSON.stringify({ ok: true, evidence })}`);
+        app.exit(0);
+      })
+      .catch((error: unknown) => {
+        fail("Production project IO smoke JavaScript failed.", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      });
+  });
+}
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
@@ -674,12 +860,14 @@ function createWindow(): void {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      backgroundThrottling: !isLaunchSmoke
+      backgroundThrottling: !(isLaunchSmoke || isProjectIoSmoke)
     }
   });
 
   if (isLaunchSmoke) {
     installLaunchSmoke(win);
+  } else if (isProjectIoSmoke) {
+    installProjectIoSmoke(win);
   } else {
     win.once("ready-to-show", () => {
       win.show();
