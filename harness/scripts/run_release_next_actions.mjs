@@ -285,15 +285,21 @@ function buildPriorityActions(remediation, context = {}) {
 
 function buildCurrentActionSummary(priorityActions, fallback = {}) {
   const currentAction = Array.isArray(priorityActions) ? priorityActions[0] : null;
+  const currentPrerequisiteCommands = currentAction?.prerequisiteCommands ?? [];
+  const currentOperatorActions = currentAction?.operatorActions ?? [];
+  const currentRerunCommands = currentAction?.rerunCommands ?? [];
   return {
     currentActionId: currentAction?.id ?? fallback.id ?? "none",
     currentActionLabel: currentAction?.label ?? fallback.label ?? "No pending priority action",
     currentNextCommand: currentAction?.nextCommand ?? fallback.nextCommand ?? "npm run release:external-check",
     currentFirstBlocker: currentAction?.firstBlocker || fallback.firstBlocker || "none",
     currentRequiredKeys: currentAction?.requiredKeys ?? [],
-    currentPrerequisiteCommands: currentAction?.prerequisiteCommands ?? [],
-    currentOperatorActions: currentAction?.operatorActions ?? [],
-    currentRerunCommands: currentAction?.rerunCommands ?? [],
+    currentPrerequisiteCommand: firstValue(currentPrerequisiteCommands) || fallback.prerequisiteCommand || "none",
+    currentOperatorAction: firstValue(currentOperatorActions) || fallback.operatorAction || "none",
+    currentRerunCommand: firstValue(currentRerunCommands) || fallback.rerunCommand || "none",
+    currentPrerequisiteCommands,
+    currentOperatorActions,
+    currentRerunCommands,
     currentActionValueRecorded: false
   };
 }
@@ -426,6 +432,8 @@ function buildMarkdown(report) {
 - Current action: ${report.currentActionLabel}
 - Current next command: \`${report.currentNextCommand}\`
 - Current first blocker: ${report.currentFirstBlocker}
+- Current operator action: ${report.currentOperatorAction}
+- Current rerun command: \`${report.currentRerunCommand}\`
 - Local release ready: ${readyLabel(report.localReleaseReady)}
 - Local release readiness: ${report.localReleaseReadinessPercent.toFixed(1)}%
 - External distribution ready: ${readyLabel(report.externalDistributionReady)}
@@ -672,6 +680,9 @@ check(typeof nextActionsReport.currentActionId === "string" && nextActionsReport
 check(typeof nextActionsReport.currentActionLabel === "string" && nextActionsReport.currentActionLabel.length > 0, "external next actions should include the current action label");
 check(typeof nextActionsReport.currentNextCommand === "string" && nextActionsReport.currentNextCommand.length > 0, "external next actions should include the current next command");
 check(typeof nextActionsReport.currentFirstBlocker === "string" && nextActionsReport.currentFirstBlocker.length > 0, "external next actions should include the current first blocker");
+check(typeof nextActionsReport.currentPrerequisiteCommand === "string" && nextActionsReport.currentPrerequisiteCommand.length > 0, "external next actions should include the current prerequisite command");
+check(typeof nextActionsReport.currentOperatorAction === "string" && nextActionsReport.currentOperatorAction.length > 0, "external next actions should include the current operator action");
+check(typeof nextActionsReport.currentRerunCommand === "string" && nextActionsReport.currentRerunCommand.length > 0, "external next actions should include the current rerun command");
 check(Array.isArray(nextActionsReport.currentRequiredKeys), "external next actions should include current required keys");
 check(Array.isArray(nextActionsReport.currentPrerequisiteCommands), "external next actions should include current prerequisite commands");
 check(Array.isArray(nextActionsReport.currentOperatorActions), "external next actions should include current operator actions");
@@ -707,6 +718,18 @@ if (nextActionsReport.priorityActions.length > 0) {
   check(nextActionsReport.currentActionLabel === firstPriorityAction.label, "external next actions should mirror the first priority action label");
   check(nextActionsReport.currentNextCommand === firstPriorityAction.nextCommand, "external next actions should mirror the first priority next command");
   check(nextActionsReport.currentFirstBlocker === firstPriorityAction.firstBlocker, "external next actions should mirror the first priority blocker");
+  check(
+    nextActionsReport.currentPrerequisiteCommand === (firstValue(firstPriorityAction.prerequisiteCommands ?? []) || "none"),
+    "external next actions should mirror the first priority prerequisite command"
+  );
+  check(
+    nextActionsReport.currentOperatorAction === (firstValue(firstPriorityAction.operatorActions ?? []) || "none"),
+    "external next actions should mirror the first priority operator action"
+  );
+  check(
+    nextActionsReport.currentRerunCommand === (firstValue(firstPriorityAction.rerunCommands ?? []) || "none"),
+    "external next actions should mirror the first priority rerun command"
+  );
 }
 check(Number.isInteger(nextActionsReport.localEnvPlaceholderKeyCount), "external next actions should include local env placeholder key count");
 check(Array.isArray(nextActionsReport.localEnvPlaceholderKeys), "external next actions should include local env placeholder key names");
@@ -718,6 +741,7 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvFileL
   const releaseChannelAction = nextActionsReport.priorityActions.find((action) => action.id === "release-channel-metadata");
   check(nextActionsReport.currentActionId === releaseChannelAction?.id, "release channel metadata should be the current action when no local env file is loaded");
   check(nextActionsReport.currentFirstBlocker.includes("local distribution env file is not loaded"), "release channel metadata should surface the missing local env file as the current first blocker");
+  check(nextActionsReport.currentOperatorAction.includes("prepare-env"), "release channel metadata should surface prepare-env as the current operator action when no local env file is loaded");
   check(releaseChannelAction?.nextCommand === "npm run release:prepare-env", "release channel metadata should prepare the ignored env scaffold when no local env file is loaded");
   check(
     releaseChannelAction?.firstBlocker.includes("local distribution env file is not loaded"),
@@ -732,6 +756,7 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   const releaseChannelAction = nextActionsReport.priorityActions.find((action) => action.id === "release-channel-metadata");
   check(nextActionsReport.currentActionId === releaseChannelAction?.id, "release channel metadata should be the current action when placeholder keys remain");
   check(nextActionsReport.currentNextCommand === "npm run release:doctor", "release channel metadata should surface release doctor as the current next command when placeholders remain");
+  check(nextActionsReport.currentOperatorAction.includes("Replace placeholder values"), "release channel metadata should surface placeholder replacement as the current operator action when placeholders remain");
   check(releaseChannelAction?.nextCommand === "npm run release:doctor", "release channel metadata should rerun release doctor after placeholder cleanup");
   check(
     releaseChannelAction?.operatorActions.some((action) => action.includes("Replace placeholder values in the ignored local distribution env file")),
@@ -762,6 +787,8 @@ check(markdown.includes("External Next Actions"), "external next actions Markdow
 check(markdown.includes("Current focus:"), "external next actions Markdown should include current focus");
 check(markdown.includes("Current next command:"), "external next actions Markdown should include current next command");
 check(markdown.includes("Current first blocker:"), "external next actions Markdown should include current first blocker");
+check(markdown.includes("Current operator action:"), "external next actions Markdown should include current operator action");
+check(markdown.includes("Current rerun command:"), "external next actions Markdown should include current rerun command");
 check(markdown.includes("Local env placeholder keys:"), "external next actions Markdown should include placeholder key count");
 check(markdown.includes("Local Env Placeholder Keys"), "external next actions Markdown should include placeholder key section");
 check(markdown.includes("Priority Next Actions"), "external next actions Markdown should include priority actions");
@@ -786,6 +813,8 @@ console.log(`- Completion stage: ${nextActionsReport.completionStage}`);
 console.log(`- Current focus: ${nextActionsReport.currentFocus}`);
 console.log(`- Current next command: ${nextActionsReport.currentNextCommand}`);
 console.log(`- Current first blocker: ${nextActionsReport.currentFirstBlocker}`);
+console.log(`- Current operator action: ${nextActionsReport.currentOperatorAction}`);
+console.log(`- Current rerun command: ${nextActionsReport.currentRerunCommand}`);
 console.log(`- Local release ready: ${nextActionsReport.localReleaseReady ? "yes" : "no"}`);
 console.log(`- Local release readiness: ${nextActionsReport.localReleaseReadinessPercent.toFixed(1)}%`);
 console.log(`- External distribution ready: ${nextActionsReport.externalDistributionReady ? "yes" : "no"}`);
