@@ -127,10 +127,16 @@ function checkPackageScripts() {
     "run_desktop_packaged_project_io_smoke.mjs",
     "package.json desktop:packaged-project-io-smoke script"
   );
+  checkIncludes(
+    packageJson.scripts?.["desktop:installed-project-io-smoke"] ?? "",
+    "run_desktop_installed_project_io_smoke.mjs",
+    "package.json desktop:installed-project-io-smoke script"
+  );
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run build", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:project-io-smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:packaged-project-io-smoke", "package.json verify script");
+  checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:installed-project-io-smoke", "package.json verify script");
   check(
     (packageJson.scripts?.verify ?? "").indexOf("npm run build") < (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:smoke"),
     "package.json verify should run desktop:smoke after npm run build"
@@ -148,6 +154,13 @@ function checkPackageScripts() {
       (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:packaged-project-io-smoke") <
         (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:adhoc-sign-smoke"),
     "package.json verify should run desktop:packaged-project-io-smoke after package smoke and before ad-hoc signing"
+  );
+  check(
+    (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:install-smoke") <
+      (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:installed-project-io-smoke") &&
+      (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:installed-project-io-smoke") <
+        (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:gatekeeper-readiness-smoke"),
+    "package.json verify should run desktop:installed-project-io-smoke after install smoke and before Gatekeeper readiness"
   );
 }
 
