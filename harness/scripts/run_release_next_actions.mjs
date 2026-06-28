@@ -285,6 +285,7 @@ function buildPriorityActions(remediation, context = {}) {
 
 function buildCurrentActionSummary(priorityActions, fallback = {}) {
   const currentAction = Array.isArray(priorityActions) ? priorityActions[0] : null;
+  const currentRequiredKeys = currentAction?.requiredKeys ?? fallback.requiredKeys ?? [];
   const currentPrerequisiteCommands = currentAction?.prerequisiteCommands ?? [];
   const currentOperatorActions = currentAction?.operatorActions ?? [];
   const currentRerunCommands = currentAction?.rerunCommands ?? [];
@@ -293,7 +294,9 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
     currentActionLabel: currentAction?.label ?? fallback.label ?? "No pending priority action",
     currentNextCommand: currentAction?.nextCommand ?? fallback.nextCommand ?? "npm run release:external-check",
     currentFirstBlocker: currentAction?.firstBlocker || fallback.firstBlocker || "none",
-    currentRequiredKeys: currentAction?.requiredKeys ?? [],
+    currentRequiredKeyCount: currentRequiredKeys.length,
+    currentRequiredKeySummary: currentRequiredKeys.length > 0 ? currentRequiredKeys.join(", ") : "none",
+    currentRequiredKeys,
     currentPrerequisiteCommand: firstValue(currentPrerequisiteCommands) || fallback.prerequisiteCommand || "none",
     currentOperatorAction: firstValue(currentOperatorActions) || fallback.operatorAction || "none",
     currentRerunCommand: firstValue(currentRerunCommands) || fallback.rerunCommand || "none",
@@ -432,6 +435,7 @@ function buildMarkdown(report) {
 - Current action: ${report.currentActionLabel}
 - Current next command: \`${report.currentNextCommand}\`
 - Current first blocker: ${report.currentFirstBlocker}
+- Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
 - Current operator action: ${report.currentOperatorAction}
 - Current rerun command: \`${report.currentRerunCommand}\`
 - Local release ready: ${readyLabel(report.localReleaseReady)}
@@ -683,7 +687,13 @@ check(typeof nextActionsReport.currentFirstBlocker === "string" && nextActionsRe
 check(typeof nextActionsReport.currentPrerequisiteCommand === "string" && nextActionsReport.currentPrerequisiteCommand.length > 0, "external next actions should include the current prerequisite command");
 check(typeof nextActionsReport.currentOperatorAction === "string" && nextActionsReport.currentOperatorAction.length > 0, "external next actions should include the current operator action");
 check(typeof nextActionsReport.currentRerunCommand === "string" && nextActionsReport.currentRerunCommand.length > 0, "external next actions should include the current rerun command");
+check(Number.isInteger(nextActionsReport.currentRequiredKeyCount), "external next actions should include the current required key count");
+check(typeof nextActionsReport.currentRequiredKeySummary === "string" && nextActionsReport.currentRequiredKeySummary.length > 0, "external next actions should include the current required key summary");
 check(Array.isArray(nextActionsReport.currentRequiredKeys), "external next actions should include current required keys");
+check(
+  nextActionsReport.currentRequiredKeyCount === nextActionsReport.currentRequiredKeys.length,
+  "external next actions current required key count should match listed keys"
+);
 check(Array.isArray(nextActionsReport.currentPrerequisiteCommands), "external next actions should include current prerequisite commands");
 check(Array.isArray(nextActionsReport.currentOperatorActions), "external next actions should include current operator actions");
 check(Array.isArray(nextActionsReport.currentRerunCommands), "external next actions should include current rerun commands");
@@ -730,6 +740,14 @@ if (nextActionsReport.priorityActions.length > 0) {
     nextActionsReport.currentRerunCommand === (firstValue(firstPriorityAction.rerunCommands ?? []) || "none"),
     "external next actions should mirror the first priority rerun command"
   );
+  check(
+    nextActionsReport.currentRequiredKeyCount === (firstPriorityAction.requiredKeys ?? []).length,
+    "external next actions should mirror the first priority required key count"
+  );
+  check(
+    nextActionsReport.currentRequiredKeySummary === ((firstPriorityAction.requiredKeys ?? []).length > 0 ? firstPriorityAction.requiredKeys.join(", ") : "none"),
+    "external next actions should mirror the first priority required key summary"
+  );
 }
 check(Number.isInteger(nextActionsReport.localEnvPlaceholderKeyCount), "external next actions should include local env placeholder key count");
 check(Array.isArray(nextActionsReport.localEnvPlaceholderKeys), "external next actions should include local env placeholder key names");
@@ -740,6 +758,8 @@ check(
 if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvFileLoaded === false) {
   const releaseChannelAction = nextActionsReport.priorityActions.find((action) => action.id === "release-channel-metadata");
   check(nextActionsReport.currentActionId === releaseChannelAction?.id, "release channel metadata should be the current action when no local env file is loaded");
+  check(nextActionsReport.currentRequiredKeyCount === 4, "release channel metadata should surface four current required metadata keys when no local env file is loaded");
+  check(nextActionsReport.currentRequiredKeys.includes("GROOVEFORGE_RELEASE_DOWNLOAD_URL"), "release channel metadata should surface release download URL as a current required key name");
   check(nextActionsReport.currentFirstBlocker.includes("local distribution env file is not loaded"), "release channel metadata should surface the missing local env file as the current first blocker");
   check(nextActionsReport.currentOperatorAction.includes("prepare-env"), "release channel metadata should surface prepare-env as the current operator action when no local env file is loaded");
   check(releaseChannelAction?.nextCommand === "npm run release:prepare-env", "release channel metadata should prepare the ignored env scaffold when no local env file is loaded");
@@ -787,6 +807,7 @@ check(markdown.includes("External Next Actions"), "external next actions Markdow
 check(markdown.includes("Current focus:"), "external next actions Markdown should include current focus");
 check(markdown.includes("Current next command:"), "external next actions Markdown should include current next command");
 check(markdown.includes("Current first blocker:"), "external next actions Markdown should include current first blocker");
+check(markdown.includes("Current required keys:"), "external next actions Markdown should include current required keys");
 check(markdown.includes("Current operator action:"), "external next actions Markdown should include current operator action");
 check(markdown.includes("Current rerun command:"), "external next actions Markdown should include current rerun command");
 check(markdown.includes("Local env placeholder keys:"), "external next actions Markdown should include placeholder key count");
@@ -813,6 +834,7 @@ console.log(`- Completion stage: ${nextActionsReport.completionStage}`);
 console.log(`- Current focus: ${nextActionsReport.currentFocus}`);
 console.log(`- Current next command: ${nextActionsReport.currentNextCommand}`);
 console.log(`- Current first blocker: ${nextActionsReport.currentFirstBlocker}`);
+console.log(`- Current required keys: ${nextActionsReport.currentRequiredKeyCount} (${nextActionsReport.currentRequiredKeySummary})`);
 console.log(`- Current operator action: ${nextActionsReport.currentOperatorAction}`);
 console.log(`- Current rerun command: ${nextActionsReport.currentRerunCommand}`);
 console.log(`- Local release ready: ${nextActionsReport.localReleaseReady ? "yes" : "no"}`);
