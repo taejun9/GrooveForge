@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { distributionPrivateInputKeys, loadDistributionLocalEnv } from "./distribution_local_env.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -18,6 +19,7 @@ const readinessRoot = path.join(root, "build", "desktop");
 const readinessPath = path.join(readinessRoot, `${appName}-${platformArch}-auto-update-readiness.json`);
 const updateFeedModule = await import(pathToFileURL(path.join(root, "electron", "updateFeedConfig.ts")).href);
 const { redactUpdateFeedConfig, resolveUpdateFeedConfig } = updateFeedModule;
+const distributionLocalEnv = await loadDistributionLocalEnv({ root, allowedKeys: distributionPrivateInputKeys });
 const sourcePaths = [
   "electron/main.ts",
   "electron/updateFeedConfig.ts",
@@ -85,6 +87,12 @@ function updateProviderSignals() {
   };
 }
 
+function privateInputValues() {
+  return distributionPrivateInputKeys
+    .map((key) => process.env[key])
+    .filter((value) => typeof value === "string" && value.trim().length >= 8);
+}
+
 function updateArtifactSignals(manifest, policy) {
   const signing = manifest?.signing ?? {};
   const releaseFiles = [
@@ -138,7 +146,9 @@ async function createReadinessSummary() {
     arch: process.arch,
     networkProbeAttempted: false,
     releaseGateClaimedAutoUpdate: false,
-    releaseGateClaimedExternalDistribution: false
+    releaseGateClaimedExternalDistribution: false,
+    localEnvInput: distributionLocalEnv,
+    localEnvValueRecorded: false
   };
 
   if (process.platform !== "darwin") {
@@ -253,6 +263,8 @@ check(readiness.bundleId === bundleId, `auto-update readiness summary should ide
 check(readiness.networkProbeAttempted === false, "auto-update readiness smoke should not probe remote update feeds");
 check(readiness.releaseGateClaimedAutoUpdate === false, "auto-update readiness smoke should not claim auto-update support");
 check(readiness.releaseGateClaimedExternalDistribution === false, "auto-update readiness smoke should not claim external distribution completion");
+check(readiness.localEnvInput?.valueRecorded === false, "auto-update readiness summary should not record local env values");
+check(readiness.localEnvValueRecorded === false, "auto-update readiness summary should mark local env values as unrecorded");
 check(Array.isArray(readiness.blockers), "auto-update readiness summary should include a blockers array");
 check(readiness.autoUpdateReady === false || readiness.blockers.length === 0, "ready auto-update summary should not include blockers");
 check(
@@ -272,12 +284,18 @@ check(
   "auto-update readiness summary should omit private channel values from redacted config"
 );
 
+const readinessJson = JSON.stringify(readiness);
+for (const privateValue of privateInputValues()) {
+  check(!readinessJson.includes(privateValue), "auto-update readiness summary should not include private distribution values");
+}
+
 if (failures.length > 0) {
   fail("Auto-update readiness validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
 }
 
 console.log("GrooveForge auto-update readiness smoke passed.");
 console.log(`- Summary: ${relative(readinessPath)}`);
+console.log(`- Local env file loaded: ${distributionLocalEnv.enabled ? "yes" : "no"}`);
 console.log(`- Updater integration ready: ${readiness.checks?.updaterIntegrationReady === true ? "yes" : "no"}`);
 console.log(`- Update provider ready: ${readiness.checks?.providerReady === true ? "yes" : "no"}`);
 console.log(`- Update feed config ready: ${readiness.checks?.updateFeedConfigReady === true ? "yes" : "no"}`);
@@ -289,4 +307,5 @@ if (readiness.blockers.length > 0) {
   console.log(`- Blockers: ${readiness.blockers.join(" | ")}`);
 }
 console.log("- Network: no update feed probe attempted");
+console.log("- Not recorded: feed URL values, channel values, local env values, credentials, or tokens");
 console.log("- Not claimed: auto-update, Developer ID signing, notarization, Gatekeeper approval, app-store submission, or external distribution-channel QA");

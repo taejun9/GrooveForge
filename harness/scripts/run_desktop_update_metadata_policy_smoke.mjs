@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { distributionPrivateInputKeys, loadDistributionLocalEnv } from "./distribution_local_env.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -13,6 +14,7 @@ const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const releaseManifestPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-manifest.json`);
 const policyPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-update-metadata-policy.json`);
+const distributionLocalEnv = await loadDistributionLocalEnv({ root, allowedKeys: distributionPrivateInputKeys });
 const failures = [];
 
 function check(condition, message) {
@@ -44,6 +46,12 @@ function providerSignals() {
     feedValueRecorded: false,
     channelValueRecorded: false
   };
+}
+
+function privateInputValues() {
+  return distributionPrivateInputKeys
+    .map((key) => process.env[key])
+    .filter((value) => typeof value === "string" && value.trim().length >= 8);
 }
 
 function requiredMetadataArtifacts(version, platformLabel) {
@@ -83,7 +91,9 @@ async function createPolicy() {
     releaseGateClaimedDeveloperIdSigning: false,
     releaseGateClaimedNotarization: false,
     releaseGateClaimedGatekeeperApproval: false,
-    releaseGateClaimedExternalDistribution: false
+    releaseGateClaimedExternalDistribution: false,
+    localEnvInput: distributionLocalEnv,
+    localEnvValueRecorded: false
   };
 
   if (process.platform !== "darwin") {
@@ -188,6 +198,8 @@ check(policy.releaseGateClaimedGatekeeperApproval === false, "update metadata po
 check(policy.releaseGateClaimedExternalDistribution === false, "update metadata policy smoke should not claim external distribution completion");
 check(policy.provider?.feedValueRecorded === false, "update metadata policy should not record private update feed values");
 check(policy.provider?.channelValueRecorded === false, "update metadata policy should not record private update channel values");
+check(policy.localEnvInput?.valueRecorded === false, "update metadata policy should not record local env values");
+check(policy.localEnvValueRecorded === false, "update metadata policy should mark local env values as unrecorded");
 check(Array.isArray(policy.metadataArtifacts), "update metadata policy should list required metadata artifacts");
 check(Array.isArray(policy.blockers), "update metadata policy should include a blockers array");
 check(policy.updateMetadataArtifactsReady === false || policy.blockers.length === 0, "ready update metadata policy should not include blockers");
@@ -200,6 +212,9 @@ for (const privateValue of [
 ].filter(Boolean)) {
   check(!policyJson.includes(privateValue), "update metadata policy should not include private update feed values");
 }
+for (const privateValue of privateInputValues()) {
+  check(!policyJson.includes(privateValue), "update metadata policy should not include private distribution values");
+}
 
 if (failures.length > 0) {
   fail("Update metadata policy validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
@@ -207,6 +222,7 @@ if (failures.length > 0) {
 
 console.log("GrooveForge update metadata policy smoke passed.");
 console.log(`- Policy: ${relative(policyPath)}`);
+console.log(`- Local env file loaded: ${distributionLocalEnv.enabled ? "yes" : "no"}`);
 console.log(`- Policy available: ${policy.policyAvailable === true ? "yes" : "no"}`);
 console.log(`- Required metadata artifacts: ${policy.metadataArtifacts?.map((artifact) => artifact.fileName).join(", ") ?? "none"}`);
 console.log(`- Update metadata artifacts ready: ${policy.updateMetadataArtifactsReady ? "yes" : "no"}`);
@@ -214,4 +230,5 @@ if (policy.blockers.length > 0) {
   console.log(`- Blockers: ${policy.blockers.join(" | ")}`);
 }
 console.log("- Network: no update feed probe attempted");
+console.log("- Not recorded: feed URL values, channel values, local env values, credentials, or tokens");
 console.log("- Not claimed: auto-update, Developer ID signing, notarization, Gatekeeper approval, app-store submission, or external distribution-channel QA");

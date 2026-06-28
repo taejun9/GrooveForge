@@ -3,6 +3,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { distributionPrivateInputKeys, loadDistributionLocalEnv } from "./distribution_local_env.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -13,6 +14,7 @@ const summaryRoot = path.join(root, "build", "desktop");
 const summaryPath = path.join(summaryRoot, `${appName}-${platformArch}-update-feed-config.json`);
 const updateFeedModule = await import(pathToFileURL(path.join(root, "electron", "updateFeedConfig.ts")).href);
 const { redactUpdateFeedConfig, resolveUpdateFeedConfig, updateChannelKeys, updateFeedUrlKeys } = updateFeedModule;
+const distributionLocalEnv = await loadDistributionLocalEnv({ root, allowedKeys: distributionPrivateInputKeys });
 const failures = [];
 
 function check(condition, message) {
@@ -45,6 +47,12 @@ function sanitizeCase(name, env) {
   };
 }
 
+function privateInputValues() {
+  return distributionPrivateInputKeys
+    .map((key) => process.env[key])
+    .filter((value) => typeof value === "string" && value.trim().length >= 8);
+}
+
 const cases = [
   sanitizeCase("missing feed and channel", {}),
   sanitizeCase("valid GrooveForge feed and channel", {
@@ -74,6 +82,7 @@ const cases = [
 ];
 
 const caseByName = new Map(cases.map((testCase) => [testCase.name, testCase]));
+const currentEnvironmentConfig = redactUpdateFeedConfig(resolveUpdateFeedConfig(process.env));
 const summary = {
   appName,
   bundleId,
@@ -90,6 +99,10 @@ const summary = {
   },
   feedValueRecorded: false,
   channelValueRecorded: false,
+  localEnvInput: distributionLocalEnv,
+  localEnvValueRecorded: false,
+  currentEnvironmentConfig,
+  currentEnvironmentReady: currentEnvironmentConfig.ready,
   cases
 };
 
@@ -136,6 +149,16 @@ check(
   summary.releaseGateClaimedExternalDistribution === false,
   "update feed config smoke should not claim external distribution completion"
 );
+check(summary.localEnvInput.valueRecorded === false, "update feed config should not record local env values");
+check(summary.localEnvValueRecorded === false, "update feed config should mark local env values as unrecorded");
+check(summary.currentEnvironmentConfig.feedValueRecorded === false, "current environment should not record feed values");
+check(summary.currentEnvironmentConfig.channelValueRecorded === false, "current environment should not record channel values");
+check(!("feedUrl" in summary.currentEnvironmentConfig), "current environment should omit feedUrl");
+check(!("releaseChannel" in summary.currentEnvironmentConfig), "current environment should omit releaseChannel");
+
+for (const privateValue of privateInputValues()) {
+  check(!serialized.includes(privateValue), "update feed config should not include private distribution values");
+}
 
 if (failures.length > 0) {
   fail("Update feed config validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
@@ -146,8 +169,10 @@ await writeFile(summaryPath, `${serialized}\n`, "utf8");
 
 console.log("GrooveForge update feed config smoke passed.");
 console.log(`- Summary: ${relative(summaryPath)}`);
+console.log(`- Local env file loaded: ${distributionLocalEnv.enabled ? "yes" : "no"}`);
+console.log(`- Current environment feed/channel ready: ${currentEnvironmentConfig.ready ? "yes" : "no"}`);
 console.log("- Valid feed/channel cases: ready");
 console.log("- Unsafe feed/channel cases: blocked before network contact");
 console.log("- Network: no update feed probe attempted");
-console.log("- Not recorded: feed URL values, channel values, credentials, or tokens");
+console.log("- Not recorded: feed URL values, channel values, local env values, credentials, or tokens");
 console.log("- Not claimed: auto-update, Developer ID signing, notarization, Gatekeeper approval, app-store submission, or external distribution-channel QA");
