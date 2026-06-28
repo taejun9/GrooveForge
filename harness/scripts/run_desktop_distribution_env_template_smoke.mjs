@@ -22,7 +22,8 @@ const distributionMetadataKeys = [
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
   "GROOVEFORGE_RELEASE_NOTES_URL",
   "GROOVEFORGE_SUPPORT_URL",
-  "GROOVEFORGE_DISTRIBUTION_QA_APPROVED"
+  "GROOVEFORGE_DISTRIBUTION_QA_APPROVED",
+  "GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256"
 ];
 const updateFeedUrlKeys = ["GROOVEFORGE_UPDATE_FEED_URL", "ELECTRON_UPDATE_FEED_URL", "UPDATE_FEED_URL"];
 const updateChannelKeys = ["GROOVEFORGE_UPDATE_CHANNEL", "ELECTRON_UPDATE_CHANNEL", "UPDATE_CHANNEL"];
@@ -187,6 +188,9 @@ function localEnvBlockers(localEnvInput) {
   }
   if (readEnv("GROOVEFORGE_DISTRIBUTION_QA_APPROVED") !== "1") {
     blockers.push("GROOVEFORGE_DISTRIBUTION_QA_APPROVED=1 is required after manual channel QA.");
+  }
+  if (!/^[a-f0-9]{64}$/.test(readEnv("GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256"))) {
+    blockers.push("GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256 must match the current distribution manual QA checklist SHA-256.");
   }
   return unique(blockers);
 }

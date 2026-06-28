@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -56,8 +57,41 @@ async function readJsonIfExists(filePath) {
 
 function privateInputValues() {
   return distributionPrivateInputKeys
+    .filter((key) => key !== "GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256")
     .map((key) => process.env[key])
     .filter((value) => typeof value === "string" && value.trim().length >= 8);
+}
+
+function sha256Text(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function manualQaDigestPayload(summary, checklist) {
+  return {
+    appName: summary.appName,
+    bundleId: summary.bundleId,
+    version: summary.version,
+    platform: summary.platform,
+    arch: summary.arch,
+    selectedUpdateArtifactSource: summary.selectedUpdateArtifactSource ?? null,
+    signedUpdateArtifactReady: summary.signedUpdateArtifactReady === true,
+    checklist: checklist.map((item) => ({
+      id: item.id,
+      label: item.label,
+      ready: item.ready,
+      evidence: item.evidence,
+      operatorAction: item.operatorAction,
+      blockers: item.blockers,
+      valueRecorded: item.valueRecorded
+    })),
+    privateValuesRecorded: false,
+    releaseGateClaimedManualQaApproval: false,
+    releaseGateClaimedExternalDistribution: false
+  };
+}
+
+function manualQaChecklistSha256(summary, checklist) {
+  return sha256Text(JSON.stringify(manualQaDigestPayload(summary, checklist)));
 }
 
 function checklistItem(id, label, ready, evidence, operatorAction, blocker) {
@@ -91,6 +125,8 @@ function buildMarkdown(summary) {
 
 - Manual QA checklist ready: ${summary.manualQaChecklistReady ? "yes" : "no"}
 - Manual QA approval ready: ${summary.manualQaApprovalReady ? "yes" : "no"}
+- Manual QA checklist SHA-256: ${summary.manualQaChecklistSha256}
+- Manual QA checklist digest matched: ${summary.manualQaChecklistDigestMatches ? "yes" : "no"}
 - Private values recorded: no
 - Network probe attempted: no
 - Release upload attempted: no
@@ -108,7 +144,7 @@ ${formatOperatorActions(summary.checklist)}
 
 ## Approval
 
-Set \`GROOVEFORGE_DISTRIBUTION_QA_APPROVED=1\` only after every operator action above has been completed against the selected signed release artifact and public channel destinations.
+Set \`GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256=${summary.manualQaChecklistSha256}\` and \`GROOVEFORGE_DISTRIBUTION_QA_APPROVED=1\` only after every operator action above has been completed against the selected signed release artifact and public channel destinations.
 
 ## Blockers
 
@@ -195,8 +231,7 @@ async function createManualQaSummary() {
     notarization?.stapled === true &&
     notarization?.stapleValidationPassed === true;
   const gatekeeperAccepted = notarizedGatekeeper?.notarizedGatekeeperAccepted === true;
-  const manualQaApprovalReady = process.env.GROOVEFORGE_DISTRIBUTION_QA_APPROVED === "1";
-  const checklist = [
+  const approvalChecklist = [
     checklistItem(
       "release-artifact",
       "Release artifact evidence",
@@ -272,14 +307,32 @@ async function createManualQaSummary() {
       existsSync(notarizedGatekeeperPath) ? relative(notarizedGatekeeperPath) : relative(notarizedGatekeeperPath),
       "Confirm notarized Gatekeeper accepts the stapled DMG and mounted app on the target macOS channel.",
       "Notarized Gatekeeper acceptance evidence is missing."
-    ),
+    )
+  ];
+  const approvalBase = {
+    ...base,
+    skipped: false,
+    selectedUpdateArtifactSource: updateArtifacts?.sourceDmg?.selectedSource ?? null,
+    signedUpdateArtifactReady: updateArtifacts?.signedUpdateArtifact?.ready === true
+  };
+  const checklistSha256 = manualQaChecklistSha256(approvalBase, approvalChecklist);
+  const manualQaChecklistDigestKey = process.env.GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256?.trim() ?? "";
+  const manualQaChecklistDigestKeyPresent = manualQaChecklistDigestKey.length > 0;
+  const manualQaChecklistDigestWellFormed = /^[a-f0-9]{64}$/.test(manualQaChecklistDigestKey);
+  const manualQaChecklistDigestMatches = manualQaChecklistDigestWellFormed && manualQaChecklistDigestKey === checklistSha256;
+  const manualQaApprovalSignalReady = process.env.GROOVEFORGE_DISTRIBUTION_QA_APPROVED === "1";
+  const manualQaApprovalReady = manualQaApprovalSignalReady && manualQaChecklistDigestMatches;
+  const checklist = [
+    ...approvalChecklist,
     checklistItem(
       "manual-approval",
-      "Manual approval env signal",
+      "Manual approval env signal and checklist digest",
       manualQaApprovalReady,
-      ".env.distribution.local or exported environment",
-      "Set GROOVEFORGE_DISTRIBUTION_QA_APPROVED=1 only after all manual channel QA checks pass.",
-      "GROOVEFORGE_DISTRIBUTION_QA_APPROVED=1 is required after manual channel QA."
+      `GROOVEFORGE_DISTRIBUTION_QA_APPROVED and GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256=${checklistSha256}`,
+      "Set GROOVEFORGE_DISTRIBUTION_QA_APPROVED=1 and GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256 to the checklist SHA-256 only after all manual channel QA checks pass.",
+      manualQaApprovalSignalReady
+        ? "GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256 must match the current distribution manual QA checklist SHA-256."
+        : "GROOVEFORGE_DISTRIBUTION_QA_APPROVED=1 and a matching GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256 are required after manual channel QA."
     )
   ];
   const blockers = checklist.flatMap((item) => item.blockers);
@@ -290,6 +343,11 @@ async function createManualQaSummary() {
     manualQaChecklistMarkdownPath: relative(checklistMarkdownPath),
     manualQaChecklistJsonPath: relative(checklistJsonPath),
     manualQaChecklistReady: true,
+    manualQaChecklistSha256: checklistSha256,
+    manualQaChecklistDigestKeyPresent,
+    manualQaChecklistDigestWellFormed,
+    manualQaChecklistDigestMatches,
+    manualQaApprovalSignalReady,
     manualQaApprovalReady,
     checklist,
     selectedUpdateArtifactSource: updateArtifacts?.sourceDmg?.selectedSource ?? null,
@@ -317,6 +375,7 @@ check(summary.credentialValueRecorded === false, "manual QA checklist should not
 check(summary.tokenValueRecorded === false, "manual QA checklist should not record token values");
 check(summary.channelValueRecorded === false, "manual QA checklist should not record channel values");
 check(summary.privateValuesRecorded === false, "manual QA checklist should not record private values");
+check(/^[a-f0-9]{64}$/.test(summary.manualQaChecklistSha256), "manual QA checklist should include a deterministic SHA-256 digest");
 check(summary.networkProbeAttempted === false, "manual QA checklist should not probe remote channels");
 check(summary.releaseUploadAttempted === false, "manual QA checklist should not upload release artifacts");
 check(summary.notarySubmissionAttemptedByThisSmoke === false, "manual QA checklist should not submit to Apple");
@@ -339,6 +398,8 @@ console.log(`- Markdown: ${relative(checklistMarkdownPath)}`);
 console.log(`- JSON: ${relative(checklistJsonPath)}`);
 console.log(`- Manual QA checklist ready: ${summary.manualQaChecklistReady ? "yes" : "no"}`);
 console.log(`- Manual QA approval ready: ${summary.manualQaApprovalReady ? "yes" : "no"}`);
+console.log(`- Manual QA checklist SHA-256: ${summary.manualQaChecklistSha256}`);
+console.log(`- Manual QA checklist digest matched: ${summary.manualQaChecklistDigestMatches ? "yes" : "no"}`);
 console.log(`- Selected update artifact source: ${summary.selectedUpdateArtifactSource ?? "none"}`);
 console.log(`- Signed update artifact ready: ${summary.signedUpdateArtifactReady ? "yes" : "no"}`);
 console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);

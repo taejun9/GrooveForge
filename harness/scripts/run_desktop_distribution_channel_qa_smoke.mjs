@@ -29,7 +29,8 @@ const distributionMetadataKeys = [
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
   "GROOVEFORGE_RELEASE_NOTES_URL",
   "GROOVEFORGE_SUPPORT_URL",
-  "GROOVEFORGE_DISTRIBUTION_QA_APPROVED"
+  "GROOVEFORGE_DISTRIBUTION_QA_APPROVED",
+  "GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256"
 ];
 const distributionLocalEnvKeys = [
   ...distributionMetadataKeys,
@@ -113,12 +114,20 @@ function validateHttpsUrl(value, label) {
   return blockers;
 }
 
-function distributionChannelSignals() {
+function distributionChannelSignals(manualQaChecklist) {
   const distributionChannel = readEnv("GROOVEFORGE_DISTRIBUTION_CHANNEL");
   const downloadUrl = readEnv("GROOVEFORGE_RELEASE_DOWNLOAD_URL");
   const releaseNotesUrl = readEnv("GROOVEFORGE_RELEASE_NOTES_URL");
   const supportUrl = readEnv("GROOVEFORGE_SUPPORT_URL");
-  const qaApproved = readEnv("GROOVEFORGE_DISTRIBUTION_QA_APPROVED") === "1";
+  const qaApprovedSignal = readEnv("GROOVEFORGE_DISTRIBUTION_QA_APPROVED") === "1";
+  const checklistDigest = readEnv("GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256");
+  const expectedChecklistDigest = manualQaChecklist?.manualQaChecklistSha256 ?? "";
+  const checklistDigestWellFormed = /^[a-f0-9]{64}$/.test(checklistDigest);
+  const checklistDigestMatches =
+    checklistDigestWellFormed &&
+    expectedChecklistDigest.length > 0 &&
+    checklistDigest === expectedChecklistDigest;
+  const qaApproved = qaApprovedSignal && checklistDigestMatches;
   const blockers = [];
 
   if (!/^(direct-download|private-beta|managed-release)$/.test(distributionChannel)) {
@@ -127,8 +136,11 @@ function distributionChannelSignals() {
   blockers.push(...validateHttpsUrl(downloadUrl, "GROOVEFORGE_RELEASE_DOWNLOAD_URL"));
   blockers.push(...validateHttpsUrl(releaseNotesUrl, "GROOVEFORGE_RELEASE_NOTES_URL"));
   blockers.push(...validateHttpsUrl(supportUrl, "GROOVEFORGE_SUPPORT_URL"));
-  if (!qaApproved) {
+  if (!qaApprovedSignal) {
     blockers.push("GROOVEFORGE_DISTRIBUTION_QA_APPROVED=1 is required after manual channel QA with the selected signed release artifact.");
+  }
+  if (!checklistDigestMatches) {
+    blockers.push("GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256 must match the current distribution manual QA checklist SHA-256 before manual approval is accepted.");
   }
 
   return {
@@ -139,6 +151,11 @@ function distributionChannelSignals() {
     releaseNotesUrlKeyPresent: releaseNotesUrl.length > 0,
     supportUrlKeyPresent: supportUrl.length > 0,
     manualQaApprovalKeyPresent: readEnv("GROOVEFORGE_DISTRIBUTION_QA_APPROVED").length > 0,
+    manualQaChecklistDigestKeyPresent: checklistDigest.length > 0,
+    manualQaChecklistDigestWellFormed: checklistDigestWellFormed,
+    manualQaChecklistDigestExpected: expectedChecklistDigest || null,
+    manualQaChecklistDigestMatches: checklistDigestMatches,
+    manualQaApprovalSignalReady: qaApprovedSignal,
     manualQaApproved: qaApproved,
     valueRecorded: false,
     blockers
@@ -262,7 +279,7 @@ async function createDistributionSummary() {
   const notarization = await readJsonIfExists(notarizationPath);
   const gatekeeper = await readJsonIfExists(notarizedGatekeeperPath);
   const manualQaChecklist = await readJsonIfExists(manualQaChecklistPath);
-  const channel = distributionChannelSignals();
+  const channel = distributionChannelSignals(manualQaChecklist);
   const inputs = summarizeInputs({
     manifest,
     releaseNotes,
@@ -373,6 +390,7 @@ console.log(`- Developer ID signed: ${summary.inputs?.developerIdSigned === true
 console.log(`- Notarized and stapled: ${summary.inputs?.notarizedAndStapled === true ? "yes" : "no"}`);
 console.log(`- Notarized Gatekeeper accepted: ${summary.inputs?.gatekeeperAccepted === true ? "yes" : "no"}`);
 console.log(`- Manual QA checklist ready: ${summary.inputs?.manualQaChecklistReady === true ? "yes" : "no"}`);
+console.log(`- Manual QA checklist digest matched: ${summary.channel?.manualQaChecklistDigestMatches === true ? "yes" : "no"}`);
 console.log(`- External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}`);
 console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
 if (summary.blockers.length > 0) {

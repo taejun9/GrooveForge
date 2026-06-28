@@ -21,6 +21,7 @@ const developerIdSigningPath = path.join(summaryRoot, `${appName}-${platformArch
 const notarizationPath = path.join(summaryRoot, `${appName}-${platformArch}-notarization.json`);
 const notarizedGatekeeperPath = path.join(summaryRoot, `${appName}-${platformArch}-notarized-gatekeeper.json`);
 const distributionChannelQaPath = path.join(summaryRoot, `${appName}-${platformArch}-distribution-channel-qa.json`);
+const manualQaChecklistPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-manual-qa.json`);
 const privateInputsMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-private-inputs.md`);
 const privateInputsJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-private-inputs.json`);
 const distributionMetadataKeys = [
@@ -28,7 +29,8 @@ const distributionMetadataKeys = [
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
   "GROOVEFORGE_RELEASE_NOTES_URL",
   "GROOVEFORGE_SUPPORT_URL",
-  "GROOVEFORGE_DISTRIBUTION_QA_APPROVED"
+  "GROOVEFORGE_DISTRIBUTION_QA_APPROVED",
+  "GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256"
 ];
 const updateFeedUrlKeys = ["GROOVEFORGE_UPDATE_FEED_URL", "ELECTRON_UPDATE_FEED_URL", "UPDATE_FEED_URL"];
 const updateChannelKeys = ["GROOVEFORGE_UPDATE_CHANNEL", "ELECTRON_UPDATE_CHANNEL", "UPDATE_CHANNEL"];
@@ -190,16 +192,29 @@ function distributionChannelSignals() {
   };
 }
 
-function manualApprovalSignals() {
+function manualApprovalSignals(distributionQa) {
   const value = readEnv("GROOVEFORGE_DISTRIBUTION_QA_APPROVED");
+  const digest = readEnv("GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256");
   const keyPresent = value.length > 0;
-  const approved = value === "1";
+  const digestKeyPresent = digest.length > 0;
+  const digestWellFormed = /^[a-f0-9]{64}$/.test(digest);
+  const approvedSignal = value === "1";
   return {
-    keys: ["GROOVEFORGE_DISTRIBUTION_QA_APPROVED"],
+    keys: ["GROOVEFORGE_DISTRIBUTION_QA_APPROVED", "GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256"],
     keyPresent,
-    approved,
+    digestKeyPresent,
+    digestWellFormed,
+    approvedSignal,
+    digestMatchesCurrentChecklist: distributionQa?.channel?.manualQaChecklistDigestMatches === true,
+    approved: approvedSignal && digestWellFormed && distributionQa?.channel?.manualQaChecklistDigestMatches === true,
     valueRecorded: false,
-    blockers: approved ? [] : ["GROOVEFORGE_DISTRIBUTION_QA_APPROVED=1 is required after manual channel QA."]
+    blockers: [
+      ...(approvedSignal ? [] : ["GROOVEFORGE_DISTRIBUTION_QA_APPROVED=1 is required after manual channel QA."]),
+      ...(digestWellFormed ? [] : ["GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256 must be the current distribution manual QA checklist SHA-256."]),
+      ...(distributionQa?.channel?.manualQaChecklistDigestMatches === true
+        ? []
+        : ["GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256 must match the distribution-channel QA checklist digest evidence."])
+    ]
   };
 }
 
@@ -293,7 +308,7 @@ function notarizationSignals(developerIdReadiness, notarization) {
 }
 
 function collectEvidence(input) {
-  const { bundleManifest, handoff, autoUpdate, developerIdReadiness, developerIdSigning, notarization, gatekeeper, distributionQa } = input;
+  const { bundleManifest, handoff, autoUpdate, developerIdReadiness, developerIdSigning, notarization, gatekeeper, distributionQa, manualQaChecklist } = input;
   return {
     bundleManifest: {
       present: Boolean(bundleManifest),
@@ -334,6 +349,12 @@ function collectEvidence(input) {
       present: Boolean(distributionQa),
       ready: distributionQa?.externalDistributionReady === true,
       path: existsSync(distributionChannelQaPath) ? relative(distributionChannelQaPath) : null
+    },
+    manualQaChecklist: {
+      present: Boolean(manualQaChecklist),
+      ready: manualQaChecklist?.manualQaChecklistReady === true && manualQaChecklist?.privateValuesRecorded === false,
+      digestReady: /^[a-f0-9]{64}$/.test(manualQaChecklist?.manualQaChecklistSha256 ?? ""),
+      path: existsSync(manualQaChecklistPath) ? relative(manualQaChecklistPath) : null
     }
   };
 }
@@ -363,6 +384,9 @@ function evidenceBlockers(evidence) {
   }
   if (!evidence.distributionChannelQa.present) {
     blockers.push("Distribution-channel QA summary is missing; run npm run desktop:distribution-channel-qa-smoke first.");
+  }
+  if (!evidence.manualQaChecklist.present) {
+    blockers.push("Manual QA checklist summary is missing; run npm run desktop:distribution-manual-qa-smoke first.");
   }
   return blockers;
 }
@@ -494,6 +518,7 @@ async function createPrivateInputsSummary() {
   const notarization = await readJsonIfExists(notarizationPath);
   const gatekeeper = await readJsonIfExists(notarizedGatekeeperPath);
   const distributionQa = await readJsonIfExists(distributionChannelQaPath);
+  const manualQaChecklist = await readJsonIfExists(manualQaChecklistPath);
   const evidence = collectEvidence({
     bundleManifest,
     handoff,
@@ -502,7 +527,8 @@ async function createPrivateInputsSummary() {
     developerIdSigning,
     notarization,
     gatekeeper,
-    distributionQa
+    distributionQa,
+    manualQaChecklist
   });
   const channel = distributionChannelSignals();
   const downloadUrl = validateHttpsUrlPresence("GROOVEFORGE_RELEASE_DOWNLOAD_URL");
@@ -512,7 +538,7 @@ async function createPrivateInputsSummary() {
   const updateChannel = updateChannelSignals();
   const developerId = developerIdSignals(developerIdReadiness, developerIdSigning);
   const notarizationInputs = notarizationSignals(developerIdReadiness, notarization);
-  const manualApproval = manualApprovalSignals();
+  const manualApproval = manualApprovalSignals(distributionQa);
   const inputGroups = [
     group("Distribution channel", ["GROOVEFORGE_DISTRIBUTION_CHANNEL"], channel.keyPresent && channel.channelValid, channel),
     group("Release download URL", ["GROOVEFORGE_RELEASE_DOWNLOAD_URL"], downloadUrl.urlValid, downloadUrl),
@@ -522,7 +548,7 @@ async function createPrivateInputsSummary() {
     group("Update channel", updateChannelKeys, updateChannel.channelValid, updateChannel),
     group("Developer ID signing identity", signingKeys, developerId.keyPresent && developerId.matchingIdentityFound, developerId),
     group("Notarization credentials", notarizationKeys, notarizationInputs.credentialSignalReady && notarizationInputs.submitRequested, notarizationInputs),
-    group("Manual distribution QA approval", ["GROOVEFORGE_DISTRIBUTION_QA_APPROVED"], manualApproval.approved, manualApproval)
+    group("Manual distribution QA approval", ["GROOVEFORGE_DISTRIBUTION_QA_APPROVED", "GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256"], manualApproval.approved, manualApproval)
   ];
   const privateInputBlockers = [
     ...channel.blockers,
