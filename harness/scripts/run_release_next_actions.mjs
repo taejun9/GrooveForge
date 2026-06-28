@@ -260,6 +260,7 @@ function buildPriorityActions(remediation, context = {}) {
       const placeholderBlocker = shouldReplacePlaceholders
         ? `Local distribution env still contains ${localEnvPlaceholderKeyCount} placeholder keys.`
         : "";
+      const missingLocalEnvBlocker = shouldPrepareEnv ? "Ignored local distribution env file is not loaded." : "";
       return {
         order: index + 1,
         id: group.id,
@@ -275,8 +276,8 @@ function buildPriorityActions(remediation, context = {}) {
           : shouldReplacePlaceholders
             ? "npm run release:doctor"
             : firstValue(rerunCommands) || "npm run release:external-preflight",
-        firstBlocker: placeholderBlocker || firstValue(group.blockers ?? []),
-        blockers: unique([placeholderBlocker, group.blockers ?? []]),
+        firstBlocker: missingLocalEnvBlocker || placeholderBlocker || firstValue(group.blockers ?? []),
+        blockers: unique([missingLocalEnvBlocker, placeholderBlocker, group.blockers ?? []]),
         valueRecorded: false
       };
     });
@@ -715,7 +716,13 @@ check(
 );
 if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvFileLoaded === false) {
   const releaseChannelAction = nextActionsReport.priorityActions.find((action) => action.id === "release-channel-metadata");
+  check(nextActionsReport.currentActionId === releaseChannelAction?.id, "release channel metadata should be the current action when no local env file is loaded");
+  check(nextActionsReport.currentFirstBlocker.includes("local distribution env file is not loaded"), "release channel metadata should surface the missing local env file as the current first blocker");
   check(releaseChannelAction?.nextCommand === "npm run release:prepare-env", "release channel metadata should prepare the ignored env scaffold when no local env file is loaded");
+  check(
+    releaseChannelAction?.firstBlocker.includes("local distribution env file is not loaded"),
+    "release channel metadata should make the missing local env file the first blocker when no local env file is loaded"
+  );
   check(
     releaseChannelAction?.prerequisiteCommands.includes("npm run release:prepare-env"),
     "release channel metadata should list prepare-env as a prerequisite when no local env file is loaded"
