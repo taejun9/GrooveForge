@@ -5,8 +5,10 @@ import { existsSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { distributionPrivateInputKeys, loadDistributionLocalEnv } from "./distribution_local_env.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const distributionLocalEnv = await loadDistributionLocalEnv({ root, allowedKeys: distributionPrivateInputKeys });
 const appName = "GrooveForge";
 const bundleId = "app.grooveforge.desktop";
 const platformArch = `${process.platform}-${process.arch}`;
@@ -160,6 +162,10 @@ async function createSigningSummary() {
     platform: process.platform,
     arch: process.arch,
     identityEnvKey,
+    localEnvInput: distributionLocalEnv,
+    localEnvValueRecorded: false,
+    developerIdIdentityValueRecorded: false,
+    credentialValueRecorded: false,
     networkSubmissionAttempted: false,
     releaseGateClaimedDeveloperIdSigning: false,
     releaseGateClaimedNotarization: false,
@@ -316,8 +322,10 @@ async function createSigningSummary() {
     developerIdApplicationIdentityCount: developerIdApplicationIdentities.length,
     matchingIdentityFound: true,
     selectedIdentity: {
-      fingerprint: matchingIdentity.fingerprint,
-      label: matchingIdentity.label
+      matched: true,
+      valueRecorded: false,
+      fingerprintRecorded: false,
+      labelRecorded: false
     },
     developerIdSigningAttempted: true,
     developerIdSigned,
@@ -339,8 +347,16 @@ check(summary.releaseGateClaimedDeveloperIdSigning === false, "Developer ID sign
 check(summary.releaseGateClaimedNotarization === false, "Developer ID signing smoke should not claim notarization");
 check(summary.releaseGateClaimedGatekeeperApproval === false, "Developer ID signing smoke should not claim Gatekeeper approval");
 check(summary.releaseGateClaimedExternalDistribution === false, "Developer ID signing smoke should not claim external distribution completion");
+check(summary.localEnvValueRecorded === false, "Developer ID signing summary should not record local env values");
+check(summary.developerIdIdentityValueRecorded === false, "Developer ID signing summary should not record Developer ID identity values");
+check(summary.credentialValueRecorded === false, "Developer ID signing summary should not record credential values");
 check(Array.isArray(summary.blockers), "Developer ID signing summary should include a blockers array");
 check(summary.developerIdSigned === false || summary.blockers.length === 0, "signed Developer ID summary should not include blockers");
+
+const summaryJson = JSON.stringify(summary);
+for (const privateValue of distributionPrivateInputKeys.map((key) => process.env[key]?.trim()).filter((value) => value && value.length >= 8)) {
+  check(!summaryJson.includes(privateValue), "Developer ID signing summary should not include private distribution values");
+}
 
 if (failures.length > 0) {
   fail("Developer ID signing validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
@@ -352,6 +368,7 @@ console.log(`- Identity configured: ${summary.configuredIdentityPresent === true
 console.log(`- Matching identity found: ${summary.matchingIdentityFound === true ? "yes" : "no"}`);
 console.log(`- Signing attempted: ${summary.developerIdSigningAttempted === true ? "yes" : "no"}`);
 console.log(`- Developer ID signed copy: ${summary.developerIdSigned === true ? "yes" : "no"}`);
+console.log(`- Local env file loaded: ${summary.localEnvInput?.enabled === true ? "yes" : "no"}`);
 if (summary.signedAppPath) {
   console.log(`- Signed app copy: ${summary.signedAppPath}`);
 }
@@ -359,4 +376,5 @@ if (summary.blockers.length > 0) {
   console.log(`- Blockers: ${summary.blockers.join(" | ")}`);
 }
 console.log("- Network: no Apple notary submission attempted");
+console.log("- Not recorded: local env values, credentials, tokens, identity labels, or channel values");
 console.log("- Not claimed: primary release artifact Developer ID signing, notarization, Gatekeeper approval, app-store submission, auto-update, or external distribution-channel QA");

@@ -5,8 +5,10 @@ import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { distributionPrivateInputKeys, loadDistributionLocalEnv } from "./distribution_local_env.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const distributionLocalEnv = await loadDistributionLocalEnv({ root, allowedKeys: distributionPrivateInputKeys });
 const appName = "GrooveForge";
 const bundleId = "app.grooveforge.desktop";
 const platformArch = `${process.platform}-${process.arch}`;
@@ -151,6 +153,10 @@ async function createReadinessSummary() {
     generatedAt: new Date().toISOString(),
     platform: process.platform,
     arch: process.arch,
+    localEnvInput: distributionLocalEnv,
+    localEnvValueRecorded: false,
+    developerIdIdentityValueRecorded: false,
+    credentialValueRecorded: false,
     networkSubmissionAttempted: false,
     releaseGateClaimedExternalDistribution: false
   };
@@ -213,7 +219,7 @@ async function createReadinessSummary() {
     developerIdSigning: {
       ready: developerIdSigningReady,
       validDeveloperIdApplicationIdentityCount: developerIdApplicationIdentities.length,
-      identities: developerIdApplicationIdentities
+      identityValuesRecorded: false
     },
     notarization: {
       ready: notarizationReady,
@@ -237,12 +243,18 @@ check(readiness.appName === appName, "readiness summary should identify GrooveFo
 check(readiness.bundleId === bundleId, `readiness summary should identify ${bundleId}`);
 check(readiness.networkSubmissionAttempted === false, "readiness smoke should not submit to Apple notary services");
 check(readiness.releaseGateClaimedExternalDistribution === false, "readiness smoke should not claim external distribution completion");
+check(readiness.localEnvValueRecorded === false, "readiness summary should not record local env values");
+check(readiness.developerIdIdentityValueRecorded === false, "readiness summary should not record Developer ID identity values");
+check(readiness.credentialValueRecorded === false, "readiness summary should not record credential values");
 check(Array.isArray(readiness.blockers), "readiness summary should include a blockers array");
 check(readiness.externalDistributionReady === false || readiness.blockers.length === 0, "ready summary should not include blockers");
 
 const readinessJson = JSON.stringify(readiness);
 check(!readinessJson.includes(process.env.APPLE_APP_SPECIFIC_PASSWORD ?? "__missing_secret__"), "readiness summary should not include Apple app-specific password values");
 check(!readinessJson.includes(process.env.ASC_PRIVATE_KEY ?? "__missing_secret__"), "readiness summary should not include App Store Connect private key values");
+for (const privateValue of distributionPrivateInputKeys.map((key) => process.env[key]?.trim()).filter((value) => value && value.length >= 8)) {
+  check(!readinessJson.includes(privateValue), "readiness summary should not include private distribution values");
+}
 
 if (failures.length > 0) {
   fail("Developer ID readiness validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
@@ -253,7 +265,9 @@ console.log(`- Summary: ${relative(readinessPath)}`);
 console.log(`- Developer ID signing ready: ${readiness.developerIdSigning?.ready === true ? "yes" : "no"}`);
 console.log(`- Notarization credential signal ready: ${readiness.notarization?.ready === true ? "yes" : "no"}`);
 console.log(`- External distribution ready: ${readiness.externalDistributionReady ? "yes" : "no"}`);
+console.log(`- Local env file loaded: ${readiness.localEnvInput?.enabled === true ? "yes" : "no"}`);
 if (readiness.blockers.length > 0) {
   console.log(`- Blockers: ${readiness.blockers.join(" | ")}`);
 }
 console.log("- Network: no Apple notary submission attempted");
+console.log("- Not recorded: local env values, credentials, tokens, identity labels, or channel values");

@@ -4,6 +4,29 @@ import path from "node:path";
 
 const defaultEnvFileName = ".env.distribution.local";
 const placeholderPattern = /^(|<[^>]+>|CHANGE_ME|REPLACE_ME|TODO|TBD|example|example-.+|your-.+|https:\/\/example\.com.*)$/i;
+export const distributionPrivateInputKeys = [
+  "GROOVEFORGE_DISTRIBUTION_CHANNEL",
+  "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
+  "GROOVEFORGE_RELEASE_NOTES_URL",
+  "GROOVEFORGE_SUPPORT_URL",
+  "GROOVEFORGE_DISTRIBUTION_QA_APPROVED",
+  "GROOVEFORGE_UPDATE_FEED_URL",
+  "ELECTRON_UPDATE_FEED_URL",
+  "UPDATE_FEED_URL",
+  "GROOVEFORGE_UPDATE_CHANNEL",
+  "ELECTRON_UPDATE_CHANNEL",
+  "UPDATE_CHANNEL",
+  "GROOVEFORGE_DEVELOPER_ID_IDENTITY",
+  "GROOVEFORGE_NOTARY_SUBMIT",
+  "APPLE_ID",
+  "APPLE_TEAM_ID",
+  "APPLE_APP_SPECIFIC_PASSWORD",
+  "ASC_KEY_ID",
+  "ASC_ISSUER_ID",
+  "ASC_KEY_PATH",
+  "APPLE_NOTARY_PROFILE",
+  "NOTARYTOOL_KEYCHAIN_PROFILE"
+];
 
 function parseEnvLine(line) {
   const trimmed = line.trim();

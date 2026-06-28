@@ -5,8 +5,10 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { distributionPrivateInputKeys, loadDistributionLocalEnv } from "./distribution_local_env.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const distributionLocalEnv = await loadDistributionLocalEnv({ root, allowedKeys: distributionPrivateInputKeys });
 const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 const appName = "GrooveForge";
 const bundleId = "app.grooveforge.desktop";
@@ -232,6 +234,10 @@ async function createNotarizationSummary() {
     platform: process.platform,
     arch: process.arch,
     submitEnvKey,
+    localEnvInput: distributionLocalEnv,
+    localEnvValueRecorded: false,
+    credentialValueRecorded: false,
+    developerIdIdentityValueRecorded: false,
     notarySubmissionRequested: process.env[submitEnvKey] === "1",
     notarySubmissionAttempted: false,
     networkSubmissionAttempted: false,
@@ -415,12 +421,18 @@ check(summary.releaseGateClaimedDeveloperIdSigning === false, "notarization smok
 check(summary.releaseGateClaimedNotarization === false, "notarization smoke should not claim primary release artifact notarization");
 check(summary.releaseGateClaimedGatekeeperApproval === false, "notarization smoke should not claim Gatekeeper approval");
 check(summary.releaseGateClaimedExternalDistribution === false, "notarization smoke should not claim external distribution completion");
+check(summary.localEnvValueRecorded === false, "notarization summary should not record local env values");
+check(summary.credentialValueRecorded === false, "notarization summary should not record credential values");
+check(summary.developerIdIdentityValueRecorded === false, "notarization summary should not record Developer ID identity values");
 check(Array.isArray(summary.blockers), "notarization summary should include a blockers array");
 check(summary.notarizationReady === false || summary.blockers.length === 0, "ready notarization summary should not include blockers");
 
 const summaryJson = JSON.stringify(summary);
 for (const secretValue of [process.env.APPLE_APP_SPECIFIC_PASSWORD, process.env.ASC_PRIVATE_KEY].filter(Boolean)) {
   check(!summaryJson.includes(secretValue), "notarization summary should not include secret credential values");
+}
+for (const privateValue of distributionPrivateInputKeys.map((key) => process.env[key]?.trim()).filter((value) => value && value.length >= 8)) {
+  check(!summaryJson.includes(privateValue), "notarization summary should not include private distribution values");
 }
 
 if (failures.length > 0) {
@@ -435,6 +447,7 @@ console.log(`- Submission attempted: ${summary.notarySubmissionAttempted === tru
 console.log(`- Notarization accepted: ${summary.notarizationAccepted === true ? "yes" : "no"}`);
 console.log(`- Stapled: ${summary.stapled === true ? "yes" : "no"}`);
 console.log(`- Staple validation passed: ${summary.stapleValidationPassed === true ? "yes" : "no"}`);
+console.log(`- Local env file loaded: ${summary.localEnvInput?.enabled === true ? "yes" : "no"}`);
 if (summary.notarizationDmgPath) {
   console.log(`- Isolated notarization DMG: ${summary.notarizationDmgPath}`);
 }
@@ -446,4 +459,5 @@ if (summary.notarySubmissionAttempted) {
 } else {
   console.log("- Network: no Apple notary submission attempted");
 }
+console.log("- Not recorded: local env values, credentials, tokens, identity labels, or channel values");
 console.log("- Not claimed: primary release artifact Developer ID signing, notarization, Gatekeeper approval, auto-update, app-store submission, or external distribution-channel QA");
