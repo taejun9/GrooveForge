@@ -304,7 +304,7 @@ function applySpaceReturn(buffer: AudioChannels, sendBuffer: AudioChannels): voi
 
 function createRenderNoiseSeed(project: ProjectState): RenderNoiseSeed {
   const renderSeed = hashString(
-    JSON.stringify({
+    stableStringify({
       bpm: project.bpm,
       selectedPattern: project.selectedPattern,
       patterns: project.patterns,
@@ -327,6 +327,19 @@ function createRenderNoiseSeed(project: ProjectState): RenderNoiseSeed {
     eventIndex += 1;
     return seed;
   };
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "undefined";
 }
 
 function seededNoiseSample(seed: number, index: number): number {
