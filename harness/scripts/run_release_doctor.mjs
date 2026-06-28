@@ -24,6 +24,11 @@ const targetedChecks = [
     script: "desktop:distribution-env-template-smoke"
   },
   {
+    label: "Release prepare env",
+    command: "npm run release:prepare-env-smoke",
+    script: "release:prepare-env-smoke"
+  },
+  {
     label: "Update feed config",
     command: "npm run desktop:update-feed-config-smoke",
     script: "desktop:update-feed-config-smoke"
@@ -54,6 +59,10 @@ const sourceArtifacts = [
   {
     label: "Distribution env template",
     path: path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-env-template.json`)
+  },
+  {
+    label: "Release prepare env",
+    path: path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-prepare-env.json`)
   },
   {
     label: "Update feed config",
@@ -199,6 +208,8 @@ function buildMarkdown(report) {
 - Local env file loaded: ${readyLabel(report.localEnvFileLoaded)}
 - Local env ready: ${readyLabel(report.localEnvReady)}
 - Distribution env template ready: ${readyLabel(report.distributionEnvTemplateReady)}
+- Release prepare env ready: ${readyLabel(report.releasePrepareEnvReady)}
+- Release prepare env scaffold written: ${readyLabel(report.releasePrepareEnvScaffoldWritten)}
 - Template keys covered: ${readyLabel(report.templateKeysCovered)}
 - Private inputs ready: ${readyLabel(report.privateInputsReady)}
 - Private input groups ready: ${report.privateInputGroupReadyCount}/${report.privateInputGroupTotal}
@@ -220,6 +231,7 @@ function buildMarkdown(report) {
 ## Commands
 
 - Doctor command: \`${report.doctorCommand}\`
+- Prepare env command: \`${report.prepareEnvCommand}\`
 - Progress command: \`${report.progressCommand}\`
 - Hard external distribution gate: \`${report.hardExternalGateCommand}\`
 
@@ -265,6 +277,7 @@ const artifactRows = sourceArtifacts.map((artifact) => ({
 
 const [
   distributionEnvTemplate,
+  releasePrepareEnv,
   updateFeedConfig,
   developerIdReadiness,
   distributionManualQa,
@@ -293,6 +306,7 @@ const releaseDoctorReport = {
   platform: process.platform,
   arch: process.arch,
   doctorCommand: "npm run release:doctor",
+  prepareEnvCommand: "npm run release:prepare-env",
   progressCommand: "npm run release:progress",
   hardExternalGateCommand: "npm run release:external-check",
   releaseDoctorMarkdownPath: relative(releaseDoctorMarkdownPath),
@@ -300,6 +314,9 @@ const releaseDoctorReport = {
   targetedCommands: targetedChecks.map(({ label, command }) => ({ label, command })),
   sourceArtifacts: artifactRows,
   distributionEnvTemplateReady: distributionEnvTemplate.distributionEnvTemplateReady === true,
+  releasePrepareEnvReady: releasePrepareEnv.releasePrepareEnvReady === true,
+  releasePrepareEnvScaffoldWritten: releasePrepareEnv.scaffoldWritten === true,
+  releasePrepareEnvLocalWriteRequested: releasePrepareEnv.localEnvWriteRequested === true,
   templateKeysCovered: distributionEnvTemplate.templateKeysCovered === true,
   localEnvFileLoaded: sourceLocalEnvLoaded(
     distributionEnvTemplate,
@@ -385,11 +402,15 @@ await writeFile(releaseDoctorMarkdownPath, markdown, "utf8");
 check(releaseDoctorReport.appName === appName, "release doctor should identify GrooveForge");
 check(releaseDoctorReport.bundleId === bundleId, `release doctor should identify ${bundleId}`);
 check(releaseDoctorReport.doctorCommand === "npm run release:doctor", "release doctor should identify the doctor command");
+check(releaseDoctorReport.prepareEnvCommand === "npm run release:prepare-env", "release doctor should include the prepare-env command");
 check(releaseDoctorReport.progressCommand === "npm run release:progress", "release doctor should include the progress command");
 check(releaseDoctorReport.hardExternalGateCommand === "npm run release:external-check", "release doctor should keep the hard external gate command");
 check(releaseDoctorReport.targetedCommands.length === targetedChecks.length, "release doctor should include every targeted command");
 check(releaseDoctorReport.sourceArtifacts.every((artifact) => artifact.present), "release doctor should cite generated source artifacts");
 check(releaseDoctorReport.releaseDoctorReportReady === true, "release doctor report should be ready after targeted checks");
+check(releaseDoctorReport.releasePrepareEnvReady === true, "release doctor should include ready release prepare-env evidence");
+check(releaseDoctorReport.releasePrepareEnvScaffoldWritten === true, "release doctor should include written prepare-env scaffold evidence");
+check(releaseDoctorReport.releasePrepareEnvLocalWriteRequested === false, "release doctor should not request a local env write");
 check(typeof releaseDoctorReport.externalDistributionReady === "boolean", "release doctor should include external distribution readiness");
 check(typeof releaseDoctorReport.privateInputsReady === "boolean", "release doctor should include private-input readiness");
 check(Array.isArray(releaseDoctorReport.privateInputGroups), "release doctor should include private-input groups");
@@ -411,6 +432,7 @@ check(releaseDoctorReport.releaseGateClaimedExternalDistribution === false, "rel
 check(releaseDoctorReport.sourceClaimedExternalDistribution === false, "release doctor source artifacts should not claim external distribution completion");
 check(markdown.includes("Release Doctor"), "release doctor Markdown should include title");
 check(markdown.includes("Doctor command: `npm run release:doctor`"), "release doctor Markdown should include the doctor command");
+check(markdown.includes("Prepare env command: `npm run release:prepare-env`"), "release doctor Markdown should include the prepare-env command");
 check(markdown.includes("Progress command: `npm run release:progress`"), "release doctor Markdown should include the progress command");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "release doctor Markdown should keep the hard external gate command");
 check(!/https?:\/\//i.test(markdown), "release doctor Markdown should not include public or private URL values");
@@ -425,6 +447,8 @@ console.log(`- Markdown: ${relative(releaseDoctorMarkdownPath)}`);
 console.log(`- JSON: ${relative(releaseDoctorJsonPath)}`);
 console.log(`- Local env file loaded: ${releaseDoctorReport.localEnvFileLoaded ? "yes" : "no"}`);
 console.log(`- Local env ready: ${releaseDoctorReport.localEnvReady ? "yes" : "no"}`);
+console.log(`- Release prepare env ready: ${releaseDoctorReport.releasePrepareEnvReady ? "yes" : "no"}`);
+console.log(`- Release prepare env scaffold written: ${releaseDoctorReport.releasePrepareEnvScaffoldWritten ? "yes" : "no"}`);
 console.log(`- Private inputs ready: ${releaseDoctorReport.privateInputsReady ? "yes" : "no"}`);
 console.log(`- Private input groups ready: ${releaseDoctorReport.privateInputGroupReadyCount}/${releaseDoctorReport.privateInputGroupTotal}`);
 console.log(`- Channel metadata ready: ${releaseDoctorReport.channelMetadataReady ? "yes" : "no"}`);
