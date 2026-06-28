@@ -86,6 +86,55 @@ const envKeyGuidance = {
   GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256:
     "Use the current distribution manual QA checklist SHA-256 digest and keep it paired with the approval signal."
 };
+const actionReadyCriteria = {
+  "regenerate-local-release-evidence": [
+    "The ignored source evidence artifacts exist after `npm run release:check`.",
+    "`npm run release:next-actions` can run external preflight from existing redacted evidence."
+  ],
+  "release-channel-metadata": [
+    "The current release-channel keys are present in the ignored local env file without placeholder values.",
+    "Distribution private-inputs evidence marks release channel metadata ready without recording URL or channel values.",
+    "Distribution-channel QA no longer reports channel, release download, release notes, or support URL blockers."
+  ],
+  "auto-update-feed": [
+    "Update feed config evidence marks one safe feed URL key and one valid update channel key ready without recording values.",
+    "Auto-update readiness evidence marks provider/feed/channel metadata ready.",
+    "Signed and notarized update metadata artifacts are regenerated after Developer ID, notarization, and Gatekeeper evidence are ready."
+  ],
+  "developer-id-signing": [
+    "Developer ID readiness finds a valid Developer ID Application identity in the current keychain search list.",
+    "Developer ID signing smoke produces an isolated signed app copy with Developer ID authority and required runtime entitlements.",
+    "Signing evidence remains value-free and does not mark notarization or external distribution complete."
+  ],
+  "notarization-stapling": [
+    "A Developer ID signed isolated app copy is available for notarization.",
+    "One bounded notary credential signal is present and the submit guard is intentionally enabled.",
+    "Notarization smoke reports accepted notarization, stapling, and staple validation for the isolated artifact."
+  ],
+  "notarized-gatekeeper": [
+    "A notarized and stapled isolated DMG is available for Gatekeeper assessment.",
+    "Notarized Gatekeeper smoke reports acceptance for the selected DMG and mounted app.",
+    "Gatekeeper evidence remains tied to the selected release artifact chain."
+  ],
+  "manual-channel-qa": [
+    "The manual QA checklist is complete against the selected signed, notarized, Gatekeeper-accepted release artifact.",
+    "The approval signal is set only after manual channel QA passes.",
+    "The checklist digest matches the current distribution manual QA checklist evidence."
+  ],
+  "final-hard-gate": [
+    "Every preceding remediation group is ready in redacted evidence.",
+    "`npm run release:external-check` runs after `npm run release:check` and no longer fails the hard external distribution gate.",
+    "External distribution readiness is claimed only by the hard gate after private inputs, signing, notarization, Gatekeeper, auto-update, and manual QA evidence are all ready."
+  ],
+  "run-hard-external-distribution-gate": [
+    "`npm run release:external-check` is the next command.",
+    "The hard external distribution gate passes without recording private values."
+  ],
+  "refresh-external-preflight-evidence": [
+    "`npm run release:external-preflight` regenerates redacted operator-loop evidence.",
+    "The refreshed evidence identifies the next pending priority action."
+  ]
+};
 
 function check(condition, message) {
   if (!condition) {
@@ -250,6 +299,7 @@ function formatDetailRows(actions) {
       const requiredKeys = action.requiredKeys.length > 0 ? action.requiredKeys.join(", ") : "none";
       const placeholderKeys = action.placeholderKeys.length > 0 ? action.placeholderKeys.join(", ") : "none";
       const keyGuidance = action.keyGuidance.map((item) => `   - ${item.key}: ${item.guidance}`).join("\n") || "   - none";
+      const readyCriteria = action.readyCriteria.map((item) => `   - ${item}`).join("\n") || "   - none";
       const prerequisites = action.prerequisiteCommands.map((command) => `   - \`${command}\``).join("\n") || "   - none";
       const operatorActions = action.operatorActions.map((item) => `   - ${item}`).join("\n") || "   - none";
       const rerunCommands = action.rerunCommands.map((command) => `   - \`${command}\``).join("\n") || "   - none";
@@ -259,6 +309,8 @@ function formatDetailRows(actions) {
    Placeholder keys: ${placeholderKeys}
    Key guidance:
 ${keyGuidance}
+   Ready criteria:
+${readyCriteria}
    Next command: \`${action.nextCommand}\`
    Prerequisites:
 ${prerequisites}
@@ -296,10 +348,29 @@ function guidanceForKeys(keys) {
     .filter(Boolean);
 }
 
+function readyCriteriaForAction(action = {}) {
+  const mappedCriteria = actionReadyCriteria[action.id] ?? [];
+  if (mappedCriteria.length > 0) {
+    return mappedCriteria;
+  }
+  const requiredKeys = Array.isArray(action.requiredKeys) ? action.requiredKeys : [];
+  if (requiredKeys.length > 0) {
+    return [
+      "Required private env keys validate in redacted evidence without recording values.",
+      "Rerun commands complete without leaving this priority action blocked."
+    ];
+  }
+  return ["Rerun commands complete and redacted evidence no longer lists this action as blocked."];
+}
+
 function formatGuidanceList(items) {
   return Array.isArray(items) && items.length > 0
     ? items.map((item) => `- ${item.key}: ${item.guidance}`).join("\n")
     : "- None.";
+}
+
+function formatReadyCriteriaList(items) {
+  return Array.isArray(items) && items.length > 0 ? items.map((item) => `- ${item}`).join("\n") : "- None.";
 }
 
 function sensitiveEnvironmentValues() {
@@ -345,6 +416,7 @@ function buildPriorityActions(remediation, context = {}) {
         ? `Current action still contains ${placeholderKeys.length} placeholder keys for required release-channel metadata.`
         : "";
       const missingLocalEnvBlocker = shouldPrepareEnv ? "Ignored local distribution env file is not loaded." : "";
+      const readyCriteria = readyCriteriaForAction(group);
       return {
         order: index + 1,
         id: group.id,
@@ -353,6 +425,7 @@ function buildPriorityActions(remediation, context = {}) {
         requiredKeys,
         placeholderKeys,
         keyGuidance,
+        readyCriteria,
         evidence: group.evidence ?? [],
         prerequisiteCommands,
         operatorActions,
@@ -374,6 +447,7 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
   const currentRequiredKeys = currentAction?.requiredKeys ?? fallback.requiredKeys ?? [];
   const currentPlaceholderKeys = currentAction?.placeholderKeys ?? fallback.placeholderKeys ?? [];
   const currentEnvKeyGuidance = currentAction?.keyGuidance ?? fallback.keyGuidance ?? guidanceForKeys(currentRequiredKeys);
+  const currentReadyCriteria = currentAction?.readyCriteria ?? fallback.readyCriteria ?? readyCriteriaForAction(fallback);
   const currentPrerequisiteCommands = currentAction?.prerequisiteCommands ?? [];
   const currentOperatorActions = currentAction?.operatorActions ?? [];
   const currentRerunCommands = currentAction?.rerunCommands ?? [];
@@ -391,6 +465,9 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
     currentEnvKeyGuidanceCount: currentEnvKeyGuidance.length,
     currentEnvKeyGuidanceSummary: currentEnvKeyGuidance.length > 0 ? `${currentEnvKeyGuidance.length} keys with value-free guidance` : "none",
     currentEnvKeyGuidance,
+    currentReadyCriteriaCount: currentReadyCriteria.length,
+    currentReadyCriteriaSummary: currentReadyCriteria.length > 0 ? `${currentReadyCriteria.length} value-free ready criteria` : "none",
+    currentReadyCriteria,
     currentPrerequisiteCommand: firstValue(currentPrerequisiteCommands) || fallback.prerequisiteCommand || "none",
     currentOperatorAction: firstValue(currentOperatorActions) || fallback.operatorAction || "none",
     currentRerunCommand: firstValue(currentRerunCommands) || fallback.rerunCommand || "none",
@@ -418,6 +495,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
       requiredKeys: [],
       placeholderKeys: [],
       keyGuidance: [],
+      readyCriteria: readyCriteriaForAction({ id: "regenerate-local-release-evidence" }),
       evidence: artifactRows,
       prerequisiteCommands: [],
       operatorActions: [
@@ -538,6 +616,7 @@ function buildMarkdown(report) {
 - Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${report.currentPlaceholderKeySummary})
 - Current env key guidance: ${report.currentEnvKeyGuidanceCount} (${report.currentEnvKeyGuidanceSummary})
+- Current ready criteria: ${report.currentReadyCriteriaCount} (${report.currentReadyCriteriaSummary})
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current operator action: ${report.currentOperatorAction}
 - Current rerun command: \`${report.currentRerunCommand}\`
@@ -591,6 +670,10 @@ ${formatKeyList(report.localEnvPlaceholderKeys)}
 ## Current Env Key Guidance
 
 ${formatGuidanceList(report.currentEnvKeyGuidance)}
+
+## Current Ready Criteria
+
+${formatReadyCriteriaList(report.currentReadyCriteria)}
 
 ## Current First Blockers
 
@@ -816,6 +899,8 @@ check(Number.isInteger(nextActionsReport.currentPlaceholderKeyCount), "external 
 check(typeof nextActionsReport.currentPlaceholderKeySummary === "string" && nextActionsReport.currentPlaceholderKeySummary.length > 0, "external next actions should include the current placeholder key summary");
 check(Number.isInteger(nextActionsReport.currentEnvKeyGuidanceCount), "external next actions should include the current env key guidance count");
 check(typeof nextActionsReport.currentEnvKeyGuidanceSummary === "string" && nextActionsReport.currentEnvKeyGuidanceSummary.length > 0, "external next actions should include the current env key guidance summary");
+check(Number.isInteger(nextActionsReport.currentReadyCriteriaCount), "external next actions should include the current ready criteria count");
+check(typeof nextActionsReport.currentReadyCriteriaSummary === "string" && nextActionsReport.currentReadyCriteriaSummary.length > 0, "external next actions should include the current ready criteria summary");
 check(typeof nextActionsReport.currentEnvEditTarget === "string" && nextActionsReport.currentEnvEditTarget.length > 0, "external next actions should include the current env edit target");
 check(nextActionsReport.currentEnvConfiguredFileKey === "GROOVEFORGE_DISTRIBUTION_ENV_FILE", "external next actions should include the env file override key name");
 check(Array.isArray(nextActionsReport.localEnvFilesChecked), "external next actions should include local env files checked");
@@ -823,6 +908,7 @@ check(Array.isArray(nextActionsReport.localEnvPresentFiles), "external next acti
 check(Array.isArray(nextActionsReport.currentRequiredKeys), "external next actions should include current required keys");
 check(Array.isArray(nextActionsReport.currentPlaceholderKeys), "external next actions should include current placeholder keys");
 check(Array.isArray(nextActionsReport.currentEnvKeyGuidance), "external next actions should include current env key guidance");
+check(Array.isArray(nextActionsReport.currentReadyCriteria), "external next actions should include current ready criteria");
 check(
   nextActionsReport.currentRequiredKeyCount === nextActionsReport.currentRequiredKeys.length,
   "external next actions current required key count should match listed keys"
@@ -834,6 +920,10 @@ check(
 check(
   nextActionsReport.currentEnvKeyGuidanceCount === nextActionsReport.currentEnvKeyGuidance.length,
   "external next actions current env key guidance count should match listed guidance"
+);
+check(
+  nextActionsReport.currentReadyCriteriaCount === nextActionsReport.currentReadyCriteria.length,
+  "external next actions current ready criteria count should match listed criteria"
 );
 check(Array.isArray(nextActionsReport.currentPrerequisiteCommands), "external next actions should include current prerequisite commands");
 check(Array.isArray(nextActionsReport.currentOperatorActions), "external next actions should include current operator actions");
@@ -864,6 +954,8 @@ check(nextActionsReport.priorityActions.every((action) => action.ready === false
 check(nextActionsReport.priorityActions.every((action) => action.valueRecorded === false), "priority actions should not record values");
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.placeholderKeys)), "priority actions should include placeholder key lists");
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.keyGuidance)), "priority actions should include key guidance lists");
+check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.readyCriteria)), "priority actions should include ready criteria lists");
+check(nextActionsReport.priorityActions.every((action) => action.readyCriteria.length > 0), "priority actions should include at least one ready criterion");
 check(
   nextActionsReport.priorityActions.every((action) =>
     (action.requiredKeys ?? []).every((key) => (action.keyGuidance ?? []).some((item) => item.key === key))
@@ -913,8 +1005,28 @@ if (nextActionsReport.priorityActions.length > 0) {
     nextActionsReport.currentEnvKeyGuidanceSummary === ((firstPriorityAction.keyGuidance ?? []).length > 0 ? `${firstPriorityAction.keyGuidance.length} keys with value-free guidance` : "none"),
     "external next actions should mirror the first priority key guidance summary"
   );
+  check(
+    nextActionsReport.currentReadyCriteriaCount === (firstPriorityAction.readyCriteria ?? []).length,
+    "external next actions should mirror the first priority ready criteria count"
+  );
+  check(
+    nextActionsReport.currentReadyCriteriaSummary ===
+      ((firstPriorityAction.readyCriteria ?? []).length > 0 ? `${firstPriorityAction.readyCriteria.length} value-free ready criteria` : "none"),
+    "external next actions should mirror the first priority ready criteria summary"
+  );
 }
 if (nextActionsReport.bootstrapMode === false) {
+  const releaseChannelAction = nextActionsReport.priorityActions.find((action) => action.id === "release-channel-metadata");
+  if (releaseChannelAction) {
+    check(
+      releaseChannelAction.readyCriteria.some((item) => item.includes("without placeholder values")),
+      "release channel metadata should explain placeholder-free readiness"
+    );
+    check(
+      releaseChannelAction.readyCriteria.some((item) => item.includes("Distribution-channel QA")),
+      "release channel metadata should explain distribution-channel QA readiness"
+    );
+  }
   const autoUpdateAction = nextActionsReport.priorityActions.find((action) => action.id === "auto-update-feed");
   if (autoUpdateAction) {
     check(autoUpdateAction.keyGuidance.length === autoUpdateAction.requiredKeys.length, "auto-update priority action should include guidance for each update feed/channel key");
@@ -926,6 +1038,10 @@ if (nextActionsReport.bootstrapMode === false) {
       autoUpdateAction.keyGuidance.some((item) => item.key === "GROOVEFORGE_UPDATE_CHANNEL" && item.guidance.includes("1-32 character lowercase update channel")),
       "auto-update priority action should explain update channel values"
     );
+    check(
+      autoUpdateAction.readyCriteria.some((item) => item.includes("provider/feed/channel metadata ready")),
+      "auto-update priority action should explain auto-update ready criteria"
+    );
   }
   const developerIdAction = nextActionsReport.priorityActions.find((action) => action.id === "developer-id-signing");
   if (developerIdAction) {
@@ -933,6 +1049,10 @@ if (nextActionsReport.bootstrapMode === false) {
     check(
       developerIdAction.keyGuidance.some((item) => item.key === "GROOVEFORGE_DEVELOPER_ID_IDENTITY" && item.guidance.includes("Developer ID Application identity")),
       "Developer ID priority action should explain identity label or fingerprint values"
+    );
+    check(
+      developerIdAction.readyCriteria.some((item) => item.includes("isolated signed app copy")),
+      "Developer ID priority action should explain signed isolated app readiness"
     );
   }
   const notarizationAction = nextActionsReport.priorityActions.find((action) => action.id === "notarization-stapling");
@@ -946,6 +1066,17 @@ if (nextActionsReport.bootstrapMode === false) {
       notarizationAction.keyGuidance.some((item) => item.key === "NOTARYTOOL_KEYCHAIN_PROFILE" && item.guidance.includes("keychain profile")),
       "notarization priority action should explain keychain profile credential signals"
     );
+    check(
+      notarizationAction.readyCriteria.some((item) => item.includes("accepted notarization, stapling, and staple validation")),
+      "notarization priority action should explain accepted notarization and staple readiness"
+    );
+  }
+  const gatekeeperAction = nextActionsReport.priorityActions.find((action) => action.id === "notarized-gatekeeper");
+  if (gatekeeperAction) {
+    check(
+      gatekeeperAction.readyCriteria.some((item) => item.includes("Gatekeeper assessment")),
+      "notarized Gatekeeper priority action should explain Gatekeeper assessment readiness"
+    );
   }
   const manualQaAction = nextActionsReport.priorityActions.find((action) => action.id === "manual-channel-qa");
   if (manualQaAction) {
@@ -957,6 +1088,17 @@ if (nextActionsReport.bootstrapMode === false) {
     check(
       manualQaAction.keyGuidance.some((item) => item.key === "GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256" && item.guidance.includes("checklist SHA-256")),
       "manual QA priority action should explain the checklist digest"
+    );
+    check(
+      manualQaAction.readyCriteria.some((item) => item.includes("checklist digest matches")),
+      "manual QA priority action should explain checklist digest readiness"
+    );
+  }
+  const finalHardGateAction = nextActionsReport.priorityActions.find((action) => action.id === "final-hard-gate");
+  if (finalHardGateAction) {
+    check(
+      finalHardGateAction.readyCriteria.some((item) => item.includes("npm run release:external-check")),
+      "final hard gate priority action should explain hard gate readiness"
     );
   }
 }
@@ -1033,12 +1175,15 @@ check(markdown.includes("Current first blocker:"), "external next actions Markdo
 check(markdown.includes("Current required keys:"), "external next actions Markdown should include current required keys");
 check(markdown.includes("Current placeholder keys:"), "external next actions Markdown should include current placeholder keys");
 check(markdown.includes("Current env key guidance:"), "external next actions Markdown should include current env key guidance");
+check(markdown.includes("Current ready criteria:"), "external next actions Markdown should include current ready criteria");
 check(markdown.includes("Current env edit target:"), "external next actions Markdown should include current env edit target");
 check(markdown.includes("Current operator action:"), "external next actions Markdown should include current operator action");
 check(markdown.includes("Current rerun command:"), "external next actions Markdown should include current rerun command");
 check(markdown.includes("Local env placeholder keys:"), "external next actions Markdown should include placeholder key count");
 check(markdown.includes("Local Env Placeholder Keys"), "external next actions Markdown should include placeholder key section");
 check(markdown.includes("Current Env Key Guidance"), "external next actions Markdown should include current key guidance section");
+check(markdown.includes("Current Ready Criteria"), "external next actions Markdown should include current ready criteria section");
+check(markdown.includes("Ready criteria:"), "external next actions Markdown should include action ready criteria details");
 if (nextActionsReport.currentEnvKeyGuidanceCount > 0) {
   check(markdown.includes("safe absolute HTTPS URL"), "external next actions Markdown should include value-free URL guidance");
   check(markdown.includes("direct-download, private-beta, or managed-release"), "external next actions Markdown should include allowed channel guidance");
@@ -1068,6 +1213,7 @@ console.log(`- Current first blocker: ${nextActionsReport.currentFirstBlocker}`)
 console.log(`- Current required keys: ${nextActionsReport.currentRequiredKeyCount} (${nextActionsReport.currentRequiredKeySummary})`);
 console.log(`- Current placeholder keys: ${nextActionsReport.currentPlaceholderKeyCount} (${nextActionsReport.currentPlaceholderKeySummary})`);
 console.log(`- Current env key guidance: ${nextActionsReport.currentEnvKeyGuidanceCount} (${nextActionsReport.currentEnvKeyGuidanceSummary})`);
+console.log(`- Current ready criteria: ${nextActionsReport.currentReadyCriteriaCount} (${nextActionsReport.currentReadyCriteriaSummary})`);
 console.log(`- Current env edit target: ${nextActionsReport.currentEnvEditTarget}`);
 console.log(`- Current operator action: ${nextActionsReport.currentOperatorAction}`);
 console.log(`- Current rerun command: ${nextActionsReport.currentRerunCommand}`);
