@@ -19,6 +19,7 @@ const externalOperatorRunbookPath = path.join(packageRoot, `${appName}-${package
 const externalReadinessLedgerPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-readiness-ledger.json`);
 const completionProgressMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-completion-progress.md`);
 const completionProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-completion-progress.json`);
+const prerequisiteNextCommand = "npm run release:check";
 const sensitivePrivateKeys = [
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
   "GROOVEFORGE_RELEASE_NOTES_URL",
@@ -107,6 +108,13 @@ function formatEvidenceRows(rows) {
   return rows.map((row) => `| ${row.label} | ${row.present ? "yes" : "no"} | ${row.path} |`).join("\n");
 }
 
+function formatMissingEvidence(rows) {
+  if (rows.length === 0) {
+    return "- none";
+  }
+  return rows.map((row) => `- ${row.label}: ${row.path}`).join("\n");
+}
+
 function formatBlockerRows(rows) {
   if (rows.length === 0) {
     return "| none | none |";
@@ -125,6 +133,8 @@ function buildMarkdown(summary) {
 
 - Completion progress ready: ${summary.completionProgressReady ? "yes" : "no"}
 - Completion stage: ${summary.completionStage}
+- Source evidence ready: ${summary.sourceEvidenceReady ? "yes" : "no"}
+- Missing source evidence artifacts: ${summary.missingEvidenceArtifacts.length}
 - Local release ready: ${summary.localReleaseReady ? "yes" : "no"}
 - Local release readiness: ${summary.localReleaseReadinessPercent.toFixed(1)}%
 - Desktop project IO evidence ready: ${summary.desktopProjectIoEvidenceReady ? "yes" : "no"}
@@ -139,6 +149,15 @@ function buildMarkdown(summary) {
 - Release upload attempted: no
 - Apple notary submission attempted by this progress report: no
 - Signing attempted by this progress report: no
+
+## Prerequisites
+
+- Required source evidence ready: ${summary.sourceEvidenceReady ? "yes" : "no"}
+- Next local command when missing: \`${summary.prerequisiteNextCommand}\`
+
+Missing source evidence:
+
+${formatMissingEvidence(summary.missingEvidenceArtifacts)}
 
 ## Evidence Artifacts
 
@@ -204,6 +223,7 @@ async function createCompletionProgressSummary() {
     evidence(externalReadinessLedgerPath, "External readiness ledger")
   ];
   const sourceEvidenceReady = evidenceArtifacts.every((item) => item.present);
+  const missingEvidenceArtifacts = evidenceArtifacts.filter((item) => !item.present);
 
   return {
     appName,
@@ -216,6 +236,9 @@ async function createCompletionProgressSummary() {
     completionProgressJsonPath: relative(completionProgressJsonPath),
     productScope: "all-genre direct beat workstation; direct composition first; sampling optional and secondary",
     progressScope: "value-free completion progress report for local release readiness and external distribution blockers",
+    prerequisiteNextCommand,
+    prerequisiteCommandReason: "Regenerates completion status, external gate, remediation, operator runbook, and readiness ledger source evidence before this progress report runs.",
+    missingEvidenceArtifacts,
     completionStage: completionStatus?.completionStage ?? "source evidence incomplete",
     completionProgressReady: sourceEvidenceReady && localReleaseReady && desktopProjectIoEvidenceReady && externalOperatorRunbook?.operatorRunbookReady === true && externalReadinessLedger?.ledgerReady === true,
     sourceEvidenceReady,
@@ -272,6 +295,10 @@ check(summary.bundleId === bundleId, `completion progress should identify ${bund
 check(summary.version === packageJson.version, "completion progress should match package version");
 check(summary.productScope.includes("all-genre direct beat workstation"), "completion progress should describe direct beat workstation scope");
 check(summary.productScope.includes("sampling optional"), "completion progress should keep sampling optional");
+check(summary.prerequisiteNextCommand === prerequisiteNextCommand, "completion progress should identify the prerequisite release check command");
+check(summary.prerequisiteCommandReason.includes("external gate"), "completion progress should explain prerequisite source evidence");
+check(Array.isArray(summary.missingEvidenceArtifacts), "completion progress should list missing source evidence artifacts");
+check(summary.missingEvidenceArtifacts.every((item) => item.valueRecorded === false), "completion progress missing source evidence should not record values");
 check(summary.completionProgressReady === true, "completion progress should be ready when source evidence is ready");
 check(summary.sourceEvidenceReady === true, "completion progress should include source evidence");
 check(summary.localReleaseReady === true, "completion progress should include ready local release evidence");
@@ -303,6 +330,8 @@ check(summary.releaseGateClaimedAutoUpdate === false, "completion progress shoul
 check(summary.releaseGateClaimedManualQaApproval === false, "completion progress should not claim manual QA approval");
 check(summary.releaseGateClaimedExternalDistribution === false, "completion progress should not claim external distribution completion");
 check(markdown.includes("Completion Progress"), "completion progress Markdown should include title");
+check(markdown.includes("Source evidence ready:"), "completion progress Markdown should include source evidence readiness");
+check(markdown.includes("Next local command when missing: `npm run release:check`"), "completion progress Markdown should include the prerequisite command");
 check(markdown.includes("Local release readiness:"), "completion progress Markdown should include local release readiness");
 check(markdown.includes("External gate requirements ready:"), "completion progress Markdown should include external gate requirement progress");
 check(markdown.includes("Remediation groups ready:"), "completion progress Markdown should include remediation progress");
@@ -316,7 +345,14 @@ for (const privateValue of sensitiveEnvironmentValues()) {
 }
 
 if (failures.length > 0) {
-  fail("Completion progress validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
+  const prerequisiteDetails = summary.sourceEvidenceReady
+    ? []
+    : [
+        `- Missing source evidence artifacts: ${summary.missingEvidenceArtifacts.length}`,
+        formatMissingEvidence(summary.missingEvidenceArtifacts),
+        `- Next local command: ${summary.prerequisiteNextCommand}`
+      ];
+  fail("Completion progress validation failed.", [...failures.map((failure) => `- ${failure}`), ...prerequisiteDetails].join("\n"));
 }
 
 console.log("GrooveForge completion progress smoke passed.");
@@ -324,6 +360,8 @@ console.log(`- Markdown: ${relative(completionProgressMarkdownPath)}`);
 console.log(`- JSON: ${relative(completionProgressJsonPath)}`);
 console.log(`- Completion progress ready: ${summary.completionProgressReady ? "yes" : "no"}`);
 console.log(`- Completion stage: ${summary.completionStage}`);
+console.log(`- Source evidence ready: ${summary.sourceEvidenceReady ? "yes" : "no"}`);
+console.log(`- Missing source evidence artifacts: ${summary.missingEvidenceArtifacts.length}`);
 console.log(`- Local release ready: ${summary.localReleaseReady ? "yes" : "no"}`);
 console.log(`- Local release readiness: ${summary.localReleaseReadinessPercent.toFixed(1)}%`);
 console.log(`- Desktop project IO evidence ready: ${summary.desktopProjectIoEvidenceReady ? "yes" : "no"}`);
@@ -332,6 +370,7 @@ console.log(`- External gate requirements ready: ${summary.gateRequirementReadyC
 console.log(`- Remediation groups ready: ${summary.remediationReadyCount}/${summary.remediationTotal} (${summary.remediationReadinessPercent.toFixed(1)}%)`);
 console.log(`- First blockers tracked: ${summary.firstBlockers.length}`);
 console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
+console.log(`- Prerequisite command when source evidence is missing: ${summary.prerequisiteNextCommand}`);
 console.log("- Private values recorded: no");
 console.log("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted");
 console.log("- Not recorded: release URLs, support URLs, feed URLs, credentials, tokens, identity labels, channel values, local env values, private beats, or real user audio");

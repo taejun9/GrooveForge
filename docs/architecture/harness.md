@@ -116,7 +116,7 @@ These commands validate the base structure, documentation rules, first-run React
 
 `npm run desktop:external-readiness-ledger-smoke` runs after the operator runbook. It writes ignored Markdown/JSON ledger artifacts with desktop project IO readiness from completion status, the external gate, and the operator runbook, hard-gate requirement counts, remediation counts, first blockers, manual QA digest posture, local release stage, and evidence rows without recording private values or claiming external distribution completion.
 
-`npm run desktop:completion-progress-smoke` runs after the external readiness ledger. It writes ignored Markdown/JSON progress artifacts with local release readiness percent, desktop project IO readiness, external hard-gate readiness, external gate requirement counts, remediation group counts, current first blockers, and not-recorded/not-claimed posture without recording private values or claiming external distribution completion.
+`npm run desktop:completion-progress-smoke` runs after the external readiness ledger. It writes ignored Markdown/JSON progress artifacts with source evidence readiness, missing source artifact rows, `npm run release:check` prerequisite guidance, local release readiness percent, desktop project IO readiness, external hard-gate readiness, external gate requirement counts, remediation group counts, current first blockers, and not-recorded/not-claimed posture without recording private values or claiming external distribution completion.
 
 Release readiness evidence is maintained in `docs/release/readiness.md`. It maps the current professional-producer, beginner, direct-composition, all-style, local export, privacy, and desktop-readiness requirements to source/docs evidence and automated gates.
 
