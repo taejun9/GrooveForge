@@ -15,6 +15,7 @@ const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const manifestPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-manifest.json`);
 const updateMetadataPolicyPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-update-metadata-policy.json`);
+const updateMetadataArtifactsPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-update-metadata-artifacts.json`);
 const readinessRoot = path.join(root, "build", "desktop");
 const readinessPath = path.join(readinessRoot, `${appName}-${platformArch}-auto-update-readiness.json`);
 const updateFeedModule = await import(pathToFileURL(path.join(root, "electron", "updateFeedConfig.ts")).href);
@@ -93,7 +94,7 @@ function privateInputValues() {
     .filter((value) => typeof value === "string" && value.trim().length >= 8);
 }
 
-function updateArtifactSignals(manifest, policy) {
+function updateArtifactSignals(manifest, policy, metadataArtifacts) {
   const signing = manifest?.signing ?? {};
   const releaseFiles = [
     "latest.yml",
@@ -102,24 +103,41 @@ function updateArtifactSignals(manifest, policy) {
     `${appName}-${packageJson.version}-${platformArch}.blockmap`,
     `${appName}-${packageJson.version}-${platformArch}.dmg.blockmap`
   ];
+  const updateMetadataFiles = releaseFiles
+    .map((fileName) => path.join(packageRoot, fileName))
+    .filter((filePath) => existsSync(filePath))
+    .map(relative);
+  const requiredUpdateMetadataArtifacts = Array.isArray(policy?.metadataArtifacts)
+    ? policy.metadataArtifacts.map((artifact) => artifact.fileName).filter(Boolean)
+    : [];
+  const requiredUpdateMetadataArtifactsPresent = requiredUpdateMetadataArtifacts.every((fileName) =>
+    updateMetadataFiles.some((filePath) => filePath.endsWith(fileName))
+  );
   return {
     releaseManifestPresent: Boolean(manifest),
     releaseManifestPath: existsSync(manifestPath) ? relative(manifestPath) : null,
     updateMetadataPolicyPresent: Boolean(policy),
     updateMetadataPolicyPath: existsSync(updateMetadataPolicyPath) ? relative(updateMetadataPolicyPath) : null,
+    updateMetadataArtifactsPresent: Boolean(metadataArtifacts),
+    updateMetadataArtifactsPath: existsSync(updateMetadataArtifactsPath) ? relative(updateMetadataArtifactsPath) : null,
+    updateMetadataArtifactsDrafted: metadataArtifacts?.updateMetadataArtifactsDrafted === true,
+    updateMetadataArtifactsPublished: metadataArtifacts?.updateMetadataArtifactsPublished === true,
+    updateMetadataArtifactsReady: metadataArtifacts?.updateMetadataArtifactsReady === true,
+    updateMetadataArtifactsRecordsFeedValue: metadataArtifacts?.feedValueRecorded === true,
+    updateMetadataArtifactsRecordsChannelValue: metadataArtifacts?.channelValueRecorded === true,
     updateMetadataPolicyAvailable: policy?.policyAvailable === true,
     updateMetadataPolicyClaimsAutoUpdate: policy?.releaseGateClaimedAutoUpdate === true,
     updateMetadataPolicyRecordsFeedValue: policy?.provider?.feedValueRecorded === true,
-    requiredUpdateMetadataArtifacts: Array.isArray(policy?.metadataArtifacts)
-      ? policy.metadataArtifacts.map((artifact) => artifact.fileName).filter(Boolean)
-      : [],
+    requiredUpdateMetadataArtifacts,
+    requiredUpdateMetadataArtifactsPresent,
     developerIdCodeSigningClaimed: signing.developerIdCodeSigningClaimed === true,
     notarizationClaimed: signing.notarizationClaimed === true,
     autoUpdateClaimedByManifest: signing.autoUpdateClaimed === true,
-    updateMetadataFiles: releaseFiles
-      .map((fileName) => path.join(packageRoot, fileName))
-      .filter((filePath) => existsSync(filePath))
-      .map(relative)
+    updateMetadataFiles,
+    updateMetadataFilesReady:
+      metadataArtifacts?.updateMetadataArtifactsDrafted === true &&
+      requiredUpdateMetadataArtifacts.length > 0 &&
+      requiredUpdateMetadataArtifactsPresent
   };
 }
 
@@ -168,6 +186,7 @@ async function createReadinessSummary() {
 
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const policy = await readJsonIfExists(updateMetadataPolicyPath);
+  const metadataArtifacts = await readJsonIfExists(updateMetadataArtifactsPath);
   const dependencies = {
     electronBuiltInAutoUpdaterAvailable: hasDependency("electron"),
     electronUpdaterPresent: hasDependency("electron-updater"),
@@ -175,7 +194,7 @@ async function createReadinessSummary() {
     updaterDependencyPresent: hasDependency("electron") || hasDependency("electron-updater") || hasDependency("update-electron-app")
   };
   const provider = updateProviderSignals();
-  const artifacts = updateArtifactSignals(manifest, policy);
+  const artifacts = updateArtifactSignals(manifest, policy, metadataArtifacts);
   const source = await sourceSignals();
   const providerReady = provider.packagePublishConfigPresent || provider.updateFeedConfigReady;
   const updaterIntegrationReady =
@@ -189,9 +208,9 @@ async function createReadinessSummary() {
     artifacts.updateMetadataPolicyRecordsFeedValue === false;
   const signedUpdateArtifactsReady =
     updateMetadataPolicyReady &&
+    artifacts.updateMetadataFilesReady &&
     artifacts.developerIdCodeSigningClaimed &&
-    artifacts.notarizationClaimed &&
-    artifacts.updateMetadataFiles.length > 0;
+    artifacts.notarizationClaimed;
   const userFacingUpdateBehaviorReady = source.hasUserFacingUpdateCopy && source.hasUpdateDownloadedHandler;
   const blockers = [];
 
@@ -208,8 +227,11 @@ async function createReadinessSummary() {
   if (!updateMetadataPolicyReady) {
     blockers.push("No signed/notarized update metadata artifact policy is available for automatic updates.");
   }
+  if (updateMetadataPolicyReady && !artifacts.updateMetadataFilesReady) {
+    blockers.push("Local update metadata artifact drafts are missing; run npm run desktop:update-metadata-artifacts-smoke first.");
+  }
   if (updateMetadataPolicyReady && !signedUpdateArtifactsReady) {
-    blockers.push("Signed/notarized update metadata artifacts are not ready because Developer ID signing, notarization, or update metadata files are missing.");
+    blockers.push("Signed/notarized update metadata artifacts are not ready because Developer ID signing or notarization evidence is missing.");
   }
   if (!userFacingUpdateBehaviorReady) {
     blockers.push("No user-facing update check, download, and install behavior is implemented.");
@@ -222,6 +244,9 @@ async function createReadinessSummary() {
   }
   if (artifacts.updateMetadataPolicyRecordsFeedValue) {
     blockers.push("Update metadata policy unexpectedly records a private update feed value.");
+  }
+  if (artifacts.updateMetadataArtifactsRecordsFeedValue || artifacts.updateMetadataArtifactsRecordsChannelValue) {
+    blockers.push("Update metadata artifact draft unexpectedly records private update provider values.");
   }
   if (provider.feedValueRecorded || provider.channelValueRecorded) {
     blockers.push("Auto-update readiness unexpectedly records private update provider values.");
@@ -239,6 +264,7 @@ async function createReadinessSummary() {
       providerReady,
       updateFeedConfigReady: provider.updateFeedConfigReady,
       updateMetadataPolicyReady,
+      updateMetadataFilesReady: artifacts.updateMetadataFilesReady,
       signedUpdateArtifactsReady,
       userFacingUpdateBehaviorReady
     },
@@ -283,6 +309,14 @@ check(
   readiness.skipped === true || !("releaseChannel" in readiness.provider?.updateFeedConfig),
   "auto-update readiness summary should omit private channel values from redacted config"
 );
+check(
+  readiness.skipped === true || readiness.artifacts?.updateMetadataArtifactsRecordsFeedValue === false,
+  "auto-update readiness summary should not record update metadata artifact feed values"
+);
+check(
+  readiness.skipped === true || readiness.artifacts?.updateMetadataArtifactsRecordsChannelValue === false,
+  "auto-update readiness summary should not record update metadata artifact channel values"
+);
 
 const readinessJson = JSON.stringify(readiness);
 for (const privateValue of privateInputValues()) {
@@ -300,6 +334,7 @@ console.log(`- Updater integration ready: ${readiness.checks?.updaterIntegration
 console.log(`- Update provider ready: ${readiness.checks?.providerReady === true ? "yes" : "no"}`);
 console.log(`- Update feed config ready: ${readiness.checks?.updateFeedConfigReady === true ? "yes" : "no"}`);
 console.log(`- Update metadata policy ready: ${readiness.checks?.updateMetadataPolicyReady === true ? "yes" : "no"}`);
+console.log(`- Update metadata files ready: ${readiness.checks?.updateMetadataFilesReady === true ? "yes" : "no"}`);
 console.log(`- Signed update artifacts ready: ${readiness.checks?.signedUpdateArtifactsReady === true ? "yes" : "no"}`);
 console.log(`- User-facing update behavior ready: ${readiness.checks?.userFacingUpdateBehaviorReady === true ? "yes" : "no"}`);
 console.log(`- Auto-update ready: ${readiness.autoUpdateReady ? "yes" : "no"}`);
