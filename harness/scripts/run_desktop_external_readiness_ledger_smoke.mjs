@@ -87,6 +87,10 @@ function sensitiveEnvironmentValues() {
   return sensitivePrivateKeys.map((key) => process.env[key]?.trim()).filter((value) => value && value.length >= 8);
 }
 
+function gateRequirementReady(externalGate, label) {
+  return (externalGate?.requirements ?? []).some((requirement) => requirement.label === label && requirement.ready === true);
+}
+
 function toRequirementRow(requirement, index) {
   const blockers = unique(requirement.blockers ?? []);
   return {
@@ -156,6 +160,7 @@ function buildMarkdown(summary) {
 - Ledger ready: ${summary.ledgerReady ? "yes" : "no"}
 - Completion stage: ${summary.completionStage}
 - Local release ready: ${summary.localReleaseReady ? "yes" : "no"}
+- Desktop project IO evidence ready: ${summary.desktopProjectIoEvidenceReady ? "yes" : "no"}
 - External distribution hard gate ready: ${summary.externalDistributionGateReady ? "yes" : "no"}
 - Gate requirements ready: ${summary.gateRequirementReadyCount}/${summary.gateRequirementTotal}
 - Remediation groups ready: ${summary.remediationReadyCount}/${summary.remediationTotal}
@@ -213,17 +218,25 @@ async function createLedgerSummary() {
   const privateInputs = await readJsonIfExists(privateInputsPath);
   const gateRequirementRows = (externalGate?.requirements ?? []).map(toRequirementRow);
   const remediationRows = (externalRemediation?.remediationGroups ?? []).map(toRemediationRow);
-  const sourceEvidenceReady = Boolean(completionStatus) && Boolean(externalGate) && Boolean(externalRemediation) && Boolean(externalOperatorRunbook);
+  const completionStatusDesktopProjectIoReady = completionStatus?.desktopProjectIoEvidenceReady === true;
+  const externalGateDesktopProjectIoReady = gateRequirementReady(externalGate, "Desktop project IO evidence ready");
+  const operatorRunbookDesktopProjectIoReady = externalOperatorRunbook?.desktopProjectIoEvidenceReady === true;
+  const desktopProjectIoEvidenceReady = completionStatusDesktopProjectIoReady && externalGateDesktopProjectIoReady && operatorRunbookDesktopProjectIoReady;
+  const sourceEvidenceReady = Boolean(completionStatus) && Boolean(externalGate) && Boolean(externalRemediation) && Boolean(externalOperatorRunbook) && desktopProjectIoEvidenceReady;
   const firstBlockers = unique([
     ...gateRequirementRows.map((row) => row.firstBlocker),
     ...remediationRows.map((row) => row.firstBlocker),
+    ...(desktopProjectIoEvidenceReady ? [] : ["Desktop project IO evidence is not ready in completion status, external gate, and operator runbook evidence."]),
     ...(sourceEvidenceReady ? [] : ["External readiness source evidence is incomplete; run npm run release:check first."])
   ]).slice(0, 12);
   const evidenceArtifacts = [
     evidence(completionStatusPath, "Completion status"),
+    evidence(completionStatusPath, "Desktop project IO status evidence"),
     evidence(externalGatePath, "External distribution gate"),
+    evidence(externalGatePath, "Desktop project IO gate requirement"),
     evidence(externalRemediationPath, "External remediation"),
     evidence(externalOperatorRunbookPath, "External operator runbook"),
+    evidence(externalOperatorRunbookPath, "Desktop project IO runbook evidence"),
     evidence(manualQaPath, "Manual QA checklist"),
     evidence(privateInputsPath, "Private inputs")
   ];
@@ -240,7 +253,17 @@ async function createLedgerSummary() {
     productScope: "all-genre direct beat workstation; direct composition first; sampling optional and secondary",
     ledgerScope: "value-free external readiness evidence ledger for completion reporting",
     completionStage: completionStatus?.completionStage ?? "source evidence incomplete",
-    localReleaseReady: completionStatus?.completionStatusReady === true && completionStatus?.localMvpEvidenceReady === true && completionStatus?.localDesktopPackageReady === true,
+    localReleaseReady: completionStatus?.completionStatusReady === true && completionStatus?.localMvpEvidenceReady === true && completionStatusDesktopProjectIoReady && completionStatus?.localDesktopPackageReady === true,
+    desktopProjectIoEvidenceReady,
+    desktopProjectIoEvidence: {
+      completionStatusReady: completionStatusDesktopProjectIoReady,
+      externalGateRequirementReady: externalGateDesktopProjectIoReady,
+      operatorRunbookReady: operatorRunbookDesktopProjectIoReady,
+      completionStatusPath: relative(completionStatusPath),
+      externalGatePath: relative(externalGatePath),
+      externalOperatorRunbookPath: relative(externalOperatorRunbookPath),
+      valueRecorded: false
+    },
     ledgerReady: sourceEvidenceReady,
     sourceEvidenceReady,
     externalDistributionGateReady: externalGate?.externalDistributionGateReady === true,
@@ -294,8 +317,20 @@ check(summary.bundleId === bundleId, `external readiness ledger should identify 
 check(summary.version === packageJson.version, "external readiness ledger should match package version");
 check(summary.productScope.includes("all-genre direct beat workstation"), "external readiness ledger should describe direct beat workstation scope");
 check(summary.productScope.includes("sampling optional"), "external readiness ledger should keep sampling optional");
-check(Array.isArray(summary.evidenceArtifacts) && summary.evidenceArtifacts.length >= 6, "external readiness ledger should include evidence artifacts");
+check(summary.desktopProjectIoEvidenceReady === true, "external readiness ledger should include ready desktop project IO evidence");
+check(summary.desktopProjectIoEvidence?.completionStatusReady === true, "external readiness ledger should read desktop project IO readiness from completion status");
+check(summary.desktopProjectIoEvidence?.externalGateRequirementReady === true, "external readiness ledger should read desktop project IO readiness from the external gate");
+check(summary.desktopProjectIoEvidence?.operatorRunbookReady === true, "external readiness ledger should read desktop project IO readiness from the operator runbook");
+check(summary.desktopProjectIoEvidence?.valueRecorded === false, "external readiness ledger desktop project IO evidence should not record values");
+check(Array.isArray(summary.evidenceArtifacts) && summary.evidenceArtifacts.length >= 9, "external readiness ledger should include evidence artifacts");
+check(summary.evidenceArtifacts.some((item) => item.label === "Desktop project IO status evidence"), "external readiness ledger should include desktop project IO status evidence");
+check(summary.evidenceArtifacts.some((item) => item.label === "Desktop project IO gate requirement"), "external readiness ledger should include desktop project IO gate evidence");
+check(summary.evidenceArtifacts.some((item) => item.label === "Desktop project IO runbook evidence"), "external readiness ledger should include desktop project IO runbook evidence");
 check(Array.isArray(summary.gateRequirementRows), "external readiness ledger should include gate requirement rows");
+check(
+  summary.gateRequirementRows.some((item) => item.label === "Desktop project IO evidence ready" && item.ready === true),
+  "external readiness ledger should include a ready desktop project IO gate row"
+);
 check(Array.isArray(summary.remediationRows), "external readiness ledger should include remediation rows");
 check(Array.isArray(summary.firstBlockers), "external readiness ledger should include first blockers");
 check(summary.evidenceArtifacts.every((item) => item.valueRecorded === false), "external readiness evidence artifacts should not record values");
@@ -324,6 +359,7 @@ check(summary.releaseGateClaimedExternalDistribution === false, "external readin
 check(markdown.includes("External Readiness Ledger"), "external readiness ledger Markdown should include title");
 check(markdown.includes("Gate Requirement Ledger"), "external readiness ledger Markdown should include gate requirement rows");
 check(markdown.includes("Remediation Ledger"), "external readiness ledger Markdown should include remediation rows");
+check(markdown.includes("Desktop project IO evidence ready:"), "external readiness ledger Markdown should include desktop project IO readiness");
 check(markdown.includes("Hard gate remains `npm run release:external-check`"), "external readiness ledger Markdown should keep hard gate authoritative");
 check(markdown.includes("Private values recorded: no"), "external readiness ledger Markdown should state value redaction");
 check(!/https?:\/\//i.test(markdown), "external readiness ledger should not include public or private URL values");
@@ -343,6 +379,7 @@ console.log(`- JSON: ${relative(ledgerJsonPath)}`);
 console.log(`- Ledger ready: ${summary.ledgerReady ? "yes" : "no"}`);
 console.log(`- Completion stage: ${summary.completionStage}`);
 console.log(`- Local release ready: ${summary.localReleaseReady ? "yes" : "no"}`);
+console.log(`- Desktop project IO evidence ready: ${summary.desktopProjectIoEvidenceReady ? "yes" : "no"}`);
 console.log(`- External distribution hard gate ready: ${summary.externalDistributionGateReady ? "yes" : "no"}`);
 console.log(`- Gate requirements ready: ${summary.gateRequirementReadyCount}/${summary.gateRequirementTotal}`);
 console.log(`- Remediation groups ready: ${summary.remediationReadyCount}/${summary.remediationTotal}`);

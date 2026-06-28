@@ -95,6 +95,10 @@ function sensitiveEnvironmentValues() {
   return sensitivePrivateKeys.map((key) => process.env[key]?.trim()).filter((value) => value && value.length >= 8);
 }
 
+function gateRequirementReady(externalGate, label) {
+  return (externalGate?.requirements ?? []).some((requirement) => requirement.label === label && requirement.ready === true);
+}
+
 function phaseFromGroup(group, index) {
   return {
     order: index + 1,
@@ -169,7 +173,7 @@ function commandStep(order, label, command, evidencePaths, note) {
 function buildCommandSequence(summarySources) {
   const manualDigest = summarySources.manualQa?.manualQaChecklistSha256;
   return [
-    commandStep(1, "Regenerate local evidence", "npm run release:check", [relative(completionStatusPath), relative(externalRemediationPath)], "Creates the local evidence chain without private value output."),
+    commandStep(1, "Regenerate local evidence", "npm run release:check", [relative(completionStatusPath), relative(externalRemediationPath)], "Creates the local evidence chain, including desktop project IO status, without private value output."),
     commandStep(2, "Prepare ignored private inputs", "copy template to ignored local env file", [relative(distributionTemplatePath)], "Use key names from the template; do not commit the filled file."),
     commandStep(3, "Validate private input posture", "npm run desktop:distribution-private-inputs-smoke", [relative(privateInputsPath)], "Records key readiness and blockers only."),
     commandStep(4, "Sign isolated release copy", "npm run desktop:developer-id-signing-smoke", ["build/desktop/GrooveForge-<platform>-<arch>-developer-id-signing.json"], "Requires a local Developer ID Application identity selector."),
@@ -184,7 +188,7 @@ function buildCommandSequence(summarySources) {
       manualDigest ? `Use current checklist SHA-256 ${manualDigest} only after manual QA is complete.` : "Manual QA digest is unavailable until the manual QA smoke runs."
     ),
     commandStep(9, "Refresh channel QA and handoff evidence", "npm run desktop:distribution-channel-qa-smoke && npm run desktop:distribution-handoff-smoke && npm run desktop:distribution-bundle-manifest-smoke", ["build/desktop/GrooveForge-<platform>-<arch>-distribution-channel-qa.json"], "Rechecks channel metadata, manual approval digest, handoff, and bundle manifest evidence."),
-    commandStep(10, "Refresh completion status", "npm run desktop:external-remediation-smoke && npm run desktop:completion-status-smoke && npm run desktop:external-operator-runbook-smoke", [relative(operatorRunbookJsonPath)], "Updates the final value-free status and operator runbook."),
+    commandStep(10, "Refresh completion status", "npm run desktop:external-remediation-smoke && npm run desktop:completion-status-smoke && npm run desktop:external-operator-runbook-smoke", [relative(operatorRunbookJsonPath)], "Updates the final value-free status, desktop project IO readiness, and operator runbook."),
     commandStep(11, "Run hard external gate", "npm run release:external-check", [relative(externalGatePath)], "This remains the only local command that may prove external distribution readiness.")
   ];
 }
@@ -214,6 +218,7 @@ function buildMarkdown(summary) {
 
 - Operator runbook ready: ${summary.operatorRunbookReady ? "yes" : "no"}
 - Completion stage: ${summary.completionStage}
+- Desktop project IO evidence ready: ${summary.desktopProjectIoEvidenceReady ? "yes" : "no"}
 - External distribution hard gate ready: ${summary.externalDistributionGateReady ? "yes" : "no"}
 - Pending remediation groups: ${summary.pendingRemediationCount}
 - Manual QA checklist digest available: ${summary.manualQaChecklistSha256 ? "yes" : "no"}
@@ -276,23 +281,29 @@ async function createRunbookSummary() {
   const distributionEnvTemplateArtifact = await readJsonIfExists(distributionEnvTemplateArtifactPath);
   const templateText = await readTextIfExists(distributionTemplatePath);
   const requiredPrivateInputKeys = parseTemplateKeys(templateText);
+  const completionStatusDesktopProjectIoReady = completionStatus?.desktopProjectIoEvidenceReady === true;
+  const externalGateDesktopProjectIoReady = gateRequirementReady(externalGate, "Desktop project IO evidence ready");
+  const desktopProjectIoEvidenceReady = completionStatusDesktopProjectIoReady && externalGateDesktopProjectIoReady;
   const operatorPhases =
     Array.isArray(externalRemediation?.remediationGroups) && externalRemediation.remediationGroups.length > 0
       ? externalRemediation.remediationGroups.map(phaseFromGroup)
       : fallbackPhases();
   const evidenceChecklist = [
     evidence(completionStatusPath, "Completion status"),
+    evidence(completionStatusPath, "Desktop project IO status evidence"),
     evidence(externalRemediationPath, "External remediation"),
     evidence(externalGatePath, "External distribution gate"),
+    evidence(externalGatePath, "Desktop project IO gate requirement"),
     evidence(manualQaPath, "Manual QA checklist"),
     evidence(privateInputsPath, "Private inputs"),
     evidence(distributionEnvTemplateArtifactPath, "Distribution env template artifact"),
     evidence(distributionTemplatePath, "Distribution private inputs template")
   ];
-  const sourceEvidenceReady = Boolean(completionStatus) && Boolean(externalRemediation) && Boolean(externalGate) && requiredPrivateInputKeys.length > 0;
+  const sourceEvidenceReady = Boolean(completionStatus) && Boolean(externalRemediation) && Boolean(externalGate) && desktopProjectIoEvidenceReady && requiredPrivateInputKeys.length > 0;
   const phaseBlockers = unique(operatorPhases.flatMap((phase) => phase.blockers));
   const operatorRunbookBlockers = unique([
     ...(sourceEvidenceReady ? [] : ["Operator runbook source evidence is incomplete; run npm run release:check first."]),
+    ...(desktopProjectIoEvidenceReady ? [] : ["Desktop project IO evidence is not ready in completion status and external gate evidence."]),
     ...(manualQa?.manualQaChecklistSha256 ? [] : ["Manual QA checklist digest evidence is missing."]),
     ...(requiredPrivateInputKeys.includes("GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256") ? [] : ["Distribution template is missing the manual QA checklist digest key."]),
     ...phaseBlockers
@@ -310,6 +321,14 @@ async function createRunbookSummary() {
     productScope: "all-genre direct beat workstation; direct composition first; sampling optional and secondary",
     runbookScope: "value-free external distribution operator command sequence and evidence checklist",
     completionStage: completionStatus?.completionStage ?? "source evidence incomplete",
+    desktopProjectIoEvidenceReady,
+    desktopProjectIoEvidence: {
+      completionStatusReady: completionStatusDesktopProjectIoReady,
+      externalGateRequirementReady: externalGateDesktopProjectIoReady,
+      completionStatusPath: relative(completionStatusPath),
+      externalGatePath: relative(externalGatePath),
+      valueRecorded: false
+    },
     operatorRunbookReady: sourceEvidenceReady,
     externalDistributionGateReady: externalGate?.externalDistributionGateReady === true,
     pendingRemediationCount: externalRemediation?.pendingRemediationCount ?? operatorPhases.filter((phase) => !phase.ready).length,
@@ -343,6 +362,7 @@ async function createRunbookSummary() {
       completionStatusPresent: Boolean(completionStatus),
       externalRemediationPresent: Boolean(externalRemediation),
       externalGatePresent: Boolean(externalGate),
+      desktopProjectIoEvidenceReady,
       manualQaPresent: Boolean(manualQa),
       privateInputsPresent: Boolean(privateInputs),
       distributionEnvTemplateArtifactPresent: Boolean(distributionEnvTemplateArtifact),
@@ -368,13 +388,20 @@ check(summary.bundleId === bundleId, `external operator runbook should identify 
 check(summary.version === packageJson.version, "external operator runbook should match package version");
 check(summary.productScope.includes("all-genre direct beat workstation"), "external operator runbook should describe direct beat workstation scope");
 check(summary.productScope.includes("sampling optional"), "external operator runbook should keep sampling optional");
+check(summary.desktopProjectIoEvidenceReady === true, "external operator runbook should include ready desktop project IO evidence");
+check(summary.desktopProjectIoEvidence?.completionStatusReady === true, "external operator runbook should read desktop project IO readiness from completion status");
+check(summary.desktopProjectIoEvidence?.externalGateRequirementReady === true, "external operator runbook should read desktop project IO readiness from the external gate");
+check(summary.desktopProjectIoEvidence?.valueRecorded === false, "external operator runbook desktop project IO evidence should not record values");
 check(Array.isArray(summary.commandSequence) && summary.commandSequence.length >= 10, "external operator runbook should include a command sequence");
 check(summary.commandSequence.some((step) => step.command === "npm run release:external-check"), "external operator runbook should end with the hard gate command");
 check(Array.isArray(summary.operatorPhases) && summary.operatorPhases.length >= 3, "external operator runbook should include operator phases");
+check(summary.evidenceChecklist.some((item) => item.label === "Desktop project IO status evidence"), "external operator runbook should include desktop project IO status evidence");
+check(summary.evidenceChecklist.some((item) => item.label === "Desktop project IO gate requirement"), "external operator runbook should include desktop project IO gate evidence");
 check(summary.operatorPhases.every((phase) => phase.valueRecorded === false), "external operator phases should not record values");
 check(summary.commandSequence.every((step) => step.valueRecorded === false), "external operator commands should not record values");
 check(summary.evidenceChecklist.every((item) => item.valueRecorded === false), "external operator evidence checklist should not record values");
 check(summary.sourceEvidence.valueRecorded === false, "external operator source evidence should not record values");
+check(summary.sourceEvidence.desktopProjectIoEvidenceReady === true, "external operator source evidence should include ready desktop project IO evidence");
 check(summary.requiredPrivateInputKeys.includes("GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256"), "external operator runbook should include manual QA digest key");
 check(summary.requiredPrivateInputKeys.includes("GROOVEFORGE_DEVELOPER_ID_IDENTITY"), "external operator runbook should include Developer ID identity key name");
 check(summary.manualQaChecklistSha256 === null || /^[a-f0-9]{64}$/.test(summary.manualQaChecklistSha256), "external operator runbook should record only a valid manual QA digest when available");
@@ -400,6 +427,7 @@ check(summary.releaseGateClaimedManualQaApproval === false, "external operator r
 check(summary.releaseGateClaimedExternalDistribution === false, "external operator runbook should not claim external distribution completion");
 check(markdown.includes("External Operator Runbook"), "external operator runbook Markdown should include title");
 check(markdown.includes("Command Sequence"), "external operator runbook Markdown should include command sequence");
+check(markdown.includes("Desktop project IO evidence ready:"), "external operator runbook Markdown should include desktop project IO readiness");
 check(markdown.includes("Hard gate remains `npm run release:external-check`"), "external operator runbook Markdown should keep the hard gate authoritative");
 check(markdown.includes("Private values recorded: no"), "external operator runbook Markdown should state value redaction");
 check(!/https?:\/\//i.test(markdown), "external operator runbook should not include public or private URL values");
@@ -418,6 +446,7 @@ console.log(`- Markdown: ${relative(operatorRunbookMarkdownPath)}`);
 console.log(`- JSON: ${relative(operatorRunbookJsonPath)}`);
 console.log(`- Operator runbook ready: ${summary.operatorRunbookReady ? "yes" : "no"}`);
 console.log(`- Completion stage: ${summary.completionStage}`);
+console.log(`- Desktop project IO evidence ready: ${summary.desktopProjectIoEvidenceReady ? "yes" : "no"}`);
 console.log(`- External distribution hard gate ready: ${summary.externalDistributionGateReady ? "yes" : "no"}`);
 console.log(`- Pending remediation groups: ${summary.pendingRemediationCount}`);
 console.log(`- Manual QA checklist digest available: ${summary.manualQaChecklistDigestAvailable ? "yes" : "no"}`);
