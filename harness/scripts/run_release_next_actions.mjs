@@ -224,24 +224,37 @@ function sensitiveEnvironmentValues() {
   return sensitivePrivateKeys.map((key) => process.env[key]?.trim()).filter((value) => value && value.length >= 8);
 }
 
-function buildPriorityActions(remediation) {
+function buildPriorityActions(remediation, context = {}) {
+  const localEnvFileLoaded = context.localEnvFileLoaded === true;
   return (remediation.remediationGroups ?? [])
     .filter((group) => group.ready !== true)
-    .map((group, index) => ({
-      order: index + 1,
-      id: group.id,
-      label: group.label,
-      ready: false,
-      requiredKeys: group.requiredKeys ?? [],
-      evidence: group.evidence ?? [],
-      prerequisiteCommands: group.prerequisiteCommands ?? [],
-      operatorActions: group.operatorActions ?? [],
-      rerunCommands: group.rerunCommands ?? [],
-      nextCommand: firstValue(group.rerunCommands ?? []) || "npm run release:external-preflight",
-      firstBlocker: firstValue(group.blockers ?? []),
-      blockers: group.blockers ?? [],
-      valueRecorded: false
-    }));
+    .map((group, index) => {
+      const shouldPrepareEnv = group.id === "release-channel-metadata" && !localEnvFileLoaded;
+      const prerequisiteCommands = shouldPrepareEnv
+        ? unique(["npm run release:prepare-env", group.prerequisiteCommands ?? []])
+        : group.prerequisiteCommands ?? [];
+      const operatorActions = shouldPrepareEnv
+        ? unique([
+            "Run the explicit prepare-env command to create the ignored local distribution env scaffold before validating private inputs.",
+            group.operatorActions ?? []
+          ])
+        : group.operatorActions ?? [];
+      return {
+        order: index + 1,
+        id: group.id,
+        label: group.label,
+        ready: false,
+        requiredKeys: group.requiredKeys ?? [],
+        evidence: group.evidence ?? [],
+        prerequisiteCommands,
+        operatorActions,
+        rerunCommands: group.rerunCommands ?? [],
+        nextCommand: shouldPrepareEnv ? "npm run release:prepare-env" : firstValue(group.rerunCommands ?? []) || "npm run release:external-preflight",
+        firstBlocker: firstValue(group.blockers ?? []),
+        blockers: group.blockers ?? [],
+        valueRecorded: false
+      };
+    });
 }
 
 function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
@@ -441,7 +454,8 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
   const [externalPreflight, externalRemediation, externalRunbook, externalLedger, completionProgress, releaseDoctor] = await Promise.all(
     sourceArtifacts.map(readJsonRequired)
   );
-  const priorityActions = buildPriorityActions(externalRemediation);
+  const localEnvFileLoaded = externalPreflight.localEnvFileLoaded === true || releaseDoctor.localEnvFileLoaded === true;
+  const priorityActions = buildPriorityActions(externalRemediation, { localEnvFileLoaded });
   const firstBlockers = unique([
     priorityActions.map((action) => action.firstBlocker),
     externalPreflight.firstBlockers ?? [],
@@ -493,7 +507,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     privateInputGroupTotal: externalPreflight.privateInputGroupTotal ?? releaseDoctor.privateInputGroupTotal ?? 0,
     privateInputGroupReadyCount: externalPreflight.privateInputGroupReadyCount ?? releaseDoctor.privateInputGroupReadyCount ?? 0,
     manualQaChecklistDigestAvailable: externalPreflight.manualQaChecklistDigestAvailable === true || externalRunbook.manualQaChecklistSha256 !== null,
-    localEnvFileLoaded: externalPreflight.localEnvFileLoaded === true,
+    localEnvFileLoaded,
     priorityActions,
     priorityActionCount: priorityActions.length,
     firstBlockers,
@@ -590,6 +604,14 @@ check(nextActionsReport.externalDistributionReady === true || nextActionsReport.
 check(nextActionsReport.priorityActions.every((action) => action.ready === false), "priority actions should be pending actions only");
 check(nextActionsReport.priorityActions.every((action) => action.valueRecorded === false), "priority actions should not record values");
 check(nextActionsReport.priorityActions.every((action) => typeof action.nextCommand === "string" && action.nextCommand.length > 0), "priority actions should include next commands");
+if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvFileLoaded === false) {
+  const releaseChannelAction = nextActionsReport.priorityActions.find((action) => action.id === "release-channel-metadata");
+  check(releaseChannelAction?.nextCommand === "npm run release:prepare-env", "release channel metadata should prepare the ignored env scaffold when no local env file is loaded");
+  check(
+    releaseChannelAction?.prerequisiteCommands.includes("npm run release:prepare-env"),
+    "release channel metadata should list prepare-env as a prerequisite when no local env file is loaded"
+  );
+}
 check(nextActionsReport.localEnvValueRecorded === false, "external next actions should not record local env values");
 check(nextActionsReport.privateValuesRecorded === false, "external next actions should not record private values");
 check(nextActionsReport.releaseUrlValueRecorded === false, "external next actions should not record release URL values");
