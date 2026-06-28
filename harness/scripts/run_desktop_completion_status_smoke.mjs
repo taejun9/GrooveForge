@@ -139,6 +139,7 @@ function buildMarkdown(summary) {
 - Completion stage: ${summary.completionStage}
 - Completion status ready: ${summary.completionStatusReady ? "yes" : "no"}
 - Local MVP evidence ready: ${summary.localMvpEvidenceReady ? "yes" : "no"}
+- Desktop project IO evidence ready: ${summary.desktopProjectIoEvidenceReady ? "yes" : "no"}
 - Local desktop package ready: ${summary.localDesktopPackageReady ? "yes" : "no"}
 - Redacted distribution evidence ready: ${summary.redactedDistributionEvidenceReady ? "yes" : "no"}
 - External distribution hard gate ready: ${summary.externalDistributionGateReady ? "yes" : "no"}
@@ -194,6 +195,7 @@ async function createCompletionStatusSummary() {
   const releaseReadiness = await readTextIfExists(releaseReadinessPath);
   const completionAuditReady = completionAudit?.completionAuditReady === true;
   const localMvpEvidenceReady = completionAudit?.localMvpEvidenceReady === true;
+  const desktopProjectIoEvidenceReady = completionAudit?.desktopProjectIoEvidenceReady === true;
   const localDesktopPackageReady = completionAudit?.localDesktopPackageReady === true;
   const redactedDistributionEvidenceReady = completionAudit?.redactedDistributionEvidenceReady === true;
   const externalDistributionGateReady = externalGate?.externalDistributionGateReady === true;
@@ -207,12 +209,20 @@ async function createCompletionStatusSummary() {
   ]);
   const completionDimensions = [
     dimension("Direct beat workstation MVP", localMvpEvidenceReady, [relative(completionAuditPath), "docs/release/readiness.md"], localBlockers),
+    dimension("Desktop project IO", desktopProjectIoEvidenceReady, [relative(completionAuditPath)], localBlockers),
     dimension("Local desktop package", localDesktopPackageReady, [relative(releaseManifestPath), relative(completionAuditPath)], localBlockers),
     dimension("Redacted distribution evidence", redactedDistributionEvidenceReady, [relative(completionAuditPath), relative(externalRemediationPath)], localBlockers),
     dimension("External remediation guidance", Boolean(externalRemediation), [relative(externalRemediationPath)], ["External remediation artifact is missing."]),
     dimension("External distribution hard gate", externalDistributionGateReady, [relative(externalGatePath)], externalBlockers)
   ];
-  const completionStatusReady = completionAuditReady && localMvpEvidenceReady && localDesktopPackageReady && redactedDistributionEvidenceReady && Boolean(externalGate) && Boolean(externalRemediation);
+  const completionStatusReady =
+    completionAuditReady &&
+    localMvpEvidenceReady &&
+    desktopProjectIoEvidenceReady &&
+    localDesktopPackageReady &&
+    redactedDistributionEvidenceReady &&
+    Boolean(externalGate) &&
+    Boolean(externalRemediation);
   const evidenceArtifacts = [
     evidence(completionAuditPath, completionAuditReady, "Completion audit"),
     evidence(externalGatePath, Boolean(externalGate), "External distribution gate"),
@@ -233,6 +243,7 @@ async function createCompletionStatusSummary() {
     productScope: "all-genre direct beat workstation; direct composition first; sampling optional and secondary",
     targetUsers: ["First-time beat makers", "Working producers"],
     localMvpEvidenceReady,
+    desktopProjectIoEvidenceReady,
     localDesktopPackageReady,
     redactedDistributionEvidenceReady,
     externalDistributionGateReady,
@@ -290,7 +301,12 @@ check(summary.productScope.includes("all-genre direct beat workstation"), "compl
 check(summary.productScope.includes("sampling optional"), "completion status should keep sampling optional");
 check(summary.targetUsers.includes("First-time beat makers"), "completion status should address first-time beat makers");
 check(summary.targetUsers.includes("Working producers"), "completion status should address working producers");
-check(Array.isArray(summary.completionDimensions) && summary.completionDimensions.length >= 5, "completion status should include completion dimensions");
+check(Array.isArray(summary.completionDimensions) && summary.completionDimensions.length >= 6, "completion status should include completion dimensions");
+check(summary.desktopProjectIoEvidenceReady === true, "completion status should include ready desktop project IO evidence");
+check(
+  summary.completionDimensions.some((item) => item.label === "Desktop project IO" && item.ready === true),
+  "completion status should include a ready desktop project IO dimension"
+);
 check(Array.isArray(summary.evidenceArtifacts) && summary.evidenceArtifacts.length >= 5, "completion status should include evidence artifacts");
 check(summary.completionDimensions.every((item) => item.valueRecorded === false), "completion dimensions should not record values");
 check(summary.pendingExternalRemediationGroups.every((item) => item.valueRecorded === false), "pending remediation groups should not record values");
@@ -315,6 +331,7 @@ check(summary.releaseGateClaimedAutoUpdate === false, "completion status should 
 check(summary.releaseGateClaimedExternalDistribution === false, "completion status should not claim external distribution completion");
 check(markdown.includes("Completion Status"), "completion status Markdown should include title");
 check(markdown.includes("Completion stage:"), "completion status Markdown should include stage");
+check(markdown.includes("Desktop project IO evidence ready:"), "completion status Markdown should include desktop project IO readiness");
 check(markdown.includes("Private values recorded: no"), "completion status Markdown should state value redaction");
 check(markdown.includes("The hard gate remains `npm run release:external-check`"), "completion status Markdown should point to hard gate");
 check(!/https?:\/\//i.test(markdown), "completion status should not include public or private URL values");
@@ -334,6 +351,7 @@ console.log(`- JSON: ${relative(completionStatusJsonPath)}`);
 console.log(`- Completion stage: ${summary.completionStage}`);
 console.log(`- Completion status ready: ${summary.completionStatusReady ? "yes" : "no"}`);
 console.log(`- Local MVP evidence ready: ${summary.localMvpEvidenceReady ? "yes" : "no"}`);
+console.log(`- Desktop project IO evidence ready: ${summary.desktopProjectIoEvidenceReady ? "yes" : "no"}`);
 console.log(`- Local desktop package ready: ${summary.localDesktopPackageReady ? "yes" : "no"}`);
 console.log(`- Redacted distribution evidence ready: ${summary.redactedDistributionEvidenceReady ? "yes" : "no"}`);
 console.log(`- External distribution hard gate ready: ${summary.externalDistributionGateReady ? "yes" : "no"}`);

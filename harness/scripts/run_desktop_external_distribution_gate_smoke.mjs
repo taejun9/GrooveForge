@@ -174,6 +174,7 @@ const requirements = [
   requirement("Completion audit artifact present", Boolean(completionAudit), relative(completionAuditPath), "Completion audit JSON is missing; run npm run release:check first."),
   requirement("Completion audit ready", completionAudit?.completionAuditReady === true, relative(completionAuditPath), "Completion audit is not ready."),
   requirement("Local MVP evidence ready", completionAudit?.localMvpEvidenceReady === true, relative(completionAuditPath), "Local MVP evidence is not ready."),
+  requirement("Desktop project IO evidence ready", completionAudit?.desktopProjectIoEvidenceReady === true, relative(completionAuditPath), "Desktop project IO evidence is not ready."),
   requirement("Local desktop package ready", completionAudit?.localDesktopPackageReady === true, relative(completionAuditPath), "Local desktop package evidence is not ready."),
   requirement("Redacted distribution evidence ready", completionAudit?.redactedDistributionEvidenceReady === true, relative(completionAuditPath), "Redacted distribution evidence is not ready."),
   requirement("Distribution env template ready", distributionEnvTemplate?.distributionEnvTemplateReady === true, relative(distributionEnvTemplatePath), "Distribution env template evidence is missing or incomplete."),
