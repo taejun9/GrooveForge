@@ -228,6 +228,7 @@ function buildMarkdown(report) {
 - Private input groups ready: ${report.privateInputGroupReadyCount}/${report.privateInputGroupTotal}
 - Manual QA checklist digest available: ${readyLabel(report.manualQaChecklistDigestAvailable)}
 - Local env file loaded: ${readyLabel(report.localEnvFileLoaded)}
+- Local env placeholder keys: ${report.localEnvPlaceholderKeyCount}
 - Private values recorded: no
 - Network probe attempted by this preflight: no
 - Release upload attempted by this preflight: no
@@ -343,6 +344,8 @@ const externalPreflightReport = {
   remediationReadinessPercent: completionProgress.remediationReadinessPercent ?? 0,
   privateInputGroupTotal: releaseDoctor.privateInputGroupTotal ?? 0,
   privateInputGroupReadyCount: releaseDoctor.privateInputGroupReadyCount ?? 0,
+  localEnvPlaceholderKeyCount: releaseDoctor.localEnvPlaceholderKeyCount ?? 0,
+  localEnvPlaceholderKeys: Array.isArray(releaseDoctor.localEnvPlaceholderKeys) ? releaseDoctor.localEnvPlaceholderKeys : [],
   manualQaChecklistDigestAvailable: externalRunbook.manualQaChecklistSha256 !== null || externalLedger.manualQaChecklistDigestAvailable === true,
   localEnvFileLoaded:
     releaseDoctor.localEnvFileLoaded === true ||
@@ -432,6 +435,12 @@ check(typeof externalPreflightReport.externalDistributionReady === "boolean", "e
 check(typeof externalPreflightReport.externalDistributionGateReady === "boolean", "external preflight should include hard-gate readiness");
 check(typeof externalPreflightReport.hardGateWouldFail === "boolean", "external preflight should include hard-gate would-fail status");
 check(Array.isArray(externalPreflightReport.firstBlockers), "external preflight should include first blockers");
+check(Number.isInteger(externalPreflightReport.localEnvPlaceholderKeyCount), "external preflight should include local env placeholder key count");
+check(Array.isArray(externalPreflightReport.localEnvPlaceholderKeys), "external preflight should include local env placeholder key names");
+check(
+  externalPreflightReport.localEnvPlaceholderKeyCount === externalPreflightReport.localEnvPlaceholderKeys.length,
+  "external preflight placeholder key count should match listed keys"
+);
 check(externalPreflightReport.localEnvValueRecorded === false, "external preflight should not record local env values");
 check(externalPreflightReport.privateValuesRecorded === false, "external preflight should not record private values");
 check(externalPreflightReport.releaseUrlValueRecorded === false, "external preflight should not record release URL values");
@@ -449,6 +458,7 @@ check(externalPreflightReport.signingAttemptedByThisPreflight === false, "extern
 check(externalPreflightReport.releaseGateClaimedExternalDistribution === false, "external preflight should not claim external distribution completion");
 check(externalPreflightReport.sourceClaimedExternalDistribution === false, "external preflight source artifacts should not claim external distribution completion");
 check(markdown.includes("External Preflight"), "external preflight Markdown should include title");
+check(markdown.includes("Local env placeholder keys:"), "external preflight Markdown should include placeholder key count");
 check(markdown.includes("Preflight command: `npm run release:external-preflight`"), "external preflight Markdown should include the preflight command");
 check(markdown.includes("Prepare env command: `npm run release:prepare-env`"), "external preflight Markdown should include the prepare-env command");
 check(markdown.includes("Source evidence prerequisite: `npm run release:check`"), "external preflight Markdown should include the prerequisite command");
@@ -475,6 +485,7 @@ console.log(`- Hard gate would fail: ${externalPreflightReport.hardGateWouldFail
 console.log(`- External gate requirements ready: ${externalPreflightReport.gateRequirementReadyCount}/${externalPreflightReport.gateRequirementTotal} (${externalPreflightReport.gateRequirementReadinessPercent.toFixed(1)}%)`);
 console.log(`- Remediation groups ready: ${externalPreflightReport.remediationReadyCount}/${externalPreflightReport.remediationTotal} (${externalPreflightReport.remediationReadinessPercent.toFixed(1)}%)`);
 console.log(`- Private input groups ready: ${externalPreflightReport.privateInputGroupReadyCount}/${externalPreflightReport.privateInputGroupTotal}`);
+console.log(`- Local env placeholder keys: ${externalPreflightReport.localEnvPlaceholderKeyCount}`);
 console.log(`- First blockers tracked: ${externalPreflightReport.firstBlockers.length}`);
 console.log(`- Local env file loaded: ${externalPreflightReport.localEnvFileLoaded ? "yes" : "no"}`);
 console.log("- Private values recorded: no");

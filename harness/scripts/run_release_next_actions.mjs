@@ -220,16 +220,25 @@ function formatBlockerRows(blockers) {
   return blockers.map((blocker, index) => `| ${index + 1} | ${escapeCell(blocker)} |`).join("\n");
 }
 
+function formatKeyList(keys) {
+  return Array.isArray(keys) && keys.length > 0 ? keys.map((key) => `- ${key}`).join("\n") : "- None.";
+}
+
 function sensitiveEnvironmentValues() {
   return sensitivePrivateKeys.map((key) => process.env[key]?.trim()).filter((value) => value && value.length >= 8);
 }
 
 function buildPriorityActions(remediation, context = {}) {
   const localEnvFileLoaded = context.localEnvFileLoaded === true;
+  const localEnvPlaceholderKeys = Array.isArray(context.localEnvPlaceholderKeys) ? context.localEnvPlaceholderKeys : [];
+  const localEnvPlaceholderKeyCount = Number.isInteger(context.localEnvPlaceholderKeyCount)
+    ? context.localEnvPlaceholderKeyCount
+    : localEnvPlaceholderKeys.length;
   return (remediation.remediationGroups ?? [])
     .filter((group) => group.ready !== true)
     .map((group, index) => {
       const shouldPrepareEnv = group.id === "release-channel-metadata" && !localEnvFileLoaded;
+      const shouldReplacePlaceholders = group.id === "release-channel-metadata" && localEnvFileLoaded && localEnvPlaceholderKeyCount > 0;
       const prerequisiteCommands = shouldPrepareEnv
         ? unique(["npm run release:prepare-env", group.prerequisiteCommands ?? []])
         : group.prerequisiteCommands ?? [];
@@ -238,7 +247,19 @@ function buildPriorityActions(remediation, context = {}) {
             "Run the explicit prepare-env command to create the ignored local distribution env scaffold before validating private inputs.",
             group.operatorActions ?? []
           ])
+        : shouldReplacePlaceholders
+          ? unique([
+              `Replace placeholder values in the ignored local distribution env file for ${localEnvPlaceholderKeyCount} keys: ${localEnvPlaceholderKeys.join(", ")}.`,
+              "Keep those private values out of committed files and generated reports.",
+              group.operatorActions ?? []
+            ])
         : group.operatorActions ?? [];
+      const rerunCommands = shouldReplacePlaceholders
+        ? unique(["npm run release:doctor", group.rerunCommands ?? []])
+        : group.rerunCommands ?? [];
+      const placeholderBlocker = shouldReplacePlaceholders
+        ? `Local distribution env still contains ${localEnvPlaceholderKeyCount} placeholder keys.`
+        : "";
       return {
         order: index + 1,
         id: group.id,
@@ -248,10 +269,14 @@ function buildPriorityActions(remediation, context = {}) {
         evidence: group.evidence ?? [],
         prerequisiteCommands,
         operatorActions,
-        rerunCommands: group.rerunCommands ?? [],
-        nextCommand: shouldPrepareEnv ? "npm run release:prepare-env" : firstValue(group.rerunCommands ?? []) || "npm run release:external-preflight",
-        firstBlocker: firstValue(group.blockers ?? []),
-        blockers: group.blockers ?? [],
+        rerunCommands,
+        nextCommand: shouldPrepareEnv
+          ? "npm run release:prepare-env"
+          : shouldReplacePlaceholders
+            ? "npm run release:doctor"
+            : firstValue(rerunCommands) || "npm run release:external-preflight",
+        firstBlocker: placeholderBlocker || firstValue(group.blockers ?? []),
+        blockers: unique([placeholderBlocker, group.blockers ?? []]),
         valueRecorded: false
       };
     });
@@ -329,6 +354,8 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
     privateInputGroupReadyCount: 0,
     manualQaChecklistDigestAvailable: false,
     localEnvFileLoaded: false,
+    localEnvPlaceholderKeyCount: 0,
+    localEnvPlaceholderKeys: [],
     priorityActions,
     priorityActionCount: priorityActions.length,
     firstBlockers,
@@ -385,6 +412,7 @@ function buildMarkdown(report) {
 - Private input groups ready: ${report.privateInputGroupReadyCount}/${report.privateInputGroupTotal}
 - Manual QA checklist digest available: ${readyLabel(report.manualQaChecklistDigestAvailable)}
 - Local env file loaded: ${readyLabel(report.localEnvFileLoaded)}
+- Local env placeholder keys: ${report.localEnvPlaceholderKeyCount}
 - Private values recorded: no
 - Network probe attempted by this next-actions report: no
 - Release upload attempted by this next-actions report: no
@@ -415,6 +443,10 @@ ${formatDetailRows(report.priorityActions)}
 | artifact | present | path |
 |---|---:|---|
 ${formatArtifactRows(report.sourceArtifacts)}
+
+## Local Env Placeholder Keys
+
+${formatKeyList(report.localEnvPlaceholderKeys)}
 
 ## Current First Blockers
 
@@ -455,7 +487,21 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     sourceArtifacts.map(readJsonRequired)
   );
   const localEnvFileLoaded = externalPreflight.localEnvFileLoaded === true || releaseDoctor.localEnvFileLoaded === true;
-  const priorityActions = buildPriorityActions(externalRemediation, { localEnvFileLoaded });
+  const localEnvPlaceholderKeys = Array.isArray(externalPreflight.localEnvPlaceholderKeys)
+    ? externalPreflight.localEnvPlaceholderKeys
+    : Array.isArray(releaseDoctor.localEnvPlaceholderKeys)
+      ? releaseDoctor.localEnvPlaceholderKeys
+      : [];
+  const localEnvPlaceholderKeyCount = Number.isInteger(externalPreflight.localEnvPlaceholderKeyCount)
+    ? externalPreflight.localEnvPlaceholderKeyCount
+    : Number.isInteger(releaseDoctor.localEnvPlaceholderKeyCount)
+      ? releaseDoctor.localEnvPlaceholderKeyCount
+      : localEnvPlaceholderKeys.length;
+  const priorityActions = buildPriorityActions(externalRemediation, {
+    localEnvFileLoaded,
+    localEnvPlaceholderKeyCount,
+    localEnvPlaceholderKeys
+  });
   const firstBlockers = unique([
     priorityActions.map((action) => action.firstBlocker),
     externalPreflight.firstBlockers ?? [],
@@ -508,6 +554,8 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     privateInputGroupReadyCount: externalPreflight.privateInputGroupReadyCount ?? releaseDoctor.privateInputGroupReadyCount ?? 0,
     manualQaChecklistDigestAvailable: externalPreflight.manualQaChecklistDigestAvailable === true || externalRunbook.manualQaChecklistSha256 !== null,
     localEnvFileLoaded,
+    localEnvPlaceholderKeyCount,
+    localEnvPlaceholderKeys,
     priorityActions,
     priorityActionCount: priorityActions.length,
     firstBlockers,
@@ -604,12 +652,30 @@ check(nextActionsReport.externalDistributionReady === true || nextActionsReport.
 check(nextActionsReport.priorityActions.every((action) => action.ready === false), "priority actions should be pending actions only");
 check(nextActionsReport.priorityActions.every((action) => action.valueRecorded === false), "priority actions should not record values");
 check(nextActionsReport.priorityActions.every((action) => typeof action.nextCommand === "string" && action.nextCommand.length > 0), "priority actions should include next commands");
+check(Number.isInteger(nextActionsReport.localEnvPlaceholderKeyCount), "external next actions should include local env placeholder key count");
+check(Array.isArray(nextActionsReport.localEnvPlaceholderKeys), "external next actions should include local env placeholder key names");
+check(
+  nextActionsReport.localEnvPlaceholderKeyCount === nextActionsReport.localEnvPlaceholderKeys.length,
+  "external next actions placeholder key count should match listed keys"
+);
 if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvFileLoaded === false) {
   const releaseChannelAction = nextActionsReport.priorityActions.find((action) => action.id === "release-channel-metadata");
   check(releaseChannelAction?.nextCommand === "npm run release:prepare-env", "release channel metadata should prepare the ignored env scaffold when no local env file is loaded");
   check(
     releaseChannelAction?.prerequisiteCommands.includes("npm run release:prepare-env"),
     "release channel metadata should list prepare-env as a prerequisite when no local env file is loaded"
+  );
+}
+if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlaceholderKeyCount > 0) {
+  const releaseChannelAction = nextActionsReport.priorityActions.find((action) => action.id === "release-channel-metadata");
+  check(releaseChannelAction?.nextCommand === "npm run release:doctor", "release channel metadata should rerun release doctor after placeholder cleanup");
+  check(
+    releaseChannelAction?.operatorActions.some((action) => action.includes("Replace placeholder values in the ignored local distribution env file")),
+    "release channel metadata should tell operators to replace placeholder values"
+  );
+  check(
+    releaseChannelAction?.firstBlocker.includes("placeholder keys"),
+    "release channel metadata should make placeholder keys the first blocker when local env placeholders remain"
   );
 }
 check(nextActionsReport.localEnvValueRecorded === false, "external next actions should not record local env values");
@@ -630,6 +696,8 @@ check(nextActionsReport.releaseGateClaimedExternalDistribution === false, "exter
 check(nextActionsReport.sourceClaimedExternalDistribution === false, "external next actions source artifacts should not claim external distribution completion");
 check(markdown.includes("External Next Actions"), "external next actions Markdown should include title");
 check(markdown.includes("Current focus:"), "external next actions Markdown should include current focus");
+check(markdown.includes("Local env placeholder keys:"), "external next actions Markdown should include placeholder key count");
+check(markdown.includes("Local Env Placeholder Keys"), "external next actions Markdown should include placeholder key section");
 check(markdown.includes("Priority Next Actions"), "external next actions Markdown should include priority actions");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "external next actions Markdown should keep the hard gate command");
 check(markdown.includes("Private values recorded: no"), "external next actions Markdown should state value redaction");
@@ -660,6 +728,7 @@ console.log(`- External gate requirements ready: ${nextActionsReport.gateRequire
 console.log(`- Remediation groups ready: ${nextActionsReport.remediationReadyCount}/${nextActionsReport.remediationTotal} (${nextActionsReport.remediationReadinessPercent.toFixed(1)}%)`);
 console.log(`- Private input groups ready: ${nextActionsReport.privateInputGroupReadyCount}/${nextActionsReport.privateInputGroupTotal}`);
 console.log(`- Local env file loaded: ${nextActionsReport.localEnvFileLoaded ? "yes" : "no"}`);
+console.log(`- Local env placeholder keys: ${nextActionsReport.localEnvPlaceholderKeyCount}`);
 console.log("- Private values recorded: no");
 console.log("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted by this next-actions report");
 console.log("- Not claimed: Developer ID signing, notarization, Gatekeeper approval, auto-update, manual QA approval, app-store submission, or external distribution completion");

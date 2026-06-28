@@ -144,6 +144,10 @@ function formatGroupRows(groups) {
     .join("\n");
 }
 
+function formatKeyList(keys) {
+  return Array.isArray(keys) && keys.length > 0 ? keys.map((key) => `- ${key}`).join("\n") : "- None.";
+}
+
 function formatBlockerRows(blockers) {
   if (!Array.isArray(blockers) || blockers.length === 0) {
     return "| none | none |";
@@ -213,6 +217,7 @@ function buildMarkdown(report) {
 - Template keys covered: ${readyLabel(report.templateKeysCovered)}
 - Private inputs ready: ${readyLabel(report.privateInputsReady)}
 - Private input groups ready: ${report.privateInputGroupReadyCount}/${report.privateInputGroupTotal}
+- Local env placeholder keys: ${report.localEnvPlaceholderKeyCount}
 - Update feed current environment ready: ${readyLabel(report.updateFeedCurrentEnvironmentReady)}
 - Channel metadata ready: ${readyLabel(report.channelMetadataReady)}
 - Distribution-channel QA ready: ${readyLabel(report.distributionChannelQaReady)}
@@ -251,6 +256,10 @@ ${formatArtifactRows(report.sourceArtifacts)}
 |---|---:|---|
 ${formatGroupRows(report.privateInputGroups)}
 
+## Local Env Placeholder Keys
+
+${formatKeyList(report.localEnvPlaceholderKeys)}
+
 ## Current First Blockers
 
 | order | blocker |
@@ -287,6 +296,12 @@ const [
 
 const privateInputGroups = Array.isArray(distributionPrivateInputs.inputGroups) ? distributionPrivateInputs.inputGroups : [];
 const privateInputGroupReadyCount = privateInputGroups.filter((group) => group.ready === true).length;
+const localEnvPlaceholderKeys = Array.isArray(distributionPrivateInputs.localEnvPlaceholderKeys)
+  ? distributionPrivateInputs.localEnvPlaceholderKeys
+  : [];
+const localEnvPlaceholderKeyCount = Number.isInteger(distributionPrivateInputs.localEnvPlaceholderKeyCount)
+  ? distributionPrivateInputs.localEnvPlaceholderKeyCount
+  : localEnvPlaceholderKeys.length;
 const combinedBlockers = unique([
   updateFeedConfig.currentEnvironmentConfig?.blockers ?? [],
   distributionEnvTemplate.localEnvBlockers ?? [],
@@ -332,6 +347,8 @@ const releaseDoctorReport = {
   privateInputGroupTotal: privateInputGroups.length,
   privateInputGroupReadyCount,
   privateInputGroups,
+  localEnvPlaceholderKeyCount,
+  localEnvPlaceholderKeys,
   privateInputBlockerCount: Array.isArray(distributionPrivateInputs.privateInputBlockers)
     ? distributionPrivateInputs.privateInputBlockers.length
     : 0,
@@ -414,6 +431,12 @@ check(releaseDoctorReport.releasePrepareEnvLocalWriteRequested === false, "relea
 check(typeof releaseDoctorReport.externalDistributionReady === "boolean", "release doctor should include external distribution readiness");
 check(typeof releaseDoctorReport.privateInputsReady === "boolean", "release doctor should include private-input readiness");
 check(Array.isArray(releaseDoctorReport.privateInputGroups), "release doctor should include private-input groups");
+check(Number.isInteger(releaseDoctorReport.localEnvPlaceholderKeyCount), "release doctor should include local env placeholder key count");
+check(Array.isArray(releaseDoctorReport.localEnvPlaceholderKeys), "release doctor should include local env placeholder key names");
+check(
+  releaseDoctorReport.localEnvPlaceholderKeyCount === releaseDoctorReport.localEnvPlaceholderKeys.length,
+  "release doctor placeholder key count should match listed keys"
+);
 check(releaseDoctorReport.localEnvValueRecorded === false, "release doctor should not record local env values");
 check(releaseDoctorReport.privateValuesRecorded === false, "release doctor should not record private values");
 check(releaseDoctorReport.releaseUrlValueRecorded === false, "release doctor should not record release URL values");
@@ -431,6 +454,8 @@ check(releaseDoctorReport.signingAttemptedByThisDoctor === false, "release docto
 check(releaseDoctorReport.releaseGateClaimedExternalDistribution === false, "release doctor should not claim external distribution completion");
 check(releaseDoctorReport.sourceClaimedExternalDistribution === false, "release doctor source artifacts should not claim external distribution completion");
 check(markdown.includes("Release Doctor"), "release doctor Markdown should include title");
+check(markdown.includes("Local env placeholder keys:"), "release doctor Markdown should include placeholder key count");
+check(markdown.includes("Local Env Placeholder Keys"), "release doctor Markdown should include placeholder key section");
 check(markdown.includes("Doctor command: `npm run release:doctor`"), "release doctor Markdown should include the doctor command");
 check(markdown.includes("Prepare env command: `npm run release:prepare-env`"), "release doctor Markdown should include the prepare-env command");
 check(markdown.includes("Progress command: `npm run release:progress`"), "release doctor Markdown should include the progress command");
@@ -451,6 +476,7 @@ console.log(`- Release prepare env ready: ${releaseDoctorReport.releasePrepareEn
 console.log(`- Release prepare env scaffold written: ${releaseDoctorReport.releasePrepareEnvScaffoldWritten ? "yes" : "no"}`);
 console.log(`- Private inputs ready: ${releaseDoctorReport.privateInputsReady ? "yes" : "no"}`);
 console.log(`- Private input groups ready: ${releaseDoctorReport.privateInputGroupReadyCount}/${releaseDoctorReport.privateInputGroupTotal}`);
+console.log(`- Local env placeholder keys: ${releaseDoctorReport.localEnvPlaceholderKeyCount}`);
 console.log(`- Channel metadata ready: ${releaseDoctorReport.channelMetadataReady ? "yes" : "no"}`);
 console.log(`- Manual QA approval ready: ${releaseDoctorReport.manualQaApprovalReady ? "yes" : "no"}`);
 console.log(`- Developer ID signing ready: ${releaseDoctorReport.developerIdSigningReady ? "yes" : "no"}`);
