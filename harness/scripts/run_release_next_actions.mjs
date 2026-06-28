@@ -59,7 +59,32 @@ const envKeyGuidance = {
   GROOVEFORGE_DISTRIBUTION_CHANNEL: "Choose exactly one allowed value: direct-download, private-beta, or managed-release.",
   GROOVEFORGE_RELEASE_DOWNLOAD_URL: "Use a safe absolute HTTPS URL with a hostname, no credentials, and no fragment.",
   GROOVEFORGE_RELEASE_NOTES_URL: "Use a safe absolute HTTPS URL with a hostname, no credentials, and no fragment.",
-  GROOVEFORGE_SUPPORT_URL: "Use a safe absolute HTTPS URL with a hostname, no credentials, and no fragment."
+  GROOVEFORGE_SUPPORT_URL: "Use a safe absolute HTTPS URL with a hostname, no credentials, and no fragment.",
+  GROOVEFORGE_UPDATE_FEED_URL:
+    "Use a safe absolute HTTPS update-feed URL with a hostname, no credentials, and no fragment; keep fallback feed keys as placeholders unless selected.",
+  ELECTRON_UPDATE_FEED_URL:
+    "Use this compatibility fallback only when it is the selected update-feed key; it must be a safe absolute HTTPS URL with no credentials or fragment.",
+  UPDATE_FEED_URL:
+    "Use this compatibility fallback only when it is the selected update-feed key; it must be a safe absolute HTTPS URL with no credentials or fragment.",
+  GROOVEFORGE_UPDATE_CHANNEL: "Use a 1-32 character lowercase update channel made from letters, numbers, dots, underscores, or hyphens.",
+  ELECTRON_UPDATE_CHANNEL:
+    "Use this compatibility fallback only when it is the selected update channel; it must match the same lowercase channel format.",
+  UPDATE_CHANNEL:
+    "Use this compatibility fallback only when it is the selected update channel; it must match the same lowercase channel format.",
+  GROOVEFORGE_DEVELOPER_ID_IDENTITY:
+    "Use an installed Developer ID Application identity label or SHA-1 fingerprint from the current macOS keychain search list.",
+  GROOVEFORGE_NOTARY_SUBMIT: "Set to 1 only after Developer ID signing and one bounded notary credential signal are ready.",
+  APPLE_ID: "Use only as part of the Apple ID notary credential set with Apple team ID and an app-specific password.",
+  APPLE_TEAM_ID: "Use only as part of the Apple ID notary credential set with Apple ID and an app-specific password.",
+  APPLE_APP_SPECIFIC_PASSWORD: "Use only as part of the Apple ID notary credential set; never commit or echo the password.",
+  ASC_KEY_ID: "Use only as part of the App Store Connect API key credential set with issuer ID and key path.",
+  ASC_ISSUER_ID: "Use only as part of the App Store Connect API key credential set with key ID and key path.",
+  ASC_KEY_PATH: "Use a local path to the App Store Connect private key file; keep the key file outside committed files.",
+  APPLE_NOTARY_PROFILE: "Use an existing notarytool keychain profile name as a bounded credential signal.",
+  NOTARYTOOL_KEYCHAIN_PROFILE: "Use an existing notarytool keychain profile name as a bounded credential signal.",
+  GROOVEFORGE_DISTRIBUTION_QA_APPROVED: "Set to 1 only after manual channel QA passes against the selected signed release artifact.",
+  GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256:
+    "Use the current distribution manual QA checklist SHA-256 digest and keep it paired with the approval signal."
 };
 
 function check(condition, message) {
@@ -839,6 +864,12 @@ check(nextActionsReport.priorityActions.every((action) => action.ready === false
 check(nextActionsReport.priorityActions.every((action) => action.valueRecorded === false), "priority actions should not record values");
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.placeholderKeys)), "priority actions should include placeholder key lists");
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.keyGuidance)), "priority actions should include key guidance lists");
+check(
+  nextActionsReport.priorityActions.every((action) =>
+    (action.requiredKeys ?? []).every((key) => (action.keyGuidance ?? []).some((item) => item.key === key))
+  ),
+  "priority actions should include guidance for every required key"
+);
 check(nextActionsReport.priorityActions.every((action) => typeof action.nextCommand === "string" && action.nextCommand.length > 0), "priority actions should include next commands");
 if (nextActionsReport.priorityActions.length > 0) {
   const firstPriorityAction = nextActionsReport.priorityActions[0];
@@ -882,6 +913,52 @@ if (nextActionsReport.priorityActions.length > 0) {
     nextActionsReport.currentEnvKeyGuidanceSummary === ((firstPriorityAction.keyGuidance ?? []).length > 0 ? `${firstPriorityAction.keyGuidance.length} keys with value-free guidance` : "none"),
     "external next actions should mirror the first priority key guidance summary"
   );
+}
+if (nextActionsReport.bootstrapMode === false) {
+  const autoUpdateAction = nextActionsReport.priorityActions.find((action) => action.id === "auto-update-feed");
+  if (autoUpdateAction) {
+    check(autoUpdateAction.keyGuidance.length === autoUpdateAction.requiredKeys.length, "auto-update priority action should include guidance for each update feed/channel key");
+    check(
+      autoUpdateAction.keyGuidance.some((item) => item.key === "GROOVEFORGE_UPDATE_FEED_URL" && item.guidance.includes("safe absolute HTTPS update-feed URL")),
+      "auto-update priority action should explain safe update-feed URL values"
+    );
+    check(
+      autoUpdateAction.keyGuidance.some((item) => item.key === "GROOVEFORGE_UPDATE_CHANNEL" && item.guidance.includes("1-32 character lowercase update channel")),
+      "auto-update priority action should explain update channel values"
+    );
+  }
+  const developerIdAction = nextActionsReport.priorityActions.find((action) => action.id === "developer-id-signing");
+  if (developerIdAction) {
+    check(developerIdAction.keyGuidance.length === developerIdAction.requiredKeys.length, "Developer ID priority action should include guidance for its identity key");
+    check(
+      developerIdAction.keyGuidance.some((item) => item.key === "GROOVEFORGE_DEVELOPER_ID_IDENTITY" && item.guidance.includes("Developer ID Application identity")),
+      "Developer ID priority action should explain identity label or fingerprint values"
+    );
+  }
+  const notarizationAction = nextActionsReport.priorityActions.find((action) => action.id === "notarization-stapling");
+  if (notarizationAction) {
+    check(notarizationAction.keyGuidance.length === notarizationAction.requiredKeys.length, "notarization priority action should include guidance for every notary key");
+    check(
+      notarizationAction.keyGuidance.some((item) => item.key === "GROOVEFORGE_NOTARY_SUBMIT" && item.guidance.includes("Set to 1 only after Developer ID signing")),
+      "notarization priority action should explain the submit guard"
+    );
+    check(
+      notarizationAction.keyGuidance.some((item) => item.key === "NOTARYTOOL_KEYCHAIN_PROFILE" && item.guidance.includes("keychain profile")),
+      "notarization priority action should explain keychain profile credential signals"
+    );
+  }
+  const manualQaAction = nextActionsReport.priorityActions.find((action) => action.id === "manual-channel-qa");
+  if (manualQaAction) {
+    check(manualQaAction.keyGuidance.length === manualQaAction.requiredKeys.length, "manual QA priority action should include guidance for approval and checklist digest keys");
+    check(
+      manualQaAction.keyGuidance.some((item) => item.key === "GROOVEFORGE_DISTRIBUTION_QA_APPROVED" && item.guidance.includes("manual channel QA passes")),
+      "manual QA priority action should explain the approval signal"
+    );
+    check(
+      manualQaAction.keyGuidance.some((item) => item.key === "GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256" && item.guidance.includes("checklist SHA-256")),
+      "manual QA priority action should explain the checklist digest"
+    );
+  }
 }
 check(Number.isInteger(nextActionsReport.localEnvPlaceholderKeyCount), "external next actions should include local env placeholder key count");
 check(Array.isArray(nextActionsReport.localEnvPlaceholderKeys), "external next actions should include local env placeholder key names");
