@@ -15,6 +15,9 @@ const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const releaseManifestPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-manifest.json`);
 const updateMetadataPolicyPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-update-metadata-policy.json`);
+const developerIdSigningPath = path.join(root, "build", "desktop", `${appName}-${platformArch}-developer-id-signing.json`);
+const notarizationPath = path.join(root, "build", "desktop", `${appName}-${platformArch}-notarization.json`);
+const notarizedGatekeeperPath = path.join(root, "build", "desktop", `${appName}-${platformArch}-notarized-gatekeeper.json`);
 const latestMacPath = path.join(packageRoot, "latest-mac.yml");
 const appUpdatePath = path.join(packageRoot, "app-update.yml");
 const dmgBlockmapPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}.dmg.blockmap`);
@@ -53,6 +56,13 @@ async function hashFile(filePath, algorithm) {
   });
 }
 
+async function readJsonIfExists(filePath) {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+  return JSON.parse(await readFile(filePath, "utf8"));
+}
+
 function yamlScalar(value) {
   return JSON.stringify(String(value));
 }
@@ -70,6 +80,63 @@ async function writeTextArtifact(filePath, text) {
     path: relative(filePath),
     bytes: fileStats.size,
     sha256: await hashFile(filePath, "sha256")
+  };
+}
+
+function notarizationReady(notarization) {
+  return (
+    notarization?.notarizationReady === true &&
+    notarization?.notarizationAccepted === true &&
+    notarization?.stapled === true &&
+    notarization?.stapleValidationPassed === true &&
+    typeof notarization?.notarizationDmgPath === "string" &&
+    notarization.notarizationDmgPath.length > 0
+  );
+}
+
+function selectUpdateSource(manifestDmgPath, signing, notarization, gatekeeper) {
+  const notarizedDmgPath = notarizationReady(notarization)
+    ? path.join(root, notarization.notarizationDmgPath)
+    : null;
+  const signedUpdateArtifact = {
+    developerIdSigningSummaryPath: existsSync(developerIdSigningPath) ? relative(developerIdSigningPath) : null,
+    notarizationSummaryPath: existsSync(notarizationPath) ? relative(notarizationPath) : null,
+    notarizedGatekeeperSummaryPath: existsSync(notarizedGatekeeperPath) ? relative(notarizedGatekeeperPath) : null,
+    developerIdSigned: signing?.developerIdSigned === true,
+    notarizationReady: notarizationReady(notarization),
+    notarizationDmgPath: notarizedDmgPath ? relative(notarizedDmgPath) : null,
+    notarizationDmgPresent: Boolean(notarizedDmgPath) && existsSync(notarizedDmgPath),
+    notarizedGatekeeperAccepted: gatekeeper?.notarizedGatekeeperAccepted === true,
+    ready: false,
+    selectedSource: "release-manifest-dmg",
+    fallbackReason: null,
+    valueRecorded: false
+  };
+  signedUpdateArtifact.ready =
+    signedUpdateArtifact.developerIdSigned &&
+    signedUpdateArtifact.notarizationReady &&
+    signedUpdateArtifact.notarizationDmgPresent &&
+    signedUpdateArtifact.notarizedGatekeeperAccepted;
+
+  if (signedUpdateArtifact.ready && notarizedDmgPath) {
+    return {
+      path: notarizedDmgPath,
+      selectedSource: "notarized-isolated-dmg",
+      signedUpdateArtifact: {
+        ...signedUpdateArtifact,
+        selectedSource: "notarized-isolated-dmg"
+      }
+    };
+  }
+
+  return {
+    path: manifestDmgPath,
+    selectedSource: "release-manifest-dmg",
+    signedUpdateArtifact: {
+      ...signedUpdateArtifact,
+      fallbackReason:
+        "Using release manifest DMG until Developer ID signing, notarization/stapling, and notarized Gatekeeper evidence select the isolated notarized DMG."
+    }
   };
 }
 
@@ -117,16 +184,24 @@ async function createArtifacts() {
 
   const manifest = JSON.parse(await readFile(releaseManifestPath, "utf8"));
   const policy = JSON.parse(await readFile(updateMetadataPolicyPath, "utf8"));
+  const developerIdSigning = await readJsonIfExists(developerIdSigningPath);
+  const notarization = await readJsonIfExists(notarizationPath);
+  const notarizedGatekeeper = await readJsonIfExists(notarizedGatekeeperPath);
   const dmgRelativePath = manifest.dmg?.path;
-  const dmgPath = dmgRelativePath ? path.join(root, dmgRelativePath) : null;
+  const manifestDmgPath = dmgRelativePath ? path.join(root, dmgRelativePath) : null;
   check(policy.policyAvailable === true, "update metadata policy should be available before artifact drafting");
-  check(Boolean(dmgPath) && existsSync(dmgPath), "release manifest DMG path should exist before update metadata artifact smoke");
+  check(
+    Boolean(manifestDmgPath) && existsSync(manifestDmgPath),
+    "release manifest DMG path should exist before update metadata artifact smoke"
+  );
   check(/^[a-f0-9]{64}$/.test(manifest.dmg?.sha256 ?? ""), "release manifest DMG SHA-256 checksum should be available");
   check(manifest.dmg?.bytes > 10000000, "release manifest DMG byte size should be substantial");
   if (failures.length > 0) {
     fail("Update metadata artifact source validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
   }
 
+  const selectedUpdateSource = selectUpdateSource(manifestDmgPath, developerIdSigning, notarization, notarizedGatekeeper);
+  const dmgPath = selectedUpdateSource.path;
   const dmgStats = await stat(dmgPath);
   const dmgSha256 = await hashFile(dmgPath, "sha256");
   const dmgSha512 = await hashFile(dmgPath, "sha512");
@@ -170,11 +245,17 @@ async function createArtifacts() {
   const requiredArtifactFiles = ["latest-mac.yml", "app-update.yml", `${appName}-${packageJson.version}-${platformArch}.dmg.blockmap`];
   const blockers = [];
 
-  if (manifest.signing?.developerIdCodeSigningClaimed !== true) {
+  if (selectedUpdateSource.signedUpdateArtifact.developerIdSigned !== true) {
     blockers.push("Developer ID signed release artifact is required before update metadata can be published.");
   }
-  if (manifest.signing?.notarizationClaimed !== true) {
+  if (
+    selectedUpdateSource.signedUpdateArtifact.notarizationReady !== true ||
+    selectedUpdateSource.signedUpdateArtifact.notarizationDmgPresent !== true
+  ) {
     blockers.push("Notarized and stapled release artifact is required before update metadata can be published.");
+  }
+  if (selectedUpdateSource.signedUpdateArtifact.notarizedGatekeeperAccepted !== true) {
+    blockers.push("Notarized Gatekeeper accepted release artifact is required before update metadata can be published.");
   }
   if (policy.prerequisites?.externalDistributionChannelQaClaimed !== true) {
     blockers.push("External distribution-channel QA is required before update metadata can be published.");
@@ -189,10 +270,13 @@ async function createArtifacts() {
     sourceDmg: {
       path: relative(dmgPath),
       fileName: dmgFileName,
+      selectedSource: selectedUpdateSource.selectedSource,
+      fallbackFromSignedNotarizedArtifact: selectedUpdateSource.selectedSource !== "notarized-isolated-dmg",
       bytes: dmgStats.size,
       sha256: dmgSha256,
       sha512: dmgSha512
     },
+    signedUpdateArtifact: selectedUpdateSource.signedUpdateArtifact,
     provider: {
       requiredFeedEnvironmentKeys: feedKeys,
       requiredChannelEnvironmentKeys: channelKeys,
@@ -236,6 +320,11 @@ if (!summary.skipped) {
   check(/^[a-f0-9]{64}$/.test(summary.sourceDmg?.sha256 ?? ""), "source DMG SHA-256 should be recorded");
   check(/^[a-f0-9]{128}$/.test(summary.sourceDmg?.sha512 ?? ""), "source DMG SHA-512 should be recorded");
   check(summary.sourceDmg?.bytes > 10000000, "source DMG byte size should be substantial");
+  check(
+    summary.signedUpdateArtifact?.ready === false || summary.sourceDmg?.selectedSource === "notarized-isolated-dmg",
+    "ready signed update artifact evidence should select the notarized isolated DMG"
+  );
+  check(summary.signedUpdateArtifact?.valueRecorded === false, "signed update artifact evidence should not record private values");
 }
 
 const serialized = JSON.stringify(summary);
@@ -268,6 +357,8 @@ console.log(`- Summary: ${relative(artifactSummaryPath)}`);
 console.log(`- Local env file loaded: ${distributionLocalEnv.enabled ? "yes" : "no"}`);
 console.log(`- Draft artifacts: ${summary.requiredArtifactFiles.join(", ")}`);
 console.log(`- Source DMG: ${summary.sourceDmg.path}, ${summary.sourceDmg.bytes} bytes`);
+console.log(`- Source selection: ${summary.sourceDmg.selectedSource}`);
+console.log(`- Signed update artifact ready: ${summary.signedUpdateArtifact.ready ? "yes" : "no"}`);
 console.log(`- Update metadata artifacts drafted: ${summary.updateMetadataArtifactsDrafted ? "yes" : "no"}`);
 console.log(`- Update metadata artifacts published: ${summary.updateMetadataArtifactsPublished ? "yes" : "no"}`);
 if (summary.blockers.length > 0) {

@@ -125,6 +125,14 @@ function updateArtifactSignals(manifest, policy, metadataArtifacts) {
     updateMetadataArtifactsReady: metadataArtifacts?.updateMetadataArtifactsReady === true,
     updateMetadataArtifactsRecordsFeedValue: metadataArtifacts?.feedValueRecorded === true,
     updateMetadataArtifactsRecordsChannelValue: metadataArtifacts?.channelValueRecorded === true,
+    selectedUpdateArtifactSource: metadataArtifacts?.sourceDmg?.selectedSource ?? null,
+    selectedUpdateArtifactPath: metadataArtifacts?.sourceDmg?.path ?? null,
+    selectedUpdateArtifactFallbackReason: metadataArtifacts?.signedUpdateArtifact?.fallbackReason ?? null,
+    signedNotarizedUpdateArtifactReady: metadataArtifacts?.signedUpdateArtifact?.ready === true,
+    signedUpdateArtifactDeveloperIdSigned: metadataArtifacts?.signedUpdateArtifact?.developerIdSigned === true,
+    signedUpdateArtifactNotarizationReady: metadataArtifacts?.signedUpdateArtifact?.notarizationReady === true,
+    signedUpdateArtifactNotarizationDmgPresent: metadataArtifacts?.signedUpdateArtifact?.notarizationDmgPresent === true,
+    signedUpdateArtifactGatekeeperAccepted: metadataArtifacts?.signedUpdateArtifact?.notarizedGatekeeperAccepted === true,
     updateMetadataPolicyAvailable: policy?.policyAvailable === true,
     updateMetadataPolicyClaimsAutoUpdate: policy?.releaseGateClaimedAutoUpdate === true,
     updateMetadataPolicyRecordsFeedValue: policy?.provider?.feedValueRecorded === true,
@@ -209,8 +217,8 @@ async function createReadinessSummary() {
   const signedUpdateArtifactsReady =
     updateMetadataPolicyReady &&
     artifacts.updateMetadataFilesReady &&
-    artifacts.developerIdCodeSigningClaimed &&
-    artifacts.notarizationClaimed;
+    (artifacts.signedNotarizedUpdateArtifactReady ||
+      (artifacts.developerIdCodeSigningClaimed && artifacts.notarizationClaimed));
   const userFacingUpdateBehaviorReady = source.hasUserFacingUpdateCopy && source.hasUpdateDownloadedHandler;
   const blockers = [];
 
@@ -231,7 +239,9 @@ async function createReadinessSummary() {
     blockers.push("Local update metadata artifact drafts are missing; run npm run desktop:update-metadata-artifacts-smoke first.");
   }
   if (updateMetadataPolicyReady && !signedUpdateArtifactsReady) {
-    blockers.push("Signed/notarized update metadata artifacts are not ready because Developer ID signing or notarization evidence is missing.");
+    blockers.push(
+      "Signed/notarized update metadata artifacts are not ready because Developer ID signing, notarization, or notarized Gatekeeper evidence is missing."
+    );
   }
   if (!userFacingUpdateBehaviorReady) {
     blockers.push("No user-facing update check, download, and install behavior is implemented.");
@@ -335,6 +345,7 @@ console.log(`- Update provider ready: ${readiness.checks?.providerReady === true
 console.log(`- Update feed config ready: ${readiness.checks?.updateFeedConfigReady === true ? "yes" : "no"}`);
 console.log(`- Update metadata policy ready: ${readiness.checks?.updateMetadataPolicyReady === true ? "yes" : "no"}`);
 console.log(`- Update metadata files ready: ${readiness.checks?.updateMetadataFilesReady === true ? "yes" : "no"}`);
+console.log(`- Update artifact source: ${readiness.artifacts?.selectedUpdateArtifactSource ?? "none"}`);
 console.log(`- Signed update artifacts ready: ${readiness.checks?.signedUpdateArtifactsReady === true ? "yes" : "no"}`);
 console.log(`- User-facing update behavior ready: ${readiness.checks?.userFacingUpdateBehaviorReady === true ? "yes" : "no"}`);
 console.log(`- Auto-update ready: ${readiness.autoUpdateReady ? "yes" : "no"}`);
