@@ -108,20 +108,31 @@ async function readJsonRequired(artifact) {
 
 function runExternalPreflight() {
   if (fromExisting) {
-    return;
+    return {
+      attempted: false,
+      succeeded: true,
+      status: 0,
+      stdout: "",
+      stderr: ""
+    };
   }
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
   const result = spawnSync(npmCommand, ["run", "release:external-preflight"], {
     cwd: root,
     env: process.env,
-    stdio: "inherit"
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
   });
   if (result.error) {
     fail("Could not run npm run release:external-preflight.", result.error.message);
   }
-  if (result.status !== 0) {
-    fail(`npm run release:external-preflight exited with status ${result.status}.`);
-  }
+  return {
+    attempted: true,
+    succeeded: result.status === 0,
+    status: result.status ?? 1,
+    stdout: result.stdout ?? "",
+    stderr: result.stderr ?? ""
+  };
 }
 
 function sourceValueRecorded(...sources) {
@@ -233,12 +244,121 @@ function buildPriorityActions(remediation) {
     }));
 }
 
+function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
+  const missingArtifacts = artifactRows.filter((item) => !item.present);
+  const missingLabels = missingArtifacts.map((item) => item.label);
+  const firstBlockers = unique([
+    `Source release evidence is missing: ${missingLabels.join(", ") || "unknown"}.`,
+    "Run npm run release:check before external preflight.",
+    "Rerun npm run release:next-actions after evidence is regenerated."
+  ]);
+  const priorityActions = [
+    {
+      order: 1,
+      id: "regenerate-local-release-evidence",
+      label: "Regenerate local release evidence",
+      ready: false,
+      requiredKeys: [],
+      evidence: artifactRows,
+      prerequisiteCommands: [],
+      operatorActions: [
+        "Run the full local release gate to regenerate ignored source evidence before external preflight.",
+        "Do not add private release values to committed files while regenerating evidence."
+      ],
+      rerunCommands: ["npm run release:check", "npm run release:next-actions"],
+      nextCommand: "npm run release:check",
+      firstBlocker: firstBlockers[0],
+      blockers: firstBlockers,
+      valueRecorded: false
+    }
+  ];
+
+  return {
+    appName,
+    bundleId,
+    version: packageJson.version,
+    generatedAt: new Date().toISOString(),
+    platform: process.platform,
+    arch: process.arch,
+    nextActionsCommand: "npm run release:next-actions",
+    nextActionsSmokeCommand: "npm run release:next-actions-smoke",
+    externalPreflightCommand: "npm run release:external-preflight",
+    prepareEnvCommand: "npm run release:prepare-env",
+    doctorCommand: "npm run release:doctor",
+    hardExternalGateCommand: "npm run release:external-check",
+    prerequisiteCommand: "npm run release:check",
+    externalNextActionsMarkdownPath: relative(nextActionsMarkdownPath),
+    externalNextActionsJsonPath: relative(nextActionsJsonPath),
+    productScope: "all-genre direct beat workstation; direct composition first; sampling optional and secondary",
+    nextActionsScope: "value-free bootstrap external distribution operator actions when source release evidence is missing",
+    bootstrapMode: true,
+    preflightRunAttempted: preflightRun.attempted,
+    preflightRunSucceeded: preflightRun.succeeded,
+    preflightExitStatus: preflightRun.status,
+    preflightOutputRecorded: false,
+    sourceArtifacts: artifactRows,
+    missingSourceArtifacts: missingArtifacts,
+    sourceEvidenceReady: false,
+    completionStage: "source evidence missing",
+    currentFocus: "Regenerate local release evidence",
+    localReleaseReady: false,
+    localReleaseReadinessPercent: 0,
+    externalDistributionReady: false,
+    externalDistributionGateReady: false,
+    hardGateWouldFail: true,
+    gateRequirementTotal: 0,
+    gateRequirementReadyCount: 0,
+    gateRequirementReadinessPercent: 0,
+    remediationTotal: 0,
+    remediationReadyCount: 0,
+    remediationReadinessPercent: 0,
+    privateInputGroupTotal: 0,
+    privateInputGroupReadyCount: 0,
+    manualQaChecklistDigestAvailable: false,
+    localEnvFileLoaded: false,
+    priorityActions,
+    priorityActionCount: priorityActions.length,
+    firstBlockers,
+    actionEvidence: [
+      artifact("Developer ID signing", developerIdSigningPath),
+      artifact("Notarization", notarizationPath),
+      artifact("Notarized Gatekeeper", notarizedGatekeeperPath),
+      artifact("Auto-update readiness", autoUpdateReadinessPath),
+      artifact("Distribution manual QA", distributionManualQaPath)
+    ],
+    localEnvValueRecorded: false,
+    privateValuesRecorded: false,
+    releaseUrlValueRecorded: false,
+    supportUrlValueRecorded: false,
+    feedValueRecorded: false,
+    credentialValueRecorded: false,
+    tokenValueRecorded: false,
+    channelValueRecorded: false,
+    developerIdIdentityValueRecorded: false,
+    networkProbeAttemptedByThisNextActionsReport: false,
+    releaseUploadAttemptedByThisNextActionsReport: false,
+    notarySubmissionAttemptedByThisNextActionsReport: false,
+    signingAttemptedByThisNextActionsReport: false,
+    releaseGateClaimedDeveloperIdSigning: false,
+    releaseGateClaimedNotarization: false,
+    releaseGateClaimedGatekeeperApproval: false,
+    releaseGateClaimedAutoUpdate: false,
+    releaseGateClaimedManualQaApproval: false,
+    releaseGateClaimedExternalDistribution: false,
+    sourceValueRecorded: false,
+    sourceClaimedExternalDistribution: false,
+    externalNextActionsReady: true
+  };
+}
+
 function buildMarkdown(report) {
   return `# ${appName} ${report.version} ${report.platform}-${report.arch} External Next Actions
 
 ## Status
 
 - Next actions ready: ${readyLabel(report.externalNextActionsReady)}
+- Bootstrap mode: ${readyLabel(report.bootstrapMode)}
+- Source evidence ready: ${readyLabel(report.sourceEvidenceReady)}
 - Completion stage: ${report.completionStage}
 - Current focus: ${report.currentFocus}
 - Local release ready: ${readyLabel(report.localReleaseReady)}
@@ -264,6 +384,7 @@ function buildMarkdown(report) {
 - Source preflight command: \`${report.externalPreflightCommand}\`
 - Prepare env command: \`${report.prepareEnvCommand}\`
 - Fast doctor command: \`${report.doctorCommand}\`
+- Source evidence prerequisite: \`${report.prerequisiteCommand ?? "none"}\`
 - Hard external distribution gate: \`${report.hardExternalGateCommand}\`
 
 ## Priority Next Actions
@@ -290,7 +411,7 @@ ${formatBlockerRows(report.firstBlockers)}
 
 ## Interpretation
 
-This is the compact operator view after external preflight. It does not replace \`npm run release:external-preflight\` or the hard gate \`npm run release:external-check\`.
+This is the compact operator view after external preflight or the bootstrap view when source evidence is missing. It does not replace \`npm run release:external-preflight\` or the hard gate \`npm run release:external-check\`.
 
 ## Not Recorded
 
@@ -302,110 +423,130 @@ This next-actions report does not claim Developer ID signing, notarization, Gate
 `;
 }
 
-runExternalPreflight();
-
+const preflightRun = runExternalPreflight();
 const artifactRows = sourceArtifacts.map((item) => artifact(item.label, item.path));
-const [externalPreflight, externalRemediation, externalRunbook, externalLedger, completionProgress, releaseDoctor] = await Promise.all(
-  sourceArtifacts.map(readJsonRequired)
-);
-const priorityActions = buildPriorityActions(externalRemediation);
-const firstBlockers = unique([
-  priorityActions.map((action) => action.firstBlocker),
-  externalPreflight.firstBlockers ?? [],
-  completionProgress.firstBlockers?.map((item) => item.blocker) ?? [],
-  externalLedger.firstBlockers ?? [],
-  externalRemediation.remediationBlockers ?? []
-]).slice(0, 12);
-const currentFocus = priorityActions[0]?.label ?? (externalPreflight.externalDistributionGateReady ? "Run hard external distribution gate" : "Refresh external preflight evidence");
+const missingSourceEvidence = artifactRows.some((item) => !item.present);
+let nextActionsReport = null;
 
-const nextActionsReport = {
-  appName,
-  bundleId,
-  version: packageJson.version,
-  generatedAt: new Date().toISOString(),
-  platform: process.platform,
-  arch: process.arch,
-  nextActionsCommand: "npm run release:next-actions",
-  nextActionsSmokeCommand: "npm run release:next-actions-smoke",
-  externalPreflightCommand: "npm run release:external-preflight",
-  prepareEnvCommand: "npm run release:prepare-env",
-  doctorCommand: "npm run release:doctor",
-  hardExternalGateCommand: "npm run release:external-check",
-  externalNextActionsMarkdownPath: relative(nextActionsMarkdownPath),
-  externalNextActionsJsonPath: relative(nextActionsJsonPath),
-  productScope: "all-genre direct beat workstation; direct composition first; sampling optional and secondary",
-  nextActionsScope: "value-free prioritized external distribution operator actions from redacted preflight and remediation evidence",
-  sourceArtifacts: artifactRows,
-  sourceEvidenceReady: artifactRows.every((item) => item.present),
-  completionStage: externalPreflight.completionStage ?? completionProgress.completionStage ?? "unknown",
-  currentFocus,
-  localReleaseReady: externalPreflight.localReleaseReady === true,
-  localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
-  externalDistributionReady: externalPreflight.externalDistributionReady === true,
-  externalDistributionGateReady: externalPreflight.externalDistributionGateReady === true,
-  hardGateWouldFail: externalPreflight.hardGateWouldFail === true,
-  gateRequirementTotal: externalPreflight.gateRequirementTotal ?? completionProgress.gateRequirementTotal ?? 0,
-  gateRequirementReadyCount: externalPreflight.gateRequirementReadyCount ?? completionProgress.gateRequirementReadyCount ?? 0,
-  gateRequirementReadinessPercent: externalPreflight.gateRequirementReadinessPercent ?? completionProgress.gateRequirementReadinessPercent ?? 0,
-  remediationTotal: externalPreflight.remediationTotal ?? completionProgress.remediationTotal ?? 0,
-  remediationReadyCount: externalPreflight.remediationReadyCount ?? completionProgress.remediationReadyCount ?? 0,
-  remediationReadinessPercent: externalPreflight.remediationReadinessPercent ?? completionProgress.remediationReadinessPercent ?? 0,
-  privateInputGroupTotal: externalPreflight.privateInputGroupTotal ?? releaseDoctor.privateInputGroupTotal ?? 0,
-  privateInputGroupReadyCount: externalPreflight.privateInputGroupReadyCount ?? releaseDoctor.privateInputGroupReadyCount ?? 0,
-  manualQaChecklistDigestAvailable: externalPreflight.manualQaChecklistDigestAvailable === true || externalRunbook.manualQaChecklistSha256 !== null,
-  localEnvFileLoaded: externalPreflight.localEnvFileLoaded === true,
-  priorityActions,
-  priorityActionCount: priorityActions.length,
-  firstBlockers,
-  actionEvidence: [
-    artifact("Developer ID signing", developerIdSigningPath),
-    artifact("Notarization", notarizationPath),
-    artifact("Notarized Gatekeeper", notarizedGatekeeperPath),
-    artifact("Auto-update readiness", autoUpdateReadinessPath),
-    artifact("Distribution manual QA", distributionManualQaPath)
-  ],
-  localEnvValueRecorded: false,
-  privateValuesRecorded: false,
-  releaseUrlValueRecorded: false,
-  supportUrlValueRecorded: false,
-  feedValueRecorded: false,
-  credentialValueRecorded: false,
-  tokenValueRecorded: false,
-  channelValueRecorded: false,
-  developerIdIdentityValueRecorded: false,
-  networkProbeAttemptedByThisNextActionsReport: false,
-  releaseUploadAttemptedByThisNextActionsReport: false,
-  notarySubmissionAttemptedByThisNextActionsReport: false,
-  signingAttemptedByThisNextActionsReport: false,
-  releaseGateClaimedDeveloperIdSigning: false,
-  releaseGateClaimedNotarization: false,
-  releaseGateClaimedGatekeeperApproval: false,
-  releaseGateClaimedAutoUpdate: false,
-  releaseGateClaimedManualQaApproval: false,
-  releaseGateClaimedExternalDistribution: false,
-  sourceValueRecorded: sourceValueRecorded(externalPreflight, externalRemediation, externalRunbook, externalLedger, completionProgress, releaseDoctor),
-  sourceClaimedExternalDistribution: sourceClaimedExternalDistribution(
-    externalPreflight,
-    externalRemediation,
-    externalRunbook,
-    externalLedger,
-    completionProgress,
-    releaseDoctor
-  )
-};
+if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
+  nextActionsReport = buildBootstrapNextActionsReport(artifactRows, preflightRun);
+} else {
+  if (!preflightRun.succeeded) {
+    fail(
+      `npm run release:external-preflight exited with status ${preflightRun.status}.`,
+      [preflightRun.stdout, preflightRun.stderr].filter((value) => value.trim().length > 0).join("\n")
+    );
+  }
 
-nextActionsReport.externalNextActionsReady =
-  nextActionsReport.sourceEvidenceReady &&
-  externalPreflight.externalPreflightReady === true &&
-  Array.isArray(externalRemediation.remediationGroups) &&
-  externalRunbook.operatorRunbookReady === true &&
-  externalLedger.ledgerReady === true &&
-  completionProgress.completionProgressReady === true &&
-  nextActionsReport.localReleaseReady === true &&
-  nextActionsReport.localReleaseReadinessPercent === 100 &&
-  nextActionsReport.priorityActions.every((action) => action.valueRecorded === false) &&
-  nextActionsReport.sourceValueRecorded === false &&
-  nextActionsReport.sourceClaimedExternalDistribution === false;
+  const [externalPreflight, externalRemediation, externalRunbook, externalLedger, completionProgress, releaseDoctor] = await Promise.all(
+    sourceArtifacts.map(readJsonRequired)
+  );
+  const priorityActions = buildPriorityActions(externalRemediation);
+  const firstBlockers = unique([
+    priorityActions.map((action) => action.firstBlocker),
+    externalPreflight.firstBlockers ?? [],
+    completionProgress.firstBlockers?.map((item) => item.blocker) ?? [],
+    externalLedger.firstBlockers ?? [],
+    externalRemediation.remediationBlockers ?? []
+  ]).slice(0, 12);
+  const currentFocus = priorityActions[0]?.label ?? (externalPreflight.externalDistributionGateReady ? "Run hard external distribution gate" : "Refresh external preflight evidence");
+
+  nextActionsReport = {
+    appName,
+    bundleId,
+    version: packageJson.version,
+    generatedAt: new Date().toISOString(),
+    platform: process.platform,
+    arch: process.arch,
+    nextActionsCommand: "npm run release:next-actions",
+    nextActionsSmokeCommand: "npm run release:next-actions-smoke",
+    externalPreflightCommand: "npm run release:external-preflight",
+    prepareEnvCommand: "npm run release:prepare-env",
+    doctorCommand: "npm run release:doctor",
+    hardExternalGateCommand: "npm run release:external-check",
+    prerequisiteCommand: "npm run release:check",
+    externalNextActionsMarkdownPath: relative(nextActionsMarkdownPath),
+    externalNextActionsJsonPath: relative(nextActionsJsonPath),
+    productScope: "all-genre direct beat workstation; direct composition first; sampling optional and secondary",
+    nextActionsScope: "value-free prioritized external distribution operator actions from redacted preflight and remediation evidence",
+    bootstrapMode: false,
+    preflightRunAttempted: preflightRun.attempted,
+    preflightRunSucceeded: preflightRun.succeeded,
+    preflightExitStatus: preflightRun.status,
+    preflightOutputRecorded: false,
+    sourceArtifacts: artifactRows,
+    missingSourceArtifacts: [],
+    sourceEvidenceReady: artifactRows.every((item) => item.present),
+    completionStage: externalPreflight.completionStage ?? completionProgress.completionStage ?? "unknown",
+    currentFocus,
+    localReleaseReady: externalPreflight.localReleaseReady === true,
+    localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
+    externalDistributionReady: externalPreflight.externalDistributionReady === true,
+    externalDistributionGateReady: externalPreflight.externalDistributionGateReady === true,
+    hardGateWouldFail: externalPreflight.hardGateWouldFail === true,
+    gateRequirementTotal: externalPreflight.gateRequirementTotal ?? completionProgress.gateRequirementTotal ?? 0,
+    gateRequirementReadyCount: externalPreflight.gateRequirementReadyCount ?? completionProgress.gateRequirementReadyCount ?? 0,
+    gateRequirementReadinessPercent: externalPreflight.gateRequirementReadinessPercent ?? completionProgress.gateRequirementReadinessPercent ?? 0,
+    remediationTotal: externalPreflight.remediationTotal ?? completionProgress.remediationTotal ?? 0,
+    remediationReadyCount: externalPreflight.remediationReadyCount ?? completionProgress.remediationReadyCount ?? 0,
+    remediationReadinessPercent: externalPreflight.remediationReadinessPercent ?? completionProgress.remediationReadinessPercent ?? 0,
+    privateInputGroupTotal: externalPreflight.privateInputGroupTotal ?? releaseDoctor.privateInputGroupTotal ?? 0,
+    privateInputGroupReadyCount: externalPreflight.privateInputGroupReadyCount ?? releaseDoctor.privateInputGroupReadyCount ?? 0,
+    manualQaChecklistDigestAvailable: externalPreflight.manualQaChecklistDigestAvailable === true || externalRunbook.manualQaChecklistSha256 !== null,
+    localEnvFileLoaded: externalPreflight.localEnvFileLoaded === true,
+    priorityActions,
+    priorityActionCount: priorityActions.length,
+    firstBlockers,
+    actionEvidence: [
+      artifact("Developer ID signing", developerIdSigningPath),
+      artifact("Notarization", notarizationPath),
+      artifact("Notarized Gatekeeper", notarizedGatekeeperPath),
+      artifact("Auto-update readiness", autoUpdateReadinessPath),
+      artifact("Distribution manual QA", distributionManualQaPath)
+    ],
+    localEnvValueRecorded: false,
+    privateValuesRecorded: false,
+    releaseUrlValueRecorded: false,
+    supportUrlValueRecorded: false,
+    feedValueRecorded: false,
+    credentialValueRecorded: false,
+    tokenValueRecorded: false,
+    channelValueRecorded: false,
+    developerIdIdentityValueRecorded: false,
+    networkProbeAttemptedByThisNextActionsReport: false,
+    releaseUploadAttemptedByThisNextActionsReport: false,
+    notarySubmissionAttemptedByThisNextActionsReport: false,
+    signingAttemptedByThisNextActionsReport: false,
+    releaseGateClaimedDeveloperIdSigning: false,
+    releaseGateClaimedNotarization: false,
+    releaseGateClaimedGatekeeperApproval: false,
+    releaseGateClaimedAutoUpdate: false,
+    releaseGateClaimedManualQaApproval: false,
+    releaseGateClaimedExternalDistribution: false,
+    sourceValueRecorded: sourceValueRecorded(externalPreflight, externalRemediation, externalRunbook, externalLedger, completionProgress, releaseDoctor),
+    sourceClaimedExternalDistribution: sourceClaimedExternalDistribution(
+      externalPreflight,
+      externalRemediation,
+      externalRunbook,
+      externalLedger,
+      completionProgress,
+      releaseDoctor
+    )
+  };
+
+  nextActionsReport.externalNextActionsReady =
+    nextActionsReport.sourceEvidenceReady &&
+    externalPreflight.externalPreflightReady === true &&
+    Array.isArray(externalRemediation.remediationGroups) &&
+    externalRunbook.operatorRunbookReady === true &&
+    externalLedger.ledgerReady === true &&
+    completionProgress.completionProgressReady === true &&
+    nextActionsReport.localReleaseReady === true &&
+    nextActionsReport.localReleaseReadinessPercent === 100 &&
+    nextActionsReport.priorityActions.every((action) => action.valueRecorded === false) &&
+    nextActionsReport.sourceValueRecorded === false &&
+    nextActionsReport.sourceClaimedExternalDistribution === false;
+}
 
 const markdown = buildMarkdown(nextActionsReport);
 const serializedReport = `${JSON.stringify(nextActionsReport, null, 2)}\n`;
@@ -421,12 +562,29 @@ check(nextActionsReport.nextActionsSmokeCommand === "npm run release:next-action
 check(nextActionsReport.externalPreflightCommand === "npm run release:external-preflight", "external next actions should include the preflight command");
 check(nextActionsReport.prepareEnvCommand === "npm run release:prepare-env", "external next actions should include the prepare-env command");
 check(nextActionsReport.hardExternalGateCommand === "npm run release:external-check", "external next actions should keep the hard gate command");
+check(nextActionsReport.prerequisiteCommand === "npm run release:check", "external next actions should include the source evidence prerequisite");
 check(nextActionsReport.productScope.includes("all-genre direct beat workstation"), "external next actions should describe direct beat workstation scope");
 check(nextActionsReport.productScope.includes("sampling optional"), "external next actions should keep sampling optional");
-check(nextActionsReport.sourceArtifacts.every((item) => item.present), "external next actions should cite generated source artifacts");
+check(Array.isArray(nextActionsReport.sourceArtifacts), "external next actions should cite source artifacts");
 check(nextActionsReport.externalNextActionsReady === true, "external next actions should be ready from redacted preflight evidence");
-check(nextActionsReport.localReleaseReady === true, "external next actions should include local release readiness");
-check(nextActionsReport.localReleaseReadinessPercent === 100, "external next actions should report 100 percent local release readiness");
+check(markdown.includes("Bootstrap mode:"), "external next actions Markdown should include bootstrap mode");
+check(markdown.includes("Source evidence ready:"), "external next actions Markdown should include source evidence readiness");
+check(markdown.includes("Source evidence prerequisite:"), "external next actions Markdown should include the source evidence prerequisite");
+if (nextActionsReport.bootstrapMode === true) {
+  check(nextActionsReport.sourceEvidenceReady === false, "bootstrap external next actions should report missing source evidence");
+  check(nextActionsReport.localReleaseReady === false, "bootstrap external next actions should not claim local release readiness");
+  check(nextActionsReport.localReleaseReadinessPercent === 0, "bootstrap external next actions should report zero local release readiness");
+  check(nextActionsReport.currentFocus === "Regenerate local release evidence", "bootstrap external next actions should focus on regenerating evidence");
+  check(nextActionsReport.priorityActions[0]?.nextCommand === "npm run release:check", "bootstrap external next actions should make release:check the first command");
+  check(Array.isArray(nextActionsReport.missingSourceArtifacts) && nextActionsReport.missingSourceArtifacts.length > 0, "bootstrap external next actions should list missing source artifacts");
+  check(markdown.includes("Regenerate local release evidence"), "bootstrap external next actions Markdown should include the evidence regeneration focus");
+  check(markdown.includes("npm run release:check"), "bootstrap external next actions Markdown should include the source evidence command");
+} else {
+  check(nextActionsReport.sourceArtifacts.every((item) => item.present), "external next actions should cite generated source artifacts");
+  check(nextActionsReport.sourceEvidenceReady === true, "external next actions should report source evidence readiness");
+  check(nextActionsReport.localReleaseReady === true, "external next actions should include local release readiness");
+  check(nextActionsReport.localReleaseReadinessPercent === 100, "external next actions should report 100 percent local release readiness");
+}
 check(Array.isArray(nextActionsReport.priorityActions), "external next actions should include priority actions");
 check(nextActionsReport.externalDistributionReady === true || nextActionsReport.priorityActions.length > 0, "pending external distribution should include at least one priority action");
 check(nextActionsReport.priorityActions.every((action) => action.ready === false), "priority actions should be pending actions only");
