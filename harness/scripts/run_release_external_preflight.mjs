@@ -344,6 +344,8 @@ const externalPreflightReport = {
   remediationReadinessPercent: completionProgress.remediationReadinessPercent ?? 0,
   privateInputGroupTotal: releaseDoctor.privateInputGroupTotal ?? 0,
   privateInputGroupReadyCount: releaseDoctor.privateInputGroupReadyCount ?? 0,
+  localEnvFilesChecked: Array.isArray(releaseDoctor.localEnvFilesChecked) ? releaseDoctor.localEnvFilesChecked : [],
+  localEnvPresentFiles: Array.isArray(releaseDoctor.localEnvPresentFiles) ? releaseDoctor.localEnvPresentFiles : [],
   localEnvPlaceholderKeyCount: releaseDoctor.localEnvPlaceholderKeyCount ?? 0,
   localEnvPlaceholderKeys: Array.isArray(releaseDoctor.localEnvPlaceholderKeys) ? releaseDoctor.localEnvPlaceholderKeys : [],
   manualQaChecklistDigestAvailable: externalRunbook.manualQaChecklistSha256 !== null || externalLedger.manualQaChecklistDigestAvailable === true,
@@ -437,6 +439,8 @@ check(typeof externalPreflightReport.hardGateWouldFail === "boolean", "external 
 check(Array.isArray(externalPreflightReport.firstBlockers), "external preflight should include first blockers");
 check(Number.isInteger(externalPreflightReport.localEnvPlaceholderKeyCount), "external preflight should include local env placeholder key count");
 check(Array.isArray(externalPreflightReport.localEnvPlaceholderKeys), "external preflight should include local env placeholder key names");
+check(Array.isArray(externalPreflightReport.localEnvFilesChecked), "external preflight should include local env files checked");
+check(Array.isArray(externalPreflightReport.localEnvPresentFiles), "external preflight should include local env present files");
 check(
   externalPreflightReport.localEnvPlaceholderKeyCount === externalPreflightReport.localEnvPlaceholderKeys.length,
   "external preflight placeholder key count should match listed keys"

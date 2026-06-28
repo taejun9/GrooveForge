@@ -302,6 +302,9 @@ const localEnvPlaceholderKeys = Array.isArray(distributionPrivateInputs.localEnv
 const localEnvPlaceholderKeyCount = Number.isInteger(distributionPrivateInputs.localEnvPlaceholderKeyCount)
   ? distributionPrivateInputs.localEnvPlaceholderKeyCount
   : localEnvPlaceholderKeys.length;
+const localEnvInput = distributionPrivateInputs.localEnvInput ?? distributionEnvTemplate.localEnvInput ?? {};
+const localEnvFilesChecked = Array.isArray(localEnvInput.filesChecked) ? localEnvInput.filesChecked : [];
+const localEnvPresentFiles = Array.isArray(localEnvInput.presentFiles) ? localEnvInput.presentFiles : [];
 const combinedBlockers = unique([
   updateFeedConfig.currentEnvironmentConfig?.blockers ?? [],
   distributionEnvTemplate.localEnvBlockers ?? [],
@@ -347,6 +350,8 @@ const releaseDoctorReport = {
   privateInputGroupTotal: privateInputGroups.length,
   privateInputGroupReadyCount,
   privateInputGroups,
+  localEnvFilesChecked,
+  localEnvPresentFiles,
   localEnvPlaceholderKeyCount,
   localEnvPlaceholderKeys,
   privateInputBlockerCount: Array.isArray(distributionPrivateInputs.privateInputBlockers)
@@ -433,6 +438,8 @@ check(typeof releaseDoctorReport.privateInputsReady === "boolean", "release doct
 check(Array.isArray(releaseDoctorReport.privateInputGroups), "release doctor should include private-input groups");
 check(Number.isInteger(releaseDoctorReport.localEnvPlaceholderKeyCount), "release doctor should include local env placeholder key count");
 check(Array.isArray(releaseDoctorReport.localEnvPlaceholderKeys), "release doctor should include local env placeholder key names");
+check(Array.isArray(releaseDoctorReport.localEnvFilesChecked), "release doctor should include local env files checked");
+check(Array.isArray(releaseDoctorReport.localEnvPresentFiles), "release doctor should include local env present files");
 check(
   releaseDoctorReport.localEnvPlaceholderKeyCount === releaseDoctorReport.localEnvPlaceholderKeys.length,
   "release doctor placeholder key count should match listed keys"
