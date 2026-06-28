@@ -55,6 +55,12 @@ const sensitivePrivateKeys = [
   "APPLE_NOTARY_PROFILE",
   "NOTARYTOOL_KEYCHAIN_PROFILE"
 ];
+const envKeyGuidance = {
+  GROOVEFORGE_DISTRIBUTION_CHANNEL: "Choose exactly one allowed value: direct-download, private-beta, or managed-release.",
+  GROOVEFORGE_RELEASE_DOWNLOAD_URL: "Use a safe absolute HTTPS URL with a hostname, no credentials, and no fragment.",
+  GROOVEFORGE_RELEASE_NOTES_URL: "Use a safe absolute HTTPS URL with a hostname, no credentials, and no fragment.",
+  GROOVEFORGE_SUPPORT_URL: "Use a safe absolute HTTPS URL with a hostname, no credentials, and no fragment."
+};
 
 function check(condition, message) {
   if (!condition) {
@@ -218,6 +224,7 @@ function formatDetailRows(actions) {
     .map((action) => {
       const requiredKeys = action.requiredKeys.length > 0 ? action.requiredKeys.join(", ") : "none";
       const placeholderKeys = action.placeholderKeys.length > 0 ? action.placeholderKeys.join(", ") : "none";
+      const keyGuidance = action.keyGuidance.map((item) => `   - ${item.key}: ${item.guidance}`).join("\n") || "   - none";
       const prerequisites = action.prerequisiteCommands.map((command) => `   - \`${command}\``).join("\n") || "   - none";
       const operatorActions = action.operatorActions.map((item) => `   - ${item}`).join("\n") || "   - none";
       const rerunCommands = action.rerunCommands.map((command) => `   - \`${command}\``).join("\n") || "   - none";
@@ -225,6 +232,8 @@ function formatDetailRows(actions) {
       return `${action.order}. ${action.label}
    Required keys: ${requiredKeys}
    Placeholder keys: ${placeholderKeys}
+   Key guidance:
+${keyGuidance}
    Next command: \`${action.nextCommand}\`
    Prerequisites:
 ${prerequisites}
@@ -253,6 +262,21 @@ function formatKeyList(keys) {
   return Array.isArray(keys) && keys.length > 0 ? keys.map((key) => `- ${key}`).join("\n") : "- None.";
 }
 
+function guidanceForKeys(keys) {
+  return (Array.isArray(keys) ? keys : [])
+    .map((key) => {
+      const guidance = envKeyGuidance[key];
+      return guidance ? { key, guidance } : null;
+    })
+    .filter(Boolean);
+}
+
+function formatGuidanceList(items) {
+  return Array.isArray(items) && items.length > 0
+    ? items.map((item) => `- ${item.key}: ${item.guidance}`).join("\n")
+    : "- None.";
+}
+
 function sensitiveEnvironmentValues() {
   return sensitivePrivateKeys.map((key) => process.env[key]?.trim()).filter((value) => value && value.length >= 8);
 }
@@ -270,6 +294,7 @@ function buildPriorityActions(remediation, context = {}) {
     .map((group, index) => {
       const requiredKeys = group.requiredKeys ?? [];
       const placeholderKeys = requiredKeys.filter((key) => localEnvPlaceholderKeySet.has(key));
+      const keyGuidance = guidanceForKeys(requiredKeys);
       const shouldPrepareEnv = group.id === "release-channel-metadata" && !localEnvFileLoaded;
       const shouldReplacePlaceholders = group.id === "release-channel-metadata" && localEnvFileLoaded && placeholderKeys.length > 0;
       const prerequisiteCommands = shouldPrepareEnv
@@ -302,6 +327,7 @@ function buildPriorityActions(remediation, context = {}) {
         ready: false,
         requiredKeys,
         placeholderKeys,
+        keyGuidance,
         evidence: group.evidence ?? [],
         prerequisiteCommands,
         operatorActions,
@@ -322,6 +348,7 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
   const currentAction = Array.isArray(priorityActions) ? priorityActions[0] : null;
   const currentRequiredKeys = currentAction?.requiredKeys ?? fallback.requiredKeys ?? [];
   const currentPlaceholderKeys = currentAction?.placeholderKeys ?? fallback.placeholderKeys ?? [];
+  const currentEnvKeyGuidance = currentAction?.keyGuidance ?? fallback.keyGuidance ?? guidanceForKeys(currentRequiredKeys);
   const currentPrerequisiteCommands = currentAction?.prerequisiteCommands ?? [];
   const currentOperatorActions = currentAction?.operatorActions ?? [];
   const currentRerunCommands = currentAction?.rerunCommands ?? [];
@@ -336,6 +363,9 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
     currentPlaceholderKeyCount: currentPlaceholderKeys.length,
     currentPlaceholderKeySummary: currentPlaceholderKeys.length > 0 ? currentPlaceholderKeys.join(", ") : "none",
     currentPlaceholderKeys,
+    currentEnvKeyGuidanceCount: currentEnvKeyGuidance.length,
+    currentEnvKeyGuidanceSummary: currentEnvKeyGuidance.length > 0 ? `${currentEnvKeyGuidance.length} keys with value-free guidance` : "none",
+    currentEnvKeyGuidance,
     currentPrerequisiteCommand: firstValue(currentPrerequisiteCommands) || fallback.prerequisiteCommand || "none",
     currentOperatorAction: firstValue(currentOperatorActions) || fallback.operatorAction || "none",
     currentRerunCommand: firstValue(currentRerunCommands) || fallback.rerunCommand || "none",
@@ -362,6 +392,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
       ready: false,
       requiredKeys: [],
       placeholderKeys: [],
+      keyGuidance: [],
       evidence: artifactRows,
       prerequisiteCommands: [],
       operatorActions: [
@@ -481,6 +512,7 @@ function buildMarkdown(report) {
 - Current first blocker: ${report.currentFirstBlocker}
 - Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${report.currentPlaceholderKeySummary})
+- Current env key guidance: ${report.currentEnvKeyGuidanceCount} (${report.currentEnvKeyGuidanceSummary})
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current operator action: ${report.currentOperatorAction}
 - Current rerun command: \`${report.currentRerunCommand}\`
@@ -530,6 +562,10 @@ ${formatArtifactRows(report.sourceArtifacts)}
 ## Local Env Placeholder Keys
 
 ${formatKeyList(report.localEnvPlaceholderKeys)}
+
+## Current Env Key Guidance
+
+${formatGuidanceList(report.currentEnvKeyGuidance)}
 
 ## Current First Blockers
 
@@ -753,12 +789,15 @@ check(Number.isInteger(nextActionsReport.currentRequiredKeyCount), "external nex
 check(typeof nextActionsReport.currentRequiredKeySummary === "string" && nextActionsReport.currentRequiredKeySummary.length > 0, "external next actions should include the current required key summary");
 check(Number.isInteger(nextActionsReport.currentPlaceholderKeyCount), "external next actions should include the current placeholder key count");
 check(typeof nextActionsReport.currentPlaceholderKeySummary === "string" && nextActionsReport.currentPlaceholderKeySummary.length > 0, "external next actions should include the current placeholder key summary");
+check(Number.isInteger(nextActionsReport.currentEnvKeyGuidanceCount), "external next actions should include the current env key guidance count");
+check(typeof nextActionsReport.currentEnvKeyGuidanceSummary === "string" && nextActionsReport.currentEnvKeyGuidanceSummary.length > 0, "external next actions should include the current env key guidance summary");
 check(typeof nextActionsReport.currentEnvEditTarget === "string" && nextActionsReport.currentEnvEditTarget.length > 0, "external next actions should include the current env edit target");
 check(nextActionsReport.currentEnvConfiguredFileKey === "GROOVEFORGE_DISTRIBUTION_ENV_FILE", "external next actions should include the env file override key name");
 check(Array.isArray(nextActionsReport.localEnvFilesChecked), "external next actions should include local env files checked");
 check(Array.isArray(nextActionsReport.localEnvPresentFiles), "external next actions should include local env present files");
 check(Array.isArray(nextActionsReport.currentRequiredKeys), "external next actions should include current required keys");
 check(Array.isArray(nextActionsReport.currentPlaceholderKeys), "external next actions should include current placeholder keys");
+check(Array.isArray(nextActionsReport.currentEnvKeyGuidance), "external next actions should include current env key guidance");
 check(
   nextActionsReport.currentRequiredKeyCount === nextActionsReport.currentRequiredKeys.length,
   "external next actions current required key count should match listed keys"
@@ -766,6 +805,10 @@ check(
 check(
   nextActionsReport.currentPlaceholderKeyCount === nextActionsReport.currentPlaceholderKeys.length,
   "external next actions current placeholder key count should match listed keys"
+);
+check(
+  nextActionsReport.currentEnvKeyGuidanceCount === nextActionsReport.currentEnvKeyGuidance.length,
+  "external next actions current env key guidance count should match listed guidance"
 );
 check(Array.isArray(nextActionsReport.currentPrerequisiteCommands), "external next actions should include current prerequisite commands");
 check(Array.isArray(nextActionsReport.currentOperatorActions), "external next actions should include current operator actions");
@@ -795,6 +838,7 @@ check(nextActionsReport.externalDistributionReady === true || nextActionsReport.
 check(nextActionsReport.priorityActions.every((action) => action.ready === false), "priority actions should be pending actions only");
 check(nextActionsReport.priorityActions.every((action) => action.valueRecorded === false), "priority actions should not record values");
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.placeholderKeys)), "priority actions should include placeholder key lists");
+check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.keyGuidance)), "priority actions should include key guidance lists");
 check(nextActionsReport.priorityActions.every((action) => typeof action.nextCommand === "string" && action.nextCommand.length > 0), "priority actions should include next commands");
 if (nextActionsReport.priorityActions.length > 0) {
   const firstPriorityAction = nextActionsReport.priorityActions[0];
@@ -830,6 +874,14 @@ if (nextActionsReport.priorityActions.length > 0) {
     nextActionsReport.currentPlaceholderKeySummary === ((firstPriorityAction.placeholderKeys ?? []).length > 0 ? firstPriorityAction.placeholderKeys.join(", ") : "none"),
     "external next actions should mirror the first priority placeholder key summary"
   );
+  check(
+    nextActionsReport.currentEnvKeyGuidanceCount === (firstPriorityAction.keyGuidance ?? []).length,
+    "external next actions should mirror the first priority key guidance count"
+  );
+  check(
+    nextActionsReport.currentEnvKeyGuidanceSummary === ((firstPriorityAction.keyGuidance ?? []).length > 0 ? `${firstPriorityAction.keyGuidance.length} keys with value-free guidance` : "none"),
+    "external next actions should mirror the first priority key guidance summary"
+  );
 }
 check(Number.isInteger(nextActionsReport.localEnvPlaceholderKeyCount), "external next actions should include local env placeholder key count");
 check(Array.isArray(nextActionsReport.localEnvPlaceholderKeys), "external next actions should include local env placeholder key names");
@@ -843,6 +895,9 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvFileL
   check(nextActionsReport.currentRequiredKeyCount === 4, "release channel metadata should surface four current required metadata keys when no local env file is loaded");
   check(nextActionsReport.currentRequiredKeys.includes("GROOVEFORGE_RELEASE_DOWNLOAD_URL"), "release channel metadata should surface release download URL as a current required key name");
   check(nextActionsReport.currentPlaceholderKeyCount === 0, "release channel metadata should not surface current placeholder keys before a local env file is loaded");
+  check(nextActionsReport.currentEnvKeyGuidanceCount === 4, "release channel metadata should surface four current key guidance rows when no local env file is loaded");
+  check(nextActionsReport.currentEnvKeyGuidance.some((item) => item.key === "GROOVEFORGE_DISTRIBUTION_CHANNEL" && item.guidance.includes("direct-download")), "release channel metadata should surface allowed channel guidance");
+  check(nextActionsReport.currentEnvKeyGuidance.some((item) => item.key === "GROOVEFORGE_RELEASE_DOWNLOAD_URL" && item.guidance.includes("safe absolute HTTPS URL")), "release channel metadata should surface safe HTTPS guidance");
   check(nextActionsReport.currentFirstBlocker.includes("local distribution env file is not loaded"), "release channel metadata should surface the missing local env file as the current first blocker");
   check(nextActionsReport.currentOperatorAction.includes("prepare-env"), "release channel metadata should surface prepare-env as the current operator action when no local env file is loaded");
   check(nextActionsReport.currentOperatorAction.includes(nextActionsReport.currentEnvEditTarget), "release channel metadata should include the env edit target when no local env file is loaded");
@@ -862,6 +917,9 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   check(nextActionsReport.currentNextCommand === "npm run release:doctor", "release channel metadata should surface release doctor as the current next command when placeholders remain");
   check(nextActionsReport.currentPlaceholderKeyCount === 4, "release channel metadata should surface four current placeholder metadata keys when placeholders remain");
   check(nextActionsReport.currentPlaceholderKeys.includes("GROOVEFORGE_RELEASE_DOWNLOAD_URL"), "release channel metadata should surface release download URL as a current placeholder key name");
+  check(nextActionsReport.currentEnvKeyGuidanceCount === 4, "release channel metadata should keep four current key guidance rows when placeholders remain");
+  check(nextActionsReport.currentEnvKeyGuidance.some((item) => item.key === "GROOVEFORGE_DISTRIBUTION_CHANNEL" && item.guidance.includes("managed-release")), "release channel metadata should keep channel value guidance when placeholders remain");
+  check(nextActionsReport.currentEnvKeyGuidance.some((item) => item.key === "GROOVEFORGE_SUPPORT_URL" && item.guidance.includes("no credentials")), "release channel metadata should keep safe URL guidance when placeholders remain");
   check(nextActionsReport.currentOperatorAction.includes("Replace placeholder values"), "release channel metadata should surface placeholder replacement as the current operator action when placeholders remain");
   check(nextActionsReport.currentOperatorAction.includes(nextActionsReport.currentEnvEditTarget), "release channel metadata should include the env edit target when placeholders remain");
   check(nextActionsReport.currentOperatorAction.includes("current release-channel keys (4)"), "release channel metadata should focus placeholder replacement on current action keys");
@@ -897,11 +955,17 @@ check(markdown.includes("Current next command:"), "external next actions Markdow
 check(markdown.includes("Current first blocker:"), "external next actions Markdown should include current first blocker");
 check(markdown.includes("Current required keys:"), "external next actions Markdown should include current required keys");
 check(markdown.includes("Current placeholder keys:"), "external next actions Markdown should include current placeholder keys");
+check(markdown.includes("Current env key guidance:"), "external next actions Markdown should include current env key guidance");
 check(markdown.includes("Current env edit target:"), "external next actions Markdown should include current env edit target");
 check(markdown.includes("Current operator action:"), "external next actions Markdown should include current operator action");
 check(markdown.includes("Current rerun command:"), "external next actions Markdown should include current rerun command");
 check(markdown.includes("Local env placeholder keys:"), "external next actions Markdown should include placeholder key count");
 check(markdown.includes("Local Env Placeholder Keys"), "external next actions Markdown should include placeholder key section");
+check(markdown.includes("Current Env Key Guidance"), "external next actions Markdown should include current key guidance section");
+if (nextActionsReport.currentEnvKeyGuidanceCount > 0) {
+  check(markdown.includes("safe absolute HTTPS URL"), "external next actions Markdown should include value-free URL guidance");
+  check(markdown.includes("direct-download, private-beta, or managed-release"), "external next actions Markdown should include allowed channel guidance");
+}
 check(markdown.includes("Priority Next Actions"), "external next actions Markdown should include priority actions");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "external next actions Markdown should keep the hard gate command");
 check(markdown.includes("Private values recorded: no"), "external next actions Markdown should state value redaction");
@@ -926,6 +990,7 @@ console.log(`- Current next command: ${nextActionsReport.currentNextCommand}`);
 console.log(`- Current first blocker: ${nextActionsReport.currentFirstBlocker}`);
 console.log(`- Current required keys: ${nextActionsReport.currentRequiredKeyCount} (${nextActionsReport.currentRequiredKeySummary})`);
 console.log(`- Current placeholder keys: ${nextActionsReport.currentPlaceholderKeyCount} (${nextActionsReport.currentPlaceholderKeySummary})`);
+console.log(`- Current env key guidance: ${nextActionsReport.currentEnvKeyGuidanceCount} (${nextActionsReport.currentEnvKeyGuidanceSummary})`);
 console.log(`- Current env edit target: ${nextActionsReport.currentEnvEditTarget}`);
 console.log(`- Current operator action: ${nextActionsReport.currentOperatorAction}`);
 console.log(`- Current rerun command: ${nextActionsReport.currentRerunCommand}`);
