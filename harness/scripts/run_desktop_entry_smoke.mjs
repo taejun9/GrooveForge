@@ -122,9 +122,15 @@ function checkPackageScripts() {
     "run_desktop_project_io_smoke.mjs",
     "package.json desktop:project-io-smoke script"
   );
+  checkIncludes(
+    packageJson.scripts?.["desktop:packaged-project-io-smoke"] ?? "",
+    "run_desktop_packaged_project_io_smoke.mjs",
+    "package.json desktop:packaged-project-io-smoke script"
+  );
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run build", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:smoke", "package.json verify script");
   checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:project-io-smoke", "package.json verify script");
+  checkIncludes(packageJson.scripts?.verify ?? "", "npm run desktop:packaged-project-io-smoke", "package.json verify script");
   check(
     (packageJson.scripts?.verify ?? "").indexOf("npm run build") < (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:smoke"),
     "package.json verify should run desktop:smoke after npm run build"
@@ -135,6 +141,13 @@ function checkPackageScripts() {
       (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:project-io-smoke") <
         (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:package-smoke"),
     "package.json verify should run desktop:project-io-smoke after launch smoke and before package smoke"
+  );
+  check(
+    (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:package-smoke") <
+      (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:packaged-project-io-smoke") &&
+      (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:packaged-project-io-smoke") <
+        (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:adhoc-sign-smoke"),
+    "package.json verify should run desktop:packaged-project-io-smoke after package smoke and before ad-hoc signing"
   );
 }
 
