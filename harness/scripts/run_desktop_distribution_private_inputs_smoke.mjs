@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadDistributionLocalEnv } from "./distribution_local_env.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -44,6 +45,7 @@ const notarizationKeys = [
   "NOTARYTOOL_KEYCHAIN_PROFILE"
 ];
 const allPrivateKeys = [...distributionMetadataKeys, ...updateFeedUrlKeys, ...updateChannelKeys, ...signingKeys, ...notarizationKeys];
+const distributionLocalEnv = await loadDistributionLocalEnv({ root, allowedKeys: allPrivateKeys });
 const failures = [];
 
 function check(condition, message) {
@@ -396,6 +398,7 @@ ${appName} is an all-genre desktop beat workstation for direct beat composition,
 
 - Private inputs ready: ${summary.privateInputsReady ? "yes" : "no"}
 - External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}
+- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}
 - Private values recorded: no
 - Network probe attempted: no
 - Release upload attempted: no
@@ -466,6 +469,8 @@ async function createPrivateInputsSummary() {
     releaseUploadAttempted: false,
     notarySubmissionAttempted: false,
     signingAttempted: false,
+    localEnvInput: distributionLocalEnv,
+    localEnvValueRecorded: false,
     privateValuesRecorded: false,
     releaseUrlValueRecorded: false,
     supportUrlValueRecorded: false,
@@ -586,6 +591,8 @@ check(summary.networkProbeAttempted === false, "distribution private inputs smok
 check(summary.releaseUploadAttempted === false, "distribution private inputs smoke should not upload release artifacts");
 check(summary.notarySubmissionAttempted === false, "distribution private inputs smoke should not submit to Apple notary services");
 check(summary.signingAttempted === false, "distribution private inputs smoke should not sign artifacts");
+check(summary.localEnvInput?.valueRecorded === false, "distribution private inputs local env loader should not record values");
+check(summary.localEnvValueRecorded === false, "distribution private inputs should not record local env values");
 check(summary.privateValuesRecorded === false, "distribution private inputs should not record private values");
 check(summary.releaseUrlValueRecorded === false, "distribution private inputs should not record release URL values");
 check(summary.supportUrlValueRecorded === false, "distribution private inputs should not record support URL values");
@@ -610,6 +617,7 @@ check(markdown.includes("First-time beat makers"), "distribution private inputs 
 check(markdown.includes("Working producers"), "distribution private inputs should address working producers");
 check(markdown.includes("Private inputs ready:"), "distribution private inputs should include private input readiness");
 check(markdown.includes("External distribution ready:"), "distribution private inputs should include external readiness");
+check(markdown.includes("Local env file loaded:"), "distribution private inputs should include local env loader status");
 check(markdown.includes("Private values recorded: no"), "distribution private inputs should state value redaction");
 check(markdown.includes("Values for required private keys are intentionally not recorded"), "distribution private inputs should state key value redaction");
 check(!/https?:\/\//i.test(markdown), "distribution private inputs should not include public or private URL values before channel selection");
@@ -628,6 +636,7 @@ console.log(`- Markdown: ${relative(privateInputsMarkdownPath)}`);
 console.log(`- JSON: ${relative(privateInputsJsonPath)}`);
 console.log(`- Private inputs ready: ${summary.privateInputsReady ? "yes" : "no"}`);
 console.log(`- External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}`);
+console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
 console.log("- Private values recorded: no");
 if (summary.privateInputBlockers.length > 0) {
   console.log(`- Private input blockers: ${summary.privateInputBlockers.join(" | ")}`);

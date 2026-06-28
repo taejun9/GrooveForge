@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadDistributionLocalEnv } from "./distribution_local_env.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -28,6 +29,7 @@ const notarizedGatekeeperPath = path.join(summaryRoot, `${appName}-${platformArc
 const distributionChannelQaPath = path.join(summaryRoot, `${appName}-${platformArch}-distribution-channel-qa.json`);
 const handoffPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-handoff.json`);
 const bundleManifestPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-bundle-manifest.json`);
+const distributionEnvTemplatePath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-env-template.json`);
 const privateInputsPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-private-inputs.json`);
 const completionAuditMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-completion-audit.md`);
 const completionAuditJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-completion-audit.json`);
@@ -54,6 +56,7 @@ const privateEnvKeys = [
   "APPLE_NOTARY_PROFILE",
   "NOTARYTOOL_KEYCHAIN_PROFILE"
 ];
+const distributionLocalEnv = await loadDistributionLocalEnv({ root, allowedKeys: privateEnvKeys });
 const failures = [];
 
 function check(condition, message) {
@@ -136,7 +139,7 @@ function evidenceReady(json, key) {
 }
 
 function buildRequirementAudit(input) {
-  const { readme, readinessDoc, qualityRules, releaseManifest, releaseNotes, supportArtifact, handoff, bundleManifest, privateInputs } = input;
+  const { readme, readinessDoc, qualityRules, releaseManifest, releaseNotes, supportArtifact, handoff, bundleManifest, distributionEnvTemplate, privateInputs } = input;
   const productScopeReady =
     hasAll(readme, ["making beats across genres", "direct beat composition", "Sampling stays a later optional sound-source module"]) &&
     hasAll(readinessDoc, ["Direct beat composition is the product spine", "Sampling is secondary and optional."]) &&
@@ -159,6 +162,7 @@ function buildRequirementAudit(input) {
   const distributionEvidenceReady =
     evidenceReady(handoff, "distributionHandoffReady") &&
     evidenceReady(bundleManifest, "distributionBundleManifestReady") &&
+    evidenceReady(distributionEnvTemplate, "distributionEnvTemplateReady") &&
     Boolean(privateInputs) &&
     privateInputs?.privateValuesRecorded === false &&
     privateInputs?.releaseUrlValueRecorded === false &&
@@ -216,8 +220,8 @@ function buildRequirementAudit(input) {
     {
       label: "Redacted distribution evidence",
       ready: distributionEvidenceReady,
-      evidence: [relative(handoffPath), relative(bundleManifestPath), relative(privateInputsPath)],
-      blockers: blockerWhen(distributionEvidenceReady, "Distribution handoff, bundle manifest, or private-input evidence is missing or not value-free.")
+      evidence: [relative(handoffPath), relative(bundleManifestPath), relative(distributionEnvTemplatePath), relative(privateInputsPath)],
+      blockers: blockerWhen(distributionEvidenceReady, "Distribution handoff, bundle manifest, env-template, or private-input evidence is missing or not value-free.")
     },
     {
       label: "Local-first privacy and value redaction",
@@ -260,6 +264,7 @@ ${appName} is an all-genre desktop beat workstation for direct beat composition,
 - Redacted distribution evidence ready: ${summary.redactedDistributionEvidenceReady ? "yes" : "no"}
 - External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}
 - Completion audit ready: ${summary.completionAuditReady ? "yes" : "no"}
+- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}
 - Private values recorded: no
 - Network probe attempted: no
 - Release upload attempted: no
@@ -317,6 +322,7 @@ async function createCompletionAuditSummary() {
   const distributionQa = await readJsonIfExists(distributionChannelQaPath);
   const handoff = await readJsonIfExists(handoffPath);
   const bundleManifest = await readJsonIfExists(bundleManifestPath);
+  const distributionEnvTemplate = await readJsonIfExists(distributionEnvTemplatePath);
   const privateInputs = await readJsonIfExists(privateInputsPath);
   const requirementAudit = buildRequirementAudit({
     readme,
@@ -327,6 +333,7 @@ async function createCompletionAuditSummary() {
     supportArtifact,
     handoff,
     bundleManifest,
+    distributionEnvTemplate,
     privateInputs
   });
   const localRequirementLabels = requirementAudit.filter((item) => item.label !== "External macOS distribution");
@@ -350,6 +357,7 @@ async function createCompletionAuditSummary() {
     artifact("Distribution-channel QA", distributionChannelQaPath, distributionQa, Boolean(distributionQa)),
     artifact("Distribution handoff", handoffPath, handoff, evidenceReady(handoff, "distributionHandoffReady")),
     artifact("Distribution bundle manifest", bundleManifestPath, bundleManifest, evidenceReady(bundleManifest, "distributionBundleManifestReady")),
+    artifact("Distribution env template", distributionEnvTemplatePath, distributionEnvTemplate, evidenceReady(distributionEnvTemplate, "distributionEnvTemplateReady")),
     artifact("Distribution private inputs", privateInputsPath, privateInputs, Boolean(privateInputs) && privateInputs.privateValuesRecorded === false)
   ];
   const localCompletionBlockers = unique(requirementAudit.flatMap((item) => (item.label === "External macOS distribution" ? [] : item.blockers)));
@@ -386,6 +394,8 @@ async function createCompletionAuditSummary() {
     releaseUploadAttempted: false,
     notarySubmissionAttempted: false,
     signingAttempted: false,
+    localEnvInput: distributionLocalEnv,
+    localEnvValueRecorded: false,
     privateValuesRecorded: false,
     releaseUrlValueRecorded: false,
     supportUrlValueRecorded: false,
@@ -426,6 +436,8 @@ check(summary.networkProbeAttempted === false, "completion audit should not prob
 check(summary.releaseUploadAttempted === false, "completion audit should not upload release artifacts");
 check(summary.notarySubmissionAttempted === false, "completion audit should not submit to Apple notary services");
 check(summary.signingAttempted === false, "completion audit should not sign artifacts");
+check(summary.localEnvInput?.valueRecorded === false, "completion audit local env loader should not record values");
+check(summary.localEnvValueRecorded === false, "completion audit should not record local env values");
 check(summary.privateValuesRecorded === false, "completion audit should not record private values");
 check(summary.releaseUrlValueRecorded === false, "completion audit should not record release URL values");
 check(summary.supportUrlValueRecorded === false, "completion audit should not record support URL values");
@@ -445,6 +457,7 @@ check(markdown.includes("First-time beat makers"), "completion audit should addr
 check(markdown.includes("Working producers"), "completion audit should address working producers");
 check(markdown.includes("Local MVP evidence ready:"), "completion audit should include local MVP readiness");
 check(markdown.includes("External distribution ready:"), "completion audit should include external readiness");
+check(markdown.includes("Local env file loaded:"), "completion audit should include local env loader status");
 check(markdown.includes("Private values recorded: no"), "completion audit should state value redaction");
 check(!/https?:\/\//i.test(markdown), "completion audit should not include public or private URL values before channel selection");
 
@@ -465,6 +478,7 @@ console.log(`- Local desktop package evidence ready: ${summary.localDesktopPacka
 console.log(`- Redacted distribution evidence ready: ${summary.redactedDistributionEvidenceReady ? "yes" : "no"}`);
 console.log(`- External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}`);
 console.log(`- Completion audit ready: ${summary.completionAuditReady ? "yes" : "no"}`);
+console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
 console.log("- Private values recorded: no");
 if (summary.localCompletionBlockers.length > 0) {
   console.log(`- Local completion blockers: ${summary.localCompletionBlockers.join(" | ")}`);

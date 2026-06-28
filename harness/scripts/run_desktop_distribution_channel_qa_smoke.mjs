@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadDistributionLocalEnv } from "./distribution_local_env.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -29,6 +30,26 @@ const distributionMetadataKeys = [
   "GROOVEFORGE_SUPPORT_URL",
   "GROOVEFORGE_DISTRIBUTION_QA_APPROVED"
 ];
+const distributionLocalEnvKeys = [
+  ...distributionMetadataKeys,
+  "GROOVEFORGE_UPDATE_FEED_URL",
+  "ELECTRON_UPDATE_FEED_URL",
+  "UPDATE_FEED_URL",
+  "GROOVEFORGE_UPDATE_CHANNEL",
+  "ELECTRON_UPDATE_CHANNEL",
+  "UPDATE_CHANNEL",
+  "GROOVEFORGE_DEVELOPER_ID_IDENTITY",
+  "GROOVEFORGE_NOTARY_SUBMIT",
+  "APPLE_ID",
+  "APPLE_TEAM_ID",
+  "APPLE_APP_SPECIFIC_PASSWORD",
+  "ASC_KEY_ID",
+  "ASC_ISSUER_ID",
+  "ASC_KEY_PATH",
+  "APPLE_NOTARY_PROFILE",
+  "NOTARYTOOL_KEYCHAIN_PROFILE"
+];
+const distributionLocalEnv = await loadDistributionLocalEnv({ root, allowedKeys: distributionLocalEnvKeys });
 const failures = [];
 
 function check(condition, message) {
@@ -191,6 +212,8 @@ async function createDistributionSummary() {
     generatedAt: new Date().toISOString(),
     platform: process.platform,
     arch: process.arch,
+    localEnvInput: distributionLocalEnv,
+    localEnvValueRecorded: false,
     networkProbeAttempted: false,
     releaseUploadAttempted: false,
     releaseGateClaimedDeveloperIdSigning: false,
@@ -286,6 +309,8 @@ check(summary.releaseGateClaimedGatekeeperApproval === false, "distribution-chan
 check(summary.releaseGateClaimedAutoUpdate === false, "distribution-channel QA smoke should not claim auto-update");
 check(summary.releaseGateClaimedExternalDistribution === false, "distribution-channel QA smoke should not claim external distribution completion");
 check(summary.channel?.valueRecorded === false, "distribution-channel QA summary should not record private channel metadata values");
+check(summary.localEnvInput?.valueRecorded === false, "distribution-channel QA local env loader should not record values");
+check(summary.localEnvValueRecorded === false, "distribution-channel QA summary should not record local env values");
 check(Array.isArray(summary.blockers), "distribution-channel QA summary should include blockers");
 check(summary.externalDistributionReady === false || summary.blockers.length === 0, "ready distribution summary should not include blockers");
 
@@ -313,6 +338,7 @@ console.log(`- Developer ID signed: ${summary.inputs?.developerIdSigned === true
 console.log(`- Notarized and stapled: ${summary.inputs?.notarizedAndStapled === true ? "yes" : "no"}`);
 console.log(`- Notarized Gatekeeper accepted: ${summary.inputs?.gatekeeperAccepted === true ? "yes" : "no"}`);
 console.log(`- External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}`);
+console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
 if (summary.blockers.length > 0) {
   console.log(`- Blockers: ${summary.blockers.join(" | ")}`);
 }
