@@ -138,6 +138,7 @@ function buildMarkdown(summary) {
 - Local release ready: ${summary.localReleaseReady ? "yes" : "no"}
 - Local release readiness: ${summary.localReleaseReadinessPercent.toFixed(1)}%
 - Desktop project IO evidence ready: ${summary.desktopProjectIoEvidenceReady ? "yes" : "no"}
+- PKG payload project IO evidence ready: ${summary.pkgPayloadProjectIoEvidenceReady ? "yes" : "no"}
 - External distribution hard gate ready: ${summary.externalDistributionGateReady ? "yes" : "no"}
 - External gate requirements ready: ${summary.gateRequirementReadyCount}/${summary.gateRequirementTotal} (${summary.gateRequirementReadinessPercent.toFixed(1)}%)
 - Remediation groups ready: ${summary.remediationReadyCount}/${summary.remediationTotal} (${summary.remediationReadinessPercent.toFixed(1)}%)
@@ -199,8 +200,16 @@ async function createCompletionProgressSummary() {
   const remediationGroups = externalRemediation?.remediationGroups ?? [];
   const gateRequirementReadyCount = countReady(gateRequirements);
   const remediationReadyCount = countReady(remediationGroups);
+  const pkgPayloadProjectIoEvidenceReady =
+    completionStatus?.pkgPayloadProjectIoReady === true &&
+    externalOperatorRunbook?.desktopProjectIoEvidence?.pkgPayloadProjectIoStatusReady === true &&
+    externalOperatorRunbook?.desktopProjectIoEvidence?.pkgPayloadProjectIoGateRequirementReady === true &&
+    externalReadinessLedger?.desktopProjectIoEvidence?.pkgPayloadProjectIoStatusReady === true &&
+    externalReadinessLedger?.desktopProjectIoEvidence?.pkgPayloadProjectIoGateRequirementReady === true &&
+    gateRequirements.some((requirement) => requirement.label === "PKG payload project IO evidence ready" && requirement.ready === true);
   const desktopProjectIoEvidenceReady =
     completionStatus?.desktopProjectIoEvidenceReady === true &&
+    pkgPayloadProjectIoEvidenceReady &&
     externalOperatorRunbook?.desktopProjectIoEvidenceReady === true &&
     externalReadinessLedger?.desktopProjectIoEvidenceReady === true &&
     gateRequirements.some((requirement) => requirement.label === "Desktop project IO evidence ready" && requirement.ready === true);
@@ -247,6 +256,7 @@ async function createCompletionProgressSummary() {
     localReleaseReadyCount: localReadyCount,
     localReleaseTotal: localTotal,
     desktopProjectIoEvidenceReady,
+    pkgPayloadProjectIoEvidenceReady,
     externalDistributionGateReady: externalGate?.externalDistributionGateReady === true,
     gateRequirementTotal: gateRequirements.length,
     gateRequirementReadyCount,
@@ -304,6 +314,7 @@ check(summary.sourceEvidenceReady === true, "completion progress should include 
 check(summary.localReleaseReady === true, "completion progress should include ready local release evidence");
 check(summary.localReleaseReadinessPercent === 100, "completion progress should report 100 percent local release readiness");
 check(summary.desktopProjectIoEvidenceReady === true, "completion progress should include ready desktop project IO evidence");
+check(summary.pkgPayloadProjectIoEvidenceReady === true, "completion progress should include ready PKG payload project IO evidence");
 check(summary.operatorRunbookReady === true, "completion progress should include ready operator runbook evidence");
 check(summary.externalReadinessLedgerReady === true, "completion progress should include ready external readiness ledger evidence");
 check(Array.isArray(summary.evidenceArtifacts) && summary.evidenceArtifacts.length >= 5, "completion progress should include evidence artifacts");
@@ -333,6 +344,7 @@ check(markdown.includes("Completion Progress"), "completion progress Markdown sh
 check(markdown.includes("Source evidence ready:"), "completion progress Markdown should include source evidence readiness");
 check(markdown.includes("Next local command when missing: `npm run release:check`"), "completion progress Markdown should include the prerequisite command");
 check(markdown.includes("Local release readiness:"), "completion progress Markdown should include local release readiness");
+check(markdown.includes("PKG payload project IO evidence ready:"), "completion progress Markdown should include PKG payload project IO readiness");
 check(markdown.includes("External gate requirements ready:"), "completion progress Markdown should include external gate requirement progress");
 check(markdown.includes("Remediation groups ready:"), "completion progress Markdown should include remediation progress");
 check(markdown.includes("Private values recorded: no"), "completion progress Markdown should state value redaction");
@@ -365,6 +377,7 @@ console.log(`- Missing source evidence artifacts: ${summary.missingEvidenceArtif
 console.log(`- Local release ready: ${summary.localReleaseReady ? "yes" : "no"}`);
 console.log(`- Local release readiness: ${summary.localReleaseReadinessPercent.toFixed(1)}%`);
 console.log(`- Desktop project IO evidence ready: ${summary.desktopProjectIoEvidenceReady ? "yes" : "no"}`);
+console.log(`- PKG payload project IO evidence ready: ${summary.pkgPayloadProjectIoEvidenceReady ? "yes" : "no"}`);
 console.log(`- External distribution hard gate ready: ${summary.externalDistributionGateReady ? "yes" : "no"}`);
 console.log(`- External gate requirements ready: ${summary.gateRequirementReadyCount}/${summary.gateRequirementTotal} (${summary.gateRequirementReadinessPercent.toFixed(1)}%)`);
 console.log(`- Remediation groups ready: ${summary.remediationReadyCount}/${summary.remediationTotal} (${summary.remediationReadinessPercent.toFixed(1)}%)`);

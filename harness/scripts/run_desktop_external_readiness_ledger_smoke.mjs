@@ -219,21 +219,31 @@ async function createLedgerSummary() {
   const gateRequirementRows = (externalGate?.requirements ?? []).map(toRequirementRow);
   const remediationRows = (externalRemediation?.remediationGroups ?? []).map(toRemediationRow);
   const completionStatusDesktopProjectIoReady = completionStatus?.desktopProjectIoEvidenceReady === true;
+  const completionStatusPkgPayloadProjectIoReady = completionStatus?.pkgPayloadProjectIoReady === true;
   const externalGateDesktopProjectIoReady = gateRequirementReady(externalGate, "Desktop project IO evidence ready");
+  const externalGatePkgPayloadProjectIoReady = gateRequirementReady(externalGate, "PKG payload project IO evidence ready");
   const operatorRunbookDesktopProjectIoReady = externalOperatorRunbook?.desktopProjectIoEvidenceReady === true;
-  const desktopProjectIoEvidenceReady = completionStatusDesktopProjectIoReady && externalGateDesktopProjectIoReady && operatorRunbookDesktopProjectIoReady;
+  const desktopProjectIoEvidenceReady =
+    completionStatusDesktopProjectIoReady &&
+    completionStatusPkgPayloadProjectIoReady &&
+    externalGateDesktopProjectIoReady &&
+    externalGatePkgPayloadProjectIoReady &&
+    operatorRunbookDesktopProjectIoReady;
   const sourceEvidenceReady = Boolean(completionStatus) && Boolean(externalGate) && Boolean(externalRemediation) && Boolean(externalOperatorRunbook) && desktopProjectIoEvidenceReady;
   const firstBlockers = unique([
     ...gateRequirementRows.map((row) => row.firstBlocker),
     ...remediationRows.map((row) => row.firstBlocker),
     ...(desktopProjectIoEvidenceReady ? [] : ["Desktop project IO evidence is not ready in completion status, external gate, and operator runbook evidence."]),
+    ...(completionStatusPkgPayloadProjectIoReady && externalGatePkgPayloadProjectIoReady ? [] : ["PKG payload project IO evidence is not ready in completion status and external gate evidence."]),
     ...(sourceEvidenceReady ? [] : ["External readiness source evidence is incomplete; run npm run release:check first."])
   ]).slice(0, 12);
   const evidenceArtifacts = [
     evidence(completionStatusPath, "Completion status"),
     evidence(completionStatusPath, "Desktop project IO status evidence"),
+    evidence(completionStatusPath, "PKG payload project IO status evidence"),
     evidence(externalGatePath, "External distribution gate"),
     evidence(externalGatePath, "Desktop project IO gate requirement"),
+    evidence(externalGatePath, "PKG payload project IO gate requirement"),
     evidence(externalRemediationPath, "External remediation"),
     evidence(externalOperatorRunbookPath, "External operator runbook"),
     evidence(externalOperatorRunbookPath, "Desktop project IO runbook evidence"),
@@ -257,7 +267,9 @@ async function createLedgerSummary() {
     desktopProjectIoEvidenceReady,
     desktopProjectIoEvidence: {
       completionStatusReady: completionStatusDesktopProjectIoReady,
+      pkgPayloadProjectIoStatusReady: completionStatusPkgPayloadProjectIoReady,
       externalGateRequirementReady: externalGateDesktopProjectIoReady,
+      pkgPayloadProjectIoGateRequirementReady: externalGatePkgPayloadProjectIoReady,
       operatorRunbookReady: operatorRunbookDesktopProjectIoReady,
       completionStatusPath: relative(completionStatusPath),
       externalGatePath: relative(externalGatePath),
@@ -319,17 +331,25 @@ check(summary.productScope.includes("all-genre direct beat workstation"), "exter
 check(summary.productScope.includes("sampling optional"), "external readiness ledger should keep sampling optional");
 check(summary.desktopProjectIoEvidenceReady === true, "external readiness ledger should include ready desktop project IO evidence");
 check(summary.desktopProjectIoEvidence?.completionStatusReady === true, "external readiness ledger should read desktop project IO readiness from completion status");
+check(summary.desktopProjectIoEvidence?.pkgPayloadProjectIoStatusReady === true, "external readiness ledger should read PKG payload project IO readiness from completion status");
 check(summary.desktopProjectIoEvidence?.externalGateRequirementReady === true, "external readiness ledger should read desktop project IO readiness from the external gate");
+check(summary.desktopProjectIoEvidence?.pkgPayloadProjectIoGateRequirementReady === true, "external readiness ledger should read PKG payload project IO readiness from the external gate");
 check(summary.desktopProjectIoEvidence?.operatorRunbookReady === true, "external readiness ledger should read desktop project IO readiness from the operator runbook");
 check(summary.desktopProjectIoEvidence?.valueRecorded === false, "external readiness ledger desktop project IO evidence should not record values");
-check(Array.isArray(summary.evidenceArtifacts) && summary.evidenceArtifacts.length >= 9, "external readiness ledger should include evidence artifacts");
+check(Array.isArray(summary.evidenceArtifacts) && summary.evidenceArtifacts.length >= 11, "external readiness ledger should include evidence artifacts");
 check(summary.evidenceArtifacts.some((item) => item.label === "Desktop project IO status evidence"), "external readiness ledger should include desktop project IO status evidence");
+check(summary.evidenceArtifacts.some((item) => item.label === "PKG payload project IO status evidence"), "external readiness ledger should include PKG payload project IO status evidence");
 check(summary.evidenceArtifacts.some((item) => item.label === "Desktop project IO gate requirement"), "external readiness ledger should include desktop project IO gate evidence");
+check(summary.evidenceArtifacts.some((item) => item.label === "PKG payload project IO gate requirement"), "external readiness ledger should include PKG payload project IO gate evidence");
 check(summary.evidenceArtifacts.some((item) => item.label === "Desktop project IO runbook evidence"), "external readiness ledger should include desktop project IO runbook evidence");
 check(Array.isArray(summary.gateRequirementRows), "external readiness ledger should include gate requirement rows");
 check(
   summary.gateRequirementRows.some((item) => item.label === "Desktop project IO evidence ready" && item.ready === true),
   "external readiness ledger should include a ready desktop project IO gate row"
+);
+check(
+  summary.gateRequirementRows.some((item) => item.label === "PKG payload project IO evidence ready" && item.ready === true),
+  "external readiness ledger should include a ready PKG payload project IO gate row"
 );
 check(Array.isArray(summary.remediationRows), "external readiness ledger should include remediation rows");
 check(Array.isArray(summary.firstBlockers), "external readiness ledger should include first blockers");

@@ -26,6 +26,11 @@ const packagedProjectIoPath = path.join(
   `${appName}-${packageJson.version}-${platformArch}-packaged-project-io-smoke`,
   `${appName}-${packageJson.version}-${platformArch}-packaged-project-io-smoke.json`
 );
+const pkgPayloadProjectIoPath = path.join(
+  packageRoot,
+  `${appName}-${packageJson.version}-${platformArch}-pkg-payload-project-io-smoke`,
+  `${appName}-${packageJson.version}-${platformArch}-pkg-payload-project-io-smoke.json`
+);
 const installedProjectIoPath = path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-installed-project-io-smoke`,
@@ -175,7 +180,9 @@ function projectIoEvidenceReady(report, readyKey) {
     report?.realUserAudioRecorded === false &&
     report?.networkProbeAttempted === false &&
     report?.releaseUploadAttempted === false &&
-    report?.releaseGateClaimedDeveloperIdSigning === false &&
+    (report?.releaseGateClaimedDeveloperIdSigning === false ||
+      (report?.releaseGateClaimedDeveloperIdInstallerSigning === false &&
+        report?.releaseGateClaimedDeveloperIdApplicationSigning === false)) &&
     report?.releaseGateClaimedNotarization === false &&
     report?.releaseGateClaimedGatekeeperApproval === false &&
     report?.releaseGateClaimedAutoUpdate === false &&
@@ -191,6 +198,7 @@ function buildRequirementAudit(input) {
     qualityRules,
     nativeProjectIo,
     packagedProjectIo,
+    pkgPayloadProjectIo,
     installedProjectIo,
     releaseManifest,
     releaseNotes,
@@ -216,6 +224,7 @@ function buildRequirementAudit(input) {
   const desktopProjectIoReady =
     projectIoEvidenceReady(nativeProjectIo, "nativeProjectIoReady") &&
     projectIoEvidenceReady(packagedProjectIo, "packagedProjectIoReady") &&
+    projectIoEvidenceReady(pkgPayloadProjectIo, "pkgPayloadProjectIoReady") &&
     projectIoEvidenceReady(installedProjectIo, "installedProjectIoReady");
   const localDesktopReady = releaseArtifactReady(releaseManifest);
   const supportReady =
@@ -272,8 +281,8 @@ function buildRequirementAudit(input) {
     {
       label: "Desktop project file IO evidence",
       ready: desktopProjectIoReady,
-      evidence: [relative(nativeProjectIoPath), relative(packagedProjectIoPath), relative(installedProjectIoPath)],
-      blockers: blockerWhen(desktopProjectIoReady, "Native, packaged, or installed project-file IO evidence is missing or not value-free.")
+      evidence: [relative(nativeProjectIoPath), relative(packagedProjectIoPath), relative(pkgPayloadProjectIoPath), relative(installedProjectIoPath)],
+      blockers: blockerWhen(desktopProjectIoReady, "Native, packaged, PKG payload, or installed project-file IO evidence is missing or not value-free.")
     },
     {
       label: "Local desktop package evidence",
@@ -382,6 +391,7 @@ async function createCompletionAuditSummary() {
   const qualityRules = await readTextIfExists(qualityRulesPath);
   const nativeProjectIo = await readJsonIfExists(nativeProjectIoPath);
   const packagedProjectIo = await readJsonIfExists(packagedProjectIoPath);
+  const pkgPayloadProjectIo = await readJsonIfExists(pkgPayloadProjectIoPath);
   const installedProjectIo = await readJsonIfExists(installedProjectIoPath);
   const releaseManifest = await readJsonIfExists(releaseManifestPath);
   const releaseNotes = await readJsonIfExists(releaseNotesPath);
@@ -404,6 +414,7 @@ async function createCompletionAuditSummary() {
     qualityRules,
     nativeProjectIo,
     packagedProjectIo,
+    pkgPayloadProjectIo,
     installedProjectIo,
     releaseManifest,
     releaseNotes,
@@ -418,8 +429,9 @@ async function createCompletionAuditSummary() {
   const localDesktopPackageReady = releaseArtifactReady(releaseManifest);
   const nativeProjectIoReady = projectIoEvidenceReady(nativeProjectIo, "nativeProjectIoReady");
   const packagedProjectIoReady = projectIoEvidenceReady(packagedProjectIo, "packagedProjectIoReady");
+  const pkgPayloadProjectIoReady = projectIoEvidenceReady(pkgPayloadProjectIo, "pkgPayloadProjectIoReady");
   const installedProjectIoReady = projectIoEvidenceReady(installedProjectIo, "installedProjectIoReady");
-  const desktopProjectIoEvidenceReady = nativeProjectIoReady && packagedProjectIoReady && installedProjectIoReady;
+  const desktopProjectIoEvidenceReady = nativeProjectIoReady && packagedProjectIoReady && pkgPayloadProjectIoReady && installedProjectIoReady;
   const redactedDistributionEvidenceReady = requirementAudit.find((item) => item.label === "Redacted distribution evidence")?.ready === true;
   const externalDistributionReady = privateInputs?.externalDistributionReady === true;
   const evidenceArtifacts = [
@@ -427,6 +439,7 @@ async function createCompletionAuditSummary() {
     artifact("README", readmePath, readme, readme.includes("making beats across genres")),
     artifact("Native project IO", nativeProjectIoPath, nativeProjectIo, nativeProjectIoReady),
     artifact("Packaged project IO", packagedProjectIoPath, packagedProjectIo, packagedProjectIoReady),
+    artifact("PKG payload project IO", pkgPayloadProjectIoPath, pkgPayloadProjectIo, pkgPayloadProjectIoReady),
     artifact("Installed project IO", installedProjectIoPath, installedProjectIo, installedProjectIoReady),
     artifact("Release manifest", releaseManifestPath, releaseManifest, releaseArtifactReady(releaseManifest)),
     artifact("Release notes", releaseNotesPath, releaseNotes, evidenceReady(releaseNotes, "releaseNotesArtifactReady")),
@@ -473,6 +486,7 @@ async function createCompletionAuditSummary() {
     localDesktopPackageReady,
     nativeProjectIoReady,
     packagedProjectIoReady,
+    pkgPayloadProjectIoReady,
     installedProjectIoReady,
     desktopProjectIoEvidenceReady,
     redactedDistributionEvidenceReady,
@@ -523,15 +537,16 @@ check(
   summary.requirementAudit.some((item) => item.label === "Desktop project file IO evidence" && item.ready === true),
   "completion audit should include a ready desktop project file IO requirement row"
 );
-check(Array.isArray(summary.evidenceArtifacts) && summary.evidenceArtifacts.length >= 13, "completion audit should include evidence artifacts");
+check(Array.isArray(summary.evidenceArtifacts) && summary.evidenceArtifacts.length >= 14, "completion audit should include evidence artifacts");
 check(
-  ["Native project IO", "Packaged project IO", "Installed project IO"].every((label) =>
+  ["Native project IO", "Packaged project IO", "PKG payload project IO", "Installed project IO"].every((label) =>
     summary.evidenceArtifacts.some((item) => item.label === label && item.ready === true)
   ),
   "completion audit should include ready project IO artifact rows"
 );
 check(summary.nativeProjectIoReady === true, "completion audit should include ready native project IO evidence");
 check(summary.packagedProjectIoReady === true, "completion audit should include ready packaged project IO evidence");
+check(summary.pkgPayloadProjectIoReady === true, "completion audit should include ready PKG payload project IO evidence");
 check(summary.installedProjectIoReady === true, "completion audit should include ready installed project IO evidence");
 check(summary.desktopProjectIoEvidenceReady === true, "completion audit should include ready desktop project IO evidence");
 check(summary.networkProbeAttempted === false, "completion audit should not probe remote channels");

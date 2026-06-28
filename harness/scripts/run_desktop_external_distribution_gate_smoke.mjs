@@ -175,6 +175,7 @@ const requirements = [
   requirement("Completion audit ready", completionAudit?.completionAuditReady === true, relative(completionAuditPath), "Completion audit is not ready."),
   requirement("Local MVP evidence ready", completionAudit?.localMvpEvidenceReady === true, relative(completionAuditPath), "Local MVP evidence is not ready."),
   requirement("Desktop project IO evidence ready", completionAudit?.desktopProjectIoEvidenceReady === true, relative(completionAuditPath), "Desktop project IO evidence is not ready."),
+  requirement("PKG payload project IO evidence ready", completionAudit?.pkgPayloadProjectIoReady === true, relative(completionAuditPath), "PKG payload project IO evidence is not ready."),
   requirement("Local desktop package ready", completionAudit?.localDesktopPackageReady === true, relative(completionAuditPath), "Local desktop package evidence is not ready."),
   requirement("Redacted distribution evidence ready", completionAudit?.redactedDistributionEvidenceReady === true, relative(completionAuditPath), "Redacted distribution evidence is not ready."),
   requirement("Distribution env template ready", distributionEnvTemplate?.distributionEnvTemplateReady === true, relative(distributionEnvTemplatePath), "Distribution env template evidence is missing or incomplete."),
@@ -249,6 +250,10 @@ check(summary.appName === appName, "external distribution gate should identify G
 check(summary.bundleId === bundleId, `external distribution gate should identify ${bundleId}`);
 check(summary.version === packageJson.version, "external distribution gate should match package version");
 check(Array.isArray(summary.requirements) && summary.requirements.length >= 10, "external distribution gate should include requirement rows");
+check(
+  summary.requirements.some((item) => item.label === "PKG payload project IO evidence ready" && item.ready === true),
+  "external distribution gate should require ready PKG payload project IO evidence"
+);
 check(Array.isArray(summary.externalDistributionGateBlockers), "external distribution gate should include blockers");
 check(summary.privateValuesRecorded === false, "external distribution gate should not record private values");
 check(summary.releaseUrlValueRecorded === false, "external distribution gate should not record release URL values");

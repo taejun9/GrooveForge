@@ -282,8 +282,14 @@ async function createRunbookSummary() {
   const templateText = await readTextIfExists(distributionTemplatePath);
   const requiredPrivateInputKeys = parseTemplateKeys(templateText);
   const completionStatusDesktopProjectIoReady = completionStatus?.desktopProjectIoEvidenceReady === true;
+  const completionStatusPkgPayloadProjectIoReady = completionStatus?.pkgPayloadProjectIoReady === true;
   const externalGateDesktopProjectIoReady = gateRequirementReady(externalGate, "Desktop project IO evidence ready");
-  const desktopProjectIoEvidenceReady = completionStatusDesktopProjectIoReady && externalGateDesktopProjectIoReady;
+  const externalGatePkgPayloadProjectIoReady = gateRequirementReady(externalGate, "PKG payload project IO evidence ready");
+  const desktopProjectIoEvidenceReady =
+    completionStatusDesktopProjectIoReady &&
+    completionStatusPkgPayloadProjectIoReady &&
+    externalGateDesktopProjectIoReady &&
+    externalGatePkgPayloadProjectIoReady;
   const operatorPhases =
     Array.isArray(externalRemediation?.remediationGroups) && externalRemediation.remediationGroups.length > 0
       ? externalRemediation.remediationGroups.map(phaseFromGroup)
@@ -291,9 +297,11 @@ async function createRunbookSummary() {
   const evidenceChecklist = [
     evidence(completionStatusPath, "Completion status"),
     evidence(completionStatusPath, "Desktop project IO status evidence"),
+    evidence(completionStatusPath, "PKG payload project IO status evidence"),
     evidence(externalRemediationPath, "External remediation"),
     evidence(externalGatePath, "External distribution gate"),
     evidence(externalGatePath, "Desktop project IO gate requirement"),
+    evidence(externalGatePath, "PKG payload project IO gate requirement"),
     evidence(manualQaPath, "Manual QA checklist"),
     evidence(privateInputsPath, "Private inputs"),
     evidence(distributionEnvTemplateArtifactPath, "Distribution env template artifact"),
@@ -304,6 +312,8 @@ async function createRunbookSummary() {
   const operatorRunbookBlockers = unique([
     ...(sourceEvidenceReady ? [] : ["Operator runbook source evidence is incomplete; run npm run release:check first."]),
     ...(desktopProjectIoEvidenceReady ? [] : ["Desktop project IO evidence is not ready in completion status and external gate evidence."]),
+    ...(completionStatusPkgPayloadProjectIoReady ? [] : ["PKG payload project IO evidence is not ready in completion status evidence."]),
+    ...(externalGatePkgPayloadProjectIoReady ? [] : ["PKG payload project IO requirement is not ready in external gate evidence."]),
     ...(manualQa?.manualQaChecklistSha256 ? [] : ["Manual QA checklist digest evidence is missing."]),
     ...(requiredPrivateInputKeys.includes("GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256") ? [] : ["Distribution template is missing the manual QA checklist digest key."]),
     ...phaseBlockers
@@ -324,7 +334,9 @@ async function createRunbookSummary() {
     desktopProjectIoEvidenceReady,
     desktopProjectIoEvidence: {
       completionStatusReady: completionStatusDesktopProjectIoReady,
+      pkgPayloadProjectIoStatusReady: completionStatusPkgPayloadProjectIoReady,
       externalGateRequirementReady: externalGateDesktopProjectIoReady,
+      pkgPayloadProjectIoGateRequirementReady: externalGatePkgPayloadProjectIoReady,
       completionStatusPath: relative(completionStatusPath),
       externalGatePath: relative(externalGatePath),
       valueRecorded: false
@@ -363,6 +375,8 @@ async function createRunbookSummary() {
       externalRemediationPresent: Boolean(externalRemediation),
       externalGatePresent: Boolean(externalGate),
       desktopProjectIoEvidenceReady,
+      pkgPayloadProjectIoStatusReady: completionStatusPkgPayloadProjectIoReady,
+      pkgPayloadProjectIoGateRequirementReady: externalGatePkgPayloadProjectIoReady,
       manualQaPresent: Boolean(manualQa),
       privateInputsPresent: Boolean(privateInputs),
       distributionEnvTemplateArtifactPresent: Boolean(distributionEnvTemplateArtifact),
@@ -390,13 +404,17 @@ check(summary.productScope.includes("all-genre direct beat workstation"), "exter
 check(summary.productScope.includes("sampling optional"), "external operator runbook should keep sampling optional");
 check(summary.desktopProjectIoEvidenceReady === true, "external operator runbook should include ready desktop project IO evidence");
 check(summary.desktopProjectIoEvidence?.completionStatusReady === true, "external operator runbook should read desktop project IO readiness from completion status");
+check(summary.desktopProjectIoEvidence?.pkgPayloadProjectIoStatusReady === true, "external operator runbook should read PKG payload project IO readiness from completion status");
 check(summary.desktopProjectIoEvidence?.externalGateRequirementReady === true, "external operator runbook should read desktop project IO readiness from the external gate");
+check(summary.desktopProjectIoEvidence?.pkgPayloadProjectIoGateRequirementReady === true, "external operator runbook should read PKG payload project IO readiness from the external gate");
 check(summary.desktopProjectIoEvidence?.valueRecorded === false, "external operator runbook desktop project IO evidence should not record values");
 check(Array.isArray(summary.commandSequence) && summary.commandSequence.length >= 10, "external operator runbook should include a command sequence");
 check(summary.commandSequence.some((step) => step.command === "npm run release:external-check"), "external operator runbook should end with the hard gate command");
 check(Array.isArray(summary.operatorPhases) && summary.operatorPhases.length >= 3, "external operator runbook should include operator phases");
 check(summary.evidenceChecklist.some((item) => item.label === "Desktop project IO status evidence"), "external operator runbook should include desktop project IO status evidence");
+check(summary.evidenceChecklist.some((item) => item.label === "PKG payload project IO status evidence"), "external operator runbook should include PKG payload project IO status evidence");
 check(summary.evidenceChecklist.some((item) => item.label === "Desktop project IO gate requirement"), "external operator runbook should include desktop project IO gate evidence");
+check(summary.evidenceChecklist.some((item) => item.label === "PKG payload project IO gate requirement"), "external operator runbook should include PKG payload project IO gate evidence");
 check(summary.operatorPhases.every((phase) => phase.valueRecorded === false), "external operator phases should not record values");
 check(summary.commandSequence.every((step) => step.valueRecorded === false), "external operator commands should not record values");
 check(summary.evidenceChecklist.every((item) => item.valueRecorded === false), "external operator evidence checklist should not record values");

@@ -54,6 +54,7 @@ function buildMarkdown(report) {
 - Local release ready: ${report.localReleaseReady ? "yes" : "no"}
 - Local release readiness: ${report.localReleaseReadinessPercent.toFixed(1)}%
 - Desktop project IO evidence ready: ${report.desktopProjectIoEvidenceReady ? "yes" : "no"}
+- PKG payload project IO evidence ready: ${report.pkgPayloadProjectIoEvidenceReady ? "yes" : "no"}
 - External distribution hard gate ready: ${report.externalDistributionGateReady ? "yes" : "no"}
 - External gate requirements ready: ${report.gateRequirementReadyCount}/${report.gateRequirementTotal} (${report.gateRequirementReadinessPercent.toFixed(1)}%)
 - Remediation groups ready: ${report.remediationReadyCount}/${report.remediationTotal} (${report.remediationReadinessPercent.toFixed(1)}%)
@@ -136,6 +137,7 @@ const releaseProgressReport = {
   localReleaseReady: completionProgress.localReleaseReady === true,
   localReleaseReadinessPercent: completionProgress.localReleaseReadinessPercent ?? 0,
   desktopProjectIoEvidenceReady: completionProgress.desktopProjectIoEvidenceReady === true,
+  pkgPayloadProjectIoEvidenceReady: completionProgress.pkgPayloadProjectIoEvidenceReady === true,
   externalDistributionGateReady: completionProgress.externalDistributionGateReady === true,
   gateRequirementTotal: completionProgress.gateRequirementTotal ?? 0,
   gateRequirementReadyCount: completionProgress.gateRequirementReadyCount ?? 0,
@@ -169,7 +171,8 @@ releaseProgressReport.releaseProgressReportReady =
   releaseProgressReport.sourceEvidenceReady &&
   releaseProgressReport.localReleaseReady &&
   releaseProgressReport.localReleaseReadinessPercent === 100 &&
-  releaseProgressReport.desktopProjectIoEvidenceReady;
+  releaseProgressReport.desktopProjectIoEvidenceReady &&
+  releaseProgressReport.pkgPayloadProjectIoEvidenceReady;
 
 const markdown = buildMarkdown(releaseProgressReport);
 
@@ -186,6 +189,7 @@ check(releaseProgressReport.sourceEvidenceReady === true, "release progress repo
 check(releaseProgressReport.localReleaseReady === true, "release progress report should include ready local release evidence");
 check(releaseProgressReport.localReleaseReadinessPercent === 100, "release progress report should report 100 percent local release readiness");
 check(releaseProgressReport.desktopProjectIoEvidenceReady === true, "release progress report should include ready desktop project IO evidence");
+check(releaseProgressReport.pkgPayloadProjectIoEvidenceReady === true, "release progress report should include ready PKG payload project IO evidence");
 check(typeof releaseProgressReport.externalDistributionGateReady === "boolean", "release progress report should include external distribution hard-gate readiness");
 check(releaseProgressReport.localEnvValueRecorded === false, "release progress report should not record local env values");
 check(releaseProgressReport.privateValuesRecorded === false, "release progress report should not record private values");
@@ -203,6 +207,7 @@ check(releaseProgressReport.signingAttemptedByThisReport === false, "release pro
 check(releaseProgressReport.releaseGateClaimedExternalDistribution === false, "release progress report should not claim external distribution completion");
 check(markdown.includes("Release Progress Report"), "release progress Markdown should include title");
 check(markdown.includes("Local release readiness:"), "release progress Markdown should include local release readiness");
+check(markdown.includes("PKG payload project IO evidence ready:"), "release progress Markdown should include PKG payload project IO readiness");
 check(markdown.includes("Hard external distribution gate remains: `npm run release:external-check`"), "release progress Markdown should keep the hard external gate command");
 check(!/https?:\/\//i.test(markdown), "release progress report should not include public or private URL values");
 
@@ -218,6 +223,7 @@ console.log(`- Source evidence ready: ${releaseProgressReport.sourceEvidenceRead
 console.log(`- Local release ready: ${releaseProgressReport.localReleaseReady ? "yes" : "no"}`);
 console.log(`- Local release readiness: ${releaseProgressReport.localReleaseReadinessPercent.toFixed(1)}%`);
 console.log(`- Desktop project IO evidence ready: ${releaseProgressReport.desktopProjectIoEvidenceReady ? "yes" : "no"}`);
+console.log(`- PKG payload project IO evidence ready: ${releaseProgressReport.pkgPayloadProjectIoEvidenceReady ? "yes" : "no"}`);
 console.log(`- External distribution hard gate ready: ${releaseProgressReport.externalDistributionGateReady ? "yes" : "no"}`);
 console.log(`- External gate requirements ready: ${releaseProgressReport.gateRequirementReadyCount}/${releaseProgressReport.gateRequirementTotal} (${releaseProgressReport.gateRequirementReadinessPercent.toFixed(1)}%)`);
 console.log(`- Remediation groups ready: ${releaseProgressReport.remediationReadyCount}/${releaseProgressReport.remediationTotal} (${releaseProgressReport.remediationReadinessPercent.toFixed(1)}%)`);
