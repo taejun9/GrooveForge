@@ -83,6 +83,10 @@ function checkBuiltArtifacts() {
     "dist-electron/main.js is missing; run npm run build before desktop smoke"
   );
   check(
+    existsSync(path.join(root, "dist-electron/updateFeedConfig.js")),
+    "dist-electron/updateFeedConfig.js is missing; run npm run build before desktop smoke"
+  );
+  check(
     existsSync(path.join(root, "dist-electron/preload.cjs")),
     "dist-electron/preload.cjs is missing; run npm run build before desktop smoke"
   );
@@ -123,6 +127,8 @@ function checkPackageScripts() {
 
 function checkElectronMainContract() {
   const source = readText("electron/main.ts");
+  const updateFeedConfigSource = readText("electron/updateFeedConfig.ts");
+  const updateFeedConfigBuilt = readText("dist-electron/updateFeedConfig.js");
   const built = readText("dist-electron/main.js");
   const label = "electron/main.ts";
 
@@ -140,6 +146,7 @@ function checkElectronMainContract() {
   checkIncludes(source, "Menu.setApplicationMenu(createNativeCommandMenu())", label);
   checkIncludes(source, "createWindow();", label);
   checkIncludes(source, "autoUpdater", label);
+  checkIncludes(source, "resolveUpdateFeedConfig", label);
   checkIncludes(source, 'label: "Check for Updates..."', label);
   checkIncludes(source, "GROOVEFORGE_UPDATE_FEED_URL", label);
   checkIncludes(source, "GROOVEFORGE_UPDATE_CHANNEL", label);
@@ -148,6 +155,13 @@ function checkElectronMainContract() {
   checkIncludes(source, 'autoUpdater.on("update-downloaded"', label);
   checkIncludes(source, "autoUpdater.quitAndInstall()", label);
   checkIncludes(source, "No update feed was contacted.", label);
+  checkIncludes(updateFeedConfigSource, "updateFeedUrlKeys", "electron/updateFeedConfig.ts");
+  checkIncludes(updateFeedConfigSource, "redactUpdateFeedConfig", "electron/updateFeedConfig.ts");
+  checkIncludes(updateFeedConfigSource, "Update feed URL must use HTTPS for release checks.", "electron/updateFeedConfig.ts");
+  checkIncludes(updateFeedConfigSource, "Update feed URL must not include credentials.", "electron/updateFeedConfig.ts");
+  checkIncludes(updateFeedConfigSource, "Update release channel must use 1-32 lowercase letters", "electron/updateFeedConfig.ts");
+  checkIncludes(updateFeedConfigBuilt, "updateFeedUrlKeys", "dist-electron/updateFeedConfig.js");
+  checkIncludes(updateFeedConfigBuilt, "redactUpdateFeedConfig", "dist-electron/updateFeedConfig.js");
   checkIncludes(source, 'label: "GrooveForge Local Workstation"', label);
   checkIncludes(source, 'filters: projectFilters', label);
   checkIncludes(source, 'properties: ["openFile"]', label);

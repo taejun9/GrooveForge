@@ -3,7 +3,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -16,10 +16,14 @@ const manifestPath = path.join(packageRoot, `${appName}-${packageJson.version}-$
 const updateMetadataPolicyPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-update-metadata-policy.json`);
 const readinessRoot = path.join(root, "build", "desktop");
 const readinessPath = path.join(readinessRoot, `${appName}-${platformArch}-auto-update-readiness.json`);
+const updateFeedModule = await import(pathToFileURL(path.join(root, "electron", "updateFeedConfig.ts")).href);
+const { redactUpdateFeedConfig, resolveUpdateFeedConfig } = updateFeedModule;
 const sourcePaths = [
   "electron/main.ts",
+  "electron/updateFeedConfig.ts",
   "electron/preload.cts",
   "dist-electron/main.js",
+  "dist-electron/updateFeedConfig.js",
   "dist-electron/preload.cjs"
 ];
 const failures = [];
@@ -63,30 +67,19 @@ async function readJsonIfExists(filePath) {
 
 function updateProviderSignals() {
   const publishConfig = packageJson.build?.publish ?? packageJson.publish ?? null;
-  const updateUrl =
-    process.env.GROOVEFORGE_UPDATE_FEED_URL ??
-    process.env.ELECTRON_UPDATE_FEED_URL ??
-    process.env.UPDATE_FEED_URL ??
-    "";
-  const updateChannel =
-    process.env.GROOVEFORGE_UPDATE_CHANNEL ??
-    process.env.ELECTRON_UPDATE_CHANNEL ??
-    process.env.UPDATE_CHANNEL ??
-    "";
+  const updateFeedConfig = redactUpdateFeedConfig(resolveUpdateFeedConfig());
 
   return {
     packagePublishConfigPresent: publishConfig !== null,
-    environmentFeedUrlKeyPresent: updateUrl.length > 0,
-    environmentChannelKeyPresent: updateChannel.length > 0,
-    presentEnvironmentKeys: [
-      "GROOVEFORGE_UPDATE_FEED_URL",
-      "ELECTRON_UPDATE_FEED_URL",
-      "UPDATE_FEED_URL",
-      "GROOVEFORGE_UPDATE_CHANNEL",
-      "ELECTRON_UPDATE_CHANNEL",
-      "UPDATE_CHANNEL"
-    ].filter((key) => Boolean(process.env[key])),
+    updateFeedConfig,
+    updateFeedConfigReady: updateFeedConfig.ready,
+    environmentFeedUrlKeyPresent: updateFeedConfig.feedUrlPresent,
+    environmentChannelKeyPresent: updateFeedConfig.releaseChannelPresent,
+    environmentFeedUrlValid: updateFeedConfig.feedUrlValid,
+    environmentChannelValid: updateFeedConfig.releaseChannelValid,
+    presentEnvironmentKeys: updateFeedConfig.presentEnvironmentKeys,
     // Do not store feed values in readiness output; URLs can reveal private release infrastructure.
+    channelValueRecorded: false,
     feedValueRecorded: false,
     publishConfigValueRecorded: false
   };
@@ -174,9 +167,7 @@ async function createReadinessSummary() {
   const provider = updateProviderSignals();
   const artifacts = updateArtifactSignals(manifest, policy);
   const source = await sourceSignals();
-  const providerReady =
-    provider.packagePublishConfigPresent ||
-    (provider.environmentFeedUrlKeyPresent && provider.environmentChannelKeyPresent);
+  const providerReady = provider.packagePublishConfigPresent || provider.updateFeedConfigReady;
   const updaterIntegrationReady =
     dependencies.updaterDependencyPresent &&
     (source.usesElectronAutoUpdaterApi || source.usesElectronUpdaterPackage) &&
@@ -198,7 +189,11 @@ async function createReadinessSummary() {
     blockers.push("No Electron auto-update API integration with update checking is implemented.");
   }
   if (!providerReady) {
-    blockers.push("No update provider, feed URL, and channel metadata are configured.");
+    if (provider.environmentFeedUrlKeyPresent || provider.environmentChannelKeyPresent) {
+      blockers.push("Update provider/feed/channel metadata is present but fails local validation.");
+    } else {
+      blockers.push("No update provider, feed URL, and channel metadata are configured.");
+    }
   }
   if (!updateMetadataPolicyReady) {
     blockers.push("No signed/notarized update metadata artifact policy is available for automatic updates.");
@@ -218,6 +213,9 @@ async function createReadinessSummary() {
   if (artifacts.updateMetadataPolicyRecordsFeedValue) {
     blockers.push("Update metadata policy unexpectedly records a private update feed value.");
   }
+  if (provider.feedValueRecorded || provider.channelValueRecorded) {
+    blockers.push("Auto-update readiness unexpectedly records private update provider values.");
+  }
 
   return {
     ...base,
@@ -229,6 +227,7 @@ async function createReadinessSummary() {
     checks: {
       updaterIntegrationReady,
       providerReady,
+      updateFeedConfigReady: provider.updateFeedConfigReady,
       updateMetadataPolicyReady,
       signedUpdateArtifactsReady,
       userFacingUpdateBehaviorReady
@@ -260,6 +259,18 @@ check(
   readiness.skipped === true || readiness.provider?.feedValueRecorded === false,
   "auto-update readiness summary should not store private update feed values"
 );
+check(
+  readiness.skipped === true || readiness.provider?.channelValueRecorded === false,
+  "auto-update readiness summary should not store private update channel values"
+);
+check(
+  readiness.skipped === true || !("feedUrl" in readiness.provider?.updateFeedConfig),
+  "auto-update readiness summary should omit private feed URL values from redacted config"
+);
+check(
+  readiness.skipped === true || !("releaseChannel" in readiness.provider?.updateFeedConfig),
+  "auto-update readiness summary should omit private channel values from redacted config"
+);
 
 if (failures.length > 0) {
   fail("Auto-update readiness validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
@@ -269,6 +280,7 @@ console.log("GrooveForge auto-update readiness smoke passed.");
 console.log(`- Summary: ${relative(readinessPath)}`);
 console.log(`- Updater integration ready: ${readiness.checks?.updaterIntegrationReady === true ? "yes" : "no"}`);
 console.log(`- Update provider ready: ${readiness.checks?.providerReady === true ? "yes" : "no"}`);
+console.log(`- Update feed config ready: ${readiness.checks?.updateFeedConfigReady === true ? "yes" : "no"}`);
 console.log(`- Update metadata policy ready: ${readiness.checks?.updateMetadataPolicyReady === true ? "yes" : "no"}`);
 console.log(`- Signed update artifacts ready: ${readiness.checks?.signedUpdateArtifactsReady === true ? "yes" : "no"}`);
 console.log(`- User-facing update behavior ready: ${readiness.checks?.userFacingUpdateBehaviorReady === true ? "yes" : "no"}`);

@@ -3,6 +3,7 @@ import type { MenuItemConstructorOptions, OpenDialogOptions, SaveDialogOptions }
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveUpdateFeedConfig } from "./updateFeedConfig.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.VITE_DEV_SERVER_URL !== undefined;
@@ -61,16 +62,7 @@ type LaunchSmokeVisualEvidence = {
   width: number;
 };
 
-type UpdateFeedConfig = {
-  channelKey: string | null;
-  feedKey: string | null;
-  feedUrl: string;
-  releaseChannel: string;
-};
-
 const projectFilters = [{ name: "GrooveForge Project", extensions: ["json"] }];
-const updateFeedUrlKeys = ["GROOVEFORGE_UPDATE_FEED_URL", "ELECTRON_UPDATE_FEED_URL", "UPDATE_FEED_URL"] as const;
-const updateChannelKeys = ["GROOVEFORGE_UPDATE_CHANNEL", "ELECTRON_UPDATE_CHANNEL", "UPDATE_CHANNEL"] as const;
 let updateHandlersRegistered = false;
 let updateCheckInProgress = false;
 
@@ -88,28 +80,6 @@ function isSaveProjectPayload(value: unknown): value is SaveProjectPayload {
 function sendMenuCommand(command: NativeMenuCommand): void {
   const targetWindow = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
   targetWindow?.webContents.send(menuCommandChannel, command);
-}
-
-function readFirstEnv(keys: readonly string[]): { key: string | null; value: string } {
-  for (const key of keys) {
-    const value = process.env[key];
-    if (value && value.trim().length > 0) {
-      return { key, value: value.trim() };
-    }
-  }
-
-  return { key: null, value: "" };
-}
-
-function resolveUpdateFeedConfig(): UpdateFeedConfig {
-  const feed = readFirstEnv(updateFeedUrlKeys);
-  const channel = readFirstEnv(updateChannelKeys);
-  return {
-    channelKey: channel.key,
-    feedKey: feed.key,
-    feedUrl: feed.value,
-    releaseChannel: channel.value
-  };
 }
 
 function updateDialogWindow(): BrowserWindow | undefined {
@@ -183,10 +153,10 @@ function checkForUpdates(): void {
   }
 
   const updateFeed = resolveUpdateFeedConfig();
-  if (!updateFeed.feedUrl || !updateFeed.releaseChannel) {
+  if (!updateFeed.ready) {
     void showUpdateStatus(
       "Auto-Update Not Configured",
-      "Set GROOVEFORGE_UPDATE_FEED_URL and GROOVEFORGE_UPDATE_CHANNEL after a signed release provider is selected. No update feed was contacted."
+      `${updateFeed.blockers.join(" ")} Set GROOVEFORGE_UPDATE_FEED_URL and GROOVEFORGE_UPDATE_CHANNEL after a signed release provider is selected. No update feed was contacted.`
     );
     return;
   }
