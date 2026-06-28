@@ -31,6 +31,8 @@ A corrected draft passes this first-session test: a user can create a beat by ch
 
 Sampling stays a later optional sound-source module, not the product spine. The first proof of GrooveForge is still a complete beat made from editable events, built-in instruments, arrangement, mixer/master, and export without imported audio.
 
+Manual distribution QA writes a local distribution manual QA checklist artifact before final channel QA without recording private values.
+
 ## MVP Target
 
 The first usable result is an Electron desktop workstation that can create a sample-free 8-bar beat in any supported style profile and export it as WAV:
@@ -684,6 +686,7 @@ npm run desktop:developer-id-readiness-smoke
 npm run desktop:developer-id-signing-smoke
 npm run desktop:notarization-smoke
 npm run desktop:notarized-gatekeeper-smoke
+npm run desktop:distribution-manual-qa-smoke
 npm run desktop:distribution-channel-qa-smoke
 npm run desktop:distribution-handoff-smoke
 npm run desktop:distribution-bundle-manifest-smoke
@@ -703,6 +706,8 @@ npm run release:check
 Update metadata artifact evidence now records selected DMG evidence: `npm run desktop:update-metadata-artifacts-smoke` prefers a notarized isolated DMG when Developer ID signing, notarization/stapling, and notarized Gatekeeper summaries are ready, otherwise falls back to the release manifest DMG without publishing a feed. `npm run desktop:auto-update-readiness-smoke` reads selected signed/notarized update artifact evidence and reports missing or unsafe provider/feed/channel metadata separately from unsigned, not-notarized, or not-Gatekeeper-accepted update artifacts without recording feed/channel/local env values or probing a remote feed.
 
 Auto-update readiness writes an auto-update readiness summary that can read the same ignored local env file and records missing or unsafe update provider/feed plus signed/notarized/Gatekeeper update artifact blockers without probing a network feed or storing feed/channel values. It reads the feed config, update metadata policy, and local update metadata artifact drafts with selected signed/notarized update artifact evidence.
+
+Manual distribution QA evidence is local and value-free: `npm run desktop:distribution-manual-qa-smoke` writes ignored Markdown/JSON checklist artifacts for the selected signed artifact, release notes, support content, update metadata/feed, user-facing update behavior, Developer ID signing, notarization/stapling, notarized Gatekeeper, and final `GROOVEFORGE_DISTRIBUTION_QA_APPROVED=1` operator signal. `npm run desktop:distribution-channel-qa-smoke` reads that checklist before reporting final channel QA readiness, while still recording no release/support/feed URL values, credentials, tokens, identity labels, channel values, private beats, or real user audio.
 
 The current requirement-by-requirement proof trail lives in [docs/release/readiness.md](docs/release/readiness.md). Completion reports should cite `npm run release:check`, the completion audit artifact, and any target-specific distribution checks added later.
 

@@ -21,6 +21,7 @@ const autoUpdateReadinessPath = path.join(root, "build", "desktop", `${appName}-
 const developerIdSigningPath = path.join(root, "build", "desktop", `${appName}-${platformArch}-developer-id-signing.json`);
 const notarizationPath = path.join(root, "build", "desktop", `${appName}-${platformArch}-notarization.json`);
 const notarizedGatekeeperPath = path.join(root, "build", "desktop", `${appName}-${platformArch}-notarized-gatekeeper.json`);
+const manualQaChecklistPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-manual-qa.json`);
 const summaryRoot = path.join(root, "build", "desktop");
 const summaryPath = path.join(summaryRoot, `${appName}-${platformArch}-distribution-channel-qa.json`);
 const distributionMetadataKeys = [
@@ -145,7 +146,18 @@ function distributionChannelSignals() {
 }
 
 function summarizeInputs(input) {
-  const { manifest, releaseNotes, supportArtifact, updateFeedConfig, updatePolicy, autoUpdate, developerIdSigning, notarization, gatekeeper } = input;
+  const {
+    manifest,
+    releaseNotes,
+    supportArtifact,
+    updateFeedConfig,
+    updatePolicy,
+    autoUpdate,
+    developerIdSigning,
+    notarization,
+    gatekeeper,
+    manualQaChecklist
+  } = input;
   const signing = manifest?.signing ?? {};
   const releaseArtifactReady =
     Boolean(manifest) &&
@@ -180,6 +192,11 @@ function summarizeInputs(input) {
     notarization?.stapled === true &&
     notarization?.stapleValidationPassed === true;
   const gatekeeperAccepted = gatekeeper?.notarizedGatekeeperAccepted === true;
+  const manualQaChecklistReady =
+    manualQaChecklist?.manualQaChecklistReady === true &&
+    manualQaChecklist?.privateValuesRecorded === false &&
+    manualQaChecklist?.releaseGateClaimedManualQaApproval === false &&
+    manualQaChecklist?.releaseGateClaimedExternalDistribution === false;
 
   return {
     releaseArtifactReady,
@@ -200,7 +217,9 @@ function summarizeInputs(input) {
     notarizedAndStapled,
     notarizationPath: existsSync(notarizationPath) ? relative(notarizationPath) : null,
     gatekeeperAccepted,
-    notarizedGatekeeperPath: existsSync(notarizedGatekeeperPath) ? relative(notarizedGatekeeperPath) : null
+    notarizedGatekeeperPath: existsSync(notarizedGatekeeperPath) ? relative(notarizedGatekeeperPath) : null,
+    manualQaChecklistReady,
+    manualQaChecklistPath: existsSync(manualQaChecklistPath) ? relative(manualQaChecklistPath) : null
   };
 }
 
@@ -242,8 +261,20 @@ async function createDistributionSummary() {
   const developerIdSigning = await readJsonIfExists(developerIdSigningPath);
   const notarization = await readJsonIfExists(notarizationPath);
   const gatekeeper = await readJsonIfExists(notarizedGatekeeperPath);
+  const manualQaChecklist = await readJsonIfExists(manualQaChecklistPath);
   const channel = distributionChannelSignals();
-  const inputs = summarizeInputs({ manifest, releaseNotes, supportArtifact, updateFeedConfig, updatePolicy, autoUpdate, developerIdSigning, notarization, gatekeeper });
+  const inputs = summarizeInputs({
+    manifest,
+    releaseNotes,
+    supportArtifact,
+    updateFeedConfig,
+    updatePolicy,
+    autoUpdate,
+    developerIdSigning,
+    notarization,
+    gatekeeper,
+    manualQaChecklist
+  });
   const blockers = [...channel.blockers];
 
   if (!inputs.releaseArtifactReady) {
@@ -273,6 +304,9 @@ async function createDistributionSummary() {
   if (!inputs.gatekeeperAccepted) {
     blockers.push("Notarized Gatekeeper assessment has not accepted the selected release artifact.");
   }
+  if (!inputs.manualQaChecklistReady) {
+    blockers.push("Manual distribution-channel QA checklist is missing or unavailable; run npm run desktop:distribution-manual-qa-smoke first.");
+  }
 
   return {
     ...base,
@@ -290,7 +324,8 @@ async function createDistributionSummary() {
       inputs.autoUpdateReady &&
       inputs.developerIdSigned &&
       inputs.notarizedAndStapled &&
-      inputs.gatekeeperAccepted,
+      inputs.gatekeeperAccepted &&
+      inputs.manualQaChecklistReady,
     blockers
   };
 }
@@ -337,6 +372,7 @@ console.log(`- Auto-update ready: ${summary.inputs?.autoUpdateReady === true ? "
 console.log(`- Developer ID signed: ${summary.inputs?.developerIdSigned === true ? "yes" : "no"}`);
 console.log(`- Notarized and stapled: ${summary.inputs?.notarizedAndStapled === true ? "yes" : "no"}`);
 console.log(`- Notarized Gatekeeper accepted: ${summary.inputs?.gatekeeperAccepted === true ? "yes" : "no"}`);
+console.log(`- Manual QA checklist ready: ${summary.inputs?.manualQaChecklistReady === true ? "yes" : "no"}`);
 console.log(`- External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}`);
 console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
 if (summary.blockers.length > 0) {
