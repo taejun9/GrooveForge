@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { distributionLocalEnvDefaults } from "./distribution_local_env.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -72,6 +73,32 @@ function fail(message, details = "") {
 
 function relative(filePath) {
   return path.relative(root, filePath);
+}
+
+function displayLocalEnvTarget(filePath) {
+  const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(root, filePath);
+  const relativePath = path.relative(root, absolutePath);
+  if (!relativePath.startsWith("..") && !path.isAbsolute(relativePath)) {
+    return relativePath;
+  }
+  return path.basename(absolutePath);
+}
+
+function firstArrayValue(values) {
+  return Array.isArray(values) ? values.find((value) => typeof value === "string" && value.trim().length > 0) : "";
+}
+
+function currentLocalEnvEditTarget(evidence = {}) {
+  const presentFile = firstArrayValue(evidence.localEnvPresentFiles);
+  if (presentFile) {
+    return displayLocalEnvTarget(presentFile);
+  }
+  const checkedFile = firstArrayValue(evidence.localEnvFilesChecked);
+  if (checkedFile) {
+    return displayLocalEnvTarget(checkedFile);
+  }
+  const configuredPath = process.env[distributionLocalEnvDefaults.configuredFileKey]?.trim();
+  return displayLocalEnvTarget(configuredPath || distributionLocalEnvDefaults.defaultEnvFileName);
 }
 
 function escapeCell(value) {
@@ -234,6 +261,7 @@ function buildPriorityActions(remediation, context = {}) {
   const localEnvPlaceholderKeyCount = Number.isInteger(context.localEnvPlaceholderKeyCount)
     ? context.localEnvPlaceholderKeyCount
     : localEnvPlaceholderKeys.length;
+  const localEnvEditTarget = context.localEnvEditTarget ?? currentLocalEnvEditTarget();
   return (remediation.remediationGroups ?? [])
     .filter((group) => group.ready !== true)
     .map((group, index) => {
@@ -244,12 +272,12 @@ function buildPriorityActions(remediation, context = {}) {
         : group.prerequisiteCommands ?? [];
       const operatorActions = shouldPrepareEnv
         ? unique([
-            "Run the explicit prepare-env command to create the ignored local distribution env scaffold before validating private inputs.",
+            `Run the explicit prepare-env command to create the ignored local distribution env scaffold at ${localEnvEditTarget} before validating private inputs.`,
             group.operatorActions ?? []
           ])
         : shouldReplacePlaceholders
           ? unique([
-              `Replace placeholder values in the ignored local distribution env file for ${localEnvPlaceholderKeyCount} keys: ${localEnvPlaceholderKeys.join(", ")}.`,
+              `Replace placeholder values in ${localEnvEditTarget} for ${localEnvPlaceholderKeyCount} keys: ${localEnvPlaceholderKeys.join(", ")}.`,
               "Keep those private values out of committed files and generated reports.",
               group.operatorActions ?? []
             ])
@@ -384,6 +412,10 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
     privateInputGroupTotal: 0,
     privateInputGroupReadyCount: 0,
     manualQaChecklistDigestAvailable: false,
+    currentEnvEditTarget: currentLocalEnvEditTarget(),
+    currentEnvConfiguredFileKey: distributionLocalEnvDefaults.configuredFileKey,
+    localEnvFilesChecked: [distributionLocalEnvDefaults.defaultEnvFileName],
+    localEnvPresentFiles: [],
     localEnvFileLoaded: false,
     localEnvPlaceholderKeyCount: 0,
     localEnvPlaceholderKeys: [],
@@ -436,6 +468,7 @@ function buildMarkdown(report) {
 - Current next command: \`${report.currentNextCommand}\`
 - Current first blocker: ${report.currentFirstBlocker}
 - Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
+- Current env edit target: ${report.currentEnvEditTarget}
 - Current operator action: ${report.currentOperatorAction}
 - Current rerun command: \`${report.currentRerunCommand}\`
 - Local release ready: ${readyLabel(report.localReleaseReady)}
@@ -534,10 +567,22 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     : Number.isInteger(releaseDoctor.localEnvPlaceholderKeyCount)
       ? releaseDoctor.localEnvPlaceholderKeyCount
       : localEnvPlaceholderKeys.length;
+  const localEnvFilesChecked = Array.isArray(externalPreflight.localEnvFilesChecked)
+    ? externalPreflight.localEnvFilesChecked
+    : Array.isArray(releaseDoctor.localEnvFilesChecked)
+      ? releaseDoctor.localEnvFilesChecked
+      : [distributionLocalEnvDefaults.defaultEnvFileName];
+  const localEnvPresentFiles = Array.isArray(externalPreflight.localEnvPresentFiles)
+    ? externalPreflight.localEnvPresentFiles
+    : Array.isArray(releaseDoctor.localEnvPresentFiles)
+      ? releaseDoctor.localEnvPresentFiles
+      : [];
+  const localEnvEditTarget = currentLocalEnvEditTarget({ localEnvFilesChecked, localEnvPresentFiles });
   const priorityActions = buildPriorityActions(externalRemediation, {
     localEnvFileLoaded,
     localEnvPlaceholderKeyCount,
-    localEnvPlaceholderKeys
+    localEnvPlaceholderKeys,
+    localEnvEditTarget
   });
   const firstBlockers = unique([
     priorityActions.map((action) => action.firstBlocker),
@@ -604,6 +649,10 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     privateInputGroupTotal: externalPreflight.privateInputGroupTotal ?? releaseDoctor.privateInputGroupTotal ?? 0,
     privateInputGroupReadyCount: externalPreflight.privateInputGroupReadyCount ?? releaseDoctor.privateInputGroupReadyCount ?? 0,
     manualQaChecklistDigestAvailable: externalPreflight.manualQaChecklistDigestAvailable === true || externalRunbook.manualQaChecklistSha256 !== null,
+    currentEnvEditTarget: localEnvEditTarget,
+    currentEnvConfiguredFileKey: distributionLocalEnvDefaults.configuredFileKey,
+    localEnvFilesChecked,
+    localEnvPresentFiles,
     localEnvFileLoaded,
     localEnvPlaceholderKeyCount,
     localEnvPlaceholderKeys,
@@ -689,6 +738,10 @@ check(typeof nextActionsReport.currentOperatorAction === "string" && nextActions
 check(typeof nextActionsReport.currentRerunCommand === "string" && nextActionsReport.currentRerunCommand.length > 0, "external next actions should include the current rerun command");
 check(Number.isInteger(nextActionsReport.currentRequiredKeyCount), "external next actions should include the current required key count");
 check(typeof nextActionsReport.currentRequiredKeySummary === "string" && nextActionsReport.currentRequiredKeySummary.length > 0, "external next actions should include the current required key summary");
+check(typeof nextActionsReport.currentEnvEditTarget === "string" && nextActionsReport.currentEnvEditTarget.length > 0, "external next actions should include the current env edit target");
+check(nextActionsReport.currentEnvConfiguredFileKey === "GROOVEFORGE_DISTRIBUTION_ENV_FILE", "external next actions should include the env file override key name");
+check(Array.isArray(nextActionsReport.localEnvFilesChecked), "external next actions should include local env files checked");
+check(Array.isArray(nextActionsReport.localEnvPresentFiles), "external next actions should include local env present files");
 check(Array.isArray(nextActionsReport.currentRequiredKeys), "external next actions should include current required keys");
 check(
   nextActionsReport.currentRequiredKeyCount === nextActionsReport.currentRequiredKeys.length,
@@ -762,6 +815,7 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvFileL
   check(nextActionsReport.currentRequiredKeys.includes("GROOVEFORGE_RELEASE_DOWNLOAD_URL"), "release channel metadata should surface release download URL as a current required key name");
   check(nextActionsReport.currentFirstBlocker.includes("local distribution env file is not loaded"), "release channel metadata should surface the missing local env file as the current first blocker");
   check(nextActionsReport.currentOperatorAction.includes("prepare-env"), "release channel metadata should surface prepare-env as the current operator action when no local env file is loaded");
+  check(nextActionsReport.currentOperatorAction.includes(nextActionsReport.currentEnvEditTarget), "release channel metadata should include the env edit target when no local env file is loaded");
   check(releaseChannelAction?.nextCommand === "npm run release:prepare-env", "release channel metadata should prepare the ignored env scaffold when no local env file is loaded");
   check(
     releaseChannelAction?.firstBlocker.includes("local distribution env file is not loaded"),
@@ -777,9 +831,10 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   check(nextActionsReport.currentActionId === releaseChannelAction?.id, "release channel metadata should be the current action when placeholder keys remain");
   check(nextActionsReport.currentNextCommand === "npm run release:doctor", "release channel metadata should surface release doctor as the current next command when placeholders remain");
   check(nextActionsReport.currentOperatorAction.includes("Replace placeholder values"), "release channel metadata should surface placeholder replacement as the current operator action when placeholders remain");
+  check(nextActionsReport.currentOperatorAction.includes(nextActionsReport.currentEnvEditTarget), "release channel metadata should include the env edit target when placeholders remain");
   check(releaseChannelAction?.nextCommand === "npm run release:doctor", "release channel metadata should rerun release doctor after placeholder cleanup");
   check(
-    releaseChannelAction?.operatorActions.some((action) => action.includes("Replace placeholder values in the ignored local distribution env file")),
+    releaseChannelAction?.operatorActions.some((action) => action.includes(`Replace placeholder values in ${nextActionsReport.currentEnvEditTarget}`)),
     "release channel metadata should tell operators to replace placeholder values"
   );
   check(
@@ -808,6 +863,7 @@ check(markdown.includes("Current focus:"), "external next actions Markdown shoul
 check(markdown.includes("Current next command:"), "external next actions Markdown should include current next command");
 check(markdown.includes("Current first blocker:"), "external next actions Markdown should include current first blocker");
 check(markdown.includes("Current required keys:"), "external next actions Markdown should include current required keys");
+check(markdown.includes("Current env edit target:"), "external next actions Markdown should include current env edit target");
 check(markdown.includes("Current operator action:"), "external next actions Markdown should include current operator action");
 check(markdown.includes("Current rerun command:"), "external next actions Markdown should include current rerun command");
 check(markdown.includes("Local env placeholder keys:"), "external next actions Markdown should include placeholder key count");
@@ -835,6 +891,7 @@ console.log(`- Current focus: ${nextActionsReport.currentFocus}`);
 console.log(`- Current next command: ${nextActionsReport.currentNextCommand}`);
 console.log(`- Current first blocker: ${nextActionsReport.currentFirstBlocker}`);
 console.log(`- Current required keys: ${nextActionsReport.currentRequiredKeyCount} (${nextActionsReport.currentRequiredKeySummary})`);
+console.log(`- Current env edit target: ${nextActionsReport.currentEnvEditTarget}`);
 console.log(`- Current operator action: ${nextActionsReport.currentOperatorAction}`);
 console.log(`- Current rerun command: ${nextActionsReport.currentRerunCommand}`);
 console.log(`- Local release ready: ${nextActionsReport.localReleaseReady ? "yes" : "no"}`);
