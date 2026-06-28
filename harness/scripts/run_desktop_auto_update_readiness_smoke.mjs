@@ -13,6 +13,7 @@ const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const manifestPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-manifest.json`);
+const updateMetadataPolicyPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-update-metadata-policy.json`);
 const readinessRoot = path.join(root, "build", "desktop");
 const readinessPath = path.join(readinessRoot, `${appName}-${platformArch}-auto-update-readiness.json`);
 const sourcePaths = [
@@ -53,6 +54,13 @@ async function readIfExists(filePath) {
   return await readFile(filePath, "utf8");
 }
 
+async function readJsonIfExists(filePath) {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+  return JSON.parse(await readFile(filePath, "utf8"));
+}
+
 function updateProviderSignals() {
   const publishConfig = packageJson.build?.publish ?? packageJson.publish ?? null;
   const updateUrl =
@@ -84,7 +92,7 @@ function updateProviderSignals() {
   };
 }
 
-function updateArtifactSignals(manifest) {
+function updateArtifactSignals(manifest, policy) {
   const signing = manifest?.signing ?? {};
   const releaseFiles = [
     "latest.yml",
@@ -96,6 +104,14 @@ function updateArtifactSignals(manifest) {
   return {
     releaseManifestPresent: Boolean(manifest),
     releaseManifestPath: existsSync(manifestPath) ? relative(manifestPath) : null,
+    updateMetadataPolicyPresent: Boolean(policy),
+    updateMetadataPolicyPath: existsSync(updateMetadataPolicyPath) ? relative(updateMetadataPolicyPath) : null,
+    updateMetadataPolicyAvailable: policy?.policyAvailable === true,
+    updateMetadataPolicyClaimsAutoUpdate: policy?.releaseGateClaimedAutoUpdate === true,
+    updateMetadataPolicyRecordsFeedValue: policy?.provider?.feedValueRecorded === true,
+    requiredUpdateMetadataArtifacts: Array.isArray(policy?.metadataArtifacts)
+      ? policy.metadataArtifacts.map((artifact) => artifact.fileName).filter(Boolean)
+      : [],
     developerIdCodeSigningClaimed: signing.developerIdCodeSigningClaimed === true,
     notarizationClaimed: signing.notarizationClaimed === true,
     autoUpdateClaimedByManifest: signing.autoUpdateClaimed === true,
@@ -148,6 +164,7 @@ async function createReadinessSummary() {
   }
 
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const policy = await readJsonIfExists(updateMetadataPolicyPath);
   const dependencies = {
     electronBuiltInAutoUpdaterAvailable: hasDependency("electron"),
     electronUpdaterPresent: hasDependency("electron-updater"),
@@ -155,7 +172,7 @@ async function createReadinessSummary() {
     updaterDependencyPresent: hasDependency("electron") || hasDependency("electron-updater") || hasDependency("update-electron-app")
   };
   const provider = updateProviderSignals();
-  const artifacts = updateArtifactSignals(manifest);
+  const artifacts = updateArtifactSignals(manifest, policy);
   const source = await sourceSignals();
   const providerReady =
     provider.packagePublishConfigPresent ||
@@ -164,7 +181,13 @@ async function createReadinessSummary() {
     dependencies.updaterDependencyPresent &&
     (source.usesElectronAutoUpdaterApi || source.usesElectronUpdaterPackage) &&
     source.hasCheckForUpdatesCall;
-  const signedUpdatePolicyReady =
+  const updateMetadataPolicyReady =
+    artifacts.updateMetadataPolicyAvailable &&
+    artifacts.requiredUpdateMetadataArtifacts.length > 0 &&
+    artifacts.updateMetadataPolicyClaimsAutoUpdate === false &&
+    artifacts.updateMetadataPolicyRecordsFeedValue === false;
+  const signedUpdateArtifactsReady =
+    updateMetadataPolicyReady &&
     artifacts.developerIdCodeSigningClaimed &&
     artifacts.notarizationClaimed &&
     artifacts.updateMetadataFiles.length > 0;
@@ -177,14 +200,23 @@ async function createReadinessSummary() {
   if (!providerReady) {
     blockers.push("No update provider, feed URL, and channel metadata are configured.");
   }
-  if (!signedUpdatePolicyReady) {
+  if (!updateMetadataPolicyReady) {
     blockers.push("No signed/notarized update metadata artifact policy is available for automatic updates.");
+  }
+  if (updateMetadataPolicyReady && !signedUpdateArtifactsReady) {
+    blockers.push("Signed/notarized update metadata artifacts are not ready because Developer ID signing, notarization, or update metadata files are missing.");
   }
   if (!userFacingUpdateBehaviorReady) {
     blockers.push("No user-facing update check, download, and install behavior is implemented.");
   }
   if (artifacts.autoUpdateClaimedByManifest) {
     blockers.push("Release manifest unexpectedly claims auto-update support before readiness is proven.");
+  }
+  if (artifacts.updateMetadataPolicyClaimsAutoUpdate) {
+    blockers.push("Update metadata policy unexpectedly claims auto-update support before readiness is proven.");
+  }
+  if (artifacts.updateMetadataPolicyRecordsFeedValue) {
+    blockers.push("Update metadata policy unexpectedly records a private update feed value.");
   }
 
   return {
@@ -197,15 +229,18 @@ async function createReadinessSummary() {
     checks: {
       updaterIntegrationReady,
       providerReady,
-      signedUpdatePolicyReady,
+      updateMetadataPolicyReady,
+      signedUpdateArtifactsReady,
       userFacingUpdateBehaviorReady
     },
     autoUpdateReady:
       updaterIntegrationReady &&
       providerReady &&
-      signedUpdatePolicyReady &&
+      updateMetadataPolicyReady &&
+      signedUpdateArtifactsReady &&
       userFacingUpdateBehaviorReady &&
-      !artifacts.autoUpdateClaimedByManifest,
+      !artifacts.autoUpdateClaimedByManifest &&
+      !artifacts.updateMetadataPolicyClaimsAutoUpdate,
     blockers
   };
 }
@@ -234,7 +269,8 @@ console.log("GrooveForge auto-update readiness smoke passed.");
 console.log(`- Summary: ${relative(readinessPath)}`);
 console.log(`- Updater integration ready: ${readiness.checks?.updaterIntegrationReady === true ? "yes" : "no"}`);
 console.log(`- Update provider ready: ${readiness.checks?.providerReady === true ? "yes" : "no"}`);
-console.log(`- Signed update policy ready: ${readiness.checks?.signedUpdatePolicyReady === true ? "yes" : "no"}`);
+console.log(`- Update metadata policy ready: ${readiness.checks?.updateMetadataPolicyReady === true ? "yes" : "no"}`);
+console.log(`- Signed update artifacts ready: ${readiness.checks?.signedUpdateArtifactsReady === true ? "yes" : "no"}`);
 console.log(`- User-facing update behavior ready: ${readiness.checks?.userFacingUpdateBehaviorReady === true ? "yes" : "no"}`);
 console.log(`- Auto-update ready: ${readiness.autoUpdateReady ? "yes" : "no"}`);
 if (readiness.blockers.length > 0) {
