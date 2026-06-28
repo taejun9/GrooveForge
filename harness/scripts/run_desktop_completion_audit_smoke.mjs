@@ -16,6 +16,21 @@ const summaryRoot = path.join(root, "build", "desktop");
 const readinessDocPath = path.join(root, "docs", "release", "readiness.md");
 const readmePath = path.join(root, "README.md");
 const qualityRulesPath = path.join(root, "docs", "quality", "rules.md");
+const nativeProjectIoPath = path.join(
+  summaryRoot,
+  `${appName}-${packageJson.version}-${platformArch}-project-io-smoke`,
+  `${appName}-${packageJson.version}-${platformArch}-project-io-smoke.json`
+);
+const packagedProjectIoPath = path.join(
+  packageRoot,
+  `${appName}-${packageJson.version}-${platformArch}-packaged-project-io-smoke`,
+  `${appName}-${packageJson.version}-${platformArch}-packaged-project-io-smoke.json`
+);
+const installedProjectIoPath = path.join(
+  packageRoot,
+  `${appName}-${packageJson.version}-${platformArch}-installed-project-io-smoke`,
+  `${appName}-${packageJson.version}-${platformArch}-installed-project-io-smoke.json`
+);
 const releaseManifestPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-manifest.json`);
 const releaseNotesPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-notes.json`);
 const supportArtifactPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-support.json`);
@@ -139,8 +154,52 @@ function evidenceReady(json, key) {
   return Boolean(json) && json?.[key] === true;
 }
 
+function projectIoEvidenceReady(report, readyKey) {
+  return (
+    Boolean(report) &&
+    report?.appName === appName &&
+    report?.version === packageJson.version &&
+    report?.platform === process.platform &&
+    report?.arch === process.arch &&
+    report?.[readyKey] === true &&
+    report?.project?.arrangementBars === 8 &&
+    report?.project?.deliveryTarget === "Beat Store" &&
+    report?.sourceSha256 === report?.savedSha256 &&
+    /^[a-f0-9]{64}$/.test(report?.savedSha256 ?? "") &&
+    Number(report?.savedBytes ?? 0) > 1000 &&
+    String(report?.productScope ?? "").includes("sample-free") &&
+    String(report?.productScope ?? "").includes("editable GrooveForge events") &&
+    report?.localEnvValueRecorded === false &&
+    report?.privateValuesRecorded === false &&
+    report?.privateBeatRecorded === false &&
+    report?.realUserAudioRecorded === false &&
+    report?.networkProbeAttempted === false &&
+    report?.releaseUploadAttempted === false &&
+    report?.releaseGateClaimedDeveloperIdSigning === false &&
+    report?.releaseGateClaimedNotarization === false &&
+    report?.releaseGateClaimedGatekeeperApproval === false &&
+    report?.releaseGateClaimedAutoUpdate === false &&
+    report?.releaseGateClaimedManualQaApproval === false &&
+    report?.releaseGateClaimedExternalDistribution === false
+  );
+}
+
 function buildRequirementAudit(input) {
-  const { readme, readinessDoc, qualityRules, releaseManifest, releaseNotes, supportArtifact, handoff, bundleManifest, distributionEnvTemplate, privateInputs } = input;
+  const {
+    readme,
+    readinessDoc,
+    qualityRules,
+    nativeProjectIo,
+    packagedProjectIo,
+    installedProjectIo,
+    releaseManifest,
+    releaseNotes,
+    supportArtifact,
+    handoff,
+    bundleManifest,
+    distributionEnvTemplate,
+    privateInputs
+  } = input;
   const productScopeReady =
     hasAll(readme, ["making beats across genres", "direct beat composition", "Sampling stays a later optional sound-source module"]) &&
     hasAll(readinessDoc, ["Direct beat composition is the product spine", "Sampling is secondary and optional."]) &&
@@ -154,6 +213,10 @@ function buildRequirementAudit(input) {
   const exportReady =
     hasAll(readinessDoc, ["A sample-free 8-bar beat can be generated and exported.", "All supported genres have editable starts."]) &&
     hasAll(readme, ["sample-free 8-bar beat", "WAV headers"]);
+  const desktopProjectIoReady =
+    projectIoEvidenceReady(nativeProjectIo, "nativeProjectIoReady") &&
+    projectIoEvidenceReady(packagedProjectIo, "packagedProjectIoReady") &&
+    projectIoEvidenceReady(installedProjectIo, "installedProjectIoReady");
   const localDesktopReady = releaseArtifactReady(releaseManifest);
   const supportReady =
     evidenceReady(releaseNotes, "releaseNotesArtifactReady") &&
@@ -205,6 +268,12 @@ function buildRequirementAudit(input) {
       ready: exportReady,
       evidence: ["runtime smoke", "release readiness matrix"],
       blockers: blockerWhen(exportReady, "Sample-free all-style export evidence is incomplete.")
+    },
+    {
+      label: "Desktop project file IO evidence",
+      ready: desktopProjectIoReady,
+      evidence: [relative(nativeProjectIoPath), relative(packagedProjectIoPath), relative(installedProjectIoPath)],
+      blockers: blockerWhen(desktopProjectIoReady, "Native, packaged, or installed project-file IO evidence is missing or not value-free.")
     },
     {
       label: "Local desktop package evidence",
@@ -262,6 +331,7 @@ ${appName} is an all-genre desktop beat workstation for direct beat composition,
 
 - Local MVP evidence ready: ${summary.localMvpEvidenceReady ? "yes" : "no"}
 - Local desktop package evidence ready: ${summary.localDesktopPackageReady ? "yes" : "no"}
+- Desktop project IO evidence ready: ${summary.desktopProjectIoEvidenceReady ? "yes" : "no"}
 - Redacted distribution evidence ready: ${summary.redactedDistributionEvidenceReady ? "yes" : "no"}
 - External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}
 - Completion audit ready: ${summary.completionAuditReady ? "yes" : "no"}
@@ -310,6 +380,9 @@ async function createCompletionAuditSummary() {
   const readme = await readTextIfExists(readmePath);
   const readinessDoc = await readTextIfExists(readinessDocPath);
   const qualityRules = await readTextIfExists(qualityRulesPath);
+  const nativeProjectIo = await readJsonIfExists(nativeProjectIoPath);
+  const packagedProjectIo = await readJsonIfExists(packagedProjectIoPath);
+  const installedProjectIo = await readJsonIfExists(installedProjectIoPath);
   const releaseManifest = await readJsonIfExists(releaseManifestPath);
   const releaseNotes = await readJsonIfExists(releaseNotesPath);
   const supportArtifact = await readJsonIfExists(supportArtifactPath);
@@ -329,6 +402,9 @@ async function createCompletionAuditSummary() {
     readme,
     readinessDoc,
     qualityRules,
+    nativeProjectIo,
+    packagedProjectIo,
+    installedProjectIo,
     releaseManifest,
     releaseNotes,
     supportArtifact,
@@ -340,11 +416,18 @@ async function createCompletionAuditSummary() {
   const localRequirementLabels = requirementAudit.filter((item) => item.label !== "External macOS distribution");
   const localMvpEvidenceReady = localRequirementLabels.every((item) => item.ready);
   const localDesktopPackageReady = releaseArtifactReady(releaseManifest);
+  const nativeProjectIoReady = projectIoEvidenceReady(nativeProjectIo, "nativeProjectIoReady");
+  const packagedProjectIoReady = projectIoEvidenceReady(packagedProjectIo, "packagedProjectIoReady");
+  const installedProjectIoReady = projectIoEvidenceReady(installedProjectIo, "installedProjectIoReady");
+  const desktopProjectIoEvidenceReady = nativeProjectIoReady && packagedProjectIoReady && installedProjectIoReady;
   const redactedDistributionEvidenceReady = requirementAudit.find((item) => item.label === "Redacted distribution evidence")?.ready === true;
   const externalDistributionReady = privateInputs?.externalDistributionReady === true;
   const evidenceArtifacts = [
     artifact("Release readiness doc", readinessDocPath, readinessDoc, readinessDoc.includes("GrooveForge Release Readiness Evidence")),
     artifact("README", readmePath, readme, readme.includes("making beats across genres")),
+    artifact("Native project IO", nativeProjectIoPath, nativeProjectIo, nativeProjectIoReady),
+    artifact("Packaged project IO", packagedProjectIoPath, packagedProjectIo, packagedProjectIoReady),
+    artifact("Installed project IO", installedProjectIoPath, installedProjectIo, installedProjectIoReady),
     artifact("Release manifest", releaseManifestPath, releaseManifest, releaseArtifactReady(releaseManifest)),
     artifact("Release notes", releaseNotesPath, releaseNotes, evidenceReady(releaseNotes, "releaseNotesArtifactReady")),
     artifact("Support artifact", supportArtifactPath, supportArtifact, evidenceReady(supportArtifact, "supportArtifactReady")),
@@ -388,6 +471,10 @@ async function createCompletionAuditSummary() {
     targetUsers: ["First-time beat makers", "Working producers"],
     localMvpEvidenceReady,
     localDesktopPackageReady,
+    nativeProjectIoReady,
+    packagedProjectIoReady,
+    installedProjectIoReady,
+    desktopProjectIoEvidenceReady,
     redactedDistributionEvidenceReady,
     externalDistributionReady,
     completionAuditReady: localMvpEvidenceReady && localDesktopPackageReady && redactedDistributionEvidenceReady,
@@ -431,8 +518,22 @@ check(summary.productScope.includes("all-genre direct beat workstation"), "compl
 check(summary.productScope.includes("sampling optional"), "completion audit should keep sampling optional");
 check(summary.targetUsers.includes("First-time beat makers"), "completion audit should address first-time beat makers");
 check(summary.targetUsers.includes("Working producers"), "completion audit should address working producers");
-check(Array.isArray(summary.requirementAudit) && summary.requirementAudit.length >= 8, "completion audit should include requirement audit rows");
-check(Array.isArray(summary.evidenceArtifacts) && summary.evidenceArtifacts.length >= 10, "completion audit should include evidence artifacts");
+check(Array.isArray(summary.requirementAudit) && summary.requirementAudit.length >= 9, "completion audit should include requirement audit rows");
+check(
+  summary.requirementAudit.some((item) => item.label === "Desktop project file IO evidence" && item.ready === true),
+  "completion audit should include a ready desktop project file IO requirement row"
+);
+check(Array.isArray(summary.evidenceArtifacts) && summary.evidenceArtifacts.length >= 13, "completion audit should include evidence artifacts");
+check(
+  ["Native project IO", "Packaged project IO", "Installed project IO"].every((label) =>
+    summary.evidenceArtifacts.some((item) => item.label === label && item.ready === true)
+  ),
+  "completion audit should include ready project IO artifact rows"
+);
+check(summary.nativeProjectIoReady === true, "completion audit should include ready native project IO evidence");
+check(summary.packagedProjectIoReady === true, "completion audit should include ready packaged project IO evidence");
+check(summary.installedProjectIoReady === true, "completion audit should include ready installed project IO evidence");
+check(summary.desktopProjectIoEvidenceReady === true, "completion audit should include ready desktop project IO evidence");
 check(summary.networkProbeAttempted === false, "completion audit should not probe remote channels");
 check(summary.releaseUploadAttempted === false, "completion audit should not upload release artifacts");
 check(summary.notarySubmissionAttempted === false, "completion audit should not submit to Apple notary services");
@@ -457,6 +558,7 @@ check(markdown.includes("Sampling remains optional future scope"), "completion a
 check(markdown.includes("First-time beat makers"), "completion audit should address first-time beat makers");
 check(markdown.includes("Working producers"), "completion audit should address working producers");
 check(markdown.includes("Local MVP evidence ready:"), "completion audit should include local MVP readiness");
+check(markdown.includes("Desktop project IO evidence ready:"), "completion audit should include project IO readiness");
 check(markdown.includes("External distribution ready:"), "completion audit should include external readiness");
 check(markdown.includes("Local env file loaded:"), "completion audit should include local env loader status");
 check(markdown.includes("Private values recorded: no"), "completion audit should state value redaction");
@@ -476,6 +578,7 @@ console.log(`- Markdown: ${relative(completionAuditMarkdownPath)}`);
 console.log(`- JSON: ${relative(completionAuditJsonPath)}`);
 console.log(`- Local MVP evidence ready: ${summary.localMvpEvidenceReady ? "yes" : "no"}`);
 console.log(`- Local desktop package evidence ready: ${summary.localDesktopPackageReady ? "yes" : "no"}`);
+console.log(`- Desktop project IO evidence ready: ${summary.desktopProjectIoEvidenceReady ? "yes" : "no"}`);
 console.log(`- Redacted distribution evidence ready: ${summary.redactedDistributionEvidenceReady ? "yes" : "no"}`);
 console.log(`- External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}`);
 console.log(`- Completion audit ready: ${summary.completionAuditReady ? "yes" : "no"}`);
