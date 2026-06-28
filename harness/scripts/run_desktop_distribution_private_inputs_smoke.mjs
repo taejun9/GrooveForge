@@ -407,6 +407,10 @@ function formatBlockers(blockers) {
   return blockers.length > 0 ? blockers.map((blocker) => `- ${blocker}`).join("\n") : "- None.";
 }
 
+function formatKeyList(keys) {
+  return keys.length > 0 ? keys.map((key) => `- ${key}`).join("\n") : "- None.";
+}
+
 function privateEnvironmentValues() {
   return allPrivateKeys.map((key) => process.env[key]?.trim()).filter((value) => value && value.length >= 8);
 }
@@ -423,6 +427,7 @@ ${appName} is an all-genre desktop beat workstation for direct beat composition,
 - Private inputs ready: ${summary.privateInputsReady ? "yes" : "no"}
 - External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}
 - Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}
+- Local env placeholder keys: ${summary.localEnvPlaceholderKeyCount}
 - Private values recorded: no
 - Network probe attempted: no
 - Release upload attempted: no
@@ -439,6 +444,10 @@ ${formatGroupRows(summary.inputGroups)}
 | evidence | present | ready | path |
 |---|---:|---:|---|
 ${formatEvidenceRows(summary.evidence)}
+
+## Local Env Placeholder Keys
+
+${formatKeyList(summary.localEnvPlaceholderKeys)}
 
 ## Next Local Commands
 
@@ -494,6 +503,8 @@ async function createPrivateInputsSummary() {
     notarySubmissionAttempted: false,
     signingAttempted: false,
     localEnvInput: distributionLocalEnv,
+    localEnvPlaceholderKeyCount: distributionLocalEnv.placeholderKeys.length,
+    localEnvPlaceholderKeys: distributionLocalEnv.placeholderKeys,
     localEnvValueRecorded: false,
     privateValuesRecorded: false,
     releaseUrlValueRecorded: false,
@@ -551,6 +562,9 @@ async function createPrivateInputsSummary() {
     group("Manual distribution QA approval", ["GROOVEFORGE_DISTRIBUTION_QA_APPROVED", "GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256"], manualApproval.approved, manualApproval)
   ];
   const privateInputBlockers = [
+    ...(distributionLocalEnv.placeholderKeys.length > 0
+      ? [`Local distribution env still contains placeholder values for keys: ${distributionLocalEnv.placeholderKeys.join(", ")}.`]
+      : []),
     ...channel.blockers,
     ...downloadUrl.blockers,
     ...releaseNotesUrl.blockers,
@@ -618,6 +632,9 @@ check(summary.releaseUploadAttempted === false, "distribution private inputs smo
 check(summary.notarySubmissionAttempted === false, "distribution private inputs smoke should not submit to Apple notary services");
 check(summary.signingAttempted === false, "distribution private inputs smoke should not sign artifacts");
 check(summary.localEnvInput?.valueRecorded === false, "distribution private inputs local env loader should not record values");
+check(Number.isInteger(summary.localEnvPlaceholderKeyCount), "distribution private inputs should count local env placeholder keys");
+check(Array.isArray(summary.localEnvPlaceholderKeys), "distribution private inputs should list local env placeholder keys");
+check(summary.localEnvPlaceholderKeyCount === summary.localEnvPlaceholderKeys.length, "distribution private inputs placeholder key count should match listed keys");
 check(summary.localEnvValueRecorded === false, "distribution private inputs should not record local env values");
 check(summary.privateValuesRecorded === false, "distribution private inputs should not record private values");
 check(summary.releaseUrlValueRecorded === false, "distribution private inputs should not record release URL values");
@@ -644,6 +661,8 @@ check(markdown.includes("Working producers"), "distribution private inputs shoul
 check(markdown.includes("Private inputs ready:"), "distribution private inputs should include private input readiness");
 check(markdown.includes("External distribution ready:"), "distribution private inputs should include external readiness");
 check(markdown.includes("Local env file loaded:"), "distribution private inputs should include local env loader status");
+check(markdown.includes("Local env placeholder keys:"), "distribution private inputs should include local env placeholder key count");
+check(markdown.includes("Local Env Placeholder Keys"), "distribution private inputs should include local env placeholder key section");
 check(markdown.includes("Private values recorded: no"), "distribution private inputs should state value redaction");
 check(markdown.includes("Values for required private keys are intentionally not recorded"), "distribution private inputs should state key value redaction");
 check(!/https?:\/\//i.test(markdown), "distribution private inputs should not include public or private URL values before channel selection");
@@ -663,6 +682,7 @@ console.log(`- JSON: ${relative(privateInputsJsonPath)}`);
 console.log(`- Private inputs ready: ${summary.privateInputsReady ? "yes" : "no"}`);
 console.log(`- External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}`);
 console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
+console.log(`- Local env placeholder keys: ${summary.localEnvPlaceholderKeyCount}`);
 console.log("- Private values recorded: no");
 if (summary.privateInputBlockers.length > 0) {
   console.log(`- Private input blockers: ${summary.privateInputBlockers.join(" | ")}`);
