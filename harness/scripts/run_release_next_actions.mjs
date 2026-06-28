@@ -282,6 +282,21 @@ function buildPriorityActions(remediation, context = {}) {
     });
 }
 
+function buildCurrentActionSummary(priorityActions, fallback = {}) {
+  const currentAction = Array.isArray(priorityActions) ? priorityActions[0] : null;
+  return {
+    currentActionId: currentAction?.id ?? fallback.id ?? "none",
+    currentActionLabel: currentAction?.label ?? fallback.label ?? "No pending priority action",
+    currentNextCommand: currentAction?.nextCommand ?? fallback.nextCommand ?? "npm run release:external-check",
+    currentFirstBlocker: currentAction?.firstBlocker || fallback.firstBlocker || "none",
+    currentRequiredKeys: currentAction?.requiredKeys ?? [],
+    currentPrerequisiteCommands: currentAction?.prerequisiteCommands ?? [],
+    currentOperatorActions: currentAction?.operatorActions ?? [],
+    currentRerunCommands: currentAction?.rerunCommands ?? [],
+    currentActionValueRecorded: false
+  };
+}
+
 function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
   const missingArtifacts = artifactRows.filter((item) => !item.present);
   const missingLabels = missingArtifacts.map((item) => item.label);
@@ -339,6 +354,12 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
     sourceEvidenceReady: false,
     completionStage: "source evidence missing",
     currentFocus: "Regenerate local release evidence",
+    ...buildCurrentActionSummary(priorityActions, {
+      id: "regenerate-local-release-evidence",
+      label: "Regenerate local release evidence",
+      nextCommand: "npm run release:check",
+      firstBlocker: firstBlockers[0]
+    }),
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
     externalDistributionReady: false,
@@ -401,6 +422,9 @@ function buildMarkdown(report) {
 - Source evidence ready: ${readyLabel(report.sourceEvidenceReady)}
 - Completion stage: ${report.completionStage}
 - Current focus: ${report.currentFocus}
+- Current action: ${report.currentActionLabel}
+- Current next command: \`${report.currentNextCommand}\`
+- Current first blocker: ${report.currentFirstBlocker}
 - Local release ready: ${readyLabel(report.localReleaseReady)}
 - Local release readiness: ${report.localReleaseReadinessPercent.toFixed(1)}%
 - External distribution ready: ${readyLabel(report.externalDistributionReady)}
@@ -509,7 +533,20 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     externalLedger.firstBlockers ?? [],
     externalRemediation.remediationBlockers ?? []
   ]).slice(0, 12);
-  const currentFocus = priorityActions[0]?.label ?? (externalPreflight.externalDistributionGateReady ? "Run hard external distribution gate" : "Refresh external preflight evidence");
+  const currentActionFallback = externalPreflight.externalDistributionGateReady
+    ? {
+        id: "run-hard-external-distribution-gate",
+        label: "Run hard external distribution gate",
+        nextCommand: "npm run release:external-check",
+        firstBlocker: "none"
+      }
+    : {
+        id: "refresh-external-preflight-evidence",
+        label: "Refresh external preflight evidence",
+        nextCommand: "npm run release:external-preflight",
+        firstBlocker: "External distribution gate is not ready in redacted evidence."
+      };
+  const currentFocus = priorityActions[0]?.label ?? currentActionFallback.label;
 
   nextActionsReport = {
     appName,
@@ -539,6 +576,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     sourceEvidenceReady: artifactRows.every((item) => item.present),
     completionStage: externalPreflight.completionStage ?? completionProgress.completionStage ?? "unknown",
     currentFocus,
+    ...buildCurrentActionSummary(priorityActions, currentActionFallback),
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
     externalDistributionReady: externalPreflight.externalDistributionReady === true,
@@ -629,6 +667,15 @@ check(nextActionsReport.productScope.includes("all-genre direct beat workstation
 check(nextActionsReport.productScope.includes("sampling optional"), "external next actions should keep sampling optional");
 check(Array.isArray(nextActionsReport.sourceArtifacts), "external next actions should cite source artifacts");
 check(nextActionsReport.externalNextActionsReady === true, "external next actions should be ready from redacted preflight evidence");
+check(typeof nextActionsReport.currentActionId === "string" && nextActionsReport.currentActionId.length > 0, "external next actions should include the current action id");
+check(typeof nextActionsReport.currentActionLabel === "string" && nextActionsReport.currentActionLabel.length > 0, "external next actions should include the current action label");
+check(typeof nextActionsReport.currentNextCommand === "string" && nextActionsReport.currentNextCommand.length > 0, "external next actions should include the current next command");
+check(typeof nextActionsReport.currentFirstBlocker === "string" && nextActionsReport.currentFirstBlocker.length > 0, "external next actions should include the current first blocker");
+check(Array.isArray(nextActionsReport.currentRequiredKeys), "external next actions should include current required keys");
+check(Array.isArray(nextActionsReport.currentPrerequisiteCommands), "external next actions should include current prerequisite commands");
+check(Array.isArray(nextActionsReport.currentOperatorActions), "external next actions should include current operator actions");
+check(Array.isArray(nextActionsReport.currentRerunCommands), "external next actions should include current rerun commands");
+check(nextActionsReport.currentActionValueRecorded === false, "external next actions should not record current action values");
 check(markdown.includes("Bootstrap mode:"), "external next actions Markdown should include bootstrap mode");
 check(markdown.includes("Source evidence ready:"), "external next actions Markdown should include source evidence readiness");
 check(markdown.includes("Source evidence prerequisite:"), "external next actions Markdown should include the source evidence prerequisite");
@@ -637,6 +684,7 @@ if (nextActionsReport.bootstrapMode === true) {
   check(nextActionsReport.localReleaseReady === false, "bootstrap external next actions should not claim local release readiness");
   check(nextActionsReport.localReleaseReadinessPercent === 0, "bootstrap external next actions should report zero local release readiness");
   check(nextActionsReport.currentFocus === "Regenerate local release evidence", "bootstrap external next actions should focus on regenerating evidence");
+  check(nextActionsReport.currentNextCommand === "npm run release:check", "bootstrap external next actions should surface release:check as the current next command");
   check(nextActionsReport.priorityActions[0]?.nextCommand === "npm run release:check", "bootstrap external next actions should make release:check the first command");
   check(Array.isArray(nextActionsReport.missingSourceArtifacts) && nextActionsReport.missingSourceArtifacts.length > 0, "bootstrap external next actions should list missing source artifacts");
   check(markdown.includes("Regenerate local release evidence"), "bootstrap external next actions Markdown should include the evidence regeneration focus");
@@ -652,6 +700,13 @@ check(nextActionsReport.externalDistributionReady === true || nextActionsReport.
 check(nextActionsReport.priorityActions.every((action) => action.ready === false), "priority actions should be pending actions only");
 check(nextActionsReport.priorityActions.every((action) => action.valueRecorded === false), "priority actions should not record values");
 check(nextActionsReport.priorityActions.every((action) => typeof action.nextCommand === "string" && action.nextCommand.length > 0), "priority actions should include next commands");
+if (nextActionsReport.priorityActions.length > 0) {
+  const firstPriorityAction = nextActionsReport.priorityActions[0];
+  check(nextActionsReport.currentActionId === firstPriorityAction.id, "external next actions should mirror the first priority action id");
+  check(nextActionsReport.currentActionLabel === firstPriorityAction.label, "external next actions should mirror the first priority action label");
+  check(nextActionsReport.currentNextCommand === firstPriorityAction.nextCommand, "external next actions should mirror the first priority next command");
+  check(nextActionsReport.currentFirstBlocker === firstPriorityAction.firstBlocker, "external next actions should mirror the first priority blocker");
+}
 check(Number.isInteger(nextActionsReport.localEnvPlaceholderKeyCount), "external next actions should include local env placeholder key count");
 check(Array.isArray(nextActionsReport.localEnvPlaceholderKeys), "external next actions should include local env placeholder key names");
 check(
@@ -668,6 +723,8 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvFileL
 }
 if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlaceholderKeyCount > 0) {
   const releaseChannelAction = nextActionsReport.priorityActions.find((action) => action.id === "release-channel-metadata");
+  check(nextActionsReport.currentActionId === releaseChannelAction?.id, "release channel metadata should be the current action when placeholder keys remain");
+  check(nextActionsReport.currentNextCommand === "npm run release:doctor", "release channel metadata should surface release doctor as the current next command when placeholders remain");
   check(releaseChannelAction?.nextCommand === "npm run release:doctor", "release channel metadata should rerun release doctor after placeholder cleanup");
   check(
     releaseChannelAction?.operatorActions.some((action) => action.includes("Replace placeholder values in the ignored local distribution env file")),
@@ -696,6 +753,8 @@ check(nextActionsReport.releaseGateClaimedExternalDistribution === false, "exter
 check(nextActionsReport.sourceClaimedExternalDistribution === false, "external next actions source artifacts should not claim external distribution completion");
 check(markdown.includes("External Next Actions"), "external next actions Markdown should include title");
 check(markdown.includes("Current focus:"), "external next actions Markdown should include current focus");
+check(markdown.includes("Current next command:"), "external next actions Markdown should include current next command");
+check(markdown.includes("Current first blocker:"), "external next actions Markdown should include current first blocker");
 check(markdown.includes("Local env placeholder keys:"), "external next actions Markdown should include placeholder key count");
 check(markdown.includes("Local Env Placeholder Keys"), "external next actions Markdown should include placeholder key section");
 check(markdown.includes("Priority Next Actions"), "external next actions Markdown should include priority actions");
@@ -718,6 +777,8 @@ console.log(`- Markdown: ${relative(nextActionsMarkdownPath)}`);
 console.log(`- JSON: ${relative(nextActionsJsonPath)}`);
 console.log(`- Completion stage: ${nextActionsReport.completionStage}`);
 console.log(`- Current focus: ${nextActionsReport.currentFocus}`);
+console.log(`- Current next command: ${nextActionsReport.currentNextCommand}`);
+console.log(`- Current first blocker: ${nextActionsReport.currentFirstBlocker}`);
 console.log(`- Local release ready: ${nextActionsReport.localReleaseReady ? "yes" : "no"}`);
 console.log(`- Local release readiness: ${nextActionsReport.localReleaseReadinessPercent.toFixed(1)}%`);
 console.log(`- External distribution ready: ${nextActionsReport.externalDistributionReady ? "yes" : "no"}`);
