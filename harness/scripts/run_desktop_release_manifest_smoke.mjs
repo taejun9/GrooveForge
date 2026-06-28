@@ -15,6 +15,7 @@ const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const packagedApp = path.join(packageRoot, `${appName}.app`);
 const dmgPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}.dmg`);
+const pkgPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}.pkg`);
 const manifestPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-manifest.json`);
 const requiredRuntimeEntitlements = [
   "com.apple.security.cs.allow-jit",
@@ -202,6 +203,7 @@ async function createManifest() {
 
   check(existsSync(packagedApp), "packaged GrooveForge.app should exist before release manifest smoke");
   check(existsSync(dmgPath), "local GrooveForge DMG should exist before release manifest smoke");
+  check(existsSync(pkgPath), "local GrooveForge PKG should exist before release manifest smoke");
   if (failures.length > 0) {
     fail("Release artifact preflight failed.", failures.map((failure) => `- ${failure}`).join("\n"));
   }
@@ -263,7 +265,8 @@ async function createManifest() {
         electronPreload: await fileEvidence(preloadPath, "packaged Electron preload")
       }
     },
-    dmg: await fileEvidence(dmgPath, "local GrooveForge DMG")
+    dmg: await fileEvidence(dmgPath, "local GrooveForge DMG"),
+    pkg: await fileEvidence(pkgPath, "local GrooveForge PKG")
   };
 }
 
@@ -298,6 +301,8 @@ function validateManifest(manifest) {
   check(manifest.appBundle.bytes > 100000000, `release manifest should count substantial app bytes, got ${manifest.appBundle.bytes}`);
   check(manifest.dmg?.path.endsWith(`.dmg`), "release manifest should include a DMG path");
   check(manifest.dmg?.bytes > 10000000, `release manifest should include substantial DMG bytes, got ${manifest.dmg?.bytes}`);
+  check(manifest.pkg?.path.endsWith(`.pkg`), "release manifest should include a PKG path");
+  check(manifest.pkg?.bytes > 10000000, `release manifest should include substantial PKG bytes, got ${manifest.pkg?.bytes}`);
 
   for (const [label, payload] of Object.entries(manifest.appBundle.payloads)) {
     check(payload && typeof payload === "object", `release manifest should include ${label} payload evidence`);
@@ -305,6 +310,7 @@ function validateManifest(manifest) {
     check(payload?.bytes > 0, `${label} should have byte size evidence`);
   }
   check(/^[a-f0-9]{64}$/.test(manifest.dmg?.sha256 ?? ""), "DMG should have a SHA-256 checksum");
+  check(/^[a-f0-9]{64}$/.test(manifest.pkg?.sha256 ?? ""), "PKG should have a SHA-256 checksum");
   check(!existsSync(path.join(packagedApp, "Contents", "Resources", "electron.icns")), "release manifest smoke should reject electron.icns in the packaged app");
 }
 
@@ -327,6 +333,7 @@ console.log("GrooveForge desktop release manifest smoke passed.");
 console.log("- Scope: local release artifact manifest, SHA-256 checksums, bundle metadata, ad-hoc signing, hardened runtime flag evidence, and runtime entitlement evidence");
 console.log(`- Manifest: ${relative(manifestPath)}`);
 console.log(`- DMG: ${manifest.dmg.path}, ${manifest.dmg.bytes} bytes, sha256 ${manifest.dmg.sha256.slice(0, 12)}...`);
+console.log(`- PKG: ${manifest.pkg.path}, ${manifest.pkg.bytes} bytes, sha256 ${manifest.pkg.sha256.slice(0, 12)}...`);
 console.log(`- App payload: ${manifest.appBundle.files} files, ${manifest.appBundle.bytes} bytes, ${manifest.appBundle.bundleIdentifier}`);
 console.log(`- Hardened runtime flag: ${manifest.signing.hardenedRuntimeFlagPresent ? "yes" : "no"}`);
 console.log(`- Runtime entitlements: ${Object.entries(manifest.signing.runtimeEntitlements).filter(([, enabled]) => enabled).length}/${requiredRuntimeEntitlements.length}`);

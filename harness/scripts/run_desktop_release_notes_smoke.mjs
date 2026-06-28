@@ -54,6 +54,9 @@ function releaseArtifactSignals(manifest) {
     dmgPath: manifest?.dmg?.path ?? null,
     dmgBytes: manifest?.dmg?.bytes ?? null,
     dmgSha256: manifest?.dmg?.sha256 ?? null,
+    pkgPath: manifest?.pkg?.path ?? null,
+    pkgBytes: manifest?.pkg?.bytes ?? null,
+    pkgSha256: manifest?.pkg?.sha256 ?? null,
     distributionScope: manifest?.distributionScope ?? null,
     signatureKind: signing.signatureKind ?? null,
     adHocCodeSigningClaimed: signing.adHocCodeSigningClaimed === true,
@@ -83,6 +86,15 @@ function artifactBlockers(artifact) {
   }
   if (Number(artifact.dmgBytes ?? 0) <= 10000000) {
     blockers.push("Release manifest DMG byte size is not substantial.");
+  }
+  if (!artifact.pkgPath?.endsWith(".pkg")) {
+    blockers.push("Release manifest should include a PKG path.");
+  }
+  if (!/^[a-f0-9]{64}$/.test(artifact.pkgSha256 ?? "")) {
+    blockers.push("Release manifest PKG SHA-256 checksum is missing.");
+  }
+  if (Number(artifact.pkgBytes ?? 0) <= 10000000) {
+    blockers.push("Release manifest PKG byte size is not substantial.");
   }
   if (artifact.distributionScope !== "local ad-hoc signed macOS artifacts") {
     blockers.push("Release manifest should describe the current local ad-hoc signed artifact scope.");
@@ -141,6 +153,9 @@ ${appName} is an all-genre desktop beat workstation for direct beat composition,
 - DMG: ${artifact.dmgPath}
 - DMG bytes: ${artifact.dmgBytes}
 - DMG SHA-256: ${artifact.dmgSha256}
+- PKG: ${artifact.pkgPath}
+- PKG bytes: ${artifact.pkgBytes}
+- PKG SHA-256: ${artifact.pkgSha256}
 - Signing scope: ${artifact.distributionScope}
 - Signature kind: ${artifact.signatureKind}
 - Hardened runtime flag present: ${artifact.hardenedRuntimeFlagPresent ? "yes" : "no"}
