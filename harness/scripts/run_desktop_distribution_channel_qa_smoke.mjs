@@ -13,6 +13,7 @@ const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const releaseManifestPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-manifest.json`);
 const releaseNotesPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-notes.json`);
+const supportArtifactPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-support.json`);
 const updateFeedConfigPath = path.join(root, "build", "desktop", `${appName}-${platformArch}-update-feed-config.json`);
 const updateMetadataPolicyPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-update-metadata-policy.json`);
 const autoUpdateReadinessPath = path.join(root, "build", "desktop", `${appName}-${platformArch}-auto-update-readiness.json`);
@@ -123,7 +124,7 @@ function distributionChannelSignals() {
 }
 
 function summarizeInputs(input) {
-  const { manifest, releaseNotes, updateFeedConfig, updatePolicy, autoUpdate, developerIdSigning, notarization, gatekeeper } = input;
+  const { manifest, releaseNotes, supportArtifact, updateFeedConfig, updatePolicy, autoUpdate, developerIdSigning, notarization, gatekeeper } = input;
   const signing = manifest?.signing ?? {};
   const releaseArtifactReady =
     Boolean(manifest) &&
@@ -139,6 +140,15 @@ function summarizeInputs(input) {
     releaseNotes?.tokenValueRecorded === false &&
     releaseNotes?.channelValueRecorded === false &&
     releaseNotes?.releaseGateClaimedExternalDistribution === false;
+  const supportArtifactReady =
+    supportArtifact?.supportArtifactReady === true &&
+    supportArtifact?.supportUrlValueRecorded === false &&
+    supportArtifact?.releaseUrlValueRecorded === false &&
+    supportArtifact?.feedValueRecorded === false &&
+    supportArtifact?.credentialValueRecorded === false &&
+    supportArtifact?.tokenValueRecorded === false &&
+    supportArtifact?.channelValueRecorded === false &&
+    supportArtifact?.releaseGateClaimedExternalDistribution === false;
   const updateFeedConfigSummaryPresent = Boolean(updateFeedConfig);
   const updateMetadataPolicyReady = updatePolicy?.policyAvailable === true;
   const autoUpdateReady = autoUpdate?.autoUpdateReady === true;
@@ -156,6 +166,8 @@ function summarizeInputs(input) {
     releaseManifestPath: existsSync(releaseManifestPath) ? relative(releaseManifestPath) : null,
     releaseNotesArtifactReady,
     releaseNotesPath: existsSync(releaseNotesPath) ? relative(releaseNotesPath) : null,
+    supportArtifactReady,
+    supportArtifactPath: existsSync(supportArtifactPath) ? relative(supportArtifactPath) : null,
     updateFeedConfigSummaryPresent,
     updateFeedConfigPath: existsSync(updateFeedConfigPath) ? relative(updateFeedConfigPath) : null,
     updateMetadataPolicyReady,
@@ -200,6 +212,7 @@ async function createDistributionSummary() {
 
   const manifest = await readJsonIfExists(releaseManifestPath);
   const releaseNotes = await readJsonIfExists(releaseNotesPath);
+  const supportArtifact = await readJsonIfExists(supportArtifactPath);
   const updateFeedConfig = await readJsonIfExists(updateFeedConfigPath);
   const updatePolicy = await readJsonIfExists(updateMetadataPolicyPath);
   const autoUpdate = await readJsonIfExists(autoUpdateReadinessPath);
@@ -207,7 +220,7 @@ async function createDistributionSummary() {
   const notarization = await readJsonIfExists(notarizationPath);
   const gatekeeper = await readJsonIfExists(notarizedGatekeeperPath);
   const channel = distributionChannelSignals();
-  const inputs = summarizeInputs({ manifest, releaseNotes, updateFeedConfig, updatePolicy, autoUpdate, developerIdSigning, notarization, gatekeeper });
+  const inputs = summarizeInputs({ manifest, releaseNotes, supportArtifact, updateFeedConfig, updatePolicy, autoUpdate, developerIdSigning, notarization, gatekeeper });
   const blockers = [...channel.blockers];
 
   if (!inputs.releaseArtifactReady) {
@@ -215,6 +228,9 @@ async function createDistributionSummary() {
   }
   if (!inputs.releaseNotesArtifactReady) {
     blockers.push("Release notes artifact is missing or unavailable; run npm run desktop:release-notes-smoke first.");
+  }
+  if (!inputs.supportArtifactReady) {
+    blockers.push("Support artifact is missing or unavailable; run npm run desktop:support-artifact-smoke first.");
   }
   if (!inputs.updateFeedConfigSummaryPresent) {
     blockers.push("Update feed config summary is missing; run npm run desktop:update-feed-config-smoke first.");
@@ -245,6 +261,7 @@ async function createDistributionSummary() {
       channel.ready &&
       inputs.releaseArtifactReady &&
       inputs.releaseNotesArtifactReady &&
+      inputs.supportArtifactReady &&
       inputs.updateFeedConfigSummaryPresent &&
       inputs.updateMetadataPolicyReady &&
       inputs.autoUpdateReady &&
@@ -290,6 +307,7 @@ console.log(`- Summary: ${relative(summaryPath)}`);
 console.log(`- Channel metadata ready: ${summary.channel?.ready === true ? "yes" : "no"}`);
 console.log(`- Release artifact ready: ${summary.inputs?.releaseArtifactReady === true ? "yes" : "no"}`);
 console.log(`- Release notes artifact ready: ${summary.inputs?.releaseNotesArtifactReady === true ? "yes" : "no"}`);
+console.log(`- Support artifact ready: ${summary.inputs?.supportArtifactReady === true ? "yes" : "no"}`);
 console.log(`- Auto-update ready: ${summary.inputs?.autoUpdateReady === true ? "yes" : "no"}`);
 console.log(`- Developer ID signed: ${summary.inputs?.developerIdSigned === true ? "yes" : "no"}`);
 console.log(`- Notarized and stapled: ${summary.inputs?.notarizedAndStapled === true ? "yes" : "no"}`);
