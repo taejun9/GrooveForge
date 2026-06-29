@@ -885,7 +885,7 @@ function buildPriorityActions(remediation, context = {}) {
             ])
         : group.operatorActions ?? [];
       const rerunCommands = shouldReplacePlaceholders
-        ? unique(["npm run release:doctor", group.rerunCommands ?? []])
+        ? unique(["npm run release:current-blocker", "npm run release:doctor", group.rerunCommands ?? []])
         : group.rerunCommands ?? [];
       const placeholderBlocker = shouldReplacePlaceholders
         ? `Current action still contains ${placeholderKeys.length} placeholder keys for required release-channel metadata.`
@@ -2564,6 +2564,30 @@ if (nextActionsReport.bootstrapMode === false) {
       releaseChannelAction.readyCriteria.some((item) => item.includes("Distribution-channel QA")),
       "release channel metadata should explain distribution-channel QA readiness"
     );
+    if ((releaseChannelAction.placeholderKeys ?? []).length > 0) {
+      check(
+        releaseChannelAction.rerunCommands[0] === "npm run release:current-blocker",
+        "release channel placeholder cleanup should make current-blocker the first rerun command"
+      );
+      check(
+        releaseChannelAction.rerunCommands.includes("npm run release:doctor"),
+        "release channel placeholder cleanup should keep doctor rerun guidance"
+      );
+      check(
+        releaseChannelAction.actionChecklist.some((item) => item.includes("npm run release:current-blocker")),
+        "release channel placeholder cleanup checklist should tell operators to refresh current blocker evidence"
+      );
+      if (nextActionsReport.currentActionId === "release-channel-metadata") {
+        check(
+          nextActionsReport.currentRerunCommand === "npm run release:current-blocker",
+          "current placeholder action should expose current-blocker as the rerun command"
+        );
+        check(
+          nextActionsReport.currentCommandSequence.includes("npm run release:current-blocker"),
+          "current placeholder action command sequence should include current-blocker refresh"
+        );
+      }
+    }
   }
   const autoUpdateAction = nextActionsReport.priorityActions.find((action) => action.id === "auto-update-feed");
   if (autoUpdateAction) {
@@ -2723,7 +2747,7 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   check(nextActionsReport.currentEnvEditRowsCount === 4, "release channel metadata should keep four current env edit rows when placeholders remain");
   check(nextActionsReport.currentPlaceholderRemediationRowCount === 4, "release channel metadata should keep four current placeholder remediation rows when placeholders remain");
   check(nextActionsReport.currentProofChecklistRowCount === 3, "release channel metadata should surface three current proof checklist rows when placeholders remain");
-  check(nextActionsReport.currentCommandVerificationRowCount === 4, "release channel metadata should surface four current command verification rows when placeholders remain");
+  check(nextActionsReport.currentCommandVerificationRowCount === 5, "release channel metadata should surface five current command verification rows when placeholders remain");
   check(
     nextActionsReport.currentPlaceholderRemediationRows.every(
       (item) =>
@@ -2737,7 +2761,7 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
         item.sourceReady === true &&
         item.doctorReportReady === true &&
         item.nextCommand === "npm run release:doctor" &&
-        item.rerunCommand === "npm run release:doctor" &&
+        item.rerunCommand === "npm run release:current-blocker" &&
         item.valueRecorded === false
     ),
     "release channel metadata should include value-free current placeholder remediation rows sourced from release doctor"
@@ -2752,7 +2776,7 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
         item.evidencePaths.some((path) => path.endsWith("-distribution-channel-qa.json")) &&
         item.evidenceReady === true &&
         item.proofCommand === "npm run release:doctor" &&
-        item.rerunCommand === "npm run release:doctor" &&
+        item.rerunCommand === "npm run release:current-blocker" &&
         item.hardGateCommand === "npm run release:external-check" &&
         item.valueRecorded === false
     ),
@@ -2760,6 +2784,7 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   );
   check(
     nextActionsReport.currentCommandVerificationRows.some((item) => item.command === "npm run release:doctor" && item.role === "proof") &&
+      nextActionsReport.currentCommandVerificationRows.some((item) => item.command === "npm run release:current-blocker" && item.role === "rerun") &&
       nextActionsReport.currentCommandVerificationRows.some((item) => item.command === "npm run desktop:distribution-channel-qa-smoke" && item.role === "rerun") &&
       nextActionsReport.currentCommandVerificationRows.filter((item) => item.role === "prerequisite").length === 2,
     "release channel metadata should classify current command verification rows by prerequisite, proof, and rerun roles"
@@ -2772,7 +2797,7 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
         item.evidenceLabels.includes("Distribution-channel QA") &&
         item.evidenceReady === true &&
         item.proofCommand === "npm run release:doctor" &&
-        item.rerunCommand === "npm run release:doctor" &&
+        item.rerunCommand === "npm run release:current-blocker" &&
         item.hardGateCommand === "npm run release:external-check" &&
         item.valueRecorded === false
     ),
@@ -2802,7 +2827,10 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   check(nextActionsReport.currentOperatorAction.includes(nextActionsReport.currentEnvEditTarget), "release channel metadata should include the env edit target when placeholders remain");
   check(nextActionsReport.currentOperatorAction.includes("current release-channel keys (4)"), "release channel metadata should focus placeholder replacement on current action keys");
   check(nextActionsReport.currentActionChecklist.some((item) => item.includes("Edit current placeholder keys at")), "release channel metadata should include edit locations in the current action checklist");
-  check(nextActionsReport.currentActionChecklist.some((item) => item.includes("release:doctor")), "release channel metadata should include release doctor rerun in the current action checklist");
+  check(
+    nextActionsReport.currentActionChecklist.some((item) => item.includes("release:current-blocker")),
+    "release channel metadata should include current-blocker refresh in the current action checklist"
+  );
   check(releaseChannelAction?.nextCommand === "npm run release:doctor", "release channel metadata should rerun release doctor after placeholder cleanup");
   check(
     releaseChannelAction?.operatorActions.some((action) => action.includes(`Replace placeholder values in ${nextActionsReport.currentEnvEditTarget}`)),

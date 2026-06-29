@@ -496,7 +496,7 @@ function buildCurrentAction({
       `Replace placeholder values in ${currentEnvEditTarget} for the current release-channel keys: ${keySummary}.`,
       "Use real operator-owned release/support URLs and one allowed distribution channel value.",
       "Keep real values out of committed files and generated reports.",
-      "Rerun `npm run release:doctor` after editing.",
+      "Rerun `npm run release:current-blocker` after editing to refresh the value-free blocker evidence.",
       "Rerun `npm run release:next-actions` after the doctor report updates."
     ];
     return {
@@ -508,7 +508,7 @@ function buildCurrentAction({
       currentActionRequiredKeys: releaseChannelMetadataKeys,
       currentActionPlaceholderKeys: releaseChannelPlaceholderKeys,
       currentActionPrerequisiteCommands: [],
-      currentActionRerunCommands: ["npm run release:doctor", "npm run release:next-actions"],
+      currentActionRerunCommands: ["npm run release:current-blocker", "npm run release:doctor", "npm run release:next-actions"],
       currentActionChecklist: checklist
     };
   }
@@ -1376,7 +1376,15 @@ if (releaseDoctorReport.localEnvFileLoaded === true && releaseChannelMetadataKey
   check(releaseDoctorReport.currentActionId === "replace-release-channel-placeholders", "release doctor should prioritize release-channel placeholder cleanup");
   check(releaseDoctorReport.currentActionNextCommand === "npm run release:doctor", "release doctor should rerun itself after placeholder cleanup");
   check(releaseDoctorReport.currentActionCommandSequence.includes("npm run release:doctor"), "release doctor placeholder command sequence should include doctor rerun");
+  check(
+    releaseDoctorReport.currentActionCommandSequence.includes("npm run release:current-blocker"),
+    "release doctor placeholder command sequence should include current-blocker refresh"
+  );
   check(releaseDoctorReport.currentActionCommandSequence.includes("npm run release:next-actions"), "release doctor placeholder command sequence should include next-actions rerun");
+  check(
+    releaseDoctorReport.currentActionChecklist.some((item) => item.includes("npm run release:current-blocker")),
+    "release doctor placeholder checklist should tell operators to refresh current blocker evidence after editing"
+  );
   check(
     releaseDoctorReport.currentActionEvidenceLabels.includes("Distribution private inputs") &&
       releaseDoctorReport.currentActionEvidenceLabels.includes("Distribution-channel QA"),
