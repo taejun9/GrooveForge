@@ -3742,6 +3742,9 @@ export function CommandReferenceDialog({
                 <button data-testid="command-reference-empty-show-all" onClick={resetCommandReferenceSearch} type="button">
                   Show All
                 </button>
+                <button data-testid="command-reference-empty-open-quick-actions" onClick={onOpenQuickActions} type="button">
+                  Quick Actions
+                </button>
               </div>
             </div>
           ) : null}
