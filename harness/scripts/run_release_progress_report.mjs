@@ -107,8 +107,10 @@ function buildUserFacingCompletionSummary(report, completedPlanSummary) {
     userFacingCompletionStatus: completionStatus,
     userFacingCompletionSummary:
       "Local app, beat-workstation, desktop package, project IO, and release evidence are ready; final external distribution proof remains operator-owned.",
+    userFacingNextProofTarget: report.externalProofBundleCurrentProofTarget,
     userFacingNextBlocker: report.externalProofBundleCurrentFirstBlocker,
     userFacingNextCommand: report.externalProofBundleCurrentNextCommand,
+    userFacingOperatorAction: report.externalProofBundleCurrentOperatorAction,
     userFacingCompletionEvidenceSummary:
       "local release ready, desktop project IO ready, PKG payload project IO ready, external proof bundle ready",
     userFacingReportCadence: completedPlanSummary.tenPlanProgressReportCadence,
@@ -130,8 +132,10 @@ function buildExternalProofBundleSummary(externalProofBundle) {
     externalProofBundleGateRequirementReadyCount: integerValue(externalProofBundle.gateRequirementReadyCount),
     externalProofBundleGateRequirementBlockedCount: integerValue(externalProofBundle.gateRequirementBlockedCount),
     externalProofBundleCurrentFocus: textValue(externalProofBundle.currentFocus),
+    externalProofBundleCurrentProofTarget: textValue(externalProofBundle.currentFocus),
     externalProofBundleCurrentNextCommand: textValue(externalProofBundle.currentNextCommand),
     externalProofBundleCurrentFirstBlocker: textValue(externalProofBundle.currentFirstBlocker),
+    externalProofBundleCurrentOperatorAction: textValue(externalProofBundle.currentOperatorAction),
     externalProofBundleCurrentRequiredKeyCount: integerValue(externalProofBundle.currentRequiredKeyCount),
     externalProofBundleCurrentRequiredKeySummary: textValue(externalProofBundle.currentRequiredKeySummary, "none"),
     externalProofBundleCurrentRequiredKeys: stringArrayValue(externalProofBundle.currentRequiredKeys),
@@ -190,8 +194,10 @@ function buildMarkdown(report) {
 - External proof bundle ready: ${report.externalProofBundleReady ? "yes" : "no"}
 - External proof artifacts present: ${report.externalProofBundleProofArtifactPresentCount}/${report.externalProofBundleProofArtifactCount} (missing: ${report.externalProofBundleProofArtifactMissingSummary})
 - External proof gate requirements ready: ${report.externalProofBundleGateRequirementReadyCount}/${report.externalProofBundleGateRequirementTotal} (blocked: ${report.externalProofBundleGateRequirementBlockedCount})
+- External proof current target: ${report.externalProofBundleCurrentProofTarget}
 - External proof current next command: \`${report.externalProofBundleCurrentNextCommand}\`
 - External proof current first blocker: ${report.externalProofBundleCurrentFirstBlocker}
+- External proof current operator action: ${report.externalProofBundleCurrentOperatorAction}
 - External proof current required keys: ${report.externalProofBundleCurrentRequiredKeyCount} (${report.externalProofBundleCurrentRequiredKeySummary})
 - External proof current placeholder keys: ${report.externalProofBundleCurrentPlaceholderKeyCount} (${report.externalProofBundleCurrentPlaceholderKeySummary})
 - External proof current env edit target: ${report.externalProofBundleCurrentEnvEditTarget}
@@ -214,8 +220,10 @@ function buildMarkdown(report) {
 - Remaining completion for status reports: ${formatUserPercent(report.userFacingRemainingPercent)}
 - Completion status wording: ${report.userFacingCompletionStatus}
 - Completion evidence summary: ${report.userFacingCompletionEvidenceSummary}
+- Next proof target to report: ${report.userFacingNextProofTarget}
 - Next blocker to report: ${report.userFacingNextBlocker}
 - Next command to report: \`${report.userFacingNextCommand}\`
+- Operator action to report: ${report.userFacingOperatorAction}
 - Report cadence: ${report.userFacingReportCadence}
 - Completed plan source: ${report.completedPlanSource}
 - Completed plan count: ${report.completedPlanCount}
@@ -245,8 +253,10 @@ function buildMarkdown(report) {
 - Gate requirements ready: ${report.externalProofBundleGateRequirementReadyCount}/${report.externalProofBundleGateRequirementTotal}
 - Gate requirements blocked: ${report.externalProofBundleGateRequirementBlockedCount}
 - Current focus: ${report.externalProofBundleCurrentFocus}
+- Current proof target: ${report.externalProofBundleCurrentProofTarget}
 - Current next command: \`${report.externalProofBundleCurrentNextCommand}\`
 - Current first blocker: ${report.externalProofBundleCurrentFirstBlocker}
+- Current operator action: ${report.externalProofBundleCurrentOperatorAction}
 - Current required keys: ${report.externalProofBundleCurrentRequiredKeyCount} (${report.externalProofBundleCurrentRequiredKeySummary})
 - Current placeholder keys: ${report.externalProofBundleCurrentPlaceholderKeyCount} (${report.externalProofBundleCurrentPlaceholderKeySummary})
 - Current placeholder edit locations: ${report.externalProofBundleCurrentPlaceholderEditLocationCount} (${report.externalProofBundleCurrentPlaceholderEditLocationSummary})
@@ -400,8 +410,10 @@ check(releaseProgressReport.userFacingCompletionPercent === (releaseProgressRepo
 check(releaseProgressReport.userFacingRemainingPercent === (releaseProgressReport.externalDistributionGateReady ? 0 : 0.000001), "release progress report should include user-facing remaining completion percent");
 check(typeof releaseProgressReport.userFacingCompletionStatus === "string" && releaseProgressReport.userFacingCompletionStatus.length > 0, "release progress report should include user-facing completion status wording");
 check(typeof releaseProgressReport.userFacingCompletionSummary === "string" && releaseProgressReport.userFacingCompletionSummary.length > 0, "release progress report should include user-facing completion summary");
+check(typeof releaseProgressReport.userFacingNextProofTarget === "string" && releaseProgressReport.userFacingNextProofTarget.length > 0, "release progress report should include user-facing next proof target");
 check(typeof releaseProgressReport.userFacingNextBlocker === "string" && releaseProgressReport.userFacingNextBlocker.length > 0, "release progress report should include user-facing next blocker");
 check(typeof releaseProgressReport.userFacingNextCommand === "string" && releaseProgressReport.userFacingNextCommand.length > 0, "release progress report should include user-facing next command");
+check(typeof releaseProgressReport.userFacingOperatorAction === "string" && releaseProgressReport.userFacingOperatorAction.length > 0, "release progress report should include user-facing operator action");
 check(releaseProgressReport.userFacingReportCadence === "report after each completed work and every 10 completed plans", "release progress report should include user-facing report cadence");
 check(releaseProgressReport.userFacingCompletionPrivateValueRecorded === false, "release progress report should not record private values in the user-facing completion summary");
 check(releaseProgressReport.completedPlanSource === "docs/exec_plans/completed", "release progress report should identify completed plan source");
@@ -432,8 +444,10 @@ check(Number.isInteger(releaseProgressReport.externalProofBundleGateRequirementT
 check(Number.isInteger(releaseProgressReport.externalProofBundleGateRequirementReadyCount), "release progress report should include external proof gate requirement ready count");
 check(Number.isInteger(releaseProgressReport.externalProofBundleGateRequirementBlockedCount), "release progress report should include external proof gate requirement blocked count");
 check(releaseProgressReport.externalProofBundleGateRequirementBlockedCount === releaseProgressReport.externalProofBundleGateRequirementTotal - releaseProgressReport.externalProofBundleGateRequirementReadyCount, "release progress report proof gate blocked count should match total minus ready count");
+check(releaseProgressReport.externalProofBundleCurrentProofTarget.length > 0, "release progress report should include external proof current proof target");
 check(releaseProgressReport.externalProofBundleCurrentNextCommand.length > 0, "release progress report should include external proof current next command");
 check(releaseProgressReport.externalProofBundleCurrentFirstBlocker.length > 0, "release progress report should include external proof current first blocker");
+check(releaseProgressReport.externalProofBundleCurrentOperatorAction.length > 0, "release progress report should include external proof current operator action");
 check(Number.isInteger(releaseProgressReport.externalProofBundleCurrentRequiredKeyCount), "release progress report should include external proof current required key count");
 check(typeof releaseProgressReport.externalProofBundleCurrentRequiredKeySummary === "string" && releaseProgressReport.externalProofBundleCurrentRequiredKeySummary.length > 0, "release progress report should include external proof current required key summary");
 check(Array.isArray(releaseProgressReport.externalProofBundleCurrentRequiredKeys), "release progress report should include external proof current required key names");
@@ -487,7 +501,11 @@ check(markdown.includes("Local release readiness:"), "release progress Markdown 
 check(markdown.includes("PKG payload project IO evidence ready:"), "release progress Markdown should include PKG payload project IO readiness");
 check(markdown.includes("External Proof Bundle"), "release progress Markdown should include external proof bundle summary");
 check(markdown.includes("External proof artifacts present:"), "release progress Markdown should include external proof artifact coverage");
+check(markdown.includes("External proof current target:"), "release progress Markdown should include external proof current target");
+check(markdown.includes("External proof current operator action:"), "release progress Markdown should include external proof current operator action");
 check(markdown.includes("External proof current required keys:"), "release progress Markdown should include external proof current required key summary");
+check(markdown.includes("Next proof target to report:"), "release progress Markdown should include user-facing next proof target");
+check(markdown.includes("Operator action to report:"), "release progress Markdown should include user-facing operator action");
 check(markdown.includes("Current env edit target:"), "release progress Markdown should include current env edit target");
 check(markdown.includes("Current placeholder remediation rows:"), "release progress Markdown should include current placeholder remediation summary");
 check(markdown.includes("Current command sequence:"), "release progress Markdown should include current command sequence summary");
@@ -521,8 +539,10 @@ console.log(`- Remediation groups ready: ${releaseProgressReport.remediationRead
 console.log(`- External proof bundle ready: ${releaseProgressReport.externalProofBundleReady ? "yes" : "no"}`);
 console.log(`- External proof artifacts present: ${releaseProgressReport.externalProofBundleProofArtifactPresentCount}/${releaseProgressReport.externalProofBundleProofArtifactCount} (missing: ${releaseProgressReport.externalProofBundleProofArtifactMissingSummary})`);
 console.log(`- External proof gate requirements ready: ${releaseProgressReport.externalProofBundleGateRequirementReadyCount}/${releaseProgressReport.externalProofBundleGateRequirementTotal} (blocked: ${releaseProgressReport.externalProofBundleGateRequirementBlockedCount})`);
+console.log(`- External proof current target: ${releaseProgressReport.externalProofBundleCurrentProofTarget}`);
 console.log(`- External proof current next command: ${releaseProgressReport.externalProofBundleCurrentNextCommand}`);
 console.log(`- External proof current first blocker: ${releaseProgressReport.externalProofBundleCurrentFirstBlocker}`);
+console.log(`- External proof current operator action: ${releaseProgressReport.externalProofBundleCurrentOperatorAction}`);
 console.log(`- External proof current required keys: ${releaseProgressReport.externalProofBundleCurrentRequiredKeyCount} (${releaseProgressReport.externalProofBundleCurrentRequiredKeySummary})`);
 console.log(`- External proof current placeholder keys: ${releaseProgressReport.externalProofBundleCurrentPlaceholderKeyCount} (${releaseProgressReport.externalProofBundleCurrentPlaceholderKeySummary})`);
 console.log(`- External proof current env edit target: ${releaseProgressReport.externalProofBundleCurrentEnvEditTarget}`);
