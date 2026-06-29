@@ -414,6 +414,43 @@ function buildCurrentActionReadyCriteria(actionId) {
   return criteriaByAction[actionId] ?? ["Rerun commands complete and redacted evidence no longer lists this action as blocked."];
 }
 
+function buildCompletionGapSummary({
+  currentActionLabel = "No pending release doctor action",
+  currentActionNextCommand = "npm run release:doctor",
+  currentActionFirstBlocker = "none",
+  currentActionEvidenceLabelSummary = "none",
+  currentActionReadyCriteriaSummary = "none",
+  currentActionChecklistSummary = "none",
+  externalDistributionReady = false,
+  hardExternalGateCommand = "npm run release:external-check"
+} = {}) {
+  const completionGapStatus = externalDistributionReady ? "hard gate confirmation pending" : "external proof pending";
+  const completionGapCurrentProofTarget = currentActionLabel;
+  const completionGapClaimBlockers = unique([
+    externalDistributionReady ? "" : `${completionGapCurrentProofTarget} is not fully proven in redacted release doctor evidence.`,
+    currentActionFirstBlocker !== "none" ? currentActionFirstBlocker : "",
+    `Hard external distribution gate must pass via ${hardExternalGateCommand}.`,
+    "This release doctor stays value-free and cannot itself claim release upload, signing, notarization, Gatekeeper approval, auto-update, manual QA approval, app-store submission, or external distribution completion."
+  ]);
+  return {
+    completionGapStatus,
+    completionGapSummary: `${completionGapStatus}: ${completionGapCurrentProofTarget} is the next proof target before any external distribution completion claim.`,
+    completionGapCompletionStage: externalDistributionReady ? "external distribution evidence ready; hard gate pending" : "external distribution pending",
+    completionGapCurrentProofTarget,
+    completionGapNextProofCommand: currentActionNextCommand,
+    completionGapHardGateCommand: hardExternalGateCommand,
+    completionGapFirstBlocker: currentActionFirstBlocker || "none",
+    completionGapEvidenceSummary: currentActionEvidenceLabelSummary,
+    completionGapReadyCriteriaSummary: currentActionReadyCriteriaSummary,
+    completionGapActionChecklistSummary: currentActionChecklistSummary,
+    completionGapClaimBlockerCount: completionGapClaimBlockers.length,
+    completionGapClaimBlockerSummary: completionGapClaimBlockers.length > 0 ? `${completionGapClaimBlockers.length} value-free blockers` : "none",
+    completionGapClaimBlockers,
+    completionGapClaimedExternalDistribution: false,
+    completionGapValueRecorded: false
+  };
+}
+
 function buildCurrentAction({
   localEnvFileLoaded,
   localEnvPlaceholderKeys,
@@ -641,6 +678,13 @@ function buildMarkdown(report) {
 
 - Doctor report ready: ${readyLabel(report.releaseDoctorReportReady)}
 - External distribution ready: ${readyLabel(report.externalDistributionReady)}
+- Completion gap status: ${report.completionGapStatus}
+- Completion gap summary: ${report.completionGapSummary}
+- Completion gap proof target: ${report.completionGapCurrentProofTarget}
+- Completion gap next proof command: \`${report.completionGapNextProofCommand}\`
+- Completion gap hard gate command: \`${report.completionGapHardGateCommand}\`
+- Completion gap first blocker: ${report.completionGapFirstBlocker}
+- Completion gap claim blockers: ${report.completionGapClaimBlockerCount} (${report.completionGapClaimBlockerSummary})
 - Local env file loaded: ${readyLabel(report.localEnvFileLoaded)}
 - Local env ready: ${readyLabel(report.localEnvReady)}
 - Distribution env template ready: ${readyLabel(report.distributionEnvTemplateReady)}
@@ -691,6 +735,23 @@ function buildMarkdown(report) {
 | targeted check | command |
 |---|---|
 ${formatCommandRows(report.targetedCommands)}
+
+## Completion Gap
+
+- Status: ${report.completionGapStatus}
+- Summary: ${report.completionGapSummary}
+- Completion stage: ${report.completionGapCompletionStage}
+- Proof target: ${report.completionGapCurrentProofTarget}
+- Next proof command: \`${report.completionGapNextProofCommand}\`
+- Hard gate command: \`${report.completionGapHardGateCommand}\`
+- First blocker: ${report.completionGapFirstBlocker}
+- Evidence summary: ${report.completionGapEvidenceSummary}
+- Ready criteria summary: ${report.completionGapReadyCriteriaSummary}
+- Action checklist summary: ${report.completionGapActionChecklistSummary}
+- External distribution claimed by this doctor: ${readyLabel(report.completionGapClaimedExternalDistribution)}
+- Value recorded: ${readyLabel(report.completionGapValueRecorded)}
+
+${formatChecklistList(report.completionGapClaimBlockers)}
 
 ## Current Action
 
@@ -839,6 +900,16 @@ const currentAction = enrichCurrentAction(
     artifacts: artifactRows
   }
 );
+const completionGap = buildCompletionGapSummary({
+  currentActionLabel: currentAction.currentActionLabel,
+  currentActionNextCommand: currentAction.currentActionNextCommand,
+  currentActionFirstBlocker: currentAction.currentActionFirstBlocker,
+  currentActionEvidenceLabelSummary: currentAction.currentActionEvidenceLabelSummary,
+  currentActionReadyCriteriaSummary: currentAction.currentActionReadyCriteriaSummary,
+  currentActionChecklistSummary: currentAction.currentActionChecklistSummary,
+  externalDistributionReady,
+  hardExternalGateCommand: "npm run release:external-check"
+});
 
 const releaseDoctorReport = {
   appName,
@@ -865,6 +936,7 @@ const releaseDoctorReport = {
   currentEnvEditTarget,
   currentEnvConfiguredFileKey: distributionLocalEnvDefaults.configuredFileKey,
   ...currentAction,
+  ...completionGap,
   updateFeedCurrentEnvironmentReady: updateFeedConfig.currentEnvironmentReady === true,
   privateInputsReady: distributionPrivateInputs.privateInputsReady === true,
   privateInputGroupTotal: privateInputGroups.length,
@@ -951,6 +1023,39 @@ check(releaseDoctorReport.releasePrepareEnvReady === true, "release doctor shoul
 check(releaseDoctorReport.releasePrepareEnvScaffoldWritten === true, "release doctor should include written prepare-env scaffold evidence");
 check(releaseDoctorReport.releasePrepareEnvLocalWriteRequested === false, "release doctor should not request a local env write");
 check(typeof releaseDoctorReport.externalDistributionReady === "boolean", "release doctor should include external distribution readiness");
+check(typeof releaseDoctorReport.completionGapStatus === "string" && releaseDoctorReport.completionGapStatus.length > 0, "release doctor should include the completion gap status");
+check(typeof releaseDoctorReport.completionGapSummary === "string" && releaseDoctorReport.completionGapSummary.length > 0, "release doctor should include the completion gap summary");
+check(
+  typeof releaseDoctorReport.completionGapCurrentProofTarget === "string" && releaseDoctorReport.completionGapCurrentProofTarget.length > 0,
+  "release doctor should include the completion gap proof target"
+);
+check(
+  releaseDoctorReport.completionGapCurrentProofTarget === releaseDoctorReport.currentActionLabel,
+  "release doctor completion gap proof target should match current action"
+);
+check(
+  releaseDoctorReport.completionGapNextProofCommand === releaseDoctorReport.currentActionNextCommand,
+  "release doctor completion gap next proof command should match current next command"
+);
+check(
+  releaseDoctorReport.completionGapHardGateCommand === releaseDoctorReport.hardExternalGateCommand,
+  "release doctor completion gap should keep the hard gate command"
+);
+check(
+  releaseDoctorReport.completionGapFirstBlocker === releaseDoctorReport.currentActionFirstBlocker,
+  "release doctor completion gap first blocker should match current first blocker"
+);
+check(Array.isArray(releaseDoctorReport.completionGapClaimBlockers), "release doctor should include completion gap claim blockers");
+check(
+  releaseDoctorReport.completionGapClaimBlockerCount === releaseDoctorReport.completionGapClaimBlockers.length,
+  "release doctor completion gap blocker count should match listed blockers"
+);
+check(
+  typeof releaseDoctorReport.completionGapClaimBlockerSummary === "string" && releaseDoctorReport.completionGapClaimBlockerSummary.length > 0,
+  "release doctor should include the completion gap blocker summary"
+);
+check(releaseDoctorReport.completionGapClaimedExternalDistribution === false, "release doctor completion gap should not claim external distribution");
+check(releaseDoctorReport.completionGapValueRecorded === false, "release doctor completion gap should not record values");
 check(typeof releaseDoctorReport.privateInputsReady === "boolean", "release doctor should include private-input readiness");
 check(Array.isArray(releaseDoctorReport.privateInputGroups), "release doctor should include private-input groups");
 check(Number.isInteger(releaseDoctorReport.localEnvPlaceholderKeyCount), "release doctor should include local env placeholder key count");
@@ -1214,6 +1319,13 @@ check(releaseDoctorReport.signingAttemptedByThisDoctor === false, "release docto
 check(releaseDoctorReport.releaseGateClaimedExternalDistribution === false, "release doctor should not claim external distribution completion");
 check(releaseDoctorReport.sourceClaimedExternalDistribution === false, "release doctor source artifacts should not claim external distribution completion");
 check(markdown.includes("Release Doctor"), "release doctor Markdown should include title");
+check(markdown.includes("Completion gap status:"), "release doctor Markdown should include completion gap status");
+check(markdown.includes("Completion gap proof target:"), "release doctor Markdown should include completion gap proof target");
+check(markdown.includes("Completion gap next proof command:"), "release doctor Markdown should include completion gap next proof command");
+check(markdown.includes("Completion gap hard gate command:"), "release doctor Markdown should include completion gap hard gate command");
+check(markdown.includes("Completion gap claim blockers:"), "release doctor Markdown should include completion gap claim blocker count");
+check(markdown.includes("Completion Gap"), "release doctor Markdown should include completion gap section");
+check(markdown.includes("Proof target:"), "release doctor Markdown should include completion gap proof target details");
 check(markdown.includes("Local env placeholder keys:"), "release doctor Markdown should include placeholder key count");
 check(markdown.includes("Local Env Placeholder Keys"), "release doctor Markdown should include placeholder key section");
 check(markdown.includes("Current action:"), "release doctor Markdown should include current action status");
@@ -1245,6 +1357,7 @@ check(markdown.includes("Doctor command: `npm run release:doctor`"), "release do
 check(markdown.includes("Prepare env command: `npm run release:prepare-env`"), "release doctor Markdown should include the prepare-env command");
 check(markdown.includes("Progress command: `npm run release:progress`"), "release doctor Markdown should include the progress command");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "release doctor Markdown should keep the hard external gate command");
+check(markdown.includes("Hard gate command: `npm run release:external-check`"), "release doctor Markdown should include completion gap hard gate details");
 check(!/https?:\/\//i.test(markdown), "release doctor Markdown should not include public or private URL values");
 check(!/https?:\/\//i.test(serializedReport), "release doctor JSON should not include public or private URL values");
 
@@ -1255,6 +1368,12 @@ if (failures.length > 0) {
 console.log("GrooveForge release doctor passed.");
 console.log(`- Markdown: ${relative(releaseDoctorMarkdownPath)}`);
 console.log(`- JSON: ${relative(releaseDoctorJsonPath)}`);
+console.log(`- Completion gap status: ${releaseDoctorReport.completionGapStatus}`);
+console.log(`- Completion gap summary: ${releaseDoctorReport.completionGapSummary}`);
+console.log(`- Completion gap proof target: ${releaseDoctorReport.completionGapCurrentProofTarget}`);
+console.log(`- Completion gap next proof command: ${releaseDoctorReport.completionGapNextProofCommand}`);
+console.log(`- Completion gap hard gate command: ${releaseDoctorReport.completionGapHardGateCommand}`);
+console.log(`- Completion gap claim blockers: ${releaseDoctorReport.completionGapClaimBlockerCount} (${releaseDoctorReport.completionGapClaimBlockerSummary})`);
 console.log(`- Local env file loaded: ${releaseDoctorReport.localEnvFileLoaded ? "yes" : "no"}`);
 console.log(`- Local env ready: ${releaseDoctorReport.localEnvReady ? "yes" : "no"}`);
 console.log(`- Release prepare env ready: ${releaseDoctorReport.releasePrepareEnvReady ? "yes" : "no"}`);
