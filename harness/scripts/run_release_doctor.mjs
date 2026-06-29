@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { distributionLocalEnvDefaults } from "./distribution_local_env.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -16,6 +17,12 @@ const summaryRoot = path.join(root, "build", "desktop");
 const releaseDoctorMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-doctor.md`);
 const releaseDoctorJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-doctor.json`);
 const failures = [];
+const releaseChannelMetadataKeys = [
+  "GROOVEFORGE_DISTRIBUTION_CHANNEL",
+  "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
+  "GROOVEFORGE_RELEASE_NOTES_URL",
+  "GROOVEFORGE_SUPPORT_URL"
+];
 
 const targetedChecks = [
   {
@@ -155,6 +162,153 @@ function formatBlockerRows(blockers) {
   return blockers.map((blocker, index) => `| ${index + 1} | ${escapeCell(blocker)} |`).join("\n");
 }
 
+function formatSummary(items) {
+  return Array.isArray(items) && items.length > 0 ? items.join(", ") : "none";
+}
+
+function formatChecklistList(items) {
+  return Array.isArray(items) && items.length > 0 ? items.map((item, index) => `${index + 1}. ${item}`).join("\n") : "1. None.";
+}
+
+function displayLocalEnvTarget(filePath) {
+  if (typeof filePath !== "string" || filePath.trim().length === 0) {
+    return distributionLocalEnvDefaults.defaultEnvFileName;
+  }
+  const absolute = path.isAbsolute(filePath) ? filePath : path.resolve(root, filePath);
+  return path.relative(root, absolute) || distributionLocalEnvDefaults.defaultEnvFileName;
+}
+
+function currentLocalEnvEditTarget(localEnvPresentFiles = []) {
+  const configuredPath = process.env[distributionLocalEnvDefaults.configuredFileKey]?.trim();
+  if (configuredPath) {
+    return displayLocalEnvTarget(configuredPath);
+  }
+  const firstPresentFile = Array.isArray(localEnvPresentFiles) ? localEnvPresentFiles[0] : "";
+  return displayLocalEnvTarget(firstPresentFile || distributionLocalEnvDefaults.defaultEnvFileName);
+}
+
+function buildCurrentAction({
+  localEnvFileLoaded,
+  localEnvPlaceholderKeys,
+  currentEnvEditTarget,
+  channelMetadataReady,
+  distributionChannelQa,
+  externalDistributionReady,
+  firstBlockers
+}) {
+  const placeholderKeys = Array.isArray(localEnvPlaceholderKeys) ? localEnvPlaceholderKeys : [];
+  const releaseChannelPlaceholderKeys = releaseChannelMetadataKeys.filter((key) => placeholderKeys.includes(key));
+  if (!localEnvFileLoaded) {
+    const checklist = [
+      `Run \`npm run release:prepare-env\` to create the ignored local env scaffold at ${currentEnvEditTarget}.`,
+      "Keep real release values out of committed files and generated reports.",
+      "Rerun `npm run release:doctor` after the scaffold exists."
+    ];
+    return {
+      currentActionId: "prepare-local-distribution-env",
+      currentActionLabel: "Create ignored local distribution env",
+      currentActionNextCommand: "npm run release:prepare-env",
+      currentActionFirstBlocker: "Ignored local distribution env file is not loaded.",
+      currentActionOperatorAction: `Run \`npm run release:prepare-env\` to create ${currentEnvEditTarget}, then replace release-channel placeholder values outside committed files.`,
+      currentActionRequiredKeys: releaseChannelMetadataKeys,
+      currentActionPlaceholderKeys: [],
+      currentActionRerunCommands: ["npm run release:doctor"],
+      currentActionChecklist: checklist
+    };
+  }
+  if (releaseChannelPlaceholderKeys.length > 0) {
+    const keySummary = releaseChannelPlaceholderKeys.join(", ");
+    const checklist = [
+      `Replace placeholder values in ${currentEnvEditTarget} for the current release-channel keys: ${keySummary}.`,
+      "Use real operator-owned release/support URLs and one allowed distribution channel value.",
+      "Keep real values out of committed files and generated reports.",
+      "Rerun `npm run release:doctor` after editing.",
+      "Rerun `npm run release:next-actions` after the doctor report updates."
+    ];
+    return {
+      currentActionId: "replace-release-channel-placeholders",
+      currentActionLabel: "Replace release-channel metadata placeholders",
+      currentActionNextCommand: "npm run release:doctor",
+      currentActionFirstBlocker: `Current release-channel metadata still contains ${releaseChannelPlaceholderKeys.length} placeholder keys.`,
+      currentActionOperatorAction: `Replace placeholder values in ${currentEnvEditTarget} for the current release-channel keys (${releaseChannelPlaceholderKeys.length}): ${keySummary}.`,
+      currentActionRequiredKeys: releaseChannelMetadataKeys,
+      currentActionPlaceholderKeys: releaseChannelPlaceholderKeys,
+      currentActionRerunCommands: ["npm run release:doctor", "npm run release:next-actions"],
+      currentActionChecklist: checklist
+    };
+  }
+  if (!channelMetadataReady) {
+    const firstChannelBlocker =
+      (Array.isArray(distributionChannelQa.channel?.blockers) && distributionChannelQa.channel.blockers[0]) ||
+      (Array.isArray(distributionChannelQa.blockers) && distributionChannelQa.blockers[0]) ||
+      "Distribution-channel metadata is not ready.";
+    const checklist = [
+      "Rerun distribution-channel QA after release-channel metadata is configured.",
+      "Keep URL, support, feed, credential, token, identity, and channel values out of generated reports.",
+      "Rerun `npm run release:next-actions` after channel metadata is ready."
+    ];
+    return {
+      currentActionId: "verify-release-channel-metadata",
+      currentActionLabel: "Verify release-channel metadata",
+      currentActionNextCommand: "npm run desktop:distribution-channel-qa-smoke",
+      currentActionFirstBlocker: firstChannelBlocker,
+      currentActionOperatorAction: "Run distribution-channel QA after the current release-channel metadata keys have real operator-owned values.",
+      currentActionRequiredKeys: releaseChannelMetadataKeys,
+      currentActionPlaceholderKeys: [],
+      currentActionRerunCommands: ["npm run desktop:distribution-channel-qa-smoke", "npm run release:next-actions"],
+      currentActionChecklist: checklist
+    };
+  }
+  if (!externalDistributionReady) {
+    const firstBlocker = Array.isArray(firstBlockers) && firstBlockers.length > 0 ? firstBlockers[0] : "External distribution is not ready.";
+    const checklist = [
+      "Run `npm run release:next-actions` for the next external proof target.",
+      "Complete the remaining value-free evidence chain before claiming external distribution."
+    ];
+    return {
+      currentActionId: "continue-external-proof-chain",
+      currentActionLabel: "Continue external proof chain",
+      currentActionNextCommand: "npm run release:next-actions",
+      currentActionFirstBlocker: firstBlocker,
+      currentActionOperatorAction: "Use external next-actions to select the next proof target after release-channel metadata.",
+      currentActionRequiredKeys: [],
+      currentActionPlaceholderKeys: [],
+      currentActionRerunCommands: ["npm run release:next-actions"],
+      currentActionChecklist: checklist
+    };
+  }
+  return {
+    currentActionId: "run-hard-external-distribution-gate",
+    currentActionLabel: "Run hard external distribution gate",
+    currentActionNextCommand: "npm run release:external-check",
+    currentActionFirstBlocker: "none",
+    currentActionOperatorAction: "Run the hard external distribution gate after every redacted readiness signal is ready.",
+    currentActionRequiredKeys: [],
+    currentActionPlaceholderKeys: [],
+    currentActionRerunCommands: ["npm run release:external-check"],
+    currentActionChecklist: ["Run `npm run release:external-check` and archive the resulting value-free evidence."]
+  };
+}
+
+function enrichCurrentAction(action) {
+  const currentActionRequiredKeys = Array.isArray(action.currentActionRequiredKeys) ? action.currentActionRequiredKeys : [];
+  const currentActionPlaceholderKeys = Array.isArray(action.currentActionPlaceholderKeys) ? action.currentActionPlaceholderKeys : [];
+  const currentActionChecklist = Array.isArray(action.currentActionChecklist) ? action.currentActionChecklist : [];
+  const currentActionRerunCommands = Array.isArray(action.currentActionRerunCommands) ? action.currentActionRerunCommands : [];
+  return {
+    ...action,
+    currentActionRequiredKeyCount: currentActionRequiredKeys.length,
+    currentActionRequiredKeySummary: formatSummary(currentActionRequiredKeys),
+    currentActionPlaceholderKeyCount: currentActionPlaceholderKeys.length,
+    currentActionPlaceholderKeySummary: formatSummary(currentActionPlaceholderKeys),
+    currentActionChecklistCount: currentActionChecklist.length,
+    currentActionChecklistSummary: currentActionChecklist.length > 0 ? `${currentActionChecklist.length} value-free steps` : "none",
+    currentActionRerunCommandCount: currentActionRerunCommands.length,
+    currentActionRerunCommandSummary: formatSummary(currentActionRerunCommands),
+    currentActionValueRecorded: false
+  };
+}
+
 function runTargetedChecks() {
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
   for (const item of targetedChecks) {
@@ -218,6 +372,13 @@ function buildMarkdown(report) {
 - Private inputs ready: ${readyLabel(report.privateInputsReady)}
 - Private input groups ready: ${report.privateInputGroupReadyCount}/${report.privateInputGroupTotal}
 - Local env placeholder keys: ${report.localEnvPlaceholderKeyCount}
+- Current action: ${report.currentActionLabel}
+- Current next command: \`${report.currentActionNextCommand}\`
+- Current first blocker: ${report.currentActionFirstBlocker}
+- Current env edit target: ${report.currentEnvEditTarget}
+- Current action required keys: ${report.currentActionRequiredKeyCount} (${report.currentActionRequiredKeySummary})
+- Current action placeholder keys: ${report.currentActionPlaceholderKeyCount} (${report.currentActionPlaceholderKeySummary})
+- Current action checklist: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})
 - Update feed current environment ready: ${readyLabel(report.updateFeedCurrentEnvironmentReady)}
 - Channel metadata ready: ${readyLabel(report.channelMetadataReady)}
 - Distribution-channel QA ready: ${readyLabel(report.distributionChannelQaReady)}
@@ -243,6 +404,20 @@ function buildMarkdown(report) {
 | targeted check | command |
 |---|---|
 ${formatCommandRows(report.targetedCommands)}
+
+## Current Action
+
+- Action: ${report.currentActionLabel}
+- Next command: \`${report.currentActionNextCommand}\`
+- First blocker: ${report.currentActionFirstBlocker}
+- Env edit target: ${report.currentEnvEditTarget}
+- Operator action: ${report.currentActionOperatorAction}
+- Required keys: ${report.currentActionRequiredKeyCount} (${report.currentActionRequiredKeySummary})
+- Placeholder keys: ${report.currentActionPlaceholderKeyCount} (${report.currentActionPlaceholderKeySummary})
+- Rerun commands: ${report.currentActionRerunCommandCount} (${report.currentActionRerunCommandSummary})
+- Value recorded: ${readyLabel(report.currentActionValueRecorded)}
+
+${formatChecklistList(report.currentActionChecklist)}
 
 ## Source Artifacts
 
@@ -305,6 +480,14 @@ const localEnvPlaceholderKeyCount = Number.isInteger(distributionPrivateInputs.l
 const localEnvInput = distributionPrivateInputs.localEnvInput ?? distributionEnvTemplate.localEnvInput ?? {};
 const localEnvFilesChecked = Array.isArray(localEnvInput.filesChecked) ? localEnvInput.filesChecked : [];
 const localEnvPresentFiles = Array.isArray(localEnvInput.presentFiles) ? localEnvInput.presentFiles : [];
+const localEnvFileLoaded = sourceLocalEnvLoaded(
+  distributionEnvTemplate,
+  updateFeedConfig,
+  developerIdReadiness,
+  distributionManualQa,
+  distributionChannelQa,
+  distributionPrivateInputs
+);
 const combinedBlockers = unique([
   updateFeedConfig.currentEnvironmentConfig?.blockers ?? [],
   distributionEnvTemplate.localEnvBlockers ?? [],
@@ -315,6 +498,22 @@ const combinedBlockers = unique([
   distributionPrivateInputs.privateInputBlockers ?? [],
   distributionPrivateInputs.externalDistributionBlockers ?? []
 ]);
+const externalDistributionReady =
+  distributionPrivateInputs.externalDistributionReady === true &&
+  distributionChannelQa.externalDistributionReady === true &&
+  developerIdReadiness.externalDistributionReady === true;
+const currentEnvEditTarget = currentLocalEnvEditTarget(localEnvPresentFiles);
+const currentAction = enrichCurrentAction(
+  buildCurrentAction({
+    localEnvFileLoaded,
+    localEnvPlaceholderKeys,
+    currentEnvEditTarget,
+    channelMetadataReady: distributionChannelQa.channel?.ready === true,
+    distributionChannelQa,
+    externalDistributionReady,
+    firstBlockers: combinedBlockers.slice(0, 12)
+  })
+);
 
 const releaseDoctorReport = {
   appName,
@@ -336,15 +535,11 @@ const releaseDoctorReport = {
   releasePrepareEnvScaffoldWritten: releasePrepareEnv.scaffoldWritten === true,
   releasePrepareEnvLocalWriteRequested: releasePrepareEnv.localEnvWriteRequested === true,
   templateKeysCovered: distributionEnvTemplate.templateKeysCovered === true,
-  localEnvFileLoaded: sourceLocalEnvLoaded(
-    distributionEnvTemplate,
-    updateFeedConfig,
-    developerIdReadiness,
-    distributionManualQa,
-    distributionChannelQa,
-    distributionPrivateInputs
-  ),
+  localEnvFileLoaded,
   localEnvReady: distributionEnvTemplate.localEnvReady === true,
+  currentEnvEditTarget,
+  currentEnvConfiguredFileKey: distributionLocalEnvDefaults.configuredFileKey,
+  ...currentAction,
   updateFeedCurrentEnvironmentReady: updateFeedConfig.currentEnvironmentReady === true,
   privateInputsReady: distributionPrivateInputs.privateInputsReady === true,
   privateInputGroupTotal: privateInputGroups.length,
@@ -366,10 +561,7 @@ const releaseDoctorReport = {
   validDeveloperIdApplicationIdentityCount:
     developerIdReadiness.developerIdSigning?.validDeveloperIdApplicationIdentityCount ?? 0,
   notarizationCredentialSignalReady: developerIdReadiness.notarization?.ready === true,
-  externalDistributionReady:
-    distributionPrivateInputs.externalDistributionReady === true &&
-    distributionChannelQa.externalDistributionReady === true &&
-    developerIdReadiness.externalDistributionReady === true,
+  externalDistributionReady,
   blockerTotal: combinedBlockers.length,
   firstBlockers: combinedBlockers.slice(0, 12),
   localEnvValueRecorded: false,
@@ -440,6 +632,58 @@ check(Number.isInteger(releaseDoctorReport.localEnvPlaceholderKeyCount), "releas
 check(Array.isArray(releaseDoctorReport.localEnvPlaceholderKeys), "release doctor should include local env placeholder key names");
 check(Array.isArray(releaseDoctorReport.localEnvFilesChecked), "release doctor should include local env files checked");
 check(Array.isArray(releaseDoctorReport.localEnvPresentFiles), "release doctor should include local env present files");
+check(typeof releaseDoctorReport.currentActionId === "string" && releaseDoctorReport.currentActionId.length > 0, "release doctor should include the current action id");
+check(typeof releaseDoctorReport.currentActionLabel === "string" && releaseDoctorReport.currentActionLabel.length > 0, "release doctor should include the current action label");
+check(typeof releaseDoctorReport.currentActionNextCommand === "string" && releaseDoctorReport.currentActionNextCommand.length > 0, "release doctor should include the current next command");
+check(typeof releaseDoctorReport.currentActionFirstBlocker === "string" && releaseDoctorReport.currentActionFirstBlocker.length > 0, "release doctor should include the current first blocker");
+check(typeof releaseDoctorReport.currentEnvEditTarget === "string" && releaseDoctorReport.currentEnvEditTarget.length > 0, "release doctor should include the current env edit target");
+check(releaseDoctorReport.currentEnvConfiguredFileKey === "GROOVEFORGE_DISTRIBUTION_ENV_FILE", "release doctor should include the env file override key name");
+check(Number.isInteger(releaseDoctorReport.currentActionRequiredKeyCount), "release doctor should include the current required key count");
+check(typeof releaseDoctorReport.currentActionRequiredKeySummary === "string", "release doctor should include the current required key summary");
+check(Array.isArray(releaseDoctorReport.currentActionRequiredKeys), "release doctor should include current required keys");
+check(Number.isInteger(releaseDoctorReport.currentActionPlaceholderKeyCount), "release doctor should include the current placeholder key count");
+check(typeof releaseDoctorReport.currentActionPlaceholderKeySummary === "string", "release doctor should include the current placeholder key summary");
+check(Array.isArray(releaseDoctorReport.currentActionPlaceholderKeys), "release doctor should include current placeholder keys");
+check(
+  releaseDoctorReport.currentActionRequiredKeyCount === releaseDoctorReport.currentActionRequiredKeys.length,
+  "release doctor current required key count should match listed keys"
+);
+check(
+  releaseDoctorReport.currentActionPlaceholderKeyCount === releaseDoctorReport.currentActionPlaceholderKeys.length,
+  "release doctor current placeholder key count should match listed keys"
+);
+check(
+  releaseDoctorReport.currentActionPlaceholderKeys.every((key) => releaseDoctorReport.localEnvPlaceholderKeys.includes(key)),
+  "release doctor current placeholder keys should be drawn from local env placeholder keys"
+);
+check(typeof releaseDoctorReport.currentActionOperatorAction === "string" && releaseDoctorReport.currentActionOperatorAction.length > 0, "release doctor should include the current operator action");
+check(Array.isArray(releaseDoctorReport.currentActionChecklist), "release doctor should include the current action checklist");
+check(Number.isInteger(releaseDoctorReport.currentActionChecklistCount), "release doctor should include the current action checklist count");
+check(
+  releaseDoctorReport.currentActionChecklistCount === releaseDoctorReport.currentActionChecklist.length,
+  "release doctor current action checklist count should match listed steps"
+);
+check(Array.isArray(releaseDoctorReport.currentActionRerunCommands), "release doctor should include current rerun commands");
+check(Number.isInteger(releaseDoctorReport.currentActionRerunCommandCount), "release doctor should include the current rerun command count");
+check(
+  releaseDoctorReport.currentActionRerunCommandCount === releaseDoctorReport.currentActionRerunCommands.length,
+  "release doctor current rerun command count should match listed commands"
+);
+check(releaseDoctorReport.currentActionValueRecorded === false, "release doctor current action should not record values");
+if (releaseDoctorReport.localEnvFileLoaded === false) {
+  check(releaseDoctorReport.currentActionNextCommand === "npm run release:prepare-env", "release doctor should surface prepare-env when local env evidence is absent");
+  check(releaseDoctorReport.currentActionFirstBlocker.includes("local distribution env file is not loaded"), "release doctor should make missing local env the current first blocker");
+}
+if (releaseDoctorReport.localEnvFileLoaded === true && releaseChannelMetadataKeys.every((key) => releaseDoctorReport.localEnvPlaceholderKeys.includes(key))) {
+  check(releaseDoctorReport.currentActionId === "replace-release-channel-placeholders", "release doctor should prioritize release-channel placeholder cleanup");
+  check(releaseDoctorReport.currentActionNextCommand === "npm run release:doctor", "release doctor should rerun itself after placeholder cleanup");
+  check(releaseDoctorReport.currentActionPlaceholderKeyCount === releaseChannelMetadataKeys.length, "release doctor should focus current placeholders on release-channel metadata keys");
+  check(
+    releaseChannelMetadataKeys.every((key) => releaseDoctorReport.currentActionPlaceholderKeys.includes(key)),
+    "release doctor current placeholder keys should include release-channel metadata keys"
+  );
+  check(releaseDoctorReport.currentActionOperatorAction.includes(releaseDoctorReport.currentEnvEditTarget), "release doctor current operator action should include the env edit target");
+}
 check(
   releaseDoctorReport.localEnvPlaceholderKeyCount === releaseDoctorReport.localEnvPlaceholderKeys.length,
   "release doctor placeholder key count should match listed keys"
@@ -463,6 +707,15 @@ check(releaseDoctorReport.sourceClaimedExternalDistribution === false, "release 
 check(markdown.includes("Release Doctor"), "release doctor Markdown should include title");
 check(markdown.includes("Local env placeholder keys:"), "release doctor Markdown should include placeholder key count");
 check(markdown.includes("Local Env Placeholder Keys"), "release doctor Markdown should include placeholder key section");
+check(markdown.includes("Current action:"), "release doctor Markdown should include current action status");
+check(markdown.includes("Current next command:"), "release doctor Markdown should include current next command");
+check(markdown.includes("Current first blocker:"), "release doctor Markdown should include current first blocker");
+check(markdown.includes("Current env edit target:"), "release doctor Markdown should include current env edit target");
+check(markdown.includes("Current action required keys:"), "release doctor Markdown should include current action required keys");
+check(markdown.includes("Current action placeholder keys:"), "release doctor Markdown should include current action placeholder keys");
+check(markdown.includes("Current Action"), "release doctor Markdown should include current action section");
+check(markdown.includes("Operator action:"), "release doctor Markdown should include current operator action details");
+check(markdown.includes("Value recorded: no"), "release doctor Markdown should state current action value redaction");
 check(markdown.includes("Doctor command: `npm run release:doctor`"), "release doctor Markdown should include the doctor command");
 check(markdown.includes("Prepare env command: `npm run release:prepare-env`"), "release doctor Markdown should include the prepare-env command");
 check(markdown.includes("Progress command: `npm run release:progress`"), "release doctor Markdown should include the progress command");
@@ -484,6 +737,13 @@ console.log(`- Release prepare env scaffold written: ${releaseDoctorReport.relea
 console.log(`- Private inputs ready: ${releaseDoctorReport.privateInputsReady ? "yes" : "no"}`);
 console.log(`- Private input groups ready: ${releaseDoctorReport.privateInputGroupReadyCount}/${releaseDoctorReport.privateInputGroupTotal}`);
 console.log(`- Local env placeholder keys: ${releaseDoctorReport.localEnvPlaceholderKeyCount}`);
+console.log(`- Current action: ${releaseDoctorReport.currentActionLabel}`);
+console.log(`- Current next command: ${releaseDoctorReport.currentActionNextCommand}`);
+console.log(`- Current first blocker: ${releaseDoctorReport.currentActionFirstBlocker}`);
+console.log(`- Current env edit target: ${releaseDoctorReport.currentEnvEditTarget}`);
+console.log(`- Current action required keys: ${releaseDoctorReport.currentActionRequiredKeyCount} (${releaseDoctorReport.currentActionRequiredKeySummary})`);
+console.log(`- Current action placeholder keys: ${releaseDoctorReport.currentActionPlaceholderKeyCount} (${releaseDoctorReport.currentActionPlaceholderKeySummary})`);
+console.log(`- Current operator action: ${releaseDoctorReport.currentActionOperatorAction}`);
 console.log(`- Channel metadata ready: ${releaseDoctorReport.channelMetadataReady ? "yes" : "no"}`);
 console.log(`- Manual QA approval ready: ${releaseDoctorReport.manualQaApprovalReady ? "yes" : "no"}`);
 console.log(`- Developer ID signing ready: ${releaseDoctorReport.developerIdSigningReady ? "yes" : "no"}`);
