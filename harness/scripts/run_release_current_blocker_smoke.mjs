@@ -270,6 +270,15 @@ function formatReleaseChannelUnblockRows(rows) {
     .join("\n");
 }
 
+function formatPrivateEditSafetyRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | no | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.check)} | ${escapeCell(row.evidence)} | \`${escapeCell(row.command)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatHardGateRequirementRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | no | none | 0 | none | no |";
@@ -770,6 +779,60 @@ function currentActionHandoffRows({
   ];
 }
 
+function privateEditSafetyRows({
+  currentEnvEditTarget,
+  currentPlaceholderKeyCount,
+  currentRequiredKeyCount,
+  currentPlaceholderEditLocationSummary,
+  currentRerunCommand,
+  currentCommandSequence,
+  hardGateCommand
+}) {
+  const commandSequence = stringArrayValue(currentCommandSequence);
+  return [
+    {
+      order: 1,
+      check: "Private edits stay in ignored local env target",
+      ready: currentEnvEditTarget === ".env.distribution.local" && currentPlaceholderKeyCount === currentRequiredKeyCount,
+      evidence: `${currentEnvEditTarget}; ${currentPlaceholderKeyCount}/${currentRequiredKeyCount} current release-channel placeholders; ${currentPlaceholderEditLocationSummary}`,
+      command: currentRerunCommand,
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      check: "Receipt output stays value-free",
+      ready: true,
+      evidence: "key names, counts, file-line locations, and assignment shapes only; private values recorded no",
+      command: currentRerunCommand,
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      check: "Post-edit rerun order is explicit",
+      ready: commandSequence.includes("npm run release:doctor") && commandSequence.includes(currentRerunCommand),
+      evidence: formatCommandSummary(commandSequence),
+      command: currentRerunCommand,
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      check: "Hard external gate remains separate",
+      ready: hardGateCommand === "npm run release:external-check",
+      evidence: "hard gate is not claimed by current-blocker receipt",
+      command: hardGateCommand,
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      check: "No remote side effects by this receipt",
+      ready: true,
+      evidence: "network probe no; release upload no; signing no; Apple notary submission no",
+      command: currentRerunCommand,
+      valueRecorded: false
+    }
+  ];
+}
+
 function currentActionAcceptanceRows({
   externalNextActions,
   releaseDoctor,
@@ -1049,6 +1112,15 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
         ? `${hardGateBlockedRequirementRows.length} blocked hard-gate requirements`
         : "none"
   });
+  const privateSafetyRows = privateEditSafetyRows({
+    currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
+    currentPlaceholderKeyCount: proofPlaceholderKeys.length,
+    currentRequiredKeyCount: proofRequiredKeys.length,
+    currentPlaceholderEditLocationSummary,
+    currentRerunCommand,
+    currentCommandSequence,
+    hardGateCommand
+  });
   const consistencyRows = [
     {
       check: "Doctor/proof/gate/progress next command consensus",
@@ -1285,6 +1357,13 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentActionHandoffRows: handoffRows,
     currentActionHandoffSourceArtifactCount: sourceArtifacts.length,
     currentActionHandoffSourceArtifactSummary: sourceArtifacts.map((artifact) => artifact.label).join(", "),
+    currentPrivateEditSafetyReady: privateSafetyRows.every((row) => row.ready && row.valueRecorded === false),
+    currentPrivateEditSafetyRowCount: privateSafetyRows.length,
+    currentPrivateEditSafetySummary:
+      privateSafetyRows.length > 0
+        ? `${privateSafetyRows.length} value-free private edit safety rows`
+        : "none",
+    currentPrivateEditSafetyRows: privateSafetyRows,
     currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: integerValue(externalProofBundle.currentRequiredKeyCount),
     currentRequiredKeys: proofRequiredKeys,
@@ -1627,6 +1706,17 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentActionHandoffRows.some((row) => row.acceptanceBlockerCount === report.currentActionAcceptanceBlockerCount), "release current blocker current action handoff should mirror acceptance blocker count");
   check(report.currentActionHandoffSourceArtifactCount === report.sourceArtifacts.length, "release current blocker current action handoff source artifact count should match source artifacts");
   check(report.currentActionHandoffSourceArtifactSummary.includes("Release doctor"), "release current blocker current action handoff should summarize source artifacts");
+  check(report.currentPrivateEditSafetyReady === true, "release current blocker private edit safety checklist should be ready");
+  check(report.currentPrivateEditSafetyRowCount === report.currentPrivateEditSafetyRows.length, "release current blocker private edit safety row count should match rows");
+  check(report.currentPrivateEditSafetyRowCount === 5, "release current blocker private edit safety should include five rows");
+  check(typeof report.currentPrivateEditSafetySummary === "string" && report.currentPrivateEditSafetySummary.length > 0, "release current blocker should include private edit safety summary");
+  check(report.currentPrivateEditSafetyRows.every((row) => row.valueRecorded === false), "release current blocker private edit safety rows should not record values");
+  check(report.currentPrivateEditSafetyRows.every((row) => row.ready === true), "release current blocker private edit safety rows should be ready");
+  check(report.currentPrivateEditSafetyRows.some((row) => /ignored local env target/i.test(row.check) && row.evidence.includes(".env.distribution.local")), "release current blocker private edit safety should include ignored env target evidence");
+  check(report.currentPrivateEditSafetyRows.some((row) => /value-free/i.test(row.check) && /private values recorded no/i.test(row.evidence)), "release current blocker private edit safety should include value-free receipt evidence");
+  check(report.currentPrivateEditSafetyRows.some((row) => /rerun order/i.test(row.check) && row.command === report.currentRerunCommand), "release current blocker private edit safety should include rerun order evidence");
+  check(report.currentPrivateEditSafetyRows.some((row) => /Hard external gate/i.test(row.check) && row.command === report.hardGateCommand), "release current blocker private edit safety should keep hard gate separate");
+  check(report.currentPrivateEditSafetyRows.some((row) => /No remote side effects/i.test(row.check) && /network probe no/i.test(row.evidence)), "release current blocker private edit safety should include no remote side effects evidence");
   check(report.currentRequiredKeyCount === report.currentRequiredKeys.length, "release current blocker required key count should match keys");
   check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release current blocker placeholder key count should match keys");
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderEditLocations.length, "release current blocker placeholder edit location count should match locations");
@@ -1804,6 +1894,8 @@ function buildMarkdown(report) {
     `- Current action post-edit signals currently ready: ${report.currentActionPostEditVerificationCurrentSummary}`,
     `- Current action handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`,
     `- Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`,
+    `- Private edit safety ready: ${report.currentPrivateEditSafetyReady ? "yes" : "no"}`,
+    `- Private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})`,
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
     `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`,
@@ -2019,6 +2111,15 @@ function buildMarkdown(report) {
     "|---:|---|---|---|---:|---:|---|---|---|---:|",
     formatCurrentActionHandoffRows(report.currentActionHandoffRows),
     "",
+    "## Private Edit Safety Checklist",
+    "",
+    `- Safety ready: ${report.currentPrivateEditSafetyReady ? "yes" : "no"}`,
+    `- Safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})`,
+    "",
+    "| order | ready | check | evidence | command | value recorded |",
+    "|---:|---:|---|---|---|---:|",
+    formatPrivateEditSafetyRows(report.currentPrivateEditSafetyRows),
+    "",
     "## Placeholder Edit Locations",
     "",
     "| location | key | placeholder | value recorded |",
@@ -2128,6 +2229,8 @@ check(markdown.includes("Current Action Post-Edit Verification"), "release curre
 check(markdown.includes("Current action post-edit verification ready:"), "release current blocker Markdown should include current action post-edit verification readiness");
 check(markdown.includes("Current Action Handoff Package"), "release current blocker Markdown should include current action handoff package");
 check(markdown.includes("Current action handoff ready:"), "release current blocker Markdown should include current action handoff readiness");
+check(markdown.includes("Private Edit Safety Checklist"), "release current blocker Markdown should include private edit safety checklist");
+check(markdown.includes("Private edit safety ready:"), "release current blocker Markdown should include private edit safety readiness");
 
 if (failures.length > 0) {
   fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
@@ -2179,6 +2282,8 @@ console.log(`- Current action post-edit verification ready: ${report.currentActi
 console.log(`- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`);
 console.log(`- Current action handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`);
 console.log(`- Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`);
+console.log(`- Private edit safety ready: ${report.currentPrivateEditSafetyReady ? "yes" : "no"}`);
+console.log(`- Private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
