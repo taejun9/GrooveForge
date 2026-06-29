@@ -333,6 +333,15 @@ function formatNextActionBlockerRows(rows) {
     .join("\n");
 }
 
+function formatNextActionVerificationRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | no | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${row.currentReady ? "yes" : "no"} | ${escapeCell(row.criterion)} | ${escapeCell(row.currentEvidence)} | ${escapeCell(row.expectedSignal)} | \`${escapeCell(row.proofCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatNextActionPrerequisiteCommandRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | none | none | none | no |";
@@ -521,6 +530,50 @@ function nextActionBlockerRows(nextAction) {
     order: index + 1,
     blocker,
     sourceField: "externalNextActions.priorityActions[1].blockers",
+    proofCommand,
+    valueRecorded: false
+  }));
+}
+
+function nextActionExpectedSignal(criterion) {
+  const lower = textValue(criterion).toLowerCase();
+  if (lower.includes("update feed config")) {
+    return "one safe feed URL key ready; one valid update channel key ready; value recorded no";
+  }
+  if (lower.includes("auto-update readiness")) {
+    return "auto-update readiness ready yes; provider/feed/channel metadata ready; value recorded no";
+  }
+  if (lower.includes("signed") && lower.includes("notarized")) {
+    return "signed/notarized update metadata artifacts ready after Developer ID, notarization, and Gatekeeper evidence; value recorded no";
+  }
+  return "next action ready signal present; value recorded no";
+}
+
+function nextActionCurrentEvidenceForCriterion(criterion, blockers) {
+  const lower = textValue(criterion).toLowerCase();
+  if (lower.includes("update feed config")) {
+    return blockers.find((blocker) => /provider, feed url, and channel metadata/i.test(blocker)) ?? "none";
+  }
+  if (lower.includes("auto-update readiness")) {
+    return blockers.find((blocker) => /auto-update readiness is not complete/i.test(blocker)) ?? "none";
+  }
+  if (lower.includes("signed") && lower.includes("notarized")) {
+    return blockers.find((blocker) => /signed\/notarized update metadata artifacts/i.test(blocker)) ?? "none";
+  }
+  return blockers.length > 0 ? blockers.join("; ") : "none";
+}
+
+function nextActionVerificationRows(nextAction) {
+  const proofCommand = textValue(nextAction?.nextCommand);
+  const blockers = stringArrayValue(nextAction?.blockers);
+  const currentReady = nextAction?.ready === true && blockers.length === 0;
+  return stringArrayValue(nextAction?.readyCriteria).map((criterion, index) => ({
+    order: index + 1,
+    criterion,
+    currentReady,
+    currentEvidence: nextActionCurrentEvidenceForCriterion(criterion, blockers),
+    expectedSignal: nextActionExpectedSignal(criterion),
+    sourceField: "externalNextActions.priorityActions[1].readyCriteria/blockers",
     proofCommand,
     valueRecorded: false
   }));
@@ -836,6 +889,7 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
   const nextActionChecklistPreviewRows = nextActionChecklistRows(rawNextPriorityAction);
   const nextActionEvidencePreviewRows = nextActionEvidenceRows(rawNextPriorityAction);
   const nextActionBlockerPreviewRows = nextActionBlockerRows(rawNextPriorityAction);
+  const nextActionVerificationPreviewRows = nextActionVerificationRows(rawNextPriorityAction);
   const nextActionPrerequisiteCommandPreviewRows = nextActionPrerequisiteCommandRows(rawNextPriorityAction);
   const nextActionOperatorActionPreviewRows = nextActionOperatorActionRows(rawNextPriorityAction);
   const nextActionEnvEditPreviewRows = nextActionEnvEditRows(rawNextPriorityAction);
@@ -857,12 +911,14 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     nextActionReadyCriteriaPreviewRows.length === nextActionRawReadyCriteria.length &&
     nextActionChecklistPreviewRows.length === nextActionRawChecklist.length &&
     nextActionBlockerPreviewRows.length === nextActionRawBlockers.length &&
+    nextActionVerificationPreviewRows.length === nextActionRawReadyCriteria.length &&
     nextActionPrerequisiteCommandPreviewRows.length === nextActionRawPrerequisiteCommands.length &&
     nextActionOperatorActionPreviewRows.length === nextActionRawOperatorActions.length &&
     nextActionEnvEditPreviewRows.length === nextActionRawEnvEditRows.length &&
     nextActionReadyCriteriaPreviewRows.length > 0 &&
     nextActionChecklistPreviewRows.length > 0 &&
     nextActionBlockerPreviewRows.length > 0 &&
+    nextActionVerificationPreviewRows.length > 0 &&
     nextActionPrerequisiteCommandPreviewRows.length > 0 &&
     nextActionOperatorActionPreviewRows.length > 0 &&
     nextActionEnvEditPreviewRows.length > 0 &&
@@ -870,6 +926,7 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     nextActionChecklistPreviewRows.every((row) => row.valueRecorded === false && row.proofCommand === nextActionPreviewProofCommand) &&
     nextActionEvidencePreviewRows.every((row) => row.valueRecorded === false) &&
     nextActionBlockerPreviewRows.every((row) => row.valueRecorded === false && row.proofCommand === nextActionPreviewProofCommand) &&
+    nextActionVerificationPreviewRows.every((row) => row.valueRecorded === false && row.proofCommand === nextActionPreviewProofCommand) &&
     nextActionPrerequisiteCommandPreviewRows.every((row) => row.valueRecorded === false && row.proofCommand === nextActionPreviewProofCommand) &&
     nextActionOperatorActionPreviewRows.every((row) => row.valueRecorded === false && row.proofCommand === nextActionPreviewProofCommand) &&
     nextActionEnvEditPreviewRows.every((row) => row.valueRecorded === false && row.proofCommand === nextActionPreviewProofCommand);
@@ -1136,6 +1193,12 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
         ? `${nextActionBlockerPreviewRows.length} value-free next action blocker rows`
         : "none",
     nextActionPreviewBlockerRows: nextActionBlockerPreviewRows,
+    nextActionPreviewVerificationRowCount: nextActionVerificationPreviewRows.length,
+    nextActionPreviewVerificationSummary:
+      nextActionVerificationPreviewRows.length > 0
+        ? `${nextActionVerificationPreviewRows.length} value-free next action verification rows`
+        : "none",
+    nextActionPreviewVerificationRows: nextActionVerificationPreviewRows,
     nextActionPreviewPrerequisiteCommandRowCount: nextActionPrerequisiteCommandPreviewRows.length,
     nextActionPreviewPrerequisiteCommandSummary:
       nextActionPrerequisiteCommandPreviewRows.length > 0
@@ -1426,6 +1489,19 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.nextActionPreviewBlockerRows.some((row) => /auto-update readiness is not complete/i.test(row.blocker)), "release current blocker next action preview blockers should include auto-update readiness blocker");
   check(report.nextActionPreviewBlockerRows.some((row) => /no update provider, feed url, and channel metadata/i.test(row.blocker)), "release current blocker next action preview blockers should include provider/feed/channel blocker");
   check(report.nextActionPreviewBlockerRows.some((row) => /signed\/notarized update metadata artifacts/i.test(row.blocker)), "release current blocker next action preview blockers should include signed and notarized update metadata blocker");
+  check(report.nextActionPreviewVerificationRowCount === report.nextActionPreviewVerificationRows.length, "release current blocker next action preview verification row count should match rows");
+  check(report.nextActionPreviewVerificationRowCount === rawNextReadyCriteria.length, "release current blocker next action preview verification rows should mirror second priority action ready criteria count");
+  check(report.nextActionPreviewVerificationRowCount > 0, "release current blocker next action preview should include verification rows");
+  check(typeof report.nextActionPreviewVerificationSummary === "string" && report.nextActionPreviewVerificationSummary.length > 0, "release current blocker should include next action preview verification summary");
+  check(report.nextActionPreviewVerificationRows.every((row) => row.valueRecorded === false), "release current blocker next action preview verification rows should not record values");
+  check(report.nextActionPreviewVerificationRows.every((row) => row.proofCommand === report.nextPriorityActionNextCommand), "release current blocker next action preview verification proof commands should match next priority action command");
+  check(report.nextActionPreviewVerificationRows.every((row) => row.currentReady === false), "release current blocker next action preview verification rows should remain not ready while the next action is blocked");
+  check(report.nextActionPreviewVerificationRows.every((row) => typeof row.currentEvidence === "string" && row.currentEvidence.length > 0), "release current blocker next action preview verification rows should include current evidence");
+  check(report.nextActionPreviewVerificationRows.every((row) => typeof row.expectedSignal === "string" && row.expectedSignal.includes("value recorded no")), "release current blocker next action preview verification rows should include value-free expected signals");
+  check(report.nextActionPreviewVerificationRows.some((row) => /safe feed URL key ready/i.test(row.expectedSignal)), "release current blocker next action preview verification should include update feed expected signal");
+  check(report.nextActionPreviewVerificationRows.some((row) => /auto-update readiness ready yes/i.test(row.expectedSignal)), "release current blocker next action preview verification should include auto-update readiness expected signal");
+  check(report.nextActionPreviewVerificationRows.some((row) => /signed\/notarized update metadata artifacts ready/i.test(row.expectedSignal)), "release current blocker next action preview verification should include signed and notarized update metadata expected signal");
+  check(report.nextActionPreviewVerificationRows.some((row) => /provider, feed url, and channel metadata/i.test(row.currentEvidence)), "release current blocker next action preview verification should cite provider/feed/channel blocker evidence");
   check(report.nextActionPreviewPrerequisiteCommandRowCount === report.nextActionPreviewPrerequisiteCommandRows.length, "release current blocker next action preview prerequisite command row count should match rows");
   check(report.nextActionPreviewPrerequisiteCommandRowCount === rawNextPrerequisiteCommands.length, "release current blocker next action preview should mirror second priority action prerequisite command count");
   check(report.nextActionPreviewPrerequisiteCommandRowCount > 0, "release current blocker next action preview should include prerequisite command rows");
@@ -1704,6 +1780,7 @@ function buildMarkdown(report) {
     `- Next action preview ready criteria rows: ${report.nextActionPreviewReadyCriteriaRowCount} (${report.nextActionPreviewReadyCriteriaSummary})`,
     `- Next action preview checklist rows: ${report.nextActionPreviewChecklistRowCount} (${report.nextActionPreviewChecklistSummary})`,
     `- Next action preview blocker rows: ${report.nextActionPreviewBlockerRowCount} (${report.nextActionPreviewBlockerSummary})`,
+    `- Next action preview verification rows: ${report.nextActionPreviewVerificationRowCount} (${report.nextActionPreviewVerificationSummary})`,
     `- Next action preview prerequisite command rows: ${report.nextActionPreviewPrerequisiteCommandRowCount} (${report.nextActionPreviewPrerequisiteCommandSummary})`,
     `- Next action preview operator action rows: ${report.nextActionPreviewOperatorActionRowCount} (${report.nextActionPreviewOperatorActionSummary})`,
     `- Next action preview env edit rows: ${report.nextActionPreviewEnvEditRowCount} (${report.nextActionPreviewEnvEditSummary})`,
@@ -1843,6 +1920,7 @@ function buildMarkdown(report) {
     `- Checklist rows: ${report.nextActionPreviewChecklistRowCount} (${report.nextActionPreviewChecklistSummary})`,
     `- Evidence rows: ${report.nextActionPreviewEvidenceRowCount} (${report.nextActionPreviewEvidenceSummary})`,
     `- Blocker rows: ${report.nextActionPreviewBlockerRowCount} (${report.nextActionPreviewBlockerSummary})`,
+    `- Verification rows: ${report.nextActionPreviewVerificationRowCount} (${report.nextActionPreviewVerificationSummary})`,
     `- Prerequisite command rows: ${report.nextActionPreviewPrerequisiteCommandRowCount} (${report.nextActionPreviewPrerequisiteCommandSummary})`,
     `- Operator action rows: ${report.nextActionPreviewOperatorActionRowCount} (${report.nextActionPreviewOperatorActionSummary})`,
     `- Env edit rows: ${report.nextActionPreviewEnvEditRowCount} (${report.nextActionPreviewEnvEditSummary})`,
@@ -1862,6 +1940,10 @@ function buildMarkdown(report) {
     "| order | blocker | source field | proof command | value recorded |",
     "|---:|---|---|---|---:|",
     formatNextActionBlockerRows(report.nextActionPreviewBlockerRows),
+    "",
+    "| order | currently ready | criterion | current evidence | expected signal | proof command | value recorded |",
+    "|---:|---:|---|---|---|---|---:|",
+    formatNextActionVerificationRows(report.nextActionPreviewVerificationRows),
     "",
     "| order | command | source field | proof command | value recorded |",
     "|---:|---|---|---|---:|",
@@ -2019,6 +2101,7 @@ check(markdown.includes("Next action preview ready:"), "release current blocker 
 check(markdown.includes("Next action preview ready criteria rows:"), "release current blocker Markdown should include next action preview ready criteria count");
 check(markdown.includes("Next action preview checklist rows:"), "release current blocker Markdown should include next action preview checklist count");
 check(markdown.includes("Next action preview blocker rows:"), "release current blocker Markdown should include next action preview blocker count");
+check(markdown.includes("Next action preview verification rows:"), "release current blocker Markdown should include next action preview verification count");
 check(markdown.includes("Next action preview prerequisite command rows:"), "release current blocker Markdown should include next action preview prerequisite command count");
 check(markdown.includes("Next action preview operator action rows:"), "release current blocker Markdown should include next action preview operator action count");
 check(markdown.includes("Next action preview env edit rows:"), "release current blocker Markdown should include next action preview env edit count");
@@ -2070,6 +2153,7 @@ console.log(`- Next action preview ready: ${report.nextActionPreviewReady ? "yes
 console.log(`- Next action preview ready criteria rows: ${report.nextActionPreviewReadyCriteriaRowCount} (${report.nextActionPreviewReadyCriteriaSummary})`);
 console.log(`- Next action preview checklist rows: ${report.nextActionPreviewChecklistRowCount} (${report.nextActionPreviewChecklistSummary})`);
 console.log(`- Next action preview blocker rows: ${report.nextActionPreviewBlockerRowCount} (${report.nextActionPreviewBlockerSummary})`);
+console.log(`- Next action preview verification rows: ${report.nextActionPreviewVerificationRowCount} (${report.nextActionPreviewVerificationSummary})`);
 console.log(`- Next action preview prerequisite command rows: ${report.nextActionPreviewPrerequisiteCommandRowCount} (${report.nextActionPreviewPrerequisiteCommandSummary})`);
 console.log(`- Next action preview operator action rows: ${report.nextActionPreviewOperatorActionRowCount} (${report.nextActionPreviewOperatorActionSummary})`);
 console.log(`- Next action preview env edit rows: ${report.nextActionPreviewEnvEditRowCount} (${report.nextActionPreviewEnvEditSummary})`);
