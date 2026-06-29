@@ -132,6 +132,14 @@ APP_UI_SURFACE_FILES = [
     "src/ui/workstationAppDerivations.tsx",
 ]
 
+SAMPLING_FIRST_UI_PHRASES = [
+    "sample pocket",
+    "crate-dig",
+    "chops hit",
+    "chop energy",
+    "rendered samples",
+]
+
 TEXT_EXPECTATIONS = {
     "README.md": [
         "making beats across genres",
@@ -20713,6 +20721,14 @@ def check_domain_sampling_boundaries(errors: list[str]) -> None:
         errors.append("core domain model must not include AudioClipEvent before optional sampling-phase work")
 
 
+def check_composition_first_ui_copy(errors: list[str]) -> None:
+    for file_path in APP_UI_SURFACE_FILES:
+        text = (ROOT / file_path).read_text(encoding="utf-8").lower()
+        for phrase in SAMPLING_FIRST_UI_PHRASES:
+            if phrase in text:
+                errors.append(f"{file_path} must avoid sampling-first UI phrase: {phrase}")
+
+
 def check_first_read_framing(errors: list[str]) -> None:
     readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
     product_text = (ROOT / "docs/product/product.md").read_text(encoding="utf-8")
@@ -20784,6 +20800,7 @@ def run_checks(strict: bool = False) -> list[str]:
     check_offline_render_determinism(errors)
     check_build_chunk_config(errors)
     check_domain_sampling_boundaries(errors)
+    check_composition_first_ui_copy(errors)
     check_first_read_framing(errors)
     if strict:
         check_strict_todos(errors)
