@@ -153,6 +153,25 @@ function formatKeyList(keys) {
   return stringArrayValue(keys).length > 0 ? stringArrayValue(keys).join(", ") : "none";
 }
 
+function formatCommandSummary(commands) {
+  return stringArrayValue(commands).length > 0 ? stringArrayValue(commands).join(", ") : "none";
+}
+
+function formatLocationSummary(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "none";
+  }
+  return rows.map((row) => `${textValue(row.location)} ${textValue(row.key)}`).join(", ");
+}
+
+function commandSequenceFromRows(rows) {
+  return objectRows(rows)
+    .slice()
+    .sort((left, right) => integerValue(left.order) - integerValue(right.order))
+    .map((row) => textValue(row.command))
+    .filter((command) => command !== "none");
+}
+
 function formatLocationRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | none | none | no |";
@@ -204,6 +223,13 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
   const gateProofChecklistRows = valueFreeObjectRows(externalGate.currentProofChecklistRows);
   const commandVerificationRows = valueFreeObjectRows(externalProofBundle.currentCommandVerificationRows);
   const gateCommandVerificationRows = valueFreeObjectRows(externalGate.currentCommandVerificationRows);
+  const currentCommandSequence = commandSequenceFromRows(commandVerificationRows);
+  const currentCommandSequenceCount =
+    integerValue(externalProofBundle.currentCommandSequenceCount) || currentCommandSequence.length;
+  const currentCommandSequenceSummary = textValue(
+    externalProofBundle.currentCommandSequenceSummary,
+    formatCommandSummary(currentCommandSequence)
+  );
   const progressConsistency = releaseProgress.externalGateProofBundleConsistencyChecks ?? {};
   const currentNextCommands = [
     textValue(releaseDoctor.currentActionNextCommand),
@@ -325,13 +351,27 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
     currentPlaceholderKeyCount: integerValue(externalProofBundle.currentPlaceholderKeyCount),
     currentPlaceholderKeys: proofPlaceholderKeys,
     currentPlaceholderEditLocationCount: integerValue(externalProofBundle.currentPlaceholderEditLocationCount),
+    currentPlaceholderEditLocationSummary: textValue(
+      externalProofBundle.currentPlaceholderEditLocationSummary,
+      formatLocationSummary(proofPlaceholderLocations)
+    ),
     currentPlaceholderEditLocations: proofPlaceholderLocations,
     currentEnvEditRowsCount: integerValue(externalProofBundle.currentEnvEditRowsCount),
+    currentEnvEditRowsSummary: textValue(externalProofBundle.currentEnvEditRowsSummary, `${proofEnvEditRows.length} value-free edit rows`),
     currentEnvEditRows: proofEnvEditRows,
     currentProofChecklistRowCount: integerValue(externalProofBundle.currentProofChecklistRowCount),
+    currentProofChecklistRowSummary: textValue(externalProofBundle.currentProofChecklistRowSummary, `${proofChecklistRows.length} value-free proof checklist rows`),
     currentProofChecklistRows: proofChecklistRows,
     currentCommandVerificationRowCount: integerValue(externalProofBundle.currentCommandVerificationRowCount),
+    currentCommandVerificationRowSummary: textValue(
+      externalProofBundle.currentCommandVerificationRowSummary,
+      `${commandVerificationRows.length} value-free command verification rows`
+    ),
     currentCommandVerificationRows: commandVerificationRows,
+    currentRerunCommand: textValue(externalProofBundle.currentRerunCommand, currentNextCommand),
+    currentCommandSequenceCount,
+    currentCommandSequenceSummary,
+    currentCommandSequence,
     currentNextCommandConsensus,
     currentFirstBlockerConsensus,
     exactFirstBlockerConsensus,
@@ -390,11 +430,21 @@ function validateReport(report, { releaseDoctor, externalProofBundle, externalGa
   check(report.currentEnvEditRowsCount === report.currentEnvEditRows.length, "release current blocker env edit row count should match rows");
   check(report.currentProofChecklistRowCount === report.currentProofChecklistRows.length, "release current blocker proof checklist row count should match rows");
   check(report.currentCommandVerificationRowCount === report.currentCommandVerificationRows.length, "release current blocker command verification row count should match rows");
+  check(typeof report.currentPlaceholderEditLocationSummary === "string" && report.currentPlaceholderEditLocationSummary.length > 0, "release current blocker receipt should include current placeholder edit location summary");
+  check(typeof report.currentEnvEditRowsSummary === "string" && report.currentEnvEditRowsSummary.length > 0, "release current blocker receipt should include current env edit rows summary");
+  check(typeof report.currentProofChecklistRowSummary === "string" && report.currentProofChecklistRowSummary.length > 0, "release current blocker receipt should include current proof checklist row summary");
+  check(typeof report.currentCommandVerificationRowSummary === "string" && report.currentCommandVerificationRowSummary.length > 0, "release current blocker receipt should include current command verification row summary");
+  check(typeof report.currentRerunCommand === "string" && report.currentRerunCommand.length > 0, "release current blocker receipt should include current rerun command");
+  check(report.currentCommandSequenceCount === report.currentCommandSequence.length, "release current blocker command sequence count should match sequence");
+  check(typeof report.currentCommandSequenceSummary === "string" && report.currentCommandSequenceSummary.length > 0, "release current blocker receipt should include current command sequence summary");
+  check(report.currentCommandSequence.includes(report.currentNextCommand), "release current blocker command sequence should include current next command");
+  check(report.currentCommandSequence.includes(report.currentRerunCommand), "release current blocker command sequence should include current rerun command");
   check(report.currentRequiredKeyCount === releaseChannelMetadataKeys.length, "release current blocker should focus on four release-channel metadata keys");
   check(sameStringArray(report.currentRequiredKeys, releaseChannelMetadataKeys), "release current blocker required keys should match release-channel metadata keys");
   if (report.currentNextCommand === "npm run release:doctor") {
     check(report.currentPlaceholderKeyCount === releaseChannelMetadataKeys.length, "release current blocker should report four release-channel placeholder keys when blocked here");
     check(sameStringArray(report.currentPlaceholderKeys, releaseChannelMetadataKeys), "release current blocker placeholder keys should match release-channel metadata keys");
+    check(report.currentRerunCommand === "npm run release:current-blocker", "release current blocker receipt should make current-blocker the current rerun command when placeholders remain");
   }
   check(report.currentPlaceholderEditLocations.every((row) => row.valueRecorded === false), "release current blocker placeholder locations should not record values");
   check(report.currentEnvEditRows.every((row) => row.valueRecorded === false), "release current blocker env edit rows should not record values");
@@ -435,6 +485,9 @@ function buildMarkdown(report) {
     `- Current first blocker: ${report.currentFirstBlocker}`,
     `- Doctor first blocker: ${report.doctorFirstBlocker}`,
     `- Current env edit target: ${report.currentEnvEditTarget}`,
+    `- Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})`,
+    `- Current rerun command: \`${report.currentRerunCommand}\``,
+    `- Current command sequence: ${report.currentCommandSequenceCount} (${report.currentCommandSequenceSummary})`,
     `- Hard gate command: \`${report.hardGateCommand}\``,
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
@@ -534,9 +587,15 @@ console.log(`- Refresh commands: ${report.refreshCommandCount}`);
 console.log(`- Current target: ${report.currentTarget}`);
 console.log(`- Current next command: ${report.currentNextCommand}`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
+console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
 console.log(`- Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})`);
-console.log(`- Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount}`);
+console.log(`- Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})`);
+console.log(`- Current env edit rows: ${report.currentEnvEditRowsCount} (${report.currentEnvEditRowsSummary})`);
+console.log(`- Current proof checklist rows: ${report.currentProofChecklistRowCount} (${report.currentProofChecklistRowSummary})`);
+console.log(`- Current rerun command: ${report.currentRerunCommand}`);
+console.log(`- Current command sequence: ${report.currentCommandSequenceCount} (${report.currentCommandSequenceSummary})`);
+console.log(`- Current command verification rows: ${report.currentCommandVerificationRowCount} (${report.currentCommandVerificationRowSummary})`);
 console.log(`- Consistency ready: ${report.consistencyReady ? "yes" : "no"}`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
