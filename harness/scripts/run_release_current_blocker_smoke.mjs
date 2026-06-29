@@ -13,6 +13,7 @@ const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const releaseDoctorJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-doctor.json`);
+const externalNextActionsJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-next-actions.json`);
 const externalProofBundleJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-proof-bundle.json`);
 const externalGateJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-distribution-gate.json`);
 const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.json`);
@@ -278,6 +279,36 @@ function formatHardGateRequirementRows(rows) {
     .join("\n");
 }
 
+function formatPriorityActionRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no | none | none | none | 0 | 0 | 0 | 0 | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.id)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.label)} | \`${escapeCell(row.nextCommand)}\` | ${escapeCell(row.rerunCommandSummary)} | ${row.placeholderKeyCount ?? 0} | ${row.evidenceRowCount ?? 0} | ${row.readyCriteriaCount ?? 0} | ${row.actionChecklistCount ?? 0} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function priorityActionRows(externalNextActions) {
+  return valueFreeObjectRows(externalNextActions.priorityActions).map((action, index) => {
+    const rerunCommands = stringArrayValue(action.rerunCommands);
+    return {
+      order: index + 1,
+      id: textValue(action.id),
+      label: textValue(action.label),
+      ready: action.ready === true,
+      nextCommand: textValue(action.nextCommand),
+      rerunCommands,
+      rerunCommandSummary: rerunCommands.length > 0 ? rerunCommands.join(", ") : "none",
+      firstBlocker: textValue(action.firstBlocker),
+      placeholderKeyCount: stringArrayValue(action.placeholderKeys).length,
+      evidenceRowCount: Array.isArray(action.evidence) ? action.evidence.length : 0,
+      readyCriteriaCount: stringArrayValue(action.readyCriteria).length,
+      actionChecklistCount: stringArrayValue(action.actionChecklist).length,
+      valueRecorded: false
+    };
+  });
+}
+
 function hardGateRequirementRows(externalGate) {
   return valueFreeObjectRows(externalGate.requirements).map((row) => {
     const blockers = stringArrayValue(row.blockers);
@@ -293,7 +324,7 @@ function hardGateRequirementRows(externalGate) {
   });
 }
 
-function buildReport({ releaseDoctor, externalProofBundle, externalGate, releaseProgress }) {
+function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, externalGate, releaseProgress }) {
   const doctorRequiredKeys = stringArrayValue(releaseDoctor.currentActionRequiredKeys);
   const proofRequiredKeys = stringArrayValue(externalProofBundle.currentRequiredKeys);
   const progressRequiredKeys = stringArrayValue(releaseProgress.externalProofBundleCurrentRequiredKeys);
@@ -311,6 +342,8 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
   const actionChecklistRows = valueFreeObjectRows(externalProofBundle.currentActionChecklistRows);
   const commandVerificationRows = valueFreeObjectRows(externalProofBundle.currentCommandVerificationRows);
   const gateCommandVerificationRows = valueFreeObjectRows(externalGate.currentCommandVerificationRows);
+  const nextActionRows = priorityActionRows(externalNextActions);
+  const currentPriorityAction = nextActionRows[0] ?? null;
   const gateRequirementRows = hardGateRequirementRows(externalGate);
   const hardGateBlockedRequirementRows = gateRequirementRows.filter((row) => !row.ready);
   const hardGateRequirementReadyCount = gateRequirementRows.filter((row) => row.ready).length;
@@ -465,6 +498,20 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
       stringArrayValue(externalGate.externalDistributionGateBlockers).length > 0
         ? `${stringArrayValue(externalGate.externalDistributionGateBlockers).length} value-free hard-gate blockers`
         : "none",
+    sourceExternalNextActionsReady: true,
+    sourceExternalNextActionsPath: relative(externalNextActionsJsonPath),
+    priorityActionCount: nextActionRows.length,
+    priorityActionSummary: nextActionRows.length > 0 ? `${nextActionRows.length} pending value-free priority actions` : "none",
+    priorityActionRows: nextActionRows,
+    currentPriorityActionId: textValue(externalNextActions.currentActionId, currentPriorityAction?.id ?? "none"),
+    currentPriorityActionLabel: textValue(externalNextActions.currentActionLabel, currentPriorityAction?.label ?? "none"),
+    currentPriorityActionNextCommand: textValue(currentPriorityAction?.nextCommand, "none"),
+    currentPriorityActionFirstBlocker: textValue(currentPriorityAction?.firstBlocker, "none"),
+    priorityActionCurrentMatchesCurrentBlocker:
+      currentPriorityAction !== null &&
+      textValue(externalNextActions.currentActionId) === currentPriorityAction.id &&
+      textValue(currentPriorityAction.nextCommand) === currentNextCommand &&
+      textValue(currentPriorityAction.firstBlocker) === textValue(externalProofBundle.currentFirstBlocker),
     currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: integerValue(externalProofBundle.currentRequiredKeyCount),
     currentRequiredKeys: proofRequiredKeys,
@@ -551,6 +598,7 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
     nextExpectedOperatorSequence,
     sourceArtifacts: [
       { label: "Release doctor", path: relative(releaseDoctorJsonPath), present: true, valueRecorded: false },
+      { label: "External next actions", path: relative(externalNextActionsJsonPath), present: true, valueRecorded: false },
       { label: "External proof bundle", path: relative(externalProofBundleJsonPath), present: true, valueRecorded: false },
       { label: "External distribution gate", path: relative(externalGateJsonPath), present: true, valueRecorded: false },
       { label: "Release progress report", path: relative(releaseProgressJsonPath), present: true, valueRecorded: false },
@@ -572,7 +620,7 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
   };
 }
 
-function validateReport(report, { releaseDoctor, externalProofBundle, externalGate, releaseProgress }) {
+function validateReport(report, { releaseDoctor, externalNextActions, externalProofBundle, externalGate, releaseProgress }) {
   check(report.releaseCurrentBlockerReady === true, "release current blocker receipt should be ready");
   check(report.appName === appName, "release current blocker receipt should identify GrooveForge");
   check(report.bundleId === bundleId, `release current blocker receipt should identify ${bundleId}`);
@@ -610,6 +658,25 @@ function validateReport(report, { releaseDoctor, externalProofBundle, externalGa
   check(report.hardGateBlockerCount === stringArrayValue(externalGate.externalDistributionGateBlockers).length, "release current blocker should mirror hard-gate blocker count");
   check(typeof report.hardGateRequirementSummary === "string" && report.hardGateRequirementSummary.length > 0, "release current blocker should include hard-gate requirement summary");
   check(typeof report.hardGateBlockedRequirementSummary === "string" && report.hardGateBlockedRequirementSummary.length > 0, "release current blocker should include hard-gate blocked requirement summary");
+  check(report.sourceExternalNextActionsReady === true, "release current blocker should include ready external next-actions source evidence");
+  check(report.sourceExternalNextActionsPath === relative(externalNextActionsJsonPath), "release current blocker should identify external next-actions source path");
+  check(report.priorityActionCount === report.priorityActionRows.length, "release current blocker priority action count should match rows");
+  check(report.priorityActionCount === integerValue(externalNextActions.priorityActionCount), "release current blocker should mirror external next-actions priority action count");
+  check(report.priorityActionRows.every((row) => row.valueRecorded === false), "release current blocker priority action rows should not record values");
+  check(report.priorityActionRows.every((row) => row.ready === false), "release current blocker priority action rows should be pending actions");
+  check(report.priorityActionRows.every((row) => row.nextCommand !== "none"), "release current blocker priority action rows should include next commands");
+  check(report.priorityActionRows.every((row) => row.actionChecklistCount > 0), "release current blocker priority action rows should include checklist counts");
+  check(report.priorityActionRows.some((row) => row.id === "release-channel-metadata"), "release current blocker priority action ladder should include release-channel metadata");
+  check(report.priorityActionRows.some((row) => row.id === "auto-update-feed"), "release current blocker priority action ladder should include auto-update feed");
+  check(report.priorityActionRows.some((row) => row.id === "developer-id-signing"), "release current blocker priority action ladder should include Developer ID signing");
+  check(report.priorityActionRows.some((row) => row.id === "notarization-stapling"), "release current blocker priority action ladder should include notarization and stapling");
+  check(report.priorityActionRows.some((row) => row.id === "notarized-gatekeeper"), "release current blocker priority action ladder should include notarized Gatekeeper");
+  check(report.priorityActionRows.some((row) => row.id === "manual-channel-qa"), "release current blocker priority action ladder should include manual channel QA");
+  check(report.priorityActionRows.some((row) => row.id === "final-hard-gate"), "release current blocker priority action ladder should include final hard gate");
+  check(report.currentPriorityActionId === externalNextActions.currentActionId, "release current blocker should mirror external next-actions current action id");
+  check(report.currentPriorityActionNextCommand === report.currentNextCommand, "release current blocker current priority action next command should match current next command");
+  check(report.currentPriorityActionFirstBlocker === report.currentFirstBlocker, "release current blocker current priority action first blocker should match current first blocker");
+  check(report.priorityActionCurrentMatchesCurrentBlocker === true, "release current blocker should prove priority action current blocker alignment");
   check(report.currentRequiredKeyCount === report.currentRequiredKeys.length, "release current blocker required key count should match keys");
   check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release current blocker placeholder key count should match keys");
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderEditLocations.length, "release current blocker placeholder edit location count should match locations");
@@ -755,6 +822,10 @@ function buildMarkdown(report) {
     `- Hard gate requirements: ${report.hardGateRequirementCount} (${report.hardGateRequirementSummary})`,
     `- Hard gate blocked requirements: ${report.hardGateRequirementBlockedCount} (${report.hardGateBlockedRequirementSummary})`,
     `- Hard gate blockers: ${report.hardGateBlockerCount} (${report.hardGateBlockerSummary})`,
+    `- Priority actions pending: ${report.priorityActionCount} (${report.priorityActionSummary})`,
+    `- Current priority action: ${report.currentPriorityActionId} (${report.currentPriorityActionLabel})`,
+    `- Current priority action next command: \`${report.currentPriorityActionNextCommand}\``,
+    `- Current priority action aligned: ${report.priorityActionCurrentMatchesCurrentBlocker ? "yes" : "no"}`,
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
     `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`,
@@ -841,6 +912,19 @@ function buildMarkdown(report) {
     "|---|---:|---|---:|---|---:|",
     formatHardGateRequirementRows(report.hardGateBlockedRequirementRows),
     "",
+    "## Priority Action Ladder",
+    "",
+    `- Source ready: ${report.sourceExternalNextActionsReady ? "yes" : "no"}`,
+    `- Source path: ${report.sourceExternalNextActionsPath}`,
+    `- Current priority action: ${report.currentPriorityActionId} (${report.currentPriorityActionLabel})`,
+    `- Current priority action next command: \`${report.currentPriorityActionNextCommand}\``,
+    `- Current priority action first blocker: ${report.currentPriorityActionFirstBlocker}`,
+    `- Current priority action aligned: ${report.priorityActionCurrentMatchesCurrentBlocker ? "yes" : "no"}`,
+    "",
+    "| order | id | ready | label | next command | rerun commands | placeholder keys | evidence rows | ready criteria | checklist steps | value recorded |",
+    "|---:|---|---:|---|---|---|---:|---:|---:|---:|---:|",
+    formatPriorityActionRows(report.priorityActionRows),
+    "",
     "## Placeholder Edit Locations",
     "",
     "| location | key | placeholder | value recorded |",
@@ -906,11 +990,12 @@ if (!fromExisting) {
 }
 
 const releaseDoctor = await readRequiredJson(releaseDoctorJsonPath, "Release doctor");
+const externalNextActions = await readRequiredJson(externalNextActionsJsonPath, "External next actions");
 const externalProofBundle = await readRequiredJson(externalProofBundleJsonPath, "External proof bundle");
 const externalGate = await readRequiredJson(externalGateJsonPath, "External distribution gate");
 const releaseProgress = await readRequiredJson(releaseProgressJsonPath, "Release progress report");
-const report = buildReport({ releaseDoctor, externalProofBundle, externalGate, releaseProgress });
-validateReport(report, { releaseDoctor, externalProofBundle, externalGate, releaseProgress });
+const report = buildReport({ releaseDoctor, externalNextActions, externalProofBundle, externalGate, releaseProgress });
+validateReport(report, { releaseDoctor, externalNextActions, externalProofBundle, externalGate, releaseProgress });
 
 await mkdir(packageRoot, { recursive: true });
 const markdown = buildMarkdown(report);
@@ -923,6 +1008,8 @@ check(markdown.includes("Release-Channel Unblock Rehearsal"), "release current b
 check(markdown.includes("Release-channel placeholder blocker cleared in rehearsal:"), "release current blocker Markdown should include release-channel unblock cleared status");
 check(markdown.includes("Hard Gate Requirement Ladder"), "release current blocker Markdown should include hard-gate requirement ladder");
 check(markdown.includes("Blocked Hard Gate Requirements"), "release current blocker Markdown should include blocked hard-gate requirements");
+check(markdown.includes("Priority Action Ladder"), "release current blocker Markdown should include priority action ladder");
+check(markdown.includes("Current priority action aligned:"), "release current blocker Markdown should include priority action alignment");
 
 if (failures.length > 0) {
   fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
@@ -953,6 +1040,8 @@ console.log(`- Consistency ready: ${report.consistencyReady ? "yes" : "no"}`);
 console.log(`- Hard gate ready: ${report.hardGateReady ? "yes" : "no"}`);
 console.log(`- Hard gate requirements: ${report.hardGateRequirementCount} (${report.hardGateRequirementSummary})`);
 console.log(`- Hard gate blocked requirements: ${report.hardGateRequirementBlockedCount} (${report.hardGateBlockedRequirementSummary})`);
+console.log(`- Priority actions pending: ${report.priorityActionCount} (${report.priorityActionSummary})`);
+console.log(`- Current priority action: ${report.currentPriorityActionId} (${report.currentPriorityActionLabel})`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
