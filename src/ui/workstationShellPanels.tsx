@@ -2798,6 +2798,16 @@ export function QuickActions({
               <ArrowRight size={14} aria-hidden="true" />
               <span>Bottleneck</span>
             </button>
+            <button
+              className="quick-actions-guide-suggestion-reference"
+              data-testid="quick-actions-guide-suggestion-reference"
+              onClick={onOpenCommandReference}
+              title={`Open Command Reference for ${guideSuggestionAction.title}`}
+              type="button"
+            >
+              <CircleHelp size={14} aria-hidden="true" />
+              <span>Reference</span>
+            </button>
             <div className="quick-actions-guide-suggestion-pin-stack" data-testid="quick-actions-guide-suggestion-pin-stack">
               <button
                 aria-label={`${guideSuggestionPinned ? "Unpin" : "Pin"} ${guideSuggestionAction.title}`}
