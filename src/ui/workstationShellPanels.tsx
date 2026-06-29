@@ -3459,7 +3459,15 @@ function QuickActionRecentResultStrip({ result }: { result: QuickActionRecentRes
   );
 }
 
-export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClose: () => void }): ReactElement | null {
+export function CommandReferenceDialog({
+  open,
+  onClose,
+  onOpenQuickActions
+}: {
+  open: boolean;
+  onClose: () => void;
+  onOpenQuickActions: () => void;
+}): ReactElement | null {
   const [selectedFilterId, setSelectedFilterId] = useState<CommandReferenceFilterId>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -3537,9 +3545,19 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
             <CircleHelp size={18} aria-hidden="true" />
             <span>Command Reference</span>
           </div>
-          <button data-testid="command-reference-close" onClick={onClose} title="Close Command Reference" type="button">
-            <X size={14} aria-hidden="true" />
-          </button>
+          <div className="command-reference-heading-actions">
+            <button
+              data-testid="command-reference-open-quick-actions"
+              onClick={onOpenQuickActions}
+              title="Open Quick Actions"
+              type="button"
+            >
+              <KeyboardMusic size={14} aria-hidden="true" />
+            </button>
+            <button data-testid="command-reference-close" onClick={onClose} title="Close Command Reference" type="button">
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <div className="command-reference-body" data-testid="command-reference-body">
           <div className="command-reference-filter-bar" data-testid="command-reference-filter-bar" aria-label="Command Reference sections">

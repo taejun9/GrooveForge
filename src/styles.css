@@ -5132,6 +5132,14 @@ h2 {
   color: #82d7ff;
 }
 
+.command-reference-heading-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-inline-start: auto;
+}
+
 .command-reference-body {
   display: grid;
   gap: 10px;

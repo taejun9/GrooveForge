@@ -9531,7 +9531,11 @@ export function App(): ReactElement {
         onScopeChange={selectQuickActionScope}
         onTogglePin={toggleQuickActionPin}
       />
-      <CommandReferenceDialog open={commandReferenceOpen} onClose={closeCommandReference} />
+      <CommandReferenceDialog
+        open={commandReferenceOpen}
+        onClose={closeCommandReference}
+        onOpenQuickActions={openQuickActions}
+      />
 
       {localDraftRecovery && (
         <LocalDraftRecoveryBanner
