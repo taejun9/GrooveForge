@@ -288,6 +288,15 @@ function formatPriorityActionRows(rows) {
     .join("\n");
 }
 
+function formatExternalCompletionChecklistRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | none | none | 0 | 0 | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.id)} | ${escapeCell(row.label)} | ${escapeCell(row.firstBlocker)} | \`${escapeCell(row.proofCommand)}\` | ${escapeCell(row.rerunCommandSummary)} | ${escapeCell(row.evidenceSummary)} | ${row.readyCriteriaCount ?? 0} | ${row.actionChecklistCount ?? 0} | \`${escapeCell(row.hardGateCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function priorityActionRows(externalNextActions) {
   return valueFreeObjectRows(externalNextActions.priorityActions).map((action, index) => {
     const rerunCommands = stringArrayValue(action.rerunCommands);
@@ -304,6 +313,36 @@ function priorityActionRows(externalNextActions) {
       evidenceRowCount: Array.isArray(action.evidence) ? action.evidence.length : 0,
       readyCriteriaCount: stringArrayValue(action.readyCriteria).length,
       actionChecklistCount: stringArrayValue(action.actionChecklist).length,
+      valueRecorded: false
+    };
+  });
+}
+
+function externalCompletionChecklistRows(externalNextActions, hardGateCommand) {
+  return valueFreeObjectRows(externalNextActions.priorityActions).map((action, index) => {
+    const evidenceRows = valueFreeObjectRows(action.evidence);
+    const evidenceLabels = evidenceRows
+      .map((row) => textValue(row.label))
+      .filter((label) => label !== "none");
+    const readyCriteria = stringArrayValue(action.readyCriteria);
+    const actionChecklist = stringArrayValue(action.actionChecklist);
+    const rerunCommands = stringArrayValue(action.rerunCommands);
+    return {
+      order: index + 1,
+      id: textValue(action.id),
+      label: textValue(action.label),
+      firstBlocker: textValue(action.firstBlocker),
+      proofCommand: textValue(action.nextCommand),
+      rerunCommands,
+      rerunCommandSummary: rerunCommands.length > 0 ? rerunCommands.join(", ") : "none",
+      evidenceLabels,
+      evidenceSummary: evidenceLabels.length > 0 ? evidenceLabels.join(", ") : "none",
+      readyCriteria,
+      readyCriteriaCount: readyCriteria.length,
+      readyCriteriaSummary: readyCriteria.length > 0 ? `${readyCriteria.length} value-free ready criteria` : "none",
+      actionChecklistCount: actionChecklist.length,
+      actionChecklistSummary: actionChecklist.length > 0 ? `${actionChecklist.length} value-free checklist steps` : "none",
+      hardGateCommand,
       valueRecorded: false
     };
   });
@@ -344,6 +383,9 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
   const gateCommandVerificationRows = valueFreeObjectRows(externalGate.currentCommandVerificationRows);
   const nextActionRows = priorityActionRows(externalNextActions);
   const currentPriorityAction = nextActionRows[0] ?? null;
+  const hardGateCommand = textValue(externalProofBundle.hardExternalGateCommand, "npm run release:external-check");
+  const completionChecklistRows = externalCompletionChecklistRows(externalNextActions, hardGateCommand);
+  const currentCompletionChecklistRow = completionChecklistRows[0] ?? null;
   const gateRequirementRows = hardGateRequirementRows(externalGate);
   const hardGateBlockedRequirementRows = gateRequirementRows.filter((row) => !row.ready);
   const hardGateRequirementReadyCount = gateRequirementRows.filter((row) => row.ready).length;
@@ -477,7 +519,7 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentFirstBlocker: textValue(externalProofBundle.currentFirstBlocker),
     doctorFirstBlocker: textValue(releaseDoctor.currentActionFirstBlocker),
     currentOperatorAction: textValue(externalProofBundle.currentOperatorAction),
-    hardGateCommand: textValue(externalProofBundle.hardExternalGateCommand, "npm run release:external-check"),
+    hardGateCommand,
     hardGateReady: externalGate.externalDistributionGateReady === true,
     hardGateWouldFail: externalGate.hardGateWouldFail === true,
     hardGateRequirementCount: gateRequirementRows.length,
@@ -512,6 +554,18 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
       textValue(externalNextActions.currentActionId) === currentPriorityAction.id &&
       textValue(currentPriorityAction.nextCommand) === currentNextCommand &&
       textValue(currentPriorityAction.firstBlocker) === textValue(externalProofBundle.currentFirstBlocker),
+    externalCompletionChecklistCount: completionChecklistRows.length,
+    externalCompletionChecklistSummary:
+      completionChecklistRows.length > 0 ? `${completionChecklistRows.length} value-free external completion checklist rows` : "none",
+    externalCompletionChecklistRows: completionChecklistRows,
+    currentExternalCompletionChecklistRowId: textValue(currentCompletionChecklistRow?.id, "none"),
+    currentExternalCompletionChecklistRowLabel: textValue(currentCompletionChecklistRow?.label, "none"),
+    currentExternalCompletionChecklistProofCommand: textValue(currentCompletionChecklistRow?.proofCommand, "none"),
+    externalCompletionChecklistCurrentMatchesPriorityAction:
+      currentCompletionChecklistRow !== null &&
+      textValue(currentCompletionChecklistRow.id) === textValue(externalNextActions.currentActionId) &&
+      textValue(currentCompletionChecklistRow.proofCommand) === currentNextCommand &&
+      textValue(currentCompletionChecklistRow.firstBlocker) === textValue(externalProofBundle.currentFirstBlocker),
     currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: integerValue(externalProofBundle.currentRequiredKeyCount),
     currentRequiredKeys: proofRequiredKeys,
@@ -677,6 +731,26 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentPriorityActionNextCommand === report.currentNextCommand, "release current blocker current priority action next command should match current next command");
   check(report.currentPriorityActionFirstBlocker === report.currentFirstBlocker, "release current blocker current priority action first blocker should match current first blocker");
   check(report.priorityActionCurrentMatchesCurrentBlocker === true, "release current blocker should prove priority action current blocker alignment");
+  check(report.externalCompletionChecklistCount === report.externalCompletionChecklistRows.length, "release current blocker external completion checklist count should match rows");
+  check(report.externalCompletionChecklistCount === report.priorityActionCount, "release current blocker external completion checklist should mirror priority action count");
+  check(report.externalCompletionChecklistCount === integerValue(externalNextActions.priorityActionCount), "release current blocker external completion checklist should mirror external next-actions count");
+  check(typeof report.externalCompletionChecklistSummary === "string" && report.externalCompletionChecklistSummary.length > 0, "release current blocker should include external completion checklist summary");
+  check(report.externalCompletionChecklistRows.every((row) => row.valueRecorded === false), "release current blocker external completion checklist rows should not record values");
+  check(report.externalCompletionChecklistRows.every((row) => row.proofCommand !== "none"), "release current blocker external completion checklist rows should include proof commands");
+  check(report.externalCompletionChecklistRows.every((row) => row.hardGateCommand === report.hardGateCommand), "release current blocker external completion checklist rows should point at the hard gate command");
+  check(report.externalCompletionChecklistRows.every((row) => row.readyCriteriaCount > 0), "release current blocker external completion checklist rows should include ready criteria counts");
+  check(report.externalCompletionChecklistRows.every((row) => row.actionChecklistCount > 0), "release current blocker external completion checklist rows should include checklist step counts");
+  check(report.externalCompletionChecklistRows.every((row) => row.evidenceSummary.length > 0), "release current blocker external completion checklist rows should include evidence summaries");
+  check(report.externalCompletionChecklistRows.some((row) => row.id === "release-channel-metadata"), "release current blocker external completion checklist should include release-channel metadata");
+  check(report.externalCompletionChecklistRows.some((row) => row.id === "auto-update-feed"), "release current blocker external completion checklist should include auto-update feed");
+  check(report.externalCompletionChecklistRows.some((row) => row.id === "developer-id-signing"), "release current blocker external completion checklist should include Developer ID signing");
+  check(report.externalCompletionChecklistRows.some((row) => row.id === "notarization-stapling"), "release current blocker external completion checklist should include notarization and stapling");
+  check(report.externalCompletionChecklistRows.some((row) => row.id === "notarized-gatekeeper"), "release current blocker external completion checklist should include notarized Gatekeeper");
+  check(report.externalCompletionChecklistRows.some((row) => row.id === "manual-channel-qa"), "release current blocker external completion checklist should include manual channel QA");
+  check(report.externalCompletionChecklistRows.some((row) => row.id === "final-hard-gate"), "release current blocker external completion checklist should include final hard gate");
+  check(report.currentExternalCompletionChecklistRowId === report.currentPriorityActionId, "release current blocker current external completion checklist row should match current priority action");
+  check(report.currentExternalCompletionChecklistProofCommand === report.currentNextCommand, "release current blocker current external completion checklist proof command should match current next command");
+  check(report.externalCompletionChecklistCurrentMatchesPriorityAction === true, "release current blocker should prove external completion checklist current-row alignment");
   check(report.currentRequiredKeyCount === report.currentRequiredKeys.length, "release current blocker required key count should match keys");
   check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release current blocker placeholder key count should match keys");
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderEditLocations.length, "release current blocker placeholder edit location count should match locations");
@@ -826,6 +900,10 @@ function buildMarkdown(report) {
     `- Current priority action: ${report.currentPriorityActionId} (${report.currentPriorityActionLabel})`,
     `- Current priority action next command: \`${report.currentPriorityActionNextCommand}\``,
     `- Current priority action aligned: ${report.priorityActionCurrentMatchesCurrentBlocker ? "yes" : "no"}`,
+    `- External completion checklist rows: ${report.externalCompletionChecklistCount} (${report.externalCompletionChecklistSummary})`,
+    `- Current external completion checklist row: ${report.currentExternalCompletionChecklistRowId} (${report.currentExternalCompletionChecklistRowLabel})`,
+    `- Current external completion checklist proof command: \`${report.currentExternalCompletionChecklistProofCommand}\``,
+    `- External completion checklist current row aligned: ${report.externalCompletionChecklistCurrentMatchesPriorityAction ? "yes" : "no"}`,
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
     `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`,
@@ -925,6 +1003,17 @@ function buildMarkdown(report) {
     "|---:|---|---:|---|---|---|---:|---:|---:|---:|---:|",
     formatPriorityActionRows(report.priorityActionRows),
     "",
+    "## External Completion Checklist",
+    "",
+    `- Checklist rows: ${report.externalCompletionChecklistCount} (${report.externalCompletionChecklistSummary})`,
+    `- Current checklist row: ${report.currentExternalCompletionChecklistRowId} (${report.currentExternalCompletionChecklistRowLabel})`,
+    `- Current checklist proof command: \`${report.currentExternalCompletionChecklistProofCommand}\``,
+    `- Current checklist aligned: ${report.externalCompletionChecklistCurrentMatchesPriorityAction ? "yes" : "no"}`,
+    "",
+    "| order | id | label | first blocker | proof command | rerun commands | evidence | ready criteria | checklist steps | hard gate | value recorded |",
+    "|---:|---|---|---|---|---|---|---:|---:|---|---:|",
+    formatExternalCompletionChecklistRows(report.externalCompletionChecklistRows),
+    "",
     "## Placeholder Edit Locations",
     "",
     "| location | key | placeholder | value recorded |",
@@ -1010,6 +1099,8 @@ check(markdown.includes("Hard Gate Requirement Ladder"), "release current blocke
 check(markdown.includes("Blocked Hard Gate Requirements"), "release current blocker Markdown should include blocked hard-gate requirements");
 check(markdown.includes("Priority Action Ladder"), "release current blocker Markdown should include priority action ladder");
 check(markdown.includes("Current priority action aligned:"), "release current blocker Markdown should include priority action alignment");
+check(markdown.includes("External Completion Checklist"), "release current blocker Markdown should include external completion checklist");
+check(markdown.includes("External completion checklist current row aligned:"), "release current blocker Markdown should include external completion checklist alignment");
 
 if (failures.length > 0) {
   fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
@@ -1042,6 +1133,8 @@ console.log(`- Hard gate requirements: ${report.hardGateRequirementCount} (${rep
 console.log(`- Hard gate blocked requirements: ${report.hardGateRequirementBlockedCount} (${report.hardGateBlockedRequirementSummary})`);
 console.log(`- Priority actions pending: ${report.priorityActionCount} (${report.priorityActionSummary})`);
 console.log(`- Current priority action: ${report.currentPriorityActionId} (${report.currentPriorityActionLabel})`);
+console.log(`- External completion checklist rows: ${report.externalCompletionChecklistCount} (${report.externalCompletionChecklistSummary})`);
+console.log(`- Current external completion checklist row: ${report.currentExternalCompletionChecklistRowId} (${report.currentExternalCompletionChecklistRowLabel})`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
