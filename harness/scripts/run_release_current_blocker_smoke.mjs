@@ -206,6 +206,15 @@ function formatCommandRows(rows) {
     .join("\n");
 }
 
+function formatActionChecklistRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.step)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function buildReport({ releaseDoctor, externalProofBundle, externalGate, releaseProgress }) {
   const doctorRequiredKeys = stringArrayValue(releaseDoctor.currentActionRequiredKeys);
   const proofRequiredKeys = stringArrayValue(externalProofBundle.currentRequiredKeys);
@@ -221,6 +230,7 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
   const gateEnvEditRows = valueFreeObjectRows(externalGate.currentEnvEditRows);
   const proofChecklistRows = valueFreeObjectRows(externalProofBundle.currentProofChecklistRows);
   const gateProofChecklistRows = valueFreeObjectRows(externalGate.currentProofChecklistRows);
+  const actionChecklistRows = valueFreeObjectRows(externalProofBundle.currentActionChecklistRows);
   const commandVerificationRows = valueFreeObjectRows(externalProofBundle.currentCommandVerificationRows);
   const gateCommandVerificationRows = valueFreeObjectRows(externalGate.currentCommandVerificationRows);
   const currentCommandSequence = commandSequenceFromRows(commandVerificationRows);
@@ -362,6 +372,9 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
     currentProofChecklistRowCount: integerValue(externalProofBundle.currentProofChecklistRowCount),
     currentProofChecklistRowSummary: textValue(externalProofBundle.currentProofChecklistRowSummary, `${proofChecklistRows.length} value-free proof checklist rows`),
     currentProofChecklistRows: proofChecklistRows,
+    currentActionChecklistCount: integerValue(externalProofBundle.currentActionChecklistCount),
+    currentActionChecklistSummary: textValue(externalProofBundle.currentActionChecklistSummary, `${actionChecklistRows.length} value-free steps`),
+    currentActionChecklistRows: actionChecklistRows,
     currentCommandVerificationRowCount: integerValue(externalProofBundle.currentCommandVerificationRowCount),
     currentCommandVerificationRowSummary: textValue(
       externalProofBundle.currentCommandVerificationRowSummary,
@@ -429,10 +442,12 @@ function validateReport(report, { releaseDoctor, externalProofBundle, externalGa
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderEditLocations.length, "release current blocker placeholder edit location count should match locations");
   check(report.currentEnvEditRowsCount === report.currentEnvEditRows.length, "release current blocker env edit row count should match rows");
   check(report.currentProofChecklistRowCount === report.currentProofChecklistRows.length, "release current blocker proof checklist row count should match rows");
+  check(report.currentActionChecklistCount === report.currentActionChecklistRows.length, "release current blocker action checklist count should match rows");
   check(report.currentCommandVerificationRowCount === report.currentCommandVerificationRows.length, "release current blocker command verification row count should match rows");
   check(typeof report.currentPlaceholderEditLocationSummary === "string" && report.currentPlaceholderEditLocationSummary.length > 0, "release current blocker receipt should include current placeholder edit location summary");
   check(typeof report.currentEnvEditRowsSummary === "string" && report.currentEnvEditRowsSummary.length > 0, "release current blocker receipt should include current env edit rows summary");
   check(typeof report.currentProofChecklistRowSummary === "string" && report.currentProofChecklistRowSummary.length > 0, "release current blocker receipt should include current proof checklist row summary");
+  check(typeof report.currentActionChecklistSummary === "string" && report.currentActionChecklistSummary.length > 0, "release current blocker receipt should include current action checklist summary");
   check(typeof report.currentCommandVerificationRowSummary === "string" && report.currentCommandVerificationRowSummary.length > 0, "release current blocker receipt should include current command verification row summary");
   check(typeof report.currentRerunCommand === "string" && report.currentRerunCommand.length > 0, "release current blocker receipt should include current rerun command");
   check(report.currentCommandSequenceCount === report.currentCommandSequence.length, "release current blocker command sequence count should match sequence");
@@ -445,10 +460,15 @@ function validateReport(report, { releaseDoctor, externalProofBundle, externalGa
     check(report.currentPlaceholderKeyCount === releaseChannelMetadataKeys.length, "release current blocker should report four release-channel placeholder keys when blocked here");
     check(sameStringArray(report.currentPlaceholderKeys, releaseChannelMetadataKeys), "release current blocker placeholder keys should match release-channel metadata keys");
     check(report.currentRerunCommand === "npm run release:current-blocker", "release current blocker receipt should make current-blocker the current rerun command when placeholders remain");
+    check(
+      report.currentActionChecklistRows.some((row) => typeof row.step === "string" && row.step.includes("npm run release:current-blocker")),
+      "release current blocker action checklist should include current-blocker rerun when placeholders remain"
+    );
   }
   check(report.currentPlaceholderEditLocations.every((row) => row.valueRecorded === false), "release current blocker placeholder locations should not record values");
   check(report.currentEnvEditRows.every((row) => row.valueRecorded === false), "release current blocker env edit rows should not record values");
   check(report.currentProofChecklistRows.every((row) => row.valueRecorded === false), "release current blocker proof checklist rows should not record values");
+  check(report.currentActionChecklistRows.every((row) => row.valueRecorded === false), "release current blocker action checklist rows should not record values");
   check(report.currentCommandVerificationRows.every((row) => row.valueRecorded === false), "release current blocker command verification rows should not record values");
   check(report.currentNextCommandConsensus === true, "release current blocker should prove next command consensus");
   check(report.currentFirstBlockerConsensus === true, "release current blocker should prove proof/gate/progress blocker consensus");
@@ -486,6 +506,7 @@ function buildMarkdown(report) {
     `- Doctor first blocker: ${report.doctorFirstBlocker}`,
     `- Current env edit target: ${report.currentEnvEditTarget}`,
     `- Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})`,
+    `- Current action checklist rows: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})`,
     `- Current rerun command: \`${report.currentRerunCommand}\``,
     `- Current command sequence: ${report.currentCommandSequenceCount} (${report.currentCommandSequenceSummary})`,
     `- Hard gate command: \`${report.hardGateCommand}\``,
@@ -511,6 +532,12 @@ function buildMarkdown(report) {
     "| location | key | assignment shape | guidance | value recorded |",
     "|---|---|---|---|---|",
     formatEditRows(report.currentEnvEditRows),
+    "",
+    "## Current Action Checklist Rows",
+    "",
+    "| order | step | value recorded |",
+    "|---|---|---|",
+    formatActionChecklistRows(report.currentActionChecklistRows),
     "",
     "## Evidence Consistency",
     "",
@@ -593,6 +620,7 @@ console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount} ($
 console.log(`- Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})`);
 console.log(`- Current env edit rows: ${report.currentEnvEditRowsCount} (${report.currentEnvEditRowsSummary})`);
 console.log(`- Current proof checklist rows: ${report.currentProofChecklistRowCount} (${report.currentProofChecklistRowSummary})`);
+console.log(`- Current action checklist rows: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})`);
 console.log(`- Current rerun command: ${report.currentRerunCommand}`);
 console.log(`- Current command sequence: ${report.currentCommandSequenceCount} (${report.currentCommandSequenceSummary})`);
 console.log(`- Current command verification rows: ${report.currentCommandVerificationRowCount} (${report.currentCommandVerificationRowSummary})`);

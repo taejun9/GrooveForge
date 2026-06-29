@@ -122,6 +122,14 @@ function valueFreeObjectRows(values) {
   return Array.isArray(values) ? values.filter((value) => value && typeof value === "object" && value.valueRecorded === false) : [];
 }
 
+function actionChecklistRows(values) {
+  return stringArrayValue(values).map((step, index) => ({
+    order: index + 1,
+    step,
+    valueRecorded: false
+  }));
+}
+
 function buildCurrentEnvSummary(externalNextActions) {
   const currentRequiredKeys = stringArrayValue(externalNextActions?.currentRequiredKeys);
   const currentPlaceholderKeys = stringArrayValue(externalNextActions?.currentPlaceholderKeys);
@@ -131,6 +139,7 @@ function buildCurrentEnvSummary(externalNextActions) {
   const currentPlaceholderRemediationRows = valueFreeObjectRows(externalNextActions?.currentPlaceholderRemediationRows);
   const currentProofChecklistRows = valueFreeObjectRows(externalNextActions?.currentProofChecklistRows);
   const currentCommandVerificationRows = valueFreeObjectRows(externalNextActions?.currentCommandVerificationRows);
+  const currentActionChecklistRows = actionChecklistRows(externalNextActions?.currentActionChecklist);
   return {
     currentRequiredKeyCount: integerValue(externalNextActions?.currentRequiredKeyCount),
     currentRequiredKeySummary: textValue(externalNextActions?.currentRequiredKeySummary),
@@ -156,6 +165,7 @@ function buildCurrentEnvSummary(externalNextActions) {
     currentProofChecklistRows,
     currentActionChecklistCount: integerValue(externalNextActions?.currentActionChecklistCount),
     currentActionChecklistSummary: textValue(externalNextActions?.currentActionChecklistSummary),
+    currentActionChecklistRows,
     currentRerunCommand: textValue(externalNextActions?.currentRerunCommand),
     currentCommandSequenceCount: integerValue(externalNextActions?.currentCommandSequenceCount),
     currentCommandSequenceSummary: textValue(externalNextActions?.currentCommandSequenceSummary),
@@ -232,6 +242,15 @@ function formatCommandVerificationRows(rows) {
     .join("\n");
 }
 
+function formatActionChecklistRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.step)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatBlockers(blockers) {
   return blockers.length > 0 ? blockers.map((blocker) => `- ${blocker}`).join("\n") : "- None.";
 }
@@ -288,6 +307,12 @@ ${formatGateRequirementRows(summary.gateRequirementRows)}
 - Current rerun command: \`${summary.currentRerunCommand}\`
 - Current command sequence: ${summary.currentCommandSequenceCount} (${summary.currentCommandSequenceSummary})
 - Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
+
+## Current Action Checklist Rows
+
+| order | step | value recorded |
+|---:|---|---:|
+${formatActionChecklistRows(summary.currentActionChecklistRows)}
 
 ## Current Proof Checklist Rows
 
@@ -512,6 +537,9 @@ check(Array.isArray(summary.currentProofChecklistRows), "release proof bundle sh
 check(summary.currentProofChecklistRows.every((row) => row.valueRecorded === false), "release proof bundle current proof checklist rows should not record values");
 check(Number.isInteger(summary.currentActionChecklistCount), "release proof bundle should include current action checklist count");
 check(typeof summary.currentActionChecklistSummary === "string" && summary.currentActionChecklistSummary.length > 0, "release proof bundle should include current action checklist summary");
+check(Array.isArray(summary.currentActionChecklistRows), "release proof bundle should include value-free current action checklist rows");
+check(summary.currentActionChecklistRows.every((row) => row.valueRecorded === false), "release proof bundle current action checklist rows should not record values");
+check(summary.currentActionChecklistCount === summary.currentActionChecklistRows.length, "release proof bundle current action checklist count should match rows");
 check(typeof summary.currentRerunCommand === "string" && summary.currentRerunCommand.length > 0, "release proof bundle should include current rerun command");
 check(Number.isInteger(summary.currentCommandSequenceCount), "release proof bundle should include current command sequence count");
 check(typeof summary.currentCommandSequenceSummary === "string" && summary.currentCommandSequenceSummary.length > 0, "release proof bundle should include current command sequence summary");
@@ -564,6 +592,7 @@ check(markdown.includes("Current placeholder keys:"), "release proof bundle Mark
 check(markdown.includes("Current env edit target:"), "release proof bundle Markdown should include current env edit target");
 check(markdown.includes("Current placeholder remediation rows:"), "release proof bundle Markdown should include current placeholder remediation summary");
 check(markdown.includes("Current Proof Checklist Rows"), "release proof bundle Markdown should include current proof checklist rows");
+check(markdown.includes("Current Action Checklist Rows"), "release proof bundle Markdown should include current action checklist rows");
 check(markdown.includes("Current Command Verification Rows"), "release proof bundle Markdown should include current command verification rows");
 check(markdown.includes("Current command sequence:"), "release proof bundle Markdown should include current command sequence summary");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "release proof bundle Markdown should keep hard gate authoritative");
@@ -600,6 +629,7 @@ console.log(`- Current env edit target: ${summary.currentEnvEditTarget}`);
 console.log(`- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})`);
 console.log(`- Current placeholder remediation rows: ${summary.currentPlaceholderRemediationRowCount} (${summary.currentPlaceholderRemediationRowSummary})`);
 console.log(`- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})`);
+console.log(`- Current action checklist rows: ${summary.currentActionChecklistCount} (${summary.currentActionChecklistSummary})`);
 console.log(`- Current rerun command: ${summary.currentRerunCommand}`);
 console.log(`- Current command sequence: ${summary.currentCommandSequenceCount} (${summary.currentCommandSequenceSummary})`);
 console.log(`- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})`);
