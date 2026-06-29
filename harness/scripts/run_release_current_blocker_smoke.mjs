@@ -1324,6 +1324,9 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentTenPlanWindowRowCount: integerValue(releaseProgress.currentTenPlanWindowRowCount),
     currentTenPlanWindowRowSummary: textValue(releaseProgress.currentTenPlanWindowRowSummary, "none"),
     currentTenPlanWindowRows: valueFreeObjectRows(releaseProgress.currentTenPlanWindowRows),
+    tenPlanProgressReportDue: releaseProgress.tenPlanProgressReportDue === true,
+    tenPlanProgressReportCadence: textValue(releaseProgress.tenPlanProgressReportCadence),
+    nextTenPlanProgressReportAt: integerValue(releaseProgress.nextTenPlanProgressReportAt),
     audienceReadinessReady: releaseProgress.audienceReadinessReady === true,
     audienceReadinessRowCount: integerValue(releaseProgress.audienceReadinessRowCount),
     audienceReadinessRowSummary: textValue(releaseProgress.audienceReadinessRowSummary, "none"),
@@ -1662,6 +1665,10 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentTenPlanWindowRowCount === report.currentTenPlanWindowRows.length, "release current blocker 10-plan row count should match rows");
   check(report.currentTenPlanProgressLabel === releaseProgress.currentTenPlanWindowLabel, "release current blocker should mirror release progress 10-plan label");
   check(report.currentTenPlanWindowRowCount === releaseProgress.currentTenPlanWindowRowCount, "release current blocker should mirror release progress 10-plan row count");
+  check(report.tenPlanProgressReportDue === releaseProgress.tenPlanProgressReportDue, "release current blocker should mirror release progress 10-plan report due posture");
+  check(report.tenPlanProgressReportDue === (report.currentTenPlanWindowRowCount === 10), "release current blocker 10-plan report due posture should match completed window count");
+  check(report.tenPlanProgressReportCadence === releaseProgress.tenPlanProgressReportCadence, "release current blocker should mirror release progress 10-plan report cadence");
+  check(report.nextTenPlanProgressReportAt === releaseProgress.nextTenPlanProgressReportAt, "release current blocker should mirror release progress next 10-plan report number");
   check(report.currentTenPlanWindowRows.every((row) => row.valueRecorded === false), "release current blocker 10-plan rows should not record values");
   check(report.audienceReadinessReady === true, "release current blocker should include ready audience readiness");
   check(report.audienceReadinessRowCount === report.audienceReadinessRows.length, "release current blocker audience row count should match rows");
@@ -1801,6 +1808,9 @@ function buildMarkdown(report) {
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
     `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`,
     `- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`,
+    `- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}`,
+    `- 10-plan report cadence: ${report.tenPlanProgressReportCadence}`,
+    `- Next 10-plan report at: plan-${String(report.nextTenPlanProgressReportAt).padStart(3, "0")}`,
     `- Audience readiness ready: ${report.audienceReadinessReady ? "yes" : "no"}`,
     `- Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})`,
     `- Audience acceptance ready: ${report.audienceAcceptanceReady ? "yes" : "no"}`,
@@ -2088,6 +2098,9 @@ check(!/GROOVEFORGE_RELEASE_DOWNLOAD_URL=https?:\/\//i.test(markdown), "release 
 check(!/GROOVEFORGE_RELEASE_NOTES_URL=https?:\/\//i.test(markdown), "release current blocker Markdown should not include release notes URL assignments with values");
 check(!/GROOVEFORGE_SUPPORT_URL=https?:\/\//i.test(markdown), "release current blocker Markdown should not include support URL assignments with values");
 check(markdown.includes("Audience Acceptance Matrix"), "release current blocker Markdown should include audience acceptance matrix");
+check(markdown.includes("10-plan report due:"), "release current blocker Markdown should include 10-plan report due posture");
+check(markdown.includes("10-plan report cadence:"), "release current blocker Markdown should include 10-plan report cadence");
+check(markdown.includes("Next 10-plan report at:"), "release current blocker Markdown should include next 10-plan report number");
 check(markdown.includes("Release-Channel Unblock Rehearsal"), "release current blocker Markdown should include release-channel unblock rehearsal");
 check(markdown.includes("Release-channel placeholder blocker cleared in rehearsal:"), "release current blocker Markdown should include release-channel unblock cleared status");
 check(markdown.includes("Hard Gate Requirement Ladder"), "release current blocker Markdown should include hard-gate requirement ladder");
@@ -2169,6 +2182,9 @@ console.log(`- Current action handoff rows: ${report.currentActionHandoffRowCoun
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
+console.log(`- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}`);
+console.log(`- 10-plan report cadence: ${report.tenPlanProgressReportCadence}`);
+console.log(`- Next 10-plan report at: plan-${String(report.nextTenPlanProgressReportAt).padStart(3, "0")}`);
 console.log(`- Audience readiness ready: ${report.audienceReadinessReady ? "yes" : "no"}`);
 console.log(`- Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})`);
 console.log(`- Audience acceptance ready: ${report.audienceAcceptanceReady ? "yes" : "no"}`);
