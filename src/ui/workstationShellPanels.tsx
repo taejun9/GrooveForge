@@ -3679,6 +3679,16 @@ export function CommandReferenceDialog({
               <strong data-testid="command-reference-spotlight-label">{commandReferenceSearchSpotlight.label}</strong>
               <small data-testid="command-reference-spotlight-detail">{commandReferenceSearchSpotlight.detail}</small>
               <small data-testid="command-reference-spotlight-context">{commandReferenceSearchSpotlight.context}</small>
+              <button
+                className="command-reference-spotlight-open-quick-actions"
+                data-testid="command-reference-spotlight-open-quick-actions"
+                onClick={onOpenQuickActions}
+                title={`Open Quick Actions from Spotlight: ${commandReferenceSearchSpotlight.label}`}
+                type="button"
+              >
+                <KeyboardMusic size={14} aria-hidden="true" />
+                <span>Quick Actions</span>
+              </button>
             </div>
           ) : null}
           <div className="command-reference-grid" data-testid="command-reference-grid">
