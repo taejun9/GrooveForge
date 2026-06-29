@@ -161,6 +161,17 @@ function formatProofChecklistRows(rows) {
   ].join("\n");
 }
 
+function formatActionChecklistRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "- None.";
+  }
+  return [
+    "| order | step | value recorded |",
+    "|---:|---|---:|",
+    ...rows.map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.step)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+  ].join("\n");
+}
+
 function formatCommandVerificationRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "- None.";
@@ -175,6 +186,7 @@ function formatCommandVerificationRows(rows) {
 function buildCurrentProofSummary(externalProofBundle) {
   const currentEnvEditRows = valueFreeObjectRows(externalProofBundle?.currentEnvEditRows);
   const currentProofChecklistRows = valueFreeObjectRows(externalProofBundle?.currentProofChecklistRows);
+  const currentActionChecklistRows = valueFreeObjectRows(externalProofBundle?.currentActionChecklistRows);
   const currentCommandVerificationRows = valueFreeObjectRows(externalProofBundle?.currentCommandVerificationRows);
   return {
     currentProofBundleSourceReady: Boolean(externalProofBundle),
@@ -196,6 +208,9 @@ function buildCurrentProofSummary(externalProofBundle) {
     currentProofChecklistRowCount: integerValue(externalProofBundle?.currentProofChecklistRowCount),
     currentProofChecklistRowSummary: textValue(externalProofBundle?.currentProofChecklistRowSummary),
     currentProofChecklistRows,
+    currentActionChecklistCount: integerValue(externalProofBundle?.currentActionChecklistCount),
+    currentActionChecklistSummary: textValue(externalProofBundle?.currentActionChecklistSummary),
+    currentActionChecklistRows,
     currentRerunCommand: textValue(externalProofBundle?.currentRerunCommand),
     currentCommandSequenceCount: integerValue(externalProofBundle?.currentCommandSequenceCount),
     currentCommandSequenceSummary: textValue(externalProofBundle?.currentCommandSequenceSummary),
@@ -223,6 +238,7 @@ function buildMarkdown(summary) {
 - Current first blocker: ${summary.currentFirstBlocker}
 - Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
 - Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})
+- Current action checklist rows: ${summary.currentActionChecklistCount} (${summary.currentActionChecklistSummary})
 - Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
 
 ## Requirements
@@ -249,6 +265,7 @@ ${formatBlockers(summary.externalDistributionGateBlockers)}
 - Env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
 - Placeholder remediation rows: ${summary.currentPlaceholderRemediationRowCount} (${summary.currentPlaceholderRemediationRowSummary})
 - Proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})
+- Action checklist rows: ${summary.currentActionChecklistCount} (${summary.currentActionChecklistSummary})
 - Rerun command: \`${summary.currentRerunCommand}\`
 - Command sequence: ${summary.currentCommandSequenceCount} (${summary.currentCommandSequenceSummary})
 - Command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
@@ -261,6 +278,10 @@ ${formatEditGuidanceRows(summary.currentEnvEditRows)}
 ## Current Proof Checklist Rows
 
 ${formatProofChecklistRows(summary.currentProofChecklistRows)}
+
+## Current Action Checklist Rows
+
+${formatActionChecklistRows(summary.currentActionChecklistRows)}
 
 ## Current Command Verification Rows
 
@@ -384,12 +405,15 @@ check(Array.isArray(summary.currentEnvEditRows), "external distribution gate sho
 check(summary.currentEnvEditRows.every((row) => row.valueRecorded === false), "external distribution gate current env edit rows should not record values");
 check(Array.isArray(summary.currentProofChecklistRows), "external distribution gate should expose current proof checklist rows");
 check(summary.currentProofChecklistRows.every((row) => row.valueRecorded === false), "external distribution gate current proof checklist rows should not record values");
+check(Array.isArray(summary.currentActionChecklistRows), "external distribution gate should expose current action checklist rows");
+check(summary.currentActionChecklistRows.every((row) => row.valueRecorded === false), "external distribution gate current action checklist rows should not record values");
 check(Array.isArray(summary.currentCommandVerificationRows), "external distribution gate should expose current command verification rows");
 check(summary.currentCommandVerificationRows.every((row) => row.valueRecorded === false), "external distribution gate current command verification rows should not record values");
 if (summary.currentProofBundleSourceReady) {
   check(summary.currentNextCommand !== "none", "external distribution gate should mirror the current next command when proof bundle evidence exists");
   check(summary.currentEnvEditRowsCount === summary.currentEnvEditRows.length, "external distribution gate should mirror current env edit row count");
   check(summary.currentProofChecklistRowCount === summary.currentProofChecklistRows.length, "external distribution gate should mirror current proof checklist row count");
+  check(summary.currentActionChecklistCount === summary.currentActionChecklistRows.length, "external distribution gate should mirror current action checklist count");
   check(summary.currentCommandVerificationRowCount === summary.currentCommandVerificationRows.length, "external distribution gate should mirror current command verification row count");
 }
 check(summary.privateValuesRecorded === false, "external distribution gate should not record private values");
@@ -411,6 +435,7 @@ check(markdown.includes("Hard gate would fail:"), "external distribution gate re
 check(markdown.includes("Current Proof Action"), "external distribution gate report should include current proof action");
 check(markdown.includes("Current Edit Guidance"), "external distribution gate report should include current edit guidance");
 check(markdown.includes("Current Proof Checklist Rows"), "external distribution gate report should include current proof checklist rows");
+check(markdown.includes("Current Action Checklist Rows"), "external distribution gate report should include current action checklist rows");
 check(markdown.includes("Current Command Verification Rows"), "external distribution gate report should include current command verification rows");
 check(markdown.includes("Private values recorded: no"), "external distribution gate report should state value redaction");
 check(!/https?:\/\//i.test(markdown), "external distribution gate should not include public or private URL values");
@@ -446,6 +471,7 @@ console.log(`- Current next command: ${summary.currentNextCommand}`);
 console.log(`- Current first blocker: ${summary.currentFirstBlocker}`);
 console.log(`- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})`);
 console.log(`- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})`);
+console.log(`- Current action checklist rows: ${summary.currentActionChecklistCount} (${summary.currentActionChecklistSummary})`);
 console.log(`- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})`);
 console.log("- Private values recorded: no");
 if (summary.externalDistributionGateBlockers.length > 0) {
