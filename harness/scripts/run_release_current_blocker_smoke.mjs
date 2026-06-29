@@ -226,10 +226,19 @@ function formatCompletedPlanRows(rows) {
 
 function formatAudienceRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
-    return "| none | none | no | none | none | none | none | no |";
+    return "| none | none | no | none | none | none | none | no | none | no |";
   }
   return rows
-    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.readinessRole)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.workflowMode)} | ${row.workflowBars ?? 0} | ${escapeCell(row.workflowDeliveryTarget)} | ${escapeCell(row.workflowStyle)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.readinessRole)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.workflowMode)} | ${row.workflowBars ?? 0} | ${escapeCell(row.workflowDeliveryTarget)} | ${escapeCell(row.workflowStyle)} | ${row.deliveryPackageReady ? "yes" : "no"} | ${row.deliveryArtifactCount ?? 0} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatDeliveryPackageRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no | none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.persona)} | ${escapeCell(row.workflowLabel)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.mode)} | ${row.bars ?? 0} | ${escapeCell(row.deliveryTarget)} | ${row.artifactCount ?? 0} | ${escapeCell(row.packageRoot)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
     .join("\n");
 }
 
@@ -419,6 +428,10 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
     audienceReadinessRowCount: integerValue(releaseProgress.audienceReadinessRowCount),
     audienceReadinessRowSummary: textValue(releaseProgress.audienceReadinessRowSummary, "none"),
     audienceReadinessRows: valueFreeObjectRows(releaseProgress.audienceReadinessRows),
+    audienceDeliveryPackagesReady: releaseProgress.audienceDeliveryPackagesReady === true,
+    audienceDeliveryPackageRowCount: integerValue(releaseProgress.audienceDeliveryPackageRowCount),
+    audienceDeliveryPackageRowSummary: textValue(releaseProgress.audienceDeliveryPackageRowSummary, "none"),
+    audienceDeliveryPackageRows: valueFreeObjectRows(releaseProgress.audienceDeliveryPackageRows),
     beginnerAudienceReadinessReady: releaseProgress.beginnerAudienceReadinessReady === true,
     professionalProducerAudienceReadinessReady: releaseProgress.professionalProducerAudienceReadinessReady === true,
     nextExpectedOperatorSequence,
@@ -508,6 +521,12 @@ function validateReport(report, { releaseDoctor, externalProofBundle, externalGa
   check(report.audienceReadinessRowCount === releaseProgress.audienceReadinessRowCount, "release current blocker should mirror release progress audience row count");
   check(report.audienceReadinessRows.every((row) => row.valueRecorded === false), "release current blocker audience readiness rows should not record values");
   check(report.audienceReadinessRows.every((row) => row.ready === true), "release current blocker audience readiness rows should be ready");
+  check(report.audienceReadinessRows.every((row) => row.deliveryPackageReady === true), "release current blocker audience readiness rows should include ready delivery packages");
+  check(report.audienceReadinessRows.every((row) => row.deliveryArtifactCount === 8), "release current blocker audience readiness rows should include eight delivery artifacts");
+  check(report.audienceDeliveryPackagesReady === releaseProgress.audienceDeliveryPackagesReady, "release current blocker should mirror persona delivery package readiness");
+  check(report.audienceDeliveryPackageRowCount === releaseProgress.audienceDeliveryPackageRowCount, "release current blocker should mirror persona delivery package row count");
+  check(report.audienceDeliveryPackageRows.every((row) => row.valueRecorded === false), "release current blocker persona delivery package rows should not record values");
+  check(report.audienceDeliveryPackageRows.every((row) => row.ready === true && row.artifactCount === 8), "release current blocker persona delivery package rows should be ready with all artifacts");
   check(report.beginnerAudienceReadinessReady === releaseProgress.beginnerAudienceReadinessReady, "release current blocker should mirror first-time composer readiness");
   check(report.professionalProducerAudienceReadinessReady === releaseProgress.professionalProducerAudienceReadinessReady, "release current blocker should mirror professional producer readiness");
   check(report.consistencyReady === true, "release current blocker should pass all consistency checks");
@@ -554,6 +573,8 @@ function buildMarkdown(report) {
     `- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`,
     `- Audience readiness ready: ${report.audienceReadinessReady ? "yes" : "no"}`,
     `- Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})`,
+    `- Persona delivery packages ready: ${report.audienceDeliveryPackagesReady ? "yes" : "no"}`,
+    `- Persona delivery package rows: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})`,
     `- First-time composer readiness: ${report.beginnerAudienceReadinessReady ? "yes" : "no"}`,
     `- Professional producer readiness: ${report.professionalProducerAudienceReadinessReady ? "yes" : "no"}`,
     `- Private values recorded: ${report.privateValuesRecorded ? "yes" : "no"}`,
@@ -572,9 +593,15 @@ function buildMarkdown(report) {
     "",
     "## Audience Readiness",
     "",
-    "| audience | role | ready | mode | bars | delivery | style | value recorded |",
-    "|---|---|---:|---|---:|---|---|---:|",
+    "| audience | role | ready | mode | bars | delivery | style | package ready | artifacts | value recorded |",
+    "|---|---|---:|---|---:|---|---|---:|---:|---:|",
     formatAudienceRows(report.audienceReadinessRows),
+    "",
+    "## Persona Delivery Packages",
+    "",
+    "| persona | workflow | ready | mode | bars | delivery | artifacts | package | value recorded |",
+    "|---|---|---:|---|---:|---|---:|---|---:|",
+    formatDeliveryPackageRows(report.audienceDeliveryPackageRows),
     "",
     "## Placeholder Edit Locations",
     "",
@@ -685,6 +712,8 @@ console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`)
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
 console.log(`- Audience readiness ready: ${report.audienceReadinessReady ? "yes" : "no"}`);
 console.log(`- Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})`);
+console.log(`- Persona delivery packages ready: ${report.audienceDeliveryPackagesReady ? "yes" : "no"}`);
+console.log(`- Persona delivery package rows: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})`);
 console.log(`- First-time composer readiness: ${report.beginnerAudienceReadinessReady ? "yes" : "no"}`);
 console.log(`- Professional producer readiness: ${report.professionalProducerAudienceReadinessReady ? "yes" : "no"}`);
 console.log("- Private values recorded: no");

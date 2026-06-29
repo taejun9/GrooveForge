@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import React from "react";
@@ -13,10 +14,12 @@ const bundleId = "app.grooveforge.desktop";
 const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
+const personaDeliveryRoot = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-persona-delivery-packages`);
 const personaReadinessMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-persona-readiness.md`);
 const personaReadinessJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-persona-readiness.json`);
 const failures = [];
 const forbiddenSamplingText = /AudioClipEvent|sample import|sample browser|chop pads|sampler track|audio clip/i;
+const expectedPersonaArtifactLabels = ["Project file", "Full mix WAV", "Drums stem WAV", "808 stem WAV", "Synth stem WAV", "Chords stem WAV", "Arrangement MIDI", "Handoff Sheet"];
 
 function check(condition, message) {
   if (!condition) {
@@ -32,8 +35,33 @@ function ascii(bytes, start, length) {
   return String.fromCharCode(...bytes.slice(start, start + length));
 }
 
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+async function blobToBuffer(blob) {
+  return Buffer.from(await blob.arrayBuffer());
+}
+
 function escapeCell(value) {
   return String(value ?? "none").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
+function checkNoSamplingText(text, label) {
+  check(!forbiddenSamplingText.test(text), `${label} should keep sampling secondary and avoid imported-audio scope`);
+}
+
+function checkWavBytes(bytes, label) {
+  check(bytes.byteLength > 44, `${label} WAV should include audio data`);
+  check(ascii(bytes, 0, 4) === "RIFF", `${label} WAV missing RIFF header`);
+  check(ascii(bytes, 8, 4) === "WAVE", `${label} WAV missing WAVE header`);
+  check(ascii(bytes, 12, 4) === "fmt ", `${label} WAV missing fmt chunk`);
+  check(ascii(bytes, 36, 4) === "data", `${label} WAV missing data chunk`);
+}
+
+function checkMidiBytes(bytes, label) {
+  check(bytes.byteLength > 128, `${label} MIDI should include arrangement events`);
+  check(ascii(bytes, 0, 4) === "MThd", `${label} MIDI missing MThd header`);
 }
 
 function installBrowserMocks() {
@@ -273,6 +301,216 @@ function validateWorkflowProject({ workstation, render, midi, handoff, label, pe
   };
 }
 
+function packageManifestPath(packageDir) {
+  return path.join(packageDir, "manifest.json");
+}
+
+function packageMarkdownPath(packageDir) {
+  return path.join(packageDir, "manifest.md");
+}
+
+function artifactRow(label, kind, filePath, bytes) {
+  return {
+    label,
+    kind,
+    path: relative(filePath),
+    bytes: bytes.byteLength,
+    sha256: sha256(bytes),
+    valueRecorded: false
+  };
+}
+
+async function writePersonaArtifact(packageDir, label, kind, fileName, bytes) {
+  const filePath = path.join(packageDir, fileName);
+  await writeFile(filePath, bytes);
+  return artifactRow(label, kind, filePath, bytes);
+}
+
+function buildPersonaDeliveryMarkdown(manifest) {
+  const artifactRows = manifest.artifacts
+    .map((artifact) => `| ${escapeCell(artifact.label)} | ${escapeCell(artifact.kind)} | ${artifact.bytes} | \`${artifact.sha256.slice(0, 16)}...\` | \`${escapeCell(artifact.path)}\` | no |`)
+    .join("\n");
+
+  return `# ${appName} ${manifest.version} ${manifest.platform}-${manifest.arch} Persona Delivery Package
+
+## Status
+
+- Persona delivery package ready: ${manifest.personaDeliveryPackageReady ? "yes" : "no"}
+- Persona: ${manifest.persona}
+- Workflow: ${manifest.workflowLabel}
+- Mode: ${manifest.project.mode}
+- Style: ${manifest.project.styleId}
+- BPM/key: ${manifest.project.bpm} / ${manifest.project.key}
+- Arrangement: ${manifest.project.arrangementBars} bars
+- Delivery target: ${manifest.project.deliveryTarget}
+- Artifacts: ${manifest.artifactCount}
+- Total bytes: ${manifest.totalBytes}
+- Private values recorded: no
+- Network attempted: no
+- External distribution claimed: no
+
+## Artifacts
+
+| artifact | kind | bytes | sha256 | path | value recorded |
+|---|---|---:|---|---|---:|
+${artifactRows}
+
+## Export Meter
+
+- Mix status: ${manifest.mixAnalysis.status}
+- Duration: ${manifest.mixAnalysis.durationSeconds.toFixed(2)}s
+- Peak: ${manifest.mixAnalysis.peakDb.toFixed(2)} dB
+- RMS: ${manifest.mixAnalysis.rmsDb.toFixed(2)} dB
+- Headroom: ${manifest.mixAnalysis.headroomDb.toFixed(2)} dB
+
+## Not Recorded
+
+Private values, private beats, real user audio, release URLs, support URLs, feed URLs, credentials, tokens, identity labels, channel values, and local env values are not recorded.
+
+## Not Claimed
+
+This package does not claim Developer ID signing, notarization, Gatekeeper approval, auto-update, manual QA approval, release upload, app-store submission, remote channel probing, or external distribution completion.
+`;
+}
+
+async function writePersonaDeliveryPackage({ workstation, render, midi, handoff, workflowRow, project, packageSlug }) {
+  const packageDir = path.join(personaDeliveryRoot, packageSlug);
+  const manifestJsonPath = packageManifestPath(packageDir);
+  const manifestMarkdownPath = packageMarkdownPath(packageDir);
+  const projectContents = workstation.serializeProjectFile(project);
+  const reopened = workstation.parseProjectFile(projectContents);
+  const analysis = render.analyzeExport(reopened);
+  const stemAnalyses = render.analyzeStemExports(reopened);
+  const handoffContents = handoff.createHandoffSheet(reopened, analysis, stemAnalyses);
+  const mixBytes = await blobToBuffer(render.createMixWavBlob(reopened));
+  const midiBytes = Buffer.from(midi.createMidiFile(reopened));
+  const stemFileNames = render.stemWavFileNames(reopened);
+  const stemArtifacts = [];
+
+  await rm(packageDir, { recursive: true, force: true });
+  await mkdir(packageDir, { recursive: true });
+
+  const artifacts = [
+    await writePersonaArtifact(packageDir, "Project file", "project-json", workstation.projectFileName(reopened), Buffer.from(projectContents, "utf8")),
+    await writePersonaArtifact(packageDir, "Full mix WAV", "wav", render.mixWavFileName(reopened), mixBytes)
+  ];
+
+  for (const [index, track] of render.stemTrackIds.entries()) {
+    const stemBytes = await blobToBuffer(render.createStemWavBlob(reopened, track));
+    stemArtifacts.push({ track, bytes: stemBytes, fileName: stemFileNames[index] });
+    artifacts.push(await writePersonaArtifact(packageDir, `${render.stemTrackLabel(track)} stem WAV`, "wav-stem", stemFileNames[index], stemBytes));
+  }
+
+  artifacts.push(await writePersonaArtifact(packageDir, "Arrangement MIDI", "midi", midi.midiFileName(reopened), midiBytes));
+  artifacts.push(await writePersonaArtifact(packageDir, "Handoff Sheet", "handoff", handoff.handoffSheetFileName(reopened), Buffer.from(handoffContents, "utf8")));
+
+  const manifest = {
+    appName,
+    version: packageJson.version,
+    generatedAt: new Date().toISOString(),
+    platform: process.platform,
+    arch: process.arch,
+    persona: workflowRow.persona,
+    workflowLabel: workflowRow.label,
+    packageRoot: relative(packageDir),
+    manifestJsonPath: relative(manifestJsonPath),
+    manifestMarkdownPath: relative(manifestMarkdownPath),
+    productScope: "local direct-composition delivery package for persona readiness; sampling is secondary",
+    project: {
+      title: reopened.title,
+      mode: reopened.mode,
+      styleId: reopened.styleId,
+      bpm: reopened.bpm,
+      key: reopened.key,
+      selectedPattern: reopened.selectedPattern,
+      arrangementBars: workstation.arrangementTotalBars(reopened),
+      deliveryTarget: workstation.activeDeliveryTarget(reopened).name,
+      masterPreset: reopened.masterPreset
+    },
+    mixAnalysis: analysis,
+    stemAnalyses,
+    artifacts,
+    artifactCount: artifacts.length,
+    totalBytes: artifacts.reduce((total, artifact) => total + artifact.bytes, 0),
+    expectedArtifactCount: expectedPersonaArtifactLabels.length,
+    stemArtifactCount: stemArtifacts.length,
+    projectBytes: projectContents.length,
+    mixBytes: mixBytes.byteLength,
+    midiBytes: midiBytes.byteLength,
+    handoffSheetBytes: handoffContents.length,
+    personaDeliveryPackageReady: true,
+    localFirst: true,
+    samplingSecondary: true,
+    valueRecorded: false,
+    localEnvValueRecorded: false,
+    privateValuesRecorded: false,
+    privateBeatRecorded: false,
+    realUserAudioRecorded: false,
+    networkProbeAttempted: false,
+    releaseUploadAttempted: false,
+    claimedExternalDistribution: false
+  };
+
+  const markdown = buildPersonaDeliveryMarkdown(manifest);
+  await writeFile(manifestJsonPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  await writeFile(manifestMarkdownPath, markdown, "utf8");
+
+  check(workstation.parseProjectFile(projectContents).title === reopened.title, `${workflowRow.label} package project file should roundtrip`);
+  check(analysis.status !== "Silent", `${workflowRow.label} package mix should be audible`);
+  check(render.stemTrackIds.every((track) => stemAnalyses[track].status !== "Silent"), `${workflowRow.label} package stems should be audible`);
+  checkWavBytes(mixBytes, `${workflowRow.label} package full mix`);
+  for (const stem of stemArtifacts) {
+    checkWavBytes(stem.bytes, `${workflowRow.label} package ${stem.track} stem`);
+  }
+  checkMidiBytes(midiBytes, `${workflowRow.label} package arrangement`);
+  check(projectContents.endsWith("\n"), `${workflowRow.label} package project file should end with newline`);
+  check(handoffContents.endsWith("\n"), `${workflowRow.label} package Handoff Sheet should end with newline`);
+  check(handoffContents.includes("GrooveForge Handoff Sheet"), `${workflowRow.label} package Handoff Sheet should include title`);
+  check(handoffContents.includes("Export Meter"), `${workflowRow.label} package Handoff Sheet should include export meter`);
+  check(handoffContents.includes("Stem Meter"), `${workflowRow.label} package Handoff Sheet should include stem meter`);
+  check(manifest.artifactCount === expectedPersonaArtifactLabels.length, `${workflowRow.label} package should include project, mix, four stems, MIDI, and Handoff artifacts`);
+  check(expectedPersonaArtifactLabels.every((label) => manifest.artifacts.some((artifact) => artifact.label === label)), `${workflowRow.label} package should include all expected artifact labels`);
+  check(manifest.artifacts.every((artifact) => artifact.bytes > 0), `${workflowRow.label} package artifacts should be non-empty`);
+  check(manifest.artifacts.every((artifact) => /^[a-f0-9]{64}$/.test(artifact.sha256)), `${workflowRow.label} package artifacts should include SHA-256 checksums`);
+  check(manifest.personaDeliveryPackageReady === true, `${workflowRow.label} persona delivery package should be ready`);
+  check(manifest.localFirst === true, `${workflowRow.label} persona delivery package should keep local-first posture`);
+  check(manifest.samplingSecondary === true, `${workflowRow.label} persona delivery package should keep sampling secondary`);
+  check(manifest.valueRecorded === false, `${workflowRow.label} persona delivery package should not record values`);
+  check(manifest.privateValuesRecorded === false, `${workflowRow.label} persona delivery package should not record private values`);
+  check(manifest.privateBeatRecorded === false, `${workflowRow.label} persona delivery package should not record private beats`);
+  check(manifest.realUserAudioRecorded === false, `${workflowRow.label} persona delivery package should not record real user audio`);
+  check(manifest.networkProbeAttempted === false, `${workflowRow.label} persona delivery package should not probe network`);
+  check(manifest.releaseUploadAttempted === false, `${workflowRow.label} persona delivery package should not upload release artifacts`);
+  check(manifest.claimedExternalDistribution === false, `${workflowRow.label} persona delivery package should not claim external distribution`);
+  checkNoSamplingText(projectContents, `${workflowRow.label} package project file`);
+  checkNoSamplingText(handoffContents, `${workflowRow.label} package Handoff Sheet`);
+  checkNoSamplingText(JSON.stringify(manifest), `${workflowRow.label} package manifest`);
+  check(!/https?:\/\//i.test(markdown), `${workflowRow.label} package Markdown should not include URL values`);
+
+  return {
+    persona: workflowRow.persona,
+    workflowLabel: workflowRow.label,
+    ready: manifest.personaDeliveryPackageReady,
+    mode: reopened.mode,
+    styleId: reopened.styleId,
+    bars: workstation.arrangementTotalBars(reopened),
+    deliveryTarget: workstation.activeDeliveryTarget(reopened).name,
+    packageRoot: manifest.packageRoot,
+    manifestJsonPath: manifest.manifestJsonPath,
+    artifactCount: manifest.artifactCount,
+    totalBytes: manifest.totalBytes,
+    projectBytes: manifest.projectBytes,
+    mixBytes: manifest.mixBytes,
+    stemArtifactCount: manifest.stemArtifactCount,
+    midiBytes: manifest.midiBytes,
+    handoffSheetBytes: manifest.handoffSheetBytes,
+    mixStatus: analysis.status,
+    localFirst: true,
+    samplingSecondary: true,
+    valueRecorded: false
+  };
+}
+
 function validateAllGenreCoverage(workstation) {
   const requiredStyleIds = [
     "trap",
@@ -348,6 +586,7 @@ function formatStyleRows(rows) {
 function buildAudienceReadinessRows({
   renderedSignalRows,
   workflowRows,
+  deliveryPackageRows,
   directCompositionReady,
   allGenreStyleReadinessReady,
   localExportReadinessReady,
@@ -357,6 +596,8 @@ function buildAudienceReadinessRows({
   const producerSignals = renderedSignalRows.find((row) => row.label === "professional producer path");
   const beginnerWorkflow = workflowRows.find((row) => row.persona === "first-time composer");
   const producerWorkflow = workflowRows.find((row) => row.persona === "professional producer");
+  const beginnerDelivery = deliveryPackageRows.find((row) => row.persona === "first-time composer");
+  const producerDelivery = deliveryPackageRows.find((row) => row.persona === "professional producer");
 
   const rows = [
     {
@@ -365,6 +606,7 @@ function buildAudienceReadinessRows({
       ready:
         beginnerSignals?.ready === true &&
         beginnerWorkflow?.ready === true &&
+        beginnerDelivery?.ready === true &&
         directCompositionReady &&
         allGenreStyleReadinessReady &&
         localExportReadinessReady &&
@@ -375,7 +617,9 @@ function buildAudienceReadinessRows({
       workflowBars: beginnerWorkflow?.bars ?? 0,
       workflowDeliveryTarget: beginnerWorkflow?.deliveryTarget ?? "missing",
       workflowStyle: beginnerWorkflow?.styleId ?? "missing",
-      proofSummary: "Guide Quick Start, First Beat Path, Composer Guide, editable 8-bar beat, WAV/stems/MIDI/Handoff",
+      deliveryPackageReady: beginnerDelivery?.ready === true,
+      deliveryArtifactCount: beginnerDelivery?.artifactCount ?? 0,
+      proofSummary: "Guide Quick Start, First Beat Path, Composer Guide, editable 8-bar beat, project/WAV/stems/MIDI/Handoff package",
       localFirst: true,
       samplingSecondary: samplingSecondaryReady,
       valueRecorded: false
@@ -386,6 +630,7 @@ function buildAudienceReadinessRows({
       ready:
         producerSignals?.ready === true &&
         producerWorkflow?.ready === true &&
+        producerDelivery?.ready === true &&
         directCompositionReady &&
         allGenreStyleReadinessReady &&
         localExportReadinessReady &&
@@ -396,7 +641,9 @@ function buildAudienceReadinessRows({
       workflowBars: producerWorkflow?.bars ?? 0,
       workflowDeliveryTarget: producerWorkflow?.deliveryTarget ?? "missing",
       workflowStyle: producerWorkflow?.styleId ?? "missing",
-      proofSummary: "Studio, Review Queue, Production Snapshot, Mix Coach, Quick Actions, Command Reference, 24-bar delivery pass",
+      deliveryPackageReady: producerDelivery?.ready === true,
+      deliveryArtifactCount: producerDelivery?.artifactCount ?? 0,
+      proofSummary: "Studio, Review Queue, Production Snapshot, Mix Coach, Quick Actions, Command Reference, project/WAV/stems/MIDI/Handoff package",
       localFirst: true,
       samplingSecondary: samplingSecondaryReady,
       valueRecorded: false
@@ -408,6 +655,7 @@ function buildAudienceReadinessRows({
     check(row.valueRecorded === false, `${row.audience} audience readiness row should not record values`);
     check(row.localFirst === true, `${row.audience} audience readiness row should keep local-first posture`);
     check(row.samplingSecondary === true, `${row.audience} audience readiness row should keep sampling secondary`);
+    check(row.deliveryPackageReady === true, `${row.audience} audience readiness row should include ready delivery package`);
   }
 
   return rows;
@@ -415,7 +663,13 @@ function buildAudienceReadinessRows({
 
 function formatAudienceRows(rows) {
   return rows
-    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.readinessRole)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.renderedSignalGroup)} | ${escapeCell(row.workflowLabel)} | ${escapeCell(row.workflowMode)} | ${row.workflowBars} | ${escapeCell(row.workflowDeliveryTarget)} | ${escapeCell(row.workflowStyle)} | ${escapeCell(row.proofSummary)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.readinessRole)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.renderedSignalGroup)} | ${escapeCell(row.workflowLabel)} | ${escapeCell(row.workflowMode)} | ${row.workflowBars} | ${escapeCell(row.workflowDeliveryTarget)} | ${escapeCell(row.workflowStyle)} | ${row.deliveryPackageReady ? "yes" : "no"} | ${row.deliveryArtifactCount ?? 0} | ${escapeCell(row.proofSummary)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatDeliveryPackageRows(rows) {
+  return rows
+    .map((row) => `| ${escapeCell(row.persona)} | ${escapeCell(row.workflowLabel)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.mode)} | ${row.bars} | ${escapeCell(row.deliveryTarget)} | ${row.artifactCount} | ${row.totalBytes} | \`${escapeCell(row.packageRoot)}\` | \`${escapeCell(row.manifestJsonPath)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
     .join("\n");
 }
 
@@ -431,6 +685,8 @@ function buildMarkdown(report) {
 - Direct composition readiness: ${report.directCompositionReady ? "yes" : "no"}
 - All-genre style readiness: ${report.allGenreStyleReadinessReady ? "yes" : "no"}
 - Local export readiness: ${report.localExportReadinessReady ? "yes" : "no"}
+- Persona delivery packages ready: ${report.personaDeliveryPackagesReady ? "yes" : "no"}
+- Persona delivery package rows: ${report.deliveryPackageRows.length}
 - Sampling secondary: ${report.samplingSecondaryReady ? "yes" : "no"}
 - Private values recorded: no
 - Network attempted: no
@@ -438,9 +694,15 @@ function buildMarkdown(report) {
 
 ## Audience Readiness
 
-| audience | role | ready | rendered signal group | workflow | mode | bars | delivery | style | proof summary | value recorded |
-|---|---|---:|---|---|---|---:|---|---|---|---:|
+| audience | role | ready | rendered signal group | workflow | mode | bars | delivery | style | package ready | artifacts | proof summary | value recorded |
+|---|---|---:|---|---|---|---:|---|---|---:|---:|---|---:|
 ${formatAudienceRows(report.audienceReadinessRows)}
+
+## Persona Delivery Packages
+
+| persona | workflow | ready | mode | bars | delivery | artifacts | total bytes | package | manifest | value recorded |
+|---|---|---:|---|---:|---|---:|---:|---|---|---:|
+${formatDeliveryPackageRows(report.deliveryPackageRows)}
 
 ## Rendered Persona Signals
 
@@ -587,6 +849,26 @@ const workflowRows = [
     }
   })
 ];
+const deliveryPackageRows = await Promise.all([
+  writePersonaDeliveryPackage({
+    workstation,
+    render,
+    midi,
+    handoff,
+    workflowRow: workflowRows[0],
+    project: createBeginnerGuidedFirstBeat(workstation),
+    packageSlug: "first-time-composer-guided"
+  }),
+  writePersonaDeliveryPackage({
+    workstation,
+    render,
+    midi,
+    handoff,
+    workflowRow: workflowRows[1],
+    project: createProducerFastPass(workstation),
+    packageSlug: "professional-producer-studio"
+  })
+]);
 const styleCoverage = validateAllGenreCoverage(workstation);
 
 const beginnerReadinessReady =
@@ -600,10 +882,14 @@ const allGenreStyleReadinessReady =
   styleCoverage.readyStyleCount === styleCoverage.requiredStyleCount &&
   styleCoverage.supportedStyleCount >= styleCoverage.requiredStyleCount;
 const localExportReadinessReady = workflowRows.every((row) => row.mixStatus !== "Silent" && row.midiBytes > 1000 && row.projectBytes > 10000);
-const samplingSecondaryReady = !forbiddenSamplingText.test(JSON.stringify({ renderedSignalRows, workflowRows, styleCoverage }));
+const personaDeliveryPackagesReady =
+  deliveryPackageRows.length === 2 &&
+  deliveryPackageRows.every((row) => row.ready === true && row.artifactCount === expectedPersonaArtifactLabels.length && row.valueRecorded === false);
+const samplingSecondaryReady = !forbiddenSamplingText.test(JSON.stringify({ renderedSignalRows, workflowRows, deliveryPackageRows, styleCoverage }));
 const audienceReadinessRows = buildAudienceReadinessRows({
   renderedSignalRows,
   workflowRows,
+  deliveryPackageRows,
   directCompositionReady,
   allGenreStyleReadinessReady,
   localExportReadinessReady,
@@ -628,12 +914,15 @@ const personaReadinessReport = {
   audienceReadinessRows,
   renderedSignalRows,
   workflowRows,
+  deliveryPackageRows,
   styleCoverage,
   beginnerReadinessReady,
   professionalProducerReadinessReady,
   directCompositionReady,
   allGenreStyleReadinessReady,
   localExportReadinessReady,
+  personaDeliveryPackagesReady,
+  personaDeliveryPackageRoot: relative(personaDeliveryRoot),
   samplingSecondaryReady,
   localFirstReady: true,
   privateValuesRecorded: false,
@@ -649,6 +938,7 @@ personaReadinessReport.personaReadinessReady =
   personaReadinessReport.directCompositionReady &&
   personaReadinessReport.allGenreStyleReadinessReady &&
   personaReadinessReport.localExportReadinessReady &&
+  personaReadinessReport.personaDeliveryPackagesReady &&
   personaReadinessReport.samplingSecondaryReady &&
   personaReadinessReport.localFirstReady;
 
@@ -662,6 +952,7 @@ check(personaReadinessReport.professionalProducerReadinessReady === true, "perso
 check(personaReadinessReport.directCompositionReady === true, "persona readiness report should prove direct composition readiness");
 check(personaReadinessReport.allGenreStyleReadinessReady === true, "persona readiness report should prove all-genre style readiness");
 check(personaReadinessReport.localExportReadinessReady === true, "persona readiness report should prove local export readiness");
+check(personaReadinessReport.personaDeliveryPackagesReady === true, "persona readiness report should prove persona delivery package readiness");
 check(personaReadinessReport.samplingSecondaryReady === true, "persona readiness report should keep sampling secondary");
 check(personaReadinessReport.localFirstReady === true, "persona readiness report should keep local-first posture");
 check(personaReadinessReport.privateValuesRecorded === false, "persona readiness report should not record private values");
@@ -670,10 +961,16 @@ check(personaReadinessReport.claimedExternalDistribution === false, "persona rea
 check(personaReadinessReport.audienceReadinessRows.length === 2, "persona readiness report should include two audience readiness rows");
 check(personaReadinessReport.audienceReadinessRows.every((row) => row.ready === true), "persona readiness audience rows should be ready");
 check(personaReadinessReport.audienceReadinessRows.every((row) => row.valueRecorded === false), "persona readiness audience rows should not record values");
+check(personaReadinessReport.audienceReadinessRows.every((row) => row.deliveryPackageReady === true), "persona readiness audience rows should include ready delivery packages");
+check(personaReadinessReport.deliveryPackageRows.length === 2, "persona readiness report should include two delivery package rows");
+check(personaReadinessReport.deliveryPackageRows.every((row) => row.ready === true), "persona readiness delivery package rows should be ready");
+check(personaReadinessReport.deliveryPackageRows.every((row) => row.artifactCount === expectedPersonaArtifactLabels.length), "persona readiness delivery package rows should include all deliverable artifacts");
+check(personaReadinessReport.deliveryPackageRows.every((row) => row.valueRecorded === false), "persona readiness delivery package rows should not record values");
 check(personaReadinessReport.workflowRows.length === 2, "persona readiness report should include two persona workflow rows");
 check(personaReadinessReport.styleCoverage.readyStyleCount === 14, "persona readiness report should include 14 ready style rows");
 check(markdown.includes("Persona Readiness"), "persona readiness Markdown should include title");
 check(markdown.includes("Audience Readiness"), "persona readiness Markdown should include audience readiness");
+check(markdown.includes("Persona Delivery Packages"), "persona readiness Markdown should include persona delivery packages");
 check(markdown.includes("first-time composer"), "persona readiness Markdown should include first-time composer evidence");
 check(markdown.includes("professional producer"), "persona readiness Markdown should include professional producer evidence");
 check(markdown.includes("Direct composition readiness:"), "persona readiness Markdown should include direct composition readiness");
@@ -702,6 +999,8 @@ console.log(`- Professional producer readiness: ${personaReadinessReport.profess
 console.log(`- Direct composition readiness: ${personaReadinessReport.directCompositionReady ? "yes" : "no"}`);
 console.log(`- All-genre style readiness: ${personaReadinessReport.styleCoverage.readyStyleCount}/${personaReadinessReport.styleCoverage.requiredStyleCount}`);
 console.log(`- Local export readiness: ${personaReadinessReport.localExportReadinessReady ? "yes" : "no"}`);
+console.log(`- Persona delivery packages ready: ${personaReadinessReport.personaDeliveryPackagesReady ? "yes" : "no"}`);
+console.log(`- Persona delivery package rows: ${personaReadinessReport.deliveryPackageRows.length}`);
 console.log(`- Sampling secondary: ${personaReadinessReport.samplingSecondaryReady ? "yes" : "no"}`);
 console.log(`- Audience readiness rows: ${personaReadinessReport.audienceReadinessRows.length}`);
 for (const row of personaReadinessReport.audienceReadinessRows) {
@@ -712,6 +1011,11 @@ for (const row of personaReadinessReport.audienceReadinessRows) {
 for (const row of personaReadinessReport.workflowRows) {
   console.log(
     `- ${row.label}: ${row.persona}, ${row.mode}, ${row.bpm} BPM ${row.key} ${row.styleId}, ${row.bars} bars, ${row.deliveryTarget}, ${row.mixStatus}, events ${row.eventCounts.drums}/${row.eventCounts.bass}/${row.eventCounts.melody}/${row.eventCounts.chords}`
+  );
+}
+for (const row of personaReadinessReport.deliveryPackageRows) {
+  console.log(
+    `- package ${row.persona}: ${row.ready ? "ready" : "blocked"}, ${row.artifactCount} artifacts, ${row.totalBytes} bytes, ${row.packageRoot}`
   );
 }
 console.log("- Private values recorded: no");

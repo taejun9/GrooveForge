@@ -123,10 +123,19 @@ function formatCompletedPlanRows(rows) {
 
 function formatAudienceRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
-    return "| none | none | no | none | none | none | none | no |";
+    return "| none | none | no | none | none | none | none | no | none | no |";
   }
   return rows
-    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.readinessRole)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.workflowMode)} | ${row.workflowBars ?? 0} | ${escapeCell(row.workflowDeliveryTarget)} | ${escapeCell(row.workflowStyle)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.readinessRole)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.workflowMode)} | ${row.workflowBars ?? 0} | ${escapeCell(row.workflowDeliveryTarget)} | ${escapeCell(row.workflowStyle)} | ${row.deliveryPackageReady ? "yes" : "no"} | ${row.deliveryArtifactCount ?? 0} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatDeliveryPackageRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no | none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.persona)} | ${escapeCell(row.workflowLabel)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.mode)} | ${row.bars ?? 0} | ${escapeCell(row.deliveryTarget)} | ${row.artifactCount ?? 0} | ${escapeCell(row.packageRoot)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
     .join("\n");
 }
 
@@ -175,6 +184,26 @@ async function buildCompletedPlanSummary() {
 }
 
 function buildAudienceReadinessSummary(personaReadiness) {
+  const deliveryPackageRows = valueFreeObjectRows(personaReadiness.deliveryPackageRows).map((row) => ({
+    persona: textValue(row.persona),
+    workflowLabel: textValue(row.workflowLabel),
+    ready: row.ready === true,
+    mode: textValue(row.mode),
+    styleId: textValue(row.styleId),
+    bars: integerValue(row.bars),
+    deliveryTarget: textValue(row.deliveryTarget),
+    packageRoot: textValue(row.packageRoot),
+    manifestJsonPath: textValue(row.manifestJsonPath),
+    artifactCount: integerValue(row.artifactCount),
+    totalBytes: integerValue(row.totalBytes),
+    stemArtifactCount: integerValue(row.stemArtifactCount),
+    midiBytes: integerValue(row.midiBytes),
+    handoffSheetBytes: integerValue(row.handoffSheetBytes),
+    mixStatus: textValue(row.mixStatus),
+    localFirst: row.localFirst === true,
+    samplingSecondary: row.samplingSecondary === true,
+    valueRecorded: false
+  }));
   const rows = valueFreeObjectRows(personaReadiness.audienceReadinessRows).map((row) => ({
     audience: textValue(row.audience),
     readinessRole: textValue(row.readinessRole),
@@ -185,6 +214,8 @@ function buildAudienceReadinessSummary(personaReadiness) {
     workflowBars: integerValue(row.workflowBars),
     workflowDeliveryTarget: textValue(row.workflowDeliveryTarget),
     workflowStyle: textValue(row.workflowStyle),
+    deliveryPackageReady: row.deliveryPackageReady === true,
+    deliveryArtifactCount: integerValue(row.deliveryArtifactCount),
     proofSummary: textValue(row.proofSummary),
     localFirst: row.localFirst === true,
     samplingSecondary: row.samplingSecondary === true,
@@ -199,9 +230,12 @@ function buildAudienceReadinessSummary(personaReadiness) {
     personaReadiness.directCompositionReady === true &&
     personaReadiness.allGenreStyleReadinessReady === true &&
     personaReadiness.localExportReadinessReady === true &&
+    personaReadiness.personaDeliveryPackagesReady === true &&
     personaReadiness.samplingSecondaryReady === true &&
+    deliveryPackageRows.length === 2 &&
+    deliveryPackageRows.every((row) => row.ready === true && row.artifactCount === 8 && row.localFirst === true && row.samplingSecondary === true && row.valueRecorded === false) &&
     rows.length === 2 &&
-    rows.every((row) => row.ready === true && row.localFirst === true && row.samplingSecondary === true && row.valueRecorded === false);
+    rows.every((row) => row.ready === true && row.deliveryPackageReady === true && row.deliveryArtifactCount === 8 && row.localFirst === true && row.samplingSecondary === true && row.valueRecorded === false);
 
   return {
     sourcePersonaReadinessReady: true,
@@ -210,6 +244,11 @@ function buildAudienceReadinessSummary(personaReadiness) {
     audienceReadinessRowCount: rows.length,
     audienceReadinessRowSummary: rows.length > 0 ? `${rows.length} value-free audience readiness rows` : "none",
     audienceReadinessRows: rows,
+    audienceDeliveryPackagesReady: personaReadiness.personaDeliveryPackagesReady === true,
+    audienceDeliveryPackageRoot: textValue(personaReadiness.personaDeliveryPackageRoot, "none"),
+    audienceDeliveryPackageRowCount: deliveryPackageRows.length,
+    audienceDeliveryPackageRowSummary: deliveryPackageRows.length > 0 ? `${deliveryPackageRows.length} value-free persona delivery package rows` : "none",
+    audienceDeliveryPackageRows: deliveryPackageRows,
     beginnerAudienceReadinessReady: beginnerRow?.ready === true,
     professionalProducerAudienceReadinessReady: producerRow?.ready === true,
     audienceReadinessLocalExportReady: personaReadiness.localExportReadinessReady === true,
@@ -239,7 +278,7 @@ function buildUserFacingCompletionSummary(report, completedPlanSummary) {
     userFacingNextCommand: report.externalProofBundleCurrentNextCommand,
     userFacingOperatorAction: report.externalProofBundleCurrentOperatorAction,
     userFacingCompletionEvidenceSummary:
-      "local release ready, desktop project IO ready, PKG payload project IO ready, audience readiness ready, external proof bundle ready",
+      "local release ready, desktop project IO ready, PKG payload project IO ready, audience readiness ready, persona delivery packages ready, external proof bundle ready",
     userFacingReportCadence: completedPlanSummary.tenPlanProgressReportCadence,
     userFacingCompletionPrivateValueRecorded: false,
     ...completedPlanSummary
@@ -381,6 +420,8 @@ function buildMarkdown(report) {
 - PKG payload project IO evidence ready: ${report.pkgPayloadProjectIoEvidenceReady ? "yes" : "no"}
 - Audience readiness ready: ${report.audienceReadinessReady ? "yes" : "no"}
 - Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})
+- Persona delivery packages ready: ${report.audienceDeliveryPackagesReady ? "yes" : "no"}
+- Persona delivery package rows: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})
 - First-time composer readiness: ${report.beginnerAudienceReadinessReady ? "yes" : "no"}
 - Professional producer readiness: ${report.professionalProducerAudienceReadinessReady ? "yes" : "no"}
 - External distribution hard gate ready: ${report.externalDistributionGateReady ? "yes" : "no"}
@@ -423,6 +464,7 @@ function buildMarkdown(report) {
 - Completion status wording: ${report.userFacingCompletionStatus}
 - Completion evidence summary: ${report.userFacingCompletionEvidenceSummary}
 - Audience readiness to report: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})
+- Persona delivery packages to report: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})
 - Next proof target to report: ${report.userFacingNextProofTarget}
 - Next blocker to report: ${report.userFacingNextBlocker}
 - Next command to report: \`${report.userFacingNextCommand}\`
@@ -444,9 +486,15 @@ ${formatCompletedPlanRows(report.currentTenPlanWindowRows)}
 
 ## Audience Readiness
 
-| audience | role | ready | mode | bars | delivery | style | value recorded |
-|---|---|---:|---|---:|---|---|---:|
+| audience | role | ready | mode | bars | delivery | style | package ready | artifacts | value recorded |
+|---|---|---:|---|---:|---|---|---:|---:|---:|
 ${formatAudienceRows(report.audienceReadinessRows)}
+
+## Persona Delivery Packages
+
+| persona | workflow | ready | mode | bars | delivery | artifacts | package | value recorded |
+|---|---|---:|---|---:|---|---:|---|---:|
+${formatDeliveryPackageRows(report.audienceDeliveryPackageRows)}
 
 ## Commands
 
@@ -688,6 +736,7 @@ releaseProgressReport.releaseProgressReportReady =
   releaseProgressReport.desktopProjectIoEvidenceReady &&
   releaseProgressReport.pkgPayloadProjectIoEvidenceReady &&
   releaseProgressReport.audienceReadinessReady &&
+  releaseProgressReport.audienceDeliveryPackagesReady &&
   releaseProgressReport.sourceExternalProofBundleReady &&
   releaseProgressReport.externalProofBundleReady &&
   releaseProgressReport.sourceExternalGateReady &&
@@ -751,8 +800,16 @@ check(releaseProgressReport.audienceReadinessRowCount === 2, "release progress r
 check(releaseProgressReport.audienceReadinessRows.length === releaseProgressReport.audienceReadinessRowCount, "release progress report audience readiness row count should match rows");
 check(releaseProgressReport.audienceReadinessRows.every((row) => row.valueRecorded === false), "release progress report audience readiness rows should not record values");
 check(releaseProgressReport.audienceReadinessRows.every((row) => row.ready === true), "release progress report audience readiness rows should be ready");
+check(releaseProgressReport.audienceReadinessRows.every((row) => row.deliveryPackageReady === true), "release progress report audience readiness rows should include ready delivery packages");
+check(releaseProgressReport.audienceReadinessRows.every((row) => row.deliveryArtifactCount === 8), "release progress report audience readiness rows should include eight delivery artifacts");
 check(releaseProgressReport.audienceReadinessRows.some((row) => row.audience === "first-time composer" && row.workflowMode === "guided"), "release progress report should include first-time composer guided readiness");
 check(releaseProgressReport.audienceReadinessRows.some((row) => row.audience === "professional producer" && row.workflowMode === "studio"), "release progress report should include professional producer studio readiness");
+check(releaseProgressReport.audienceDeliveryPackagesReady === true, "release progress report should include ready persona delivery packages");
+check(releaseProgressReport.audienceDeliveryPackageRowCount === 2, "release progress report should include two persona delivery package rows");
+check(releaseProgressReport.audienceDeliveryPackageRows.length === releaseProgressReport.audienceDeliveryPackageRowCount, "release progress report persona delivery package row count should match rows");
+check(releaseProgressReport.audienceDeliveryPackageRows.every((row) => row.ready === true), "release progress report persona delivery package rows should be ready");
+check(releaseProgressReport.audienceDeliveryPackageRows.every((row) => row.artifactCount === 8), "release progress report persona delivery package rows should include all deliverable artifacts");
+check(releaseProgressReport.audienceDeliveryPackageRows.every((row) => row.valueRecorded === false), "release progress report persona delivery package rows should not record values");
 check(releaseProgressReport.beginnerAudienceReadinessReady === true, "release progress report should include first-time composer readiness");
 check(releaseProgressReport.professionalProducerAudienceReadinessReady === true, "release progress report should include professional producer readiness");
 check(releaseProgressReport.audienceReadinessLocalExportReady === true, "release progress report should include audience local export readiness");
@@ -875,6 +932,7 @@ check(markdown.includes("User-facing overall completion:"), "release progress Ma
 check(markdown.includes("Current 10-plan progress:"), "release progress Markdown should include current 10-plan progress");
 check(markdown.includes("Current 10-Plan Window Rows"), "release progress Markdown should include current 10-plan window rows");
 check(markdown.includes("Audience Readiness"), "release progress Markdown should include audience readiness summary");
+check(markdown.includes("Persona Delivery Packages"), "release progress Markdown should include persona delivery package summary");
 check(markdown.includes("First-time composer readiness:"), "release progress Markdown should include first-time composer readiness");
 check(markdown.includes("Professional producer readiness:"), "release progress Markdown should include professional producer readiness");
 check(markdown.includes("Local release readiness:"), "release progress Markdown should include local release readiness");
@@ -930,6 +988,8 @@ console.log(`- Desktop project IO evidence ready: ${releaseProgressReport.deskto
 console.log(`- PKG payload project IO evidence ready: ${releaseProgressReport.pkgPayloadProjectIoEvidenceReady ? "yes" : "no"}`);
 console.log(`- Audience readiness ready: ${releaseProgressReport.audienceReadinessReady ? "yes" : "no"}`);
 console.log(`- Audience readiness rows: ${releaseProgressReport.audienceReadinessRowCount} (${releaseProgressReport.audienceReadinessRowSummary})`);
+console.log(`- Persona delivery packages ready: ${releaseProgressReport.audienceDeliveryPackagesReady ? "yes" : "no"}`);
+console.log(`- Persona delivery package rows: ${releaseProgressReport.audienceDeliveryPackageRowCount} (${releaseProgressReport.audienceDeliveryPackageRowSummary})`);
 console.log(`- First-time composer readiness: ${releaseProgressReport.beginnerAudienceReadinessReady ? "yes" : "no"}`);
 console.log(`- Professional producer readiness: ${releaseProgressReport.professionalProducerAudienceReadinessReady ? "yes" : "no"}`);
 console.log(`- External distribution hard gate ready: ${releaseProgressReport.externalDistributionGateReady ? "yes" : "no"}`);
