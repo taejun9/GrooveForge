@@ -193,6 +193,16 @@ type CommandReferenceSearchSpotlight = {
   title: string;
 };
 
+type CommandReferenceSectionRecovery = {
+  filterId: CommandReferenceFilterId;
+  status: string;
+  title: string;
+  detail: string;
+  metricLabel: string;
+  metricValue: string;
+  nextCheck: string;
+};
+
 const commandReferenceSections: CommandReferenceSection[] = [
   {
     id: "desktop-shortcuts",
@@ -1819,6 +1829,70 @@ function beatTermMatchesQuery(item: BeatTermItem, query: string): boolean {
   return commandReferenceMatchesQuery([item.term, item.meaning, item.target], query);
 }
 
+function commandReferenceVisibleCountForFilter(filterId: CommandReferenceFilterId, query: string): number {
+  const matchingSection = filterId === "all" ? null : commandReferenceSections.find((section) => section.id === filterId) ?? null;
+  const commandCount =
+    filterId === "all"
+      ? commandReferenceSections.reduce(
+          (total, section) => total + section.items.filter((item) => commandReferenceItemMatchesQuery(section, item, query)).length,
+          0
+        )
+      : matchingSection?.items.filter((item) => commandReferenceItemMatchesQuery(matchingSection, item, query)).length ?? 0;
+  const beatTermCount =
+    filterId === "all" || filterId === "beat-terms"
+      ? beatTermItems.filter((item) => beatTermMatchesQuery(item, query)).length
+      : 0;
+
+  return commandCount + beatTermCount;
+}
+
+function createCommandReferenceSectionRecovery(
+  query: string,
+  selectedFilterId: CommandReferenceFilterId,
+  shownCount: number
+): CommandReferenceSectionRecovery | null {
+  if (shownCount > 0) {
+    return null;
+  }
+
+  const currentFilter = commandReferenceFilterOptions.find((option) => option.id === selectedFilterId);
+  const focusedRecovery =
+    commandReferenceFilterOptions
+      .filter((option) => option.id !== "all" && option.id !== selectedFilterId)
+      .map((option) => ({
+        ...option,
+        count: commandReferenceVisibleCountForFilter(option.id, query)
+      }))
+      .filter((option) => option.count > 0)
+      .sort((left, right) => right.count - left.count)[0] ?? null;
+  const fallbackAll =
+    selectedFilterId === "all"
+      ? null
+      : {
+          id: "all" as const,
+          label: "All",
+          count: commandReferenceVisibleCountForFilter("all", query)
+        };
+  const suggestedFilter = focusedRecovery ?? (fallbackAll && fallbackAll.count > 0 ? fallbackAll : null);
+
+  if (!suggestedFilter) {
+    return null;
+  }
+
+  const currentLabel = currentFilter?.label ?? selectedFilterId;
+  const queryLabel = query ? `"${query}"` : "empty search";
+
+  return {
+    filterId: suggestedFilter.id,
+    status: suggestedFilter.id === "all" ? "Fallback section" : "Focused section match",
+    title: `Switch to ${suggestedFilter.label}`,
+    detail: `${currentLabel} filter / ${queryLabel} / 0 shown`,
+    metricLabel: suggestedFilter.id === "all" ? "Fallback matches" : "Focused matches",
+    metricValue: `${suggestedFilter.count} in ${suggestedFilter.label}`,
+    nextCheck: `Switch to ${suggestedFilter.label} to inspect matching reference rows before opening Quick Actions.`
+  };
+}
+
 function createCommandReferenceSearchSpotlight(
   visibleSections: CommandReferenceSection[],
   visibleBeatTerms: BeatTermItem[],
@@ -3412,6 +3486,11 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
     visibleBeatTerms,
     searchQuery.trim()
   );
+  const commandReferenceSectionRecovery = createCommandReferenceSectionRecovery(
+    normalizedSearchQuery,
+    selectedFilterId,
+    visibleResultCount
+  );
 
   useEffect(() => {
     if (!open) {
@@ -3430,6 +3509,11 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
   function resetCommandReferenceSearch(): void {
     setSelectedFilterId("all");
     setSearchQuery("");
+    searchInputRef.current?.focus();
+  }
+
+  function switchCommandReferenceRecoverySection(filterId: CommandReferenceFilterId): void {
+    setSelectedFilterId(filterId);
     searchInputRef.current?.focus();
   }
 
@@ -3574,10 +3658,45 @@ export function CommandReferenceDialog({ open, onClose }: { open: boolean; onClo
             <div className="command-reference-empty" data-testid="command-reference-empty">
               <strong>No command reference matches</strong>
               <small>Try another command, shortcut, production term, or section filter.</small>
+              {commandReferenceSectionRecovery ? (
+                <div
+                  className="command-reference-empty-recovery"
+                  data-command-reference-recovery={commandReferenceSectionRecovery.filterId}
+                  data-testid="command-reference-empty-recovery"
+                >
+                  <span data-testid="command-reference-empty-recovery-status">
+                    {commandReferenceSectionRecovery.status}
+                  </span>
+                  <strong data-testid="command-reference-empty-recovery-title">
+                    {commandReferenceSectionRecovery.title}
+                  </strong>
+                  <small data-testid="command-reference-empty-recovery-detail">
+                    {commandReferenceSectionRecovery.detail}
+                  </small>
+                  <span data-testid="command-reference-empty-recovery-metric-label">
+                    {commandReferenceSectionRecovery.metricLabel}
+                  </span>
+                  <strong data-testid="command-reference-empty-recovery-metric-value">
+                    {commandReferenceSectionRecovery.metricValue}
+                  </strong>
+                  <small data-testid="command-reference-empty-recovery-next-check">
+                    {commandReferenceSectionRecovery.nextCheck}
+                  </small>
+                </div>
+              ) : null}
               <div>
                 <button data-testid="command-reference-empty-clear" onClick={clearCommandReferenceSearch} type="button">
                   Clear Search
                 </button>
+                {commandReferenceSectionRecovery ? (
+                  <button
+                    data-testid="command-reference-empty-switch-section"
+                    onClick={() => switchCommandReferenceRecoverySection(commandReferenceSectionRecovery.filterId)}
+                    type="button"
+                  >
+                    {commandReferenceSectionRecovery.title}
+                  </button>
+                ) : null}
                 <button data-testid="command-reference-empty-show-all" onClick={resetCommandReferenceSearch} type="button">
                   Show All
                 </button>
