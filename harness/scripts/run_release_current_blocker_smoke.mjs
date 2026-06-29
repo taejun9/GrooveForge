@@ -224,6 +224,15 @@ function formatCompletedPlanRows(rows) {
     .join("\n");
 }
 
+function formatAudienceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.readinessRole)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.workflowMode)} | ${row.workflowBars ?? 0} | ${escapeCell(row.workflowDeliveryTarget)} | ${escapeCell(row.workflowStyle)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function buildReport({ releaseDoctor, externalProofBundle, externalGate, releaseProgress }) {
   const doctorRequiredKeys = stringArrayValue(releaseDoctor.currentActionRequiredKeys);
   const proofRequiredKeys = stringArrayValue(externalProofBundle.currentRequiredKeys);
@@ -406,6 +415,12 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
     currentTenPlanWindowRowCount: integerValue(releaseProgress.currentTenPlanWindowRowCount),
     currentTenPlanWindowRowSummary: textValue(releaseProgress.currentTenPlanWindowRowSummary, "none"),
     currentTenPlanWindowRows: valueFreeObjectRows(releaseProgress.currentTenPlanWindowRows),
+    audienceReadinessReady: releaseProgress.audienceReadinessReady === true,
+    audienceReadinessRowCount: integerValue(releaseProgress.audienceReadinessRowCount),
+    audienceReadinessRowSummary: textValue(releaseProgress.audienceReadinessRowSummary, "none"),
+    audienceReadinessRows: valueFreeObjectRows(releaseProgress.audienceReadinessRows),
+    beginnerAudienceReadinessReady: releaseProgress.beginnerAudienceReadinessReady === true,
+    professionalProducerAudienceReadinessReady: releaseProgress.professionalProducerAudienceReadinessReady === true,
     nextExpectedOperatorSequence,
     sourceArtifacts: [
       { label: "Release doctor", path: relative(releaseDoctorJsonPath), present: true, valueRecorded: false },
@@ -488,6 +503,13 @@ function validateReport(report, { releaseDoctor, externalProofBundle, externalGa
   check(report.currentTenPlanProgressLabel === releaseProgress.currentTenPlanWindowLabel, "release current blocker should mirror release progress 10-plan label");
   check(report.currentTenPlanWindowRowCount === releaseProgress.currentTenPlanWindowRowCount, "release current blocker should mirror release progress 10-plan row count");
   check(report.currentTenPlanWindowRows.every((row) => row.valueRecorded === false), "release current blocker 10-plan rows should not record values");
+  check(report.audienceReadinessReady === true, "release current blocker should include ready audience readiness");
+  check(report.audienceReadinessRowCount === report.audienceReadinessRows.length, "release current blocker audience row count should match rows");
+  check(report.audienceReadinessRowCount === releaseProgress.audienceReadinessRowCount, "release current blocker should mirror release progress audience row count");
+  check(report.audienceReadinessRows.every((row) => row.valueRecorded === false), "release current blocker audience readiness rows should not record values");
+  check(report.audienceReadinessRows.every((row) => row.ready === true), "release current blocker audience readiness rows should be ready");
+  check(report.beginnerAudienceReadinessReady === releaseProgress.beginnerAudienceReadinessReady, "release current blocker should mirror first-time composer readiness");
+  check(report.professionalProducerAudienceReadinessReady === releaseProgress.professionalProducerAudienceReadinessReady, "release current blocker should mirror professional producer readiness");
   check(report.consistencyReady === true, "release current blocker should pass all consistency checks");
   check(releaseDoctor.completionGapClaimedExternalDistribution === false, "release doctor source should not claim external distribution");
   check(releaseDoctor.completionGapValueRecorded === false, "release doctor source should not record completion gap values");
@@ -530,6 +552,10 @@ function buildMarkdown(report) {
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
     `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`,
     `- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`,
+    `- Audience readiness ready: ${report.audienceReadinessReady ? "yes" : "no"}`,
+    `- Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})`,
+    `- First-time composer readiness: ${report.beginnerAudienceReadinessReady ? "yes" : "no"}`,
+    `- Professional producer readiness: ${report.professionalProducerAudienceReadinessReady ? "yes" : "no"}`,
     `- Private values recorded: ${report.privateValuesRecorded ? "yes" : "no"}`,
     `- External distribution claimed: ${report.claimedExternalDistribution ? "yes" : "no"}`,
     "",
@@ -543,6 +569,12 @@ function buildMarkdown(report) {
     "| plan | file | path | value recorded |",
     "|---|---|---|---|",
     formatCompletedPlanRows(report.currentTenPlanWindowRows),
+    "",
+    "## Audience Readiness",
+    "",
+    "| audience | role | ready | mode | bars | delivery | style | value recorded |",
+    "|---|---|---:|---|---:|---|---|---:|",
+    formatAudienceRows(report.audienceReadinessRows),
     "",
     "## Placeholder Edit Locations",
     "",
@@ -651,6 +683,10 @@ console.log(`- Consistency ready: ${report.consistencyReady ? "yes" : "no"}`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
+console.log(`- Audience readiness ready: ${report.audienceReadinessReady ? "yes" : "no"}`);
+console.log(`- Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})`);
+console.log(`- First-time composer readiness: ${report.beginnerAudienceReadinessReady ? "yes" : "no"}`);
+console.log(`- Professional producer readiness: ${report.professionalProducerAudienceReadinessReady ? "yes" : "no"}`);
 console.log("- Private values recorded: no");
 console.log("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted by this report");
 console.log("- Not claimed: Developer ID signing, notarization, Gatekeeper approval, auto-update, manual QA approval, app-store submission, or external distribution completion");

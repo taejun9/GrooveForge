@@ -13,6 +13,7 @@ const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const completedPlansDir = path.join(root, "docs", "exec_plans", "completed");
+const personaReadinessJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-persona-readiness.json`);
 const completionProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-completion-progress.json`);
 const externalProofBundleJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-proof-bundle.json`);
 const externalGateJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-distribution-gate.json`);
@@ -120,6 +121,15 @@ function formatCompletedPlanRows(rows) {
     .join("\n");
 }
 
+function formatAudienceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.readinessRole)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.workflowMode)} | ${row.workflowBars ?? 0} | ${escapeCell(row.workflowDeliveryTarget)} | ${escapeCell(row.workflowStyle)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 async function buildCompletedPlanSummary() {
   const names = await readdir(completedPlansDir);
   const planRows = names
@@ -164,6 +174,53 @@ async function buildCompletedPlanSummary() {
   };
 }
 
+function buildAudienceReadinessSummary(personaReadiness) {
+  const rows = valueFreeObjectRows(personaReadiness.audienceReadinessRows).map((row) => ({
+    audience: textValue(row.audience),
+    readinessRole: textValue(row.readinessRole),
+    ready: row.ready === true,
+    renderedSignalGroup: textValue(row.renderedSignalGroup),
+    workflowLabel: textValue(row.workflowLabel),
+    workflowMode: textValue(row.workflowMode),
+    workflowBars: integerValue(row.workflowBars),
+    workflowDeliveryTarget: textValue(row.workflowDeliveryTarget),
+    workflowStyle: textValue(row.workflowStyle),
+    proofSummary: textValue(row.proofSummary),
+    localFirst: row.localFirst === true,
+    samplingSecondary: row.samplingSecondary === true,
+    valueRecorded: false
+  }));
+  const beginnerRow = rows.find((row) => row.audience === "first-time composer");
+  const producerRow = rows.find((row) => row.audience === "professional producer");
+  const audienceReadinessReady =
+    personaReadiness.personaReadinessReady === true &&
+    personaReadiness.beginnerReadinessReady === true &&
+    personaReadiness.professionalProducerReadinessReady === true &&
+    personaReadiness.directCompositionReady === true &&
+    personaReadiness.allGenreStyleReadinessReady === true &&
+    personaReadiness.localExportReadinessReady === true &&
+    personaReadiness.samplingSecondaryReady === true &&
+    rows.length === 2 &&
+    rows.every((row) => row.ready === true && row.localFirst === true && row.samplingSecondary === true && row.valueRecorded === false);
+
+  return {
+    sourcePersonaReadinessReady: true,
+    sourcePersonaReadinessPath: relative(personaReadinessJsonPath),
+    audienceReadinessReady,
+    audienceReadinessRowCount: rows.length,
+    audienceReadinessRowSummary: rows.length > 0 ? `${rows.length} value-free audience readiness rows` : "none",
+    audienceReadinessRows: rows,
+    beginnerAudienceReadinessReady: beginnerRow?.ready === true,
+    professionalProducerAudienceReadinessReady: producerRow?.ready === true,
+    audienceReadinessLocalExportReady: personaReadiness.localExportReadinessReady === true,
+    audienceReadinessAllGenreReady: personaReadiness.allGenreStyleReadinessReady === true,
+    audienceReadinessSamplingSecondary: personaReadiness.samplingSecondaryReady === true,
+    audienceReadinessPrivateValuesRecorded: false,
+    audienceReadinessNetworkAttempted: false,
+    audienceReadinessClaimedExternalDistribution: false
+  };
+}
+
 function buildUserFacingCompletionSummary(report, completedPlanSummary) {
   const completionPercent = report.externalDistributionGateReady ? 100 : 99.999999;
   const remainingPercent = report.externalDistributionGateReady ? 0 : 0.000001;
@@ -182,7 +239,7 @@ function buildUserFacingCompletionSummary(report, completedPlanSummary) {
     userFacingNextCommand: report.externalProofBundleCurrentNextCommand,
     userFacingOperatorAction: report.externalProofBundleCurrentOperatorAction,
     userFacingCompletionEvidenceSummary:
-      "local release ready, desktop project IO ready, PKG payload project IO ready, external proof bundle ready",
+      "local release ready, desktop project IO ready, PKG payload project IO ready, audience readiness ready, external proof bundle ready",
     userFacingReportCadence: completedPlanSummary.tenPlanProgressReportCadence,
     userFacingCompletionPrivateValueRecorded: false,
     ...completedPlanSummary
@@ -309,6 +366,7 @@ function buildMarkdown(report) {
 - Report ready: ${report.releaseProgressReportReady ? "yes" : "no"}
 - Report mode: ${report.releaseProgressReportMode}
 - Release check run by this report: ${report.releaseCheckRunByThisReport ? "yes" : "no"}
+- Persona readiness refreshed by this report: ${report.personaReadinessRefreshedByThisReport ? "yes" : "no"}
 - Completion stage: ${report.completionStage}
 - User-facing overall completion: ${formatUserPercent(report.userFacingCompletionPercent)}
 - User-facing remaining completion: ${formatUserPercent(report.userFacingRemainingPercent)}
@@ -321,6 +379,10 @@ function buildMarkdown(report) {
 - Local release readiness: ${report.localReleaseReadinessPercent.toFixed(1)}%
 - Desktop project IO evidence ready: ${report.desktopProjectIoEvidenceReady ? "yes" : "no"}
 - PKG payload project IO evidence ready: ${report.pkgPayloadProjectIoEvidenceReady ? "yes" : "no"}
+- Audience readiness ready: ${report.audienceReadinessReady ? "yes" : "no"}
+- Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})
+- First-time composer readiness: ${report.beginnerAudienceReadinessReady ? "yes" : "no"}
+- Professional producer readiness: ${report.professionalProducerAudienceReadinessReady ? "yes" : "no"}
 - External distribution hard gate ready: ${report.externalDistributionGateReady ? "yes" : "no"}
 - External gate requirements ready: ${report.gateRequirementReadyCount}/${report.gateRequirementTotal} (${report.gateRequirementReadinessPercent.toFixed(1)}%)
 - Remediation groups ready: ${report.remediationReadyCount}/${report.remediationTotal} (${report.remediationReadinessPercent.toFixed(1)}%)
@@ -360,6 +422,7 @@ function buildMarkdown(report) {
 - Remaining completion for status reports: ${formatUserPercent(report.userFacingRemainingPercent)}
 - Completion status wording: ${report.userFacingCompletionStatus}
 - Completion evidence summary: ${report.userFacingCompletionEvidenceSummary}
+- Audience readiness to report: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})
 - Next proof target to report: ${report.userFacingNextProofTarget}
 - Next blocker to report: ${report.userFacingNextBlocker}
 - Next command to report: \`${report.userFacingNextCommand}\`
@@ -379,9 +442,16 @@ function buildMarkdown(report) {
 |---|---|---|---|
 ${formatCompletedPlanRows(report.currentTenPlanWindowRows)}
 
+## Audience Readiness
+
+| audience | role | ready | mode | bars | delivery | style | value recorded |
+|---|---|---:|---|---:|---|---|---:|
+${formatAudienceRows(report.audienceReadinessRows)}
+
 ## Commands
 
 - Regenerated evidence with: \`${report.evidenceCommand}\`
+- Persona readiness refresh: \`${report.personaReadinessCommand}\`
 - Progress command: \`${report.progressCommand}\`
 - Existing-evidence smoke command: \`npm run release:progress-smoke\`
 - Hard external distribution gate remains: \`${report.hardExternalGateCommand}\`
@@ -390,6 +460,7 @@ ${formatCompletedPlanRows(report.currentTenPlanWindowRows)}
 ## Source Evidence
 
 - Completion progress JSON: ${report.sourceCompletionProgressPath}
+- Persona readiness JSON: ${report.sourcePersonaReadinessPath}
 - External proof bundle JSON: ${report.sourceExternalProofBundlePath}
 - External distribution gate JSON: ${report.sourceExternalGatePath}
 
@@ -499,9 +570,26 @@ function runReleaseCheck() {
   }
 }
 
+function runPersonaReadinessSmoke() {
+  const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+  const result = spawnSync(npmCommand, ["run", "persona:smoke"], {
+    cwd: root,
+    env: process.env,
+    stdio: "inherit"
+  });
+  if (result.error) {
+    fail("Could not run npm run persona:smoke.", result.error.message);
+  }
+  if (result.status !== 0) {
+    fail(`npm run persona:smoke exited with status ${result.status}.`);
+  }
+}
+
 if (!fromExisting) {
   runReleaseCheck();
 }
+
+runPersonaReadinessSmoke();
 
 if (!existsSync(completionProgressJsonPath)) {
   fail(
@@ -521,12 +609,20 @@ if (!existsSync(externalGateJsonPath)) {
     `${fromExisting ? "Run npm run release:check or npm run verify before npm run release:progress-smoke.\n" : ""}Expected: ${relative(externalGateJsonPath)}`
   );
 }
+if (!existsSync(personaReadinessJsonPath)) {
+  fail(
+    "Persona readiness JSON was not generated.",
+    `Expected: ${relative(personaReadinessJsonPath)}`
+  );
+}
 
+const personaReadiness = JSON.parse(await readFile(personaReadinessJsonPath, "utf8"));
 const completionProgress = JSON.parse(await readFile(completionProgressJsonPath, "utf8"));
 const externalProofBundle = JSON.parse(await readFile(externalProofBundleJsonPath, "utf8"));
 const externalGate = JSON.parse(await readFile(externalGateJsonPath, "utf8"));
 const externalProofBundleSummary = buildExternalProofBundleSummary(externalProofBundle);
 const externalGateCurrentProofSummary = buildExternalGateCurrentProofSummary(externalGate, externalProofBundleSummary);
+const audienceReadinessSummary = buildAudienceReadinessSummary(personaReadiness);
 const completedPlanSummary = await buildCompletedPlanSummary();
 const releaseProgressReport = {
   appName,
@@ -538,12 +634,15 @@ const releaseProgressReport = {
   releaseProgressReportMode: fromExisting ? "existing-evidence smoke" : "full release gate",
   releaseProgressFromExisting: fromExisting,
   releaseCheckRunByThisReport: !fromExisting,
+  personaReadinessRefreshedByThisReport: true,
+  personaReadinessCommand: "npm run persona:smoke",
   progressCommand: fromExisting ? "npm run release:progress-smoke" : "npm run release:progress",
   evidenceCommand: fromExisting ? "existing release evidence from npm run verify or npm run release:check" : "npm run release:check",
   hardExternalGateCommand: "npm run release:external-check",
   releaseProgressMarkdownPath: relative(releaseProgressMarkdownPath),
   releaseProgressJsonPath: relative(releaseProgressJsonPath),
   sourceCompletionProgressPath: relative(completionProgressJsonPath),
+  ...audienceReadinessSummary,
   ...externalProofBundleSummary,
   ...externalGateCurrentProofSummary,
   productScope: completionProgress.productScope,
@@ -588,6 +687,7 @@ releaseProgressReport.releaseProgressReportReady =
   releaseProgressReport.localReleaseReadinessPercent === 100 &&
   releaseProgressReport.desktopProjectIoEvidenceReady &&
   releaseProgressReport.pkgPayloadProjectIoEvidenceReady &&
+  releaseProgressReport.audienceReadinessReady &&
   releaseProgressReport.sourceExternalProofBundleReady &&
   releaseProgressReport.externalProofBundleReady &&
   releaseProgressReport.sourceExternalGateReady &&
@@ -605,6 +705,8 @@ check(releaseProgressReport.bundleId === bundleId, `release progress report shou
 check(releaseProgressReport.releaseProgressReportMode === (fromExisting ? "existing-evidence smoke" : "full release gate"), "release progress report should identify its mode");
 check(releaseProgressReport.releaseProgressFromExisting === fromExisting, "release progress report should identify whether it used existing evidence");
 check(releaseProgressReport.releaseCheckRunByThisReport === !fromExisting, "release progress report should identify whether it ran release:check");
+check(releaseProgressReport.personaReadinessRefreshedByThisReport === true, "release progress report should refresh persona readiness evidence");
+check(releaseProgressReport.personaReadinessCommand === "npm run persona:smoke", "release progress report should identify the persona readiness refresh command");
 check(releaseProgressReport.progressCommand === (fromExisting ? "npm run release:progress-smoke" : "npm run release:progress"), "release progress report should identify the progress command");
 check(releaseProgressReport.evidenceCommand === (fromExisting ? "existing release evidence from npm run verify or npm run release:check" : "npm run release:check"), "release progress report should identify its evidence source");
 check(releaseProgressReport.hardExternalGateCommand === "npm run release:external-check", "release progress report should keep the hard external gate command");
@@ -642,6 +744,23 @@ check(releaseProgressReport.nextTenPlanProgressReportAt === releaseProgressRepor
 check(releaseProgressReport.completedPlanValueRecorded === false, "release progress report should not record completed plan values beyond filenames and counts");
 check(releaseProgressReport.desktopProjectIoEvidenceReady === true, "release progress report should include ready desktop project IO evidence");
 check(releaseProgressReport.pkgPayloadProjectIoEvidenceReady === true, "release progress report should include ready PKG payload project IO evidence");
+check(releaseProgressReport.sourcePersonaReadinessReady === true, "release progress report should include ready persona readiness source evidence");
+check(releaseProgressReport.sourcePersonaReadinessPath === relative(personaReadinessJsonPath), "release progress report should identify the persona readiness source path");
+check(releaseProgressReport.audienceReadinessReady === true, "release progress report should include ready audience readiness evidence");
+check(releaseProgressReport.audienceReadinessRowCount === 2, "release progress report should include two audience readiness rows");
+check(releaseProgressReport.audienceReadinessRows.length === releaseProgressReport.audienceReadinessRowCount, "release progress report audience readiness row count should match rows");
+check(releaseProgressReport.audienceReadinessRows.every((row) => row.valueRecorded === false), "release progress report audience readiness rows should not record values");
+check(releaseProgressReport.audienceReadinessRows.every((row) => row.ready === true), "release progress report audience readiness rows should be ready");
+check(releaseProgressReport.audienceReadinessRows.some((row) => row.audience === "first-time composer" && row.workflowMode === "guided"), "release progress report should include first-time composer guided readiness");
+check(releaseProgressReport.audienceReadinessRows.some((row) => row.audience === "professional producer" && row.workflowMode === "studio"), "release progress report should include professional producer studio readiness");
+check(releaseProgressReport.beginnerAudienceReadinessReady === true, "release progress report should include first-time composer readiness");
+check(releaseProgressReport.professionalProducerAudienceReadinessReady === true, "release progress report should include professional producer readiness");
+check(releaseProgressReport.audienceReadinessLocalExportReady === true, "release progress report should include audience local export readiness");
+check(releaseProgressReport.audienceReadinessAllGenreReady === true, "release progress report should include audience all-genre readiness");
+check(releaseProgressReport.audienceReadinessSamplingSecondary === true, "release progress report should include audience sampling-secondary posture");
+check(releaseProgressReport.audienceReadinessPrivateValuesRecorded === false, "release progress report should not record private audience values");
+check(releaseProgressReport.audienceReadinessNetworkAttempted === false, "release progress report should not probe network for audience readiness");
+check(releaseProgressReport.audienceReadinessClaimedExternalDistribution === false, "release progress report should not claim external distribution from audience readiness");
 check(typeof releaseProgressReport.externalDistributionGateReady === "boolean", "release progress report should include external distribution hard-gate readiness");
 check(releaseProgressReport.sourceExternalProofBundleReady === true, "release progress report should include ready external proof bundle source evidence");
 check(releaseProgressReport.externalProofBundleReady === true, "release progress report should include a ready external proof bundle");
@@ -750,10 +869,14 @@ check(releaseProgressReport.releaseGateClaimedExternalDistribution === false, "r
 check(markdown.includes("Release Progress Report"), "release progress Markdown should include title");
 check(markdown.includes("Report mode:"), "release progress Markdown should include report mode");
 check(markdown.includes("Release check run by this report:"), "release progress Markdown should include release-check run posture");
+check(markdown.includes("Persona readiness refreshed by this report:"), "release progress Markdown should include persona readiness refresh posture");
 check(markdown.includes("User-Facing Progress"), "release progress Markdown should include user-facing progress summary");
 check(markdown.includes("User-facing overall completion:"), "release progress Markdown should include user-facing overall completion");
 check(markdown.includes("Current 10-plan progress:"), "release progress Markdown should include current 10-plan progress");
 check(markdown.includes("Current 10-Plan Window Rows"), "release progress Markdown should include current 10-plan window rows");
+check(markdown.includes("Audience Readiness"), "release progress Markdown should include audience readiness summary");
+check(markdown.includes("First-time composer readiness:"), "release progress Markdown should include first-time composer readiness");
+check(markdown.includes("Professional producer readiness:"), "release progress Markdown should include professional producer readiness");
 check(markdown.includes("Local release readiness:"), "release progress Markdown should include local release readiness");
 check(markdown.includes("PKG payload project IO evidence ready:"), "release progress Markdown should include PKG payload project IO readiness");
 check(markdown.includes("External Proof Bundle"), "release progress Markdown should include external proof bundle summary");
@@ -792,6 +915,7 @@ console.log(`- Markdown: ${relative(releaseProgressMarkdownPath)}`);
 console.log(`- JSON: ${relative(releaseProgressJsonPath)}`);
 console.log(`- Report mode: ${releaseProgressReport.releaseProgressReportMode}`);
 console.log(`- Release check run by this report: ${releaseProgressReport.releaseCheckRunByThisReport ? "yes" : "no"}`);
+console.log(`- Persona readiness refreshed by this report: ${releaseProgressReport.personaReadinessRefreshedByThisReport ? "yes" : "no"}`);
 console.log(`- Completion stage: ${releaseProgressReport.completionStage}`);
 console.log(`- User-facing overall completion: ${formatUserPercent(releaseProgressReport.userFacingCompletionPercent)}`);
 console.log(`- User-facing remaining completion: ${formatUserPercent(releaseProgressReport.userFacingRemainingPercent)}`);
@@ -804,6 +928,10 @@ console.log(`- Local release ready: ${releaseProgressReport.localReleaseReady ? 
 console.log(`- Local release readiness: ${releaseProgressReport.localReleaseReadinessPercent.toFixed(1)}%`);
 console.log(`- Desktop project IO evidence ready: ${releaseProgressReport.desktopProjectIoEvidenceReady ? "yes" : "no"}`);
 console.log(`- PKG payload project IO evidence ready: ${releaseProgressReport.pkgPayloadProjectIoEvidenceReady ? "yes" : "no"}`);
+console.log(`- Audience readiness ready: ${releaseProgressReport.audienceReadinessReady ? "yes" : "no"}`);
+console.log(`- Audience readiness rows: ${releaseProgressReport.audienceReadinessRowCount} (${releaseProgressReport.audienceReadinessRowSummary})`);
+console.log(`- First-time composer readiness: ${releaseProgressReport.beginnerAudienceReadinessReady ? "yes" : "no"}`);
+console.log(`- Professional producer readiness: ${releaseProgressReport.professionalProducerAudienceReadinessReady ? "yes" : "no"}`);
 console.log(`- External distribution hard gate ready: ${releaseProgressReport.externalDistributionGateReady ? "yes" : "no"}`);
 console.log(`- External gate requirements ready: ${releaseProgressReport.gateRequirementReadyCount}/${releaseProgressReport.gateRequirementTotal} (${releaseProgressReport.gateRequirementReadinessPercent.toFixed(1)}%)`);
 console.log(`- Remediation groups ready: ${releaseProgressReport.remediationReadyCount}/${releaseProgressReport.remediationTotal} (${releaseProgressReport.remediationReadinessPercent.toFixed(1)}%)`);
