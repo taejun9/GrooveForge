@@ -279,6 +279,15 @@ function formatPrivateEditSafetyRows(rows) {
     .join("\n");
 }
 
+function formatCurrentInputShapeRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.key)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.evidenceSource)} | \`${escapeCell(row.rerunCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatHardGateRequirementRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | no | none | 0 | none | no |";
@@ -833,6 +842,32 @@ function privateEditSafetyRows({
   ];
 }
 
+function expectedInputShapeForKey(key) {
+  if (key === "GROOVEFORGE_DISTRIBUTION_CHANNEL") {
+    return "allowed channel token: direct-download, private-beta, or managed-release";
+  }
+  return "safe HTTPS URL shape: https protocol, hostname present, no credentials, no fragment";
+}
+
+function currentInputShapeRows({ currentRequiredKeys, releaseChannelUnblockMetadataRows, currentNextCommand, currentRerunCommand }) {
+  const unblockRowsByKey = new Map(
+    valueFreeObjectRows(releaseChannelUnblockMetadataRows).map((row) => [textValue(row.key), row])
+  );
+  return stringArrayValue(currentRequiredKeys).map((key, index) => {
+    const unblockRow = unblockRowsByKey.get(key);
+    return {
+      order: index + 1,
+      key,
+      ready: unblockRow?.ready === true && unblockRow.valueRecorded === false,
+      expectedShape: expectedInputShapeForKey(key),
+      evidenceSource: textValue(unblockRow?.evidence, key === "GROOVEFORGE_DISTRIBUTION_CHANNEL" ? "allowed channel token" : "safe HTTPS URL shape"),
+      proofCommand: currentNextCommand,
+      rerunCommand: currentRerunCommand,
+      valueRecorded: false
+    };
+  });
+}
+
 function currentActionAcceptanceRows({
   externalNextActions,
   releaseDoctor,
@@ -1121,6 +1156,12 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentCommandSequence,
     hardGateCommand
   });
+  const inputShapeRows = currentInputShapeRows({
+    currentRequiredKeys: proofRequiredKeys,
+    releaseChannelUnblockMetadataRows: releaseProgress.releaseChannelUnblockMetadataRows,
+    currentNextCommand,
+    currentRerunCommand
+  });
   const consistencyRows = [
     {
       check: "Doctor/proof/gate/progress next command consensus",
@@ -1364,6 +1405,16 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
         ? `${privateSafetyRows.length} value-free private edit safety rows`
         : "none",
     currentPrivateEditSafetyRows: privateSafetyRows,
+    currentInputShapeChecklistReady:
+      inputShapeRows.length === proofRequiredKeys.length &&
+      inputShapeRows.length === releaseChannelMetadataKeys.length &&
+      inputShapeRows.every((row) => row.ready && row.valueRecorded === false && row.proofCommand === currentNextCommand && row.rerunCommand === currentRerunCommand),
+    currentInputShapeChecklistRowCount: inputShapeRows.length,
+    currentInputShapeChecklistSummary:
+      inputShapeRows.length > 0
+        ? `${inputShapeRows.length} value-free current input shape rows`
+        : "none",
+    currentInputShapeChecklistRows: inputShapeRows,
     currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: integerValue(externalProofBundle.currentRequiredKeyCount),
     currentRequiredKeys: proofRequiredKeys,
@@ -1717,6 +1768,18 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentPrivateEditSafetyRows.some((row) => /rerun order/i.test(row.check) && row.command === report.currentRerunCommand), "release current blocker private edit safety should include rerun order evidence");
   check(report.currentPrivateEditSafetyRows.some((row) => /Hard external gate/i.test(row.check) && row.command === report.hardGateCommand), "release current blocker private edit safety should keep hard gate separate");
   check(report.currentPrivateEditSafetyRows.some((row) => /No remote side effects/i.test(row.check) && /network probe no/i.test(row.evidence)), "release current blocker private edit safety should include no remote side effects evidence");
+  check(report.currentInputShapeChecklistReady === true, "release current blocker input shape checklist should be ready");
+  check(report.currentInputShapeChecklistRowCount === report.currentInputShapeChecklistRows.length, "release current blocker input shape checklist row count should match rows");
+  check(report.currentInputShapeChecklistRowCount === releaseChannelMetadataKeys.length, "release current blocker input shape checklist should include four rows");
+  check(typeof report.currentInputShapeChecklistSummary === "string" && report.currentInputShapeChecklistSummary.length > 0, "release current blocker should include input shape checklist summary");
+  check(report.currentInputShapeChecklistRows.every((row) => row.valueRecorded === false), "release current blocker input shape checklist rows should not record values");
+  check(report.currentInputShapeChecklistRows.every((row) => row.ready === true), "release current blocker input shape checklist rows should be ready");
+  check(sameStringArray(report.currentInputShapeChecklistRows.map((row) => row.key), releaseChannelMetadataKeys), "release current blocker input shape checklist should cover release-channel metadata keys");
+  check(report.currentInputShapeChecklistRows.every((row) => row.proofCommand === report.currentNextCommand), "release current blocker input shape checklist proof commands should match current next command");
+  check(report.currentInputShapeChecklistRows.every((row) => row.rerunCommand === report.currentRerunCommand), "release current blocker input shape checklist rerun commands should match current rerun command");
+  check(report.currentInputShapeChecklistRows.some((row) => row.key === "GROOVEFORGE_DISTRIBUTION_CHANNEL" && /allowed channel token/i.test(row.expectedShape)), "release current blocker input shape checklist should include allowed channel token shape");
+  check(report.currentInputShapeChecklistRows.filter((row) => /safe HTTPS URL shape/i.test(row.expectedShape)).length === 3, "release current blocker input shape checklist should include three safe HTTPS URL shapes");
+  check(report.currentInputShapeChecklistRows.every((row) => /allowed channel token|safe HTTPS URL shape/i.test(row.evidenceSource)), "release current blocker input shape checklist should mirror unblock shape evidence");
   check(report.currentRequiredKeyCount === report.currentRequiredKeys.length, "release current blocker required key count should match keys");
   check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release current blocker placeholder key count should match keys");
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderEditLocations.length, "release current blocker placeholder edit location count should match locations");
@@ -1896,6 +1959,8 @@ function buildMarkdown(report) {
     `- Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`,
     `- Private edit safety ready: ${report.currentPrivateEditSafetyReady ? "yes" : "no"}`,
     `- Private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})`,
+    `- Current input shape checklist ready: ${report.currentInputShapeChecklistReady ? "yes" : "no"}`,
+    `- Current input shape checklist rows: ${report.currentInputShapeChecklistRowCount} (${report.currentInputShapeChecklistSummary})`,
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
     `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`,
@@ -2120,6 +2185,15 @@ function buildMarkdown(report) {
     "|---:|---:|---|---|---|---:|",
     formatPrivateEditSafetyRows(report.currentPrivateEditSafetyRows),
     "",
+    "## Current Input Shape Checklist",
+    "",
+    `- Shape checklist ready: ${report.currentInputShapeChecklistReady ? "yes" : "no"}`,
+    `- Shape checklist rows: ${report.currentInputShapeChecklistRowCount} (${report.currentInputShapeChecklistSummary})`,
+    "",
+    "| order | key | ready | expected shape | evidence source | rerun command | value recorded |",
+    "|---:|---|---:|---|---|---|---:|",
+    formatCurrentInputShapeRows(report.currentInputShapeChecklistRows),
+    "",
     "## Placeholder Edit Locations",
     "",
     "| location | key | placeholder | value recorded |",
@@ -2231,6 +2305,8 @@ check(markdown.includes("Current Action Handoff Package"), "release current bloc
 check(markdown.includes("Current action handoff ready:"), "release current blocker Markdown should include current action handoff readiness");
 check(markdown.includes("Private Edit Safety Checklist"), "release current blocker Markdown should include private edit safety checklist");
 check(markdown.includes("Private edit safety ready:"), "release current blocker Markdown should include private edit safety readiness");
+check(markdown.includes("Current Input Shape Checklist"), "release current blocker Markdown should include input shape checklist");
+check(markdown.includes("Current input shape checklist ready:"), "release current blocker Markdown should include input shape checklist readiness");
 
 if (failures.length > 0) {
   fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
@@ -2284,6 +2360,8 @@ console.log(`- Current action handoff ready: ${report.currentActionHandoffReady 
 console.log(`- Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`);
 console.log(`- Private edit safety ready: ${report.currentPrivateEditSafetyReady ? "yes" : "no"}`);
 console.log(`- Private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})`);
+console.log(`- Current input shape checklist ready: ${report.currentInputShapeChecklistReady ? "yes" : "no"}`);
+console.log(`- Current input shape checklist rows: ${report.currentInputShapeChecklistRowCount} (${report.currentInputShapeChecklistSummary})`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
