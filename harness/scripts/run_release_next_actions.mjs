@@ -806,6 +806,59 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
   };
 }
 
+function buildCompletionGapSummary({
+  sourceEvidenceReady = false,
+  completionStage = "unknown",
+  currentActionLabel = "No pending priority action",
+  currentNextCommand = "npm run release:external-check",
+  currentFirstBlocker = "none",
+  currentEvidenceLabelSummary = "none",
+  currentReadyCriteriaSummary = "none",
+  currentActionChecklistSummary = "none",
+  externalDistributionReady = false,
+  externalDistributionGateReady = false,
+  hardGateWouldFail = true,
+  priorityActionCount = 0,
+  hardExternalGateCommand = "npm run release:external-check",
+  prerequisiteCommand = "npm run release:check"
+} = {}) {
+  const pendingPriorityActionCount = Number.isInteger(priorityActionCount) ? priorityActionCount : 0;
+  const completionGapStatus = !sourceEvidenceReady
+    ? "source evidence missing"
+    : pendingPriorityActionCount > 0
+      ? "external proof pending"
+      : externalDistributionReady && externalDistributionGateReady && hardGateWouldFail === false
+        ? "hard gate evidence ready"
+        : "external hard gate pending";
+  const completionGapCurrentProofTarget = sourceEvidenceReady ? currentActionLabel : "Regenerate local release evidence";
+  const completionGapClaimBlockers = unique([
+    sourceEvidenceReady ? "" : `Regenerate source release evidence with ${prerequisiteCommand}.`,
+    pendingPriorityActionCount > 0
+      ? `${pendingPriorityActionCount} value-free priority action${pendingPriorityActionCount === 1 ? "" : "s"} must be resolved in redacted evidence.`
+      : "",
+    currentFirstBlocker !== "none" ? currentFirstBlocker : "",
+    externalDistributionGateReady && hardGateWouldFail === false ? "" : `Hard external distribution gate must pass via ${hardExternalGateCommand}.`,
+    "This next-actions report stays value-free and cannot itself claim release upload, signing, notarization, Gatekeeper approval, auto-update, manual QA approval, app-store submission, or external distribution completion."
+  ]);
+  return {
+    completionGapStatus,
+    completionGapSummary: `${completionGapStatus}: ${completionGapCurrentProofTarget} is the next proof target before any external distribution completion claim.`,
+    completionGapCompletionStage: completionStage,
+    completionGapCurrentProofTarget,
+    completionGapNextProofCommand: currentNextCommand,
+    completionGapHardGateCommand: hardExternalGateCommand,
+    completionGapFirstBlocker: currentFirstBlocker || "none",
+    completionGapEvidenceSummary: currentEvidenceLabelSummary,
+    completionGapReadyCriteriaSummary: currentReadyCriteriaSummary,
+    completionGapActionChecklistSummary: currentActionChecklistSummary,
+    completionGapClaimBlockerCount: completionGapClaimBlockers.length,
+    completionGapClaimBlockerSummary: completionGapClaimBlockers.length > 0 ? `${completionGapClaimBlockers.length} value-free blockers` : "none",
+    completionGapClaimBlockers,
+    completionGapClaimedExternalDistribution: false,
+    completionGapValueRecorded: false
+  };
+}
+
 function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
   const missingArtifacts = artifactRows.filter((item) => !item.present);
   const missingLabels = missingArtifacts.map((item) => item.label);
@@ -841,6 +894,21 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
     }
   ];
   priorityActions[0].actionChecklist = buildActionChecklist(priorityActions[0]);
+  const currentActionSummary = buildCurrentActionSummary(priorityActions, {
+    id: "regenerate-local-release-evidence",
+    label: "Regenerate local release evidence",
+    nextCommand: "npm run release:check",
+    firstBlocker: firstBlockers[0]
+  });
+  const completionGap = buildCompletionGapSummary({
+    sourceEvidenceReady: false,
+    completionStage: "source evidence missing",
+    ...currentActionSummary,
+    externalDistributionReady: false,
+    externalDistributionGateReady: false,
+    hardGateWouldFail: true,
+    priorityActionCount: priorityActions.length
+  });
 
   return {
     appName,
@@ -870,12 +938,8 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
     sourceEvidenceReady: false,
     completionStage: "source evidence missing",
     currentFocus: "Regenerate local release evidence",
-    ...buildCurrentActionSummary(priorityActions, {
-      id: "regenerate-local-release-evidence",
-      label: "Regenerate local release evidence",
-      nextCommand: "npm run release:check",
-      firstBlocker: firstBlockers[0]
-    }),
+    ...currentActionSummary,
+    ...completionGap,
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
     externalDistributionReady: false,
@@ -946,6 +1010,13 @@ function buildMarkdown(report) {
 - Current action: ${report.currentActionLabel}
 - Current next command: \`${report.currentNextCommand}\`
 - Current first blocker: ${report.currentFirstBlocker}
+- Completion gap status: ${report.completionGapStatus}
+- Completion gap summary: ${report.completionGapSummary}
+- Completion gap proof target: ${report.completionGapCurrentProofTarget}
+- Completion gap next proof command: \`${report.completionGapNextProofCommand}\`
+- Completion gap hard gate command: \`${report.completionGapHardGateCommand}\`
+- Completion gap first blocker: ${report.completionGapFirstBlocker}
+- Completion gap claim blockers: ${report.completionGapClaimBlockerCount} (${report.completionGapClaimBlockerSummary})
 - Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${report.currentPlaceholderKeySummary})
 - Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})
@@ -992,6 +1063,23 @@ function buildMarkdown(report) {
 ## Current Command Sequence
 
 ${formatCommandList(report.currentCommandSequence)}
+
+## Completion Gap
+
+- Status: ${report.completionGapStatus}
+- Summary: ${report.completionGapSummary}
+- Completion stage: ${report.completionGapCompletionStage}
+- Proof target: ${report.completionGapCurrentProofTarget}
+- Next proof command: \`${report.completionGapNextProofCommand}\`
+- Hard gate command: \`${report.completionGapHardGateCommand}\`
+- First blocker: ${report.completionGapFirstBlocker}
+- Evidence summary: ${report.completionGapEvidenceSummary}
+- Ready criteria summary: ${report.completionGapReadyCriteriaSummary}
+- Action checklist summary: ${report.completionGapActionChecklistSummary}
+- External distribution claimed by this report: ${readyLabel(report.completionGapClaimedExternalDistribution)}
+- Value recorded: ${readyLabel(report.completionGapValueRecorded)}
+
+${formatChecklistList(report.completionGapClaimBlockers)}
 
 ## Priority Next Actions
 
@@ -1130,6 +1218,18 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
         firstBlocker: "External distribution gate is not ready in redacted evidence."
       };
   const currentFocus = priorityActions[0]?.label ?? currentActionFallback.label;
+  const sourceEvidenceReady = artifactRows.every((item) => item.present);
+  const completionStage = externalPreflight.completionStage ?? completionProgress.completionStage ?? "unknown";
+  const currentActionSummary = buildCurrentActionSummary(priorityActions, currentActionFallback);
+  const completionGap = buildCompletionGapSummary({
+    sourceEvidenceReady,
+    completionStage,
+    ...currentActionSummary,
+    externalDistributionReady: externalPreflight.externalDistributionReady === true,
+    externalDistributionGateReady: externalPreflight.externalDistributionGateReady === true,
+    hardGateWouldFail: externalPreflight.hardGateWouldFail === true,
+    priorityActionCount: priorityActions.length
+  });
 
   nextActionsReport = {
     appName,
@@ -1156,10 +1256,11 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     preflightOutputRecorded: false,
     sourceArtifacts: artifactRows,
     missingSourceArtifacts: [],
-    sourceEvidenceReady: artifactRows.every((item) => item.present),
-    completionStage: externalPreflight.completionStage ?? completionProgress.completionStage ?? "unknown",
+    sourceEvidenceReady,
+    completionStage,
     currentFocus,
-    ...buildCurrentActionSummary(priorityActions, currentActionFallback),
+    ...currentActionSummary,
+    ...completionGap,
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
     externalDistributionReady: externalPreflight.externalDistributionReady === true,
@@ -1259,6 +1360,32 @@ check(typeof nextActionsReport.currentActionId === "string" && nextActionsReport
 check(typeof nextActionsReport.currentActionLabel === "string" && nextActionsReport.currentActionLabel.length > 0, "external next actions should include the current action label");
 check(typeof nextActionsReport.currentNextCommand === "string" && nextActionsReport.currentNextCommand.length > 0, "external next actions should include the current next command");
 check(typeof nextActionsReport.currentFirstBlocker === "string" && nextActionsReport.currentFirstBlocker.length > 0, "external next actions should include the current first blocker");
+check(typeof nextActionsReport.completionGapStatus === "string" && nextActionsReport.completionGapStatus.length > 0, "external next actions should include the completion gap status");
+check(typeof nextActionsReport.completionGapSummary === "string" && nextActionsReport.completionGapSummary.length > 0, "external next actions should include the completion gap summary");
+check(
+  typeof nextActionsReport.completionGapCurrentProofTarget === "string" && nextActionsReport.completionGapCurrentProofTarget.length > 0,
+  "external next actions should include the completion gap proof target"
+);
+check(
+  nextActionsReport.completionGapNextProofCommand === nextActionsReport.currentNextCommand,
+  "external next actions completion gap should mirror the current next proof command"
+);
+check(
+  nextActionsReport.completionGapHardGateCommand === nextActionsReport.hardExternalGateCommand,
+  "external next actions completion gap should keep the hard gate command"
+);
+check(
+  nextActionsReport.completionGapFirstBlocker === nextActionsReport.currentFirstBlocker,
+  "external next actions completion gap should mirror the current first blocker"
+);
+check(Array.isArray(nextActionsReport.completionGapClaimBlockers), "external next actions should include completion gap claim blockers");
+check(nextActionsReport.completionGapClaimBlockerCount === nextActionsReport.completionGapClaimBlockers.length, "external next actions completion gap blocker count should match listed blockers");
+check(
+  typeof nextActionsReport.completionGapClaimBlockerSummary === "string" && nextActionsReport.completionGapClaimBlockerSummary.length > 0,
+  "external next actions should include the completion gap blocker summary"
+);
+check(nextActionsReport.completionGapClaimedExternalDistribution === false, "external next actions completion gap should not claim external distribution");
+check(nextActionsReport.completionGapValueRecorded === false, "external next actions completion gap should not record values");
 check(typeof nextActionsReport.currentPrerequisiteCommand === "string" && nextActionsReport.currentPrerequisiteCommand.length > 0, "external next actions should include the current prerequisite command");
 check(typeof nextActionsReport.currentOperatorAction === "string" && nextActionsReport.currentOperatorAction.length > 0, "external next actions should include the current operator action");
 check(typeof nextActionsReport.currentRerunCommand === "string" && nextActionsReport.currentRerunCommand.length > 0, "external next actions should include the current rerun command");
@@ -1904,6 +2031,13 @@ check(markdown.includes("External Next Actions"), "external next actions Markdow
 check(markdown.includes("Current focus:"), "external next actions Markdown should include current focus");
 check(markdown.includes("Current next command:"), "external next actions Markdown should include current next command");
 check(markdown.includes("Current first blocker:"), "external next actions Markdown should include current first blocker");
+check(markdown.includes("Completion gap status:"), "external next actions Markdown should include completion gap status");
+check(markdown.includes("Completion gap summary:"), "external next actions Markdown should include completion gap summary");
+check(markdown.includes("Completion gap proof target:"), "external next actions Markdown should include completion gap proof target");
+check(markdown.includes("Completion gap next proof command:"), "external next actions Markdown should include completion gap next proof command");
+check(markdown.includes("Completion gap hard gate command:"), "external next actions Markdown should include completion gap hard gate command");
+check(markdown.includes("Completion gap first blocker:"), "external next actions Markdown should include completion gap first blocker");
+check(markdown.includes("Completion gap claim blockers:"), "external next actions Markdown should include completion gap claim blocker count");
 check(markdown.includes("Current required keys:"), "external next actions Markdown should include current required keys");
 check(markdown.includes("Current placeholder keys:"), "external next actions Markdown should include current placeholder keys");
 check(markdown.includes("Current placeholder edit locations:"), "external next actions Markdown should include current placeholder edit locations");
@@ -1932,6 +2066,9 @@ check(markdown.includes("Current Ready Criteria"), "external next actions Markdo
 check(markdown.includes("Ready criteria:"), "external next actions Markdown should include action ready criteria details");
 check(markdown.includes("Current Action Checklist"), "external next actions Markdown should include current action checklist section");
 check(markdown.includes("Action checklist:"), "external next actions Markdown should include action checklist details");
+check(markdown.includes("Completion Gap"), "external next actions Markdown should include completion gap section");
+check(markdown.includes("Proof target:"), "external next actions Markdown should include completion gap proof target details");
+check(markdown.includes("External distribution claimed by this report: no"), "external next actions Markdown should state completion gap does not claim distribution");
 if (nextActionsReport.currentEnvKeyGuidanceCount > 0) {
   check(markdown.includes("safe absolute HTTPS URL"), "external next actions Markdown should include value-free URL guidance");
   check(markdown.includes("direct-download, private-beta, or managed-release"), "external next actions Markdown should include allowed channel guidance");
@@ -1972,6 +2109,12 @@ console.log(`- Completion stage: ${nextActionsReport.completionStage}`);
 console.log(`- Current focus: ${nextActionsReport.currentFocus}`);
 console.log(`- Current next command: ${nextActionsReport.currentNextCommand}`);
 console.log(`- Current first blocker: ${nextActionsReport.currentFirstBlocker}`);
+console.log(`- Completion gap status: ${nextActionsReport.completionGapStatus}`);
+console.log(`- Completion gap summary: ${nextActionsReport.completionGapSummary}`);
+console.log(`- Completion gap proof target: ${nextActionsReport.completionGapCurrentProofTarget}`);
+console.log(`- Completion gap next proof command: ${nextActionsReport.completionGapNextProofCommand}`);
+console.log(`- Completion gap hard gate command: ${nextActionsReport.completionGapHardGateCommand}`);
+console.log(`- Completion gap claim blockers: ${nextActionsReport.completionGapClaimBlockerCount} (${nextActionsReport.completionGapClaimBlockerSummary})`);
 console.log(`- Current required keys: ${nextActionsReport.currentRequiredKeyCount} (${nextActionsReport.currentRequiredKeySummary})`);
 console.log(`- Current placeholder keys: ${nextActionsReport.currentPlaceholderKeyCount} (${nextActionsReport.currentPlaceholderKeySummary})`);
 console.log(`- Current placeholder edit locations: ${nextActionsReport.currentPlaceholderEditLocationCount} (${nextActionsReport.currentPlaceholderEditLocationSummary})`);
