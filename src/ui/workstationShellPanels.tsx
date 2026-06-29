@@ -2703,6 +2703,21 @@ export function QuickActions({
           <strong data-testid="quick-actions-spotlight-title">{spotlight.titleLabel}</strong>
           <small data-testid="quick-actions-spotlight-detail">{spotlight.detailLabel}</small>
           <small data-testid="quick-actions-spotlight-context">{spotlight.contextLabel}</small>
+          <button
+            className="quick-actions-spotlight-reference"
+            data-testid="quick-actions-spotlight-reference"
+            disabled={!spotlight.actionId}
+            onClick={onOpenCommandReference}
+            title={
+              spotlight.actionId
+                ? `Open Command Reference for Spotlight target: ${spotlight.titleLabel}`
+                : "No Spotlight command to inspect"
+            }
+            type="button"
+          >
+            <CircleHelp size={14} aria-hidden="true" />
+            <span>Reference</span>
+          </button>
         </div>
         {guideSuggestionAction && (
           <div
