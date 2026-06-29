@@ -610,6 +610,10 @@ function formatChecklistList(items) {
   return Array.isArray(items) && items.length > 0 ? items.map((item, index) => `${index + 1}. ${item}`).join("\n") : "1. None.";
 }
 
+function formatCommandSummary(commands) {
+  return Array.isArray(commands) && commands.length > 0 ? commands.join(", ") : "none";
+}
+
 function buildActionChecklist(action, context = {}) {
   const rerunCommand = firstValue(action.rerunCommands ?? []) || action.nextCommand;
   if (context.shouldPrepareEnv) {
@@ -771,8 +775,12 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
     currentActionChecklistCount: currentActionChecklist.length,
     currentActionChecklistSummary: currentActionChecklist.length > 0 ? `${currentActionChecklist.length} value-free steps` : "none",
     currentActionChecklist,
+    currentPrerequisiteCommandCount: currentPrerequisiteCommands.length,
+    currentPrerequisiteCommandSummary: formatCommandSummary(currentPrerequisiteCommands),
     currentPrerequisiteCommand: firstValue(currentPrerequisiteCommands) || fallback.prerequisiteCommand || "none",
     currentOperatorAction: firstValue(currentOperatorActions) || fallback.operatorAction || "none",
+    currentRerunCommandCount: currentRerunCommands.length,
+    currentRerunCommandSummary: formatCommandSummary(currentRerunCommands),
     currentRerunCommand: firstValue(currentRerunCommands) || fallback.rerunCommand || "none",
     currentPrerequisiteCommands,
     currentOperatorActions,
@@ -931,6 +939,8 @@ function buildMarkdown(report) {
 - Current evidence labels: ${report.currentEvidenceLabelCount} (${report.currentEvidenceLabelSummary})
 - Current ready criteria: ${report.currentReadyCriteriaCount} (${report.currentReadyCriteriaSummary})
 - Current action checklist: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})
+- Current prerequisite commands: ${report.currentPrerequisiteCommandCount} (${report.currentPrerequisiteCommandSummary})
+- Current rerun commands: ${report.currentRerunCommandCount} (${report.currentRerunCommandSummary})
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current operator action: ${report.currentOperatorAction}
 - Current rerun command: \`${report.currentRerunCommand}\`
@@ -1265,6 +1275,16 @@ check(Number.isInteger(nextActionsReport.currentReadyCriteriaCount), "external n
 check(typeof nextActionsReport.currentReadyCriteriaSummary === "string" && nextActionsReport.currentReadyCriteriaSummary.length > 0, "external next actions should include the current ready criteria summary");
 check(Number.isInteger(nextActionsReport.currentActionChecklistCount), "external next actions should include the current action checklist count");
 check(typeof nextActionsReport.currentActionChecklistSummary === "string" && nextActionsReport.currentActionChecklistSummary.length > 0, "external next actions should include the current action checklist summary");
+check(Number.isInteger(nextActionsReport.currentPrerequisiteCommandCount), "external next actions should include the current prerequisite command count");
+check(
+  typeof nextActionsReport.currentPrerequisiteCommandSummary === "string" && nextActionsReport.currentPrerequisiteCommandSummary.length > 0,
+  "external next actions should include the current prerequisite command summary"
+);
+check(Number.isInteger(nextActionsReport.currentRerunCommandCount), "external next actions should include the current rerun command count");
+check(
+  typeof nextActionsReport.currentRerunCommandSummary === "string" && nextActionsReport.currentRerunCommandSummary.length > 0,
+  "external next actions should include the current rerun command summary"
+);
 check(typeof nextActionsReport.currentEnvEditTarget === "string" && nextActionsReport.currentEnvEditTarget.length > 0, "external next actions should include the current env edit target");
 check(nextActionsReport.currentEnvConfiguredFileKey === "GROOVEFORGE_DISTRIBUTION_ENV_FILE", "external next actions should include the env file override key name");
 check(Array.isArray(nextActionsReport.localEnvFilesChecked), "external next actions should include local env files checked");
@@ -1279,6 +1299,9 @@ check(Array.isArray(nextActionsReport.currentEvidenceRows), "external next actio
 check(Array.isArray(nextActionsReport.currentEvidenceLabels), "external next actions should include current evidence labels");
 check(Array.isArray(nextActionsReport.currentReadyCriteria), "external next actions should include current ready criteria");
 check(Array.isArray(nextActionsReport.currentActionChecklist), "external next actions should include current action checklist");
+check(Array.isArray(nextActionsReport.currentPrerequisiteCommands), "external next actions should include current prerequisite commands");
+check(Array.isArray(nextActionsReport.currentOperatorActions), "external next actions should include current operator actions");
+check(Array.isArray(nextActionsReport.currentRerunCommands), "external next actions should include current rerun commands");
 check(
   nextActionsReport.currentRequiredKeyCount === nextActionsReport.currentRequiredKeys.length,
   "external next actions current required key count should match listed keys"
@@ -1378,13 +1401,28 @@ check(
   nextActionsReport.currentActionChecklistCount === nextActionsReport.currentActionChecklist.length,
   "external next actions current action checklist count should match listed steps"
 );
-check(Array.isArray(nextActionsReport.currentPrerequisiteCommands), "external next actions should include current prerequisite commands");
-check(Array.isArray(nextActionsReport.currentOperatorActions), "external next actions should include current operator actions");
-check(Array.isArray(nextActionsReport.currentRerunCommands), "external next actions should include current rerun commands");
+check(
+  nextActionsReport.currentPrerequisiteCommandCount === nextActionsReport.currentPrerequisiteCommands.length,
+  "external next actions current prerequisite command count should match listed commands"
+);
+check(
+  nextActionsReport.currentPrerequisiteCommandSummary === formatCommandSummary(nextActionsReport.currentPrerequisiteCommands),
+  "external next actions current prerequisite command summary should list current prerequisite commands"
+);
+check(
+  nextActionsReport.currentRerunCommandCount === nextActionsReport.currentRerunCommands.length,
+  "external next actions current rerun command count should match listed commands"
+);
+check(
+  nextActionsReport.currentRerunCommandSummary === formatCommandSummary(nextActionsReport.currentRerunCommands),
+  "external next actions current rerun command summary should list current rerun commands"
+);
 check(nextActionsReport.currentActionValueRecorded === false, "external next actions should not record current action values");
 check(markdown.includes("Bootstrap mode:"), "external next actions Markdown should include bootstrap mode");
 check(markdown.includes("Source evidence ready:"), "external next actions Markdown should include source evidence readiness");
 check(markdown.includes("Source evidence prerequisite:"), "external next actions Markdown should include the source evidence prerequisite");
+check(markdown.includes("Current prerequisite commands:"), "external next actions Markdown should include current prerequisite commands status");
+check(markdown.includes("Current rerun commands:"), "external next actions Markdown should include current rerun commands status");
 if (nextActionsReport.bootstrapMode === true) {
   check(nextActionsReport.sourceEvidenceReady === false, "bootstrap external next actions should report missing source evidence");
   check(nextActionsReport.localReleaseReady === false, "bootstrap external next actions should not claim local release readiness");
@@ -1548,6 +1586,22 @@ if (nextActionsReport.priorityActions.length > 0) {
     nextActionsReport.currentActionChecklistSummary ===
       ((firstPriorityAction.actionChecklist ?? []).length > 0 ? `${firstPriorityAction.actionChecklist.length} value-free steps` : "none"),
     "external next actions should mirror the first priority action checklist summary"
+  );
+  check(
+    nextActionsReport.currentPrerequisiteCommandCount === (firstPriorityAction.prerequisiteCommands ?? []).length,
+    "external next actions should mirror the first priority prerequisite command count"
+  );
+  check(
+    nextActionsReport.currentPrerequisiteCommandSummary === formatCommandSummary(firstPriorityAction.prerequisiteCommands ?? []),
+    "external next actions should mirror the first priority prerequisite command summary"
+  );
+  check(
+    nextActionsReport.currentRerunCommandCount === (firstPriorityAction.rerunCommands ?? []).length,
+    "external next actions should mirror the first priority rerun command count"
+  );
+  check(
+    nextActionsReport.currentRerunCommandSummary === formatCommandSummary(firstPriorityAction.rerunCommands ?? []),
+    "external next actions should mirror the first priority rerun command summary"
   );
 }
 if (nextActionsReport.bootstrapMode === false) {
@@ -1851,6 +1905,8 @@ console.log(`- Current evidence rows: ${nextActionsReport.currentEvidenceRowsCou
 console.log(`- Current evidence labels: ${nextActionsReport.currentEvidenceLabelCount} (${nextActionsReport.currentEvidenceLabelSummary})`);
 console.log(`- Current ready criteria: ${nextActionsReport.currentReadyCriteriaCount} (${nextActionsReport.currentReadyCriteriaSummary})`);
 console.log(`- Current action checklist: ${nextActionsReport.currentActionChecklistCount} (${nextActionsReport.currentActionChecklistSummary})`);
+console.log(`- Current prerequisite commands: ${nextActionsReport.currentPrerequisiteCommandCount} (${nextActionsReport.currentPrerequisiteCommandSummary})`);
+console.log(`- Current rerun commands: ${nextActionsReport.currentRerunCommandCount} (${nextActionsReport.currentRerunCommandSummary})`);
 console.log(`- Current env edit target: ${nextActionsReport.currentEnvEditTarget}`);
 console.log(`- Current operator action: ${nextActionsReport.currentOperatorAction}`);
 console.log(`- Current rerun command: ${nextActionsReport.currentRerunCommand}`);
