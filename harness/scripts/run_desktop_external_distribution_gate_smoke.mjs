@@ -22,6 +22,7 @@ const autoUpdateReadinessPath = path.join(summaryRoot, `${appName}-${platformArc
 const developerIdSigningPath = path.join(summaryRoot, `${appName}-${platformArch}-developer-id-signing.json`);
 const notarizationPath = path.join(summaryRoot, `${appName}-${platformArch}-notarization.json`);
 const notarizedGatekeeperPath = path.join(summaryRoot, `${appName}-${platformArch}-notarized-gatekeeper.json`);
+const externalProofBundlePath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-proof-bundle.json`);
 const externalGateMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-distribution-gate.md`);
 const externalGateJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-distribution-gate.json`);
 const privateEnvKeys = [
@@ -114,12 +115,95 @@ function valuesRedacted(...artifacts) {
   });
 }
 
+function textValue(value, fallback = "none") {
+  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
+}
+
+function integerValue(value) {
+  return Number.isInteger(value) ? value : 0;
+}
+
+function valueFreeObjectRows(values) {
+  return Array.isArray(values) ? values.filter((value) => value && typeof value === "object" && value.valueRecorded === false) : [];
+}
+
 function formatRequirementRows(requirements) {
   return requirements.map((item) => `| ${item.label} | ${item.ready ? "yes" : "no"} | ${item.evidence} |`).join("\n");
 }
 
 function formatBlockers(blockers) {
   return blockers.length > 0 ? blockers.map((blocker) => `- ${blocker}`).join("\n") : "- None.";
+}
+
+function escapeCell(value) {
+  return String(value ?? "none").replaceAll("|", "\\|").replace(/\s+/g, " ").trim();
+}
+
+function formatEditGuidanceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "- None.";
+  }
+  return [
+    "| location | key | assignment | guidance | value recorded |",
+    "|---|---|---|---|---:|",
+    ...rows.map((row) => `| ${escapeCell(row.location ?? row.editTarget)} | ${escapeCell(row.key)} | ${escapeCell(row.assignment)} | ${escapeCell(row.guidance)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+  ].join("\n");
+}
+
+function formatProofChecklistRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "- None.";
+  }
+  return [
+    "| order | criterion | evidence | proof command | hard gate | value recorded |",
+    "|---:|---|---|---|---|---:|",
+    ...rows.map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.criterion)} | ${escapeCell(row.evidenceSummary)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.hardGateCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+  ].join("\n");
+}
+
+function formatCommandVerificationRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "- None.";
+  }
+  return [
+    "| order | command | role | expectation | proof target | value recorded |",
+    "|---:|---|---|---|---|---:|",
+    ...rows.map((row) => `| ${row.order ?? "?"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.expectation)} | ${escapeCell(row.proofTarget)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+  ].join("\n");
+}
+
+function buildCurrentProofSummary(externalProofBundle) {
+  const currentEnvEditRows = valueFreeObjectRows(externalProofBundle?.currentEnvEditRows);
+  const currentProofChecklistRows = valueFreeObjectRows(externalProofBundle?.currentProofChecklistRows);
+  const currentCommandVerificationRows = valueFreeObjectRows(externalProofBundle?.currentCommandVerificationRows);
+  return {
+    currentProofBundleSourceReady: Boolean(externalProofBundle),
+    currentProofBundleSourcePath: relative(externalProofBundlePath),
+    currentFocus: textValue(externalProofBundle?.currentFocus),
+    currentNextCommand: textValue(externalProofBundle?.currentNextCommand),
+    currentFirstBlocker: textValue(externalProofBundle?.currentFirstBlocker),
+    currentOperatorAction: textValue(externalProofBundle?.currentOperatorAction),
+    currentRequiredKeyCount: integerValue(externalProofBundle?.currentRequiredKeyCount),
+    currentRequiredKeySummary: textValue(externalProofBundle?.currentRequiredKeySummary),
+    currentPlaceholderKeyCount: integerValue(externalProofBundle?.currentPlaceholderKeyCount),
+    currentPlaceholderKeySummary: textValue(externalProofBundle?.currentPlaceholderKeySummary),
+    currentEnvEditTarget: textValue(externalProofBundle?.currentEnvEditTarget),
+    currentEnvEditRowsCount: integerValue(externalProofBundle?.currentEnvEditRowsCount),
+    currentEnvEditRowsSummary: textValue(externalProofBundle?.currentEnvEditRowsSummary),
+    currentEnvEditRows,
+    currentPlaceholderRemediationRowCount: integerValue(externalProofBundle?.currentPlaceholderRemediationRowCount),
+    currentPlaceholderRemediationRowSummary: textValue(externalProofBundle?.currentPlaceholderRemediationRowSummary),
+    currentProofChecklistRowCount: integerValue(externalProofBundle?.currentProofChecklistRowCount),
+    currentProofChecklistRowSummary: textValue(externalProofBundle?.currentProofChecklistRowSummary),
+    currentProofChecklistRows,
+    currentRerunCommand: textValue(externalProofBundle?.currentRerunCommand),
+    currentCommandSequenceCount: integerValue(externalProofBundle?.currentCommandSequenceCount),
+    currentCommandSequenceSummary: textValue(externalProofBundle?.currentCommandSequenceSummary),
+    currentCommandVerificationRowCount: integerValue(externalProofBundle?.currentCommandVerificationRowCount),
+    currentCommandVerificationRowSummary: textValue(externalProofBundle?.currentCommandVerificationRowSummary),
+    currentCommandVerificationRows,
+    currentProofValueRecorded: false
+  };
 }
 
 function buildMarkdown(summary) {
@@ -134,6 +218,12 @@ function buildMarkdown(summary) {
 - Network probe attempted: no
 - Release upload attempted: no
 - Notary submission attempted by this gate: no
+- Current proof bundle source ready: ${summary.currentProofBundleSourceReady ? "yes" : "no"}
+- Current next command: \`${summary.currentNextCommand}\`
+- Current first blocker: ${summary.currentFirstBlocker}
+- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
+- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})
+- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
 
 ## Requirements
 
@@ -144,6 +234,37 @@ ${formatRequirementRows(summary.requirements)}
 ## Gate Blockers
 
 ${formatBlockers(summary.externalDistributionGateBlockers)}
+
+## Current Proof Action
+
+- Source: ${summary.currentProofBundleSourcePath}
+- Source ready: ${summary.currentProofBundleSourceReady ? "yes" : "no"}
+- Focus: ${summary.currentFocus}
+- Next command: \`${summary.currentNextCommand}\`
+- First blocker: ${summary.currentFirstBlocker}
+- Operator action: ${summary.currentOperatorAction}
+- Required keys: ${summary.currentRequiredKeyCount} (${summary.currentRequiredKeySummary})
+- Placeholder keys: ${summary.currentPlaceholderKeyCount} (${summary.currentPlaceholderKeySummary})
+- Env edit target: ${summary.currentEnvEditTarget}
+- Env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
+- Placeholder remediation rows: ${summary.currentPlaceholderRemediationRowCount} (${summary.currentPlaceholderRemediationRowSummary})
+- Proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})
+- Rerun command: \`${summary.currentRerunCommand}\`
+- Command sequence: ${summary.currentCommandSequenceCount} (${summary.currentCommandSequenceSummary})
+- Command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
+- Current proof values recorded: no
+
+## Current Edit Guidance
+
+${formatEditGuidanceRows(summary.currentEnvEditRows)}
+
+## Current Proof Checklist Rows
+
+${formatProofChecklistRows(summary.currentProofChecklistRows)}
+
+## Current Command Verification Rows
+
+${formatCommandVerificationRows(summary.currentCommandVerificationRows)}
 
 ## Next Commands
 
@@ -169,6 +290,7 @@ const autoUpdate = await readJsonIfExists(autoUpdateReadinessPath);
 const developerIdSigning = await readJsonIfExists(developerIdSigningPath);
 const notarization = await readJsonIfExists(notarizationPath);
 const notarizedGatekeeper = await readJsonIfExists(notarizedGatekeeperPath);
+const externalProofBundle = await readJsonIfExists(externalProofBundlePath);
 
 const requirements = [
   requirement("Completion audit artifact present", Boolean(completionAudit), relative(completionAuditPath), "Completion audit JSON is missing; run npm run release:check first."),
@@ -219,8 +341,10 @@ const summary = {
     autoUpdateReadinessPath: relative(autoUpdateReadinessPath),
     developerIdSigningPath: relative(developerIdSigningPath),
     notarizationPath: relative(notarizationPath),
-    notarizedGatekeeperPath: relative(notarizedGatekeeperPath)
+    notarizedGatekeeperPath: relative(notarizedGatekeeperPath),
+    externalProofBundlePath: relative(externalProofBundlePath)
   },
+  ...buildCurrentProofSummary(externalProofBundle),
   requirements,
   externalDistributionGateReady,
   hardGateWouldFail: !externalDistributionGateReady,
@@ -255,6 +379,19 @@ check(
   "external distribution gate should require ready PKG payload project IO evidence"
 );
 check(Array.isArray(summary.externalDistributionGateBlockers), "external distribution gate should include blockers");
+check(summary.currentProofValueRecorded === false, "external distribution gate current proof summary should not record values");
+check(Array.isArray(summary.currentEnvEditRows), "external distribution gate should expose current env edit rows");
+check(summary.currentEnvEditRows.every((row) => row.valueRecorded === false), "external distribution gate current env edit rows should not record values");
+check(Array.isArray(summary.currentProofChecklistRows), "external distribution gate should expose current proof checklist rows");
+check(summary.currentProofChecklistRows.every((row) => row.valueRecorded === false), "external distribution gate current proof checklist rows should not record values");
+check(Array.isArray(summary.currentCommandVerificationRows), "external distribution gate should expose current command verification rows");
+check(summary.currentCommandVerificationRows.every((row) => row.valueRecorded === false), "external distribution gate current command verification rows should not record values");
+if (summary.currentProofBundleSourceReady) {
+  check(summary.currentNextCommand !== "none", "external distribution gate should mirror the current next command when proof bundle evidence exists");
+  check(summary.currentEnvEditRowsCount === summary.currentEnvEditRows.length, "external distribution gate should mirror current env edit row count");
+  check(summary.currentProofChecklistRowCount === summary.currentProofChecklistRows.length, "external distribution gate should mirror current proof checklist row count");
+  check(summary.currentCommandVerificationRowCount === summary.currentCommandVerificationRows.length, "external distribution gate should mirror current command verification row count");
+}
 check(summary.privateValuesRecorded === false, "external distribution gate should not record private values");
 check(summary.releaseUrlValueRecorded === false, "external distribution gate should not record release URL values");
 check(summary.supportUrlValueRecorded === false, "external distribution gate should not record support URL values");
@@ -271,6 +408,10 @@ check(summary.signingAttemptedByThisGate === false, "external distribution gate 
 check(summary.releaseGateClaimedExternalDistribution === (!dryRun && externalDistributionGateReady), "external distribution gate claim should match hard-mode readiness");
 check(markdown.includes("External distribution gate ready:"), "external distribution gate report should include readiness");
 check(markdown.includes("Hard gate would fail:"), "external distribution gate report should include hard-gate outcome");
+check(markdown.includes("Current Proof Action"), "external distribution gate report should include current proof action");
+check(markdown.includes("Current Edit Guidance"), "external distribution gate report should include current edit guidance");
+check(markdown.includes("Current Proof Checklist Rows"), "external distribution gate report should include current proof checklist rows");
+check(markdown.includes("Current Command Verification Rows"), "external distribution gate report should include current command verification rows");
 check(markdown.includes("Private values recorded: no"), "external distribution gate report should state value redaction");
 check(!/https?:\/\//i.test(markdown), "external distribution gate should not include public or private URL values");
 
@@ -300,6 +441,12 @@ console.log(`- JSON: ${relative(externalGateJsonPath)}`);
 console.log(`- Dry run: ${summary.dryRun ? "yes" : "no"}`);
 console.log(`- External distribution gate ready: ${summary.externalDistributionGateReady ? "yes" : "no"}`);
 console.log(`- Hard gate would fail: ${summary.hardGateWouldFail ? "yes" : "no"}`);
+console.log(`- Current proof bundle source ready: ${summary.currentProofBundleSourceReady ? "yes" : "no"}`);
+console.log(`- Current next command: ${summary.currentNextCommand}`);
+console.log(`- Current first blocker: ${summary.currentFirstBlocker}`);
+console.log(`- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})`);
+console.log(`- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})`);
+console.log(`- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})`);
 console.log("- Private values recorded: no");
 if (summary.externalDistributionGateBlockers.length > 0) {
   console.log(`- Gate blockers: ${summary.externalDistributionGateBlockers.join(" | ")}`);
