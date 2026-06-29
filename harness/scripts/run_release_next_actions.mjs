@@ -606,6 +606,64 @@ function formatEnvEditRowsTable(items) {
   ].join("\n");
 }
 
+function buildCurrentPlaceholderRemediationSummary({ currentActionSummary = {}, doctorPrepareEnvAudit = {} } = {}) {
+  const currentEnvEditRows = Array.isArray(currentActionSummary.currentEnvEditRows) ? currentActionSummary.currentEnvEditRows : [];
+  const currentPlaceholderKeys = Array.isArray(currentActionSummary.currentPlaceholderKeys) ? currentActionSummary.currentPlaceholderKeys : [];
+  const placeholderKeySet = new Set(currentPlaceholderKeys);
+  const doctorEditLocations = Array.isArray(doctorPrepareEnvAudit.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocations)
+    ? doctorPrepareEnvAudit.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocations
+    : [];
+  const doctorLocationByKey = new Map(doctorEditLocations.map((item) => [item.key, item]));
+  const currentPlaceholderRemediationRows = currentEnvEditRows
+    .filter((item) => placeholderKeySet.has(item.key) || item.placeholder === true)
+    .map((item, index) => {
+      const doctorLocation = doctorLocationByKey.get(item.key);
+      const file = doctorLocation?.file ?? item.file ?? currentActionSummary.currentEnvEditTarget ?? "unknown";
+      const line = Number.isInteger(doctorLocation?.line) ? doctorLocation.line : Number.isInteger(item.line) ? item.line : null;
+      const location = line === null ? item.location ?? `${file}:line-after-scaffold` : `${file}:${line}`;
+      const nextCommand = currentActionSummary.currentNextCommand ?? "npm run release:doctor";
+      return {
+        order: index + 1,
+        key: item.key,
+        editTarget: item.editTarget ?? currentActionSummary.currentEnvEditTarget ?? file,
+        file,
+        line,
+        location,
+        assignment: item.assignment,
+        guidance: item.guidance,
+        placeholder: true,
+        sourceArtifact: doctorPrepareEnvAudit.doctorPrepareEnvAuditSourceArtifact ?? "Release doctor",
+        sourcePath: doctorPrepareEnvAudit.doctorPrepareEnvAuditSourcePath ?? relative(releaseDoctorPath),
+        sourceReady: doctorPrepareEnvAudit.doctorPrepareEnvAuditSourceReady === true,
+        doctorReportReady: doctorPrepareEnvAudit.doctorPrepareEnvAuditDoctorReportReady === true,
+        nextCommand,
+        rerunCommand: currentActionSummary.currentRerunCommand && currentActionSummary.currentRerunCommand !== "none" ? currentActionSummary.currentRerunCommand : nextCommand,
+        valueRecorded: false
+      };
+    });
+
+  return {
+    currentPlaceholderRemediationRowCount: currentPlaceholderRemediationRows.length,
+    currentPlaceholderRemediationRowSummary:
+      currentPlaceholderRemediationRows.length > 0 ? `${currentPlaceholderRemediationRows.length} value-free remediation rows` : "none",
+    currentPlaceholderRemediationRows
+  };
+}
+
+function formatPlaceholderRemediationRowsTable(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "| key | location | assignment | guidance | source | next command | value recorded |\n|---|---|---|---|---|---|---:|\n| none | none | none | none | none | none | no |";
+  }
+  return [
+    "| key | location | assignment | guidance | source | next command | value recorded |",
+    "|---|---|---|---|---|---|---:|",
+    ...items.map(
+      (item) =>
+        `| ${escapeCell(item.key)} | ${escapeCell(item.location)} | ${escapeCell(item.assignment)} | ${escapeCell(item.guidance)} | ${escapeCell(`${item.sourceArtifact}: ${item.sourcePath}`)} | ${escapeCell(item.nextCommand)} | ${readyLabel(item.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
 function formatChecklistList(items) {
   return Array.isArray(items) && items.length > 0 ? items.map((item, index) => `${index + 1}. ${item}`).join("\n") : "1. None.";
 }
@@ -1108,6 +1166,10 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     prerequisiteCommand: "npm run release:check"
   });
   const doctorPrepareEnvAudit = buildDoctorPrepareEnvAuditSummary(releaseDoctor);
+  const currentPlaceholderRemediation = buildCurrentPlaceholderRemediationSummary({
+    currentActionSummary,
+    doctorPrepareEnvAudit
+  });
 
   return {
     appName,
@@ -1141,6 +1203,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...completionGap,
     ...doctorCompletionGap,
     ...doctorPrepareEnvAudit,
+    ...currentPlaceholderRemediation,
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
     externalDistributionReady: false,
@@ -1234,6 +1297,7 @@ function buildMarkdown(report) {
 - Current env key guidance: ${report.currentEnvKeyGuidanceCount} (${report.currentEnvKeyGuidanceSummary})
 - Current env edit template: ${report.currentEnvEditTemplateCount} (${report.currentEnvEditTemplateSummary})
 - Current env edit rows: ${report.currentEnvEditRowsCount} (${report.currentEnvEditRowsSummary})
+- Current placeholder remediation rows: ${report.currentPlaceholderRemediationRowCount} (${report.currentPlaceholderRemediationRowSummary})
 - Current evidence rows: ${report.currentEvidenceRowsCount} (${report.currentEvidenceRowsSummary})
 - Current evidence labels: ${report.currentEvidenceLabelCount} (${report.currentEvidenceLabelSummary})
 - Current ready criteria: ${report.currentReadyCriteriaCount} (${report.currentReadyCriteriaSummary})
@@ -1375,6 +1439,10 @@ ${formatEnvEditTemplateBlock(report.currentEnvEditTemplate)}
 
 ${formatEnvEditRowsTable(report.currentEnvEditRows)}
 
+## Current Placeholder Remediation Checklist
+
+${formatPlaceholderRemediationRowsTable(report.currentPlaceholderRemediationRows)}
+
 ## Current Evidence Rows
 
 ${formatEvidenceRowsTable(report.currentEvidenceRows)}
@@ -1496,6 +1564,13 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     prerequisiteCommand: "npm run release:check"
   });
   const doctorPrepareEnvAudit = buildDoctorPrepareEnvAuditSummary(releaseDoctor);
+  const currentPlaceholderRemediation = buildCurrentPlaceholderRemediationSummary({
+    currentActionSummary: {
+      ...currentActionSummary,
+      currentEnvEditTarget: localEnvEditTarget
+    },
+    doctorPrepareEnvAudit
+  });
 
   nextActionsReport = {
     appName,
@@ -1529,6 +1604,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...completionGap,
     ...doctorCompletionGap,
     ...doctorPrepareEnvAudit,
+    ...currentPlaceholderRemediation,
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
     externalDistributionReady: externalPreflight.externalDistributionReady === true,
@@ -1770,6 +1846,11 @@ check(
   typeof nextActionsReport.currentEnvEditRowsSummary === "string" && nextActionsReport.currentEnvEditRowsSummary.length > 0,
   "external next actions should include the current env edit rows summary"
 );
+check(Number.isInteger(nextActionsReport.currentPlaceholderRemediationRowCount), "external next actions should include the current placeholder remediation row count");
+check(
+  typeof nextActionsReport.currentPlaceholderRemediationRowSummary === "string" && nextActionsReport.currentPlaceholderRemediationRowSummary.length > 0,
+  "external next actions should include the current placeholder remediation row summary"
+);
 check(Number.isInteger(nextActionsReport.currentEvidenceRowsCount), "external next actions should include the current evidence rows count");
 check(
   typeof nextActionsReport.currentEvidenceRowsSummary === "string" && nextActionsReport.currentEvidenceRowsSummary.length > 0,
@@ -1809,6 +1890,7 @@ check(Array.isArray(nextActionsReport.currentPlaceholderEditLocations), "externa
 check(Array.isArray(nextActionsReport.currentEnvKeyGuidance), "external next actions should include current env key guidance");
 check(Array.isArray(nextActionsReport.currentEnvEditTemplate), "external next actions should include current env edit template");
 check(Array.isArray(nextActionsReport.currentEnvEditRows), "external next actions should include current env edit rows");
+check(Array.isArray(nextActionsReport.currentPlaceholderRemediationRows), "external next actions should include current placeholder remediation rows");
 check(Array.isArray(nextActionsReport.currentEvidenceRows), "external next actions should include current evidence rows");
 check(Array.isArray(nextActionsReport.currentEvidenceLabels), "external next actions should include current evidence labels");
 check(Array.isArray(nextActionsReport.currentReadyCriteria), "external next actions should include current ready criteria");
@@ -1840,6 +1922,10 @@ check(
 check(
   nextActionsReport.currentEnvEditRowsCount === nextActionsReport.currentEnvEditRows.length,
   "external next actions current env edit rows count should match listed rows"
+);
+check(
+  nextActionsReport.currentPlaceholderRemediationRowCount === nextActionsReport.currentPlaceholderRemediationRows.length,
+  "external next actions current placeholder remediation row count should match listed rows"
 );
 check(
   nextActionsReport.currentEvidenceRowsCount === nextActionsReport.currentEvidenceRows.length,
@@ -1886,6 +1972,45 @@ check(
     );
   }),
   "external next actions current env edit rows should combine value-free assignment, location, guidance, and placeholder status"
+);
+check(
+  nextActionsReport.currentPlaceholderRemediationRows.every((item) => {
+    const matchingEnvRow = nextActionsReport.currentEnvEditRows.find((row) => row.key === item.key);
+    const matchingDoctorLocation = nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocations.find((location) => location.key === item.key);
+    return (
+      matchingEnvRow &&
+      nextActionsReport.currentPlaceholderKeys.includes(item.key) &&
+      item.editTarget === nextActionsReport.currentEnvEditTarget &&
+      item.assignment === matchingEnvRow.assignment &&
+      item.guidance === matchingEnvRow.guidance &&
+      item.placeholder === true &&
+      item.sourceArtifact === "Release doctor" &&
+      item.sourcePath === nextActionsReport.doctorPrepareEnvAuditSourcePath &&
+      item.sourceReady === nextActionsReport.doctorPrepareEnvAuditSourceReady &&
+      item.doctorReportReady === nextActionsReport.doctorPrepareEnvAuditDoctorReportReady &&
+      item.nextCommand === nextActionsReport.currentNextCommand &&
+      item.rerunCommand === nextActionsReport.currentRerunCommand &&
+      item.valueRecorded === false &&
+      (!matchingDoctorLocation ||
+        (item.file === matchingDoctorLocation.file &&
+          item.line === matchingDoctorLocation.line &&
+          item.location === `${matchingDoctorLocation.file}:${matchingDoctorLocation.line}`))
+    );
+  }),
+  "external next actions current placeholder remediation rows should combine current env rows with release doctor file-line evidence without values"
+);
+check(
+  nextActionsReport.currentPlaceholderRemediationRows.every(
+    (item) =>
+      typeof item.key === "string" &&
+      typeof item.location === "string" &&
+      typeof item.assignment === "string" &&
+      typeof item.guidance === "string" &&
+      typeof item.sourcePath === "string" &&
+      typeof item.nextCommand === "string" &&
+      typeof item.rerunCommand === "string"
+  ),
+  "external next actions current placeholder remediation rows should include key, location, assignment, guidance, source, and commands"
 );
 check(
   nextActionsReport.currentEvidenceRows.every(
@@ -2343,6 +2468,25 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   check(nextActionsReport.currentEnvKeyGuidanceCount === 4, "release channel metadata should keep four current key guidance rows when placeholders remain");
   check(nextActionsReport.currentEnvEditTemplateCount === 4, "release channel metadata should keep four current env edit template assignments when placeholders remain");
   check(nextActionsReport.currentEnvEditRowsCount === 4, "release channel metadata should keep four current env edit rows when placeholders remain");
+  check(nextActionsReport.currentPlaceholderRemediationRowCount === 4, "release channel metadata should keep four current placeholder remediation rows when placeholders remain");
+  check(
+    nextActionsReport.currentPlaceholderRemediationRows.every(
+      (item) =>
+        nextActionsReport.currentPlaceholderKeys.includes(item.key) &&
+        item.editTarget === nextActionsReport.currentEnvEditTarget &&
+        item.file === nextActionsReport.currentEnvEditTarget &&
+        Number.isInteger(item.line) &&
+        item.line > 0 &&
+        item.placeholder === true &&
+        item.sourceArtifact === "Release doctor" &&
+        item.sourceReady === true &&
+        item.doctorReportReady === true &&
+        item.nextCommand === "npm run release:doctor" &&
+        item.rerunCommand === "npm run release:doctor" &&
+        item.valueRecorded === false
+    ),
+    "release channel metadata should include value-free current placeholder remediation rows sourced from release doctor"
+  );
   check(
     nextActionsReport.currentEnvEditTemplate.every((item) => nextActionsReport.currentRequiredKeys.includes(item.key) && item.valueRecorded === false),
     "release channel metadata should keep value-free env edit templates scoped to current required keys when placeholders remain"
@@ -2411,6 +2555,7 @@ check(markdown.includes("Current placeholder edit locations:"), "external next a
 check(markdown.includes("Current env key guidance:"), "external next actions Markdown should include current env key guidance");
 check(markdown.includes("Current env edit template:"), "external next actions Markdown should include current env edit template status");
 check(markdown.includes("Current env edit rows:"), "external next actions Markdown should include current env edit rows status");
+check(markdown.includes("Current placeholder remediation rows:"), "external next actions Markdown should include current placeholder remediation row status");
 check(markdown.includes("Current evidence rows:"), "external next actions Markdown should include current evidence rows status");
 check(markdown.includes("Current evidence labels:"), "external next actions Markdown should include current evidence labels status");
 check(markdown.includes("Current ready criteria:"), "external next actions Markdown should include current ready criteria");
@@ -2427,6 +2572,7 @@ check(markdown.includes("Current Env Edit Template"), "external next actions Mar
 check(markdown.includes("Env edit template:"), "external next actions Markdown should include action env edit template details");
 check(markdown.includes("Current Env Edit Rows"), "external next actions Markdown should include current env edit rows section");
 check(markdown.includes("Env edit rows:"), "external next actions Markdown should include action env edit row details");
+check(markdown.includes("Current Placeholder Remediation Checklist"), "external next actions Markdown should include current placeholder remediation checklist section");
 check(markdown.includes("Current Evidence Rows"), "external next actions Markdown should include current evidence rows section");
 check(markdown.includes("Evidence:"), "external next actions Markdown should include action evidence details");
 check(markdown.includes("Current Ready Criteria"), "external next actions Markdown should include current ready criteria section");
@@ -2447,6 +2593,13 @@ if (nextActionsReport.currentEnvEditTemplateCount > 0) {
 if (nextActionsReport.currentEnvEditRowsCount > 0) {
   check(nextActionsReport.currentEnvEditRows.some((item) => markdown.includes(item.location)), "external next actions Markdown should include current env edit row locations");
   check(markdown.includes("| key | location | assignment | guidance | placeholder |"), "external next actions Markdown should include current env edit row table");
+}
+if (nextActionsReport.currentPlaceholderRemediationRowCount > 0) {
+  check(
+    nextActionsReport.currentPlaceholderRemediationRows.every((item) => markdown.includes(item.location) && markdown.includes(item.assignment)),
+    "external next actions Markdown should include current placeholder remediation locations and assignments"
+  );
+  check(markdown.includes("| key | location | assignment | guidance | source | next command | value recorded |"), "external next actions Markdown should include current placeholder remediation checklist table");
 }
 if (nextActionsReport.currentEvidenceRowsCount > 0) {
   check(markdown.includes(nextActionsReport.currentEvidenceLabelSummary), "external next actions Markdown should include current evidence label summary");
@@ -2520,6 +2673,7 @@ console.log(`- Current placeholder edit locations: ${nextActionsReport.currentPl
 console.log(`- Current env key guidance: ${nextActionsReport.currentEnvKeyGuidanceCount} (${nextActionsReport.currentEnvKeyGuidanceSummary})`);
 console.log(`- Current env edit template: ${nextActionsReport.currentEnvEditTemplateCount} (${nextActionsReport.currentEnvEditTemplateSummary})`);
 console.log(`- Current env edit rows: ${nextActionsReport.currentEnvEditRowsCount} (${nextActionsReport.currentEnvEditRowsSummary})`);
+console.log(`- Current placeholder remediation rows: ${nextActionsReport.currentPlaceholderRemediationRowCount} (${nextActionsReport.currentPlaceholderRemediationRowSummary})`);
 console.log(`- Current evidence rows: ${nextActionsReport.currentEvidenceRowsCount} (${nextActionsReport.currentEvidenceRowsSummary})`);
 console.log(`- Current evidence labels: ${nextActionsReport.currentEvidenceLabelCount} (${nextActionsReport.currentEvidenceLabelSummary})`);
 console.log(`- Current ready criteria: ${nextActionsReport.currentReadyCriteriaCount} (${nextActionsReport.currentReadyCriteriaSummary})`);
