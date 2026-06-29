@@ -59,6 +59,7 @@
     "release:check": "npm run qa && npm run verify",
     "release:progress": "node harness/scripts/run_release_progress_report.mjs",
     "release:progress-smoke": "node harness/scripts/run_release_progress_report.mjs --from-existing",
+    "release:current-blocker": "node harness/scripts/run_release_current_blocker_smoke.mjs",
     "release:current-blocker-smoke": "node harness/scripts/run_release_current_blocker_smoke.mjs --from-existing",
     "release:doctor": "node harness/scripts/run_release_doctor.mjs",
     "release:prepare-env-smoke": "node harness/scripts/run_release_prepare_env.mjs",

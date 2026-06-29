@@ -2,6 +2,7 @@
 
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +20,15 @@ const currentBlockerMarkdownPath = path.join(packageRoot, `${appName}-${packageJ
 const currentBlockerJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`);
 const fromExisting = process.argv.includes("--from-existing");
 const failures = [];
+const refreshCommandsBeforeSourceCheck = [
+  ["run", "release:doctor"],
+  ["run", "release:proof-bundle"]
+];
+const refreshCommandsAfterSourceCheck = [
+  ["run", "desktop:external-distribution-gate-smoke"],
+  ["run", "release:progress-smoke"]
+];
+const refreshCommands = [...refreshCommandsBeforeSourceCheck, ...refreshCommandsAfterSourceCheck];
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
@@ -33,12 +43,56 @@ function check(condition, message) {
 }
 
 function fail(message, details = "") {
-  console.error("GrooveForge release current blocker smoke failed:");
+  console.error(`GrooveForge release current blocker${fromExisting ? " smoke" : ""} failed:`);
   console.error(`- ${message}`);
   if (details.trim().length > 0) {
     console.error(details.trim());
   }
   process.exit(1);
+}
+
+function runCommand(args) {
+  const command = `npm ${args.join(" ")}`;
+  console.log(`Refreshing release current blocker evidence: ${command}`);
+  const result = spawnSync("npm", args, {
+    cwd: root,
+    env: process.env,
+    stdio: "inherit"
+  });
+
+  if (result.error) {
+    fail(`Could not run ${command}.`, result.error.message);
+  }
+
+  if (result.status !== 0) {
+    fail(`${command} exited with status ${result.status}.`);
+  }
+}
+
+async function assertSourceEvidenceReadyForRefresh() {
+  const proofBundle = await readRequiredJson(externalProofBundleJsonPath, "External proof bundle");
+  if (proofBundle.sourceEvidenceReady !== true) {
+    fail(
+      "Source release evidence is missing for release:current-blocker.",
+      [
+        "Run npm run release:check once to regenerate local release evidence before refreshing the current blocker.",
+        `Current proof bundle next command: ${textValue(proofBundle.currentNextCommand)}`,
+        `Current proof bundle first blocker: ${textValue(proofBundle.currentFirstBlocker)}`
+      ].join("\n")
+    );
+  }
+}
+
+async function runRefreshCommands() {
+  for (const args of refreshCommandsBeforeSourceCheck) {
+    runCommand(args);
+  }
+
+  await assertSourceEvidenceReadyForRefresh();
+
+  for (const args of refreshCommandsAfterSourceCheck) {
+    runCommand(args);
+  }
 }
 
 function relative(filePath) {
@@ -47,7 +101,7 @@ function relative(filePath) {
 
 async function readRequiredJson(filePath, label) {
   if (!existsSync(filePath)) {
-    fail(`${label} artifact is missing.`, `Run npm run release:check or npm run verify before ${fromExisting ? "release:current-blocker-smoke" : "this smoke"}. Missing: ${relative(filePath)}`);
+    fail(`${label} artifact is missing.`, `Run npm run release:check or npm run verify before ${fromExisting ? "release:current-blocker-smoke" : "release:current-blocker"}. Missing: ${relative(filePath)}`);
   }
   return JSON.parse(await readFile(filePath, "utf8"));
 }
@@ -253,8 +307,10 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
     bundleId,
     version: packageJson.version,
     platformArch,
-    reportCommand: "npm run release:current-blocker-smoke",
-    sourceMode: fromExisting ? "existing evidence" : "existing evidence",
+    reportCommand: fromExisting ? "npm run release:current-blocker-smoke" : "npm run release:current-blocker",
+    sourceMode: fromExisting ? "existing evidence" : "refreshed external release evidence",
+    refreshCommandSequence: fromExisting ? [] : refreshCommands.map((args) => `npm ${args.join(" ")}`),
+    refreshCommandCount: fromExisting ? 0 : refreshCommands.length,
     releaseCurrentBlockerReady: true,
     releaseCurrentBlockerState: placeholderState,
     currentTarget: textValue(externalProofBundle.currentFocus, "Release channel metadata"),
@@ -312,7 +368,16 @@ function validateReport(report, { releaseDoctor, externalProofBundle, externalGa
   check(report.releaseCurrentBlockerReady === true, "release current blocker receipt should be ready");
   check(report.appName === appName, "release current blocker receipt should identify GrooveForge");
   check(report.bundleId === bundleId, `release current blocker receipt should identify ${bundleId}`);
-  check(report.reportCommand === "npm run release:current-blocker-smoke", "release current blocker receipt should identify its command");
+  check(report.reportCommand === (fromExisting ? "npm run release:current-blocker-smoke" : "npm run release:current-blocker"), "release current blocker receipt should identify its command");
+  check(report.sourceMode === (fromExisting ? "existing evidence" : "refreshed external release evidence"), "release current blocker receipt should identify its source mode");
+  check(report.refreshCommandCount === report.refreshCommandSequence.length, "release current blocker refresh command count should match sequence");
+  if (!fromExisting) {
+    check(report.refreshCommandCount === refreshCommands.length, "release current blocker should record refresh command sequence count");
+    check(report.refreshCommandSequence.includes("npm run release:doctor"), "release current blocker should refresh release doctor evidence");
+    check(report.refreshCommandSequence.includes("npm run release:proof-bundle"), "release current blocker should refresh proof bundle evidence");
+    check(report.refreshCommandSequence.includes("npm run desktop:external-distribution-gate-smoke"), "release current blocker should refresh external gate dry-run evidence");
+    check(report.refreshCommandSequence.includes("npm run release:progress-smoke"), "release current blocker should refresh release progress evidence from refreshed sources");
+  }
   check(report.currentEnvEditTarget === ".env.distribution.local", "release current blocker receipt should identify the current env edit target");
   check(
     ["npm run release:prepare-env", "npm run release:doctor"].includes(report.currentNextCommand),
@@ -362,6 +427,8 @@ function buildMarkdown(report) {
     `- App: ${report.appName}`,
     `- Bundle ID: ${report.bundleId}`,
     `- Report command: \`${report.reportCommand}\``,
+    `- Source mode: ${report.sourceMode}`,
+    `- Refresh command count: ${report.refreshCommandCount}`,
     `- Current target: ${report.currentTarget}`,
     `- Current state: ${report.releaseCurrentBlockerState}`,
     `- Current next command: \`${report.currentNextCommand}\``,
@@ -412,6 +479,10 @@ function buildMarkdown(report) {
     "|---|---|---|---|",
     formatCommandRows(report.currentCommandVerificationRows),
     "",
+    "## Refresh Commands",
+    "",
+    ...(report.refreshCommandSequence.length > 0 ? report.refreshCommandSequence.map((command, index) => `${index + 1}. \`${command}\``) : ["1. Existing evidence only; no refresh commands were run by this smoke."]),
+    "",
     "## Next Expected Operator Sequence",
     "",
     ...report.nextExpectedOperatorSequence.map((item, index) => `${index + 1}. ${item}`),
@@ -428,6 +499,10 @@ function buildMarkdown(report) {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+if (!fromExisting) {
+  await runRefreshCommands();
 }
 
 const releaseDoctor = await readRequiredJson(releaseDoctorJsonPath, "Release doctor");
@@ -451,9 +526,11 @@ if (failures.length > 0) {
 await writeFile(currentBlockerMarkdownPath, markdown);
 await writeFile(currentBlockerJsonPath, `${JSON.stringify(report, null, 2)}\n`);
 
-console.log("GrooveForge release current blocker smoke passed.");
+console.log(`GrooveForge release current blocker${fromExisting ? " smoke" : ""} passed.`);
 console.log(`- Markdown: ${relative(currentBlockerMarkdownPath)}`);
 console.log(`- JSON: ${relative(currentBlockerJsonPath)}`);
+console.log(`- Source mode: ${report.sourceMode}`);
+console.log(`- Refresh commands: ${report.refreshCommandCount}`);
 console.log(`- Current target: ${report.currentTarget}`);
 console.log(`- Current next command: ${report.currentNextCommand}`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
