@@ -9530,6 +9530,7 @@ export function App(): ReactElement {
         onInspectRecentAction={inspectQuickActionRecent}
         onScopeChange={selectQuickActionScope}
         onTogglePin={toggleQuickActionPin}
+        onOpenCommandReference={openCommandReference}
       />
       <CommandReferenceDialog
         open={commandReferenceOpen}

@@ -5092,6 +5092,14 @@ h2 {
   color: #78f0c8;
 }
 
+.quick-actions-heading-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-inline-start: auto;
+}
+
 .quick-actions-heading button {
   display: grid;
   place-items: center;

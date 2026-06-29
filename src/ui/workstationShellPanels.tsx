@@ -2495,7 +2495,8 @@ export function QuickActions({
   onRecoverSearchScope,
   onRun,
   onScopeChange,
-  onTogglePin
+  onTogglePin,
+  onOpenCommandReference
 }: {
   actions: QuickAction[];
   inspectedPinnedActionId: string | null;
@@ -2523,6 +2524,7 @@ export function QuickActions({
   onRun: (action: QuickAction) => void;
   onScopeChange: (scope: QuickActionScopeId) => void;
   onTogglePin: (action: QuickAction) => void;
+  onOpenCommandReference: () => void;
 }): ReactElement | null {
   if (!open) {
     return null;
@@ -2617,9 +2619,19 @@ export function QuickActions({
             <KeyboardMusic size={18} aria-hidden="true" />
             <span>Quick Actions</span>
           </div>
-          <button data-testid="quick-actions-close" onClick={onClose} title="Close Quick Actions" type="button">
-            <X size={14} aria-hidden="true" />
-          </button>
+          <div className="quick-actions-heading-actions">
+            <button
+              data-testid="quick-actions-open-command-reference"
+              onClick={onOpenCommandReference}
+              title="Open Command Reference"
+              type="button"
+            >
+              <CircleHelp size={14} aria-hidden="true" />
+            </button>
+            <button data-testid="quick-actions-close" onClick={onClose} title="Close Quick Actions" type="button">
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <input
           aria-label="Search Quick Actions"
