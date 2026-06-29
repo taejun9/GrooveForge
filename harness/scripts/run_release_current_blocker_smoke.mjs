@@ -215,6 +215,15 @@ function formatActionChecklistRows(rows) {
     .join("\n");
 }
 
+function formatCompletedPlanRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.number ?? "?"} | ${escapeCell(row.fileName)} | ${escapeCell(row.path)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function buildReport({ releaseDoctor, externalProofBundle, externalGate, releaseProgress }) {
   const doctorRequiredKeys = stringArrayValue(releaseDoctor.currentActionRequiredKeys);
   const proofRequiredKeys = stringArrayValue(externalProofBundle.currentRequiredKeys);
@@ -394,6 +403,9 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
     userFacingCompletionPercent: releaseProgress.userFacingCompletionPercent,
     userFacingRemainingPercent: releaseProgress.userFacingRemainingPercent,
     currentTenPlanProgressLabel: releaseProgress.currentTenPlanWindowLabel,
+    currentTenPlanWindowRowCount: integerValue(releaseProgress.currentTenPlanWindowRowCount),
+    currentTenPlanWindowRowSummary: textValue(releaseProgress.currentTenPlanWindowRowSummary, "none"),
+    currentTenPlanWindowRows: valueFreeObjectRows(releaseProgress.currentTenPlanWindowRows),
     nextExpectedOperatorSequence,
     sourceArtifacts: [
       { label: "Release doctor", path: relative(releaseDoctorJsonPath), present: true, valueRecorded: false },
@@ -472,6 +484,10 @@ function validateReport(report, { releaseDoctor, externalProofBundle, externalGa
   check(report.currentCommandVerificationRows.every((row) => row.valueRecorded === false), "release current blocker command verification rows should not record values");
   check(report.currentNextCommandConsensus === true, "release current blocker should prove next command consensus");
   check(report.currentFirstBlockerConsensus === true, "release current blocker should prove proof/gate/progress blocker consensus");
+  check(report.currentTenPlanWindowRowCount === report.currentTenPlanWindowRows.length, "release current blocker 10-plan row count should match rows");
+  check(report.currentTenPlanProgressLabel === releaseProgress.currentTenPlanWindowLabel, "release current blocker should mirror release progress 10-plan label");
+  check(report.currentTenPlanWindowRowCount === releaseProgress.currentTenPlanWindowRowCount, "release current blocker should mirror release progress 10-plan row count");
+  check(report.currentTenPlanWindowRows.every((row) => row.valueRecorded === false), "release current blocker 10-plan rows should not record values");
   check(report.consistencyReady === true, "release current blocker should pass all consistency checks");
   check(releaseDoctor.completionGapClaimedExternalDistribution === false, "release doctor source should not claim external distribution");
   check(releaseDoctor.completionGapValueRecorded === false, "release doctor source should not record completion gap values");
@@ -513,6 +529,7 @@ function buildMarkdown(report) {
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
     `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`,
+    `- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`,
     `- Private values recorded: ${report.privateValuesRecorded ? "yes" : "no"}`,
     `- External distribution claimed: ${report.claimedExternalDistribution ? "yes" : "no"}`,
     "",
@@ -520,6 +537,12 @@ function buildMarkdown(report) {
     "",
     `- Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})`,
     `- Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})`,
+    "",
+    "## Current 10-Plan Window Rows",
+    "",
+    "| plan | file | path | value recorded |",
+    "|---|---|---|---|",
+    formatCompletedPlanRows(report.currentTenPlanWindowRows),
     "",
     "## Placeholder Edit Locations",
     "",
@@ -627,6 +650,7 @@ console.log(`- Current command verification rows: ${report.currentCommandVerific
 console.log(`- Consistency ready: ${report.consistencyReady ? "yes" : "no"}`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
+console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
 console.log("- Private values recorded: no");
 console.log("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted by this report");
 console.log("- Not claimed: Developer ID signing, notarization, Gatekeeper approval, auto-update, manual QA approval, app-store submission, or external distribution completion");

@@ -111,6 +111,15 @@ function formatCommandVerificationRows(rows) {
     .join("\n");
 }
 
+function formatCompletedPlanRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.number ?? "?"} | ${escapeCell(row.fileName)} | ${escapeCell(row.path)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 async function buildCompletedPlanSummary() {
   const names = await readdir(completedPlansDir);
   const planRows = names
@@ -125,6 +134,12 @@ async function buildCompletedPlanSummary() {
   const windowEnd = windowStart + 9;
   const windowCompleted = planRows.filter((row) => row.number >= windowStart && row.number <= windowEnd);
   const latestPath = latest.fileName === "none" ? "none" : relative(path.join(completedPlansDir, latest.fileName));
+  const currentTenPlanWindowRows = windowCompleted.map((row) => ({
+    number: row.number,
+    fileName: row.fileName,
+    path: relative(path.join(completedPlansDir, row.fileName)),
+    valueRecorded: false
+  }));
 
   return {
     completedPlanSource: relative(completedPlansDir),
@@ -136,6 +151,12 @@ async function buildCompletedPlanSummary() {
     currentTenPlanWindowCompletedCount: windowCompleted.length,
     currentTenPlanWindowTotal: 10,
     currentTenPlanWindowLabel: `${windowStart}-${windowEnd}: ${windowCompleted.length}/10`,
+    currentTenPlanWindowRowCount: currentTenPlanWindowRows.length,
+    currentTenPlanWindowRowSummary:
+      currentTenPlanWindowRows.length > 0
+        ? `${currentTenPlanWindowRows.length} completed plan filenames`
+        : "none",
+    currentTenPlanWindowRows,
     tenPlanProgressReportDue: windowCompleted.length === 10,
     tenPlanProgressReportCadence: "report after each completed work and every 10 completed plans",
     nextTenPlanProgressReportAt: windowEnd,
@@ -293,6 +314,7 @@ function buildMarkdown(report) {
 - User-facing remaining completion: ${formatUserPercent(report.userFacingRemainingPercent)}
 - User-facing completion status: ${report.userFacingCompletionStatus}
 - Current 10-plan progress: ${report.currentTenPlanWindowLabel}
+- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})
 - 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}
 - Source evidence ready: ${report.sourceEvidenceReady ? "yes" : "no"}
 - Local release ready: ${report.localReleaseReady ? "yes" : "no"}
@@ -347,8 +369,15 @@ function buildMarkdown(report) {
 - Completed plan count: ${report.completedPlanCount}
 - Latest completed plan: ${report.latestCompletedPlanPath}
 - Current 10-plan window: ${report.currentTenPlanWindowLabel}
+- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})
 - Next 10-plan report at: plan-${String(report.nextTenPlanProgressReportAt).padStart(3, "0")}
 - Private values recorded in this summary: no
+
+## Current 10-Plan Window Rows
+
+| plan | file | path | value recorded |
+|---|---|---|---|
+${formatCompletedPlanRows(report.currentTenPlanWindowRows)}
 
 ## Commands
 
@@ -602,6 +631,12 @@ check(releaseProgressReport.currentTenPlanWindowEnd === releaseProgressReport.cu
 check(releaseProgressReport.currentTenPlanWindowTotal === 10, "release progress report should use a 10-plan reporting window");
 check(releaseProgressReport.currentTenPlanWindowCompletedCount >= 1 && releaseProgressReport.currentTenPlanWindowCompletedCount <= 10, "release progress report should count completed plans in the current 10-plan window");
 check(releaseProgressReport.currentTenPlanWindowLabel === `${releaseProgressReport.currentTenPlanWindowStart}-${releaseProgressReport.currentTenPlanWindowEnd}: ${releaseProgressReport.currentTenPlanWindowCompletedCount}/10`, "release progress report should format the current 10-plan window label");
+check(Number.isInteger(releaseProgressReport.currentTenPlanWindowRowCount), "release progress report should include current 10-plan window row count");
+check(releaseProgressReport.currentTenPlanWindowRowCount === releaseProgressReport.currentTenPlanWindowCompletedCount, "release progress report current 10-plan row count should match completed count");
+check(Array.isArray(releaseProgressReport.currentTenPlanWindowRows), "release progress report should include current 10-plan window rows");
+check(releaseProgressReport.currentTenPlanWindowRows.length === releaseProgressReport.currentTenPlanWindowRowCount, "release progress report current 10-plan rows should match row count");
+check(releaseProgressReport.currentTenPlanWindowRows.every((row) => row.valueRecorded === false), "release progress report current 10-plan rows should not record values");
+check(releaseProgressReport.currentTenPlanWindowRows.every((row) => Number.isInteger(row.number) && typeof row.fileName === "string" && row.path.startsWith("docs/exec_plans/completed/")), "release progress report current 10-plan rows should identify completed plan filenames");
 check(typeof releaseProgressReport.tenPlanProgressReportDue === "boolean", "release progress report should include 10-plan report due posture");
 check(releaseProgressReport.nextTenPlanProgressReportAt === releaseProgressReport.currentTenPlanWindowEnd, "release progress report should identify the next 10-plan report plan number");
 check(releaseProgressReport.completedPlanValueRecorded === false, "release progress report should not record completed plan values beyond filenames and counts");
@@ -718,6 +753,7 @@ check(markdown.includes("Release check run by this report:"), "release progress 
 check(markdown.includes("User-Facing Progress"), "release progress Markdown should include user-facing progress summary");
 check(markdown.includes("User-facing overall completion:"), "release progress Markdown should include user-facing overall completion");
 check(markdown.includes("Current 10-plan progress:"), "release progress Markdown should include current 10-plan progress");
+check(markdown.includes("Current 10-Plan Window Rows"), "release progress Markdown should include current 10-plan window rows");
 check(markdown.includes("Local release readiness:"), "release progress Markdown should include local release readiness");
 check(markdown.includes("PKG payload project IO evidence ready:"), "release progress Markdown should include PKG payload project IO readiness");
 check(markdown.includes("External Proof Bundle"), "release progress Markdown should include external proof bundle summary");
@@ -761,6 +797,7 @@ console.log(`- User-facing overall completion: ${formatUserPercent(releaseProgre
 console.log(`- User-facing remaining completion: ${formatUserPercent(releaseProgressReport.userFacingRemainingPercent)}`);
 console.log(`- User-facing completion status: ${releaseProgressReport.userFacingCompletionStatus}`);
 console.log(`- Current 10-plan progress: ${releaseProgressReport.currentTenPlanWindowLabel}`);
+console.log(`- Current 10-plan rows: ${releaseProgressReport.currentTenPlanWindowRowCount} (${releaseProgressReport.currentTenPlanWindowRowSummary})`);
 console.log(`- 10-plan report due: ${releaseProgressReport.tenPlanProgressReportDue ? "yes" : "no"}`);
 console.log(`- Source evidence ready: ${releaseProgressReport.sourceEvidenceReady ? "yes" : "no"}`);
 console.log(`- Local release ready: ${releaseProgressReport.localReleaseReady ? "yes" : "no"}`);
