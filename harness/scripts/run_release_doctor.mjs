@@ -23,6 +23,12 @@ const releaseChannelMetadataKeys = [
   "GROOVEFORGE_RELEASE_NOTES_URL",
   "GROOVEFORGE_SUPPORT_URL"
 ];
+const releaseChannelEnvKeyGuidance = {
+  GROOVEFORGE_DISTRIBUTION_CHANNEL: "Use one of direct-download, private-beta, or managed-release.",
+  GROOVEFORGE_RELEASE_DOWNLOAD_URL: "Use a safe absolute HTTPS URL without credentials or URL fragments.",
+  GROOVEFORGE_RELEASE_NOTES_URL: "Use a safe absolute HTTPS URL without credentials or URL fragments.",
+  GROOVEFORGE_SUPPORT_URL: "Use a safe absolute HTTPS URL without credentials or URL fragments."
+};
 
 const targetedChecks = [
   {
@@ -170,6 +176,34 @@ function formatChecklistList(items) {
   return Array.isArray(items) && items.length > 0 ? items.map((item, index) => `${index + 1}. ${item}`).join("\n") : "1. None.";
 }
 
+function formatLocationSummary(items) {
+  return Array.isArray(items) && items.length > 0 ? items.map((item) => `${item.file}:${item.line} ${item.key}`).join(", ") : "none";
+}
+
+function formatLocationList(items) {
+  return Array.isArray(items) && items.length > 0
+    ? items.map((item) => `- ${item.file}:${item.line} ${item.key}`).join("\n")
+    : "- None.";
+}
+
+function formatEnvEditTemplateBlock(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "- None.";
+  }
+  return `\`\`\`env\n${items.map((item) => item.assignment).join("\n")}\n\`\`\``;
+}
+
+function formatEnvEditRowsTable(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "| key | location | assignment | guidance | placeholder |\n|---|---|---|---|---:|\n| none | none | none | none | no |";
+  }
+  return [
+    "| key | location | assignment | guidance | placeholder |",
+    "|---|---|---|---|---:|",
+    ...items.map((item) => `| ${escapeCell(item.key)} | ${escapeCell(item.location)} | ${escapeCell(item.assignment)} | ${escapeCell(item.guidance)} | ${readyLabel(item.placeholder)} |`)
+  ].join("\n");
+}
+
 function displayLocalEnvTarget(filePath) {
   if (typeof filePath !== "string" || filePath.trim().length === 0) {
     return distributionLocalEnvDefaults.defaultEnvFileName;
@@ -185,6 +219,103 @@ function currentLocalEnvEditTarget(localEnvPresentFiles = []) {
   }
   const firstPresentFile = Array.isArray(localEnvPresentFiles) ? localEnvPresentFiles[0] : "";
   return displayLocalEnvTarget(firstPresentFile || distributionLocalEnvDefaults.defaultEnvFileName);
+}
+
+function localEnvCandidatePaths() {
+  const paths = [path.join(root, distributionLocalEnvDefaults.defaultEnvFileName)];
+  const configuredPath = process.env[distributionLocalEnvDefaults.configuredFileKey]?.trim();
+  if (configuredPath) {
+    paths.push(path.isAbsolute(configuredPath) ? configuredPath : path.resolve(root, configuredPath));
+  }
+  return [...new Set(paths)];
+}
+
+function parseEnvLineKey(line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("#")) {
+    return null;
+  }
+  const withoutExport = trimmed.startsWith("export ") ? trimmed.slice("export ".length).trim() : trimmed;
+  const separatorIndex = withoutExport.indexOf("=");
+  if (separatorIndex <= 0) {
+    return null;
+  }
+  const key = withoutExport.slice(0, separatorIndex).trim();
+  return /^[A-Z0-9_]+$/.test(key) ? key : null;
+}
+
+async function readLocalEnvKeyLocations(keys) {
+  const keySet = new Set(Array.isArray(keys) ? keys : []);
+  if (keySet.size === 0) {
+    return [];
+  }
+  const locations = [];
+  for (const filePath of localEnvCandidatePaths()) {
+    if (!existsSync(filePath)) {
+      continue;
+    }
+    const lines = (await readFile(filePath, "utf8")).split(/\r?\n/);
+    for (const [index, line] of lines.entries()) {
+      const key = parseEnvLineKey(line);
+      if (!keySet.has(key)) {
+        continue;
+      }
+      locations.push({
+        key,
+        file: displayLocalEnvTarget(filePath),
+        line: index + 1,
+        placeholder: true,
+        valueRecorded: false
+      });
+    }
+  }
+  return locations;
+}
+
+function envTemplatePlaceholderForKey(key) {
+  const placeholders = {
+    GROOVEFORGE_DISTRIBUTION_CHANNEL: "<direct-download/private-beta/managed-release>",
+    GROOVEFORGE_RELEASE_DOWNLOAD_URL: "<safe-absolute-HTTPS-url-no-credentials-or-fragment>",
+    GROOVEFORGE_RELEASE_NOTES_URL: "<safe-absolute-HTTPS-url-no-credentials-or-fragment>",
+    GROOVEFORGE_SUPPORT_URL: "<safe-absolute-HTTPS-url-no-credentials-or-fragment>"
+  };
+  return placeholders[key] ?? "<private-value-kept-out-of-committed-files>";
+}
+
+function buildCurrentActionEnvEditTemplate(keys) {
+  return (Array.isArray(keys) ? keys : []).map((key) => {
+    const placeholder = envTemplatePlaceholderForKey(key);
+    return {
+      key,
+      placeholder,
+      assignment: `${key}=${placeholder}`,
+      guidance: releaseChannelEnvKeyGuidance[key] ?? "Set this private env key only in the ignored local env file.",
+      valueRecorded: false
+    };
+  });
+}
+
+function buildCurrentActionEnvEditRows({ envEditTemplate = [], editLocations = [], placeholderKeys = [], currentEnvEditTarget = "" } = {}) {
+  const locationByKey = new Map(editLocations.map((item) => [item.key, item]));
+  const placeholderKeySet = new Set(placeholderKeys);
+  return envEditTemplate.map((template) => {
+    const location = locationByKey.get(template.key);
+    const file = location?.file ?? currentEnvEditTarget;
+    const line = Number.isInteger(location?.line) ? location.line : null;
+    return {
+      key: template.key,
+      editTarget: currentEnvEditTarget,
+      file,
+      line,
+      locationKnown: line !== null,
+      location: line === null ? `${file}:line-after-scaffold` : `${file}:${line}`,
+      placeholder: placeholderKeySet.has(template.key),
+      placeholderShape: template.placeholder,
+      assignment: template.assignment,
+      guidance: template.guidance,
+      valueRecorded: false
+    };
+  });
 }
 
 function buildCurrentAction({
@@ -290,17 +421,36 @@ function buildCurrentAction({
   };
 }
 
-function enrichCurrentAction(action) {
+function enrichCurrentAction(action, { currentEnvEditTarget = "", editLocations = [] } = {}) {
   const currentActionRequiredKeys = Array.isArray(action.currentActionRequiredKeys) ? action.currentActionRequiredKeys : [];
   const currentActionPlaceholderKeys = Array.isArray(action.currentActionPlaceholderKeys) ? action.currentActionPlaceholderKeys : [];
   const currentActionChecklist = Array.isArray(action.currentActionChecklist) ? action.currentActionChecklist : [];
   const currentActionRerunCommands = Array.isArray(action.currentActionRerunCommands) ? action.currentActionRerunCommands : [];
+  const currentActionPlaceholderEditLocations = Array.isArray(editLocations)
+    ? editLocations.filter((item) => currentActionPlaceholderKeys.includes(item.key))
+    : [];
+  const currentActionEnvEditTemplate = buildCurrentActionEnvEditTemplate(currentActionRequiredKeys);
+  const currentActionEnvEditRows = buildCurrentActionEnvEditRows({
+    envEditTemplate: currentActionEnvEditTemplate,
+    editLocations: currentActionPlaceholderEditLocations,
+    placeholderKeys: currentActionPlaceholderKeys,
+    currentEnvEditTarget
+  });
   return {
     ...action,
     currentActionRequiredKeyCount: currentActionRequiredKeys.length,
     currentActionRequiredKeySummary: formatSummary(currentActionRequiredKeys),
     currentActionPlaceholderKeyCount: currentActionPlaceholderKeys.length,
     currentActionPlaceholderKeySummary: formatSummary(currentActionPlaceholderKeys),
+    currentActionPlaceholderEditLocationCount: currentActionPlaceholderEditLocations.length,
+    currentActionPlaceholderEditLocationSummary: formatLocationSummary(currentActionPlaceholderEditLocations),
+    currentActionPlaceholderEditLocations,
+    currentActionEnvEditTemplateCount: currentActionEnvEditTemplate.length,
+    currentActionEnvEditTemplateSummary: currentActionEnvEditTemplate.length > 0 ? `${currentActionEnvEditTemplate.length} value-free env assignments` : "none",
+    currentActionEnvEditTemplate,
+    currentActionEnvEditRowsCount: currentActionEnvEditRows.length,
+    currentActionEnvEditRowsSummary: currentActionEnvEditRows.length > 0 ? `${currentActionEnvEditRows.length} value-free edit rows` : "none",
+    currentActionEnvEditRows,
     currentActionChecklistCount: currentActionChecklist.length,
     currentActionChecklistSummary: currentActionChecklist.length > 0 ? `${currentActionChecklist.length} value-free steps` : "none",
     currentActionRerunCommandCount: currentActionRerunCommands.length,
@@ -378,6 +528,9 @@ function buildMarkdown(report) {
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current action required keys: ${report.currentActionRequiredKeyCount} (${report.currentActionRequiredKeySummary})
 - Current action placeholder keys: ${report.currentActionPlaceholderKeyCount} (${report.currentActionPlaceholderKeySummary})
+- Current action placeholder edit locations: ${report.currentActionPlaceholderEditLocationCount} (${report.currentActionPlaceholderEditLocationSummary})
+- Current action env edit template: ${report.currentActionEnvEditTemplateCount} (${report.currentActionEnvEditTemplateSummary})
+- Current action env edit rows: ${report.currentActionEnvEditRowsCount} (${report.currentActionEnvEditRowsSummary})
 - Current action checklist: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})
 - Update feed current environment ready: ${readyLabel(report.updateFeedCurrentEnvironmentReady)}
 - Channel metadata ready: ${readyLabel(report.channelMetadataReady)}
@@ -414,10 +567,25 @@ ${formatCommandRows(report.targetedCommands)}
 - Operator action: ${report.currentActionOperatorAction}
 - Required keys: ${report.currentActionRequiredKeyCount} (${report.currentActionRequiredKeySummary})
 - Placeholder keys: ${report.currentActionPlaceholderKeyCount} (${report.currentActionPlaceholderKeySummary})
+- Placeholder edit locations: ${report.currentActionPlaceholderEditLocationCount} (${report.currentActionPlaceholderEditLocationSummary})
+- Env edit template: ${report.currentActionEnvEditTemplateCount} (${report.currentActionEnvEditTemplateSummary})
+- Env edit rows: ${report.currentActionEnvEditRowsCount} (${report.currentActionEnvEditRowsSummary})
 - Rerun commands: ${report.currentActionRerunCommandCount} (${report.currentActionRerunCommandSummary})
 - Value recorded: ${readyLabel(report.currentActionValueRecorded)}
 
 ${formatChecklistList(report.currentActionChecklist)}
+
+## Current Action Placeholder Edit Locations
+
+${formatLocationList(report.currentActionPlaceholderEditLocations)}
+
+## Current Action Env Edit Template
+
+${formatEnvEditTemplateBlock(report.currentActionEnvEditTemplate)}
+
+## Current Action Env Edit Rows
+
+${formatEnvEditRowsTable(report.currentActionEnvEditRows)}
 
 ## Source Artifacts
 
@@ -503,6 +671,7 @@ const externalDistributionReady =
   distributionChannelQa.externalDistributionReady === true &&
   developerIdReadiness.externalDistributionReady === true;
 const currentEnvEditTarget = currentLocalEnvEditTarget(localEnvPresentFiles);
+const currentActionEditLocations = await readLocalEnvKeyLocations(releaseChannelMetadataKeys);
 const currentAction = enrichCurrentAction(
   buildCurrentAction({
     localEnvFileLoaded,
@@ -512,7 +681,11 @@ const currentAction = enrichCurrentAction(
     distributionChannelQa,
     externalDistributionReady,
     firstBlockers: combinedBlockers.slice(0, 12)
-  })
+  }),
+  {
+    currentEnvEditTarget,
+    editLocations: currentActionEditLocations
+  }
 );
 
 const releaseDoctorReport = {
@@ -644,6 +817,15 @@ check(Array.isArray(releaseDoctorReport.currentActionRequiredKeys), "release doc
 check(Number.isInteger(releaseDoctorReport.currentActionPlaceholderKeyCount), "release doctor should include the current placeholder key count");
 check(typeof releaseDoctorReport.currentActionPlaceholderKeySummary === "string", "release doctor should include the current placeholder key summary");
 check(Array.isArray(releaseDoctorReport.currentActionPlaceholderKeys), "release doctor should include current placeholder keys");
+check(Number.isInteger(releaseDoctorReport.currentActionPlaceholderEditLocationCount), "release doctor should include the current placeholder edit location count");
+check(typeof releaseDoctorReport.currentActionPlaceholderEditLocationSummary === "string", "release doctor should include the current placeholder edit location summary");
+check(Array.isArray(releaseDoctorReport.currentActionPlaceholderEditLocations), "release doctor should include current placeholder edit locations");
+check(Number.isInteger(releaseDoctorReport.currentActionEnvEditTemplateCount), "release doctor should include the current env edit template count");
+check(typeof releaseDoctorReport.currentActionEnvEditTemplateSummary === "string", "release doctor should include the current env edit template summary");
+check(Array.isArray(releaseDoctorReport.currentActionEnvEditTemplate), "release doctor should include the current env edit template");
+check(Number.isInteger(releaseDoctorReport.currentActionEnvEditRowsCount), "release doctor should include the current env edit rows count");
+check(typeof releaseDoctorReport.currentActionEnvEditRowsSummary === "string", "release doctor should include the current env edit rows summary");
+check(Array.isArray(releaseDoctorReport.currentActionEnvEditRows), "release doctor should include current env edit rows");
 check(
   releaseDoctorReport.currentActionRequiredKeyCount === releaseDoctorReport.currentActionRequiredKeys.length,
   "release doctor current required key count should match listed keys"
@@ -651,6 +833,45 @@ check(
 check(
   releaseDoctorReport.currentActionPlaceholderKeyCount === releaseDoctorReport.currentActionPlaceholderKeys.length,
   "release doctor current placeholder key count should match listed keys"
+);
+check(
+  releaseDoctorReport.currentActionPlaceholderEditLocationCount === releaseDoctorReport.currentActionPlaceholderEditLocations.length,
+  "release doctor current placeholder edit location count should match listed locations"
+);
+check(
+  releaseDoctorReport.currentActionEnvEditTemplateCount === releaseDoctorReport.currentActionEnvEditTemplate.length,
+  "release doctor current env edit template count should match listed assignments"
+);
+check(
+  releaseDoctorReport.currentActionEnvEditRowsCount === releaseDoctorReport.currentActionEnvEditRows.length,
+  "release doctor current env edit rows count should match listed rows"
+);
+check(
+  releaseDoctorReport.currentActionEnvEditTemplate.every(
+    (item) =>
+      releaseDoctorReport.currentActionRequiredKeys.includes(item.key) &&
+      typeof item.placeholder === "string" &&
+      item.placeholder.startsWith("<") &&
+      item.placeholder.endsWith(">") &&
+      item.assignment === `${item.key}=${item.placeholder}` &&
+      item.valueRecorded === false
+  ),
+  "release doctor current env edit template should contain only value-free assignments"
+);
+check(
+  releaseDoctorReport.currentActionEnvEditRows.every((item) => {
+    const matchingTemplate = releaseDoctorReport.currentActionEnvEditTemplate.find((template) => template.key === item.key);
+    return (
+      matchingTemplate &&
+      releaseDoctorReport.currentActionRequiredKeys.includes(item.key) &&
+      item.editTarget === releaseDoctorReport.currentEnvEditTarget &&
+      typeof item.location === "string" &&
+      item.assignment === matchingTemplate.assignment &&
+      item.placeholderShape === matchingTemplate.placeholder &&
+      item.valueRecorded === false
+    );
+  }),
+  "release doctor current env edit rows should combine value-free assignment, location, guidance, and placeholder status"
 );
 check(
   releaseDoctorReport.currentActionPlaceholderKeys.every((key) => releaseDoctorReport.localEnvPlaceholderKeys.includes(key)),
@@ -681,6 +902,34 @@ if (releaseDoctorReport.localEnvFileLoaded === true && releaseChannelMetadataKey
   check(
     releaseChannelMetadataKeys.every((key) => releaseDoctorReport.currentActionPlaceholderKeys.includes(key)),
     "release doctor current placeholder keys should include release-channel metadata keys"
+  );
+  check(releaseDoctorReport.currentActionPlaceholderEditLocationCount === releaseChannelMetadataKeys.length, "release doctor should surface current release-channel placeholder edit locations");
+  check(
+    releaseDoctorReport.currentActionPlaceholderEditLocations.every(
+      (item) =>
+        releaseChannelMetadataKeys.includes(item.key) &&
+        item.file === releaseDoctorReport.currentEnvEditTarget &&
+        Number.isInteger(item.line) &&
+        item.line > 0 &&
+        item.placeholder === true &&
+        item.valueRecorded === false
+    ),
+    "release doctor current placeholder edit locations should include file, line, key, placeholder flag, and value redaction"
+  );
+  check(releaseDoctorReport.currentActionEnvEditTemplateCount === releaseChannelMetadataKeys.length, "release doctor should include release-channel env edit templates");
+  check(releaseDoctorReport.currentActionEnvEditRowsCount === releaseChannelMetadataKeys.length, "release doctor should include release-channel env edit rows");
+  check(
+    releaseDoctorReport.currentActionEnvEditRows.every(
+      (item) =>
+        releaseChannelMetadataKeys.includes(item.key) &&
+        item.file === releaseDoctorReport.currentEnvEditTarget &&
+        Number.isInteger(item.line) &&
+        item.line > 0 &&
+        item.locationKnown === true &&
+        item.placeholder === true &&
+        item.valueRecorded === false
+    ),
+    "release doctor current env edit rows should include known file and line for release-channel placeholders"
   );
   check(releaseDoctorReport.currentActionOperatorAction.includes(releaseDoctorReport.currentEnvEditTarget), "release doctor current operator action should include the env edit target");
 }
@@ -713,8 +962,15 @@ check(markdown.includes("Current first blocker:"), "release doctor Markdown shou
 check(markdown.includes("Current env edit target:"), "release doctor Markdown should include current env edit target");
 check(markdown.includes("Current action required keys:"), "release doctor Markdown should include current action required keys");
 check(markdown.includes("Current action placeholder keys:"), "release doctor Markdown should include current action placeholder keys");
+check(markdown.includes("Current action placeholder edit locations:"), "release doctor Markdown should include current action placeholder edit locations");
+check(markdown.includes("Current action env edit template:"), "release doctor Markdown should include current action env edit template status");
+check(markdown.includes("Current action env edit rows:"), "release doctor Markdown should include current action env edit rows status");
 check(markdown.includes("Current Action"), "release doctor Markdown should include current action section");
 check(markdown.includes("Operator action:"), "release doctor Markdown should include current operator action details");
+check(markdown.includes("Current Action Placeholder Edit Locations"), "release doctor Markdown should include current placeholder edit location section");
+check(markdown.includes("Current Action Env Edit Template"), "release doctor Markdown should include current env edit template section");
+check(markdown.includes("Current Action Env Edit Rows"), "release doctor Markdown should include current env edit row section");
+check(markdown.includes("| key | location | assignment | guidance | placeholder |"), "release doctor Markdown should include current env edit row table");
 check(markdown.includes("Value recorded: no"), "release doctor Markdown should state current action value redaction");
 check(markdown.includes("Doctor command: `npm run release:doctor`"), "release doctor Markdown should include the doctor command");
 check(markdown.includes("Prepare env command: `npm run release:prepare-env`"), "release doctor Markdown should include the prepare-env command");
@@ -743,6 +999,9 @@ console.log(`- Current first blocker: ${releaseDoctorReport.currentActionFirstBl
 console.log(`- Current env edit target: ${releaseDoctorReport.currentEnvEditTarget}`);
 console.log(`- Current action required keys: ${releaseDoctorReport.currentActionRequiredKeyCount} (${releaseDoctorReport.currentActionRequiredKeySummary})`);
 console.log(`- Current action placeholder keys: ${releaseDoctorReport.currentActionPlaceholderKeyCount} (${releaseDoctorReport.currentActionPlaceholderKeySummary})`);
+console.log(`- Current action placeholder edit locations: ${releaseDoctorReport.currentActionPlaceholderEditLocationCount} (${releaseDoctorReport.currentActionPlaceholderEditLocationSummary})`);
+console.log(`- Current action env edit template: ${releaseDoctorReport.currentActionEnvEditTemplateCount} (${releaseDoctorReport.currentActionEnvEditTemplateSummary})`);
+console.log(`- Current action env edit rows: ${releaseDoctorReport.currentActionEnvEditRowsCount} (${releaseDoctorReport.currentActionEnvEditRowsSummary})`);
 console.log(`- Current operator action: ${releaseDoctorReport.currentActionOperatorAction}`);
 console.log(`- Channel metadata ready: ${releaseDoctorReport.channelMetadataReady ? "yes" : "no"}`);
 console.log(`- Manual QA approval ready: ${releaseDoctorReport.manualQaApprovalReady ? "yes" : "no"}`);
