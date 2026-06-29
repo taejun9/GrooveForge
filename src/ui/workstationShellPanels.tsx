@@ -3017,6 +3017,7 @@ export function QuickActions({
                 <QuickActionSearchRecoveryCard
                   recovery={searchRecovery}
                   onClearSearch={onRecoverSearchClear}
+                  onOpenCommandReference={onOpenCommandReference}
                   onSwitchScope={onRecoverSearchScope}
                 />
               )}
@@ -3317,10 +3318,12 @@ function createQuickActionSearchRecovery(
 function QuickActionSearchRecoveryCard({
   recovery,
   onClearSearch,
+  onOpenCommandReference,
   onSwitchScope
 }: {
   recovery: QuickActionSearchRecovery;
   onClearSearch: () => void;
+  onOpenCommandReference: () => void;
   onSwitchScope: (scope: QuickActionScopeId) => void;
 }): ReactElement {
   return (
@@ -3364,6 +3367,15 @@ function QuickActionSearchRecoveryCard({
         >
           <Target size={14} aria-hidden="true" />
           <span>{recovery.suggestedScope ? recovery.suggestedScope.label : "Scope"}</span>
+        </button>
+        <button
+          data-testid="quick-actions-search-recovery-reference"
+          onClick={onOpenCommandReference}
+          title="Open Command Reference"
+          type="button"
+        >
+          <CircleHelp size={14} aria-hidden="true" />
+          <span>Reference</span>
         </button>
       </div>
     </div>
