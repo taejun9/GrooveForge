@@ -24,6 +24,13 @@ const args = process.argv.slice(2);
 const writeLocal = args.includes("--write-local");
 const force = args.includes("--force");
 const failures = [];
+const placeholderPattern = /^(|<[^>]+>|CHANGE_ME|REPLACE_ME|TODO|TBD|example|example-.+|your-.+|https:\/\/example\.com.*)$/i;
+const releaseChannelMetadataKeys = [
+  "GROOVEFORGE_DISTRIBUTION_CHANNEL",
+  "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
+  "GROOVEFORGE_RELEASE_NOTES_URL",
+  "GROOVEFORGE_SUPPORT_URL"
+];
 
 function check(condition, message) {
   if (!condition) {
@@ -62,6 +69,18 @@ function parseEnvLine(line) {
   return { key, value };
 }
 
+function normalizedEnvValue(value) {
+  const trimmed = String(value ?? "").trim();
+  if ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function isPlaceholderValue(value) {
+  return placeholderPattern.test(normalizedEnvValue(value));
+}
+
 function parseTemplateEntries(templateText) {
   return templateText
     .split(/\r?\n/)
@@ -86,6 +105,75 @@ async function readJsonIfExists(filePath) {
     return null;
   }
   return JSON.parse(await readFile(filePath, "utf8"));
+}
+
+function displayLocalEnvTarget(filePath) {
+  const relativePath = path.relative(root, filePath);
+  if (!relativePath.startsWith("..") && !path.isAbsolute(relativePath)) {
+    return relativePath;
+  }
+  return path.basename(filePath);
+}
+
+function localEnvCandidatePaths() {
+  const configuredPath = process.env[distributionLocalEnvDefaults.configuredFileKey]?.trim();
+  return [
+    localEnvPath,
+    configuredPath ? (path.isAbsolute(configuredPath) ? configuredPath : path.resolve(root, configuredPath)) : ""
+  ].filter(Boolean);
+}
+
+async function readExistingLocalEnvPlaceholderAudit() {
+  const filesChecked = [...new Set(localEnvCandidatePaths())];
+  const placeholderKeys = [];
+  const placeholderEditLocations = [];
+  const presentFiles = [];
+
+  for (const filePath of filesChecked) {
+    if (!existsSync(filePath)) {
+      continue;
+    }
+    const displayFile = displayLocalEnvTarget(filePath);
+    presentFiles.push(displayFile);
+    const lines = (await readFile(filePath, "utf8")).split(/\r?\n/);
+    for (const [index, line] of lines.entries()) {
+      const parsed = parseEnvLine(line);
+      if (!parsed || !distributionPrivateInputKeys.includes(parsed.key) || !isPlaceholderValue(parsed.value)) {
+        continue;
+      }
+      placeholderKeys.push(parsed.key);
+      placeholderEditLocations.push({
+        key: parsed.key,
+        file: displayFile,
+        line: index + 1,
+        placeholder: true,
+        valueRecorded: false
+      });
+    }
+  }
+
+  const uniquePlaceholderKeys = unique(placeholderKeys);
+  const releaseChannelPlaceholderKeys = releaseChannelMetadataKeys.filter((key) => uniquePlaceholderKeys.includes(key));
+  const releaseChannelPlaceholderEditLocations = placeholderEditLocations.filter((item) => releaseChannelMetadataKeys.includes(item.key));
+
+  return {
+    existingLocalEnvFilesChecked: filesChecked.map(displayLocalEnvTarget),
+    existingLocalEnvPresentFiles: unique(presentFiles),
+    existingLocalEnvFileLoaded: presentFiles.length > 0,
+    existingLocalEnvPlaceholderKeyCount: uniquePlaceholderKeys.length,
+    existingLocalEnvPlaceholderKeySummary: uniquePlaceholderKeys.length > 0 ? uniquePlaceholderKeys.join(", ") : "none",
+    existingLocalEnvPlaceholderKeys: uniquePlaceholderKeys,
+    existingLocalEnvPlaceholderEditLocationCount: placeholderEditLocations.length,
+    existingLocalEnvPlaceholderEditLocationSummary: formatLocationSummary(placeholderEditLocations),
+    existingLocalEnvPlaceholderEditLocations: placeholderEditLocations,
+    existingReleaseChannelPlaceholderKeyCount: releaseChannelPlaceholderKeys.length,
+    existingReleaseChannelPlaceholderKeySummary: releaseChannelPlaceholderKeys.length > 0 ? releaseChannelPlaceholderKeys.join(", ") : "none",
+    existingReleaseChannelPlaceholderKeys: releaseChannelPlaceholderKeys,
+    existingReleaseChannelPlaceholderEditLocationCount: releaseChannelPlaceholderEditLocations.length,
+    existingReleaseChannelPlaceholderEditLocationSummary: formatLocationSummary(releaseChannelPlaceholderEditLocations),
+    existingReleaseChannelPlaceholderEditLocations: releaseChannelPlaceholderEditLocations,
+    existingLocalEnvValueRecorded: false
+  };
 }
 
 function validDigest(value) {
@@ -197,6 +285,29 @@ function formatBlockers(blockers) {
   return blockers.map((blocker) => `- ${blocker}`).join("\n");
 }
 
+function formatKeyList(keys) {
+  if (!Array.isArray(keys) || keys.length === 0) {
+    return "- None.";
+  }
+  return keys.map((key) => `- ${key}`).join("\n");
+}
+
+function formatLocationSummary(locations) {
+  if (!Array.isArray(locations) || locations.length === 0) {
+    return "none";
+  }
+  return locations.map((item) => `${item.file}:${item.line} ${item.key}`).join(", ");
+}
+
+function formatLocationRows(locations) {
+  if (!Array.isArray(locations) || locations.length === 0) {
+    return "| none | none | none | none |";
+  }
+  return locations
+    .map((item) => `| ${item.file} | ${item.line} | ${item.key} | ${item.valueRecorded ? "yes" : "no"} |`)
+    .join("\n");
+}
+
 function buildMarkdown(summary) {
   return `# ${appName} ${summary.version} ${summary.platform}-${summary.arch} Release Prepare Env
 
@@ -210,6 +321,10 @@ function buildMarkdown(summary) {
 - Force overwrite requested: ${summary.forceOverwrite ? "yes" : "no"}
 - Manual QA checklist digest available: ${summary.manualQaChecklistDigestAvailable ? "yes" : "no"}
 - Manual QA checklist digest applied: ${summary.manualQaChecklistDigestApplied ? "yes" : "no"}
+- Existing local env file loaded: ${summary.existingLocalEnvFileLoaded ? "yes" : "no"}
+- Existing local env placeholder keys: ${summary.existingLocalEnvPlaceholderKeyCount} (${summary.existingLocalEnvPlaceholderKeySummary})
+- Existing release-channel placeholder keys: ${summary.existingReleaseChannelPlaceholderKeyCount} (${summary.existingReleaseChannelPlaceholderKeySummary})
+- Existing release-channel placeholder edit locations: ${summary.existingReleaseChannelPlaceholderEditLocationCount} (${summary.existingReleaseChannelPlaceholderEditLocationSummary})
 - Private values recorded: no
 - Network probe attempted: no
 - Release upload attempted: no
@@ -240,6 +355,25 @@ ${formatKeyRows(summary.scaffoldKeys, summary.manualQaChecklistDigestApplied ? "
 ## Local Env Write Blockers
 
 ${formatBlockers(summary.localEnvWriteBlockers)}
+
+## Existing Local Env Placeholder Audit
+
+- Files checked: ${summary.existingLocalEnvFilesChecked.join(", ") || "none"}
+- Present files: ${summary.existingLocalEnvPresentFiles.join(", ") || "none"}
+- Placeholder keys: ${summary.existingLocalEnvPlaceholderKeyCount} (${summary.existingLocalEnvPlaceholderKeySummary})
+- Release-channel placeholder keys: ${summary.existingReleaseChannelPlaceholderKeyCount} (${summary.existingReleaseChannelPlaceholderKeySummary})
+- Release-channel placeholder edit locations: ${summary.existingReleaseChannelPlaceholderEditLocationCount} (${summary.existingReleaseChannelPlaceholderEditLocationSummary})
+- Value recorded: ${summary.existingLocalEnvValueRecorded ? "yes" : "no"}
+
+### Existing Placeholder Keys
+
+${formatKeyList(summary.existingLocalEnvPlaceholderKeys)}
+
+### Existing Release-Channel Placeholder Edit Locations
+
+| file | line | key | value recorded |
+|---|---:|---|---:|
+${formatLocationRows(summary.existingReleaseChannelPlaceholderEditLocations)}
 
 ## Not Recorded
 
@@ -276,6 +410,8 @@ if (writeLocal && localEnvWriteBlockers.length === 0) {
   localEnvWritten = true;
 }
 
+const existingLocalEnvPlaceholderAudit = await readExistingLocalEnvPlaceholderAudit();
+
 const releasePrepareEnvReport = {
   appName,
   bundleId,
@@ -309,6 +445,7 @@ const releasePrepareEnvReport = {
   localEnvAlreadyExists,
   forceOverwrite: force,
   localEnvWriteBlockers,
+  ...existingLocalEnvPlaceholderAudit,
   manualQaChecklistDigestAvailable,
   manualQaChecklistDigestApplied: manualQaChecklistDigestAvailable,
   privateValuesRecorded: false,
@@ -353,6 +490,46 @@ check(releasePrepareEnvReport.missingTemplateKeys.length === 0, `release prepare
 check(releasePrepareEnvReport.extraTemplateKeys.length === 0, `release prepare env template has unexpected keys: ${releasePrepareEnvReport.extraTemplateKeys.join(", ")}`);
 check(releasePrepareEnvReport.scaffoldWritten === true, "release prepare env should write the build scaffold");
 check(releasePrepareEnvReport.scaffoldGuidanceSectionCount === 5, "release prepare env should include guided scaffold sections");
+check(Array.isArray(releasePrepareEnvReport.existingLocalEnvFilesChecked), "release prepare env should include existing local env files checked");
+check(Array.isArray(releasePrepareEnvReport.existingLocalEnvPresentFiles), "release prepare env should include existing local env present files");
+check(typeof releasePrepareEnvReport.existingLocalEnvFileLoaded === "boolean", "release prepare env should include existing local env loaded status");
+check(Number.isInteger(releasePrepareEnvReport.existingLocalEnvPlaceholderKeyCount), "release prepare env should include existing local env placeholder key count");
+check(typeof releasePrepareEnvReport.existingLocalEnvPlaceholderKeySummary === "string", "release prepare env should include existing local env placeholder key summary");
+check(Array.isArray(releasePrepareEnvReport.existingLocalEnvPlaceholderKeys), "release prepare env should include existing local env placeholder keys");
+check(
+  releasePrepareEnvReport.existingLocalEnvPlaceholderKeyCount === releasePrepareEnvReport.existingLocalEnvPlaceholderKeys.length,
+  "release prepare env existing placeholder key count should match listed keys"
+);
+check(Number.isInteger(releasePrepareEnvReport.existingLocalEnvPlaceholderEditLocationCount), "release prepare env should include existing local env placeholder edit location count");
+check(typeof releasePrepareEnvReport.existingLocalEnvPlaceholderEditLocationSummary === "string", "release prepare env should include existing local env placeholder edit location summary");
+check(Array.isArray(releasePrepareEnvReport.existingLocalEnvPlaceholderEditLocations), "release prepare env should include existing local env placeholder edit locations");
+check(Number.isInteger(releasePrepareEnvReport.existingReleaseChannelPlaceholderKeyCount), "release prepare env should include release-channel placeholder key count");
+check(typeof releasePrepareEnvReport.existingReleaseChannelPlaceholderKeySummary === "string", "release prepare env should include release-channel placeholder key summary");
+check(Array.isArray(releasePrepareEnvReport.existingReleaseChannelPlaceholderKeys), "release prepare env should include release-channel placeholder keys");
+check(
+  releasePrepareEnvReport.existingReleaseChannelPlaceholderKeyCount === releasePrepareEnvReport.existingReleaseChannelPlaceholderKeys.length,
+  "release prepare env release-channel placeholder key count should match listed keys"
+);
+check(Number.isInteger(releasePrepareEnvReport.existingReleaseChannelPlaceholderEditLocationCount), "release prepare env should include release-channel placeholder edit location count");
+check(
+  typeof releasePrepareEnvReport.existingReleaseChannelPlaceholderEditLocationSummary === "string",
+  "release prepare env should include release-channel placeholder edit location summary"
+);
+check(Array.isArray(releasePrepareEnvReport.existingReleaseChannelPlaceholderEditLocations), "release prepare env should include release-channel placeholder edit locations");
+check(
+  releasePrepareEnvReport.existingReleaseChannelPlaceholderEditLocations.every(
+    (item) =>
+      releaseChannelMetadataKeys.includes(item.key) &&
+      typeof item.file === "string" &&
+      item.file.length > 0 &&
+      Number.isInteger(item.line) &&
+      item.line > 0 &&
+      item.placeholder === true &&
+      item.valueRecorded === false
+  ),
+  "release prepare env release-channel placeholder edit locations should include only value-free file, line, and key rows"
+);
+check(releasePrepareEnvReport.existingLocalEnvValueRecorded === false, "release prepare env existing local env audit should not record values");
 check(scaffold.includes("GROOVEFORGE_DISTRIBUTION_CHANNEL="), "release prepare env scaffold should include channel key");
 check(scaffold.includes("GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256="), "release prepare env scaffold should include manual QA digest key");
 check(scaffold.includes("# Distribution channel and public metadata"), "release prepare env scaffold should guide distribution metadata");
@@ -378,6 +555,10 @@ check(releasePrepareEnvReport.releaseGateClaimedExternalDistribution === false, 
 check(markdown.includes("Release Prepare Env"), "release prepare env Markdown should include title");
 check(markdown.includes("Prepare local env command: `npm run release:prepare-env`"), "release prepare env Markdown should include local env command");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "release prepare env Markdown should include hard gate command");
+check(markdown.includes("Existing local env placeholder keys:"), "release prepare env Markdown should include existing local env placeholder key status");
+check(markdown.includes("Existing release-channel placeholder keys:"), "release prepare env Markdown should include release-channel placeholder key status");
+check(markdown.includes("## Existing Local Env Placeholder Audit"), "release prepare env Markdown should include existing local env placeholder audit section");
+check(markdown.includes("Existing Release-Channel Placeholder Edit Locations"), "release prepare env Markdown should include release-channel placeholder edit locations section");
 check(!/https?:\/\//i.test(markdown), "release prepare env Markdown should not include public or private URL values");
 check(!/https?:\/\//i.test(serializedReport), "release prepare env JSON should not include public or private URL values");
 
@@ -401,6 +582,14 @@ console.log(`- Local env write requested: ${releasePrepareEnvReport.localEnvWrit
 console.log(`- Local env written: ${releasePrepareEnvReport.localEnvWritten ? "yes" : "no"}`);
 console.log(`- Manual QA checklist digest available: ${releasePrepareEnvReport.manualQaChecklistDigestAvailable ? "yes" : "no"}`);
 console.log(`- Manual QA checklist digest applied: ${releasePrepareEnvReport.manualQaChecklistDigestApplied ? "yes" : "no"}`);
+console.log(`- Existing local env file loaded: ${releasePrepareEnvReport.existingLocalEnvFileLoaded ? "yes" : "no"}`);
+console.log(`- Existing local env placeholder keys: ${releasePrepareEnvReport.existingLocalEnvPlaceholderKeyCount} (${releasePrepareEnvReport.existingLocalEnvPlaceholderKeySummary})`);
+console.log(
+  `- Existing release-channel placeholder keys: ${releasePrepareEnvReport.existingReleaseChannelPlaceholderKeyCount} (${releasePrepareEnvReport.existingReleaseChannelPlaceholderKeySummary})`
+);
+console.log(
+  `- Existing release-channel placeholder edit locations: ${releasePrepareEnvReport.existingReleaseChannelPlaceholderEditLocationCount} (${releasePrepareEnvReport.existingReleaseChannelPlaceholderEditLocationSummary})`
+);
 console.log("- Private values recorded: no");
 console.log("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted");
 console.log("- Not claimed: Developer ID signing, notarization, Gatekeeper approval, auto-update, manual QA approval, app-store submission, or external distribution completion");
