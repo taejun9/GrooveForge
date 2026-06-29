@@ -315,6 +315,15 @@ function formatCurrentActionAcceptanceBlockerRows(rows) {
     .join("\n");
 }
 
+function formatCurrentActionHandoffRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | 0 | 0 | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.item)} | ${escapeCell(row.sourceField)} | ${escapeCell(row.evidence)} | ${row.blockerCount ?? 0} | ${row.acceptanceBlockerCount ?? 0} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.rerunCommand)}\` | \`${escapeCell(row.hardGateCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function priorityActionRows(externalNextActions) {
   return valueFreeObjectRows(externalNextActions.priorityActions).map((action, index) => {
     const rerunCommands = stringArrayValue(action.rerunCommands);
@@ -372,7 +381,89 @@ function currentActionAcceptanceBlockerRows({
         rerunCommand: currentRerunCommand,
         valueRecorded: false
       };
-    });
+  });
+}
+
+function currentActionHandoffRows({
+  sourceArtifacts,
+  currentEnvEditTarget,
+  currentPlaceholderEditLocationSummary,
+  currentPlaceholderKeyCount,
+  currentActionAcceptanceBlockerSummary,
+  currentActionAcceptanceBlockerCount,
+  currentNextCommand,
+  currentRerunCommand,
+  currentCommandSequenceSummary,
+  hardGateCommand,
+  hardGateRequirementBlockedCount,
+  hardGateBlockedRequirementSummary
+}) {
+  const sourceArtifactSummary = valueFreeObjectRows(sourceArtifacts)
+    .map((artifact) => textValue(artifact.label))
+    .filter((label) => label !== "none")
+    .join(", ");
+  return [
+    {
+      order: 1,
+      item: "Source artifacts",
+      sourceField: "sourceArtifacts",
+      evidence: sourceArtifactSummary || "none",
+      blockerCount: hardGateRequirementBlockedCount,
+      acceptanceBlockerCount: currentActionAcceptanceBlockerCount,
+      proofCommand: currentNextCommand,
+      rerunCommand: currentRerunCommand,
+      hardGateCommand,
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      item: "Current edit target",
+      sourceField: "externalProofBundle.currentEnvEditTarget/currentPlaceholderEditLocations",
+      evidence: `${currentEnvEditTarget}; ${currentPlaceholderEditLocationSummary}`,
+      blockerCount: currentPlaceholderKeyCount,
+      acceptanceBlockerCount: currentActionAcceptanceBlockerCount,
+      proofCommand: currentNextCommand,
+      rerunCommand: currentRerunCommand,
+      hardGateCommand,
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      item: "Acceptance blockers",
+      sourceField: "currentActionAcceptanceBlockerRows",
+      evidence: currentActionAcceptanceBlockerSummary,
+      blockerCount: currentActionAcceptanceBlockerCount,
+      acceptanceBlockerCount: currentActionAcceptanceBlockerCount,
+      proofCommand: currentNextCommand,
+      rerunCommand: currentRerunCommand,
+      hardGateCommand,
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      item: "Rerun order",
+      sourceField: "externalProofBundle.currentCommandVerificationRows/nextExpectedOperatorSequence",
+      evidence: currentCommandSequenceSummary,
+      blockerCount: currentActionAcceptanceBlockerCount,
+      acceptanceBlockerCount: currentActionAcceptanceBlockerCount,
+      proofCommand: currentNextCommand,
+      rerunCommand: currentRerunCommand,
+      hardGateCommand,
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      item: "Hard gate",
+      sourceField: "externalGate.requirements",
+      evidence: hardGateBlockedRequirementSummary,
+      blockerCount: hardGateRequirementBlockedCount,
+      acceptanceBlockerCount: currentActionAcceptanceBlockerCount,
+      proofCommand: currentNextCommand,
+      rerunCommand: currentRerunCommand,
+      hardGateCommand,
+      valueRecorded: false
+    }
+  ];
 }
 
 function currentActionAcceptanceRows({
@@ -554,6 +645,14 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentNextCommand,
     currentRerunCommand
   });
+  const sourceArtifacts = [
+    { label: "Release doctor", path: relative(releaseDoctorJsonPath), present: true, valueRecorded: false },
+    { label: "External next actions", path: relative(externalNextActionsJsonPath), present: true, valueRecorded: false },
+    { label: "External proof bundle", path: relative(externalProofBundleJsonPath), present: true, valueRecorded: false },
+    { label: "External distribution gate", path: relative(externalGateJsonPath), present: true, valueRecorded: false },
+    { label: "Release progress report", path: relative(releaseProgressJsonPath), present: true, valueRecorded: false },
+    { label: "Release-channel unblock smoke", path: textValue(releaseProgress.sourceReleaseChannelUnblockPath, "none"), present: releaseProgress.sourceReleaseChannelUnblockReady === true, valueRecorded: false }
+  ];
   const nextExpectedOperatorSequence = localEnvSetupPending
     ? [
         "Run npm run release:prepare-env to create the ignored local distribution env scaffold.",
@@ -570,6 +669,23 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
         "Run npm run release:proof-bundle to refresh hard-gate preparation evidence.",
         "Run npm run release:external-check only when signing, notarization, Gatekeeper, update metadata, and manual QA are also ready."
       ];
+  const handoffRows = currentActionHandoffRows({
+    sourceArtifacts,
+    currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
+    currentPlaceholderEditLocationSummary,
+    currentPlaceholderKeyCount: proofPlaceholderKeys.length,
+    currentActionAcceptanceBlockerSummary: acceptanceBlockerRows.length > 0 ? `${acceptanceBlockerRows.length} current action acceptance blockers` : "none",
+    currentActionAcceptanceBlockerCount: acceptanceBlockerRows.length,
+    currentNextCommand,
+    currentRerunCommand,
+    currentCommandSequenceSummary,
+    hardGateCommand,
+    hardGateRequirementBlockedCount,
+    hardGateBlockedRequirementSummary:
+      hardGateBlockedRequirementRows.length > 0
+        ? `${hardGateBlockedRequirementRows.length} blocked hard-gate requirements`
+        : "none"
+  });
   const consistencyRows = [
     {
       check: "Doctor/proof/gate/progress next command consensus",
@@ -710,6 +826,15 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentActionAcceptanceBlockerRows: acceptanceBlockerRows,
     currentActionAcceptanceBlockersMatchAcceptance:
       acceptanceBlockerRows.length === acceptanceRows.filter((row) => row.ready !== true).length,
+    currentActionHandoffReady:
+      handoffRows.length === 5 &&
+      handoffRows.every((row) => row.valueRecorded === false) &&
+      handoffRows.every((row) => row.proofCommand === currentNextCommand && row.rerunCommand === currentRerunCommand && row.hardGateCommand === hardGateCommand),
+    currentActionHandoffRowCount: handoffRows.length,
+    currentActionHandoffSummary: handoffRows.length > 0 ? `${handoffRows.length} value-free current action handoff rows` : "none",
+    currentActionHandoffRows: handoffRows,
+    currentActionHandoffSourceArtifactCount: sourceArtifacts.length,
+    currentActionHandoffSourceArtifactSummary: sourceArtifacts.map((artifact) => artifact.label).join(", "),
     currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: integerValue(externalProofBundle.currentRequiredKeyCount),
     currentRequiredKeys: proofRequiredKeys,
@@ -791,14 +916,7 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     releaseChannelUnblockClaimedExternalDistribution: releaseProgress.releaseChannelUnblockClaimedExternalDistribution === true,
     releaseChannelUnblockValueRecorded: releaseProgress.releaseChannelUnblockValueRecorded === true ? true : false,
     nextExpectedOperatorSequence,
-    sourceArtifacts: [
-      { label: "Release doctor", path: relative(releaseDoctorJsonPath), present: true, valueRecorded: false },
-      { label: "External next actions", path: relative(externalNextActionsJsonPath), present: true, valueRecorded: false },
-      { label: "External proof bundle", path: relative(externalProofBundleJsonPath), present: true, valueRecorded: false },
-      { label: "External distribution gate", path: relative(externalGateJsonPath), present: true, valueRecorded: false },
-      { label: "Release progress report", path: relative(releaseProgressJsonPath), present: true, valueRecorded: false },
-      { label: "Release-channel unblock smoke", path: textValue(releaseProgress.sourceReleaseChannelUnblockPath, "none"), present: releaseProgress.sourceReleaseChannelUnblockReady === true, valueRecorded: false }
-    ],
+    sourceArtifacts,
     privateValuesRecorded: false,
     networkProbeAttemptedByThisReport: false,
     releaseUploadAttemptedByThisReport: false,
@@ -923,6 +1041,22 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
     check(report.currentActionAcceptanceBlockerRows.some((row) => row.sourceField.includes("distributionChannelQaReady")), "release current blocker current action acceptance blockers should include distribution-channel QA source fields while channel QA is blocked");
   }
   check(report.currentActionAcceptanceBlockersMatchAcceptance === true, "release current blocker should prove current action acceptance blockers match failing acceptance criteria");
+  check(report.currentActionHandoffReady === true, "release current blocker current action handoff should be ready");
+  check(report.currentActionHandoffRowCount === report.currentActionHandoffRows.length, "release current blocker current action handoff row count should match rows");
+  check(report.currentActionHandoffRowCount === 5, "release current blocker current action handoff should include five handoff rows");
+  check(typeof report.currentActionHandoffSummary === "string" && report.currentActionHandoffSummary.length > 0, "release current blocker should include current action handoff summary");
+  check(report.currentActionHandoffRows.every((row) => row.valueRecorded === false), "release current blocker current action handoff rows should not record values");
+  check(report.currentActionHandoffRows.every((row) => row.proofCommand === report.currentNextCommand), "release current blocker current action handoff proof commands should match current next command");
+  check(report.currentActionHandoffRows.every((row) => row.rerunCommand === report.currentRerunCommand), "release current blocker current action handoff rerun commands should match current rerun command");
+  check(report.currentActionHandoffRows.every((row) => row.hardGateCommand === report.hardGateCommand), "release current blocker current action handoff hard-gate commands should match hard gate command");
+  check(report.currentActionHandoffRows.some((row) => row.sourceField === "sourceArtifacts"), "release current blocker current action handoff should include source artifacts");
+  check(report.currentActionHandoffRows.some((row) => row.sourceField.includes("currentEnvEditTarget")), "release current blocker current action handoff should include current edit target");
+  check(report.currentActionHandoffRows.some((row) => row.sourceField === "currentActionAcceptanceBlockerRows"), "release current blocker current action handoff should include acceptance blockers");
+  check(report.currentActionHandoffRows.some((row) => row.sourceField.includes("currentCommandVerificationRows")), "release current blocker current action handoff should include rerun order");
+  check(report.currentActionHandoffRows.some((row) => row.sourceField === "externalGate.requirements"), "release current blocker current action handoff should include hard-gate requirements");
+  check(report.currentActionHandoffRows.some((row) => row.acceptanceBlockerCount === report.currentActionAcceptanceBlockerCount), "release current blocker current action handoff should mirror acceptance blocker count");
+  check(report.currentActionHandoffSourceArtifactCount === report.sourceArtifacts.length, "release current blocker current action handoff source artifact count should match source artifacts");
+  check(report.currentActionHandoffSourceArtifactSummary.includes("Release doctor"), "release current blocker current action handoff should summarize source artifacts");
   check(report.currentRequiredKeyCount === report.currentRequiredKeys.length, "release current blocker required key count should match keys");
   check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release current blocker placeholder key count should match keys");
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderEditLocations.length, "release current blocker placeholder edit location count should match locations");
@@ -1080,6 +1214,8 @@ function buildMarkdown(report) {
     `- Current action acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})`,
     `- Current action acceptance blockers: ${report.currentActionAcceptanceBlockerCount} (${report.currentActionAcceptanceBlockerSummary})`,
     `- Current action acceptance aligned: ${report.currentActionAcceptanceMatchesCurrentAction ? "yes" : "no"}`,
+    `- Current action handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`,
+    `- Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`,
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
     `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`,
@@ -1210,6 +1346,16 @@ function buildMarkdown(report) {
     "|---:|---|---|---|---|---|---:|",
     formatCurrentActionAcceptanceBlockerRows(report.currentActionAcceptanceBlockerRows),
     "",
+    "## Current Action Handoff Package",
+    "",
+    `- Handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`,
+    `- Handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`,
+    `- Source artifacts: ${report.currentActionHandoffSourceArtifactCount} (${report.currentActionHandoffSourceArtifactSummary})`,
+    "",
+    "| order | item | source field | evidence | blocker count | acceptance blockers | proof command | rerun command | hard gate | value recorded |",
+    "|---:|---|---|---|---:|---:|---|---|---|---:|",
+    formatCurrentActionHandoffRows(report.currentActionHandoffRows),
+    "",
     "## Placeholder Edit Locations",
     "",
     "| location | key | placeholder | value recorded |",
@@ -1301,6 +1447,8 @@ check(markdown.includes("Current Action Acceptance"), "release current blocker M
 check(markdown.includes("Current action acceptance aligned:"), "release current blocker Markdown should include current action acceptance alignment");
 check(markdown.includes("Current Action Acceptance Blockers"), "release current blocker Markdown should include current action acceptance blockers");
 check(markdown.includes("Blockers match acceptance:"), "release current blocker Markdown should include current action acceptance blocker alignment");
+check(markdown.includes("Current Action Handoff Package"), "release current blocker Markdown should include current action handoff package");
+check(markdown.includes("Current action handoff ready:"), "release current blocker Markdown should include current action handoff readiness");
 
 if (failures.length > 0) {
   fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
@@ -1338,6 +1486,8 @@ console.log(`- Current external completion checklist row: ${report.currentExtern
 console.log(`- Current action acceptance ready: ${report.currentActionAcceptanceReady ? "yes" : "no"}`);
 console.log(`- Current action acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})`);
 console.log(`- Current action acceptance blockers: ${report.currentActionAcceptanceBlockerCount} (${report.currentActionAcceptanceBlockerSummary})`);
+console.log(`- Current action handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`);
+console.log(`- Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
