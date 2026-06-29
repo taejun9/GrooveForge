@@ -233,6 +233,15 @@ function formatAudienceRows(rows) {
     .join("\n");
 }
 
+function formatAudienceAcceptanceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | no | none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.acceptanceArea)} | ${escapeCell(row.criterion)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.evidenceSource)} | ${escapeCell(row.evidenceSummary)} | ${escapeCell(row.workflowLabel)} | ${row.artifactCount ?? 0} | ${row.verifiedArtifactCount ?? 0} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatDeliveryPackageRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | none | no | none | none | none | none | none | no |";
@@ -437,6 +446,10 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
     audienceReadinessRowCount: integerValue(releaseProgress.audienceReadinessRowCount),
     audienceReadinessRowSummary: textValue(releaseProgress.audienceReadinessRowSummary, "none"),
     audienceReadinessRows: valueFreeObjectRows(releaseProgress.audienceReadinessRows),
+    audienceAcceptanceReady: releaseProgress.audienceAcceptanceReady === true,
+    audienceAcceptanceRowCount: integerValue(releaseProgress.audienceAcceptanceRowCount),
+    audienceAcceptanceRowSummary: textValue(releaseProgress.audienceAcceptanceRowSummary, "none"),
+    audienceAcceptanceRows: valueFreeObjectRows(releaseProgress.audienceAcceptanceRows),
     audienceDeliveryPackagesReady: releaseProgress.audienceDeliveryPackagesReady === true,
     audienceDeliveryPackageRowCount: integerValue(releaseProgress.audienceDeliveryPackageRowCount),
     audienceDeliveryPackageRowSummary: textValue(releaseProgress.audienceDeliveryPackageRowSummary, "none"),
@@ -538,6 +551,21 @@ function validateReport(report, { releaseDoctor, externalProofBundle, externalGa
   check(report.audienceReadinessRows.every((row) => row.deliveryPackageReopenReady === true), "release current blocker audience readiness rows should include reopened delivery packages");
   check(report.audienceReadinessRows.every((row) => row.deliveryArtifactCount === 8), "release current blocker audience readiness rows should include eight delivery artifacts");
   check(report.audienceReadinessRows.every((row) => row.verifiedDeliveryArtifactCount === 8), "release current blocker audience readiness rows should include eight verified delivery artifacts");
+  check(report.audienceAcceptanceReady === true, "release current blocker should include ready audience acceptance");
+  check(report.audienceAcceptanceReady === releaseProgress.audienceAcceptanceReady, "release current blocker should mirror audience acceptance readiness");
+  check(report.audienceAcceptanceRowCount === releaseProgress.audienceAcceptanceRowCount, "release current blocker should mirror audience acceptance row count");
+  check(report.audienceAcceptanceRows.length === report.audienceAcceptanceRowCount, "release current blocker audience acceptance row count should match rows");
+  check(report.audienceAcceptanceRows.every((row) => row.valueRecorded === false), "release current blocker audience acceptance rows should not record values");
+  check(report.audienceAcceptanceRows.every((row) => row.ready === true), "release current blocker audience acceptance rows should be ready");
+  check(report.audienceAcceptanceRows.every((row) => row.localFirst === true), "release current blocker audience acceptance rows should keep local-first posture");
+  check(report.audienceAcceptanceRows.every((row) => row.samplingSecondary === true), "release current blocker audience acceptance rows should keep sampling secondary");
+  check(report.audienceAcceptanceRows.filter((row) => row.audience === "first-time composer").length === 5, "release current blocker should include five first-time composer acceptance rows");
+  check(report.audienceAcceptanceRows.filter((row) => row.audience === "professional producer").length === 5, "release current blocker should include five professional producer acceptance rows");
+  check(report.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Rendered path"), "release current blocker audience acceptance should include rendered path evidence");
+  check(report.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Workflow"), "release current blocker audience acceptance should include workflow evidence");
+  check(report.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Package"), "release current blocker audience acceptance should include package evidence");
+  check(report.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Package reopen"), "release current blocker audience acceptance should include package reopen evidence");
+  check(report.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Export and Handoff"), "release current blocker audience acceptance should include export and Handoff evidence");
   check(report.audienceDeliveryPackagesReady === releaseProgress.audienceDeliveryPackagesReady, "release current blocker should mirror persona delivery package readiness");
   check(report.audienceDeliveryPackageRowCount === releaseProgress.audienceDeliveryPackageRowCount, "release current blocker should mirror persona delivery package row count");
   check(report.audienceDeliveryPackageRows.every((row) => row.valueRecorded === false), "release current blocker persona delivery package rows should not record values");
@@ -598,6 +626,8 @@ function buildMarkdown(report) {
     `- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`,
     `- Audience readiness ready: ${report.audienceReadinessReady ? "yes" : "no"}`,
     `- Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})`,
+    `- Audience acceptance ready: ${report.audienceAcceptanceReady ? "yes" : "no"}`,
+    `- Audience acceptance rows: ${report.audienceAcceptanceRowCount} (${report.audienceAcceptanceRowSummary})`,
     `- Persona delivery packages ready: ${report.audienceDeliveryPackagesReady ? "yes" : "no"}`,
     `- Persona delivery package rows: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})`,
     `- Persona delivery packages reopen ready: ${report.audienceDeliveryPackagesReopenReady ? "yes" : "no"}`,
@@ -623,6 +653,12 @@ function buildMarkdown(report) {
     "| audience | role | ready | mode | bars | delivery | style | package ready | package reopen ready | artifacts | verified artifacts | value recorded |",
     "|---|---|---:|---|---:|---|---|---:|---:|---:|---:|---:|",
     formatAudienceRows(report.audienceReadinessRows),
+    "",
+    "## Audience Acceptance Matrix",
+    "",
+    "| audience | area | criterion | ready | evidence source | evidence summary | workflow | artifacts | verified artifacts | value recorded |",
+    "|---|---|---|---:|---|---|---|---:|---:|---:|",
+    formatAudienceAcceptanceRows(report.audienceAcceptanceRows),
     "",
     "## Persona Delivery Packages",
     "",
@@ -713,6 +749,7 @@ check(!/https?:\/\//i.test(markdown), "release current blocker Markdown should n
 check(!/GROOVEFORGE_RELEASE_DOWNLOAD_URL=https?:\/\//i.test(markdown), "release current blocker Markdown should not include release URL assignments with values");
 check(!/GROOVEFORGE_RELEASE_NOTES_URL=https?:\/\//i.test(markdown), "release current blocker Markdown should not include release notes URL assignments with values");
 check(!/GROOVEFORGE_SUPPORT_URL=https?:\/\//i.test(markdown), "release current blocker Markdown should not include support URL assignments with values");
+check(markdown.includes("Audience Acceptance Matrix"), "release current blocker Markdown should include audience acceptance matrix");
 
 if (failures.length > 0) {
   fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
@@ -745,6 +782,8 @@ console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`)
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
 console.log(`- Audience readiness ready: ${report.audienceReadinessReady ? "yes" : "no"}`);
 console.log(`- Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})`);
+console.log(`- Audience acceptance ready: ${report.audienceAcceptanceReady ? "yes" : "no"}`);
+console.log(`- Audience acceptance rows: ${report.audienceAcceptanceRowCount} (${report.audienceAcceptanceRowSummary})`);
 console.log(`- Persona delivery packages ready: ${report.audienceDeliveryPackagesReady ? "yes" : "no"}`);
 console.log(`- Persona delivery package rows: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})`);
 console.log(`- Persona delivery packages reopen ready: ${report.audienceDeliveryPackagesReopenReady ? "yes" : "no"}`);

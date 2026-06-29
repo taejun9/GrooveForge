@@ -798,9 +798,137 @@ function buildAudienceReadinessRows({
   return rows;
 }
 
+function buildAudienceAcceptanceRows({ renderedSignalRows, workflowRows, deliveryPackageRows, deliveryPackageReopenRows }) {
+  const specs = [
+    {
+      audience: "first-time composer",
+      readinessRole: "guided first beat creation",
+      renderedSignalLabel: "beginner first-run path",
+      workflowPersona: "first-time composer",
+      uiSummary: "Guide Quick Start, First Beat Path, Composer Guide, Workflow Navigator, Guided Focus, Guided Session Pass"
+    },
+    {
+      audience: "professional producer",
+      readinessRole: "studio fast-pass production and delivery",
+      renderedSignalLabel: "professional producer path",
+      workflowPersona: "professional producer",
+      uiSummary: "Studio, Review Queue, Production Snapshot, Mix Coach, Quick Actions, Command Reference"
+    }
+  ];
+  const rows = [];
+
+  for (const spec of specs) {
+    const signal = renderedSignalRows.find((row) => row.label === spec.renderedSignalLabel);
+    const workflow = workflowRows.find((row) => row.persona === spec.workflowPersona);
+    const delivery = deliveryPackageRows.find((row) => row.persona === spec.workflowPersona);
+    const reopen = deliveryPackageReopenRows.find((row) => row.persona === spec.workflowPersona);
+
+    rows.push(
+      {
+        audience: spec.audience,
+        readinessRole: spec.readinessRole,
+        acceptanceArea: "Rendered path",
+        criterion: "Target audience UI signals render",
+        ready: signal?.ready === true,
+        evidenceSource: signal?.label ?? "missing",
+        evidenceSummary: `${signal?.presentSignalCount ?? 0}/${signal?.requiredSignalCount ?? 0} rendered signals: ${spec.uiSummary}`,
+        workflowLabel: workflow?.label ?? "missing",
+        artifactCount: 0,
+        verifiedArtifactCount: 0,
+        localFirst: true,
+        samplingSecondary: true,
+        valueRecorded: false
+      },
+      {
+        audience: spec.audience,
+        readinessRole: spec.readinessRole,
+        acceptanceArea: "Workflow",
+        criterion: "Audience workflow creates an editable beat",
+        ready: workflow?.ready === true,
+        evidenceSource: workflow?.label ?? "missing",
+        evidenceSummary: `${workflow?.mode ?? "missing"} mode, ${workflow?.bars ?? 0} bars, ${workflow?.deliveryTarget ?? "missing"}, ${workflow?.styleId ?? "missing"}, events ${workflow ? `${workflow.eventCounts.drums}/${workflow.eventCounts.bass}/${workflow.eventCounts.melody}/${workflow.eventCounts.chords}` : "0/0/0/0"}`,
+        workflowLabel: workflow?.label ?? "missing",
+        artifactCount: 0,
+        verifiedArtifactCount: 0,
+        localFirst: true,
+        samplingSecondary: true,
+        valueRecorded: false
+      },
+      {
+        audience: spec.audience,
+        readinessRole: spec.readinessRole,
+        acceptanceArea: "Package",
+        criterion: "Local deliverable package contains expected artifacts",
+        ready: delivery?.ready === true && delivery?.artifactCount === expectedPersonaArtifactCount,
+        evidenceSource: delivery?.packageRoot ?? "missing",
+        evidenceSummary: `${delivery?.artifactCount ?? 0}/${expectedPersonaArtifactCount} artifacts, ${delivery?.stemArtifactCount ?? 0} stems, ${delivery?.totalBytes ?? 0} bytes`,
+        workflowLabel: delivery?.workflowLabel ?? "missing",
+        artifactCount: delivery?.artifactCount ?? 0,
+        verifiedArtifactCount: 0,
+        localFirst: delivery?.localFirst === true,
+        samplingSecondary: delivery?.samplingSecondary === true,
+        valueRecorded: false
+      },
+      {
+        audience: spec.audience,
+        readinessRole: spec.readinessRole,
+        acceptanceArea: "Package reopen",
+        criterion: "Package reopens from disk with verified artifacts",
+        ready: reopen?.ready === true && reopen?.verifiedArtifactCount === expectedPersonaArtifactCount,
+        evidenceSource: reopen?.manifestJsonPath ?? "missing",
+        evidenceSummary: `${reopen?.verifiedArtifactCount ?? 0}/${expectedPersonaArtifactCount} artifacts verified; project ${reopen?.projectReopened ? "yes" : "no"}, hashes ${reopen?.hashesReady ? "yes" : "no"}, WAV ${reopen?.wavHeadersReady ? "yes" : "no"}, MIDI ${reopen?.midiHeaderReady ? "yes" : "no"}, Handoff ${reopen?.handoffReady ? "yes" : "no"}`,
+        workflowLabel: reopen?.workflowLabel ?? "missing",
+        artifactCount: reopen?.artifactCount ?? 0,
+        verifiedArtifactCount: reopen?.verifiedArtifactCount ?? 0,
+        localFirst: reopen?.localFirst === true,
+        samplingSecondary: reopen?.samplingSecondary === true,
+        valueRecorded: false
+      },
+      {
+        audience: spec.audience,
+        readinessRole: spec.readinessRole,
+        acceptanceArea: "Export and Handoff",
+        criterion: "WAV, stems, MIDI, and Handoff deliverables are ready",
+        ready:
+          workflow?.mixStatus !== "Silent" &&
+          delivery?.mixBytes > 0 &&
+          delivery?.stemArtifactCount === 4 &&
+          delivery?.midiBytes > 1000 &&
+          delivery?.handoffSheetBytes > 1000 &&
+          reopen?.wavHeadersReady === true &&
+          reopen?.midiHeaderReady === true &&
+          reopen?.handoffReady === true,
+        evidenceSource: delivery?.packageRoot ?? "missing",
+        evidenceSummary: `mix ${delivery?.mixStatus ?? "missing"}, mix bytes ${delivery?.mixBytes ?? 0}, stems ${delivery?.stemArtifactCount ?? 0}, MIDI bytes ${delivery?.midiBytes ?? 0}, Handoff bytes ${delivery?.handoffSheetBytes ?? 0}`,
+        workflowLabel: delivery?.workflowLabel ?? "missing",
+        artifactCount: delivery?.artifactCount ?? 0,
+        verifiedArtifactCount: reopen?.verifiedArtifactCount ?? 0,
+        localFirst: true,
+        samplingSecondary: true,
+        valueRecorded: false
+      }
+    );
+  }
+
+  for (const row of rows) {
+    check(row.ready === true, `${row.audience} ${row.acceptanceArea} acceptance row should be ready`);
+    check(row.valueRecorded === false, `${row.audience} ${row.acceptanceArea} acceptance row should not record values`);
+    check(row.localFirst === true, `${row.audience} ${row.acceptanceArea} acceptance row should keep local-first posture`);
+    check(row.samplingSecondary === true, `${row.audience} ${row.acceptanceArea} acceptance row should keep sampling secondary`);
+  }
+
+  return rows;
+}
+
 function formatAudienceRows(rows) {
   return rows
     .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.readinessRole)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.renderedSignalGroup)} | ${escapeCell(row.workflowLabel)} | ${escapeCell(row.workflowMode)} | ${row.workflowBars} | ${escapeCell(row.workflowDeliveryTarget)} | ${escapeCell(row.workflowStyle)} | ${row.deliveryPackageReady ? "yes" : "no"} | ${row.deliveryPackageReopenReady ? "yes" : "no"} | ${row.deliveryArtifactCount ?? 0} | ${row.verifiedDeliveryArtifactCount ?? 0} | ${escapeCell(row.proofSummary)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatAudienceAcceptanceRows(rows) {
+  return rows
+    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.acceptanceArea)} | ${escapeCell(row.criterion)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.evidenceSource)} | ${escapeCell(row.evidenceSummary)} | ${escapeCell(row.workflowLabel)} | ${row.artifactCount ?? 0} | ${row.verifiedArtifactCount ?? 0} | ${row.valueRecorded === false ? "no" : "yes"} |`)
     .join("\n");
 }
 
@@ -832,6 +960,8 @@ function buildMarkdown(report) {
 - Persona delivery package rows: ${report.deliveryPackageRows.length}
 - Persona delivery packages reopen ready: ${report.personaDeliveryPackagesReopenReady ? "yes" : "no"}
 - Persona delivery package reopen rows: ${report.deliveryPackageReopenRows.length}
+- Audience acceptance ready: ${report.audienceAcceptanceReady ? "yes" : "no"}
+- Audience acceptance rows: ${report.audienceAcceptanceRows.length}
 - Sampling secondary: ${report.samplingSecondaryReady ? "yes" : "no"}
 - Private values recorded: no
 - Network attempted: no
@@ -842,6 +972,12 @@ function buildMarkdown(report) {
 | audience | role | ready | rendered signal group | workflow | mode | bars | delivery | style | package ready | package reopen ready | artifacts | verified artifacts | proof summary | value recorded |
 |---|---|---:|---|---|---|---:|---|---|---:|---:|---:|---:|---|---:|
 ${formatAudienceRows(report.audienceReadinessRows)}
+
+## Audience Acceptance Matrix
+
+| audience | area | criterion | ready | evidence source | evidence summary | workflow | artifacts | verified artifacts | value recorded |
+|---|---|---|---:|---|---|---|---:|---:|---:|
+${formatAudienceAcceptanceRows(report.audienceAcceptanceRows)}
 
 ## Persona Delivery Packages
 
@@ -1051,6 +1187,10 @@ const audienceReadinessRows = buildAudienceReadinessRows({
   localExportReadinessReady,
   samplingSecondaryReady
 });
+const audienceAcceptanceRows = buildAudienceAcceptanceRows({ renderedSignalRows, workflowRows, deliveryPackageRows, deliveryPackageReopenRows });
+const audienceAcceptanceReady =
+  audienceAcceptanceRows.length === 10 &&
+  audienceAcceptanceRows.every((row) => row.ready === true && row.localFirst === true && row.samplingSecondary === true && row.valueRecorded === false);
 
 const personaReadinessReport = {
   appName,
@@ -1068,6 +1208,7 @@ const personaReadinessReport = {
   productScope: "all-genre direct beat workstation for professional producers and first-time composers; sampling is secondary",
   renderedMarkupCharacters: html.length,
   audienceReadinessRows,
+  audienceAcceptanceRows,
   renderedSignalRows,
   workflowRows,
   deliveryPackageRows,
@@ -1080,6 +1221,7 @@ const personaReadinessReport = {
   localExportReadinessReady,
   personaDeliveryPackagesReady,
   personaDeliveryPackagesReopenReady,
+  audienceAcceptanceReady,
   personaDeliveryPackageRoot: relative(personaDeliveryRoot),
   samplingSecondaryReady,
   localFirstReady: true,
@@ -1098,6 +1240,7 @@ personaReadinessReport.personaReadinessReady =
   personaReadinessReport.localExportReadinessReady &&
   personaReadinessReport.personaDeliveryPackagesReady &&
   personaReadinessReport.personaDeliveryPackagesReopenReady &&
+  personaReadinessReport.audienceAcceptanceReady &&
   personaReadinessReport.samplingSecondaryReady &&
   personaReadinessReport.localFirstReady;
 
@@ -1113,6 +1256,7 @@ check(personaReadinessReport.allGenreStyleReadinessReady === true, "persona read
 check(personaReadinessReport.localExportReadinessReady === true, "persona readiness report should prove local export readiness");
 check(personaReadinessReport.personaDeliveryPackagesReady === true, "persona readiness report should prove persona delivery package readiness");
 check(personaReadinessReport.personaDeliveryPackagesReopenReady === true, "persona readiness report should prove persona delivery package reopen readiness");
+check(personaReadinessReport.audienceAcceptanceReady === true, "persona readiness report should prove audience acceptance readiness");
 check(personaReadinessReport.samplingSecondaryReady === true, "persona readiness report should keep sampling secondary");
 check(personaReadinessReport.localFirstReady === true, "persona readiness report should keep local-first posture");
 check(personaReadinessReport.privateValuesRecorded === false, "persona readiness report should not record private values");
@@ -1124,6 +1268,16 @@ check(personaReadinessReport.audienceReadinessRows.every((row) => row.valueRecor
 check(personaReadinessReport.audienceReadinessRows.every((row) => row.deliveryPackageReady === true), "persona readiness audience rows should include ready delivery packages");
 check(personaReadinessReport.audienceReadinessRows.every((row) => row.deliveryPackageReopenReady === true), "persona readiness audience rows should include reopened delivery packages");
 check(personaReadinessReport.audienceReadinessRows.every((row) => row.verifiedDeliveryArtifactCount === expectedPersonaArtifactCount), "persona readiness audience rows should include verified delivery artifacts");
+check(personaReadinessReport.audienceAcceptanceRows.length === 10, "persona readiness report should include ten audience acceptance rows");
+check(personaReadinessReport.audienceAcceptanceRows.every((row) => row.ready === true), "persona readiness audience acceptance rows should be ready");
+check(personaReadinessReport.audienceAcceptanceRows.every((row) => row.valueRecorded === false), "persona readiness audience acceptance rows should not record values");
+check(personaReadinessReport.audienceAcceptanceRows.filter((row) => row.audience === "first-time composer").length === 5, "persona readiness should include five first-time composer acceptance rows");
+check(personaReadinessReport.audienceAcceptanceRows.filter((row) => row.audience === "professional producer").length === 5, "persona readiness should include five professional producer acceptance rows");
+check(personaReadinessReport.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Rendered path"), "persona readiness audience acceptance should include rendered path evidence");
+check(personaReadinessReport.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Workflow"), "persona readiness audience acceptance should include workflow evidence");
+check(personaReadinessReport.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Package"), "persona readiness audience acceptance should include package evidence");
+check(personaReadinessReport.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Package reopen"), "persona readiness audience acceptance should include package reopen evidence");
+check(personaReadinessReport.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Export and Handoff"), "persona readiness audience acceptance should include export and Handoff evidence");
 check(personaReadinessReport.deliveryPackageRows.length === 2, "persona readiness report should include two delivery package rows");
 check(personaReadinessReport.deliveryPackageRows.every((row) => row.ready === true), "persona readiness delivery package rows should be ready");
 check(personaReadinessReport.deliveryPackageRows.every((row) => row.artifactCount === expectedPersonaArtifactCount), "persona readiness delivery package rows should include all deliverable artifacts");
@@ -1137,6 +1291,7 @@ check(personaReadinessReport.workflowRows.length === 2, "persona readiness repor
 check(personaReadinessReport.styleCoverage.readyStyleCount === 14, "persona readiness report should include 14 ready style rows");
 check(markdown.includes("Persona Readiness"), "persona readiness Markdown should include title");
 check(markdown.includes("Audience Readiness"), "persona readiness Markdown should include audience readiness");
+check(markdown.includes("Audience Acceptance Matrix"), "persona readiness Markdown should include audience acceptance matrix");
 check(markdown.includes("Persona Delivery Packages"), "persona readiness Markdown should include persona delivery packages");
 check(markdown.includes("Persona Delivery Package Reopen"), "persona readiness Markdown should include persona delivery package reopen");
 check(markdown.includes("first-time composer"), "persona readiness Markdown should include first-time composer evidence");
@@ -1171,11 +1326,18 @@ console.log(`- Persona delivery packages ready: ${personaReadinessReport.persona
 console.log(`- Persona delivery package rows: ${personaReadinessReport.deliveryPackageRows.length}`);
 console.log(`- Persona delivery packages reopen ready: ${personaReadinessReport.personaDeliveryPackagesReopenReady ? "yes" : "no"}`);
 console.log(`- Persona delivery package reopen rows: ${personaReadinessReport.deliveryPackageReopenRows.length}`);
+console.log(`- Audience acceptance ready: ${personaReadinessReport.audienceAcceptanceReady ? "yes" : "no"}`);
+console.log(`- Audience acceptance rows: ${personaReadinessReport.audienceAcceptanceRows.length}`);
 console.log(`- Sampling secondary: ${personaReadinessReport.samplingSecondaryReady ? "yes" : "no"}`);
 console.log(`- Audience readiness rows: ${personaReadinessReport.audienceReadinessRows.length}`);
 for (const row of personaReadinessReport.audienceReadinessRows) {
   console.log(
     `- ${row.audience}: ${row.ready ? "ready" : "blocked"}, ${row.readinessRole}, ${row.workflowMode}, ${row.workflowBars} bars, ${row.workflowDeliveryTarget}, ${row.workflowStyle}`
+  );
+}
+for (const row of personaReadinessReport.audienceAcceptanceRows) {
+  console.log(
+    `- acceptance ${row.audience} ${row.acceptanceArea}: ${row.ready ? "ready" : "blocked"}, ${row.evidenceSummary}`
   );
 }
 for (const row of personaReadinessReport.workflowRows) {

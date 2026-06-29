@@ -130,6 +130,15 @@ function formatAudienceRows(rows) {
     .join("\n");
 }
 
+function formatAudienceAcceptanceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | no | none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.acceptanceArea)} | ${escapeCell(row.criterion)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.evidenceSource)} | ${escapeCell(row.evidenceSummary)} | ${escapeCell(row.workflowLabel)} | ${row.artifactCount ?? 0} | ${row.verifiedArtifactCount ?? 0} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatDeliveryPackageRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | none | no | none | none | none | none | none | no |";
@@ -250,8 +259,29 @@ function buildAudienceReadinessSummary(personaReadiness) {
     samplingSecondary: row.samplingSecondary === true,
     valueRecorded: false
   }));
+  const acceptanceRows = valueFreeObjectRows(personaReadiness.audienceAcceptanceRows).map((row) => ({
+    audience: textValue(row.audience),
+    readinessRole: textValue(row.readinessRole),
+    acceptanceArea: textValue(row.acceptanceArea),
+    criterion: textValue(row.criterion),
+    ready: row.ready === true,
+    evidenceSource: textValue(row.evidenceSource),
+    evidenceSummary: textValue(row.evidenceSummary),
+    workflowLabel: textValue(row.workflowLabel),
+    artifactCount: integerValue(row.artifactCount),
+    verifiedArtifactCount: integerValue(row.verifiedArtifactCount),
+    localFirst: row.localFirst === true,
+    samplingSecondary: row.samplingSecondary === true,
+    valueRecorded: false
+  }));
   const beginnerRow = rows.find((row) => row.audience === "first-time composer");
   const producerRow = rows.find((row) => row.audience === "professional producer");
+  const audienceAcceptanceReady =
+    personaReadiness.audienceAcceptanceReady === true &&
+    acceptanceRows.length === 10 &&
+    acceptanceRows.filter((row) => row.audience === "first-time composer").length === 5 &&
+    acceptanceRows.filter((row) => row.audience === "professional producer").length === 5 &&
+    acceptanceRows.every((row) => row.ready === true && row.localFirst === true && row.samplingSecondary === true && row.valueRecorded === false);
   const audienceReadinessReady =
     personaReadiness.personaReadinessReady === true &&
     personaReadiness.beginnerReadinessReady === true &&
@@ -261,6 +291,7 @@ function buildAudienceReadinessSummary(personaReadiness) {
     personaReadiness.localExportReadinessReady === true &&
     personaReadiness.personaDeliveryPackagesReady === true &&
     personaReadiness.personaDeliveryPackagesReopenReady === true &&
+    audienceAcceptanceReady &&
     personaReadiness.samplingSecondaryReady === true &&
     deliveryPackageRows.length === 2 &&
     deliveryPackageRows.every((row) => row.ready === true && row.artifactCount === 8 && row.localFirst === true && row.samplingSecondary === true && row.valueRecorded === false) &&
@@ -298,6 +329,10 @@ function buildAudienceReadinessSummary(personaReadiness) {
     audienceReadinessRowCount: rows.length,
     audienceReadinessRowSummary: rows.length > 0 ? `${rows.length} value-free audience readiness rows` : "none",
     audienceReadinessRows: rows,
+    audienceAcceptanceReady,
+    audienceAcceptanceRowCount: acceptanceRows.length,
+    audienceAcceptanceRowSummary: acceptanceRows.length > 0 ? `${acceptanceRows.length} value-free audience acceptance rows` : "none",
+    audienceAcceptanceRows: acceptanceRows,
     audienceDeliveryPackagesReady: personaReadiness.personaDeliveryPackagesReady === true,
     audienceDeliveryPackageRoot: textValue(personaReadiness.personaDeliveryPackageRoot, "none"),
     audienceDeliveryPackageRowCount: deliveryPackageRows.length,
@@ -479,6 +514,8 @@ function buildMarkdown(report) {
 - PKG payload project IO evidence ready: ${report.pkgPayloadProjectIoEvidenceReady ? "yes" : "no"}
 - Audience readiness ready: ${report.audienceReadinessReady ? "yes" : "no"}
 - Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})
+- Audience acceptance ready: ${report.audienceAcceptanceReady ? "yes" : "no"}
+- Audience acceptance rows: ${report.audienceAcceptanceRowCount} (${report.audienceAcceptanceRowSummary})
 - Persona delivery packages ready: ${report.audienceDeliveryPackagesReady ? "yes" : "no"}
 - Persona delivery package rows: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})
 - Persona delivery packages reopen ready: ${report.audienceDeliveryPackagesReopenReady ? "yes" : "no"}
@@ -525,6 +562,7 @@ function buildMarkdown(report) {
 - Completion status wording: ${report.userFacingCompletionStatus}
 - Completion evidence summary: ${report.userFacingCompletionEvidenceSummary}
 - Audience readiness to report: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})
+- Audience acceptance rows to report: ${report.audienceAcceptanceRowCount} (${report.audienceAcceptanceRowSummary})
 - Persona delivery packages to report: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})
 - Persona delivery package reopen rows to report: ${report.audienceDeliveryPackageReopenRowCount} (${report.audienceDeliveryPackageReopenRowSummary})
 - Next proof target to report: ${report.userFacingNextProofTarget}
@@ -551,6 +589,12 @@ ${formatCompletedPlanRows(report.currentTenPlanWindowRows)}
 | audience | role | ready | mode | bars | delivery | style | package ready | package reopen ready | artifacts | verified artifacts | value recorded |
 |---|---|---:|---|---:|---|---|---:|---:|---:|---:|---:|
 ${formatAudienceRows(report.audienceReadinessRows)}
+
+## Audience Acceptance Matrix
+
+| audience | area | criterion | ready | evidence source | evidence summary | workflow | artifacts | verified artifacts | value recorded |
+|---|---|---|---:|---|---|---|---:|---:|---:|
+${formatAudienceAcceptanceRows(report.audienceAcceptanceRows)}
 
 ## Persona Delivery Packages
 
@@ -804,6 +848,7 @@ releaseProgressReport.releaseProgressReportReady =
   releaseProgressReport.desktopProjectIoEvidenceReady &&
   releaseProgressReport.pkgPayloadProjectIoEvidenceReady &&
   releaseProgressReport.audienceReadinessReady &&
+  releaseProgressReport.audienceAcceptanceReady &&
   releaseProgressReport.audienceDeliveryPackagesReady &&
   releaseProgressReport.audienceDeliveryPackagesReopenReady &&
   releaseProgressReport.sourceExternalProofBundleReady &&
@@ -873,6 +918,18 @@ check(releaseProgressReport.audienceReadinessRows.every((row) => row.deliveryPac
 check(releaseProgressReport.audienceReadinessRows.every((row) => row.deliveryPackageReopenReady === true), "release progress report audience readiness rows should include reopened delivery packages");
 check(releaseProgressReport.audienceReadinessRows.every((row) => row.deliveryArtifactCount === 8), "release progress report audience readiness rows should include eight delivery artifacts");
 check(releaseProgressReport.audienceReadinessRows.every((row) => row.verifiedDeliveryArtifactCount === 8), "release progress report audience readiness rows should include eight verified delivery artifacts");
+check(releaseProgressReport.audienceAcceptanceReady === true, "release progress report should include ready audience acceptance evidence");
+check(releaseProgressReport.audienceAcceptanceRowCount === 10, "release progress report should include ten audience acceptance rows");
+check(releaseProgressReport.audienceAcceptanceRows.length === releaseProgressReport.audienceAcceptanceRowCount, "release progress report audience acceptance row count should match rows");
+check(releaseProgressReport.audienceAcceptanceRows.every((row) => row.valueRecorded === false), "release progress report audience acceptance rows should not record values");
+check(releaseProgressReport.audienceAcceptanceRows.every((row) => row.ready === true), "release progress report audience acceptance rows should be ready");
+check(releaseProgressReport.audienceAcceptanceRows.filter((row) => row.audience === "first-time composer").length === 5, "release progress report should include five first-time composer acceptance rows");
+check(releaseProgressReport.audienceAcceptanceRows.filter((row) => row.audience === "professional producer").length === 5, "release progress report should include five professional producer acceptance rows");
+check(releaseProgressReport.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Rendered path"), "release progress report audience acceptance should include rendered path evidence");
+check(releaseProgressReport.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Workflow"), "release progress report audience acceptance should include workflow evidence");
+check(releaseProgressReport.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Package"), "release progress report audience acceptance should include package evidence");
+check(releaseProgressReport.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Package reopen"), "release progress report audience acceptance should include package reopen evidence");
+check(releaseProgressReport.audienceAcceptanceRows.some((row) => row.acceptanceArea === "Export and Handoff"), "release progress report audience acceptance should include export and Handoff evidence");
 check(releaseProgressReport.audienceReadinessRows.some((row) => row.audience === "first-time composer" && row.workflowMode === "guided"), "release progress report should include first-time composer guided readiness");
 check(releaseProgressReport.audienceReadinessRows.some((row) => row.audience === "professional producer" && row.workflowMode === "studio"), "release progress report should include professional producer studio readiness");
 check(releaseProgressReport.audienceDeliveryPackagesReady === true, "release progress report should include ready persona delivery packages");
@@ -1015,6 +1072,7 @@ check(markdown.includes("User-facing overall completion:"), "release progress Ma
 check(markdown.includes("Current 10-plan progress:"), "release progress Markdown should include current 10-plan progress");
 check(markdown.includes("Current 10-Plan Window Rows"), "release progress Markdown should include current 10-plan window rows");
 check(markdown.includes("Audience Readiness"), "release progress Markdown should include audience readiness summary");
+check(markdown.includes("Audience Acceptance Matrix"), "release progress Markdown should include audience acceptance summary");
 check(markdown.includes("Persona Delivery Packages"), "release progress Markdown should include persona delivery package summary");
 check(markdown.includes("Persona Delivery Package Reopen"), "release progress Markdown should include persona delivery package reopen summary");
 check(markdown.includes("First-time composer readiness:"), "release progress Markdown should include first-time composer readiness");
@@ -1072,6 +1130,8 @@ console.log(`- Desktop project IO evidence ready: ${releaseProgressReport.deskto
 console.log(`- PKG payload project IO evidence ready: ${releaseProgressReport.pkgPayloadProjectIoEvidenceReady ? "yes" : "no"}`);
 console.log(`- Audience readiness ready: ${releaseProgressReport.audienceReadinessReady ? "yes" : "no"}`);
 console.log(`- Audience readiness rows: ${releaseProgressReport.audienceReadinessRowCount} (${releaseProgressReport.audienceReadinessRowSummary})`);
+console.log(`- Audience acceptance ready: ${releaseProgressReport.audienceAcceptanceReady ? "yes" : "no"}`);
+console.log(`- Audience acceptance rows: ${releaseProgressReport.audienceAcceptanceRowCount} (${releaseProgressReport.audienceAcceptanceRowSummary})`);
 console.log(`- Persona delivery packages ready: ${releaseProgressReport.audienceDeliveryPackagesReady ? "yes" : "no"}`);
 console.log(`- Persona delivery package rows: ${releaseProgressReport.audienceDeliveryPackageRowCount} (${releaseProgressReport.audienceDeliveryPackageRowSummary})`);
 console.log(`- Persona delivery packages reopen ready: ${releaseProgressReport.audienceDeliveryPackagesReopenReady ? "yes" : "no"}`);
