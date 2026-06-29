@@ -269,6 +269,30 @@ function formatReleaseChannelUnblockRows(rows) {
     .join("\n");
 }
 
+function formatHardGateRequirementRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | no | none | 0 | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.label)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.evidence)} | ${row.blockerCount ?? 0} | ${escapeCell(row.blockerSummary)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function hardGateRequirementRows(externalGate) {
+  return valueFreeObjectRows(externalGate.requirements).map((row) => {
+    const blockers = stringArrayValue(row.blockers);
+    return {
+      label: textValue(row.label),
+      ready: row.ready === true,
+      evidence: textValue(row.evidence),
+      blockerCount: blockers.length,
+      blockerSummary: blockers.length > 0 ? blockers.join("; ") : "none",
+      blockers,
+      valueRecorded: false
+    };
+  });
+}
+
 function buildReport({ releaseDoctor, externalProofBundle, externalGate, releaseProgress }) {
   const doctorRequiredKeys = stringArrayValue(releaseDoctor.currentActionRequiredKeys);
   const proofRequiredKeys = stringArrayValue(externalProofBundle.currentRequiredKeys);
@@ -287,6 +311,10 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
   const actionChecklistRows = valueFreeObjectRows(externalProofBundle.currentActionChecklistRows);
   const commandVerificationRows = valueFreeObjectRows(externalProofBundle.currentCommandVerificationRows);
   const gateCommandVerificationRows = valueFreeObjectRows(externalGate.currentCommandVerificationRows);
+  const gateRequirementRows = hardGateRequirementRows(externalGate);
+  const hardGateBlockedRequirementRows = gateRequirementRows.filter((row) => !row.ready);
+  const hardGateRequirementReadyCount = gateRequirementRows.filter((row) => row.ready).length;
+  const hardGateRequirementBlockedCount = hardGateBlockedRequirementRows.length;
   const currentCommandSequence = commandSequenceFromRows(commandVerificationRows);
   const currentCommandSequenceCount =
     integerValue(externalProofBundle.currentCommandSequenceCount) || currentCommandSequence.length;
@@ -417,6 +445,26 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
     doctorFirstBlocker: textValue(releaseDoctor.currentActionFirstBlocker),
     currentOperatorAction: textValue(externalProofBundle.currentOperatorAction),
     hardGateCommand: textValue(externalProofBundle.hardExternalGateCommand, "npm run release:external-check"),
+    hardGateReady: externalGate.externalDistributionGateReady === true,
+    hardGateWouldFail: externalGate.hardGateWouldFail === true,
+    hardGateRequirementCount: gateRequirementRows.length,
+    hardGateRequirementReadyCount,
+    hardGateRequirementBlockedCount,
+    hardGateRequirementSummary:
+      gateRequirementRows.length > 0
+        ? `${hardGateRequirementReadyCount}/${gateRequirementRows.length} hard-gate requirements ready`
+        : "none",
+    hardGateBlockedRequirementSummary:
+      hardGateBlockedRequirementRows.length > 0
+        ? `${hardGateBlockedRequirementRows.length} blocked hard-gate requirements`
+        : "none",
+    hardGateRequirementRows: gateRequirementRows,
+    hardGateBlockedRequirementRows,
+    hardGateBlockerCount: stringArrayValue(externalGate.externalDistributionGateBlockers).length,
+    hardGateBlockerSummary:
+      stringArrayValue(externalGate.externalDistributionGateBlockers).length > 0
+        ? `${stringArrayValue(externalGate.externalDistributionGateBlockers).length} value-free hard-gate blockers`
+        : "none",
     currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: integerValue(externalProofBundle.currentRequiredKeyCount),
     currentRequiredKeys: proofRequiredKeys,
@@ -544,6 +592,24 @@ function validateReport(report, { releaseDoctor, externalProofBundle, externalGa
     "release current blocker receipt should route local env setup to prepare-env or placeholder cleanup to release doctor"
   );
   check(report.hardGateCommand === "npm run release:external-check", "release current blocker receipt should keep the hard external gate command");
+  check(report.hardGateReady === externalGate.externalDistributionGateReady, "release current blocker should mirror hard-gate readiness");
+  check(report.hardGateWouldFail === externalGate.hardGateWouldFail, "release current blocker should mirror hard-gate would-fail posture");
+  check(report.hardGateRequirementCount === report.hardGateRequirementRows.length, "release current blocker hard-gate requirement count should match rows");
+  check(report.hardGateRequirementCount === valueFreeObjectRows(externalGate.requirements).length, "release current blocker should mirror external gate requirement rows");
+  check(report.hardGateRequirementReadyCount === report.hardGateRequirementRows.filter((row) => row.ready).length, "release current blocker hard-gate ready count should match rows");
+  check(report.hardGateRequirementBlockedCount === report.hardGateBlockedRequirementRows.length, "release current blocker hard-gate blocked count should match blocked rows");
+  check(report.hardGateRequirementBlockedCount === report.hardGateRequirementRows.filter((row) => !row.ready).length, "release current blocker hard-gate blocked count should match requirement rows");
+  check(report.hardGateRequirementRows.every((row) => row.valueRecorded === false), "release current blocker hard-gate requirement rows should not record values");
+  check(report.hardGateBlockedRequirementRows.every((row) => row.valueRecorded === false), "release current blocker hard-gate blocked rows should not record values");
+  check(report.hardGateBlockedRequirementRows.some((row) => row.label === "Private inputs ready"), "release current blocker hard-gate ladder should include private-input blocker");
+  check(report.hardGateBlockedRequirementRows.some((row) => row.label === "Distribution-channel QA ready"), "release current blocker hard-gate ladder should include distribution-channel QA blocker");
+  check(report.hardGateBlockedRequirementRows.some((row) => row.label === "Auto-update ready"), "release current blocker hard-gate ladder should include auto-update blocker");
+  check(report.hardGateBlockedRequirementRows.some((row) => row.label === "Developer ID signed isolated app ready"), "release current blocker hard-gate ladder should include Developer ID signing blocker");
+  check(report.hardGateBlockedRequirementRows.some((row) => row.label === "Notarization accepted and stapled"), "release current blocker hard-gate ladder should include notarization blocker");
+  check(report.hardGateBlockedRequirementRows.some((row) => row.label === "Notarized Gatekeeper accepted"), "release current blocker hard-gate ladder should include notarized Gatekeeper blocker");
+  check(report.hardGateBlockerCount === stringArrayValue(externalGate.externalDistributionGateBlockers).length, "release current blocker should mirror hard-gate blocker count");
+  check(typeof report.hardGateRequirementSummary === "string" && report.hardGateRequirementSummary.length > 0, "release current blocker should include hard-gate requirement summary");
+  check(typeof report.hardGateBlockedRequirementSummary === "string" && report.hardGateBlockedRequirementSummary.length > 0, "release current blocker should include hard-gate blocked requirement summary");
   check(report.currentRequiredKeyCount === report.currentRequiredKeys.length, "release current blocker required key count should match keys");
   check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release current blocker placeholder key count should match keys");
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderEditLocations.length, "release current blocker placeholder edit location count should match locations");
@@ -684,6 +750,11 @@ function buildMarkdown(report) {
     `- Current rerun command: \`${report.currentRerunCommand}\``,
     `- Current command sequence: ${report.currentCommandSequenceCount} (${report.currentCommandSequenceSummary})`,
     `- Hard gate command: \`${report.hardGateCommand}\``,
+    `- Hard gate ready: ${report.hardGateReady ? "yes" : "no"}`,
+    `- Hard gate would fail: ${report.hardGateWouldFail ? "yes" : "no"}`,
+    `- Hard gate requirements: ${report.hardGateRequirementCount} (${report.hardGateRequirementSummary})`,
+    `- Hard gate blocked requirements: ${report.hardGateRequirementBlockedCount} (${report.hardGateBlockedRequirementSummary})`,
+    `- Hard gate blockers: ${report.hardGateBlockerCount} (${report.hardGateBlockerSummary})`,
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
     `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`,
@@ -757,6 +828,18 @@ function buildMarkdown(report) {
     "| key | present | ready | evidence | value recorded |",
     "|---|---:|---:|---|---:|",
     formatReleaseChannelUnblockRows(report.releaseChannelUnblockMetadataRows),
+    "",
+    "## Hard Gate Requirement Ladder",
+    "",
+    "| requirement | ready | evidence | blocker count | blocker summary | value recorded |",
+    "|---|---:|---|---:|---|---:|",
+    formatHardGateRequirementRows(report.hardGateRequirementRows),
+    "",
+    "## Blocked Hard Gate Requirements",
+    "",
+    "| requirement | ready | evidence | blocker count | blocker summary | value recorded |",
+    "|---|---:|---|---:|---|---:|",
+    formatHardGateRequirementRows(report.hardGateBlockedRequirementRows),
     "",
     "## Placeholder Edit Locations",
     "",
@@ -838,6 +921,8 @@ check(!/GROOVEFORGE_SUPPORT_URL=https?:\/\//i.test(markdown), "release current b
 check(markdown.includes("Audience Acceptance Matrix"), "release current blocker Markdown should include audience acceptance matrix");
 check(markdown.includes("Release-Channel Unblock Rehearsal"), "release current blocker Markdown should include release-channel unblock rehearsal");
 check(markdown.includes("Release-channel placeholder blocker cleared in rehearsal:"), "release current blocker Markdown should include release-channel unblock cleared status");
+check(markdown.includes("Hard Gate Requirement Ladder"), "release current blocker Markdown should include hard-gate requirement ladder");
+check(markdown.includes("Blocked Hard Gate Requirements"), "release current blocker Markdown should include blocked hard-gate requirements");
 
 if (failures.length > 0) {
   fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
@@ -865,6 +950,9 @@ console.log(`- Current rerun command: ${report.currentRerunCommand}`);
 console.log(`- Current command sequence: ${report.currentCommandSequenceCount} (${report.currentCommandSequenceSummary})`);
 console.log(`- Current command verification rows: ${report.currentCommandVerificationRowCount} (${report.currentCommandVerificationRowSummary})`);
 console.log(`- Consistency ready: ${report.consistencyReady ? "yes" : "no"}`);
+console.log(`- Hard gate ready: ${report.hardGateReady ? "yes" : "no"}`);
+console.log(`- Hard gate requirements: ${report.hardGateRequirementCount} (${report.hardGateRequirementSummary})`);
+console.log(`- Hard gate blocked requirements: ${report.hardGateRequirementBlockedCount} (${report.hardGateBlockedRequirementSummary})`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
