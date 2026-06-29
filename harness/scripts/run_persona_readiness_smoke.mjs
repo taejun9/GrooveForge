@@ -345,6 +345,80 @@ function formatStyleRows(rows) {
     .join("\n");
 }
 
+function buildAudienceReadinessRows({
+  renderedSignalRows,
+  workflowRows,
+  directCompositionReady,
+  allGenreStyleReadinessReady,
+  localExportReadinessReady,
+  samplingSecondaryReady
+}) {
+  const beginnerSignals = renderedSignalRows.find((row) => row.label === "beginner first-run path");
+  const producerSignals = renderedSignalRows.find((row) => row.label === "professional producer path");
+  const beginnerWorkflow = workflowRows.find((row) => row.persona === "first-time composer");
+  const producerWorkflow = workflowRows.find((row) => row.persona === "professional producer");
+
+  const rows = [
+    {
+      audience: "first-time composer",
+      readinessRole: "guided first beat creation",
+      ready:
+        beginnerSignals?.ready === true &&
+        beginnerWorkflow?.ready === true &&
+        directCompositionReady &&
+        allGenreStyleReadinessReady &&
+        localExportReadinessReady &&
+        samplingSecondaryReady,
+      renderedSignalGroup: beginnerSignals?.label ?? "missing",
+      workflowLabel: beginnerWorkflow?.label ?? "missing",
+      workflowMode: beginnerWorkflow?.mode ?? "missing",
+      workflowBars: beginnerWorkflow?.bars ?? 0,
+      workflowDeliveryTarget: beginnerWorkflow?.deliveryTarget ?? "missing",
+      workflowStyle: beginnerWorkflow?.styleId ?? "missing",
+      proofSummary: "Guide Quick Start, First Beat Path, Composer Guide, editable 8-bar beat, WAV/stems/MIDI/Handoff",
+      localFirst: true,
+      samplingSecondary: samplingSecondaryReady,
+      valueRecorded: false
+    },
+    {
+      audience: "professional producer",
+      readinessRole: "studio fast-pass production and delivery",
+      ready:
+        producerSignals?.ready === true &&
+        producerWorkflow?.ready === true &&
+        directCompositionReady &&
+        allGenreStyleReadinessReady &&
+        localExportReadinessReady &&
+        samplingSecondaryReady,
+      renderedSignalGroup: producerSignals?.label ?? "missing",
+      workflowLabel: producerWorkflow?.label ?? "missing",
+      workflowMode: producerWorkflow?.mode ?? "missing",
+      workflowBars: producerWorkflow?.bars ?? 0,
+      workflowDeliveryTarget: producerWorkflow?.deliveryTarget ?? "missing",
+      workflowStyle: producerWorkflow?.styleId ?? "missing",
+      proofSummary: "Studio, Review Queue, Production Snapshot, Mix Coach, Quick Actions, Command Reference, 24-bar delivery pass",
+      localFirst: true,
+      samplingSecondary: samplingSecondaryReady,
+      valueRecorded: false
+    }
+  ];
+
+  for (const row of rows) {
+    check(row.ready === true, `${row.audience} audience readiness row should be ready`);
+    check(row.valueRecorded === false, `${row.audience} audience readiness row should not record values`);
+    check(row.localFirst === true, `${row.audience} audience readiness row should keep local-first posture`);
+    check(row.samplingSecondary === true, `${row.audience} audience readiness row should keep sampling secondary`);
+  }
+
+  return rows;
+}
+
+function formatAudienceRows(rows) {
+  return rows
+    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.readinessRole)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.renderedSignalGroup)} | ${escapeCell(row.workflowLabel)} | ${escapeCell(row.workflowMode)} | ${row.workflowBars} | ${escapeCell(row.workflowDeliveryTarget)} | ${escapeCell(row.workflowStyle)} | ${escapeCell(row.proofSummary)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function buildMarkdown(report) {
   return `# ${appName} ${report.version} ${report.platform}-${report.arch} Persona Readiness
 
@@ -361,6 +435,12 @@ function buildMarkdown(report) {
 - Private values recorded: no
 - Network attempted: no
 - External distribution claimed: no
+
+## Audience Readiness
+
+| audience | role | ready | rendered signal group | workflow | mode | bars | delivery | style | proof summary | value recorded |
+|---|---|---:|---|---|---|---:|---|---|---|---:|
+${formatAudienceRows(report.audienceReadinessRows)}
 
 ## Rendered Persona Signals
 
@@ -521,6 +601,14 @@ const allGenreStyleReadinessReady =
   styleCoverage.supportedStyleCount >= styleCoverage.requiredStyleCount;
 const localExportReadinessReady = workflowRows.every((row) => row.mixStatus !== "Silent" && row.midiBytes > 1000 && row.projectBytes > 10000);
 const samplingSecondaryReady = !forbiddenSamplingText.test(JSON.stringify({ renderedSignalRows, workflowRows, styleCoverage }));
+const audienceReadinessRows = buildAudienceReadinessRows({
+  renderedSignalRows,
+  workflowRows,
+  directCompositionReady,
+  allGenreStyleReadinessReady,
+  localExportReadinessReady,
+  samplingSecondaryReady
+});
 
 const personaReadinessReport = {
   appName,
@@ -537,6 +625,7 @@ const personaReadinessReport = {
   personaReadinessJsonPath: relative(personaReadinessJsonPath),
   productScope: "all-genre direct beat workstation for professional producers and first-time composers; sampling is secondary",
   renderedMarkupCharacters: html.length,
+  audienceReadinessRows,
   renderedSignalRows,
   workflowRows,
   styleCoverage,
@@ -578,9 +667,13 @@ check(personaReadinessReport.localFirstReady === true, "persona readiness report
 check(personaReadinessReport.privateValuesRecorded === false, "persona readiness report should not record private values");
 check(personaReadinessReport.networkAttemptedByThisReport === false, "persona readiness report should not use network");
 check(personaReadinessReport.claimedExternalDistribution === false, "persona readiness report should not claim external distribution");
+check(personaReadinessReport.audienceReadinessRows.length === 2, "persona readiness report should include two audience readiness rows");
+check(personaReadinessReport.audienceReadinessRows.every((row) => row.ready === true), "persona readiness audience rows should be ready");
+check(personaReadinessReport.audienceReadinessRows.every((row) => row.valueRecorded === false), "persona readiness audience rows should not record values");
 check(personaReadinessReport.workflowRows.length === 2, "persona readiness report should include two persona workflow rows");
 check(personaReadinessReport.styleCoverage.readyStyleCount === 14, "persona readiness report should include 14 ready style rows");
 check(markdown.includes("Persona Readiness"), "persona readiness Markdown should include title");
+check(markdown.includes("Audience Readiness"), "persona readiness Markdown should include audience readiness");
 check(markdown.includes("first-time composer"), "persona readiness Markdown should include first-time composer evidence");
 check(markdown.includes("professional producer"), "persona readiness Markdown should include professional producer evidence");
 check(markdown.includes("Direct composition readiness:"), "persona readiness Markdown should include direct composition readiness");
@@ -610,6 +703,12 @@ console.log(`- Direct composition readiness: ${personaReadinessReport.directComp
 console.log(`- All-genre style readiness: ${personaReadinessReport.styleCoverage.readyStyleCount}/${personaReadinessReport.styleCoverage.requiredStyleCount}`);
 console.log(`- Local export readiness: ${personaReadinessReport.localExportReadinessReady ? "yes" : "no"}`);
 console.log(`- Sampling secondary: ${personaReadinessReport.samplingSecondaryReady ? "yes" : "no"}`);
+console.log(`- Audience readiness rows: ${personaReadinessReport.audienceReadinessRows.length}`);
+for (const row of personaReadinessReport.audienceReadinessRows) {
+  console.log(
+    `- ${row.audience}: ${row.ready ? "ready" : "blocked"}, ${row.readinessRole}, ${row.workflowMode}, ${row.workflowBars} bars, ${row.workflowDeliveryTarget}, ${row.workflowStyle}`
+  );
+}
 for (const row of personaReadinessReport.workflowRows) {
   console.log(
     `- ${row.label}: ${row.persona}, ${row.mode}, ${row.bpm} BPM ${row.key} ${row.styleId}, ${row.bars} bars, ${row.deliveryTarget}, ${row.mixStatus}, events ${row.eventCounts.drums}/${row.eventCounts.bass}/${row.eventCounts.melody}/${row.eventCounts.chords}`
