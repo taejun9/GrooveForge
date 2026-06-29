@@ -226,10 +226,10 @@ function formatCompletedPlanRows(rows) {
 
 function formatAudienceRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
-    return "| none | none | no | none | none | none | none | no | none | no |";
+    return "| none | none | no | none | none | none | none | no | no | none | none | no |";
   }
   return rows
-    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.readinessRole)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.workflowMode)} | ${row.workflowBars ?? 0} | ${escapeCell(row.workflowDeliveryTarget)} | ${escapeCell(row.workflowStyle)} | ${row.deliveryPackageReady ? "yes" : "no"} | ${row.deliveryArtifactCount ?? 0} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .map((row) => `| ${escapeCell(row.audience)} | ${escapeCell(row.readinessRole)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.workflowMode)} | ${row.workflowBars ?? 0} | ${escapeCell(row.workflowDeliveryTarget)} | ${escapeCell(row.workflowStyle)} | ${row.deliveryPackageReady ? "yes" : "no"} | ${row.deliveryPackageReopenReady ? "yes" : "no"} | ${row.deliveryArtifactCount ?? 0} | ${row.verifiedDeliveryArtifactCount ?? 0} | ${row.valueRecorded === false ? "no" : "yes"} |`)
     .join("\n");
 }
 
@@ -239,6 +239,15 @@ function formatDeliveryPackageRows(rows) {
   }
   return rows
     .map((row) => `| ${escapeCell(row.persona)} | ${escapeCell(row.workflowLabel)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.mode)} | ${row.bars ?? 0} | ${escapeCell(row.deliveryTarget)} | ${row.artifactCount ?? 0} | ${escapeCell(row.packageRoot)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatDeliveryPackageReopenRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no | none | none | no | no | no | no | no | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.persona)} | ${escapeCell(row.workflowLabel)} | ${row.ready ? "yes" : "no"} | ${row.artifactCount ?? 0} | ${row.verifiedArtifactCount ?? 0} | ${row.projectReopened ? "yes" : "no"} | ${row.hashesReady ? "yes" : "no"} | ${row.wavHeadersReady ? "yes" : "no"} | ${row.midiHeaderReady ? "yes" : "no"} | ${row.handoffReady ? "yes" : "no"} | ${escapeCell(row.packageRoot)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
     .join("\n");
 }
 
@@ -432,6 +441,10 @@ function buildReport({ releaseDoctor, externalProofBundle, externalGate, release
     audienceDeliveryPackageRowCount: integerValue(releaseProgress.audienceDeliveryPackageRowCount),
     audienceDeliveryPackageRowSummary: textValue(releaseProgress.audienceDeliveryPackageRowSummary, "none"),
     audienceDeliveryPackageRows: valueFreeObjectRows(releaseProgress.audienceDeliveryPackageRows),
+    audienceDeliveryPackagesReopenReady: releaseProgress.audienceDeliveryPackagesReopenReady === true,
+    audienceDeliveryPackageReopenRowCount: integerValue(releaseProgress.audienceDeliveryPackageReopenRowCount),
+    audienceDeliveryPackageReopenRowSummary: textValue(releaseProgress.audienceDeliveryPackageReopenRowSummary, "none"),
+    audienceDeliveryPackageReopenRows: valueFreeObjectRows(releaseProgress.audienceDeliveryPackageReopenRows),
     beginnerAudienceReadinessReady: releaseProgress.beginnerAudienceReadinessReady === true,
     professionalProducerAudienceReadinessReady: releaseProgress.professionalProducerAudienceReadinessReady === true,
     nextExpectedOperatorSequence,
@@ -522,11 +535,23 @@ function validateReport(report, { releaseDoctor, externalProofBundle, externalGa
   check(report.audienceReadinessRows.every((row) => row.valueRecorded === false), "release current blocker audience readiness rows should not record values");
   check(report.audienceReadinessRows.every((row) => row.ready === true), "release current blocker audience readiness rows should be ready");
   check(report.audienceReadinessRows.every((row) => row.deliveryPackageReady === true), "release current blocker audience readiness rows should include ready delivery packages");
+  check(report.audienceReadinessRows.every((row) => row.deliveryPackageReopenReady === true), "release current blocker audience readiness rows should include reopened delivery packages");
   check(report.audienceReadinessRows.every((row) => row.deliveryArtifactCount === 8), "release current blocker audience readiness rows should include eight delivery artifacts");
+  check(report.audienceReadinessRows.every((row) => row.verifiedDeliveryArtifactCount === 8), "release current blocker audience readiness rows should include eight verified delivery artifacts");
   check(report.audienceDeliveryPackagesReady === releaseProgress.audienceDeliveryPackagesReady, "release current blocker should mirror persona delivery package readiness");
   check(report.audienceDeliveryPackageRowCount === releaseProgress.audienceDeliveryPackageRowCount, "release current blocker should mirror persona delivery package row count");
   check(report.audienceDeliveryPackageRows.every((row) => row.valueRecorded === false), "release current blocker persona delivery package rows should not record values");
   check(report.audienceDeliveryPackageRows.every((row) => row.ready === true && row.artifactCount === 8), "release current blocker persona delivery package rows should be ready with all artifacts");
+  check(report.audienceDeliveryPackagesReopenReady === releaseProgress.audienceDeliveryPackagesReopenReady, "release current blocker should mirror persona delivery package reopen readiness");
+  check(report.audienceDeliveryPackageReopenRowCount === releaseProgress.audienceDeliveryPackageReopenRowCount, "release current blocker should mirror persona delivery package reopen row count");
+  check(report.audienceDeliveryPackageReopenRows.every((row) => row.valueRecorded === false), "release current blocker persona delivery package reopen rows should not record values");
+  check(report.audienceDeliveryPackageReopenRows.every((row) => row.ready === true && row.verifiedArtifactCount === 8), "release current blocker persona delivery package reopen rows should be ready with all artifacts verified");
+  check(
+    report.audienceDeliveryPackageReopenRows.every(
+      (row) => row.projectReopened === true && row.hashesReady === true && row.wavHeadersReady === true && row.midiHeaderReady === true && row.handoffReady === true
+    ),
+    "release current blocker persona delivery package reopen rows should verify project, hashes, WAV, MIDI, and Handoff"
+  );
   check(report.beginnerAudienceReadinessReady === releaseProgress.beginnerAudienceReadinessReady, "release current blocker should mirror first-time composer readiness");
   check(report.professionalProducerAudienceReadinessReady === releaseProgress.professionalProducerAudienceReadinessReady, "release current blocker should mirror professional producer readiness");
   check(report.consistencyReady === true, "release current blocker should pass all consistency checks");
@@ -575,6 +600,8 @@ function buildMarkdown(report) {
     `- Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})`,
     `- Persona delivery packages ready: ${report.audienceDeliveryPackagesReady ? "yes" : "no"}`,
     `- Persona delivery package rows: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})`,
+    `- Persona delivery packages reopen ready: ${report.audienceDeliveryPackagesReopenReady ? "yes" : "no"}`,
+    `- Persona delivery package reopen rows: ${report.audienceDeliveryPackageReopenRowCount} (${report.audienceDeliveryPackageReopenRowSummary})`,
     `- First-time composer readiness: ${report.beginnerAudienceReadinessReady ? "yes" : "no"}`,
     `- Professional producer readiness: ${report.professionalProducerAudienceReadinessReady ? "yes" : "no"}`,
     `- Private values recorded: ${report.privateValuesRecorded ? "yes" : "no"}`,
@@ -593,8 +620,8 @@ function buildMarkdown(report) {
     "",
     "## Audience Readiness",
     "",
-    "| audience | role | ready | mode | bars | delivery | style | package ready | artifacts | value recorded |",
-    "|---|---|---:|---|---:|---|---|---:|---:|---:|",
+    "| audience | role | ready | mode | bars | delivery | style | package ready | package reopen ready | artifacts | verified artifacts | value recorded |",
+    "|---|---|---:|---|---:|---|---|---:|---:|---:|---:|---:|",
     formatAudienceRows(report.audienceReadinessRows),
     "",
     "## Persona Delivery Packages",
@@ -602,6 +629,12 @@ function buildMarkdown(report) {
     "| persona | workflow | ready | mode | bars | delivery | artifacts | package | value recorded |",
     "|---|---|---:|---|---:|---|---:|---|---:|",
     formatDeliveryPackageRows(report.audienceDeliveryPackageRows),
+    "",
+    "## Persona Delivery Package Reopen",
+    "",
+    "| persona | workflow | ready | artifacts | verified artifacts | project | hashes | WAV | MIDI | Handoff | package | value recorded |",
+    "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|",
+    formatDeliveryPackageReopenRows(report.audienceDeliveryPackageReopenRows),
     "",
     "## Placeholder Edit Locations",
     "",
@@ -714,6 +747,8 @@ console.log(`- Audience readiness ready: ${report.audienceReadinessReady ? "yes"
 console.log(`- Audience readiness rows: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})`);
 console.log(`- Persona delivery packages ready: ${report.audienceDeliveryPackagesReady ? "yes" : "no"}`);
 console.log(`- Persona delivery package rows: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})`);
+console.log(`- Persona delivery packages reopen ready: ${report.audienceDeliveryPackagesReopenReady ? "yes" : "no"}`);
+console.log(`- Persona delivery package reopen rows: ${report.audienceDeliveryPackageReopenRowCount} (${report.audienceDeliveryPackageReopenRowSummary})`);
 console.log(`- First-time composer readiness: ${report.beginnerAudienceReadinessReady ? "yes" : "no"}`);
 console.log(`- Professional producer readiness: ${report.professionalProducerAudienceReadinessReady ? "yes" : "no"}`);
 console.log("- Private values recorded: no");
