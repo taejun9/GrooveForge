@@ -714,6 +714,95 @@ function formatProofChecklistRowsTable(items) {
   ].join("\n");
 }
 
+function classifyCurrentCommand(command, currentActionSummary = {}, hardExternalGateCommand = "npm run release:external-check") {
+  const prerequisiteCommands = Array.isArray(currentActionSummary.currentPrerequisiteCommands) ? currentActionSummary.currentPrerequisiteCommands : [];
+  const rerunCommands = Array.isArray(currentActionSummary.currentRerunCommands) ? currentActionSummary.currentRerunCommands : [];
+  if (command === hardExternalGateCommand) {
+    return "hard-gate";
+  }
+  if (command === currentActionSummary.currentNextCommand) {
+    return "proof";
+  }
+  if (prerequisiteCommands.includes(command)) {
+    return "prerequisite";
+  }
+  if (rerunCommands.includes(command)) {
+    return "rerun";
+  }
+  return "supporting";
+}
+
+function commandVerificationExpectation(role) {
+  switch (role) {
+    case "prerequisite":
+      return "Refresh current prerequisite evidence before the proof command.";
+    case "proof":
+      return "Run the current proof command after the current action is completed.";
+    case "rerun":
+      return "Rerun after editing to confirm the current action leaves the priority list.";
+    case "hard-gate":
+      return "Run only after all external distribution requirements are proven.";
+    default:
+      return "Keep this supporting command value-free and local.";
+  }
+}
+
+function buildCurrentCommandVerificationSummary({ currentActionSummary = {}, hardExternalGateCommand = "npm run release:external-check" } = {}) {
+  const currentCommandSequence = Array.isArray(currentActionSummary.currentCommandSequence) ? currentActionSummary.currentCommandSequence : [];
+  const currentEvidenceRows = Array.isArray(currentActionSummary.currentEvidenceRows) ? currentActionSummary.currentEvidenceRows : [];
+  const currentEvidenceLabels = buildEvidenceLabels(currentEvidenceRows);
+  const currentEvidencePaths = currentEvidenceRows.map((item) => item.path).filter((item) => typeof item === "string" && item.length > 0);
+  const currentEvidenceReady = currentEvidenceRows.length > 0 && currentEvidenceRows.every((item) => item.present === true);
+  const currentEvidenceSummary = formatEvidenceLabelSummary(currentEvidenceRows);
+  const proofCommand =
+    currentActionSummary.currentNextCommand && currentActionSummary.currentNextCommand !== "none"
+      ? currentActionSummary.currentNextCommand
+      : hardExternalGateCommand;
+  const rerunCommand =
+    currentActionSummary.currentRerunCommand && currentActionSummary.currentRerunCommand !== "none"
+      ? currentActionSummary.currentRerunCommand
+      : proofCommand;
+  const currentCommandVerificationRows = currentCommandSequence.map((command, index) => {
+    const role = classifyCurrentCommand(command, currentActionSummary, hardExternalGateCommand);
+    return {
+      order: index + 1,
+      command,
+      role,
+      expectation: commandVerificationExpectation(role),
+      proofTarget: currentActionSummary.currentActionLabel ?? "No pending priority action",
+      evidenceLabels: currentEvidenceLabels,
+      evidencePaths: currentEvidencePaths,
+      evidenceReady: currentEvidenceReady,
+      evidenceSummary: currentEvidenceSummary,
+      proofCommand,
+      rerunCommand,
+      hardGateCommand: hardExternalGateCommand,
+      valueRecorded: false
+    };
+  });
+
+  return {
+    currentCommandVerificationRowCount: currentCommandVerificationRows.length,
+    currentCommandVerificationRowSummary:
+      currentCommandVerificationRows.length > 0 ? `${currentCommandVerificationRows.length} value-free command verification rows` : "none",
+    currentCommandVerificationRows
+  };
+}
+
+function formatCommandVerificationRowsTable(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "| order | command | role | expectation | evidence | proof target | hard gate | value recorded |\n|---:|---|---|---|---|---|---|---:|\n| 0 | none | none | none | none | none | none | no |";
+  }
+  return [
+    "| order | command | role | expectation | evidence | proof target | hard gate | value recorded |",
+    "|---:|---|---|---|---|---|---|---:|",
+    ...items.map(
+      (item) =>
+        `| ${item.order} | ${escapeCell(item.command)} | ${escapeCell(item.role)} | ${escapeCell(item.expectation)} | ${escapeCell(item.evidenceSummary)} | ${escapeCell(item.proofTarget)} | ${escapeCell(item.hardGateCommand)} | ${readyLabel(item.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
 function formatChecklistList(items) {
   return Array.isArray(items) && items.length > 0 ? items.map((item, index) => `${index + 1}. ${item}`).join("\n") : "1. None.";
 }
@@ -1224,6 +1313,10 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     currentActionSummary,
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const currentCommandVerification = buildCurrentCommandVerificationSummary({
+    currentActionSummary,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
 
   return {
     appName,
@@ -1259,6 +1352,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...doctorPrepareEnvAudit,
     ...currentPlaceholderRemediation,
     ...currentProofChecklist,
+    ...currentCommandVerification,
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
     externalDistributionReady: false,
@@ -1361,6 +1455,7 @@ function buildMarkdown(report) {
 - Current prerequisite commands: ${report.currentPrerequisiteCommandCount} (${report.currentPrerequisiteCommandSummary})
 - Current rerun commands: ${report.currentRerunCommandCount} (${report.currentRerunCommandSummary})
 - Current command sequence: ${report.currentCommandSequenceCount} (${report.currentCommandSequenceSummary})
+- Current command verification rows: ${report.currentCommandVerificationRowCount} (${report.currentCommandVerificationRowSummary})
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current operator action: ${report.currentOperatorAction}
 - Current rerun command: \`${report.currentRerunCommand}\`
@@ -1394,6 +1489,10 @@ function buildMarkdown(report) {
 ## Current Command Sequence
 
 ${formatCommandList(report.currentCommandSequence)}
+
+## Current Command Verification
+
+${formatCommandVerificationRowsTable(report.currentCommandVerificationRows)}
 
 ## Completion Gap
 
@@ -1635,6 +1734,10 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     currentActionSummary,
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const currentCommandVerification = buildCurrentCommandVerificationSummary({
+    currentActionSummary,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
 
   nextActionsReport = {
     appName,
@@ -1670,6 +1773,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...doctorPrepareEnvAudit,
     ...currentPlaceholderRemediation,
     ...currentProofChecklist,
+    ...currentCommandVerification,
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
     externalDistributionReady: externalPreflight.externalDistributionReady === true,
@@ -1950,6 +2054,11 @@ check(
   typeof nextActionsReport.currentCommandSequenceSummary === "string" && nextActionsReport.currentCommandSequenceSummary.length > 0,
   "external next actions should include the current command sequence summary"
 );
+check(Number.isInteger(nextActionsReport.currentCommandVerificationRowCount), "external next actions should include the current command verification row count");
+check(
+  typeof nextActionsReport.currentCommandVerificationRowSummary === "string" && nextActionsReport.currentCommandVerificationRowSummary.length > 0,
+  "external next actions should include the current command verification row summary"
+);
 check(typeof nextActionsReport.currentEnvEditTarget === "string" && nextActionsReport.currentEnvEditTarget.length > 0, "external next actions should include the current env edit target");
 check(nextActionsReport.currentEnvConfiguredFileKey === "GROOVEFORGE_DISTRIBUTION_ENV_FILE", "external next actions should include the env file override key name");
 check(Array.isArray(nextActionsReport.localEnvFilesChecked), "external next actions should include local env files checked");
@@ -1970,6 +2079,7 @@ check(Array.isArray(nextActionsReport.currentPrerequisiteCommands), "external ne
 check(Array.isArray(nextActionsReport.currentOperatorActions), "external next actions should include current operator actions");
 check(Array.isArray(nextActionsReport.currentRerunCommands), "external next actions should include current rerun commands");
 check(Array.isArray(nextActionsReport.currentCommandSequence), "external next actions should include current command sequence");
+check(Array.isArray(nextActionsReport.currentCommandVerificationRows), "external next actions should include current command verification rows");
 check(
   nextActionsReport.currentRequiredKeyCount === nextActionsReport.currentRequiredKeys.length,
   "external next actions current required key count should match listed keys"
@@ -2013,6 +2123,10 @@ check(
 check(
   nextActionsReport.currentProofChecklistRowCount === nextActionsReport.currentProofChecklistRows.length,
   "external next actions current proof checklist row count should match listed rows"
+);
+check(
+  nextActionsReport.currentCommandVerificationRowCount === nextActionsReport.currentCommandVerificationRows.length,
+  "external next actions current command verification row count should match listed rows"
 );
 check(
   nextActionsReport.currentEnvEditTemplate.every(
@@ -2170,6 +2284,39 @@ check(
   "external next actions current command sequence summary should list current command sequence"
 );
 check(
+  nextActionsReport.currentCommandVerificationRowCount === nextActionsReport.currentCommandSequenceCount,
+  "external next actions current command verification row count should match current command sequence count"
+);
+check(
+  nextActionsReport.currentCommandVerificationRows.every((item, index) => {
+    const expectedRerunCommand =
+      nextActionsReport.currentRerunCommand && nextActionsReport.currentRerunCommand !== "none"
+        ? nextActionsReport.currentRerunCommand
+        : nextActionsReport.currentNextCommand;
+    const expectedEvidencePaths = nextActionsReport.currentEvidenceRows.map((row) => row.path);
+    const expectedEvidenceReady = nextActionsReport.currentEvidenceRows.length > 0 && nextActionsReport.currentEvidenceRows.every((row) => row.present === true);
+    const role = classifyCurrentCommand(item.command, nextActionsReport, nextActionsReport.hardExternalGateCommand);
+    return (
+      item.order === index + 1 &&
+      item.command === nextActionsReport.currentCommandSequence[index] &&
+      item.role === role &&
+      item.expectation === commandVerificationExpectation(role) &&
+      item.proofTarget === nextActionsReport.currentActionLabel &&
+      Array.isArray(item.evidenceLabels) &&
+      JSON.stringify(item.evidenceLabels) === JSON.stringify(nextActionsReport.currentEvidenceLabels) &&
+      Array.isArray(item.evidencePaths) &&
+      JSON.stringify(item.evidencePaths) === JSON.stringify(expectedEvidencePaths) &&
+      item.evidenceReady === expectedEvidenceReady &&
+      item.evidenceSummary === nextActionsReport.currentEvidenceLabelSummary &&
+      item.proofCommand === nextActionsReport.currentNextCommand &&
+      item.rerunCommand === expectedRerunCommand &&
+      item.hardGateCommand === nextActionsReport.hardExternalGateCommand &&
+      item.valueRecorded === false
+    );
+  }),
+  "external next actions current command verification rows should classify sequence commands and connect evidence without values"
+);
+check(
   JSON.stringify(nextActionsReport.currentCommandSequence) ===
     JSON.stringify(
       buildCurrentCommandSequence({
@@ -2195,7 +2342,9 @@ check(markdown.includes("Source evidence prerequisite:"), "external next actions
 check(markdown.includes("Current prerequisite commands:"), "external next actions Markdown should include current prerequisite commands status");
 check(markdown.includes("Current rerun commands:"), "external next actions Markdown should include current rerun commands status");
 check(markdown.includes("Current command sequence:"), "external next actions Markdown should include current command sequence status");
+check(markdown.includes("Current command verification rows:"), "external next actions Markdown should include current command verification row status");
 check(markdown.includes("## Current Command Sequence"), "external next actions Markdown should include current command sequence section");
+check(markdown.includes("## Current Command Verification"), "external next actions Markdown should include current command verification section");
 if (nextActionsReport.bootstrapMode === true) {
   const releaseDoctorArtifactPresent = nextActionsReport.sourceArtifacts.some((item) => item.label === "Release doctor" && item.present === true);
   check(nextActionsReport.sourceEvidenceReady === false, "bootstrap external next actions should report missing source evidence");
@@ -2574,6 +2723,7 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   check(nextActionsReport.currentEnvEditRowsCount === 4, "release channel metadata should keep four current env edit rows when placeholders remain");
   check(nextActionsReport.currentPlaceholderRemediationRowCount === 4, "release channel metadata should keep four current placeholder remediation rows when placeholders remain");
   check(nextActionsReport.currentProofChecklistRowCount === 3, "release channel metadata should surface three current proof checklist rows when placeholders remain");
+  check(nextActionsReport.currentCommandVerificationRowCount === 4, "release channel metadata should surface four current command verification rows when placeholders remain");
   check(
     nextActionsReport.currentPlaceholderRemediationRows.every(
       (item) =>
@@ -2607,6 +2757,26 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
         item.valueRecorded === false
     ),
     "release channel metadata should connect current proof checklist rows to stable evidence, release doctor, and the hard gate"
+  );
+  check(
+    nextActionsReport.currentCommandVerificationRows.some((item) => item.command === "npm run release:doctor" && item.role === "proof") &&
+      nextActionsReport.currentCommandVerificationRows.some((item) => item.command === "npm run desktop:distribution-channel-qa-smoke" && item.role === "rerun") &&
+      nextActionsReport.currentCommandVerificationRows.filter((item) => item.role === "prerequisite").length === 2,
+    "release channel metadata should classify current command verification rows by prerequisite, proof, and rerun roles"
+  );
+  check(
+    nextActionsReport.currentCommandVerificationRows.every(
+      (item) =>
+        nextActionsReport.currentCommandSequence.includes(item.command) &&
+        item.evidenceLabels.includes("Distribution private inputs") &&
+        item.evidenceLabels.includes("Distribution-channel QA") &&
+        item.evidenceReady === true &&
+        item.proofCommand === "npm run release:doctor" &&
+        item.rerunCommand === "npm run release:doctor" &&
+        item.hardGateCommand === "npm run release:external-check" &&
+        item.valueRecorded === false
+    ),
+    "release channel metadata should connect current command verification rows to stable evidence, release doctor, and the hard gate"
   );
   check(
     nextActionsReport.currentEnvEditTemplate.every((item) => nextActionsReport.currentRequiredKeys.includes(item.key) && item.valueRecorded === false),
@@ -2734,6 +2904,13 @@ if (nextActionsReport.currentProofChecklistRowCount > 0) {
   check(nextActionsReport.currentProofChecklistRows.some((item) => markdown.includes(item.criterion)), "external next actions Markdown should include current proof checklist criteria");
   check(markdown.includes("| order | criterion | evidence | proof command | rerun command | hard gate | value recorded |"), "external next actions Markdown should include current proof checklist table");
 }
+if (nextActionsReport.currentCommandVerificationRowCount > 0) {
+  check(nextActionsReport.currentCommandVerificationRows.some((item) => markdown.includes(item.command)), "external next actions Markdown should include current command verification commands");
+  check(
+    markdown.includes("| order | command | role | expectation | evidence | proof target | hard gate | value recorded |"),
+    "external next actions Markdown should include current command verification table"
+  );
+}
 check(markdown.includes("Priority Next Actions"), "external next actions Markdown should include priority actions");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "external next actions Markdown should keep the hard gate command");
 check(markdown.includes("Doctor completion gap status:"), "external next actions Markdown should include release doctor completion gap status");
@@ -2809,6 +2986,7 @@ console.log(`- Current action checklist: ${nextActionsReport.currentActionCheckl
 console.log(`- Current prerequisite commands: ${nextActionsReport.currentPrerequisiteCommandCount} (${nextActionsReport.currentPrerequisiteCommandSummary})`);
 console.log(`- Current rerun commands: ${nextActionsReport.currentRerunCommandCount} (${nextActionsReport.currentRerunCommandSummary})`);
 console.log(`- Current command sequence: ${nextActionsReport.currentCommandSequenceCount} (${nextActionsReport.currentCommandSequenceSummary})`);
+console.log(`- Current command verification rows: ${nextActionsReport.currentCommandVerificationRowCount} (${nextActionsReport.currentCommandVerificationRowSummary})`);
 console.log(`- Current env edit target: ${nextActionsReport.currentEnvEditTarget}`);
 console.log(`- Current operator action: ${nextActionsReport.currentOperatorAction}`);
 console.log(`- Current rerun command: ${nextActionsReport.currentRerunCommand}`);
