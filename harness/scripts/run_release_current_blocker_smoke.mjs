@@ -315,6 +315,15 @@ function formatCurrentActionAcceptanceBlockerRows(rows) {
     .join("\n");
 }
 
+function formatCurrentActionPostEditVerificationRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | no | none | none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${row.currentReady ? "yes" : "no"} | ${escapeCell(row.criterion)} | ${escapeCell(row.currentEvidence)} | ${escapeCell(row.expectedSignal)} | ${escapeCell(row.sourceField)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.rerunCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatCurrentActionHandoffRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | none | none | none | 0 | 0 | none | none | none | no |";
@@ -381,6 +390,39 @@ function currentActionAcceptanceBlockerRows({
         rerunCommand: currentRerunCommand,
         valueRecorded: false
       };
+  });
+}
+
+function currentActionPostEditVerificationRows({ acceptanceRows, currentNextCommand, currentRerunCommand, hardGateCommand }) {
+  return valueFreeObjectRows(acceptanceRows).map((row, index) => {
+    const criterion = textValue(row.criterion);
+    const lower = criterion.toLowerCase();
+    let sourceField = "currentActionAcceptanceRows";
+    let expectedSignal = "criterion ready yes without recording private values";
+
+    if (lower.includes("without placeholder values")) {
+      sourceField = "externalProofBundle.currentPlaceholderKeyCount/currentPlaceholderKeys";
+      expectedSignal = "current required keys present and current placeholder key count is 0";
+    } else if (lower.includes("private-inputs") || lower.includes("private inputs")) {
+      sourceField = "releaseDoctor.privateInputsReady/channelMetadataReady/privateValuesRecorded";
+      expectedSignal = "private inputs ready yes; channel metadata ready yes; private values recorded no";
+    } else if (lower.includes("distribution-channel qa")) {
+      sourceField = "releaseDoctor.distributionChannelQaReady/channelMetadataReady/privateValuesRecorded";
+      expectedSignal = "distribution-channel QA ready yes; channel metadata ready yes; private values recorded no";
+    }
+
+    return {
+      order: index + 1,
+      criterion,
+      currentReady: row.ready === true,
+      currentEvidence: textValue(row.evidence),
+      expectedSignal,
+      sourceField,
+      proofCommand: currentNextCommand,
+      rerunCommand: currentRerunCommand,
+      hardGateCommand,
+      valueRecorded: false
+    };
   });
 }
 
@@ -645,6 +687,12 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentNextCommand,
     currentRerunCommand
   });
+  const postEditVerificationRows = currentActionPostEditVerificationRows({
+    acceptanceRows,
+    currentNextCommand,
+    currentRerunCommand,
+    hardGateCommand
+  });
   const sourceArtifacts = [
     { label: "Release doctor", path: relative(releaseDoctorJsonPath), present: true, valueRecorded: false },
     { label: "External next actions", path: relative(externalNextActionsJsonPath), present: true, valueRecorded: false },
@@ -826,6 +874,20 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentActionAcceptanceBlockerRows: acceptanceBlockerRows,
     currentActionAcceptanceBlockersMatchAcceptance:
       acceptanceBlockerRows.length === acceptanceRows.filter((row) => row.ready !== true).length,
+    currentActionPostEditVerificationReady:
+      postEditVerificationRows.length === acceptanceRows.length &&
+      postEditVerificationRows.every((row) => row.valueRecorded === false) &&
+      postEditVerificationRows.every((row) => row.proofCommand === currentNextCommand && row.rerunCommand === currentRerunCommand && row.hardGateCommand === hardGateCommand),
+    currentActionPostEditVerificationRowCount: postEditVerificationRows.length,
+    currentActionPostEditVerificationCurrentReadyCount: postEditVerificationRows.filter((row) => row.currentReady).length,
+    currentActionPostEditVerificationSummary:
+      postEditVerificationRows.length > 0 ? `${postEditVerificationRows.length} value-free post-edit verification rows` : "none",
+    currentActionPostEditVerificationCurrentSummary:
+      postEditVerificationRows.length > 0
+        ? `${postEditVerificationRows.filter((row) => row.currentReady).length}/${postEditVerificationRows.length} post-edit signals currently ready`
+        : "none",
+    currentActionPostEditVerificationRows: postEditVerificationRows,
+    currentActionPostEditVerificationMatchesAcceptance: postEditVerificationRows.length === acceptanceRows.length,
     currentActionHandoffReady:
       handoffRows.length === 5 &&
       handoffRows.every((row) => row.valueRecorded === false) &&
@@ -1041,6 +1103,21 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
     check(report.currentActionAcceptanceBlockerRows.some((row) => row.sourceField.includes("distributionChannelQaReady")), "release current blocker current action acceptance blockers should include distribution-channel QA source fields while channel QA is blocked");
   }
   check(report.currentActionAcceptanceBlockersMatchAcceptance === true, "release current blocker should prove current action acceptance blockers match failing acceptance criteria");
+  check(report.currentActionPostEditVerificationReady === true, "release current blocker current action post-edit verification should be ready");
+  check(report.currentActionPostEditVerificationRowCount === report.currentActionPostEditVerificationRows.length, "release current blocker current action post-edit verification row count should match rows");
+  check(report.currentActionPostEditVerificationRowCount === report.currentActionAcceptanceRowCount, "release current blocker current action post-edit verification rows should mirror acceptance rows");
+  check(report.currentActionPostEditVerificationCurrentReadyCount === report.currentActionPostEditVerificationRows.filter((row) => row.currentReady).length, "release current blocker current action post-edit verification current-ready count should match rows");
+  check(typeof report.currentActionPostEditVerificationSummary === "string" && report.currentActionPostEditVerificationSummary.length > 0, "release current blocker should include current action post-edit verification summary");
+  check(typeof report.currentActionPostEditVerificationCurrentSummary === "string" && report.currentActionPostEditVerificationCurrentSummary.length > 0, "release current blocker should include current action post-edit verification current summary");
+  check(report.currentActionPostEditVerificationRows.every((row) => row.valueRecorded === false), "release current blocker current action post-edit verification rows should not record values");
+  check(report.currentActionPostEditVerificationRows.every((row) => row.proofCommand === report.currentNextCommand), "release current blocker current action post-edit verification proof commands should match current next command");
+  check(report.currentActionPostEditVerificationRows.every((row) => row.rerunCommand === report.currentRerunCommand), "release current blocker current action post-edit verification rerun commands should match current rerun command");
+  check(report.currentActionPostEditVerificationRows.every((row) => row.hardGateCommand === report.hardGateCommand), "release current blocker current action post-edit verification hard-gate commands should match hard gate command");
+  check(report.currentActionPostEditVerificationRows.every((row) => typeof row.expectedSignal === "string" && row.expectedSignal.length > 0), "release current blocker current action post-edit verification rows should include expected signals");
+  check(report.currentActionPostEditVerificationRows.some((row) => row.sourceField.includes("currentPlaceholderKeyCount")), "release current blocker current action post-edit verification should include placeholder-count source field");
+  check(report.currentActionPostEditVerificationRows.some((row) => row.sourceField.includes("privateInputsReady")), "release current blocker current action post-edit verification should include private-input source field");
+  check(report.currentActionPostEditVerificationRows.some((row) => row.sourceField.includes("distributionChannelQaReady")), "release current blocker current action post-edit verification should include distribution-channel QA source field");
+  check(report.currentActionPostEditVerificationMatchesAcceptance === true, "release current blocker current action post-edit verification should match acceptance rows");
   check(report.currentActionHandoffReady === true, "release current blocker current action handoff should be ready");
   check(report.currentActionHandoffRowCount === report.currentActionHandoffRows.length, "release current blocker current action handoff row count should match rows");
   check(report.currentActionHandoffRowCount === 5, "release current blocker current action handoff should include five handoff rows");
@@ -1214,6 +1291,9 @@ function buildMarkdown(report) {
     `- Current action acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})`,
     `- Current action acceptance blockers: ${report.currentActionAcceptanceBlockerCount} (${report.currentActionAcceptanceBlockerSummary})`,
     `- Current action acceptance aligned: ${report.currentActionAcceptanceMatchesCurrentAction ? "yes" : "no"}`,
+    `- Current action post-edit verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`,
+    `- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`,
+    `- Current action post-edit signals currently ready: ${report.currentActionPostEditVerificationCurrentSummary}`,
     `- Current action handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`,
     `- Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`,
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
@@ -1346,6 +1426,17 @@ function buildMarkdown(report) {
     "|---:|---|---|---|---|---|---:|",
     formatCurrentActionAcceptanceBlockerRows(report.currentActionAcceptanceBlockerRows),
     "",
+    "## Current Action Post-Edit Verification",
+    "",
+    `- Verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`,
+    `- Verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`,
+    `- Signals currently ready: ${report.currentActionPostEditVerificationCurrentSummary}`,
+    `- Matches acceptance: ${report.currentActionPostEditVerificationMatchesAcceptance ? "yes" : "no"}`,
+    "",
+    "| order | currently ready | criterion | current evidence | expected post-edit signal | source field | proof command | rerun command | value recorded |",
+    "|---:|---:|---|---|---|---|---|---|---:|",
+    formatCurrentActionPostEditVerificationRows(report.currentActionPostEditVerificationRows),
+    "",
     "## Current Action Handoff Package",
     "",
     `- Handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`,
@@ -1447,6 +1538,8 @@ check(markdown.includes("Current Action Acceptance"), "release current blocker M
 check(markdown.includes("Current action acceptance aligned:"), "release current blocker Markdown should include current action acceptance alignment");
 check(markdown.includes("Current Action Acceptance Blockers"), "release current blocker Markdown should include current action acceptance blockers");
 check(markdown.includes("Blockers match acceptance:"), "release current blocker Markdown should include current action acceptance blocker alignment");
+check(markdown.includes("Current Action Post-Edit Verification"), "release current blocker Markdown should include current action post-edit verification");
+check(markdown.includes("Current action post-edit verification ready:"), "release current blocker Markdown should include current action post-edit verification readiness");
 check(markdown.includes("Current Action Handoff Package"), "release current blocker Markdown should include current action handoff package");
 check(markdown.includes("Current action handoff ready:"), "release current blocker Markdown should include current action handoff readiness");
 
@@ -1486,6 +1579,8 @@ console.log(`- Current external completion checklist row: ${report.currentExtern
 console.log(`- Current action acceptance ready: ${report.currentActionAcceptanceReady ? "yes" : "no"}`);
 console.log(`- Current action acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})`);
 console.log(`- Current action acceptance blockers: ${report.currentActionAcceptanceBlockerCount} (${report.currentActionAcceptanceBlockerSummary})`);
+console.log(`- Current action post-edit verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`);
+console.log(`- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`);
 console.log(`- Current action handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`);
 console.log(`- Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
