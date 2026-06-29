@@ -18,6 +18,7 @@ const externalGatePath = path.join(packageRoot, `${appName}-${packageJson.versio
 const manualQaPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-manual-qa.json`);
 const privateInputsPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-private-inputs.json`);
 const distributionEnvTemplateArtifactPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-distribution-env-template.json`);
+const externalNextActionsPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-next-actions.json`);
 const distributionTemplatePath = path.join(root, "harness", "templates", "distribution-private-inputs.env.example");
 const operatorRunbookMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-operator-runbook.md`);
 const operatorRunbookJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-operator-runbook.json`);
@@ -76,6 +77,26 @@ async function readTextIfExists(filePath) {
 
 function unique(values) {
   return [...new Set(values.filter((value) => typeof value === "string" && value.trim().length > 0))];
+}
+
+function textValue(value, fallback = "none") {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function integerValue(value) {
+  return Number.isInteger(value) ? value : 0;
+}
+
+function stringArrayValue(values) {
+  return Array.isArray(values) ? values.filter((value) => typeof value === "string" && value.trim().length > 0) : [];
+}
+
+function valueFreeObjectRows(values) {
+  return Array.isArray(values) ? values.filter((value) => value && typeof value === "object" && value.valueRecorded === false) : [];
+}
+
+function escapeCell(value) {
+  return String(value ?? "none").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
 }
 
 function evidence(filePath, label) {
@@ -170,6 +191,57 @@ function commandStep(order, label, command, evidencePaths, note) {
   };
 }
 
+function buildCurrentActionSummary(externalNextActions) {
+  const currentRequiredKeys = stringArrayValue(externalNextActions?.currentRequiredKeys);
+  const currentPlaceholderKeys = stringArrayValue(externalNextActions?.currentPlaceholderKeys);
+  const currentPlaceholderEditLocations = valueFreeObjectRows(externalNextActions?.currentPlaceholderEditLocations);
+  const currentEnvEditTemplate = valueFreeObjectRows(externalNextActions?.currentEnvEditTemplate);
+  const currentEnvEditRows = valueFreeObjectRows(externalNextActions?.currentEnvEditRows);
+  const currentPlaceholderRemediationRows = valueFreeObjectRows(externalNextActions?.currentPlaceholderRemediationRows);
+  const currentProofChecklistRows = valueFreeObjectRows(externalNextActions?.currentProofChecklistRows);
+  const currentCommandVerificationRows = valueFreeObjectRows(externalNextActions?.currentCommandVerificationRows);
+  return {
+    currentActionSourceReady: Boolean(externalNextActions),
+    currentActionSourcePath: relative(externalNextActionsPath),
+    currentFocus: textValue(externalNextActions?.currentFocus),
+    currentActionLabel: textValue(externalNextActions?.currentActionLabel, "No pending priority action"),
+    currentNextCommand: textValue(externalNextActions?.currentNextCommand),
+    currentFirstBlocker: textValue(externalNextActions?.currentFirstBlocker),
+    currentOperatorAction: textValue(externalNextActions?.currentOperatorAction),
+    currentRequiredKeyCount: integerValue(externalNextActions?.currentRequiredKeyCount),
+    currentRequiredKeySummary: textValue(externalNextActions?.currentRequiredKeySummary),
+    currentRequiredKeys,
+    currentPlaceholderKeyCount: integerValue(externalNextActions?.currentPlaceholderKeyCount),
+    currentPlaceholderKeySummary: textValue(externalNextActions?.currentPlaceholderKeySummary),
+    currentPlaceholderKeys,
+    currentPlaceholderEditLocationCount: integerValue(externalNextActions?.currentPlaceholderEditLocationCount),
+    currentPlaceholderEditLocationSummary: textValue(externalNextActions?.currentPlaceholderEditLocationSummary),
+    currentPlaceholderEditLocations,
+    currentEnvEditTarget: textValue(externalNextActions?.currentEnvEditTarget, ".env.distribution.local"),
+    currentEnvEditTemplateCount: integerValue(externalNextActions?.currentEnvEditTemplateCount),
+    currentEnvEditTemplateSummary: textValue(externalNextActions?.currentEnvEditTemplateSummary),
+    currentEnvEditTemplate,
+    currentEnvEditRowsCount: integerValue(externalNextActions?.currentEnvEditRowsCount),
+    currentEnvEditRowsSummary: textValue(externalNextActions?.currentEnvEditRowsSummary),
+    currentEnvEditRows,
+    currentPlaceholderRemediationRowCount: integerValue(externalNextActions?.currentPlaceholderRemediationRowCount),
+    currentPlaceholderRemediationRowSummary: textValue(externalNextActions?.currentPlaceholderRemediationRowSummary),
+    currentPlaceholderRemediationRows,
+    currentProofChecklistRowCount: integerValue(externalNextActions?.currentProofChecklistRowCount),
+    currentProofChecklistRowSummary: textValue(externalNextActions?.currentProofChecklistRowSummary),
+    currentProofChecklistRows,
+    currentActionChecklistCount: integerValue(externalNextActions?.currentActionChecklistCount),
+    currentActionChecklistSummary: textValue(externalNextActions?.currentActionChecklistSummary),
+    currentRerunCommand: textValue(externalNextActions?.currentRerunCommand),
+    currentCommandSequenceCount: integerValue(externalNextActions?.currentCommandSequenceCount),
+    currentCommandSequenceSummary: textValue(externalNextActions?.currentCommandSequenceSummary),
+    currentCommandVerificationRowCount: integerValue(externalNextActions?.currentCommandVerificationRowCount),
+    currentCommandVerificationRowSummary: textValue(externalNextActions?.currentCommandVerificationRowSummary),
+    currentCommandVerificationRows,
+    currentActionValueRecorded: false
+  };
+}
+
 function buildCommandSequence(summarySources) {
   const manualDigest = summarySources.manualQa?.manualQaChecklistSha256;
   return [
@@ -207,6 +279,33 @@ function formatEvidenceRows(evidenceChecklist) {
   return evidenceChecklist.map((item) => `| ${item.label} | ${item.present ? "yes" : "no"} | ${item.path} |`).join("\n");
 }
 
+function formatEditGuidanceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.location ?? row.editTarget)} | ${escapeCell(row.key)} | ${escapeCell(row.assignment)} | ${escapeCell(row.guidance)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatProofChecklistRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.criterion)} | ${escapeCell(row.evidenceSummary)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.hardGateCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatCommandVerificationRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.expectation)} | ${escapeCell(row.proofTarget)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatBlockers(blockers) {
   return blockers.length > 0 ? blockers.map((blocker) => `- ${blocker}`).join("\n") : "- None.";
 }
@@ -223,12 +322,55 @@ function buildMarkdown(summary) {
 - Pending remediation groups: ${summary.pendingRemediationCount}
 - Manual QA checklist digest available: ${summary.manualQaChecklistSha256 ? "yes" : "no"}
 - Required private input keys: ${summary.requiredPrivateInputKeys.length}
+- Current action source ready: ${summary.currentActionSourceReady ? "yes" : "no"}
+- Current next command: \`${summary.currentNextCommand}\`
+- Current first blocker: ${summary.currentFirstBlocker}
+- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
+- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})
+- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
 - Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}
 - Private values recorded: no
 - Network probe attempted: no
 - Release upload attempted: no
 - Apple notary submission attempted by this runbook: no
 - Signing attempted by this runbook: no
+
+## Current Action
+
+- Source artifact: ${summary.currentActionSourcePath}
+- Current focus: ${summary.currentFocus}
+- Current action: ${summary.currentActionLabel}
+- Current operator action: ${summary.currentOperatorAction}
+- Current required keys: ${summary.currentRequiredKeyCount} (${summary.currentRequiredKeySummary})
+- Current placeholder keys: ${summary.currentPlaceholderKeyCount} (${summary.currentPlaceholderKeySummary})
+- Current placeholder edit locations: ${summary.currentPlaceholderEditLocationCount} (${summary.currentPlaceholderEditLocationSummary})
+- Current env edit target: ${summary.currentEnvEditTarget}
+- Current env edit template: ${summary.currentEnvEditTemplateCount} (${summary.currentEnvEditTemplateSummary})
+- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
+- Current placeholder remediation rows: ${summary.currentPlaceholderRemediationRowCount} (${summary.currentPlaceholderRemediationRowSummary})
+- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})
+- Current action checklist: ${summary.currentActionChecklistCount} (${summary.currentActionChecklistSummary})
+- Current rerun command: \`${summary.currentRerunCommand}\`
+- Current command sequence: ${summary.currentCommandSequenceCount} (${summary.currentCommandSequenceSummary})
+- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
+
+### Current Edit Guidance
+
+| location | key | assignment shape | guidance | value recorded |
+|---|---|---|---|---:|
+${formatEditGuidanceRows(summary.currentEnvEditRows)}
+
+### Current Proof Checklist Rows
+
+| order | criterion | evidence | proof command | hard gate | value recorded |
+|---:|---|---|---|---|---:|
+${formatProofChecklistRows(summary.currentProofChecklistRows)}
+
+### Current Command Verification Rows
+
+| order | command | role | expectation | proof target | value recorded |
+|---:|---|---|---|---|---:|
+${formatCommandVerificationRows(summary.currentCommandVerificationRows)}
 
 ## Command Sequence
 
@@ -279,6 +421,7 @@ async function createRunbookSummary() {
   const manualQa = await readJsonIfExists(manualQaPath);
   const privateInputs = await readJsonIfExists(privateInputsPath);
   const distributionEnvTemplateArtifact = await readJsonIfExists(distributionEnvTemplateArtifactPath);
+  const externalNextActions = await readJsonIfExists(externalNextActionsPath);
   const templateText = await readTextIfExists(distributionTemplatePath);
   const requiredPrivateInputKeys = parseTemplateKeys(templateText);
   const completionStatusDesktopProjectIoReady = completionStatus?.desktopProjectIoEvidenceReady === true;
@@ -305,6 +448,7 @@ async function createRunbookSummary() {
     evidence(manualQaPath, "Manual QA checklist"),
     evidence(privateInputsPath, "Private inputs"),
     evidence(distributionEnvTemplateArtifactPath, "Distribution env template artifact"),
+    evidence(externalNextActionsPath, "External next actions current proof rows"),
     evidence(distributionTemplatePath, "Distribution private inputs template")
   ];
   const sourceEvidenceReady = Boolean(completionStatus) && Boolean(externalRemediation) && Boolean(externalGate) && desktopProjectIoEvidenceReady && requiredPrivateInputKeys.length > 0;
@@ -374,6 +518,7 @@ async function createRunbookSummary() {
       completionStatusPresent: Boolean(completionStatus),
       externalRemediationPresent: Boolean(externalRemediation),
       externalGatePresent: Boolean(externalGate),
+      externalNextActionsPresent: Boolean(externalNextActions),
       desktopProjectIoEvidenceReady,
       pkgPayloadProjectIoStatusReady: completionStatusPkgPayloadProjectIoReady,
       pkgPayloadProjectIoGateRequirementReady: externalGatePkgPayloadProjectIoReady,
@@ -384,6 +529,7 @@ async function createRunbookSummary() {
       valueRecorded: false
     },
     evidenceChecklist,
+    ...buildCurrentActionSummary(externalNextActions),
     commandSequence: buildCommandSequence({ completionStatus, externalRemediation, externalGate, manualQa, privateInputs }),
     operatorPhases,
     operatorRunbookBlockers
@@ -415,11 +561,24 @@ check(summary.evidenceChecklist.some((item) => item.label === "Desktop project I
 check(summary.evidenceChecklist.some((item) => item.label === "PKG payload project IO status evidence"), "external operator runbook should include PKG payload project IO status evidence");
 check(summary.evidenceChecklist.some((item) => item.label === "Desktop project IO gate requirement"), "external operator runbook should include desktop project IO gate evidence");
 check(summary.evidenceChecklist.some((item) => item.label === "PKG payload project IO gate requirement"), "external operator runbook should include PKG payload project IO gate evidence");
+check(summary.evidenceChecklist.some((item) => item.label === "External next actions current proof rows"), "external operator runbook should include external next-actions evidence");
 check(summary.operatorPhases.every((phase) => phase.valueRecorded === false), "external operator phases should not record values");
 check(summary.commandSequence.every((step) => step.valueRecorded === false), "external operator commands should not record values");
 check(summary.evidenceChecklist.every((item) => item.valueRecorded === false), "external operator evidence checklist should not record values");
 check(summary.sourceEvidence.valueRecorded === false, "external operator source evidence should not record values");
 check(summary.sourceEvidence.desktopProjectIoEvidenceReady === true, "external operator source evidence should include ready desktop project IO evidence");
+check(summary.currentActionValueRecorded === false, "external operator current action summary should not record values");
+check(Array.isArray(summary.currentEnvEditRows), "external operator runbook should expose current env edit rows");
+check(summary.currentEnvEditRows.every((row) => row.valueRecorded === false), "external operator current env edit rows should not record values");
+check(Array.isArray(summary.currentProofChecklistRows), "external operator runbook should expose current proof checklist rows");
+check(summary.currentProofChecklistRows.every((row) => row.valueRecorded === false), "external operator current proof checklist rows should not record values");
+check(Array.isArray(summary.currentCommandVerificationRows), "external operator runbook should expose current command verification rows");
+check(summary.currentCommandVerificationRows.every((row) => row.valueRecorded === false), "external operator current command verification rows should not record values");
+if (summary.currentActionSourceReady) {
+  check(summary.currentNextCommand !== "none", "external operator runbook should mirror the current next command when next-actions evidence exists");
+  check(summary.currentProofChecklistRowCount === summary.currentProofChecklistRows.length, "external operator runbook should mirror current proof checklist row count");
+  check(summary.currentCommandVerificationRowCount === summary.currentCommandVerificationRows.length, "external operator runbook should mirror current command verification row count");
+}
 check(summary.requiredPrivateInputKeys.includes("GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256"), "external operator runbook should include manual QA digest key");
 check(summary.requiredPrivateInputKeys.includes("GROOVEFORGE_DEVELOPER_ID_IDENTITY"), "external operator runbook should include Developer ID identity key name");
 check(summary.manualQaChecklistSha256 === null || /^[a-f0-9]{64}$/.test(summary.manualQaChecklistSha256), "external operator runbook should record only a valid manual QA digest when available");
@@ -444,6 +603,10 @@ check(summary.releaseGateClaimedAutoUpdate === false, "external operator runbook
 check(summary.releaseGateClaimedManualQaApproval === false, "external operator runbook should not claim manual QA approval");
 check(summary.releaseGateClaimedExternalDistribution === false, "external operator runbook should not claim external distribution completion");
 check(markdown.includes("External Operator Runbook"), "external operator runbook Markdown should include title");
+check(markdown.includes("Current Action"), "external operator runbook Markdown should include current action");
+check(markdown.includes("Current Edit Guidance"), "external operator runbook Markdown should include current edit guidance");
+check(markdown.includes("Current Proof Checklist Rows"), "external operator runbook Markdown should include current proof checklist rows");
+check(markdown.includes("Current Command Verification Rows"), "external operator runbook Markdown should include current command verification rows");
 check(markdown.includes("Command Sequence"), "external operator runbook Markdown should include command sequence");
 check(markdown.includes("Desktop project IO evidence ready:"), "external operator runbook Markdown should include desktop project IO readiness");
 check(markdown.includes("Hard gate remains `npm run release:external-check`"), "external operator runbook Markdown should keep the hard gate authoritative");
@@ -469,6 +632,12 @@ console.log(`- External distribution hard gate ready: ${summary.externalDistribu
 console.log(`- Pending remediation groups: ${summary.pendingRemediationCount}`);
 console.log(`- Manual QA checklist digest available: ${summary.manualQaChecklistDigestAvailable ? "yes" : "no"}`);
 console.log(`- Required private input keys: ${summary.requiredPrivateInputKeyCount}`);
+console.log(`- Current action source ready: ${summary.currentActionSourceReady ? "yes" : "no"}`);
+console.log(`- Current next command: ${summary.currentNextCommand}`);
+console.log(`- Current first blocker: ${summary.currentFirstBlocker}`);
+console.log(`- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})`);
+console.log(`- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})`);
+console.log(`- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})`);
 console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
 console.log("- Private values recorded: no");
 if (summary.operatorRunbookBlockers.length > 0) {
