@@ -3202,10 +3202,13 @@ function createQuickActionSearchRecovery(
 
   const trimmedQuery = query.trim();
   const currentScope = scopeOptions.find((option) => option.id === scope);
-  const suggestedScope =
+  const focusedSuggestedScope =
     scopeOptions
-      .filter((option) => option.id !== scope && option.count > 0)
+      .filter((option) => option.id !== "all" && option.id !== scope && option.count > 0)
       .sort((left, right) => right.count - left.count)[0] ?? null;
+  const fallbackAllScope =
+    scope === "all" ? null : scopeOptions.find((option) => option.id === "all" && option.count > 0) ?? null;
+  const suggestedScope = focusedSuggestedScope ?? fallbackAllScope;
   const scopeLabel = currentScope?.label ?? scope;
   const searchLabel = trimmedQuery ? `"${trimmedQuery}"` : "empty search";
 
@@ -3213,7 +3216,7 @@ function createQuickActionSearchRecovery(
     status: "No match recovery",
     title: trimmedQuery ? `Recover search ${searchLabel}` : `Recover ${scopeLabel} scope`,
     detail: `${scopeLabel} scope / ${searchLabel} / 0 shown`,
-    metricLabel: suggestedScope ? "Best scope" : "Recovery",
+    metricLabel: suggestedScope ? (suggestedScope.id === "all" ? "Fallback scope" : "Best focused scope") : "Recovery",
     metricValue: suggestedScope ? `${suggestedScope.label} / ${suggestedScope.count} matching` : "Clear search",
     nextCheck: suggestedScope
       ? `Switch to ${suggestedScope.label} or clear search before running a command.`
