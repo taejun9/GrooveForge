@@ -106,6 +106,48 @@ function firstBlockerFrom(values) {
   return values.find((value) => typeof value === "string" && value.trim().length > 0) ?? "";
 }
 
+function textValue(value, fallback = "none") {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function integerValue(value) {
+  return Number.isInteger(value) ? value : 0;
+}
+
+function stringArrayValue(values) {
+  return Array.isArray(values) ? values.filter((value) => typeof value === "string" && value.trim().length > 0) : [];
+}
+
+function buildCurrentEnvSummary(externalNextActions) {
+  const currentRequiredKeys = stringArrayValue(externalNextActions?.currentRequiredKeys);
+  const currentPlaceholderKeys = stringArrayValue(externalNextActions?.currentPlaceholderKeys);
+  return {
+    currentRequiredKeyCount: integerValue(externalNextActions?.currentRequiredKeyCount),
+    currentRequiredKeySummary: textValue(externalNextActions?.currentRequiredKeySummary),
+    currentRequiredKeys,
+    currentPlaceholderKeyCount: integerValue(externalNextActions?.currentPlaceholderKeyCount),
+    currentPlaceholderKeySummary: textValue(externalNextActions?.currentPlaceholderKeySummary),
+    currentPlaceholderKeys,
+    currentPlaceholderEditLocationCount: integerValue(externalNextActions?.currentPlaceholderEditLocationCount),
+    currentPlaceholderEditLocationSummary: textValue(externalNextActions?.currentPlaceholderEditLocationSummary),
+    currentEnvEditTarget: textValue(externalNextActions?.currentEnvEditTarget, ".env.distribution.local"),
+    currentEnvEditTemplateCount: integerValue(externalNextActions?.currentEnvEditTemplateCount),
+    currentEnvEditTemplateSummary: textValue(externalNextActions?.currentEnvEditTemplateSummary),
+    currentEnvEditRowsCount: integerValue(externalNextActions?.currentEnvEditRowsCount),
+    currentEnvEditRowsSummary: textValue(externalNextActions?.currentEnvEditRowsSummary),
+    currentPlaceholderRemediationRowCount: integerValue(externalNextActions?.currentPlaceholderRemediationRowCount),
+    currentPlaceholderRemediationRowSummary: textValue(externalNextActions?.currentPlaceholderRemediationRowSummary),
+    currentProofChecklistRowCount: integerValue(externalNextActions?.currentProofChecklistRowCount),
+    currentProofChecklistRowSummary: textValue(externalNextActions?.currentProofChecklistRowSummary),
+    currentActionChecklistCount: integerValue(externalNextActions?.currentActionChecklistCount),
+    currentActionChecklistSummary: textValue(externalNextActions?.currentActionChecklistSummary),
+    currentRerunCommand: textValue(externalNextActions?.currentRerunCommand),
+    currentCommandSequenceCount: integerValue(externalNextActions?.currentCommandSequenceCount),
+    currentCommandSequenceSummary: textValue(externalNextActions?.currentCommandSequenceSummary),
+    currentEnvSummaryValueRecorded: false
+  };
+}
+
 function proofArtifact(order, label, category, filePath, source, readyKeys = [], requiredForHardGate = true) {
   const blockers = unique([
     ...(source?.blockers ?? []),
@@ -196,6 +238,17 @@ ${formatGateRequirementRows(summary.gateRequirementRows)}
 - Current focus: ${summary.currentFocus}
 - Current first blocker: ${summary.currentFirstBlocker}
 - Current operator action: ${summary.currentOperatorAction}
+- Current required keys: ${summary.currentRequiredKeyCount} (${summary.currentRequiredKeySummary})
+- Current placeholder keys: ${summary.currentPlaceholderKeyCount} (${summary.currentPlaceholderKeySummary})
+- Current placeholder edit locations: ${summary.currentPlaceholderEditLocationCount} (${summary.currentPlaceholderEditLocationSummary})
+- Current env edit target: ${summary.currentEnvEditTarget}
+- Current env edit template: ${summary.currentEnvEditTemplateCount} (${summary.currentEnvEditTemplateSummary})
+- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
+- Current placeholder remediation rows: ${summary.currentPlaceholderRemediationRowCount} (${summary.currentPlaceholderRemediationRowSummary})
+- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})
+- Current action checklist: ${summary.currentActionChecklistCount} (${summary.currentActionChecklistSummary})
+- Current rerun command: \`${summary.currentRerunCommand}\`
+- Current command sequence: ${summary.currentCommandSequenceCount} (${summary.currentCommandSequenceSummary})
 - Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
 
 ## First Blockers
@@ -293,6 +346,7 @@ async function createProofBundleSummary(nextActionsRun) {
   const localReleaseReady = externalNextActions?.localReleaseReady === true || externalPreflight?.localReleaseReady === true || completionStatus?.localReleaseReady === true;
   const externalDistributionGateReady = externalGate?.externalDistributionGateReady === true || externalNextActions?.externalDistributionGateReady === true;
   const hardGateWouldFail = externalNextActions?.hardGateWouldFail === true || externalPreflight?.hardGateWouldFail === true || externalDistributionGateReady !== true;
+  const currentEnvSummary = buildCurrentEnvSummary(externalNextActions);
 
   return {
     appName,
@@ -322,6 +376,7 @@ async function createProofBundleSummary(nextActionsRun) {
     currentNextCommand: externalNextActions?.currentNextCommand ?? releaseDoctor?.currentActionNextCommand ?? "npm run release:next-actions",
     currentFirstBlocker: externalNextActions?.currentFirstBlocker ?? releaseDoctor?.currentActionFirstBlocker ?? firstBlockers[0] ?? "unknown",
     currentOperatorAction: externalNextActions?.currentOperatorAction ?? releaseDoctor?.currentActionOperatorAction ?? "Review the proof bundle and resolve the first blocker.",
+    ...currentEnvSummary,
     currentCommandVerificationRowCount: externalNextActions?.currentCommandVerificationRowCount ?? 0,
     currentCommandVerificationRowSummary: externalNextActions?.currentCommandVerificationRowSummary ?? "none",
     proofArtifactCount: proofArtifacts.length,
@@ -378,6 +433,31 @@ check(summary.productScope.includes("sampling optional"), "release proof bundle 
 check(summary.hardExternalGateCommand === hardExternalGateCommand, "release proof bundle should keep the hard external gate command");
 check(summary.currentNextCommand.length > 0, "release proof bundle should include the current next command");
 check(summary.currentFirstBlocker.length > 0, "release proof bundle should include the current first blocker");
+check(Number.isInteger(summary.currentRequiredKeyCount), "release proof bundle should include current required key count");
+check(typeof summary.currentRequiredKeySummary === "string" && summary.currentRequiredKeySummary.length > 0, "release proof bundle should include current required key summary");
+check(Array.isArray(summary.currentRequiredKeys), "release proof bundle should include current required key names");
+check(Number.isInteger(summary.currentPlaceholderKeyCount), "release proof bundle should include current placeholder key count");
+check(typeof summary.currentPlaceholderKeySummary === "string" && summary.currentPlaceholderKeySummary.length > 0, "release proof bundle should include current placeholder key summary");
+check(Array.isArray(summary.currentPlaceholderKeys), "release proof bundle should include current placeholder key names");
+check(Number.isInteger(summary.currentPlaceholderEditLocationCount), "release proof bundle should include current placeholder edit location count");
+check(typeof summary.currentPlaceholderEditLocationSummary === "string" && summary.currentPlaceholderEditLocationSummary.length > 0, "release proof bundle should include current placeholder edit location summary");
+check(typeof summary.currentEnvEditTarget === "string" && summary.currentEnvEditTarget.length > 0, "release proof bundle should include current env edit target");
+check(Number.isInteger(summary.currentEnvEditTemplateCount), "release proof bundle should include current env edit template count");
+check(typeof summary.currentEnvEditTemplateSummary === "string" && summary.currentEnvEditTemplateSummary.length > 0, "release proof bundle should include current env edit template summary");
+check(Number.isInteger(summary.currentEnvEditRowsCount), "release proof bundle should include current env edit rows count");
+check(typeof summary.currentEnvEditRowsSummary === "string" && summary.currentEnvEditRowsSummary.length > 0, "release proof bundle should include current env edit rows summary");
+check(Number.isInteger(summary.currentPlaceholderRemediationRowCount), "release proof bundle should include current placeholder remediation row count");
+check(typeof summary.currentPlaceholderRemediationRowSummary === "string" && summary.currentPlaceholderRemediationRowSummary.length > 0, "release proof bundle should include current placeholder remediation row summary");
+check(Number.isInteger(summary.currentProofChecklistRowCount), "release proof bundle should include current proof checklist row count");
+check(typeof summary.currentProofChecklistRowSummary === "string" && summary.currentProofChecklistRowSummary.length > 0, "release proof bundle should include current proof checklist row summary");
+check(Number.isInteger(summary.currentActionChecklistCount), "release proof bundle should include current action checklist count");
+check(typeof summary.currentActionChecklistSummary === "string" && summary.currentActionChecklistSummary.length > 0, "release proof bundle should include current action checklist summary");
+check(typeof summary.currentRerunCommand === "string" && summary.currentRerunCommand.length > 0, "release proof bundle should include current rerun command");
+check(Number.isInteger(summary.currentCommandSequenceCount), "release proof bundle should include current command sequence count");
+check(typeof summary.currentCommandSequenceSummary === "string" && summary.currentCommandSequenceSummary.length > 0, "release proof bundle should include current command sequence summary");
+check(summary.currentRequiredKeyCount === summary.currentRequiredKeys.length, "release proof bundle current required key count should match names");
+check(summary.currentPlaceholderKeyCount === summary.currentPlaceholderKeys.length, "release proof bundle current placeholder key count should match names");
+check(summary.currentEnvSummaryValueRecorded === false, "release proof bundle current env summary should not record values");
 check(Number.isInteger(summary.proofArtifactCount), "release proof bundle should include proof artifact count");
 check(Number.isInteger(summary.proofArtifactPresentCount), "release proof bundle should include present proof artifact count");
 check(Number.isInteger(summary.proofArtifactMissingCount), "release proof bundle should include missing proof artifact count");
@@ -417,6 +497,11 @@ check(summary.releaseGateClaimedExternalDistribution === false, "release proof b
 check(markdown.includes("External Proof Bundle"), "release proof bundle Markdown should include title");
 check(markdown.includes("Proof Artifacts"), "release proof bundle Markdown should include proof artifact rows");
 check(markdown.includes("Gate Requirements"), "release proof bundle Markdown should include gate requirement rows");
+check(markdown.includes("Current required keys:"), "release proof bundle Markdown should include current required key summary");
+check(markdown.includes("Current placeholder keys:"), "release proof bundle Markdown should include current placeholder key summary");
+check(markdown.includes("Current env edit target:"), "release proof bundle Markdown should include current env edit target");
+check(markdown.includes("Current placeholder remediation rows:"), "release proof bundle Markdown should include current placeholder remediation summary");
+check(markdown.includes("Current command sequence:"), "release proof bundle Markdown should include current command sequence summary");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "release proof bundle Markdown should keep hard gate authoritative");
 check(markdown.includes("Private values recorded: no"), "release proof bundle Markdown should state value redaction");
 check(!/https?:\/\//i.test(markdown), "release proof bundle Markdown should not include public or private URL values");
@@ -444,6 +529,15 @@ console.log(`- Proof artifacts present: ${summary.proofArtifactPresentCount}/${s
 console.log(`- Gate requirements ready: ${summary.gateRequirementReadyCount}/${summary.gateRequirementTotal}`);
 console.log(`- Current next command: ${summary.currentNextCommand}`);
 console.log(`- Current first blocker: ${summary.currentFirstBlocker}`);
+console.log(`- Current required keys: ${summary.currentRequiredKeyCount} (${summary.currentRequiredKeySummary})`);
+console.log(`- Current placeholder keys: ${summary.currentPlaceholderKeyCount} (${summary.currentPlaceholderKeySummary})`);
+console.log(`- Current placeholder edit locations: ${summary.currentPlaceholderEditLocationCount} (${summary.currentPlaceholderEditLocationSummary})`);
+console.log(`- Current env edit target: ${summary.currentEnvEditTarget}`);
+console.log(`- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})`);
+console.log(`- Current placeholder remediation rows: ${summary.currentPlaceholderRemediationRowCount} (${summary.currentPlaceholderRemediationRowSummary})`);
+console.log(`- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})`);
+console.log(`- Current rerun command: ${summary.currentRerunCommand}`);
+console.log(`- Current command sequence: ${summary.currentCommandSequenceCount} (${summary.currentCommandSequenceSummary})`);
 console.log(`- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})`);
 console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
 console.log("- Private values recorded: no");
