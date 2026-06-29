@@ -30,12 +30,79 @@ export type NextMoveQuickActionSource = "beat-map" | "structure-lens";
 export const quickActionScopeDefinitions: Array<Omit<QuickActionScopeOption, "count">> = [
   { id: "all", label: "All" },
   { id: "transport", label: "Transport" },
+  { id: "guide", label: "Guide" },
   { id: "compose", label: "Compose" },
+  { id: "create", label: "Create" },
+  { id: "sound", label: "Sound" },
   { id: "arrange", label: "Arrange" },
   { id: "mix", label: "Mix" },
   { id: "master", label: "Master" },
+  { id: "finish", label: "Finish" },
+  { id: "deliver", label: "Deliver" },
   { id: "project", label: "Project" },
   { id: "export", label: "Export" }
+];
+
+const guideScopeTerms = [
+  "guide",
+  "first beat",
+  "session pass",
+  "workflow",
+  "mode focus",
+  "beat spine",
+  "beat readiness",
+  "beat passport",
+  "production snapshot",
+  "reference alignment",
+  "composer guide",
+  "key compass",
+  "groove compass",
+  "hook readiness",
+  "topline space",
+  "listening pass",
+  "next move"
+];
+
+const soundScopeTerms = [
+  "sound",
+  "drum kit",
+  "drum-kit",
+  "style inspector",
+  "style goal",
+  "style quick",
+  "sound preset",
+  "sound focus",
+  "sound snapshot",
+  "space fx",
+  "space-fx",
+  "tone"
+];
+
+const finishScopeTerms = [
+  "finish",
+  "master finish",
+  "master-finish",
+  "master automation",
+  "master-automation",
+  "export meter",
+  "master output",
+  "limiter",
+  "fade"
+];
+
+const deliverScopeTerms = [
+  "deliver",
+  "delivery",
+  "handoff",
+  "export preflight",
+  "export-preflight",
+  "direct export",
+  "wav",
+  "stems",
+  "midi",
+  "sheet",
+  "send order",
+  "package"
 ];
 
 export function createNextMoveSourceQuickActions(
@@ -295,8 +362,14 @@ export function quickActionMatchesScope(action: QuickAction, scope: QuickActionS
       return true;
     case "transport":
       return action.group === "Transport";
+    case "guide":
+      return quickActionHasAnyTerm(action, guideScopeTerms);
     case "compose":
       return action.group === "Create";
+    case "create":
+      return action.group === "Create";
+    case "sound":
+      return quickActionHasAnyTerm(action, soundScopeTerms);
     case "arrange":
       return action.group === "Arrange";
     case "mix":
@@ -316,11 +389,25 @@ export function quickActionMatchesScope(action: QuickAction, scope: QuickActionS
         action.id.startsWith("master-finish-") ||
         composerActionQuickActionArea(action.id) === "finish"
       );
+    case "finish":
+      return (
+        quickActionHasAnyTerm(action, finishScopeTerms) ||
+        action.id === "master-finish" ||
+        action.id.startsWith("master-finish-") ||
+        composerActionQuickActionArea(action.id) === "finish"
+      );
+    case "deliver":
+      return action.group === "Export" || quickActionHasAnyTerm(action, deliverScopeTerms);
     case "project":
       return action.group === "Project" || action.group === "Edit";
     case "export":
       return action.group === "Export";
   }
+}
+
+function quickActionHasAnyTerm(action: QuickAction, terms: string[]): boolean {
+  const text = `${action.id} ${action.group} ${action.title} ${action.detail} ${action.keywords}`.toLowerCase();
+  return terms.some((term) => text.includes(term));
 }
 
 export function quickActionSearchTokens(action: QuickAction): string[] {

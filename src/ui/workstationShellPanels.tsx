@@ -2462,12 +2462,13 @@ export function QuickActions({
   const recentActions = createQuickActionRecentOptions(recents, recentActionSource);
   const inspectedPinnedAction = pinnedActions.find((action) => action.id === inspectedPinnedActionId) ?? null;
   const inspectedRecentAction = recentActions.find(({ action }) => action.id === inspectedRecentActionId) ?? null;
+  const shouldShowGuideSuggestion = query.trim().length === 0 && (scope === "all" || scope === "guide" || scope === "project");
   const guideSuggestionAction =
-    query.trim().length === 0 && (scope === "all" || scope === "project")
+    shouldShowGuideSuggestion
       ? recentActionSource.find((action) => action.id === "guide-quick-start") ?? null
       : null;
   const guideBottleneckSuggestionAction =
-    query.trim().length === 0 && (scope === "all" || scope === "project")
+    shouldShowGuideSuggestion
       ? recentActionSource.find((action) => action.id === "guide-bottleneck-focus") ?? null
       : null;
   const guideSuggestionPinned = guideSuggestionAction ? pinnedActionIds.includes(guideSuggestionAction.id) : false;
@@ -3009,10 +3010,15 @@ type QuickActionSearchHint = {
 const quickActionSearchHintTerms: Record<QuickActionScopeId, string[]> = {
   all: ["guide", "blueprint", "export", "mix"],
   transport: ["play", "loop", "tempo", "metronome"],
+  guide: ["guide", "workflow", "readiness", "passport"],
   compose: ["blueprint", "drum", "808", "melody"],
+  create: ["blueprint", "drum", "808", "melody"],
+  sound: ["sound", "preset", "kit", "tone"],
   arrange: ["block", "section", "pattern", "arrange"],
   mix: ["mix", "headroom", "balance", "snapshot"],
   master: ["master", "finish", "fade", "limiter"],
+  finish: ["finish", "master", "fade", "limiter"],
+  deliver: ["handoff", "export", "stems", "package"],
   project: ["save", "draft", "snapshot", "handoff"],
   export: ["wav", "stems", "midi", "handoff"]
 };
@@ -3046,19 +3052,91 @@ function quickActionHintMatchesScope(action: QuickAction, scope: QuickActionScop
       return true;
     case "transport":
       return action.group === "Transport";
+    case "guide":
+      return quickActionHasAnyScopeTerm(action, [
+        "guide",
+        "first beat",
+        "session pass",
+        "workflow",
+        "mode focus",
+        "beat spine",
+        "beat readiness",
+        "beat passport",
+        "production snapshot",
+        "reference alignment",
+        "composer guide",
+        "key compass",
+        "groove compass",
+        "hook readiness",
+        "topline space",
+        "listening pass",
+        "next move"
+      ]);
     case "compose":
       return action.group === "Create";
+    case "create":
+      return action.group === "Create";
+    case "sound":
+      return quickActionHasAnyScopeTerm(action, [
+        "sound",
+        "drum kit",
+        "drum-kit",
+        "style inspector",
+        "style goal",
+        "style quick",
+        "sound preset",
+        "sound focus",
+        "sound snapshot",
+        "space fx",
+        "space-fx",
+        "tone"
+      ]);
     case "arrange":
       return action.group === "Arrange";
     case "mix":
       return action.group === "Mix" && action.id !== "master-finish" && !action.id.startsWith("master-finish-");
     case "master":
       return action.id === "master-finish" || action.id.startsWith("master-finish-") || action.title.toLowerCase().includes("master");
+    case "finish":
+      return quickActionHasAnyScopeTerm(action, [
+        "finish",
+        "master finish",
+        "master-finish",
+        "master automation",
+        "master-automation",
+        "export meter",
+        "master output",
+        "limiter",
+        "fade"
+      ]);
+    case "deliver":
+      return (
+        action.group === "Export" ||
+        quickActionHasAnyScopeTerm(action, [
+          "deliver",
+          "delivery",
+          "handoff",
+          "export preflight",
+          "export-preflight",
+          "direct export",
+          "wav",
+          "stems",
+          "midi",
+          "sheet",
+          "send order",
+          "package"
+        ])
+      );
     case "project":
       return action.group === "Project" || action.group === "Edit";
     case "export":
       return action.group === "Export";
   }
+}
+
+function quickActionHasAnyScopeTerm(action: QuickAction, terms: string[]): boolean {
+  const text = `${action.id} ${action.group} ${action.title} ${action.detail} ${action.keywords}`.toLowerCase();
+  return terms.some((term) => text.includes(term));
 }
 
 function quickActionHintMatchesTerm(action: QuickAction, term: string): boolean {

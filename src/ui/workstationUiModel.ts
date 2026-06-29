@@ -1150,7 +1150,20 @@ export type QuickActionRecentResult = {
   tone: MixCoachTone;
 };
 
-export type QuickActionScopeId = "all" | "transport" | "compose" | "arrange" | "mix" | "master" | "project" | "export";
+export type QuickActionScopeId =
+  | "all"
+  | "transport"
+  | "guide"
+  | "compose"
+  | "create"
+  | "sound"
+  | "arrange"
+  | "mix"
+  | "master"
+  | "finish"
+  | "deliver"
+  | "project"
+  | "export";
 
 export type QuickActionScopeOption = {
   id: QuickActionScopeId;
