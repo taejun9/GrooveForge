@@ -2932,6 +2932,16 @@ export function QuickActions({
                 <Play size={14} aria-hidden="true" />
                 <span>Run</span>
               </button>
+              <button
+                className="quick-actions-pinned-inspector-reference"
+                data-testid="quick-actions-pinned-inspector-reference"
+                onClick={onOpenCommandReference}
+                title={`Open Command Reference for pinned command: ${inspectedPinnedAction.title}`}
+                type="button"
+              >
+                <CircleHelp size={14} aria-hidden="true" />
+                <span>Reference</span>
+              </button>
             </div>
           )}
           {pinnedResult && <QuickActionPinnedResultStrip result={pinnedResult} />}
@@ -3015,6 +3025,16 @@ export function QuickActions({
               >
                 <Play size={14} aria-hidden="true" />
                 <span>Rerun</span>
+              </button>
+              <button
+                className="quick-actions-recent-inspector-reference"
+                data-testid="quick-actions-recent-inspector-reference"
+                onClick={onOpenCommandReference}
+                title={`Open Command Reference for recent command: ${inspectedRecentAction.action.title}`}
+                type="button"
+              >
+                <CircleHelp size={14} aria-hidden="true" />
+                <span>Reference</span>
               </button>
             </div>
           )}
