@@ -297,6 +297,15 @@ function formatExternalCompletionChecklistRows(rows) {
     .join("\n");
 }
 
+function formatCurrentActionAcceptanceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | no | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.criterion)} | ${escapeCell(row.evidence)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.rerunCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function priorityActionRows(externalNextActions) {
   return valueFreeObjectRows(externalNextActions.priorityActions).map((action, index) => {
     const rerunCommands = stringArrayValue(action.rerunCommands);
@@ -313,6 +322,53 @@ function priorityActionRows(externalNextActions) {
       evidenceRowCount: Array.isArray(action.evidence) ? action.evidence.length : 0,
       readyCriteriaCount: stringArrayValue(action.readyCriteria).length,
       actionChecklistCount: stringArrayValue(action.actionChecklist).length,
+      valueRecorded: false
+    };
+  });
+}
+
+function currentActionAcceptanceRows({
+  externalNextActions,
+  releaseDoctor,
+  externalProofBundle,
+  currentNextCommand,
+  currentRerunCommand,
+  hardGateCommand
+}) {
+  return stringArrayValue(externalNextActions.currentReadyCriteria).map((criterion, index) => {
+    const lower = criterion.toLowerCase();
+    let ready = false;
+    let evidence = "Current evidence does not yet prove this criterion.";
+
+    if (lower.includes("without placeholder values")) {
+      const placeholderCount = integerValue(externalProofBundle.currentPlaceholderKeyCount);
+      const requiredCount = integerValue(externalProofBundle.currentRequiredKeyCount);
+      ready = requiredCount > 0 && placeholderCount === 0;
+      evidence = ready
+        ? `${requiredCount} current required keys are present without placeholder values`
+        : `${placeholderCount} current placeholder keys remain`;
+    } else if (lower.includes("private-inputs") || lower.includes("private inputs")) {
+      ready =
+        releaseDoctor.privateInputsReady === true &&
+        releaseDoctor.channelMetadataReady === true &&
+        releaseDoctor.privateValuesRecorded === false;
+      evidence = `private inputs ready ${releaseDoctor.privateInputsReady === true ? "yes" : "no"}; channel metadata ready ${releaseDoctor.channelMetadataReady === true ? "yes" : "no"}; private values recorded ${releaseDoctor.privateValuesRecorded === true ? "yes" : "no"}`;
+    } else if (lower.includes("distribution-channel qa")) {
+      ready =
+        releaseDoctor.distributionChannelQaReady === true &&
+        releaseDoctor.channelMetadataReady === true &&
+        releaseDoctor.privateValuesRecorded === false;
+      evidence = `distribution-channel QA ready ${releaseDoctor.distributionChannelQaReady === true ? "yes" : "no"}; channel metadata ready ${releaseDoctor.channelMetadataReady === true ? "yes" : "no"}; private values recorded ${releaseDoctor.privateValuesRecorded === true ? "yes" : "no"}`;
+    }
+
+    return {
+      order: index + 1,
+      criterion,
+      ready,
+      evidence,
+      proofCommand: currentNextCommand,
+      rerunCommand: currentRerunCommand,
+      hardGateCommand,
       valueRecorded: false
     };
   });
@@ -419,6 +475,16 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
   const currentFirstBlockerConsensus = proofGateProgressBlockers.every((blocker) => blocker === proofGateProgressBlockers[0]);
   const exactFirstBlockerConsensus = currentFirstBlockers.every((blocker) => blocker === currentFirstBlockers[0]);
   const currentNextCommand = textValue(externalProofBundle.currentNextCommand);
+  const currentRerunCommand = textValue(externalProofBundle.currentRerunCommand, currentNextCommand);
+  const acceptanceRows = currentActionAcceptanceRows({
+    externalNextActions,
+    releaseDoctor,
+    externalProofBundle,
+    currentNextCommand,
+    currentRerunCommand,
+    hardGateCommand
+  });
+  const currentActionAcceptanceReadyCount = acceptanceRows.filter((row) => row.ready).length;
   const localEnvSetupPending = currentNextCommand === "npm run release:prepare-env";
   const placeholderCleanupPending = currentNextCommand === "npm run release:doctor" && proofPlaceholderKeys.length > 0;
   const doctorFirstBlockerAligned = localEnvSetupPending
@@ -566,6 +632,17 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
       textValue(currentCompletionChecklistRow.id) === textValue(externalNextActions.currentActionId) &&
       textValue(currentCompletionChecklistRow.proofCommand) === currentNextCommand &&
       textValue(currentCompletionChecklistRow.firstBlocker) === textValue(externalProofBundle.currentFirstBlocker),
+    currentActionAcceptanceReady: acceptanceRows.length > 0 && acceptanceRows.every((row) => row.ready),
+    currentActionAcceptanceRowCount: acceptanceRows.length,
+    currentActionAcceptanceReadyCount,
+    currentActionAcceptanceSummary:
+      acceptanceRows.length > 0
+        ? `${currentActionAcceptanceReadyCount}/${acceptanceRows.length} current action acceptance criteria ready`
+        : "none",
+    currentActionAcceptanceRows: acceptanceRows,
+    currentActionAcceptanceMatchesCurrentAction:
+      acceptanceRows.length === integerValue(externalNextActions.currentReadyCriteriaCount) &&
+      acceptanceRows.every((row) => row.proofCommand === currentNextCommand && row.rerunCommand === currentRerunCommand),
     currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: integerValue(externalProofBundle.currentRequiredKeyCount),
     currentRequiredKeys: proofRequiredKeys,
@@ -592,7 +669,7 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
       `${commandVerificationRows.length} value-free command verification rows`
     ),
     currentCommandVerificationRows: commandVerificationRows,
-    currentRerunCommand: textValue(externalProofBundle.currentRerunCommand, currentNextCommand),
+    currentRerunCommand,
     currentCommandSequenceCount,
     currentCommandSequenceSummary,
     currentCommandSequence,
@@ -751,6 +828,19 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentExternalCompletionChecklistRowId === report.currentPriorityActionId, "release current blocker current external completion checklist row should match current priority action");
   check(report.currentExternalCompletionChecklistProofCommand === report.currentNextCommand, "release current blocker current external completion checklist proof command should match current next command");
   check(report.externalCompletionChecklistCurrentMatchesPriorityAction === true, "release current blocker should prove external completion checklist current-row alignment");
+  check(report.currentActionAcceptanceRowCount === report.currentActionAcceptanceRows.length, "release current blocker current action acceptance row count should match rows");
+  check(report.currentActionAcceptanceRowCount === integerValue(externalNextActions.currentReadyCriteriaCount), "release current blocker current action acceptance rows should mirror current ready criteria count");
+  check(report.currentActionAcceptanceReadyCount === report.currentActionAcceptanceRows.filter((row) => row.ready).length, "release current blocker current action acceptance ready count should match rows");
+  check(typeof report.currentActionAcceptanceSummary === "string" && report.currentActionAcceptanceSummary.length > 0, "release current blocker should include current action acceptance summary");
+  check(report.currentActionAcceptanceRows.every((row) => row.valueRecorded === false), "release current blocker current action acceptance rows should not record values");
+  check(report.currentActionAcceptanceRows.every((row) => row.proofCommand === report.currentNextCommand), "release current blocker current action acceptance proof commands should match current next command");
+  check(report.currentActionAcceptanceRows.every((row) => row.rerunCommand === report.currentRerunCommand), "release current blocker current action acceptance rerun commands should match current rerun command");
+  check(report.currentActionAcceptanceRows.every((row) => row.hardGateCommand === report.hardGateCommand), "release current blocker current action acceptance rows should keep hard gate command references");
+  check(report.currentActionAcceptanceRows.some((row) => row.criterion.includes("without placeholder values")), "release current blocker current action acceptance should include placeholder-free criterion");
+  check(report.currentActionAcceptanceRows.some((row) => row.criterion.includes("private-inputs")), "release current blocker current action acceptance should include private-inputs criterion");
+  check(report.currentActionAcceptanceRows.some((row) => row.criterion.includes("Distribution-channel QA")), "release current blocker current action acceptance should include distribution-channel QA criterion");
+  check(report.currentActionAcceptanceRows.every((row) => typeof row.evidence === "string" && row.evidence.length > 0), "release current blocker current action acceptance should include evidence summaries");
+  check(report.currentActionAcceptanceMatchesCurrentAction === true, "release current blocker should prove current action acceptance alignment");
   check(report.currentRequiredKeyCount === report.currentRequiredKeys.length, "release current blocker required key count should match keys");
   check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release current blocker placeholder key count should match keys");
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderEditLocations.length, "release current blocker placeholder edit location count should match locations");
@@ -904,6 +994,9 @@ function buildMarkdown(report) {
     `- Current external completion checklist row: ${report.currentExternalCompletionChecklistRowId} (${report.currentExternalCompletionChecklistRowLabel})`,
     `- Current external completion checklist proof command: \`${report.currentExternalCompletionChecklistProofCommand}\``,
     `- External completion checklist current row aligned: ${report.externalCompletionChecklistCurrentMatchesPriorityAction ? "yes" : "no"}`,
+    `- Current action acceptance ready: ${report.currentActionAcceptanceReady ? "yes" : "no"}`,
+    `- Current action acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})`,
+    `- Current action acceptance aligned: ${report.currentActionAcceptanceMatchesCurrentAction ? "yes" : "no"}`,
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
     `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`,
@@ -1014,6 +1107,17 @@ function buildMarkdown(report) {
     "|---:|---|---|---|---|---|---|---:|---:|---|---:|",
     formatExternalCompletionChecklistRows(report.externalCompletionChecklistRows),
     "",
+    "## Current Action Acceptance",
+    "",
+    `- Acceptance ready: ${report.currentActionAcceptanceReady ? "yes" : "no"}`,
+    `- Acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})`,
+    `- Ready rows: ${report.currentActionAcceptanceReadyCount}/${report.currentActionAcceptanceRowCount}`,
+    `- Current action aligned: ${report.currentActionAcceptanceMatchesCurrentAction ? "yes" : "no"}`,
+    "",
+    "| order | ready | criterion | evidence | proof command | rerun command | value recorded |",
+    "|---:|---:|---|---|---|---|---:|",
+    formatCurrentActionAcceptanceRows(report.currentActionAcceptanceRows),
+    "",
     "## Placeholder Edit Locations",
     "",
     "| location | key | placeholder | value recorded |",
@@ -1101,6 +1205,8 @@ check(markdown.includes("Priority Action Ladder"), "release current blocker Mark
 check(markdown.includes("Current priority action aligned:"), "release current blocker Markdown should include priority action alignment");
 check(markdown.includes("External Completion Checklist"), "release current blocker Markdown should include external completion checklist");
 check(markdown.includes("External completion checklist current row aligned:"), "release current blocker Markdown should include external completion checklist alignment");
+check(markdown.includes("Current Action Acceptance"), "release current blocker Markdown should include current action acceptance");
+check(markdown.includes("Current action acceptance aligned:"), "release current blocker Markdown should include current action acceptance alignment");
 
 if (failures.length > 0) {
   fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
@@ -1135,6 +1241,8 @@ console.log(`- Priority actions pending: ${report.priorityActionCount} (${report
 console.log(`- Current priority action: ${report.currentPriorityActionId} (${report.currentPriorityActionLabel})`);
 console.log(`- External completion checklist rows: ${report.externalCompletionChecklistCount} (${report.externalCompletionChecklistSummary})`);
 console.log(`- Current external completion checklist row: ${report.currentExternalCompletionChecklistRowId} (${report.currentExternalCompletionChecklistRowLabel})`);
+console.log(`- Current action acceptance ready: ${report.currentActionAcceptanceReady ? "yes" : "no"}`);
+console.log(`- Current action acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
