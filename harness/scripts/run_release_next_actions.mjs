@@ -664,6 +664,56 @@ function formatPlaceholderRemediationRowsTable(items) {
   ].join("\n");
 }
 
+function buildCurrentProofChecklistSummary({ currentActionSummary = {}, hardExternalGateCommand = "npm run release:external-check" } = {}) {
+  const currentReadyCriteria = Array.isArray(currentActionSummary.currentReadyCriteria) ? currentActionSummary.currentReadyCriteria : [];
+  const currentEvidenceRows = Array.isArray(currentActionSummary.currentEvidenceRows) ? currentActionSummary.currentEvidenceRows : [];
+  const currentEvidenceLabels = buildEvidenceLabels(currentEvidenceRows);
+  const currentEvidencePaths = currentEvidenceRows.map((item) => item.path).filter((item) => typeof item === "string" && item.length > 0);
+  const currentEvidenceReady = currentEvidenceRows.length > 0 && currentEvidenceRows.every((item) => item.present === true);
+  const currentEvidenceSummary = formatEvidenceLabelSummary(currentEvidenceRows);
+  const proofCommand =
+    currentActionSummary.currentNextCommand && currentActionSummary.currentNextCommand !== "none"
+      ? currentActionSummary.currentNextCommand
+      : hardExternalGateCommand;
+  const rerunCommand =
+    currentActionSummary.currentRerunCommand && currentActionSummary.currentRerunCommand !== "none"
+      ? currentActionSummary.currentRerunCommand
+      : proofCommand;
+  const currentProofChecklistRows = currentReadyCriteria.map((criterion, index) => ({
+    order: index + 1,
+    criterion,
+    evidenceLabels: currentEvidenceLabels,
+    evidencePaths: currentEvidencePaths,
+    evidenceReady: currentEvidenceReady,
+    evidenceSummary: currentEvidenceSummary,
+    proofCommand,
+    rerunCommand,
+    hardGateCommand: hardExternalGateCommand,
+    valueRecorded: false
+  }));
+
+  return {
+    currentProofChecklistRowCount: currentProofChecklistRows.length,
+    currentProofChecklistRowSummary:
+      currentProofChecklistRows.length > 0 ? `${currentProofChecklistRows.length} value-free proof checklist rows` : "none",
+    currentProofChecklistRows
+  };
+}
+
+function formatProofChecklistRowsTable(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "| order | criterion | evidence | proof command | rerun command | hard gate | value recorded |\n|---:|---|---|---|---|---|---:|\n| 0 | none | none | none | none | none | no |";
+  }
+  return [
+    "| order | criterion | evidence | proof command | rerun command | hard gate | value recorded |",
+    "|---:|---|---|---|---|---|---:|",
+    ...items.map(
+      (item) =>
+        `| ${item.order} | ${escapeCell(item.criterion)} | ${escapeCell(item.evidenceSummary)} | ${escapeCell(item.proofCommand)} | ${escapeCell(item.rerunCommand)} | ${escapeCell(item.hardGateCommand)} | ${readyLabel(item.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
 function formatChecklistList(items) {
   return Array.isArray(items) && items.length > 0 ? items.map((item, index) => `${index + 1}. ${item}`).join("\n") : "1. None.";
 }
@@ -1170,6 +1220,10 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     currentActionSummary,
     doctorPrepareEnvAudit
   });
+  const currentProofChecklist = buildCurrentProofChecklistSummary({
+    currentActionSummary,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
 
   return {
     appName,
@@ -1204,6 +1258,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...doctorCompletionGap,
     ...doctorPrepareEnvAudit,
     ...currentPlaceholderRemediation,
+    ...currentProofChecklist,
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
     externalDistributionReady: false,
@@ -1301,6 +1356,7 @@ function buildMarkdown(report) {
 - Current evidence rows: ${report.currentEvidenceRowsCount} (${report.currentEvidenceRowsSummary})
 - Current evidence labels: ${report.currentEvidenceLabelCount} (${report.currentEvidenceLabelSummary})
 - Current ready criteria: ${report.currentReadyCriteriaCount} (${report.currentReadyCriteriaSummary})
+- Current proof checklist rows: ${report.currentProofChecklistRowCount} (${report.currentProofChecklistRowSummary})
 - Current action checklist: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})
 - Current prerequisite commands: ${report.currentPrerequisiteCommandCount} (${report.currentPrerequisiteCommandSummary})
 - Current rerun commands: ${report.currentRerunCommandCount} (${report.currentRerunCommandSummary})
@@ -1451,6 +1507,10 @@ ${formatEvidenceRowsTable(report.currentEvidenceRows)}
 
 ${formatReadyCriteriaList(report.currentReadyCriteria)}
 
+## Current Proof Checklist
+
+${formatProofChecklistRowsTable(report.currentProofChecklistRows)}
+
 ## Current Action Checklist
 
 ${formatChecklistList(report.currentActionChecklist)}
@@ -1571,6 +1631,10 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     },
     doctorPrepareEnvAudit
   });
+  const currentProofChecklist = buildCurrentProofChecklistSummary({
+    currentActionSummary,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
 
   nextActionsReport = {
     appName,
@@ -1605,6 +1669,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...doctorCompletionGap,
     ...doctorPrepareEnvAudit,
     ...currentPlaceholderRemediation,
+    ...currentProofChecklist,
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
     externalDistributionReady: externalPreflight.externalDistributionReady === true,
@@ -1863,6 +1928,11 @@ check(
 );
 check(Number.isInteger(nextActionsReport.currentReadyCriteriaCount), "external next actions should include the current ready criteria count");
 check(typeof nextActionsReport.currentReadyCriteriaSummary === "string" && nextActionsReport.currentReadyCriteriaSummary.length > 0, "external next actions should include the current ready criteria summary");
+check(Number.isInteger(nextActionsReport.currentProofChecklistRowCount), "external next actions should include the current proof checklist row count");
+check(
+  typeof nextActionsReport.currentProofChecklistRowSummary === "string" && nextActionsReport.currentProofChecklistRowSummary.length > 0,
+  "external next actions should include the current proof checklist row summary"
+);
 check(Number.isInteger(nextActionsReport.currentActionChecklistCount), "external next actions should include the current action checklist count");
 check(typeof nextActionsReport.currentActionChecklistSummary === "string" && nextActionsReport.currentActionChecklistSummary.length > 0, "external next actions should include the current action checklist summary");
 check(Number.isInteger(nextActionsReport.currentPrerequisiteCommandCount), "external next actions should include the current prerequisite command count");
@@ -1894,6 +1964,7 @@ check(Array.isArray(nextActionsReport.currentPlaceholderRemediationRows), "exter
 check(Array.isArray(nextActionsReport.currentEvidenceRows), "external next actions should include current evidence rows");
 check(Array.isArray(nextActionsReport.currentEvidenceLabels), "external next actions should include current evidence labels");
 check(Array.isArray(nextActionsReport.currentReadyCriteria), "external next actions should include current ready criteria");
+check(Array.isArray(nextActionsReport.currentProofChecklistRows), "external next actions should include current proof checklist rows");
 check(Array.isArray(nextActionsReport.currentActionChecklist), "external next actions should include current action checklist");
 check(Array.isArray(nextActionsReport.currentPrerequisiteCommands), "external next actions should include current prerequisite commands");
 check(Array.isArray(nextActionsReport.currentOperatorActions), "external next actions should include current operator actions");
@@ -1938,6 +2009,10 @@ check(
 check(
   nextActionsReport.currentEvidenceLabelCount === nextActionsReport.currentEvidenceRowsCount,
   "external next actions current evidence label count should match current evidence rows"
+);
+check(
+  nextActionsReport.currentProofChecklistRowCount === nextActionsReport.currentProofChecklistRows.length,
+  "external next actions current proof checklist row count should match listed rows"
 );
 check(
   nextActionsReport.currentEnvEditTemplate.every(
@@ -2036,6 +2111,35 @@ check(
 check(
   nextActionsReport.currentReadyCriteriaCount === nextActionsReport.currentReadyCriteria.length,
   "external next actions current ready criteria count should match listed criteria"
+);
+check(
+  nextActionsReport.currentProofChecklistRowCount === nextActionsReport.currentReadyCriteriaCount,
+  "external next actions current proof checklist row count should match current ready criteria count"
+);
+check(
+  nextActionsReport.currentProofChecklistRows.every((item, index) => {
+    const expectedRerunCommand =
+      nextActionsReport.currentRerunCommand && nextActionsReport.currentRerunCommand !== "none"
+        ? nextActionsReport.currentRerunCommand
+        : nextActionsReport.currentNextCommand;
+    const expectedEvidencePaths = nextActionsReport.currentEvidenceRows.map((row) => row.path);
+    const expectedEvidenceReady = nextActionsReport.currentEvidenceRows.length > 0 && nextActionsReport.currentEvidenceRows.every((row) => row.present === true);
+    return (
+      item.order === index + 1 &&
+      item.criterion === nextActionsReport.currentReadyCriteria[index] &&
+      Array.isArray(item.evidenceLabels) &&
+      JSON.stringify(item.evidenceLabels) === JSON.stringify(nextActionsReport.currentEvidenceLabels) &&
+      Array.isArray(item.evidencePaths) &&
+      JSON.stringify(item.evidencePaths) === JSON.stringify(expectedEvidencePaths) &&
+      item.evidenceReady === expectedEvidenceReady &&
+      item.evidenceSummary === nextActionsReport.currentEvidenceLabelSummary &&
+      item.proofCommand === nextActionsReport.currentNextCommand &&
+      item.rerunCommand === expectedRerunCommand &&
+      item.hardGateCommand === nextActionsReport.hardExternalGateCommand &&
+      item.valueRecorded === false
+    );
+  }),
+  "external next actions current proof checklist rows should connect ready criteria to current evidence and commands without values"
 );
 check(
   nextActionsReport.currentActionChecklistCount === nextActionsReport.currentActionChecklist.length,
@@ -2469,6 +2573,7 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   check(nextActionsReport.currentEnvEditTemplateCount === 4, "release channel metadata should keep four current env edit template assignments when placeholders remain");
   check(nextActionsReport.currentEnvEditRowsCount === 4, "release channel metadata should keep four current env edit rows when placeholders remain");
   check(nextActionsReport.currentPlaceholderRemediationRowCount === 4, "release channel metadata should keep four current placeholder remediation rows when placeholders remain");
+  check(nextActionsReport.currentProofChecklistRowCount === 3, "release channel metadata should surface three current proof checklist rows when placeholders remain");
   check(
     nextActionsReport.currentPlaceholderRemediationRows.every(
       (item) =>
@@ -2486,6 +2591,22 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
         item.valueRecorded === false
     ),
     "release channel metadata should include value-free current placeholder remediation rows sourced from release doctor"
+  );
+  check(
+    nextActionsReport.currentProofChecklistRows.every(
+      (item) =>
+        nextActionsReport.currentReadyCriteria.includes(item.criterion) &&
+        item.evidenceLabels.includes("Distribution private inputs") &&
+        item.evidenceLabels.includes("Distribution-channel QA") &&
+        item.evidencePaths.some((path) => path.endsWith("-distribution-private-inputs.json")) &&
+        item.evidencePaths.some((path) => path.endsWith("-distribution-channel-qa.json")) &&
+        item.evidenceReady === true &&
+        item.proofCommand === "npm run release:doctor" &&
+        item.rerunCommand === "npm run release:doctor" &&
+        item.hardGateCommand === "npm run release:external-check" &&
+        item.valueRecorded === false
+    ),
+    "release channel metadata should connect current proof checklist rows to stable evidence, release doctor, and the hard gate"
   );
   check(
     nextActionsReport.currentEnvEditTemplate.every((item) => nextActionsReport.currentRequiredKeys.includes(item.key) && item.valueRecorded === false),
@@ -2559,6 +2680,7 @@ check(markdown.includes("Current placeholder remediation rows:"), "external next
 check(markdown.includes("Current evidence rows:"), "external next actions Markdown should include current evidence rows status");
 check(markdown.includes("Current evidence labels:"), "external next actions Markdown should include current evidence labels status");
 check(markdown.includes("Current ready criteria:"), "external next actions Markdown should include current ready criteria");
+check(markdown.includes("Current proof checklist rows:"), "external next actions Markdown should include current proof checklist row status");
 check(markdown.includes("Current action checklist:"), "external next actions Markdown should include current action checklist status");
 check(markdown.includes("Current env edit target:"), "external next actions Markdown should include current env edit target");
 check(markdown.includes("Current operator action:"), "external next actions Markdown should include current operator action");
@@ -2577,6 +2699,7 @@ check(markdown.includes("Current Evidence Rows"), "external next actions Markdow
 check(markdown.includes("Evidence:"), "external next actions Markdown should include action evidence details");
 check(markdown.includes("Current Ready Criteria"), "external next actions Markdown should include current ready criteria section");
 check(markdown.includes("Ready criteria:"), "external next actions Markdown should include action ready criteria details");
+check(markdown.includes("Current Proof Checklist"), "external next actions Markdown should include current proof checklist section");
 check(markdown.includes("Current Action Checklist"), "external next actions Markdown should include current action checklist section");
 check(markdown.includes("Action checklist:"), "external next actions Markdown should include action checklist details");
 check(markdown.includes("Completion Gap"), "external next actions Markdown should include completion gap section");
@@ -2606,6 +2729,10 @@ if (nextActionsReport.currentEvidenceRowsCount > 0) {
   check(nextActionsReport.currentEvidenceRows.some((item) => markdown.includes(item.label)), "external next actions Markdown should include current evidence row labels");
   check(nextActionsReport.currentEvidenceRows.some((item) => markdown.includes(item.path)), "external next actions Markdown should include current evidence row paths");
   check(markdown.includes("| evidence | present | path | value recorded |"), "external next actions Markdown should include current evidence row table");
+}
+if (nextActionsReport.currentProofChecklistRowCount > 0) {
+  check(nextActionsReport.currentProofChecklistRows.some((item) => markdown.includes(item.criterion)), "external next actions Markdown should include current proof checklist criteria");
+  check(markdown.includes("| order | criterion | evidence | proof command | rerun command | hard gate | value recorded |"), "external next actions Markdown should include current proof checklist table");
 }
 check(markdown.includes("Priority Next Actions"), "external next actions Markdown should include priority actions");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "external next actions Markdown should keep the hard gate command");
@@ -2677,6 +2804,7 @@ console.log(`- Current placeholder remediation rows: ${nextActionsReport.current
 console.log(`- Current evidence rows: ${nextActionsReport.currentEvidenceRowsCount} (${nextActionsReport.currentEvidenceRowsSummary})`);
 console.log(`- Current evidence labels: ${nextActionsReport.currentEvidenceLabelCount} (${nextActionsReport.currentEvidenceLabelSummary})`);
 console.log(`- Current ready criteria: ${nextActionsReport.currentReadyCriteriaCount} (${nextActionsReport.currentReadyCriteriaSummary})`);
+console.log(`- Current proof checklist rows: ${nextActionsReport.currentProofChecklistRowCount} (${nextActionsReport.currentProofChecklistRowSummary})`);
 console.log(`- Current action checklist: ${nextActionsReport.currentActionChecklistCount} (${nextActionsReport.currentActionChecklistSummary})`);
 console.log(`- Current prerequisite commands: ${nextActionsReport.currentPrerequisiteCommandCount} (${nextActionsReport.currentPrerequisiteCommandSummary})`);
 console.log(`- Current rerun commands: ${nextActionsReport.currentRerunCommandCount} (${nextActionsReport.currentRerunCommandSummary})`);
