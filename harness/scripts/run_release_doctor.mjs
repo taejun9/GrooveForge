@@ -228,6 +228,15 @@ function formatLocationList(items) {
     : "- None.";
 }
 
+function formatLocationRows(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "| none | none | none | no |";
+  }
+  return items
+    .map((item) => `| ${escapeCell(item.file)} | ${Number.isInteger(item.line) ? item.line : "none"} | ${escapeCell(item.key)} | ${readyLabel(item.valueRecorded)} |`)
+    .join("\n");
+}
+
 function formatEnvEditTemplateBlock(items) {
   if (!Array.isArray(items) || items.length === 0) {
     return "- None.";
@@ -690,6 +699,10 @@ function buildMarkdown(report) {
 - Distribution env template ready: ${readyLabel(report.distributionEnvTemplateReady)}
 - Release prepare env ready: ${readyLabel(report.releasePrepareEnvReady)}
 - Release prepare env scaffold written: ${readyLabel(report.releasePrepareEnvScaffoldWritten)}
+- Release prepare-env existing local env file loaded: ${readyLabel(report.releasePrepareEnvExistingLocalEnvFileLoaded)}
+- Release prepare-env existing local env placeholder keys: ${report.releasePrepareEnvExistingLocalEnvPlaceholderKeyCount} (${report.releasePrepareEnvExistingLocalEnvPlaceholderKeySummary})
+- Release prepare-env release-channel placeholder keys: ${report.releasePrepareEnvExistingReleaseChannelPlaceholderKeyCount} (${report.releasePrepareEnvExistingReleaseChannelPlaceholderKeySummary})
+- Release prepare-env release-channel placeholder edit locations: ${report.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationCount} (${report.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationSummary})
 - Template keys covered: ${readyLabel(report.templateKeysCovered)}
 - Private inputs ready: ${readyLabel(report.privateInputsReady)}
 - Private input groups ready: ${report.privateInputGroupReadyCount}/${report.privateInputGroupTotal}
@@ -735,6 +748,27 @@ function buildMarkdown(report) {
 | targeted check | command |
 |---|---|
 ${formatCommandRows(report.targetedCommands)}
+
+## Release Prepare Env Placeholder Audit
+
+- Existing local env files checked: ${report.releasePrepareEnvExistingLocalEnvFilesChecked.join(", ") || "none"}
+- Existing local env present files: ${report.releasePrepareEnvExistingLocalEnvPresentFiles.join(", ") || "none"}
+- Existing local env file loaded: ${readyLabel(report.releasePrepareEnvExistingLocalEnvFileLoaded)}
+- Existing local env placeholder keys: ${report.releasePrepareEnvExistingLocalEnvPlaceholderKeyCount} (${report.releasePrepareEnvExistingLocalEnvPlaceholderKeySummary})
+- Existing local env placeholder edit locations: ${report.releasePrepareEnvExistingLocalEnvPlaceholderEditLocationCount} (${report.releasePrepareEnvExistingLocalEnvPlaceholderEditLocationSummary})
+- Existing release-channel placeholder keys: ${report.releasePrepareEnvExistingReleaseChannelPlaceholderKeyCount} (${report.releasePrepareEnvExistingReleaseChannelPlaceholderKeySummary})
+- Existing release-channel placeholder edit locations: ${report.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationCount} (${report.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationSummary})
+- Value recorded: ${readyLabel(report.releasePrepareEnvExistingLocalEnvValueRecorded)}
+
+### Release Prepare Env Existing Placeholder Keys
+
+${formatKeyList(report.releasePrepareEnvExistingLocalEnvPlaceholderKeys)}
+
+### Release Prepare Env Release-Channel Placeholder Edit Locations
+
+| file | line | key | value recorded |
+|---|---:|---|---:|
+${formatLocationRows(report.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocations)}
 
 ## Completion Gap
 
@@ -930,6 +964,54 @@ const releaseDoctorReport = {
   releasePrepareEnvReady: releasePrepareEnv.releasePrepareEnvReady === true,
   releasePrepareEnvScaffoldWritten: releasePrepareEnv.scaffoldWritten === true,
   releasePrepareEnvLocalWriteRequested: releasePrepareEnv.localEnvWriteRequested === true,
+  releasePrepareEnvExistingLocalEnvFilesChecked: Array.isArray(releasePrepareEnv.existingLocalEnvFilesChecked)
+    ? releasePrepareEnv.existingLocalEnvFilesChecked
+    : [],
+  releasePrepareEnvExistingLocalEnvPresentFiles: Array.isArray(releasePrepareEnv.existingLocalEnvPresentFiles)
+    ? releasePrepareEnv.existingLocalEnvPresentFiles
+    : [],
+  releasePrepareEnvExistingLocalEnvFileLoaded: releasePrepareEnv.existingLocalEnvFileLoaded === true,
+  releasePrepareEnvExistingLocalEnvPlaceholderKeyCount: Number.isInteger(releasePrepareEnv.existingLocalEnvPlaceholderKeyCount)
+    ? releasePrepareEnv.existingLocalEnvPlaceholderKeyCount
+    : 0,
+  releasePrepareEnvExistingLocalEnvPlaceholderKeySummary:
+    typeof releasePrepareEnv.existingLocalEnvPlaceholderKeySummary === "string"
+      ? releasePrepareEnv.existingLocalEnvPlaceholderKeySummary
+      : "none",
+  releasePrepareEnvExistingLocalEnvPlaceholderKeys: Array.isArray(releasePrepareEnv.existingLocalEnvPlaceholderKeys)
+    ? releasePrepareEnv.existingLocalEnvPlaceholderKeys
+    : [],
+  releasePrepareEnvExistingLocalEnvPlaceholderEditLocationCount: Number.isInteger(releasePrepareEnv.existingLocalEnvPlaceholderEditLocationCount)
+    ? releasePrepareEnv.existingLocalEnvPlaceholderEditLocationCount
+    : 0,
+  releasePrepareEnvExistingLocalEnvPlaceholderEditLocationSummary:
+    typeof releasePrepareEnv.existingLocalEnvPlaceholderEditLocationSummary === "string"
+      ? releasePrepareEnv.existingLocalEnvPlaceholderEditLocationSummary
+      : "none",
+  releasePrepareEnvExistingLocalEnvPlaceholderEditLocations: Array.isArray(releasePrepareEnv.existingLocalEnvPlaceholderEditLocations)
+    ? releasePrepareEnv.existingLocalEnvPlaceholderEditLocations
+    : [],
+  releasePrepareEnvExistingReleaseChannelPlaceholderKeyCount: Number.isInteger(releasePrepareEnv.existingReleaseChannelPlaceholderKeyCount)
+    ? releasePrepareEnv.existingReleaseChannelPlaceholderKeyCount
+    : 0,
+  releasePrepareEnvExistingReleaseChannelPlaceholderKeySummary:
+    typeof releasePrepareEnv.existingReleaseChannelPlaceholderKeySummary === "string"
+      ? releasePrepareEnv.existingReleaseChannelPlaceholderKeySummary
+      : "none",
+  releasePrepareEnvExistingReleaseChannelPlaceholderKeys: Array.isArray(releasePrepareEnv.existingReleaseChannelPlaceholderKeys)
+    ? releasePrepareEnv.existingReleaseChannelPlaceholderKeys
+    : [],
+  releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationCount: Number.isInteger(releasePrepareEnv.existingReleaseChannelPlaceholderEditLocationCount)
+    ? releasePrepareEnv.existingReleaseChannelPlaceholderEditLocationCount
+    : 0,
+  releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationSummary:
+    typeof releasePrepareEnv.existingReleaseChannelPlaceholderEditLocationSummary === "string"
+      ? releasePrepareEnv.existingReleaseChannelPlaceholderEditLocationSummary
+      : "none",
+  releasePrepareEnvExistingReleaseChannelPlaceholderEditLocations: Array.isArray(releasePrepareEnv.existingReleaseChannelPlaceholderEditLocations)
+    ? releasePrepareEnv.existingReleaseChannelPlaceholderEditLocations
+    : [],
+  releasePrepareEnvExistingLocalEnvValueRecorded: releasePrepareEnv.existingLocalEnvValueRecorded === true,
   templateKeysCovered: distributionEnvTemplate.templateKeysCovered === true,
   localEnvFileLoaded,
   localEnvReady: distributionEnvTemplate.localEnvReady === true,
@@ -1022,6 +1104,51 @@ check(releaseDoctorReport.releaseDoctorReportReady === true, "release doctor rep
 check(releaseDoctorReport.releasePrepareEnvReady === true, "release doctor should include ready release prepare-env evidence");
 check(releaseDoctorReport.releasePrepareEnvScaffoldWritten === true, "release doctor should include written prepare-env scaffold evidence");
 check(releaseDoctorReport.releasePrepareEnvLocalWriteRequested === false, "release doctor should not request a local env write");
+check(Array.isArray(releaseDoctorReport.releasePrepareEnvExistingLocalEnvFilesChecked), "release doctor should include prepare-env existing local env files checked");
+check(Array.isArray(releaseDoctorReport.releasePrepareEnvExistingLocalEnvPresentFiles), "release doctor should include prepare-env existing local env present files");
+check(typeof releaseDoctorReport.releasePrepareEnvExistingLocalEnvFileLoaded === "boolean", "release doctor should include prepare-env existing local env loaded status");
+check(Number.isInteger(releaseDoctorReport.releasePrepareEnvExistingLocalEnvPlaceholderKeyCount), "release doctor should include prepare-env existing local env placeholder key count");
+check(typeof releaseDoctorReport.releasePrepareEnvExistingLocalEnvPlaceholderKeySummary === "string", "release doctor should include prepare-env existing local env placeholder key summary");
+check(Array.isArray(releaseDoctorReport.releasePrepareEnvExistingLocalEnvPlaceholderKeys), "release doctor should include prepare-env existing local env placeholder keys");
+check(
+  releaseDoctorReport.releasePrepareEnvExistingLocalEnvPlaceholderKeyCount === releaseDoctorReport.releasePrepareEnvExistingLocalEnvPlaceholderKeys.length,
+  "release doctor prepare-env existing local env placeholder key count should match listed keys"
+);
+check(Number.isInteger(releaseDoctorReport.releasePrepareEnvExistingLocalEnvPlaceholderEditLocationCount), "release doctor should include prepare-env existing local env placeholder edit location count");
+check(typeof releaseDoctorReport.releasePrepareEnvExistingLocalEnvPlaceholderEditLocationSummary === "string", "release doctor should include prepare-env existing local env placeholder edit location summary");
+check(Array.isArray(releaseDoctorReport.releasePrepareEnvExistingLocalEnvPlaceholderEditLocations), "release doctor should include prepare-env existing local env placeholder edit locations");
+check(
+  releaseDoctorReport.releasePrepareEnvExistingLocalEnvPlaceholderEditLocationCount === releaseDoctorReport.releasePrepareEnvExistingLocalEnvPlaceholderEditLocations.length,
+  "release doctor prepare-env existing local env placeholder edit location count should match listed locations"
+);
+check(Number.isInteger(releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderKeyCount), "release doctor should include prepare-env release-channel placeholder key count");
+check(typeof releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderKeySummary === "string", "release doctor should include prepare-env release-channel placeholder key summary");
+check(Array.isArray(releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderKeys), "release doctor should include prepare-env release-channel placeholder keys");
+check(
+  releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderKeyCount === releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderKeys.length,
+  "release doctor prepare-env release-channel placeholder key count should match listed keys"
+);
+check(Number.isInteger(releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationCount), "release doctor should include prepare-env release-channel placeholder edit location count");
+check(typeof releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationSummary === "string", "release doctor should include prepare-env release-channel placeholder edit location summary");
+check(Array.isArray(releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocations), "release doctor should include prepare-env release-channel placeholder edit locations");
+check(
+  releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationCount === releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocations.length,
+  "release doctor prepare-env release-channel placeholder edit location count should match listed locations"
+);
+check(
+  releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocations.every(
+    (item) =>
+      releaseChannelMetadataKeys.includes(item.key) &&
+      typeof item.file === "string" &&
+      item.file.length > 0 &&
+      Number.isInteger(item.line) &&
+      item.line > 0 &&
+      item.placeholder === true &&
+      item.valueRecorded === false
+  ),
+  "release doctor prepare-env release-channel placeholder edit locations should include only value-free file, line, and key rows"
+);
+check(releaseDoctorReport.releasePrepareEnvExistingLocalEnvValueRecorded === false, "release doctor prepare-env placeholder audit should not record values");
 check(typeof releaseDoctorReport.externalDistributionReady === "boolean", "release doctor should include external distribution readiness");
 check(typeof releaseDoctorReport.completionGapStatus === "string" && releaseDoctorReport.completionGapStatus.length > 0, "release doctor should include the completion gap status");
 check(typeof releaseDoctorReport.completionGapSummary === "string" && releaseDoctorReport.completionGapSummary.length > 0, "release doctor should include the completion gap summary");
@@ -1328,6 +1455,12 @@ check(markdown.includes("Completion Gap"), "release doctor Markdown should inclu
 check(markdown.includes("Proof target:"), "release doctor Markdown should include completion gap proof target details");
 check(markdown.includes("Local env placeholder keys:"), "release doctor Markdown should include placeholder key count");
 check(markdown.includes("Local Env Placeholder Keys"), "release doctor Markdown should include placeholder key section");
+check(markdown.includes("Release prepare-env existing local env placeholder keys:"), "release doctor Markdown should include prepare-env existing local env placeholder key status");
+check(markdown.includes("Release prepare-env release-channel placeholder keys:"), "release doctor Markdown should include prepare-env release-channel placeholder key status");
+check(markdown.includes("Release prepare-env release-channel placeholder edit locations:"), "release doctor Markdown should include prepare-env release-channel placeholder edit location status");
+check(markdown.includes("Release Prepare Env Placeholder Audit"), "release doctor Markdown should include prepare-env placeholder audit section");
+check(markdown.includes("Release Prepare Env Existing Placeholder Keys"), "release doctor Markdown should include prepare-env existing placeholder key section");
+check(markdown.includes("Release Prepare Env Release-Channel Placeholder Edit Locations"), "release doctor Markdown should include prepare-env release-channel placeholder edit location section");
 check(markdown.includes("Current action:"), "release doctor Markdown should include current action status");
 check(markdown.includes("Current next command:"), "release doctor Markdown should include current next command");
 check(markdown.includes("Current first blocker:"), "release doctor Markdown should include current first blocker");
@@ -1378,6 +1511,16 @@ console.log(`- Local env file loaded: ${releaseDoctorReport.localEnvFileLoaded ?
 console.log(`- Local env ready: ${releaseDoctorReport.localEnvReady ? "yes" : "no"}`);
 console.log(`- Release prepare env ready: ${releaseDoctorReport.releasePrepareEnvReady ? "yes" : "no"}`);
 console.log(`- Release prepare env scaffold written: ${releaseDoctorReport.releasePrepareEnvScaffoldWritten ? "yes" : "no"}`);
+console.log(`- Release prepare-env existing local env file loaded: ${releaseDoctorReport.releasePrepareEnvExistingLocalEnvFileLoaded ? "yes" : "no"}`);
+console.log(
+  `- Release prepare-env existing local env placeholder keys: ${releaseDoctorReport.releasePrepareEnvExistingLocalEnvPlaceholderKeyCount} (${releaseDoctorReport.releasePrepareEnvExistingLocalEnvPlaceholderKeySummary})`
+);
+console.log(
+  `- Release prepare-env release-channel placeholder keys: ${releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderKeyCount} (${releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderKeySummary})`
+);
+console.log(
+  `- Release prepare-env release-channel placeholder edit locations: ${releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationCount} (${releaseDoctorReport.releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationSummary})`
+);
 console.log(`- Private inputs ready: ${releaseDoctorReport.privateInputsReady ? "yes" : "no"}`);
 console.log(`- Private input groups ready: ${releaseDoctorReport.privateInputGroupReadyCount}/${releaseDoctorReport.privateInputGroupTotal}`);
 console.log(`- Local env placeholder keys: ${releaseDoctorReport.localEnvPlaceholderKeyCount}`);
