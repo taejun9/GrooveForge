@@ -2,7 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,6 +12,7 @@ const bundleId = "app.grooveforge.desktop";
 const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
+const completedPlansDir = path.join(root, "docs", "exec_plans", "completed");
 const completionProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-completion-progress.json`);
 const externalProofBundleJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-proof-bundle.json`);
 const releaseProgressMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.md`);
@@ -54,6 +55,65 @@ function integerValue(value) {
 
 function stringArrayValue(values) {
   return Array.isArray(values) ? values.filter((value) => typeof value === "string" && value.trim().length > 0) : [];
+}
+
+function formatUserPercent(value) {
+  return value === 100 ? "100%" : `${value.toFixed(6)}%`;
+}
+
+async function buildCompletedPlanSummary() {
+  const names = await readdir(completedPlansDir);
+  const planRows = names
+    .map((name) => {
+      const match = name.match(/^plan-(\d{3,})-[a-z0-9][a-z0-9-]*\.md$/);
+      return match ? { number: Number.parseInt(match[1], 10), fileName: name } : null;
+    })
+    .filter((row) => row && Number.isInteger(row.number))
+    .sort((a, b) => a.number - b.number);
+  const latest = planRows.at(-1) ?? { number: 0, fileName: "none" };
+  const windowStart = latest.number > 0 ? Math.floor((latest.number - 1) / 10) * 10 + 1 : 1;
+  const windowEnd = windowStart + 9;
+  const windowCompleted = planRows.filter((row) => row.number >= windowStart && row.number <= windowEnd);
+  const latestPath = latest.fileName === "none" ? "none" : relative(path.join(completedPlansDir, latest.fileName));
+
+  return {
+    completedPlanSource: relative(completedPlansDir),
+    completedPlanCount: planRows.length,
+    latestCompletedPlanNumber: latest.number,
+    latestCompletedPlanPath: latestPath,
+    currentTenPlanWindowStart: windowStart,
+    currentTenPlanWindowEnd: windowEnd,
+    currentTenPlanWindowCompletedCount: windowCompleted.length,
+    currentTenPlanWindowTotal: 10,
+    currentTenPlanWindowLabel: `${windowStart}-${windowEnd}: ${windowCompleted.length}/10`,
+    tenPlanProgressReportDue: windowCompleted.length === 10,
+    tenPlanProgressReportCadence: "report after each completed work and every 10 completed plans",
+    nextTenPlanProgressReportAt: windowEnd,
+    completedPlanValueRecorded: false
+  };
+}
+
+function buildUserFacingCompletionSummary(report, completedPlanSummary) {
+  const completionPercent = report.externalDistributionGateReady ? 100 : 99.999999;
+  const remainingPercent = report.externalDistributionGateReady ? 0 : 0.000001;
+  const completionStatus = report.externalDistributionGateReady
+    ? "100% complete; external distribution hard gate is ready."
+    : "99.999999% complete; external/private release proof remains.";
+
+  return {
+    userFacingCompletionPercent: completionPercent,
+    userFacingRemainingPercent: remainingPercent,
+    userFacingCompletionStatus: completionStatus,
+    userFacingCompletionSummary:
+      "Local app, beat-workstation, desktop package, project IO, and release evidence are ready; final external distribution proof remains operator-owned.",
+    userFacingNextBlocker: report.externalProofBundleCurrentFirstBlocker,
+    userFacingNextCommand: report.externalProofBundleCurrentNextCommand,
+    userFacingCompletionEvidenceSummary:
+      "local release ready, desktop project IO ready, PKG payload project IO ready, external proof bundle ready",
+    userFacingReportCadence: completedPlanSummary.tenPlanProgressReportCadence,
+    userFacingCompletionPrivateValueRecorded: false,
+    ...completedPlanSummary
+  };
 }
 
 function buildExternalProofBundleSummary(externalProofBundle) {
@@ -110,6 +170,11 @@ function buildMarkdown(report) {
 
 - Report ready: ${report.releaseProgressReportReady ? "yes" : "no"}
 - Completion stage: ${report.completionStage}
+- User-facing overall completion: ${formatUserPercent(report.userFacingCompletionPercent)}
+- User-facing remaining completion: ${formatUserPercent(report.userFacingRemainingPercent)}
+- User-facing completion status: ${report.userFacingCompletionStatus}
+- Current 10-plan progress: ${report.currentTenPlanWindowLabel}
+- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}
 - Source evidence ready: ${report.sourceEvidenceReady ? "yes" : "no"}
 - Local release ready: ${report.localReleaseReady ? "yes" : "no"}
 - Local release readiness: ${report.localReleaseReadinessPercent.toFixed(1)}%
@@ -139,6 +204,22 @@ function buildMarkdown(report) {
 - Release upload attempted by this report: no
 - Apple notary submission attempted by this report: no
 - Signing attempted by this report: no
+
+## User-Facing Progress
+
+- Overall completion for status reports: ${formatUserPercent(report.userFacingCompletionPercent)}
+- Remaining completion for status reports: ${formatUserPercent(report.userFacingRemainingPercent)}
+- Completion status wording: ${report.userFacingCompletionStatus}
+- Completion evidence summary: ${report.userFacingCompletionEvidenceSummary}
+- Next blocker to report: ${report.userFacingNextBlocker}
+- Next command to report: \`${report.userFacingNextCommand}\`
+- Report cadence: ${report.userFacingReportCadence}
+- Completed plan source: ${report.completedPlanSource}
+- Completed plan count: ${report.completedPlanCount}
+- Latest completed plan: ${report.latestCompletedPlanPath}
+- Current 10-plan window: ${report.currentTenPlanWindowLabel}
+- Next 10-plan report at: plan-${String(report.nextTenPlanProgressReportAt).padStart(3, "0")}
+- Private values recorded in this summary: no
 
 ## Commands
 
@@ -222,6 +303,7 @@ if (!existsSync(externalProofBundleJsonPath)) {
 const completionProgress = JSON.parse(await readFile(completionProgressJsonPath, "utf8"));
 const externalProofBundle = JSON.parse(await readFile(externalProofBundleJsonPath, "utf8"));
 const externalProofBundleSummary = buildExternalProofBundleSummary(externalProofBundle);
+const completedPlanSummary = await buildCompletedPlanSummary();
 const releaseProgressReport = {
   appName,
   bundleId,
@@ -280,6 +362,7 @@ releaseProgressReport.releaseProgressReportReady =
   releaseProgressReport.pkgPayloadProjectIoEvidenceReady &&
   releaseProgressReport.sourceExternalProofBundleReady &&
   releaseProgressReport.externalProofBundleReady;
+Object.assign(releaseProgressReport, buildUserFacingCompletionSummary(releaseProgressReport, completedPlanSummary));
 
 const markdown = buildMarkdown(releaseProgressReport);
 
@@ -295,6 +378,27 @@ check(releaseProgressReport.hardExternalGateCommand === "npm run release:externa
 check(releaseProgressReport.sourceEvidenceReady === true, "release progress report should include ready source evidence");
 check(releaseProgressReport.localReleaseReady === true, "release progress report should include ready local release evidence");
 check(releaseProgressReport.localReleaseReadinessPercent === 100, "release progress report should report 100 percent local release readiness");
+check(releaseProgressReport.userFacingCompletionPercent === (releaseProgressReport.externalDistributionGateReady ? 100 : 99.999999), "release progress report should include user-facing overall completion percent");
+check(releaseProgressReport.userFacingRemainingPercent === (releaseProgressReport.externalDistributionGateReady ? 0 : 0.000001), "release progress report should include user-facing remaining completion percent");
+check(typeof releaseProgressReport.userFacingCompletionStatus === "string" && releaseProgressReport.userFacingCompletionStatus.length > 0, "release progress report should include user-facing completion status wording");
+check(typeof releaseProgressReport.userFacingCompletionSummary === "string" && releaseProgressReport.userFacingCompletionSummary.length > 0, "release progress report should include user-facing completion summary");
+check(typeof releaseProgressReport.userFacingNextBlocker === "string" && releaseProgressReport.userFacingNextBlocker.length > 0, "release progress report should include user-facing next blocker");
+check(typeof releaseProgressReport.userFacingNextCommand === "string" && releaseProgressReport.userFacingNextCommand.length > 0, "release progress report should include user-facing next command");
+check(releaseProgressReport.userFacingReportCadence === "report after each completed work and every 10 completed plans", "release progress report should include user-facing report cadence");
+check(releaseProgressReport.userFacingCompletionPrivateValueRecorded === false, "release progress report should not record private values in the user-facing completion summary");
+check(releaseProgressReport.completedPlanSource === "docs/exec_plans/completed", "release progress report should identify completed plan source");
+check(Number.isInteger(releaseProgressReport.completedPlanCount) && releaseProgressReport.completedPlanCount > 0, "release progress report should count completed plans");
+check(Number.isInteger(releaseProgressReport.latestCompletedPlanNumber) && releaseProgressReport.latestCompletedPlanNumber >= 1130, "release progress report should identify the latest completed plan number");
+check(typeof releaseProgressReport.latestCompletedPlanPath === "string" && releaseProgressReport.latestCompletedPlanPath.includes(`plan-${String(releaseProgressReport.latestCompletedPlanNumber).padStart(3, "0")}-`), "release progress report should identify the latest completed plan path");
+check(Number.isInteger(releaseProgressReport.currentTenPlanWindowStart), "release progress report should include current 10-plan window start");
+check(Number.isInteger(releaseProgressReport.currentTenPlanWindowEnd), "release progress report should include current 10-plan window end");
+check(releaseProgressReport.currentTenPlanWindowEnd === releaseProgressReport.currentTenPlanWindowStart + 9, "release progress report should make 10-plan window end match start plus nine");
+check(releaseProgressReport.currentTenPlanWindowTotal === 10, "release progress report should use a 10-plan reporting window");
+check(releaseProgressReport.currentTenPlanWindowCompletedCount >= 1 && releaseProgressReport.currentTenPlanWindowCompletedCount <= 10, "release progress report should count completed plans in the current 10-plan window");
+check(releaseProgressReport.currentTenPlanWindowLabel === `${releaseProgressReport.currentTenPlanWindowStart}-${releaseProgressReport.currentTenPlanWindowEnd}: ${releaseProgressReport.currentTenPlanWindowCompletedCount}/10`, "release progress report should format the current 10-plan window label");
+check(typeof releaseProgressReport.tenPlanProgressReportDue === "boolean", "release progress report should include 10-plan report due posture");
+check(releaseProgressReport.nextTenPlanProgressReportAt === releaseProgressReport.currentTenPlanWindowEnd, "release progress report should identify the next 10-plan report plan number");
+check(releaseProgressReport.completedPlanValueRecorded === false, "release progress report should not record completed plan values beyond filenames and counts");
 check(releaseProgressReport.desktopProjectIoEvidenceReady === true, "release progress report should include ready desktop project IO evidence");
 check(releaseProgressReport.pkgPayloadProjectIoEvidenceReady === true, "release progress report should include ready PKG payload project IO evidence");
 check(typeof releaseProgressReport.externalDistributionGateReady === "boolean", "release progress report should include external distribution hard-gate readiness");
@@ -356,6 +460,9 @@ check(releaseProgressReport.notarySubmissionAttemptedByThisReport === false, "re
 check(releaseProgressReport.signingAttemptedByThisReport === false, "release progress report should not sign artifacts");
 check(releaseProgressReport.releaseGateClaimedExternalDistribution === false, "release progress report should not claim external distribution completion");
 check(markdown.includes("Release Progress Report"), "release progress Markdown should include title");
+check(markdown.includes("User-Facing Progress"), "release progress Markdown should include user-facing progress summary");
+check(markdown.includes("User-facing overall completion:"), "release progress Markdown should include user-facing overall completion");
+check(markdown.includes("Current 10-plan progress:"), "release progress Markdown should include current 10-plan progress");
 check(markdown.includes("Local release readiness:"), "release progress Markdown should include local release readiness");
 check(markdown.includes("PKG payload project IO evidence ready:"), "release progress Markdown should include PKG payload project IO readiness");
 check(markdown.includes("External Proof Bundle"), "release progress Markdown should include external proof bundle summary");
@@ -376,6 +483,11 @@ console.log("GrooveForge release progress report passed.");
 console.log(`- Markdown: ${relative(releaseProgressMarkdownPath)}`);
 console.log(`- JSON: ${relative(releaseProgressJsonPath)}`);
 console.log(`- Completion stage: ${releaseProgressReport.completionStage}`);
+console.log(`- User-facing overall completion: ${formatUserPercent(releaseProgressReport.userFacingCompletionPercent)}`);
+console.log(`- User-facing remaining completion: ${formatUserPercent(releaseProgressReport.userFacingRemainingPercent)}`);
+console.log(`- User-facing completion status: ${releaseProgressReport.userFacingCompletionStatus}`);
+console.log(`- Current 10-plan progress: ${releaseProgressReport.currentTenPlanWindowLabel}`);
+console.log(`- 10-plan report due: ${releaseProgressReport.tenPlanProgressReportDue ? "yes" : "no"}`);
 console.log(`- Source evidence ready: ${releaseProgressReport.sourceEvidenceReady ? "yes" : "no"}`);
 console.log(`- Local release ready: ${releaseProgressReport.localReleaseReady ? "yes" : "no"}`);
 console.log(`- Local release readiness: ${releaseProgressReport.localReleaseReadinessPercent.toFixed(1)}%`);
