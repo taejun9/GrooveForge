@@ -947,6 +947,110 @@ function buildDoctorCompletionGapSummary(releaseDoctor = null, fallback = {}) {
   };
 }
 
+function arrayObjectField(source, key) {
+  return Array.isArray(source?.[key]) ? source[key].filter((item) => item !== null && typeof item === "object") : [];
+}
+
+function numberField(source, key, fallback = 0) {
+  const value = source?.[key];
+  return Number.isInteger(value) ? value : fallback;
+}
+
+function buildDoctorPrepareEnvAuditSummary(releaseDoctor = null) {
+  const doctorPrepareEnvAuditSourceReady = releaseDoctor !== null && typeof releaseDoctor === "object";
+  const doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeys = doctorPrepareEnvAuditSourceReady
+    ? arrayField(releaseDoctor, "releasePrepareEnvExistingLocalEnvPlaceholderKeys")
+    : [];
+  const doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocations = doctorPrepareEnvAuditSourceReady
+    ? arrayObjectField(releaseDoctor, "releasePrepareEnvExistingLocalEnvPlaceholderEditLocations")
+    : [];
+  const doctorPrepareEnvAuditReleaseChannelPlaceholderKeys = doctorPrepareEnvAuditSourceReady
+    ? arrayField(releaseDoctor, "releasePrepareEnvExistingReleaseChannelPlaceholderKeys")
+    : [];
+  const doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocations = doctorPrepareEnvAuditSourceReady
+    ? arrayObjectField(releaseDoctor, "releasePrepareEnvExistingReleaseChannelPlaceholderEditLocations")
+    : [];
+  return {
+    doctorPrepareEnvAuditSourceArtifact: "Release doctor",
+    doctorPrepareEnvAuditSourcePath: relative(releaseDoctorPath),
+    doctorPrepareEnvAuditSourceReady,
+    doctorPrepareEnvAuditDoctorReportReady: doctorPrepareEnvAuditSourceReady
+      ? booleanField(releaseDoctor, "releaseDoctorReportReady", false)
+      : false,
+    doctorPrepareEnvAuditExistingLocalEnvFilesChecked: doctorPrepareEnvAuditSourceReady
+      ? arrayField(releaseDoctor, "releasePrepareEnvExistingLocalEnvFilesChecked")
+      : [],
+    doctorPrepareEnvAuditExistingLocalEnvPresentFiles: doctorPrepareEnvAuditSourceReady
+      ? arrayField(releaseDoctor, "releasePrepareEnvExistingLocalEnvPresentFiles")
+      : [],
+    doctorPrepareEnvAuditExistingLocalEnvFileLoaded: doctorPrepareEnvAuditSourceReady
+      ? booleanField(releaseDoctor, "releasePrepareEnvExistingLocalEnvFileLoaded", false)
+      : false,
+    doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeyCount: doctorPrepareEnvAuditSourceReady
+      ? numberField(releaseDoctor, "releasePrepareEnvExistingLocalEnvPlaceholderKeyCount", doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeys.length)
+      : 0,
+    doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeySummary: doctorPrepareEnvAuditSourceReady
+      ? stringField(
+          releaseDoctor,
+          "releasePrepareEnvExistingLocalEnvPlaceholderKeySummary",
+          doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeys.length > 0 ? doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeys.join(", ") : "none"
+        )
+      : "none",
+    doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeys,
+    doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocationCount: doctorPrepareEnvAuditSourceReady
+      ? numberField(
+          releaseDoctor,
+          "releasePrepareEnvExistingLocalEnvPlaceholderEditLocationCount",
+          doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocations.length
+        )
+      : 0,
+    doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocationSummary: doctorPrepareEnvAuditSourceReady
+      ? stringField(
+          releaseDoctor,
+          "releasePrepareEnvExistingLocalEnvPlaceholderEditLocationSummary",
+          formatEditLocationSummary(doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocations)
+        )
+      : "none",
+    doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocations,
+    doctorPrepareEnvAuditReleaseChannelPlaceholderKeyCount: doctorPrepareEnvAuditSourceReady
+      ? numberField(
+          releaseDoctor,
+          "releasePrepareEnvExistingReleaseChannelPlaceholderKeyCount",
+          doctorPrepareEnvAuditReleaseChannelPlaceholderKeys.length
+        )
+      : 0,
+    doctorPrepareEnvAuditReleaseChannelPlaceholderKeySummary: doctorPrepareEnvAuditSourceReady
+      ? stringField(
+          releaseDoctor,
+          "releasePrepareEnvExistingReleaseChannelPlaceholderKeySummary",
+          doctorPrepareEnvAuditReleaseChannelPlaceholderKeys.length > 0 ? doctorPrepareEnvAuditReleaseChannelPlaceholderKeys.join(", ") : "none"
+        )
+      : "none",
+    doctorPrepareEnvAuditReleaseChannelPlaceholderKeys,
+    doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationCount: doctorPrepareEnvAuditSourceReady
+      ? numberField(
+          releaseDoctor,
+          "releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationCount",
+          doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocations.length
+        )
+      : 0,
+    doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationSummary: doctorPrepareEnvAuditSourceReady
+      ? stringField(
+          releaseDoctor,
+          "releasePrepareEnvExistingReleaseChannelPlaceholderEditLocationSummary",
+          formatEditLocationSummary(doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocations)
+        )
+      : "none",
+    doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocations,
+    doctorPrepareEnvAuditValueRecorded: doctorPrepareEnvAuditSourceReady
+      ? booleanField(releaseDoctor, "releasePrepareEnvExistingLocalEnvValueRecorded", false)
+      : false,
+    doctorPrepareEnvAuditClaimedExternalDistribution: doctorPrepareEnvAuditSourceReady
+      ? booleanField(releaseDoctor, "releaseGateClaimedExternalDistribution", false)
+      : false
+  };
+}
+
 function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoctor = null) {
   const missingArtifacts = artifactRows.filter((item) => !item.present);
   const missingLabels = missingArtifacts.map((item) => item.label);
@@ -1003,6 +1107,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     hardExternalGateCommand: "npm run release:external-check",
     prerequisiteCommand: "npm run release:check"
   });
+  const doctorPrepareEnvAudit = buildDoctorPrepareEnvAuditSummary(releaseDoctor);
 
   return {
     appName,
@@ -1035,6 +1140,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...currentActionSummary,
     ...completionGap,
     ...doctorCompletionGap,
+    ...doctorPrepareEnvAudit,
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
     externalDistributionReady: false,
@@ -1118,6 +1224,10 @@ function buildMarkdown(report) {
 - Doctor completion gap next proof command: \`${report.doctorCompletionGapNextProofCommand}\`
 - Doctor completion gap hard gate command: \`${report.doctorCompletionGapHardGateCommand}\`
 - Doctor completion gap claim blockers: ${report.doctorCompletionGapClaimBlockerCount} (${report.doctorCompletionGapClaimBlockerSummary})
+- Doctor prepare-env audit source ready: ${readyLabel(report.doctorPrepareEnvAuditSourceReady)}
+- Doctor prepare-env existing local env placeholder keys: ${report.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeyCount} (${report.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeySummary})
+- Doctor prepare-env release-channel placeholder keys: ${report.doctorPrepareEnvAuditReleaseChannelPlaceholderKeyCount} (${report.doctorPrepareEnvAuditReleaseChannelPlaceholderKeySummary})
+- Doctor prepare-env release-channel placeholder edit locations: ${report.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationCount} (${report.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationSummary})
 - Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${report.currentPlaceholderKeySummary})
 - Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})
@@ -1204,6 +1314,30 @@ ${formatChecklistList(report.completionGapClaimBlockers)}
 - Source external distribution claimed: ${readyLabel(report.doctorCompletionGapSourceClaimedExternalDistribution)}
 
 ${formatChecklistList(report.doctorCompletionGapClaimBlockers)}
+
+## Release Doctor Prepare Env Audit
+
+- Source artifact: ${report.doctorPrepareEnvAuditSourceArtifact}
+- Source path: ${report.doctorPrepareEnvAuditSourcePath}
+- Source ready: ${readyLabel(report.doctorPrepareEnvAuditSourceReady)}
+- Doctor report ready: ${readyLabel(report.doctorPrepareEnvAuditDoctorReportReady)}
+- Existing local env files checked: ${report.doctorPrepareEnvAuditExistingLocalEnvFilesChecked.join(", ") || "none"}
+- Existing local env present files: ${report.doctorPrepareEnvAuditExistingLocalEnvPresentFiles.join(", ") || "none"}
+- Existing local env file loaded: ${readyLabel(report.doctorPrepareEnvAuditExistingLocalEnvFileLoaded)}
+- Existing local env placeholder keys: ${report.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeyCount} (${report.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeySummary})
+- Existing local env placeholder edit locations: ${report.doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocationCount} (${report.doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocationSummary})
+- Release-channel placeholder keys: ${report.doctorPrepareEnvAuditReleaseChannelPlaceholderKeyCount} (${report.doctorPrepareEnvAuditReleaseChannelPlaceholderKeySummary})
+- Release-channel placeholder edit locations: ${report.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationCount} (${report.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationSummary})
+- Value recorded by release doctor prepare-env audit: ${readyLabel(report.doctorPrepareEnvAuditValueRecorded)}
+- External distribution claimed by release doctor prepare-env audit: ${readyLabel(report.doctorPrepareEnvAuditClaimedExternalDistribution)}
+
+### Doctor Prepare Env Existing Placeholder Keys
+
+${formatKeyList(report.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeys)}
+
+### Doctor Prepare Env Release-Channel Placeholder Edit Locations
+
+${formatEditLocationList(report.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocations)}
 
 ## Priority Next Actions
 
@@ -1361,6 +1495,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     hardExternalGateCommand: "npm run release:external-check",
     prerequisiteCommand: "npm run release:check"
   });
+  const doctorPrepareEnvAudit = buildDoctorPrepareEnvAuditSummary(releaseDoctor);
 
   nextActionsReport = {
     appName,
@@ -1393,6 +1528,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...currentActionSummary,
     ...completionGap,
     ...doctorCompletionGap,
+    ...doctorPrepareEnvAudit,
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
     externalDistributionReady: externalPreflight.externalDistributionReady === true,
@@ -1560,6 +1696,56 @@ check(
   nextActionsReport.doctorCompletionGapSourceClaimedExternalDistribution === false,
   "external next actions release doctor completion gap source should not claim external distribution"
 );
+check(nextActionsReport.doctorPrepareEnvAuditSourceArtifact === "Release doctor", "external next actions should identify the release doctor prepare-env audit source");
+check(typeof nextActionsReport.doctorPrepareEnvAuditSourcePath === "string" && nextActionsReport.doctorPrepareEnvAuditSourcePath.length > 0, "external next actions should include the release doctor prepare-env audit source path");
+check(typeof nextActionsReport.doctorPrepareEnvAuditSourceReady === "boolean", "external next actions should include release doctor prepare-env audit source readiness");
+check(typeof nextActionsReport.doctorPrepareEnvAuditDoctorReportReady === "boolean", "external next actions should include release doctor prepare-env audit doctor readiness");
+check(Array.isArray(nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvFilesChecked), "external next actions should include doctor prepare-env existing local env files checked");
+check(Array.isArray(nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPresentFiles), "external next actions should include doctor prepare-env existing local env present files");
+check(typeof nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvFileLoaded === "boolean", "external next actions should include doctor prepare-env existing local env loaded status");
+check(Number.isInteger(nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeyCount), "external next actions should include doctor prepare-env existing local env placeholder key count");
+check(typeof nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeySummary === "string", "external next actions should include doctor prepare-env existing local env placeholder key summary");
+check(Array.isArray(nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeys), "external next actions should include doctor prepare-env existing local env placeholder keys");
+check(
+  nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeyCount === nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeys.length,
+  "external next actions doctor prepare-env existing local env placeholder key count should match listed keys"
+);
+check(Number.isInteger(nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocationCount), "external next actions should include doctor prepare-env existing local env placeholder edit location count");
+check(typeof nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocationSummary === "string", "external next actions should include doctor prepare-env existing local env placeholder edit location summary");
+check(Array.isArray(nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocations), "external next actions should include doctor prepare-env existing local env placeholder edit locations");
+check(
+  nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocationCount === nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPlaceholderEditLocations.length,
+  "external next actions doctor prepare-env existing local env placeholder edit location count should match listed locations"
+);
+check(Number.isInteger(nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderKeyCount), "external next actions should include doctor prepare-env release-channel placeholder key count");
+check(typeof nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderKeySummary === "string", "external next actions should include doctor prepare-env release-channel placeholder key summary");
+check(Array.isArray(nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderKeys), "external next actions should include doctor prepare-env release-channel placeholder keys");
+check(
+  nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderKeyCount === nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderKeys.length,
+  "external next actions doctor prepare-env release-channel placeholder key count should match listed keys"
+);
+check(Number.isInteger(nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationCount), "external next actions should include doctor prepare-env release-channel placeholder edit location count");
+check(typeof nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationSummary === "string", "external next actions should include doctor prepare-env release-channel placeholder edit location summary");
+check(Array.isArray(nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocations), "external next actions should include doctor prepare-env release-channel placeholder edit locations");
+check(
+  nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationCount === nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocations.length,
+  "external next actions doctor prepare-env release-channel placeholder edit location count should match listed locations"
+);
+check(
+  nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocations.every(
+    (item) =>
+      typeof item.key === "string" &&
+      typeof item.file === "string" &&
+      item.file.length > 0 &&
+      Number.isInteger(item.line) &&
+      item.line > 0 &&
+      item.placeholder === true &&
+      item.valueRecorded === false
+  ),
+  "external next actions doctor prepare-env release-channel placeholder edit locations should include only value-free file, line, and key rows"
+);
+check(nextActionsReport.doctorPrepareEnvAuditValueRecorded === false, "external next actions doctor prepare-env audit should not record values");
+check(nextActionsReport.doctorPrepareEnvAuditClaimedExternalDistribution === false, "external next actions doctor prepare-env audit should not claim external distribution");
 check(typeof nextActionsReport.currentPrerequisiteCommand === "string" && nextActionsReport.currentPrerequisiteCommand.length > 0, "external next actions should include the current prerequisite command");
 check(typeof nextActionsReport.currentOperatorAction === "string" && nextActionsReport.currentOperatorAction.length > 0, "external next actions should include the current operator action");
 check(typeof nextActionsReport.currentRerunCommand === "string" && nextActionsReport.currentRerunCommand.length > 0, "external next actions should include the current rerun command");
@@ -2277,6 +2463,14 @@ check(markdown.includes("Doctor completion gap hard gate command:"), "external n
 check(markdown.includes("Doctor completion gap claim blockers:"), "external next actions Markdown should include release doctor completion gap claim blocker count");
 check(markdown.includes("## Release Doctor Completion Gap"), "external next actions Markdown should include release doctor completion gap section");
 check(markdown.includes("External distribution claimed by release doctor: no"), "external next actions Markdown should state release doctor completion gap does not claim distribution");
+check(markdown.includes("Doctor prepare-env audit source ready:"), "external next actions Markdown should include release doctor prepare-env audit source status");
+check(markdown.includes("Doctor prepare-env existing local env placeholder keys:"), "external next actions Markdown should include release doctor prepare-env placeholder key status");
+check(markdown.includes("Doctor prepare-env release-channel placeholder keys:"), "external next actions Markdown should include release doctor prepare-env release-channel placeholder key status");
+check(markdown.includes("Doctor prepare-env release-channel placeholder edit locations:"), "external next actions Markdown should include release doctor prepare-env release-channel edit location status");
+check(markdown.includes("## Release Doctor Prepare Env Audit"), "external next actions Markdown should include release doctor prepare-env audit section");
+check(markdown.includes("Doctor Prepare Env Existing Placeholder Keys"), "external next actions Markdown should include release doctor prepare-env existing placeholder key section");
+check(markdown.includes("Doctor Prepare Env Release-Channel Placeholder Edit Locations"), "external next actions Markdown should include release doctor prepare-env release-channel edit location section");
+check(markdown.includes("Value recorded by release doctor prepare-env audit: no"), "external next actions Markdown should state release doctor prepare-env audit value redaction");
 check(markdown.includes("Private values recorded: no"), "external next actions Markdown should state value redaction");
 check(!/https?:\/\//i.test(markdown), "external next actions Markdown should not include public or private URL values");
 check(!/https?:\/\//i.test(serializedReport), "external next actions JSON should not include public or private URL values");
@@ -2310,6 +2504,16 @@ console.log(`- Doctor completion gap proof target: ${nextActionsReport.doctorCom
 console.log(`- Doctor completion gap next proof command: ${nextActionsReport.doctorCompletionGapNextProofCommand}`);
 console.log(`- Doctor completion gap hard gate command: ${nextActionsReport.doctorCompletionGapHardGateCommand}`);
 console.log(`- Doctor completion gap claim blockers: ${nextActionsReport.doctorCompletionGapClaimBlockerCount} (${nextActionsReport.doctorCompletionGapClaimBlockerSummary})`);
+console.log(`- Doctor prepare-env audit source ready: ${nextActionsReport.doctorPrepareEnvAuditSourceReady ? "yes" : "no"}`);
+console.log(
+  `- Doctor prepare-env existing local env placeholder keys: ${nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeyCount} (${nextActionsReport.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeySummary})`
+);
+console.log(
+  `- Doctor prepare-env release-channel placeholder keys: ${nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderKeyCount} (${nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderKeySummary})`
+);
+console.log(
+  `- Doctor prepare-env release-channel placeholder edit locations: ${nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationCount} (${nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationSummary})`
+);
 console.log(`- Current required keys: ${nextActionsReport.currentRequiredKeyCount} (${nextActionsReport.currentRequiredKeySummary})`);
 console.log(`- Current placeholder keys: ${nextActionsReport.currentPlaceholderKeyCount} (${nextActionsReport.currentPlaceholderKeySummary})`);
 console.log(`- Current placeholder edit locations: ${nextActionsReport.currentPlaceholderEditLocationCount} (${nextActionsReport.currentPlaceholderEditLocationSummary})`);
