@@ -18,6 +18,7 @@ const externalProofBundleJsonPath = path.join(packageRoot, `${appName}-${package
 const releaseProgressMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.md`);
 const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.json`);
 const failures = [];
+const fromExisting = process.argv.includes("--from-existing");
 
 function check(condition, message) {
   if (!condition) {
@@ -169,6 +170,8 @@ function buildMarkdown(report) {
 ## Status
 
 - Report ready: ${report.releaseProgressReportReady ? "yes" : "no"}
+- Report mode: ${report.releaseProgressReportMode}
+- Release check run by this report: ${report.releaseCheckRunByThisReport ? "yes" : "no"}
 - Completion stage: ${report.completionStage}
 - User-facing overall completion: ${formatUserPercent(report.userFacingCompletionPercent)}
 - User-facing remaining completion: ${formatUserPercent(report.userFacingRemainingPercent)}
@@ -225,6 +228,7 @@ function buildMarkdown(report) {
 
 - Regenerated evidence with: \`${report.evidenceCommand}\`
 - Progress command: \`${report.progressCommand}\`
+- Existing-evidence smoke command: \`npm run release:progress-smoke\`
 - Hard external distribution gate remains: \`${report.hardExternalGateCommand}\`
 - External proof hard gate: \`${report.externalProofBundleHardGateCommand}\`
 
@@ -291,13 +295,21 @@ function runReleaseCheck() {
   }
 }
 
-runReleaseCheck();
+if (!fromExisting) {
+  runReleaseCheck();
+}
 
 if (!existsSync(completionProgressJsonPath)) {
-  fail("Completion progress JSON was not generated.", `Expected: ${relative(completionProgressJsonPath)}`);
+  fail(
+    "Completion progress JSON was not generated.",
+    `${fromExisting ? "Run npm run release:check or npm run verify before npm run release:progress-smoke.\n" : ""}Expected: ${relative(completionProgressJsonPath)}`
+  );
 }
 if (!existsSync(externalProofBundleJsonPath)) {
-  fail("External proof bundle JSON was not generated.", `Expected: ${relative(externalProofBundleJsonPath)}`);
+  fail(
+    "External proof bundle JSON was not generated.",
+    `${fromExisting ? "Run npm run release:check or npm run verify before npm run release:progress-smoke.\n" : ""}Expected: ${relative(externalProofBundleJsonPath)}`
+  );
 }
 
 const completionProgress = JSON.parse(await readFile(completionProgressJsonPath, "utf8"));
@@ -311,8 +323,11 @@ const releaseProgressReport = {
   generatedAt: new Date().toISOString(),
   platform: process.platform,
   arch: process.arch,
-  progressCommand: "npm run release:progress",
-  evidenceCommand: "npm run release:check",
+  releaseProgressReportMode: fromExisting ? "existing-evidence smoke" : "full release gate",
+  releaseProgressFromExisting: fromExisting,
+  releaseCheckRunByThisReport: !fromExisting,
+  progressCommand: fromExisting ? "npm run release:progress-smoke" : "npm run release:progress",
+  evidenceCommand: fromExisting ? "existing release evidence from npm run verify or npm run release:check" : "npm run release:check",
   hardExternalGateCommand: "npm run release:external-check",
   releaseProgressMarkdownPath: relative(releaseProgressMarkdownPath),
   releaseProgressJsonPath: relative(releaseProgressJsonPath),
@@ -372,8 +387,11 @@ await writeFile(releaseProgressMarkdownPath, markdown, "utf8");
 
 check(releaseProgressReport.appName === appName, "release progress report should identify GrooveForge");
 check(releaseProgressReport.bundleId === bundleId, `release progress report should identify ${bundleId}`);
-check(releaseProgressReport.progressCommand === "npm run release:progress", "release progress report should identify the progress command");
-check(releaseProgressReport.evidenceCommand === "npm run release:check", "release progress report should identify release:check evidence regeneration");
+check(releaseProgressReport.releaseProgressReportMode === (fromExisting ? "existing-evidence smoke" : "full release gate"), "release progress report should identify its mode");
+check(releaseProgressReport.releaseProgressFromExisting === fromExisting, "release progress report should identify whether it used existing evidence");
+check(releaseProgressReport.releaseCheckRunByThisReport === !fromExisting, "release progress report should identify whether it ran release:check");
+check(releaseProgressReport.progressCommand === (fromExisting ? "npm run release:progress-smoke" : "npm run release:progress"), "release progress report should identify the progress command");
+check(releaseProgressReport.evidenceCommand === (fromExisting ? "existing release evidence from npm run verify or npm run release:check" : "npm run release:check"), "release progress report should identify its evidence source");
 check(releaseProgressReport.hardExternalGateCommand === "npm run release:external-check", "release progress report should keep the hard external gate command");
 check(releaseProgressReport.sourceEvidenceReady === true, "release progress report should include ready source evidence");
 check(releaseProgressReport.localReleaseReady === true, "release progress report should include ready local release evidence");
@@ -460,6 +478,8 @@ check(releaseProgressReport.notarySubmissionAttemptedByThisReport === false, "re
 check(releaseProgressReport.signingAttemptedByThisReport === false, "release progress report should not sign artifacts");
 check(releaseProgressReport.releaseGateClaimedExternalDistribution === false, "release progress report should not claim external distribution completion");
 check(markdown.includes("Release Progress Report"), "release progress Markdown should include title");
+check(markdown.includes("Report mode:"), "release progress Markdown should include report mode");
+check(markdown.includes("Release check run by this report:"), "release progress Markdown should include release-check run posture");
 check(markdown.includes("User-Facing Progress"), "release progress Markdown should include user-facing progress summary");
 check(markdown.includes("User-facing overall completion:"), "release progress Markdown should include user-facing overall completion");
 check(markdown.includes("Current 10-plan progress:"), "release progress Markdown should include current 10-plan progress");
@@ -482,6 +502,8 @@ if (failures.length > 0) {
 console.log("GrooveForge release progress report passed.");
 console.log(`- Markdown: ${relative(releaseProgressMarkdownPath)}`);
 console.log(`- JSON: ${relative(releaseProgressJsonPath)}`);
+console.log(`- Report mode: ${releaseProgressReport.releaseProgressReportMode}`);
+console.log(`- Release check run by this report: ${releaseProgressReport.releaseCheckRunByThisReport ? "yes" : "no"}`);
 console.log(`- Completion stage: ${releaseProgressReport.completionStage}`);
 console.log(`- User-facing overall completion: ${formatUserPercent(releaseProgressReport.userFacingCompletionPercent)}`);
 console.log(`- User-facing remaining completion: ${formatUserPercent(releaseProgressReport.userFacingRemainingPercent)}`);
