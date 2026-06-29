@@ -2787,9 +2787,9 @@ const patternContrastStyleSectionReasonLabels: Record<StyleId, Record<Arrangemen
   },
   boom_bap: {
     Intro: "Establish the loop and drum character",
-    Verse: "Keep the sample pocket easy to rap over",
+    Verse: "Keep the drum pocket easy to rap over",
     Hook: "Lift the loop without crowding the drums",
-    Bridge: "Strip back for a crate-dig pause",
+    Bridge: "Strip back for a rhythmic pause",
     Outro: "Let the anchor loop resolve"
   },
   lofi: {
@@ -2842,9 +2842,9 @@ const patternContrastStyleSectionReasonLabels: Record<StyleId, Record<Arrangemen
     Outro: "Resolve on dembow or a break"
   },
   jersey: {
-    Intro: "Cue bounce space before chops hit",
+    Intro: "Cue bounce space before the rhythm hits",
     Verse: "Hold the club bounce foundation",
-    Hook: "Lift or switch the chop energy",
+    Hook: "Lift or switch the bounce energy",
     Bridge: "Break the bounce before the next hit",
     Outro: "Leave a clean club exit"
   },
@@ -6509,7 +6509,7 @@ export function limiterCheck(analysis: ExportAnalysis): MixCoachCheck {
       id: "limiter",
       label: "Limiter activity",
       status: "Catching peaks",
-      detail: `${formatPercent(analysis.limitedPercent)} of rendered samples hit the ceiling.`,
+      detail: `${formatPercent(analysis.limitedPercent)} of rendered frames hit the ceiling.`,
       tone: analysis.limitedPercent > 0.1 ? "warn" : "good"
     };
   }
@@ -6517,7 +6517,7 @@ export function limiterCheck(analysis: ExportAnalysis): MixCoachCheck {
     id: "limiter",
     label: "Limiter activity",
     status: "Clear",
-    detail: "No rendered samples hit the ceiling.",
+    detail: "No rendered frames hit the ceiling.",
     tone: "good"
   };
 }
