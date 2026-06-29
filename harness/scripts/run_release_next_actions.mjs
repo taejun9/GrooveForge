@@ -395,9 +395,40 @@ function formatArtifactRows(artifacts) {
   return artifacts.map((item) => `| ${escapeCell(item.label)} | ${readyLabel(item.present)} | ${escapeCell(item.path)} |`).join("\n");
 }
 
+function isGenericEvidenceLabel(label) {
+  return /^Evidence\s+\d+$/i.test(String(label ?? "").trim());
+}
+
+function titleCaseEvidenceSlug(value) {
+  return String(value ?? "")
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((part) => {
+      const upper = part.toUpperCase();
+      if (["ID", "QA", "URL", "PKG", "DMG"].includes(upper)) {
+        return upper;
+      }
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join(" ");
+}
+
+function inferEvidenceLabelFromPath(filePath, index) {
+  const rawPath = typeof filePath === "string" ? filePath : "";
+  const baseName = path.basename(rawPath, path.extname(rawPath));
+  const prefixes = [`${appName}-${packageJson.version}-${platformArch}-`, `${appName}-${platformArch}-`, `${appName}-`];
+  const slug = prefixes.reduce((current, prefix) => (current.startsWith(prefix) ? current.slice(prefix.length) : current), baseName);
+  return titleCaseEvidenceSlug(slug) || `Evidence artifact ${index + 1}`;
+}
+
+function stableEvidenceLabel(item, index) {
+  const label = typeof item.label === "string" ? item.label.trim() : "";
+  return label.length > 0 && !isGenericEvidenceLabel(label) ? label : inferEvidenceLabelFromPath(item.path, index);
+}
+
 function buildEvidenceRows(items = []) {
   return (Array.isArray(items) ? items : []).map((item, index) => ({
-    label: item.label ?? `Evidence ${index + 1}`,
+    label: stableEvidenceLabel(item, index),
     path: item.path ?? "unknown",
     present: item.present === true,
     valueRecorded: false
@@ -1293,12 +1324,13 @@ check(
     (item) =>
       typeof item.label === "string" &&
       item.label.length > 0 &&
+      !isGenericEvidenceLabel(item.label) &&
       typeof item.path === "string" &&
       item.path.length > 0 &&
       typeof item.present === "boolean" &&
       item.valueRecorded === false
   ),
-  "external next actions current evidence rows should cite only value-free artifact labels and paths"
+  "external next actions current evidence rows should cite stable value-free artifact labels and paths"
 );
 check(
   nextActionsReport.currentReadyCriteriaCount === nextActionsReport.currentReadyCriteria.length,
@@ -1344,13 +1376,14 @@ check(
       (item) =>
         typeof item.label === "string" &&
         item.label.length > 0 &&
+        !isGenericEvidenceLabel(item.label) &&
         typeof item.path === "string" &&
         item.path.length > 0 &&
         typeof item.present === "boolean" &&
         item.valueRecorded === false
     )
   ),
-  "priority actions should include value-free evidence rows"
+  "priority actions should include stable value-free evidence rows"
 );
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.keyGuidance)), "priority actions should include key guidance lists");
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.envEditTemplate)), "priority actions should include env edit template lists");
@@ -1734,6 +1767,7 @@ if (nextActionsReport.currentEnvEditRowsCount > 0) {
   check(markdown.includes("| key | location | assignment | guidance | placeholder |"), "external next actions Markdown should include current env edit row table");
 }
 if (nextActionsReport.currentEvidenceRowsCount > 0) {
+  check(nextActionsReport.currentEvidenceRows.some((item) => markdown.includes(item.label)), "external next actions Markdown should include current evidence row labels");
   check(nextActionsReport.currentEvidenceRows.some((item) => markdown.includes(item.path)), "external next actions Markdown should include current evidence row paths");
   check(markdown.includes("| evidence | present | path | value recorded |"), "external next actions Markdown should include current evidence row table");
 }

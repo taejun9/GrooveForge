@@ -101,8 +101,9 @@ function inputGroupReady(privateInputs, label) {
   return privateInputs?.inputGroups?.find((group) => group.label === label)?.ready === true;
 }
 
-function evidencePath(filePath) {
+function evidencePath(label, filePath) {
   return {
+    label,
     path: relative(filePath),
     present: existsSync(filePath)
   };
@@ -136,7 +137,7 @@ function formatRequirementRows(groups) {
     .map(
       (group) =>
         `| ${group.label} | ${group.ready ? "yes" : "no"} | ${group.requiredKeys.length > 0 ? group.requiredKeys.join(", ") : "none"} | ${group.evidence
-          .map((item) => item.path)
+          .map((item) => `${item.label}: ${item.path}`)
           .join(", ")} |`
     )
     .join("\n");
@@ -151,7 +152,7 @@ function formatActionGroups(groups) {
       const blockers = group.blockers.map((blocker) => `   - ${blocker}`).join("\n");
       return `${index + 1}. ${group.label} (${group.ready ? "ready" : "blocked"})
    Required keys: ${group.requiredKeys.length > 0 ? group.requiredKeys.join(", ") : "none"}
-   Evidence: ${group.evidence.map((item) => `${item.path} ${item.present ? "(present)" : "(missing)"}`).join(", ")}
+   Evidence: ${group.evidence.map((item) => `${item.label}: ${item.path} ${item.present ? "(present)" : "(missing)"}`).join(", ")}
    Prerequisite commands:
 ${prerequisiteCommands || "   - none"}
    Operator actions:
@@ -215,7 +216,12 @@ function buildGroups(input) {
       label: "Redacted local evidence chain",
       ready: redactedEvidenceReady,
       requiredKeys: [],
-      evidence: [evidencePath(completionAuditPath), evidencePath(distributionEnvTemplatePath), evidencePath(privateInputsPath), evidencePath(externalGatePath)],
+      evidence: [
+        evidencePath("Completion audit", completionAuditPath),
+        evidencePath("Distribution env template", distributionEnvTemplatePath),
+        evidencePath("Distribution private inputs", privateInputsPath),
+        evidencePath("External distribution gate", externalGatePath)
+      ],
       prerequisiteCommands: ["npm run release:check", "npm run desktop:external-distribution-gate-smoke"],
       operatorActions: ["Regenerate the local release evidence chain before filling private distribution values."],
       rerunCommands: ["npm run desktop:completion-audit-smoke", "npm run desktop:external-distribution-gate-smoke"],
@@ -231,7 +237,7 @@ function buildGroups(input) {
       label: "Release channel metadata",
       ready: metadataReady,
       requiredKeys: distributionMetadataKeys,
-      evidence: [evidencePath(privateInputsPath), evidencePath(distributionChannelQaPath)],
+      evidence: [evidencePath("Distribution private inputs", privateInputsPath), evidencePath("Distribution-channel QA", distributionChannelQaPath)],
       prerequisiteCommands: ["npm run desktop:distribution-env-template-smoke", "npm run desktop:distribution-private-inputs-smoke"],
       operatorActions: [
         "Fill the ignored distribution env file with the selected channel plus safe release, release-notes, and support URL keys.",
@@ -259,7 +265,7 @@ function buildGroups(input) {
       label: "Auto-update feed and signed metadata",
       ready: updateReady,
       requiredKeys: [...updateFeedUrlKeys, ...updateChannelKeys],
-      evidence: [evidencePath(autoUpdateReadinessPath)],
+      evidence: [evidencePath("Auto-update readiness", autoUpdateReadinessPath)],
       prerequisiteCommands: [
         "npm run desktop:update-feed-config-smoke",
         "npm run desktop:update-metadata-policy-smoke",
@@ -278,7 +284,7 @@ function buildGroups(input) {
       label: "Developer ID signing",
       ready: developerIdReady,
       requiredKeys: signingKeys,
-      evidence: [evidencePath(developerIdReadinessPath), evidencePath(developerIdSigningPath)],
+      evidence: [evidencePath("Developer ID readiness", developerIdReadinessPath), evidencePath("Developer ID signing", developerIdSigningPath)],
       prerequisiteCommands: ["npm run desktop:developer-id-readiness-smoke", "npm run desktop:developer-id-signing-smoke"],
       operatorActions: [
         "Install or unlock the intended Developer ID Application identity.",
@@ -296,7 +302,7 @@ function buildGroups(input) {
       label: "Notarization and stapling",
       ready: notarizationReady,
       requiredKeys: notarizationKeys,
-      evidence: [evidencePath(notarizationPath)],
+      evidence: [evidencePath("Notarization", notarizationPath)],
       prerequisiteCommands: ["npm run desktop:developer-id-signing-smoke", "npm run desktop:notarization-smoke"],
       operatorActions: [
         "Provide one bounded notary credential signal in the ignored env file.",
@@ -313,7 +319,7 @@ function buildGroups(input) {
       label: "Notarized Gatekeeper assessment",
       ready: gatekeeperReady,
       requiredKeys: [],
-      evidence: [evidencePath(notarizedGatekeeperPath)],
+      evidence: [evidencePath("Notarized Gatekeeper", notarizedGatekeeperPath)],
       prerequisiteCommands: ["npm run desktop:notarization-smoke", "npm run desktop:notarized-gatekeeper-smoke"],
       operatorActions: ["Assess the stapled isolated DMG and mounted app after notarization succeeds."],
       rerunCommands: ["npm run desktop:notarized-gatekeeper-smoke"],
@@ -327,7 +333,11 @@ function buildGroups(input) {
       label: "Manual distribution QA approval digest",
       ready: manualQaReady,
       requiredKeys: manualQaKeys,
-      evidence: [evidencePath(manualQaChecklistPath), evidencePath(distributionChannelQaPath), evidencePath(privateInputsPath)],
+      evidence: [
+        evidencePath("Distribution manual QA", manualQaChecklistPath),
+        evidencePath("Distribution-channel QA", distributionChannelQaPath),
+        evidencePath("Distribution private inputs", privateInputsPath)
+      ],
       prerequisiteCommands: ["npm run desktop:distribution-manual-qa-smoke", "npm run desktop:distribution-channel-qa-smoke"],
       operatorActions: [
         "Complete the value-free manual QA checklist for the selected signed and notarized artifact.",
@@ -350,7 +360,7 @@ function buildGroups(input) {
       label: "Final hard external distribution gate",
       ready: externalGate?.externalDistributionGateReady === true,
       requiredKeys: distributionPrivateInputKeys,
-      evidence: [evidencePath(externalGatePath)],
+      evidence: [evidencePath("External distribution gate", externalGatePath)],
       prerequisiteCommands: ["npm run release:check"],
       operatorActions: ["Run the hard external distribution gate only after every remediation group is ready."],
       rerunCommands: ["npm run release:external-check"],
@@ -488,6 +498,12 @@ check(summary.productScope.includes("all-genre direct beat workstation"), "exter
 check(summary.productScope.includes("sampling optional"), "external remediation should keep sampling optional");
 check(Array.isArray(summary.remediationGroups) && summary.remediationGroups.length >= 8, "external remediation should include ordered remediation groups");
 check(summary.remediationGroups.every((group) => group.valueRecorded === false), "external remediation groups should not record values");
+check(
+  summary.remediationGroups.every((group) =>
+    group.evidence.every((item) => typeof item.label === "string" && item.label.length > 0 && typeof item.path === "string" && item.path.length > 0 && typeof item.present === "boolean")
+  ),
+  "external remediation evidence rows should include stable labels, paths, and presence"
+);
 check(Array.isArray(summary.remediationBlockers), "external remediation should include consolidated blockers");
 check(summary.externalRemediationReady === false || summary.remediationBlockers.length === 0, "ready external remediation should not include blockers");
 check(summary.localEnvInput?.valueRecorded === false, "external remediation local env loader should not record values");
@@ -512,6 +528,7 @@ check(summary.releaseGateClaimedManualQaApproval === false, "external remediatio
 check(summary.releaseGateClaimedExternalDistribution === false, "external remediation should not claim external distribution completion");
 check(markdown.includes("External Distribution Remediation"), "external remediation Markdown should include title");
 check(markdown.includes("Ordered Operator Actions"), "external remediation Markdown should include ordered actions");
+check(markdown.includes("Distribution private inputs:"), "external remediation Markdown should include stable evidence labels");
 check(markdown.includes("Private values recorded: no"), "external remediation Markdown should state value redaction");
 check(markdown.includes("This remediation artifact does not claim"), "external remediation Markdown should state non-claiming posture");
 check(!/https?:\/\//i.test(markdown), "external remediation should not include public or private URL values");
