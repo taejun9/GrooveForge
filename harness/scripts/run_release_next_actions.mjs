@@ -354,6 +354,7 @@ function formatDetailRows(actions) {
       const editLocations =
         action.placeholderEditLocations.map((item) => `   - ${item.file}:${item.line} ${item.key}`).join("\n") || "   - none";
       const envEditTemplate = action.envEditTemplate.map((item) => `   - ${item.assignment}`).join("\n") || "   - none";
+      const envEditRows = action.envEditRows.map((item) => `   - ${item.location} ${item.assignment} | ${item.guidance}`).join("\n") || "   - none";
       const actionChecklist = action.actionChecklist.map((item) => `   - ${item}`).join("\n") || "   - none";
       const prerequisites = action.prerequisiteCommands.map((command) => `   - \`${command}\``).join("\n") || "   - none";
       const operatorActions = action.operatorActions.map((item) => `   - ${item}`).join("\n") || "   - none";
@@ -370,6 +371,8 @@ ${readyCriteria}
 ${editLocations}
    Env edit template:
 ${envEditTemplate}
+   Env edit rows:
+${envEditRows}
    Action checklist:
 ${actionChecklist}
    Next command: \`${action.nextCommand}\`
@@ -496,6 +499,44 @@ function formatEnvEditTemplateBlock(items) {
   return `\`\`\`env\n${items.map((item) => item.assignment).join("\n")}\n\`\`\``;
 }
 
+function buildEnvEditRows({ envEditTemplate = [], placeholderEditLocations = [], placeholderKeys = [], localEnvEditTarget = "" } = {}) {
+  const locationByKey = new Map(placeholderEditLocations.map((item) => [item.key, item]));
+  const placeholderKeySet = new Set(placeholderKeys);
+  return envEditTemplate.map((template) => {
+    const location = locationByKey.get(template.key);
+    const file = location?.file ?? localEnvEditTarget;
+    const line = Number.isInteger(location?.line) ? location.line : null;
+    return {
+      key: template.key,
+      editTarget: localEnvEditTarget,
+      file,
+      line,
+      locationKnown: line !== null,
+      location: line === null ? `${file}:line-after-scaffold` : `${file}:${line}`,
+      placeholder: placeholderKeySet.has(template.key),
+      placeholderShape: template.placeholder,
+      assignment: template.assignment,
+      guidance: template.guidance,
+      valueRecorded: false
+    };
+  });
+}
+
+function formatEnvEditRowsSummary(items) {
+  return Array.isArray(items) && items.length > 0 ? `${items.length} value-free edit rows` : "none";
+}
+
+function formatEnvEditRowsTable(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "| key | location | assignment | guidance | placeholder |\n|---|---|---|---|---|\n| none | none | none | none | no |";
+  }
+  return [
+    "| key | location | assignment | guidance | placeholder |",
+    "|---|---|---|---|---|",
+    ...items.map((item) => `| ${escapeCell(item.key)} | ${escapeCell(item.location)} | ${escapeCell(item.assignment)} | ${escapeCell(item.guidance)} | ${readyLabel(item.placeholder)} |`)
+  ].join("\n");
+}
+
 function formatChecklistList(items) {
   return Array.isArray(items) && items.length > 0 ? items.map((item, index) => `${index + 1}. ${item}`).join("\n") : "1. None.";
 }
@@ -546,6 +587,7 @@ function buildPriorityActions(remediation, context = {}) {
       const placeholderEditLocations = localEnvPlaceholderLocations.filter((item) => placeholderKeys.includes(item.key));
       const keyGuidance = guidanceForKeys(requiredKeys);
       const envEditTemplate = buildEnvEditTemplate(requiredKeys);
+      const envEditRows = buildEnvEditRows({ envEditTemplate, placeholderEditLocations, placeholderKeys, localEnvEditTarget });
       const shouldPrepareEnv = group.id === "release-channel-metadata" && !localEnvFileLoaded;
       const shouldReplacePlaceholders = group.id === "release-channel-metadata" && localEnvFileLoaded && placeholderKeys.length > 0;
       const prerequisiteCommands = shouldPrepareEnv
@@ -582,6 +624,7 @@ function buildPriorityActions(remediation, context = {}) {
         placeholderEditLocations,
         keyGuidance,
         envEditTemplate,
+        envEditRows,
         readyCriteria,
         evidence: group.evidence ?? [],
         prerequisiteCommands,
@@ -608,6 +651,15 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
   const currentPlaceholderEditLocations = currentAction?.placeholderEditLocations ?? fallback.placeholderEditLocations ?? [];
   const currentEnvKeyGuidance = currentAction?.keyGuidance ?? fallback.keyGuidance ?? guidanceForKeys(currentRequiredKeys);
   const currentEnvEditTemplate = currentAction?.envEditTemplate ?? fallback.envEditTemplate ?? buildEnvEditTemplate(currentRequiredKeys);
+  const currentEnvEditRows =
+    currentAction?.envEditRows ??
+    fallback.envEditRows ??
+    buildEnvEditRows({
+      envEditTemplate: currentEnvEditTemplate,
+      placeholderEditLocations: currentPlaceholderEditLocations,
+      placeholderKeys: currentPlaceholderKeys,
+      localEnvEditTarget: fallback.currentEnvEditTarget ?? currentLocalEnvEditTarget()
+    });
   const currentReadyCriteria = currentAction?.readyCriteria ?? fallback.readyCriteria ?? readyCriteriaForAction(fallback);
   const currentActionChecklist = currentAction?.actionChecklist ?? fallback.actionChecklist ?? [];
   const currentPrerequisiteCommands = currentAction?.prerequisiteCommands ?? [];
@@ -633,6 +685,9 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
     currentEnvEditTemplateCount: currentEnvEditTemplate.length,
     currentEnvEditTemplateSummary: formatEnvEditTemplateSummary(currentEnvEditTemplate),
     currentEnvEditTemplate,
+    currentEnvEditRowsCount: currentEnvEditRows.length,
+    currentEnvEditRowsSummary: formatEnvEditRowsSummary(currentEnvEditRows),
+    currentEnvEditRows,
     currentReadyCriteriaCount: currentReadyCriteria.length,
     currentReadyCriteriaSummary: currentReadyCriteria.length > 0 ? `${currentReadyCriteria.length} value-free ready criteria` : "none",
     currentReadyCriteria,
@@ -668,6 +723,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
       placeholderEditLocations: [],
       keyGuidance: [],
       envEditTemplate: [],
+      envEditRows: [],
       readyCriteria: readyCriteriaForAction({ id: "regenerate-local-release-evidence" }),
       evidence: artifactRows,
       prerequisiteCommands: [],
@@ -793,6 +849,7 @@ function buildMarkdown(report) {
 - Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})
 - Current env key guidance: ${report.currentEnvKeyGuidanceCount} (${report.currentEnvKeyGuidanceSummary})
 - Current env edit template: ${report.currentEnvEditTemplateCount} (${report.currentEnvEditTemplateSummary})
+- Current env edit rows: ${report.currentEnvEditRowsCount} (${report.currentEnvEditRowsSummary})
 - Current ready criteria: ${report.currentReadyCriteriaCount} (${report.currentReadyCriteriaSummary})
 - Current action checklist: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})
 - Current env edit target: ${report.currentEnvEditTarget}
@@ -856,6 +913,10 @@ ${formatGuidanceList(report.currentEnvKeyGuidance)}
 ## Current Env Edit Template
 
 ${formatEnvEditTemplateBlock(report.currentEnvEditTemplate)}
+
+## Current Env Edit Rows
+
+${formatEnvEditRowsTable(report.currentEnvEditRows)}
 
 ## Current Ready Criteria
 
@@ -1102,6 +1163,11 @@ check(
   typeof nextActionsReport.currentEnvEditTemplateSummary === "string" && nextActionsReport.currentEnvEditTemplateSummary.length > 0,
   "external next actions should include the current env edit template summary"
 );
+check(Number.isInteger(nextActionsReport.currentEnvEditRowsCount), "external next actions should include the current env edit rows count");
+check(
+  typeof nextActionsReport.currentEnvEditRowsSummary === "string" && nextActionsReport.currentEnvEditRowsSummary.length > 0,
+  "external next actions should include the current env edit rows summary"
+);
 check(Number.isInteger(nextActionsReport.currentReadyCriteriaCount), "external next actions should include the current ready criteria count");
 check(typeof nextActionsReport.currentReadyCriteriaSummary === "string" && nextActionsReport.currentReadyCriteriaSummary.length > 0, "external next actions should include the current ready criteria summary");
 check(Number.isInteger(nextActionsReport.currentActionChecklistCount), "external next actions should include the current action checklist count");
@@ -1115,6 +1181,7 @@ check(Array.isArray(nextActionsReport.currentPlaceholderKeys), "external next ac
 check(Array.isArray(nextActionsReport.currentPlaceholderEditLocations), "external next actions should include current placeholder edit locations");
 check(Array.isArray(nextActionsReport.currentEnvKeyGuidance), "external next actions should include current env key guidance");
 check(Array.isArray(nextActionsReport.currentEnvEditTemplate), "external next actions should include current env edit template");
+check(Array.isArray(nextActionsReport.currentEnvEditRows), "external next actions should include current env edit rows");
 check(Array.isArray(nextActionsReport.currentReadyCriteria), "external next actions should include current ready criteria");
 check(Array.isArray(nextActionsReport.currentActionChecklist), "external next actions should include current action checklist");
 check(
@@ -1138,6 +1205,10 @@ check(
   "external next actions current env edit template count should match listed assignments"
 );
 check(
+  nextActionsReport.currentEnvEditRowsCount === nextActionsReport.currentEnvEditRows.length,
+  "external next actions current env edit rows count should match listed rows"
+);
+check(
   nextActionsReport.currentEnvEditTemplate.every(
     (item) =>
       nextActionsReport.currentRequiredKeys.includes(item.key) &&
@@ -1148,6 +1219,28 @@ check(
       item.valueRecorded === false
   ),
   "external next actions current env edit template should contain only value-free assignments for current required keys"
+);
+check(
+  nextActionsReport.currentEnvEditRows.every((item) => {
+    const matchingTemplate = nextActionsReport.currentEnvEditTemplate.find((template) => template.key === item.key);
+    return (
+      nextActionsReport.currentRequiredKeys.includes(item.key) &&
+      matchingTemplate &&
+      item.assignment === matchingTemplate.assignment &&
+      item.placeholderShape === matchingTemplate.placeholder &&
+      item.editTarget === nextActionsReport.currentEnvEditTarget &&
+      item.placeholder === nextActionsReport.currentPlaceholderKeys.includes(item.key) &&
+      typeof item.file === "string" &&
+      item.file.length > 0 &&
+      (item.line === null || (Number.isInteger(item.line) && item.line > 0)) &&
+      item.locationKnown === (item.line !== null) &&
+      item.location === (item.line === null ? `${item.file}:line-after-scaffold` : `${item.file}:${item.line}`) &&
+      typeof item.guidance === "string" &&
+      item.guidance.length > 0 &&
+      item.valueRecorded === false
+    );
+  }),
+  "external next actions current env edit rows should combine value-free assignment, location, guidance, and placeholder status"
 );
 check(
   nextActionsReport.currentReadyCriteriaCount === nextActionsReport.currentReadyCriteria.length,
@@ -1188,11 +1281,18 @@ check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.p
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.placeholderEditLocations)), "priority actions should include placeholder edit location lists");
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.keyGuidance)), "priority actions should include key guidance lists");
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.envEditTemplate)), "priority actions should include env edit template lists");
+check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.envEditRows)), "priority actions should include env edit row lists");
 check(
   nextActionsReport.priorityActions.every((action) =>
     (action.requiredKeys ?? []).every((key) => (action.envEditTemplate ?? []).some((item) => item.key === key && item.valueRecorded === false))
   ),
   "priority actions should include a value-free env edit template for every required key"
+);
+check(
+  nextActionsReport.priorityActions.every((action) =>
+    (action.requiredKeys ?? []).every((key) => (action.envEditRows ?? []).some((item) => item.key === key && item.valueRecorded === false))
+  ),
+  "priority actions should include a value-free env edit row for every required key"
 );
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.readyCriteria)), "priority actions should include ready criteria lists");
 check(nextActionsReport.priorityActions.every((action) => action.readyCriteria.length > 0), "priority actions should include at least one ready criterion");
@@ -1262,6 +1362,14 @@ if (nextActionsReport.priorityActions.length > 0) {
   check(
     nextActionsReport.currentEnvEditTemplateSummary === formatEnvEditTemplateSummary(firstPriorityAction.envEditTemplate ?? []),
     "external next actions should mirror the first priority env edit template summary"
+  );
+  check(
+    nextActionsReport.currentEnvEditRowsCount === (firstPriorityAction.envEditRows ?? []).length,
+    "external next actions should mirror the first priority env edit rows count"
+  );
+  check(
+    nextActionsReport.currentEnvEditRowsSummary === formatEnvEditRowsSummary(firstPriorityAction.envEditRows ?? []),
+    "external next actions should mirror the first priority env edit rows summary"
   );
   check(
     nextActionsReport.currentReadyCriteriaCount === (firstPriorityAction.readyCriteria ?? []).length,
@@ -1385,6 +1493,21 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvFileL
   check(nextActionsReport.currentPlaceholderEditLocationCount === 0, "release channel metadata should not surface edit locations before a local env file is loaded");
   check(nextActionsReport.currentEnvKeyGuidanceCount === 4, "release channel metadata should surface four current key guidance rows when no local env file is loaded");
   check(nextActionsReport.currentEnvEditTemplateCount === 4, "release channel metadata should surface four current env edit template assignments when no local env file is loaded");
+  check(nextActionsReport.currentEnvEditRowsCount === 4, "release channel metadata should surface four current env edit rows when no local env file is loaded");
+  check(
+    nextActionsReport.currentEnvEditRows.every(
+      (item) =>
+        nextActionsReport.currentRequiredKeys.includes(item.key) &&
+        item.editTarget === nextActionsReport.currentEnvEditTarget &&
+        item.file === nextActionsReport.currentEnvEditTarget &&
+        item.line === null &&
+        item.locationKnown === false &&
+        item.location.endsWith(":line-after-scaffold") &&
+        item.placeholder === false &&
+        item.valueRecorded === false
+    ),
+    "release channel metadata should surface value-free scaffold-pending env edit rows when no local env file is loaded"
+  );
   check(
     nextActionsReport.currentEnvEditTemplate.some(
       (item) => item.key === "GROOVEFORGE_DISTRIBUTION_CHANNEL" && item.assignment.includes("<direct-download/private-beta/managed-release>")
@@ -1434,9 +1557,24 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   );
   check(nextActionsReport.currentEnvKeyGuidanceCount === 4, "release channel metadata should keep four current key guidance rows when placeholders remain");
   check(nextActionsReport.currentEnvEditTemplateCount === 4, "release channel metadata should keep four current env edit template assignments when placeholders remain");
+  check(nextActionsReport.currentEnvEditRowsCount === 4, "release channel metadata should keep four current env edit rows when placeholders remain");
   check(
     nextActionsReport.currentEnvEditTemplate.every((item) => nextActionsReport.currentRequiredKeys.includes(item.key) && item.valueRecorded === false),
     "release channel metadata should keep value-free env edit templates scoped to current required keys when placeholders remain"
+  );
+  check(
+    nextActionsReport.currentEnvEditRows.every(
+      (item) =>
+        nextActionsReport.currentRequiredKeys.includes(item.key) &&
+        item.editTarget === nextActionsReport.currentEnvEditTarget &&
+        item.file === nextActionsReport.currentEnvEditTarget &&
+        Number.isInteger(item.line) &&
+        item.line > 0 &&
+        item.locationKnown === true &&
+        item.placeholder === true &&
+        item.valueRecorded === false
+    ),
+    "release channel metadata should combine current file, line, assignment, guidance, and placeholder status when placeholders remain"
   );
   check(nextActionsReport.currentEnvKeyGuidance.some((item) => item.key === "GROOVEFORGE_DISTRIBUTION_CHANNEL" && item.guidance.includes("managed-release")), "release channel metadata should keep channel value guidance when placeholders remain");
   check(nextActionsReport.currentEnvKeyGuidance.some((item) => item.key === "GROOVEFORGE_SUPPORT_URL" && item.guidance.includes("no credentials")), "release channel metadata should keep safe URL guidance when placeholders remain");
@@ -1480,6 +1618,7 @@ check(markdown.includes("Current placeholder keys:"), "external next actions Mar
 check(markdown.includes("Current placeholder edit locations:"), "external next actions Markdown should include current placeholder edit locations");
 check(markdown.includes("Current env key guidance:"), "external next actions Markdown should include current env key guidance");
 check(markdown.includes("Current env edit template:"), "external next actions Markdown should include current env edit template status");
+check(markdown.includes("Current env edit rows:"), "external next actions Markdown should include current env edit rows status");
 check(markdown.includes("Current ready criteria:"), "external next actions Markdown should include current ready criteria");
 check(markdown.includes("Current action checklist:"), "external next actions Markdown should include current action checklist status");
 check(markdown.includes("Current env edit target:"), "external next actions Markdown should include current env edit target");
@@ -1492,6 +1631,8 @@ check(markdown.includes("Placeholder edit locations:"), "external next actions M
 check(markdown.includes("Current Env Key Guidance"), "external next actions Markdown should include current key guidance section");
 check(markdown.includes("Current Env Edit Template"), "external next actions Markdown should include current env edit template section");
 check(markdown.includes("Env edit template:"), "external next actions Markdown should include action env edit template details");
+check(markdown.includes("Current Env Edit Rows"), "external next actions Markdown should include current env edit rows section");
+check(markdown.includes("Env edit rows:"), "external next actions Markdown should include action env edit row details");
 check(markdown.includes("Current Ready Criteria"), "external next actions Markdown should include current ready criteria section");
 check(markdown.includes("Ready criteria:"), "external next actions Markdown should include action ready criteria details");
 check(markdown.includes("Current Action Checklist"), "external next actions Markdown should include current action checklist section");
@@ -1503,6 +1644,10 @@ if (nextActionsReport.currentEnvKeyGuidanceCount > 0) {
 if (nextActionsReport.currentEnvEditTemplateCount > 0) {
   check(markdown.includes("GROOVEFORGE_DISTRIBUTION_CHANNEL=<direct-download/private-beta/managed-release>"), "external next actions Markdown should include allowed channel assignment template");
   check(markdown.includes("GROOVEFORGE_RELEASE_DOWNLOAD_URL=<safe-absolute-HTTPS-url-no-credentials-or-fragment>"), "external next actions Markdown should include safe URL assignment template");
+}
+if (nextActionsReport.currentEnvEditRowsCount > 0) {
+  check(nextActionsReport.currentEnvEditRows.some((item) => markdown.includes(item.location)), "external next actions Markdown should include current env edit row locations");
+  check(markdown.includes("| key | location | assignment | guidance | placeholder |"), "external next actions Markdown should include current env edit row table");
 }
 check(markdown.includes("Priority Next Actions"), "external next actions Markdown should include priority actions");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "external next actions Markdown should keep the hard gate command");
@@ -1531,6 +1676,7 @@ console.log(`- Current placeholder keys: ${nextActionsReport.currentPlaceholderK
 console.log(`- Current placeholder edit locations: ${nextActionsReport.currentPlaceholderEditLocationCount} (${nextActionsReport.currentPlaceholderEditLocationSummary})`);
 console.log(`- Current env key guidance: ${nextActionsReport.currentEnvKeyGuidanceCount} (${nextActionsReport.currentEnvKeyGuidanceSummary})`);
 console.log(`- Current env edit template: ${nextActionsReport.currentEnvEditTemplateCount} (${nextActionsReport.currentEnvEditTemplateSummary})`);
+console.log(`- Current env edit rows: ${nextActionsReport.currentEnvEditRowsCount} (${nextActionsReport.currentEnvEditRowsSummary})`);
 console.log(`- Current ready criteria: ${nextActionsReport.currentReadyCriteriaCount} (${nextActionsReport.currentReadyCriteriaSummary})`);
 console.log(`- Current action checklist: ${nextActionsReport.currentActionChecklistCount} (${nextActionsReport.currentActionChecklistSummary})`);
 console.log(`- Current env edit target: ${nextActionsReport.currentEnvEditTarget}`);
