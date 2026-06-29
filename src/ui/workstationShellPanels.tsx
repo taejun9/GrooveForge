@@ -673,9 +673,9 @@ const commandReferenceSections: CommandReferenceSection[] = [
         id: "blueprints",
         command: "Beat Blueprints",
         shortcut: "Quick Actions / Readout",
-        target: "Sample-free starts",
+        target: "Direct beat starts",
         context:
-          "Sample-Free Style Starts, Current-Style Match, Preview Decision, Preview Listening Cue, Direct Preview/Apply Commands, Blueprint Result Feedback, Audition Cue, and Next Preview/Apply Check context before Beat Blueprints commands run."
+          "Direct Style Starts, Current-Style Match, Preview Decision, Preview Listening Cue, Direct Preview/Apply Commands, Blueprint Result Feedback, Audition Cue, and Next Preview/Apply Check context before Beat Blueprints commands run."
       },
       {
         id: "style-inspector",
@@ -1743,7 +1743,7 @@ const beatTermItems: BeatTermItem[] = [
   { id: "swing", term: "Swing", meaning: "Timing offset that changes groove feel without changing BPM.", target: "Groove" },
   { id: "velocity-chance", term: "Velocity / Chance", meaning: "Per-event loudness and probability used to shape dynamics and variation.", target: "Events" },
   { id: "style-profile", term: "Style Profile", meaning: "Editable genre direction for BPM, swing, bass role, melody role, and sound goals.", target: "Style" },
-  { id: "beat-blueprint", term: "Beat Blueprint", meaning: "Sample-free starter beat for a style that stays fully editable after Apply.", target: "Start" },
+  { id: "beat-blueprint", term: "Beat Blueprint", meaning: "Direct starter beat for a style that stays fully editable after Apply.", target: "Start" },
   { id: "sound", term: "Sound", meaning: "Preset, kit, focus, timbre, and A/B tone passes.", target: "Tone" },
   { id: "arrangement", term: "Arrangement", meaning: "Song sections, pattern blocks, energy, mutes, and transitions.", target: "Song" },
   { id: "section", term: "Section", meaning: "Arrangement block role such as intro, verse, hook, bridge, or outro.", target: "Arrange" },

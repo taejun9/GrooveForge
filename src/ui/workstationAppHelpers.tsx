@@ -1938,7 +1938,7 @@ export function createBeatBlueprintPreviewDecision(
       : `${changedCount} change${changedCount === 1 ? "" : "s"} before Apply`;
   const detailLabel =
     changedCount === 0
-      ? "Project already matches this sample-free starter."
+      ? "Project already matches this direct beat starter."
       : `${changedLabels.join(" / ")} will update the beat starter.`;
   const actionLabel = styleMatchPreviewed
     ? previewSummary.applyLabel
@@ -12080,7 +12080,7 @@ export function createReviewFixOption(
             itemId: item.id,
             fixId: `blueprint-${blueprintId}`,
             label: "Current Style Starter",
-            detail: "Use the existing current-style Beat Blueprint to create sample-free signal.",
+            detail: "Use the existing current-style Beat Blueprint to create editable beat signal.",
             group: "Create",
             action: { kind: "blueprint", blueprintId },
             auditionCue: "Loop Pattern A and confirm drums, 808, chords, and Synth have audible signal.",
@@ -15174,7 +15174,7 @@ export function createHookFixOption(card: HookReadinessCard): HookFixOption {
         cardId: card.id,
         fixId: "section-chain",
         label: "8 Bar Chain",
-        detail: "Use the existing 8 Bar Pattern Chain to make a sample-free Hook section.",
+        detail: "Use the existing 8 Bar Pattern Chain to make an editable Hook section.",
         group: "Arrange",
         action: { kind: "patternChain", chain: "eight_bar" },
         auditionCue: "Play the Hook loop and confirm the section is easy to find before adding more blocks.",

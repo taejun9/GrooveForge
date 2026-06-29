@@ -39,7 +39,7 @@ These rules should be enforced by the local harness where practical.
 - Sensitive real user, customer, startup, credential, and production data must not appear in samples, tests, docs, or screenshots.
 - Broad permissions, remote AI calls, trackers, ads, payment flows, and destructive automations require explicit project rationale.
 - Real user audio, copyrighted sample packs, unreleased beats, credentials, and private project files must not be committed.
-- User-facing UI copy must keep GrooveForge composition-first: section guidance and mix/master details should avoid sampling-first phrases such as sample pocket, crate-dig, chop energy, and rendered samples when direct beat-writing or rendered-frame wording is more accurate.
+- User-facing UI copy must keep GrooveForge composition-first: section guidance, beat-starter guidance, and mix/master details should avoid sampling-first phrases such as sample pocket, crate-dig, chop energy, rendered samples, and sample-free starter/signal wording when direct beat-writing, editable beat, or rendered-frame wording is more accurate.
 
 ## Commands
 
