@@ -62,6 +62,10 @@ function valueFreeObjectRows(values) {
   return Array.isArray(values) ? values.filter((value) => value && typeof value === "object" && value.valueRecorded === false) : [];
 }
 
+function escapeCell(value) {
+  return String(value ?? "none").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
 function formatUserPercent(value) {
   return value === 100 ? "100%" : `${value.toFixed(6)}%`;
 }
@@ -74,8 +78,26 @@ function formatEditGuidanceRows(rows) {
   return rows
     .map((row) => {
       const location = row.location ?? (row.file && row.line ? `${row.file}:${row.line}` : row.editTarget ?? "unknown");
-      return `| ${location} | ${row.key ?? "unknown"} | ${row.assignment ?? "none"} | ${row.guidance ?? "none"} |`;
+      return `| ${escapeCell(location)} | ${escapeCell(row.key ?? "unknown")} | ${escapeCell(row.assignment ?? "none")} | ${escapeCell(row.guidance ?? "none")} |`;
     })
+    .join("\n");
+}
+
+function formatProofChecklistRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.criterion)} | ${escapeCell(row.evidenceSummary)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.hardGateCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatCommandVerificationRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.expectation)} | ${escapeCell(row.proofTarget)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
     .join("\n");
 }
 
@@ -174,6 +196,7 @@ function buildExternalProofBundleSummary(externalProofBundle) {
     externalProofBundleCurrentPlaceholderRemediationRows: valueFreeObjectRows(externalProofBundle.currentPlaceholderRemediationRows),
     externalProofBundleCurrentProofChecklistRowCount: integerValue(externalProofBundle.currentProofChecklistRowCount),
     externalProofBundleCurrentProofChecklistRowSummary: textValue(externalProofBundle.currentProofChecklistRowSummary, "none"),
+    externalProofBundleCurrentProofChecklistRows: valueFreeObjectRows(externalProofBundle.currentProofChecklistRows),
     externalProofBundleCurrentActionChecklistCount: integerValue(externalProofBundle.currentActionChecklistCount),
     externalProofBundleCurrentActionChecklistSummary: textValue(externalProofBundle.currentActionChecklistSummary, "none"),
     externalProofBundleCurrentRerunCommand: textValue(externalProofBundle.currentRerunCommand, "none"),
@@ -181,6 +204,7 @@ function buildExternalProofBundleSummary(externalProofBundle) {
     externalProofBundleCurrentCommandSequenceSummary: textValue(externalProofBundle.currentCommandSequenceSummary, "none"),
     externalProofBundleCurrentCommandVerificationRowCount: integerValue(externalProofBundle.currentCommandVerificationRowCount),
     externalProofBundleCurrentCommandVerificationRowSummary: textValue(externalProofBundle.currentCommandVerificationRowSummary, "none"),
+    externalProofBundleCurrentCommandVerificationRows: valueFreeObjectRows(externalProofBundle.currentCommandVerificationRows),
     externalProofBundleHardGateCommand: textValue(externalProofBundle.hardExternalGateCommand, "npm run release:external-check"),
     externalProofBundleLocalEnvLoaded: externalProofBundle.localEnvInput?.enabled === true,
     externalProofBundleCurrentEnvSummaryValueRecorded: false,
@@ -298,6 +322,18 @@ function buildMarkdown(report) {
 | location | key | assignment shape | guidance |
 |---|---|---|---|
 ${formatEditGuidanceRows(report.externalProofBundleCurrentEnvEditRows)}
+
+## Current Proof Checklist Rows
+
+| order | criterion | evidence | proof command | hard gate | value recorded |
+|---:|---|---|---|---|---:|
+${formatProofChecklistRows(report.externalProofBundleCurrentProofChecklistRows)}
+
+## Current Command Verification Rows
+
+| order | command | role | expectation | proof target | value recorded |
+|---:|---|---|---|---|---:|
+${formatCommandVerificationRows(report.externalProofBundleCurrentCommandVerificationRows)}
 
 ## Current First Blockers
 
@@ -502,11 +538,15 @@ check(Array.isArray(releaseProgressReport.externalProofBundleCurrentPlaceholderR
 check(releaseProgressReport.externalProofBundleCurrentPlaceholderRemediationRows.every((row) => row.valueRecorded === false), "release progress report placeholder remediation rows should not record values");
 check(Number.isInteger(releaseProgressReport.externalProofBundleCurrentProofChecklistRowCount), "release progress report should include external proof current proof checklist row count");
 check(typeof releaseProgressReport.externalProofBundleCurrentProofChecklistRowSummary === "string" && releaseProgressReport.externalProofBundleCurrentProofChecklistRowSummary.length > 0, "release progress report should include external proof current proof checklist row summary");
+check(Array.isArray(releaseProgressReport.externalProofBundleCurrentProofChecklistRows), "release progress report should include value-free external proof current proof checklist rows");
+check(releaseProgressReport.externalProofBundleCurrentProofChecklistRows.every((row) => row.valueRecorded === false), "release progress report proof checklist rows should not record values");
 check(Number.isInteger(releaseProgressReport.externalProofBundleCurrentActionChecklistCount), "release progress report should include external proof current action checklist count");
 check(typeof releaseProgressReport.externalProofBundleCurrentActionChecklistSummary === "string" && releaseProgressReport.externalProofBundleCurrentActionChecklistSummary.length > 0, "release progress report should include external proof current action checklist summary");
 check(typeof releaseProgressReport.externalProofBundleCurrentRerunCommand === "string" && releaseProgressReport.externalProofBundleCurrentRerunCommand.length > 0, "release progress report should include external proof current rerun command");
 check(Number.isInteger(releaseProgressReport.externalProofBundleCurrentCommandSequenceCount), "release progress report should include external proof current command sequence count");
 check(typeof releaseProgressReport.externalProofBundleCurrentCommandSequenceSummary === "string" && releaseProgressReport.externalProofBundleCurrentCommandSequenceSummary.length > 0, "release progress report should include external proof current command sequence summary");
+check(Array.isArray(releaseProgressReport.externalProofBundleCurrentCommandVerificationRows), "release progress report should include value-free external proof current command verification rows");
+check(releaseProgressReport.externalProofBundleCurrentCommandVerificationRows.every((row) => row.valueRecorded === false), "release progress report command verification rows should not record values");
 check(releaseProgressReport.externalProofBundleCurrentRequiredKeyCount === releaseProgressReport.externalProofBundleCurrentRequiredKeys.length, "release progress report current required key count should match names");
 check(releaseProgressReport.externalProofBundleCurrentPlaceholderKeyCount === releaseProgressReport.externalProofBundleCurrentPlaceholderKeys.length, "release progress report current placeholder key count should match names");
 check(releaseProgressReport.externalProofBundleCurrentCommandVerificationRowCount >= 0, "release progress report should include external proof command verification row count");
@@ -545,6 +585,10 @@ check(markdown.includes("Next proof target to report:"), "release progress Markd
 check(markdown.includes("Operator action to report:"), "release progress Markdown should include user-facing operator action");
 check(markdown.includes("Current Edit Guidance"), "release progress Markdown should include current edit guidance table");
 check(markdown.includes("assignment shape"), "release progress Markdown should include value-free assignment shape guidance");
+check(markdown.includes("Current Proof Checklist Rows"), "release progress Markdown should include current proof checklist rows");
+check(markdown.includes("Current Command Verification Rows"), "release progress Markdown should include current command verification rows");
+check(markdown.includes("proof command"), "release progress Markdown should include proof command guidance");
+check(markdown.includes("expectation"), "release progress Markdown should include command expectation guidance");
 check(markdown.includes("Current env edit target:"), "release progress Markdown should include current env edit target");
 check(markdown.includes("Current placeholder remediation rows:"), "release progress Markdown should include current placeholder remediation summary");
 check(markdown.includes("Current command sequence:"), "release progress Markdown should include current command sequence summary");
@@ -589,6 +633,7 @@ console.log(`- External proof current env edit target: ${releaseProgressReport.e
 console.log(`- External proof current env edit template: ${releaseProgressReport.externalProofBundleCurrentEnvEditTemplateCount} (${releaseProgressReport.externalProofBundleCurrentEnvEditTemplateSummary})`);
 console.log(`- External proof current env edit rows: ${releaseProgressReport.externalProofBundleCurrentEnvEditRowsCount} (${releaseProgressReport.externalProofBundleCurrentEnvEditRowsSummary})`);
 console.log(`- External proof current placeholder remediation rows: ${releaseProgressReport.externalProofBundleCurrentPlaceholderRemediationRowCount} (${releaseProgressReport.externalProofBundleCurrentPlaceholderRemediationRowSummary})`);
+console.log(`- External proof current proof checklist rows: ${releaseProgressReport.externalProofBundleCurrentProofChecklistRowCount} (${releaseProgressReport.externalProofBundleCurrentProofChecklistRowSummary})`);
 console.log(`- External proof current rerun command: ${releaseProgressReport.externalProofBundleCurrentRerunCommand}`);
 console.log(`- External proof current command sequence: ${releaseProgressReport.externalProofBundleCurrentCommandSequenceCount} (${releaseProgressReport.externalProofBundleCurrentCommandSequenceSummary})`);
 console.log(`- External proof current command verification rows: ${releaseProgressReport.externalProofBundleCurrentCommandVerificationRowCount} (${releaseProgressReport.externalProofBundleCurrentCommandVerificationRowSummary})`);

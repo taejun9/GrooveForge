@@ -129,6 +129,8 @@ function buildCurrentEnvSummary(externalNextActions) {
   const currentEnvEditTemplate = valueFreeObjectRows(externalNextActions?.currentEnvEditTemplate);
   const currentEnvEditRows = valueFreeObjectRows(externalNextActions?.currentEnvEditRows);
   const currentPlaceholderRemediationRows = valueFreeObjectRows(externalNextActions?.currentPlaceholderRemediationRows);
+  const currentProofChecklistRows = valueFreeObjectRows(externalNextActions?.currentProofChecklistRows);
+  const currentCommandVerificationRows = valueFreeObjectRows(externalNextActions?.currentCommandVerificationRows);
   return {
     currentRequiredKeyCount: integerValue(externalNextActions?.currentRequiredKeyCount),
     currentRequiredKeySummary: textValue(externalNextActions?.currentRequiredKeySummary),
@@ -151,11 +153,13 @@ function buildCurrentEnvSummary(externalNextActions) {
     currentPlaceholderRemediationRows,
     currentProofChecklistRowCount: integerValue(externalNextActions?.currentProofChecklistRowCount),
     currentProofChecklistRowSummary: textValue(externalNextActions?.currentProofChecklistRowSummary),
+    currentProofChecklistRows,
     currentActionChecklistCount: integerValue(externalNextActions?.currentActionChecklistCount),
     currentActionChecklistSummary: textValue(externalNextActions?.currentActionChecklistSummary),
     currentRerunCommand: textValue(externalNextActions?.currentRerunCommand),
     currentCommandSequenceCount: integerValue(externalNextActions?.currentCommandSequenceCount),
     currentCommandSequenceSummary: textValue(externalNextActions?.currentCommandSequenceSummary),
+    currentCommandVerificationRows,
     currentEnvSummaryValueRecorded: false
   };
 }
@@ -204,6 +208,28 @@ function formatGateRequirementRows(rows) {
     return "| none | no | 0 | no gate requirement rows |";
   }
   return rows.map((row) => `| ${row.label} | ${row.ready ? "yes" : "no"} | ${row.blockerCount} | ${row.firstBlocker || "none"} |`).join("\n");
+}
+
+function escapeCell(value) {
+  return String(value ?? "none").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
+function formatProofChecklistRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.criterion)} | ${escapeCell(row.evidenceSummary)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.hardGateCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatCommandVerificationRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.expectation)} | ${escapeCell(row.proofTarget)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
 }
 
 function formatBlockers(blockers) {
@@ -262,6 +288,18 @@ ${formatGateRequirementRows(summary.gateRequirementRows)}
 - Current rerun command: \`${summary.currentRerunCommand}\`
 - Current command sequence: ${summary.currentCommandSequenceCount} (${summary.currentCommandSequenceSummary})
 - Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
+
+## Current Proof Checklist Rows
+
+| order | criterion | evidence | proof command | hard gate | value recorded |
+|---:|---|---|---|---|---:|
+${formatProofChecklistRows(summary.currentProofChecklistRows)}
+
+## Current Command Verification Rows
+
+| order | command | role | expectation | proof target | value recorded |
+|---:|---|---|---|---|---:|
+${formatCommandVerificationRows(summary.currentCommandVerificationRows)}
 
 ## First Blockers
 
@@ -470,11 +508,15 @@ check(Array.isArray(summary.currentPlaceholderRemediationRows), "release proof b
 check(summary.currentPlaceholderRemediationRows.every((row) => row.valueRecorded === false), "release proof bundle placeholder remediation rows should not record values");
 check(Number.isInteger(summary.currentProofChecklistRowCount), "release proof bundle should include current proof checklist row count");
 check(typeof summary.currentProofChecklistRowSummary === "string" && summary.currentProofChecklistRowSummary.length > 0, "release proof bundle should include current proof checklist row summary");
+check(Array.isArray(summary.currentProofChecklistRows), "release proof bundle should include value-free current proof checklist rows");
+check(summary.currentProofChecklistRows.every((row) => row.valueRecorded === false), "release proof bundle current proof checklist rows should not record values");
 check(Number.isInteger(summary.currentActionChecklistCount), "release proof bundle should include current action checklist count");
 check(typeof summary.currentActionChecklistSummary === "string" && summary.currentActionChecklistSummary.length > 0, "release proof bundle should include current action checklist summary");
 check(typeof summary.currentRerunCommand === "string" && summary.currentRerunCommand.length > 0, "release proof bundle should include current rerun command");
 check(Number.isInteger(summary.currentCommandSequenceCount), "release proof bundle should include current command sequence count");
 check(typeof summary.currentCommandSequenceSummary === "string" && summary.currentCommandSequenceSummary.length > 0, "release proof bundle should include current command sequence summary");
+check(Array.isArray(summary.currentCommandVerificationRows), "release proof bundle should include value-free current command verification rows");
+check(summary.currentCommandVerificationRows.every((row) => row.valueRecorded === false), "release proof bundle current command verification rows should not record values");
 check(summary.currentRequiredKeyCount === summary.currentRequiredKeys.length, "release proof bundle current required key count should match names");
 check(summary.currentPlaceholderKeyCount === summary.currentPlaceholderKeys.length, "release proof bundle current placeholder key count should match names");
 check(summary.currentEnvSummaryValueRecorded === false, "release proof bundle current env summary should not record values");
@@ -521,6 +563,8 @@ check(markdown.includes("Current required keys:"), "release proof bundle Markdow
 check(markdown.includes("Current placeholder keys:"), "release proof bundle Markdown should include current placeholder key summary");
 check(markdown.includes("Current env edit target:"), "release proof bundle Markdown should include current env edit target");
 check(markdown.includes("Current placeholder remediation rows:"), "release proof bundle Markdown should include current placeholder remediation summary");
+check(markdown.includes("Current Proof Checklist Rows"), "release proof bundle Markdown should include current proof checklist rows");
+check(markdown.includes("Current Command Verification Rows"), "release proof bundle Markdown should include current command verification rows");
 check(markdown.includes("Current command sequence:"), "release proof bundle Markdown should include current command sequence summary");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "release proof bundle Markdown should keep hard gate authoritative");
 check(markdown.includes("Private values recorded: no"), "release proof bundle Markdown should state value redaction");
