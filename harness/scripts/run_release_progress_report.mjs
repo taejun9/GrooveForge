@@ -17,6 +17,7 @@ const personaReadinessJsonPath = path.join(packageRoot, `${appName}-${packageJso
 const completionProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-completion-progress.json`);
 const externalProofBundleJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-proof-bundle.json`);
 const externalGateJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-distribution-gate.json`);
+const releaseChannelUnblockJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-unblock-smoke.json`);
 const releaseProgressMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.md`);
 const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.json`);
 const failures = [];
@@ -154,6 +155,15 @@ function formatDeliveryPackageReopenRows(rows) {
   }
   return rows
     .map((row) => `| ${escapeCell(row.persona)} | ${escapeCell(row.workflowLabel)} | ${row.ready ? "yes" : "no"} | ${row.artifactCount ?? 0} | ${row.verifiedArtifactCount ?? 0} | ${row.projectReopened ? "yes" : "no"} | ${row.hashesReady ? "yes" : "no"} | ${row.wavHeadersReady ? "yes" : "no"} | ${row.midiHeaderReady ? "yes" : "no"} | ${row.handoffReady ? "yes" : "no"} | ${escapeCell(row.packageRoot)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatReleaseChannelUnblockRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | no | no | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.key)} | ${row.present ? "yes" : "no"} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.evidence)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
     .join("\n");
 }
 
@@ -435,6 +445,41 @@ function buildExternalProofBundleSummary(externalProofBundle) {
   };
 }
 
+function buildReleaseChannelUnblockSummary(releaseChannelUnblock) {
+  const metadataRows = valueFreeObjectRows(releaseChannelUnblock.releaseChannelMetadataRows).map((row) => ({
+    key: textValue(row.key),
+    present: row.present === true,
+    ready: row.ready === true,
+    evidence: textValue(row.evidence),
+    valueRecorded: false
+  }));
+  return {
+    sourceReleaseChannelUnblockReady: true,
+    sourceReleaseChannelUnblockPath: relative(releaseChannelUnblockJsonPath),
+    releaseChannelUnblockSmokeReady: releaseChannelUnblock.releaseChannelUnblockSmokeReady === true,
+    releaseChannelUnblockSyntheticFixturePath: textValue(releaseChannelUnblock.syntheticEnvFixturePath, "none"),
+    releaseChannelUnblockLoaderEnabled: releaseChannelUnblock.loaderEnabled === true,
+    releaseChannelUnblockLoadedKeyCount: integerValue(releaseChannelUnblock.loadedKeyCount),
+    releaseChannelUnblockLoadedKeys: stringArrayValue(releaseChannelUnblock.loadedKeys),
+    releaseChannelUnblockPlaceholderKeyCount: integerValue(releaseChannelUnblock.placeholderKeyCount),
+    releaseChannelUnblockPlaceholderKeys: stringArrayValue(releaseChannelUnblock.placeholderKeys),
+    releaseChannelUnblockMetadataReady: releaseChannelUnblock.releaseChannelMetadataReady === true,
+    releaseChannelUnblockMetadataRowCount: metadataRows.length,
+    releaseChannelUnblockMetadataRowSummary: metadataRows.length > 0 ? `${metadataRows.length} value-free release-channel unblock rows` : "none",
+    releaseChannelUnblockMetadataRows: metadataRows,
+    releaseChannelUnblockPlaceholderBlockerCleared: releaseChannelUnblock.releaseChannelPlaceholderBlockerCleared === true,
+    releaseChannelUnblockNextProofCommandAfterRealEdits: textValue(releaseChannelUnblock.nextProofCommandAfterRealEdits, "npm run release:doctor"),
+    releaseChannelUnblockCurrentBlockerRefreshCommand: textValue(releaseChannelUnblock.currentBlockerRefreshCommand, "npm run release:current-blocker"),
+    releaseChannelUnblockPrivateValuesRecorded: releaseChannelUnblock.privateValuesRecorded === true ? true : false,
+    releaseChannelUnblockNetworkProbeAttempted: releaseChannelUnblock.networkProbeAttempted === true,
+    releaseChannelUnblockReleaseUploadAttempted: releaseChannelUnblock.releaseUploadAttempted === true,
+    releaseChannelUnblockAppleNotarySubmissionAttempted: releaseChannelUnblock.appleNotarySubmissionAttempted === true,
+    releaseChannelUnblockSigningAttempted: releaseChannelUnblock.signingAttempted === true,
+    releaseChannelUnblockClaimedExternalDistribution: releaseChannelUnblock.claimedExternalDistribution === true,
+    releaseChannelUnblockValueRecorded: false
+  };
+}
+
 function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
@@ -530,6 +575,10 @@ function buildMarkdown(report) {
 - External gate source ready: ${report.sourceExternalGateReady ? "yes" : "no"}
 - External gate current proof source ready: ${report.externalGateCurrentProofBundleSourceReady ? "yes" : "no"}
 - External gate/proof current action consistent: ${report.externalGateProofBundleConsistencyReady ? "yes" : "no"}
+- Release-channel unblock source ready: ${report.sourceReleaseChannelUnblockReady ? "yes" : "no"}
+- Release-channel unblock ready: ${report.releaseChannelUnblockSmokeReady ? "yes" : "no"}
+- Release-channel placeholder blocker cleared in rehearsal: ${report.releaseChannelUnblockPlaceholderBlockerCleared ? "yes" : "no"}
+- Release-channel unblock metadata rows: ${report.releaseChannelUnblockMetadataRowCount} (${report.releaseChannelUnblockMetadataRowSummary})
 - External proof artifacts present: ${report.externalProofBundleProofArtifactPresentCount}/${report.externalProofBundleProofArtifactCount} (missing: ${report.externalProofBundleProofArtifactMissingSummary})
 - External proof gate requirements ready: ${report.externalProofBundleGateRequirementReadyCount}/${report.externalProofBundleGateRequirementTotal} (blocked: ${report.externalProofBundleGateRequirementBlockedCount})
 - External proof current target: ${report.externalProofBundleCurrentProofTarget}
@@ -561,6 +610,7 @@ function buildMarkdown(report) {
 - Remaining completion for status reports: ${formatUserPercent(report.userFacingRemainingPercent)}
 - Completion status wording: ${report.userFacingCompletionStatus}
 - Completion evidence summary: ${report.userFacingCompletionEvidenceSummary}
+- Release-channel unblock rehearsal to report: ${report.releaseChannelUnblockSmokeReady ? "ready" : "blocked"}; placeholder blocker cleared: ${report.releaseChannelUnblockPlaceholderBlockerCleared ? "yes" : "no"}
 - Audience readiness to report: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})
 - Audience acceptance rows to report: ${report.audienceAcceptanceRowCount} (${report.audienceAcceptanceRowSummary})
 - Persona delivery packages to report: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})
@@ -623,6 +673,25 @@ ${formatDeliveryPackageReopenRows(report.audienceDeliveryPackageReopenRows)}
 - Persona readiness JSON: ${report.sourcePersonaReadinessPath}
 - External proof bundle JSON: ${report.sourceExternalProofBundlePath}
 - External distribution gate JSON: ${report.sourceExternalGatePath}
+- Release-channel unblock JSON: ${report.sourceReleaseChannelUnblockPath}
+
+## Release-Channel Unblock Rehearsal
+
+- Source ready: ${report.sourceReleaseChannelUnblockReady ? "yes" : "no"}
+- Smoke ready: ${report.releaseChannelUnblockSmokeReady ? "yes" : "no"}
+- Synthetic fixture path: ${report.releaseChannelUnblockSyntheticFixturePath}
+- Loader enabled: ${report.releaseChannelUnblockLoaderEnabled ? "yes" : "no"}
+- Loaded keys: ${report.releaseChannelUnblockLoadedKeyCount} (${report.releaseChannelUnblockLoadedKeys.join(", ") || "none"})
+- Placeholder keys in rehearsal: ${report.releaseChannelUnblockPlaceholderKeyCount} (${report.releaseChannelUnblockPlaceholderKeys.join(", ") || "none"})
+- Metadata ready: ${report.releaseChannelUnblockMetadataReady ? "yes" : "no"}
+- Placeholder blocker cleared in rehearsal: ${report.releaseChannelUnblockPlaceholderBlockerCleared ? "yes" : "no"}
+- Next proof command after real edits: \`${report.releaseChannelUnblockNextProofCommandAfterRealEdits}\`
+- Current blocker refresh command: \`${report.releaseChannelUnblockCurrentBlockerRefreshCommand}\`
+- Value recorded: ${report.releaseChannelUnblockValueRecorded ? "yes" : "no"}
+
+| key | present | ready | evidence | value recorded |
+|---|---:|---:|---|---:|
+${formatReleaseChannelUnblockRows(report.releaseChannelUnblockMetadataRows)}
 
 ## External Proof Bundle
 
@@ -769,6 +838,12 @@ if (!existsSync(externalGateJsonPath)) {
     `${fromExisting ? "Run npm run release:check or npm run verify before npm run release:progress-smoke.\n" : ""}Expected: ${relative(externalGateJsonPath)}`
   );
 }
+if (!existsSync(releaseChannelUnblockJsonPath)) {
+  fail(
+    "Release-channel unblock JSON was not generated.",
+    `${fromExisting ? "Run npm run release:check or npm run verify before npm run release:progress-smoke.\n" : ""}Expected: ${relative(releaseChannelUnblockJsonPath)}`
+  );
+}
 if (!existsSync(personaReadinessJsonPath)) {
   fail(
     "Persona readiness JSON was not generated.",
@@ -780,8 +855,10 @@ const personaReadiness = JSON.parse(await readFile(personaReadinessJsonPath, "ut
 const completionProgress = JSON.parse(await readFile(completionProgressJsonPath, "utf8"));
 const externalProofBundle = JSON.parse(await readFile(externalProofBundleJsonPath, "utf8"));
 const externalGate = JSON.parse(await readFile(externalGateJsonPath, "utf8"));
+const releaseChannelUnblock = JSON.parse(await readFile(releaseChannelUnblockJsonPath, "utf8"));
 const externalProofBundleSummary = buildExternalProofBundleSummary(externalProofBundle);
 const externalGateCurrentProofSummary = buildExternalGateCurrentProofSummary(externalGate, externalProofBundleSummary);
+const releaseChannelUnblockSummary = buildReleaseChannelUnblockSummary(releaseChannelUnblock);
 const audienceReadinessSummary = buildAudienceReadinessSummary(personaReadiness);
 const completedPlanSummary = await buildCompletedPlanSummary();
 const releaseProgressReport = {
@@ -805,6 +882,7 @@ const releaseProgressReport = {
   ...audienceReadinessSummary,
   ...externalProofBundleSummary,
   ...externalGateCurrentProofSummary,
+  ...releaseChannelUnblockSummary,
   productScope: completionProgress.productScope,
   completionStage: completionProgress.completionStage,
   sourceEvidenceReady: completionProgress.sourceEvidenceReady === true,
@@ -854,7 +932,10 @@ releaseProgressReport.releaseProgressReportReady =
   releaseProgressReport.sourceExternalProofBundleReady &&
   releaseProgressReport.externalProofBundleReady &&
   releaseProgressReport.sourceExternalGateReady &&
-  releaseProgressReport.externalGateProofBundleConsistencyReady;
+  releaseProgressReport.externalGateProofBundleConsistencyReady &&
+  releaseProgressReport.sourceReleaseChannelUnblockReady &&
+  releaseProgressReport.releaseChannelUnblockSmokeReady &&
+  releaseProgressReport.releaseChannelUnblockPlaceholderBlockerCleared;
 Object.assign(releaseProgressReport, buildUserFacingCompletionSummary(releaseProgressReport, completedPlanSummary));
 
 const markdown = buildMarkdown(releaseProgressReport);
@@ -989,6 +1070,29 @@ check(releaseProgressReport.externalGateProofBundleConsistencyChecks.currentActi
 check(releaseProgressReport.externalGateProofBundleConsistencyChecks.currentCommandVerificationRowsMatch === true, "release progress report should prove external gate current command verification rows match proof bundle");
 check(releaseProgressReport.externalGateProofBundleConsistencyValueRecorded === false, "release progress report should not record external gate consistency values");
 check(releaseProgressReport.externalGateValueRecorded === false, "release progress report should not record external gate values");
+check(releaseProgressReport.sourceReleaseChannelUnblockReady === true, "release progress report should include ready release-channel unblock source evidence");
+check(releaseProgressReport.sourceReleaseChannelUnblockPath === relative(releaseChannelUnblockJsonPath), "release progress report should identify the release-channel unblock source path");
+check(releaseProgressReport.releaseChannelUnblockSmokeReady === true, "release progress report should mirror ready release-channel unblock smoke evidence");
+check(releaseProgressReport.releaseChannelUnblockLoaderEnabled === true, "release progress report should mirror release-channel unblock loader readiness");
+check(releaseProgressReport.releaseChannelUnblockLoadedKeyCount === 4, "release progress report should mirror four loaded release-channel unblock keys");
+check(releaseProgressReport.releaseChannelUnblockLoadedKeys.length === releaseProgressReport.releaseChannelUnblockLoadedKeyCount, "release progress report unblock loaded key count should match names");
+check(releaseProgressReport.releaseChannelUnblockPlaceholderKeyCount === 0, "release progress report should mirror zero release-channel unblock placeholder keys");
+check(releaseProgressReport.releaseChannelUnblockPlaceholderKeys.length === 0, "release progress report unblock placeholder key names should be empty");
+check(releaseProgressReport.releaseChannelUnblockMetadataReady === true, "release progress report should mirror release-channel unblock metadata readiness");
+check(releaseProgressReport.releaseChannelUnblockMetadataRowCount === releaseProgressReport.releaseChannelUnblockMetadataRows.length, "release progress report unblock row count should match rows");
+check(releaseProgressReport.releaseChannelUnblockMetadataRowCount === 4, "release progress report should include four release-channel unblock metadata rows");
+check(releaseProgressReport.releaseChannelUnblockMetadataRows.every((row) => row.valueRecorded === false), "release progress report unblock metadata rows should not record values");
+check(releaseProgressReport.releaseChannelUnblockMetadataRows.every((row) => row.present === true && row.ready === true), "release progress report unblock metadata rows should be present and ready");
+check(releaseProgressReport.releaseChannelUnblockPlaceholderBlockerCleared === true, "release progress report should prove release-channel placeholder blocker can clear in rehearsal");
+check(releaseProgressReport.releaseChannelUnblockNextProofCommandAfterRealEdits === "npm run release:doctor", "release progress report should mirror unblock next proof command");
+check(releaseProgressReport.releaseChannelUnblockCurrentBlockerRefreshCommand === "npm run release:current-blocker", "release progress report should mirror unblock current blocker refresh command");
+check(releaseProgressReport.releaseChannelUnblockPrivateValuesRecorded === false, "release progress report unblock evidence should not record private values");
+check(releaseProgressReport.releaseChannelUnblockNetworkProbeAttempted === false, "release progress report unblock evidence should not probe network");
+check(releaseProgressReport.releaseChannelUnblockReleaseUploadAttempted === false, "release progress report unblock evidence should not upload releases");
+check(releaseProgressReport.releaseChannelUnblockAppleNotarySubmissionAttempted === false, "release progress report unblock evidence should not submit to Apple");
+check(releaseProgressReport.releaseChannelUnblockSigningAttempted === false, "release progress report unblock evidence should not sign artifacts");
+check(releaseProgressReport.releaseChannelUnblockClaimedExternalDistribution === false, "release progress report unblock evidence should not claim external distribution");
+check(releaseProgressReport.releaseChannelUnblockValueRecorded === false, "release progress report should not record release-channel unblock values");
 check(Number.isInteger(releaseProgressReport.externalProofBundleProofArtifactCount), "release progress report should include external proof artifact count");
 check(Number.isInteger(releaseProgressReport.externalProofBundleProofArtifactPresentCount), "release progress report should include external proof artifact present count");
 check(Number.isInteger(releaseProgressReport.externalProofBundleProofArtifactMissingCount), "release progress report should include external proof artifact missing count");
@@ -1080,6 +1184,9 @@ check(markdown.includes("Professional producer readiness:"), "release progress M
 check(markdown.includes("Local release readiness:"), "release progress Markdown should include local release readiness");
 check(markdown.includes("PKG payload project IO evidence ready:"), "release progress Markdown should include PKG payload project IO readiness");
 check(markdown.includes("External Proof Bundle"), "release progress Markdown should include external proof bundle summary");
+check(markdown.includes("Release-Channel Unblock Rehearsal"), "release progress Markdown should include release-channel unblock rehearsal summary");
+check(markdown.includes("Release-channel placeholder blocker cleared in rehearsal:"), "release progress Markdown should include release-channel unblock cleared status");
+check(markdown.includes("Release-channel unblock JSON:"), "release progress Markdown should include release-channel unblock source path");
 check(markdown.includes("External Gate Current Proof Consistency"), "release progress Markdown should include external gate current proof consistency summary");
 check(markdown.includes("External gate/proof current action consistent:"), "release progress Markdown should include external gate/proof consistency status");
 check(markdown.includes("Current next command matches:"), "release progress Markdown should include external gate next-command match status");
@@ -1145,6 +1252,9 @@ console.log(`- External proof bundle ready: ${releaseProgressReport.externalProo
 console.log(`- External gate source ready: ${releaseProgressReport.sourceExternalGateReady ? "yes" : "no"}`);
 console.log(`- External gate current proof source ready: ${releaseProgressReport.externalGateCurrentProofBundleSourceReady ? "yes" : "no"}`);
 console.log(`- External gate/proof current action consistent: ${releaseProgressReport.externalGateProofBundleConsistencyReady ? "yes" : "no"}`);
+console.log(`- Release-channel unblock ready: ${releaseProgressReport.releaseChannelUnblockSmokeReady ? "yes" : "no"}`);
+console.log(`- Release-channel placeholder blocker cleared in rehearsal: ${releaseProgressReport.releaseChannelUnblockPlaceholderBlockerCleared ? "yes" : "no"}`);
+console.log(`- Release-channel unblock rows: ${releaseProgressReport.releaseChannelUnblockMetadataRowCount} (${releaseProgressReport.releaseChannelUnblockMetadataRowSummary})`);
 console.log(`- External gate current next command: ${releaseProgressReport.externalGateCurrentNextCommand}`);
 console.log(`- External gate current first blocker: ${releaseProgressReport.externalGateCurrentFirstBlocker}`);
 console.log(`- External gate current env edit rows: ${releaseProgressReport.externalGateCurrentEnvEditRowsCount} (${releaseProgressReport.externalGateCurrentEnvEditRowsSummary})`);
