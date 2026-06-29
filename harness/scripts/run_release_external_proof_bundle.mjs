@@ -118,9 +118,17 @@ function stringArrayValue(values) {
   return Array.isArray(values) ? values.filter((value) => typeof value === "string" && value.trim().length > 0) : [];
 }
 
+function valueFreeObjectRows(values) {
+  return Array.isArray(values) ? values.filter((value) => value && typeof value === "object" && value.valueRecorded === false) : [];
+}
+
 function buildCurrentEnvSummary(externalNextActions) {
   const currentRequiredKeys = stringArrayValue(externalNextActions?.currentRequiredKeys);
   const currentPlaceholderKeys = stringArrayValue(externalNextActions?.currentPlaceholderKeys);
+  const currentPlaceholderEditLocations = valueFreeObjectRows(externalNextActions?.currentPlaceholderEditLocations);
+  const currentEnvEditTemplate = valueFreeObjectRows(externalNextActions?.currentEnvEditTemplate);
+  const currentEnvEditRows = valueFreeObjectRows(externalNextActions?.currentEnvEditRows);
+  const currentPlaceholderRemediationRows = valueFreeObjectRows(externalNextActions?.currentPlaceholderRemediationRows);
   return {
     currentRequiredKeyCount: integerValue(externalNextActions?.currentRequiredKeyCount),
     currentRequiredKeySummary: textValue(externalNextActions?.currentRequiredKeySummary),
@@ -130,13 +138,17 @@ function buildCurrentEnvSummary(externalNextActions) {
     currentPlaceholderKeys,
     currentPlaceholderEditLocationCount: integerValue(externalNextActions?.currentPlaceholderEditLocationCount),
     currentPlaceholderEditLocationSummary: textValue(externalNextActions?.currentPlaceholderEditLocationSummary),
+    currentPlaceholderEditLocations,
     currentEnvEditTarget: textValue(externalNextActions?.currentEnvEditTarget, ".env.distribution.local"),
     currentEnvEditTemplateCount: integerValue(externalNextActions?.currentEnvEditTemplateCount),
     currentEnvEditTemplateSummary: textValue(externalNextActions?.currentEnvEditTemplateSummary),
+    currentEnvEditTemplate,
     currentEnvEditRowsCount: integerValue(externalNextActions?.currentEnvEditRowsCount),
     currentEnvEditRowsSummary: textValue(externalNextActions?.currentEnvEditRowsSummary),
+    currentEnvEditRows,
     currentPlaceholderRemediationRowCount: integerValue(externalNextActions?.currentPlaceholderRemediationRowCount),
     currentPlaceholderRemediationRowSummary: textValue(externalNextActions?.currentPlaceholderRemediationRowSummary),
+    currentPlaceholderRemediationRows,
     currentProofChecklistRowCount: integerValue(externalNextActions?.currentProofChecklistRowCount),
     currentProofChecklistRowSummary: textValue(externalNextActions?.currentProofChecklistRowSummary),
     currentActionChecklistCount: integerValue(externalNextActions?.currentActionChecklistCount),
@@ -441,13 +453,21 @@ check(typeof summary.currentPlaceholderKeySummary === "string" && summary.curren
 check(Array.isArray(summary.currentPlaceholderKeys), "release proof bundle should include current placeholder key names");
 check(Number.isInteger(summary.currentPlaceholderEditLocationCount), "release proof bundle should include current placeholder edit location count");
 check(typeof summary.currentPlaceholderEditLocationSummary === "string" && summary.currentPlaceholderEditLocationSummary.length > 0, "release proof bundle should include current placeholder edit location summary");
+check(Array.isArray(summary.currentPlaceholderEditLocations), "release proof bundle should include value-free current placeholder edit locations");
+check(summary.currentPlaceholderEditLocations.every((row) => row.valueRecorded === false), "release proof bundle placeholder edit locations should not record values");
 check(typeof summary.currentEnvEditTarget === "string" && summary.currentEnvEditTarget.length > 0, "release proof bundle should include current env edit target");
 check(Number.isInteger(summary.currentEnvEditTemplateCount), "release proof bundle should include current env edit template count");
 check(typeof summary.currentEnvEditTemplateSummary === "string" && summary.currentEnvEditTemplateSummary.length > 0, "release proof bundle should include current env edit template summary");
+check(Array.isArray(summary.currentEnvEditTemplate), "release proof bundle should include value-free current env edit template rows");
+check(summary.currentEnvEditTemplate.every((row) => row.valueRecorded === false), "release proof bundle env edit template rows should not record values");
 check(Number.isInteger(summary.currentEnvEditRowsCount), "release proof bundle should include current env edit rows count");
 check(typeof summary.currentEnvEditRowsSummary === "string" && summary.currentEnvEditRowsSummary.length > 0, "release proof bundle should include current env edit rows summary");
+check(Array.isArray(summary.currentEnvEditRows), "release proof bundle should include value-free current env edit rows");
+check(summary.currentEnvEditRows.every((row) => row.valueRecorded === false), "release proof bundle env edit rows should not record values");
 check(Number.isInteger(summary.currentPlaceholderRemediationRowCount), "release proof bundle should include current placeholder remediation row count");
 check(typeof summary.currentPlaceholderRemediationRowSummary === "string" && summary.currentPlaceholderRemediationRowSummary.length > 0, "release proof bundle should include current placeholder remediation row summary");
+check(Array.isArray(summary.currentPlaceholderRemediationRows), "release proof bundle should include value-free current placeholder remediation rows");
+check(summary.currentPlaceholderRemediationRows.every((row) => row.valueRecorded === false), "release proof bundle placeholder remediation rows should not record values");
 check(Number.isInteger(summary.currentProofChecklistRowCount), "release proof bundle should include current proof checklist row count");
 check(typeof summary.currentProofChecklistRowSummary === "string" && summary.currentProofChecklistRowSummary.length > 0, "release proof bundle should include current proof checklist row summary");
 check(Number.isInteger(summary.currentActionChecklistCount), "release proof bundle should include current action checklist count");
