@@ -172,6 +172,18 @@ function formatSummary(items) {
   return Array.isArray(items) && items.length > 0 ? items.join(", ") : "none";
 }
 
+function formatCommandSummary(commands) {
+  return Array.isArray(commands) && commands.length > 0 ? commands.join(", ") : "none";
+}
+
+function formatCommandList(commands) {
+  return Array.isArray(commands) && commands.length > 0 ? commands.map((command, index) => `${index + 1}. \`${command}\``).join("\n") : "1. None.";
+}
+
+function buildCurrentActionCommandSequence({ prerequisiteCommands = [], nextCommand = "", rerunCommands = [] } = {}) {
+  return unique([prerequisiteCommands, nextCommand, rerunCommands]);
+}
+
 function formatChecklistList(items) {
   return Array.isArray(items) && items.length > 0 ? items.map((item, index) => `${index + 1}. ${item}`).join("\n") : "1. None.";
 }
@@ -343,6 +355,7 @@ function buildCurrentAction({
       currentActionOperatorAction: `Run \`npm run release:prepare-env\` to create ${currentEnvEditTarget}, then replace release-channel placeholder values outside committed files.`,
       currentActionRequiredKeys: releaseChannelMetadataKeys,
       currentActionPlaceholderKeys: [],
+      currentActionPrerequisiteCommands: [],
       currentActionRerunCommands: ["npm run release:doctor"],
       currentActionChecklist: checklist
     };
@@ -364,6 +377,7 @@ function buildCurrentAction({
       currentActionOperatorAction: `Replace placeholder values in ${currentEnvEditTarget} for the current release-channel keys (${releaseChannelPlaceholderKeys.length}): ${keySummary}.`,
       currentActionRequiredKeys: releaseChannelMetadataKeys,
       currentActionPlaceholderKeys: releaseChannelPlaceholderKeys,
+      currentActionPrerequisiteCommands: [],
       currentActionRerunCommands: ["npm run release:doctor", "npm run release:next-actions"],
       currentActionChecklist: checklist
     };
@@ -386,6 +400,7 @@ function buildCurrentAction({
       currentActionOperatorAction: "Run distribution-channel QA after the current release-channel metadata keys have real operator-owned values.",
       currentActionRequiredKeys: releaseChannelMetadataKeys,
       currentActionPlaceholderKeys: [],
+      currentActionPrerequisiteCommands: ["npm run desktop:distribution-private-inputs-smoke"],
       currentActionRerunCommands: ["npm run desktop:distribution-channel-qa-smoke", "npm run release:next-actions"],
       currentActionChecklist: checklist
     };
@@ -404,6 +419,7 @@ function buildCurrentAction({
       currentActionOperatorAction: "Use external next-actions to select the next proof target after release-channel metadata.",
       currentActionRequiredKeys: [],
       currentActionPlaceholderKeys: [],
+      currentActionPrerequisiteCommands: ["npm run release:external-preflight"],
       currentActionRerunCommands: ["npm run release:next-actions"],
       currentActionChecklist: checklist
     };
@@ -416,6 +432,7 @@ function buildCurrentAction({
     currentActionOperatorAction: "Run the hard external distribution gate after every redacted readiness signal is ready.",
     currentActionRequiredKeys: [],
     currentActionPlaceholderKeys: [],
+    currentActionPrerequisiteCommands: ["npm run release:check"],
     currentActionRerunCommands: ["npm run release:external-check"],
     currentActionChecklist: ["Run `npm run release:external-check` and archive the resulting value-free evidence."]
   };
@@ -425,7 +442,15 @@ function enrichCurrentAction(action, { currentEnvEditTarget = "", editLocations 
   const currentActionRequiredKeys = Array.isArray(action.currentActionRequiredKeys) ? action.currentActionRequiredKeys : [];
   const currentActionPlaceholderKeys = Array.isArray(action.currentActionPlaceholderKeys) ? action.currentActionPlaceholderKeys : [];
   const currentActionChecklist = Array.isArray(action.currentActionChecklist) ? action.currentActionChecklist : [];
+  const currentActionPrerequisiteCommands = Array.isArray(action.currentActionPrerequisiteCommands)
+    ? action.currentActionPrerequisiteCommands
+    : [];
   const currentActionRerunCommands = Array.isArray(action.currentActionRerunCommands) ? action.currentActionRerunCommands : [];
+  const currentActionCommandSequence = buildCurrentActionCommandSequence({
+    prerequisiteCommands: currentActionPrerequisiteCommands,
+    nextCommand: action.currentActionNextCommand,
+    rerunCommands: currentActionRerunCommands
+  });
   const currentActionPlaceholderEditLocations = Array.isArray(editLocations)
     ? editLocations.filter((item) => currentActionPlaceholderKeys.includes(item.key))
     : [];
@@ -438,6 +463,8 @@ function enrichCurrentAction(action, { currentEnvEditTarget = "", editLocations 
   });
   return {
     ...action,
+    currentActionPrerequisiteCommands,
+    currentActionRerunCommands,
     currentActionRequiredKeyCount: currentActionRequiredKeys.length,
     currentActionRequiredKeySummary: formatSummary(currentActionRequiredKeys),
     currentActionPlaceholderKeyCount: currentActionPlaceholderKeys.length,
@@ -453,8 +480,13 @@ function enrichCurrentAction(action, { currentEnvEditTarget = "", editLocations 
     currentActionEnvEditRows,
     currentActionChecklistCount: currentActionChecklist.length,
     currentActionChecklistSummary: currentActionChecklist.length > 0 ? `${currentActionChecklist.length} value-free steps` : "none",
+    currentActionPrerequisiteCommandCount: currentActionPrerequisiteCommands.length,
+    currentActionPrerequisiteCommandSummary: formatCommandSummary(currentActionPrerequisiteCommands),
     currentActionRerunCommandCount: currentActionRerunCommands.length,
-    currentActionRerunCommandSummary: formatSummary(currentActionRerunCommands),
+    currentActionRerunCommandSummary: formatCommandSummary(currentActionRerunCommands),
+    currentActionCommandSequenceCount: currentActionCommandSequence.length,
+    currentActionCommandSequenceSummary: formatCommandSummary(currentActionCommandSequence),
+    currentActionCommandSequence,
     currentActionValueRecorded: false
   };
 }
@@ -532,6 +564,9 @@ function buildMarkdown(report) {
 - Current action env edit template: ${report.currentActionEnvEditTemplateCount} (${report.currentActionEnvEditTemplateSummary})
 - Current action env edit rows: ${report.currentActionEnvEditRowsCount} (${report.currentActionEnvEditRowsSummary})
 - Current action checklist: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})
+- Current action prerequisite commands: ${report.currentActionPrerequisiteCommandCount} (${report.currentActionPrerequisiteCommandSummary})
+- Current action rerun commands: ${report.currentActionRerunCommandCount} (${report.currentActionRerunCommandSummary})
+- Current action command sequence: ${report.currentActionCommandSequenceCount} (${report.currentActionCommandSequenceSummary})
 - Update feed current environment ready: ${readyLabel(report.updateFeedCurrentEnvironmentReady)}
 - Channel metadata ready: ${readyLabel(report.channelMetadataReady)}
 - Distribution-channel QA ready: ${readyLabel(report.distributionChannelQaReady)}
@@ -570,10 +605,16 @@ ${formatCommandRows(report.targetedCommands)}
 - Placeholder edit locations: ${report.currentActionPlaceholderEditLocationCount} (${report.currentActionPlaceholderEditLocationSummary})
 - Env edit template: ${report.currentActionEnvEditTemplateCount} (${report.currentActionEnvEditTemplateSummary})
 - Env edit rows: ${report.currentActionEnvEditRowsCount} (${report.currentActionEnvEditRowsSummary})
+- Prerequisite commands: ${report.currentActionPrerequisiteCommandCount} (${report.currentActionPrerequisiteCommandSummary})
 - Rerun commands: ${report.currentActionRerunCommandCount} (${report.currentActionRerunCommandSummary})
+- Command sequence: ${report.currentActionCommandSequenceCount} (${report.currentActionCommandSequenceSummary})
 - Value recorded: ${readyLabel(report.currentActionValueRecorded)}
 
 ${formatChecklistList(report.currentActionChecklist)}
+
+## Current Action Command Sequence
+
+${formatCommandList(report.currentActionCommandSequence)}
 
 ## Current Action Placeholder Edit Locations
 
@@ -884,20 +925,51 @@ check(
   releaseDoctorReport.currentActionChecklistCount === releaseDoctorReport.currentActionChecklist.length,
   "release doctor current action checklist count should match listed steps"
 );
+check(Array.isArray(releaseDoctorReport.currentActionPrerequisiteCommands), "release doctor should include current prerequisite commands");
+check(Number.isInteger(releaseDoctorReport.currentActionPrerequisiteCommandCount), "release doctor should include the current prerequisite command count");
+check(typeof releaseDoctorReport.currentActionPrerequisiteCommandSummary === "string", "release doctor should include the current prerequisite command summary");
+check(
+  releaseDoctorReport.currentActionPrerequisiteCommandCount === releaseDoctorReport.currentActionPrerequisiteCommands.length,
+  "release doctor current prerequisite command count should match listed commands"
+);
 check(Array.isArray(releaseDoctorReport.currentActionRerunCommands), "release doctor should include current rerun commands");
 check(Number.isInteger(releaseDoctorReport.currentActionRerunCommandCount), "release doctor should include the current rerun command count");
+check(typeof releaseDoctorReport.currentActionRerunCommandSummary === "string", "release doctor should include the current rerun command summary");
 check(
   releaseDoctorReport.currentActionRerunCommandCount === releaseDoctorReport.currentActionRerunCommands.length,
   "release doctor current rerun command count should match listed commands"
+);
+check(Array.isArray(releaseDoctorReport.currentActionCommandSequence), "release doctor should include current command sequence");
+check(Number.isInteger(releaseDoctorReport.currentActionCommandSequenceCount), "release doctor should include the current command sequence count");
+check(typeof releaseDoctorReport.currentActionCommandSequenceSummary === "string", "release doctor should include the current command sequence summary");
+check(
+  releaseDoctorReport.currentActionCommandSequenceCount === releaseDoctorReport.currentActionCommandSequence.length,
+  "release doctor current command sequence count should match listed commands"
+);
+check(
+  releaseDoctorReport.currentActionCommandSequence.includes(releaseDoctorReport.currentActionNextCommand),
+  "release doctor current command sequence should include the current next command"
+);
+check(
+  releaseDoctorReport.currentActionCommandSequence.every((command) => typeof command === "string" && command.length > 0 && command !== "none"),
+  "release doctor current command sequence should contain only concrete commands"
+);
+check(
+  new Set(releaseDoctorReport.currentActionCommandSequence).size === releaseDoctorReport.currentActionCommandSequence.length,
+  "release doctor current command sequence should not duplicate commands"
 );
 check(releaseDoctorReport.currentActionValueRecorded === false, "release doctor current action should not record values");
 if (releaseDoctorReport.localEnvFileLoaded === false) {
   check(releaseDoctorReport.currentActionNextCommand === "npm run release:prepare-env", "release doctor should surface prepare-env when local env evidence is absent");
   check(releaseDoctorReport.currentActionFirstBlocker.includes("local distribution env file is not loaded"), "release doctor should make missing local env the current first blocker");
+  check(releaseDoctorReport.currentActionCommandSequence.includes("npm run release:prepare-env"), "release doctor missing-env command sequence should include prepare-env");
+  check(releaseDoctorReport.currentActionCommandSequence.includes("npm run release:doctor"), "release doctor missing-env command sequence should include doctor rerun");
 }
 if (releaseDoctorReport.localEnvFileLoaded === true && releaseChannelMetadataKeys.every((key) => releaseDoctorReport.localEnvPlaceholderKeys.includes(key))) {
   check(releaseDoctorReport.currentActionId === "replace-release-channel-placeholders", "release doctor should prioritize release-channel placeholder cleanup");
   check(releaseDoctorReport.currentActionNextCommand === "npm run release:doctor", "release doctor should rerun itself after placeholder cleanup");
+  check(releaseDoctorReport.currentActionCommandSequence.includes("npm run release:doctor"), "release doctor placeholder command sequence should include doctor rerun");
+  check(releaseDoctorReport.currentActionCommandSequence.includes("npm run release:next-actions"), "release doctor placeholder command sequence should include next-actions rerun");
   check(releaseDoctorReport.currentActionPlaceholderKeyCount === releaseChannelMetadataKeys.length, "release doctor should focus current placeholders on release-channel metadata keys");
   check(
     releaseChannelMetadataKeys.every((key) => releaseDoctorReport.currentActionPlaceholderKeys.includes(key)),
@@ -965,8 +1037,12 @@ check(markdown.includes("Current action placeholder keys:"), "release doctor Mar
 check(markdown.includes("Current action placeholder edit locations:"), "release doctor Markdown should include current action placeholder edit locations");
 check(markdown.includes("Current action env edit template:"), "release doctor Markdown should include current action env edit template status");
 check(markdown.includes("Current action env edit rows:"), "release doctor Markdown should include current action env edit rows status");
+check(markdown.includes("Current action prerequisite commands:"), "release doctor Markdown should include current action prerequisite commands");
+check(markdown.includes("Current action rerun commands:"), "release doctor Markdown should include current action rerun commands");
+check(markdown.includes("Current action command sequence:"), "release doctor Markdown should include current action command sequence status");
 check(markdown.includes("Current Action"), "release doctor Markdown should include current action section");
 check(markdown.includes("Operator action:"), "release doctor Markdown should include current operator action details");
+check(markdown.includes("Current Action Command Sequence"), "release doctor Markdown should include current command sequence section");
 check(markdown.includes("Current Action Placeholder Edit Locations"), "release doctor Markdown should include current placeholder edit location section");
 check(markdown.includes("Current Action Env Edit Template"), "release doctor Markdown should include current env edit template section");
 check(markdown.includes("Current Action Env Edit Rows"), "release doctor Markdown should include current env edit row section");
@@ -1002,6 +1078,9 @@ console.log(`- Current action placeholder keys: ${releaseDoctorReport.currentAct
 console.log(`- Current action placeholder edit locations: ${releaseDoctorReport.currentActionPlaceholderEditLocationCount} (${releaseDoctorReport.currentActionPlaceholderEditLocationSummary})`);
 console.log(`- Current action env edit template: ${releaseDoctorReport.currentActionEnvEditTemplateCount} (${releaseDoctorReport.currentActionEnvEditTemplateSummary})`);
 console.log(`- Current action env edit rows: ${releaseDoctorReport.currentActionEnvEditRowsCount} (${releaseDoctorReport.currentActionEnvEditRowsSummary})`);
+console.log(`- Current action prerequisite commands: ${releaseDoctorReport.currentActionPrerequisiteCommandCount} (${releaseDoctorReport.currentActionPrerequisiteCommandSummary})`);
+console.log(`- Current action rerun commands: ${releaseDoctorReport.currentActionRerunCommandCount} (${releaseDoctorReport.currentActionRerunCommandSummary})`);
+console.log(`- Current action command sequence: ${releaseDoctorReport.currentActionCommandSequenceCount} (${releaseDoctorReport.currentActionCommandSequenceSummary})`);
 console.log(`- Current operator action: ${releaseDoctorReport.currentActionOperatorAction}`);
 console.log(`- Channel metadata ready: ${releaseDoctorReport.channelMetadataReady ? "yes" : "no"}`);
 console.log(`- Manual QA approval ready: ${releaseDoctorReport.manualQaApprovalReady ? "yes" : "no"}`);
