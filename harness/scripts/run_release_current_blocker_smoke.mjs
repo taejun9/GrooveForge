@@ -306,6 +306,15 @@ function formatCurrentActionAcceptanceRows(rows) {
     .join("\n");
 }
 
+function formatCurrentActionAcceptanceBlockerRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.criterion)} | ${escapeCell(row.blocker)} | ${escapeCell(row.sourceField)} | ${escapeCell(row.operatorAction)} | \`${escapeCell(row.rerunCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function priorityActionRows(externalNextActions) {
   return valueFreeObjectRows(externalNextActions.priorityActions).map((action, index) => {
     const rerunCommands = stringArrayValue(action.rerunCommands);
@@ -325,6 +334,45 @@ function priorityActionRows(externalNextActions) {
       valueRecorded: false
     };
   });
+}
+
+function currentActionAcceptanceBlockerRows({
+  acceptanceRows,
+  currentEnvEditTarget,
+  currentPlaceholderEditLocationSummary,
+  currentNextCommand,
+  currentRerunCommand
+}) {
+  return valueFreeObjectRows(acceptanceRows)
+    .filter((row) => row.ready !== true)
+    .map((row, index) => {
+      const criterion = textValue(row.criterion);
+      const lower = criterion.toLowerCase();
+      let sourceField = "currentActionAcceptanceRows";
+      let operatorAction = `Rerun ${currentRerunCommand} after resolving this criterion.`;
+
+      if (lower.includes("without placeholder values")) {
+        sourceField = "externalProofBundle.currentPlaceholderKeys/currentPlaceholderEditLocations";
+        operatorAction = `Replace current release-channel placeholder keys in ${currentEnvEditTarget}: ${currentPlaceholderEditLocationSummary}.`;
+      } else if (lower.includes("private-inputs") || lower.includes("private inputs")) {
+        sourceField = "releaseDoctor.privateInputsReady/channelMetadataReady/privateValuesRecorded";
+        operatorAction = `Run ${currentNextCommand} after replacing the current release-channel metadata placeholders.`;
+      } else if (lower.includes("distribution-channel qa")) {
+        sourceField = "releaseDoctor.distributionChannelQaReady/channelMetadataReady/privateValuesRecorded";
+        operatorAction = "Run npm run desktop:distribution-channel-qa-smoke after release doctor reports channel metadata ready.";
+      }
+
+      return {
+        order: index + 1,
+        criterion,
+        blocker: textValue(row.evidence),
+        sourceField,
+        operatorAction,
+        proofCommand: currentNextCommand,
+        rerunCommand: currentRerunCommand,
+        valueRecorded: false
+      };
+    });
 }
 
 function currentActionAcceptanceRows({
@@ -495,6 +543,17 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     : placeholderCleanupPending
       ? "placeholder cleanup pending"
       : "release-channel metadata proof can advance";
+  const currentPlaceholderEditLocationSummary = textValue(
+    externalProofBundle.currentPlaceholderEditLocationSummary,
+    formatLocationSummary(proofPlaceholderLocations)
+  );
+  const acceptanceBlockerRows = currentActionAcceptanceBlockerRows({
+    acceptanceRows,
+    currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
+    currentPlaceholderEditLocationSummary,
+    currentNextCommand,
+    currentRerunCommand
+  });
   const nextExpectedOperatorSequence = localEnvSetupPending
     ? [
         "Run npm run release:prepare-env to create the ignored local distribution env scaffold.",
@@ -643,16 +702,21 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentActionAcceptanceMatchesCurrentAction:
       acceptanceRows.length === integerValue(externalNextActions.currentReadyCriteriaCount) &&
       acceptanceRows.every((row) => row.proofCommand === currentNextCommand && row.rerunCommand === currentRerunCommand),
+    currentActionAcceptanceBlockerCount: acceptanceBlockerRows.length,
+    currentActionAcceptanceBlockerSummary:
+      acceptanceBlockerRows.length > 0
+        ? `${acceptanceBlockerRows.length} current action acceptance blockers`
+        : "none",
+    currentActionAcceptanceBlockerRows: acceptanceBlockerRows,
+    currentActionAcceptanceBlockersMatchAcceptance:
+      acceptanceBlockerRows.length === acceptanceRows.filter((row) => row.ready !== true).length,
     currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: integerValue(externalProofBundle.currentRequiredKeyCount),
     currentRequiredKeys: proofRequiredKeys,
     currentPlaceholderKeyCount: integerValue(externalProofBundle.currentPlaceholderKeyCount),
     currentPlaceholderKeys: proofPlaceholderKeys,
     currentPlaceholderEditLocationCount: integerValue(externalProofBundle.currentPlaceholderEditLocationCount),
-    currentPlaceholderEditLocationSummary: textValue(
-      externalProofBundle.currentPlaceholderEditLocationSummary,
-      formatLocationSummary(proofPlaceholderLocations)
-    ),
+    currentPlaceholderEditLocationSummary,
     currentPlaceholderEditLocations: proofPlaceholderLocations,
     currentEnvEditRowsCount: integerValue(externalProofBundle.currentEnvEditRowsCount),
     currentEnvEditRowsSummary: textValue(externalProofBundle.currentEnvEditRowsSummary, `${proofEnvEditRows.length} value-free edit rows`),
@@ -841,6 +905,24 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentActionAcceptanceRows.some((row) => row.criterion.includes("Distribution-channel QA")), "release current blocker current action acceptance should include distribution-channel QA criterion");
   check(report.currentActionAcceptanceRows.every((row) => typeof row.evidence === "string" && row.evidence.length > 0), "release current blocker current action acceptance should include evidence summaries");
   check(report.currentActionAcceptanceMatchesCurrentAction === true, "release current blocker should prove current action acceptance alignment");
+  check(report.currentActionAcceptanceBlockerCount === report.currentActionAcceptanceBlockerRows.length, "release current blocker current action acceptance blocker count should match rows");
+  check(report.currentActionAcceptanceBlockerCount === report.currentActionAcceptanceRows.filter((row) => row.ready !== true).length, "release current blocker current action acceptance blocker rows should mirror failing acceptance criteria");
+  check(typeof report.currentActionAcceptanceBlockerSummary === "string" && report.currentActionAcceptanceBlockerSummary.length > 0, "release current blocker should include current action acceptance blocker summary");
+  check(report.currentActionAcceptanceBlockerRows.every((row) => row.valueRecorded === false), "release current blocker current action acceptance blocker rows should not record values");
+  check(report.currentActionAcceptanceBlockerRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release current blocker current action acceptance blocker rows should include source fields");
+  check(report.currentActionAcceptanceBlockerRows.every((row) => typeof row.operatorAction === "string" && row.operatorAction.length > 0), "release current blocker current action acceptance blocker rows should include operator actions");
+  check(report.currentActionAcceptanceBlockerRows.every((row) => row.proofCommand === report.currentNextCommand), "release current blocker current action acceptance blocker proof commands should match current next command");
+  check(report.currentActionAcceptanceBlockerRows.every((row) => row.rerunCommand === report.currentRerunCommand), "release current blocker current action acceptance blocker rerun commands should match current rerun command");
+  if (report.currentPlaceholderKeyCount > 0) {
+    check(report.currentActionAcceptanceBlockerRows.some((row) => row.sourceField.includes("currentPlaceholderKeys")), "release current blocker current action acceptance blockers should include placeholder source fields while placeholders remain");
+  }
+  if (releaseDoctor.privateInputsReady !== true || releaseDoctor.channelMetadataReady !== true) {
+    check(report.currentActionAcceptanceBlockerRows.some((row) => row.sourceField.includes("privateInputsReady")), "release current blocker current action acceptance blockers should include private-input source fields while private inputs are blocked");
+  }
+  if (releaseDoctor.distributionChannelQaReady !== true) {
+    check(report.currentActionAcceptanceBlockerRows.some((row) => row.sourceField.includes("distributionChannelQaReady")), "release current blocker current action acceptance blockers should include distribution-channel QA source fields while channel QA is blocked");
+  }
+  check(report.currentActionAcceptanceBlockersMatchAcceptance === true, "release current blocker should prove current action acceptance blockers match failing acceptance criteria");
   check(report.currentRequiredKeyCount === report.currentRequiredKeys.length, "release current blocker required key count should match keys");
   check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release current blocker placeholder key count should match keys");
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderEditLocations.length, "release current blocker placeholder edit location count should match locations");
@@ -996,6 +1078,7 @@ function buildMarkdown(report) {
     `- External completion checklist current row aligned: ${report.externalCompletionChecklistCurrentMatchesPriorityAction ? "yes" : "no"}`,
     `- Current action acceptance ready: ${report.currentActionAcceptanceReady ? "yes" : "no"}`,
     `- Current action acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})`,
+    `- Current action acceptance blockers: ${report.currentActionAcceptanceBlockerCount} (${report.currentActionAcceptanceBlockerSummary})`,
     `- Current action acceptance aligned: ${report.currentActionAcceptanceMatchesCurrentAction ? "yes" : "no"}`,
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
@@ -1118,6 +1201,15 @@ function buildMarkdown(report) {
     "|---:|---:|---|---|---|---|---:|",
     formatCurrentActionAcceptanceRows(report.currentActionAcceptanceRows),
     "",
+    "## Current Action Acceptance Blockers",
+    "",
+    `- Blocker rows: ${report.currentActionAcceptanceBlockerCount} (${report.currentActionAcceptanceBlockerSummary})`,
+    `- Blockers match acceptance: ${report.currentActionAcceptanceBlockersMatchAcceptance ? "yes" : "no"}`,
+    "",
+    "| order | criterion | blocker | source field | operator action | rerun command | value recorded |",
+    "|---:|---|---|---|---|---|---:|",
+    formatCurrentActionAcceptanceBlockerRows(report.currentActionAcceptanceBlockerRows),
+    "",
     "## Placeholder Edit Locations",
     "",
     "| location | key | placeholder | value recorded |",
@@ -1207,6 +1299,8 @@ check(markdown.includes("External Completion Checklist"), "release current block
 check(markdown.includes("External completion checklist current row aligned:"), "release current blocker Markdown should include external completion checklist alignment");
 check(markdown.includes("Current Action Acceptance"), "release current blocker Markdown should include current action acceptance");
 check(markdown.includes("Current action acceptance aligned:"), "release current blocker Markdown should include current action acceptance alignment");
+check(markdown.includes("Current Action Acceptance Blockers"), "release current blocker Markdown should include current action acceptance blockers");
+check(markdown.includes("Blockers match acceptance:"), "release current blocker Markdown should include current action acceptance blocker alignment");
 
 if (failures.length > 0) {
   fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
@@ -1243,6 +1337,7 @@ console.log(`- External completion checklist rows: ${report.externalCompletionCh
 console.log(`- Current external completion checklist row: ${report.currentExternalCompletionChecklistRowId} (${report.currentExternalCompletionChecklistRowLabel})`);
 console.log(`- Current action acceptance ready: ${report.currentActionAcceptanceReady ? "yes" : "no"}`);
 console.log(`- Current action acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})`);
+console.log(`- Current action acceptance blockers: ${report.currentActionAcceptanceBlockerCount} (${report.currentActionAcceptanceBlockerSummary})`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
