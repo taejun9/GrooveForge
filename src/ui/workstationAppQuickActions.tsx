@@ -6345,7 +6345,7 @@ export function createQuickActions({
     {
       id: "blueprint-style-match",
       title: `Apply ${currentStyleName} starter`,
-      detail: `${suggestedBlueprintName} / sample-free drums, 808, harmony, arrangement, sound, and master.`,
+      detail: `${suggestedBlueprintName} / editable drums, 808, harmony, arrangement, sound, and master.`,
       group: "Create",
       keywords: `current style match blueprint starter ${currentStyleName} ${project.styleId} ${suggestedBlueprintName} beat drums 808 bass chords synth arrangement sound master sample free`,
       run: () => onApplyBlueprint(suggestedBlueprint)
@@ -21373,7 +21373,7 @@ export function quickActionResultFollowup(
   if (action.id === "blueprint" || action.id === "blueprint-style-match" || action.id.startsWith("blueprint-apply-")) {
     return {
       auditionCue: "Loop the new starter beat; hear drums, 808, chords, Synth, arrangement, sound, and master together.",
-      nextCheck: "Use Beat Spine, Pattern DNA, and First Beat Path to edit the sample-free starter instead of treating it as fixed audio."
+      nextCheck: "Use Beat Spine, Pattern DNA, and First Beat Path to edit the starter as musical events instead of treating it as fixed audio."
     };
   }
 
