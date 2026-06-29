@@ -70,6 +70,26 @@ function unique(values) {
   return [...new Set(values.filter((value) => typeof value === "string" && value.trim().length > 0))];
 }
 
+function textValue(value, fallback = "none") {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function integerValue(value) {
+  return Number.isInteger(value) ? value : 0;
+}
+
+function stringArrayValue(values) {
+  return Array.isArray(values) ? values.filter((value) => typeof value === "string" && value.trim().length > 0) : [];
+}
+
+function valueFreeObjectRows(values) {
+  return Array.isArray(values) ? values.filter((value) => value && typeof value === "object" && value.valueRecorded === false) : [];
+}
+
+function escapeCell(value) {
+  return String(value ?? "none").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
 function evidence(filePath, label) {
   return {
     label,
@@ -148,8 +168,82 @@ function formatEvidenceRows(rows) {
   return rows.map((row) => `| ${row.label} | ${row.present ? "yes" : "no"} | ${row.path} |`).join("\n");
 }
 
+function formatEditGuidanceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.location ?? row.editTarget)} | ${escapeCell(row.key)} | ${escapeCell(row.assignment)} | ${escapeCell(row.guidance)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatProofChecklistRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.criterion)} | ${escapeCell(row.evidenceSummary)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.hardGateCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatCommandVerificationRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.expectation)} | ${escapeCell(row.proofTarget)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatBlockers(blockers) {
   return blockers.length > 0 ? blockers.map((blocker) => `- ${blocker}`).join("\n") : "- None.";
+}
+
+function buildCurrentActionSummary(externalOperatorRunbook) {
+  const currentRequiredKeys = stringArrayValue(externalOperatorRunbook?.currentRequiredKeys);
+  const currentPlaceholderKeys = stringArrayValue(externalOperatorRunbook?.currentPlaceholderKeys);
+  const currentPlaceholderEditLocations = valueFreeObjectRows(externalOperatorRunbook?.currentPlaceholderEditLocations);
+  const currentEnvEditRows = valueFreeObjectRows(externalOperatorRunbook?.currentEnvEditRows);
+  const currentPlaceholderRemediationRows = valueFreeObjectRows(externalOperatorRunbook?.currentPlaceholderRemediationRows);
+  const currentProofChecklistRows = valueFreeObjectRows(externalOperatorRunbook?.currentProofChecklistRows);
+  const currentCommandVerificationRows = valueFreeObjectRows(externalOperatorRunbook?.currentCommandVerificationRows);
+  return {
+    currentActionSourceReady: externalOperatorRunbook?.currentActionSourceReady === true,
+    currentActionSourcePath: relative(externalOperatorRunbookPath),
+    currentFocus: textValue(externalOperatorRunbook?.currentFocus),
+    currentActionLabel: textValue(externalOperatorRunbook?.currentActionLabel, "No pending priority action"),
+    currentNextCommand: textValue(externalOperatorRunbook?.currentNextCommand),
+    currentFirstBlocker: textValue(externalOperatorRunbook?.currentFirstBlocker),
+    currentOperatorAction: textValue(externalOperatorRunbook?.currentOperatorAction),
+    currentRequiredKeyCount: integerValue(externalOperatorRunbook?.currentRequiredKeyCount),
+    currentRequiredKeySummary: textValue(externalOperatorRunbook?.currentRequiredKeySummary),
+    currentRequiredKeys,
+    currentPlaceholderKeyCount: integerValue(externalOperatorRunbook?.currentPlaceholderKeyCount),
+    currentPlaceholderKeySummary: textValue(externalOperatorRunbook?.currentPlaceholderKeySummary),
+    currentPlaceholderKeys,
+    currentPlaceholderEditLocationCount: integerValue(externalOperatorRunbook?.currentPlaceholderEditLocationCount),
+    currentPlaceholderEditLocationSummary: textValue(externalOperatorRunbook?.currentPlaceholderEditLocationSummary),
+    currentPlaceholderEditLocations,
+    currentEnvEditTarget: textValue(externalOperatorRunbook?.currentEnvEditTarget, ".env.distribution.local"),
+    currentEnvEditRowsCount: integerValue(externalOperatorRunbook?.currentEnvEditRowsCount),
+    currentEnvEditRowsSummary: textValue(externalOperatorRunbook?.currentEnvEditRowsSummary),
+    currentEnvEditRows,
+    currentPlaceholderRemediationRowCount: integerValue(externalOperatorRunbook?.currentPlaceholderRemediationRowCount),
+    currentPlaceholderRemediationRowSummary: textValue(externalOperatorRunbook?.currentPlaceholderRemediationRowSummary),
+    currentPlaceholderRemediationRows,
+    currentProofChecklistRowCount: integerValue(externalOperatorRunbook?.currentProofChecklistRowCount),
+    currentProofChecklistRowSummary: textValue(externalOperatorRunbook?.currentProofChecklistRowSummary),
+    currentProofChecklistRows,
+    currentActionChecklistCount: integerValue(externalOperatorRunbook?.currentActionChecklistCount),
+    currentActionChecklistSummary: textValue(externalOperatorRunbook?.currentActionChecklistSummary),
+    currentRerunCommand: textValue(externalOperatorRunbook?.currentRerunCommand),
+    currentCommandSequenceCount: integerValue(externalOperatorRunbook?.currentCommandSequenceCount),
+    currentCommandSequenceSummary: textValue(externalOperatorRunbook?.currentCommandSequenceSummary),
+    currentCommandVerificationRowCount: integerValue(externalOperatorRunbook?.currentCommandVerificationRowCount),
+    currentCommandVerificationRowSummary: textValue(externalOperatorRunbook?.currentCommandVerificationRowSummary),
+    currentCommandVerificationRows,
+    currentActionValueRecorded: false
+  };
 }
 
 function buildMarkdown(summary) {
@@ -166,6 +260,12 @@ function buildMarkdown(summary) {
 - Remediation groups ready: ${summary.remediationReadyCount}/${summary.remediationTotal}
 - Operator runbook ready: ${summary.operatorRunbookReady ? "yes" : "no"}
 - Manual QA checklist digest available: ${summary.manualQaChecklistDigestAvailable ? "yes" : "no"}
+- Current action source ready: ${summary.currentActionSourceReady ? "yes" : "no"}
+- Current next command: \`${summary.currentNextCommand}\`
+- Current first blocker: ${summary.currentFirstBlocker}
+- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
+- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})
+- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
 - Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}
 - Private values recorded: no
 - Network probe attempted: no
@@ -184,6 +284,42 @@ ${formatRequirementRows(summary.gateRequirementRows)}
 | remediation group | ready | required keys | blockers | first blocker |
 |---|---:|---|---:|---|
 ${formatRemediationRows(summary.remediationRows)}
+
+## Current Action
+
+- Source artifact: ${summary.currentActionSourcePath}
+- Current focus: ${summary.currentFocus}
+- Current action: ${summary.currentActionLabel}
+- Current operator action: ${summary.currentOperatorAction}
+- Current required keys: ${summary.currentRequiredKeyCount} (${summary.currentRequiredKeySummary})
+- Current placeholder keys: ${summary.currentPlaceholderKeyCount} (${summary.currentPlaceholderKeySummary})
+- Current placeholder edit locations: ${summary.currentPlaceholderEditLocationCount} (${summary.currentPlaceholderEditLocationSummary})
+- Current env edit target: ${summary.currentEnvEditTarget}
+- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
+- Current placeholder remediation rows: ${summary.currentPlaceholderRemediationRowCount} (${summary.currentPlaceholderRemediationRowSummary})
+- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})
+- Current action checklist: ${summary.currentActionChecklistCount} (${summary.currentActionChecklistSummary})
+- Current rerun command: \`${summary.currentRerunCommand}\`
+- Current command sequence: ${summary.currentCommandSequenceCount} (${summary.currentCommandSequenceSummary})
+- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
+
+### Current Edit Guidance
+
+| location | key | assignment shape | guidance | value recorded |
+|---|---|---|---|---:|
+${formatEditGuidanceRows(summary.currentEnvEditRows)}
+
+### Current Proof Checklist Rows
+
+| order | criterion | evidence | proof command | hard gate | value recorded |
+|---:|---|---|---|---|---:|
+${formatProofChecklistRows(summary.currentProofChecklistRows)}
+
+### Current Command Verification Rows
+
+| order | command | role | expectation | proof target | value recorded |
+|---:|---|---|---|---|---:|
+${formatCommandVerificationRows(summary.currentCommandVerificationRows)}
 
 ## Evidence Artifacts
 
@@ -247,6 +383,7 @@ async function createLedgerSummary() {
     evidence(externalRemediationPath, "External remediation"),
     evidence(externalOperatorRunbookPath, "External operator runbook"),
     evidence(externalOperatorRunbookPath, "Desktop project IO runbook evidence"),
+    evidence(externalOperatorRunbookPath, "Operator runbook current proof rows"),
     evidence(manualQaPath, "Manual QA checklist"),
     evidence(privateInputsPath, "Private inputs")
   ];
@@ -313,6 +450,7 @@ async function createLedgerSummary() {
     evidenceArtifacts,
     gateRequirementRows,
     remediationRows,
+    ...buildCurrentActionSummary(externalOperatorRunbook),
     firstBlockers
   };
 }
@@ -342,6 +480,7 @@ check(summary.evidenceArtifacts.some((item) => item.label === "PKG payload proje
 check(summary.evidenceArtifacts.some((item) => item.label === "Desktop project IO gate requirement"), "external readiness ledger should include desktop project IO gate evidence");
 check(summary.evidenceArtifacts.some((item) => item.label === "PKG payload project IO gate requirement"), "external readiness ledger should include PKG payload project IO gate evidence");
 check(summary.evidenceArtifacts.some((item) => item.label === "Desktop project IO runbook evidence"), "external readiness ledger should include desktop project IO runbook evidence");
+check(summary.evidenceArtifacts.some((item) => item.label === "Operator runbook current proof rows"), "external readiness ledger should include operator runbook current proof row evidence");
 check(Array.isArray(summary.gateRequirementRows), "external readiness ledger should include gate requirement rows");
 check(
   summary.gateRequirementRows.some((item) => item.label === "Desktop project IO evidence ready" && item.ready === true),
@@ -356,6 +495,18 @@ check(Array.isArray(summary.firstBlockers), "external readiness ledger should in
 check(summary.evidenceArtifacts.every((item) => item.valueRecorded === false), "external readiness evidence artifacts should not record values");
 check(summary.gateRequirementRows.every((item) => item.valueRecorded === false), "external readiness gate rows should not record values");
 check(summary.remediationRows.every((item) => item.valueRecorded === false), "external readiness remediation rows should not record values");
+check(summary.currentActionValueRecorded === false, "external readiness current action summary should not record values");
+check(Array.isArray(summary.currentEnvEditRows), "external readiness ledger should expose current env edit rows");
+check(summary.currentEnvEditRows.every((row) => row.valueRecorded === false), "external readiness current env edit rows should not record values");
+check(Array.isArray(summary.currentProofChecklistRows), "external readiness ledger should expose current proof checklist rows");
+check(summary.currentProofChecklistRows.every((row) => row.valueRecorded === false), "external readiness current proof checklist rows should not record values");
+check(Array.isArray(summary.currentCommandVerificationRows), "external readiness ledger should expose current command verification rows");
+check(summary.currentCommandVerificationRows.every((row) => row.valueRecorded === false), "external readiness current command verification rows should not record values");
+if (summary.currentActionSourceReady) {
+  check(summary.currentNextCommand !== "none", "external readiness ledger should mirror the current next command when runbook current action evidence exists");
+  check(summary.currentProofChecklistRowCount === summary.currentProofChecklistRows.length, "external readiness ledger should mirror current proof checklist row count");
+  check(summary.currentCommandVerificationRowCount === summary.currentCommandVerificationRows.length, "external readiness ledger should mirror current command verification row count");
+}
 check(summary.localEnvInput?.valueRecorded === false, "external readiness ledger local env loader should not record values");
 check(summary.localEnvValueRecorded === false, "external readiness ledger should not record local env values");
 check(summary.privateValuesRecorded === false, "external readiness ledger should not record private values");
@@ -379,6 +530,10 @@ check(summary.releaseGateClaimedExternalDistribution === false, "external readin
 check(markdown.includes("External Readiness Ledger"), "external readiness ledger Markdown should include title");
 check(markdown.includes("Gate Requirement Ledger"), "external readiness ledger Markdown should include gate requirement rows");
 check(markdown.includes("Remediation Ledger"), "external readiness ledger Markdown should include remediation rows");
+check(markdown.includes("Current Action"), "external readiness ledger Markdown should include current action");
+check(markdown.includes("Current Edit Guidance"), "external readiness ledger Markdown should include current edit guidance");
+check(markdown.includes("Current Proof Checklist Rows"), "external readiness ledger Markdown should include current proof checklist rows");
+check(markdown.includes("Current Command Verification Rows"), "external readiness ledger Markdown should include current command verification rows");
 check(markdown.includes("Desktop project IO evidence ready:"), "external readiness ledger Markdown should include desktop project IO readiness");
 check(markdown.includes("Hard gate remains `npm run release:external-check`"), "external readiness ledger Markdown should keep hard gate authoritative");
 check(markdown.includes("Private values recorded: no"), "external readiness ledger Markdown should state value redaction");
@@ -404,6 +559,12 @@ console.log(`- External distribution hard gate ready: ${summary.externalDistribu
 console.log(`- Gate requirements ready: ${summary.gateRequirementReadyCount}/${summary.gateRequirementTotal}`);
 console.log(`- Remediation groups ready: ${summary.remediationReadyCount}/${summary.remediationTotal}`);
 console.log(`- Manual QA checklist digest available: ${summary.manualQaChecklistDigestAvailable ? "yes" : "no"}`);
+console.log(`- Current action source ready: ${summary.currentActionSourceReady ? "yes" : "no"}`);
+console.log(`- Current next command: ${summary.currentNextCommand}`);
+console.log(`- Current first blocker: ${summary.currentFirstBlocker}`);
+console.log(`- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})`);
+console.log(`- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})`);
+console.log(`- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})`);
 console.log(`- First blockers tracked: ${summary.firstBlockers.length}`);
 console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
 console.log("- Private values recorded: no");

@@ -70,6 +70,26 @@ function unique(values) {
   return [...new Set(values.filter((value) => typeof value === "string" && value.trim().length > 0))];
 }
 
+function textValue(value, fallback = "none") {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function integerValue(value) {
+  return Number.isInteger(value) ? value : 0;
+}
+
+function stringArrayValue(values) {
+  return Array.isArray(values) ? values.filter((value) => typeof value === "string" && value.trim().length > 0) : [];
+}
+
+function valueFreeObjectRows(values) {
+  return Array.isArray(values) ? values.filter((value) => value && typeof value === "object" && value.valueRecorded === false) : [];
+}
+
+function escapeCell(value) {
+  return String(value ?? "none").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
 function percent(ready, total) {
   if (total <= 0) {
     return 0;
@@ -122,6 +142,80 @@ function formatBlockerRows(rows) {
   return rows.map((row) => `| ${row.order} | ${row.blocker} |`).join("\n");
 }
 
+function formatEditGuidanceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.location ?? row.editTarget)} | ${escapeCell(row.key)} | ${escapeCell(row.assignment)} | ${escapeCell(row.guidance)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatProofChecklistRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.criterion)} | ${escapeCell(row.evidenceSummary)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.hardGateCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatCommandVerificationRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.expectation)} | ${escapeCell(row.proofTarget)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function buildCurrentActionSummary(externalReadinessLedger) {
+  const currentRequiredKeys = stringArrayValue(externalReadinessLedger?.currentRequiredKeys);
+  const currentPlaceholderKeys = stringArrayValue(externalReadinessLedger?.currentPlaceholderKeys);
+  const currentPlaceholderEditLocations = valueFreeObjectRows(externalReadinessLedger?.currentPlaceholderEditLocations);
+  const currentEnvEditRows = valueFreeObjectRows(externalReadinessLedger?.currentEnvEditRows);
+  const currentPlaceholderRemediationRows = valueFreeObjectRows(externalReadinessLedger?.currentPlaceholderRemediationRows);
+  const currentProofChecklistRows = valueFreeObjectRows(externalReadinessLedger?.currentProofChecklistRows);
+  const currentCommandVerificationRows = valueFreeObjectRows(externalReadinessLedger?.currentCommandVerificationRows);
+  return {
+    currentActionSourceReady: externalReadinessLedger?.currentActionSourceReady === true,
+    currentActionSourcePath: relative(externalReadinessLedgerPath),
+    currentFocus: textValue(externalReadinessLedger?.currentFocus),
+    currentActionLabel: textValue(externalReadinessLedger?.currentActionLabel, "No pending priority action"),
+    currentNextCommand: textValue(externalReadinessLedger?.currentNextCommand),
+    currentFirstBlocker: textValue(externalReadinessLedger?.currentFirstBlocker),
+    currentOperatorAction: textValue(externalReadinessLedger?.currentOperatorAction),
+    currentRequiredKeyCount: integerValue(externalReadinessLedger?.currentRequiredKeyCount),
+    currentRequiredKeySummary: textValue(externalReadinessLedger?.currentRequiredKeySummary),
+    currentRequiredKeys,
+    currentPlaceholderKeyCount: integerValue(externalReadinessLedger?.currentPlaceholderKeyCount),
+    currentPlaceholderKeySummary: textValue(externalReadinessLedger?.currentPlaceholderKeySummary),
+    currentPlaceholderKeys,
+    currentPlaceholderEditLocationCount: integerValue(externalReadinessLedger?.currentPlaceholderEditLocationCount),
+    currentPlaceholderEditLocationSummary: textValue(externalReadinessLedger?.currentPlaceholderEditLocationSummary),
+    currentPlaceholderEditLocations,
+    currentEnvEditTarget: textValue(externalReadinessLedger?.currentEnvEditTarget, ".env.distribution.local"),
+    currentEnvEditRowsCount: integerValue(externalReadinessLedger?.currentEnvEditRowsCount),
+    currentEnvEditRowsSummary: textValue(externalReadinessLedger?.currentEnvEditRowsSummary),
+    currentEnvEditRows,
+    currentPlaceholderRemediationRowCount: integerValue(externalReadinessLedger?.currentPlaceholderRemediationRowCount),
+    currentPlaceholderRemediationRowSummary: textValue(externalReadinessLedger?.currentPlaceholderRemediationRowSummary),
+    currentPlaceholderRemediationRows,
+    currentProofChecklistRowCount: integerValue(externalReadinessLedger?.currentProofChecklistRowCount),
+    currentProofChecklistRowSummary: textValue(externalReadinessLedger?.currentProofChecklistRowSummary),
+    currentProofChecklistRows,
+    currentActionChecklistCount: integerValue(externalReadinessLedger?.currentActionChecklistCount),
+    currentActionChecklistSummary: textValue(externalReadinessLedger?.currentActionChecklistSummary),
+    currentRerunCommand: textValue(externalReadinessLedger?.currentRerunCommand),
+    currentCommandSequenceCount: integerValue(externalReadinessLedger?.currentCommandSequenceCount),
+    currentCommandSequenceSummary: textValue(externalReadinessLedger?.currentCommandSequenceSummary),
+    currentCommandVerificationRowCount: integerValue(externalReadinessLedger?.currentCommandVerificationRowCount),
+    currentCommandVerificationRowSummary: textValue(externalReadinessLedger?.currentCommandVerificationRowSummary),
+    currentCommandVerificationRows,
+    currentActionValueRecorded: false
+  };
+}
+
 function sensitiveEnvironmentValues() {
   return sensitivePrivateKeys.map((key) => process.env[key]?.trim()).filter((value) => value && value.length >= 8);
 }
@@ -144,6 +238,12 @@ function buildMarkdown(summary) {
 - Remediation groups ready: ${summary.remediationReadyCount}/${summary.remediationTotal} (${summary.remediationReadinessPercent.toFixed(1)}%)
 - Operator runbook ready: ${summary.operatorRunbookReady ? "yes" : "no"}
 - External readiness ledger ready: ${summary.externalReadinessLedgerReady ? "yes" : "no"}
+- Current action source ready: ${summary.currentActionSourceReady ? "yes" : "no"}
+- Current next command: \`${summary.currentNextCommand}\`
+- Current first blocker: ${summary.currentFirstBlocker}
+- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
+- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})
+- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
 - Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}
 - Private values recorded: no
 - Network probe attempted: no
@@ -165,6 +265,42 @@ ${formatMissingEvidence(summary.missingEvidenceArtifacts)}
 | artifact | present | path |
 |---|---:|---|
 ${formatEvidenceRows(summary.evidenceArtifacts)}
+
+## Current Action
+
+- Source artifact: ${summary.currentActionSourcePath}
+- Current focus: ${summary.currentFocus}
+- Current action: ${summary.currentActionLabel}
+- Current operator action: ${summary.currentOperatorAction}
+- Current required keys: ${summary.currentRequiredKeyCount} (${summary.currentRequiredKeySummary})
+- Current placeholder keys: ${summary.currentPlaceholderKeyCount} (${summary.currentPlaceholderKeySummary})
+- Current placeholder edit locations: ${summary.currentPlaceholderEditLocationCount} (${summary.currentPlaceholderEditLocationSummary})
+- Current env edit target: ${summary.currentEnvEditTarget}
+- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})
+- Current placeholder remediation rows: ${summary.currentPlaceholderRemediationRowCount} (${summary.currentPlaceholderRemediationRowSummary})
+- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})
+- Current action checklist: ${summary.currentActionChecklistCount} (${summary.currentActionChecklistSummary})
+- Current rerun command: \`${summary.currentRerunCommand}\`
+- Current command sequence: ${summary.currentCommandSequenceCount} (${summary.currentCommandSequenceSummary})
+- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})
+
+### Current Edit Guidance
+
+| location | key | assignment shape | guidance | value recorded |
+|---|---|---|---|---:|
+${formatEditGuidanceRows(summary.currentEnvEditRows)}
+
+### Current Proof Checklist Rows
+
+| order | criterion | evidence | proof command | hard gate | value recorded |
+|---:|---|---|---|---|---:|
+${formatProofChecklistRows(summary.currentProofChecklistRows)}
+
+### Current Command Verification Rows
+
+| order | command | role | expectation | proof target | value recorded |
+|---:|---|---|---|---|---:|
+${formatCommandVerificationRows(summary.currentCommandVerificationRows)}
 
 ## Current First Blockers
 
@@ -270,6 +406,7 @@ async function createCompletionProgressSummary() {
     externalReadinessLedgerReady: externalReadinessLedger?.ledgerReady === true,
     evidenceArtifacts,
     firstBlockers,
+    ...buildCurrentActionSummary(externalReadinessLedger),
     localEnvInput: distributionLocalEnv,
     localEnvValueRecorded: false,
     privateValuesRecorded: false,
@@ -320,6 +457,18 @@ check(summary.externalReadinessLedgerReady === true, "completion progress should
 check(Array.isArray(summary.evidenceArtifacts) && summary.evidenceArtifacts.length >= 5, "completion progress should include evidence artifacts");
 check(summary.evidenceArtifacts.every((item) => item.valueRecorded === false), "completion progress evidence artifacts should not record values");
 check(summary.firstBlockers.every((item) => item.valueRecorded === false), "completion progress blockers should not record values");
+check(summary.currentActionValueRecorded === false, "completion progress current action summary should not record values");
+check(Array.isArray(summary.currentEnvEditRows), "completion progress should expose current env edit rows");
+check(summary.currentEnvEditRows.every((row) => row.valueRecorded === false), "completion progress current env edit rows should not record values");
+check(Array.isArray(summary.currentProofChecklistRows), "completion progress should expose current proof checklist rows");
+check(summary.currentProofChecklistRows.every((row) => row.valueRecorded === false), "completion progress current proof checklist rows should not record values");
+check(Array.isArray(summary.currentCommandVerificationRows), "completion progress should expose current command verification rows");
+check(summary.currentCommandVerificationRows.every((row) => row.valueRecorded === false), "completion progress current command verification rows should not record values");
+if (summary.currentActionSourceReady) {
+  check(summary.currentNextCommand !== "none", "completion progress should mirror the current next command when ledger current action evidence exists");
+  check(summary.currentProofChecklistRowCount === summary.currentProofChecklistRows.length, "completion progress should mirror current proof checklist row count");
+  check(summary.currentCommandVerificationRowCount === summary.currentCommandVerificationRows.length, "completion progress should mirror current command verification row count");
+}
 check(summary.localEnvInput?.valueRecorded === false, "completion progress local env loader should not record values");
 check(summary.localEnvValueRecorded === false, "completion progress should not record local env values");
 check(summary.privateValuesRecorded === false, "completion progress should not record private values");
@@ -345,6 +494,10 @@ check(markdown.includes("Source evidence ready:"), "completion progress Markdown
 check(markdown.includes("Next local command when missing: `npm run release:check`"), "completion progress Markdown should include the prerequisite command");
 check(markdown.includes("Local release readiness:"), "completion progress Markdown should include local release readiness");
 check(markdown.includes("PKG payload project IO evidence ready:"), "completion progress Markdown should include PKG payload project IO readiness");
+check(markdown.includes("Current Action"), "completion progress Markdown should include current action");
+check(markdown.includes("Current Edit Guidance"), "completion progress Markdown should include current edit guidance");
+check(markdown.includes("Current Proof Checklist Rows"), "completion progress Markdown should include current proof checklist rows");
+check(markdown.includes("Current Command Verification Rows"), "completion progress Markdown should include current command verification rows");
 check(markdown.includes("External gate requirements ready:"), "completion progress Markdown should include external gate requirement progress");
 check(markdown.includes("Remediation groups ready:"), "completion progress Markdown should include remediation progress");
 check(markdown.includes("Private values recorded: no"), "completion progress Markdown should state value redaction");
@@ -381,6 +534,12 @@ console.log(`- PKG payload project IO evidence ready: ${summary.pkgPayloadProjec
 console.log(`- External distribution hard gate ready: ${summary.externalDistributionGateReady ? "yes" : "no"}`);
 console.log(`- External gate requirements ready: ${summary.gateRequirementReadyCount}/${summary.gateRequirementTotal} (${summary.gateRequirementReadinessPercent.toFixed(1)}%)`);
 console.log(`- Remediation groups ready: ${summary.remediationReadyCount}/${summary.remediationTotal} (${summary.remediationReadinessPercent.toFixed(1)}%)`);
+console.log(`- Current action source ready: ${summary.currentActionSourceReady ? "yes" : "no"}`);
+console.log(`- Current next command: ${summary.currentNextCommand}`);
+console.log(`- Current first blocker: ${summary.currentFirstBlocker}`);
+console.log(`- Current env edit rows: ${summary.currentEnvEditRowsCount} (${summary.currentEnvEditRowsSummary})`);
+console.log(`- Current proof checklist rows: ${summary.currentProofChecklistRowCount} (${summary.currentProofChecklistRowSummary})`);
+console.log(`- Current command verification rows: ${summary.currentCommandVerificationRowCount} (${summary.currentCommandVerificationRowSummary})`);
 console.log(`- First blockers tracked: ${summary.firstBlockers.length}`);
 console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
 console.log(`- Prerequisite command when source evidence is missing: ${summary.prerequisiteNextCommand}`);
