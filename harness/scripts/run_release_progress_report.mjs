@@ -15,6 +15,7 @@ const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformAr
 const completedPlansDir = path.join(root, "docs", "exec_plans", "completed");
 const completionProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-completion-progress.json`);
 const externalProofBundleJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-proof-bundle.json`);
+const externalGateJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-distribution-gate.json`);
 const releaseProgressMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.md`);
 const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.json`);
 const failures = [];
@@ -213,6 +214,55 @@ function buildExternalProofBundleSummary(externalProofBundle) {
   };
 }
 
+function sameJson(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function buildExternalGateCurrentProofSummary(externalGate, proofBundleSummary) {
+  const currentEnvEditRows = valueFreeObjectRows(externalGate.currentEnvEditRows);
+  const currentProofChecklistRows = valueFreeObjectRows(externalGate.currentProofChecklistRows);
+  const currentCommandVerificationRows = valueFreeObjectRows(externalGate.currentCommandVerificationRows);
+  const consistencyChecks = {
+    currentNextCommandMatches: textValue(externalGate.currentNextCommand, "none") === proofBundleSummary.externalProofBundleCurrentNextCommand,
+    currentFirstBlockerMatches: textValue(externalGate.currentFirstBlocker, "none") === proofBundleSummary.externalProofBundleCurrentFirstBlocker,
+    currentEnvEditRowsMatch:
+      integerValue(externalGate.currentEnvEditRowsCount) === proofBundleSummary.externalProofBundleCurrentEnvEditRowsCount &&
+      sameJson(currentEnvEditRows, proofBundleSummary.externalProofBundleCurrentEnvEditRows),
+    currentProofChecklistRowsMatch:
+      integerValue(externalGate.currentProofChecklistRowCount) === proofBundleSummary.externalProofBundleCurrentProofChecklistRowCount &&
+      sameJson(currentProofChecklistRows, proofBundleSummary.externalProofBundleCurrentProofChecklistRows),
+    currentCommandVerificationRowsMatch:
+      integerValue(externalGate.currentCommandVerificationRowCount) === proofBundleSummary.externalProofBundleCurrentCommandVerificationRowCount &&
+      sameJson(currentCommandVerificationRows, proofBundleSummary.externalProofBundleCurrentCommandVerificationRows)
+  };
+  const externalGateProofBundleConsistencyReady =
+    externalGate.currentProofBundleSourceReady === true &&
+    Object.values(consistencyChecks).every((value) => value === true);
+
+  return {
+    sourceExternalGateReady: true,
+    sourceExternalGatePath: relative(externalGateJsonPath),
+    externalGateDryRun: externalGate.dryRun === true,
+    externalGateCurrentProofBundleSourceReady: externalGate.currentProofBundleSourceReady === true,
+    externalGateCurrentProofBundleSourcePath: textValue(externalGate.currentProofBundleSourcePath, "none"),
+    externalGateCurrentNextCommand: textValue(externalGate.currentNextCommand, "none"),
+    externalGateCurrentFirstBlocker: textValue(externalGate.currentFirstBlocker, "none"),
+    externalGateCurrentEnvEditRowsCount: integerValue(externalGate.currentEnvEditRowsCount),
+    externalGateCurrentEnvEditRowsSummary: textValue(externalGate.currentEnvEditRowsSummary, "none"),
+    externalGateCurrentEnvEditRows: currentEnvEditRows,
+    externalGateCurrentProofChecklistRowCount: integerValue(externalGate.currentProofChecklistRowCount),
+    externalGateCurrentProofChecklistRowSummary: textValue(externalGate.currentProofChecklistRowSummary, "none"),
+    externalGateCurrentProofChecklistRows: currentProofChecklistRows,
+    externalGateCurrentCommandVerificationRowCount: integerValue(externalGate.currentCommandVerificationRowCount),
+    externalGateCurrentCommandVerificationRowSummary: textValue(externalGate.currentCommandVerificationRowSummary, "none"),
+    externalGateCurrentCommandVerificationRows: currentCommandVerificationRows,
+    externalGateProofBundleConsistencyReady,
+    externalGateProofBundleConsistencyChecks: consistencyChecks,
+    externalGateProofBundleConsistencyValueRecorded: false,
+    externalGateValueRecorded: false
+  };
+}
+
 function buildMarkdown(report) {
   return `# ${appName} ${report.version} ${report.platform}-${report.arch} Release Progress Report
 
@@ -237,6 +287,9 @@ function buildMarkdown(report) {
 - Remediation groups ready: ${report.remediationReadyCount}/${report.remediationTotal} (${report.remediationReadinessPercent.toFixed(1)}%)
 - External proof bundle source ready: ${report.sourceExternalProofBundleReady ? "yes" : "no"}
 - External proof bundle ready: ${report.externalProofBundleReady ? "yes" : "no"}
+- External gate source ready: ${report.sourceExternalGateReady ? "yes" : "no"}
+- External gate current proof source ready: ${report.externalGateCurrentProofBundleSourceReady ? "yes" : "no"}
+- External gate/proof current action consistent: ${report.externalGateProofBundleConsistencyReady ? "yes" : "no"}
 - External proof artifacts present: ${report.externalProofBundleProofArtifactPresentCount}/${report.externalProofBundleProofArtifactCount} (missing: ${report.externalProofBundleProofArtifactMissingSummary})
 - External proof gate requirements ready: ${report.externalProofBundleGateRequirementReadyCount}/${report.externalProofBundleGateRequirementTotal} (blocked: ${report.externalProofBundleGateRequirementBlockedCount})
 - External proof current target: ${report.externalProofBundleCurrentProofTarget}
@@ -291,6 +344,7 @@ function buildMarkdown(report) {
 
 - Completion progress JSON: ${report.sourceCompletionProgressPath}
 - External proof bundle JSON: ${report.sourceExternalProofBundlePath}
+- External distribution gate JSON: ${report.sourceExternalGatePath}
 
 ## External Proof Bundle
 
@@ -316,6 +370,26 @@ function buildMarkdown(report) {
 - Current command sequence: ${report.externalProofBundleCurrentCommandSequenceCount} (${report.externalProofBundleCurrentCommandSequenceSummary})
 - Current command verification rows: ${report.externalProofBundleCurrentCommandVerificationRowCount} (${report.externalProofBundleCurrentCommandVerificationRowSummary})
 - Hard gate: \`${report.externalProofBundleHardGateCommand}\`
+
+## External Gate Current Proof Consistency
+
+- Gate source ready: ${report.sourceExternalGateReady ? "yes" : "no"}
+- Gate source: ${report.sourceExternalGatePath}
+- Gate dry run: ${report.externalGateDryRun ? "yes" : "no"}
+- Gate current proof source ready: ${report.externalGateCurrentProofBundleSourceReady ? "yes" : "no"}
+- Gate current proof source: ${report.externalGateCurrentProofBundleSourcePath}
+- Gate/proof current action consistent: ${report.externalGateProofBundleConsistencyReady ? "yes" : "no"}
+- Current next command matches: ${report.externalGateProofBundleConsistencyChecks.currentNextCommandMatches ? "yes" : "no"}
+- Current first blocker matches: ${report.externalGateProofBundleConsistencyChecks.currentFirstBlockerMatches ? "yes" : "no"}
+- Current edit rows match: ${report.externalGateProofBundleConsistencyChecks.currentEnvEditRowsMatch ? "yes" : "no"}
+- Current proof checklist rows match: ${report.externalGateProofBundleConsistencyChecks.currentProofChecklistRowsMatch ? "yes" : "no"}
+- Current command verification rows match: ${report.externalGateProofBundleConsistencyChecks.currentCommandVerificationRowsMatch ? "yes" : "no"}
+- Gate current next command: \`${report.externalGateCurrentNextCommand}\`
+- Gate current first blocker: ${report.externalGateCurrentFirstBlocker}
+- Gate current env edit rows: ${report.externalGateCurrentEnvEditRowsCount} (${report.externalGateCurrentEnvEditRowsSummary})
+- Gate current proof checklist rows: ${report.externalGateCurrentProofChecklistRowCount} (${report.externalGateCurrentProofChecklistRowSummary})
+- Gate current command verification rows: ${report.externalGateCurrentCommandVerificationRowCount} (${report.externalGateCurrentCommandVerificationRowSummary})
+- Gate consistency values recorded: no
 
 ## Current Edit Guidance
 
@@ -386,10 +460,18 @@ if (!existsSync(externalProofBundleJsonPath)) {
     `${fromExisting ? "Run npm run release:check or npm run verify before npm run release:progress-smoke.\n" : ""}Expected: ${relative(externalProofBundleJsonPath)}`
   );
 }
+if (!existsSync(externalGateJsonPath)) {
+  fail(
+    "External distribution gate JSON was not generated.",
+    `${fromExisting ? "Run npm run release:check or npm run verify before npm run release:progress-smoke.\n" : ""}Expected: ${relative(externalGateJsonPath)}`
+  );
+}
 
 const completionProgress = JSON.parse(await readFile(completionProgressJsonPath, "utf8"));
 const externalProofBundle = JSON.parse(await readFile(externalProofBundleJsonPath, "utf8"));
+const externalGate = JSON.parse(await readFile(externalGateJsonPath, "utf8"));
 const externalProofBundleSummary = buildExternalProofBundleSummary(externalProofBundle);
+const externalGateCurrentProofSummary = buildExternalGateCurrentProofSummary(externalGate, externalProofBundleSummary);
 const completedPlanSummary = await buildCompletedPlanSummary();
 const releaseProgressReport = {
   appName,
@@ -408,6 +490,7 @@ const releaseProgressReport = {
   releaseProgressJsonPath: relative(releaseProgressJsonPath),
   sourceCompletionProgressPath: relative(completionProgressJsonPath),
   ...externalProofBundleSummary,
+  ...externalGateCurrentProofSummary,
   productScope: completionProgress.productScope,
   completionStage: completionProgress.completionStage,
   sourceEvidenceReady: completionProgress.sourceEvidenceReady === true,
@@ -451,7 +534,9 @@ releaseProgressReport.releaseProgressReportReady =
   releaseProgressReport.desktopProjectIoEvidenceReady &&
   releaseProgressReport.pkgPayloadProjectIoEvidenceReady &&
   releaseProgressReport.sourceExternalProofBundleReady &&
-  releaseProgressReport.externalProofBundleReady;
+  releaseProgressReport.externalProofBundleReady &&
+  releaseProgressReport.sourceExternalGateReady &&
+  releaseProgressReport.externalGateProofBundleConsistencyReady;
 Object.assign(releaseProgressReport, buildUserFacingCompletionSummary(releaseProgressReport, completedPlanSummary));
 
 const markdown = buildMarkdown(releaseProgressReport);
@@ -500,6 +585,29 @@ check(typeof releaseProgressReport.externalDistributionGateReady === "boolean", 
 check(releaseProgressReport.sourceExternalProofBundleReady === true, "release progress report should include ready external proof bundle source evidence");
 check(releaseProgressReport.externalProofBundleReady === true, "release progress report should include a ready external proof bundle");
 check(releaseProgressReport.sourceExternalProofBundlePath === relative(externalProofBundleJsonPath), "release progress report should identify the external proof bundle source path");
+check(releaseProgressReport.sourceExternalGateReady === true, "release progress report should include ready external gate source evidence");
+check(releaseProgressReport.sourceExternalGatePath === relative(externalGateJsonPath), "release progress report should identify the external gate source path");
+check(releaseProgressReport.externalGateCurrentProofBundleSourceReady === true, "release progress report should include external gate current proof source readiness");
+check(releaseProgressReport.externalGateCurrentProofBundleSourcePath === relative(externalProofBundleJsonPath), "release progress report should identify the external gate proof bundle source path");
+check(typeof releaseProgressReport.externalGateCurrentNextCommand === "string" && releaseProgressReport.externalGateCurrentNextCommand.length > 0, "release progress report should include external gate current next command");
+check(typeof releaseProgressReport.externalGateCurrentFirstBlocker === "string" && releaseProgressReport.externalGateCurrentFirstBlocker.length > 0, "release progress report should include external gate current first blocker");
+check(Number.isInteger(releaseProgressReport.externalGateCurrentEnvEditRowsCount), "release progress report should include external gate current env edit row count");
+check(Array.isArray(releaseProgressReport.externalGateCurrentEnvEditRows), "release progress report should include external gate current env edit rows");
+check(releaseProgressReport.externalGateCurrentEnvEditRows.every((row) => row.valueRecorded === false), "release progress report external gate env edit rows should not record values");
+check(Number.isInteger(releaseProgressReport.externalGateCurrentProofChecklistRowCount), "release progress report should include external gate current proof checklist row count");
+check(Array.isArray(releaseProgressReport.externalGateCurrentProofChecklistRows), "release progress report should include external gate current proof checklist rows");
+check(releaseProgressReport.externalGateCurrentProofChecklistRows.every((row) => row.valueRecorded === false), "release progress report external gate proof checklist rows should not record values");
+check(Number.isInteger(releaseProgressReport.externalGateCurrentCommandVerificationRowCount), "release progress report should include external gate current command verification row count");
+check(Array.isArray(releaseProgressReport.externalGateCurrentCommandVerificationRows), "release progress report should include external gate current command verification rows");
+check(releaseProgressReport.externalGateCurrentCommandVerificationRows.every((row) => row.valueRecorded === false), "release progress report external gate command verification rows should not record values");
+check(releaseProgressReport.externalGateProofBundleConsistencyReady === true, "release progress report should prove external gate and proof bundle current proof rows are consistent");
+check(releaseProgressReport.externalGateProofBundleConsistencyChecks.currentNextCommandMatches === true, "release progress report should prove external gate current next command matches proof bundle");
+check(releaseProgressReport.externalGateProofBundleConsistencyChecks.currentFirstBlockerMatches === true, "release progress report should prove external gate current first blocker matches proof bundle");
+check(releaseProgressReport.externalGateProofBundleConsistencyChecks.currentEnvEditRowsMatch === true, "release progress report should prove external gate current edit rows match proof bundle");
+check(releaseProgressReport.externalGateProofBundleConsistencyChecks.currentProofChecklistRowsMatch === true, "release progress report should prove external gate current proof checklist rows match proof bundle");
+check(releaseProgressReport.externalGateProofBundleConsistencyChecks.currentCommandVerificationRowsMatch === true, "release progress report should prove external gate current command verification rows match proof bundle");
+check(releaseProgressReport.externalGateProofBundleConsistencyValueRecorded === false, "release progress report should not record external gate consistency values");
+check(releaseProgressReport.externalGateValueRecorded === false, "release progress report should not record external gate values");
 check(Number.isInteger(releaseProgressReport.externalProofBundleProofArtifactCount), "release progress report should include external proof artifact count");
 check(Number.isInteger(releaseProgressReport.externalProofBundleProofArtifactPresentCount), "release progress report should include external proof artifact present count");
 check(Number.isInteger(releaseProgressReport.externalProofBundleProofArtifactMissingCount), "release progress report should include external proof artifact missing count");
@@ -577,6 +685,11 @@ check(markdown.includes("Current 10-plan progress:"), "release progress Markdown
 check(markdown.includes("Local release readiness:"), "release progress Markdown should include local release readiness");
 check(markdown.includes("PKG payload project IO evidence ready:"), "release progress Markdown should include PKG payload project IO readiness");
 check(markdown.includes("External Proof Bundle"), "release progress Markdown should include external proof bundle summary");
+check(markdown.includes("External Gate Current Proof Consistency"), "release progress Markdown should include external gate current proof consistency summary");
+check(markdown.includes("External gate/proof current action consistent:"), "release progress Markdown should include external gate/proof consistency status");
+check(markdown.includes("Current next command matches:"), "release progress Markdown should include external gate next-command match status");
+check(markdown.includes("Current edit rows match:"), "release progress Markdown should include external gate edit-row match status");
+check(markdown.includes("Current command verification rows match:"), "release progress Markdown should include external gate command-row match status");
 check(markdown.includes("External proof artifacts present:"), "release progress Markdown should include external proof artifact coverage");
 check(markdown.includes("External proof current target:"), "release progress Markdown should include external proof current target");
 check(markdown.includes("External proof current operator action:"), "release progress Markdown should include external proof current operator action");
@@ -620,6 +733,14 @@ console.log(`- External distribution hard gate ready: ${releaseProgressReport.ex
 console.log(`- External gate requirements ready: ${releaseProgressReport.gateRequirementReadyCount}/${releaseProgressReport.gateRequirementTotal} (${releaseProgressReport.gateRequirementReadinessPercent.toFixed(1)}%)`);
 console.log(`- Remediation groups ready: ${releaseProgressReport.remediationReadyCount}/${releaseProgressReport.remediationTotal} (${releaseProgressReport.remediationReadinessPercent.toFixed(1)}%)`);
 console.log(`- External proof bundle ready: ${releaseProgressReport.externalProofBundleReady ? "yes" : "no"}`);
+console.log(`- External gate source ready: ${releaseProgressReport.sourceExternalGateReady ? "yes" : "no"}`);
+console.log(`- External gate current proof source ready: ${releaseProgressReport.externalGateCurrentProofBundleSourceReady ? "yes" : "no"}`);
+console.log(`- External gate/proof current action consistent: ${releaseProgressReport.externalGateProofBundleConsistencyReady ? "yes" : "no"}`);
+console.log(`- External gate current next command: ${releaseProgressReport.externalGateCurrentNextCommand}`);
+console.log(`- External gate current first blocker: ${releaseProgressReport.externalGateCurrentFirstBlocker}`);
+console.log(`- External gate current env edit rows: ${releaseProgressReport.externalGateCurrentEnvEditRowsCount} (${releaseProgressReport.externalGateCurrentEnvEditRowsSummary})`);
+console.log(`- External gate current proof checklist rows: ${releaseProgressReport.externalGateCurrentProofChecklistRowCount} (${releaseProgressReport.externalGateCurrentProofChecklistRowSummary})`);
+console.log(`- External gate current command verification rows: ${releaseProgressReport.externalGateCurrentCommandVerificationRowCount} (${releaseProgressReport.externalGateCurrentCommandVerificationRowSummary})`);
 console.log(`- External proof artifacts present: ${releaseProgressReport.externalProofBundleProofArtifactPresentCount}/${releaseProgressReport.externalProofBundleProofArtifactCount} (missing: ${releaseProgressReport.externalProofBundleProofArtifactMissingSummary})`);
 console.log(`- External proof gate requirements ready: ${releaseProgressReport.externalProofBundleGateRequirementReadyCount}/${releaseProgressReport.externalProofBundleGateRequirementTotal} (blocked: ${releaseProgressReport.externalProofBundleGateRequirementBlockedCount})`);
 console.log(`- External proof current target: ${releaseProgressReport.externalProofBundleCurrentProofTarget}`);
