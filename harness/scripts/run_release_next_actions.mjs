@@ -349,6 +349,7 @@ function formatDetailRows(actions) {
     .map((action) => {
       const requiredKeys = action.requiredKeys.length > 0 ? action.requiredKeys.join(", ") : "none";
       const placeholderKeys = action.placeholderKeys.length > 0 ? action.placeholderKeys.join(", ") : "none";
+      const evidence = action.evidence.map((item) => `   - ${item.label}: ${item.path} (${item.present ? "present" : "missing"})`).join("\n") || "   - none";
       const keyGuidance = action.keyGuidance.map((item) => `   - ${item.key}: ${item.guidance}`).join("\n") || "   - none";
       const readyCriteria = action.readyCriteria.map((item) => `   - ${item}`).join("\n") || "   - none";
       const editLocations =
@@ -363,6 +364,8 @@ function formatDetailRows(actions) {
       return `${action.order}. ${action.label}
    Required keys: ${requiredKeys}
    Placeholder keys: ${placeholderKeys}
+   Evidence:
+${evidence}
    Key guidance:
 ${keyGuidance}
    Ready criteria:
@@ -390,6 +393,30 @@ ${blockers}`;
 
 function formatArtifactRows(artifacts) {
   return artifacts.map((item) => `| ${escapeCell(item.label)} | ${readyLabel(item.present)} | ${escapeCell(item.path)} |`).join("\n");
+}
+
+function buildEvidenceRows(items = []) {
+  return (Array.isArray(items) ? items : []).map((item, index) => ({
+    label: item.label ?? `Evidence ${index + 1}`,
+    path: item.path ?? "unknown",
+    present: item.present === true,
+    valueRecorded: false
+  }));
+}
+
+function formatEvidenceRowsSummary(items) {
+  return Array.isArray(items) && items.length > 0 ? `${items.length} value-free evidence rows` : "none";
+}
+
+function formatEvidenceRowsTable(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "| evidence | present | path | value recorded |\n|---|---:|---|---:|\n| none | no | none | no |";
+  }
+  return [
+    "| evidence | present | path | value recorded |",
+    "|---|---:|---|---:|",
+    ...items.map((item) => `| ${escapeCell(item.label)} | ${readyLabel(item.present)} | ${escapeCell(item.path)} | ${readyLabel(item.valueRecorded)} |`)
+  ].join("\n");
 }
 
 function formatBlockerRows(blockers) {
@@ -626,7 +653,7 @@ function buildPriorityActions(remediation, context = {}) {
         envEditTemplate,
         envEditRows,
         readyCriteria,
-        evidence: group.evidence ?? [],
+        evidence: buildEvidenceRows(group.evidence ?? []),
         prerequisiteCommands,
         operatorActions,
         rerunCommands,
@@ -660,6 +687,7 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
       placeholderKeys: currentPlaceholderKeys,
       localEnvEditTarget: fallback.currentEnvEditTarget ?? currentLocalEnvEditTarget()
     });
+  const currentEvidenceRows = currentAction?.evidence ?? fallback.evidence ?? [];
   const currentReadyCriteria = currentAction?.readyCriteria ?? fallback.readyCriteria ?? readyCriteriaForAction(fallback);
   const currentActionChecklist = currentAction?.actionChecklist ?? fallback.actionChecklist ?? [];
   const currentPrerequisiteCommands = currentAction?.prerequisiteCommands ?? [];
@@ -688,6 +716,9 @@ function buildCurrentActionSummary(priorityActions, fallback = {}) {
     currentEnvEditRowsCount: currentEnvEditRows.length,
     currentEnvEditRowsSummary: formatEnvEditRowsSummary(currentEnvEditRows),
     currentEnvEditRows,
+    currentEvidenceRowsCount: currentEvidenceRows.length,
+    currentEvidenceRowsSummary: formatEvidenceRowsSummary(currentEvidenceRows),
+    currentEvidenceRows,
     currentReadyCriteriaCount: currentReadyCriteria.length,
     currentReadyCriteriaSummary: currentReadyCriteria.length > 0 ? `${currentReadyCriteria.length} value-free ready criteria` : "none",
     currentReadyCriteria,
@@ -725,7 +756,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
       envEditTemplate: [],
       envEditRows: [],
       readyCriteria: readyCriteriaForAction({ id: "regenerate-local-release-evidence" }),
-      evidence: artifactRows,
+      evidence: buildEvidenceRows(artifactRows),
       prerequisiteCommands: [],
       operatorActions: [
         "Run the full local release gate to regenerate ignored source evidence before external preflight.",
@@ -850,6 +881,7 @@ function buildMarkdown(report) {
 - Current env key guidance: ${report.currentEnvKeyGuidanceCount} (${report.currentEnvKeyGuidanceSummary})
 - Current env edit template: ${report.currentEnvEditTemplateCount} (${report.currentEnvEditTemplateSummary})
 - Current env edit rows: ${report.currentEnvEditRowsCount} (${report.currentEnvEditRowsSummary})
+- Current evidence rows: ${report.currentEvidenceRowsCount} (${report.currentEvidenceRowsSummary})
 - Current ready criteria: ${report.currentReadyCriteriaCount} (${report.currentReadyCriteriaSummary})
 - Current action checklist: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})
 - Current env edit target: ${report.currentEnvEditTarget}
@@ -917,6 +949,10 @@ ${formatEnvEditTemplateBlock(report.currentEnvEditTemplate)}
 ## Current Env Edit Rows
 
 ${formatEnvEditRowsTable(report.currentEnvEditRows)}
+
+## Current Evidence Rows
+
+${formatEvidenceRowsTable(report.currentEvidenceRows)}
 
 ## Current Ready Criteria
 
@@ -1168,6 +1204,11 @@ check(
   typeof nextActionsReport.currentEnvEditRowsSummary === "string" && nextActionsReport.currentEnvEditRowsSummary.length > 0,
   "external next actions should include the current env edit rows summary"
 );
+check(Number.isInteger(nextActionsReport.currentEvidenceRowsCount), "external next actions should include the current evidence rows count");
+check(
+  typeof nextActionsReport.currentEvidenceRowsSummary === "string" && nextActionsReport.currentEvidenceRowsSummary.length > 0,
+  "external next actions should include the current evidence rows summary"
+);
 check(Number.isInteger(nextActionsReport.currentReadyCriteriaCount), "external next actions should include the current ready criteria count");
 check(typeof nextActionsReport.currentReadyCriteriaSummary === "string" && nextActionsReport.currentReadyCriteriaSummary.length > 0, "external next actions should include the current ready criteria summary");
 check(Number.isInteger(nextActionsReport.currentActionChecklistCount), "external next actions should include the current action checklist count");
@@ -1182,6 +1223,7 @@ check(Array.isArray(nextActionsReport.currentPlaceholderEditLocations), "externa
 check(Array.isArray(nextActionsReport.currentEnvKeyGuidance), "external next actions should include current env key guidance");
 check(Array.isArray(nextActionsReport.currentEnvEditTemplate), "external next actions should include current env edit template");
 check(Array.isArray(nextActionsReport.currentEnvEditRows), "external next actions should include current env edit rows");
+check(Array.isArray(nextActionsReport.currentEvidenceRows), "external next actions should include current evidence rows");
 check(Array.isArray(nextActionsReport.currentReadyCriteria), "external next actions should include current ready criteria");
 check(Array.isArray(nextActionsReport.currentActionChecklist), "external next actions should include current action checklist");
 check(
@@ -1207,6 +1249,10 @@ check(
 check(
   nextActionsReport.currentEnvEditRowsCount === nextActionsReport.currentEnvEditRows.length,
   "external next actions current env edit rows count should match listed rows"
+);
+check(
+  nextActionsReport.currentEvidenceRowsCount === nextActionsReport.currentEvidenceRows.length,
+  "external next actions current evidence rows count should match listed rows"
 );
 check(
   nextActionsReport.currentEnvEditTemplate.every(
@@ -1241,6 +1287,18 @@ check(
     );
   }),
   "external next actions current env edit rows should combine value-free assignment, location, guidance, and placeholder status"
+);
+check(
+  nextActionsReport.currentEvidenceRows.every(
+    (item) =>
+      typeof item.label === "string" &&
+      item.label.length > 0 &&
+      typeof item.path === "string" &&
+      item.path.length > 0 &&
+      typeof item.present === "boolean" &&
+      item.valueRecorded === false
+  ),
+  "external next actions current evidence rows should cite only value-free artifact labels and paths"
 );
 check(
   nextActionsReport.currentReadyCriteriaCount === nextActionsReport.currentReadyCriteria.length,
@@ -1279,6 +1337,21 @@ check(nextActionsReport.priorityActions.every((action) => action.ready === false
 check(nextActionsReport.priorityActions.every((action) => action.valueRecorded === false), "priority actions should not record values");
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.placeholderKeys)), "priority actions should include placeholder key lists");
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.placeholderEditLocations)), "priority actions should include placeholder edit location lists");
+check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.evidence)), "priority actions should include evidence row lists");
+check(
+  nextActionsReport.priorityActions.every((action) =>
+    (action.evidence ?? []).every(
+      (item) =>
+        typeof item.label === "string" &&
+        item.label.length > 0 &&
+        typeof item.path === "string" &&
+        item.path.length > 0 &&
+        typeof item.present === "boolean" &&
+        item.valueRecorded === false
+    )
+  ),
+  "priority actions should include value-free evidence rows"
+);
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.keyGuidance)), "priority actions should include key guidance lists");
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.envEditTemplate)), "priority actions should include env edit template lists");
 check(nextActionsReport.priorityActions.every((action) => Array.isArray(action.envEditRows)), "priority actions should include env edit row lists");
@@ -1370,6 +1443,14 @@ if (nextActionsReport.priorityActions.length > 0) {
   check(
     nextActionsReport.currentEnvEditRowsSummary === formatEnvEditRowsSummary(firstPriorityAction.envEditRows ?? []),
     "external next actions should mirror the first priority env edit rows summary"
+  );
+  check(
+    nextActionsReport.currentEvidenceRowsCount === (firstPriorityAction.evidence ?? []).length,
+    "external next actions should mirror the first priority evidence rows count"
+  );
+  check(
+    nextActionsReport.currentEvidenceRowsSummary === formatEvidenceRowsSummary(firstPriorityAction.evidence ?? []),
+    "external next actions should mirror the first priority evidence rows summary"
   );
   check(
     nextActionsReport.currentReadyCriteriaCount === (firstPriorityAction.readyCriteria ?? []).length,
@@ -1619,6 +1700,7 @@ check(markdown.includes("Current placeholder edit locations:"), "external next a
 check(markdown.includes("Current env key guidance:"), "external next actions Markdown should include current env key guidance");
 check(markdown.includes("Current env edit template:"), "external next actions Markdown should include current env edit template status");
 check(markdown.includes("Current env edit rows:"), "external next actions Markdown should include current env edit rows status");
+check(markdown.includes("Current evidence rows:"), "external next actions Markdown should include current evidence rows status");
 check(markdown.includes("Current ready criteria:"), "external next actions Markdown should include current ready criteria");
 check(markdown.includes("Current action checklist:"), "external next actions Markdown should include current action checklist status");
 check(markdown.includes("Current env edit target:"), "external next actions Markdown should include current env edit target");
@@ -1633,6 +1715,8 @@ check(markdown.includes("Current Env Edit Template"), "external next actions Mar
 check(markdown.includes("Env edit template:"), "external next actions Markdown should include action env edit template details");
 check(markdown.includes("Current Env Edit Rows"), "external next actions Markdown should include current env edit rows section");
 check(markdown.includes("Env edit rows:"), "external next actions Markdown should include action env edit row details");
+check(markdown.includes("Current Evidence Rows"), "external next actions Markdown should include current evidence rows section");
+check(markdown.includes("Evidence:"), "external next actions Markdown should include action evidence details");
 check(markdown.includes("Current Ready Criteria"), "external next actions Markdown should include current ready criteria section");
 check(markdown.includes("Ready criteria:"), "external next actions Markdown should include action ready criteria details");
 check(markdown.includes("Current Action Checklist"), "external next actions Markdown should include current action checklist section");
@@ -1648,6 +1732,10 @@ if (nextActionsReport.currentEnvEditTemplateCount > 0) {
 if (nextActionsReport.currentEnvEditRowsCount > 0) {
   check(nextActionsReport.currentEnvEditRows.some((item) => markdown.includes(item.location)), "external next actions Markdown should include current env edit row locations");
   check(markdown.includes("| key | location | assignment | guidance | placeholder |"), "external next actions Markdown should include current env edit row table");
+}
+if (nextActionsReport.currentEvidenceRowsCount > 0) {
+  check(nextActionsReport.currentEvidenceRows.some((item) => markdown.includes(item.path)), "external next actions Markdown should include current evidence row paths");
+  check(markdown.includes("| evidence | present | path | value recorded |"), "external next actions Markdown should include current evidence row table");
 }
 check(markdown.includes("Priority Next Actions"), "external next actions Markdown should include priority actions");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "external next actions Markdown should keep the hard gate command");
@@ -1677,6 +1765,7 @@ console.log(`- Current placeholder edit locations: ${nextActionsReport.currentPl
 console.log(`- Current env key guidance: ${nextActionsReport.currentEnvKeyGuidanceCount} (${nextActionsReport.currentEnvKeyGuidanceSummary})`);
 console.log(`- Current env edit template: ${nextActionsReport.currentEnvEditTemplateCount} (${nextActionsReport.currentEnvEditTemplateSummary})`);
 console.log(`- Current env edit rows: ${nextActionsReport.currentEnvEditRowsCount} (${nextActionsReport.currentEnvEditRowsSummary})`);
+console.log(`- Current evidence rows: ${nextActionsReport.currentEvidenceRowsCount} (${nextActionsReport.currentEvidenceRowsSummary})`);
 console.log(`- Current ready criteria: ${nextActionsReport.currentReadyCriteriaCount} (${nextActionsReport.currentReadyCriteriaSummary})`);
 console.log(`- Current action checklist: ${nextActionsReport.currentActionChecklistCount} (${nextActionsReport.currentActionChecklistSummary})`);
 console.log(`- Current env edit target: ${nextActionsReport.currentEnvEditTarget}`);
