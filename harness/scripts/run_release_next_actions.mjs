@@ -859,7 +859,95 @@ function buildCompletionGapSummary({
   };
 }
 
-function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
+function stringField(source, key, fallback = "none") {
+  const value = source?.[key];
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function booleanField(source, key, fallback = false) {
+  const value = source?.[key];
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function arrayField(source, key) {
+  return Array.isArray(source?.[key]) ? unique(source[key]) : [];
+}
+
+function buildDoctorCompletionGapSummary(releaseDoctor = null, fallback = {}) {
+  const doctorCompletionGapSourceReady = releaseDoctor !== null && typeof releaseDoctor === "object";
+  const doctorCompletionGapStatus = doctorCompletionGapSourceReady
+    ? stringField(releaseDoctor, "completionGapStatus", "unknown")
+    : "source evidence missing";
+  const doctorCompletionGapProofTarget = doctorCompletionGapSourceReady
+    ? stringField(releaseDoctor, "completionGapCurrentProofTarget", fallback.currentActionLabel ?? "Regenerate local release evidence")
+    : fallback.currentActionLabel ?? "Regenerate local release evidence";
+  const doctorCompletionGapNextProofCommand = doctorCompletionGapSourceReady
+    ? stringField(releaseDoctor, "completionGapNextProofCommand", fallback.currentNextCommand ?? "npm run release:check")
+    : fallback.currentNextCommand ?? "npm run release:check";
+  const doctorCompletionGapHardGateCommand = doctorCompletionGapSourceReady
+    ? stringField(releaseDoctor, "completionGapHardGateCommand", fallback.hardExternalGateCommand ?? "npm run release:external-check")
+    : fallback.hardExternalGateCommand ?? "npm run release:external-check";
+  const doctorCompletionGapFirstBlocker = doctorCompletionGapSourceReady
+    ? stringField(releaseDoctor, "completionGapFirstBlocker", fallback.currentFirstBlocker ?? "none")
+    : fallback.currentFirstBlocker ?? "Release doctor source evidence is missing.";
+  const doctorCompletionGapClaimBlockers = doctorCompletionGapSourceReady
+    ? arrayField(releaseDoctor, "completionGapClaimBlockers")
+    : unique([
+        "Release doctor source evidence is missing.",
+        `Regenerate source release evidence with ${fallback.prerequisiteCommand ?? "npm run release:check"}.`,
+        `Hard external distribution gate must pass via ${doctorCompletionGapHardGateCommand}.`
+      ]);
+  return {
+    doctorCompletionGapSourceArtifact: "Release doctor",
+    doctorCompletionGapSourcePath: relative(releaseDoctorPath),
+    doctorCompletionGapSourceReady,
+    doctorCompletionGapDoctorReportReady: doctorCompletionGapSourceReady
+      ? booleanField(releaseDoctor, "releaseDoctorReportReady", false)
+      : false,
+    doctorCompletionGapStatus,
+    doctorCompletionGapSummary: doctorCompletionGapSourceReady
+      ? stringField(
+          releaseDoctor,
+          "completionGapSummary",
+          `${doctorCompletionGapStatus}: ${doctorCompletionGapProofTarget} is the next proof target before any external distribution completion claim.`
+        )
+      : `${doctorCompletionGapStatus}: ${doctorCompletionGapProofTarget} requires release doctor source evidence before any external distribution completion claim.`,
+    doctorCompletionGapCompletionStage: doctorCompletionGapSourceReady
+      ? stringField(releaseDoctor, "completionGapCompletionStage", fallback.completionStage ?? "unknown")
+      : fallback.completionStage ?? "source evidence missing",
+    doctorCompletionGapProofTarget,
+    doctorCompletionGapNextProofCommand,
+    doctorCompletionGapHardGateCommand,
+    doctorCompletionGapFirstBlocker,
+    doctorCompletionGapEvidenceSummary: doctorCompletionGapSourceReady
+      ? stringField(releaseDoctor, "completionGapEvidenceSummary", fallback.currentEvidenceLabelSummary ?? "none")
+      : fallback.currentEvidenceLabelSummary ?? "none",
+    doctorCompletionGapReadyCriteriaSummary: doctorCompletionGapSourceReady
+      ? stringField(releaseDoctor, "completionGapReadyCriteriaSummary", fallback.currentReadyCriteriaSummary ?? "none")
+      : fallback.currentReadyCriteriaSummary ?? "none",
+    doctorCompletionGapActionChecklistSummary: doctorCompletionGapSourceReady
+      ? stringField(releaseDoctor, "completionGapActionChecklistSummary", fallback.currentActionChecklistSummary ?? "none")
+      : fallback.currentActionChecklistSummary ?? "none",
+    doctorCompletionGapClaimBlockerCount: doctorCompletionGapClaimBlockers.length,
+    doctorCompletionGapClaimBlockerSummary:
+      doctorCompletionGapClaimBlockers.length > 0 ? `${doctorCompletionGapClaimBlockers.length} value-free blockers` : "none",
+    doctorCompletionGapClaimBlockers,
+    doctorCompletionGapClaimedExternalDistribution: doctorCompletionGapSourceReady
+      ? booleanField(releaseDoctor, "completionGapClaimedExternalDistribution", false)
+      : false,
+    doctorCompletionGapValueRecorded: doctorCompletionGapSourceReady
+      ? booleanField(releaseDoctor, "completionGapValueRecorded", false)
+      : false,
+    doctorCompletionGapSourceValueRecorded: doctorCompletionGapSourceReady
+      ? booleanField(releaseDoctor, "sourceValueRecorded", false)
+      : false,
+    doctorCompletionGapSourceClaimedExternalDistribution: doctorCompletionGapSourceReady
+      ? booleanField(releaseDoctor, "sourceClaimedExternalDistribution", false)
+      : false
+  };
+}
+
+function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoctor = null) {
   const missingArtifacts = artifactRows.filter((item) => !item.present);
   const missingLabels = missingArtifacts.map((item) => item.label);
   const firstBlockers = unique([
@@ -909,6 +997,12 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
     hardGateWouldFail: true,
     priorityActionCount: priorityActions.length
   });
+  const doctorCompletionGap = buildDoctorCompletionGapSummary(releaseDoctor, {
+    completionStage: "source evidence missing",
+    ...currentActionSummary,
+    hardExternalGateCommand: "npm run release:external-check",
+    prerequisiteCommand: "npm run release:check"
+  });
 
   return {
     appName,
@@ -940,6 +1034,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun) {
     currentFocus: "Regenerate local release evidence",
     ...currentActionSummary,
     ...completionGap,
+    ...doctorCompletionGap,
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
     externalDistributionReady: false,
@@ -1017,6 +1112,12 @@ function buildMarkdown(report) {
 - Completion gap hard gate command: \`${report.completionGapHardGateCommand}\`
 - Completion gap first blocker: ${report.completionGapFirstBlocker}
 - Completion gap claim blockers: ${report.completionGapClaimBlockerCount} (${report.completionGapClaimBlockerSummary})
+- Doctor completion gap source ready: ${readyLabel(report.doctorCompletionGapSourceReady)}
+- Doctor completion gap status: ${report.doctorCompletionGapStatus}
+- Doctor completion gap proof target: ${report.doctorCompletionGapProofTarget}
+- Doctor completion gap next proof command: \`${report.doctorCompletionGapNextProofCommand}\`
+- Doctor completion gap hard gate command: \`${report.doctorCompletionGapHardGateCommand}\`
+- Doctor completion gap claim blockers: ${report.doctorCompletionGapClaimBlockerCount} (${report.doctorCompletionGapClaimBlockerSummary})
 - Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${report.currentPlaceholderKeySummary})
 - Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})
@@ -1080,6 +1181,29 @@ ${formatCommandList(report.currentCommandSequence)}
 - Value recorded: ${readyLabel(report.completionGapValueRecorded)}
 
 ${formatChecklistList(report.completionGapClaimBlockers)}
+
+## Release Doctor Completion Gap
+
+- Source artifact: ${report.doctorCompletionGapSourceArtifact}
+- Source path: ${report.doctorCompletionGapSourcePath}
+- Source ready: ${readyLabel(report.doctorCompletionGapSourceReady)}
+- Doctor report ready: ${readyLabel(report.doctorCompletionGapDoctorReportReady)}
+- Status: ${report.doctorCompletionGapStatus}
+- Summary: ${report.doctorCompletionGapSummary}
+- Completion stage: ${report.doctorCompletionGapCompletionStage}
+- Proof target: ${report.doctorCompletionGapProofTarget}
+- Next proof command: \`${report.doctorCompletionGapNextProofCommand}\`
+- Hard gate command: \`${report.doctorCompletionGapHardGateCommand}\`
+- First blocker: ${report.doctorCompletionGapFirstBlocker}
+- Evidence summary: ${report.doctorCompletionGapEvidenceSummary}
+- Ready criteria summary: ${report.doctorCompletionGapReadyCriteriaSummary}
+- Action checklist summary: ${report.doctorCompletionGapActionChecklistSummary}
+- External distribution claimed by release doctor: ${readyLabel(report.doctorCompletionGapClaimedExternalDistribution)}
+- Value recorded by release doctor: ${readyLabel(report.doctorCompletionGapValueRecorded)}
+- Source values recorded: ${readyLabel(report.doctorCompletionGapSourceValueRecorded)}
+- Source external distribution claimed: ${readyLabel(report.doctorCompletionGapSourceClaimedExternalDistribution)}
+
+${formatChecklistList(report.doctorCompletionGapClaimBlockers)}
 
 ## Priority Next Actions
 
@@ -1155,7 +1279,8 @@ const missingSourceEvidence = artifactRows.some((item) => !item.present);
 let nextActionsReport = null;
 
 if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
-  nextActionsReport = buildBootstrapNextActionsReport(artifactRows, preflightRun);
+  const bootstrapReleaseDoctor = existsSync(releaseDoctorPath) ? JSON.parse(await readFile(releaseDoctorPath, "utf8")) : null;
+  nextActionsReport = buildBootstrapNextActionsReport(artifactRows, preflightRun, bootstrapReleaseDoctor);
 } else {
   if (!preflightRun.succeeded) {
     fail(
@@ -1230,6 +1355,12 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     hardGateWouldFail: externalPreflight.hardGateWouldFail === true,
     priorityActionCount: priorityActions.length
   });
+  const doctorCompletionGap = buildDoctorCompletionGapSummary(releaseDoctor, {
+    completionStage,
+    ...currentActionSummary,
+    hardExternalGateCommand: "npm run release:external-check",
+    prerequisiteCommand: "npm run release:check"
+  });
 
   nextActionsReport = {
     appName,
@@ -1261,6 +1392,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     currentFocus,
     ...currentActionSummary,
     ...completionGap,
+    ...doctorCompletionGap,
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
     externalDistributionReady: externalPreflight.externalDistributionReady === true,
@@ -1386,6 +1518,48 @@ check(
 );
 check(nextActionsReport.completionGapClaimedExternalDistribution === false, "external next actions completion gap should not claim external distribution");
 check(nextActionsReport.completionGapValueRecorded === false, "external next actions completion gap should not record values");
+check(nextActionsReport.doctorCompletionGapSourceArtifact === "Release doctor", "external next actions should identify the release doctor completion gap source");
+check(typeof nextActionsReport.doctorCompletionGapSourcePath === "string" && nextActionsReport.doctorCompletionGapSourcePath.length > 0, "external next actions should include the release doctor completion gap source path");
+check(typeof nextActionsReport.doctorCompletionGapSourceReady === "boolean", "external next actions should include release doctor completion gap source readiness");
+check(typeof nextActionsReport.doctorCompletionGapDoctorReportReady === "boolean", "external next actions should include release doctor report readiness");
+check(typeof nextActionsReport.doctorCompletionGapStatus === "string" && nextActionsReport.doctorCompletionGapStatus.length > 0, "external next actions should include the release doctor completion gap status");
+check(typeof nextActionsReport.doctorCompletionGapSummary === "string" && nextActionsReport.doctorCompletionGapSummary.length > 0, "external next actions should include the release doctor completion gap summary");
+check(
+  typeof nextActionsReport.doctorCompletionGapCompletionStage === "string" && nextActionsReport.doctorCompletionGapCompletionStage.length > 0,
+  "external next actions should include the release doctor completion gap completion stage"
+);
+check(
+  typeof nextActionsReport.doctorCompletionGapProofTarget === "string" && nextActionsReport.doctorCompletionGapProofTarget.length > 0,
+  "external next actions should include the release doctor completion gap proof target"
+);
+check(
+  typeof nextActionsReport.doctorCompletionGapNextProofCommand === "string" && nextActionsReport.doctorCompletionGapNextProofCommand.length > 0,
+  "external next actions should include the release doctor completion gap next proof command"
+);
+check(
+  nextActionsReport.doctorCompletionGapHardGateCommand === nextActionsReport.hardExternalGateCommand,
+  "external next actions release doctor completion gap should keep the hard gate command"
+);
+check(
+  typeof nextActionsReport.doctorCompletionGapFirstBlocker === "string" && nextActionsReport.doctorCompletionGapFirstBlocker.length > 0,
+  "external next actions should include the release doctor completion gap first blocker"
+);
+check(Array.isArray(nextActionsReport.doctorCompletionGapClaimBlockers), "external next actions should include release doctor completion gap claim blockers");
+check(
+  nextActionsReport.doctorCompletionGapClaimBlockerCount === nextActionsReport.doctorCompletionGapClaimBlockers.length,
+  "external next actions release doctor completion gap blocker count should match listed blockers"
+);
+check(
+  typeof nextActionsReport.doctorCompletionGapClaimBlockerSummary === "string" && nextActionsReport.doctorCompletionGapClaimBlockerSummary.length > 0,
+  "external next actions should include the release doctor completion gap blocker summary"
+);
+check(nextActionsReport.doctorCompletionGapClaimedExternalDistribution === false, "external next actions release doctor completion gap should not claim external distribution");
+check(nextActionsReport.doctorCompletionGapValueRecorded === false, "external next actions release doctor completion gap should not record values");
+check(nextActionsReport.doctorCompletionGapSourceValueRecorded === false, "external next actions release doctor completion gap source should not record values");
+check(
+  nextActionsReport.doctorCompletionGapSourceClaimedExternalDistribution === false,
+  "external next actions release doctor completion gap source should not claim external distribution"
+);
 check(typeof nextActionsReport.currentPrerequisiteCommand === "string" && nextActionsReport.currentPrerequisiteCommand.length > 0, "external next actions should include the current prerequisite command");
 check(typeof nextActionsReport.currentOperatorAction === "string" && nextActionsReport.currentOperatorAction.length > 0, "external next actions should include the current operator action");
 check(typeof nextActionsReport.currentRerunCommand === "string" && nextActionsReport.currentRerunCommand.length > 0, "external next actions should include the current rerun command");
@@ -1608,7 +1782,12 @@ check(markdown.includes("Current rerun commands:"), "external next actions Markd
 check(markdown.includes("Current command sequence:"), "external next actions Markdown should include current command sequence status");
 check(markdown.includes("## Current Command Sequence"), "external next actions Markdown should include current command sequence section");
 if (nextActionsReport.bootstrapMode === true) {
+  const releaseDoctorArtifactPresent = nextActionsReport.sourceArtifacts.some((item) => item.label === "Release doctor" && item.present === true);
   check(nextActionsReport.sourceEvidenceReady === false, "bootstrap external next actions should report missing source evidence");
+  check(
+    nextActionsReport.doctorCompletionGapSourceReady === releaseDoctorArtifactPresent,
+    "bootstrap external next actions should match release doctor completion gap source readiness to the release doctor artifact"
+  );
   check(nextActionsReport.localReleaseReady === false, "bootstrap external next actions should not claim local release readiness");
   check(nextActionsReport.localReleaseReadinessPercent === 0, "bootstrap external next actions should report zero local release readiness");
   check(nextActionsReport.currentFocus === "Regenerate local release evidence", "bootstrap external next actions should focus on regenerating evidence");
@@ -1620,6 +1799,8 @@ if (nextActionsReport.bootstrapMode === true) {
 } else {
   check(nextActionsReport.sourceArtifacts.every((item) => item.present), "external next actions should cite generated source artifacts");
   check(nextActionsReport.sourceEvidenceReady === true, "external next actions should report source evidence readiness");
+  check(nextActionsReport.doctorCompletionGapSourceReady === true, "external next actions should report ready release doctor completion gap source evidence");
+  check(nextActionsReport.doctorCompletionGapDoctorReportReady === true, "external next actions should report ready release doctor evidence");
   check(nextActionsReport.localReleaseReady === true, "external next actions should include local release readiness");
   check(nextActionsReport.localReleaseReadinessPercent === 100, "external next actions should report 100 percent local release readiness");
 }
@@ -2089,6 +2270,13 @@ if (nextActionsReport.currentEvidenceRowsCount > 0) {
 }
 check(markdown.includes("Priority Next Actions"), "external next actions Markdown should include priority actions");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "external next actions Markdown should keep the hard gate command");
+check(markdown.includes("Doctor completion gap status:"), "external next actions Markdown should include release doctor completion gap status");
+check(markdown.includes("Doctor completion gap proof target:"), "external next actions Markdown should include release doctor completion gap proof target");
+check(markdown.includes("Doctor completion gap next proof command:"), "external next actions Markdown should include release doctor completion gap next proof command");
+check(markdown.includes("Doctor completion gap hard gate command:"), "external next actions Markdown should include release doctor completion gap hard gate command");
+check(markdown.includes("Doctor completion gap claim blockers:"), "external next actions Markdown should include release doctor completion gap claim blocker count");
+check(markdown.includes("## Release Doctor Completion Gap"), "external next actions Markdown should include release doctor completion gap section");
+check(markdown.includes("External distribution claimed by release doctor: no"), "external next actions Markdown should state release doctor completion gap does not claim distribution");
 check(markdown.includes("Private values recorded: no"), "external next actions Markdown should state value redaction");
 check(!/https?:\/\//i.test(markdown), "external next actions Markdown should not include public or private URL values");
 check(!/https?:\/\//i.test(serializedReport), "external next actions JSON should not include public or private URL values");
@@ -2115,6 +2303,13 @@ console.log(`- Completion gap proof target: ${nextActionsReport.completionGapCur
 console.log(`- Completion gap next proof command: ${nextActionsReport.completionGapNextProofCommand}`);
 console.log(`- Completion gap hard gate command: ${nextActionsReport.completionGapHardGateCommand}`);
 console.log(`- Completion gap claim blockers: ${nextActionsReport.completionGapClaimBlockerCount} (${nextActionsReport.completionGapClaimBlockerSummary})`);
+console.log(`- Doctor completion gap source ready: ${nextActionsReport.doctorCompletionGapSourceReady ? "yes" : "no"}`);
+console.log(`- Doctor completion gap status: ${nextActionsReport.doctorCompletionGapStatus}`);
+console.log(`- Doctor completion gap summary: ${nextActionsReport.doctorCompletionGapSummary}`);
+console.log(`- Doctor completion gap proof target: ${nextActionsReport.doctorCompletionGapProofTarget}`);
+console.log(`- Doctor completion gap next proof command: ${nextActionsReport.doctorCompletionGapNextProofCommand}`);
+console.log(`- Doctor completion gap hard gate command: ${nextActionsReport.doctorCompletionGapHardGateCommand}`);
+console.log(`- Doctor completion gap claim blockers: ${nextActionsReport.doctorCompletionGapClaimBlockerCount} (${nextActionsReport.doctorCompletionGapClaimBlockerSummary})`);
 console.log(`- Current required keys: ${nextActionsReport.currentRequiredKeyCount} (${nextActionsReport.currentRequiredKeySummary})`);
 console.log(`- Current placeholder keys: ${nextActionsReport.currentPlaceholderKeyCount} (${nextActionsReport.currentPlaceholderKeySummary})`);
 console.log(`- Current placeholder edit locations: ${nextActionsReport.currentPlaceholderEditLocationCount} (${nextActionsReport.currentPlaceholderEditLocationSummary})`);
