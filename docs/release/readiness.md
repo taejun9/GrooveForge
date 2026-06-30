@@ -82,6 +82,12 @@ Run the value-free post-edit proof bundle when the operator wants one receipt th
 npm run release:post-edit-proof-bundle
 ```
 
+Run the value-free final release handoff when the operator wants one compact receipt for the remaining private release-channel edit rows, post-edit proof order, hard-gate boundary, completion percentage, and current 10-plan cadence:
+
+```sh
+npm run release:final-handoff
+```
+
 Rerun the fast redacted external preflight after editing the ignored local env file:
 
 ```sh
@@ -117,6 +123,8 @@ npm run release:proof-bundle
 `release:post-edit-proof-success-smoke` writes ignored `release-post-edit-proof-success-smoke` Markdown/JSON artifacts from synthetic ready evidence. It proves the post-edit proof ready branch with four current-ready metadata rows, zero placeholder keys, the same live-check/current-blocker command order, no real local env read or modification, no URL/channel values, no remote probes, and no external distribution claim.
 
 `release:post-edit-proof-bundle` runs the synthetic success rehearsal first and the real post-edit proof second, then writes ignored `release-post-edit-proof-bundle` Markdown/JSON artifacts that record bundle command order, success-branch coverage, current real release-channel readiness/blocker posture, current 10-plan progress, source artifacts, and not-recorded/not-claimed posture. It records no URL/channel values, does not probe remote channels, and makes no external distribution claim.
+
+`release:final-handoff` refreshes `release:post-edit-proof-bundle`, then writes ignored `release-final-handoff` Markdown/JSON artifacts that record source artifacts, final handoff command rows, current private edit rows, release-channel post-edit operator receipt rows, post-edit proof sequence rows, hard-gate boundary, user-facing completion percentage, and 10-plan report cadence without recording URL/channel values, probing remote channels, or claiming external distribution.
 
 `release:doctor` runs targeted redacted distribution input/readiness smokes, reads the generated env-template, prepare-env, update-feed, Developer ID readiness, manual QA, distribution-channel QA, and private-input summaries, then writes a compact release doctor Markdown/JSON report under ignored `build/desktop/` without running the full release gate, recording private values, probing remote channels, signing artifacts, submitting to Apple, or claiming external distribution completion. It mirrors the distribution private-inputs release-channel focus receipt so the four current metadata keys show receipt readiness, current-ready count, placeholder count, proof command, rerun command, and value-recording posture. When release-channel placeholders remain, it keeps `npm run release:doctor` as the next proof command and lists `npm run release:current-blocker` as the refresh rerun after ignored env edits.
 
