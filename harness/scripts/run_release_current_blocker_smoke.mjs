@@ -432,6 +432,15 @@ function formatCurrentActionAcceptanceRemediationRows(rows) {
     .join("\n");
 }
 
+function formatCurrentReleaseChannelKeyRemediationRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no | none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.key)} | ${row.placeholder ? "yes" : "no"} | ${escapeCell(row.location)} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.acceptanceCriteriaImpacted)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.rerunCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatCurrentActionPostEditVerificationRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | no | none | none | none | none | none | none | no |";
@@ -743,6 +752,47 @@ function currentActionAcceptanceRemediationRows({
         valueRecorded: false
       };
     });
+}
+
+function currentReleaseChannelKeyRemediationRows({
+  currentRequiredKeys,
+  currentPlaceholderEditLocations,
+  currentInputShapeChecklistRows,
+  acceptanceRows,
+  currentNextCommand,
+  currentRerunCommand,
+  hardGateCommand
+}) {
+  const locationByKey = new Map(valueFreeObjectRows(currentPlaceholderEditLocations).map((row) => [textValue(row.key), row]));
+  const shapeByKey = new Map(valueFreeObjectRows(currentInputShapeChecklistRows).map((row) => [textValue(row.key), row]));
+  const acceptanceCriteria = valueFreeObjectRows(acceptanceRows)
+    .filter((row) => row.ready !== true)
+    .map((row) => textValue(row.criterion))
+    .join("; ");
+  const acceptanceSourceFields = [
+    "currentActionAcceptanceRows",
+    "currentActionAcceptanceBlockerRows",
+    "currentActionAcceptanceRemediationRows"
+  ].join("; ");
+
+  return stringArrayValue(currentRequiredKeys).map((key, index) => {
+    const locationRow = locationByKey.get(key) ?? {};
+    const shapeRow = shapeByKey.get(key) ?? {};
+    return {
+      order: index + 1,
+      key,
+      location: textValue(locationRow.location, textValue(locationRow.file) !== "none" && Number.isInteger(locationRow.line) ? `${locationRow.file}:${locationRow.line}` : "none"),
+      placeholder: locationRow.placeholder === true,
+      expectedShape: textValue(shapeRow.expectedShape, "shape evidence pending"),
+      evidenceSource: `${textValue(locationRow.location, "missing location")}; ${textValue(shapeRow.evidenceSource, "missing shape evidence")}`,
+      acceptanceCriteriaImpacted: acceptanceCriteria || "none",
+      acceptanceSourceFields,
+      proofCommand: currentNextCommand,
+      rerunCommand: currentRerunCommand,
+      hardGateCommand,
+      valueRecorded: false
+    };
+  });
 }
 
 function currentActionPostEditVerificationRows({ acceptanceRows, currentNextCommand, currentRerunCommand, hardGateCommand }) {
@@ -1330,6 +1380,15 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentRerunCommand,
     hardGateCommand
   });
+  const keyRemediationRows = currentReleaseChannelKeyRemediationRows({
+    currentRequiredKeys: proofRequiredKeys,
+    currentPlaceholderEditLocations: proofPlaceholderLocations,
+    currentInputShapeChecklistRows: inputShapeRows,
+    acceptanceRows,
+    currentNextCommand,
+    currentRerunCommand,
+    hardGateCommand
+  });
   const consistencyRows = [
     {
       check: "Doctor/proof/gate/progress next command consensus",
@@ -1552,6 +1611,16 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
         ? `${acceptanceRemediationRows.length} value-free current action acceptance remediation rows`
         : "none",
     currentActionAcceptanceRemediationRows: acceptanceRemediationRows,
+    currentReleaseChannelKeyRemediationReady:
+      keyRemediationRows.length === releaseChannelMetadataKeys.length &&
+      sameStringArray(keyRemediationRows.map((row) => row.key), releaseChannelMetadataKeys) &&
+      keyRemediationRows.every((row) => row.valueRecorded === false && row.proofCommand === currentNextCommand && row.rerunCommand === currentRerunCommand && row.hardGateCommand === hardGateCommand),
+    currentReleaseChannelKeyRemediationRowCount: keyRemediationRows.length,
+    currentReleaseChannelKeyRemediationSummary:
+      keyRemediationRows.length > 0
+        ? `${keyRemediationRows.length} value-free release-channel key remediation rows`
+        : "none",
+    currentReleaseChannelKeyRemediationRows: keyRemediationRows,
     currentActionPostEditVerificationReady:
       postEditVerificationRows.length === acceptanceRows.length &&
       postEditVerificationRows.every((row) => row.valueRecorded === false) &&
@@ -1927,6 +1996,23 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentActionAcceptanceRemediationRows.some((row) => /input shape checklist/i.test(row.evidenceToCheck)), "release current blocker current action acceptance remediation should reference input shape checklist");
   check(report.currentActionAcceptanceRemediationRows.some((row) => /local env diagnostics/i.test(row.evidenceToCheck)), "release current blocker current action acceptance remediation should reference local env diagnostics");
   check(report.currentActionAcceptanceRemediationRows.some((row) => /distribution-channel-qa/i.test(row.operatorFix)), "release current blocker current action acceptance remediation should include distribution-channel QA rerun");
+  check(report.currentReleaseChannelKeyRemediationReady === true, "release current blocker release-channel key remediation matrix should be ready");
+  check(report.currentReleaseChannelKeyRemediationRowCount === report.currentReleaseChannelKeyRemediationRows.length, "release current blocker release-channel key remediation row count should match rows");
+  check(report.currentReleaseChannelKeyRemediationRowCount === releaseChannelMetadataKeys.length, "release current blocker release-channel key remediation should include four rows");
+  check(sameStringArray(report.currentReleaseChannelKeyRemediationRows.map((row) => row.key), releaseChannelMetadataKeys), "release current blocker release-channel key remediation should cover release-channel metadata keys");
+  check(typeof report.currentReleaseChannelKeyRemediationSummary === "string" && report.currentReleaseChannelKeyRemediationSummary.length > 0, "release current blocker should include release-channel key remediation summary");
+  check(report.currentReleaseChannelKeyRemediationRows.every((row) => row.valueRecorded === false), "release current blocker release-channel key remediation rows should not record values");
+  check(report.currentReleaseChannelKeyRemediationRows.every((row) => row.proofCommand === report.currentNextCommand), "release current blocker release-channel key remediation proof commands should match current next command");
+  check(report.currentReleaseChannelKeyRemediationRows.every((row) => row.rerunCommand === report.currentRerunCommand), "release current blocker release-channel key remediation rerun commands should match current rerun command");
+  check(report.currentReleaseChannelKeyRemediationRows.every((row) => row.hardGateCommand === report.hardGateCommand), "release current blocker release-channel key remediation hard-gate commands should match hard gate command");
+  check(report.currentReleaseChannelKeyRemediationRows.every((row) => typeof row.location === "string" && row.location.includes(".env.distribution.local:")), "release current blocker release-channel key remediation rows should include local env edit locations");
+  check(report.currentReleaseChannelKeyRemediationRows.every((row) => typeof row.expectedShape === "string" && /allowed channel token|safe HTTPS URL shape/i.test(row.expectedShape)), "release current blocker release-channel key remediation rows should include expected shapes");
+  check(report.currentReleaseChannelKeyRemediationRows.every((row) => /without placeholder values/i.test(row.acceptanceCriteriaImpacted)), "release current blocker release-channel key remediation rows should include placeholder-free acceptance impact");
+  check(report.currentReleaseChannelKeyRemediationRows.every((row) => /private-inputs/i.test(row.acceptanceCriteriaImpacted)), "release current blocker release-channel key remediation rows should include private-inputs acceptance impact");
+  check(report.currentReleaseChannelKeyRemediationRows.every((row) => /Distribution-channel QA/i.test(row.acceptanceCriteriaImpacted)), "release current blocker release-channel key remediation rows should include distribution-channel QA acceptance impact");
+  if (report.currentPlaceholderKeyCount > 0) {
+    check(report.currentReleaseChannelKeyRemediationRows.every((row) => row.placeholder === true), "release current blocker release-channel key remediation rows should mark current placeholders while blocked");
+  }
   check(report.currentActionPostEditVerificationReady === true, "release current blocker current action post-edit verification should be ready");
   check(report.currentActionPostEditVerificationRowCount === report.currentActionPostEditVerificationRows.length, "release current blocker current action post-edit verification row count should match rows");
   check(report.currentActionPostEditVerificationRowCount === report.currentActionAcceptanceRowCount, "release current blocker current action post-edit verification rows should mirror acceptance rows");
@@ -2168,6 +2254,8 @@ function buildMarkdown(report) {
     `- Current action acceptance aligned: ${report.currentActionAcceptanceMatchesCurrentAction ? "yes" : "no"}`,
     `- Current action acceptance remediation ready: ${report.currentActionAcceptanceRemediationReady ? "yes" : "no"}`,
     `- Current action acceptance remediation rows: ${report.currentActionAcceptanceRemediationRowCount} (${report.currentActionAcceptanceRemediationSummary})`,
+    `- Release-channel key remediation ready: ${report.currentReleaseChannelKeyRemediationReady ? "yes" : "no"}`,
+    `- Release-channel key remediation rows: ${report.currentReleaseChannelKeyRemediationRowCount} (${report.currentReleaseChannelKeyRemediationSummary})`,
     `- Current action post-edit verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`,
     `- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`,
     `- Current action post-edit signals currently ready: ${report.currentActionPostEditVerificationCurrentSummary}`,
@@ -2382,6 +2470,15 @@ function buildMarkdown(report) {
     "|---:|---|---|---|---|---|---|---:|",
     formatCurrentActionAcceptanceRemediationRows(report.currentActionAcceptanceRemediationRows),
     "",
+    "## Current Release-Channel Key Remediation Matrix",
+    "",
+    `- Key remediation ready: ${report.currentReleaseChannelKeyRemediationReady ? "yes" : "no"}`,
+    `- Key remediation rows: ${report.currentReleaseChannelKeyRemediationRowCount} (${report.currentReleaseChannelKeyRemediationSummary})`,
+    "",
+    "| order | key | placeholder | location | expected shape | acceptance criteria impacted | proof command | rerun command | value recorded |",
+    "|---:|---|---:|---|---|---|---|---|---:|",
+    formatCurrentReleaseChannelKeyRemediationRows(report.currentReleaseChannelKeyRemediationRows),
+    "",
     "## Current Action Post-Edit Verification",
     "",
     `- Verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`,
@@ -2537,6 +2634,8 @@ check(markdown.includes("Current Action Acceptance Blockers"), "release current 
 check(markdown.includes("Blockers match acceptance:"), "release current blocker Markdown should include current action acceptance blocker alignment");
 check(markdown.includes("Current Action Acceptance Remediation"), "release current blocker Markdown should include current action acceptance remediation");
 check(markdown.includes("Current action acceptance remediation ready:"), "release current blocker Markdown should include current action acceptance remediation readiness");
+check(markdown.includes("Current Release-Channel Key Remediation Matrix"), "release current blocker Markdown should include release-channel key remediation matrix");
+check(markdown.includes("Release-channel key remediation ready:"), "release current blocker Markdown should include release-channel key remediation readiness");
 check(markdown.includes("Current Action Post-Edit Verification"), "release current blocker Markdown should include current action post-edit verification");
 check(markdown.includes("Current action post-edit verification ready:"), "release current blocker Markdown should include current action post-edit verification readiness");
 check(markdown.includes("Current Action Handoff Package"), "release current blocker Markdown should include current action handoff package");
@@ -2596,6 +2695,8 @@ console.log(`- Current action acceptance rows: ${report.currentActionAcceptanceR
 console.log(`- Current action acceptance blockers: ${report.currentActionAcceptanceBlockerCount} (${report.currentActionAcceptanceBlockerSummary})`);
 console.log(`- Current action acceptance remediation ready: ${report.currentActionAcceptanceRemediationReady ? "yes" : "no"}`);
 console.log(`- Current action acceptance remediation rows: ${report.currentActionAcceptanceRemediationRowCount} (${report.currentActionAcceptanceRemediationSummary})`);
+console.log(`- Release-channel key remediation ready: ${report.currentReleaseChannelKeyRemediationReady ? "yes" : "no"}`);
+console.log(`- Release-channel key remediation rows: ${report.currentReleaseChannelKeyRemediationRowCount} (${report.currentReleaseChannelKeyRemediationSummary})`);
 console.log(`- Current action post-edit verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`);
 console.log(`- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`);
 console.log(`- Current action handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`);
