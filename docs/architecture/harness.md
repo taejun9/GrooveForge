@@ -128,6 +128,7 @@ npm run release:final-handoff
 npm run release:final-handoff-success-redaction-smoke
 npm run release:final-handoff-refresh-smoke
 npm run release:audience-completion-handoff-smoke
+npm run release:completion-report-packet-smoke
 npm run release:channel-clearance-transition-smoke
 npm run release:auto-update-transition-smoke
 npm run release:update-feed-live-check
@@ -149,6 +150,8 @@ These commands validate the base structure, documentation rules, first-run React
 `npm run release:channel-clearance-transition-smoke` refreshes the final-handoff success-redaction smoke and the real current-blocker receipt, then writes ignored release-channel-clearance-transition-smoke Markdown/JSON artifacts that connect synthetic clearance, the real release-channel metadata blocker, the auto-update-feed next priority action, the hard-gate boundary, and the current 10-plan progress without recording URL/channel/private values or claiming external distribution. It validates that the synthetic strict-ready proof shows four ready release-channel rows and zero placeholders, the real current blocker still has the four release-channel metadata placeholders, `auto-update-feed` remains the next operator focus with `npm run desktop:auto-update-readiness-smoke`, and `npm run release:external-check` remains the hard gate.
 
 `npm run release:channel-edit-packet-smoke` refreshes release doctor and release-channel live-check evidence, then writes ignored release-channel-edit-packet-smoke Markdown/JSON artifacts with the current edit packet mode, ignored env edit target, four release-channel metadata rows, key shape guidance, placeholder locations when present, operator command order, hard-gate boundary, current 10-plan progress, completion percentage, and non-claim posture without URL/channel/private values.
+
+`npm run release:completion-report-packet-smoke` refreshes audience completion handoff evidence and release-channel edit packet evidence in one sequence, then writes ignored release-completion-report-packet-smoke Markdown/JSON artifacts with matched latest 10-plan labels, beginner/professional producer readiness, direct composition, all-genre coverage, local package durability, current release-channel edit packet mode, completion percentage, remaining percentage, and external/private blocker posture without recording values or claiming external distribution.
 
 `npm run release:auto-update-transition-smoke` refreshes the release-channel clearance transition, update feed config smoke, and real auto-update readiness smoke, then writes ignored release-auto-update-transition-smoke Markdown/JSON artifacts that connect `auto-update-feed`, the synthetic feed/channel config ready branch, real auto-update blocker rows, signed-update artifact readiness, the hard-gate boundary, and current 10-plan progress without recording feed/channel/private values or claiming auto-update or external distribution. It validates that the synthetic feed/channel config is ready and redacted, the real auto-update readiness remains blocked, `npm run desktop:auto-update-readiness-smoke` remains the proof command, and `npm run release:external-check` remains the hard gate.
 
