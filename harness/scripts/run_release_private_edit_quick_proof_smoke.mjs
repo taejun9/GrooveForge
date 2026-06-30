@@ -21,6 +21,8 @@ const quickProofJsonPath = path.join(packageRoot, `${appName}-${packageJson.vers
 const liveCheckJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-live-check.json`);
 const currentBlockerJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`);
 const failures = [];
+const recommendedOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const recommendedStrictFirstProofCommand = "npm run release:channel-live-check-strict";
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
@@ -136,7 +138,7 @@ function currentKeyRows(liveCheck) {
     placeholder: row.placeholder === true,
     shapeReady: row.shapeReady === true,
     currentReady: row.currentReady === true,
-    proofCommand: "npm run release:channel-live-check-strict",
+    proofCommand: recommendedStrictFirstProofCommand,
     rerunCommand: "npm run release:private-edit-quick-proof",
     valueRecorded: false
   }));
@@ -159,30 +161,36 @@ function buildReport({ liveCheck, currentBlocker, refreshRows }) {
     },
     {
       order: 2,
+      command: recommendedOperatorProofCommand,
+      role: "recommended one-command proof chain after replacing the four private release-channel placeholders",
+      valueRecorded: false
+    },
+    {
+      order: 3,
       command: "npm run release:channel-live-check",
       role: "value-free shape/location check that passes while reporting any remaining blocker",
       valueRecorded: false
     },
     {
-      order: 3,
-      command: "npm run release:channel-live-check-strict",
+      order: 4,
+      command: recommendedStrictFirstProofCommand,
       role: "pass/fail proof for the four release-channel keys after private edits",
       valueRecorded: false
     },
     {
-      order: 4,
+      order: 5,
       command: "npm run release:post-edit-proof",
       role: "refresh live-check and current-blocker proof after the private edit",
       valueRecorded: false
     },
     {
-      order: 5,
+      order: 6,
       command: "npm run release:progress-refresh-smoke",
       role: "refresh user-facing completion and 10-plan progress receipts",
       valueRecorded: false
     },
     {
-      order: 6,
+      order: 7,
       command: "npm run release:external-check",
       role: "hard gate after every private and external proof is ready",
       valueRecorded: false
@@ -221,7 +229,10 @@ function buildReport({ liveCheck, currentBlocker, refreshRows }) {
     privateEditQuickProofCurrentAction: textValue(currentBlocker.currentExternalCompletionChecklistRow?.label, "Release channel metadata"),
     privateEditQuickProofCurrentFirstBlocker: textValue(currentBlocker.currentFirstBlocker),
     privateEditQuickProofCurrentNextCommand: textValue(currentBlocker.currentNextCommand, "npm run release:doctor"),
-    privateEditQuickProofRecommendedFirstProofCommand: "npm run release:channel-live-check-strict",
+    privateEditQuickProofRecommendedOperatorProofCommand: recommendedOperatorProofCommand,
+    privateEditQuickProofRecommendedOperatorProofRole:
+      "run the strict release-channel proof first, then refresh post-edit and progress evidence only after strict proof passes",
+    privateEditQuickProofRecommendedFirstProofCommand: recommendedStrictFirstProofCommand,
     privateEditQuickProofRerunCommand: "npm run release:private-edit-quick-proof",
     currentEnvEditTarget: textValue(liveCheck.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: releaseChannelMetadataKeys.length,
@@ -277,6 +288,8 @@ function buildMarkdown(report) {
 - Source mode: ${report.sourceMode}
 - Current target: ${report.privateEditQuickProofCurrentTarget}
 - Current blocker: ${report.privateEditQuickProofCurrentFirstBlocker}
+- Recommended operator proof after edit: \`${report.privateEditQuickProofRecommendedOperatorProofCommand}\`
+- Recommended operator proof role: ${report.privateEditQuickProofRecommendedOperatorProofRole}
 - Recommended first proof after edit: \`${report.privateEditQuickProofRecommendedFirstProofCommand}\`
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current ready rows: ${report.currentReadyCount}/${report.currentRowCount}
@@ -359,10 +372,13 @@ check(report.currentRequiredKeyCount === 4, "release private edit quick proof sh
 check(report.currentRowCount === 4, "release private edit quick proof should include four current key rows");
 check(releaseChannelMetadataKeys.every((key) => report.currentRequiredKeys.includes(key)), "release private edit quick proof should cover release-channel metadata keys");
 check(report.currentKeyRows.every((row) => row.valueRecorded === false), "release private edit quick proof key rows should not record values");
-check(report.currentKeyRows.every((row) => row.proofCommand === "npm run release:channel-live-check-strict"), "release private edit quick proof should make strict live-check the key proof");
+check(report.currentKeyRows.every((row) => row.proofCommand === recommendedStrictFirstProofCommand), "release private edit quick proof should make strict live-check the key proof");
 check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release private edit quick proof placeholder key count should match listed keys");
-check(report.operatorProofCommandRowCount === 6, "release private edit quick proof should include six operator proof rows");
-check(report.operatorProofCommandRows.some((row) => row.command === "npm run release:channel-live-check-strict"), "release private edit quick proof should include strict live-check guidance");
+check(report.privateEditQuickProofRecommendedOperatorProofCommand === recommendedOperatorProofCommand, "release private edit quick proof should recommend the strict proof chain operator command");
+check(report.privateEditQuickProofRecommendedFirstProofCommand === recommendedStrictFirstProofCommand, "release private edit quick proof should preserve the strict first proof command");
+check(report.operatorProofCommandRowCount === 7, "release private edit quick proof should include seven operator proof rows");
+check(report.operatorProofCommandRows.some((row) => row.command === recommendedOperatorProofCommand), "release private edit quick proof should include strict proof chain guidance");
+check(report.operatorProofCommandRows.some((row) => row.command === recommendedStrictFirstProofCommand), "release private edit quick proof should include strict live-check guidance");
 check(report.operatorProofCommandRows.some((row) => row.command === "npm run release:post-edit-proof"), "release private edit quick proof should include post-edit proof guidance");
 check(report.operatorProofCommandRows.some((row) => row.command === "npm run release:progress-refresh-smoke"), "release private edit quick proof should include progress refresh guidance");
 check(report.refreshCommandRowCount === 2, "release private edit quick proof should include two refresh rows");
@@ -380,6 +396,7 @@ check(report.claimedExternalDistribution === false, "release private edit quick 
 check(!/https?:\/\//i.test(JSON.stringify(report)), "release private edit quick proof JSON should not include URL values");
 check(!/https?:\/\//i.test(markdown), "release private edit quick proof Markdown should not include URL values");
 check(markdown.includes("Release Private Edit Quick Proof"), "release private edit quick proof Markdown should include title");
+check(markdown.includes("Recommended operator proof after edit"), "release private edit quick proof Markdown should include operator proof guidance");
 check(markdown.includes("Recommended first proof after edit"), "release private edit quick proof Markdown should include first proof guidance");
 check(markdown.includes("Current Keys"), "release private edit quick proof Markdown should include current keys");
 check(markdown.includes("Operator Proof Commands"), "release private edit quick proof Markdown should include operator proof commands");
@@ -402,6 +419,7 @@ console.log(`- Receipt ready: ${report.privateEditQuickProofReceiptReady ? "yes"
 console.log(`- Private edit proof ready: ${report.privateEditQuickProofReady ? "yes" : "no"}`);
 console.log(`- Current target: ${report.privateEditQuickProofCurrentTarget}`);
 console.log(`- Current blocker: ${report.privateEditQuickProofCurrentFirstBlocker}`);
+console.log(`- Recommended operator proof after edit: ${report.privateEditQuickProofRecommendedOperatorProofCommand}`);
 console.log(`- Recommended first proof after edit: ${report.privateEditQuickProofRecommendedFirstProofCommand}`);
 console.log(`- Current ready rows: ${report.currentReadyCount}/${report.currentRowCount}`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount}`);

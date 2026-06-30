@@ -23,6 +23,7 @@ const releaseProgressMarkdownPath = path.join(packageRoot, `${appName}-${package
 const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.json`);
 const failures = [];
 const fromExisting = process.argv.includes("--from-existing");
+const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
 
 function check(condition, message) {
   if (!condition) {
@@ -1027,6 +1028,10 @@ function buildReleaseChannelLiveCheckSummary(releaseChannelLiveCheck) {
     releaseChannelFirstProofCommandRole:
       "first value-free release-channel metadata check after ignored local env edits",
     releaseChannelFirstProofCommandValueRecorded: false,
+    releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits: recommendedPrivateEditOperatorProofCommand,
+    releaseChannelRecommendedOperatorProofCommandRole:
+      "recommended strict-first proof chain after replacing the four private release-channel placeholders",
+    releaseChannelRecommendedOperatorProofCommandValueRecorded: false,
     releaseChannelLiveCheckRefreshedByThisReport: true,
     releaseChannelLiveCheckReady: releaseChannelLiveCheck.releaseChannelLiveCheckReady === true,
     releaseChannelLiveCheckCurrentReadyCount: integerValue(releaseChannelLiveCheck.releaseChannelLiveCheckCurrentReadyCount),
@@ -1192,6 +1197,7 @@ function buildMarkdown(report) {
 - Release-channel live-check current-ready rows: ${report.releaseChannelLiveCheckCurrentReadyCount}/${report.releaseChannelLiveCheckRowCount}
 - Release-channel live-check placeholder keys: ${report.releaseChannelLiveCheckCurrentPlaceholderKeyCount}
 - Release-channel first proof after private edits: \`${report.releaseChannelFirstProofCommandAfterPrivateEdits}\`
+- Release-channel recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits}\`
 - Release-channel post-edit receipt ready: ${report.releaseChannelPostEditReceiptReady ? "yes" : "no"}
 - Release-channel post-edit receipt rows: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary})
 - Release-channel post-edit current-ready rows: ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}
@@ -1240,7 +1246,7 @@ function buildMarkdown(report) {
 - Completion status wording: ${report.userFacingCompletionStatus}
 - Completion evidence summary: ${report.userFacingCompletionEvidenceSummary}
 - Release-channel unblock rehearsal to report: ${report.releaseChannelUnblockSmokeReady ? "ready" : "blocked"}; placeholder blocker cleared: ${report.releaseChannelUnblockPlaceholderBlockerCleared ? "yes" : "no"}
-- Release-channel live-check to report: ${report.releaseChannelLiveCheckCurrentReadyCount}/${report.releaseChannelLiveCheckRowCount} current-ready rows; placeholders ${report.releaseChannelLiveCheckCurrentPlaceholderKeyCount}; command ${report.releaseChannelLiveCheckCommand}; first proof after private edits ${report.releaseChannelFirstProofCommandAfterPrivateEdits}
+- Release-channel live-check to report: ${report.releaseChannelLiveCheckCurrentReadyCount}/${report.releaseChannelLiveCheckRowCount} current-ready rows; placeholders ${report.releaseChannelLiveCheckCurrentPlaceholderKeyCount}; command ${report.releaseChannelLiveCheckCommand}; first proof after private edits ${report.releaseChannelFirstProofCommandAfterPrivateEdits}; recommended operator proof chain ${report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits}
 - Release-channel post-edit receipt to report: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary}); current-ready rows ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}
 - Release-channel post-edit operator receipt to report: ${report.releaseChannelPostEditOperatorReceiptRowCount} (${report.releaseChannelPostEditOperatorReceiptSummary}); proof ${report.releaseChannelPostEditOperatorReceiptProofCommand}; blocker refresh ${report.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand}
 - Post-edit proof sequence to report: ${report.postEditProofSequenceReceiptRowCount} (${report.postEditProofSequenceReceiptSummary}); next commands ${report.postEditProofSequenceReceiptDoctorCommand}, ${report.postEditProofSequenceReceiptCurrentBlockerCommand}, ${report.postEditProofSequenceReceiptNextActionsCommand}, ${report.postEditProofSequenceReceiptProofBundleCommand}, ${report.postEditProofSequenceReceiptProgressCommand}
@@ -1359,6 +1365,8 @@ ${formatReleaseChannelUnblockRows(report.releaseChannelUnblockMetadataRows)}
 - Command: \`${report.releaseChannelLiveCheckCommand}\`
 - First proof after private edits: \`${report.releaseChannelFirstProofCommandAfterPrivateEdits}\`
 - First proof role: ${report.releaseChannelFirstProofCommandRole}
+- Recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits}\`
+- Recommended operator proof role: ${report.releaseChannelRecommendedOperatorProofCommandRole}
 - Live-check ready: ${report.releaseChannelLiveCheckReady ? "yes" : "no"}
 - Current-ready rows: ${report.releaseChannelLiveCheckCurrentReadyCount}/${report.releaseChannelLiveCheckRowCount}
 - Current env edit target: ${report.releaseChannelLiveCheckCurrentEnvEditTarget}
@@ -1892,6 +1900,10 @@ check(releaseProgressReport.releaseChannelFirstProofCommandAfterPrivateEdits ===
 check(releaseProgressReport.releaseChannelFirstProofCommandAfterPrivateEdits !== releaseProgressReport.releaseChannelLiveCheckDoctorCommand, "release progress report should keep first proof narrower than release doctor");
 check(releaseProgressReport.releaseChannelFirstProofCommandRole === "first value-free release-channel metadata check after ignored local env edits", "release progress report should describe the live-check first proof role");
 check(releaseProgressReport.releaseChannelFirstProofCommandValueRecorded === false, "release progress report first proof command should not record values");
+check(releaseProgressReport.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits === recommendedPrivateEditOperatorProofCommand, "release progress report should recommend the private edit strict proof chain after private edits");
+check(releaseProgressReport.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits !== releaseProgressReport.releaseChannelFirstProofCommandAfterPrivateEdits, "release progress report should distinguish the operator proof chain from the narrow first proof");
+check(releaseProgressReport.releaseChannelRecommendedOperatorProofCommandRole === "recommended strict-first proof chain after replacing the four private release-channel placeholders", "release progress report should describe the strict proof chain role");
+check(releaseProgressReport.releaseChannelRecommendedOperatorProofCommandValueRecorded === false, "release progress report operator proof chain command should not record values");
 check(releaseProgressReport.releaseChannelLiveCheckRefreshedByThisReport === true, "release progress report should refresh release-channel live check");
 check(releaseProgressReport.releaseChannelLiveCheckRowCount === releaseProgressReport.releaseChannelLiveCheckRows.length, "release progress report live-check row count should match rows");
 check(releaseProgressReport.releaseChannelLiveCheckRowCount === 4, "release progress report should mirror four release-channel live-check rows");
@@ -2218,6 +2230,7 @@ console.log(`- Release-channel live-check current-ready rows: ${releaseProgressR
 console.log(`- Release-channel live-check placeholder keys: ${releaseProgressReport.releaseChannelLiveCheckCurrentPlaceholderKeyCount}`);
 console.log(`- Release-channel live-check placeholder edit locations: ${releaseProgressReport.releaseChannelLiveCheckCurrentPlaceholderEditLocationCount}`);
 console.log(`- Release-channel first proof after private edits: ${releaseProgressReport.releaseChannelFirstProofCommandAfterPrivateEdits}`);
+console.log(`- Release-channel recommended operator proof chain: ${releaseProgressReport.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits}`);
 console.log(`- Release-channel post-edit receipt ready: ${releaseProgressReport.releaseChannelPostEditReceiptReady ? "yes" : "no"}`);
 console.log(`- Release-channel post-edit receipt rows: ${releaseProgressReport.releaseChannelPostEditReceiptRowCount} (${releaseProgressReport.releaseChannelPostEditReceiptSummary})`);
 console.log(`- Release-channel post-edit current-ready rows: ${releaseProgressReport.releaseChannelPostEditReceiptCurrentReadyCount}/${releaseProgressReport.releaseChannelPostEditReceiptRowCount}`);

@@ -21,6 +21,7 @@ const channelEditPacketJsonPath = path.join(packageRoot, `${appName}-${packageJs
 const clearanceTransitionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-clearance-transition-smoke.json`);
 const autoUpdateTransitionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-auto-update-transition-smoke.json`);
 const failures = [];
+const privateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const refreshCommandRows = [
   {
     order: 1,
@@ -242,6 +243,8 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
   const currentTenPlanWindowRowCount = currentTenPlanWindowRows.length;
   const currentTenPlanWindowRowSummary = planRowSummary(currentTenPlanWindowRows);
   const privateEditProofCommandSummary = commandSummary(privateEditProofCommandRows);
+  const privateEditOperatorProofCommandRole =
+    "recommended strict-first proof chain after replacing the four private release-channel placeholders";
   const postClearanceTransitionRows = objectRows(clearance.transitionRows);
   const autoUpdateTransitionRows = objectRows(autoUpdate.transitionRows);
   const tenPlanProgressReportRolloverRows = [
@@ -485,6 +488,9 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
     privateEditProofCommandRows,
     privateEditProofCommandCount: privateEditProofCommandRows.length,
     privateEditProofCommandSummary,
+    privateEditOperatorProofCommand,
+    privateEditOperatorProofCommandRole,
+    privateEditOperatorProofCommandValueRecorded: false,
     firstPrivateEditProofCommand: privateEditProofCommandRows[0].command,
     postEditProofCommand: privateEditProofCommandRows[1].command,
     sourceArtifactRows,
@@ -610,6 +616,8 @@ function buildMarkdown(report) {
 - Completion report packet ready: ${readyLabel(report.releaseCompletionReportPacketReady)}
 - Refresh command order: ${report.refreshCommandSummary}
 - Private-edit proof command order: ${report.privateEditProofCommandSummary}
+- Private-edit operator proof command: \`${report.privateEditOperatorProofCommand}\`
+- Private-edit operator proof role: ${report.privateEditOperatorProofCommandRole}
 - Latest completed plan: plan-${report.latestCompletedPlanNumber}
 - Latest 10-plan progress: ${report.latestTenPlanProgressLabel}
 - 10-plan report due: ${readyLabel(report.tenPlanProgressReportDue)}
@@ -743,6 +751,9 @@ function validateReport(report, markdown) {
     report.privateEditProofCommandSummary === "npm run release:channel-live-check-strict -> npm run release:post-edit-proof -> npm run release:external-check",
     "release completion report packet should expose the private-edit proof command order"
   );
+  check(report.privateEditOperatorProofCommand === privateEditOperatorProofCommand, "release completion report packet should include the recommended private-edit operator proof command");
+  check(report.privateEditOperatorProofCommandRole === "recommended strict-first proof chain after replacing the four private release-channel placeholders", "release completion report packet should describe the private-edit operator proof command");
+  check(report.privateEditOperatorProofCommandValueRecorded === false, "release completion report packet operator proof command should be value-free");
   check(report.privateEditProofCommandRows.every((row) => row.valueRecorded === false), "release completion report packet private-edit proof commands should be value-free");
   check(report.firstPrivateEditProofCommand === "npm run release:channel-live-check-strict", "release completion report packet should make strict live check the first private-edit proof command");
   check(report.postEditProofCommand === "npm run release:post-edit-proof", "release completion report packet should include post-edit proof command");
@@ -970,6 +981,7 @@ console.log(`- Markdown: ${relative(packetMarkdownPath)}`);
 console.log(`- JSON: ${relative(packetJsonPath)}`);
 console.log("- Completion report packet ready: yes");
 console.log(`- Private-edit proof command order: ${report.privateEditProofCommandSummary}`);
+console.log(`- Private-edit operator proof command: ${report.privateEditOperatorProofCommand}`);
 console.log(`- Latest completed plan: plan-${report.latestCompletedPlanNumber}`);
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
 console.log(`- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}`);
