@@ -32,6 +32,13 @@ const distributionMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_QA_APPROVED",
   "GROOVEFORGE_DISTRIBUTION_QA_CHECKLIST_SHA256"
 ];
+const releaseChannelMetadataKeys = distributionMetadataKeys.slice(0, 4);
+const releaseChannelGuidance = {
+  GROOVEFORGE_DISTRIBUTION_CHANNEL: "Allowed release channel token",
+  GROOVEFORGE_RELEASE_DOWNLOAD_URL: "Safe HTTPS release download URL shape",
+  GROOVEFORGE_RELEASE_NOTES_URL: "Safe HTTPS release notes URL shape",
+  GROOVEFORGE_SUPPORT_URL: "Safe HTTPS support URL shape"
+};
 const updateFeedUrlKeys = ["GROOVEFORGE_UPDATE_FEED_URL", "ELECTRON_UPDATE_FEED_URL", "UPDATE_FEED_URL"];
 const updateChannelKeys = ["GROOVEFORGE_UPDATE_CHANNEL", "ELECTRON_UPDATE_CHANNEL", "UPDATE_CHANNEL"];
 const signingKeys = ["GROOVEFORGE_DEVELOPER_ID_IDENTITY"];
@@ -403,6 +410,15 @@ function formatEvidenceRows(evidence) {
     .join("\n");
 }
 
+function formatReleaseChannelFocusRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | no | no | no | no | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.key} | ${row.present ? "yes" : "no"} | ${row.placeholder ? "yes" : "no"} | ${row.shapeReady ? "yes" : "no"} | ${row.currentReady ? "yes" : "no"} | ${row.evidence} | ${row.expectedSignal} | \`${row.proofCommand}\` | \`${row.rerunCommand}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatBlockers(blockers) {
   return blockers.length > 0 ? blockers.map((blocker) => `- ${blocker}`).join("\n") : "- None.";
 }
@@ -428,10 +444,28 @@ ${appName} is an all-genre desktop beat workstation for direct beat composition,
 - External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}
 - Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}
 - Local env placeholder keys: ${summary.localEnvPlaceholderKeyCount}
+- Release-channel focus receipt ready: ${summary.releaseChannelFocusReceiptReady ? "yes" : "no"}
+- Release-channel focus current-ready rows: ${summary.releaseChannelFocusCurrentReadyCount}/${summary.releaseChannelFocusRowCount}
+- Release-channel focus placeholder keys: ${summary.releaseChannelFocusPlaceholderKeyCount}
 - Private values recorded: no
 - Network probe attempted: no
 - Release upload attempted: no
 - Notary submission attempted: no
+
+## Release-Channel Focus Receipt
+
+- Receipt ready: ${summary.releaseChannelFocusReceiptReady ? "yes" : "no"}
+- Current action ready: ${summary.releaseChannelFocusCurrentReady ? "yes" : "no"}
+- Receipt rows: ${summary.releaseChannelFocusRowCount} (${summary.releaseChannelFocusSummary})
+- Current-ready rows: ${summary.releaseChannelFocusCurrentReadyCount}/${summary.releaseChannelFocusRowCount}
+- Placeholder keys: ${summary.releaseChannelFocusPlaceholderKeyCount}
+- Proof command: \`${summary.releaseChannelFocusProofCommand}\`
+- Rerun command: \`${summary.releaseChannelFocusRerunCommand}\`
+- Value recorded: ${summary.releaseChannelFocusValueRecorded ? "yes" : "no"}
+
+| key | present | placeholder | shape ready | current ready | evidence | expected signal | proof command | rerun command | value recorded |
+|---|---:|---:|---:|---:|---|---|---|---|---:|
+${formatReleaseChannelFocusRows(summary.releaseChannelFocusRows)}
 
 ## Input Groups
 
@@ -485,6 +519,62 @@ function group(label, requiredKeys, ready, detail) {
     ready,
     valueRecorded: false,
     detail
+  };
+}
+
+function buildReleaseChannelFocusReceipt({ channel, downloadUrl, releaseNotesUrl, supportUrl }) {
+  const validationByKey = {
+    GROOVEFORGE_DISTRIBUTION_CHANNEL: {
+      present: channel.keyPresent,
+      shapeReady: channel.channelValid,
+      evidence: channel.channelValid ? "allowed channel token" : "allowed channel token missing or invalid"
+    },
+    GROOVEFORGE_RELEASE_DOWNLOAD_URL: {
+      present: downloadUrl.keyPresent,
+      shapeReady: downloadUrl.urlValid,
+      evidence: downloadUrl.urlValid ? "safe HTTPS URL shape" : "safe HTTPS URL shape missing or invalid"
+    },
+    GROOVEFORGE_RELEASE_NOTES_URL: {
+      present: releaseNotesUrl.keyPresent,
+      shapeReady: releaseNotesUrl.urlValid,
+      evidence: releaseNotesUrl.urlValid ? "safe HTTPS URL shape" : "safe HTTPS URL shape missing or invalid"
+    },
+    GROOVEFORGE_SUPPORT_URL: {
+      present: supportUrl.keyPresent,
+      shapeReady: supportUrl.urlValid,
+      evidence: supportUrl.urlValid ? "safe HTTPS URL shape" : "safe HTTPS URL shape missing or invalid"
+    }
+  };
+  const placeholderKeys = releaseChannelMetadataKeys.filter((key) => distributionLocalEnv.placeholderKeys.includes(key));
+  const rows = releaseChannelMetadataKeys.map((key) => {
+    const validation = validationByKey[key];
+    const placeholder = placeholderKeys.includes(key);
+    return {
+      key,
+      present: validation.present === true,
+      placeholder,
+      shapeReady: validation.shapeReady === true,
+      currentReady: validation.present === true && validation.shapeReady === true && placeholder === false,
+      evidence: `${validation.evidence}; placeholder ${placeholder ? "yes" : "no"}`,
+      expectedSignal: `${releaseChannelGuidance[key]} loads from ignored local env without placeholder status`,
+      proofCommand: "npm run desktop:distribution-private-inputs-smoke",
+      rerunCommand: "npm run release:doctor",
+      valueRecorded: false
+    };
+  });
+  const currentReadyCount = rows.filter((row) => row.currentReady === true).length;
+  return {
+    releaseChannelFocusReceiptReady: rows.length === releaseChannelMetadataKeys.length && rows.every((row) => row.valueRecorded === false),
+    releaseChannelFocusCurrentReady: currentReadyCount === rows.length,
+    releaseChannelFocusCurrentReadyCount: currentReadyCount,
+    releaseChannelFocusRowCount: rows.length,
+    releaseChannelFocusSummary: `${rows.length} value-free release-channel focus rows`,
+    releaseChannelFocusRows: rows,
+    releaseChannelFocusPlaceholderKeyCount: placeholderKeys.length,
+    releaseChannelFocusPlaceholderKeys: placeholderKeys,
+    releaseChannelFocusProofCommand: "npm run desktop:distribution-private-inputs-smoke",
+    releaseChannelFocusRerunCommand: "npm run release:doctor",
+    releaseChannelFocusValueRecorded: false
   };
 }
 
@@ -550,6 +640,12 @@ async function createPrivateInputsSummary() {
   const developerId = developerIdSignals(developerIdReadiness, developerIdSigning);
   const notarizationInputs = notarizationSignals(developerIdReadiness, notarization);
   const manualApproval = manualApprovalSignals(distributionQa);
+  const releaseChannelFocusReceipt = buildReleaseChannelFocusReceipt({
+    channel,
+    downloadUrl,
+    releaseNotesUrl,
+    supportUrl
+  });
   const inputGroups = [
     group("Distribution channel", ["GROOVEFORGE_DISTRIBUTION_CHANNEL"], channel.keyPresent && channel.channelValid, channel),
     group("Release download URL", ["GROOVEFORGE_RELEASE_DOWNLOAD_URL"], downloadUrl.urlValid, downloadUrl),
@@ -593,6 +689,7 @@ async function createPrivateInputsSummary() {
     reason: process.platform === "darwin" ? null : "Distribution private inputs smoke currently targets the macOS desktop release artifact chain",
     productScope: "all-genre direct beat workstation; direct composition first; sampling optional and secondary",
     privateInputsScope: "redacted local external distribution input checklist for release URLs, update feeds, signing, notarization, channel metadata, and manual QA approval",
+    ...releaseChannelFocusReceipt,
     requiredPrivateInputs: {
       distributionMetadataKeys,
       updateFeedUrlKeys,
@@ -650,6 +747,40 @@ check(summary.releaseGateClaimedGatekeeperApproval === false, "distribution priv
 check(summary.releaseGateClaimedAutoUpdate === false, "distribution private inputs should not claim auto-update");
 check(summary.releaseGateClaimedExternalDistribution === false, "distribution private inputs should not claim external distribution completion");
 check(summary.requiredPrivateInputs?.valuesRecorded === false, "distribution private inputs should record key names only");
+check(summary.releaseChannelFocusReceiptReady === true, "distribution private inputs release-channel focus receipt should be ready");
+check(typeof summary.releaseChannelFocusCurrentReady === "boolean", "distribution private inputs should include release-channel focus current readiness");
+check(Number.isInteger(summary.releaseChannelFocusCurrentReadyCount), "distribution private inputs should include release-channel focus current-ready count");
+check(Number.isInteger(summary.releaseChannelFocusRowCount), "distribution private inputs should include release-channel focus row count");
+check(typeof summary.releaseChannelFocusSummary === "string" && summary.releaseChannelFocusSummary.length > 0, "distribution private inputs should include release-channel focus summary");
+check(Array.isArray(summary.releaseChannelFocusRows), "distribution private inputs should include release-channel focus rows");
+check(summary.releaseChannelFocusRowCount === summary.releaseChannelFocusRows.length, "distribution private inputs release-channel focus row count should match rows");
+check(summary.releaseChannelFocusRowCount === releaseChannelMetadataKeys.length, "distribution private inputs release-channel focus should cover four metadata keys");
+check(releaseChannelMetadataKeys.every((key) => summary.releaseChannelFocusRows.some((row) => row.key === key)), "distribution private inputs release-channel focus should cover current release-channel keys");
+check(summary.releaseChannelFocusRows.every((row) => row.valueRecorded === false), "distribution private inputs release-channel focus rows should not record values");
+check(summary.releaseChannelFocusRows.every((row) => typeof row.expectedSignal === "string" && row.expectedSignal.length > 0), "distribution private inputs release-channel focus rows should include expected signals");
+check(summary.releaseChannelFocusRows.every((row) => row.proofCommand === "npm run desktop:distribution-private-inputs-smoke"), "distribution private inputs release-channel focus proof command should be private-inputs smoke");
+check(summary.releaseChannelFocusRows.every((row) => row.rerunCommand === "npm run release:doctor"), "distribution private inputs release-channel focus rerun command should be release doctor");
+check(
+  summary.releaseChannelFocusCurrentReadyCount === summary.releaseChannelFocusRows.filter((row) => row.currentReady === true).length,
+  "distribution private inputs release-channel focus current-ready count should match rows"
+);
+check(
+  summary.releaseChannelFocusCurrentReady === (summary.releaseChannelFocusCurrentReadyCount === summary.releaseChannelFocusRowCount),
+  "distribution private inputs release-channel focus current readiness should match rows"
+);
+check(Number.isInteger(summary.releaseChannelFocusPlaceholderKeyCount), "distribution private inputs should include release-channel focus placeholder count");
+check(Array.isArray(summary.releaseChannelFocusPlaceholderKeys), "distribution private inputs should include release-channel focus placeholder keys");
+check(
+  summary.releaseChannelFocusPlaceholderKeyCount === summary.releaseChannelFocusPlaceholderKeys.length,
+  "distribution private inputs release-channel focus placeholder count should match listed keys"
+);
+check(
+  summary.releaseChannelFocusPlaceholderKeys.every((key) => releaseChannelMetadataKeys.includes(key)),
+  "distribution private inputs release-channel focus placeholders should be limited to current metadata keys"
+);
+check(summary.releaseChannelFocusProofCommand === "npm run desktop:distribution-private-inputs-smoke", "distribution private inputs should include release-channel focus proof command");
+check(summary.releaseChannelFocusRerunCommand === "npm run release:doctor", "distribution private inputs should include release-channel focus rerun command");
+check(summary.releaseChannelFocusValueRecorded === false, "distribution private inputs release-channel focus should not record values");
 check(Array.isArray(summary.inputGroups), "distribution private inputs should include input groups");
 check(Array.isArray(summary.privateInputBlockers), "distribution private inputs should include private input blockers");
 check(Array.isArray(summary.externalDistributionBlockers), "distribution private inputs should include external distribution blockers");
@@ -662,6 +793,10 @@ check(markdown.includes("Private inputs ready:"), "distribution private inputs s
 check(markdown.includes("External distribution ready:"), "distribution private inputs should include external readiness");
 check(markdown.includes("Local env file loaded:"), "distribution private inputs should include local env loader status");
 check(markdown.includes("Local env placeholder keys:"), "distribution private inputs should include local env placeholder key count");
+check(markdown.includes("Release-channel focus receipt ready:"), "distribution private inputs Markdown should include release-channel focus receipt readiness");
+check(markdown.includes("Release-channel focus current-ready rows:"), "distribution private inputs Markdown should include release-channel focus current-ready rows");
+check(markdown.includes("Release-Channel Focus Receipt"), "distribution private inputs Markdown should include release-channel focus receipt table");
+check(markdown.includes("expected signal"), "distribution private inputs Markdown should include release-channel focus expected signals");
 check(markdown.includes("Local Env Placeholder Keys"), "distribution private inputs should include local env placeholder key section");
 check(markdown.includes("Private values recorded: no"), "distribution private inputs should state value redaction");
 check(markdown.includes("Values for required private keys are intentionally not recorded"), "distribution private inputs should state key value redaction");
@@ -683,6 +818,9 @@ console.log(`- Private inputs ready: ${summary.privateInputsReady ? "yes" : "no"
 console.log(`- External distribution ready: ${summary.externalDistributionReady ? "yes" : "no"}`);
 console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
 console.log(`- Local env placeholder keys: ${summary.localEnvPlaceholderKeyCount}`);
+console.log(`- Release-channel focus receipt ready: ${summary.releaseChannelFocusReceiptReady ? "yes" : "no"}`);
+console.log(`- Release-channel focus current-ready rows: ${summary.releaseChannelFocusCurrentReadyCount}/${summary.releaseChannelFocusRowCount}`);
+console.log(`- Release-channel focus placeholder keys: ${summary.releaseChannelFocusPlaceholderKeyCount}`);
 console.log("- Private values recorded: no");
 if (summary.privateInputBlockers.length > 0) {
   console.log(`- Private input blockers: ${summary.privateInputBlockers.join(" | ")}`);

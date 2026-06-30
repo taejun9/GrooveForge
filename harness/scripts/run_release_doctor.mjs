@@ -255,6 +255,15 @@ function formatEnvEditRowsTable(items) {
   ].join("\n");
 }
 
+function formatReleaseChannelFocusRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | no | no | no | no | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.key)} | ${readyLabel(row.present)} | ${readyLabel(row.placeholder)} | ${readyLabel(row.shapeReady)} | ${readyLabel(row.currentReady)} | ${escapeCell(row.evidence)} | ${escapeCell(row.expectedSignal)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.rerunCommand)}\` | ${readyLabel(row.valueRecorded)} |`)
+    .join("\n");
+}
+
 function displayLocalEnvTarget(filePath) {
   if (typeof filePath !== "string" || filePath.trim().length === 0) {
     return distributionLocalEnvDefaults.defaultEnvFileName;
@@ -706,6 +715,10 @@ function buildMarkdown(report) {
 - Template keys covered: ${readyLabel(report.templateKeysCovered)}
 - Private inputs ready: ${readyLabel(report.privateInputsReady)}
 - Private input groups ready: ${report.privateInputGroupReadyCount}/${report.privateInputGroupTotal}
+- Release-channel focus receipt ready: ${readyLabel(report.releaseChannelFocusReceiptReady)}
+- Release-channel focus current action ready: ${readyLabel(report.releaseChannelFocusCurrentReady)}
+- Release-channel focus current-ready rows: ${report.releaseChannelFocusCurrentReadyCount}/${report.releaseChannelFocusRowCount}
+- Release-channel focus placeholder keys: ${report.releaseChannelFocusPlaceholderKeyCount}
 - Local env placeholder keys: ${report.localEnvPlaceholderKeyCount}
 - Current action: ${report.currentActionLabel}
 - Current next command: \`${report.currentActionNextCommand}\`
@@ -833,6 +846,21 @@ ${formatEnvEditTemplateBlock(report.currentActionEnvEditTemplate)}
 
 ${formatEnvEditRowsTable(report.currentActionEnvEditRows)}
 
+## Release-Channel Focus Receipt
+
+- Receipt ready: ${readyLabel(report.releaseChannelFocusReceiptReady)}
+- Current action ready: ${readyLabel(report.releaseChannelFocusCurrentReady)}
+- Receipt rows: ${report.releaseChannelFocusRowCount} (${report.releaseChannelFocusSummary})
+- Current-ready rows: ${report.releaseChannelFocusCurrentReadyCount}/${report.releaseChannelFocusRowCount}
+- Placeholder keys: ${report.releaseChannelFocusPlaceholderKeyCount}
+- Proof command: \`${report.releaseChannelFocusProofCommand}\`
+- Rerun command: \`${report.releaseChannelFocusRerunCommand}\`
+- Value recorded: ${readyLabel(report.releaseChannelFocusValueRecorded)}
+
+| key | present | placeholder | shape ready | current ready | evidence | expected signal | proof command | rerun command | value recorded |
+|---|---:|---:|---:|---:|---|---|---|---|---:|
+${formatReleaseChannelFocusRows(report.releaseChannelFocusRows)}
+
 ## Source Artifacts
 
 | artifact | present | path |
@@ -885,6 +913,9 @@ const [
 
 const privateInputGroups = Array.isArray(distributionPrivateInputs.inputGroups) ? distributionPrivateInputs.inputGroups : [];
 const privateInputGroupReadyCount = privateInputGroups.filter((group) => group.ready === true).length;
+const releaseChannelFocusRows = Array.isArray(distributionPrivateInputs.releaseChannelFocusRows)
+  ? distributionPrivateInputs.releaseChannelFocusRows
+  : [];
 const localEnvPlaceholderKeys = Array.isArray(distributionPrivateInputs.localEnvPlaceholderKeys)
   ? distributionPrivateInputs.localEnvPlaceholderKeys
   : [];
@@ -1024,6 +1055,34 @@ const releaseDoctorReport = {
   privateInputGroupTotal: privateInputGroups.length,
   privateInputGroupReadyCount,
   privateInputGroups,
+  releaseChannelFocusReceiptReady: distributionPrivateInputs.releaseChannelFocusReceiptReady === true,
+  releaseChannelFocusCurrentReady: distributionPrivateInputs.releaseChannelFocusCurrentReady === true,
+  releaseChannelFocusCurrentReadyCount: Number.isInteger(distributionPrivateInputs.releaseChannelFocusCurrentReadyCount)
+    ? distributionPrivateInputs.releaseChannelFocusCurrentReadyCount
+    : releaseChannelFocusRows.filter((row) => row.currentReady === true).length,
+  releaseChannelFocusRowCount: Number.isInteger(distributionPrivateInputs.releaseChannelFocusRowCount)
+    ? distributionPrivateInputs.releaseChannelFocusRowCount
+    : releaseChannelFocusRows.length,
+  releaseChannelFocusSummary:
+    typeof distributionPrivateInputs.releaseChannelFocusSummary === "string"
+      ? distributionPrivateInputs.releaseChannelFocusSummary
+      : "none",
+  releaseChannelFocusRows,
+  releaseChannelFocusPlaceholderKeyCount: Number.isInteger(distributionPrivateInputs.releaseChannelFocusPlaceholderKeyCount)
+    ? distributionPrivateInputs.releaseChannelFocusPlaceholderKeyCount
+    : 0,
+  releaseChannelFocusPlaceholderKeys: Array.isArray(distributionPrivateInputs.releaseChannelFocusPlaceholderKeys)
+    ? distributionPrivateInputs.releaseChannelFocusPlaceholderKeys
+    : [],
+  releaseChannelFocusProofCommand:
+    typeof distributionPrivateInputs.releaseChannelFocusProofCommand === "string"
+      ? distributionPrivateInputs.releaseChannelFocusProofCommand
+      : "npm run desktop:distribution-private-inputs-smoke",
+  releaseChannelFocusRerunCommand:
+    typeof distributionPrivateInputs.releaseChannelFocusRerunCommand === "string"
+      ? distributionPrivateInputs.releaseChannelFocusRerunCommand
+      : "npm run release:doctor",
+  releaseChannelFocusValueRecorded: distributionPrivateInputs.releaseChannelFocusValueRecorded === true,
   localEnvFilesChecked,
   localEnvPresentFiles,
   localEnvPlaceholderKeyCount,
@@ -1185,6 +1244,61 @@ check(releaseDoctorReport.completionGapClaimedExternalDistribution === false, "r
 check(releaseDoctorReport.completionGapValueRecorded === false, "release doctor completion gap should not record values");
 check(typeof releaseDoctorReport.privateInputsReady === "boolean", "release doctor should include private-input readiness");
 check(Array.isArray(releaseDoctorReport.privateInputGroups), "release doctor should include private-input groups");
+check(releaseDoctorReport.releaseChannelFocusReceiptReady === true, "release doctor should mirror ready release-channel focus receipt");
+check(typeof releaseDoctorReport.releaseChannelFocusCurrentReady === "boolean", "release doctor should include release-channel focus current readiness");
+check(Number.isInteger(releaseDoctorReport.releaseChannelFocusCurrentReadyCount), "release doctor should include release-channel focus current-ready count");
+check(Number.isInteger(releaseDoctorReport.releaseChannelFocusRowCount), "release doctor should include release-channel focus row count");
+check(typeof releaseDoctorReport.releaseChannelFocusSummary === "string", "release doctor should include release-channel focus summary");
+check(Array.isArray(releaseDoctorReport.releaseChannelFocusRows), "release doctor should include release-channel focus rows");
+check(
+  releaseDoctorReport.releaseChannelFocusRowCount === releaseDoctorReport.releaseChannelFocusRows.length,
+  "release doctor release-channel focus row count should match rows"
+);
+check(releaseDoctorReport.releaseChannelFocusRowCount === releaseChannelMetadataKeys.length, "release doctor release-channel focus should cover four metadata keys");
+check(
+  releaseChannelMetadataKeys.every((key) => releaseDoctorReport.releaseChannelFocusRows.some((row) => row.key === key)),
+  "release doctor release-channel focus should cover current release-channel keys"
+);
+check(
+  releaseDoctorReport.releaseChannelFocusRows.every((row) => row.valueRecorded === false),
+  "release doctor release-channel focus rows should not record values"
+);
+check(
+  releaseDoctorReport.releaseChannelFocusRows.every((row) => typeof row.expectedSignal === "string" && row.expectedSignal.length > 0),
+  "release doctor release-channel focus rows should include expected signals"
+);
+check(
+  releaseDoctorReport.releaseChannelFocusRows.every((row) => row.proofCommand === releaseDoctorReport.releaseChannelFocusProofCommand),
+  "release doctor release-channel focus rows should mirror proof command"
+);
+check(
+  releaseDoctorReport.releaseChannelFocusRows.every((row) => row.rerunCommand === releaseDoctorReport.releaseChannelFocusRerunCommand),
+  "release doctor release-channel focus rows should mirror rerun command"
+);
+check(
+  releaseDoctorReport.releaseChannelFocusCurrentReadyCount === releaseDoctorReport.releaseChannelFocusRows.filter((row) => row.currentReady === true).length,
+  "release doctor release-channel focus current-ready count should match rows"
+);
+check(
+  releaseDoctorReport.releaseChannelFocusCurrentReady === (releaseDoctorReport.releaseChannelFocusCurrentReadyCount === releaseDoctorReport.releaseChannelFocusRowCount),
+  "release doctor release-channel focus current readiness should match rows"
+);
+check(Number.isInteger(releaseDoctorReport.releaseChannelFocusPlaceholderKeyCount), "release doctor should include release-channel focus placeholder count");
+check(Array.isArray(releaseDoctorReport.releaseChannelFocusPlaceholderKeys), "release doctor should include release-channel focus placeholder keys");
+check(
+  releaseDoctorReport.releaseChannelFocusPlaceholderKeyCount === releaseDoctorReport.releaseChannelFocusPlaceholderKeys.length,
+  "release doctor release-channel focus placeholder count should match listed keys"
+);
+check(
+  releaseDoctorReport.releaseChannelFocusPlaceholderKeys.every((key) => releaseChannelMetadataKeys.includes(key)),
+  "release doctor release-channel focus placeholders should be limited to current metadata keys"
+);
+check(
+  releaseDoctorReport.releaseChannelFocusProofCommand === "npm run desktop:distribution-private-inputs-smoke",
+  "release doctor release-channel focus proof command should be private-inputs smoke"
+);
+check(releaseDoctorReport.releaseChannelFocusRerunCommand === "npm run release:doctor", "release doctor release-channel focus rerun command should be release doctor");
+check(releaseDoctorReport.releaseChannelFocusValueRecorded === false, "release doctor release-channel focus should not record values");
 check(Number.isInteger(releaseDoctorReport.localEnvPlaceholderKeyCount), "release doctor should include local env placeholder key count");
 check(Array.isArray(releaseDoctorReport.localEnvPlaceholderKeys), "release doctor should include local env placeholder key names");
 check(Array.isArray(releaseDoctorReport.localEnvFilesChecked), "release doctor should include local env files checked");
@@ -1398,6 +1512,16 @@ if (releaseDoctorReport.localEnvFileLoaded === true && releaseChannelMetadataKey
     releaseDoctorReport.currentActionReadyCriteria.some((item) => item.includes("Distribution-channel QA")),
     "release doctor placeholder ready criteria should explain distribution-channel QA readiness"
   );
+  check(releaseDoctorReport.releaseChannelFocusCurrentReady === false, "release doctor release-channel focus should remain current-blocked while placeholders remain");
+  check(releaseDoctorReport.releaseChannelFocusPlaceholderKeyCount === releaseChannelMetadataKeys.length, "release doctor release-channel focus should count current release-channel placeholders");
+  check(
+    releaseChannelMetadataKeys.every((key) => releaseDoctorReport.releaseChannelFocusPlaceholderKeys.includes(key)),
+    "release doctor release-channel focus placeholder keys should include current release-channel metadata keys"
+  );
+  check(
+    releaseDoctorReport.releaseChannelFocusRows.every((row) => row.placeholder === true && row.currentReady === false),
+    "release doctor release-channel focus rows should mark current placeholder rows blocked"
+  );
   check(releaseDoctorReport.currentActionPlaceholderKeyCount === releaseChannelMetadataKeys.length, "release doctor should focus current placeholders on release-channel metadata keys");
   check(
     releaseChannelMetadataKeys.every((key) => releaseDoctorReport.currentActionPlaceholderKeys.includes(key)),
@@ -1462,6 +1586,10 @@ check(markdown.includes("Completion gap claim blockers:"), "release doctor Markd
 check(markdown.includes("Completion Gap"), "release doctor Markdown should include completion gap section");
 check(markdown.includes("Proof target:"), "release doctor Markdown should include completion gap proof target details");
 check(markdown.includes("Local env placeholder keys:"), "release doctor Markdown should include placeholder key count");
+check(markdown.includes("Release-channel focus receipt ready:"), "release doctor Markdown should include release-channel focus receipt readiness");
+check(markdown.includes("Release-channel focus current-ready rows:"), "release doctor Markdown should include release-channel focus current-ready rows");
+check(markdown.includes("Release-Channel Focus Receipt"), "release doctor Markdown should include release-channel focus receipt table");
+check(markdown.includes("expected signal"), "release doctor Markdown should include release-channel focus expected signals");
 check(markdown.includes("Local Env Placeholder Keys"), "release doctor Markdown should include placeholder key section");
 check(markdown.includes("Release prepare-env existing local env placeholder keys:"), "release doctor Markdown should include prepare-env existing local env placeholder key status");
 check(markdown.includes("Release prepare-env release-channel placeholder keys:"), "release doctor Markdown should include prepare-env release-channel placeholder key status");
@@ -1531,6 +1659,10 @@ console.log(
 );
 console.log(`- Private inputs ready: ${releaseDoctorReport.privateInputsReady ? "yes" : "no"}`);
 console.log(`- Private input groups ready: ${releaseDoctorReport.privateInputGroupReadyCount}/${releaseDoctorReport.privateInputGroupTotal}`);
+console.log(`- Release-channel focus receipt ready: ${releaseDoctorReport.releaseChannelFocusReceiptReady ? "yes" : "no"}`);
+console.log(`- Release-channel focus current action ready: ${releaseDoctorReport.releaseChannelFocusCurrentReady ? "yes" : "no"}`);
+console.log(`- Release-channel focus current-ready rows: ${releaseDoctorReport.releaseChannelFocusCurrentReadyCount}/${releaseDoctorReport.releaseChannelFocusRowCount}`);
+console.log(`- Release-channel focus placeholder keys: ${releaseDoctorReport.releaseChannelFocusPlaceholderKeyCount}`);
 console.log(`- Local env placeholder keys: ${releaseDoctorReport.localEnvPlaceholderKeyCount}`);
 console.log(`- Current action: ${releaseDoctorReport.currentActionLabel}`);
 console.log(`- Current next command: ${releaseDoctorReport.currentActionNextCommand}`);
