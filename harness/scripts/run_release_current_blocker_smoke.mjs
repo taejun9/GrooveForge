@@ -441,6 +441,15 @@ function formatCurrentReleaseChannelKeyRemediationRows(rows) {
     .join("\n");
 }
 
+function formatCurrentCommandAcceptanceLadderRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.acceptanceSignal)} | ${escapeCell(row.sourceArtifacts)} | ${escapeCell(row.evidenceLabels)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.rerunCommand)}\` | \`${escapeCell(row.hardGateCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatCurrentActionPostEditVerificationRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | no | none | none | none | none | none | none | no |";
@@ -787,6 +796,77 @@ function currentReleaseChannelKeyRemediationRows({
       evidenceSource: `${textValue(locationRow.location, "missing location")}; ${textValue(shapeRow.evidenceSource, "missing shape evidence")}`,
       acceptanceCriteriaImpacted: acceptanceCriteria || "none",
       acceptanceSourceFields,
+      proofCommand: currentNextCommand,
+      rerunCommand: currentRerunCommand,
+      hardGateCommand,
+      valueRecorded: false
+    };
+  });
+}
+
+function postEditExpectedSignal(postEditVerificationRows, pattern, fallback) {
+  return textValue(
+    valueFreeObjectRows(postEditVerificationRows).find((row) => pattern.test(textValue(row.criterion)))?.expectedSignal,
+    fallback
+  );
+}
+
+function currentCommandAcceptanceSignal(command, role, postEditVerificationRows) {
+  const lower = textValue(command).toLowerCase();
+  const placeholderSignal = postEditExpectedSignal(
+    postEditVerificationRows,
+    /without placeholder values/i,
+    "current required keys present and current placeholder key count is 0"
+  );
+  const privateInputsSignal = postEditExpectedSignal(
+    postEditVerificationRows,
+    /private-inputs|private inputs/i,
+    "private inputs ready yes; channel metadata ready yes; private values recorded no"
+  );
+  const channelQaSignal = postEditExpectedSignal(
+    postEditVerificationRows,
+    /distribution-channel qa/i,
+    "distribution-channel QA ready yes; channel metadata ready yes; private values recorded no"
+  );
+  const acceptanceReadySignal = "current action acceptance ready yes; current priority action advances without recording private values";
+
+  if (lower.includes("distribution-env-template")) {
+    return `ignored local env template and loader ready; ${placeholderSignal}; value recorded no`;
+  }
+  if (lower.includes("distribution-private-inputs")) {
+    return `${placeholderSignal}; ${privateInputsSignal}`;
+  }
+  if (lower.includes("release:doctor")) {
+    return `${privateInputsSignal}; ${channelQaSignal}`;
+  }
+  if (lower.includes("release:current-blocker")) {
+    return `${acceptanceReadySignal}; ${placeholderSignal}; ${privateInputsSignal}; ${channelQaSignal}`;
+  }
+  if (lower.includes("distribution-channel-qa")) {
+    return channelQaSignal;
+  }
+  return role === "proof" ? `${acceptanceReadySignal}; value recorded no` : "value-free command evidence refreshed without private values";
+}
+
+function currentCommandAcceptanceLadderRows({
+  currentCommandVerificationRows,
+  postEditVerificationRows,
+  currentNextCommand,
+  currentRerunCommand,
+  hardGateCommand
+}) {
+  return valueFreeObjectRows(currentCommandVerificationRows).map((row, index) => {
+    const command = textValue(row.command);
+    const evidencePaths = stringArrayValue(row.evidencePaths);
+    const evidenceLabels = stringArrayValue(row.evidenceLabels);
+    return {
+      order: index + 1,
+      command,
+      role: textValue(row.role),
+      acceptanceSignal: currentCommandAcceptanceSignal(command, textValue(row.role), postEditVerificationRows),
+      sourceArtifacts: evidencePaths.length > 0 ? evidencePaths.join("; ") : textValue(row.evidenceSummary),
+      evidenceLabels: evidenceLabels.length > 0 ? evidenceLabels.join("; ") : textValue(row.evidenceSummary),
+      sourceField: "externalProofBundle.currentCommandVerificationRows/currentActionPostEditVerificationRows",
       proofCommand: currentNextCommand,
       rerunCommand: currentRerunCommand,
       hardGateCommand,
@@ -1389,6 +1469,13 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentRerunCommand,
     hardGateCommand
   });
+  const commandAcceptanceLadderRows = currentCommandAcceptanceLadderRows({
+    currentCommandVerificationRows: commandVerificationRows,
+    postEditVerificationRows,
+    currentNextCommand,
+    currentRerunCommand,
+    hardGateCommand
+  });
   const consistencyRows = [
     {
       check: "Doctor/proof/gate/progress next command consensus",
@@ -1621,6 +1708,15 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
         ? `${keyRemediationRows.length} value-free release-channel key remediation rows`
         : "none",
     currentReleaseChannelKeyRemediationRows: keyRemediationRows,
+    currentCommandAcceptanceLadderReady:
+      commandAcceptanceLadderRows.length === commandVerificationRows.length &&
+      commandAcceptanceLadderRows.every((row) => row.valueRecorded === false && row.proofCommand === currentNextCommand && row.rerunCommand === currentRerunCommand && row.hardGateCommand === hardGateCommand),
+    currentCommandAcceptanceLadderRowCount: commandAcceptanceLadderRows.length,
+    currentCommandAcceptanceLadderSummary:
+      commandAcceptanceLadderRows.length > 0
+        ? `${commandAcceptanceLadderRows.length} value-free command acceptance ladder rows`
+        : "none",
+    currentCommandAcceptanceLadderRows: commandAcceptanceLadderRows,
     currentActionPostEditVerificationReady:
       postEditVerificationRows.length === acceptanceRows.length &&
       postEditVerificationRows.every((row) => row.valueRecorded === false) &&
@@ -2013,6 +2109,22 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   if (report.currentPlaceholderKeyCount > 0) {
     check(report.currentReleaseChannelKeyRemediationRows.every((row) => row.placeholder === true), "release current blocker release-channel key remediation rows should mark current placeholders while blocked");
   }
+  check(report.currentCommandAcceptanceLadderReady === true, "release current blocker current command acceptance ladder should be ready");
+  check(report.currentCommandAcceptanceLadderRowCount === report.currentCommandAcceptanceLadderRows.length, "release current blocker current command acceptance ladder row count should match rows");
+  check(report.currentCommandAcceptanceLadderRowCount === report.currentCommandVerificationRowCount, "release current blocker current command acceptance ladder should mirror command verification rows");
+  check(sameStringArray(report.currentCommandAcceptanceLadderRows.map((row) => row.command), report.currentCommandSequence), "release current blocker current command acceptance ladder should cover current command sequence");
+  check(typeof report.currentCommandAcceptanceLadderSummary === "string" && report.currentCommandAcceptanceLadderSummary.length > 0, "release current blocker should include current command acceptance ladder summary");
+  check(report.currentCommandAcceptanceLadderRows.every((row) => row.valueRecorded === false), "release current blocker current command acceptance ladder rows should not record values");
+  check(report.currentCommandAcceptanceLadderRows.every((row) => row.proofCommand === report.currentNextCommand), "release current blocker current command acceptance ladder proof commands should match current next command");
+  check(report.currentCommandAcceptanceLadderRows.every((row) => row.rerunCommand === report.currentRerunCommand), "release current blocker current command acceptance ladder rerun commands should match current rerun command");
+  check(report.currentCommandAcceptanceLadderRows.every((row) => row.hardGateCommand === report.hardGateCommand), "release current blocker current command acceptance ladder hard-gate commands should match hard gate command");
+  check(report.currentCommandAcceptanceLadderRows.every((row) => typeof row.sourceArtifacts === "string" && row.sourceArtifacts.includes("build/desktop/")), "release current blocker current command acceptance ladder should include source artifact paths");
+  check(report.currentCommandAcceptanceLadderRows.some((row) => /ignored local env template/i.test(row.acceptanceSignal)), "release current blocker current command acceptance ladder should include ignored local env template signal");
+  check(report.currentCommandAcceptanceLadderRows.some((row) => /private inputs ready yes/i.test(row.acceptanceSignal)), "release current blocker current command acceptance ladder should include private-input ready signal");
+  check(report.currentCommandAcceptanceLadderRows.some((row) => /distribution-channel QA ready yes/i.test(row.acceptanceSignal)), "release current blocker current command acceptance ladder should include distribution-channel QA ready signal");
+  check(report.currentCommandAcceptanceLadderRows.some((row) => /current action acceptance ready yes/i.test(row.acceptanceSignal)), "release current blocker current command acceptance ladder should include current action acceptance ready signal");
+  check(report.currentCommandAcceptanceLadderRows.some((row) => row.command === "npm run release:doctor" && row.role === "proof"), "release current blocker current command acceptance ladder should include release doctor proof row");
+  check(report.currentCommandAcceptanceLadderRows.some((row) => row.command === "npm run release:current-blocker" && row.role === "rerun"), "release current blocker current command acceptance ladder should include current-blocker rerun row");
   check(report.currentActionPostEditVerificationReady === true, "release current blocker current action post-edit verification should be ready");
   check(report.currentActionPostEditVerificationRowCount === report.currentActionPostEditVerificationRows.length, "release current blocker current action post-edit verification row count should match rows");
   check(report.currentActionPostEditVerificationRowCount === report.currentActionAcceptanceRowCount, "release current blocker current action post-edit verification rows should mirror acceptance rows");
@@ -2256,6 +2368,8 @@ function buildMarkdown(report) {
     `- Current action acceptance remediation rows: ${report.currentActionAcceptanceRemediationRowCount} (${report.currentActionAcceptanceRemediationSummary})`,
     `- Release-channel key remediation ready: ${report.currentReleaseChannelKeyRemediationReady ? "yes" : "no"}`,
     `- Release-channel key remediation rows: ${report.currentReleaseChannelKeyRemediationRowCount} (${report.currentReleaseChannelKeyRemediationSummary})`,
+    `- Current command acceptance ladder ready: ${report.currentCommandAcceptanceLadderReady ? "yes" : "no"}`,
+    `- Current command acceptance ladder rows: ${report.currentCommandAcceptanceLadderRowCount} (${report.currentCommandAcceptanceLadderSummary})`,
     `- Current action post-edit verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`,
     `- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`,
     `- Current action post-edit signals currently ready: ${report.currentActionPostEditVerificationCurrentSummary}`,
@@ -2479,6 +2593,15 @@ function buildMarkdown(report) {
     "|---:|---|---:|---|---|---|---|---|---:|",
     formatCurrentReleaseChannelKeyRemediationRows(report.currentReleaseChannelKeyRemediationRows),
     "",
+    "## Current Command Acceptance Ladder",
+    "",
+    `- Command acceptance ladder ready: ${report.currentCommandAcceptanceLadderReady ? "yes" : "no"}`,
+    `- Command acceptance ladder rows: ${report.currentCommandAcceptanceLadderRowCount} (${report.currentCommandAcceptanceLadderSummary})`,
+    "",
+    "| order | command | role | acceptance signal | source artifacts | evidence labels | proof command | rerun command | hard gate | value recorded |",
+    "|---:|---|---|---|---|---|---|---|---|---:|",
+    formatCurrentCommandAcceptanceLadderRows(report.currentCommandAcceptanceLadderRows),
+    "",
     "## Current Action Post-Edit Verification",
     "",
     `- Verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`,
@@ -2636,6 +2759,8 @@ check(markdown.includes("Current Action Acceptance Remediation"), "release curre
 check(markdown.includes("Current action acceptance remediation ready:"), "release current blocker Markdown should include current action acceptance remediation readiness");
 check(markdown.includes("Current Release-Channel Key Remediation Matrix"), "release current blocker Markdown should include release-channel key remediation matrix");
 check(markdown.includes("Release-channel key remediation ready:"), "release current blocker Markdown should include release-channel key remediation readiness");
+check(markdown.includes("Current Command Acceptance Ladder"), "release current blocker Markdown should include current command acceptance ladder");
+check(markdown.includes("Current command acceptance ladder ready:"), "release current blocker Markdown should include current command acceptance ladder readiness");
 check(markdown.includes("Current Action Post-Edit Verification"), "release current blocker Markdown should include current action post-edit verification");
 check(markdown.includes("Current action post-edit verification ready:"), "release current blocker Markdown should include current action post-edit verification readiness");
 check(markdown.includes("Current Action Handoff Package"), "release current blocker Markdown should include current action handoff package");
@@ -2697,6 +2822,8 @@ console.log(`- Current action acceptance remediation ready: ${report.currentActi
 console.log(`- Current action acceptance remediation rows: ${report.currentActionAcceptanceRemediationRowCount} (${report.currentActionAcceptanceRemediationSummary})`);
 console.log(`- Release-channel key remediation ready: ${report.currentReleaseChannelKeyRemediationReady ? "yes" : "no"}`);
 console.log(`- Release-channel key remediation rows: ${report.currentReleaseChannelKeyRemediationRowCount} (${report.currentReleaseChannelKeyRemediationSummary})`);
+console.log(`- Current command acceptance ladder ready: ${report.currentCommandAcceptanceLadderReady ? "yes" : "no"}`);
+console.log(`- Current command acceptance ladder rows: ${report.currentCommandAcceptanceLadderRowCount} (${report.currentCommandAcceptanceLadderSummary})`);
 console.log(`- Current action post-edit verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`);
 console.log(`- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`);
 console.log(`- Current action handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`);
