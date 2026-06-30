@@ -306,6 +306,15 @@ function formatHardGateRequirementRows(rows) {
     .join("\n");
 }
 
+function formatBlockedHardGateActionRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | none | 0 | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.requirement)} | ${escapeCell(row.actionId)} | ${escapeCell(row.actionLabel)} | \`${escapeCell(row.nextCommand)}\` | ${escapeCell(row.rerunCommandSummary)} | ${row.blockerCount ?? 0} | ${escapeCell(row.blockerSummary)} | ${escapeCell(row.evidence)} | \`${escapeCell(row.hardGateCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatPriorityActionRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | none | no | none | none | none | 0 | 0 | 0 | 0 | no |";
@@ -493,6 +502,52 @@ function priorityActionRows(externalNextActions) {
       evidenceRowCount: Array.isArray(action.evidence) ? action.evidence.length : 0,
       readyCriteriaCount: stringArrayValue(action.readyCriteria).length,
       actionChecklistCount: stringArrayValue(action.actionChecklist).length,
+      valueRecorded: false
+    };
+  });
+}
+
+function actionIdForHardGateRequirement(row) {
+  const lower = `${textValue(row.label)} ${textValue(row.blockerSummary)}`.toLowerCase();
+  if (lower.includes("private inputs") || lower.includes("distribution-channel")) {
+    return "release-channel-metadata";
+  }
+  if (lower.includes("auto-update")) {
+    return "auto-update-feed";
+  }
+  if (lower.includes("developer id")) {
+    return "developer-id-signing";
+  }
+  if (lower.includes("gatekeeper")) {
+    return "notarized-gatekeeper";
+  }
+  if (lower.includes("notarization") || lower.includes("stapled")) {
+    return "notarization-stapling";
+  }
+  if (lower.includes("manual")) {
+    return "manual-channel-qa";
+  }
+  return "final-hard-gate";
+}
+
+function blockedHardGateActionRows({ hardGateBlockedRequirementRows, priorityRows, hardGateCommand }) {
+  const priorityById = new Map(valueFreeObjectRows(priorityRows).map((row) => [textValue(row.id), row]));
+  return valueFreeObjectRows(hardGateBlockedRequirementRows).map((row, index) => {
+    const actionId = actionIdForHardGateRequirement(row);
+    const action = priorityById.get(actionId) ?? null;
+    return {
+      order: index + 1,
+      requirement: textValue(row.label),
+      actionId,
+      actionLabel: textValue(action?.label, actionId),
+      nextCommand: textValue(action?.nextCommand, hardGateCommand),
+      rerunCommandSummary: textValue(action?.rerunCommandSummary, hardGateCommand),
+      actionFirstBlocker: textValue(action?.firstBlocker, textValue(row.blockerSummary)),
+      blockerCount: integerValue(row.blockerCount),
+      blockerSummary: textValue(row.blockerSummary),
+      evidence: textValue(row.evidence),
+      sourceField: "externalGate.requirements/externalNextActions.priorityActions",
+      hardGateCommand,
       valueRecorded: false
     };
   });
@@ -1395,6 +1450,11 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
   const hardGateBlockedRequirementRows = gateRequirementRows.filter((row) => !row.ready);
   const hardGateRequirementReadyCount = gateRequirementRows.filter((row) => row.ready).length;
   const hardGateRequirementBlockedCount = hardGateBlockedRequirementRows.length;
+  const blockedHardGateActionMatrixRows = blockedHardGateActionRows({
+    hardGateBlockedRequirementRows,
+    priorityRows: nextActionRows,
+    hardGateCommand
+  });
   const currentCommandSequence = commandSequenceFromRows(commandVerificationRows);
   const currentCommandSequenceCount =
     integerValue(externalProofBundle.currentCommandSequenceCount) || currentCommandSequence.length;
@@ -1645,6 +1705,22 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
         : "none",
     hardGateRequirementRows: gateRequirementRows,
     hardGateBlockedRequirementRows,
+    blockedHardGateActionMatrixReady:
+      blockedHardGateActionMatrixRows.length === hardGateBlockedRequirementRows.length &&
+      blockedHardGateActionMatrixRows.length > 0 &&
+      blockedHardGateActionMatrixRows.every(
+        (row) =>
+          row.valueRecorded === false &&
+          row.hardGateCommand === hardGateCommand &&
+          textValue(row.nextCommand).startsWith("npm run ") &&
+          textValue(row.actionId) !== "none"
+      ),
+    blockedHardGateActionMatrixRowCount: blockedHardGateActionMatrixRows.length,
+    blockedHardGateActionMatrixSummary:
+      blockedHardGateActionMatrixRows.length > 0
+        ? `${blockedHardGateActionMatrixRows.length} value-free blocked hard-gate action rows`
+        : "none",
+    blockedHardGateActionMatrixRows,
     hardGateBlockerCount: stringArrayValue(externalGate.externalDistributionGateBlockers).length,
     hardGateBlockerSummary:
       stringArrayValue(externalGate.externalDistributionGateBlockers).length > 0
@@ -2012,6 +2088,22 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.hardGateBlockerCount === stringArrayValue(externalGate.externalDistributionGateBlockers).length, "release current blocker should mirror hard-gate blocker count");
   check(typeof report.hardGateRequirementSummary === "string" && report.hardGateRequirementSummary.length > 0, "release current blocker should include hard-gate requirement summary");
   check(typeof report.hardGateBlockedRequirementSummary === "string" && report.hardGateBlockedRequirementSummary.length > 0, "release current blocker should include hard-gate blocked requirement summary");
+  check(report.blockedHardGateActionMatrixReady === true, "release current blocker blocked hard-gate action matrix should be ready");
+  check(report.blockedHardGateActionMatrixRowCount === report.blockedHardGateActionMatrixRows.length, "release current blocker blocked hard-gate action matrix row count should match rows");
+  check(report.blockedHardGateActionMatrixRowCount === report.hardGateRequirementBlockedCount, "release current blocker blocked hard-gate action matrix should mirror blocked hard-gate requirements");
+  check(typeof report.blockedHardGateActionMatrixSummary === "string" && report.blockedHardGateActionMatrixSummary.length > 0, "release current blocker should include blocked hard-gate action matrix summary");
+  check(report.blockedHardGateActionMatrixRows.every((row) => row.valueRecorded === false), "release current blocker blocked hard-gate action matrix rows should not record values");
+  check(report.blockedHardGateActionMatrixRows.every((row) => row.hardGateCommand === report.hardGateCommand), "release current blocker blocked hard-gate action matrix hard-gate commands should match hard gate command");
+  check(report.blockedHardGateActionMatrixRows.every((row) => typeof row.nextCommand === "string" && row.nextCommand.startsWith("npm run ")), "release current blocker blocked hard-gate action matrix should include next commands");
+  check(report.blockedHardGateActionMatrixRows.every((row) => typeof row.evidence === "string" && row.evidence.includes("build/desktop/")), "release current blocker blocked hard-gate action matrix should include evidence artifact paths");
+  check(report.blockedHardGateActionMatrixRows.every((row) => row.blockerCount > 0), "release current blocker blocked hard-gate action matrix should include blocker counts");
+  check(report.blockedHardGateActionMatrixRows.every((row) => row.sourceField === "externalGate.requirements/externalNextActions.priorityActions"), "release current blocker blocked hard-gate action matrix should identify source fields");
+  check(report.blockedHardGateActionMatrixRows.some((row) => row.actionId === "release-channel-metadata" && row.nextCommand === report.currentNextCommand), "release current blocker blocked hard-gate action matrix should include current release-channel action");
+  check(report.blockedHardGateActionMatrixRows.some((row) => row.actionId === "auto-update-feed" && row.nextCommand === "npm run desktop:auto-update-readiness-smoke"), "release current blocker blocked hard-gate action matrix should include auto-update action");
+  check(report.blockedHardGateActionMatrixRows.some((row) => row.actionId === "developer-id-signing" && row.nextCommand === "npm run desktop:developer-id-signing-smoke"), "release current blocker blocked hard-gate action matrix should include Developer ID action");
+  check(report.blockedHardGateActionMatrixRows.some((row) => row.actionId === "notarization-stapling" && row.nextCommand === "npm run desktop:notarization-smoke"), "release current blocker blocked hard-gate action matrix should include notarization action");
+  check(report.blockedHardGateActionMatrixRows.some((row) => row.actionId === "notarized-gatekeeper" && row.nextCommand === "npm run desktop:notarized-gatekeeper-smoke"), "release current blocker blocked hard-gate action matrix should include Gatekeeper action");
+  check(report.blockedHardGateActionMatrixRows.some((row) => row.actionId === "final-hard-gate" && row.nextCommand === report.hardGateCommand), "release current blocker blocked hard-gate action matrix should include final hard-gate action");
   check(report.sourceExternalNextActionsReady === true, "release current blocker should include ready external next-actions source evidence");
   check(report.sourceExternalNextActionsPath === relative(externalNextActionsJsonPath), "release current blocker should identify external next-actions source path");
   check(report.priorityActionCount === report.priorityActionRows.length, "release current blocker priority action count should match rows");
@@ -2450,6 +2542,8 @@ function buildMarkdown(report) {
     `- Hard gate would fail: ${report.hardGateWouldFail ? "yes" : "no"}`,
     `- Hard gate requirements: ${report.hardGateRequirementCount} (${report.hardGateRequirementSummary})`,
     `- Hard gate blocked requirements: ${report.hardGateRequirementBlockedCount} (${report.hardGateBlockedRequirementSummary})`,
+    `- Blocked hard-gate action matrix ready: ${report.blockedHardGateActionMatrixReady ? "yes" : "no"}`,
+    `- Blocked hard-gate action matrix rows: ${report.blockedHardGateActionMatrixRowCount} (${report.blockedHardGateActionMatrixSummary})`,
     `- Hard gate blockers: ${report.hardGateBlockerCount} (${report.hardGateBlockerSummary})`,
     `- Priority actions pending: ${report.priorityActionCount} (${report.priorityActionSummary})`,
     `- Current priority action: ${report.currentPriorityActionId} (${report.currentPriorityActionLabel})`,
@@ -2581,6 +2675,15 @@ function buildMarkdown(report) {
     "| requirement | ready | evidence | blocker count | blocker summary | value recorded |",
     "|---|---:|---|---:|---|---:|",
     formatHardGateRequirementRows(report.hardGateBlockedRequirementRows),
+    "",
+    "## Blocked Hard Gate Action Matrix",
+    "",
+    `- Blocked hard-gate action matrix ready: ${report.blockedHardGateActionMatrixReady ? "yes" : "no"}`,
+    `- Blocked hard-gate action matrix rows: ${report.blockedHardGateActionMatrixRowCount} (${report.blockedHardGateActionMatrixSummary})`,
+    "",
+    "| order | requirement | action id | action label | next command | rerun commands | blocker count | blocker summary | evidence | hard gate | value recorded |",
+    "|---:|---|---|---|---|---|---:|---|---|---|---:|",
+    formatBlockedHardGateActionRows(report.blockedHardGateActionMatrixRows),
     "",
     "## Priority Action Ladder",
     "",
@@ -2857,6 +2960,8 @@ check(markdown.includes("Release-Channel Unblock Rehearsal"), "release current b
 check(markdown.includes("Release-channel placeholder blocker cleared in rehearsal:"), "release current blocker Markdown should include release-channel unblock cleared status");
 check(markdown.includes("Hard Gate Requirement Ladder"), "release current blocker Markdown should include hard-gate requirement ladder");
 check(markdown.includes("Blocked Hard Gate Requirements"), "release current blocker Markdown should include blocked hard-gate requirements");
+check(markdown.includes("Blocked Hard Gate Action Matrix"), "release current blocker Markdown should include blocked hard-gate action matrix");
+check(markdown.includes("Blocked hard-gate action matrix ready:"), "release current blocker Markdown should include blocked hard-gate action matrix readiness");
 check(markdown.includes("Priority Action Ladder"), "release current blocker Markdown should include priority action ladder");
 check(markdown.includes("Current priority action aligned:"), "release current blocker Markdown should include priority action alignment");
 check(markdown.includes("Current Action Transition Preview"), "release current blocker Markdown should include current action transition preview");
@@ -2924,6 +3029,8 @@ console.log(`- Consistency ready: ${report.consistencyReady ? "yes" : "no"}`);
 console.log(`- Hard gate ready: ${report.hardGateReady ? "yes" : "no"}`);
 console.log(`- Hard gate requirements: ${report.hardGateRequirementCount} (${report.hardGateRequirementSummary})`);
 console.log(`- Hard gate blocked requirements: ${report.hardGateRequirementBlockedCount} (${report.hardGateBlockedRequirementSummary})`);
+console.log(`- Blocked hard-gate action matrix ready: ${report.blockedHardGateActionMatrixReady ? "yes" : "no"}`);
+console.log(`- Blocked hard-gate action matrix rows: ${report.blockedHardGateActionMatrixRowCount} (${report.blockedHardGateActionMatrixSummary})`);
 console.log(`- Priority actions pending: ${report.priorityActionCount} (${report.priorityActionSummary})`);
 console.log(`- Current priority action: ${report.currentPriorityActionId} (${report.currentPriorityActionLabel})`);
 console.log(`- Next priority action after current clears: ${report.nextPriorityActionId} (${report.nextPriorityActionLabel})`);
