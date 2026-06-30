@@ -631,6 +631,48 @@ function buildReleaseChannelPostEditOperatorReceiptSummary(report) {
 }
 
 function buildPostEditProofSequenceReceiptSummary(report) {
+  const upstreamRows = valueFreeObjectRows(report.externalProofBundlePostEditProofSequenceReceiptRows);
+  if (upstreamRows.length > 0) {
+    return {
+      postEditProofSequenceReceiptReady:
+        report.externalProofBundlePostEditProofSequenceReceiptReady === true &&
+        upstreamRows.length === 7 &&
+        upstreamRows.every((row) => row.ready === true && row.valueRecorded === false),
+      postEditProofSequenceReceiptRowCount: upstreamRows.length,
+      postEditProofSequenceReceiptSummary: textValue(
+        report.externalProofBundlePostEditProofSequenceReceiptSummary,
+        `${upstreamRows.length} value-free post-edit proof sequence rows`
+      ),
+      postEditProofSequenceReceiptRows: upstreamRows,
+      postEditProofSequenceReceiptDoctorCommand: textValue(
+        report.externalProofBundlePostEditProofSequenceReceiptDoctorCommand,
+        "npm run release:doctor"
+      ),
+      postEditProofSequenceReceiptCurrentBlockerCommand: textValue(
+        report.externalProofBundlePostEditProofSequenceReceiptCurrentBlockerCommand,
+        "npm run release:current-blocker"
+      ),
+      postEditProofSequenceReceiptNextActionsCommand: textValue(
+        report.externalProofBundlePostEditProofSequenceReceiptNextActionsCommand,
+        "npm run release:next-actions"
+      ),
+      postEditProofSequenceReceiptProofBundleCommand: textValue(
+        report.externalProofBundlePostEditProofSequenceReceiptProofBundleCommand,
+        "npm run release:proof-bundle"
+      ),
+      postEditProofSequenceReceiptProgressCommand: textValue(
+        report.externalProofBundlePostEditProofSequenceReceiptProgressCommand,
+        "npm run release:progress-smoke"
+      ),
+      postEditProofSequenceReceiptHardGateCommand: textValue(
+        report.externalProofBundlePostEditProofSequenceReceiptHardGateCommand,
+        "npm run release:external-check"
+      ),
+      postEditProofSequenceReceiptValueRecorded:
+        report.externalProofBundlePostEditProofSequenceReceiptValueRecorded === true ? true : false
+    };
+  }
+
   const envEditTarget = textValue(report.externalProofBundleCurrentEnvEditTarget, ".env.distribution.local");
   const placeholderKeyCount = integerValue(report.externalProofBundleCurrentPlaceholderKeyCount);
   const doctorCommand = textValue(report.releaseChannelPostEditOperatorReceiptProofCommand, "npm run release:doctor");
@@ -722,6 +764,7 @@ function buildPostEditProofSequenceReceiptSummary(report) {
 
 function buildExternalProofBundleSummary(externalProofBundle) {
   const releaseChannelPostEditOperatorReceiptRows = valueFreeObjectRows(externalProofBundle.releaseChannelPostEditOperatorReceiptRows);
+  const postEditProofSequenceReceiptRows = valueFreeObjectRows(externalProofBundle.postEditProofSequenceReceiptRows);
   return {
     sourceExternalProofBundleReady: true,
     sourceExternalProofBundlePath: relative(externalProofBundleJsonPath),
@@ -795,6 +838,40 @@ function buildExternalProofBundleSummary(externalProofBundle) {
     ),
     externalProofBundleReleaseChannelPostEditOperatorReceiptValueRecorded:
       externalProofBundle.releaseChannelPostEditOperatorReceiptValueRecorded === true ? true : false,
+    externalProofBundlePostEditProofSequenceReceiptReady:
+      externalProofBundle.postEditProofSequenceReceiptReady === true &&
+      integerValue(externalProofBundle.postEditProofSequenceReceiptRowCount) === postEditProofSequenceReceiptRows.length &&
+      postEditProofSequenceReceiptRows.length === 7 &&
+      postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false),
+    externalProofBundlePostEditProofSequenceReceiptRowCount: integerValue(externalProofBundle.postEditProofSequenceReceiptRowCount),
+    externalProofBundlePostEditProofSequenceReceiptSummary: textValue(externalProofBundle.postEditProofSequenceReceiptSummary, "none"),
+    externalProofBundlePostEditProofSequenceReceiptRows: postEditProofSequenceReceiptRows,
+    externalProofBundlePostEditProofSequenceReceiptDoctorCommand: textValue(
+      externalProofBundle.postEditProofSequenceReceiptDoctorCommand,
+      "npm run release:doctor"
+    ),
+    externalProofBundlePostEditProofSequenceReceiptCurrentBlockerCommand: textValue(
+      externalProofBundle.postEditProofSequenceReceiptCurrentBlockerCommand,
+      "npm run release:current-blocker"
+    ),
+    externalProofBundlePostEditProofSequenceReceiptNextActionsCommand: textValue(
+      externalProofBundle.postEditProofSequenceReceiptNextActionsCommand,
+      "npm run release:next-actions"
+    ),
+    externalProofBundlePostEditProofSequenceReceiptProofBundleCommand: textValue(
+      externalProofBundle.postEditProofSequenceReceiptProofBundleCommand,
+      "npm run release:proof-bundle"
+    ),
+    externalProofBundlePostEditProofSequenceReceiptProgressCommand: textValue(
+      externalProofBundle.postEditProofSequenceReceiptProgressCommand,
+      "npm run release:progress-smoke"
+    ),
+    externalProofBundlePostEditProofSequenceReceiptHardGateCommand: textValue(
+      externalProofBundle.postEditProofSequenceReceiptHardGateCommand,
+      "npm run release:external-check"
+    ),
+    externalProofBundlePostEditProofSequenceReceiptValueRecorded:
+      externalProofBundle.postEditProofSequenceReceiptValueRecorded === true ? true : false,
     externalProofBundleHardGateCommand: textValue(externalProofBundle.hardExternalGateCommand, "npm run release:external-check"),
     externalProofBundleLocalEnvLoaded: externalProofBundle.localEnvInput?.enabled === true,
     externalProofBundleCurrentEnvSummaryValueRecorded: false,
@@ -1593,8 +1670,29 @@ check(releaseProgressReport.releaseChannelPostEditOperatorReceiptNextActionsComm
 check(releaseProgressReport.releaseChannelPostEditOperatorReceiptHardGateCommand === "npm run release:external-check", "release progress report post-edit operator receipt should keep hard-gate command");
 check(releaseProgressReport.releaseChannelPostEditOperatorReceiptValueRecorded === false, "release progress report post-edit operator receipt should not record values");
 check(releaseProgressReport.postEditProofSequenceReceiptReady === true, "release progress report post-edit proof sequence receipt should be ready");
+check(
+  releaseProgressReport.externalProofBundlePostEditProofSequenceReceiptReady === true,
+  "release progress report should include ready external proof post-edit proof sequence receipt"
+);
+check(
+  releaseProgressReport.postEditProofSequenceReceiptReady ===
+    releaseProgressReport.externalProofBundlePostEditProofSequenceReceiptReady,
+  "release progress report should mirror external proof post-edit proof sequence readiness"
+);
+check(
+  releaseProgressReport.postEditProofSequenceReceiptRowCount ===
+    releaseProgressReport.externalProofBundlePostEditProofSequenceReceiptRowCount,
+  "release progress report should mirror external proof post-edit proof sequence row count"
+);
 check(releaseProgressReport.postEditProofSequenceReceiptRowCount === releaseProgressReport.postEditProofSequenceReceiptRows.length, "release progress report post-edit proof sequence row count should match rows");
 check(releaseProgressReport.postEditProofSequenceReceiptRowCount === 7, "release progress report post-edit proof sequence receipt should include seven rows");
+check(
+  sameJson(
+    releaseProgressReport.postEditProofSequenceReceiptRows,
+    releaseProgressReport.externalProofBundlePostEditProofSequenceReceiptRows
+  ),
+  "release progress report should mirror external proof post-edit proof sequence rows"
+);
 check(releaseProgressReport.postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release progress report post-edit proof sequence rows should be ready and value-free");
 check(releaseProgressReport.postEditProofSequenceReceiptRows.every((row) => typeof row.expectedEvidence === "string" && row.expectedEvidence.length > 0), "release progress report post-edit proof sequence rows should include expected evidence");
 check(releaseProgressReport.postEditProofSequenceReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release progress report post-edit proof sequence rows should include source fields");

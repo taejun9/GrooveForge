@@ -1655,6 +1655,112 @@ function buildReleaseChannelPostEditOperatorReceiptSummary({
   };
 }
 
+function buildPostEditProofSequenceReceiptSummary({
+  currentActionSummary = {},
+  releaseChannelPostEditOperatorReceipt = {},
+  hardExternalGateCommand = "npm run release:external-check"
+} = {}) {
+  const textOrFallback = (value, fallback) => (typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback);
+  const envEditTarget = textOrFallback(currentActionSummary.currentEnvEditTarget, currentLocalEnvEditTarget());
+  const placeholderKeyCount = Number.isInteger(currentActionSummary.currentPlaceholderKeyCount)
+    ? currentActionSummary.currentPlaceholderKeyCount
+    : 0;
+  const doctorCommand = textOrFallback(releaseChannelPostEditOperatorReceipt.releaseChannelPostEditOperatorReceiptProofCommand, "npm run release:doctor");
+  const currentBlockerCommand = textOrFallback(
+    releaseChannelPostEditOperatorReceipt.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand,
+    "npm run release:current-blocker"
+  );
+  const nextActionsCommand = textOrFallback(
+    releaseChannelPostEditOperatorReceipt.releaseChannelPostEditOperatorReceiptNextActionsCommand,
+    "npm run release:next-actions"
+  );
+  const proofBundleCommand = "npm run release:proof-bundle";
+  const progressCommand = "npm run release:progress-smoke";
+  const hardGateCommand = textOrFallback(
+    releaseChannelPostEditOperatorReceipt.releaseChannelPostEditOperatorReceiptHardGateCommand,
+    hardExternalGateCommand
+  );
+  const rows = [
+    {
+      order: 1,
+      step: "Private value edit",
+      ready: envEditTarget === ".env.distribution.local" && placeholderKeyCount >= 0,
+      command: `manual edit ${envEditTarget}`,
+      expectedEvidence: "current release-channel placeholder key count becomes 0 after the operator-owned edit",
+      sourceField: "currentEnvEditTarget/currentPlaceholderKeyCount",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      step: "Release doctor proof",
+      ready: doctorCommand === "npm run release:doctor",
+      command: doctorCommand,
+      expectedEvidence: "release doctor reports release-channel metadata without placeholder blockers",
+      sourceField: "releaseChannelPostEditOperatorReceiptProofCommand",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      step: "Current-blocker refresh",
+      ready: currentBlockerCommand === "npm run release:current-blocker",
+      command: currentBlockerCommand,
+      expectedEvidence: "current-blocker mirrors the advanced blocker and refreshed proof sequence",
+      sourceField: "releaseChannelPostEditOperatorReceiptBlockerRefreshCommand",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      step: "Next-actions refresh",
+      ready: nextActionsCommand === "npm run release:next-actions",
+      command: nextActionsCommand,
+      expectedEvidence: "next-actions reprioritizes downstream blockers after release-channel metadata clears",
+      sourceField: "releaseChannelPostEditOperatorReceiptNextActionsCommand",
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      step: "Proof bundle refresh",
+      ready: proofBundleCommand === "npm run release:proof-bundle",
+      command: proofBundleCommand,
+      expectedEvidence: "external proof bundle mirrors refreshed current-action evidence",
+      sourceField: "externalNextActionsJsonPath/proofBundleCommand",
+      valueRecorded: false
+    },
+    {
+      order: 6,
+      step: "Progress refresh",
+      ready: progressCommand === "npm run release:progress-smoke",
+      command: progressCommand,
+      expectedEvidence: "release progress mirrors the refreshed proof bundle and 10-plan status",
+      sourceField: "releaseProgressReportMode/currentTenPlanWindowLabel",
+      valueRecorded: false
+    },
+    {
+      order: 7,
+      step: "Hard-gate boundary",
+      ready: hardGateCommand === "npm run release:external-check",
+      command: hardGateCommand,
+      expectedEvidence: "hard gate remains blocked until downstream external proofs are ready; no completion claimed",
+      sourceField: "releaseChannelPostEditOperatorReceiptHardGateCommand/externalDistributionGateReady",
+      valueRecorded: false
+    }
+  ];
+
+  return {
+    postEditProofSequenceReceiptReady: rows.length === 7 && rows.every((row) => row.ready === true && row.valueRecorded === false),
+    postEditProofSequenceReceiptRowCount: rows.length,
+    postEditProofSequenceReceiptSummary: `${rows.length} value-free post-edit proof sequence rows`,
+    postEditProofSequenceReceiptRows: rows,
+    postEditProofSequenceReceiptDoctorCommand: doctorCommand,
+    postEditProofSequenceReceiptCurrentBlockerCommand: currentBlockerCommand,
+    postEditProofSequenceReceiptNextActionsCommand: nextActionsCommand,
+    postEditProofSequenceReceiptProofBundleCommand: proofBundleCommand,
+    postEditProofSequenceReceiptProgressCommand: progressCommand,
+    postEditProofSequenceReceiptHardGateCommand: hardGateCommand,
+    postEditProofSequenceReceiptValueRecorded: false
+  };
+}
+
 function formatCurrentActionAcceptanceRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| order | criterion | ready | evidence | proof command | rerun command | hard gate | value recorded |\n|---:|---|---:|---|---|---|---|---:|\n| 0 | none | no | none | none | none | none | no |";
@@ -1777,6 +1883,20 @@ function formatReleaseChannelPostEditOperatorReceiptRows(rows) {
     ...rows.map(
       (row) =>
         `| ${row.order} | ${escapeCell(row.step)} | ${readyLabel(row.ready)} | ${escapeCell(row.currentState)} | ${escapeCell(row.operatorAction)} | ${escapeCell(row.expectedPostEditSignal)} | ${escapeCell(row.command)} | ${escapeCell(row.proofCommand)} | ${escapeCell(row.rerunCommand)} | ${escapeCell(row.sourceField)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatPostEditProofSequenceReceiptRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | step | ready | command | expected evidence | source | value recorded |\n|---:|---|---:|---|---|---|---:|\n| 0 | none | no | none | none | none | no |";
+  }
+  return [
+    "| order | step | ready | command | expected evidence | source | value recorded |",
+    "|---:|---|---:|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.step)} | ${readyLabel(row.ready)} | ${escapeCell(row.command)} | ${escapeCell(row.expectedEvidence)} | ${escapeCell(row.sourceField)} | ${readyLabel(row.valueRecorded)} |`
     )
   ].join("\n");
 }
@@ -2758,6 +2878,11 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     releaseChannelPostEditReceipt,
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const postEditProofSequenceReceipt = buildPostEditProofSequenceReceiptSummary({
+    currentActionSummary,
+    releaseChannelPostEditOperatorReceipt,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
   const nextActionPreview = buildNextActionPreviewSummary(priorityActions);
 
   return {
@@ -2804,6 +2929,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...currentLocalEnvDiagnostics,
     ...releaseChannelPostEditReceipt,
     ...releaseChannelPostEditOperatorReceipt,
+    ...postEditProofSequenceReceipt,
     ...nextActionPreview,
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
@@ -2930,6 +3056,14 @@ function buildMarkdown(report) {
 - Release-channel post-edit operator proof command: \`${report.releaseChannelPostEditOperatorReceiptProofCommand}\`
 - Release-channel post-edit operator blocker refresh: \`${report.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand}\`
 - Release-channel post-edit operator next-actions refresh: \`${report.releaseChannelPostEditOperatorReceiptNextActionsCommand}\`
+- Post-edit proof sequence receipt ready: ${readyLabel(report.postEditProofSequenceReceiptReady)}
+- Post-edit proof sequence receipt rows: ${report.postEditProofSequenceReceiptRowCount} (${report.postEditProofSequenceReceiptSummary})
+- Post-edit proof sequence doctor command: \`${report.postEditProofSequenceReceiptDoctorCommand}\`
+- Post-edit proof sequence current-blocker command: \`${report.postEditProofSequenceReceiptCurrentBlockerCommand}\`
+- Post-edit proof sequence next-actions command: \`${report.postEditProofSequenceReceiptNextActionsCommand}\`
+- Post-edit proof sequence proof-bundle command: \`${report.postEditProofSequenceReceiptProofBundleCommand}\`
+- Post-edit proof sequence progress command: \`${report.postEditProofSequenceReceiptProgressCommand}\`
+- Post-edit proof sequence hard-gate command: \`${report.postEditProofSequenceReceiptHardGateCommand}\`
 - Next priority action after current clears: ${report.nextPriorityActionId} (${report.nextPriorityActionLabel})
 - Next action preview ready: ${readyLabel(report.nextActionPreviewReady)}
 - Next action preview ready criteria rows: ${report.nextActionPreviewReadyCriteriaRowCount} (${report.nextActionPreviewReadyCriteriaSummary})
@@ -3196,6 +3330,20 @@ ${formatReleaseChannelPostEditReceiptRows(report.releaseChannelPostEditReceiptRo
 
 ${formatReleaseChannelPostEditOperatorReceiptRows(report.releaseChannelPostEditOperatorReceiptRows)}
 
+## Post-Edit Proof Sequence Receipt
+
+- Receipt ready: ${readyLabel(report.postEditProofSequenceReceiptReady)}
+- Receipt rows: ${report.postEditProofSequenceReceiptRowCount} (${report.postEditProofSequenceReceiptSummary})
+- Doctor command: \`${report.postEditProofSequenceReceiptDoctorCommand}\`
+- Current-blocker command: \`${report.postEditProofSequenceReceiptCurrentBlockerCommand}\`
+- Next-actions command: \`${report.postEditProofSequenceReceiptNextActionsCommand}\`
+- Proof-bundle command: \`${report.postEditProofSequenceReceiptProofBundleCommand}\`
+- Progress command: \`${report.postEditProofSequenceReceiptProgressCommand}\`
+- Hard-gate command: \`${report.postEditProofSequenceReceiptHardGateCommand}\`
+- Value recorded: ${readyLabel(report.postEditProofSequenceReceiptValueRecorded)}
+
+${formatPostEditProofSequenceReceiptRows(report.postEditProofSequenceReceiptRows)}
+
 ## Next Action Preview
 
 - Preview ready: ${readyLabel(report.nextActionPreviewReady)}
@@ -3427,6 +3575,14 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     releaseChannelPostEditReceipt,
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const postEditProofSequenceReceipt = buildPostEditProofSequenceReceiptSummary({
+    currentActionSummary: {
+      ...currentActionSummary,
+      currentEnvEditTarget: localEnvEditTarget
+    },
+    releaseChannelPostEditOperatorReceipt,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
   const nextActionPreview = buildNextActionPreviewSummary(priorityActions);
 
   nextActionsReport = {
@@ -3473,6 +3629,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...currentLocalEnvDiagnostics,
     ...releaseChannelPostEditReceipt,
     ...releaseChannelPostEditOperatorReceipt,
+    ...postEditProofSequenceReceipt,
     ...nextActionPreview,
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
@@ -4530,6 +4687,110 @@ check(
   ),
   "external next actions release-channel post-edit operator receipt rows should include value-free operator actions"
 );
+check(typeof nextActionsReport.postEditProofSequenceReceiptReady === "boolean", "external next actions should include post-edit proof sequence receipt readiness");
+check(Number.isInteger(nextActionsReport.postEditProofSequenceReceiptRowCount), "external next actions should include post-edit proof sequence row count");
+check(
+  typeof nextActionsReport.postEditProofSequenceReceiptSummary === "string" &&
+    nextActionsReport.postEditProofSequenceReceiptSummary.length > 0,
+  "external next actions should include post-edit proof sequence summary"
+);
+check(Array.isArray(nextActionsReport.postEditProofSequenceReceiptRows), "external next actions should include post-edit proof sequence rows");
+check(
+  nextActionsReport.postEditProofSequenceReceiptReady === true,
+  "external next actions post-edit proof sequence receipt should be ready"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptRowCount === nextActionsReport.postEditProofSequenceReceiptRows.length,
+  "external next actions post-edit proof sequence row count should match rows"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptRowCount === 7,
+  "external next actions post-edit proof sequence receipt should include seven rows"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptRows.every(
+    (row, index) =>
+      row.order === index + 1 &&
+      typeof row.step === "string" &&
+      row.step.length > 0 &&
+      row.ready === true &&
+      typeof row.command === "string" &&
+      row.command.length > 0 &&
+      typeof row.expectedEvidence === "string" &&
+      row.expectedEvidence.length > 0 &&
+      typeof row.sourceField === "string" &&
+      row.sourceField.length > 0 &&
+      row.valueRecorded === false
+  ),
+  "external next actions post-edit proof sequence rows should include ready value-free evidence"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptRows.some(
+    (row) => row.step === "Private value edit" && row.command === "manual edit .env.distribution.local"
+  ),
+  "external next actions post-edit proof sequence should include private value edit"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptRows.some(
+    (row) => row.step === "Release doctor proof" && row.command === "npm run release:doctor"
+  ),
+  "external next actions post-edit proof sequence should include release doctor proof"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptRows.some(
+    (row) => row.step === "Current-blocker refresh" && row.command === "npm run release:current-blocker"
+  ),
+  "external next actions post-edit proof sequence should include current-blocker refresh"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptRows.some(
+    (row) => row.step === "Next-actions refresh" && row.command === "npm run release:next-actions"
+  ),
+  "external next actions post-edit proof sequence should include next-actions refresh"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptRows.some(
+    (row) => row.step === "Proof bundle refresh" && row.command === "npm run release:proof-bundle"
+  ),
+  "external next actions post-edit proof sequence should include proof-bundle refresh"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptRows.some(
+    (row) => row.step === "Progress refresh" && row.command === "npm run release:progress-smoke"
+  ),
+  "external next actions post-edit proof sequence should include progress refresh"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptRows.some(
+    (row) => row.step === "Hard-gate boundary" && row.command === nextActionsReport.hardExternalGateCommand
+  ),
+  "external next actions post-edit proof sequence should include hard-gate boundary"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptDoctorCommand === "npm run release:doctor",
+  "external next actions post-edit proof sequence should keep release doctor command"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptCurrentBlockerCommand === "npm run release:current-blocker",
+  "external next actions post-edit proof sequence should keep current-blocker command"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptNextActionsCommand === "npm run release:next-actions",
+  "external next actions post-edit proof sequence should keep next-actions command"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptProofBundleCommand === "npm run release:proof-bundle",
+  "external next actions post-edit proof sequence should keep proof-bundle command"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptProgressCommand === "npm run release:progress-smoke",
+  "external next actions post-edit proof sequence should keep progress-smoke command"
+);
+check(
+  nextActionsReport.postEditProofSequenceReceiptHardGateCommand === nextActionsReport.hardExternalGateCommand,
+  "external next actions post-edit proof sequence should keep hard-gate command"
+);
+check(nextActionsReport.postEditProofSequenceReceiptValueRecorded === false, "external next actions post-edit proof sequence should not record values");
 check(typeof nextActionsReport.nextPriorityActionId === "string", "external next actions should include the next priority action id");
 check(typeof nextActionsReport.nextPriorityActionLabel === "string", "external next actions should include the next priority action label");
 check(typeof nextActionsReport.nextPriorityActionNextCommand === "string", "external next actions should include the next priority action command");
@@ -5412,6 +5673,60 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
     "release channel metadata post-edit operator receipt should include value redaction"
   );
   check(
+    nextActionsReport.postEditProofSequenceReceiptReady === true,
+    "release channel metadata should include ready post-edit proof sequence receipt"
+  );
+  check(
+    nextActionsReport.postEditProofSequenceReceiptRowCount === 7,
+    "release channel metadata post-edit proof sequence should include seven rows"
+  );
+  check(
+    nextActionsReport.postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false),
+    "release channel metadata post-edit proof sequence rows should be ready and value-free"
+  );
+  check(
+    nextActionsReport.postEditProofSequenceReceiptRows.some(
+      (row) => row.step === "Private value edit" && row.command === "manual edit .env.distribution.local"
+    ),
+    "release channel metadata post-edit proof sequence should include private value edit"
+  );
+  check(
+    nextActionsReport.postEditProofSequenceReceiptRows.some(
+      (row) => row.step === "Release doctor proof" && row.command === "npm run release:doctor"
+    ),
+    "release channel metadata post-edit proof sequence should include release doctor proof"
+  );
+  check(
+    nextActionsReport.postEditProofSequenceReceiptRows.some(
+      (row) => row.step === "Current-blocker refresh" && row.command === "npm run release:current-blocker"
+    ),
+    "release channel metadata post-edit proof sequence should include current-blocker refresh"
+  );
+  check(
+    nextActionsReport.postEditProofSequenceReceiptRows.some(
+      (row) => row.step === "Next-actions refresh" && row.command === "npm run release:next-actions"
+    ),
+    "release channel metadata post-edit proof sequence should include next-actions refresh"
+  );
+  check(
+    nextActionsReport.postEditProofSequenceReceiptRows.some(
+      (row) => row.step === "Proof bundle refresh" && row.command === "npm run release:proof-bundle"
+    ),
+    "release channel metadata post-edit proof sequence should include proof-bundle refresh"
+  );
+  check(
+    nextActionsReport.postEditProofSequenceReceiptRows.some(
+      (row) => row.step === "Progress refresh" && row.command === "npm run release:progress-smoke"
+    ),
+    "release channel metadata post-edit proof sequence should include progress refresh"
+  );
+  check(
+    nextActionsReport.postEditProofSequenceReceiptRows.some(
+      (row) => row.step === "Hard-gate boundary" && row.command === "npm run release:external-check"
+    ),
+    "release channel metadata post-edit proof sequence should include hard-gate boundary"
+  );
+  check(
     nextActionsReport.currentPlaceholderRemediationRows.every(
       (item) =>
         nextActionsReport.currentPlaceholderKeys.includes(item.key) &&
@@ -5629,6 +5944,14 @@ check(markdown.includes("## Release-Channel Post-Edit Operator Receipt"), "exter
 check(
   markdown.includes("| order | step | ready | current state | operator action | expected post-edit signal | command | proof command | rerun command | source | value recorded |"),
   "external next actions Markdown should include release-channel post-edit operator receipt table"
+);
+check(markdown.includes("Post-edit proof sequence receipt ready:"), "external next actions Markdown should include post-edit proof sequence receipt readiness");
+check(markdown.includes("Post-edit proof sequence receipt rows:"), "external next actions Markdown should include post-edit proof sequence receipt rows");
+check(markdown.includes("Post-edit proof sequence doctor command:"), "external next actions Markdown should include post-edit proof sequence doctor command");
+check(markdown.includes("## Post-Edit Proof Sequence Receipt"), "external next actions Markdown should include post-edit proof sequence receipt section");
+check(
+  markdown.includes("| order | step | ready | command | expected evidence | source | value recorded |"),
+  "external next actions Markdown should include post-edit proof sequence receipt table"
 );
 check(markdown.includes("## Next Action Preview"), "external next actions Markdown should include next action preview section");
 check(
@@ -5884,6 +6207,14 @@ console.log(`- Release-channel post-edit operator receipt rows: ${nextActionsRep
 console.log(`- Release-channel post-edit operator proof command: ${nextActionsReport.releaseChannelPostEditOperatorReceiptProofCommand}`);
 console.log(`- Release-channel post-edit operator blocker refresh: ${nextActionsReport.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand}`);
 console.log(`- Release-channel post-edit operator next-actions refresh: ${nextActionsReport.releaseChannelPostEditOperatorReceiptNextActionsCommand}`);
+console.log(`- Post-edit proof sequence receipt ready: ${nextActionsReport.postEditProofSequenceReceiptReady ? "yes" : "no"}`);
+console.log(`- Post-edit proof sequence rows: ${nextActionsReport.postEditProofSequenceReceiptRowCount} (${nextActionsReport.postEditProofSequenceReceiptSummary})`);
+console.log(`- Post-edit proof sequence doctor command: ${nextActionsReport.postEditProofSequenceReceiptDoctorCommand}`);
+console.log(`- Post-edit proof sequence current-blocker command: ${nextActionsReport.postEditProofSequenceReceiptCurrentBlockerCommand}`);
+console.log(`- Post-edit proof sequence next-actions command: ${nextActionsReport.postEditProofSequenceReceiptNextActionsCommand}`);
+console.log(`- Post-edit proof sequence proof-bundle command: ${nextActionsReport.postEditProofSequenceReceiptProofBundleCommand}`);
+console.log(`- Post-edit proof sequence progress command: ${nextActionsReport.postEditProofSequenceReceiptProgressCommand}`);
+console.log(`- Post-edit proof sequence hard-gate command: ${nextActionsReport.postEditProofSequenceReceiptHardGateCommand}`);
 console.log(`- Next priority action after current clears: ${nextActionsReport.nextPriorityActionId} (${nextActionsReport.nextPriorityActionLabel})`);
 console.log(`- Next action preview ready: ${nextActionsReport.nextActionPreviewReady ? "yes" : "no"}`);
 console.log(`- Next action preview ready criteria rows: ${nextActionsReport.nextActionPreviewReadyCriteriaRowCount} (${nextActionsReport.nextActionPreviewReadyCriteriaSummary})`);

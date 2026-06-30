@@ -140,6 +140,7 @@ function buildCurrentEnvSummary(externalNextActions) {
   const currentProofChecklistRows = valueFreeObjectRows(externalNextActions?.currentProofChecklistRows);
   const currentCommandVerificationRows = valueFreeObjectRows(externalNextActions?.currentCommandVerificationRows);
   const releaseChannelPostEditOperatorReceiptRows = valueFreeObjectRows(externalNextActions?.releaseChannelPostEditOperatorReceiptRows);
+  const postEditProofSequenceReceiptRows = valueFreeObjectRows(externalNextActions?.postEditProofSequenceReceiptRows);
   const currentActionChecklistRows = actionChecklistRows(externalNextActions?.currentActionChecklist);
   return {
     currentRequiredKeyCount: integerValue(externalNextActions?.currentRequiredKeyCount),
@@ -194,6 +195,40 @@ function buildCurrentEnvSummary(externalNextActions) {
     ),
     releaseChannelPostEditOperatorReceiptValueRecorded:
       externalNextActions?.releaseChannelPostEditOperatorReceiptValueRecorded === true ? true : false,
+    postEditProofSequenceReceiptReady:
+      externalNextActions?.postEditProofSequenceReceiptReady === true &&
+      integerValue(externalNextActions?.postEditProofSequenceReceiptRowCount) === postEditProofSequenceReceiptRows.length &&
+      postEditProofSequenceReceiptRows.length === 7 &&
+      postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false),
+    postEditProofSequenceReceiptRowCount: integerValue(externalNextActions?.postEditProofSequenceReceiptRowCount),
+    postEditProofSequenceReceiptSummary: textValue(externalNextActions?.postEditProofSequenceReceiptSummary, "none"),
+    postEditProofSequenceReceiptRows: postEditProofSequenceReceiptRows,
+    postEditProofSequenceReceiptDoctorCommand: textValue(
+      externalNextActions?.postEditProofSequenceReceiptDoctorCommand,
+      "npm run release:doctor"
+    ),
+    postEditProofSequenceReceiptCurrentBlockerCommand: textValue(
+      externalNextActions?.postEditProofSequenceReceiptCurrentBlockerCommand,
+      "npm run release:current-blocker"
+    ),
+    postEditProofSequenceReceiptNextActionsCommand: textValue(
+      externalNextActions?.postEditProofSequenceReceiptNextActionsCommand,
+      "npm run release:next-actions"
+    ),
+    postEditProofSequenceReceiptProofBundleCommand: textValue(
+      externalNextActions?.postEditProofSequenceReceiptProofBundleCommand,
+      "npm run release:proof-bundle"
+    ),
+    postEditProofSequenceReceiptProgressCommand: textValue(
+      externalNextActions?.postEditProofSequenceReceiptProgressCommand,
+      "npm run release:progress-smoke"
+    ),
+    postEditProofSequenceReceiptHardGateCommand: textValue(
+      externalNextActions?.postEditProofSequenceReceiptHardGateCommand,
+      hardExternalGateCommand
+    ),
+    postEditProofSequenceReceiptValueRecorded:
+      externalNextActions?.postEditProofSequenceReceiptValueRecorded === true ? true : false,
     currentEnvSummaryValueRecorded: false
   };
 }
@@ -287,6 +322,18 @@ function formatReleaseChannelPostEditOperatorReceiptRows(rows) {
     .join("\n");
 }
 
+function formatPostEditProofSequenceReceiptRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no | none | none | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order ?? "?"} | ${escapeCell(row.step)} | ${row.ready ? "yes" : "no"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.expectedEvidence)} | ${escapeCell(row.sourceField)} | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
+    .join("\n");
+}
+
 function formatBlockers(blockers) {
   return blockers.length > 0 ? blockers.map((blocker) => `- ${blocker}`).join("\n") : "- None.";
 }
@@ -349,6 +396,14 @@ ${formatGateRequirementRows(summary.gateRequirementRows)}
 - Release-channel post-edit operator blocker refresh: \`${summary.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand}\`
 - Release-channel post-edit operator next-actions refresh: \`${summary.releaseChannelPostEditOperatorReceiptNextActionsCommand}\`
 - Release-channel post-edit operator hard gate: \`${summary.releaseChannelPostEditOperatorReceiptHardGateCommand}\`
+- Post-edit proof sequence receipt ready: ${summary.postEditProofSequenceReceiptReady ? "yes" : "no"}
+- Post-edit proof sequence receipt rows: ${summary.postEditProofSequenceReceiptRowCount} (${summary.postEditProofSequenceReceiptSummary})
+- Post-edit proof sequence doctor command: \`${summary.postEditProofSequenceReceiptDoctorCommand}\`
+- Post-edit proof sequence current-blocker command: \`${summary.postEditProofSequenceReceiptCurrentBlockerCommand}\`
+- Post-edit proof sequence next-actions command: \`${summary.postEditProofSequenceReceiptNextActionsCommand}\`
+- Post-edit proof sequence proof-bundle command: \`${summary.postEditProofSequenceReceiptProofBundleCommand}\`
+- Post-edit proof sequence progress command: \`${summary.postEditProofSequenceReceiptProgressCommand}\`
+- Post-edit proof sequence hard gate: \`${summary.postEditProofSequenceReceiptHardGateCommand}\`
 
 ## Current Action Checklist Rows
 
@@ -373,6 +428,12 @@ ${formatCommandVerificationRows(summary.currentCommandVerificationRows)}
 | order | step | ready | current state | operator action | expected post-edit signal | command | proof command | rerun command | source | value recorded |
 |---:|---|---:|---|---|---|---|---|---|---|---:|
 ${formatReleaseChannelPostEditOperatorReceiptRows(summary.releaseChannelPostEditOperatorReceiptRows)}
+
+## Post-Edit Proof Sequence Receipt
+
+| order | step | ready | command | expected evidence | source | value recorded |
+|---:|---|---:|---|---|---|---:|
+${formatPostEditProofSequenceReceiptRows(summary.postEditProofSequenceReceiptRows)}
 
 ## First Blockers
 
@@ -608,6 +669,26 @@ check(summary.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand === "np
 check(summary.releaseChannelPostEditOperatorReceiptNextActionsCommand === "npm run release:next-actions", "release proof bundle post-edit operator receipt should keep next-actions as refresh command");
 check(summary.releaseChannelPostEditOperatorReceiptHardGateCommand === hardExternalGateCommand, "release proof bundle post-edit operator receipt should keep hard-gate command");
 check(summary.releaseChannelPostEditOperatorReceiptValueRecorded === false, "release proof bundle post-edit operator receipt should not record values");
+check(summary.postEditProofSequenceReceiptReady === true, "release proof bundle should include ready post-edit proof sequence receipt");
+check(summary.postEditProofSequenceReceiptRowCount === summary.postEditProofSequenceReceiptRows.length, "release proof bundle post-edit proof sequence row count should match rows");
+check(summary.postEditProofSequenceReceiptRowCount === 7, "release proof bundle post-edit proof sequence should include seven rows");
+check(summary.postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release proof bundle post-edit proof sequence rows should be ready and value-free");
+check(summary.postEditProofSequenceReceiptRows.every((row) => typeof row.expectedEvidence === "string" && row.expectedEvidence.length > 0), "release proof bundle post-edit proof sequence rows should include expected evidence");
+check(summary.postEditProofSequenceReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release proof bundle post-edit proof sequence rows should include source fields");
+check(summary.postEditProofSequenceReceiptRows.some((row) => row.step === "Private value edit" && row.command === "manual edit .env.distribution.local"), "release proof bundle post-edit proof sequence should include private value edit");
+check(summary.postEditProofSequenceReceiptRows.some((row) => row.step === "Release doctor proof" && row.command === "npm run release:doctor"), "release proof bundle post-edit proof sequence should include release doctor proof");
+check(summary.postEditProofSequenceReceiptRows.some((row) => row.step === "Current-blocker refresh" && row.command === "npm run release:current-blocker"), "release proof bundle post-edit proof sequence should include current-blocker refresh");
+check(summary.postEditProofSequenceReceiptRows.some((row) => row.step === "Next-actions refresh" && row.command === "npm run release:next-actions"), "release proof bundle post-edit proof sequence should include next-actions refresh");
+check(summary.postEditProofSequenceReceiptRows.some((row) => row.step === "Proof bundle refresh" && row.command === "npm run release:proof-bundle"), "release proof bundle post-edit proof sequence should include proof-bundle refresh");
+check(summary.postEditProofSequenceReceiptRows.some((row) => row.step === "Progress refresh" && row.command === "npm run release:progress-smoke"), "release proof bundle post-edit proof sequence should include progress refresh");
+check(summary.postEditProofSequenceReceiptRows.some((row) => row.step === "Hard-gate boundary" && row.command === hardExternalGateCommand), "release proof bundle post-edit proof sequence should include hard-gate boundary");
+check(summary.postEditProofSequenceReceiptDoctorCommand === "npm run release:doctor", "release proof bundle post-edit proof sequence should keep release doctor command");
+check(summary.postEditProofSequenceReceiptCurrentBlockerCommand === "npm run release:current-blocker", "release proof bundle post-edit proof sequence should keep current-blocker command");
+check(summary.postEditProofSequenceReceiptNextActionsCommand === "npm run release:next-actions", "release proof bundle post-edit proof sequence should keep next-actions command");
+check(summary.postEditProofSequenceReceiptProofBundleCommand === "npm run release:proof-bundle", "release proof bundle post-edit proof sequence should keep proof-bundle command");
+check(summary.postEditProofSequenceReceiptProgressCommand === "npm run release:progress-smoke", "release proof bundle post-edit proof sequence should keep progress-smoke command");
+check(summary.postEditProofSequenceReceiptHardGateCommand === hardExternalGateCommand, "release proof bundle post-edit proof sequence should keep hard-gate command");
+check(summary.postEditProofSequenceReceiptValueRecorded === false, "release proof bundle post-edit proof sequence should not record values");
 check(summary.currentRequiredKeyCount === summary.currentRequiredKeys.length, "release proof bundle current required key count should match names");
 check(summary.currentPlaceholderKeyCount === summary.currentPlaceholderKeys.length, "release proof bundle current placeholder key count should match names");
 check(summary.currentEnvSummaryValueRecorded === false, "release proof bundle current env summary should not record values");
@@ -660,6 +741,9 @@ check(markdown.includes("Current Command Verification Rows"), "release proof bun
 check(markdown.includes("Release-channel post-edit operator receipt ready:"), "release proof bundle Markdown should include release-channel post-edit operator receipt readiness");
 check(markdown.includes("Release-Channel Post-Edit Operator Receipt"), "release proof bundle Markdown should include release-channel post-edit operator receipt table");
 check(markdown.includes("operator action"), "release proof bundle Markdown should include post-edit operator action guidance");
+check(markdown.includes("Post-edit proof sequence receipt ready:"), "release proof bundle Markdown should include post-edit proof sequence receipt readiness");
+check(markdown.includes("Post-Edit Proof Sequence Receipt"), "release proof bundle Markdown should include post-edit proof sequence receipt table");
+check(markdown.includes("expected evidence"), "release proof bundle Markdown should include post-edit proof sequence expected evidence");
 check(markdown.includes("Current command sequence:"), "release proof bundle Markdown should include current command sequence summary");
 check(markdown.includes("Hard external distribution gate: `npm run release:external-check`"), "release proof bundle Markdown should keep hard gate authoritative");
 check(markdown.includes("Private values recorded: no"), "release proof bundle Markdown should state value redaction");
@@ -704,6 +788,14 @@ console.log(`- Release-channel post-edit operator receipt rows: ${summary.releas
 console.log(`- Release-channel post-edit operator proof command: ${summary.releaseChannelPostEditOperatorReceiptProofCommand}`);
 console.log(`- Release-channel post-edit operator blocker refresh: ${summary.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand}`);
 console.log(`- Release-channel post-edit operator next-actions refresh: ${summary.releaseChannelPostEditOperatorReceiptNextActionsCommand}`);
+console.log(`- Post-edit proof sequence receipt ready: ${summary.postEditProofSequenceReceiptReady ? "yes" : "no"}`);
+console.log(`- Post-edit proof sequence rows: ${summary.postEditProofSequenceReceiptRowCount} (${summary.postEditProofSequenceReceiptSummary})`);
+console.log(`- Post-edit proof sequence doctor command: ${summary.postEditProofSequenceReceiptDoctorCommand}`);
+console.log(`- Post-edit proof sequence current-blocker command: ${summary.postEditProofSequenceReceiptCurrentBlockerCommand}`);
+console.log(`- Post-edit proof sequence next-actions command: ${summary.postEditProofSequenceReceiptNextActionsCommand}`);
+console.log(`- Post-edit proof sequence proof-bundle command: ${summary.postEditProofSequenceReceiptProofBundleCommand}`);
+console.log(`- Post-edit proof sequence progress command: ${summary.postEditProofSequenceReceiptProgressCommand}`);
+console.log(`- Post-edit proof sequence hard-gate command: ${summary.postEditProofSequenceReceiptHardGateCommand}`);
 console.log(`- Local env file loaded: ${summary.localEnvInput.enabled ? "yes" : "no"}`);
 console.log("- Private values recorded: no");
 console.log("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted");
