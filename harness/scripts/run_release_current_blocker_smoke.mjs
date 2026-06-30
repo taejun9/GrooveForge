@@ -2254,6 +2254,16 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     sourceReleaseChannelLiveCheckReady: releaseProgress.sourceReleaseChannelLiveCheckReady === true,
     sourceReleaseChannelLiveCheckPath: textValue(releaseProgress.sourceReleaseChannelLiveCheckPath, "none"),
     releaseChannelLiveCheckCommand: textValue(releaseProgress.releaseChannelLiveCheckCommand, "npm run release:channel-live-check"),
+    releaseChannelFirstProofCommandAfterPrivateEdits: textValue(
+      releaseProgress.releaseChannelFirstProofCommandAfterPrivateEdits,
+      "npm run release:channel-live-check"
+    ),
+    releaseChannelFirstProofCommandRole: textValue(
+      releaseProgress.releaseChannelFirstProofCommandRole,
+      "first value-free release-channel metadata check after ignored local env edits"
+    ),
+    releaseChannelFirstProofCommandValueRecorded:
+      releaseProgress.releaseChannelFirstProofCommandValueRecorded === true ? true : false,
     releaseChannelLiveCheckRefreshedByProgressReport: releaseProgress.releaseChannelLiveCheckRefreshedByThisReport === true,
     releaseChannelLiveCheckReady: releaseProgress.releaseChannelLiveCheckReady === true,
     releaseChannelLiveCheckCurrentReadyCount: integerValue(releaseProgress.releaseChannelLiveCheckCurrentReadyCount),
@@ -2912,6 +2922,12 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.sourceReleaseChannelLiveCheckReady === true, "release current blocker should mirror release-channel live-check source readiness");
   check(report.sourceReleaseChannelLiveCheckPath === releaseProgress.sourceReleaseChannelLiveCheckPath, "release current blocker should mirror release-channel live-check source path");
   check(report.releaseChannelLiveCheckCommand === "npm run release:channel-live-check", "release current blocker should mirror release-channel live-check command");
+  check(report.releaseChannelFirstProofCommandAfterPrivateEdits === releaseProgress.releaseChannelFirstProofCommandAfterPrivateEdits, "release current blocker should mirror first proof after private edits");
+  check(report.releaseChannelFirstProofCommandAfterPrivateEdits === "npm run release:channel-live-check", "release current blocker should identify live-check as the first proof after private edits");
+  check(report.releaseChannelFirstProofCommandAfterPrivateEdits === report.releaseChannelLiveCheckCommand, "release current blocker first proof command should match live-check command");
+  check(report.releaseChannelFirstProofCommandAfterPrivateEdits !== report.releaseChannelLiveCheckDoctorCommand, "release current blocker should keep first proof narrower than release doctor");
+  check(report.releaseChannelFirstProofCommandRole === "first value-free release-channel metadata check after ignored local env edits", "release current blocker should describe the live-check first proof role");
+  check(report.releaseChannelFirstProofCommandValueRecorded === false, "release current blocker first proof command should not record values");
   check(report.releaseChannelLiveCheckRefreshedByProgressReport === true, "release current blocker should mirror live-check refresh posture");
   check(report.releaseChannelLiveCheckReady === releaseProgress.releaseChannelLiveCheckReady, "release current blocker should mirror live-check readiness");
   check(report.releaseChannelLiveCheckRowCount === report.releaseChannelLiveCheckRows.length, "release current blocker live-check row count should match rows");
@@ -3067,6 +3083,7 @@ function buildMarkdown(report) {
     `- Release-channel live-check placeholder keys: ${report.releaseChannelLiveCheckCurrentPlaceholderKeyCount}`,
     `- Release-channel live-check placeholder edit locations: ${report.releaseChannelLiveCheckCurrentPlaceholderEditLocationCount}`,
     `- Release-channel live-check command: ${report.releaseChannelLiveCheckCommand}`,
+    `- Release-channel first proof after private edits: ${report.releaseChannelFirstProofCommandAfterPrivateEdits}`,
     `- Release-channel post-edit receipt ready: ${report.releaseChannelPostEditReceiptReady ? "yes" : "no"}`,
     `- Release-channel post-edit receipt rows: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary})`,
     `- Release-channel post-edit current-ready rows: ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}`,
@@ -3160,6 +3177,8 @@ function buildMarkdown(report) {
     `- Source path: ${report.sourceReleaseChannelLiveCheckPath}`,
     `- Refreshed by progress report: ${report.releaseChannelLiveCheckRefreshedByProgressReport ? "yes" : "no"}`,
     `- Command: \`${report.releaseChannelLiveCheckCommand}\``,
+    `- First proof after private edits: \`${report.releaseChannelFirstProofCommandAfterPrivateEdits}\``,
+    `- First proof role: ${report.releaseChannelFirstProofCommandRole}`,
     `- Live-check ready: ${report.releaseChannelLiveCheckReady ? "yes" : "no"}`,
     `- Current-ready rows: ${report.releaseChannelLiveCheckCurrentReadyCount}/${report.releaseChannelLiveCheckRowCount}`,
     `- Current env edit target: ${report.releaseChannelLiveCheckCurrentEnvEditTarget}`,
@@ -3705,6 +3724,7 @@ console.log(`- Release-channel live-check ready: ${report.releaseChannelLiveChec
 console.log(`- Release-channel live-check current-ready rows: ${report.releaseChannelLiveCheckCurrentReadyCount}/${report.releaseChannelLiveCheckRowCount}`);
 console.log(`- Release-channel live-check placeholder keys: ${report.releaseChannelLiveCheckCurrentPlaceholderKeyCount}`);
 console.log(`- Release-channel live-check placeholder edit locations: ${report.releaseChannelLiveCheckCurrentPlaceholderEditLocationCount}`);
+console.log(`- Release-channel first proof after private edits: ${report.releaseChannelFirstProofCommandAfterPrivateEdits}`);
 console.log(`- Release-channel post-edit receipt ready: ${report.releaseChannelPostEditReceiptReady ? "yes" : "no"}`);
 console.log(`- Release-channel post-edit receipt rows: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary})`);
 console.log(`- Release-channel post-edit current-ready rows: ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}`);
