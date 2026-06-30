@@ -5562,7 +5562,7 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
         row.diagnostic === "Current placeholder scope" &&
         row.status === "blocked" &&
         row.evidence.includes("4 current release-channel placeholders") &&
-        row.evidence.includes("21 total local env placeholders")
+        row.evidence.includes(`${nextActionsReport.localEnvPlaceholderKeyCount} total local env placeholders`)
     ),
     "release channel metadata local env diagnostics should summarize current and total placeholder scope"
   );

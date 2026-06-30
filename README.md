@@ -740,6 +740,7 @@ npm run release:post-edit-proof-success-smoke
 npm run release:post-edit-proof-bundle
 npm run release:final-handoff
 npm run release:final-handoff-success-redaction-smoke
+npm run release:final-handoff-refresh-smoke
 npm run release:channel-clearance-transition-smoke
 npm run release:auto-update-transition-smoke
 npm run release:update-feed-live-check
@@ -771,6 +772,8 @@ npm run release:current-blocker-smoke
 `npm run release:final-handoff` refreshes the post-edit proof bundle, strict success smoke, and real strict live-check receipt, then writes ignored release-final-handoff Markdown/JSON artifacts that tie the current private release-channel edit rows, strict proof rows, exact post-edit proof command order, hard-gate boundary, user-facing completion percentage, and current 10-plan cadence into one value-free operator handoff without URL/channel values or external distribution claims.
 
 `npm run release:final-handoff-success-redaction-smoke` writes synthetic value-free source artifacts under ignored build output, runs final handoff in a separate release-final-handoff-success-redaction-smoke Markdown/JSON artifact stem, and proves the strict-ready final handoff path stays free of URL/channel/private values, does not read or modify the real local env, and does not claim external distribution.
+
+`npm run release:final-handoff-refresh-smoke` runs `npm run release:proof-bundle`, `npm run release:progress-refresh-smoke`, `npm run release:final-handoff`, and `npm run release:final-handoff-success-redaction-smoke` in order. It writes ignored release-final-handoff-refresh-smoke Markdown/JSON artifacts proving progress, current-blocker, final-handoff, final-handoff success-redaction, post-edit-proof-bundle, and post-edit-proof labels match the latest 10-plan checkpoint without recording URL/channel values or claiming auto-update/external distribution.
 
 `npm run release:channel-clearance-transition-smoke` refreshes the final-handoff success-redaction smoke and the real current-blocker receipt, then writes ignored release-channel-clearance-transition-smoke Markdown/JSON artifacts that tie synthetic strict-ready final handoff proof to the real release-channel metadata blocker, the four real current placeholders, the `auto-update-feed` next priority action, the `npm run desktop:auto-update-readiness-smoke` proof command, the hard-gate boundary, and current 10-plan progress without recording URL/channel values or claiming external distribution. The release-channel clearance transition smoke ties synthetic strict-ready handoff proof to the real release-channel metadata blocker and the auto-update-feed next action.
 

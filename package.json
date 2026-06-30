@@ -73,6 +73,7 @@
     "release:post-edit-proof-bundle": "node harness/scripts/run_release_post_edit_proof_bundle.mjs",
     "release:final-handoff": "node harness/scripts/run_release_final_handoff.mjs",
     "release:final-handoff-success-redaction-smoke": "node harness/scripts/run_release_final_handoff_success_redaction_smoke.mjs",
+    "release:final-handoff-refresh-smoke": "node harness/scripts/run_release_final_handoff_refresh_smoke.mjs",
     "release:channel-clearance-transition-smoke": "node harness/scripts/run_release_channel_clearance_transition_smoke.mjs",
     "release:auto-update-transition-smoke": "node harness/scripts/run_release_auto_update_transition_smoke.mjs",
     "release:update-feed-live-check": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_release_update_feed_live_check.mjs",
