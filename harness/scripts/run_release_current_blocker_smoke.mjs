@@ -324,6 +324,15 @@ function formatPriorityActionRows(rows) {
     .join("\n");
 }
 
+function formatPriorityActionEvidenceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | no | none | none | no | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.actionId)} | ${escapeCell(row.actionLabel)} | ${row.actionReady ? "yes" : "no"} | \`${escapeCell(row.nextCommand)}\` | ${escapeCell(row.evidenceLabel)} | ${row.present ? "yes" : "no"} | ${escapeCell(row.evidencePath)} | ${escapeCell(row.rerunCommandSummary)} | ${escapeCell(row.firstBlocker)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatCurrentActionTransitionRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | none | none | no | none | none | none | none | none | no |";
@@ -505,6 +514,32 @@ function priorityActionRows(externalNextActions) {
       valueRecorded: false
     };
   });
+}
+
+function priorityActionEvidenceRows(externalNextActions) {
+  const rows = [];
+  for (const action of valueFreeObjectRows(externalNextActions.priorityActions)) {
+    const actionId = textValue(action.id);
+    const actionLabel = textValue(action.label);
+    const rerunCommands = stringArrayValue(action.rerunCommands);
+    for (const evidence of valueFreeObjectRows(action.evidence)) {
+      rows.push({
+        order: rows.length + 1,
+        actionId,
+        actionLabel,
+        actionReady: action.ready === true,
+        nextCommand: textValue(action.nextCommand),
+        rerunCommandSummary: rerunCommands.length > 0 ? rerunCommands.join(", ") : "none",
+        firstBlocker: textValue(action.firstBlocker),
+        evidenceLabel: textValue(evidence.label),
+        evidencePath: textValue(evidence.path),
+        present: evidence.present === true,
+        sourceField: "externalNextActions.priorityActions[].evidence",
+        valueRecorded: false
+      });
+    }
+  }
+  return rows;
 }
 
 function actionIdForHardGateRequirement(row) {
@@ -1389,6 +1424,7 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
   const commandVerificationRows = valueFreeObjectRows(externalProofBundle.currentCommandVerificationRows);
   const gateCommandVerificationRows = valueFreeObjectRows(externalGate.currentCommandVerificationRows);
   const nextActionRows = priorityActionRows(externalNextActions);
+  const priorityEvidenceRows = priorityActionEvidenceRows(externalNextActions);
   const currentPriorityAction = nextActionRows[0] ?? null;
   const nextPriorityAction = nextActionRows[1] ?? null;
   const rawPriorityActions = valueFreeObjectRows(externalNextActions.priorityActions);
@@ -1731,6 +1767,22 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     priorityActionCount: nextActionRows.length,
     priorityActionSummary: nextActionRows.length > 0 ? `${nextActionRows.length} pending value-free priority actions` : "none",
     priorityActionRows: nextActionRows,
+    priorityActionEvidenceMatrixReady:
+      priorityEvidenceRows.length === nextActionRows.reduce((count, row) => count + integerValue(row.evidenceRowCount), 0) &&
+      priorityEvidenceRows.length > 0 &&
+      priorityEvidenceRows.every(
+        (row) =>
+          row.valueRecorded === false &&
+          row.present === true &&
+          textValue(row.nextCommand).startsWith("npm run ") &&
+          textValue(row.evidencePath).includes("build/desktop/")
+      ),
+    priorityActionEvidenceMatrixRowCount: priorityEvidenceRows.length,
+    priorityActionEvidenceMatrixSummary:
+      priorityEvidenceRows.length > 0
+        ? `${priorityEvidenceRows.length} value-free priority action evidence rows`
+        : "none",
+    priorityActionEvidenceMatrixRows: priorityEvidenceRows,
     currentPriorityActionId: textValue(externalNextActions.currentActionId, currentPriorityAction?.id ?? "none"),
     currentPriorityActionLabel: textValue(externalNextActions.currentActionLabel, currentPriorityAction?.label ?? "none"),
     currentPriorityActionNextCommand: textValue(currentPriorityAction?.nextCommand, "none"),
@@ -2119,6 +2171,24 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.priorityActionRows.some((row) => row.id === "notarized-gatekeeper"), "release current blocker priority action ladder should include notarized Gatekeeper");
   check(report.priorityActionRows.some((row) => row.id === "manual-channel-qa"), "release current blocker priority action ladder should include manual channel QA");
   check(report.priorityActionRows.some((row) => row.id === "final-hard-gate"), "release current blocker priority action ladder should include final hard gate");
+  check(report.priorityActionEvidenceMatrixReady === true, "release current blocker priority action evidence matrix should be ready");
+  check(report.priorityActionEvidenceMatrixRowCount === report.priorityActionEvidenceMatrixRows.length, "release current blocker priority action evidence matrix row count should match rows");
+  check(report.priorityActionEvidenceMatrixRowCount === report.priorityActionRows.reduce((count, row) => count + integerValue(row.evidenceRowCount), 0), "release current blocker priority action evidence matrix should mirror priority action evidence counts");
+  check(typeof report.priorityActionEvidenceMatrixSummary === "string" && report.priorityActionEvidenceMatrixSummary.length > 0, "release current blocker should include priority action evidence matrix summary");
+  check(report.priorityActionEvidenceMatrixRows.every((row) => row.valueRecorded === false), "release current blocker priority action evidence matrix rows should not record values");
+  check(report.priorityActionEvidenceMatrixRows.every((row) => row.present === true), "release current blocker priority action evidence matrix rows should point at present artifacts");
+  check(report.priorityActionEvidenceMatrixRows.every((row) => typeof row.nextCommand === "string" && row.nextCommand.startsWith("npm run ")), "release current blocker priority action evidence matrix should include next commands");
+  check(report.priorityActionEvidenceMatrixRows.every((row) => typeof row.evidencePath === "string" && row.evidencePath.includes("build/desktop/")), "release current blocker priority action evidence matrix should include evidence artifact paths");
+  check(report.priorityActionEvidenceMatrixRows.every((row) => row.sourceField === "externalNextActions.priorityActions[].evidence"), "release current blocker priority action evidence matrix should identify source fields");
+  check(report.priorityActionRows.every((action) => report.priorityActionEvidenceMatrixRows.some((row) => row.actionId === action.id)), "release current blocker priority action evidence matrix should cover every priority action");
+  check(report.priorityActionEvidenceMatrixRows.some((row) => row.actionId === "release-channel-metadata" && /distribution-private-inputs\.json/i.test(row.evidencePath)), "release current blocker priority action evidence matrix should include release-channel private-input evidence");
+  check(report.priorityActionEvidenceMatrixRows.some((row) => row.actionId === "release-channel-metadata" && /distribution-channel-qa\.json/i.test(row.evidencePath)), "release current blocker priority action evidence matrix should include release-channel QA evidence");
+  check(report.priorityActionEvidenceMatrixRows.some((row) => row.actionId === "auto-update-feed" && /auto-update-readiness\.json/i.test(row.evidencePath)), "release current blocker priority action evidence matrix should include auto-update evidence");
+  check(report.priorityActionEvidenceMatrixRows.some((row) => row.actionId === "developer-id-signing" && /developer-id-signing\.json/i.test(row.evidencePath)), "release current blocker priority action evidence matrix should include Developer ID signing evidence");
+  check(report.priorityActionEvidenceMatrixRows.some((row) => row.actionId === "notarization-stapling" && /notarization\.json/i.test(row.evidencePath)), "release current blocker priority action evidence matrix should include notarization evidence");
+  check(report.priorityActionEvidenceMatrixRows.some((row) => row.actionId === "notarized-gatekeeper" && /notarized-gatekeeper\.json/i.test(row.evidencePath)), "release current blocker priority action evidence matrix should include Gatekeeper evidence");
+  check(report.priorityActionEvidenceMatrixRows.some((row) => row.actionId === "manual-channel-qa" && /distribution-manual-qa\.json/i.test(row.evidencePath)), "release current blocker priority action evidence matrix should include manual QA evidence");
+  check(report.priorityActionEvidenceMatrixRows.some((row) => row.actionId === "final-hard-gate" && /external-distribution-gate\.json/i.test(row.evidencePath)), "release current blocker priority action evidence matrix should include final hard-gate evidence");
   check(report.currentPriorityActionId === externalNextActions.currentActionId, "release current blocker should mirror external next-actions current action id");
   check(report.currentPriorityActionNextCommand === report.currentNextCommand, "release current blocker current priority action next command should match current next command");
   check(report.currentPriorityActionFirstBlocker === report.currentFirstBlocker, "release current blocker current priority action first blocker should match current first blocker");
@@ -2546,6 +2616,8 @@ function buildMarkdown(report) {
     `- Blocked hard-gate action matrix rows: ${report.blockedHardGateActionMatrixRowCount} (${report.blockedHardGateActionMatrixSummary})`,
     `- Hard gate blockers: ${report.hardGateBlockerCount} (${report.hardGateBlockerSummary})`,
     `- Priority actions pending: ${report.priorityActionCount} (${report.priorityActionSummary})`,
+    `- Priority action evidence matrix ready: ${report.priorityActionEvidenceMatrixReady ? "yes" : "no"}`,
+    `- Priority action evidence matrix rows: ${report.priorityActionEvidenceMatrixRowCount} (${report.priorityActionEvidenceMatrixSummary})`,
     `- Current priority action: ${report.currentPriorityActionId} (${report.currentPriorityActionLabel})`,
     `- Current priority action next command: \`${report.currentPriorityActionNextCommand}\``,
     `- Current priority action aligned: ${report.priorityActionCurrentMatchesCurrentBlocker ? "yes" : "no"}`,
@@ -2697,6 +2769,15 @@ function buildMarkdown(report) {
     "| order | id | ready | label | next command | rerun commands | placeholder keys | evidence rows | ready criteria | checklist steps | value recorded |",
     "|---:|---|---:|---|---|---|---:|---:|---:|---:|---:|",
     formatPriorityActionRows(report.priorityActionRows),
+    "",
+    "## Priority Action Evidence Matrix",
+    "",
+    `- Priority action evidence matrix ready: ${report.priorityActionEvidenceMatrixReady ? "yes" : "no"}`,
+    `- Priority action evidence matrix rows: ${report.priorityActionEvidenceMatrixRowCount} (${report.priorityActionEvidenceMatrixSummary})`,
+    "",
+    "| order | action id | action label | action ready | next command | evidence label | present | evidence path | rerun commands | first blocker | value recorded |",
+    "|---:|---|---|---:|---|---|---:|---|---|---|---:|",
+    formatPriorityActionEvidenceRows(report.priorityActionEvidenceMatrixRows),
     "",
     "## Current Action Transition Preview",
     "",
@@ -2964,6 +3045,8 @@ check(markdown.includes("Blocked Hard Gate Action Matrix"), "release current blo
 check(markdown.includes("Blocked hard-gate action matrix ready:"), "release current blocker Markdown should include blocked hard-gate action matrix readiness");
 check(markdown.includes("Priority Action Ladder"), "release current blocker Markdown should include priority action ladder");
 check(markdown.includes("Current priority action aligned:"), "release current blocker Markdown should include priority action alignment");
+check(markdown.includes("Priority Action Evidence Matrix"), "release current blocker Markdown should include priority action evidence matrix");
+check(markdown.includes("Priority action evidence matrix ready:"), "release current blocker Markdown should include priority action evidence matrix readiness");
 check(markdown.includes("Current Action Transition Preview"), "release current blocker Markdown should include current action transition preview");
 check(markdown.includes("Current action transition ready:"), "release current blocker Markdown should include current action transition readiness");
 check(markdown.includes("Next Action Preview"), "release current blocker Markdown should include next action preview");
@@ -3032,6 +3115,8 @@ console.log(`- Hard gate blocked requirements: ${report.hardGateRequirementBlock
 console.log(`- Blocked hard-gate action matrix ready: ${report.blockedHardGateActionMatrixReady ? "yes" : "no"}`);
 console.log(`- Blocked hard-gate action matrix rows: ${report.blockedHardGateActionMatrixRowCount} (${report.blockedHardGateActionMatrixSummary})`);
 console.log(`- Priority actions pending: ${report.priorityActionCount} (${report.priorityActionSummary})`);
+console.log(`- Priority action evidence matrix ready: ${report.priorityActionEvidenceMatrixReady ? "yes" : "no"}`);
+console.log(`- Priority action evidence matrix rows: ${report.priorityActionEvidenceMatrixRowCount} (${report.priorityActionEvidenceMatrixSummary})`);
 console.log(`- Current priority action: ${report.currentPriorityActionId} (${report.currentPriorityActionLabel})`);
 console.log(`- Next priority action after current clears: ${report.nextPriorityActionId} (${report.nextPriorityActionLabel})`);
 console.log(`- Current action transition rows: ${report.currentActionTransitionRowCount} (${report.currentActionTransitionSummary})`);
