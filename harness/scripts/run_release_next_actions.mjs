@@ -478,6 +478,10 @@ function formatKeyList(keys) {
   return Array.isArray(keys) && keys.length > 0 ? keys.map((key) => `- ${key}`).join("\n") : "- None.";
 }
 
+function formatInlineList(items) {
+  return Array.isArray(items) && items.length > 0 ? items.join(", ") : "none";
+}
+
 function guidanceForKeys(keys) {
   return (Array.isArray(keys) ? keys : [])
     .map((key) => {
@@ -1231,6 +1235,142 @@ function buildCurrentInputShapeChecklistSummary({
   };
 }
 
+function firstStringArray(...values) {
+  for (const value of values) {
+    if (Array.isArray(value)) {
+      return value.filter((item) => typeof item === "string" && item.length > 0);
+    }
+  }
+  return [];
+}
+
+function buildCurrentLocalEnvDiagnosticsSummary({
+  externalPreflight = {},
+  releaseDoctor = {},
+  currentEnvEditTarget = ".env.distribution.local",
+  currentPlaceholderKeyCount = 0
+} = {}) {
+  const filesChecked = firstStringArray(
+    externalPreflight.localEnvFilesChecked,
+    releaseDoctor.localEnvFilesChecked,
+    releaseDoctor.releasePrepareEnvExistingLocalEnvFilesChecked,
+    [distributionLocalEnvDefaults.defaultEnvFileName]
+  );
+  const presentFiles = firstStringArray(
+    externalPreflight.localEnvPresentFiles,
+    releaseDoctor.localEnvPresentFiles,
+    releaseDoctor.releasePrepareEnvExistingLocalEnvPresentFiles
+  );
+  const placeholderKeys = firstStringArray(
+    externalPreflight.localEnvPlaceholderKeys,
+    releaseDoctor.localEnvPlaceholderKeys,
+    releaseDoctor.releasePrepareEnvExistingLocalEnvPlaceholderKeys
+  );
+  const unknownKeys = firstStringArray(
+    externalPreflight.localEnvUnknownKeys,
+    releaseDoctor.localEnvUnknownKeys,
+    externalPreflight.localEnvInput?.unknownKeys,
+    releaseDoctor.localEnvInput?.unknownKeys
+  );
+  const malformedLines = firstStringArray(
+    externalPreflight.localEnvMalformedLines,
+    releaseDoctor.localEnvMalformedLines,
+    externalPreflight.localEnvInput?.malformedLines,
+    releaseDoctor.localEnvInput?.malformedLines
+  );
+  const skippedExistingKeys = firstStringArray(
+    externalPreflight.localEnvSkippedExistingKeys,
+    releaseDoctor.localEnvSkippedExistingKeys,
+    externalPreflight.localEnvInput?.skippedExistingKeys,
+    releaseDoctor.localEnvInput?.skippedExistingKeys
+  );
+  const loadedKeys = firstStringArray(
+    externalPreflight.localEnvLoadedKeys,
+    releaseDoctor.localEnvLoadedKeys,
+    externalPreflight.localEnvInput?.loadedKeys,
+    releaseDoctor.localEnvInput?.loadedKeys
+  );
+  const localEnvValueRecorded =
+    externalPreflight.localEnvValueRecorded === true ||
+    releaseDoctor.localEnvValueRecorded === true ||
+    releaseDoctor.releasePrepareEnvExistingLocalEnvValueRecorded === true ||
+    externalPreflight.localEnvInput?.valueRecorded === true ||
+    releaseDoctor.localEnvInput?.valueRecorded === true;
+  const rows = [
+    {
+      order: 1,
+      diagnostic: "Local env source files checked",
+      status: filesChecked.length > 0 ? "checked" : "missing",
+      evidence: `checked: ${formatInlineList(filesChecked)}; present: ${formatInlineList(presentFiles)}`,
+      sourceField: "externalPreflight.localEnvFilesChecked/presentFiles",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      diagnostic: "Current edit target present",
+      status: presentFiles.includes(currentEnvEditTarget) ? "present" : "missing",
+      evidence: currentEnvEditTarget,
+      sourceField: "externalPreflight.localEnvPresentFiles/currentEnvEditTarget",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      diagnostic: "Current placeholder scope",
+      status: currentPlaceholderKeyCount === 0 ? "clear" : "blocked",
+      evidence: `${currentPlaceholderKeyCount} current release-channel placeholders; ${placeholderKeys.length} total local env placeholders`,
+      sourceField: "currentPlaceholderKeys/localEnvPlaceholderKeys",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      diagnostic: "Unknown key scan",
+      status: unknownKeys.length === 0 ? "clean" : "needs-edit",
+      evidence: `${unknownKeys.length} unknown key names reported`,
+      sourceField: "localEnvUnknownKeys/localEnvInput.unknownKeys",
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      diagnostic: "Malformed line scan",
+      status: malformedLines.length === 0 ? "clean" : "needs-edit",
+      evidence: `${malformedLines.length} malformed line locations reported`,
+      sourceField: "localEnvMalformedLines/localEnvInput.malformedLines",
+      valueRecorded: false
+    },
+    {
+      order: 6,
+      diagnostic: "Existing environment overrides",
+      status: skippedExistingKeys.length === 0 ? "none" : "skipped",
+      evidence: `${skippedExistingKeys.length} existing environment key names skipped`,
+      sourceField: "localEnvSkippedExistingKeys/localEnvInput.skippedExistingKeys",
+      valueRecorded: false
+    },
+    {
+      order: 7,
+      diagnostic: "Loaded key redaction",
+      status: "redacted",
+      evidence: `${loadedKeys.length} non-placeholder key names loaded; values recorded no`,
+      sourceField: "localEnvLoadedKeys/localEnvInput.loadedKeys/valueRecorded",
+      valueRecorded: false
+    },
+    {
+      order: 8,
+      diagnostic: "Local env value recording",
+      status: localEnvValueRecorded ? "blocked" : "clean",
+      evidence: `local env values recorded ${localEnvValueRecorded ? "yes" : "no"}`,
+      sourceField: "localEnvValueRecorded/releasePrepareEnvExistingLocalEnvValueRecorded",
+      valueRecorded: false
+    }
+  ];
+  return {
+    currentLocalEnvDiagnosticsReady:
+      rows.length === 8 && rows.every((row) => row.valueRecorded === false) && localEnvValueRecorded === false,
+    currentLocalEnvDiagnosticRowCount: rows.length,
+    currentLocalEnvDiagnosticSummary: rows.length > 0 ? `${rows.length} value-free local env diagnostic rows` : "none",
+    currentLocalEnvDiagnosticRows: rows
+  };
+}
+
 function formatCurrentActionAcceptanceRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| order | criterion | ready | evidence | proof command | rerun command | hard gate | value recorded |\n|---:|---|---:|---|---|---|---|---:|\n| 0 | none | no | none | none | none | none | no |";
@@ -1311,6 +1451,20 @@ function formatCurrentInputShapeChecklistRows(rows) {
     ...rows.map(
       (row) =>
         `| ${row.order} | ${escapeCell(row.key)} | ${readyLabel(row.ready)} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.evidenceSource)} | ${escapeCell(row.proofCommand)} | ${escapeCell(row.rerunCommand)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatCurrentLocalEnvDiagnosticRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | diagnostic | status | evidence | source | value recorded |\n|---:|---|---|---|---|---:|\n| 0 | none | none | none | none | no |";
+  }
+  return [
+    "| order | diagnostic | status | evidence | source | value recorded |",
+    "|---:|---|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.diagnostic)} | ${escapeCell(row.status)} | ${escapeCell(row.evidence)} | ${escapeCell(row.sourceField)} | ${readyLabel(row.valueRecorded)} |`
     )
   ].join("\n");
 }
@@ -2274,6 +2428,11 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     doctorReleaseChannelFocus,
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const currentLocalEnvDiagnostics = buildCurrentLocalEnvDiagnosticsSummary({
+    releaseDoctor: releaseDoctor ?? {},
+    currentEnvEditTarget: currentLocalEnvEditTarget(),
+    currentPlaceholderKeyCount: currentActionSummary.currentPlaceholderKeyCount ?? 0
+  });
   const nextActionPreview = buildNextActionPreviewSummary(priorityActions);
 
   return {
@@ -2317,6 +2476,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...currentActionHandoff,
     ...currentPrivateEditSafety,
     ...currentInputShapeChecklist,
+    ...currentLocalEnvDiagnostics,
     ...nextActionPreview,
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
@@ -2433,6 +2593,8 @@ function buildMarkdown(report) {
 - Current private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})
 - Current input shape checklist ready: ${readyLabel(report.currentInputShapeChecklistReady)}
 - Current input shape checklist rows: ${report.currentInputShapeChecklistRowCount} (${report.currentInputShapeChecklistSummary})
+- Current local env diagnostics ready: ${readyLabel(report.currentLocalEnvDiagnosticsReady)}
+- Current local env diagnostic rows: ${report.currentLocalEnvDiagnosticRowCount} (${report.currentLocalEnvDiagnosticSummary})
 - Next priority action after current clears: ${report.nextPriorityActionId} (${report.nextPriorityActionLabel})
 - Next action preview ready: ${readyLabel(report.nextActionPreviewReady)}
 - Next action preview ready criteria rows: ${report.nextActionPreviewReadyCriteriaRowCount} (${report.nextActionPreviewReadyCriteriaSummary})
@@ -2669,6 +2831,13 @@ ${formatCurrentPrivateEditSafetyRows(report.currentPrivateEditSafetyRows)}
 
 ${formatCurrentInputShapeChecklistRows(report.currentInputShapeChecklistRows)}
 
+## Current Local Env Diagnostics
+
+- Diagnostics ready: ${readyLabel(report.currentLocalEnvDiagnosticsReady)}
+- Diagnostic rows: ${report.currentLocalEnvDiagnosticRowCount} (${report.currentLocalEnvDiagnosticSummary})
+
+${formatCurrentLocalEnvDiagnosticRows(report.currentLocalEnvDiagnosticRows)}
+
 ## Next Action Preview
 
 - Preview ready: ${readyLabel(report.nextActionPreviewReady)}
@@ -2875,6 +3044,12 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     doctorReleaseChannelFocus,
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const currentLocalEnvDiagnostics = buildCurrentLocalEnvDiagnosticsSummary({
+    externalPreflight,
+    releaseDoctor,
+    currentEnvEditTarget: localEnvEditTarget,
+    currentPlaceholderKeyCount: currentActionSummary.currentPlaceholderKeyCount ?? 0
+  });
   const nextActionPreview = buildNextActionPreviewSummary(priorityActions);
 
   nextActionsReport = {
@@ -2918,6 +3093,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...currentActionHandoff,
     ...currentPrivateEditSafety,
     ...currentInputShapeChecklist,
+    ...currentLocalEnvDiagnostics,
     ...nextActionPreview,
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
@@ -2995,6 +3171,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     nextActionsReport.currentActionHandoffReady === true &&
     nextActionsReport.currentPrivateEditSafetyReady === true &&
     nextActionsReport.currentInputShapeChecklistReady === true &&
+    nextActionsReport.currentLocalEnvDiagnosticsReady === true &&
     nextActionsReport.nextActionPreviewReady === true &&
     nextActionsReport.sourceValueRecorded === false &&
     nextActionsReport.sourceClaimedExternalDistribution === false;
@@ -3788,6 +3965,74 @@ check(
   ),
   "external next actions current input shape checklist rows should include shape guidance and current commands without values"
 );
+check(typeof nextActionsReport.currentLocalEnvDiagnosticsReady === "boolean", "external next actions should include current local env diagnostics readiness");
+check(Number.isInteger(nextActionsReport.currentLocalEnvDiagnosticRowCount), "external next actions should include current local env diagnostic row count");
+check(
+  typeof nextActionsReport.currentLocalEnvDiagnosticSummary === "string" &&
+    nextActionsReport.currentLocalEnvDiagnosticSummary.length > 0,
+  "external next actions should include current local env diagnostic summary"
+);
+check(Array.isArray(nextActionsReport.currentLocalEnvDiagnosticRows), "external next actions should include current local env diagnostic rows");
+check(
+  nextActionsReport.currentLocalEnvDiagnosticsReady === true,
+  "external next actions current local env diagnostics should be ready"
+);
+check(
+  nextActionsReport.currentLocalEnvDiagnosticRowCount === nextActionsReport.currentLocalEnvDiagnosticRows.length,
+  "external next actions current local env diagnostic row count should match rows"
+);
+check(
+  nextActionsReport.currentLocalEnvDiagnosticRowCount === 8,
+  "external next actions current local env diagnostics should include eight rows"
+);
+check(
+  nextActionsReport.currentLocalEnvDiagnosticRows.every(
+    (row, index) =>
+      row.order === index + 1 &&
+      typeof row.diagnostic === "string" &&
+      row.diagnostic.length > 0 &&
+      typeof row.status === "string" &&
+      row.status.length > 0 &&
+      typeof row.evidence === "string" &&
+      row.evidence.length > 0 &&
+      typeof row.sourceField === "string" &&
+      row.sourceField.length > 0 &&
+      row.valueRecorded === false
+  ),
+  "external next actions current local env diagnostic rows should include value-free source evidence"
+);
+check(
+  nextActionsReport.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Local env source files checked" && row.status === "checked"),
+  "external next actions current local env diagnostics should include checked files"
+);
+check(
+  nextActionsReport.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Current edit target present" && row.evidence === nextActionsReport.currentEnvEditTarget),
+  "external next actions current local env diagnostics should include current edit target presence"
+);
+check(
+  nextActionsReport.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Current placeholder scope" && row.evidence.includes("current release-channel placeholders")),
+  "external next actions current local env diagnostics should include current placeholder scope"
+);
+check(
+  nextActionsReport.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Unknown key scan" && row.evidence.includes("unknown key names reported")),
+  "external next actions current local env diagnostics should include unknown key scan"
+);
+check(
+  nextActionsReport.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Malformed line scan" && row.evidence.includes("malformed line locations reported")),
+  "external next actions current local env diagnostics should include malformed line scan"
+);
+check(
+  nextActionsReport.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Existing environment overrides" && row.evidence.includes("existing environment key names skipped")),
+  "external next actions current local env diagnostics should include skipped existing env scan"
+);
+check(
+  nextActionsReport.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Loaded key redaction" && row.evidence.includes("values recorded no")),
+  "external next actions current local env diagnostics should include loaded key redaction"
+);
+check(
+  nextActionsReport.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Local env value recording" && row.evidence.includes("values recorded no")),
+  "external next actions current local env diagnostics should include local env value-recording posture"
+);
 check(typeof nextActionsReport.nextPriorityActionId === "string", "external next actions should include the next priority action id");
 check(typeof nextActionsReport.nextPriorityActionLabel === "string", "external next actions should include the next priority action label");
 check(typeof nextActionsReport.nextPriorityActionNextCommand === "string", "external next actions should include the next priority action command");
@@ -4538,6 +4783,32 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
     "release channel metadata input shape checklist should cite value-free expected signals or guidance"
   );
   check(
+    nextActionsReport.currentLocalEnvDiagnosticsReady === true,
+    "release channel metadata should include ready local env diagnostics while placeholders remain"
+  );
+  check(
+    nextActionsReport.currentLocalEnvDiagnosticRowCount === 8,
+    "release channel metadata local env diagnostics should include eight rows while placeholders remain"
+  );
+  check(
+    nextActionsReport.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Current edit target present" && row.status === "present"),
+    "release channel metadata local env diagnostics should confirm the current edit target is present"
+  );
+  check(
+    nextActionsReport.currentLocalEnvDiagnosticRows.some(
+      (row) =>
+        row.diagnostic === "Current placeholder scope" &&
+        row.status === "blocked" &&
+        row.evidence.includes("4 current release-channel placeholders") &&
+        row.evidence.includes("21 total local env placeholders")
+    ),
+    "release channel metadata local env diagnostics should summarize current and total placeholder scope"
+  );
+  check(
+    nextActionsReport.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Local env value recording" && row.status === "clean"),
+    "release channel metadata local env diagnostics should keep local env value recording clean"
+  );
+  check(
     nextActionsReport.currentPlaceholderRemediationRows.every(
       (item) =>
         nextActionsReport.currentPlaceholderKeys.includes(item.key) &&
@@ -4680,6 +4951,8 @@ check(markdown.includes("Current private edit safety ready:"), "external next ac
 check(markdown.includes("Current private edit safety rows:"), "external next actions Markdown should include current private edit safety row status");
 check(markdown.includes("Current input shape checklist ready:"), "external next actions Markdown should include current input shape checklist readiness");
 check(markdown.includes("Current input shape checklist rows:"), "external next actions Markdown should include current input shape checklist row status");
+check(markdown.includes("Current local env diagnostics ready:"), "external next actions Markdown should include current local env diagnostics readiness");
+check(markdown.includes("Current local env diagnostic rows:"), "external next actions Markdown should include current local env diagnostic row status");
 check(markdown.includes("Next priority action after current clears:"), "external next actions Markdown should include next priority action status");
 check(markdown.includes("Next action preview ready:"), "external next actions Markdown should include next action preview readiness");
 check(markdown.includes("Next action preview ready criteria rows:"), "external next actions Markdown should include next action preview ready criteria status");
@@ -4732,6 +5005,11 @@ check(markdown.includes("## Current Input Shape Checklist"), "external next acti
 check(
   markdown.includes("| order | key | ready | expected shape | evidence source | proof command | rerun command | value recorded |"),
   "external next actions Markdown should include current input shape checklist table"
+);
+check(markdown.includes("## Current Local Env Diagnostics"), "external next actions Markdown should include current local env diagnostics section");
+check(
+  markdown.includes("| order | diagnostic | status | evidence | source | value recorded |"),
+  "external next actions Markdown should include current local env diagnostics table"
 );
 check(markdown.includes("## Next Action Preview"), "external next actions Markdown should include next action preview section");
 check(
@@ -4977,6 +5255,8 @@ console.log(`- Current private edit safety ready: ${nextActionsReport.currentPri
 console.log(`- Current private edit safety rows: ${nextActionsReport.currentPrivateEditSafetyRowCount} (${nextActionsReport.currentPrivateEditSafetySummary})`);
 console.log(`- Current input shape checklist ready: ${nextActionsReport.currentInputShapeChecklistReady ? "yes" : "no"}`);
 console.log(`- Current input shape checklist rows: ${nextActionsReport.currentInputShapeChecklistRowCount} (${nextActionsReport.currentInputShapeChecklistSummary})`);
+console.log(`- Current local env diagnostics ready: ${nextActionsReport.currentLocalEnvDiagnosticsReady ? "yes" : "no"}`);
+console.log(`- Current local env diagnostic rows: ${nextActionsReport.currentLocalEnvDiagnosticRowCount} (${nextActionsReport.currentLocalEnvDiagnosticSummary})`);
 console.log(`- Next priority action after current clears: ${nextActionsReport.nextPriorityActionId} (${nextActionsReport.nextPriorityActionLabel})`);
 console.log(`- Next action preview ready: ${nextActionsReport.nextActionPreviewReady ? "yes" : "no"}`);
 console.log(`- Next action preview ready criteria rows: ${nextActionsReport.nextActionPreviewReadyCriteriaRowCount} (${nextActionsReport.nextActionPreviewReadyCriteriaSummary})`);
