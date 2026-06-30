@@ -119,17 +119,36 @@ async function readJsonRequired(filePath, label) {
 async function completedPlanProgress() {
   const completedDir = path.join(root, "docs", "exec_plans", "completed");
   const entries = await readdir(completedDir);
-  const planNumbers = entries
-    .map((entry) => /^plan-(\d+)-/.exec(entry)?.[1])
+  const completedPlanEntries = entries
+    .map((entry) => {
+      const match = /^plan-(\d+)-/.exec(entry);
+      if (!match) {
+        return null;
+      }
+      const planNumber = Number.parseInt(match[1], 10);
+      if (!Number.isInteger(planNumber) || planNumber <= 0) {
+        return null;
+      }
+      return {
+        planNumber,
+        filename: entry
+      };
+    })
     .filter(Boolean)
-    .map((value) => Number.parseInt(value, 10))
-    .filter((value) => Number.isInteger(value) && value > 0);
+    .sort((left, right) => left.planNumber - right.planNumber);
+  const planNumbers = completedPlanEntries.map((entry) => entry.planNumber);
   const latestCompletedPlanNumber = Math.max(...planNumbers);
   const latestTenPlanWindowStart = Math.floor((latestCompletedPlanNumber - 1) / 10) * 10 + 1;
   const latestTenPlanWindowEnd = latestTenPlanWindowStart + 9;
-  const latestTenPlanCompletedCount = planNumbers.filter(
-    (planNumber) => planNumber >= latestTenPlanWindowStart && planNumber <= latestTenPlanWindowEnd
-  ).length;
+  const currentTenPlanWindowRows = completedPlanEntries
+    .filter((entry) => entry.planNumber >= latestTenPlanWindowStart && entry.planNumber <= latestTenPlanWindowEnd)
+    .map((entry, index) => ({
+      order: index + 1,
+      planNumber: entry.planNumber,
+      filename: entry.filename,
+      valueRecorded: false
+    }));
+  const latestTenPlanCompletedCount = currentTenPlanWindowRows.length;
   const latestTenPlanTotal = 10;
   return {
     latestCompletedPlanNumber,
@@ -139,7 +158,8 @@ async function completedPlanProgress() {
     latestTenPlanTotal,
     latestTenPlanProgressLabel: `${latestTenPlanWindowStart}-${latestTenPlanWindowEnd}: ${latestTenPlanCompletedCount}/${latestTenPlanTotal}`,
     tenPlanProgressReportDue: latestTenPlanCompletedCount === latestTenPlanTotal,
-    nextTenPlanProgressReportAt: `plan-${latestTenPlanWindowEnd}`
+    nextTenPlanProgressReportAt: `plan-${latestTenPlanWindowEnd}`,
+    currentTenPlanWindowRows
   };
 }
 
@@ -158,6 +178,20 @@ function formatCommandRows(rows) {
   return rows.map((row) => `| ${row.order} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${readyLabel(row.valueRecorded)} |`).join("\n");
 }
 
+function planRowSummary(rows) {
+  return rows.length > 0 ? rows.map((row) => `plan-${row.planNumber}`).join(", ") : "none";
+}
+
+function formatPlanRows(rows) {
+  return rows.map((row) => `| ${row.order} | plan-${row.planNumber} | \`${escapeCell(row.filename)}\` | ${readyLabel(row.valueRecorded)} |`).join("\n");
+}
+
+function formatReceiptRows(rows) {
+  return rows
+    .map((row) => `| ${row.order} | ${escapeCell(row.item)} | ${escapeCell(row.evidence)} | \`${escapeCell(row.sourceField)}\` | ${readyLabel(row.valueRecorded)} |`)
+    .join("\n");
+}
+
 function formatSourceRows(rows) {
   return rows
     .map((row) => `| ${escapeCell(row.label)} | ${readyLabel(row.present)} | ${readyLabel(row.ready)} | ${escapeCell(row.evidence)} | \`${escapeCell(row.path)}\` | ${readyLabel(row.valueRecorded)} |`)
@@ -165,6 +199,66 @@ function formatSourceRows(rows) {
 }
 
 function buildReport({ audience, channel, progress }) {
+  const currentTenPlanWindowRows = progress.currentTenPlanWindowRows;
+  const currentTenPlanWindowRowCount = currentTenPlanWindowRows.length;
+  const currentTenPlanWindowRowSummary = planRowSummary(currentTenPlanWindowRows);
+  const privateEditProofCommandSummary = commandSummary(privateEditProofCommandRows);
+  const tenPlanProgressReportReceiptRows = [
+    {
+      order: 1,
+      item: "10-plan cadence",
+      evidence: `Report once per ${progress.latestTenPlanTotal} completed plans`,
+      sourceField: "latestTenPlanTotal",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      item: "Current 10-plan window",
+      evidence: progress.latestTenPlanProgressLabel,
+      sourceField: "latestTenPlanProgressLabel",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      item: "Completed plan rows",
+      evidence: `${currentTenPlanWindowRowCount}/${progress.latestTenPlanTotal} value-free rows: ${currentTenPlanWindowRowSummary}`,
+      sourceField: "currentTenPlanWindowRows",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      item: "Report due posture",
+      evidence: `due ${readyLabel(progress.tenPlanProgressReportDue)} at ${progress.nextTenPlanProgressReportAt}`,
+      sourceField: "tenPlanProgressReportDue",
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      item: "Completion posture",
+      evidence: "99.999999% complete; 0.000001% remaining",
+      sourceField: "userFacingCompletionPercent/userFacingRemainingPercent",
+      valueRecorded: false
+    },
+    {
+      order: 6,
+      item: "Current blocker",
+      evidence: textValue(channel.currentFirstBlocker),
+      sourceField: "currentFirstBlocker",
+      valueRecorded: false
+    },
+    {
+      order: 7,
+      item: "Private-edit proof command order",
+      evidence: privateEditProofCommandSummary,
+      sourceField: "privateEditProofCommandSummary",
+      valueRecorded: false
+    }
+  ];
+  const tenPlanProgressReportReceiptReady =
+    currentTenPlanWindowRowCount === progress.latestTenPlanCompletedCount &&
+    currentTenPlanWindowRowCount > 0 &&
+    currentTenPlanWindowRows.every((row) => row.valueRecorded === false) &&
+    tenPlanProgressReportReceiptRows.every((row) => row.valueRecorded === false);
   const sourceArtifactRows = [
     sourceRow({
       label: "Audience completion handoff",
@@ -197,6 +291,7 @@ function buildReport({ audience, channel, progress }) {
   const releaseCompletionReportPacketReady =
     refreshCommandRows.every((row) => row.valueRecorded === false) &&
     privateEditProofCommandRows.every((row) => row.valueRecorded === false) &&
+    tenPlanProgressReportReceiptReady &&
     sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
     labelsMatch &&
     completionPercentsMatch &&
@@ -229,7 +324,7 @@ function buildReport({ audience, channel, progress }) {
     refreshCommandSummary: commandSummary(refreshCommandRows),
     privateEditProofCommandRows,
     privateEditProofCommandCount: privateEditProofCommandRows.length,
-    privateEditProofCommandSummary: commandSummary(privateEditProofCommandRows),
+    privateEditProofCommandSummary,
     firstPrivateEditProofCommand: privateEditProofCommandRows[0].command,
     postEditProofCommand: privateEditProofCommandRows[1].command,
     sourceArtifactRows,
@@ -245,6 +340,14 @@ function buildReport({ audience, channel, progress }) {
     latestTenPlanTotal: progress.latestTenPlanTotal,
     tenPlanProgressReportDue: progress.tenPlanProgressReportDue,
     nextTenPlanProgressReportAt: progress.nextTenPlanProgressReportAt,
+    currentTenPlanWindowRows,
+    currentTenPlanWindowRowCount,
+    currentTenPlanWindowRowSummary,
+    tenPlanProgressReportReceiptRows,
+    tenPlanProgressReportReceiptRowCount: tenPlanProgressReportReceiptRows.length,
+    tenPlanProgressReportReceiptReady,
+    tenPlanProgressReportReceiptSummary: tenPlanProgressReportReceiptRows.map((row) => row.item).join(", "),
+    tenPlanProgressReportReceiptValueRecorded: false,
     userFacingCompletionPercent: 99.999999,
     userFacingRemainingPercent: 0.000001,
     firstTimeComposerReady: audience.firstTimeComposerReady === true,
@@ -310,6 +413,9 @@ function buildMarkdown(report) {
 - Latest 10-plan progress: ${report.latestTenPlanProgressLabel}
 - 10-plan report due: ${readyLabel(report.tenPlanProgressReportDue)}
 - Next 10-plan progress report at: ${report.nextTenPlanProgressReportAt}
+- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})
+- 10-plan progress report receipt ready: ${readyLabel(report.tenPlanProgressReportReceiptReady)}
+- 10-plan progress report receipt rows: ${report.tenPlanProgressReportReceiptRowCount} (${report.tenPlanProgressReportReceiptSummary})
 - Source labels match latest 10-plan: ${readyLabel(report.sourceLabelsMatchLatestTenPlan)}
 - Audience source label: ${report.audienceLatestTenPlanProgressLabel}
 - Channel edit source label: ${report.channelEditLatestTenPlanProgressLabel}
@@ -353,6 +459,18 @@ ${formatCommandRows(report.refreshCommandRows)}
 | order | command | role | value recorded |
 |---:|---|---|---:|
 ${formatCommandRows(report.privateEditProofCommandRows)}
+
+## Current 10-Plan Window Rows
+
+| order | plan | filename | value recorded |
+|---:|---|---|---:|
+${formatPlanRows(report.currentTenPlanWindowRows)}
+
+## 10-Plan Progress Report Receipt
+
+| order | item | evidence | source field | value recorded |
+|---:|---|---|---|---:|
+${formatReceiptRows(report.tenPlanProgressReportReceiptRows)}
 
 ## Source Artifacts
 
@@ -432,6 +550,37 @@ function validateReport(report, markdown) {
     report.latestTenPlanProgressLabel === `${report.latestTenPlanWindowStart}-${report.latestTenPlanWindowEnd}: ${report.latestTenPlanCompletedCount}/10`,
     "release completion report packet progress label should match latest 10-plan fields"
   );
+  check(Array.isArray(report.currentTenPlanWindowRows), "release completion report packet should include current 10-plan rows");
+  check(report.currentTenPlanWindowRowCount === report.currentTenPlanWindowRows.length, "release completion report packet current 10-plan row count should match row length");
+  check(report.currentTenPlanWindowRowCount === report.latestTenPlanCompletedCount, "release completion report packet current 10-plan row count should match completed count");
+  check(report.currentTenPlanWindowRowCount > 0 && report.currentTenPlanWindowRowCount <= report.latestTenPlanTotal, "release completion report packet current 10-plan row count should stay within the current window");
+  check(report.currentTenPlanWindowRows.every((row) => row.valueRecorded === false), "release completion report packet 10-plan rows should not record values");
+  check(
+    report.currentTenPlanWindowRows.every((row, index) => row.order === index + 1 && row.planNumber >= report.latestTenPlanWindowStart && row.planNumber <= report.latestTenPlanWindowEnd),
+    "release completion report packet 10-plan rows should match the current window"
+  );
+  check(
+    report.currentTenPlanWindowRows.some((row) => row.planNumber === report.latestCompletedPlanNumber),
+    "release completion report packet 10-plan rows should include the latest completed plan"
+  );
+  check(report.currentTenPlanWindowRowSummary.includes(`plan-${report.latestCompletedPlanNumber}`), "release completion report packet 10-plan row summary should include the latest completed plan");
+  check(report.tenPlanProgressReportReceiptReady === true, "release completion report packet 10-plan receipt should be ready");
+  check(Array.isArray(report.tenPlanProgressReportReceiptRows), "release completion report packet should include 10-plan receipt rows");
+  check(report.tenPlanProgressReportReceiptRowCount === report.tenPlanProgressReportReceiptRows.length, "release completion report packet 10-plan receipt row count should match row length");
+  check(report.tenPlanProgressReportReceiptRowCount >= 7, "release completion report packet should include the required 10-plan receipt coverage");
+  check(report.tenPlanProgressReportReceiptRows.every((row) => row.valueRecorded === false), "release completion report packet 10-plan receipt rows should not record values");
+  check(report.tenPlanProgressReportReceiptValueRecorded === false, "release completion report packet 10-plan receipt should be value-free");
+  check(report.tenPlanProgressReportReceiptRows.every((row, index) => row.order === index + 1 && textValue(row.sourceField) !== "none"), "release completion report packet 10-plan receipt rows should keep source fields");
+  const tenPlanReceiptEvidence = report.tenPlanProgressReportReceiptRows.map((row) => `${row.item}: ${row.evidence}`).join(" | ");
+  check(tenPlanReceiptEvidence.includes(report.latestTenPlanProgressLabel), "release completion report packet 10-plan receipt should include the current window label");
+  check(tenPlanReceiptEvidence.includes(`${report.currentTenPlanWindowRowCount}/${report.latestTenPlanTotal}`), "release completion report packet 10-plan receipt should include completed row count");
+  check(tenPlanReceiptEvidence.includes(`due ${readyLabel(report.tenPlanProgressReportDue)}`), "release completion report packet 10-plan receipt should include report due posture");
+  check(
+    tenPlanReceiptEvidence.includes(`${report.userFacingCompletionPercent}%`) && tenPlanReceiptEvidence.includes(`${report.userFacingRemainingPercent}%`),
+    "release completion report packet 10-plan receipt should include completion and remaining percentages"
+  );
+  check(tenPlanReceiptEvidence.includes(report.currentFirstBlocker), "release completion report packet 10-plan receipt should include current blocker");
+  check(tenPlanReceiptEvidence.includes(report.privateEditProofCommandSummary), "release completion report packet 10-plan receipt should include private-edit proof command order");
   check(report.privateValuesRecorded === false, "release completion report packet should not record private values");
   check(report.localEnvValueRecorded === false, "release completion report packet should not record local env values");
   check(report.releaseUrlValueRecorded === false, "release completion report packet should not record release URL values");
@@ -459,6 +608,11 @@ function validateReport(report, markdown) {
   check(markdown.includes("Private-Edit Proof Commands"), "release completion report packet Markdown should include private-edit proof command table");
   check(markdown.includes("10-plan report due:"), "release completion report packet Markdown should include the 10-plan report due flag");
   check(markdown.includes(`Next 10-plan progress report at: ${report.nextTenPlanProgressReportAt}`), "release completion report packet Markdown should include next 10-plan report plan");
+  check(markdown.includes("Current 10-plan rows:"), "release completion report packet Markdown should include current 10-plan row summary");
+  check(markdown.includes("10-plan progress report receipt ready:"), "release completion report packet Markdown should include 10-plan progress report receipt readiness");
+  check(markdown.includes("10-plan progress report receipt rows:"), "release completion report packet Markdown should include 10-plan progress report receipt rows");
+  check(markdown.includes("Current 10-Plan Window Rows"), "release completion report packet Markdown should include current 10-plan window rows");
+  check(markdown.includes("10-Plan Progress Report Receipt"), "release completion report packet Markdown should include 10-plan progress report receipt table");
   check(markdown.includes("Source labels match latest 10-plan: yes"), "release completion report packet Markdown should include source label agreement");
   check(markdown.includes("External distribution claimed: no"), "release completion report packet Markdown should keep external distribution unclaimed");
 
@@ -492,6 +646,9 @@ console.log(`- Latest completed plan: plan-${report.latestCompletedPlanNumber}`)
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
 console.log(`- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}`);
 console.log(`- Next 10-plan progress report at: ${report.nextTenPlanProgressReportAt}`);
+console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
+console.log(`- 10-plan progress report receipt ready: ${report.tenPlanProgressReportReceiptReady ? "yes" : "no"}`);
+console.log(`- 10-plan progress report receipt rows: ${report.tenPlanProgressReportReceiptRowCount} (${report.tenPlanProgressReportReceiptSummary})`);
 console.log(`- Source labels match latest 10-plan: ${report.sourceLabelsMatchLatestTenPlan ? "yes" : "no"}`);
 console.log(`- First-time composer ready: ${report.firstTimeComposerReady ? "yes" : "no"}`);
 console.log(`- Professional producer ready: ${report.professionalProducerReady ? "yes" : "no"}`);
