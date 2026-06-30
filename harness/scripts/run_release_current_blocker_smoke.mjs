@@ -945,6 +945,7 @@ function currentActionAcceptanceRemediationRows({
 function currentReleaseChannelKeyRemediationRows({
   currentRequiredKeys,
   currentPlaceholderEditLocations,
+  currentEnvEditRows,
   currentInputShapeChecklistRows,
   acceptanceRows,
   currentNextCommand,
@@ -952,9 +953,9 @@ function currentReleaseChannelKeyRemediationRows({
   hardGateCommand
 }) {
   const locationByKey = new Map(valueFreeObjectRows(currentPlaceholderEditLocations).map((row) => [textValue(row.key), row]));
+  const envEditByKey = new Map(valueFreeObjectRows(currentEnvEditRows).map((row) => [textValue(row.key), row]));
   const shapeByKey = new Map(valueFreeObjectRows(currentInputShapeChecklistRows).map((row) => [textValue(row.key), row]));
   const acceptanceCriteria = valueFreeObjectRows(acceptanceRows)
-    .filter((row) => row.ready !== true)
     .map((row) => textValue(row.criterion))
     .join("; ");
   const acceptanceSourceFields = [
@@ -965,14 +966,22 @@ function currentReleaseChannelKeyRemediationRows({
 
   return stringArrayValue(currentRequiredKeys).map((key, index) => {
     const locationRow = locationByKey.get(key) ?? {};
+    const envEditRow = envEditByKey.get(key) ?? {};
     const shapeRow = shapeByKey.get(key) ?? {};
+    const location =
+      textValue(locationRow.location, "none") !== "none"
+        ? textValue(locationRow.location)
+        : textValue(
+            envEditRow.location,
+            textValue(locationRow.file) !== "none" && Number.isInteger(locationRow.line) ? `${locationRow.file}:${locationRow.line}` : "none"
+          );
     return {
       order: index + 1,
       key,
-      location: textValue(locationRow.location, textValue(locationRow.file) !== "none" && Number.isInteger(locationRow.line) ? `${locationRow.file}:${locationRow.line}` : "none"),
-      placeholder: locationRow.placeholder === true,
+      location,
+      placeholder: locationRow.placeholder === true || envEditRow.placeholder === true,
       expectedShape: textValue(shapeRow.expectedShape, "shape evidence pending"),
-      evidenceSource: `${textValue(locationRow.location, "missing location")}; ${textValue(shapeRow.evidenceSource, "missing shape evidence")}`,
+      evidenceSource: `${location}; ${textValue(shapeRow.evidenceSource, "missing shape evidence")}`,
       acceptanceCriteriaImpacted: acceptanceCriteria || "none",
       acceptanceSourceFields,
       proofCommand: currentNextCommand,
@@ -1237,16 +1246,20 @@ function privateEditSafetyRows({
   currentPlaceholderKeyCount,
   currentRequiredKeyCount,
   currentPlaceholderEditLocationSummary,
+  currentNextCommand,
   currentRerunCommand,
   currentCommandSequence,
   hardGateCommand
 }) {
   const commandSequence = stringArrayValue(currentCommandSequence);
+  const missingLocalEnv = currentNextCommand === "npm run release:prepare-env" && currentPlaceholderKeyCount === 0;
   return [
     {
       order: 1,
       check: "Private edits stay in ignored local env target",
-      ready: currentEnvEditTarget === ".env.distribution.local" && currentPlaceholderKeyCount === currentRequiredKeyCount,
+      ready:
+        currentEnvEditTarget === ".env.distribution.local" &&
+        (currentPlaceholderKeyCount === currentRequiredKeyCount || (missingLocalEnv && currentRequiredKeyCount === releaseChannelMetadataKeys.length)),
       evidence: `${currentEnvEditTarget}; ${currentPlaceholderKeyCount}/${currentRequiredKeyCount} current release-channel placeholders; ${currentPlaceholderEditLocationSummary}`,
       command: currentRerunCommand,
       valueRecorded: false
@@ -1262,7 +1275,9 @@ function privateEditSafetyRows({
     {
       order: 3,
       check: "Post-edit rerun order is explicit",
-      ready: commandSequence.includes("npm run release:doctor") && commandSequence.includes(currentRerunCommand),
+      ready:
+        (commandSequence.includes("npm run release:doctor") && commandSequence.includes(currentRerunCommand)) ||
+        (missingLocalEnv && commandSequence.includes("npm run release:prepare-env") && commandSequence.includes(currentRerunCommand)),
       evidence: formatCommandSummary(commandSequence),
       command: currentRerunCommand,
       valueRecorded: false
@@ -1684,6 +1699,7 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentPlaceholderKeyCount: proofPlaceholderKeys.length,
     currentRequiredKeyCount: proofRequiredKeys.length,
     currentPlaceholderEditLocationSummary,
+    currentNextCommand,
     currentRerunCommand,
     currentCommandSequence,
     hardGateCommand
@@ -1712,6 +1728,7 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
   const keyRemediationRows = currentReleaseChannelKeyRemediationRows({
     currentRequiredKeys: proofRequiredKeys,
     currentPlaceholderEditLocations: proofPlaceholderLocations,
+    currentEnvEditRows: externalProofBundle.currentEnvEditRows,
     currentInputShapeChecklistRows: inputShapeRows,
     acceptanceRows,
     currentNextCommand,
@@ -2378,6 +2395,15 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   const rawNextPrerequisiteCommands = stringArrayValue(rawNextPriorityAction.prerequisiteCommands);
   const rawNextOperatorActions = stringArrayValue(rawNextPriorityAction.operatorActions);
   const rawNextEnvEditRows = valueFreeObjectRows(rawNextPriorityAction.envEditRows);
+  const missingLocalEnvCurrentBlocker =
+    report.currentNextCommand === "npm run release:prepare-env" ||
+    String(report.currentFirstBlocker ?? "").includes("local distribution env file is not loaded");
+  const postEditProofCommand = missingLocalEnvCurrentBlocker
+    ? report.releaseChannelPostEditReceiptProofCommand
+    : report.currentNextCommand;
+  const postEditRerunCommand = missingLocalEnvCurrentBlocker
+    ? report.releaseChannelPostEditReceiptRerunCommand
+    : report.currentRerunCommand;
   check(report.releaseCurrentBlockerReady === true, "release current blocker receipt should be ready");
   check(report.appName === appName, "release current blocker receipt should identify GrooveForge");
   check(report.bundleId === bundleId, `release current blocker receipt should identify ${bundleId}`);
@@ -2631,7 +2657,9 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentActionAcceptanceRemediationRows.every((row) => typeof row.operatorFix === "string" && row.operatorFix.length > 0), "release current blocker current action acceptance remediation rows should include operator fixes");
   check(report.currentActionAcceptanceRemediationRows.every((row) => typeof row.evidenceToCheck === "string" && row.evidenceToCheck.length > 0), "release current blocker current action acceptance remediation rows should include evidence to check");
   check(report.currentActionAcceptanceRemediationRows.every((row) => typeof row.expectedReadySignal === "string" && row.expectedReadySignal.length > 0), "release current blocker current action acceptance remediation rows should include expected ready signals");
-  check(report.currentActionAcceptanceRemediationRows.some((row) => /input shape checklist/i.test(row.evidenceToCheck)), "release current blocker current action acceptance remediation should reference input shape checklist");
+  if (!missingLocalEnvCurrentBlocker) {
+    check(report.currentActionAcceptanceRemediationRows.some((row) => /input shape checklist/i.test(row.evidenceToCheck)), "release current blocker current action acceptance remediation should reference input shape checklist");
+  }
   check(report.currentActionAcceptanceRemediationRows.some((row) => /local env diagnostics/i.test(row.evidenceToCheck)), "release current blocker current action acceptance remediation should reference local env diagnostics");
   check(report.currentActionAcceptanceRemediationRows.some((row) => /distribution-channel-qa/i.test(row.operatorFix)), "release current blocker current action acceptance remediation should include distribution-channel QA rerun");
   check(report.currentReleaseChannelKeyRemediationReady === true, "release current blocker release-channel key remediation matrix should be ready");
@@ -2665,8 +2693,13 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentCommandAcceptanceLadderRows.some((row) => /private inputs ready yes/i.test(row.acceptanceSignal)), "release current blocker current command acceptance ladder should include private-input ready signal");
   check(report.currentCommandAcceptanceLadderRows.some((row) => /distribution-channel QA ready yes/i.test(row.acceptanceSignal)), "release current blocker current command acceptance ladder should include distribution-channel QA ready signal");
   check(report.currentCommandAcceptanceLadderRows.some((row) => /current action acceptance ready yes/i.test(row.acceptanceSignal)), "release current blocker current command acceptance ladder should include current action acceptance ready signal");
-  check(report.currentCommandAcceptanceLadderRows.some((row) => row.command === "npm run release:doctor" && row.role === "proof"), "release current blocker current command acceptance ladder should include release doctor proof row");
-  check(report.currentCommandAcceptanceLadderRows.some((row) => row.command === "npm run release:current-blocker" && row.role === "rerun"), "release current blocker current command acceptance ladder should include current-blocker rerun row");
+  if (missingLocalEnvCurrentBlocker) {
+    check(report.releaseChannelPostEditReceiptProofCommand === "npm run release:doctor", "release current blocker post-edit receipt should carry release doctor proof command while env scaffold is missing");
+    check(report.releaseChannelPostEditReceiptRerunCommand === "npm run release:current-blocker", "release current blocker post-edit receipt should carry current-blocker rerun command while env scaffold is missing");
+  } else {
+    check(report.currentCommandAcceptanceLadderRows.some((row) => row.command === "npm run release:doctor" && row.role === "proof"), "release current blocker current command acceptance ladder should include release doctor proof row");
+    check(report.currentCommandAcceptanceLadderRows.some((row) => row.command === "npm run release:current-blocker" && row.role === "rerun"), "release current blocker current command acceptance ladder should include current-blocker rerun row");
+  }
   check(report.currentCommandSourceArtifactMatrixReady === true, "release current blocker current command source artifact matrix should be ready");
   check(report.currentCommandSourceArtifactMatrixRowCount === report.currentCommandSourceArtifactMatrixRows.length, "release current blocker current command source artifact matrix row count should match rows");
   check(report.currentCommandSourceArtifactMatrixRowCount > 0, "release current blocker current command source artifact matrix should include source artifact rows");
@@ -2834,12 +2867,12 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.releaseChannelPostEditReceiptRows.some((row) => row.item === "Current key coverage" && row.evidence.includes("4 required release-channel keys")), "release current blocker post-edit receipt should include required key coverage");
   check(report.releaseChannelPostEditReceiptRows.some((row) => row.item === "Shape rehearsal coverage" && row.evidence.includes("value-free release-channel unblock rows")), "release current blocker post-edit receipt should include shape rehearsal coverage");
   check(report.releaseChannelPostEditReceiptRows.some((row) => row.item === "Placeholder cleanup acceptance" && row.expectedPostEditSignal.includes("0 current placeholder keys")), "release current blocker post-edit receipt should include placeholder cleanup acceptance");
-  check(report.releaseChannelPostEditReceiptRows.some((row) => row.item === "Proof and rerun sequence" && row.proofCommand === report.currentNextCommand && row.rerunCommand === report.currentRerunCommand), "release current blocker post-edit receipt should include proof and rerun sequence");
+  check(report.releaseChannelPostEditReceiptRows.some((row) => row.item === "Proof and rerun sequence" && row.proofCommand === postEditProofCommand && row.rerunCommand === postEditRerunCommand), "release current blocker post-edit receipt should include proof and rerun sequence");
   check(report.releaseChannelPostEditReceiptRows.some((row) => row.item === "Acceptance evidence coverage" && row.expectedPostEditSignal.includes("private-input")), "release current blocker post-edit receipt should include acceptance evidence coverage");
   check(report.releaseChannelPostEditReceiptRows.some((row) => row.item === "Hard gate separation" && row.proofCommand === report.hardGateCommand), "release current blocker post-edit receipt should include hard gate separation");
   check(report.releaseChannelPostEditReceiptCurrentReadyCount === report.releaseChannelPostEditReceiptRows.filter((row) => row.currentReady === true).length, "release current blocker post-edit receipt current-ready count should match rows");
-  check(report.releaseChannelPostEditReceiptProofCommand === report.currentNextCommand, "release current blocker post-edit receipt proof command should match current next command");
-  check(report.releaseChannelPostEditReceiptRerunCommand === report.currentRerunCommand, "release current blocker post-edit receipt rerun command should match current rerun command");
+  check(report.releaseChannelPostEditReceiptProofCommand === postEditProofCommand, "release current blocker post-edit receipt proof command should match expected post-edit proof command");
+  check(report.releaseChannelPostEditReceiptRerunCommand === postEditRerunCommand, "release current blocker post-edit receipt rerun command should match expected post-edit rerun command");
   check(report.releaseChannelPostEditReceiptValueRecorded === false, "release current blocker post-edit receipt should not record values");
   check(report.releaseChannelPostEditOperatorReceiptReady === true, "release current blocker release-channel post-edit operator receipt should be ready");
   check(report.releaseChannelPostEditOperatorReceiptReady === releaseProgress.releaseChannelPostEditOperatorReceiptReady, "release current blocker should mirror release progress post-edit operator receipt readiness");
@@ -2850,13 +2883,13 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.releaseChannelPostEditOperatorReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release current blocker post-edit operator receipt rows should be ready and value-free");
   check(report.releaseChannelPostEditOperatorReceiptRows.every((row) => typeof row.operatorAction === "string" && row.operatorAction.length > 0), "release current blocker post-edit operator receipt rows should include operator actions");
   check(report.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Edit target" && row.operatorAction.includes(report.currentEnvEditTarget)), "release current blocker post-edit operator receipt should include ignored edit target");
-  check(report.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Proof refresh" && row.command === report.currentNextCommand), "release current blocker post-edit operator receipt should include current proof refresh");
-  check(report.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Current blocker refresh" && row.command === report.currentRerunCommand), "release current blocker post-edit operator receipt should include current-blocker refresh");
+  check(report.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Proof refresh" && row.command === postEditProofCommand), "release current blocker post-edit operator receipt should include current proof refresh");
+  check(report.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Current blocker refresh" && row.command === postEditRerunCommand), "release current blocker post-edit operator receipt should include current-blocker refresh");
   check(report.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Next-actions refresh" && row.command === "npm run release:next-actions"), "release current blocker post-edit operator receipt should include next-actions refresh");
   check(report.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Hard-gate boundary" && row.command === report.hardGateCommand), "release current blocker post-edit operator receipt should include hard-gate boundary");
   check(report.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Value redaction" && row.expectedPostEditSignal.includes("private URL/channel values never appear")), "release current blocker post-edit operator receipt should include value redaction");
-  check(report.releaseChannelPostEditOperatorReceiptProofCommand === report.currentNextCommand, "release current blocker post-edit operator receipt proof command should match current next command");
-  check(report.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand === report.currentRerunCommand, "release current blocker post-edit operator receipt blocker refresh should match current rerun command");
+  check(report.releaseChannelPostEditOperatorReceiptProofCommand === postEditProofCommand, "release current blocker post-edit operator receipt proof command should match expected post-edit proof command");
+  check(report.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand === postEditRerunCommand, "release current blocker post-edit operator receipt blocker refresh should match expected post-edit rerun command");
   check(report.releaseChannelPostEditOperatorReceiptNextActionsCommand === "npm run release:next-actions", "release current blocker post-edit operator receipt should keep next-actions refresh command");
   check(report.releaseChannelPostEditOperatorReceiptHardGateCommand === report.hardGateCommand, "release current blocker post-edit operator receipt hard gate should match hard gate command");
   check(report.releaseChannelPostEditOperatorReceiptValueRecorded === false, "release current blocker post-edit operator receipt should not record values");

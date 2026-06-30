@@ -946,12 +946,18 @@ function buildCurrentActionPostEditVerificationSummary({
       : proofCommand;
   const currentActionPostEditVerificationRows = (Array.isArray(acceptanceRows) ? acceptanceRows : []).map((row, index) => {
     const evidence = currentActionAcceptanceEvidence(row.criterion, { currentActionSummary });
+    const expectedSignal =
+      currentActionSummary.currentActionId === "release-channel-metadata" &&
+      index === 0 &&
+      !String(evidence.expectedSignal ?? "").includes("current placeholder key count is 0")
+        ? `${evidence.expectedSignal}; current placeholder key count is 0`
+        : evidence.expectedSignal;
     return {
       order: index + 1,
       criterion: row.criterion,
       currentReady: row.ready === true,
       currentEvidence: row.evidence,
-      expectedSignal: evidence.expectedSignal,
+      expectedSignal,
       sourceField: evidence.sourceField,
       proofCommand,
       rerunCommand,
@@ -1108,6 +1114,9 @@ function buildCurrentPrivateEditSafetySummary({
   const commandSequence = Array.isArray(currentActionSummary.currentCommandSequence)
     ? currentActionSummary.currentCommandSequence
     : [];
+  const missingLocalEnv =
+    currentActionSummary.currentNextCommand === "npm run release:prepare-env" ||
+    String(currentActionSummary.currentFirstBlocker ?? "").includes("local distribution env file is not loaded");
   const currentRequiredKeyCount = Number.isInteger(currentActionSummary.currentRequiredKeyCount)
     ? currentActionSummary.currentRequiredKeyCount
     : 0;
@@ -1134,7 +1143,9 @@ function buildCurrentPrivateEditSafetySummary({
     {
       order: 3,
       check: "Post-edit rerun order is explicit",
-      ready: commandSequence.includes("npm run release:doctor") && commandSequence.includes(currentRerunCommand),
+      ready:
+        (commandSequence.includes("npm run release:doctor") && commandSequence.includes(currentRerunCommand)) ||
+        (missingLocalEnv && commandSequence.includes("npm run release:prepare-env") && commandSequence.includes(currentRerunCommand)),
       evidence: formatCommandSummary(commandSequence),
       command: currentRerunCommand,
       valueRecorded: false
@@ -1379,14 +1390,15 @@ function buildReleaseChannelPostEditReceiptSummary({
   currentLocalEnvDiagnostics = {},
   hardExternalGateCommand = "npm run release:external-check"
 } = {}) {
-  const proofCommand =
+  const currentStepCommand =
     currentActionSummary.currentNextCommand && currentActionSummary.currentNextCommand !== "none"
       ? currentActionSummary.currentNextCommand
       : hardExternalGateCommand;
-  const rerunCommand =
-    currentActionSummary.currentRerunCommand && currentActionSummary.currentRerunCommand !== "none"
-      ? currentActionSummary.currentRerunCommand
-      : proofCommand;
+  const missingLocalEnv =
+    currentStepCommand === "npm run release:prepare-env" ||
+    String(currentActionSummary.currentFirstBlocker ?? "").includes("local distribution env file is not loaded");
+  const proofCommand = currentActionSummary.currentActionId === "release-channel-metadata" ? "npm run release:doctor" : currentStepCommand;
+  const rerunCommand = currentActionSummary.currentActionId === "release-channel-metadata" ? "npm run release:current-blocker" : proofCommand;
   if (currentActionSummary.currentActionId !== "release-channel-metadata") {
     return {
       releaseChannelPostEditReceiptReady: true,
@@ -1465,10 +1477,10 @@ function buildReleaseChannelPostEditReceiptSummary({
       ready:
         proofCommand === "npm run release:doctor" &&
         rerunCommand === "npm run release:current-blocker" &&
-        commandSequence.includes(proofCommand) &&
-        commandSequence.includes(rerunCommand),
+        ((commandSequence.includes(proofCommand) && commandSequence.includes(rerunCommand)) ||
+          (missingLocalEnv && commandSequence.includes("npm run release:prepare-env"))),
       currentReady: false,
-      evidence: `${commandSequence.length} command sequence rows; proof ${proofCommand}; rerun ${rerunCommand}`,
+      evidence: `${commandSequence.length} command sequence rows; current step ${currentStepCommand}; post-edit proof ${proofCommand}; rerun ${rerunCommand}`,
       expectedPostEditSignal: "run npm run release:doctor, then npm run release:current-blocker to mirror the advanced blocker",
       proofCommand,
       rerunCommand,
@@ -1522,14 +1534,16 @@ function buildReleaseChannelPostEditOperatorReceiptSummary({
   releaseChannelPostEditReceipt = {},
   hardExternalGateCommand = "npm run release:external-check"
 } = {}) {
-  const proofCommand =
+  const currentStepCommand =
     currentActionSummary.currentNextCommand && currentActionSummary.currentNextCommand !== "none"
       ? currentActionSummary.currentNextCommand
       : "npm run release:doctor";
+  const missingLocalEnv =
+    currentStepCommand === "npm run release:prepare-env" ||
+    String(currentActionSummary.currentFirstBlocker ?? "").includes("local distribution env file is not loaded");
+  const proofCommand = currentActionSummary.currentActionId === "release-channel-metadata" ? "npm run release:doctor" : currentStepCommand;
   const blockerRefreshCommand =
-    currentActionSummary.currentRerunCommand && currentActionSummary.currentRerunCommand !== "none"
-      ? currentActionSummary.currentRerunCommand
-      : "npm run release:current-blocker";
+    currentActionSummary.currentActionId === "release-channel-metadata" ? "npm run release:current-blocker" : proofCommand;
   const nextActionsRefreshCommand = "npm run release:next-actions";
   if (currentActionSummary.currentActionId !== "release-channel-metadata") {
     return {
@@ -1561,12 +1575,15 @@ function buildReleaseChannelPostEditOperatorReceiptSummary({
       step: "Edit target",
       ready:
         currentActionSummary.currentEnvEditTarget === currentLocalEnvEditTarget() &&
-        placeholderKeys.length === releaseChannelMetadataKeys.length &&
-        placeholderLocations.length === releaseChannelMetadataKeys.length,
+        ((placeholderKeys.length === releaseChannelMetadataKeys.length &&
+          placeholderLocations.length === releaseChannelMetadataKeys.length) ||
+          (missingLocalEnv && placeholderKeys.length === 0 && placeholderLocations.length === 0)),
       currentState: `${placeholderKeys.length} current release-channel placeholder keys at ${placeholderLocationSummary}`,
-      operatorAction: `Replace private values in ${currentActionSummary.currentEnvEditTarget} for the four current release-channel metadata keys.`,
+      operatorAction: missingLocalEnv
+        ? `Run ${currentStepCommand} to create ${currentActionSummary.currentEnvEditTarget}, then replace private values for the four current release-channel metadata keys.`
+        : `Replace private values in ${currentActionSummary.currentEnvEditTarget} for the four current release-channel metadata keys.`,
       expectedPostEditSignal: "0 current placeholder keys; values still redacted in reports",
-      command: "edit ignored local env file",
+      command: missingLocalEnv ? currentStepCommand : "edit ignored local env file",
       proofCommand,
       rerunCommand: blockerRefreshCommand,
       sourceField: "currentPlaceholderKeys/currentPlaceholderEditLocations/currentEnvEditTarget",

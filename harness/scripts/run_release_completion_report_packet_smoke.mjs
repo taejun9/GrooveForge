@@ -18,6 +18,7 @@ const packetMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.vers
 const packetJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${packetJsonArtifactName}`);
 const audienceHandoffJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-audience-completion-handoff-smoke.json`);
 const channelEditPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-edit-packet-smoke.json`);
+const clearanceTransitionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-clearance-transition-smoke.json`);
 const failures = [];
 const refreshCommandRows = [
   {
@@ -30,6 +31,12 @@ const refreshCommandRows = [
     order: 2,
     command: "npm run release:channel-edit-packet-smoke",
     role: "refresh current release-channel edit packet and external/private blocker evidence",
+    valueRecorded: false
+  },
+  {
+    order: 3,
+    command: "npm run release:channel-clearance-transition-smoke",
+    role: "refresh post-clearance transition evidence from release-channel metadata to auto-update feed",
     valueRecorded: false
   }
 ];
@@ -87,6 +94,10 @@ function textValue(value, fallback = "none") {
 
 function integerValue(value) {
   return Number.isInteger(value) ? value : 0;
+}
+
+function objectRows(value) {
+  return Array.isArray(value) ? value.filter((row) => row && typeof row === "object" && !Array.isArray(row)) : [];
 }
 
 function commandSummary(rows) {
@@ -213,11 +224,18 @@ function formatSourceRows(rows) {
     .join("\n");
 }
 
-function buildReport({ audience, channel, progress }) {
+function formatClearanceTransitionRows(rows) {
+  return rows
+    .map((row) => `| ${row.order} | ${escapeCell(row.state)} | ${escapeCell(row.evidence)} | \`${escapeCell(row.command)}\` | ${readyLabel(row.ready)} | ${readyLabel(row.valueRecorded)} |`)
+    .join("\n");
+}
+
+function buildReport({ audience, channel, clearance, progress }) {
   const currentTenPlanWindowRows = progress.currentTenPlanWindowRows;
   const currentTenPlanWindowRowCount = currentTenPlanWindowRows.length;
   const currentTenPlanWindowRowSummary = planRowSummary(currentTenPlanWindowRows);
   const privateEditProofCommandSummary = commandSummary(privateEditProofCommandRows);
+  const postClearanceTransitionRows = objectRows(clearance.transitionRows);
   const tenPlanProgressReportRolloverRows = [
     {
       order: 1,
@@ -290,6 +308,13 @@ function buildReport({ audience, channel, progress }) {
       evidence: progress.nextScheduledTenPlanProgressReportAt,
       sourceField: "nextScheduledTenPlanProgressReportAt",
       valueRecorded: false
+    },
+    {
+      order: 9,
+      item: "Post-clearance next action",
+      evidence: `${textValue(clearance.nextPriorityActionLabel)} via ${textValue(clearance.nextActionPreviewProofCommand)}`,
+      sourceField: "clearanceTransition.nextPriorityActionLabel/nextActionPreviewProofCommand",
+      valueRecorded: false
     }
   ];
   const tenPlanProgressReportReceiptReady =
@@ -313,23 +338,60 @@ function buildReport({ audience, channel, progress }) {
       path: channelEditPacketJsonPath,
       ready: channel.releaseChannelEditPacketReady === true,
       evidence: `${channel.latestTenPlanProgressLabel}; ${textValue(channel.releaseChannelEditPacketMode)}; placeholders ${integerValue(channel.currentPlaceholderKeyCount)}`
+    }),
+    sourceRow({
+      label: "Release-channel clearance transition",
+      path: clearanceTransitionJsonPath,
+      ready: clearance.releaseChannelClearanceTransitionReady === true,
+      evidence: `${clearance.currentTenPlanProgressLabel}; next ${textValue(clearance.nextPriorityActionId)}; proof ${textValue(clearance.nextActionPreviewProofCommand)}`
     })
   ];
   const labelsMatch =
     audience.latestTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
-    channel.latestTenPlanProgressLabel === progress.latestTenPlanProgressLabel;
+    channel.latestTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
+    clearance.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel;
   const completionPercentsMatch =
     audience.userFacingCompletionPercent === 99.999999 &&
     channel.userFacingCompletionPercent === 99.999999 &&
+    clearance.userFacingCompletionPercent === 99.999999 &&
     audience.userFacingRemainingPercent === 0.000001 &&
-    channel.userFacingRemainingPercent === 0.000001;
+    channel.userFacingRemainingPercent === 0.000001 &&
+    clearance.userFacingRemainingPercent === 0.000001;
   const valueBoundaryClean =
     audience.valueRecorded === false &&
     audience.claimedExternalDistribution === false &&
     audience.networkProbeAttempted === false &&
     channel.valueRecorded === false &&
     channel.claimedExternalDistribution === false &&
-    channel.networkProbeAttempted === false;
+    channel.networkProbeAttempted === false &&
+    clearance.valueRecorded === false &&
+    clearance.privateValuesRecorded === false &&
+    clearance.claimedExternalDistribution === false &&
+    clearance.networkProbeAttempted === false;
+  const clearanceTransitionReady =
+    clearance.releaseChannelClearanceTransitionReady === true &&
+    ["prepare-local-distribution-env", "replace-release-channel-placeholders", "release-channel-metadata"].includes(
+      clearance.currentPriorityActionId
+    ) &&
+    (clearance.currentBlockerMode === "missing-local-env" || clearance.currentBlockerMode === "replace-release-channel-placeholders") &&
+    integerValue(clearance.currentRequiredKeyCount) === 4 &&
+    (clearance.currentBlockerMode === "missing-local-env"
+      ? integerValue(clearance.currentPlaceholderKeyCount) === 0 && clearance.currentNextCommand === "npm run release:prepare-env"
+      : integerValue(clearance.currentPlaceholderKeyCount) === 4) &&
+    clearance.syntheticClearanceReady === true &&
+    clearance.syntheticClearanceStrictReady === true &&
+    integerValue(clearance.syntheticClearanceCurrentReadyCount) === 4 &&
+    integerValue(clearance.syntheticClearancePlaceholderKeyCount) === 0 &&
+    clearance.nextPriorityActionId === "auto-update-feed" &&
+    clearance.nextActionPreviewId === "auto-update-feed" &&
+    clearance.nextActionPreviewReady === true &&
+    clearance.nextActionPreviewProofCommand === "npm run desktop:auto-update-readiness-smoke" &&
+    clearance.hardGateCommand === "npm run release:external-check" &&
+    clearance.hardGateReady === false &&
+    clearance.hardGateWouldFail === true &&
+    postClearanceTransitionRows.length === integerValue(clearance.transitionRowCount) &&
+    postClearanceTransitionRows.length > 0 &&
+    postClearanceTransitionRows.every((row) => row.ready === true && row.valueRecorded === false);
   const releaseCompletionReportPacketReady =
     refreshCommandRows.every((row) => row.valueRecorded === false) &&
     privateEditProofCommandRows.every((row) => row.valueRecorded === false) &&
@@ -347,7 +409,8 @@ function buildReport({ audience, channel, progress }) {
     audience.localPackageReopenReady === true &&
     audience.completionGapStatus === "external proof pending" &&
     channel.completionGapStatus === "external proof pending" &&
-    channel.externalDistributionReady === false;
+    channel.externalDistributionReady === false &&
+    clearanceTransitionReady;
 
   return {
     appName,
@@ -375,6 +438,26 @@ function buildReport({ audience, channel, progress }) {
     sourceLabelsMatchLatestTenPlan: labelsMatch,
     audienceLatestTenPlanProgressLabel: textValue(audience.latestTenPlanProgressLabel),
     channelEditLatestTenPlanProgressLabel: textValue(channel.latestTenPlanProgressLabel),
+    clearanceTransitionLatestTenPlanProgressLabel: textValue(clearance.currentTenPlanProgressLabel),
+    releaseChannelClearanceTransitionReady: clearance.releaseChannelClearanceTransitionReady === true,
+    postClearanceCurrentBlockerMode: textValue(clearance.currentBlockerMode),
+    postClearanceCurrentPriorityActionId: textValue(clearance.currentPriorityActionId),
+    postClearanceCurrentPriorityActionLabel: textValue(clearance.currentPriorityActionLabel),
+    postClearanceCurrentPlaceholderKeyCount: integerValue(clearance.currentPlaceholderKeyCount),
+    postClearanceSyntheticClearanceReady: clearance.syntheticClearanceReady === true,
+    postClearanceSyntheticStrictReady: clearance.syntheticClearanceStrictReady === true,
+    postClearanceSyntheticReadyRowCount: integerValue(clearance.syntheticClearanceCurrentReadyCount),
+    postClearanceSyntheticRowCount: integerValue(clearance.syntheticClearanceCurrentRowCount),
+    postClearanceSyntheticPlaceholderKeyCount: integerValue(clearance.syntheticClearancePlaceholderKeyCount),
+    postClearanceNextPriorityActionId: textValue(clearance.nextPriorityActionId),
+    postClearanceNextPriorityActionLabel: textValue(clearance.nextPriorityActionLabel),
+    postClearanceNextActionPreviewReady: clearance.nextActionPreviewReady === true,
+    postClearanceNextActionPreviewProofCommand: textValue(clearance.nextActionPreviewProofCommand),
+    postClearanceNextActionPreviewFirstBlocker: textValue(clearance.nextActionPreviewFirstBlocker),
+    postClearanceNextActionPreviewRequiredKeyCount: integerValue(clearance.nextActionPreviewRequiredKeyCount),
+    postClearanceNextActionPreviewPlaceholderKeyCount: integerValue(clearance.nextActionPreviewPlaceholderKeyCount),
+    postClearanceTransitionRows,
+    postClearanceTransitionRowCount: postClearanceTransitionRows.length,
     latestCompletedPlanNumber: progress.latestCompletedPlanNumber,
     latestTenPlanProgressLabel: progress.latestTenPlanProgressLabel,
     latestTenPlanWindowStart: progress.latestTenPlanWindowStart,
@@ -475,6 +558,7 @@ function buildMarkdown(report) {
 - Source labels match latest 10-plan: ${readyLabel(report.sourceLabelsMatchLatestTenPlan)}
 - Audience source label: ${report.audienceLatestTenPlanProgressLabel}
 - Channel edit source label: ${report.channelEditLatestTenPlanProgressLabel}
+- Clearance transition source label: ${report.clearanceTransitionLatestTenPlanProgressLabel}
 - User-facing completion: ${report.userFacingCompletionPercent}%
 - Remaining completion: ${report.userFacingRemainingPercent}%
 - First-time composer ready: ${readyLabel(report.firstTimeComposerReady)}
@@ -495,6 +579,15 @@ function buildMarkdown(report) {
 - Current required keys: ${report.currentRequiredKeyCount}
 - Current placeholder keys: ${report.currentPlaceholderKeyCount}
 - Live-check ready rows: ${report.liveCheckCurrentReadyCount}/${report.liveCheckRowCount}
+- Post-clearance transition ready: ${readyLabel(report.releaseChannelClearanceTransitionReady)}
+- Post-clearance current blocker mode: ${report.postClearanceCurrentBlockerMode}
+- Post-clearance current priority: ${report.postClearanceCurrentPriorityActionLabel} (${report.postClearanceCurrentPriorityActionId})
+- Post-clearance current placeholder keys: ${report.postClearanceCurrentPlaceholderKeyCount}
+- Post-clearance synthetic strict ready: ${readyLabel(report.postClearanceSyntheticStrictReady)}
+- Post-clearance synthetic ready rows: ${report.postClearanceSyntheticReadyRowCount}/${report.postClearanceSyntheticRowCount}
+- Post-clearance next priority action: ${report.postClearanceNextPriorityActionLabel} (${report.postClearanceNextPriorityActionId})
+- Post-clearance next proof command: \`${report.postClearanceNextActionPreviewProofCommand}\`
+- Post-clearance next first blocker: ${report.postClearanceNextActionPreviewFirstBlocker}
 - Hard gate command: \`${report.hardGateCommand}\`
 - Private values recorded: no
 - Local env values recorded: no
@@ -540,6 +633,12 @@ ${formatRolloverRows(report.tenPlanProgressReportRolloverRows)}
 |---|---:|---:|---|---|---:|
 ${formatSourceRows(report.sourceArtifactRows)}
 
+## Post-Clearance Transition Rows
+
+| order | state | evidence | command | ready | value recorded |
+|---:|---|---|---|---:|---:|
+${formatClearanceTransitionRows(report.postClearanceTransitionRows)}
+
 ## Not Recorded Or Claimed
 
 - No release URL, support URL, feed URL, credential, token, channel value, Developer ID identity value, private beat, or real user audio is recorded.
@@ -552,10 +651,11 @@ function validateReport(report, markdown) {
   const serialized = JSON.stringify(report);
   check(report.releaseCompletionReportPacketReady === true, "release completion report packet should be ready");
   check(report.reportCommand === "npm run release:completion-report-packet-smoke", "release completion report packet should report its command");
-  check(report.refreshCommandCount === 2, "release completion report packet should refresh two source commands");
+  check(report.refreshCommandCount === 3, "release completion report packet should refresh three source commands");
   check(
-    report.refreshCommandSummary === "npm run release:audience-completion-handoff-smoke -> npm run release:channel-edit-packet-smoke",
-    "release completion report packet should refresh audience then channel edit packet"
+    report.refreshCommandSummary ===
+      "npm run release:audience-completion-handoff-smoke -> npm run release:channel-edit-packet-smoke -> npm run release:channel-clearance-transition-smoke",
+    "release completion report packet should refresh audience, channel edit packet, then clearance transition"
   );
   check(report.refreshCommandRows.every((row) => row.valueRecorded === false), "release completion report packet command rows should be value-free");
   check(report.privateEditProofCommandCount === 3, "release completion report packet should include three private-edit proof commands");
@@ -566,11 +666,12 @@ function validateReport(report, markdown) {
   check(report.privateEditProofCommandRows.every((row) => row.valueRecorded === false), "release completion report packet private-edit proof commands should be value-free");
   check(report.firstPrivateEditProofCommand === "npm run release:channel-live-check-strict", "release completion report packet should make strict live check the first private-edit proof command");
   check(report.postEditProofCommand === "npm run release:post-edit-proof", "release completion report packet should include post-edit proof command");
-  check(report.sourceArtifactRowCount === 2, "release completion report packet should include two source artifacts");
+  check(report.sourceArtifactRowCount === 3, "release completion report packet should include three source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release completion report packet sources should be present, ready, and value-free");
   check(report.sourceLabelsMatchLatestTenPlan === true, "release completion report packet source labels should match latest 10-plan progress");
   check(report.audienceLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet audience label should match latest progress");
   check(report.channelEditLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet channel edit label should match latest progress");
+  check(report.clearanceTransitionLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet clearance transition label should match latest progress");
   check(report.firstTimeComposerReady === true, "release completion report packet should prove first-time composer readiness");
   check(report.professionalProducerReady === true, "release completion report packet should prove professional producer readiness");
   check(report.directCompositionReady === true, "release completion report packet should prove direct composition readiness");
@@ -587,6 +688,40 @@ function validateReport(report, markdown) {
   check(report.currentEnvEditTarget === ".env.distribution.local", "release completion report packet should point at ignored local env target");
   check(report.currentRequiredKeyCount === 4, "release completion report packet should report four release-channel keys");
   check(report.liveCheckRowCount === 4, "release completion report packet should mirror four live-check rows");
+  check(report.releaseChannelClearanceTransitionReady === true, "release completion report packet should carry ready clearance transition evidence");
+  check(
+    report.postClearanceCurrentBlockerMode === "missing-local-env" || report.postClearanceCurrentBlockerMode === "replace-release-channel-placeholders",
+    "release completion report packet should identify the post-clearance current blocker mode"
+  );
+  check(
+    ["prepare-local-distribution-env", "replace-release-channel-placeholders", "release-channel-metadata"].includes(
+      report.postClearanceCurrentPriorityActionId
+    ),
+    "release completion report packet should keep release-channel setup as the current real blocker"
+  );
+  if (report.postClearanceCurrentBlockerMode === "missing-local-env") {
+    check(report.postClearanceCurrentPlaceholderKeyCount === 0, "release completion report packet should show zero placeholders before the ignored env exists");
+    check(report.currentNextCommand === "npm run release:prepare-env", "release completion report packet should surface prepare-env when the ignored env is missing");
+  } else {
+    check(report.postClearanceCurrentPlaceholderKeyCount === 4, "release completion report packet should mirror four current release-channel placeholders");
+  }
+  check(report.postClearanceSyntheticClearanceReady === true, "release completion report packet should prove synthetic clearance readiness");
+  check(report.postClearanceSyntheticStrictReady === true, "release completion report packet should prove synthetic strict readiness");
+  check(report.postClearanceSyntheticReadyRowCount === 4, "release completion report packet should prove four synthetic ready rows");
+  check(report.postClearanceSyntheticPlaceholderKeyCount === 0, "release completion report packet should prove zero synthetic placeholder keys");
+  check(report.postClearanceNextPriorityActionId === "auto-update-feed", "release completion report packet should expose auto-update feed as the post-clearance next action");
+  check(report.postClearanceNextActionPreviewReady === true, "release completion report packet should carry ready post-clearance next-action preview");
+  check(
+    report.postClearanceNextActionPreviewProofCommand === "npm run desktop:auto-update-readiness-smoke",
+    "release completion report packet should expose the auto-update readiness proof command"
+  );
+  check(report.postClearanceNextActionPreviewRequiredKeyCount === 6, "release completion report packet should mirror six post-clearance update feed/channel keys");
+  check(report.postClearanceTransitionRowCount === report.postClearanceTransitionRows.length, "release completion report packet should match post-clearance transition row count");
+  check(report.postClearanceTransitionRowCount === 4, "release completion report packet should include four post-clearance transition rows");
+  check(
+    report.postClearanceTransitionRows.every((row) => row.ready === true && row.valueRecorded === false),
+    "release completion report packet post-clearance transition rows should be ready and value-free"
+  );
   check(report.hardGateCommand === "npm run release:external-check", "release completion report packet should keep hard external gate");
   check(
     report.privateEditProofCommandRows.some((row) => row.command === report.hardGateCommand),
@@ -666,6 +801,7 @@ function validateReport(report, markdown) {
   );
   check(tenPlanReceiptEvidence.includes(report.currentFirstBlocker), "release completion report packet 10-plan receipt should include current blocker");
   check(tenPlanReceiptEvidence.includes(report.privateEditProofCommandSummary), "release completion report packet 10-plan receipt should include private-edit proof command order");
+  check(tenPlanReceiptEvidence.includes(report.postClearanceNextPriorityActionLabel), "release completion report packet 10-plan receipt should include post-clearance next action");
   check(report.privateValuesRecorded === false, "release completion report packet should not record private values");
   check(report.localEnvValueRecorded === false, "release completion report packet should not record local env values");
   check(report.releaseUrlValueRecorded === false, "release completion report packet should not record release URL values");
@@ -703,6 +839,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("10-Plan Progress Report Receipt"), "release completion report packet Markdown should include 10-plan progress report receipt table");
   check(markdown.includes("10-Plan Cadence Rollover"), "release completion report packet Markdown should include 10-plan cadence rollover table");
   check(markdown.includes("Source labels match latest 10-plan: yes"), "release completion report packet Markdown should include source label agreement");
+  check(markdown.includes("Post-clearance transition ready: yes"), "release completion report packet Markdown should include post-clearance transition readiness");
+  check(markdown.includes("Post-Clearance Transition Rows"), "release completion report packet Markdown should include post-clearance transition rows");
   check(markdown.includes("External distribution claimed: no"), "release completion report packet Markdown should keep external distribution unclaimed");
 
   if (failures.length > 0) {
@@ -717,8 +855,9 @@ for (const row of refreshCommandRows) {
 
 const audience = await readJsonRequired(audienceHandoffJsonPath, "Audience completion handoff");
 const channel = await readJsonRequired(channelEditPacketJsonPath, "Release-channel edit packet");
+const clearance = await readJsonRequired(clearanceTransitionJsonPath, "Release-channel clearance transition");
 const progress = await completedPlanProgress();
-const report = buildReport({ audience, channel, progress });
+const report = buildReport({ audience, channel, clearance, progress });
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
 
@@ -748,6 +887,9 @@ console.log(`- Professional producer ready: ${report.professionalProducerReady ?
 console.log(`- Current action: ${report.currentActionLabel}`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
 console.log(`- Release-channel edit packet mode: ${report.releaseChannelEditPacketMode}`);
+console.log(`- Post-clearance transition ready: ${report.releaseChannelClearanceTransitionReady ? "yes" : "no"}`);
+console.log(`- Post-clearance next priority action: ${report.postClearanceNextPriorityActionLabel}`);
+console.log(`- Post-clearance next proof command: ${report.postClearanceNextActionPreviewProofCommand}`);
 console.log(`- User-facing completion: ${report.userFacingCompletionPercent}%`);
 console.log(`- Remaining completion: ${report.userFacingRemainingPercent}%`);
 console.log("- Private values recorded: no");

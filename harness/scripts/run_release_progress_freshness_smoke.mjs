@@ -19,6 +19,7 @@ const checkpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.vers
 const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.json`);
 const currentBlockerJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`);
 const completionReportPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-completion-report-packet-smoke.json`);
+const clearanceTransitionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-clearance-transition-smoke.json`);
 const freshnessMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${freshnessStem}.md`);
 const freshnessJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${freshnessStem}.json`);
 const failures = [];
@@ -170,6 +171,9 @@ function artifactReady(kind, artifact) {
   if (kind === "release completion report packet") {
     return artifact.releaseCompletionReportPacketReady === true;
   }
+  if (kind === "release-channel clearance transition") {
+    return artifact.releaseChannelClearanceTransitionReady === true;
+  }
   return artifact.releaseUpdateFeedCheckpointReady === true;
 }
 
@@ -205,7 +209,7 @@ function refreshCommandRows(rows) {
     }));
 }
 
-function buildReport({ checkpoint, releaseProgress, currentBlocker, completionReportPacket }) {
+function buildReport({ checkpoint, releaseProgress, currentBlocker, completionReportPacket, clearanceTransition }) {
   const latestLabel = textValue(checkpoint.currentTenPlanProgressLabel);
   const rows = [
     progressRow({
@@ -243,6 +247,15 @@ function buildReport({ checkpoint, releaseProgress, currentBlocker, completionRe
       kind: "release completion report packet",
       sourceField: "latestTenPlanProgressLabel",
       command: "npm run release:completion-report-packet-smoke"
+    }),
+    progressRow({
+      label: "Release-channel clearance transition",
+      filePath: clearanceTransitionJsonPath,
+      artifact: clearanceTransition,
+      latestLabel,
+      kind: "release-channel clearance transition",
+      sourceField: "currentTenPlanProgressLabel",
+      command: "npm run release:channel-clearance-transition-smoke"
     })
   ];
   const staleRows = rows.filter((row) => row.stale === true);
@@ -268,6 +281,7 @@ function buildReport({ checkpoint, releaseProgress, currentBlocker, completionRe
     releaseProgressJsonPath: relative(releaseProgressJsonPath),
     currentBlockerJsonPath: relative(currentBlockerJsonPath),
     completionReportPacketJsonPath: relative(completionReportPacketJsonPath),
+    clearanceTransitionJsonPath: relative(clearanceTransitionJsonPath),
     releaseProgressFreshnessReady:
       checkpointValueFree(checkpoint) &&
       checkpointRow.present === true &&
@@ -380,7 +394,7 @@ function validateReport(report, markdown) {
   check(report.releaseProgressFreshnessReady === true, "release progress freshness smoke should be ready");
   check(report.reportCommand === "npm run release:progress-freshness-smoke", "release progress freshness smoke should report its command");
   check(report.refreshCommand === "npm run release:update-feed-checkpoint-smoke", "release progress freshness smoke should refresh update-feed checkpoint first");
-  check(report.freshnessRowCount === 4, "release progress freshness smoke should include four freshness rows");
+  check(report.freshnessRowCount === 5, "release progress freshness smoke should include five freshness rows");
   check(report.freshnessRows.every((row) => row.valueRecorded === false), "release progress freshness rows should be value-free");
   check(report.freshnessRows[0].label === "Update feed checkpoint", "release progress freshness smoke should lead with checkpoint row");
   check(report.freshnessRows[0].present === true, "release progress freshness smoke should require checkpoint artifact");
@@ -389,6 +403,10 @@ function validateReport(report, markdown) {
   check(
     report.freshnessRows.some((row) => row.label === "Release completion report packet" && row.command === "npm run release:completion-report-packet-smoke"),
     "release progress freshness smoke should include completion report packet refresh guidance"
+  );
+  check(
+    report.freshnessRows.some((row) => row.label === "Release-channel clearance transition" && row.command === "npm run release:channel-clearance-transition-smoke"),
+    "release progress freshness smoke should include clearance transition refresh guidance"
   );
   check(report.latestTenPlanWindowStart > 0, "release progress freshness smoke should report a positive latest 10-plan window start");
   check(report.latestTenPlanWindowEnd === report.latestTenPlanWindowStart + 9, "release progress freshness smoke should report a 10-plan window");
@@ -433,7 +451,8 @@ const checkpoint = await readJsonRequired(checkpointJsonPath, "Update feed check
 const releaseProgress = await readJsonOptional(releaseProgressJsonPath);
 const currentBlocker = await readJsonOptional(currentBlockerJsonPath);
 const completionReportPacket = await readJsonOptional(completionReportPacketJsonPath);
-const report = buildReport({ checkpoint, releaseProgress, currentBlocker, completionReportPacket });
+const clearanceTransition = await readJsonOptional(clearanceTransitionJsonPath);
+const report = buildReport({ checkpoint, releaseProgress, currentBlocker, completionReportPacket, clearanceTransition });
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
 

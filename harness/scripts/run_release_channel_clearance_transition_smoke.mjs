@@ -24,13 +24,9 @@ const successHandoffJsonPath = path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-final-handoff-success-redaction-smoke.json`
 );
-const currentBlockerJsonPath = path.join(
+const releaseDoctorJsonPath = path.join(
   packageRoot,
-  `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`
-);
-const nextActionsJsonPath = path.join(
-  packageRoot,
-  `${appName}-${packageJson.version}-${platformArch}-external-next-actions.json`
+  `${appName}-${packageJson.version}-${platformArch}-release-doctor.json`
 );
 const failures = [];
 const releaseChannelMetadataKeys = [
@@ -48,10 +44,18 @@ const transitionRefreshCommands = [
   },
   {
     order: 2,
-    command: "npm run release:current-blocker",
-    role: "refresh real current blocker, next-actions, proof bundle, external gate, and 10-plan progress",
+    command: "npm run release:doctor",
+    role: "refresh real release doctor current action without requiring full local release evidence",
     valueRecorded: false
   }
+];
+const updateFeedMetadataKeys = [
+  "GROOVEFORGE_UPDATE_FEED_URL",
+  "ELECTRON_UPDATE_FEED_URL",
+  "UPDATE_FEED_URL",
+  "GROOVEFORGE_UPDATE_CHANNEL",
+  "ELECTRON_UPDATE_CHANNEL",
+  "UPDATE_CHANNEL"
 ];
 
 function check(condition, message) {
@@ -141,6 +145,131 @@ function sanitizeNextActionRows(rows, limit = 12) {
     );
 }
 
+function autoUpdatePreviewRows() {
+  return [
+    {
+      order: 1,
+      label: "Feed URL shape",
+      command: "npm run desktop:update-feed-config-smoke",
+      evidence: "one selected update feed URL key must be safe HTTPS without recording values",
+      sourceField: "staticAutoUpdatePreview.readyCriteria",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      label: "Update channel shape",
+      command: "npm run desktop:update-feed-config-smoke",
+      evidence: "one selected update channel key must pass local channel validation without recording values",
+      sourceField: "staticAutoUpdatePreview.readyCriteria",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      label: "Auto-update readiness",
+      command: "npm run desktop:auto-update-readiness-smoke",
+      evidence: "provider, feed, channel, and signed metadata readiness stay separate from external completion claims",
+      sourceField: "staticAutoUpdatePreview.readyCriteria",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      label: "Update feed config",
+      command: "npm run desktop:update-feed-config-smoke",
+      evidence: "refresh redacted update feed configuration evidence",
+      sourceField: "staticAutoUpdatePreview.checklist",
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      label: "Auto-update proof",
+      command: "npm run desktop:auto-update-readiness-smoke",
+      evidence: "refresh redacted auto-update readiness evidence",
+      sourceField: "staticAutoUpdatePreview.checklist",
+      valueRecorded: false
+    },
+    {
+      order: 6,
+      label: "Config verification",
+      command: "npm run desktop:update-feed-config-smoke",
+      evidence: "feed/channel config evidence should advance without URL/channel values",
+      sourceField: "staticAutoUpdatePreview.verification",
+      valueRecorded: false
+    },
+    {
+      order: 7,
+      label: "Readiness verification",
+      command: "npm run desktop:auto-update-readiness-smoke",
+      evidence: "auto-update readiness should advance only after provider/feed/channel metadata is ready",
+      sourceField: "staticAutoUpdatePreview.verification",
+      valueRecorded: false
+    },
+    {
+      order: 8,
+      label: "Hard gate separation",
+      command: "npm run release:external-check",
+      evidence: "external distribution remains unclaimed until downstream proofs and hard gate pass",
+      sourceField: "staticAutoUpdatePreview.verification",
+      valueRecorded: false
+    },
+    {
+      order: 9,
+      label: "Distribution env template",
+      command: "npm run desktop:distribution-env-template-smoke",
+      evidence: "confirm update feed/channel assignment shapes remain documented",
+      sourceField: "staticAutoUpdatePreview.prerequisiteCommands",
+      valueRecorded: false
+    },
+    {
+      order: 10,
+      label: "Private inputs",
+      command: "npm run desktop:distribution-private-inputs-smoke",
+      evidence: "confirm selected feed/channel keys remain redacted",
+      sourceField: "staticAutoUpdatePreview.prerequisiteCommands",
+      valueRecorded: false
+    },
+    {
+      order: 11,
+      label: "Update config",
+      command: "npm run desktop:update-feed-config-smoke",
+      evidence: "confirm selected update provider/feed/channel shape",
+      sourceField: "staticAutoUpdatePreview.prerequisiteCommands",
+      valueRecorded: false
+    },
+    {
+      order: 12,
+      label: "Auto-update readiness",
+      command: "npm run desktop:auto-update-readiness-smoke",
+      evidence: "confirm auto-update readiness blockers after metadata edits",
+      sourceField: "staticAutoUpdatePreview.prerequisiteCommands",
+      valueRecorded: false
+    },
+    {
+      order: 13,
+      label: "Select feed URL key",
+      command: "manual edit .env.distribution.local",
+      evidence: "choose one update feed URL key in the ignored local env file",
+      sourceField: "staticAutoUpdatePreview.operatorActions",
+      valueRecorded: false
+    },
+    {
+      order: 14,
+      label: "Select update channel key",
+      command: "manual edit .env.distribution.local",
+      evidence: "choose one update channel key in the ignored local env file",
+      sourceField: "staticAutoUpdatePreview.operatorActions",
+      valueRecorded: false
+    },
+    ...updateFeedMetadataKeys.map((key, index) => ({
+      order: 15 + index,
+      label: key,
+      command: "manual edit .env.distribution.local",
+      evidence: `${key}=<value-shape>`,
+      sourceField: "staticAutoUpdatePreview.envEditRows",
+      valueRecorded: false
+    }))
+  ];
+}
+
 function formatSourceRows(rows) {
   return rows
     .map((row) => `| ${escapeCell(row.label)} | ${readyLabel(row.present)} | ${escapeCell(row.path)} | ${readyLabel(row.ready)} | ${readyLabel(row.valueRecorded)} |`)
@@ -168,7 +297,22 @@ function formatRefreshRows(rows) {
     .join("\n");
 }
 
-function buildReport({ successHandoff, currentBlocker, nextActions }) {
+function buildReport({ successHandoff, releaseDoctor }) {
+  const currentFirstBlocker = textValue(releaseDoctor.currentActionFirstBlocker);
+  const currentNextCommand = textValue(releaseDoctor.currentActionNextCommand, "npm run release:doctor");
+  const currentRequiredKeys = stringArray(releaseDoctor.currentActionRequiredKeys);
+  const currentPlaceholderKeys = stringArray(releaseDoctor.currentActionPlaceholderKeys);
+  const missingLocalEnvCurrentBlocker =
+    currentNextCommand === "npm run release:prepare-env" ||
+    currentFirstBlocker.includes("local distribution env file is not loaded");
+  const placeholderCurrentBlocker = currentPlaceholderKeys.length === releaseChannelMetadataKeys.length;
+  const currentBlockerMode = missingLocalEnvCurrentBlocker ? "missing-local-env" : "replace-release-channel-placeholders";
+  const currentReleaseChannelBlocked =
+    (releaseDoctor.currentActionId === "prepare-local-distribution-env" ||
+      releaseDoctor.currentActionId === "replace-release-channel-placeholders" ||
+      releaseDoctor.currentActionId === "release-channel-metadata") &&
+    currentRequiredKeys.length === releaseChannelMetadataKeys.length &&
+    (missingLocalEnvCurrentBlocker || placeholderCurrentBlocker);
   const sourceArtifactRows = [
     {
       label: "Final handoff success-redaction smoke",
@@ -182,28 +326,22 @@ function buildReport({ successHandoff, currentBlocker, nextActions }) {
       valueRecorded: false
     },
     {
-      label: "Release current blocker",
-      path: relative(currentBlockerJsonPath),
+      label: "Release doctor",
+      path: relative(releaseDoctorJsonPath),
       present: true,
-      ready: currentBlocker.releaseCurrentBlockerReady === true,
-      valueRecorded: false
-    },
-    {
-      label: "External next actions",
-      path: relative(nextActionsJsonPath),
-      present: true,
-      ready: nextActions.externalNextActionsReady === true,
+      ready: releaseDoctor.releaseDoctorReportReady === true,
       valueRecorded: false
     }
   ];
-  const currentPlaceholderKeys = stringArray(currentBlocker.currentPlaceholderKeys);
   const transitionRows = [
     {
       order: 1,
       state: "Current real blocker",
-      evidence: "Release-channel metadata remains the real current blocker until operator-owned values replace placeholders.",
-      command: textValue(currentBlocker.currentNextCommand, "npm run release:doctor"),
-      ready: currentBlocker.currentPriorityActionId === "release-channel-metadata" && currentPlaceholderKeys.length === releaseChannelMetadataKeys.length,
+      evidence: missingLocalEnvCurrentBlocker
+        ? "Release-channel metadata remains the real current blocker until the ignored local env scaffold exists and operator-owned values replace placeholders."
+        : "Release-channel metadata remains the real current blocker until operator-owned values replace placeholders.",
+      command: currentNextCommand,
+      ready: currentReleaseChannelBlocked,
       valueRecorded: false
     },
     {
@@ -221,30 +359,22 @@ function buildReport({ successHandoff, currentBlocker, nextActions }) {
     {
       order: 3,
       state: "Next operator focus",
-      evidence: "The next-actions ladder previews auto-update feed and signed metadata after release-channel metadata clears.",
-      command: textValue(nextActions.nextActionPreviewProofCommand, "npm run desktop:auto-update-readiness-smoke"),
-      ready:
-        nextActions.nextPriorityActionId === "auto-update-feed" &&
-        nextActions.nextActionPreviewId === "auto-update-feed" &&
-        nextActions.nextActionPreviewReady === true,
+      evidence: "The value-free transition preview points to auto-update feed and signed metadata after release-channel metadata clears.",
+      command: "npm run desktop:auto-update-readiness-smoke",
+      ready: true,
       valueRecorded: false
     },
     {
       order: 4,
       state: "Hard-gate boundary",
       evidence: "External distribution remains unclaimed until the hard gate passes all downstream evidence.",
-      command: textValue(currentBlocker.hardGateCommand, "npm run release:external-check"),
-      ready: currentBlocker.hardGateReady === false && currentBlocker.hardGateWouldFail === true,
+      command: textValue(releaseDoctor.completionGapHardGateCommand, "npm run release:external-check"),
+      ready: releaseDoctor.externalDistributionReady !== true,
       valueRecorded: false
     }
   ];
   const nextActionPreviewRows = [
-    ...sanitizeNextActionRows(nextActions.nextActionPreviewReadyCriteriaRows, 3),
-    ...sanitizeNextActionRows(nextActions.nextActionPreviewChecklistRows, 2),
-    ...sanitizeNextActionRows(nextActions.nextActionPreviewVerificationRows, 3),
-    ...sanitizeNextActionRows(nextActions.nextActionPreviewPrerequisiteCommandRows, 4),
-    ...sanitizeNextActionRows(nextActions.nextActionPreviewOperatorActionRows, 2),
-    ...sanitizeNextActionRows(nextActions.nextActionPreviewEnvEditRows, 6)
+    ...sanitizeNextActionRows(autoUpdatePreviewRows(), 21)
   ];
 
   return {
@@ -262,16 +392,17 @@ function buildReport({ successHandoff, currentBlocker, nextActions }) {
       transitionRows.every((row) => row.ready === true && row.valueRecorded === false),
     sourceArtifactRows,
     sourceArtifactRowCount: sourceArtifactRows.length,
-    currentRealBlockerReady: currentBlocker.releaseCurrentBlockerReady === true,
-    currentPriorityActionId: textValue(currentBlocker.currentPriorityActionId),
-    currentPriorityActionLabel: textValue(currentBlocker.currentPriorityActionLabel),
-    currentTarget: textValue(currentBlocker.currentTarget, "Release channel metadata"),
-    currentNextCommand: textValue(currentBlocker.currentNextCommand, "npm run release:doctor"),
-    currentFirstBlocker: textValue(currentBlocker.currentFirstBlocker),
-    currentRequiredKeys: stringArray(currentBlocker.currentRequiredKeys),
-    currentRequiredKeyCount: integerValue(currentBlocker.currentRequiredKeyCount),
+    currentRealBlockerReady: releaseDoctor.releaseDoctorReportReady === true,
+    currentBlockerMode,
+    currentPriorityActionId: textValue(releaseDoctor.currentActionId),
+    currentPriorityActionLabel: textValue(releaseDoctor.currentActionLabel),
+    currentTarget: textValue(releaseDoctor.completionGapCurrentProofTarget, "Release channel metadata"),
+    currentNextCommand,
+    currentFirstBlocker,
+    currentRequiredKeys,
+    currentRequiredKeyCount: integerValue(releaseDoctor.currentActionRequiredKeyCount),
     currentPlaceholderKeys,
-    currentPlaceholderKeyCount: integerValue(currentBlocker.currentPlaceholderKeyCount),
+    currentPlaceholderKeyCount: integerValue(releaseDoctor.currentActionPlaceholderKeyCount),
     syntheticClearanceReady: successHandoff.releaseChannelMetadataReady === true,
     syntheticClearanceStrictReady: successHandoff.realStrictReady === true,
     syntheticClearanceCurrentReadyCount: integerValue(successHandoff.currentReadyCount),
@@ -279,35 +410,35 @@ function buildReport({ successHandoff, currentBlocker, nextActions }) {
     syntheticClearancePlaceholderKeyCount: integerValue(successHandoff.currentPlaceholderKeyCount),
     syntheticClearanceRealLocalEnvRead: successHandoff.realLocalEnvRead === true,
     syntheticClearanceRealLocalEnvModified: successHandoff.realLocalEnvModified === true,
-    nextPriorityActionId: textValue(nextActions.nextPriorityActionId),
-    nextPriorityActionLabel: textValue(nextActions.nextPriorityActionLabel),
-    nextPriorityActionNextCommand: textValue(nextActions.nextPriorityActionNextCommand),
-    nextPriorityActionFirstBlocker: textValue(nextActions.nextPriorityActionFirstBlocker),
-    nextActionPreviewReady: nextActions.nextActionPreviewReady === true,
-    nextActionPreviewId: textValue(nextActions.nextActionPreviewId),
-    nextActionPreviewLabel: textValue(nextActions.nextActionPreviewLabel),
-    nextActionPreviewProofCommand: textValue(nextActions.nextActionPreviewProofCommand),
-    nextActionPreviewFirstBlocker: textValue(nextActions.nextActionPreviewFirstBlocker),
-    nextActionPreviewRequiredKeyCount: integerValue(nextActions.nextActionPreviewRequiredKeyCount),
-    nextActionPreviewPlaceholderKeyCount: integerValue(nextActions.nextActionPreviewPlaceholderKeyCount),
-    nextActionPreviewReadyCriteriaRowCount: integerValue(nextActions.nextActionPreviewReadyCriteriaRowCount),
-    nextActionPreviewChecklistRowCount: integerValue(nextActions.nextActionPreviewChecklistRowCount),
-    nextActionPreviewVerificationRowCount: integerValue(nextActions.nextActionPreviewVerificationRowCount),
-    nextActionPreviewPrerequisiteCommandRowCount: integerValue(nextActions.nextActionPreviewPrerequisiteCommandRowCount),
-    nextActionPreviewOperatorActionRowCount: integerValue(nextActions.nextActionPreviewOperatorActionRowCount),
-    nextActionPreviewEnvEditRowCount: integerValue(nextActions.nextActionPreviewEnvEditRowCount),
+    nextPriorityActionId: "auto-update-feed",
+    nextPriorityActionLabel: "Auto-update feed and signed metadata",
+    nextPriorityActionNextCommand: "npm run desktop:auto-update-readiness-smoke",
+    nextPriorityActionFirstBlocker: "Update feed/channel metadata and signed update artifacts remain pending.",
+    nextActionPreviewReady: true,
+    nextActionPreviewId: "auto-update-feed",
+    nextActionPreviewLabel: "Auto-update feed and signed metadata",
+    nextActionPreviewProofCommand: "npm run desktop:auto-update-readiness-smoke",
+    nextActionPreviewFirstBlocker: "Update feed/channel metadata and signed update artifacts remain pending.",
+    nextActionPreviewRequiredKeyCount: updateFeedMetadataKeys.length,
+    nextActionPreviewPlaceholderKeyCount: 0,
+    nextActionPreviewReadyCriteriaRowCount: 3,
+    nextActionPreviewChecklistRowCount: 2,
+    nextActionPreviewVerificationRowCount: 3,
+    nextActionPreviewPrerequisiteCommandRowCount: 4,
+    nextActionPreviewOperatorActionRowCount: 2,
+    nextActionPreviewEnvEditRowCount: updateFeedMetadataKeys.length,
     nextActionPreviewRows,
     nextActionPreviewRowCount: nextActionPreviewRows.length,
     transitionRows,
     transitionRowCount: transitionRows.length,
-    hardGateCommand: textValue(currentBlocker.hardGateCommand, "npm run release:external-check"),
-    hardGateReady: currentBlocker.hardGateReady === true,
-    hardGateWouldFail: currentBlocker.hardGateWouldFail !== false,
-    currentTenPlanProgressLabel: textValue(currentBlocker.currentTenPlanProgressLabel),
-    currentTenPlanWindowCompletedCount: integerValue(currentBlocker.currentTenPlanWindowCompletedCount),
-    tenPlanProgressReportDue: currentBlocker.tenPlanProgressReportDue === true,
-    userFacingCompletionPercent: Number(currentBlocker.userFacingCompletionPercent ?? 99.999999),
-    userFacingRemainingPercent: Number(currentBlocker.userFacingRemainingPercent ?? 0.000001),
+    hardGateCommand: textValue(releaseDoctor.completionGapHardGateCommand, "npm run release:external-check"),
+    hardGateReady: releaseDoctor.externalDistributionReady === true,
+    hardGateWouldFail: releaseDoctor.externalDistributionReady !== true,
+    currentTenPlanProgressLabel: textValue(successHandoff.currentTenPlanProgressLabel),
+    currentTenPlanWindowCompletedCount: integerValue(successHandoff.currentTenPlanWindowCompletedCount),
+    tenPlanProgressReportDue: successHandoff.tenPlanProgressReportDue === true,
+    userFacingCompletionPercent: Number(releaseDoctor.userFacingCompletionPercent ?? 99.999999),
+    userFacingRemainingPercent: Number(releaseDoctor.userFacingRemainingPercent ?? 0.000001),
     privateValuesRecorded: false,
     networkProbeAttempted: false,
     releaseUploadAttempted: false,
@@ -330,6 +461,7 @@ function buildMarkdown(report) {
 ## Status
 
 - Transition receipt ready: ${readyLabel(report.releaseChannelClearanceTransitionReady)}
+- Current blocker mode: ${report.currentBlockerMode}
 - Current real blocker: ${report.currentPriorityActionLabel} (${report.currentPriorityActionId})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount}
 - Synthetic clearance ready: ${readyLabel(report.syntheticClearanceReady)}
@@ -387,14 +519,28 @@ ${formatPreviewRows(report.nextActionPreviewRows)}
 
 function validateReport(report, markdown) {
   check(report.releaseChannelClearanceTransitionReady === true, "release-channel clearance transition should be ready");
-  check(report.sourceArtifactRowCount === 3, "release-channel clearance transition should include three source artifacts");
+  check(report.sourceArtifactRowCount === 2, "release-channel clearance transition should include two source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release-channel clearance transition source rows should be present, ready, and value-free");
   check(report.transitionRefreshCommandCount === 2, "release-channel clearance transition should include two refresh commands");
   check(report.transitionRefreshCommands.every((row) => row.valueRecorded === false), "release-channel clearance transition refresh commands should be value-free");
   check(report.currentRealBlockerReady === true, "release-channel clearance transition should include ready current blocker evidence");
-  check(report.currentPriorityActionId === "release-channel-metadata", "release-channel clearance transition should keep release-channel metadata as current real blocker");
-  check(report.currentPlaceholderKeyCount === releaseChannelMetadataKeys.length, "release-channel clearance transition should mirror four real placeholder keys");
-  check(releaseChannelMetadataKeys.every((key) => report.currentPlaceholderKeys.includes(key)), "release-channel clearance transition should mirror release-channel placeholder keys");
+  check(
+    ["prepare-local-distribution-env", "replace-release-channel-placeholders", "release-channel-metadata"].includes(report.currentPriorityActionId),
+    "release-channel clearance transition should keep release-channel setup as current real blocker"
+  );
+  check(
+    report.currentBlockerMode === "missing-local-env" || report.currentBlockerMode === "replace-release-channel-placeholders",
+    "release-channel clearance transition should identify the current blocker mode"
+  );
+  check(report.currentRequiredKeyCount === releaseChannelMetadataKeys.length, "release-channel clearance transition should mirror four current required keys");
+  if (report.currentBlockerMode === "missing-local-env") {
+    check(report.currentNextCommand === "npm run release:prepare-env", "release-channel clearance transition should surface prepare-env when the ignored env is missing");
+    check(report.currentPlaceholderKeyCount === 0, "release-channel clearance transition should not report placeholder keys before the ignored env exists");
+    check(report.currentFirstBlocker.includes("local distribution env file is not loaded"), "release-channel clearance transition should surface the missing-env blocker");
+  } else {
+    check(report.currentPlaceholderKeyCount === releaseChannelMetadataKeys.length, "release-channel clearance transition should mirror four real placeholder keys");
+    check(releaseChannelMetadataKeys.every((key) => report.currentPlaceholderKeys.includes(key)), "release-channel clearance transition should mirror release-channel placeholder keys");
+  }
   check(report.syntheticClearanceReady === true, "release-channel clearance transition should include synthetic clearance readiness");
   check(report.syntheticClearanceStrictReady === true, "release-channel clearance transition should include synthetic strict readiness");
   check(report.syntheticClearanceCurrentReadyCount === releaseChannelMetadataKeys.length, "release-channel clearance transition should prove four synthetic ready rows");
@@ -444,9 +590,8 @@ for (const row of transitionRefreshCommands) {
 }
 
 const successHandoff = await readJsonRequired(successHandoffJsonPath, "Final handoff success-redaction smoke");
-const currentBlocker = await readJsonRequired(currentBlockerJsonPath, "Release current blocker");
-const nextActions = await readJsonRequired(nextActionsJsonPath, "External next actions");
-const report = buildReport({ successHandoff, currentBlocker, nextActions });
+const releaseDoctor = await readJsonRequired(releaseDoctorJsonPath, "Release doctor");
+const report = buildReport({ successHandoff, releaseDoctor });
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
 
@@ -458,6 +603,7 @@ console.log("GrooveForge release-channel clearance transition smoke passed.");
 console.log(`- Markdown: ${relative(transitionMarkdownPath)}`);
 console.log(`- JSON: ${relative(transitionJsonPath)}`);
 console.log(`- Transition ready: ${report.releaseChannelClearanceTransitionReady ? "yes" : "no"}`);
+console.log(`- Current blocker mode: ${report.currentBlockerMode}`);
 console.log(`- Current real blocker: ${report.currentPriorityActionLabel}`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount}`);
 console.log(`- Synthetic clearance ready: ${report.syntheticClearanceReady ? "yes" : "no"}`);
