@@ -65,6 +65,7 @@
     "release:channel-unblock-smoke": "node harness/scripts/run_release_channel_unblock_smoke.mjs",
     "release:channel-live-check": "node harness/scripts/run_release_channel_live_check.mjs",
     "release:post-edit-proof": "node harness/scripts/run_release_post_edit_proof.mjs",
+    "release:post-edit-proof-success-smoke": "node harness/scripts/run_release_post_edit_proof_success_smoke.mjs",
     "release:prepare-env-smoke": "node harness/scripts/run_release_prepare_env.mjs",
     "release:prepare-env": "node harness/scripts/run_release_prepare_env.mjs --write-local",
     "release:external-preflight": "node harness/scripts/run_release_external_preflight.mjs",

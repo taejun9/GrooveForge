@@ -70,6 +70,12 @@ Run the value-free post-edit proof after editing the ignored local env file when
 npm run release:post-edit-proof
 ```
 
+Run the value-free synthetic success rehearsal when the operator wants proof that the post-edit proof ready branch works without reading or modifying the real ignored local env file:
+
+```sh
+npm run release:post-edit-proof-success-smoke
+```
+
 Rerun the fast redacted external preflight after editing the ignored local env file:
 
 ```sh
@@ -101,6 +107,8 @@ npm run release:proof-bundle
 `release:channel-live-check` reads the real ignored `.env.distribution.local` or configured local env file through the shared loader, inspects only the four current release-channel metadata keys, and writes a value-free Markdown/JSON receipt with present, placeholder, shape-ready, current-ready, file/line, and follow-up command fields. It passes truthfully when placeholders remain by marking live-check readiness false, records no URL or channel values, does not probe remote channels, and makes no external distribution claim.
 
 `release:post-edit-proof` runs the value-free live check first, then `release:current-blocker`, and writes ignored `release-post-edit-proof` Markdown/JSON artifacts that record command order, live-check readiness, placeholder counts, placeholder edit locations, current blocker, current 10-plan progress, completion percentage, and non-claiming posture. It records no URL/channel values, does not probe remote channels, and makes no external distribution claim.
+
+`release:post-edit-proof-success-smoke` writes ignored `release-post-edit-proof-success-smoke` Markdown/JSON artifacts from synthetic ready evidence. It proves the post-edit proof ready branch with four current-ready metadata rows, zero placeholder keys, the same live-check/current-blocker command order, no real local env read or modification, no URL/channel values, no remote probes, and no external distribution claim.
 
 `release:doctor` runs targeted redacted distribution input/readiness smokes, reads the generated env-template, prepare-env, update-feed, Developer ID readiness, manual QA, distribution-channel QA, and private-input summaries, then writes a compact release doctor Markdown/JSON report under ignored `build/desktop/` without running the full release gate, recording private values, probing remote channels, signing artifacts, submitting to Apple, or claiming external distribution completion. It mirrors the distribution private-inputs release-channel focus receipt so the four current metadata keys show receipt readiness, current-ready count, placeholder count, proof command, rerun command, and value-recording posture. When release-channel placeholders remain, it keeps `npm run release:doctor` as the next proof command and lists `npm run release:current-blocker` as the refresh rerun after ignored env edits.
 
