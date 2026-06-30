@@ -13,25 +13,58 @@ const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const summaryRoot = path.join(root, "build", "desktop");
+const requestedReportStem = process.env.GROOVEFORGE_UPDATE_FEED_POST_EDIT_PROOF_REPORT_STEM?.trim() ?? "";
+const postEditProofArtifacts = {
+  default: {
+    stem: "release-update-feed-post-edit-proof",
+    markdownName: "release-update-feed-post-edit-proof.md",
+    jsonName: "release-update-feed-post-edit-proof.json",
+    command: "npm run release:update-feed-post-edit-proof",
+    sourceMode: "real-update-feed-post-edit-proof",
+    syntheticSuccessSmoke: false,
+    liveCheckLabel: "Update feed live check",
+    liveCheckCommand: "npm run release:update-feed-live-check",
+    liveCheckStem: "release-update-feed-live-check",
+    liveCheckRole: "refresh real ignored local env update feed/channel posture"
+  },
+  successSmoke: {
+    stem: "release-update-feed-post-edit-proof-success-smoke",
+    markdownName: "release-update-feed-post-edit-proof-success-smoke.md",
+    jsonName: "release-update-feed-post-edit-proof-success-smoke.json",
+    command: "npm run release:update-feed-post-edit-proof-success-smoke",
+    sourceMode: "synthetic-update-feed-post-edit-proof-success-smoke",
+    syntheticSuccessSmoke: true,
+    liveCheckLabel: "Update feed live check strict success smoke",
+    liveCheckCommand: "npm run release:update-feed-live-check-strict-success-smoke",
+    liveCheckStem: "release-update-feed-live-check-strict-success-smoke",
+    liveCheckRole: "refresh synthetic shape-ready update feed/channel posture without reading the real local env root"
+  }
+};
+const selectedArtifact = requestedReportStem ? postEditProofArtifacts.successSmoke : postEditProofArtifacts.default;
+if (requestedReportStem && requestedReportStem !== postEditProofArtifacts.successSmoke.stem) {
+  console.error("GrooveForge update feed post-edit proof failed:");
+  console.error("- Unsupported report stem override.");
+  process.exit(1);
+}
 const liveCheckJsonPath = path.join(
   packageRoot,
-  `${appName}-${packageJson.version}-${platformArch}-release-update-feed-live-check.json`
+  `${appName}-${packageJson.version}-${platformArch}-${selectedArtifact.liveCheckStem}.json`
 );
 const autoUpdateReadinessJsonPath = path.join(summaryRoot, `${appName}-${platformArch}-auto-update-readiness.json`);
 const postEditProofMarkdownPath = path.join(
   packageRoot,
-  `${appName}-${packageJson.version}-${platformArch}-release-update-feed-post-edit-proof.md`
+  `${appName}-${packageJson.version}-${platformArch}-${selectedArtifact.stem}.md`
 );
 const postEditProofJsonPath = path.join(
   packageRoot,
-  `${appName}-${packageJson.version}-${platformArch}-release-update-feed-post-edit-proof.json`
+  `${appName}-${packageJson.version}-${platformArch}-${selectedArtifact.stem}.json`
 );
 const failures = [];
 const proofCommands = [
   {
     order: 1,
-    command: "npm run release:update-feed-live-check",
-    role: "refresh real ignored local env update feed/channel posture",
+    command: selectedArtifact.liveCheckCommand,
+    role: selectedArtifact.liveCheckRole,
     valueRecorded: false
   },
   {
@@ -128,7 +161,7 @@ async function currentTenPlanProgress() {
     .filter((value) => typeof value === "string")
     .map((value) => Number(value))
     .filter((value) => Number.isInteger(value));
-  const currentPlan = 1208;
+  const currentPlan = 1209;
   const windowStart = Math.floor((currentPlan - 1) / 10) * 10 + 1;
   const windowEnd = windowStart + 9;
   const windowRows = planNumbers.filter((number) => number >= windowStart && number <= windowEnd).sort((a, b) => a - b);
@@ -297,7 +330,7 @@ function buildReport({ liveCheck, autoUpdateReadiness, progress }) {
     liveCheck.claimedExternalDistribution === false &&
     releaseUpdateFeedLiveRows.every((row) => row.valueRecorded === false);
   const sourceArtifactRows = [
-    sourceRow("Update feed live check", liveCheckJsonPath, liveCheckSourceReady),
+    sourceRow(selectedArtifact.liveCheckLabel, liveCheckJsonPath, liveCheckSourceReady),
     sourceRow("Auto-update readiness smoke", autoUpdateReadinessJsonPath, autoUpdateSourceReady)
   ];
   const signedUpdateArtifactsReady = autoUpdateReadiness.checks?.signedUpdateArtifactsReady === true;
@@ -308,7 +341,7 @@ function buildReport({ liveCheck, autoUpdateReadiness, progress }) {
       order: 1,
       state: "Update feed live-check posture",
       evidence: `${integerValue(liveCheck.currentSelectedReadyCount)}/2 selected update feed/channel rows ready; ${integerValue(liveCheck.currentPlaceholderKeyCount)} placeholders remain.`,
-      command: "npm run release:update-feed-live-check",
+      command: selectedArtifact.liveCheckCommand,
       ready: liveCheckSourceReady,
       valueRecorded: false
     },
@@ -346,7 +379,7 @@ function buildReport({ liveCheck, autoUpdateReadiness, progress }) {
       order: 5,
       state: "Non-claim posture",
       evidence: "No feed values, channel values, network probes, uploads, signing, notarization, auto-update claim, or external distribution claim are recorded.",
-      command: "npm run release:update-feed-post-edit-proof",
+      command: selectedArtifact.command,
       ready: true,
       valueRecorded: false
     }
@@ -359,7 +392,13 @@ function buildReport({ liveCheck, autoUpdateReadiness, progress }) {
     platform: process.platform,
     arch: process.arch,
     platformArch,
-    reportCommand: "npm run release:update-feed-post-edit-proof",
+    sourceMode: selectedArtifact.sourceMode,
+    syntheticSuccessSmoke: selectedArtifact.syntheticSuccessSmoke,
+    reportCommand: selectedArtifact.command,
+    updateFeedPostEditProofMarkdownArtifactName: selectedArtifact.markdownName,
+    updateFeedPostEditProofJsonArtifactName: selectedArtifact.jsonName,
+    updateFeedPostEditProofMarkdownPath: relative(postEditProofMarkdownPath),
+    updateFeedPostEditProofJsonPath: relative(postEditProofJsonPath),
     releaseUpdateFeedPostEditProofReady:
       sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
       proofRows.every((row) => row.ready === true && row.valueRecorded === false),
@@ -391,6 +430,8 @@ function buildReport({ liveCheck, autoUpdateReadiness, progress }) {
     currentEnvEditTarget: textValue(liveCheck.currentEnvEditTarget),
     selectedFeedKey: textValue(liveCheck.selectedFeedKey),
     selectedChannelKey: textValue(liveCheck.selectedChannelKey),
+    realLocalEnvRead: liveCheck.realLocalEnvRead === true,
+    realLocalEnvModified: liveCheck.realLocalEnvModified === true,
     autoUpdateReady: autoUpdateReadiness.autoUpdateReady === true,
     autoUpdateBlocked: realAutoUpdateBlocked,
     autoUpdateBlockerRows,
@@ -443,6 +484,8 @@ function buildMarkdown(report) {
 
 - Post-edit proof ready: ${readyLabel(report.releaseUpdateFeedPostEditProofReady)}
 - State: ${report.releaseUpdateFeedPostEditProofState}
+- Source mode: ${report.sourceMode}
+- Synthetic success smoke: ${readyLabel(report.syntheticSuccessSmoke)}
 - Command order: ${report.releaseUpdateFeedPostEditProofCommandSummary}
 - Update feed live check ready: ${readyLabel(report.updateFeedLiveCheckReady)}
 - Update feed strict ready: ${readyLabel(report.updateFeedStrictReady)}
@@ -532,10 +575,14 @@ ${formatBlockerRows(report.autoUpdateBlockerRows)}
 function validateReport(report, markdown) {
   const serialized = JSON.stringify(report);
   check(report.releaseUpdateFeedPostEditProofReady === true, "update feed post-edit proof should be ready");
+  check(report.sourceMode === selectedArtifact.sourceMode, "update feed post-edit proof source mode should match artifact mode");
+  check(report.syntheticSuccessSmoke === selectedArtifact.syntheticSuccessSmoke, "update feed post-edit proof synthetic flag should match artifact mode");
+  check(report.reportCommand === selectedArtifact.command, "update feed post-edit proof report command should match artifact mode");
+  check(report.updateFeedPostEditProofMarkdownArtifactName === selectedArtifact.markdownName, "update feed post-edit proof Markdown artifact name should match artifact mode");
+  check(report.updateFeedPostEditProofJsonArtifactName === selectedArtifact.jsonName, "update feed post-edit proof JSON artifact name should match artifact mode");
   check(report.releaseUpdateFeedPostEditProofCommandCount === 2, "update feed post-edit proof should include two commands");
   check(
-    report.releaseUpdateFeedPostEditProofCommandSummary ===
-      "npm run release:update-feed-live-check -> npm run desktop:auto-update-readiness-smoke",
+    report.releaseUpdateFeedPostEditProofCommandSummary === `${selectedArtifact.liveCheckCommand} -> npm run desktop:auto-update-readiness-smoke`,
     "update feed post-edit proof should run live check before auto-update readiness"
   );
   check(
@@ -610,6 +657,18 @@ function validateReport(report, markdown) {
   check(markdown.includes("Auto-update claimed: no"), "update feed post-edit proof Markdown should keep auto-update unclaimed");
   check(markdown.includes("External distribution claimed: no"), "update feed post-edit proof Markdown should keep external distribution unclaimed");
 
+  if (selectedArtifact.syntheticSuccessSmoke) {
+    check(report.updateFeedLiveCheckReady === true, "update feed post-edit proof success smoke should prove live-check readiness");
+    check(report.updateFeedStrictReady === true, "update feed post-edit proof success smoke should prove strict readiness");
+    check(report.updateFeedStrictExitCode === 0, "update feed post-edit proof success smoke should record strict exit code zero");
+    check(report.updateFeedStrictFailureRowCount === 0, "update feed post-edit proof success smoke should have zero strict failure rows");
+    check(report.currentSelectedReadyCount === 2, "update feed post-edit proof success smoke should prove two selected-ready keys");
+    check(report.currentPlaceholderKeyCount === 0, "update feed post-edit proof success smoke should prove zero placeholder keys");
+    check(report.currentPlaceholderEditLocationCount === 0, "update feed post-edit proof success smoke should prove zero placeholder edit locations");
+    check(report.realLocalEnvRead === false, "update feed post-edit proof success smoke should not read the real local env root for the live check");
+    check(report.realLocalEnvModified === false, "update feed post-edit proof success smoke should not modify the real local env");
+  }
+
   if (failures.length > 0) {
     fail("Validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
   }
@@ -634,6 +693,8 @@ await writeFile(postEditProofJsonPath, `${JSON.stringify(report, null, 2)}\n`, "
 console.log("GrooveForge update feed post-edit proof passed.");
 console.log(`- Markdown: ${relative(postEditProofMarkdownPath)}`);
 console.log(`- JSON: ${relative(postEditProofJsonPath)}`);
+console.log(`- Source mode: ${report.sourceMode}`);
+console.log(`- Synthetic success smoke: ${report.syntheticSuccessSmoke ? "yes" : "no"}`);
 console.log(`- Proof ready: ${report.releaseUpdateFeedPostEditProofReady ? "yes" : "no"}`);
 console.log(`- Update feed live check ready: ${report.updateFeedLiveCheckReady ? "yes" : "no"}`);
 console.log(`- Current selected keys ready: ${report.currentSelectedReadyCount}/2`);

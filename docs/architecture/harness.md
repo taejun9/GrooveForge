@@ -100,6 +100,7 @@ npm run release:update-feed-live-check
 npm run release:update-feed-live-check-strict
 npm run release:update-feed-live-check-strict-success-smoke
 npm run release:update-feed-post-edit-proof
+npm run release:update-feed-post-edit-proof-success-smoke
 npm run desktop:completion-audit-smoke
 npm run desktop:external-distribution-gate-smoke
 npm run desktop:external-remediation-smoke
@@ -127,6 +128,7 @@ npm run release:update-feed-live-check
 npm run release:update-feed-live-check-strict
 npm run release:update-feed-live-check-strict-success-smoke
 npm run release:update-feed-post-edit-proof
+npm run release:update-feed-post-edit-proof-success-smoke
 npm run release:current-blocker
 npm run release:current-blocker-smoke
 ```
@@ -252,6 +254,8 @@ The digest check extends the existing blocker contract that reports blockers whe
 `npm run release:update-feed-live-check` is the operator-facing companion for the `auto-update-feed` step after release-channel metadata clears. It reads the actual ignored `.env.distribution.local` or configured local env file through the shared loader, inspects only `GROOVEFORGE_UPDATE_FEED_URL`, `ELECTRON_UPDATE_FEED_URL`, `UPDATE_FEED_URL`, `GROOVEFORGE_UPDATE_CHANNEL`, `ELECTRON_UPDATE_CHANNEL`, and `UPDATE_CHANNEL`, writes ignored `release-update-feed-live-check` Markdown/JSON artifacts, and records key names, selected-key booleans, placeholder booleans, shape readiness, file/line edit locations, current 10-plan progress, and non-claiming safety fields only. It passes truthfully with readiness false while feed/channel metadata is missing or placeholder, records no feed URL or channel values, probes no update feed, publishes no feed, signs nothing, and claims neither auto-update nor external distribution. `npm run release:update-feed-live-check-strict` uses the same parser and redaction path with `--strict`, writes separate strict artifacts, and exits non-zero until one update feed URL key and one update channel key are selected, non-placeholder, and shape-ready. `npm run release:update-feed-live-check-strict-success-smoke` runs that strict path against a synthetic ignored env root and proves the ready branch with two selected-ready keys, zero placeholders, no real local env read/modify, no feed/channel values in output, and no auto-update or external distribution claim.
 
 `npm run release:update-feed-post-edit-proof` is the operator-facing wrapper after ignored update feed/channel edits. It runs the real update feed live check first and the real auto-update readiness smoke second, writes ignored `release-update-feed-post-edit-proof` Markdown/JSON artifacts, and records command rows, source artifact rows, live-check posture, strict failure rows, placeholder edit locations, real auto-update blocker rows, signed-update artifact readiness, hard-gate boundary, current 10-plan progress, completion percentage, and not-recorded/not-claimed posture. It stays outside `npm run verify` while private placeholder values remain expected.
+
+`npm run release:update-feed-post-edit-proof-success-smoke` runs the same wrapper with a separate success-smoke artifact stem, using the synthetic strict-ready update feed live-check smoke before the real auto-update readiness smoke. It proves the live-ready branch with `2/2` selected-ready feed/channel keys and zero placeholders while preserving downstream auto-update blockers, signed-update artifact boundary, hard-gate boundary, value redaction, and false auto-update/external distribution claims.
 
 `npm run release:progress` and `npm run release:progress-smoke` refresh `npm run release:channel-live-check` before writing the user-facing release progress report, then mirror live-check source readiness, command, first proof after private edits, current-ready rows, placeholder keys, placeholder edit locations, follow-up proof commands, and value-redaction posture into JSON, Markdown, and console output. `npm run release:current-blocker` and `npm run release:current-blocker-smoke` mirror those same live-check receipt fields from release progress so the compact current-blocker report shows both the synthetic unblock rehearsal and the real ignored-env live-check posture without recording URL or channel values.
 
