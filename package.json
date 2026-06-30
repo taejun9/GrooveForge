@@ -76,6 +76,7 @@
     "release:update-feed-live-check": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_release_update_feed_live_check.mjs",
     "release:update-feed-live-check-strict": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_release_update_feed_live_check.mjs --strict",
     "release:update-feed-live-check-strict-success-smoke": "node harness/scripts/run_release_update_feed_live_check_strict_success_smoke.mjs",
+    "release:update-feed-post-edit-proof": "node harness/scripts/run_release_update_feed_post_edit_proof.mjs",
     "release:prepare-env-smoke": "node harness/scripts/run_release_prepare_env.mjs",
     "release:prepare-env": "node harness/scripts/run_release_prepare_env.mjs --write-local",
     "release:external-preflight": "node harness/scripts/run_release_external_preflight.mjs",
