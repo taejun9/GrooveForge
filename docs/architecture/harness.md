@@ -233,6 +233,8 @@ The digest check extends the existing blocker contract that reports blockers whe
 
 `npm run release:post-edit-proof-success-smoke` is the value-free success-path rehearsal for that wrapper. It writes ignored `release-post-edit-proof-success-smoke` Markdown/JSON artifacts from synthetic ready evidence, proves four current-ready release-channel metadata rows, zero placeholder keys, the same live-check/current-blocker command order, no real local env read or modification, and no URL/channel values or external distribution claim.
 
+`npm run release:post-edit-proof-bundle` runs the success-path rehearsal first and the real post-edit proof second, then writes ignored `release-post-edit-proof-bundle` Markdown/JSON artifacts that keep success-branch coverage, current real release-channel blocker posture, current 10-plan progress, source artifact rows, readiness rows, and non-claiming safety fields in one value-free receipt without recording URL/channel values.
+
 Current-blocker reporting keeps release-channel unblock readiness, release-channel live-check source/readiness/current-ready/placeholder-key posture, `npm run release:channel-live-check` as the first proof after private edits, placeholder-blocker-cleared rehearsal posture, and release-channel live-check rows/placeholder locations mirrored from release progress in one value-free operator receipt.
 
 The same receipt preserves release-channel unblock readiness, release-channel live-check source/readiness/current-ready/placeholder-key posture, placeholder-blocker-cleared rehearsal posture, and the live-check first-proof command without recording private values.
