@@ -74,6 +74,10 @@ function formatUserPercent(value) {
   return value === 100 ? "100%" : `${value.toFixed(6)}%`;
 }
 
+function planLabel(planNumber) {
+  return `plan-${String(planNumber).padStart(3, "0")}`;
+}
+
 function formatEditGuidanceRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | none | none | none |";
@@ -130,6 +134,10 @@ function formatTenPlanProgressReportReceiptRows(rows) {
   return rows
     .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.item)} | ${row.ready ? "yes" : "no"} | ${escapeCell(row.evidence)} | ${escapeCell(row.sourceField)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
     .join("\n");
+}
+
+function formatTenPlanCadenceRolloverRows(rows) {
+  return formatTenPlanProgressReportReceiptRows(rows);
 }
 
 function formatAudienceRows(rows) {
@@ -251,6 +259,9 @@ async function buildCompletedPlanSummary() {
     path: relative(path.join(completedPlansDir, row.fileName)),
     valueRecorded: false
   }));
+  const tenPlanProgressReportDue = windowCompleted.length === 10;
+  const currentTenPlanReportBoundaryAt = windowEnd;
+  const nextScheduledTenPlanProgressReportAt = tenPlanProgressReportDue ? windowEnd + 10 : windowEnd;
 
   return {
     completedPlanSource: relative(completedPlansDir),
@@ -268,9 +279,13 @@ async function buildCompletedPlanSummary() {
         ? `${currentTenPlanWindowRows.length} completed plan filenames`
         : "none",
     currentTenPlanWindowRows,
-    tenPlanProgressReportDue: windowCompleted.length === 10,
+    tenPlanProgressReportDue,
     tenPlanProgressReportCadence: "report after each completed work and every 10 completed plans",
-    nextTenPlanProgressReportAt: windowEnd,
+    currentTenPlanReportBoundaryAt,
+    currentTenPlanReportBoundaryLabel: planLabel(currentTenPlanReportBoundaryAt),
+    nextTenPlanProgressReportAt: currentTenPlanReportBoundaryAt,
+    nextScheduledTenPlanProgressReportAt,
+    nextScheduledTenPlanProgressReportLabel: planLabel(nextScheduledTenPlanProgressReportAt),
     completedPlanValueRecorded: false
   };
 }
@@ -455,7 +470,7 @@ function buildUserFacingCompletionSummary(report, completedPlanSummary) {
 
 function buildTenPlanProgressReportReceiptSummary(report) {
   const currentRows = valueFreeObjectRows(report.currentTenPlanWindowRows);
-  const nextPlan = `plan-${String(report.nextTenPlanProgressReportAt).padStart(3, "0")}`;
+  const nextPlan = planLabel(report.nextTenPlanProgressReportAt);
   const rows = [
     {
       order: 1,
@@ -504,15 +519,52 @@ function buildTenPlanProgressReportReceiptSummary(report) {
       evidence: textValue(report.userFacingNextBlocker, "none"),
       sourceField: "userFacingNextBlocker/externalProofBundleCurrentFirstBlocker",
       valueRecorded: false
+    },
+    {
+      order: 7,
+      item: "Next scheduled report after delivery",
+      ready: Number.isInteger(report.nextScheduledTenPlanProgressReportAt) && report.nextScheduledTenPlanProgressReportAt >= report.nextTenPlanProgressReportAt,
+      evidence: report.nextScheduledTenPlanProgressReportLabel,
+      sourceField: "nextScheduledTenPlanProgressReportAt/nextScheduledTenPlanProgressReportLabel",
+      valueRecorded: false
     }
   ];
 
   return {
-    tenPlanProgressReportReceiptReady: rows.length === 6 && rows.every((row) => row.ready === true && row.valueRecorded === false),
+    tenPlanProgressReportReceiptReady: rows.length === 7 && rows.every((row) => row.ready === true && row.valueRecorded === false),
     tenPlanProgressReportReceiptRowCount: rows.length,
     tenPlanProgressReportReceiptSummary: `${rows.length} value-free 10-plan progress report receipt rows`,
     tenPlanProgressReportReceiptRows: rows,
     tenPlanProgressReportReceiptValueRecorded: false
+  };
+}
+
+function buildTenPlanCadenceRolloverSummary(report) {
+  const rows = [
+    {
+      order: 1,
+      item: "Current report boundary",
+      ready: report.currentTenPlanReportBoundaryAt === report.nextTenPlanProgressReportAt,
+      evidence: report.currentTenPlanReportBoundaryLabel,
+      sourceField: "currentTenPlanReportBoundaryAt/currentTenPlanReportBoundaryLabel",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      item: "Next scheduled report after delivery",
+      ready: report.nextScheduledTenPlanProgressReportAt >= report.currentTenPlanReportBoundaryAt,
+      evidence: report.nextScheduledTenPlanProgressReportLabel,
+      sourceField: "nextScheduledTenPlanProgressReportAt/nextScheduledTenPlanProgressReportLabel",
+      valueRecorded: false
+    }
+  ];
+
+  return {
+    tenPlanProgressReportRolloverReady: rows.length === 2 && rows.every((row) => row.ready === true && row.valueRecorded === false),
+    tenPlanProgressReportRolloverRowCount: rows.length,
+    tenPlanProgressReportRolloverSummary: `${rows.length} value-free 10-plan cadence rollover rows`,
+    tenPlanProgressReportRolloverRows: rows,
+    tenPlanProgressReportRolloverValueRecorded: false
   };
 }
 
@@ -1102,8 +1154,12 @@ function buildMarkdown(report) {
 - Current 10-plan progress: ${report.currentTenPlanWindowLabel}
 - Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})
 - 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}
+- Current 10-plan report boundary: ${report.currentTenPlanReportBoundaryLabel}
+- Next scheduled 10-plan progress report after delivery: ${report.nextScheduledTenPlanProgressReportLabel}
 - 10-plan progress report receipt ready: ${report.tenPlanProgressReportReceiptReady ? "yes" : "no"}
 - 10-plan progress report receipt rows: ${report.tenPlanProgressReportReceiptRowCount} (${report.tenPlanProgressReportReceiptSummary})
+- 10-plan cadence rollover ready: ${report.tenPlanProgressReportRolloverReady ? "yes" : "no"}
+- 10-plan cadence rollover rows: ${report.tenPlanProgressReportRolloverRowCount} (${report.tenPlanProgressReportRolloverSummary})
 - Source evidence ready: ${report.sourceEvidenceReady ? "yes" : "no"}
 - Local release ready: ${report.localReleaseReady ? "yes" : "no"}
 - Local release readiness: ${report.localReleaseReadinessPercent.toFixed(1)}%
@@ -1202,8 +1258,11 @@ function buildMarkdown(report) {
 - Latest completed plan: ${report.latestCompletedPlanPath}
 - Current 10-plan window: ${report.currentTenPlanWindowLabel}
 - Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})
-- Next 10-plan report at: plan-${String(report.nextTenPlanProgressReportAt).padStart(3, "0")}
+- Current 10-plan report boundary: ${report.currentTenPlanReportBoundaryLabel}
+- Next 10-plan report at: ${planLabel(report.nextTenPlanProgressReportAt)}
+- Next scheduled 10-plan progress report after delivery: ${report.nextScheduledTenPlanProgressReportLabel}
 - 10-plan progress report receipt: ${report.tenPlanProgressReportReceiptRowCount} (${report.tenPlanProgressReportReceiptSummary})
+- 10-plan cadence rollover: ${report.tenPlanProgressReportRolloverRowCount} (${report.tenPlanProgressReportRolloverSummary})
 - Private values recorded in this summary: no
 
 ## Current 10-Plan Window Rows
@@ -1221,6 +1280,16 @@ ${formatCompletedPlanRows(report.currentTenPlanWindowRows)}
 | order | item | ready | evidence | source field | value recorded |
 |---:|---|---:|---|---|---:|
 ${formatTenPlanProgressReportReceiptRows(report.tenPlanProgressReportReceiptRows)}
+
+## 10-Plan Cadence Rollover
+
+- Rollover ready: ${report.tenPlanProgressReportRolloverReady ? "yes" : "no"}
+- Rollover rows: ${report.tenPlanProgressReportRolloverRowCount} (${report.tenPlanProgressReportRolloverSummary})
+- Value recorded: ${report.tenPlanProgressReportRolloverValueRecorded ? "yes" : "no"}
+
+| order | item | ready | evidence | source field | value recorded |
+|---:|---|---:|---|---|---:|
+${formatTenPlanCadenceRolloverRows(report.tenPlanProgressReportRolloverRows)}
 
 ## Audience Readiness
 
@@ -1627,6 +1696,7 @@ releaseProgressReport.releaseProgressReportReady =
   releaseProgressReport.releaseChannelUnblockPlaceholderBlockerCleared;
 Object.assign(releaseProgressReport, buildUserFacingCompletionSummary(releaseProgressReport, completedPlanSummary));
 Object.assign(releaseProgressReport, buildTenPlanProgressReportReceiptSummary(releaseProgressReport));
+Object.assign(releaseProgressReport, buildTenPlanCadenceRolloverSummary(releaseProgressReport));
 Object.assign(releaseProgressReport, buildReleaseChannelPostEditReceiptSummary(releaseProgressReport));
 Object.assign(releaseProgressReport, buildReleaseChannelPostEditOperatorReceiptSummary(releaseProgressReport));
 Object.assign(releaseProgressReport, buildPostEditProofSequenceReceiptSummary(releaseProgressReport));
@@ -1677,11 +1747,18 @@ check(releaseProgressReport.currentTenPlanWindowRows.length === releaseProgressR
 check(releaseProgressReport.currentTenPlanWindowRows.every((row) => row.valueRecorded === false), "release progress report current 10-plan rows should not record values");
 check(releaseProgressReport.currentTenPlanWindowRows.every((row) => Number.isInteger(row.number) && typeof row.fileName === "string" && row.path.startsWith("docs/exec_plans/completed/")), "release progress report current 10-plan rows should identify completed plan filenames");
 check(typeof releaseProgressReport.tenPlanProgressReportDue === "boolean", "release progress report should include 10-plan report due posture");
-check(releaseProgressReport.nextTenPlanProgressReportAt === releaseProgressReport.currentTenPlanWindowEnd, "release progress report should identify the next 10-plan report plan number");
+check(releaseProgressReport.currentTenPlanReportBoundaryAt === releaseProgressReport.currentTenPlanWindowEnd, "release progress report current report boundary should match current window end");
+check(releaseProgressReport.currentTenPlanReportBoundaryLabel === planLabel(releaseProgressReport.currentTenPlanReportBoundaryAt), "release progress report current report boundary label should match boundary number");
+check(releaseProgressReport.nextTenPlanProgressReportAt === releaseProgressReport.currentTenPlanReportBoundaryAt, "release progress report should identify the current 10-plan report boundary number");
+const expectedNextScheduledTenPlanProgressReportAt = releaseProgressReport.tenPlanProgressReportDue
+  ? releaseProgressReport.currentTenPlanWindowEnd + releaseProgressReport.currentTenPlanWindowTotal
+  : releaseProgressReport.currentTenPlanWindowEnd;
+check(releaseProgressReport.nextScheduledTenPlanProgressReportAt === expectedNextScheduledTenPlanProgressReportAt, "release progress report should derive the next scheduled 10-plan report after delivery");
+check(releaseProgressReport.nextScheduledTenPlanProgressReportLabel === planLabel(releaseProgressReport.nextScheduledTenPlanProgressReportAt), "release progress report next scheduled label should match next scheduled report number");
 check(releaseProgressReport.completedPlanValueRecorded === false, "release progress report should not record completed plan values beyond filenames and counts");
 check(releaseProgressReport.tenPlanProgressReportReceiptReady === true, "release progress report 10-plan progress report receipt should be ready");
 check(releaseProgressReport.tenPlanProgressReportReceiptRowCount === releaseProgressReport.tenPlanProgressReportReceiptRows.length, "release progress report 10-plan receipt row count should match rows");
-check(releaseProgressReport.tenPlanProgressReportReceiptRowCount >= 6, "release progress report 10-plan receipt should include cadence, window, completed rows, due, completion, and blocker rows");
+check(releaseProgressReport.tenPlanProgressReportReceiptRowCount >= 7, "release progress report 10-plan receipt should include cadence, window, completed rows, due, completion, blocker, and next scheduled rows");
 check(releaseProgressReport.tenPlanProgressReportReceiptRows.every((row) => row.valueRecorded === false), "release progress report 10-plan receipt rows should not record values");
 check(releaseProgressReport.tenPlanProgressReportReceiptRows.some((row) => row.item === "10-plan cadence" && row.evidence.includes("every 10 completed plans")), "release progress report 10-plan receipt should include report cadence");
 check(releaseProgressReport.tenPlanProgressReportReceiptRows.some((row) => row.item === "Current 10-plan window" && row.evidence.includes(releaseProgressReport.currentTenPlanWindowLabel)), "release progress report 10-plan receipt should include current 10-plan window");
@@ -1689,8 +1766,17 @@ check(releaseProgressReport.tenPlanProgressReportReceiptRows.some((row) => row.i
 check(releaseProgressReport.tenPlanProgressReportReceiptRows.some((row) => row.item === "10-plan report due posture" && row.evidence.includes(`due ${releaseProgressReport.tenPlanProgressReportDue ? "yes" : "no"}`)), "release progress report 10-plan receipt should include due posture");
 check(releaseProgressReport.tenPlanProgressReportReceiptRows.some((row) => row.item === "Completion posture" && row.evidence.includes(formatUserPercent(releaseProgressReport.userFacingCompletionPercent)) && row.evidence.includes(formatUserPercent(releaseProgressReport.userFacingRemainingPercent))), "release progress report 10-plan receipt should include completion and remaining percentages");
 check(releaseProgressReport.tenPlanProgressReportReceiptRows.some((row) => row.item === "Current blocker" && row.evidence === releaseProgressReport.userFacingNextBlocker), "release progress report 10-plan receipt should include current blocker");
+check(releaseProgressReport.tenPlanProgressReportReceiptRows.some((row) => row.item === "Next scheduled report after delivery" && row.evidence === releaseProgressReport.nextScheduledTenPlanProgressReportLabel), "release progress report 10-plan receipt should include next scheduled report after delivery");
 check(releaseProgressReport.tenPlanProgressReportReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release progress report 10-plan receipt rows should identify source fields");
 check(releaseProgressReport.tenPlanProgressReportReceiptValueRecorded === false, "release progress report 10-plan receipt should not record values");
+check(releaseProgressReport.tenPlanProgressReportRolloverReady === true, "release progress report 10-plan rollover should be ready");
+check(Array.isArray(releaseProgressReport.tenPlanProgressReportRolloverRows), "release progress report should include 10-plan rollover rows");
+check(releaseProgressReport.tenPlanProgressReportRolloverRowCount === releaseProgressReport.tenPlanProgressReportRolloverRows.length, "release progress report 10-plan rollover row count should match rows");
+check(releaseProgressReport.tenPlanProgressReportRolloverRowCount === 2, "release progress report should include current-boundary and next-scheduled rollover rows");
+check(releaseProgressReport.tenPlanProgressReportRolloverRows.every((row) => row.valueRecorded === false), "release progress report 10-plan rollover rows should not record values");
+check(releaseProgressReport.tenPlanProgressReportRolloverRows.some((row) => row.item === "Current report boundary" && row.evidence === releaseProgressReport.currentTenPlanReportBoundaryLabel), "release progress report 10-plan rollover should include current report boundary");
+check(releaseProgressReport.tenPlanProgressReportRolloverRows.some((row) => row.item === "Next scheduled report after delivery" && row.evidence === releaseProgressReport.nextScheduledTenPlanProgressReportLabel), "release progress report 10-plan rollover should include next scheduled report");
+check(releaseProgressReport.tenPlanProgressReportRolloverValueRecorded === false, "release progress report 10-plan rollover should not record values");
 check(releaseProgressReport.desktopProjectIoEvidenceReady === true, "release progress report should include ready desktop project IO evidence");
 check(releaseProgressReport.pkgPayloadProjectIoEvidenceReady === true, "release progress report should include ready PKG payload project IO evidence");
 check(releaseProgressReport.sourcePersonaReadinessReady === true, "release progress report should include ready persona readiness source evidence");
@@ -2016,9 +2102,14 @@ check(markdown.includes("User-Facing Progress"), "release progress Markdown shou
 check(markdown.includes("User-facing overall completion:"), "release progress Markdown should include user-facing overall completion");
 check(markdown.includes("Current 10-plan progress:"), "release progress Markdown should include current 10-plan progress");
 check(markdown.includes("Current 10-Plan Window Rows"), "release progress Markdown should include current 10-plan window rows");
+check(markdown.includes("Current 10-plan report boundary:"), "release progress Markdown should include current 10-plan report boundary");
+check(markdown.includes("Next scheduled 10-plan progress report after delivery:"), "release progress Markdown should include next scheduled 10-plan progress report");
 check(markdown.includes("10-plan progress report receipt ready:"), "release progress Markdown should include 10-plan progress report receipt readiness");
 check(markdown.includes("10-plan progress report receipt rows:"), "release progress Markdown should include 10-plan progress report receipt rows");
 check(markdown.includes("10-Plan Progress Report Receipt"), "release progress Markdown should include 10-plan progress report receipt table");
+check(markdown.includes("10-plan cadence rollover ready:"), "release progress Markdown should include 10-plan cadence rollover readiness");
+check(markdown.includes("10-plan cadence rollover rows:"), "release progress Markdown should include 10-plan cadence rollover rows");
+check(markdown.includes("10-Plan Cadence Rollover"), "release progress Markdown should include 10-plan cadence rollover table");
 check(markdown.includes("Audience Readiness"), "release progress Markdown should include audience readiness summary");
 check(markdown.includes("Audience Acceptance Matrix"), "release progress Markdown should include audience acceptance summary");
 check(markdown.includes("Persona Delivery Packages"), "release progress Markdown should include persona delivery package summary");
@@ -2091,8 +2182,12 @@ console.log(`- User-facing completion status: ${releaseProgressReport.userFacing
 console.log(`- Current 10-plan progress: ${releaseProgressReport.currentTenPlanWindowLabel}`);
 console.log(`- Current 10-plan rows: ${releaseProgressReport.currentTenPlanWindowRowCount} (${releaseProgressReport.currentTenPlanWindowRowSummary})`);
 console.log(`- 10-plan report due: ${releaseProgressReport.tenPlanProgressReportDue ? "yes" : "no"}`);
+console.log(`- Current 10-plan report boundary: ${releaseProgressReport.currentTenPlanReportBoundaryLabel}`);
+console.log(`- Next scheduled 10-plan progress report after delivery: ${releaseProgressReport.nextScheduledTenPlanProgressReportLabel}`);
 console.log(`- 10-plan progress report receipt ready: ${releaseProgressReport.tenPlanProgressReportReceiptReady ? "yes" : "no"}`);
 console.log(`- 10-plan progress report receipt rows: ${releaseProgressReport.tenPlanProgressReportReceiptRowCount} (${releaseProgressReport.tenPlanProgressReportReceiptSummary})`);
+console.log(`- 10-plan cadence rollover ready: ${releaseProgressReport.tenPlanProgressReportRolloverReady ? "yes" : "no"}`);
+console.log(`- 10-plan cadence rollover rows: ${releaseProgressReport.tenPlanProgressReportRolloverRowCount} (${releaseProgressReport.tenPlanProgressReportRolloverSummary})`);
 console.log(`- Source evidence ready: ${releaseProgressReport.sourceEvidenceReady ? "yes" : "no"}`);
 console.log(`- Local release ready: ${releaseProgressReport.localReleaseReady ? "yes" : "no"}`);
 console.log(`- Local release readiness: ${releaseProgressReport.localReleaseReadinessPercent.toFixed(1)}%`);
