@@ -1371,6 +1371,152 @@ function buildCurrentLocalEnvDiagnosticsSummary({
   };
 }
 
+function buildReleaseChannelPostEditReceiptSummary({
+  currentActionSummary = {},
+  currentActionAcceptance = {},
+  currentActionPostEditVerification = {},
+  currentInputShapeChecklist = {},
+  currentLocalEnvDiagnostics = {},
+  hardExternalGateCommand = "npm run release:external-check"
+} = {}) {
+  const proofCommand =
+    currentActionSummary.currentNextCommand && currentActionSummary.currentNextCommand !== "none"
+      ? currentActionSummary.currentNextCommand
+      : hardExternalGateCommand;
+  const rerunCommand =
+    currentActionSummary.currentRerunCommand && currentActionSummary.currentRerunCommand !== "none"
+      ? currentActionSummary.currentRerunCommand
+      : proofCommand;
+  if (currentActionSummary.currentActionId !== "release-channel-metadata") {
+    return {
+      releaseChannelPostEditReceiptReady: true,
+      releaseChannelPostEditReceiptCurrentReadyCount: 0,
+      releaseChannelPostEditReceiptRowCount: 0,
+      releaseChannelPostEditReceiptSummary: "none",
+      releaseChannelPostEditReceiptRows: [],
+      releaseChannelPostEditReceiptProofCommand: proofCommand,
+      releaseChannelPostEditReceiptRerunCommand: rerunCommand,
+      releaseChannelPostEditReceiptValueRecorded: false
+    };
+  }
+
+  const currentRequiredKeys = Array.isArray(currentActionSummary.currentRequiredKeys)
+    ? currentActionSummary.currentRequiredKeys
+    : [];
+  const currentPlaceholderKeys = Array.isArray(currentActionSummary.currentPlaceholderKeys)
+    ? currentActionSummary.currentPlaceholderKeys
+    : [];
+  const currentInputShapeRows = valueFreeObjectRows(currentInputShapeChecklist.currentInputShapeChecklistRows);
+  const postEditRows = valueFreeObjectRows(currentActionPostEditVerification.currentActionPostEditVerificationRows);
+  const acceptanceRows = valueFreeObjectRows(currentActionAcceptance.currentActionAcceptanceRows);
+  const localEnvDiagnosticRows = valueFreeObjectRows(currentLocalEnvDiagnostics.currentLocalEnvDiagnosticRows);
+  const commandSequence = Array.isArray(currentActionSummary.currentCommandSequence)
+    ? currentActionSummary.currentCommandSequence
+    : [];
+  const rows = [
+    {
+      order: 1,
+      item: "Current key coverage",
+      ready:
+        currentRequiredKeys.length === releaseChannelMetadataKeys.length &&
+        releaseChannelMetadataKeys.every((key) => currentRequiredKeys.includes(key)) &&
+        currentActionSummary.currentEnvEditTarget === currentLocalEnvEditTarget(),
+      currentReady: currentPlaceholderKeys.length === 0,
+      evidence: `${currentRequiredKeys.length} required release-channel keys; ${currentPlaceholderKeys.length} current placeholder keys; edit target ${currentActionSummary.currentEnvEditTarget}`,
+      expectedPostEditSignal: "all current release-channel metadata keys load without placeholders; 0 current placeholder keys",
+      proofCommand,
+      rerunCommand,
+      sourceField: "currentRequiredKeys/currentPlaceholderKeys/currentEnvEditTarget",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      item: "Shape rehearsal coverage",
+      ready:
+        currentInputShapeChecklist.currentInputShapeChecklistReady === true &&
+        currentInputShapeRows.length === releaseChannelMetadataKeys.length &&
+        currentInputShapeRows.every((row) => row.ready === true && row.valueRecorded === false),
+      currentReady: currentInputShapeChecklist.currentInputShapeChecklistReady === true,
+      evidence: `${currentInputShapeRows.length} value-free current input shape rows; values recorded no`,
+      expectedPostEditSignal: "real private edits satisfy the same allowed channel-token and safe HTTPS URL shapes",
+      proofCommand,
+      rerunCommand,
+      sourceField: "currentInputShapeChecklistRows/currentInputShapeChecklistReady",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      item: "Placeholder cleanup acceptance",
+      ready:
+        Number.isInteger(currentActionSummary.currentPlaceholderKeyCount) &&
+        currentActionSummary.currentPlaceholderKeyCount === currentPlaceholderKeys.length &&
+        postEditRows.some((row) => String(row.expectedSignal ?? "").includes("current placeholder key count is 0")),
+      currentReady: currentActionSummary.currentPlaceholderKeyCount === 0,
+      evidence: `${currentActionSummary.currentPlaceholderKeyCount} current placeholder keys remain; ${currentActionPostEditVerification.currentActionPostEditVerificationCurrentReadyCount}/${currentActionPostEditVerification.currentActionPostEditVerificationRowCount} current post-edit signals ready`,
+      expectedPostEditSignal: "0 current placeholder keys; current first blocker advances past release-channel metadata",
+      proofCommand,
+      rerunCommand,
+      sourceField: "currentPlaceholderKeyCount/currentActionPostEditVerificationRows",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      item: "Proof and rerun sequence",
+      ready:
+        proofCommand === "npm run release:doctor" &&
+        rerunCommand === "npm run release:current-blocker" &&
+        commandSequence.includes(proofCommand) &&
+        commandSequence.includes(rerunCommand),
+      currentReady: false,
+      evidence: `${commandSequence.length} command sequence rows; proof ${proofCommand}; rerun ${rerunCommand}`,
+      expectedPostEditSignal: "run npm run release:doctor, then npm run release:current-blocker to mirror the advanced blocker",
+      proofCommand,
+      rerunCommand,
+      sourceField: "currentCommandSequence/currentNextCommand/currentRerunCommand",
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      item: "Acceptance evidence coverage",
+      ready:
+        acceptanceRows.length > 0 &&
+        Number.isInteger(currentActionAcceptance.currentActionAcceptanceBlockerCount) &&
+        postEditRows.length === acceptanceRows.length &&
+        localEnvDiagnosticRows.length === 8,
+      currentReady: currentActionAcceptance.currentActionAcceptanceReady === true,
+      evidence: `${acceptanceRows.length} current action acceptance rows; ${currentActionAcceptance.currentActionAcceptanceBlockerCount} blockers; ${localEnvDiagnosticRows.length} local env diagnostic rows`,
+      expectedPostEditSignal: "private-input, distribution-channel QA, and current proof checklist signals turn ready without storing values",
+      proofCommand,
+      rerunCommand,
+      sourceField: "currentActionAcceptanceRows/currentActionPostEditVerificationRows/currentLocalEnvDiagnosticRows",
+      valueRecorded: false
+    },
+    {
+      order: 6,
+      item: "Hard gate separation",
+      ready: hardExternalGateCommand === "npm run release:external-check",
+      currentReady: false,
+      evidence: `hard gate remains ${hardExternalGateCommand}; next-actions does not claim external distribution completion`,
+      expectedPostEditSignal: "release-channel metadata clears first; hard gate remains separate until downstream proofs are ready",
+      proofCommand: hardExternalGateCommand,
+      rerunCommand,
+      sourceField: "hardExternalGateCommand/releaseGateClaimedExternalDistribution",
+      valueRecorded: false
+    }
+  ];
+
+  return {
+    releaseChannelPostEditReceiptReady: rows.length === 6 && rows.every((row) => row.ready === true && row.valueRecorded === false),
+    releaseChannelPostEditReceiptCurrentReadyCount: rows.filter((row) => row.currentReady === true).length,
+    releaseChannelPostEditReceiptRowCount: rows.length,
+    releaseChannelPostEditReceiptSummary: `${rows.length} value-free release-channel post-edit receipt rows`,
+    releaseChannelPostEditReceiptRows: rows,
+    releaseChannelPostEditReceiptProofCommand: proofCommand,
+    releaseChannelPostEditReceiptRerunCommand: rerunCommand,
+    releaseChannelPostEditReceiptValueRecorded: false
+  };
+}
+
 function formatCurrentActionAcceptanceRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| order | criterion | ready | evidence | proof command | rerun command | hard gate | value recorded |\n|---:|---|---:|---|---|---|---|---:|\n| 0 | none | no | none | none | none | none | no |";
@@ -1465,6 +1611,20 @@ function formatCurrentLocalEnvDiagnosticRows(rows) {
     ...rows.map(
       (row) =>
         `| ${row.order} | ${escapeCell(row.diagnostic)} | ${escapeCell(row.status)} | ${escapeCell(row.evidence)} | ${escapeCell(row.sourceField)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatReleaseChannelPostEditReceiptRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | item | receipt ready | current ready | evidence | expected post-edit signal | proof command | rerun command | source | value recorded |\n|---:|---|---:|---:|---|---|---|---|---|---:|\n| 0 | none | no | no | none | none | none | none | none | no |";
+  }
+  return [
+    "| order | item | receipt ready | current ready | evidence | expected post-edit signal | proof command | rerun command | source | value recorded |",
+    "|---:|---|---:|---:|---|---|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.item)} | ${readyLabel(row.ready)} | ${readyLabel(row.currentReady)} | ${escapeCell(row.evidence)} | ${escapeCell(row.expectedPostEditSignal)} | ${escapeCell(row.proofCommand)} | ${escapeCell(row.rerunCommand)} | ${escapeCell(row.sourceField)} | ${readyLabel(row.valueRecorded)} |`
     )
   ].join("\n");
 }
@@ -2433,6 +2593,14 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     currentEnvEditTarget: currentLocalEnvEditTarget(),
     currentPlaceholderKeyCount: currentActionSummary.currentPlaceholderKeyCount ?? 0
   });
+  const releaseChannelPostEditReceipt = buildReleaseChannelPostEditReceiptSummary({
+    currentActionSummary,
+    currentActionAcceptance,
+    currentActionPostEditVerification,
+    currentInputShapeChecklist,
+    currentLocalEnvDiagnostics,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
   const nextActionPreview = buildNextActionPreviewSummary(priorityActions);
 
   return {
@@ -2477,6 +2645,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...currentPrivateEditSafety,
     ...currentInputShapeChecklist,
     ...currentLocalEnvDiagnostics,
+    ...releaseChannelPostEditReceipt,
     ...nextActionPreview,
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
@@ -2595,6 +2764,9 @@ function buildMarkdown(report) {
 - Current input shape checklist rows: ${report.currentInputShapeChecklistRowCount} (${report.currentInputShapeChecklistSummary})
 - Current local env diagnostics ready: ${readyLabel(report.currentLocalEnvDiagnosticsReady)}
 - Current local env diagnostic rows: ${report.currentLocalEnvDiagnosticRowCount} (${report.currentLocalEnvDiagnosticSummary})
+- Release-channel post-edit receipt ready: ${readyLabel(report.releaseChannelPostEditReceiptReady)}
+- Release-channel post-edit receipt rows: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary})
+- Release-channel post-edit current-ready rows: ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}
 - Next priority action after current clears: ${report.nextPriorityActionId} (${report.nextPriorityActionLabel})
 - Next action preview ready: ${readyLabel(report.nextActionPreviewReady)}
 - Next action preview ready criteria rows: ${report.nextActionPreviewReadyCriteriaRowCount} (${report.nextActionPreviewReadyCriteriaSummary})
@@ -2838,6 +3010,17 @@ ${formatCurrentInputShapeChecklistRows(report.currentInputShapeChecklistRows)}
 
 ${formatCurrentLocalEnvDiagnosticRows(report.currentLocalEnvDiagnosticRows)}
 
+## Release-Channel Post-Edit Receipt
+
+- Receipt ready: ${readyLabel(report.releaseChannelPostEditReceiptReady)}
+- Receipt rows: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary})
+- Current-ready rows: ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}
+- Proof command: \`${report.releaseChannelPostEditReceiptProofCommand}\`
+- Rerun command: \`${report.releaseChannelPostEditReceiptRerunCommand}\`
+- Value recorded: ${readyLabel(report.releaseChannelPostEditReceiptValueRecorded)}
+
+${formatReleaseChannelPostEditReceiptRows(report.releaseChannelPostEditReceiptRows)}
+
 ## Next Action Preview
 
 - Preview ready: ${readyLabel(report.nextActionPreviewReady)}
@@ -3050,6 +3233,17 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     currentEnvEditTarget: localEnvEditTarget,
     currentPlaceholderKeyCount: currentActionSummary.currentPlaceholderKeyCount ?? 0
   });
+  const releaseChannelPostEditReceipt = buildReleaseChannelPostEditReceiptSummary({
+    currentActionSummary: {
+      ...currentActionSummary,
+      currentEnvEditTarget: localEnvEditTarget
+    },
+    currentActionAcceptance,
+    currentActionPostEditVerification,
+    currentInputShapeChecklist,
+    currentLocalEnvDiagnostics,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
   const nextActionPreview = buildNextActionPreviewSummary(priorityActions);
 
   nextActionsReport = {
@@ -3094,6 +3288,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...currentPrivateEditSafety,
     ...currentInputShapeChecklist,
     ...currentLocalEnvDiagnostics,
+    ...releaseChannelPostEditReceipt,
     ...nextActionPreview,
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
@@ -3172,6 +3367,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     nextActionsReport.currentPrivateEditSafetyReady === true &&
     nextActionsReport.currentInputShapeChecklistReady === true &&
     nextActionsReport.currentLocalEnvDiagnosticsReady === true &&
+    nextActionsReport.releaseChannelPostEditReceiptReady === true &&
     nextActionsReport.nextActionPreviewReady === true &&
     nextActionsReport.sourceValueRecorded === false &&
     nextActionsReport.sourceClaimedExternalDistribution === false;
@@ -4033,6 +4229,63 @@ check(
   nextActionsReport.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Local env value recording" && row.evidence.includes("values recorded no")),
   "external next actions current local env diagnostics should include local env value-recording posture"
 );
+check(typeof nextActionsReport.releaseChannelPostEditReceiptReady === "boolean", "external next actions should include release-channel post-edit receipt readiness");
+check(Number.isInteger(nextActionsReport.releaseChannelPostEditReceiptCurrentReadyCount), "external next actions should include release-channel post-edit receipt current-ready count");
+check(Number.isInteger(nextActionsReport.releaseChannelPostEditReceiptRowCount), "external next actions should include release-channel post-edit receipt row count");
+check(
+  typeof nextActionsReport.releaseChannelPostEditReceiptSummary === "string" &&
+    nextActionsReport.releaseChannelPostEditReceiptSummary.length > 0,
+  "external next actions should include release-channel post-edit receipt summary"
+);
+check(Array.isArray(nextActionsReport.releaseChannelPostEditReceiptRows), "external next actions should include release-channel post-edit receipt rows");
+check(
+  typeof nextActionsReport.releaseChannelPostEditReceiptProofCommand === "string" &&
+    nextActionsReport.releaseChannelPostEditReceiptProofCommand.length > 0,
+  "external next actions should include release-channel post-edit receipt proof command"
+);
+check(
+  typeof nextActionsReport.releaseChannelPostEditReceiptRerunCommand === "string" &&
+    nextActionsReport.releaseChannelPostEditReceiptRerunCommand.length > 0,
+  "external next actions should include release-channel post-edit receipt rerun command"
+);
+check(nextActionsReport.releaseChannelPostEditReceiptValueRecorded === false, "external next actions release-channel post-edit receipt should not record values");
+check(
+  nextActionsReport.releaseChannelPostEditReceiptRowCount === nextActionsReport.releaseChannelPostEditReceiptRows.length,
+  "external next actions release-channel post-edit receipt row count should match rows"
+);
+check(
+  nextActionsReport.releaseChannelPostEditReceiptCurrentReadyCount ===
+    nextActionsReport.releaseChannelPostEditReceiptRows.filter((row) => row.currentReady === true).length,
+  "external next actions release-channel post-edit receipt current-ready count should match rows"
+);
+check(
+  nextActionsReport.releaseChannelPostEditReceiptReady ===
+    (nextActionsReport.releaseChannelPostEditReceiptRows.length === 0 ||
+      (nextActionsReport.releaseChannelPostEditReceiptRows.length === 6 &&
+        nextActionsReport.releaseChannelPostEditReceiptRows.every((row) => row.ready === true && row.valueRecorded === false))),
+  "external next actions release-channel post-edit receipt readiness should reflect listed rows"
+);
+check(
+  nextActionsReport.releaseChannelPostEditReceiptRows.every(
+    (row, index) =>
+      row.order === index + 1 &&
+      typeof row.item === "string" &&
+      row.item.length > 0 &&
+      typeof row.ready === "boolean" &&
+      typeof row.currentReady === "boolean" &&
+      typeof row.evidence === "string" &&
+      row.evidence.length > 0 &&
+      typeof row.expectedPostEditSignal === "string" &&
+      row.expectedPostEditSignal.length > 0 &&
+      typeof row.proofCommand === "string" &&
+      row.proofCommand.length > 0 &&
+      row.rerunCommand === nextActionsReport.releaseChannelPostEditReceiptRerunCommand &&
+      typeof row.sourceField === "string" &&
+      row.sourceField.length > 0 &&
+      row.valueRecorded === false
+  ),
+  "external next actions release-channel post-edit receipt rows should include value-free receipt evidence"
+);
 check(typeof nextActionsReport.nextPriorityActionId === "string", "external next actions should include the next priority action id");
 check(typeof nextActionsReport.nextPriorityActionLabel === "string", "external next actions should include the next priority action label");
 check(typeof nextActionsReport.nextPriorityActionNextCommand === "string", "external next actions should include the next priority action command");
@@ -4809,6 +5062,64 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
     "release channel metadata local env diagnostics should keep local env value recording clean"
   );
   check(
+    nextActionsReport.releaseChannelPostEditReceiptReady === true,
+    "release channel metadata should include ready release-channel post-edit receipt while placeholders remain"
+  );
+  check(
+    nextActionsReport.releaseChannelPostEditReceiptRowCount === 6,
+    "release channel metadata post-edit receipt should include six rows when placeholders remain"
+  );
+  check(
+    nextActionsReport.releaseChannelPostEditReceiptCurrentReadyCount === 1,
+    "release channel metadata post-edit receipt should report one current-ready row while placeholders remain"
+  );
+  check(
+    nextActionsReport.releaseChannelPostEditReceiptRows.every((row) => row.ready === true && row.valueRecorded === false),
+    "release channel metadata post-edit receipt rows should be receipt-ready and value-free"
+  );
+  check(
+    nextActionsReport.releaseChannelPostEditReceiptRows.some(
+      (row) => row.item === "Current key coverage" && row.evidence.includes("4 required release-channel keys")
+    ),
+    "release channel metadata post-edit receipt should include current key coverage"
+  );
+  check(
+    nextActionsReport.releaseChannelPostEditReceiptRows.some(
+      (row) => row.item === "Shape rehearsal coverage" && row.evidence.includes("value-free current input shape rows") && row.currentReady === true
+    ),
+    "release channel metadata post-edit receipt should include current-ready shape rehearsal coverage"
+  );
+  check(
+    nextActionsReport.releaseChannelPostEditReceiptRows.some(
+      (row) => row.item === "Placeholder cleanup acceptance" && row.expectedPostEditSignal.includes("0 current placeholder keys")
+    ),
+    "release channel metadata post-edit receipt should include placeholder cleanup acceptance"
+  );
+  check(
+    nextActionsReport.releaseChannelPostEditReceiptRows.some(
+      (row) =>
+        row.item === "Proof and rerun sequence" &&
+        row.proofCommand === "npm run release:doctor" &&
+        row.rerunCommand === "npm run release:current-blocker"
+    ),
+    "release channel metadata post-edit receipt should include proof and rerun sequence"
+  );
+  check(
+    nextActionsReport.releaseChannelPostEditReceiptRows.some(
+      (row) =>
+        row.item === "Acceptance evidence coverage" &&
+        row.expectedPostEditSignal.includes("private-input") &&
+        row.expectedPostEditSignal.includes("distribution-channel QA")
+    ),
+    "release channel metadata post-edit receipt should include acceptance evidence coverage"
+  );
+  check(
+    nextActionsReport.releaseChannelPostEditReceiptRows.some(
+      (row) => row.item === "Hard gate separation" && row.proofCommand === "npm run release:external-check"
+    ),
+    "release channel metadata post-edit receipt should include hard gate separation"
+  );
+  check(
     nextActionsReport.currentPlaceholderRemediationRows.every(
       (item) =>
         nextActionsReport.currentPlaceholderKeys.includes(item.key) &&
@@ -5010,6 +5321,14 @@ check(markdown.includes("## Current Local Env Diagnostics"), "external next acti
 check(
   markdown.includes("| order | diagnostic | status | evidence | source | value recorded |"),
   "external next actions Markdown should include current local env diagnostics table"
+);
+check(markdown.includes("Release-channel post-edit receipt ready:"), "external next actions Markdown should include release-channel post-edit receipt readiness");
+check(markdown.includes("Release-channel post-edit receipt rows:"), "external next actions Markdown should include release-channel post-edit receipt rows");
+check(markdown.includes("Release-channel post-edit current-ready rows:"), "external next actions Markdown should include release-channel post-edit current-ready rows");
+check(markdown.includes("## Release-Channel Post-Edit Receipt"), "external next actions Markdown should include release-channel post-edit receipt section");
+check(
+  markdown.includes("| order | item | receipt ready | current ready | evidence | expected post-edit signal | proof command | rerun command | source | value recorded |"),
+  "external next actions Markdown should include release-channel post-edit receipt table"
 );
 check(markdown.includes("## Next Action Preview"), "external next actions Markdown should include next action preview section");
 check(
@@ -5257,6 +5576,9 @@ console.log(`- Current input shape checklist ready: ${nextActionsReport.currentI
 console.log(`- Current input shape checklist rows: ${nextActionsReport.currentInputShapeChecklistRowCount} (${nextActionsReport.currentInputShapeChecklistSummary})`);
 console.log(`- Current local env diagnostics ready: ${nextActionsReport.currentLocalEnvDiagnosticsReady ? "yes" : "no"}`);
 console.log(`- Current local env diagnostic rows: ${nextActionsReport.currentLocalEnvDiagnosticRowCount} (${nextActionsReport.currentLocalEnvDiagnosticSummary})`);
+console.log(`- Release-channel post-edit receipt ready: ${nextActionsReport.releaseChannelPostEditReceiptReady ? "yes" : "no"}`);
+console.log(`- Release-channel post-edit receipt rows: ${nextActionsReport.releaseChannelPostEditReceiptRowCount} (${nextActionsReport.releaseChannelPostEditReceiptSummary})`);
+console.log(`- Release-channel post-edit current-ready rows: ${nextActionsReport.releaseChannelPostEditReceiptCurrentReadyCount}/${nextActionsReport.releaseChannelPostEditReceiptRowCount}`);
 console.log(`- Next priority action after current clears: ${nextActionsReport.nextPriorityActionId} (${nextActionsReport.nextPriorityActionLabel})`);
 console.log(`- Next action preview ready: ${nextActionsReport.nextActionPreviewReady ? "yes" : "no"}`);
 console.log(`- Next action preview ready criteria rows: ${nextActionsReport.nextActionPreviewReadyCriteriaRowCount} (${nextActionsReport.nextActionPreviewReadyCriteriaSummary})`);
