@@ -12,33 +12,85 @@ const bundleId = "app.grooveforge.desktop";
 const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
-const postEditProofBundleJsonPath = path.join(
+const requestedReportStem = process.env.GROOVEFORGE_RELEASE_FINAL_HANDOFF_REPORT_STEM?.trim() ?? "";
+const defaultReportMarkdownName = "release-final-handoff.md";
+const defaultReportJsonName = "release-final-handoff.json";
+const successRedactionReportStem = "release-final-handoff-success-redaction-smoke";
+if (requestedReportStem && requestedReportStem !== successRedactionReportStem) {
+  console.error("GrooveForge release final handoff failed:");
+  console.error("- Unsupported final handoff report stem override.");
+  process.exit(1);
+}
+const reportStem = requestedReportStem || "release-final-handoff";
+const syntheticSuccessRedactionSmoke = reportStem === successRedactionReportStem;
+const selectedReportCommand = syntheticSuccessRedactionSmoke
+  ? "npm run release:final-handoff-success-redaction-smoke"
+  : "npm run release:final-handoff";
+
+function resolvePackageJsonOverride(envKey, defaultPath) {
+  const configuredPath = process.env[envKey]?.trim() ?? "";
+  if (!configuredPath) {
+    return defaultPath;
+  }
+  const resolvedPath = path.isAbsolute(configuredPath)
+    ? configuredPath
+    : path.resolve(root, configuredPath);
+  const relativeToPackage = path.relative(packageRoot, resolvedPath);
+  if (relativeToPackage.startsWith("..") || path.isAbsolute(relativeToPackage)) {
+    console.error("GrooveForge release final handoff failed:");
+    console.error(`- ${envKey} must point inside ${path.relative(root, packageRoot)}.`);
+    process.exit(1);
+  }
+  if (!resolvedPath.endsWith(".json")) {
+    console.error("GrooveForge release final handoff failed:");
+    console.error(`- ${envKey} must point to a JSON artifact.`);
+    process.exit(1);
+  }
+  return resolvedPath;
+}
+
+const postEditProofBundleJsonPath = resolvePackageJsonOverride(
+  "GROOVEFORGE_RELEASE_FINAL_HANDOFF_POST_EDIT_PROOF_BUNDLE_JSON",
+  path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-post-edit-proof-bundle.json`
+  )
 );
-const currentBlockerJsonPath = path.join(
+const currentBlockerJsonPath = resolvePackageJsonOverride(
+  "GROOVEFORGE_RELEASE_FINAL_HANDOFF_CURRENT_BLOCKER_JSON",
+  path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`
+  )
 );
-const releaseProgressJsonPath = path.join(
+const releaseProgressJsonPath = resolvePackageJsonOverride(
+  "GROOVEFORGE_RELEASE_FINAL_HANDOFF_RELEASE_PROGRESS_JSON",
+  path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-progress-report.json`
+  )
 );
-const strictLiveCheckJsonPath = path.join(
+const strictLiveCheckJsonPath = resolvePackageJsonOverride(
+  "GROOVEFORGE_RELEASE_FINAL_HANDOFF_STRICT_LIVE_CHECK_JSON",
+  path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-channel-live-check-strict.json`
+  )
 );
-const strictSuccessSmokeJsonPath = path.join(
+const strictSuccessSmokeJsonPath = resolvePackageJsonOverride(
+  "GROOVEFORGE_RELEASE_FINAL_HANDOFF_STRICT_SUCCESS_SMOKE_JSON",
+  path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-channel-live-check-strict-success-smoke.json`
+  )
 );
 const finalHandoffMarkdownPath = path.join(
   packageRoot,
-  `${appName}-${packageJson.version}-${platformArch}-release-final-handoff.md`
+  `${appName}-${packageJson.version}-${platformArch}-${reportStem}.md`
 );
 const finalHandoffJsonPath = path.join(
   packageRoot,
-  `${appName}-${packageJson.version}-${platformArch}-release-final-handoff.json`
+  `${appName}-${packageJson.version}-${platformArch}-${reportStem}.json`
 );
 const fromExisting = process.argv.includes("--from-existing");
 const failures = [];
@@ -466,12 +518,23 @@ function buildReport({ postEditProofBundle, currentBlocker, releaseProgress, str
     platform: process.platform,
     arch: process.arch,
     platformArch,
-    reportCommand: fromExisting ? "npm run release:final-handoff -- --from-existing" : "npm run release:final-handoff",
+    reportStem,
+    reportCommand: syntheticSuccessRedactionSmoke
+      ? selectedReportCommand
+      : fromExisting
+        ? "npm run release:final-handoff -- --from-existing"
+        : selectedReportCommand,
+    sourceMode: syntheticSuccessRedactionSmoke ? "synthetic-final-handoff-success-redaction-smoke" : "real-final-handoff",
+    syntheticSuccessRedactionSmoke,
+    realLocalEnvRead: syntheticSuccessRedactionSmoke ? false : strictLiveCheck.realLocalEnvRead !== false,
+    realLocalEnvModified: false,
     refreshCommand: fromExisting ? "none" : refreshCommand,
     releaseFinalHandoffReady: sourceArtifactRows.every((row) => row.present && row.ready && row.valueRecorded === false),
-    releaseFinalHandoffState: privateEditStillRequired
-      ? "private release-channel metadata handoff ready; external distribution still blocked"
-      : "release-channel metadata proof cleared; continue downstream external hard-gate actions",
+    releaseFinalHandoffState: syntheticSuccessRedactionSmoke
+      ? "synthetic success-redaction proof ready; real external distribution still unclaimed"
+      : privateEditStillRequired
+        ? "private release-channel metadata handoff ready; external distribution still blocked"
+        : "release-channel metadata proof cleared; continue downstream external hard-gate actions",
     sourceArtifactRows,
     sourceArtifactRowCount: sourceArtifactRows.length,
     releaseFinalHandoffCommandRows: commandRows,
@@ -570,6 +633,8 @@ function buildMarkdown(report) {
 ## Status
 
 - Final handoff receipt ready: ${readyLabel(report.releaseFinalHandoffReady)}
+- Source mode: ${report.sourceMode}
+- Synthetic success-redaction smoke: ${readyLabel(report.syntheticSuccessRedactionSmoke)}
 - State: ${report.releaseFinalHandoffState}
 - Current target: ${report.currentTarget}
 - Current first blocker: ${report.currentFirstBlocker}
@@ -595,6 +660,8 @@ function buildMarkdown(report) {
 - User-facing completion: ${report.userFacingCompletionPercent}%
 - Remaining completion: ${report.userFacingRemainingPercent}%
 - Private values recorded: no
+- Real local env read by this handoff: ${readyLabel(report.realLocalEnvRead)}
+- Real local env modified by this handoff: ${readyLabel(report.realLocalEnvModified)}
 - Network probe attempted: no
 - Release upload attempted: no
 - Signing attempted: no
@@ -660,6 +727,9 @@ ${formatOperatorRows(report.releaseChannelPostEditOperatorReceiptRows)}
 
 function validateReport(report, markdown) {
   check(report.releaseFinalHandoffReady === true, "release final handoff should be ready");
+  check(report.reportStem === reportStem, "release final handoff should record the selected report stem");
+  check(report.syntheticSuccessRedactionSmoke === syntheticSuccessRedactionSmoke, "release final handoff should record success-redaction smoke mode");
+  check(report.realLocalEnvModified === false, "release final handoff should not modify real local env");
   check(report.sourceArtifactRowCount === 5, "release final handoff should include five source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release final handoff source rows should be present, ready, and value-free");
   check(report.releaseFinalHandoffCommandCount === 7, "release final handoff should include seven handoff commands");
@@ -686,6 +756,23 @@ function validateReport(report, markdown) {
   check(report.strictSuccessSmokePlaceholderKeyCount === 0, "release final handoff strict success smoke should prove zero placeholder keys");
   check(report.strictSuccessSmokeRealLocalEnvRead === false, "release final handoff strict success smoke should not read real local env");
   check(report.strictSuccessSmokeRealLocalEnvModified === false, "release final handoff strict success smoke should not modify real local env");
+  if (syntheticSuccessRedactionSmoke) {
+    check(report.reportCommand === "npm run release:final-handoff-success-redaction-smoke", "release final handoff success-redaction smoke should record the smoke command");
+    check(report.sourceMode === "synthetic-final-handoff-success-redaction-smoke", "release final handoff success-redaction smoke should record synthetic source mode");
+    check(report.releaseChannelMetadataReady === true, "release final handoff success-redaction smoke should prove release-channel metadata ready posture");
+    check(report.privateEditStillRequired === false, "release final handoff success-redaction smoke should clear private-edit-required posture");
+    check(report.currentReadyCount === 4, "release final handoff success-redaction smoke should prove four current-ready rows");
+    check(report.currentPlaceholderKeyCount === 0, "release final handoff success-redaction smoke should prove zero current placeholder keys");
+    check(report.currentPlaceholderEditLocationCount === 0, "release final handoff success-redaction smoke should prove zero placeholder edit locations");
+    check(report.realStrictReady === true, "release final handoff success-redaction smoke should prove strict ready posture");
+    check(report.realStrictExitCode === 0, "release final handoff success-redaction smoke should prove strict exit code zero");
+    check(report.realStrictCurrentReadyCount === 4, "release final handoff success-redaction smoke should prove four strict-ready rows");
+    check(report.realStrictPlaceholderKeyCount === 0, "release final handoff success-redaction smoke should prove zero strict placeholder keys");
+    check(report.realLocalEnvRead === false, "release final handoff success-redaction smoke should not read real local env");
+    check(report.realLocalEnvModified === false, "release final handoff success-redaction smoke should not modify real local env");
+    check(!JSON.stringify(report).includes("direct-download"), "release final handoff success-redaction JSON should not include synthetic channel values");
+    check(!markdown.includes("direct-download"), "release final handoff success-redaction Markdown should not include synthetic channel values");
+  }
   check(report.currentEnvEditRows.every((row) => row.valueRecorded === false), "release final handoff edit rows should not record values");
   check(report.currentPlaceholderEditLocations.every((row) => row.valueRecorded === false), "release final handoff placeholder locations should not record values");
   check(report.postEditProofSequenceReceiptReady === true, "release final handoff should include ready post-edit proof sequence receipt");
@@ -712,6 +799,7 @@ function validateReport(report, markdown) {
   check(!/https?:\/\//i.test(JSON.stringify(report)), "release final handoff JSON should not include URL values");
   check(!/https?:\/\//i.test(markdown), "release final handoff Markdown should not include URL values");
   check(markdown.includes("Release Final Handoff"), "release final handoff Markdown should include title");
+  check(markdown.includes("Synthetic success-redaction smoke:"), "release final handoff Markdown should include success-redaction posture");
   check(markdown.includes("Final Handoff Commands"), "release final handoff Markdown should include commands");
   check(markdown.includes("Current Private Edit Rows"), "release final handoff Markdown should include private edit rows");
   check(markdown.includes("Post-Edit Proof Sequence Receipt"), "release final handoff Markdown should include proof sequence");
@@ -745,6 +833,8 @@ console.log("GrooveForge release final handoff passed.");
 console.log(`- Markdown: ${relative(finalHandoffMarkdownPath)}`);
 console.log(`- JSON: ${relative(finalHandoffJsonPath)}`);
 console.log(`- Final handoff ready: ${report.releaseFinalHandoffReady ? "yes" : "no"}`);
+console.log(`- Source mode: ${report.sourceMode}`);
+console.log(`- Synthetic success-redaction smoke: ${report.syntheticSuccessRedactionSmoke ? "yes" : "no"}`);
 console.log(`- State: ${report.releaseFinalHandoffState}`);
 console.log(`- Release-channel metadata ready: ${report.releaseChannelMetadataReady ? "yes" : "no"}`);
 console.log(`- Private edit still required: ${report.privateEditStillRequired ? "yes" : "no"}`);
@@ -761,5 +851,7 @@ console.log(`- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "
 console.log(`- User-facing completion: ${report.userFacingCompletionPercent}%`);
 console.log(`- Remaining completion: ${report.userFacingRemainingPercent}%`);
 console.log("- Private values recorded: no");
+console.log(`- Real local env read by this handoff: ${report.realLocalEnvRead ? "yes" : "no"}`);
+console.log(`- Real local env modified by this handoff: ${report.realLocalEnvModified ? "yes" : "no"}`);
 console.log("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted");
 console.log("- Not claimed: Developer ID signing, notarization, Gatekeeper approval, auto-update, manual QA approval, app-store submission, or external distribution completion");

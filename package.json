@@ -70,6 +70,7 @@
     "release:post-edit-proof-success-smoke": "node harness/scripts/run_release_post_edit_proof_success_smoke.mjs",
     "release:post-edit-proof-bundle": "node harness/scripts/run_release_post_edit_proof_bundle.mjs",
     "release:final-handoff": "node harness/scripts/run_release_final_handoff.mjs",
+    "release:final-handoff-success-redaction-smoke": "node harness/scripts/run_release_final_handoff_success_redaction_smoke.mjs",
     "release:prepare-env-smoke": "node harness/scripts/run_release_prepare_env.mjs",
     "release:prepare-env": "node harness/scripts/run_release_prepare_env.mjs --write-local",
     "release:external-preflight": "node harness/scripts/run_release_external_preflight.mjs",
