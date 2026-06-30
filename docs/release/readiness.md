@@ -129,6 +129,12 @@ npm run release:update-feed-post-edit-proof-success-smoke
 npm run release:update-feed-checkpoint-smoke
 ```
 
+Run the value-free release progress freshness smoke when the operator wants to know whether existing progress/current-blocker artifacts match the latest update-feed checkpoint 10-plan label:
+
+```sh
+npm run release:progress-freshness-smoke
+```
+
 Rerun the fast redacted external preflight after editing the ignored local env file:
 
 ```sh
@@ -180,6 +186,8 @@ npm run release:proof-bundle
 `release:update-feed-post-edit-proof-success-smoke` runs the same wrapper with a separate success-smoke artifact stem, uses the synthetic strict-ready update feed live-check smoke as the live-check source, then refreshes the real auto-update readiness smoke. It proves live-check readiness true, `2/2` selected-ready feed/channel keys, zero placeholders, real auto-update blockers, signed-update artifact boundary, hard-gate boundary, current 10-plan progress, completion percentage, and non-claim posture without reading the real local env root for the live check, recording feed/channel values, probing feeds, publishing feeds, uploading releases, signing artifacts, submitting to Apple, or claiming auto-update/external distribution.
 
 `release:update-feed-checkpoint-smoke` refreshes the real update feed post-edit proof first and the synthetic success-path proof second, then writes ignored checkpoint Markdown/JSON artifacts comparing real ignored-env placeholder posture with the synthetic `2/2` selected-ready branch. It keeps downstream auto-update readiness false, blocker rows present, signed update artifacts false, the hard gate would-fail, current 10-plan progress, completion percentage, and non-claim posture without recording feed/channel values, probing feeds, publishing feeds, uploading releases, signing artifacts, submitting to Apple, or claiming auto-update/external distribution.
+
+`release:progress-freshness-smoke` refreshes that checkpoint, then writes ignored freshness Markdown/JSON artifacts comparing the latest checkpoint progress label with existing release-progress-report and release-current-blocker labels. It marks each source as fresh, stale, or missing and emits value-free rerun commands while treating stale optional artifacts as evidence freshness gaps rather than external completion claims.
 
 Update feed live-check, post-edit proof, and checkpoint receipts derive the current 10-plan window from `docs/exec_plans/active` plus `docs/exec_plans/completed`, then count only completed plan files inside that window. This keeps post-edit operator receipts aligned when the project rolls from one 10-plan window to the next.
 
