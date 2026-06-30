@@ -24,6 +24,9 @@ const releaseChannelMetadataKeys = [
   "GROOVEFORGE_RELEASE_NOTES_URL",
   "GROOVEFORGE_SUPPORT_URL"
 ];
+const recommendedOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const lowerLevelLiveCheckCommand = "npm run release:channel-live-check";
+const lowerLevelStrictProofCommand = "npm run release:channel-live-check-strict";
 const refreshCommandRows = [
   {
     order: 1,
@@ -169,23 +172,38 @@ function operatorCommandRows(mode) {
           },
           {
             order: 2,
-            command: "npm run release:doctor",
-            role: "refresh value-free release-channel blocker evidence after scaffold creation",
+            command: "manual edit .env.distribution.local",
+            role: "replace the four private release-channel placeholder values outside committed files",
             valueRecorded: false
           }
         ]
       : [
           {
             order: 1,
-            command: "npm run release:doctor",
-            role: "refresh value-free blocker evidence after editing release-channel metadata",
+            command: "manual edit .env.distribution.local",
+            role: "replace the four private release-channel placeholder values outside committed files",
             valueRecorded: false
           }
         ];
   const followUpRows = [
     {
-      command: "npm run release:channel-live-check",
-      role: "confirm the four release-channel metadata rows are present, non-placeholder, and shape-ready",
+      command: recommendedOperatorProofCommand,
+      role: "recommended one-command strict proof chain after replacing the four private release-channel placeholders",
+      valueRecorded: false
+    },
+    {
+      command: lowerLevelLiveCheckCommand,
+      role: "narrow value-free shape/location check for the four release-channel metadata rows",
+      valueRecorded: false
+    },
+    {
+      command: lowerLevelStrictProofCommand,
+      role: "lower-level pass/fail proof for the same four release-channel metadata rows",
+      valueRecorded: false
+    },
+    {
+      command: "npm run release:doctor",
+      role: "broader redacted release readiness refresh after the strict proof chain",
       valueRecorded: false
     },
     {
@@ -219,8 +237,9 @@ function buildEditRows(liveCheck) {
     currentReady: row.currentReady === true,
     editTarget: textValue(row.editTarget),
     line: Number.isInteger(row.line) ? row.line : null,
-    proofCommand: "npm run release:channel-live-check",
-    strictProofCommand: "npm run release:channel-live-check-strict",
+    proofCommand: lowerLevelLiveCheckCommand,
+    strictProofCommand: lowerLevelStrictProofCommand,
+    operatorProofCommand: recommendedOperatorProofCommand,
     doctorCommand: "npm run release:doctor",
     currentBlockerCommand: "npm run release:current-blocker",
     hardGateCommand: "npm run release:external-check",
@@ -242,7 +261,7 @@ function formatEditRows(rows) {
   return rows
     .map(
       (row) =>
-        `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.kind)} | ${escapeCell(row.expectedShape)} | ${readyLabel(row.present)} | ${readyLabel(row.placeholder)} | ${readyLabel(row.shapeReady)} | ${readyLabel(row.currentReady)} | ${escapeCell(row.editTarget)} | ${escapeCell(row.line ?? "none")} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.doctorCommand)}\` | ${readyLabel(row.valueRecorded)} |`
+        `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.kind)} | ${escapeCell(row.expectedShape)} | ${readyLabel(row.present)} | ${readyLabel(row.placeholder)} | ${readyLabel(row.shapeReady)} | ${readyLabel(row.currentReady)} | ${escapeCell(row.editTarget)} | ${escapeCell(row.line ?? "none")} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.strictProofCommand)}\` | \`${escapeCell(row.operatorProofCommand)}\` | \`${escapeCell(row.doctorCommand)}\` | ${readyLabel(row.valueRecorded)} |`
     )
     .join("\n");
 }
@@ -305,6 +324,13 @@ function buildReport({ doctor, liveCheck, progress }) {
     operatorCommandRows: operatorRows,
     operatorCommandCount: operatorRows.length,
     operatorCommandSummary: commandSummary(operatorRows),
+    releaseChannelRecommendedOperatorProofCommand: recommendedOperatorProofCommand,
+    releaseChannelRecommendedOperatorProofCommandRole:
+      "recommended strict-first proof chain after replacing the four private release-channel placeholders",
+    releaseChannelRecommendedOperatorProofCommandValueRecorded: false,
+    releaseChannelLowerLevelLiveCheckCommand: lowerLevelLiveCheckCommand,
+    releaseChannelLowerLevelStrictProofCommand: lowerLevelStrictProofCommand,
+    releaseChannelLowerLevelProofCommandsValueRecorded: false,
     sourceArtifactRows,
     sourceArtifactRowCount: sourceArtifactRows.length,
     currentActionId: textValue(doctor.currentActionId),
@@ -337,8 +363,8 @@ function buildReport({ doctor, liveCheck, progress }) {
     releaseChannelEditRows: editRows,
     releaseChannelEditRowCount: editRows.length,
     doctorCommand: "npm run release:doctor",
-    liveCheckCommand: "npm run release:channel-live-check",
-    strictLiveCheckCommand: "npm run release:channel-live-check-strict",
+    liveCheckCommand: lowerLevelLiveCheckCommand,
+    strictLiveCheckCommand: lowerLevelStrictProofCommand,
     currentBlockerCommand: "npm run release:current-blocker",
     nextActionsCommand: "npm run release:next-actions",
     proofBundleCommand: "npm run release:proof-bundle",
@@ -393,6 +419,10 @@ function buildMarkdown(report) {
 - Packet mode: ${report.releaseChannelEditPacketMode}
 - Refresh command order: ${report.refreshCommandSummary}
 - Operator command order: ${report.operatorCommandSummary}
+- Recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommand}\`
+- Recommended operator proof role: ${report.releaseChannelRecommendedOperatorProofCommandRole}
+- Lower-level live-check proof: \`${report.releaseChannelLowerLevelLiveCheckCommand}\`
+- Lower-level strict proof: \`${report.releaseChannelLowerLevelStrictProofCommand}\`
 - Latest 10-plan progress: ${report.latestTenPlanProgressLabel}
 - User-facing completion: ${report.userFacingCompletionPercent}%
 - Remaining completion: ${report.userFacingRemainingPercent}%
@@ -434,8 +464,8 @@ ${formatSourceRows(report.sourceArtifactRows)}
 
 ## Release-Channel Edit Rows
 
-| order | key | kind | expected shape | present | placeholder | shape ready | current ready | edit target | line | live check | doctor | value recorded |
-|---:|---|---|---|---:|---:|---:|---:|---|---:|---|---|---:|
+| order | key | kind | expected shape | present | placeholder | shape ready | current ready | edit target | line | live check | strict proof | operator proof chain | doctor | value recorded |
+|---:|---|---|---|---:|---:|---:|---:|---|---:|---|---|---|---|---:|
 ${formatEditRows(report.releaseChannelEditRows)}
 
 ## Not Recorded Or Claimed
@@ -452,8 +482,29 @@ function validateReport(report, markdown) {
   check(report.reportCommand === "npm run release:channel-edit-packet-smoke", "release-channel edit packet should report its command");
   check(report.refreshCommandCount === 2, "release-channel edit packet should refresh two source commands");
   check(report.refreshCommandSummary === "npm run release:doctor -> npm run release:channel-live-check", "release-channel edit packet should refresh doctor then live-check");
-  check(report.operatorCommandCount >= 5, "release-channel edit packet should include operator proof commands");
+  check(report.operatorCommandCount >= 7, "release-channel edit packet should include operator proof commands");
   check(report.operatorCommandRows.every((row) => row.valueRecorded === false), "release-channel edit packet operator rows should be value-free");
+  check(
+    report.operatorCommandRows.some((row) => row.command === recommendedOperatorProofCommand),
+    "release-channel edit packet should include the recommended private-edit strict proof chain"
+  );
+  check(
+    report.operatorCommandRows.some((row) => row.command === lowerLevelLiveCheckCommand),
+    "release-channel edit packet should keep the lower-level live-check command"
+  );
+  check(
+    report.operatorCommandRows.some((row) => row.command === lowerLevelStrictProofCommand),
+    "release-channel edit packet should keep the lower-level strict proof command"
+  );
+  check(report.releaseChannelRecommendedOperatorProofCommand === recommendedOperatorProofCommand, "release-channel edit packet should expose the recommended operator proof chain");
+  check(
+    report.releaseChannelRecommendedOperatorProofCommandRole === "recommended strict-first proof chain after replacing the four private release-channel placeholders",
+    "release-channel edit packet should describe the recommended operator proof chain role"
+  );
+  check(report.releaseChannelRecommendedOperatorProofCommandValueRecorded === false, "release-channel edit packet recommended operator proof chain should be value-free");
+  check(report.releaseChannelLowerLevelLiveCheckCommand === lowerLevelLiveCheckCommand, "release-channel edit packet should expose the lower-level live-check command");
+  check(report.releaseChannelLowerLevelStrictProofCommand === lowerLevelStrictProofCommand, "release-channel edit packet should expose the lower-level strict proof command");
+  check(report.releaseChannelLowerLevelProofCommandsValueRecorded === false, "release-channel edit packet lower-level proof commands should be value-free");
   check(report.sourceArtifactRowCount === 2, "release-channel edit packet should include two source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release-channel edit packet source artifacts should be present, ready, and value-free");
   check(["create-ignored-env-scaffold", "replace-release-channel-placeholders", "verify-release-channel-metadata", "continue-external-proof-chain"].includes(report.releaseChannelEditPacketMode), "release-channel edit packet should identify a known mode");
@@ -463,7 +514,9 @@ function validateReport(report, markdown) {
   check(report.releaseChannelEditRowCount === 4, "release-channel edit packet should include four edit rows");
   check(report.releaseChannelEditRows.every((row) => releaseChannelMetadataKeys.includes(row.key)), "release-channel edit packet rows should cover only current release-channel keys");
   check(report.releaseChannelEditRows.every((row) => row.valueRecorded === false), "release-channel edit packet rows should not record values");
-  check(report.releaseChannelEditRows.every((row) => row.proofCommand === "npm run release:channel-live-check"), "release-channel edit packet rows should point at live-check proof");
+  check(report.releaseChannelEditRows.every((row) => row.proofCommand === lowerLevelLiveCheckCommand), "release-channel edit packet rows should point at live-check proof");
+  check(report.releaseChannelEditRows.every((row) => row.strictProofCommand === lowerLevelStrictProofCommand), "release-channel edit packet rows should point at strict proof");
+  check(report.releaseChannelEditRows.every((row) => row.operatorProofCommand === recommendedOperatorProofCommand), "release-channel edit packet rows should point at recommended operator proof chain");
   check(report.releaseChannelEditRows.every((row) => row.doctorCommand === "npm run release:doctor"), "release-channel edit packet rows should point at doctor proof");
   check(report.liveCheckRowCount === 4, "release-channel edit packet should mirror four live-check rows");
   check(report.liveCheckPlaceholderEditLocations.every((row) => row.valueRecorded === false), "release-channel edit packet placeholder locations should be value-free");
@@ -503,6 +556,7 @@ function validateReport(report, markdown) {
   check(!/https?:\/\//i.test(markdown), "release-channel edit packet Markdown should not include URL values");
   check(markdown.includes("Release-Channel Edit Packet Smoke"), "release-channel edit packet Markdown should include title");
   check(markdown.includes("Release-channel edit packet ready: yes"), "release-channel edit packet Markdown should include readiness");
+  check(markdown.includes("Recommended operator proof chain"), "release-channel edit packet Markdown should include the recommended operator proof chain");
   check(markdown.includes("Release-Channel Edit Rows"), "release-channel edit packet Markdown should include edit rows");
   check(markdown.includes("External distribution claimed: no"), "release-channel edit packet Markdown should keep external distribution unclaimed");
 
@@ -532,6 +586,7 @@ console.log(`- Markdown: ${relative(packetMarkdownPath)}`);
 console.log(`- JSON: ${relative(packetJsonPath)}`);
 console.log("- Release-channel edit packet ready: yes");
 console.log(`- Packet mode: ${report.releaseChannelEditPacketMode}`);
+console.log(`- Recommended operator proof chain: ${report.releaseChannelRecommendedOperatorProofCommand}`);
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
 console.log(`- Current action: ${report.currentActionLabel}`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);

@@ -355,7 +355,7 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
       label: "Release-channel edit packet",
       path: channelEditPacketJsonPath,
       ready: channel.releaseChannelEditPacketReady === true,
-      evidence: `${channel.latestTenPlanProgressLabel}; ${textValue(channel.releaseChannelEditPacketMode)}; placeholders ${integerValue(channel.currentPlaceholderKeyCount)}`
+      evidence: `${channel.latestTenPlanProgressLabel}; ${textValue(channel.releaseChannelEditPacketMode)}; placeholders ${integerValue(channel.currentPlaceholderKeyCount)}; recommended ${textValue(channel.releaseChannelRecommendedOperatorProofCommand)}`
     }),
     sourceRow({
       label: "Release-channel clearance transition",
@@ -466,6 +466,8 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
     audience.completionGapStatus === "external proof pending" &&
     channel.completionGapStatus === "external proof pending" &&
     channel.externalDistributionReady === false &&
+    channel.releaseChannelRecommendedOperatorProofCommand === privateEditOperatorProofCommand &&
+    channel.releaseChannelRecommendedOperatorProofCommandValueRecorded === false &&
     clearanceTransitionReady &&
     autoUpdateTransitionReady;
 
@@ -491,6 +493,10 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
     privateEditOperatorProofCommand,
     privateEditOperatorProofCommandRole,
     privateEditOperatorProofCommandValueRecorded: false,
+    channelEditRecommendedOperatorProofCommand: textValue(channel.releaseChannelRecommendedOperatorProofCommand),
+    channelEditRecommendedOperatorProofCommandRole: textValue(channel.releaseChannelRecommendedOperatorProofCommandRole),
+    channelEditRecommendedOperatorProofCommandValueRecorded:
+      channel.releaseChannelRecommendedOperatorProofCommandValueRecorded === false,
     firstPrivateEditProofCommand: privateEditProofCommandRows[0].command,
     postEditProofCommand: privateEditProofCommandRows[1].command,
     sourceArtifactRows,
@@ -574,6 +580,7 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
     currentFirstBlocker: textValue(channel.currentFirstBlocker),
     currentEnvEditTarget: textValue(channel.currentEnvEditTarget),
     releaseChannelEditPacketMode: textValue(channel.releaseChannelEditPacketMode),
+    releaseChannelEditPacketOperatorCommandSummary: textValue(channel.operatorCommandSummary),
     currentRequiredKeyCount: integerValue(channel.currentRequiredKeyCount),
     currentPlaceholderKeyCount: integerValue(channel.currentPlaceholderKeyCount),
     liveCheckCurrentReadyCount: integerValue(channel.liveCheckCurrentReadyCount),
@@ -618,6 +625,8 @@ function buildMarkdown(report) {
 - Private-edit proof command order: ${report.privateEditProofCommandSummary}
 - Private-edit operator proof command: \`${report.privateEditOperatorProofCommand}\`
 - Private-edit operator proof role: ${report.privateEditOperatorProofCommandRole}
+- Channel edit packet recommended proof chain: \`${report.channelEditRecommendedOperatorProofCommand}\`
+- Channel edit packet proof role: ${report.channelEditRecommendedOperatorProofCommandRole}
 - Latest completed plan: plan-${report.latestCompletedPlanNumber}
 - Latest 10-plan progress: ${report.latestTenPlanProgressLabel}
 - 10-plan report due: ${readyLabel(report.tenPlanProgressReportDue)}
@@ -651,6 +660,7 @@ function buildMarkdown(report) {
 - Current first blocker: ${report.currentFirstBlocker}
 - Current env edit target: \`${report.currentEnvEditTarget}\`
 - Release-channel edit packet mode: ${report.releaseChannelEditPacketMode}
+- Release-channel edit packet operator order: ${report.releaseChannelEditPacketOperatorCommandSummary}
 - Current required keys: ${report.currentRequiredKeyCount}
 - Current placeholder keys: ${report.currentPlaceholderKeyCount}
 - Live-check ready rows: ${report.liveCheckCurrentReadyCount}/${report.liveCheckRowCount}
@@ -754,6 +764,16 @@ function validateReport(report, markdown) {
   check(report.privateEditOperatorProofCommand === privateEditOperatorProofCommand, "release completion report packet should include the recommended private-edit operator proof command");
   check(report.privateEditOperatorProofCommandRole === "recommended strict-first proof chain after replacing the four private release-channel placeholders", "release completion report packet should describe the private-edit operator proof command");
   check(report.privateEditOperatorProofCommandValueRecorded === false, "release completion report packet operator proof command should be value-free");
+  check(report.channelEditRecommendedOperatorProofCommand === privateEditOperatorProofCommand, "release completion report packet should mirror the channel edit packet recommended proof chain");
+  check(
+    report.channelEditRecommendedOperatorProofCommandRole === report.privateEditOperatorProofCommandRole,
+    "release completion report packet should mirror the channel edit packet recommended proof role"
+  );
+  check(report.channelEditRecommendedOperatorProofCommandValueRecorded === true, "release completion report packet should prove the channel edit packet recommendation is value-free");
+  check(
+    report.releaseChannelEditPacketOperatorCommandSummary.includes(privateEditOperatorProofCommand),
+    "release completion report packet should show the channel edit packet operator order includes the strict proof chain"
+  );
   check(report.privateEditProofCommandRows.every((row) => row.valueRecorded === false), "release completion report packet private-edit proof commands should be value-free");
   check(report.firstPrivateEditProofCommand === "npm run release:channel-live-check-strict", "release completion report packet should make strict live check the first private-edit proof command");
   check(report.postEditProofCommand === "npm run release:post-edit-proof", "release completion report packet should include post-edit proof command");
@@ -934,6 +954,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("Release Completion Report Packet Smoke"), "release completion report packet Markdown should include title");
   check(markdown.includes("Completion report packet ready: yes"), "release completion report packet Markdown should include readiness");
   check(markdown.includes("Private-edit proof command order:"), "release completion report packet Markdown should include private-edit proof command order");
+  check(markdown.includes("Channel edit packet recommended proof chain:"), "release completion report packet Markdown should include channel edit packet proof recommendation");
   check(markdown.includes("Private-Edit Proof Commands"), "release completion report packet Markdown should include private-edit proof command table");
   check(markdown.includes("10-plan report due:"), "release completion report packet Markdown should include the 10-plan report due flag");
   check(markdown.includes(`Next 10-plan progress report at: ${report.nextTenPlanProgressReportAt}`), "release completion report packet Markdown should include next 10-plan report plan");
@@ -982,6 +1003,7 @@ console.log(`- JSON: ${relative(packetJsonPath)}`);
 console.log("- Completion report packet ready: yes");
 console.log(`- Private-edit proof command order: ${report.privateEditProofCommandSummary}`);
 console.log(`- Private-edit operator proof command: ${report.privateEditOperatorProofCommand}`);
+console.log(`- Channel edit packet recommended proof chain: ${report.channelEditRecommendedOperatorProofCommand}`);
 console.log(`- Latest completed plan: plan-${report.latestCompletedPlanNumber}`);
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
 console.log(`- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}`);
@@ -999,6 +1021,7 @@ console.log(`- Professional producer ready: ${report.professionalProducerReady ?
 console.log(`- Current action: ${report.currentActionLabel}`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
 console.log(`- Release-channel edit packet mode: ${report.releaseChannelEditPacketMode}`);
+console.log(`- Release-channel edit packet operator order: ${report.releaseChannelEditPacketOperatorCommandSummary}`);
 console.log(`- Post-clearance transition ready: ${report.releaseChannelClearanceTransitionReady ? "yes" : "no"}`);
 console.log(`- Post-clearance next priority action: ${report.postClearanceNextPriorityActionLabel}`);
 console.log(`- Post-clearance next proof command: ${report.postClearanceNextActionPreviewProofCommand}`);
