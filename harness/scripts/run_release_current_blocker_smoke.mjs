@@ -279,6 +279,30 @@ function formatReleaseChannelUnblockRows(rows) {
     .join("\n");
 }
 
+function formatReleaseChannelLiveCheckRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| 0 | none | none | no | no | no | no | none | none | none | none | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order ?? "?"} | ${escapeCell(row.key)} | ${escapeCell(row.kind)} | ${row.present ? "yes" : "no"} | ${row.placeholder ? "yes" : "no"} | ${row.shapeReady ? "yes" : "no"} | ${row.currentReady ? "yes" : "no"} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.editTarget)} | ${escapeCell(row.line ?? "none")} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.rerunCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
+    .join("\n");
+}
+
+function formatReleaseChannelLiveCheckLocations(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | no | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${escapeCell(row.key)} | ${escapeCell(row.file)} | ${escapeCell(row.line ?? "none")} | ${row.placeholder ? "yes" : "no"} | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
+    .join("\n");
+}
+
 function formatReleaseChannelPostEditReceiptRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | no | no | none | none | none | none | none | no |";
@@ -1611,7 +1635,8 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     { label: "External proof bundle", path: relative(externalProofBundleJsonPath), present: true, valueRecorded: false },
     { label: "External distribution gate", path: relative(externalGateJsonPath), present: true, valueRecorded: false },
     { label: "Release progress report", path: relative(releaseProgressJsonPath), present: true, valueRecorded: false },
-    { label: "Release-channel unblock smoke", path: textValue(releaseProgress.sourceReleaseChannelUnblockPath, "none"), present: releaseProgress.sourceReleaseChannelUnblockReady === true, valueRecorded: false }
+    { label: "Release-channel unblock smoke", path: textValue(releaseProgress.sourceReleaseChannelUnblockPath, "none"), present: releaseProgress.sourceReleaseChannelUnblockReady === true, valueRecorded: false },
+    { label: "Release-channel live check", path: textValue(releaseProgress.sourceReleaseChannelLiveCheckPath, "none"), present: releaseProgress.sourceReleaseChannelLiveCheckReady === true, valueRecorded: false }
   ];
   const nextExpectedOperatorSequence = localEnvSetupPending
     ? [
@@ -2226,6 +2251,70 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     releaseChannelUnblockSigningAttempted: releaseProgress.releaseChannelUnblockSigningAttempted === true,
     releaseChannelUnblockClaimedExternalDistribution: releaseProgress.releaseChannelUnblockClaimedExternalDistribution === true,
     releaseChannelUnblockValueRecorded: releaseProgress.releaseChannelUnblockValueRecorded === true ? true : false,
+    sourceReleaseChannelLiveCheckReady: releaseProgress.sourceReleaseChannelLiveCheckReady === true,
+    sourceReleaseChannelLiveCheckPath: textValue(releaseProgress.sourceReleaseChannelLiveCheckPath, "none"),
+    releaseChannelLiveCheckCommand: textValue(releaseProgress.releaseChannelLiveCheckCommand, "npm run release:channel-live-check"),
+    releaseChannelLiveCheckRefreshedByProgressReport: releaseProgress.releaseChannelLiveCheckRefreshedByThisReport === true,
+    releaseChannelLiveCheckReady: releaseProgress.releaseChannelLiveCheckReady === true,
+    releaseChannelLiveCheckCurrentReadyCount: integerValue(releaseProgress.releaseChannelLiveCheckCurrentReadyCount),
+    releaseChannelLiveCheckRowCount: integerValue(releaseProgress.releaseChannelLiveCheckRowCount),
+    releaseChannelLiveCheckRowSummary: textValue(releaseProgress.releaseChannelLiveCheckRowSummary, "none"),
+    releaseChannelLiveCheckRows: valueFreeObjectRows(releaseProgress.releaseChannelLiveCheckRows),
+    releaseChannelLiveCheckLocalEnvFileLoaded: releaseProgress.releaseChannelLiveCheckLocalEnvFileLoaded === true,
+    releaseChannelLiveCheckCurrentEnvEditTarget: textValue(
+      releaseProgress.releaseChannelLiveCheckCurrentEnvEditTarget,
+      ".env.distribution.local"
+    ),
+    releaseChannelLiveCheckCurrentRequiredKeyCount: integerValue(
+      releaseProgress.releaseChannelLiveCheckCurrentRequiredKeyCount
+    ),
+    releaseChannelLiveCheckCurrentRequiredKeys: stringArrayValue(releaseProgress.releaseChannelLiveCheckCurrentRequiredKeys),
+    releaseChannelLiveCheckCurrentPlaceholderKeyCount: integerValue(
+      releaseProgress.releaseChannelLiveCheckCurrentPlaceholderKeyCount
+    ),
+    releaseChannelLiveCheckCurrentPlaceholderKeys: stringArrayValue(
+      releaseProgress.releaseChannelLiveCheckCurrentPlaceholderKeys
+    ),
+    releaseChannelLiveCheckCurrentPlaceholderEditLocationCount: integerValue(
+      releaseProgress.releaseChannelLiveCheckCurrentPlaceholderEditLocationCount
+    ),
+    releaseChannelLiveCheckCurrentPlaceholderEditLocationSummary: textValue(
+      releaseProgress.releaseChannelLiveCheckCurrentPlaceholderEditLocationSummary,
+      "none"
+    ),
+    releaseChannelLiveCheckCurrentPlaceholderEditLocations: valueFreeObjectRows(
+      releaseProgress.releaseChannelLiveCheckCurrentPlaceholderEditLocations
+    ),
+    releaseChannelLiveCheckDoctorCommand: textValue(releaseProgress.releaseChannelLiveCheckDoctorCommand, "npm run release:doctor"),
+    releaseChannelLiveCheckCurrentBlockerCommand: textValue(
+      releaseProgress.releaseChannelLiveCheckCurrentBlockerCommand,
+      "npm run release:current-blocker"
+    ),
+    releaseChannelLiveCheckNextActionsCommand: textValue(
+      releaseProgress.releaseChannelLiveCheckNextActionsCommand,
+      "npm run release:next-actions"
+    ),
+    releaseChannelLiveCheckProofBundleCommand: textValue(
+      releaseProgress.releaseChannelLiveCheckProofBundleCommand,
+      "npm run release:proof-bundle"
+    ),
+    releaseChannelLiveCheckProgressCommand: textValue(
+      releaseProgress.releaseChannelLiveCheckProgressCommand,
+      "npm run release:progress-smoke"
+    ),
+    releaseChannelLiveCheckHardGateCommand: textValue(
+      releaseProgress.releaseChannelLiveCheckHardGateCommand,
+      "npm run release:external-check"
+    ),
+    releaseChannelLiveCheckPrivateValuesRecorded: releaseProgress.releaseChannelLiveCheckPrivateValuesRecorded === true,
+    releaseChannelLiveCheckNetworkProbeAttempted: releaseProgress.releaseChannelLiveCheckNetworkProbeAttempted === true,
+    releaseChannelLiveCheckReleaseUploadAttempted: releaseProgress.releaseChannelLiveCheckReleaseUploadAttempted === true,
+    releaseChannelLiveCheckNotarySubmissionAttempted:
+      releaseProgress.releaseChannelLiveCheckNotarySubmissionAttempted === true,
+    releaseChannelLiveCheckSigningAttempted: releaseProgress.releaseChannelLiveCheckSigningAttempted === true,
+    releaseChannelLiveCheckClaimedExternalDistribution:
+      releaseProgress.releaseChannelLiveCheckClaimedExternalDistribution === true,
+    releaseChannelLiveCheckValueRecorded: releaseProgress.releaseChannelLiveCheckValueRecorded === true ? true : false,
     nextExpectedOperatorSequence,
     sourceArtifacts,
     privateValuesRecorded: false,
@@ -2820,6 +2909,47 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.releaseChannelUnblockSigningAttempted === false, "release current blocker unblock evidence should not sign artifacts");
   check(report.releaseChannelUnblockClaimedExternalDistribution === false, "release current blocker unblock evidence should not claim external distribution");
   check(report.releaseChannelUnblockValueRecorded === false, "release current blocker should not record release-channel unblock values");
+  check(report.sourceReleaseChannelLiveCheckReady === true, "release current blocker should mirror release-channel live-check source readiness");
+  check(report.sourceReleaseChannelLiveCheckPath === releaseProgress.sourceReleaseChannelLiveCheckPath, "release current blocker should mirror release-channel live-check source path");
+  check(report.releaseChannelLiveCheckCommand === "npm run release:channel-live-check", "release current blocker should mirror release-channel live-check command");
+  check(report.releaseChannelLiveCheckRefreshedByProgressReport === true, "release current blocker should mirror live-check refresh posture");
+  check(report.releaseChannelLiveCheckReady === releaseProgress.releaseChannelLiveCheckReady, "release current blocker should mirror live-check readiness");
+  check(report.releaseChannelLiveCheckRowCount === report.releaseChannelLiveCheckRows.length, "release current blocker live-check row count should match rows");
+  check(report.releaseChannelLiveCheckRowCount === 4, "release current blocker should mirror four release-channel live-check rows");
+  check(report.releaseChannelLiveCheckCurrentReadyCount === report.releaseChannelLiveCheckRows.filter((row) => row.currentReady === true).length, "release current blocker live-check current-ready count should match rows");
+  check(report.releaseChannelLiveCheckReady === (report.releaseChannelLiveCheckCurrentReadyCount === report.releaseChannelLiveCheckRowCount), "release current blocker live-check readiness should match current-ready rows");
+  check(report.releaseChannelLiveCheckRows.every((row) => row.valueRecorded === false), "release current blocker live-check rows should not record values");
+  check(report.releaseChannelLiveCheckRows.every((row) => typeof row.expectedShape === "string" && row.expectedShape.length > 0), "release current blocker live-check rows should include expected shapes");
+  check(report.releaseChannelLiveCheckRows.every((row) => row.proofCommand === "npm run release:channel-live-check"), "release current blocker live-check rows should mirror live-check command");
+  check(report.releaseChannelLiveCheckRows.every((row) => row.rerunCommand === "npm run release:doctor"), "release current blocker live-check rows should keep release doctor as rerun command");
+  check(report.releaseChannelLiveCheckCurrentRequiredKeyCount === 4, "release current blocker live-check should mirror four current required keys");
+  check(report.releaseChannelLiveCheckCurrentRequiredKeys.length === report.releaseChannelLiveCheckCurrentRequiredKeyCount, "release current blocker live-check required key count should match names");
+  check(report.releaseChannelLiveCheckCurrentPlaceholderKeyCount === report.releaseChannelLiveCheckCurrentPlaceholderKeys.length, "release current blocker live-check placeholder count should match names");
+  check(
+    report.releaseChannelLiveCheckCurrentPlaceholderKeyCount === report.releaseChannelLiveCheckRows.filter((row) => row.placeholder === true).length,
+    "release current blocker live-check placeholder count should match rows"
+  );
+  check(
+    report.releaseChannelLiveCheckCurrentPlaceholderEditLocationCount === report.releaseChannelLiveCheckCurrentPlaceholderEditLocations.length,
+    "release current blocker live-check placeholder edit location count should match rows"
+  );
+  check(
+    report.releaseChannelLiveCheckCurrentPlaceholderEditLocations.every((row) => row.valueRecorded === false),
+    "release current blocker live-check placeholder edit locations should not record values"
+  );
+  check(report.releaseChannelLiveCheckDoctorCommand === "npm run release:doctor", "release current blocker live-check should mirror doctor command");
+  check(report.releaseChannelLiveCheckCurrentBlockerCommand === "npm run release:current-blocker", "release current blocker live-check should mirror current-blocker command");
+  check(report.releaseChannelLiveCheckNextActionsCommand === "npm run release:next-actions", "release current blocker live-check should mirror next-actions command");
+  check(report.releaseChannelLiveCheckProofBundleCommand === "npm run release:proof-bundle", "release current blocker live-check should mirror proof-bundle command");
+  check(report.releaseChannelLiveCheckProgressCommand === "npm run release:progress-smoke", "release current blocker live-check should mirror progress command");
+  check(report.releaseChannelLiveCheckHardGateCommand === "npm run release:external-check", "release current blocker live-check should mirror hard-gate command");
+  check(report.releaseChannelLiveCheckPrivateValuesRecorded === false, "release current blocker live-check evidence should not record private values");
+  check(report.releaseChannelLiveCheckNetworkProbeAttempted === false, "release current blocker live-check evidence should not probe network");
+  check(report.releaseChannelLiveCheckReleaseUploadAttempted === false, "release current blocker live-check evidence should not upload releases");
+  check(report.releaseChannelLiveCheckNotarySubmissionAttempted === false, "release current blocker live-check evidence should not submit to Apple");
+  check(report.releaseChannelLiveCheckSigningAttempted === false, "release current blocker live-check evidence should not sign artifacts");
+  check(report.releaseChannelLiveCheckClaimedExternalDistribution === false, "release current blocker live-check evidence should not claim external distribution");
+  check(report.releaseChannelLiveCheckValueRecorded === false, "release current blocker should not record release-channel live-check values");
   check(report.consistencyReady === true, "release current blocker should pass all consistency checks");
   check(releaseDoctor.completionGapClaimedExternalDistribution === false, "release doctor source should not claim external distribution");
   check(releaseDoctor.completionGapValueRecorded === false, "release doctor source should not record completion gap values");
@@ -2931,6 +3061,12 @@ function buildMarkdown(report) {
     `- Release-channel unblock ready: ${report.releaseChannelUnblockSmokeReady ? "yes" : "no"}`,
     `- Release-channel placeholder blocker cleared in rehearsal: ${report.releaseChannelUnblockPlaceholderBlockerCleared ? "yes" : "no"}`,
     `- Release-channel unblock rows: ${report.releaseChannelUnblockMetadataRowCount} (${report.releaseChannelUnblockMetadataRowSummary})`,
+    `- Release-channel live-check source ready: ${report.sourceReleaseChannelLiveCheckReady ? "yes" : "no"}`,
+    `- Release-channel live-check ready: ${report.releaseChannelLiveCheckReady ? "yes" : "no"}`,
+    `- Release-channel live-check current-ready rows: ${report.releaseChannelLiveCheckCurrentReadyCount}/${report.releaseChannelLiveCheckRowCount}`,
+    `- Release-channel live-check placeholder keys: ${report.releaseChannelLiveCheckCurrentPlaceholderKeyCount}`,
+    `- Release-channel live-check placeholder edit locations: ${report.releaseChannelLiveCheckCurrentPlaceholderEditLocationCount}`,
+    `- Release-channel live-check command: ${report.releaseChannelLiveCheckCommand}`,
     `- Release-channel post-edit receipt ready: ${report.releaseChannelPostEditReceiptReady ? "yes" : "no"}`,
     `- Release-channel post-edit receipt rows: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary})`,
     `- Release-channel post-edit current-ready rows: ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}`,
@@ -3017,6 +3153,36 @@ function buildMarkdown(report) {
     "| key | present | ready | evidence | value recorded |",
     "|---|---:|---:|---|---:|",
     formatReleaseChannelUnblockRows(report.releaseChannelUnblockMetadataRows),
+    "",
+    "## Release-Channel Live Check",
+    "",
+    `- Source ready: ${report.sourceReleaseChannelLiveCheckReady ? "yes" : "no"}`,
+    `- Source path: ${report.sourceReleaseChannelLiveCheckPath}`,
+    `- Refreshed by progress report: ${report.releaseChannelLiveCheckRefreshedByProgressReport ? "yes" : "no"}`,
+    `- Command: \`${report.releaseChannelLiveCheckCommand}\``,
+    `- Live-check ready: ${report.releaseChannelLiveCheckReady ? "yes" : "no"}`,
+    `- Current-ready rows: ${report.releaseChannelLiveCheckCurrentReadyCount}/${report.releaseChannelLiveCheckRowCount}`,
+    `- Current env edit target: ${report.releaseChannelLiveCheckCurrentEnvEditTarget}`,
+    `- Current required keys: ${report.releaseChannelLiveCheckCurrentRequiredKeyCount} (${formatKeyList(report.releaseChannelLiveCheckCurrentRequiredKeys)})`,
+    `- Current placeholder keys: ${report.releaseChannelLiveCheckCurrentPlaceholderKeyCount} (${formatKeyList(report.releaseChannelLiveCheckCurrentPlaceholderKeys)})`,
+    `- Current placeholder edit locations: ${report.releaseChannelLiveCheckCurrentPlaceholderEditLocationCount} (${report.releaseChannelLiveCheckCurrentPlaceholderEditLocationSummary})`,
+    `- Doctor command: \`${report.releaseChannelLiveCheckDoctorCommand}\``,
+    `- Current blocker command: \`${report.releaseChannelLiveCheckCurrentBlockerCommand}\``,
+    `- Next-actions command: \`${report.releaseChannelLiveCheckNextActionsCommand}\``,
+    `- Proof bundle command: \`${report.releaseChannelLiveCheckProofBundleCommand}\``,
+    `- Progress command: \`${report.releaseChannelLiveCheckProgressCommand}\``,
+    `- Hard gate command: \`${report.releaseChannelLiveCheckHardGateCommand}\``,
+    `- Value recorded: ${report.releaseChannelLiveCheckValueRecorded ? "yes" : "no"}`,
+    "",
+    "| order | key | kind | present | placeholder | shape ready | current ready | expected shape | edit target | line | proof command | rerun command | value recorded |",
+    "|---:|---|---|---:|---:|---:|---:|---|---|---:|---|---|---:|",
+    formatReleaseChannelLiveCheckRows(report.releaseChannelLiveCheckRows),
+    "",
+    "### Release-Channel Live Check Placeholder Locations",
+    "",
+    "| key | file | line | placeholder | value recorded |",
+    "|---|---|---:|---:|---:|",
+    formatReleaseChannelLiveCheckLocations(report.releaseChannelLiveCheckCurrentPlaceholderEditLocations),
     "",
     "## Release-Channel Post-Edit Receipt",
     "",
@@ -3382,6 +3548,9 @@ check(markdown.includes("10-plan progress report receipt rows:"), "release curre
 check(markdown.includes("10-Plan Progress Report Receipt"), "release current blocker Markdown should include 10-plan progress report receipt table");
 check(markdown.includes("Release-Channel Unblock Rehearsal"), "release current blocker Markdown should include release-channel unblock rehearsal");
 check(markdown.includes("Release-channel placeholder blocker cleared in rehearsal:"), "release current blocker Markdown should include release-channel unblock cleared status");
+check(markdown.includes("Release-Channel Live Check"), "release current blocker Markdown should include release-channel live-check section");
+check(markdown.includes("Release-channel live-check current-ready rows:"), "release current blocker Markdown should include release-channel live-check current-ready rows");
+check(markdown.includes("Release-Channel Live Check Placeholder Locations"), "release current blocker Markdown should include release-channel live-check placeholder locations");
 check(markdown.includes("Release-channel post-edit receipt ready:"), "release current blocker Markdown should include release-channel post-edit receipt readiness");
 check(markdown.includes("Release-channel post-edit receipt rows:"), "release current blocker Markdown should include release-channel post-edit receipt rows");
 check(markdown.includes("Release-Channel Post-Edit Receipt"), "release current blocker Markdown should include release-channel post-edit receipt table");
@@ -3532,6 +3701,10 @@ console.log(`- Professional producer readiness: ${report.professionalProducerAud
 console.log(`- Release-channel unblock ready: ${report.releaseChannelUnblockSmokeReady ? "yes" : "no"}`);
 console.log(`- Release-channel placeholder blocker cleared in rehearsal: ${report.releaseChannelUnblockPlaceholderBlockerCleared ? "yes" : "no"}`);
 console.log(`- Release-channel unblock rows: ${report.releaseChannelUnblockMetadataRowCount} (${report.releaseChannelUnblockMetadataRowSummary})`);
+console.log(`- Release-channel live-check ready: ${report.releaseChannelLiveCheckReady ? "yes" : "no"}`);
+console.log(`- Release-channel live-check current-ready rows: ${report.releaseChannelLiveCheckCurrentReadyCount}/${report.releaseChannelLiveCheckRowCount}`);
+console.log(`- Release-channel live-check placeholder keys: ${report.releaseChannelLiveCheckCurrentPlaceholderKeyCount}`);
+console.log(`- Release-channel live-check placeholder edit locations: ${report.releaseChannelLiveCheckCurrentPlaceholderEditLocationCount}`);
 console.log(`- Release-channel post-edit receipt ready: ${report.releaseChannelPostEditReceiptReady ? "yes" : "no"}`);
 console.log(`- Release-channel post-edit receipt rows: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary})`);
 console.log(`- Release-channel post-edit current-ready rows: ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}`);
