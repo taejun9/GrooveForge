@@ -176,6 +176,15 @@ function formatReleaseChannelUnblockRows(rows) {
     .join("\n");
 }
 
+function formatReleaseChannelPostEditReceiptRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | no | no | none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.item)} | ${row.ready ? "yes" : "no"} | ${row.currentReady ? "yes" : "no"} | ${escapeCell(row.evidence)} | ${escapeCell(row.expectedPostEditSignal)} | \`${escapeCell(row.proofCommand)}\` | ${escapeCell(row.sourceField)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 async function buildCompletedPlanSummary() {
   const names = await readdir(completedPlansDir);
   const planRows = names
@@ -461,6 +470,113 @@ function buildTenPlanProgressReportReceiptSummary(report) {
   };
 }
 
+function buildReleaseChannelPostEditReceiptSummary(report) {
+  const requiredKeys = stringArrayValue(report.externalProofBundleCurrentRequiredKeys);
+  const placeholderKeys = stringArrayValue(report.externalProofBundleCurrentPlaceholderKeys);
+  const unblockRows = valueFreeObjectRows(report.releaseChannelUnblockMetadataRows);
+  const proofChecklistRows = valueFreeObjectRows(report.externalProofBundleCurrentProofChecklistRows);
+  const actionChecklistRows = valueFreeObjectRows(report.externalProofBundleCurrentActionChecklistRows);
+  const commandVerificationRows = valueFreeObjectRows(report.externalProofBundleCurrentCommandVerificationRows);
+  const currentProofCommand = textValue(report.releaseChannelUnblockNextProofCommandAfterRealEdits, report.externalProofBundleCurrentNextCommand);
+  const currentRerunCommand = textValue(report.releaseChannelUnblockCurrentBlockerRefreshCommand, report.externalProofBundleCurrentRerunCommand);
+  const hardGateCommand = textValue(report.externalProofBundleHardGateCommand, "npm run release:external-check");
+  const rows = [
+    {
+      order: 1,
+      item: "Current key coverage",
+      ready:
+        requiredKeys.length === report.externalProofBundleCurrentRequiredKeyCount &&
+        requiredKeys.length === 4 &&
+        textValue(report.externalProofBundleCurrentEnvEditTarget) === ".env.distribution.local",
+      currentReady: placeholderKeys.length === 0,
+      evidence: `${requiredKeys.length} required release-channel keys; edit target ${report.externalProofBundleCurrentEnvEditTarget}; ${report.externalProofBundleCurrentPlaceholderEditLocationCount} edit locations`,
+      expectedPostEditSignal: "all current release-channel keys load without placeholders",
+      proofCommand: currentProofCommand,
+      rerunCommand: currentRerunCommand,
+      sourceField: "externalProofBundleCurrentRequiredKeys/externalProofBundleCurrentPlaceholderEditLocations",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      item: "Shape rehearsal coverage",
+      ready:
+        report.releaseChannelUnblockMetadataReady === true &&
+        report.releaseChannelUnblockPlaceholderBlockerCleared === true &&
+        unblockRows.length === 4 &&
+        unblockRows.every((row) => row.ready === true && row.valueRecorded === false),
+      currentReady: report.releaseChannelUnblockPlaceholderBlockerCleared === true,
+      evidence: `${unblockRows.length} value-free release-channel unblock rows; values recorded no`,
+      expectedPostEditSignal: "real private edits satisfy the same allowed channel and safe HTTPS URL shapes",
+      proofCommand: currentProofCommand,
+      rerunCommand: currentRerunCommand,
+      sourceField: "releaseChannelUnblockMetadataRows/releaseChannelUnblockPlaceholderBlockerCleared",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      item: "Placeholder cleanup acceptance",
+      ready: Number.isInteger(report.externalProofBundleCurrentPlaceholderKeyCount) && placeholderKeys.length === report.externalProofBundleCurrentPlaceholderKeyCount,
+      currentReady: report.externalProofBundleCurrentPlaceholderKeyCount === 0,
+      evidence: `${report.externalProofBundleCurrentPlaceholderKeyCount} current placeholder keys remain`,
+      expectedPostEditSignal: "0 current placeholder keys; current first blocker advances past release-channel metadata",
+      proofCommand: currentProofCommand,
+      rerunCommand: currentRerunCommand,
+      sourceField: "externalProofBundleCurrentPlaceholderKeyCount/externalProofBundleCurrentFirstBlocker",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      item: "Proof and rerun sequence",
+      ready:
+        currentProofCommand === "npm run release:doctor" &&
+        currentRerunCommand === "npm run release:current-blocker" &&
+        commandVerificationRows.length > 0,
+      currentReady: false,
+      evidence: `${commandVerificationRows.length} value-free command verification rows; proof ${currentProofCommand}; rerun ${currentRerunCommand}`,
+      expectedPostEditSignal: "release doctor refreshes private-input evidence, then current-blocker mirrors the advanced blocker",
+      proofCommand: currentProofCommand,
+      rerunCommand: currentRerunCommand,
+      sourceField: "externalProofBundleCurrentCommandVerificationRows/releaseChannelUnblockCurrentBlockerRefreshCommand",
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      item: "Acceptance evidence coverage",
+      ready: proofChecklistRows.length > 0 && actionChecklistRows.length > 0,
+      currentReady: false,
+      evidence: `${proofChecklistRows.length} proof checklist rows; ${actionChecklistRows.length} action checklist rows`,
+      expectedPostEditSignal: "private-input, release-channel QA, and current proof checklist signals turn ready without storing values",
+      proofCommand: currentProofCommand,
+      rerunCommand: currentRerunCommand,
+      sourceField: "externalProofBundleCurrentProofChecklistRows/externalProofBundleCurrentActionChecklistRows",
+      valueRecorded: false
+    },
+    {
+      order: 6,
+      item: "Hard gate separation",
+      ready: hardGateCommand === "npm run release:external-check",
+      currentReady: report.externalDistributionGateReady === true,
+      evidence: `hard gate remains ${hardGateCommand}; external distribution ready ${report.externalDistributionGateReady ? "yes" : "no"}`,
+      expectedPostEditSignal: "release-channel metadata clears first; external hard gate remains blocked until downstream proofs are ready",
+      proofCommand: hardGateCommand,
+      rerunCommand: currentRerunCommand,
+      sourceField: "externalProofBundleHardGateCommand/externalDistributionGateReady",
+      valueRecorded: false
+    }
+  ];
+
+  return {
+    releaseChannelPostEditReceiptReady: rows.length === 6 && rows.every((row) => row.ready === true && row.valueRecorded === false),
+    releaseChannelPostEditReceiptCurrentReadyCount: rows.filter((row) => row.currentReady === true).length,
+    releaseChannelPostEditReceiptRowCount: rows.length,
+    releaseChannelPostEditReceiptSummary: `${rows.length} value-free release-channel post-edit receipt rows`,
+    releaseChannelPostEditReceiptRows: rows,
+    releaseChannelPostEditReceiptProofCommand: currentProofCommand,
+    releaseChannelPostEditReceiptRerunCommand: currentRerunCommand,
+    releaseChannelPostEditReceiptValueRecorded: false
+  };
+}
+
 function buildExternalProofBundleSummary(externalProofBundle) {
   return {
     sourceExternalProofBundleReady: true,
@@ -653,6 +769,9 @@ function buildMarkdown(report) {
 - Release-channel unblock ready: ${report.releaseChannelUnblockSmokeReady ? "yes" : "no"}
 - Release-channel placeholder blocker cleared in rehearsal: ${report.releaseChannelUnblockPlaceholderBlockerCleared ? "yes" : "no"}
 - Release-channel unblock metadata rows: ${report.releaseChannelUnblockMetadataRowCount} (${report.releaseChannelUnblockMetadataRowSummary})
+- Release-channel post-edit receipt ready: ${report.releaseChannelPostEditReceiptReady ? "yes" : "no"}
+- Release-channel post-edit receipt rows: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary})
+- Release-channel post-edit current-ready rows: ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}
 - External proof artifacts present: ${report.externalProofBundleProofArtifactPresentCount}/${report.externalProofBundleProofArtifactCount} (missing: ${report.externalProofBundleProofArtifactMissingSummary})
 - External proof gate requirements ready: ${report.externalProofBundleGateRequirementReadyCount}/${report.externalProofBundleGateRequirementTotal} (blocked: ${report.externalProofBundleGateRequirementBlockedCount})
 - External proof current target: ${report.externalProofBundleCurrentProofTarget}
@@ -685,6 +804,7 @@ function buildMarkdown(report) {
 - Completion status wording: ${report.userFacingCompletionStatus}
 - Completion evidence summary: ${report.userFacingCompletionEvidenceSummary}
 - Release-channel unblock rehearsal to report: ${report.releaseChannelUnblockSmokeReady ? "ready" : "blocked"}; placeholder blocker cleared: ${report.releaseChannelUnblockPlaceholderBlockerCleared ? "yes" : "no"}
+- Release-channel post-edit receipt to report: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary}); current-ready rows ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}
 - Audience readiness to report: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})
 - Audience acceptance rows to report: ${report.audienceAcceptanceRowCount} (${report.audienceAcceptanceRowSummary})
 - Persona delivery packages to report: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})
@@ -777,6 +897,19 @@ ${formatDeliveryPackageReopenRows(report.audienceDeliveryPackageReopenRows)}
 | key | present | ready | evidence | value recorded |
 |---|---:|---:|---|---:|
 ${formatReleaseChannelUnblockRows(report.releaseChannelUnblockMetadataRows)}
+
+## Release-Channel Post-Edit Receipt
+
+- Receipt ready: ${report.releaseChannelPostEditReceiptReady ? "yes" : "no"}
+- Receipt rows: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary})
+- Current-ready rows: ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}
+- Proof command: \`${report.releaseChannelPostEditReceiptProofCommand}\`
+- Rerun command: \`${report.releaseChannelPostEditReceiptRerunCommand}\`
+- Value recorded: ${report.releaseChannelPostEditReceiptValueRecorded ? "yes" : "no"}
+
+| order | item | receipt ready | current ready | evidence | expected post-edit signal | proof command | source field | value recorded |
+|---:|---|---:|---:|---|---|---|---|---:|
+${formatReleaseChannelPostEditReceiptRows(report.releaseChannelPostEditReceiptRows)}
 
 ## External Proof Bundle
 
@@ -1023,6 +1156,7 @@ releaseProgressReport.releaseProgressReportReady =
   releaseProgressReport.releaseChannelUnblockPlaceholderBlockerCleared;
 Object.assign(releaseProgressReport, buildUserFacingCompletionSummary(releaseProgressReport, completedPlanSummary));
 Object.assign(releaseProgressReport, buildTenPlanProgressReportReceiptSummary(releaseProgressReport));
+Object.assign(releaseProgressReport, buildReleaseChannelPostEditReceiptSummary(releaseProgressReport));
 
 const markdown = buildMarkdown(releaseProgressReport);
 
@@ -1191,6 +1325,23 @@ check(releaseProgressReport.releaseChannelUnblockAppleNotarySubmissionAttempted 
 check(releaseProgressReport.releaseChannelUnblockSigningAttempted === false, "release progress report unblock evidence should not sign artifacts");
 check(releaseProgressReport.releaseChannelUnblockClaimedExternalDistribution === false, "release progress report unblock evidence should not claim external distribution");
 check(releaseProgressReport.releaseChannelUnblockValueRecorded === false, "release progress report should not record release-channel unblock values");
+check(releaseProgressReport.releaseChannelPostEditReceiptReady === true, "release progress report release-channel post-edit receipt should be ready");
+check(releaseProgressReport.releaseChannelPostEditReceiptRowCount === releaseProgressReport.releaseChannelPostEditReceiptRows.length, "release progress report post-edit receipt row count should match rows");
+check(releaseProgressReport.releaseChannelPostEditReceiptRowCount === 6, "release progress report post-edit receipt should include six rows");
+check(releaseProgressReport.releaseChannelPostEditReceiptRows.every((row) => row.valueRecorded === false), "release progress report post-edit receipt rows should not record values");
+check(releaseProgressReport.releaseChannelPostEditReceiptRows.every((row) => row.ready === true), "release progress report post-edit receipt rows should be receipt-ready");
+check(releaseProgressReport.releaseChannelPostEditReceiptRows.every((row) => typeof row.expectedPostEditSignal === "string" && row.expectedPostEditSignal.length > 0), "release progress report post-edit receipt rows should include expected post-edit signals");
+check(releaseProgressReport.releaseChannelPostEditReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release progress report post-edit receipt rows should include source fields");
+check(releaseProgressReport.releaseChannelPostEditReceiptRows.some((row) => row.item === "Current key coverage" && row.evidence.includes("4 required release-channel keys")), "release progress report post-edit receipt should include required key coverage");
+check(releaseProgressReport.releaseChannelPostEditReceiptRows.some((row) => row.item === "Shape rehearsal coverage" && row.evidence.includes("value-free release-channel unblock rows")), "release progress report post-edit receipt should include shape rehearsal coverage");
+check(releaseProgressReport.releaseChannelPostEditReceiptRows.some((row) => row.item === "Placeholder cleanup acceptance" && row.expectedPostEditSignal.includes("0 current placeholder keys")), "release progress report post-edit receipt should include placeholder cleanup acceptance");
+check(releaseProgressReport.releaseChannelPostEditReceiptRows.some((row) => row.item === "Proof and rerun sequence" && row.proofCommand === "npm run release:doctor" && row.rerunCommand === "npm run release:current-blocker"), "release progress report post-edit receipt should include proof and rerun sequence");
+check(releaseProgressReport.releaseChannelPostEditReceiptRows.some((row) => row.item === "Acceptance evidence coverage" && row.expectedPostEditSignal.includes("private-input")), "release progress report post-edit receipt should include acceptance evidence coverage");
+check(releaseProgressReport.releaseChannelPostEditReceiptRows.some((row) => row.item === "Hard gate separation" && row.proofCommand === "npm run release:external-check"), "release progress report post-edit receipt should include hard gate separation");
+check(releaseProgressReport.releaseChannelPostEditReceiptCurrentReadyCount === releaseProgressReport.releaseChannelPostEditReceiptRows.filter((row) => row.currentReady === true).length, "release progress report post-edit receipt current-ready count should match rows");
+check(releaseProgressReport.releaseChannelPostEditReceiptProofCommand === "npm run release:doctor", "release progress report post-edit receipt should keep release doctor as proof command");
+check(releaseProgressReport.releaseChannelPostEditReceiptRerunCommand === "npm run release:current-blocker", "release progress report post-edit receipt should keep current-blocker as rerun command");
+check(releaseProgressReport.releaseChannelPostEditReceiptValueRecorded === false, "release progress report post-edit receipt should not record values");
 check(Number.isInteger(releaseProgressReport.externalProofBundleProofArtifactCount), "release progress report should include external proof artifact count");
 check(Number.isInteger(releaseProgressReport.externalProofBundleProofArtifactPresentCount), "release progress report should include external proof artifact present count");
 check(Number.isInteger(releaseProgressReport.externalProofBundleProofArtifactMissingCount), "release progress report should include external proof artifact missing count");
@@ -1288,6 +1439,10 @@ check(markdown.includes("External Proof Bundle"), "release progress Markdown sho
 check(markdown.includes("Release-Channel Unblock Rehearsal"), "release progress Markdown should include release-channel unblock rehearsal summary");
 check(markdown.includes("Release-channel placeholder blocker cleared in rehearsal:"), "release progress Markdown should include release-channel unblock cleared status");
 check(markdown.includes("Release-channel unblock JSON:"), "release progress Markdown should include release-channel unblock source path");
+check(markdown.includes("Release-channel post-edit receipt ready:"), "release progress Markdown should include release-channel post-edit receipt readiness");
+check(markdown.includes("Release-channel post-edit receipt rows:"), "release progress Markdown should include release-channel post-edit receipt rows");
+check(markdown.includes("Release-Channel Post-Edit Receipt"), "release progress Markdown should include release-channel post-edit receipt table");
+check(markdown.includes("expected post-edit signal"), "release progress Markdown should include post-edit expected signals");
 check(markdown.includes("External Gate Current Proof Consistency"), "release progress Markdown should include external gate current proof consistency summary");
 check(markdown.includes("External gate/proof current action consistent:"), "release progress Markdown should include external gate/proof consistency status");
 check(markdown.includes("Current next command matches:"), "release progress Markdown should include external gate next-command match status");
@@ -1358,6 +1513,9 @@ console.log(`- External gate/proof current action consistent: ${releaseProgressR
 console.log(`- Release-channel unblock ready: ${releaseProgressReport.releaseChannelUnblockSmokeReady ? "yes" : "no"}`);
 console.log(`- Release-channel placeholder blocker cleared in rehearsal: ${releaseProgressReport.releaseChannelUnblockPlaceholderBlockerCleared ? "yes" : "no"}`);
 console.log(`- Release-channel unblock rows: ${releaseProgressReport.releaseChannelUnblockMetadataRowCount} (${releaseProgressReport.releaseChannelUnblockMetadataRowSummary})`);
+console.log(`- Release-channel post-edit receipt ready: ${releaseProgressReport.releaseChannelPostEditReceiptReady ? "yes" : "no"}`);
+console.log(`- Release-channel post-edit receipt rows: ${releaseProgressReport.releaseChannelPostEditReceiptRowCount} (${releaseProgressReport.releaseChannelPostEditReceiptSummary})`);
+console.log(`- Release-channel post-edit current-ready rows: ${releaseProgressReport.releaseChannelPostEditReceiptCurrentReadyCount}/${releaseProgressReport.releaseChannelPostEditReceiptRowCount}`);
 console.log(`- External gate current next command: ${releaseProgressReport.externalGateCurrentNextCommand}`);
 console.log(`- External gate current first blocker: ${releaseProgressReport.externalGateCurrentFirstBlocker}`);
 console.log(`- External gate current env edit rows: ${releaseProgressReport.externalGateCurrentEnvEditRowsCount} (${releaseProgressReport.externalGateCurrentEnvEditRowsSummary})`);
