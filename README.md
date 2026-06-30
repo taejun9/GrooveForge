@@ -733,6 +733,7 @@ npm run release:doctor
 npm run release:prepare-env-smoke
 npm run release:prepare-env
 npm run release:channel-live-check
+npm run release:channel-live-check-strict
 npm run release:post-edit-proof
 npm run release:post-edit-proof-success-smoke
 npm run release:post-edit-proof-bundle
@@ -744,6 +745,8 @@ npm run release:progress-smoke
 npm run release:current-blocker
 npm run release:current-blocker-smoke
 ```
+
+`npm run release:channel-live-check-strict` runs the same value-free current release-channel metadata check as `npm run release:channel-live-check`, but exits non-zero until all four current metadata rows are present, non-placeholder, and shape-ready. It writes separate ignored release-channel-live-check-strict Markdown/JSON artifacts without recording URL/channel values or claiming external distribution.
 
 `npm run release:post-edit-proof` runs `npm run release:channel-live-check` first and `npm run release:current-blocker` second after ignored local env edits, then writes ignored release-post-edit-proof Markdown/JSON artifacts with command order, live-check readiness, placeholder counts/locations, current blocker posture, completion percentage, current 10-plan progress, and non-claiming safety fields without recording URL/channel values.
 

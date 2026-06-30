@@ -64,6 +64,12 @@ Run the value-free release-channel live check after editing the ignored local en
 npm run release:channel-live-check
 ```
 
+Run the strict value-free release-channel live check after editing the ignored local env file when the operator needs a pass/fail command for the same four current metadata keys:
+
+```sh
+npm run release:channel-live-check-strict
+```
+
 Run the value-free post-edit proof after editing the ignored local env file when the operator wants the narrow live check and current-blocker evidence refresh in one command:
 
 ```sh
@@ -116,7 +122,7 @@ npm run release:proof-bundle
 
 `release:channel-unblock-smoke` writes an isolated synthetic env fixture under ignored build output, loads it through the shared loader using a synthetic root, proves the four release-channel metadata keys are present, non-placeholder, and shape-valid, and proves that the placeholder blocker can clear after real operator-owned edits. It records no URL values, does not read or modify the real ignored `.env.distribution.local`, and makes no external distribution claim.
 
-`release:channel-live-check` reads the real ignored `.env.distribution.local` or configured local env file through the shared loader, inspects only the four current release-channel metadata keys, and writes a value-free Markdown/JSON receipt with present, placeholder, shape-ready, current-ready, file/line, and follow-up command fields. It passes truthfully when placeholders remain by marking live-check readiness false, records no URL or channel values, does not probe remote channels, and makes no external distribution claim.
+`release:channel-live-check` reads the real ignored `.env.distribution.local` or configured local env file through the shared loader, inspects only the four current release-channel metadata keys, and writes a value-free Markdown/JSON receipt with present, placeholder, shape-ready, current-ready, file/line, and follow-up command fields. It passes truthfully when placeholders remain by marking live-check readiness false, records no URL or channel values, does not probe remote channels, and makes no external distribution claim. `release:channel-live-check-strict` runs the same check with `--strict`, writes separate value-free `release-channel-live-check-strict` Markdown/JSON artifacts, and exits non-zero until all four current metadata rows are present, non-placeholder, and shape-ready.
 
 `release:post-edit-proof` runs the value-free live check first, then `release:current-blocker`, and writes ignored `release-post-edit-proof` Markdown/JSON artifacts that record command order, live-check readiness, placeholder counts, placeholder edit locations, current blocker, current 10-plan progress, completion percentage, and non-claiming posture. It records no URL/channel values, does not probe remote channels, and makes no external distribution claim.
 

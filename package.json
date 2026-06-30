@@ -64,6 +64,7 @@
     "release:doctor": "node harness/scripts/run_release_doctor.mjs",
     "release:channel-unblock-smoke": "node harness/scripts/run_release_channel_unblock_smoke.mjs",
     "release:channel-live-check": "node harness/scripts/run_release_channel_live_check.mjs",
+    "release:channel-live-check-strict": "node harness/scripts/run_release_channel_live_check.mjs --strict",
     "release:post-edit-proof": "node harness/scripts/run_release_post_edit_proof.mjs",
     "release:post-edit-proof-success-smoke": "node harness/scripts/run_release_post_edit_proof_success_smoke.mjs",
     "release:post-edit-proof-bundle": "node harness/scripts/run_release_post_edit_proof_bundle.mjs",

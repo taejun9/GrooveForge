@@ -16,8 +16,23 @@ const bundleId = "app.grooveforge.desktop";
 const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
-const markdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-live-check.md`);
-const jsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-live-check.json`);
+const strictMode = process.argv.includes("--strict");
+const reportArtifacts = {
+  default: {
+    stem: "release-channel-live-check",
+    markdownName: "release-channel-live-check.md",
+    jsonName: "release-channel-live-check.json"
+  },
+  strict: {
+    stem: "release-channel-live-check-strict",
+    markdownName: "release-channel-live-check-strict.md",
+    jsonName: "release-channel-live-check-strict.json"
+  }
+};
+const selectedArtifact = strictMode ? reportArtifacts.strict : reportArtifacts.default;
+const reportStem = selectedArtifact.stem;
+const markdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${reportStem}.md`);
+const jsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${reportStem}.json`);
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
@@ -207,6 +222,23 @@ function buildPlaceholderEditLocations(rows) {
     }));
 }
 
+function buildStrictFailureRows(rows) {
+  return rows
+    .filter((row) => row.currentReady !== true)
+    .map((row) => ({
+      key: row.key,
+      present: row.present,
+      placeholder: row.placeholder,
+      shapeReady: row.shapeReady,
+      editTarget: row.editTarget,
+      line: row.line,
+      expectedShape: row.expectedShape,
+      proofCommand: "npm run release:channel-live-check-strict",
+      nonStrictProofCommand: "npm run release:channel-live-check",
+      valueRecorded: false
+    }));
+}
+
 function formatRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| 0 | none | none | no | no | no | no | none | none | none | none | none | no |";
@@ -215,6 +247,18 @@ function formatRows(rows) {
     .map(
       (row) =>
         `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.kind)} | ${readyLabel(row.present)} | ${readyLabel(row.placeholder)} | ${readyLabel(row.shapeReady)} | ${readyLabel(row.currentReady)} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.editTarget)} | ${escapeCell(row.line ?? "none")} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.rerunCommand)}\` | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
+function formatStrictFailureRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | yes | no | yes | none | none | none | none | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${escapeCell(row.key)} | ${readyLabel(row.present)} | ${readyLabel(row.placeholder)} | ${readyLabel(row.shapeReady)} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.editTarget)} | ${escapeCell(row.line ?? "none")} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.nonStrictProofCommand)}\` | ${readyLabel(row.valueRecorded)} |`
     )
     .join("\n");
 }
@@ -236,6 +280,10 @@ function buildMarkdown(report) {
 
 ## Summary
 
+- Strict mode: ${readyLabel(report.strictMode)}
+- Strict ready: ${readyLabel(report.strictReady)}
+- Strict exit code: ${report.strictExitCode}
+- Strict failure rows: ${report.strictFailureRowCount}
 - Live check ready: ${readyLabel(report.releaseChannelLiveCheckReady)}
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current required keys: ${report.currentRequiredKeyCount}
@@ -258,6 +306,12 @@ function buildMarkdown(report) {
 | order | key | kind | present | placeholder | shape ready | current ready | expected shape | edit target | line | proof command | rerun command | value recorded |
 |---:|---|---|---:|---:|---:|---:|---|---|---:|---|---|---:|
 ${formatRows(report.releaseChannelLiveCheckRows)}
+
+## Strict Failure Rows
+
+| key | present | placeholder | shape ready | expected shape | edit target | line | strict command | non-strict command | value recorded |
+|---|---:|---:|---:|---|---|---:|---|---|---:|
+${formatStrictFailureRows(report.strictFailureRows)}
 
 ## Current Placeholder Edit Locations
 
@@ -309,7 +363,10 @@ async function main() {
       platform: process.platform,
       arch: process.arch,
       platformArch,
-      reportCommand: "npm run release:channel-live-check",
+      strictMode,
+      reportCommand: strictMode ? "npm run release:channel-live-check-strict" : "npm run release:channel-live-check",
+      releaseChannelLiveCheckMarkdownArtifactName: selectedArtifact.markdownName,
+      releaseChannelLiveCheckJsonArtifactName: selectedArtifact.jsonName,
       releaseChannelLiveCheckMarkdownPath: relative(markdownPath),
       releaseChannelLiveCheckJsonPath: relative(jsonPath),
       releaseChannelLiveCheckReady: currentReadyCount === rows.length && rows.every((row) => row.valueRecorded === false),
@@ -338,6 +395,18 @@ async function main() {
       currentPlaceholderEditLocationSummary:
         currentPlaceholderEditLocations.length > 0 ? `${currentPlaceholderEditLocations.length} current placeholder edit locations` : "none",
       currentPlaceholderEditLocations,
+      strictReady: currentReadyCount === rows.length && rows.every((row) => row.valueRecorded === false),
+      strictExitCode: currentReadyCount === rows.length && rows.every((row) => row.valueRecorded === false) ? 0 : 1,
+      strictFailureRowCount: buildStrictFailureRows(rows).length,
+      strictFailureRows: buildStrictFailureRows(rows),
+      strictFailureSummary:
+        currentReadyCount === rows.length
+          ? "all current release-channel metadata rows are strict-ready"
+          : `${rows.length - currentReadyCount} current release-channel metadata rows are not strict-ready`,
+      strictFailureReason:
+        currentReadyCount === rows.length
+          ? "none"
+          : "strict mode requires all four current release-channel metadata rows to be present, non-placeholder, and shape-ready",
       currentReadyKeyCount: currentReadyCount,
       currentReadyKeys: rows.filter((row) => row.currentReady === true).map((row) => row.key),
       doctorCommand: "npm run release:doctor",
@@ -364,9 +433,23 @@ async function main() {
     check(rows.every((row) => row.proofCommand === "npm run release:channel-live-check"), "release-channel live check rows should point at the live check command");
     check(rows.every((row) => row.rerunCommand === "npm run release:doctor"), "release-channel live check rows should rerun release doctor after edits");
     check(report.currentRequiredKeyCount === releaseChannelMetadataKeys.length, "release-channel live check should list four current required keys");
+    check(report.releaseChannelLiveCheckMarkdownArtifactName === selectedArtifact.markdownName, "release-channel live check Markdown artifact name should match mode");
+    check(report.releaseChannelLiveCheckJsonArtifactName === selectedArtifact.jsonName, "release-channel live check JSON artifact name should match mode");
     check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release-channel live check placeholder count should match keys");
     check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderEditLocations.length, "release-channel live check placeholder edit location count should match rows");
     check(report.currentPlaceholderEditLocations.every((row) => row.valueRecorded === false), "release-channel live check placeholder edit locations should not record values");
+    check(report.strictReady === report.releaseChannelLiveCheckReady, "release-channel strict readiness should mirror live-check readiness");
+    check(report.strictExitCode === (report.strictReady ? 0 : 1), "release-channel strict exit code should match strict readiness");
+    check(report.strictFailureRowCount === report.strictFailureRows.length, "release-channel strict failure row count should match rows");
+    check(report.strictFailureRows.every((row) => row.valueRecorded === false), "release-channel strict failure rows should not record values");
+    check(
+      report.strictFailureRows.every((row) => row.proofCommand === "npm run release:channel-live-check-strict"),
+      "release-channel strict failure rows should point at the strict command"
+    );
+    check(
+      report.strictFailureRows.every((row) => row.nonStrictProofCommand === "npm run release:channel-live-check"),
+      "release-channel strict failure rows should point at the non-strict evidence command"
+    );
     check(report.localEnvValueRecorded === false, "release-channel live check should not record local env values");
     check(report.privateValuesRecorded === false, "release-channel live check should not record private values");
     check(report.networkProbeAttempted === false, "release-channel live check should not probe the network");
@@ -383,6 +466,7 @@ async function main() {
     }
     check(!/https?:\/\//i.test(combinedOutput), "release-channel live check should not include URL values");
     check(markdown.includes("Current Metadata Rows"), "release-channel live check Markdown should include metadata rows");
+    check(markdown.includes("Strict Failure Rows"), "release-channel live check Markdown should include strict failure rows");
     check(markdown.includes("Current Placeholder Edit Locations"), "release-channel live check Markdown should include placeholder edit locations");
     check(markdown.includes("Private values recorded: no"), "release-channel live check Markdown should state value redaction");
 
@@ -394,9 +478,31 @@ async function main() {
     await writeFile(markdownPath, markdown, "utf8");
     await writeFile(jsonPath, json, "utf8");
 
-    console.log("GrooveForge release-channel live check passed.");
+    if (strictMode && !report.strictReady) {
+      console.error("GrooveForge release-channel live check strict failed.");
+      console.error(`- Markdown: ${relative(markdownPath)}`);
+      console.error(`- JSON: ${relative(jsonPath)}`);
+      console.error(`- Live check ready: ${report.releaseChannelLiveCheckReady ? "yes" : "no"}`);
+      console.error(`- Strict failure rows: ${report.strictFailureRowCount}`);
+      console.error(`- Current ready rows: ${report.releaseChannelLiveCheckCurrentReadyCount}/${report.releaseChannelLiveCheckRowCount}`);
+      console.error(`- Current placeholder keys: ${report.currentPlaceholderKeyCount}`);
+      console.error(`- Current env edit target: ${report.currentEnvEditTarget}`);
+      console.error(`- Retry after private edits: ${report.reportCommand}`);
+      console.error("- Private values recorded: no");
+      console.error("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted");
+      console.error("- Not claimed: Developer ID signing, notarization, Gatekeeper approval, auto-update, manual QA approval, app-store submission, or external distribution completion");
+      process.exit(1);
+    }
+
+    if (strictMode) {
+      console.log("GrooveForge release-channel live check strict passed.");
+    } else {
+      console.log("GrooveForge release-channel live check passed.");
+    }
     console.log(`- Markdown: ${relative(markdownPath)}`);
     console.log(`- JSON: ${relative(jsonPath)}`);
+    console.log(`- Strict mode: ${report.strictMode ? "yes" : "no"}`);
+    console.log(`- Strict ready: ${report.strictReady ? "yes" : "no"}`);
     console.log(`- Live check ready: ${report.releaseChannelLiveCheckReady ? "yes" : "no"}`);
     console.log(`- Current ready rows: ${report.releaseChannelLiveCheckCurrentReadyCount}/${report.releaseChannelLiveCheckRowCount}`);
     console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount}`);
