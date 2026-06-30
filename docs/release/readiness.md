@@ -101,6 +101,7 @@ npm run release:final-handoff
 npm run release:final-handoff-success-redaction-smoke
 npm run release:final-handoff-refresh-smoke
 npm run release:audience-completion-handoff-smoke
+npm run release:channel-edit-packet-smoke
 ```
 
 Run the value-free release-channel clearance transition smoke when the operator wants one receipt tying the synthetic strict-ready handoff path to the real current release-channel blocker and the immediate `auto-update-feed` follow-up:
@@ -167,6 +168,8 @@ npm run release:proof-bundle
 `release:channel-unblock-smoke` writes an isolated synthetic env fixture under ignored build output, loads it through the shared loader using a synthetic root, proves the four release-channel metadata keys are present, non-placeholder, and shape-valid, and proves that the placeholder blocker can clear after real operator-owned edits. It records no URL values, does not read or modify the real ignored `.env.distribution.local`, and makes no external distribution claim.
 
 `release:channel-live-check` reads the real ignored `.env.distribution.local` or configured local env file through the shared loader, inspects only the four current release-channel metadata keys, and writes a value-free Markdown/JSON receipt with present, placeholder, shape-ready, current-ready, file/line, and follow-up command fields. It passes truthfully when placeholders remain by marking live-check readiness false, records no URL or channel values, does not probe remote channels, and makes no external distribution claim. `release:channel-live-check-strict` runs the same check with `--strict`, writes separate value-free `release-channel-live-check-strict` Markdown/JSON artifacts, and exits non-zero until all four current metadata rows are present, non-placeholder, and shape-ready. `release:channel-live-check-strict-success-smoke` writes a synthetic ignored env fixture under `build/desktop/`, runs the strict check against that synthetic root with a separate `release-channel-live-check-strict-success-smoke` artifact stem, proves 4/4 current-ready rows and zero placeholders, and records no synthetic URL/channel values or real local env read/modify.
+
+`release:channel-edit-packet-smoke` refreshes `release:doctor` and `release:channel-live-check`, then writes ignored `release-channel-edit-packet-smoke` Markdown/JSON artifacts with the current ignored env edit target, release-channel edit packet mode, four metadata edit rows, required key list, placeholder key/location posture, operator command order, hard gate, completion percentage, remaining percentage, and current 10-plan progress. It handles both missing-env scaffold and placeholder-replacement states, records no URL/channel/private values, probes no network, signs nothing, submits nothing to Apple, and makes no external distribution claim.
 
 `release:post-edit-proof` runs the value-free live check first, then `release:current-blocker`, and writes ignored `release-post-edit-proof` Markdown/JSON artifacts that record command order, live-check readiness, placeholder counts, placeholder edit locations, current blocker, current 10-plan progress, completion percentage, and non-claiming posture. It records no URL/channel values, does not probe remote channels, and makes no external distribution claim.
 
