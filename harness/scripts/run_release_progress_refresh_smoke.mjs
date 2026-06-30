@@ -15,6 +15,7 @@ const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformAr
 const refreshStem = "release-progress-refresh-smoke";
 const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.json`);
 const currentBlockerJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`);
+const completionReportPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-completion-report-packet-smoke.json`);
 const freshnessJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-freshness-smoke.json`);
 const refreshMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${refreshStem}.md`);
 const refreshJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${refreshStem}.json`);
@@ -34,6 +35,12 @@ const refreshCommands = [
   },
   {
     order: 3,
+    command: "npm run release:completion-report-packet-smoke",
+    role: "refresh user-facing completion report packet",
+    valueRecorded: false
+  },
+  {
+    order: 4,
     command: "npm run release:progress-freshness-smoke",
     role: "verify refreshed artifacts match latest update-feed checkpoint",
     valueRecorded: false
@@ -114,16 +121,24 @@ function commandSummary(rows) {
   return rows.map((row) => row.command).join(" -> ");
 }
 
-function buildReport({ releaseProgress, currentBlocker, freshness }) {
+function buildReport({ releaseProgress, currentBlocker, completionReportPacket, freshness }) {
   const progressLabel = textValue(releaseProgress.currentTenPlanWindowLabel);
   const blockerLabel = textValue(currentBlocker.currentTenPlanProgressLabel);
+  const packetLabel = textValue(completionReportPacket.latestTenPlanProgressLabel);
   const freshnessLabel = textValue(freshness.latestTenPlanProgressLabel);
   const sourceArtifactRows = [
     artifactRow("Release progress report", releaseProgressJsonPath, releaseProgress.releaseProgressReportReady === true, progressLabel, "currentTenPlanWindowLabel"),
     artifactRow("Release current blocker", currentBlockerJsonPath, currentBlocker.releaseCurrentBlockerReady === true, blockerLabel, "currentTenPlanProgressLabel"),
+    artifactRow(
+      "Release completion report packet",
+      completionReportPacketJsonPath,
+      completionReportPacket.releaseCompletionReportPacketReady === true,
+      packetLabel,
+      "latestTenPlanProgressLabel"
+    ),
     artifactRow("Release progress freshness smoke", freshnessJsonPath, freshness.releaseProgressFreshnessReady === true, freshnessLabel, "latestTenPlanProgressLabel")
   ];
-  const labelsMatch = progressLabel === blockerLabel && blockerLabel === freshnessLabel;
+  const labelsMatch = progressLabel === blockerLabel && blockerLabel === packetLabel && packetLabel === freshnessLabel;
   const freshnessClean =
     freshness.releaseProgressFreshnessReady === true &&
     integerValue(freshness.freshArtifactCount) === integerValue(freshness.freshnessRowCount) &&
@@ -260,13 +275,14 @@ function validateReport(report, markdown) {
   const serialized = JSON.stringify(report);
   check(report.releaseProgressRefreshReady === true, "release progress refresh smoke should be ready");
   check(report.reportCommand === "npm run release:progress-refresh-smoke", "release progress refresh smoke should report its command");
-  check(report.refreshCommandCount === 3, "release progress refresh smoke should run three commands");
+  check(report.refreshCommandCount === 4, "release progress refresh smoke should run four commands");
   check(
-    report.refreshCommandSummary === "npm run release:progress-smoke -> npm run release:current-blocker-smoke -> npm run release:progress-freshness-smoke",
-    "release progress refresh smoke should run progress, current-blocker, then freshness"
+    report.refreshCommandSummary ===
+      "npm run release:progress-smoke -> npm run release:current-blocker-smoke -> npm run release:completion-report-packet-smoke -> npm run release:progress-freshness-smoke",
+    "release progress refresh smoke should run progress, current-blocker, completion packet, then freshness"
   );
   check(report.refreshCommandRows.every((row) => row.valueRecorded === false), "release progress refresh command rows should be value-free");
-  check(report.sourceArtifactRowCount === 3, "release progress refresh smoke should include three source artifacts");
+  check(report.sourceArtifactRowCount === 4, "release progress refresh smoke should include four source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release progress refresh source artifacts should be present, ready, and value-free");
   check(report.labelsMatch === true, "release progress refresh smoke should leave progress labels matched");
   check(report.latestTenPlanWindowStart > 0, "release progress refresh smoke should report a positive 10-plan window start");
@@ -314,8 +330,9 @@ for (const row of refreshCommands) {
 
 const releaseProgress = await readJsonRequired(releaseProgressJsonPath, "Release progress report");
 const currentBlocker = await readJsonRequired(currentBlockerJsonPath, "Release current blocker");
+const completionReportPacket = await readJsonRequired(completionReportPacketJsonPath, "Release completion report packet");
 const freshness = await readJsonRequired(freshnessJsonPath, "Release progress freshness smoke");
-const report = buildReport({ releaseProgress, currentBlocker, freshness });
+const report = buildReport({ releaseProgress, currentBlocker, completionReportPacket, freshness });
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
 
