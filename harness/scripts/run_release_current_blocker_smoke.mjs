@@ -288,6 +288,15 @@ function formatCurrentInputShapeRows(rows) {
     .join("\n");
 }
 
+function formatLocalEnvDiagnosticRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.diagnostic)} | ${escapeCell(row.status)} | ${escapeCell(row.evidence)} | ${escapeCell(row.sourceField)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatHardGateRequirementRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | no | none | 0 | none | no |";
@@ -868,6 +877,87 @@ function currentInputShapeRows({ currentRequiredKeys, releaseChannelUnblockMetad
   });
 }
 
+function localEnvInputObject(value) {
+  return value && typeof value === "object" ? value : {};
+}
+
+function currentLocalEnvDiagnosticRows({ localEnvInput, currentEnvEditTarget, currentPlaceholderKeyCount }) {
+  const input = localEnvInputObject(localEnvInput);
+  const filesChecked = stringArrayValue(input.filesChecked);
+  const presentFiles = stringArrayValue(input.presentFiles);
+  const placeholderKeys = stringArrayValue(input.placeholderKeys);
+  const unknownKeys = stringArrayValue(input.unknownKeys);
+  const malformedLines = stringArrayValue(input.malformedLines);
+  const skippedExistingKeys = stringArrayValue(input.skippedExistingKeys);
+  const loadedKeys = stringArrayValue(input.loadedKeys);
+  return [
+    {
+      order: 1,
+      diagnostic: "Local env source files checked",
+      status: filesChecked.length > 0 ? "checked" : "missing",
+      evidence: `checked: ${formatKeyList(filesChecked)}; present: ${formatKeyList(presentFiles)}`,
+      sourceField: "externalProofBundle.localEnvInput.filesChecked/presentFiles",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      diagnostic: "Current edit target present",
+      status: presentFiles.includes(currentEnvEditTarget) ? "present" : "missing",
+      evidence: currentEnvEditTarget,
+      sourceField: "externalProofBundle.localEnvInput.presentFiles/currentEnvEditTarget",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      diagnostic: "Current placeholder scope",
+      status: currentPlaceholderKeyCount === 0 ? "clear" : "blocked",
+      evidence: `${currentPlaceholderKeyCount} current release-channel placeholders; ${placeholderKeys.length} total local env placeholders`,
+      sourceField: "externalProofBundle.currentPlaceholderKeys/localEnvInput.placeholderKeys",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      diagnostic: "Unknown key scan",
+      status: unknownKeys.length === 0 ? "clean" : "needs-edit",
+      evidence: `${unknownKeys.length} unknown key names reported`,
+      sourceField: "externalProofBundle.localEnvInput.unknownKeys",
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      diagnostic: "Malformed line scan",
+      status: malformedLines.length === 0 ? "clean" : "needs-edit",
+      evidence: `${malformedLines.length} malformed line locations reported`,
+      sourceField: "externalProofBundle.localEnvInput.malformedLines",
+      valueRecorded: false
+    },
+    {
+      order: 6,
+      diagnostic: "Existing environment overrides",
+      status: skippedExistingKeys.length === 0 ? "none" : "skipped",
+      evidence: `${skippedExistingKeys.length} existing environment key names skipped`,
+      sourceField: "externalProofBundle.localEnvInput.skippedExistingKeys",
+      valueRecorded: false
+    },
+    {
+      order: 7,
+      diagnostic: "Loaded key redaction",
+      status: "redacted",
+      evidence: `${loadedKeys.length} non-placeholder key names loaded; values recorded no`,
+      sourceField: "externalProofBundle.localEnvInput.loadedKeys/valueRecorded",
+      valueRecorded: false
+    },
+    {
+      order: 8,
+      diagnostic: "Local env value recording",
+      status: input.valueRecorded === false ? "clean" : "blocked",
+      evidence: `local env values recorded ${input.valueRecorded === false ? "no" : "yes"}`,
+      sourceField: "externalProofBundle.localEnvInput.valueRecorded",
+      valueRecorded: false
+    }
+  ];
+}
+
 function currentActionAcceptanceRows({
   externalNextActions,
   releaseDoctor,
@@ -1162,6 +1252,11 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentNextCommand,
     currentRerunCommand
   });
+  const localEnvDiagnosticRows = currentLocalEnvDiagnosticRows({
+    localEnvInput: externalProofBundle.localEnvInput,
+    currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
+    currentPlaceholderKeyCount: proofPlaceholderKeys.length
+  });
   const consistencyRows = [
     {
       check: "Doctor/proof/gate/progress next command consensus",
@@ -1415,6 +1510,16 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
         ? `${inputShapeRows.length} value-free current input shape rows`
         : "none",
     currentInputShapeChecklistRows: inputShapeRows,
+    currentLocalEnvDiagnosticsReady:
+      localEnvDiagnosticRows.length === 8 &&
+      localEnvDiagnosticRows.every((row) => row.valueRecorded === false) &&
+      localEnvInputObject(externalProofBundle.localEnvInput).valueRecorded === false,
+    currentLocalEnvDiagnosticRowCount: localEnvDiagnosticRows.length,
+    currentLocalEnvDiagnosticSummary:
+      localEnvDiagnosticRows.length > 0
+        ? `${localEnvDiagnosticRows.length} value-free local env diagnostic rows`
+        : "none",
+    currentLocalEnvDiagnosticRows: localEnvDiagnosticRows,
     currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
     currentRequiredKeyCount: integerValue(externalProofBundle.currentRequiredKeyCount),
     currentRequiredKeys: proofRequiredKeys,
@@ -1780,6 +1885,19 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentInputShapeChecklistRows.some((row) => row.key === "GROOVEFORGE_DISTRIBUTION_CHANNEL" && /allowed channel token/i.test(row.expectedShape)), "release current blocker input shape checklist should include allowed channel token shape");
   check(report.currentInputShapeChecklistRows.filter((row) => /safe HTTPS URL shape/i.test(row.expectedShape)).length === 3, "release current blocker input shape checklist should include three safe HTTPS URL shapes");
   check(report.currentInputShapeChecklistRows.every((row) => /allowed channel token|safe HTTPS URL shape/i.test(row.evidenceSource)), "release current blocker input shape checklist should mirror unblock shape evidence");
+  check(report.currentLocalEnvDiagnosticsReady === true, "release current blocker local env diagnostics should be ready");
+  check(report.currentLocalEnvDiagnosticRowCount === report.currentLocalEnvDiagnosticRows.length, "release current blocker local env diagnostic row count should match rows");
+  check(report.currentLocalEnvDiagnosticRowCount === 8, "release current blocker local env diagnostics should include eight rows");
+  check(typeof report.currentLocalEnvDiagnosticSummary === "string" && report.currentLocalEnvDiagnosticSummary.length > 0, "release current blocker should include local env diagnostic summary");
+  check(report.currentLocalEnvDiagnosticRows.every((row) => row.valueRecorded === false), "release current blocker local env diagnostic rows should not record values");
+  check(report.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Local env source files checked" && row.status === "checked"), "release current blocker local env diagnostics should include checked files");
+  check(report.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Current edit target present" && row.evidence === report.currentEnvEditTarget), "release current blocker local env diagnostics should include current edit target presence");
+  check(report.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Current placeholder scope" && row.evidence.includes("current release-channel placeholders")), "release current blocker local env diagnostics should include current placeholder scope");
+  check(report.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Unknown key scan" && row.evidence.includes("unknown key names reported")), "release current blocker local env diagnostics should include unknown key scan");
+  check(report.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Malformed line scan" && row.evidence.includes("malformed line locations reported")), "release current blocker local env diagnostics should include malformed line scan");
+  check(report.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Existing environment overrides" && row.evidence.includes("existing environment key names skipped")), "release current blocker local env diagnostics should include skipped existing env scan");
+  check(report.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Loaded key redaction" && row.evidence.includes("values recorded no")), "release current blocker local env diagnostics should include loaded key redaction");
+  check(report.currentLocalEnvDiagnosticRows.some((row) => row.diagnostic === "Local env value recording" && row.evidence.includes("values recorded no")), "release current blocker local env diagnostics should include local env value recording posture");
   check(report.currentRequiredKeyCount === report.currentRequiredKeys.length, "release current blocker required key count should match keys");
   check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release current blocker placeholder key count should match keys");
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderEditLocations.length, "release current blocker placeholder edit location count should match locations");
@@ -1961,6 +2079,8 @@ function buildMarkdown(report) {
     `- Private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})`,
     `- Current input shape checklist ready: ${report.currentInputShapeChecklistReady ? "yes" : "no"}`,
     `- Current input shape checklist rows: ${report.currentInputShapeChecklistRowCount} (${report.currentInputShapeChecklistSummary})`,
+    `- Local env diagnostics ready: ${report.currentLocalEnvDiagnosticsReady ? "yes" : "no"}`,
+    `- Local env diagnostic rows: ${report.currentLocalEnvDiagnosticRowCount} (${report.currentLocalEnvDiagnosticSummary})`,
     `- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`,
     `- Remaining completion: ${Number(report.userFacingRemainingPercent).toFixed(6)}%`,
     `- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`,
@@ -2194,6 +2314,15 @@ function buildMarkdown(report) {
     "|---:|---|---:|---|---|---|---:|",
     formatCurrentInputShapeRows(report.currentInputShapeChecklistRows),
     "",
+    "## Local Env Loader Diagnostics",
+    "",
+    `- Diagnostics ready: ${report.currentLocalEnvDiagnosticsReady ? "yes" : "no"}`,
+    `- Diagnostic rows: ${report.currentLocalEnvDiagnosticRowCount} (${report.currentLocalEnvDiagnosticSummary})`,
+    "",
+    "| order | diagnostic | status | evidence | source field | value recorded |",
+    "|---:|---|---|---|---|---:|",
+    formatLocalEnvDiagnosticRows(report.currentLocalEnvDiagnosticRows),
+    "",
     "## Placeholder Edit Locations",
     "",
     "| location | key | placeholder | value recorded |",
@@ -2307,6 +2436,8 @@ check(markdown.includes("Private Edit Safety Checklist"), "release current block
 check(markdown.includes("Private edit safety ready:"), "release current blocker Markdown should include private edit safety readiness");
 check(markdown.includes("Current Input Shape Checklist"), "release current blocker Markdown should include input shape checklist");
 check(markdown.includes("Current input shape checklist ready:"), "release current blocker Markdown should include input shape checklist readiness");
+check(markdown.includes("Local Env Loader Diagnostics"), "release current blocker Markdown should include local env loader diagnostics");
+check(markdown.includes("Local env diagnostics ready:"), "release current blocker Markdown should include local env diagnostics readiness");
 
 if (failures.length > 0) {
   fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
@@ -2362,6 +2493,8 @@ console.log(`- Private edit safety ready: ${report.currentPrivateEditSafetyReady
 console.log(`- Private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})`);
 console.log(`- Current input shape checklist ready: ${report.currentInputShapeChecklistReady ? "yes" : "no"}`);
 console.log(`- Current input shape checklist rows: ${report.currentInputShapeChecklistRowCount} (${report.currentInputShapeChecklistSummary})`);
+console.log(`- Local env diagnostics ready: ${report.currentLocalEnvDiagnosticsReady ? "yes" : "no"}`);
+console.log(`- Local env diagnostic rows: ${report.currentLocalEnvDiagnosticRowCount} (${report.currentLocalEnvDiagnosticSummary})`);
 console.log(`- Overall completion: ${Number(report.userFacingCompletionPercent).toFixed(6)}%`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
 console.log(`- Current 10-plan rows: ${report.currentTenPlanWindowRowCount} (${report.currentTenPlanWindowRowSummary})`);
