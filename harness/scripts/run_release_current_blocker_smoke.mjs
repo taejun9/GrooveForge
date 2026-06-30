@@ -423,6 +423,15 @@ function formatCurrentActionAcceptanceBlockerRows(rows) {
     .join("\n");
 }
 
+function formatCurrentActionAcceptanceRemediationRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.criterion)} | ${escapeCell(row.operatorFix)} | ${escapeCell(row.evidenceToCheck)} | ${escapeCell(row.expectedReadySignal)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.rerunCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatCurrentActionPostEditVerificationRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | no | none | none | none | none | none | none | no |";
@@ -679,7 +688,61 @@ function currentActionAcceptanceBlockerRows({
         rerunCommand: currentRerunCommand,
         valueRecorded: false
       };
-  });
+    });
+}
+
+function currentActionAcceptanceRemediationRows({
+  acceptanceRows,
+  blockerRows,
+  postEditVerificationRows,
+  currentInputShapeChecklistRows,
+  currentLocalEnvDiagnosticRows,
+  currentNextCommand,
+  currentRerunCommand,
+  hardGateCommand
+}) {
+  const blockerByCriterion = new Map(valueFreeObjectRows(blockerRows).map((row) => [textValue(row.criterion), row]));
+  const verificationByCriterion = new Map(valueFreeObjectRows(postEditVerificationRows).map((row) => [textValue(row.criterion), row]));
+  const shapeSummary = valueFreeObjectRows(currentInputShapeChecklistRows)
+    .map((row) => `${textValue(row.key)}: ${textValue(row.expectedShape)}`)
+    .join("; ");
+  const diagnosticSummary = valueFreeObjectRows(currentLocalEnvDiagnosticRows)
+    .map((row) => `${textValue(row.diagnostic)} ${textValue(row.status)}`)
+    .join("; ");
+
+  return valueFreeObjectRows(acceptanceRows)
+    .filter((row) => row.ready !== true)
+    .map((row, index) => {
+      const criterion = textValue(row.criterion);
+      const blocker = blockerByCriterion.get(criterion) ?? {};
+      const verification = verificationByCriterion.get(criterion) ?? {};
+      const lower = criterion.toLowerCase();
+      let operatorFix = textValue(blocker.operatorAction, `Rerun ${currentRerunCommand} after resolving this criterion.`);
+      let evidenceToCheck = textValue(blocker.sourceField, "currentActionAcceptanceRows");
+
+      if (lower.includes("without placeholder values")) {
+        evidenceToCheck = `${textValue(blocker.sourceField, "currentPlaceholderKeys")}; input shape checklist: ${shapeSummary || "shape evidence pending"}`;
+      } else if (lower.includes("private-inputs") || lower.includes("private inputs")) {
+        evidenceToCheck = `${textValue(blocker.sourceField, "privateInputsReady")}; local env diagnostics: ${diagnosticSummary || "diagnostic evidence pending"}`;
+      } else if (lower.includes("distribution-channel qa")) {
+        operatorFix = "Run npm run desktop:distribution-channel-qa-smoke after release doctor reports channel metadata ready.";
+        evidenceToCheck = textValue(blocker.sourceField, "distributionChannelQaReady/channelMetadataReady");
+      }
+
+      return {
+        order: index + 1,
+        criterion,
+        currentReady: row.ready === true,
+        operatorFix,
+        evidenceToCheck,
+        expectedReadySignal: textValue(verification.expectedSignal, "criterion ready yes without recording private values"),
+        sourceField: textValue(blocker.sourceField, "currentActionAcceptanceRows"),
+        proofCommand: currentNextCommand,
+        rerunCommand: currentRerunCommand,
+        hardGateCommand,
+        valueRecorded: false
+      };
+    });
 }
 
 function currentActionPostEditVerificationRows({ acceptanceRows, currentNextCommand, currentRerunCommand, hardGateCommand }) {
@@ -1257,6 +1320,16 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentEnvEditTarget: textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local"),
     currentPlaceholderKeyCount: proofPlaceholderKeys.length
   });
+  const acceptanceRemediationRows = currentActionAcceptanceRemediationRows({
+    acceptanceRows,
+    blockerRows: acceptanceBlockerRows,
+    postEditVerificationRows,
+    currentInputShapeChecklistRows: inputShapeRows,
+    currentLocalEnvDiagnosticRows: localEnvDiagnosticRows,
+    currentNextCommand,
+    currentRerunCommand,
+    hardGateCommand
+  });
   const consistencyRows = [
     {
       check: "Doctor/proof/gate/progress next command consensus",
@@ -1470,6 +1543,15 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentActionAcceptanceBlockerRows: acceptanceBlockerRows,
     currentActionAcceptanceBlockersMatchAcceptance:
       acceptanceBlockerRows.length === acceptanceRows.filter((row) => row.ready !== true).length,
+    currentActionAcceptanceRemediationReady:
+      acceptanceRemediationRows.length === acceptanceRows.filter((row) => row.ready !== true).length &&
+      acceptanceRemediationRows.every((row) => row.valueRecorded === false && row.proofCommand === currentNextCommand && row.rerunCommand === currentRerunCommand && row.hardGateCommand === hardGateCommand),
+    currentActionAcceptanceRemediationRowCount: acceptanceRemediationRows.length,
+    currentActionAcceptanceRemediationSummary:
+      acceptanceRemediationRows.length > 0
+        ? `${acceptanceRemediationRows.length} value-free current action acceptance remediation rows`
+        : "none",
+    currentActionAcceptanceRemediationRows: acceptanceRemediationRows,
     currentActionPostEditVerificationReady:
       postEditVerificationRows.length === acceptanceRows.length &&
       postEditVerificationRows.every((row) => row.valueRecorded === false) &&
@@ -1831,6 +1913,20 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
     check(report.currentActionAcceptanceBlockerRows.some((row) => row.sourceField.includes("distributionChannelQaReady")), "release current blocker current action acceptance blockers should include distribution-channel QA source fields while channel QA is blocked");
   }
   check(report.currentActionAcceptanceBlockersMatchAcceptance === true, "release current blocker should prove current action acceptance blockers match failing acceptance criteria");
+  check(report.currentActionAcceptanceRemediationReady === true, "release current blocker current action acceptance remediation should be ready");
+  check(report.currentActionAcceptanceRemediationRowCount === report.currentActionAcceptanceRemediationRows.length, "release current blocker current action acceptance remediation row count should match rows");
+  check(report.currentActionAcceptanceRemediationRowCount === report.currentActionAcceptanceBlockerCount, "release current blocker current action acceptance remediation rows should mirror acceptance blockers");
+  check(typeof report.currentActionAcceptanceRemediationSummary === "string" && report.currentActionAcceptanceRemediationSummary.length > 0, "release current blocker should include current action acceptance remediation summary");
+  check(report.currentActionAcceptanceRemediationRows.every((row) => row.valueRecorded === false), "release current blocker current action acceptance remediation rows should not record values");
+  check(report.currentActionAcceptanceRemediationRows.every((row) => row.proofCommand === report.currentNextCommand), "release current blocker current action acceptance remediation proof commands should match current next command");
+  check(report.currentActionAcceptanceRemediationRows.every((row) => row.rerunCommand === report.currentRerunCommand), "release current blocker current action acceptance remediation rerun commands should match current rerun command");
+  check(report.currentActionAcceptanceRemediationRows.every((row) => row.hardGateCommand === report.hardGateCommand), "release current blocker current action acceptance remediation hard-gate commands should match hard gate command");
+  check(report.currentActionAcceptanceRemediationRows.every((row) => typeof row.operatorFix === "string" && row.operatorFix.length > 0), "release current blocker current action acceptance remediation rows should include operator fixes");
+  check(report.currentActionAcceptanceRemediationRows.every((row) => typeof row.evidenceToCheck === "string" && row.evidenceToCheck.length > 0), "release current blocker current action acceptance remediation rows should include evidence to check");
+  check(report.currentActionAcceptanceRemediationRows.every((row) => typeof row.expectedReadySignal === "string" && row.expectedReadySignal.length > 0), "release current blocker current action acceptance remediation rows should include expected ready signals");
+  check(report.currentActionAcceptanceRemediationRows.some((row) => /input shape checklist/i.test(row.evidenceToCheck)), "release current blocker current action acceptance remediation should reference input shape checklist");
+  check(report.currentActionAcceptanceRemediationRows.some((row) => /local env diagnostics/i.test(row.evidenceToCheck)), "release current blocker current action acceptance remediation should reference local env diagnostics");
+  check(report.currentActionAcceptanceRemediationRows.some((row) => /distribution-channel-qa/i.test(row.operatorFix)), "release current blocker current action acceptance remediation should include distribution-channel QA rerun");
   check(report.currentActionPostEditVerificationReady === true, "release current blocker current action post-edit verification should be ready");
   check(report.currentActionPostEditVerificationRowCount === report.currentActionPostEditVerificationRows.length, "release current blocker current action post-edit verification row count should match rows");
   check(report.currentActionPostEditVerificationRowCount === report.currentActionAcceptanceRowCount, "release current blocker current action post-edit verification rows should mirror acceptance rows");
@@ -2070,6 +2166,8 @@ function buildMarkdown(report) {
     `- Current action acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})`,
     `- Current action acceptance blockers: ${report.currentActionAcceptanceBlockerCount} (${report.currentActionAcceptanceBlockerSummary})`,
     `- Current action acceptance aligned: ${report.currentActionAcceptanceMatchesCurrentAction ? "yes" : "no"}`,
+    `- Current action acceptance remediation ready: ${report.currentActionAcceptanceRemediationReady ? "yes" : "no"}`,
+    `- Current action acceptance remediation rows: ${report.currentActionAcceptanceRemediationRowCount} (${report.currentActionAcceptanceRemediationSummary})`,
     `- Current action post-edit verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`,
     `- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`,
     `- Current action post-edit signals currently ready: ${report.currentActionPostEditVerificationCurrentSummary}`,
@@ -2275,6 +2373,15 @@ function buildMarkdown(report) {
     "|---:|---|---|---|---|---|---:|",
     formatCurrentActionAcceptanceBlockerRows(report.currentActionAcceptanceBlockerRows),
     "",
+    "## Current Action Acceptance Remediation",
+    "",
+    `- Remediation ready: ${report.currentActionAcceptanceRemediationReady ? "yes" : "no"}`,
+    `- Remediation rows: ${report.currentActionAcceptanceRemediationRowCount} (${report.currentActionAcceptanceRemediationSummary})`,
+    "",
+    "| order | criterion | operator fix | evidence to check | expected ready signal | proof command | rerun command | value recorded |",
+    "|---:|---|---|---|---|---|---|---:|",
+    formatCurrentActionAcceptanceRemediationRows(report.currentActionAcceptanceRemediationRows),
+    "",
     "## Current Action Post-Edit Verification",
     "",
     `- Verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`,
@@ -2428,6 +2535,8 @@ check(markdown.includes("Current Action Acceptance"), "release current blocker M
 check(markdown.includes("Current action acceptance aligned:"), "release current blocker Markdown should include current action acceptance alignment");
 check(markdown.includes("Current Action Acceptance Blockers"), "release current blocker Markdown should include current action acceptance blockers");
 check(markdown.includes("Blockers match acceptance:"), "release current blocker Markdown should include current action acceptance blocker alignment");
+check(markdown.includes("Current Action Acceptance Remediation"), "release current blocker Markdown should include current action acceptance remediation");
+check(markdown.includes("Current action acceptance remediation ready:"), "release current blocker Markdown should include current action acceptance remediation readiness");
 check(markdown.includes("Current Action Post-Edit Verification"), "release current blocker Markdown should include current action post-edit verification");
 check(markdown.includes("Current action post-edit verification ready:"), "release current blocker Markdown should include current action post-edit verification readiness");
 check(markdown.includes("Current Action Handoff Package"), "release current blocker Markdown should include current action handoff package");
@@ -2485,6 +2594,8 @@ console.log(`- Current external completion checklist row: ${report.currentExtern
 console.log(`- Current action acceptance ready: ${report.currentActionAcceptanceReady ? "yes" : "no"}`);
 console.log(`- Current action acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})`);
 console.log(`- Current action acceptance blockers: ${report.currentActionAcceptanceBlockerCount} (${report.currentActionAcceptanceBlockerSummary})`);
+console.log(`- Current action acceptance remediation ready: ${report.currentActionAcceptanceRemediationReady ? "yes" : "no"}`);
+console.log(`- Current action acceptance remediation rows: ${report.currentActionAcceptanceRemediationRowCount} (${report.currentActionAcceptanceRemediationSummary})`);
 console.log(`- Current action post-edit verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`);
 console.log(`- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`);
 console.log(`- Current action handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`);
