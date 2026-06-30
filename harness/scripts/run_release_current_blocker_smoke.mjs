@@ -450,6 +450,15 @@ function formatCurrentCommandAcceptanceLadderRows(rows) {
     .join("\n");
 }
 
+function formatCurrentCommandSourceArtifactRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no | 0 | none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.artifactPath)} | ${row.present ? "yes" : "no"} | ${row.commandCount ?? 0} | ${escapeCell(row.consumingCommands)} | ${escapeCell(row.evidenceLabels)} | ${escapeCell(row.acceptanceSignals)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.rerunCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatCurrentActionPostEditVerificationRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | no | none | none | none | none | none | none | no |";
@@ -870,6 +879,69 @@ function currentCommandAcceptanceLadderRows({
       proofCommand: currentNextCommand,
       rerunCommand: currentRerunCommand,
       hardGateCommand,
+      valueRecorded: false
+    };
+  });
+}
+
+function currentCommandSourceArtifactRows({
+  currentCommandVerificationRows,
+  commandAcceptanceLadderRows,
+  currentNextCommand,
+  currentRerunCommand,
+  hardGateCommand
+}) {
+  const acceptanceSignalByCommand = new Map(
+    valueFreeObjectRows(commandAcceptanceLadderRows).map((row) => [textValue(row.command), textValue(row.acceptanceSignal)])
+  );
+  const artifactsByPath = new Map();
+
+  for (const row of valueFreeObjectRows(currentCommandVerificationRows)) {
+    const command = textValue(row.command);
+    const role = textValue(row.role);
+    const evidencePaths = stringArrayValue(row.evidencePaths);
+    const evidenceLabels = stringArrayValue(row.evidenceLabels);
+
+    for (const [index, artifactPath] of evidencePaths.entries()) {
+      const artifact = artifactsByPath.get(artifactPath) ?? {
+        artifactPath,
+        present: existsSync(path.join(root, artifactPath)),
+        consumingCommands: [],
+        consumingRoles: [],
+        evidenceLabels: [],
+        acceptanceSignals: [],
+        sourceField: "externalProofBundle.currentCommandVerificationRows/currentCommandAcceptanceLadderRows",
+        proofCommand: currentNextCommand,
+        rerunCommand: currentRerunCommand,
+        hardGateCommand,
+        valueRecorded: false
+      };
+
+      artifact.consumingCommands.push(command);
+      artifact.consumingRoles.push(role);
+      artifact.evidenceLabels.push(textValue(evidenceLabels[index], textValue(row.evidenceSummary)));
+      artifact.acceptanceSignals.push(
+        textValue(acceptanceSignalByCommand.get(command), "value-free command evidence refreshed without private values")
+      );
+      artifactsByPath.set(artifactPath, artifact);
+    }
+  }
+
+  return Array.from(artifactsByPath.values()).map((artifact, index) => {
+    const consumingCommands = Array.from(new Set(artifact.consumingCommands));
+    return {
+      order: index + 1,
+      artifactPath: artifact.artifactPath,
+      present: artifact.present === true,
+      commandCount: consumingCommands.length,
+      consumingCommands: consumingCommands.join("; "),
+      consumingRoles: Array.from(new Set(artifact.consumingRoles)).join("; "),
+      evidenceLabels: Array.from(new Set(artifact.evidenceLabels)).join("; "),
+      acceptanceSignals: Array.from(new Set(artifact.acceptanceSignals)).join("; "),
+      sourceField: artifact.sourceField,
+      proofCommand: artifact.proofCommand,
+      rerunCommand: artifact.rerunCommand,
+      hardGateCommand: artifact.hardGateCommand,
       valueRecorded: false
     };
   });
@@ -1476,6 +1548,13 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentRerunCommand,
     hardGateCommand
   });
+  const commandSourceArtifactRows = currentCommandSourceArtifactRows({
+    currentCommandVerificationRows: commandVerificationRows,
+    commandAcceptanceLadderRows,
+    currentNextCommand,
+    currentRerunCommand,
+    hardGateCommand
+  });
   const consistencyRows = [
     {
       check: "Doctor/proof/gate/progress next command consensus",
@@ -1717,6 +1796,22 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
         ? `${commandAcceptanceLadderRows.length} value-free command acceptance ladder rows`
         : "none",
     currentCommandAcceptanceLadderRows: commandAcceptanceLadderRows,
+    currentCommandSourceArtifactMatrixReady:
+      commandSourceArtifactRows.length > 0 &&
+      commandSourceArtifactRows.every(
+        (row) =>
+          row.valueRecorded === false &&
+          row.present === true &&
+          row.proofCommand === currentNextCommand &&
+          row.rerunCommand === currentRerunCommand &&
+          row.hardGateCommand === hardGateCommand
+      ),
+    currentCommandSourceArtifactMatrixRowCount: commandSourceArtifactRows.length,
+    currentCommandSourceArtifactMatrixSummary:
+      commandSourceArtifactRows.length > 0
+        ? `${commandSourceArtifactRows.length} value-free command source artifact rows`
+        : "none",
+    currentCommandSourceArtifactMatrixRows: commandSourceArtifactRows,
     currentActionPostEditVerificationReady:
       postEditVerificationRows.length === acceptanceRows.length &&
       postEditVerificationRows.every((row) => row.valueRecorded === false) &&
@@ -2125,6 +2220,21 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentCommandAcceptanceLadderRows.some((row) => /current action acceptance ready yes/i.test(row.acceptanceSignal)), "release current blocker current command acceptance ladder should include current action acceptance ready signal");
   check(report.currentCommandAcceptanceLadderRows.some((row) => row.command === "npm run release:doctor" && row.role === "proof"), "release current blocker current command acceptance ladder should include release doctor proof row");
   check(report.currentCommandAcceptanceLadderRows.some((row) => row.command === "npm run release:current-blocker" && row.role === "rerun"), "release current blocker current command acceptance ladder should include current-blocker rerun row");
+  check(report.currentCommandSourceArtifactMatrixReady === true, "release current blocker current command source artifact matrix should be ready");
+  check(report.currentCommandSourceArtifactMatrixRowCount === report.currentCommandSourceArtifactMatrixRows.length, "release current blocker current command source artifact matrix row count should match rows");
+  check(report.currentCommandSourceArtifactMatrixRowCount > 0, "release current blocker current command source artifact matrix should include source artifact rows");
+  check(typeof report.currentCommandSourceArtifactMatrixSummary === "string" && report.currentCommandSourceArtifactMatrixSummary.length > 0, "release current blocker should include current command source artifact matrix summary");
+  check(report.currentCommandSourceArtifactMatrixRows.every((row) => row.valueRecorded === false), "release current blocker current command source artifact matrix rows should not record values");
+  check(report.currentCommandSourceArtifactMatrixRows.every((row) => row.present === true), "release current blocker current command source artifact matrix rows should point at present artifacts");
+  check(report.currentCommandSourceArtifactMatrixRows.every((row) => row.proofCommand === report.currentNextCommand), "release current blocker current command source artifact matrix proof commands should match current next command");
+  check(report.currentCommandSourceArtifactMatrixRows.every((row) => row.rerunCommand === report.currentRerunCommand), "release current blocker current command source artifact matrix rerun commands should match current rerun command");
+  check(report.currentCommandSourceArtifactMatrixRows.every((row) => row.hardGateCommand === report.hardGateCommand), "release current blocker current command source artifact matrix hard-gate commands should match hard gate command");
+  check(report.currentCommandSourceArtifactMatrixRows.every((row) => typeof row.artifactPath === "string" && row.artifactPath.includes("build/desktop/")), "release current blocker current command source artifact matrix should include artifact paths");
+  check(report.currentCommandSourceArtifactMatrixRows.every((row) => typeof row.consumingCommands === "string" && row.consumingCommands.includes("npm run")), "release current blocker current command source artifact matrix should include consuming commands");
+  check(report.currentCommandSourceArtifactMatrixRows.some((row) => /distribution-private-inputs\.json/i.test(row.artifactPath)), "release current blocker current command source artifact matrix should include private-input artifact");
+  check(report.currentCommandSourceArtifactMatrixRows.some((row) => /distribution-channel-qa\.json/i.test(row.artifactPath)), "release current blocker current command source artifact matrix should include distribution-channel QA artifact");
+  check(report.currentCommandSourceArtifactMatrixRows.some((row) => /private inputs ready yes/i.test(row.acceptanceSignals)), "release current blocker current command source artifact matrix should include private-input acceptance signal");
+  check(report.currentCommandSourceArtifactMatrixRows.some((row) => /distribution-channel QA ready yes/i.test(row.acceptanceSignals)), "release current blocker current command source artifact matrix should include distribution-channel QA signal");
   check(report.currentActionPostEditVerificationReady === true, "release current blocker current action post-edit verification should be ready");
   check(report.currentActionPostEditVerificationRowCount === report.currentActionPostEditVerificationRows.length, "release current blocker current action post-edit verification row count should match rows");
   check(report.currentActionPostEditVerificationRowCount === report.currentActionAcceptanceRowCount, "release current blocker current action post-edit verification rows should mirror acceptance rows");
@@ -2370,6 +2480,8 @@ function buildMarkdown(report) {
     `- Release-channel key remediation rows: ${report.currentReleaseChannelKeyRemediationRowCount} (${report.currentReleaseChannelKeyRemediationSummary})`,
     `- Current command acceptance ladder ready: ${report.currentCommandAcceptanceLadderReady ? "yes" : "no"}`,
     `- Current command acceptance ladder rows: ${report.currentCommandAcceptanceLadderRowCount} (${report.currentCommandAcceptanceLadderSummary})`,
+    `- Current command source artifact matrix ready: ${report.currentCommandSourceArtifactMatrixReady ? "yes" : "no"}`,
+    `- Current command source artifact matrix rows: ${report.currentCommandSourceArtifactMatrixRowCount} (${report.currentCommandSourceArtifactMatrixSummary})`,
     `- Current action post-edit verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`,
     `- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`,
     `- Current action post-edit signals currently ready: ${report.currentActionPostEditVerificationCurrentSummary}`,
@@ -2602,6 +2714,15 @@ function buildMarkdown(report) {
     "|---:|---|---|---|---|---|---|---|---|---:|",
     formatCurrentCommandAcceptanceLadderRows(report.currentCommandAcceptanceLadderRows),
     "",
+    "## Current Command Source Artifact Matrix",
+    "",
+    `- Source artifact matrix ready: ${report.currentCommandSourceArtifactMatrixReady ? "yes" : "no"}`,
+    `- Source artifact matrix rows: ${report.currentCommandSourceArtifactMatrixRowCount} (${report.currentCommandSourceArtifactMatrixSummary})`,
+    "",
+    "| order | artifact path | present | commands | consuming commands | evidence labels | acceptance signals | proof command | rerun command | value recorded |",
+    "|---:|---|---:|---:|---|---|---|---|---|---:|",
+    formatCurrentCommandSourceArtifactRows(report.currentCommandSourceArtifactMatrixRows),
+    "",
     "## Current Action Post-Edit Verification",
     "",
     `- Verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`,
@@ -2761,6 +2882,8 @@ check(markdown.includes("Current Release-Channel Key Remediation Matrix"), "rele
 check(markdown.includes("Release-channel key remediation ready:"), "release current blocker Markdown should include release-channel key remediation readiness");
 check(markdown.includes("Current Command Acceptance Ladder"), "release current blocker Markdown should include current command acceptance ladder");
 check(markdown.includes("Current command acceptance ladder ready:"), "release current blocker Markdown should include current command acceptance ladder readiness");
+check(markdown.includes("Current Command Source Artifact Matrix"), "release current blocker Markdown should include current command source artifact matrix");
+check(markdown.includes("Current command source artifact matrix ready:"), "release current blocker Markdown should include current command source artifact matrix readiness");
 check(markdown.includes("Current Action Post-Edit Verification"), "release current blocker Markdown should include current action post-edit verification");
 check(markdown.includes("Current action post-edit verification ready:"), "release current blocker Markdown should include current action post-edit verification readiness");
 check(markdown.includes("Current Action Handoff Package"), "release current blocker Markdown should include current action handoff package");
@@ -2824,6 +2947,8 @@ console.log(`- Release-channel key remediation ready: ${report.currentReleaseCha
 console.log(`- Release-channel key remediation rows: ${report.currentReleaseChannelKeyRemediationRowCount} (${report.currentReleaseChannelKeyRemediationSummary})`);
 console.log(`- Current command acceptance ladder ready: ${report.currentCommandAcceptanceLadderReady ? "yes" : "no"}`);
 console.log(`- Current command acceptance ladder rows: ${report.currentCommandAcceptanceLadderRowCount} (${report.currentCommandAcceptanceLadderSummary})`);
+console.log(`- Current command source artifact matrix ready: ${report.currentCommandSourceArtifactMatrixReady ? "yes" : "no"}`);
+console.log(`- Current command source artifact matrix rows: ${report.currentCommandSourceArtifactMatrixRowCount} (${report.currentCommandSourceArtifactMatrixSummary})`);
 console.log(`- Current action post-edit verification ready: ${report.currentActionPostEditVerificationReady ? "yes" : "no"}`);
 console.log(`- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})`);
 console.log(`- Current action handoff ready: ${report.currentActionHandoffReady ? "yes" : "no"}`);
