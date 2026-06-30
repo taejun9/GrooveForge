@@ -101,6 +101,7 @@ npm run release:update-feed-live-check-strict
 npm run release:update-feed-live-check-strict-success-smoke
 npm run release:update-feed-post-edit-proof
 npm run release:update-feed-post-edit-proof-success-smoke
+npm run release:update-feed-checkpoint-smoke
 npm run desktop:completion-audit-smoke
 npm run desktop:external-distribution-gate-smoke
 npm run desktop:external-remediation-smoke
@@ -129,6 +130,7 @@ npm run release:update-feed-live-check-strict
 npm run release:update-feed-live-check-strict-success-smoke
 npm run release:update-feed-post-edit-proof
 npm run release:update-feed-post-edit-proof-success-smoke
+npm run release:update-feed-checkpoint-smoke
 npm run release:current-blocker
 npm run release:current-blocker-smoke
 ```
@@ -256,6 +258,8 @@ The digest check extends the existing blocker contract that reports blockers whe
 `npm run release:update-feed-post-edit-proof` is the operator-facing wrapper after ignored update feed/channel edits. It runs the real update feed live check first and the real auto-update readiness smoke second, writes ignored `release-update-feed-post-edit-proof` Markdown/JSON artifacts, and records command rows, source artifact rows, live-check posture, strict failure rows, placeholder edit locations, real auto-update blocker rows, signed-update artifact readiness, hard-gate boundary, current 10-plan progress, completion percentage, and not-recorded/not-claimed posture. It stays outside `npm run verify` while private placeholder values remain expected.
 
 `npm run release:update-feed-post-edit-proof-success-smoke` runs the same wrapper with a separate success-smoke artifact stem, using the synthetic strict-ready update feed live-check smoke before the real auto-update readiness smoke. It proves the live-ready branch with `2/2` selected-ready feed/channel keys and zero placeholders while preserving downstream auto-update blockers, signed-update artifact boundary, hard-gate boundary, value redaction, and false auto-update/external distribution claims.
+
+`npm run release:update-feed-checkpoint-smoke` refreshes the real update feed post-edit proof first and the synthetic success-path proof second, then writes separate ignored checkpoint Markdown/JSON artifacts. The checkpoint compares real ignored-env placeholder posture with the synthetic `2/2` selected-ready branch, preserves downstream auto-update blockers and signed-update artifact boundaries, keeps `npm run release:external-check` as the would-fail hard gate, records the current 10-plan progress, and keeps feed/channel/private values plus auto-update/external distribution claims false.
 
 `npm run release:progress` and `npm run release:progress-smoke` refresh `npm run release:channel-live-check` before writing the user-facing release progress report, then mirror live-check source readiness, command, first proof after private edits, current-ready rows, placeholder keys, placeholder edit locations, follow-up proof commands, and value-redaction posture into JSON, Markdown, and console output. `npm run release:current-blocker` and `npm run release:current-blocker-smoke` mirror those same live-check receipt fields from release progress so the compact current-blocker report shows both the synthetic unblock rehearsal and the real ignored-env live-check posture without recording URL or channel values.
 
