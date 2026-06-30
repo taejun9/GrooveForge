@@ -279,7 +279,10 @@ function buildMarkdown(report) {
 
 - Completion report packet ready: ${readyLabel(report.releaseCompletionReportPacketReady)}
 - Refresh command order: ${report.refreshCommandSummary}
+- Latest completed plan: plan-${report.latestCompletedPlanNumber}
 - Latest 10-plan progress: ${report.latestTenPlanProgressLabel}
+- 10-plan report due: ${readyLabel(report.tenPlanProgressReportDue)}
+- Next 10-plan progress report at: ${report.nextTenPlanProgressReportAt}
 - Source labels match latest 10-plan: ${readyLabel(report.sourceLabelsMatchLatestTenPlan)}
 - Audience source label: ${report.audienceLatestTenPlanProgressLabel}
 - Channel edit source label: ${report.channelEditLatestTenPlanProgressLabel}
@@ -370,6 +373,16 @@ function validateReport(report, markdown) {
   check(report.latestTenPlanWindowStart > 0, "release completion report packet should report a positive 10-plan window start");
   check(report.latestTenPlanWindowEnd === report.latestTenPlanWindowStart + 9, "release completion report packet should report a 10-plan window");
   check(report.latestTenPlanTotal === 10, "release completion report packet should use ten-plan windows");
+  check(report.latestCompletedPlanNumber >= report.latestTenPlanWindowStart, "release completion report packet should report a latest completed plan inside or after the current window start");
+  check(report.latestCompletedPlanNumber <= report.latestTenPlanWindowEnd, "release completion report packet should report a latest completed plan inside the current window");
+  check(
+    report.tenPlanProgressReportDue === (report.latestTenPlanCompletedCount === report.latestTenPlanTotal),
+    "release completion report packet should derive the 10-plan report due flag from the completed count"
+  );
+  check(
+    report.nextTenPlanProgressReportAt === `plan-${report.latestTenPlanWindowEnd}`,
+    "release completion report packet should expose the next 10-plan report plan"
+  );
   check(
     report.latestTenPlanProgressLabel === `${report.latestTenPlanWindowStart}-${report.latestTenPlanWindowEnd}: ${report.latestTenPlanCompletedCount}/10`,
     "release completion report packet progress label should match latest 10-plan fields"
@@ -397,6 +410,8 @@ function validateReport(report, markdown) {
   check(!/https?:\/\//i.test(markdown), "release completion report packet Markdown should not include URL values");
   check(markdown.includes("Release Completion Report Packet Smoke"), "release completion report packet Markdown should include title");
   check(markdown.includes("Completion report packet ready: yes"), "release completion report packet Markdown should include readiness");
+  check(markdown.includes("10-plan report due:"), "release completion report packet Markdown should include the 10-plan report due flag");
+  check(markdown.includes(`Next 10-plan progress report at: ${report.nextTenPlanProgressReportAt}`), "release completion report packet Markdown should include next 10-plan report plan");
   check(markdown.includes("Source labels match latest 10-plan: yes"), "release completion report packet Markdown should include source label agreement");
   check(markdown.includes("External distribution claimed: no"), "release completion report packet Markdown should keep external distribution unclaimed");
 
@@ -425,7 +440,10 @@ console.log("GrooveForge release completion report packet smoke passed.");
 console.log(`- Markdown: ${relative(packetMarkdownPath)}`);
 console.log(`- JSON: ${relative(packetJsonPath)}`);
 console.log("- Completion report packet ready: yes");
+console.log(`- Latest completed plan: plan-${report.latestCompletedPlanNumber}`);
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
+console.log(`- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}`);
+console.log(`- Next 10-plan progress report at: ${report.nextTenPlanProgressReportAt}`);
 console.log(`- Source labels match latest 10-plan: ${report.sourceLabelsMatchLatestTenPlan ? "yes" : "no"}`);
 console.log(`- First-time composer ready: ${report.firstTimeComposerReady ? "yes" : "no"}`);
 console.log(`- Professional producer ready: ${report.professionalProducerReady ? "yes" : "no"}`);
