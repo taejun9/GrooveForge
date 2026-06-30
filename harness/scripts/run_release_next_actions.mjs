@@ -809,6 +809,329 @@ function formatCommandVerificationRowsTable(items) {
   ].join("\n");
 }
 
+function currentActionAcceptanceEvidence(criterion, { currentActionSummary = {}, releaseDoctor = null } = {}) {
+  const lower = String(criterion ?? "").toLowerCase();
+  if (lower.includes("without placeholder values")) {
+    const requiredCount = Number.isInteger(currentActionSummary.currentRequiredKeyCount)
+      ? currentActionSummary.currentRequiredKeyCount
+      : Array.isArray(currentActionSummary.currentRequiredKeys)
+        ? currentActionSummary.currentRequiredKeys.length
+        : 0;
+    const placeholderCount = Number.isInteger(currentActionSummary.currentPlaceholderKeyCount)
+      ? currentActionSummary.currentPlaceholderKeyCount
+      : Array.isArray(currentActionSummary.currentPlaceholderKeys)
+        ? currentActionSummary.currentPlaceholderKeys.length
+        : 0;
+    const ready = requiredCount > 0 && placeholderCount === 0;
+    return {
+      ready,
+      evidence: ready
+        ? `${requiredCount} current required keys are present without placeholder values`
+        : `${placeholderCount} current placeholder keys remain`,
+      sourceField: "currentRequiredKeys/currentPlaceholderKeys/currentPlaceholderEditLocations",
+      operatorAction:
+        placeholderCount > 0
+          ? `Replace current release-channel placeholder keys in ${currentActionSummary.currentEnvEditTarget ?? ".env.distribution.local"}: ${currentActionSummary.currentPlaceholderEditLocationSummary ?? "current placeholder edit locations"}.`
+          : "Keep the current release-channel keys placeholder-free in the ignored local env file.",
+      expectedSignal: "current required keys present and current placeholder key count is 0"
+    };
+  }
+  if (lower.includes("private-inputs") || lower.includes("private inputs")) {
+    const privateInputsReady = releaseDoctor?.privateInputsReady === true;
+    const channelMetadataReady = releaseDoctor?.channelMetadataReady === true;
+    const privateValuesRecorded = releaseDoctor?.privateValuesRecorded === true;
+    return {
+      ready: privateInputsReady && channelMetadataReady && !privateValuesRecorded,
+      evidence: `private inputs ready ${readyLabel(privateInputsReady)}; channel metadata ready ${readyLabel(channelMetadataReady)}; private values recorded ${readyLabel(privateValuesRecorded)}`,
+      sourceField: "releaseDoctor.privateInputsReady/channelMetadataReady/privateValuesRecorded",
+      operatorAction: `Run ${currentActionSummary.currentNextCommand ?? "npm run release:doctor"} after replacing the current release-channel metadata placeholders.`,
+      expectedSignal: "private inputs ready yes; channel metadata ready yes; private values recorded no"
+    };
+  }
+  if (lower.includes("distribution-channel qa")) {
+    const distributionChannelQaReady = releaseDoctor?.distributionChannelQaReady === true;
+    const channelMetadataReady = releaseDoctor?.channelMetadataReady === true;
+    const privateValuesRecorded = releaseDoctor?.privateValuesRecorded === true;
+    return {
+      ready: distributionChannelQaReady && channelMetadataReady && !privateValuesRecorded,
+      evidence: `distribution-channel QA ready ${readyLabel(distributionChannelQaReady)}; channel metadata ready ${readyLabel(channelMetadataReady)}; private values recorded ${readyLabel(privateValuesRecorded)}`,
+      sourceField: "releaseDoctor.distributionChannelQaReady/channelMetadataReady/privateValuesRecorded",
+      operatorAction: "Run npm run desktop:distribution-channel-qa-smoke after release doctor reports channel metadata ready.",
+      expectedSignal: "distribution-channel QA ready yes; channel metadata ready yes; private values recorded no"
+    };
+  }
+  return {
+    ready: false,
+    evidence: currentActionSummary.currentFirstBlocker ?? "Current evidence does not yet prove this criterion.",
+    sourceField: "currentReadyCriteria/currentFirstBlocker",
+    operatorAction: `Rerun ${currentActionSummary.currentRerunCommand ?? currentActionSummary.currentNextCommand ?? "npm run release:next-actions"} after resolving this criterion.`,
+    expectedSignal: "criterion ready yes without recording private values"
+  };
+}
+
+function buildCurrentActionAcceptanceSummary({
+  currentActionSummary = {},
+  releaseDoctor = null,
+  hardExternalGateCommand = "npm run release:external-check"
+} = {}) {
+  const currentReadyCriteria = Array.isArray(currentActionSummary.currentReadyCriteria) ? currentActionSummary.currentReadyCriteria : [];
+  const proofCommand =
+    currentActionSummary.currentNextCommand && currentActionSummary.currentNextCommand !== "none"
+      ? currentActionSummary.currentNextCommand
+      : hardExternalGateCommand;
+  const rerunCommand =
+    currentActionSummary.currentRerunCommand && currentActionSummary.currentRerunCommand !== "none"
+      ? currentActionSummary.currentRerunCommand
+      : proofCommand;
+  const currentActionAcceptanceRows = currentReadyCriteria.map((criterion, index) => {
+    const evidence = currentActionAcceptanceEvidence(criterion, { currentActionSummary, releaseDoctor });
+    return {
+      order: index + 1,
+      criterion,
+      ready: evidence.ready,
+      evidence: evidence.evidence,
+      proofCommand,
+      rerunCommand,
+      hardGateCommand: hardExternalGateCommand,
+      valueRecorded: false
+    };
+  });
+  const currentActionAcceptanceBlockerRows = currentActionAcceptanceRows
+    .filter((row) => row.ready !== true)
+    .map((row, index) => {
+      const evidence = currentActionAcceptanceEvidence(row.criterion, { currentActionSummary, releaseDoctor });
+      return {
+        order: index + 1,
+        criterion: row.criterion,
+        blocker: row.evidence,
+        sourceField: evidence.sourceField,
+        operatorAction: evidence.operatorAction,
+        proofCommand,
+        rerunCommand,
+        valueRecorded: false
+      };
+    });
+  const readyCount = currentActionAcceptanceRows.filter((row) => row.ready).length;
+  return {
+    currentActionAcceptanceReady: currentActionAcceptanceRows.length > 0 && readyCount === currentActionAcceptanceRows.length,
+    currentActionAcceptanceRowCount: currentActionAcceptanceRows.length,
+    currentActionAcceptanceReadyCount: readyCount,
+    currentActionAcceptanceSummary:
+      currentActionAcceptanceRows.length > 0 ? `${readyCount}/${currentActionAcceptanceRows.length} current action acceptance criteria ready` : "none",
+    currentActionAcceptanceRows,
+    currentActionAcceptanceBlockerCount: currentActionAcceptanceBlockerRows.length,
+    currentActionAcceptanceBlockerSummary:
+      currentActionAcceptanceBlockerRows.length > 0 ? `${currentActionAcceptanceBlockerRows.length} current action acceptance blockers` : "none",
+    currentActionAcceptanceBlockerRows,
+    currentActionAcceptanceValueRecorded: false
+  };
+}
+
+function buildCurrentActionPostEditVerificationSummary({
+  currentActionSummary = {},
+  acceptanceRows = [],
+  hardExternalGateCommand = "npm run release:external-check"
+} = {}) {
+  const proofCommand =
+    currentActionSummary.currentNextCommand && currentActionSummary.currentNextCommand !== "none"
+      ? currentActionSummary.currentNextCommand
+      : hardExternalGateCommand;
+  const rerunCommand =
+    currentActionSummary.currentRerunCommand && currentActionSummary.currentRerunCommand !== "none"
+      ? currentActionSummary.currentRerunCommand
+      : proofCommand;
+  const currentActionPostEditVerificationRows = (Array.isArray(acceptanceRows) ? acceptanceRows : []).map((row, index) => {
+    const evidence = currentActionAcceptanceEvidence(row.criterion, { currentActionSummary });
+    return {
+      order: index + 1,
+      criterion: row.criterion,
+      currentReady: row.ready === true,
+      currentEvidence: row.evidence,
+      expectedSignal: evidence.expectedSignal,
+      sourceField: evidence.sourceField,
+      proofCommand,
+      rerunCommand,
+      hardGateCommand: hardExternalGateCommand,
+      valueRecorded: false
+    };
+  });
+  const currentReadyCount = currentActionPostEditVerificationRows.filter((row) => row.currentReady).length;
+  return {
+    currentActionPostEditVerificationReady:
+      currentActionPostEditVerificationRows.length === (Array.isArray(acceptanceRows) ? acceptanceRows.length : 0) &&
+      currentActionPostEditVerificationRows.every((row) => row.valueRecorded === false),
+    currentActionPostEditVerificationRowCount: currentActionPostEditVerificationRows.length,
+    currentActionPostEditVerificationCurrentReadyCount: currentReadyCount,
+    currentActionPostEditVerificationSummary:
+      currentActionPostEditVerificationRows.length > 0
+        ? `${currentActionPostEditVerificationRows.length} value-free post-edit verification rows`
+        : "none",
+    currentActionPostEditVerificationCurrentSummary:
+      currentActionPostEditVerificationRows.length > 0
+        ? `${currentReadyCount}/${currentActionPostEditVerificationRows.length} post-edit signals currently ready`
+        : "none",
+    currentActionPostEditVerificationRows,
+    currentActionPostEditVerificationMatchesAcceptance:
+      currentActionPostEditVerificationRows.length === (Array.isArray(acceptanceRows) ? acceptanceRows.length : 0)
+  };
+}
+
+function buildCurrentActionHandoffSummary({
+  sourceArtifacts = [],
+  currentActionSummary = {},
+  currentActionAcceptance = {},
+  currentCommandVerification = {},
+  hardGateRequirementBlockedCount = 0,
+  hardGateBlockedRequirementSummary = "none",
+  hardExternalGateCommand = "npm run release:external-check"
+} = {}) {
+  const proofCommand =
+    currentActionSummary.currentNextCommand && currentActionSummary.currentNextCommand !== "none"
+      ? currentActionSummary.currentNextCommand
+      : hardExternalGateCommand;
+  const rerunCommand =
+    currentActionSummary.currentRerunCommand && currentActionSummary.currentRerunCommand !== "none"
+      ? currentActionSummary.currentRerunCommand
+      : proofCommand;
+  const sourceArtifactSummary = (Array.isArray(sourceArtifacts) ? sourceArtifacts : [])
+    .map((item) => item.label)
+    .filter((label) => typeof label === "string" && label.length > 0)
+    .join(", ");
+  const acceptanceBlockerCount = Number.isInteger(currentActionAcceptance.currentActionAcceptanceBlockerCount)
+    ? currentActionAcceptance.currentActionAcceptanceBlockerCount
+    : 0;
+  const currentActionHandoffRows = [
+    {
+      order: 1,
+      item: "Source artifacts",
+      sourceField: "sourceArtifacts",
+      evidence: sourceArtifactSummary || "none",
+      blockerCount: hardGateRequirementBlockedCount,
+      acceptanceBlockerCount,
+      proofCommand,
+      rerunCommand,
+      hardGateCommand: hardExternalGateCommand,
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      item: "Current edit target",
+      sourceField: "currentEnvEditTarget/currentPlaceholderEditLocations",
+      evidence: `${currentActionSummary.currentEnvEditTarget ?? "unknown"}; ${currentActionSummary.currentPlaceholderEditLocationSummary ?? "none"}`,
+      blockerCount: Number.isInteger(currentActionSummary.currentPlaceholderKeyCount)
+        ? currentActionSummary.currentPlaceholderKeyCount
+        : 0,
+      acceptanceBlockerCount,
+      proofCommand,
+      rerunCommand,
+      hardGateCommand: hardExternalGateCommand,
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      item: "Acceptance blockers",
+      sourceField: "currentActionAcceptanceBlockerRows",
+      evidence: currentActionAcceptance.currentActionAcceptanceBlockerSummary ?? "none",
+      blockerCount: acceptanceBlockerCount,
+      acceptanceBlockerCount,
+      proofCommand,
+      rerunCommand,
+      hardGateCommand: hardExternalGateCommand,
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      item: "Rerun order",
+      sourceField: "currentCommandVerificationRows/currentCommandSequence",
+      evidence: currentActionSummary.currentCommandSequenceSummary ?? currentCommandVerification.currentCommandVerificationRowSummary ?? "none",
+      blockerCount: acceptanceBlockerCount,
+      acceptanceBlockerCount,
+      proofCommand,
+      rerunCommand,
+      hardGateCommand: hardExternalGateCommand,
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      item: "Hard gate",
+      sourceField: "externalPreflight.gateRequirementTotal/gateRequirementReadyCount",
+      evidence: hardGateBlockedRequirementSummary,
+      blockerCount: hardGateRequirementBlockedCount,
+      acceptanceBlockerCount,
+      proofCommand,
+      rerunCommand,
+      hardGateCommand: hardExternalGateCommand,
+      valueRecorded: false
+    }
+  ];
+
+  return {
+    currentActionHandoffReady: currentActionHandoffRows.length === 5 && currentActionHandoffRows.every((row) => row.valueRecorded === false),
+    currentActionHandoffRowCount: currentActionHandoffRows.length,
+    currentActionHandoffSummary:
+      currentActionHandoffRows.length > 0 ? `${currentActionHandoffRows.length} value-free current action handoff rows` : "none",
+    currentActionHandoffRows,
+    currentActionHandoffSourceArtifactCount: Array.isArray(sourceArtifacts) ? sourceArtifacts.length : 0,
+    currentActionHandoffSourceArtifactSummary: sourceArtifactSummary || "none"
+  };
+}
+
+function formatCurrentActionAcceptanceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | criterion | ready | evidence | proof command | rerun command | hard gate | value recorded |\n|---:|---|---:|---|---|---|---|---:|\n| 0 | none | no | none | none | none | none | no |";
+  }
+  return [
+    "| order | criterion | ready | evidence | proof command | rerun command | hard gate | value recorded |",
+    "|---:|---|---:|---|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.criterion)} | ${readyLabel(row.ready)} | ${escapeCell(row.evidence)} | ${escapeCell(row.proofCommand)} | ${escapeCell(row.rerunCommand)} | ${escapeCell(row.hardGateCommand)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatCurrentActionAcceptanceBlockerRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | criterion | blocker | source | operator action | proof command | rerun command | value recorded |\n|---:|---|---|---|---|---|---|---:|\n| 0 | none | none | none | none | none | none | no |";
+  }
+  return [
+    "| order | criterion | blocker | source | operator action | proof command | rerun command | value recorded |",
+    "|---:|---|---|---|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.criterion)} | ${escapeCell(row.blocker)} | ${escapeCell(row.sourceField)} | ${escapeCell(row.operatorAction)} | ${escapeCell(row.proofCommand)} | ${escapeCell(row.rerunCommand)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatCurrentActionPostEditVerificationRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | criterion | current ready | current evidence | expected signal | source | proof command | rerun command | hard gate | value recorded |\n|---:|---|---:|---|---|---|---|---|---|---:|\n| 0 | none | no | none | none | none | none | none | none | no |";
+  }
+  return [
+    "| order | criterion | current ready | current evidence | expected signal | source | proof command | rerun command | hard gate | value recorded |",
+    "|---:|---|---:|---|---|---|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.criterion)} | ${readyLabel(row.currentReady)} | ${escapeCell(row.currentEvidence)} | ${escapeCell(row.expectedSignal)} | ${escapeCell(row.sourceField)} | ${escapeCell(row.proofCommand)} | ${escapeCell(row.rerunCommand)} | ${escapeCell(row.hardGateCommand)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatCurrentActionHandoffRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | item | source | evidence | blockers | acceptance blockers | proof command | rerun command | hard gate | value recorded |\n|---:|---|---|---|---:|---:|---|---|---|---:|\n| 0 | none | none | none | 0 | 0 | none | none | none | no |";
+  }
+  return [
+    "| order | item | source | evidence | blockers | acceptance blockers | proof command | rerun command | hard gate | value recorded |",
+    "|---:|---|---|---|---:|---:|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.item)} | ${escapeCell(row.sourceField)} | ${escapeCell(row.evidence)} | ${row.blockerCount} | ${row.acceptanceBlockerCount} | ${escapeCell(row.proofCommand)} | ${escapeCell(row.rerunCommand)} | ${escapeCell(row.hardGateCommand)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
 function formatChecklistList(items) {
   return Array.isArray(items) && items.length > 0 ? items.map((item, index) => `${index + 1}. ${item}`).join("\n") : "1. None.";
 }
@@ -1398,6 +1721,25 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     currentActionSummary,
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const currentActionAcceptance = buildCurrentActionAcceptanceSummary({
+    currentActionSummary,
+    releaseDoctor,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
+  const currentActionPostEditVerification = buildCurrentActionPostEditVerificationSummary({
+    currentActionSummary,
+    acceptanceRows: currentActionAcceptance.currentActionAcceptanceRows,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
+  const currentActionHandoff = buildCurrentActionHandoffSummary({
+    sourceArtifacts: artifactRows,
+    currentActionSummary,
+    currentActionAcceptance,
+    currentCommandVerification,
+    hardGateRequirementBlockedCount: 0,
+    hardGateBlockedRequirementSummary: "source evidence missing",
+    hardExternalGateCommand: "npm run release:external-check"
+  });
 
   return {
     appName,
@@ -1435,6 +1777,9 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...currentPlaceholderRemediation,
     ...currentProofChecklist,
     ...currentCommandVerification,
+    ...currentActionAcceptance,
+    ...currentActionPostEditVerification,
+    ...currentActionHandoff,
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
     externalDistributionReady: false,
@@ -1538,6 +1883,14 @@ function buildMarkdown(report) {
 - Current ready criteria: ${report.currentReadyCriteriaCount} (${report.currentReadyCriteriaSummary})
 - Current proof checklist rows: ${report.currentProofChecklistRowCount} (${report.currentProofChecklistRowSummary})
 - Current action checklist: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})
+- Current action acceptance ready: ${readyLabel(report.currentActionAcceptanceReady)}
+- Current action acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})
+- Current action acceptance blockers: ${report.currentActionAcceptanceBlockerCount} (${report.currentActionAcceptanceBlockerSummary})
+- Current action post-edit verification ready: ${readyLabel(report.currentActionPostEditVerificationReady)}
+- Current action post-edit verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})
+- Current action post-edit signals currently ready: ${report.currentActionPostEditVerificationCurrentSummary}
+- Current action handoff ready: ${readyLabel(report.currentActionHandoffReady)}
+- Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})
 - Current prerequisite commands: ${report.currentPrerequisiteCommandCount} (${report.currentPrerequisiteCommandSummary})
 - Current rerun commands: ${report.currentRerunCommandCount} (${report.currentRerunCommandSummary})
 - Current command sequence: ${report.currentCommandSequenceCount} (${report.currentCommandSequenceSummary})
@@ -1720,6 +2073,37 @@ ${formatProofChecklistRowsTable(report.currentProofChecklistRows)}
 
 ${formatChecklistList(report.currentActionChecklist)}
 
+## Current Action Acceptance
+
+- Acceptance ready: ${readyLabel(report.currentActionAcceptanceReady)}
+- Acceptance rows: ${report.currentActionAcceptanceRowCount} (${report.currentActionAcceptanceSummary})
+- Ready rows: ${report.currentActionAcceptanceReadyCount}/${report.currentActionAcceptanceRowCount}
+- Blocker rows: ${report.currentActionAcceptanceBlockerCount} (${report.currentActionAcceptanceBlockerSummary})
+- Value recorded: ${readyLabel(report.currentActionAcceptanceValueRecorded)}
+
+${formatCurrentActionAcceptanceRows(report.currentActionAcceptanceRows)}
+
+### Current Action Acceptance Blockers
+
+${formatCurrentActionAcceptanceBlockerRows(report.currentActionAcceptanceBlockerRows)}
+
+## Current Action Post-Edit Verification
+
+- Verification ready: ${readyLabel(report.currentActionPostEditVerificationReady)}
+- Verification rows: ${report.currentActionPostEditVerificationRowCount} (${report.currentActionPostEditVerificationSummary})
+- Signals currently ready: ${report.currentActionPostEditVerificationCurrentSummary}
+- Matches acceptance: ${readyLabel(report.currentActionPostEditVerificationMatchesAcceptance)}
+
+${formatCurrentActionPostEditVerificationRows(report.currentActionPostEditVerificationRows)}
+
+## Current Action Handoff Package
+
+- Handoff ready: ${readyLabel(report.currentActionHandoffReady)}
+- Handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})
+- Source artifacts: ${report.currentActionHandoffSourceArtifactCount} (${report.currentActionHandoffSourceArtifactSummary})
+
+${formatCurrentActionHandoffRows(report.currentActionHandoffRows)}
+
 ## Current First Blockers
 
 | order | blocker |
@@ -1848,6 +2232,37 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     currentActionSummary,
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const gateRequirementTotal = externalPreflight.gateRequirementTotal ?? completionProgress.gateRequirementTotal ?? 0;
+  const gateRequirementReadyCount = externalPreflight.gateRequirementReadyCount ?? completionProgress.gateRequirementReadyCount ?? 0;
+  const gateRequirementReadinessPercent =
+    externalPreflight.gateRequirementReadinessPercent ?? completionProgress.gateRequirementReadinessPercent ?? 0;
+  const hardGateRequirementBlockedCount = Math.max(gateRequirementTotal - gateRequirementReadyCount, 0);
+  const currentActionAcceptance = buildCurrentActionAcceptanceSummary({
+    currentActionSummary: {
+      ...currentActionSummary,
+      currentEnvEditTarget: localEnvEditTarget
+    },
+    releaseDoctor,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
+  const currentActionPostEditVerification = buildCurrentActionPostEditVerificationSummary({
+    currentActionSummary,
+    acceptanceRows: currentActionAcceptance.currentActionAcceptanceRows,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
+  const currentActionHandoff = buildCurrentActionHandoffSummary({
+    sourceArtifacts: artifactRows,
+    currentActionSummary: {
+      ...currentActionSummary,
+      currentEnvEditTarget: localEnvEditTarget
+    },
+    currentActionAcceptance,
+    currentCommandVerification,
+    hardGateRequirementBlockedCount,
+    hardGateBlockedRequirementSummary:
+      hardGateRequirementBlockedCount > 0 ? `${hardGateRequirementBlockedCount} blocked hard-gate requirements` : "none",
+    hardExternalGateCommand: "npm run release:external-check"
+  });
 
   nextActionsReport = {
     appName,
@@ -1885,14 +2300,17 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...currentPlaceholderRemediation,
     ...currentProofChecklist,
     ...currentCommandVerification,
+    ...currentActionAcceptance,
+    ...currentActionPostEditVerification,
+    ...currentActionHandoff,
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
     externalDistributionReady: externalPreflight.externalDistributionReady === true,
     externalDistributionGateReady: externalPreflight.externalDistributionGateReady === true,
     hardGateWouldFail: externalPreflight.hardGateWouldFail === true,
-    gateRequirementTotal: externalPreflight.gateRequirementTotal ?? completionProgress.gateRequirementTotal ?? 0,
-    gateRequirementReadyCount: externalPreflight.gateRequirementReadyCount ?? completionProgress.gateRequirementReadyCount ?? 0,
-    gateRequirementReadinessPercent: externalPreflight.gateRequirementReadinessPercent ?? completionProgress.gateRequirementReadinessPercent ?? 0,
+    gateRequirementTotal,
+    gateRequirementReadyCount,
+    gateRequirementReadinessPercent,
     remediationTotal: externalPreflight.remediationTotal ?? completionProgress.remediationTotal ?? 0,
     remediationReadyCount: externalPreflight.remediationReadyCount ?? completionProgress.remediationReadyCount ?? 0,
     remediationReadinessPercent: externalPreflight.remediationReadinessPercent ?? completionProgress.remediationReadinessPercent ?? 0,
@@ -1957,6 +2375,8 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     nextActionsReport.localReleaseReady === true &&
     nextActionsReport.localReleaseReadinessPercent === 100 &&
     nextActionsReport.priorityActions.every((action) => action.valueRecorded === false) &&
+    nextActionsReport.currentActionPostEditVerificationReady === true &&
+    nextActionsReport.currentActionHandoffReady === true &&
     nextActionsReport.sourceValueRecorded === false &&
     nextActionsReport.sourceClaimedExternalDistribution === false;
 }
@@ -2516,6 +2936,179 @@ check(
   nextActionsReport.currentCommandSequence.every((command) => typeof command === "string" && command.length > 0 && command !== "none"),
   "external next actions current command sequence should contain only concrete commands"
 );
+check(typeof nextActionsReport.currentActionAcceptanceReady === "boolean", "external next actions should include current action acceptance readiness");
+check(Number.isInteger(nextActionsReport.currentActionAcceptanceRowCount), "external next actions should include current action acceptance row count");
+check(Number.isInteger(nextActionsReport.currentActionAcceptanceReadyCount), "external next actions should include current action acceptance ready count");
+check(typeof nextActionsReport.currentActionAcceptanceSummary === "string" && nextActionsReport.currentActionAcceptanceSummary.length > 0, "external next actions should include current action acceptance summary");
+check(Array.isArray(nextActionsReport.currentActionAcceptanceRows), "external next actions should include current action acceptance rows");
+check(Number.isInteger(nextActionsReport.currentActionAcceptanceBlockerCount), "external next actions should include current action acceptance blocker count");
+check(typeof nextActionsReport.currentActionAcceptanceBlockerSummary === "string" && nextActionsReport.currentActionAcceptanceBlockerSummary.length > 0, "external next actions should include current action acceptance blocker summary");
+check(Array.isArray(nextActionsReport.currentActionAcceptanceBlockerRows), "external next actions should include current action acceptance blocker rows");
+check(nextActionsReport.currentActionAcceptanceValueRecorded === false, "external next actions current action acceptance should not record values");
+check(
+  nextActionsReport.currentActionAcceptanceRowCount === nextActionsReport.currentActionAcceptanceRows.length,
+  "external next actions current action acceptance row count should match listed rows"
+);
+check(
+  nextActionsReport.currentActionAcceptanceRowCount === nextActionsReport.currentReadyCriteriaCount,
+  "external next actions current action acceptance rows should match current ready criteria"
+);
+check(
+  nextActionsReport.currentActionAcceptanceReadyCount === nextActionsReport.currentActionAcceptanceRows.filter((row) => row.ready === true).length,
+  "external next actions current action acceptance ready count should match listed rows"
+);
+check(
+  nextActionsReport.currentActionAcceptanceReady ===
+    (nextActionsReport.currentActionAcceptanceRows.length > 0 &&
+      nextActionsReport.currentActionAcceptanceRows.every((row) => row.ready === true)),
+  "external next actions current action acceptance readiness should reflect listed rows"
+);
+check(
+  nextActionsReport.currentActionAcceptanceBlockerCount === nextActionsReport.currentActionAcceptanceBlockerRows.length,
+  "external next actions current action acceptance blocker count should match listed blockers"
+);
+check(
+  nextActionsReport.currentActionAcceptanceBlockerCount ===
+    nextActionsReport.currentActionAcceptanceRows.filter((row) => row.ready !== true).length,
+  "external next actions current action acceptance blocker rows should match not-ready acceptance rows"
+);
+check(
+  nextActionsReport.currentActionAcceptanceRows.every(
+    (row, index) =>
+      row.order === index + 1 &&
+      row.criterion === nextActionsReport.currentReadyCriteria[index] &&
+      typeof row.ready === "boolean" &&
+      typeof row.evidence === "string" &&
+      row.evidence.length > 0 &&
+      row.proofCommand === nextActionsReport.currentNextCommand &&
+      row.rerunCommand === nextActionsReport.currentRerunCommand &&
+      row.hardGateCommand === nextActionsReport.hardExternalGateCommand &&
+      row.valueRecorded === false
+  ),
+  "external next actions current action acceptance rows should mirror current criteria and commands without values"
+);
+check(
+  nextActionsReport.currentActionAcceptanceBlockerRows.every(
+    (row, index) =>
+      row.order === index + 1 &&
+      typeof row.criterion === "string" &&
+      row.criterion.length > 0 &&
+      typeof row.blocker === "string" &&
+      row.blocker.length > 0 &&
+      typeof row.sourceField === "string" &&
+      row.sourceField.length > 0 &&
+      typeof row.operatorAction === "string" &&
+      row.operatorAction.length > 0 &&
+      row.proofCommand === nextActionsReport.currentNextCommand &&
+      row.rerunCommand === nextActionsReport.currentRerunCommand &&
+      row.valueRecorded === false
+  ),
+  "external next actions current action acceptance blocker rows should include value-free source and operator action evidence"
+);
+check(typeof nextActionsReport.currentActionPostEditVerificationReady === "boolean", "external next actions should include current action post-edit verification readiness");
+check(Number.isInteger(nextActionsReport.currentActionPostEditVerificationRowCount), "external next actions should include current action post-edit verification row count");
+check(Number.isInteger(nextActionsReport.currentActionPostEditVerificationCurrentReadyCount), "external next actions should include current action post-edit verification current-ready count");
+check(
+  typeof nextActionsReport.currentActionPostEditVerificationSummary === "string" &&
+    nextActionsReport.currentActionPostEditVerificationSummary.length > 0,
+  "external next actions should include current action post-edit verification summary"
+);
+check(
+  typeof nextActionsReport.currentActionPostEditVerificationCurrentSummary === "string" &&
+    nextActionsReport.currentActionPostEditVerificationCurrentSummary.length > 0,
+  "external next actions should include current action post-edit verification current summary"
+);
+check(Array.isArray(nextActionsReport.currentActionPostEditVerificationRows), "external next actions should include current action post-edit verification rows");
+check(typeof nextActionsReport.currentActionPostEditVerificationMatchesAcceptance === "boolean", "external next actions should state whether post-edit verification matches acceptance");
+check(
+  nextActionsReport.currentActionPostEditVerificationReady === true,
+  "external next actions current action post-edit verification should be ready"
+);
+check(
+  nextActionsReport.currentActionPostEditVerificationRowCount === nextActionsReport.currentActionPostEditVerificationRows.length,
+  "external next actions current action post-edit verification row count should match listed rows"
+);
+check(
+  nextActionsReport.currentActionPostEditVerificationRowCount === nextActionsReport.currentActionAcceptanceRowCount,
+  "external next actions current action post-edit verification rows should mirror acceptance rows"
+);
+check(
+  nextActionsReport.currentActionPostEditVerificationCurrentReadyCount ===
+    nextActionsReport.currentActionPostEditVerificationRows.filter((row) => row.currentReady === true).length,
+  "external next actions current action post-edit verification current-ready count should match listed rows"
+);
+check(
+  nextActionsReport.currentActionPostEditVerificationRows.every(
+    (row, index) =>
+      row.order === index + 1 &&
+      row.criterion === nextActionsReport.currentActionAcceptanceRows[index]?.criterion &&
+      row.currentReady === nextActionsReport.currentActionAcceptanceRows[index]?.ready &&
+      row.currentEvidence === nextActionsReport.currentActionAcceptanceRows[index]?.evidence &&
+      typeof row.expectedSignal === "string" &&
+      row.expectedSignal.length > 0 &&
+      typeof row.sourceField === "string" &&
+      row.sourceField.length > 0 &&
+      row.proofCommand === nextActionsReport.currentNextCommand &&
+      row.rerunCommand === nextActionsReport.currentRerunCommand &&
+      row.hardGateCommand === nextActionsReport.hardExternalGateCommand &&
+      row.valueRecorded === false
+  ),
+  "external next actions current action post-edit verification rows should mirror acceptance rows and expected post-edit signals"
+);
+check(
+  nextActionsReport.currentActionPostEditVerificationRows.some((row) => row.expectedSignal.includes("current placeholder key count is 0")) ||
+    nextActionsReport.currentActionPostEditVerificationRows.length === 0,
+  "external next actions current action post-edit verification should include the placeholder-clear expected signal"
+);
+check(
+  nextActionsReport.currentActionPostEditVerificationMatchesAcceptance ===
+    (nextActionsReport.currentActionPostEditVerificationRowCount === nextActionsReport.currentActionAcceptanceRowCount),
+  "external next actions current action post-edit verification match flag should align with acceptance row count"
+);
+check(typeof nextActionsReport.currentActionHandoffReady === "boolean", "external next actions should include current action handoff readiness");
+check(Number.isInteger(nextActionsReport.currentActionHandoffRowCount), "external next actions should include current action handoff row count");
+check(typeof nextActionsReport.currentActionHandoffSummary === "string" && nextActionsReport.currentActionHandoffSummary.length > 0, "external next actions should include current action handoff summary");
+check(Array.isArray(nextActionsReport.currentActionHandoffRows), "external next actions should include current action handoff rows");
+check(Number.isInteger(nextActionsReport.currentActionHandoffSourceArtifactCount), "external next actions should include current action handoff source artifact count");
+check(typeof nextActionsReport.currentActionHandoffSourceArtifactSummary === "string" && nextActionsReport.currentActionHandoffSourceArtifactSummary.length > 0, "external next actions should include current action handoff source artifact summary");
+check(nextActionsReport.currentActionHandoffReady === true, "external next actions current action handoff should be ready");
+check(
+  nextActionsReport.currentActionHandoffRowCount === nextActionsReport.currentActionHandoffRows.length,
+  "external next actions current action handoff row count should match listed rows"
+);
+check(nextActionsReport.currentActionHandoffRowCount === 5, "external next actions current action handoff should include five rows");
+check(
+  nextActionsReport.currentActionHandoffSourceArtifactCount === nextActionsReport.sourceArtifacts.length,
+  "external next actions current action handoff source artifact count should match source artifacts"
+);
+check(
+  nextActionsReport.currentActionHandoffRows.every(
+    (row, index) =>
+      row.order === index + 1 &&
+      typeof row.item === "string" &&
+      row.item.length > 0 &&
+      typeof row.sourceField === "string" &&
+      row.sourceField.length > 0 &&
+      typeof row.evidence === "string" &&
+      row.evidence.length > 0 &&
+      Number.isInteger(row.blockerCount) &&
+      Number.isInteger(row.acceptanceBlockerCount) &&
+      row.acceptanceBlockerCount === nextActionsReport.currentActionAcceptanceBlockerCount &&
+      row.proofCommand === nextActionsReport.currentNextCommand &&
+      row.rerunCommand === nextActionsReport.currentRerunCommand &&
+      row.hardGateCommand === nextActionsReport.hardExternalGateCommand &&
+      row.valueRecorded === false
+  ),
+  "external next actions current action handoff rows should summarize sources, edit target, acceptance blockers, rerun order, and hard gate without values"
+);
+check(
+  nextActionsReport.currentActionHandoffRows.some((row) => row.sourceField === "sourceArtifacts") &&
+    nextActionsReport.currentActionHandoffRows.some((row) => row.sourceField.includes("currentEnvEditTarget")) &&
+    nextActionsReport.currentActionHandoffRows.some((row) => row.sourceField === "currentActionAcceptanceBlockerRows") &&
+    nextActionsReport.currentActionHandoffRows.some((row) => row.sourceField.includes("currentCommandVerificationRows")) &&
+    nextActionsReport.currentActionHandoffRows.some((row) => row.sourceField.includes("externalPreflight")),
+  "external next actions current action handoff should include source artifacts, edit target, acceptance blockers, rerun order, and hard gate rows"
+);
 check(nextActionsReport.currentActionValueRecorded === false, "external next actions should not record current action values");
 check(markdown.includes("Bootstrap mode:"), "external next actions Markdown should include bootstrap mode");
 check(markdown.includes("Source evidence ready:"), "external next actions Markdown should include source evidence readiness");
@@ -2941,6 +3534,60 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   check(nextActionsReport.currentPlaceholderRemediationRowCount === 4, "release channel metadata should keep four current placeholder remediation rows when placeholders remain");
   check(nextActionsReport.currentProofChecklistRowCount === 3, "release channel metadata should surface three current proof checklist rows when placeholders remain");
   check(nextActionsReport.currentCommandVerificationRowCount === 5, "release channel metadata should surface five current command verification rows when placeholders remain");
+  check(nextActionsReport.currentActionAcceptanceReady === false, "release channel metadata should keep current action acceptance blocked while placeholders remain");
+  check(nextActionsReport.currentActionAcceptanceRowCount === 3, "release channel metadata should surface three current action acceptance rows when placeholders remain");
+  check(nextActionsReport.currentActionAcceptanceReadyCount === 0, "release channel metadata should report zero ready acceptance rows while placeholders remain");
+  check(nextActionsReport.currentActionAcceptanceBlockerCount === 3, "release channel metadata should surface three acceptance blockers while placeholders remain");
+  check(
+    nextActionsReport.currentActionAcceptanceRows.every(
+      (row) =>
+        row.ready === false &&
+        row.proofCommand === "npm run release:doctor" &&
+        row.rerunCommand === "npm run release:current-blocker" &&
+        row.hardGateCommand === "npm run release:external-check" &&
+        row.valueRecorded === false
+    ),
+    "release channel metadata should keep current action acceptance rows value-free and tied to doctor/current-blocker commands"
+  );
+  check(
+    nextActionsReport.currentActionAcceptanceRows.some((row) => row.evidence.includes("4 current placeholder keys remain")),
+    "release channel metadata should include placeholder count in current action acceptance evidence"
+  );
+  check(
+    nextActionsReport.currentActionAcceptanceRows.some((row) => row.evidence.includes("private inputs ready no")) &&
+      nextActionsReport.currentActionAcceptanceRows.some((row) => row.evidence.includes("distribution-channel QA ready no")),
+    "release channel metadata should include private-input and distribution-channel QA acceptance evidence"
+  );
+  check(
+    nextActionsReport.currentActionAcceptanceBlockerRows.some((row) => row.sourceField.includes("currentPlaceholderKeys")) &&
+      nextActionsReport.currentActionAcceptanceBlockerRows.some((row) => row.sourceField.includes("privateInputsReady")) &&
+      nextActionsReport.currentActionAcceptanceBlockerRows.some((row) => row.sourceField.includes("distributionChannelQaReady")),
+    "release channel metadata should map acceptance blockers to placeholder, private-input, and channel-QA source fields"
+  );
+  check(
+    nextActionsReport.currentActionAcceptanceBlockerRows.some((row) => row.operatorAction.includes("Replace current release-channel placeholder keys")),
+    "release channel metadata should include placeholder replacement operator action in acceptance blockers"
+  );
+  check(nextActionsReport.currentActionPostEditVerificationReady === true, "release channel metadata should include ready post-edit verification receipt while placeholders remain");
+  check(nextActionsReport.currentActionPostEditVerificationRowCount === 3, "release channel metadata should surface three post-edit verification rows when placeholders remain");
+  check(nextActionsReport.currentActionPostEditVerificationCurrentReadyCount === 0, "release channel metadata should report zero current-ready post-edit rows while placeholders remain");
+  check(nextActionsReport.currentActionPostEditVerificationMatchesAcceptance === true, "release channel metadata post-edit verification should match acceptance rows");
+  check(
+    nextActionsReport.currentActionPostEditVerificationRows.some((row) => row.expectedSignal.includes("current placeholder key count is 0")) &&
+      nextActionsReport.currentActionPostEditVerificationRows.some((row) => row.expectedSignal.includes("private inputs ready yes")) &&
+      nextActionsReport.currentActionPostEditVerificationRows.some((row) => row.expectedSignal.includes("distribution-channel QA ready yes")),
+    "release channel metadata should include placeholder, private-input, and channel-QA post-edit expected signals"
+  );
+  check(nextActionsReport.currentActionHandoffReady === true, "release channel metadata should include ready current action handoff package while placeholders remain");
+  check(nextActionsReport.currentActionHandoffRowCount === 5, "release channel metadata should include five current action handoff rows when placeholders remain");
+  check(
+    nextActionsReport.currentActionHandoffRows.some((row) => row.item === "Source artifacts" && row.evidence.includes("Release doctor")) &&
+      nextActionsReport.currentActionHandoffRows.some((row) => row.item === "Current edit target" && row.evidence.includes(nextActionsReport.currentEnvEditTarget)) &&
+      nextActionsReport.currentActionHandoffRows.some((row) => row.item === "Acceptance blockers" && row.acceptanceBlockerCount === 3) &&
+      nextActionsReport.currentActionHandoffRows.some((row) => row.item === "Rerun order" && row.evidence.includes("npm run release:current-blocker")) &&
+      nextActionsReport.currentActionHandoffRows.some((row) => row.item === "Hard gate" && row.hardGateCommand === "npm run release:external-check"),
+    "release channel metadata should include source, edit-target, acceptance, rerun, and hard-gate handoff rows"
+  );
   check(
     nextActionsReport.currentPlaceholderRemediationRows.every(
       (item) =>
@@ -3073,6 +3720,13 @@ check(markdown.includes("Current evidence labels:"), "external next actions Mark
 check(markdown.includes("Current ready criteria:"), "external next actions Markdown should include current ready criteria");
 check(markdown.includes("Current proof checklist rows:"), "external next actions Markdown should include current proof checklist row status");
 check(markdown.includes("Current action checklist:"), "external next actions Markdown should include current action checklist status");
+check(markdown.includes("Current action acceptance ready:"), "external next actions Markdown should include current action acceptance readiness");
+check(markdown.includes("Current action acceptance rows:"), "external next actions Markdown should include current action acceptance row status");
+check(markdown.includes("Current action acceptance blockers:"), "external next actions Markdown should include current action acceptance blocker status");
+check(markdown.includes("Current action post-edit verification ready:"), "external next actions Markdown should include current action post-edit verification readiness");
+check(markdown.includes("Current action post-edit verification rows:"), "external next actions Markdown should include current action post-edit verification row status");
+check(markdown.includes("Current action handoff ready:"), "external next actions Markdown should include current action handoff readiness");
+check(markdown.includes("Current action handoff rows:"), "external next actions Markdown should include current action handoff row status");
 check(markdown.includes("Current env edit target:"), "external next actions Markdown should include current env edit target");
 check(markdown.includes("Current operator action:"), "external next actions Markdown should include current operator action");
 check(markdown.includes("Current rerun command:"), "external next actions Markdown should include current rerun command");
@@ -3093,6 +3747,20 @@ check(markdown.includes("Ready criteria:"), "external next actions Markdown shou
 check(markdown.includes("Current Proof Checklist"), "external next actions Markdown should include current proof checklist section");
 check(markdown.includes("Current Action Checklist"), "external next actions Markdown should include current action checklist section");
 check(markdown.includes("Action checklist:"), "external next actions Markdown should include action checklist details");
+check(markdown.includes("## Current Action Acceptance"), "external next actions Markdown should include current action acceptance section");
+check(markdown.includes("| order | criterion | ready | evidence | proof command | rerun command | hard gate | value recorded |"), "external next actions Markdown should include current action acceptance table");
+check(markdown.includes("### Current Action Acceptance Blockers"), "external next actions Markdown should include current action acceptance blockers section");
+check(markdown.includes("| order | criterion | blocker | source | operator action | proof command | rerun command | value recorded |"), "external next actions Markdown should include current action acceptance blockers table");
+check(markdown.includes("## Current Action Post-Edit Verification"), "external next actions Markdown should include current action post-edit verification section");
+check(
+  markdown.includes("| order | criterion | current ready | current evidence | expected signal | source | proof command | rerun command | hard gate | value recorded |"),
+  "external next actions Markdown should include current action post-edit verification table"
+);
+check(markdown.includes("## Current Action Handoff Package"), "external next actions Markdown should include current action handoff package section");
+check(
+  markdown.includes("| order | item | source | evidence | blockers | acceptance blockers | proof command | rerun command | hard gate | value recorded |"),
+  "external next actions Markdown should include current action handoff table"
+);
 check(markdown.includes("Completion Gap"), "external next actions Markdown should include completion gap section");
 check(markdown.includes("Proof target:"), "external next actions Markdown should include completion gap proof target details");
 check(markdown.includes("External distribution claimed by this report: no"), "external next actions Markdown should state completion gap does not claim distribution");
@@ -3130,6 +3798,34 @@ if (nextActionsReport.currentCommandVerificationRowCount > 0) {
   check(
     markdown.includes("| order | command | role | expectation | evidence | proof target | hard gate | value recorded |"),
     "external next actions Markdown should include current command verification table"
+  );
+}
+if (nextActionsReport.currentActionAcceptanceRowCount > 0) {
+  check(
+    nextActionsReport.currentActionAcceptanceRows.some((item) => markdown.includes(item.criterion)),
+    "external next actions Markdown should include current action acceptance criteria"
+  );
+  check(
+    nextActionsReport.currentActionAcceptanceRows.some((item) => markdown.includes(item.evidence)),
+    "external next actions Markdown should include current action acceptance evidence"
+  );
+}
+if (nextActionsReport.currentActionAcceptanceBlockerCount > 0) {
+  check(
+    nextActionsReport.currentActionAcceptanceBlockerRows.some((item) => markdown.includes(item.operatorAction)),
+    "external next actions Markdown should include current action acceptance operator actions"
+  );
+}
+if (nextActionsReport.currentActionPostEditVerificationRowCount > 0) {
+  check(
+    nextActionsReport.currentActionPostEditVerificationRows.some((item) => markdown.includes(item.expectedSignal)),
+    "external next actions Markdown should include current action post-edit expected signals"
+  );
+}
+if (nextActionsReport.currentActionHandoffRowCount > 0) {
+  check(
+    nextActionsReport.currentActionHandoffRows.some((item) => markdown.includes(item.item) && markdown.includes(item.evidence)),
+    "external next actions Markdown should include current action handoff rows"
   );
 }
 check(markdown.includes("Priority Next Actions"), "external next actions Markdown should include priority actions");
@@ -3214,6 +3910,16 @@ console.log(`- Current evidence labels: ${nextActionsReport.currentEvidenceLabel
 console.log(`- Current ready criteria: ${nextActionsReport.currentReadyCriteriaCount} (${nextActionsReport.currentReadyCriteriaSummary})`);
 console.log(`- Current proof checklist rows: ${nextActionsReport.currentProofChecklistRowCount} (${nextActionsReport.currentProofChecklistRowSummary})`);
 console.log(`- Current action checklist: ${nextActionsReport.currentActionChecklistCount} (${nextActionsReport.currentActionChecklistSummary})`);
+console.log(`- Current action acceptance ready: ${nextActionsReport.currentActionAcceptanceReady ? "yes" : "no"}`);
+console.log(`- Current action acceptance rows: ${nextActionsReport.currentActionAcceptanceRowCount} (${nextActionsReport.currentActionAcceptanceSummary})`);
+console.log(`- Current action acceptance blockers: ${nextActionsReport.currentActionAcceptanceBlockerCount} (${nextActionsReport.currentActionAcceptanceBlockerSummary})`);
+console.log(`- Current action post-edit verification ready: ${nextActionsReport.currentActionPostEditVerificationReady ? "yes" : "no"}`);
+console.log(
+  `- Current action post-edit verification rows: ${nextActionsReport.currentActionPostEditVerificationRowCount} (${nextActionsReport.currentActionPostEditVerificationSummary})`
+);
+console.log(`- Current action post-edit signals currently ready: ${nextActionsReport.currentActionPostEditVerificationCurrentSummary}`);
+console.log(`- Current action handoff ready: ${nextActionsReport.currentActionHandoffReady ? "yes" : "no"}`);
+console.log(`- Current action handoff rows: ${nextActionsReport.currentActionHandoffRowCount} (${nextActionsReport.currentActionHandoffSummary})`);
 console.log(`- Current prerequisite commands: ${nextActionsReport.currentPrerequisiteCommandCount} (${nextActionsReport.currentPrerequisiteCommandSummary})`);
 console.log(`- Current rerun commands: ${nextActionsReport.currentRerunCommandCount} (${nextActionsReport.currentRerunCommandSummary})`);
 console.log(`- Current command sequence: ${nextActionsReport.currentCommandSequenceCount} (${nextActionsReport.currentCommandSequenceSummary})`);
