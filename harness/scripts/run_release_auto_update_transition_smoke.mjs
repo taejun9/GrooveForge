@@ -272,7 +272,10 @@ function buildReport({ releaseChannelTransition, updateFeedConfig, autoUpdateRea
     sourceArtifactRows,
     sourceArtifactRowCount: sourceArtifactRows.length,
     releaseChannelClearanceTransitionReady: releaseChannelTransition.releaseChannelClearanceTransitionReady === true,
+    releaseChannelCurrentBlockerMode: textValue(releaseChannelTransition.currentBlockerMode),
     releaseChannelCurrentPriorityActionId: textValue(releaseChannelTransition.currentPriorityActionId),
+    releaseChannelCurrentNextCommand: textValue(releaseChannelTransition.currentNextCommand),
+    releaseChannelCurrentRequiredKeyCount: integerValue(releaseChannelTransition.currentRequiredKeyCount),
     releaseChannelCurrentPlaceholderKeyCount: integerValue(releaseChannelTransition.currentPlaceholderKeyCount),
     releaseChannelSyntheticClearanceReady: releaseChannelTransition.syntheticClearanceReady === true,
     releaseChannelNextPriorityActionId: textValue(releaseChannelTransition.nextPriorityActionId),
@@ -342,7 +345,10 @@ function buildMarkdown(report) {
 
 - Transition receipt ready: ${readyLabel(report.releaseAutoUpdateTransitionReady)}
 - Release-channel transition ready: ${readyLabel(report.releaseChannelClearanceTransitionReady)}
+- Release-channel current blocker mode: ${report.releaseChannelCurrentBlockerMode}
 - Release-channel current blocker: ${report.releaseChannelCurrentPriorityActionId}
+- Release-channel current next command: \`${report.releaseChannelCurrentNextCommand}\`
+- Release-channel required keys: ${report.releaseChannelCurrentRequiredKeyCount}
 - Release-channel placeholder keys: ${report.releaseChannelCurrentPlaceholderKeyCount}
 - Next priority action: ${report.releaseChannelNextPriorityActionId}
 - Next action proof command: \`${report.releaseChannelNextActionProofCommand}\`
@@ -419,8 +425,24 @@ function validateReport(report, markdown) {
   check(report.sourceArtifactRowCount === 3, "release auto-update transition should include three source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release auto-update transition source rows should be present, ready, and value-free");
   check(report.releaseChannelClearanceTransitionReady === true, "release auto-update transition should include release-channel clearance transition readiness");
-  check(report.releaseChannelCurrentPriorityActionId === "release-channel-metadata", "release auto-update transition should keep release-channel metadata as the current real blocker");
-  check(report.releaseChannelCurrentPlaceholderKeyCount === 4, "release auto-update transition should mirror four release-channel placeholders");
+  check(
+    ["prepare-local-distribution-env", "replace-release-channel-placeholders", "release-channel-metadata"].includes(
+      report.releaseChannelCurrentPriorityActionId
+    ),
+    "release auto-update transition should keep release-channel setup as the current real blocker"
+  );
+  check(
+    report.releaseChannelCurrentBlockerMode === "missing-local-env" ||
+      report.releaseChannelCurrentBlockerMode === "replace-release-channel-placeholders",
+    "release auto-update transition should identify the release-channel blocker mode"
+  );
+  check(report.releaseChannelCurrentRequiredKeyCount === 4, "release auto-update transition should mirror four release-channel required keys");
+  if (report.releaseChannelCurrentBlockerMode === "missing-local-env") {
+    check(report.releaseChannelCurrentPlaceholderKeyCount === 0, "release auto-update transition should not report placeholders before the ignored env exists");
+    check(report.releaseChannelCurrentNextCommand === "npm run release:prepare-env", "release auto-update transition should surface prepare-env when the ignored env is missing");
+  } else {
+    check(report.releaseChannelCurrentPlaceholderKeyCount === 4, "release auto-update transition should mirror four release-channel placeholders");
+  }
   check(report.releaseChannelSyntheticClearanceReady === true, "release auto-update transition should include synthetic release-channel clearance readiness");
   check(report.releaseChannelNextPriorityActionId === "auto-update-feed", "release auto-update transition should point to auto-update feed as next priority action");
   check(report.releaseChannelNextActionProofCommand === "npm run desktop:auto-update-readiness-smoke", "release auto-update transition should keep auto-update readiness proof command");

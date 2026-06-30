@@ -187,12 +187,7 @@ async function createReadinessSummary() {
     };
   }
 
-  check(existsSync(manifestPath), "release manifest should exist before auto-update readiness smoke");
-  if (failures.length > 0) {
-    fail("Auto-update readiness preflight failed.", failures.map((failure) => `- ${failure}`).join("\n"));
-  }
-
-  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const manifest = await readJsonIfExists(manifestPath);
   const policy = await readJsonIfExists(updateMetadataPolicyPath);
   const metadataArtifacts = await readJsonIfExists(updateMetadataArtifactsPath);
   const dependencies = {
@@ -224,6 +219,9 @@ async function createReadinessSummary() {
 
   if (!updaterIntegrationReady) {
     blockers.push("No Electron auto-update API integration with update checking is implemented.");
+  }
+  if (!artifacts.releaseManifestPresent) {
+    blockers.push("Release manifest evidence is missing; run npm run desktop:release-manifest-smoke first.");
   }
   if (!providerReady) {
     if (provider.environmentFeedUrlKeyPresent || provider.environmentChannelKeyPresent) {

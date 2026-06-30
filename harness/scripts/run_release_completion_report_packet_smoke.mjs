@@ -19,6 +19,7 @@ const packetJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}
 const audienceHandoffJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-audience-completion-handoff-smoke.json`);
 const channelEditPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-edit-packet-smoke.json`);
 const clearanceTransitionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-clearance-transition-smoke.json`);
+const autoUpdateTransitionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-auto-update-transition-smoke.json`);
 const failures = [];
 const refreshCommandRows = [
   {
@@ -37,6 +38,12 @@ const refreshCommandRows = [
     order: 3,
     command: "npm run release:channel-clearance-transition-smoke",
     role: "refresh post-clearance transition evidence from release-channel metadata to auto-update feed",
+    valueRecorded: false
+  },
+  {
+    order: 4,
+    command: "npm run release:auto-update-transition-smoke",
+    role: "refresh value-free auto-update transition evidence after the release-channel handoff",
     valueRecorded: false
   }
 ];
@@ -230,12 +237,13 @@ function formatClearanceTransitionRows(rows) {
     .join("\n");
 }
 
-function buildReport({ audience, channel, clearance, progress }) {
+function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
   const currentTenPlanWindowRows = progress.currentTenPlanWindowRows;
   const currentTenPlanWindowRowCount = currentTenPlanWindowRows.length;
   const currentTenPlanWindowRowSummary = planRowSummary(currentTenPlanWindowRows);
   const privateEditProofCommandSummary = commandSummary(privateEditProofCommandRows);
   const postClearanceTransitionRows = objectRows(clearance.transitionRows);
+  const autoUpdateTransitionRows = objectRows(autoUpdate.transitionRows);
   const tenPlanProgressReportRolloverRows = [
     {
       order: 1,
@@ -315,6 +323,13 @@ function buildReport({ audience, channel, clearance, progress }) {
       evidence: `${textValue(clearance.nextPriorityActionLabel)} via ${textValue(clearance.nextActionPreviewProofCommand)}`,
       sourceField: "clearanceTransition.nextPriorityActionLabel/nextActionPreviewProofCommand",
       valueRecorded: false
+    },
+    {
+      order: 10,
+      item: "Post-clearance auto-update proof",
+      evidence: `${textValue(autoUpdate.releaseChannelNextPriorityActionId)} via ${textValue(autoUpdate.releaseChannelNextActionProofCommand)}; real auto-update blocked ${readyLabel(autoUpdate.realAutoUpdateBlocked === true)}`,
+      sourceField: "autoUpdateTransition.releaseChannelNextPriorityActionId/releaseChannelNextActionProofCommand/realAutoUpdateBlocked",
+      valueRecorded: false
     }
   ];
   const tenPlanProgressReportReceiptReady =
@@ -344,19 +359,28 @@ function buildReport({ audience, channel, clearance, progress }) {
       path: clearanceTransitionJsonPath,
       ready: clearance.releaseChannelClearanceTransitionReady === true,
       evidence: `${clearance.currentTenPlanProgressLabel}; next ${textValue(clearance.nextPriorityActionId)}; proof ${textValue(clearance.nextActionPreviewProofCommand)}`
+    }),
+    sourceRow({
+      label: "Release auto-update transition",
+      path: autoUpdateTransitionJsonPath,
+      ready: autoUpdate.releaseAutoUpdateTransitionReady === true,
+      evidence: `${autoUpdate.currentTenPlanProgressLabel}; synthetic feed/channel ${readyLabel(autoUpdate.syntheticFeedChannelConfigReady)}; real auto-update blocked ${readyLabel(autoUpdate.realAutoUpdateBlocked)}`
     })
   ];
   const labelsMatch =
     audience.latestTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
     channel.latestTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
-    clearance.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel;
+    clearance.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
+    autoUpdate.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel;
   const completionPercentsMatch =
     audience.userFacingCompletionPercent === 99.999999 &&
     channel.userFacingCompletionPercent === 99.999999 &&
     clearance.userFacingCompletionPercent === 99.999999 &&
+    autoUpdate.userFacingCompletionPercent === 99.999999 &&
     audience.userFacingRemainingPercent === 0.000001 &&
     channel.userFacingRemainingPercent === 0.000001 &&
-    clearance.userFacingRemainingPercent === 0.000001;
+    clearance.userFacingRemainingPercent === 0.000001 &&
+    autoUpdate.userFacingRemainingPercent === 0.000001;
   const valueBoundaryClean =
     audience.valueRecorded === false &&
     audience.claimedExternalDistribution === false &&
@@ -367,7 +391,15 @@ function buildReport({ audience, channel, clearance, progress }) {
     clearance.valueRecorded === false &&
     clearance.privateValuesRecorded === false &&
     clearance.claimedExternalDistribution === false &&
-    clearance.networkProbeAttempted === false;
+    clearance.networkProbeAttempted === false &&
+    autoUpdate.valueRecorded === false &&
+    autoUpdate.privateValuesRecorded === false &&
+    autoUpdate.feedValueRecorded === false &&
+    autoUpdate.channelValueRecorded === false &&
+    autoUpdate.claimedAutoUpdate === false &&
+    autoUpdate.claimedExternalDistribution === false &&
+    autoUpdate.networkProbeAttempted === false &&
+    autoUpdate.updateFeedPublishAttempted === false;
   const clearanceTransitionReady =
     clearance.releaseChannelClearanceTransitionReady === true &&
     ["prepare-local-distribution-env", "replace-release-channel-placeholders", "release-channel-metadata"].includes(
@@ -392,6 +424,27 @@ function buildReport({ audience, channel, clearance, progress }) {
     postClearanceTransitionRows.length === integerValue(clearance.transitionRowCount) &&
     postClearanceTransitionRows.length > 0 &&
     postClearanceTransitionRows.every((row) => row.ready === true && row.valueRecorded === false);
+  const autoUpdateTransitionReady =
+    autoUpdate.releaseAutoUpdateTransitionReady === true &&
+    autoUpdate.releaseChannelClearanceTransitionReady === true &&
+    autoUpdate.releaseChannelNextPriorityActionId === "auto-update-feed" &&
+    autoUpdate.releaseChannelNextActionProofCommand === "npm run desktop:auto-update-readiness-smoke" &&
+    autoUpdate.syntheticFeedChannelConfigReady === true &&
+    autoUpdate.syntheticFeedValueRecorded === false &&
+    autoUpdate.syntheticChannelValueRecorded === false &&
+    autoUpdate.currentEnvironmentFeedChannelReady === false &&
+    autoUpdate.realAutoUpdateReady === false &&
+    autoUpdate.realAutoUpdateBlocked === true &&
+    integerValue(autoUpdate.realAutoUpdateBlockerCount) > 0 &&
+    autoUpdate.realAutoUpdateBlockerRows?.every((row) => row.valueRecorded === false) &&
+    autoUpdate.signedUpdateArtifactsReady === false &&
+    integerValue(autoUpdate.requiredUpdateFeedKeyCount) === 6 &&
+    autoUpdate.hardGateCommand === "npm run release:external-check" &&
+    autoUpdate.hardGateReady === false &&
+    autoUpdate.hardGateWouldFail === true &&
+    autoUpdateTransitionRows.length === integerValue(autoUpdate.transitionRowCount) &&
+    autoUpdateTransitionRows.length > 0 &&
+    autoUpdateTransitionRows.every((row) => row.ready === true && row.valueRecorded === false);
   const releaseCompletionReportPacketReady =
     refreshCommandRows.every((row) => row.valueRecorded === false) &&
     privateEditProofCommandRows.every((row) => row.valueRecorded === false) &&
@@ -410,7 +463,8 @@ function buildReport({ audience, channel, clearance, progress }) {
     audience.completionGapStatus === "external proof pending" &&
     channel.completionGapStatus === "external proof pending" &&
     channel.externalDistributionReady === false &&
-    clearanceTransitionReady;
+    clearanceTransitionReady &&
+    autoUpdateTransitionReady;
 
   return {
     appName,
@@ -439,6 +493,7 @@ function buildReport({ audience, channel, clearance, progress }) {
     audienceLatestTenPlanProgressLabel: textValue(audience.latestTenPlanProgressLabel),
     channelEditLatestTenPlanProgressLabel: textValue(channel.latestTenPlanProgressLabel),
     clearanceTransitionLatestTenPlanProgressLabel: textValue(clearance.currentTenPlanProgressLabel),
+    autoUpdateTransitionLatestTenPlanProgressLabel: textValue(autoUpdate.currentTenPlanProgressLabel),
     releaseChannelClearanceTransitionReady: clearance.releaseChannelClearanceTransitionReady === true,
     postClearanceCurrentBlockerMode: textValue(clearance.currentBlockerMode),
     postClearanceCurrentPriorityActionId: textValue(clearance.currentPriorityActionId),
@@ -458,6 +513,17 @@ function buildReport({ audience, channel, clearance, progress }) {
     postClearanceNextActionPreviewPlaceholderKeyCount: integerValue(clearance.nextActionPreviewPlaceholderKeyCount),
     postClearanceTransitionRows,
     postClearanceTransitionRowCount: postClearanceTransitionRows.length,
+    releaseAutoUpdateTransitionReady: autoUpdate.releaseAutoUpdateTransitionReady === true,
+    autoUpdateTransitionReady,
+    autoUpdateSyntheticFeedChannelConfigReady: autoUpdate.syntheticFeedChannelConfigReady === true,
+    autoUpdateRealAutoUpdateReady: autoUpdate.realAutoUpdateReady === true,
+    autoUpdateRealAutoUpdateBlocked: autoUpdate.realAutoUpdateBlocked === true,
+    autoUpdateRealAutoUpdateBlockerCount: integerValue(autoUpdate.realAutoUpdateBlockerCount),
+    autoUpdateSignedUpdateArtifactsReady: autoUpdate.signedUpdateArtifactsReady === true,
+    autoUpdateRequiredUpdateFeedKeyCount: integerValue(autoUpdate.requiredUpdateFeedKeyCount),
+    autoUpdateProofCommand: textValue(autoUpdate.releaseChannelNextActionProofCommand),
+    autoUpdateTransitionRows,
+    autoUpdateTransitionRowCount: autoUpdateTransitionRows.length,
     latestCompletedPlanNumber: progress.latestCompletedPlanNumber,
     latestTenPlanProgressLabel: progress.latestTenPlanProgressLabel,
     latestTenPlanWindowStart: progress.latestTenPlanWindowStart,
@@ -559,6 +625,7 @@ function buildMarkdown(report) {
 - Audience source label: ${report.audienceLatestTenPlanProgressLabel}
 - Channel edit source label: ${report.channelEditLatestTenPlanProgressLabel}
 - Clearance transition source label: ${report.clearanceTransitionLatestTenPlanProgressLabel}
+- Auto-update transition source label: ${report.autoUpdateTransitionLatestTenPlanProgressLabel}
 - User-facing completion: ${report.userFacingCompletionPercent}%
 - Remaining completion: ${report.userFacingRemainingPercent}%
 - First-time composer ready: ${readyLabel(report.firstTimeComposerReady)}
@@ -588,6 +655,13 @@ function buildMarkdown(report) {
 - Post-clearance next priority action: ${report.postClearanceNextPriorityActionLabel} (${report.postClearanceNextPriorityActionId})
 - Post-clearance next proof command: \`${report.postClearanceNextActionPreviewProofCommand}\`
 - Post-clearance next first blocker: ${report.postClearanceNextActionPreviewFirstBlocker}
+- Auto-update transition ready: ${readyLabel(report.releaseAutoUpdateTransitionReady)}
+- Auto-update synthetic feed/channel ready: ${readyLabel(report.autoUpdateSyntheticFeedChannelConfigReady)}
+- Auto-update real readiness: ${readyLabel(report.autoUpdateRealAutoUpdateReady)}
+- Auto-update real blocked: ${readyLabel(report.autoUpdateRealAutoUpdateBlocked)}
+- Auto-update blocker rows: ${report.autoUpdateRealAutoUpdateBlockerCount}
+- Auto-update signed artifacts ready: ${readyLabel(report.autoUpdateSignedUpdateArtifactsReady)}
+- Auto-update proof command: \`${report.autoUpdateProofCommand}\`
 - Hard gate command: \`${report.hardGateCommand}\`
 - Private values recorded: no
 - Local env values recorded: no
@@ -639,6 +713,12 @@ ${formatSourceRows(report.sourceArtifactRows)}
 |---:|---|---|---|---:|---:|
 ${formatClearanceTransitionRows(report.postClearanceTransitionRows)}
 
+## Auto-Update Transition Rows
+
+| order | state | evidence | command | ready | value recorded |
+|---:|---|---|---|---:|---:|
+${formatClearanceTransitionRows(report.autoUpdateTransitionRows)}
+
 ## Not Recorded Or Claimed
 
 - No release URL, support URL, feed URL, credential, token, channel value, Developer ID identity value, private beat, or real user audio is recorded.
@@ -651,11 +731,11 @@ function validateReport(report, markdown) {
   const serialized = JSON.stringify(report);
   check(report.releaseCompletionReportPacketReady === true, "release completion report packet should be ready");
   check(report.reportCommand === "npm run release:completion-report-packet-smoke", "release completion report packet should report its command");
-  check(report.refreshCommandCount === 3, "release completion report packet should refresh three source commands");
+  check(report.refreshCommandCount === 4, "release completion report packet should refresh four source commands");
   check(
     report.refreshCommandSummary ===
-      "npm run release:audience-completion-handoff-smoke -> npm run release:channel-edit-packet-smoke -> npm run release:channel-clearance-transition-smoke",
-    "release completion report packet should refresh audience, channel edit packet, then clearance transition"
+      "npm run release:audience-completion-handoff-smoke -> npm run release:channel-edit-packet-smoke -> npm run release:channel-clearance-transition-smoke -> npm run release:auto-update-transition-smoke",
+    "release completion report packet should refresh audience, channel edit packet, clearance transition, then auto-update transition"
   );
   check(report.refreshCommandRows.every((row) => row.valueRecorded === false), "release completion report packet command rows should be value-free");
   check(report.privateEditProofCommandCount === 3, "release completion report packet should include three private-edit proof commands");
@@ -666,12 +746,13 @@ function validateReport(report, markdown) {
   check(report.privateEditProofCommandRows.every((row) => row.valueRecorded === false), "release completion report packet private-edit proof commands should be value-free");
   check(report.firstPrivateEditProofCommand === "npm run release:channel-live-check-strict", "release completion report packet should make strict live check the first private-edit proof command");
   check(report.postEditProofCommand === "npm run release:post-edit-proof", "release completion report packet should include post-edit proof command");
-  check(report.sourceArtifactRowCount === 3, "release completion report packet should include three source artifacts");
+  check(report.sourceArtifactRowCount === 4, "release completion report packet should include four source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release completion report packet sources should be present, ready, and value-free");
   check(report.sourceLabelsMatchLatestTenPlan === true, "release completion report packet source labels should match latest 10-plan progress");
   check(report.audienceLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet audience label should match latest progress");
   check(report.channelEditLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet channel edit label should match latest progress");
   check(report.clearanceTransitionLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet clearance transition label should match latest progress");
+  check(report.autoUpdateTransitionLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet auto-update transition label should match latest progress");
   check(report.firstTimeComposerReady === true, "release completion report packet should prove first-time composer readiness");
   check(report.professionalProducerReady === true, "release completion report packet should prove professional producer readiness");
   check(report.directCompositionReady === true, "release completion report packet should prove direct composition readiness");
@@ -721,6 +802,21 @@ function validateReport(report, markdown) {
   check(
     report.postClearanceTransitionRows.every((row) => row.ready === true && row.valueRecorded === false),
     "release completion report packet post-clearance transition rows should be ready and value-free"
+  );
+  check(report.releaseAutoUpdateTransitionReady === true, "release completion report packet should carry ready auto-update transition evidence");
+  check(report.autoUpdateTransitionReady === true, "release completion report packet should validate auto-update transition readiness");
+  check(report.autoUpdateSyntheticFeedChannelConfigReady === true, "release completion report packet should prove synthetic feed/channel readiness");
+  check(report.autoUpdateRealAutoUpdateReady === false, "release completion report packet should keep real auto-update unready while blockers remain");
+  check(report.autoUpdateRealAutoUpdateBlocked === true, "release completion report packet should expose real auto-update blockers");
+  check(report.autoUpdateRealAutoUpdateBlockerCount > 0, "release completion report packet should include real auto-update blocker rows");
+  check(report.autoUpdateSignedUpdateArtifactsReady === false, "release completion report packet should keep signed update artifacts unready");
+  check(report.autoUpdateRequiredUpdateFeedKeyCount === 6, "release completion report packet should mirror six auto-update feed/channel keys");
+  check(report.autoUpdateProofCommand === "npm run desktop:auto-update-readiness-smoke", "release completion report packet should expose the auto-update transition proof command");
+  check(report.autoUpdateTransitionRowCount === report.autoUpdateTransitionRows.length, "release completion report packet should match auto-update transition row count");
+  check(report.autoUpdateTransitionRowCount === 4, "release completion report packet should include four auto-update transition rows");
+  check(
+    report.autoUpdateTransitionRows.every((row) => row.ready === true && row.valueRecorded === false),
+    "release completion report packet auto-update transition rows should be ready and value-free"
   );
   check(report.hardGateCommand === "npm run release:external-check", "release completion report packet should keep hard external gate");
   check(
@@ -802,6 +898,7 @@ function validateReport(report, markdown) {
   check(tenPlanReceiptEvidence.includes(report.currentFirstBlocker), "release completion report packet 10-plan receipt should include current blocker");
   check(tenPlanReceiptEvidence.includes(report.privateEditProofCommandSummary), "release completion report packet 10-plan receipt should include private-edit proof command order");
   check(tenPlanReceiptEvidence.includes(report.postClearanceNextPriorityActionLabel), "release completion report packet 10-plan receipt should include post-clearance next action");
+  check(tenPlanReceiptEvidence.includes(report.autoUpdateProofCommand), "release completion report packet should include auto-update transition proof");
   check(report.privateValuesRecorded === false, "release completion report packet should not record private values");
   check(report.localEnvValueRecorded === false, "release completion report packet should not record local env values");
   check(report.releaseUrlValueRecorded === false, "release completion report packet should not record release URL values");
@@ -841,6 +938,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("Source labels match latest 10-plan: yes"), "release completion report packet Markdown should include source label agreement");
   check(markdown.includes("Post-clearance transition ready: yes"), "release completion report packet Markdown should include post-clearance transition readiness");
   check(markdown.includes("Post-Clearance Transition Rows"), "release completion report packet Markdown should include post-clearance transition rows");
+  check(markdown.includes("Auto-update transition ready: yes"), "release completion report packet Markdown should include auto-update transition readiness");
+  check(markdown.includes("Auto-Update Transition Rows"), "release completion report packet Markdown should include auto-update transition rows");
   check(markdown.includes("External distribution claimed: no"), "release completion report packet Markdown should keep external distribution unclaimed");
 
   if (failures.length > 0) {
@@ -856,8 +955,9 @@ for (const row of refreshCommandRows) {
 const audience = await readJsonRequired(audienceHandoffJsonPath, "Audience completion handoff");
 const channel = await readJsonRequired(channelEditPacketJsonPath, "Release-channel edit packet");
 const clearance = await readJsonRequired(clearanceTransitionJsonPath, "Release-channel clearance transition");
+const autoUpdate = await readJsonRequired(autoUpdateTransitionJsonPath, "Release auto-update transition");
 const progress = await completedPlanProgress();
-const report = buildReport({ audience, channel, clearance, progress });
+const report = buildReport({ audience, channel, clearance, autoUpdate, progress });
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
 
@@ -890,6 +990,9 @@ console.log(`- Release-channel edit packet mode: ${report.releaseChannelEditPack
 console.log(`- Post-clearance transition ready: ${report.releaseChannelClearanceTransitionReady ? "yes" : "no"}`);
 console.log(`- Post-clearance next priority action: ${report.postClearanceNextPriorityActionLabel}`);
 console.log(`- Post-clearance next proof command: ${report.postClearanceNextActionPreviewProofCommand}`);
+console.log(`- Auto-update transition ready: ${report.releaseAutoUpdateTransitionReady ? "yes" : "no"}`);
+console.log(`- Auto-update proof command: ${report.autoUpdateProofCommand}`);
+console.log(`- Auto-update blocker rows: ${report.autoUpdateRealAutoUpdateBlockerCount}`);
 console.log(`- User-facing completion: ${report.userFacingCompletionPercent}%`);
 console.log(`- Remaining completion: ${report.userFacingRemainingPercent}%`);
 console.log("- Private values recorded: no");
