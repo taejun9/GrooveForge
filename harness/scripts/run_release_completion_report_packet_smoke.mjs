@@ -33,6 +33,26 @@ const refreshCommandRows = [
     valueRecorded: false
   }
 ];
+const privateEditProofCommandRows = [
+  {
+    order: 1,
+    command: "npm run release:channel-live-check-strict",
+    role: "prove the four release-channel metadata rows are present, non-placeholder, and shape-ready after private edits",
+    valueRecorded: false
+  },
+  {
+    order: 2,
+    command: "npm run release:post-edit-proof",
+    role: "refresh the value-free live check and current-blocker evidence after private edits",
+    valueRecorded: false
+  },
+  {
+    order: 3,
+    command: "npm run release:external-check",
+    role: "run the hard external distribution gate after all private and external evidence is ready",
+    valueRecorded: false
+  }
+];
 
 function check(condition, message) {
   if (!condition) {
@@ -176,6 +196,7 @@ function buildReport({ audience, channel, progress }) {
     channel.networkProbeAttempted === false;
   const releaseCompletionReportPacketReady =
     refreshCommandRows.every((row) => row.valueRecorded === false) &&
+    privateEditProofCommandRows.every((row) => row.valueRecorded === false) &&
     sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
     labelsMatch &&
     completionPercentsMatch &&
@@ -206,6 +227,11 @@ function buildReport({ audience, channel, progress }) {
     refreshCommandRows,
     refreshCommandCount: refreshCommandRows.length,
     refreshCommandSummary: commandSummary(refreshCommandRows),
+    privateEditProofCommandRows,
+    privateEditProofCommandCount: privateEditProofCommandRows.length,
+    privateEditProofCommandSummary: commandSummary(privateEditProofCommandRows),
+    firstPrivateEditProofCommand: privateEditProofCommandRows[0].command,
+    postEditProofCommand: privateEditProofCommandRows[1].command,
     sourceArtifactRows,
     sourceArtifactRowCount: sourceArtifactRows.length,
     sourceLabelsMatchLatestTenPlan: labelsMatch,
@@ -279,6 +305,7 @@ function buildMarkdown(report) {
 
 - Completion report packet ready: ${readyLabel(report.releaseCompletionReportPacketReady)}
 - Refresh command order: ${report.refreshCommandSummary}
+- Private-edit proof command order: ${report.privateEditProofCommandSummary}
 - Latest completed plan: plan-${report.latestCompletedPlanNumber}
 - Latest 10-plan progress: ${report.latestTenPlanProgressLabel}
 - 10-plan report due: ${readyLabel(report.tenPlanProgressReportDue)}
@@ -321,6 +348,12 @@ function buildMarkdown(report) {
 |---:|---|---|---:|
 ${formatCommandRows(report.refreshCommandRows)}
 
+## Private-Edit Proof Commands
+
+| order | command | role | value recorded |
+|---:|---|---|---:|
+${formatCommandRows(report.privateEditProofCommandRows)}
+
 ## Source Artifacts
 
 | artifact | present | ready | evidence | path | value recorded |
@@ -345,6 +378,14 @@ function validateReport(report, markdown) {
     "release completion report packet should refresh audience then channel edit packet"
   );
   check(report.refreshCommandRows.every((row) => row.valueRecorded === false), "release completion report packet command rows should be value-free");
+  check(report.privateEditProofCommandCount === 3, "release completion report packet should include three private-edit proof commands");
+  check(
+    report.privateEditProofCommandSummary === "npm run release:channel-live-check-strict -> npm run release:post-edit-proof -> npm run release:external-check",
+    "release completion report packet should expose the private-edit proof command order"
+  );
+  check(report.privateEditProofCommandRows.every((row) => row.valueRecorded === false), "release completion report packet private-edit proof commands should be value-free");
+  check(report.firstPrivateEditProofCommand === "npm run release:channel-live-check-strict", "release completion report packet should make strict live check the first private-edit proof command");
+  check(report.postEditProofCommand === "npm run release:post-edit-proof", "release completion report packet should include post-edit proof command");
   check(report.sourceArtifactRowCount === 2, "release completion report packet should include two source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release completion report packet sources should be present, ready, and value-free");
   check(report.sourceLabelsMatchLatestTenPlan === true, "release completion report packet source labels should match latest 10-plan progress");
@@ -367,6 +408,10 @@ function validateReport(report, markdown) {
   check(report.currentRequiredKeyCount === 4, "release completion report packet should report four release-channel keys");
   check(report.liveCheckRowCount === 4, "release completion report packet should mirror four live-check rows");
   check(report.hardGateCommand === "npm run release:external-check", "release completion report packet should keep hard external gate");
+  check(
+    report.privateEditProofCommandRows.some((row) => row.command === report.hardGateCommand),
+    "release completion report packet private-edit proof commands should include the hard external gate"
+  );
   check(report.externalDistributionReady === false, "release completion report packet should keep external distribution unready");
   check(report.userFacingCompletionPercent === 99.999999, "release completion report packet should preserve completion percent");
   check(report.userFacingRemainingPercent === 0.000001, "release completion report packet should preserve remaining percent");
@@ -410,6 +455,8 @@ function validateReport(report, markdown) {
   check(!/https?:\/\//i.test(markdown), "release completion report packet Markdown should not include URL values");
   check(markdown.includes("Release Completion Report Packet Smoke"), "release completion report packet Markdown should include title");
   check(markdown.includes("Completion report packet ready: yes"), "release completion report packet Markdown should include readiness");
+  check(markdown.includes("Private-edit proof command order:"), "release completion report packet Markdown should include private-edit proof command order");
+  check(markdown.includes("Private-Edit Proof Commands"), "release completion report packet Markdown should include private-edit proof command table");
   check(markdown.includes("10-plan report due:"), "release completion report packet Markdown should include the 10-plan report due flag");
   check(markdown.includes(`Next 10-plan progress report at: ${report.nextTenPlanProgressReportAt}`), "release completion report packet Markdown should include next 10-plan report plan");
   check(markdown.includes("Source labels match latest 10-plan: yes"), "release completion report packet Markdown should include source label agreement");
@@ -440,6 +487,7 @@ console.log("GrooveForge release completion report packet smoke passed.");
 console.log(`- Markdown: ${relative(packetMarkdownPath)}`);
 console.log(`- JSON: ${relative(packetJsonPath)}`);
 console.log("- Completion report packet ready: yes");
+console.log(`- Private-edit proof command order: ${report.privateEditProofCommandSummary}`);
 console.log(`- Latest completed plan: plan-${report.latestCompletedPlanNumber}`);
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
 console.log(`- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}`);
