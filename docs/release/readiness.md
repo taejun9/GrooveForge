@@ -132,6 +132,7 @@ npm run release:update-feed-checkpoint-smoke
 Run the value-free release progress freshness smoke when the operator wants to know whether existing progress/current-blocker artifacts match the latest update-feed checkpoint 10-plan label:
 
 ```sh
+npm run release:progress-refresh-smoke
 npm run release:progress-freshness-smoke
 ```
 
@@ -186,6 +187,8 @@ npm run release:proof-bundle
 `release:update-feed-post-edit-proof-success-smoke` runs the same wrapper with a separate success-smoke artifact stem, uses the synthetic strict-ready update feed live-check smoke as the live-check source, then refreshes the real auto-update readiness smoke. It proves live-check readiness true, `2/2` selected-ready feed/channel keys, zero placeholders, real auto-update blockers, signed-update artifact boundary, hard-gate boundary, current 10-plan progress, completion percentage, and non-claim posture without reading the real local env root for the live check, recording feed/channel values, probing feeds, publishing feeds, uploading releases, signing artifacts, submitting to Apple, or claiming auto-update/external distribution.
 
 `release:update-feed-checkpoint-smoke` refreshes the real update feed post-edit proof first and the synthetic success-path proof second, then writes ignored checkpoint Markdown/JSON artifacts comparing real ignored-env placeholder posture with the synthetic `2/2` selected-ready branch. It keeps downstream auto-update readiness false, blocker rows present, signed update artifacts false, the hard gate would-fail, current 10-plan progress, completion percentage, and non-claim posture without recording feed/channel values, probing feeds, publishing feeds, uploading releases, signing artifacts, submitting to Apple, or claiming auto-update/external distribution.
+
+`release:progress-refresh-smoke` refreshes existing-evidence release progress, current blocker, and freshness receipts in one value-free sequence without running the full release gate. It proves the refreshed progress/current-blocker/freshness labels match the latest 10-plan checkpoint, final freshness has zero stale/missing artifacts, and the hard gate remains unclaimed until external distribution evidence is real.
 
 `release:progress-freshness-smoke` refreshes that checkpoint, then writes ignored freshness Markdown/JSON artifacts comparing the latest checkpoint progress label with existing release-progress-report and release-current-blocker labels. It marks each source as fresh, stale, or missing and emits value-free rerun commands while treating stale optional artifacts as evidence freshness gaps rather than external completion claims.
 
