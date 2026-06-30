@@ -1076,6 +1076,161 @@ function buildCurrentActionHandoffSummary({
   };
 }
 
+function expectedInputShapeForKey(key) {
+  if (key === "GROOVEFORGE_DISTRIBUTION_CHANNEL") {
+    return "allowed channel token: direct-download, private-beta, or managed-release";
+  }
+  return "safe HTTPS URL shape: HTTPS protocol, hostname present, no credentials, no fragment";
+}
+
+function buildCurrentPrivateEditSafetySummary({
+  currentActionSummary = {},
+  currentEnvEditTarget = ".env.distribution.local",
+  hardExternalGateCommand = "npm run release:external-check"
+} = {}) {
+  if (currentActionSummary.currentActionId !== "release-channel-metadata") {
+    return {
+      currentPrivateEditSafetyReady: true,
+      currentPrivateEditSafetyRowCount: 0,
+      currentPrivateEditSafetySummary: "none",
+      currentPrivateEditSafetyRows: []
+    };
+  }
+
+  const currentRerunCommand =
+    currentActionSummary.currentRerunCommand && currentActionSummary.currentRerunCommand !== "none"
+      ? currentActionSummary.currentRerunCommand
+      : currentActionSummary.currentNextCommand;
+  const commandSequence = Array.isArray(currentActionSummary.currentCommandSequence)
+    ? currentActionSummary.currentCommandSequence
+    : [];
+  const currentRequiredKeyCount = Number.isInteger(currentActionSummary.currentRequiredKeyCount)
+    ? currentActionSummary.currentRequiredKeyCount
+    : 0;
+  const currentPlaceholderKeyCount = Number.isInteger(currentActionSummary.currentPlaceholderKeyCount)
+    ? currentActionSummary.currentPlaceholderKeyCount
+    : 0;
+  const currentPrivateEditSafetyRows = [
+    {
+      order: 1,
+      check: "Private edits stay in ignored local env target",
+      ready: currentEnvEditTarget === ".env.distribution.local" && currentRequiredKeyCount === releaseChannelMetadataKeys.length,
+      evidence: `${currentEnvEditTarget}; ${currentPlaceholderKeyCount}/${currentRequiredKeyCount} current release-channel placeholders; ${currentActionSummary.currentPlaceholderEditLocationSummary ?? "current placeholder edit locations"}`,
+      command: currentRerunCommand,
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      check: "Receipt output stays value-free",
+      ready: true,
+      evidence: "key names, counts, file-line locations, assignment shapes, and expected signals only; private values recorded no",
+      command: currentRerunCommand,
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      check: "Post-edit rerun order is explicit",
+      ready: commandSequence.includes("npm run release:doctor") && commandSequence.includes(currentRerunCommand),
+      evidence: formatCommandSummary(commandSequence),
+      command: currentRerunCommand,
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      check: "Hard external gate remains separate",
+      ready: hardExternalGateCommand === "npm run release:external-check",
+      evidence: "next-actions does not claim the hard external distribution gate",
+      command: hardExternalGateCommand,
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      check: "No remote side effects by this report",
+      ready: true,
+      evidence: "network probe no; release upload no; signing no; Apple notary submission no",
+      command: currentRerunCommand,
+      valueRecorded: false
+    }
+  ];
+
+  return {
+    currentPrivateEditSafetyReady: currentPrivateEditSafetyRows.every((row) => row.ready === true && row.valueRecorded === false),
+    currentPrivateEditSafetyRowCount: currentPrivateEditSafetyRows.length,
+    currentPrivateEditSafetySummary:
+      currentPrivateEditSafetyRows.length > 0
+        ? `${currentPrivateEditSafetyRows.length} value-free private edit safety rows`
+        : "none",
+    currentPrivateEditSafetyRows
+  };
+}
+
+function buildCurrentInputShapeChecklistSummary({
+  currentActionSummary = {},
+  doctorReleaseChannelFocus = {},
+  hardExternalGateCommand = "npm run release:external-check"
+} = {}) {
+  if (currentActionSummary.currentActionId !== "release-channel-metadata") {
+    return {
+      currentInputShapeChecklistReady: true,
+      currentInputShapeChecklistRowCount: 0,
+      currentInputShapeChecklistSummary: "none",
+      currentInputShapeChecklistRows: []
+    };
+  }
+
+  const currentRequiredKeys = Array.isArray(currentActionSummary.currentRequiredKeys)
+    ? currentActionSummary.currentRequiredKeys
+    : [];
+  const proofCommand =
+    currentActionSummary.currentNextCommand && currentActionSummary.currentNextCommand !== "none"
+      ? currentActionSummary.currentNextCommand
+      : hardExternalGateCommand;
+  const rerunCommand =
+    currentActionSummary.currentRerunCommand && currentActionSummary.currentRerunCommand !== "none"
+      ? currentActionSummary.currentRerunCommand
+      : proofCommand;
+  const focusRowsByKey = new Map(
+    valueFreeObjectRows(doctorReleaseChannelFocus.doctorReleaseChannelFocusRows).map((row) => [row.key, row])
+  );
+  const currentInputShapeChecklistRows = currentRequiredKeys.map((key, index) => {
+    const focusRow = focusRowsByKey.get(key);
+    const guidance = envKeyGuidance[key] ?? expectedInputShapeForKey(key);
+    return {
+      order: index + 1,
+      key,
+      ready: releaseChannelMetadataKeys.includes(key) && typeof guidance === "string" && guidance.length > 0,
+      expectedShape: expectedInputShapeForKey(key),
+      evidenceSource: focusRow?.expectedSignal
+        ? `${focusRow.expectedSignal}; guidance: ${guidance}`
+        : `guidance: ${guidance}`,
+      proofCommand,
+      rerunCommand,
+      hardGateCommand: hardExternalGateCommand,
+      valueRecorded: false
+    };
+  });
+
+  return {
+    currentInputShapeChecklistReady:
+      currentInputShapeChecklistRows.length === releaseChannelMetadataKeys.length &&
+      releaseChannelMetadataKeys.every((key) => currentInputShapeChecklistRows.some((row) => row.key === key)) &&
+      currentInputShapeChecklistRows.every(
+        (row) =>
+          row.ready === true &&
+          row.valueRecorded === false &&
+          row.proofCommand === proofCommand &&
+          row.rerunCommand === rerunCommand &&
+          row.hardGateCommand === hardExternalGateCommand
+      ),
+    currentInputShapeChecklistRowCount: currentInputShapeChecklistRows.length,
+    currentInputShapeChecklistSummary:
+      currentInputShapeChecklistRows.length > 0
+        ? `${currentInputShapeChecklistRows.length} value-free current input shape rows`
+        : "none",
+    currentInputShapeChecklistRows
+  };
+}
+
 function formatCurrentActionAcceptanceRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| order | criterion | ready | evidence | proof command | rerun command | hard gate | value recorded |\n|---:|---|---:|---|---|---|---|---:|\n| 0 | none | no | none | none | none | none | no |";
@@ -1128,6 +1283,34 @@ function formatCurrentActionHandoffRows(rows) {
     ...rows.map(
       (row) =>
         `| ${row.order} | ${escapeCell(row.item)} | ${escapeCell(row.sourceField)} | ${escapeCell(row.evidence)} | ${row.blockerCount} | ${row.acceptanceBlockerCount} | ${escapeCell(row.proofCommand)} | ${escapeCell(row.rerunCommand)} | ${escapeCell(row.hardGateCommand)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatCurrentPrivateEditSafetyRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | ready | check | evidence | command | value recorded |\n|---:|---:|---|---|---|---:|\n| 0 | no | none | none | none | no |";
+  }
+  return [
+    "| order | ready | check | evidence | command | value recorded |",
+    "|---:|---:|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${readyLabel(row.ready)} | ${escapeCell(row.check)} | ${escapeCell(row.evidence)} | ${escapeCell(row.command)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatCurrentInputShapeChecklistRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | key | ready | expected shape | evidence source | proof command | rerun command | value recorded |\n|---:|---|---:|---|---|---|---|---:|\n| 0 | none | no | none | none | none | none | no |";
+  }
+  return [
+    "| order | key | ready | expected shape | evidence source | proof command | rerun command | value recorded |",
+    "|---:|---|---:|---|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.key)} | ${readyLabel(row.ready)} | ${escapeCell(row.expectedShape)} | ${escapeCell(row.evidenceSource)} | ${escapeCell(row.proofCommand)} | ${escapeCell(row.rerunCommand)} | ${readyLabel(row.valueRecorded)} |`
     )
   ].join("\n");
 }
@@ -1740,6 +1923,16 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     hardGateBlockedRequirementSummary: "source evidence missing",
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const currentPrivateEditSafety = buildCurrentPrivateEditSafetySummary({
+    currentActionSummary,
+    currentEnvEditTarget: currentLocalEnvEditTarget(),
+    hardExternalGateCommand: "npm run release:external-check"
+  });
+  const currentInputShapeChecklist = buildCurrentInputShapeChecklistSummary({
+    currentActionSummary,
+    doctorReleaseChannelFocus,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
 
   return {
     appName,
@@ -1780,6 +1973,8 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...currentActionAcceptance,
     ...currentActionPostEditVerification,
     ...currentActionHandoff,
+    ...currentPrivateEditSafety,
+    ...currentInputShapeChecklist,
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
     externalDistributionReady: false,
@@ -1891,6 +2086,10 @@ function buildMarkdown(report) {
 - Current action post-edit signals currently ready: ${report.currentActionPostEditVerificationCurrentSummary}
 - Current action handoff ready: ${readyLabel(report.currentActionHandoffReady)}
 - Current action handoff rows: ${report.currentActionHandoffRowCount} (${report.currentActionHandoffSummary})
+- Current private edit safety ready: ${readyLabel(report.currentPrivateEditSafetyReady)}
+- Current private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})
+- Current input shape checklist ready: ${readyLabel(report.currentInputShapeChecklistReady)}
+- Current input shape checklist rows: ${report.currentInputShapeChecklistRowCount} (${report.currentInputShapeChecklistSummary})
 - Current prerequisite commands: ${report.currentPrerequisiteCommandCount} (${report.currentPrerequisiteCommandSummary})
 - Current rerun commands: ${report.currentRerunCommandCount} (${report.currentRerunCommandSummary})
 - Current command sequence: ${report.currentCommandSequenceCount} (${report.currentCommandSequenceSummary})
@@ -2104,6 +2303,20 @@ ${formatCurrentActionPostEditVerificationRows(report.currentActionPostEditVerifi
 
 ${formatCurrentActionHandoffRows(report.currentActionHandoffRows)}
 
+## Current Private Edit Safety Checklist
+
+- Safety ready: ${readyLabel(report.currentPrivateEditSafetyReady)}
+- Safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})
+
+${formatCurrentPrivateEditSafetyRows(report.currentPrivateEditSafetyRows)}
+
+## Current Input Shape Checklist
+
+- Shape checklist ready: ${readyLabel(report.currentInputShapeChecklistReady)}
+- Shape checklist rows: ${report.currentInputShapeChecklistRowCount} (${report.currentInputShapeChecklistSummary})
+
+${formatCurrentInputShapeChecklistRows(report.currentInputShapeChecklistRows)}
+
 ## Current First Blockers
 
 | order | blocker |
@@ -2263,6 +2476,19 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
       hardGateRequirementBlockedCount > 0 ? `${hardGateRequirementBlockedCount} blocked hard-gate requirements` : "none",
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const currentPrivateEditSafety = buildCurrentPrivateEditSafetySummary({
+    currentActionSummary: {
+      ...currentActionSummary,
+      currentEnvEditTarget: localEnvEditTarget
+    },
+    currentEnvEditTarget: localEnvEditTarget,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
+  const currentInputShapeChecklist = buildCurrentInputShapeChecklistSummary({
+    currentActionSummary,
+    doctorReleaseChannelFocus,
+    hardExternalGateCommand: "npm run release:external-check"
+  });
 
   nextActionsReport = {
     appName,
@@ -2303,6 +2529,8 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...currentActionAcceptance,
     ...currentActionPostEditVerification,
     ...currentActionHandoff,
+    ...currentPrivateEditSafety,
+    ...currentInputShapeChecklist,
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
     externalDistributionReady: externalPreflight.externalDistributionReady === true,
@@ -2377,6 +2605,8 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     nextActionsReport.priorityActions.every((action) => action.valueRecorded === false) &&
     nextActionsReport.currentActionPostEditVerificationReady === true &&
     nextActionsReport.currentActionHandoffReady === true &&
+    nextActionsReport.currentPrivateEditSafetyReady === true &&
+    nextActionsReport.currentInputShapeChecklistReady === true &&
     nextActionsReport.sourceValueRecorded === false &&
     nextActionsReport.sourceClaimedExternalDistribution === false;
 }
@@ -3109,6 +3339,66 @@ check(
     nextActionsReport.currentActionHandoffRows.some((row) => row.sourceField.includes("externalPreflight")),
   "external next actions current action handoff should include source artifacts, edit target, acceptance blockers, rerun order, and hard gate rows"
 );
+check(typeof nextActionsReport.currentPrivateEditSafetyReady === "boolean", "external next actions should include current private edit safety readiness");
+check(Number.isInteger(nextActionsReport.currentPrivateEditSafetyRowCount), "external next actions should include current private edit safety row count");
+check(typeof nextActionsReport.currentPrivateEditSafetySummary === "string" && nextActionsReport.currentPrivateEditSafetySummary.length > 0, "external next actions should include current private edit safety summary");
+check(Array.isArray(nextActionsReport.currentPrivateEditSafetyRows), "external next actions should include current private edit safety rows");
+check(
+  nextActionsReport.currentPrivateEditSafetyRowCount === nextActionsReport.currentPrivateEditSafetyRows.length,
+  "external next actions current private edit safety row count should match listed rows"
+);
+check(
+  nextActionsReport.currentPrivateEditSafetyReady ===
+    nextActionsReport.currentPrivateEditSafetyRows.every((row) => row.ready === true && row.valueRecorded === false),
+  "external next actions current private edit safety readiness should reflect listed rows"
+);
+check(
+  nextActionsReport.currentPrivateEditSafetyRows.every(
+    (row, index) =>
+      row.order === index + 1 &&
+      typeof row.check === "string" &&
+      row.check.length > 0 &&
+      typeof row.evidence === "string" &&
+      row.evidence.length > 0 &&
+      typeof row.command === "string" &&
+      row.command.length > 0 &&
+      row.valueRecorded === false
+  ),
+  "external next actions current private edit safety rows should include value-free checks, evidence, and commands"
+);
+check(typeof nextActionsReport.currentInputShapeChecklistReady === "boolean", "external next actions should include current input shape checklist readiness");
+check(Number.isInteger(nextActionsReport.currentInputShapeChecklistRowCount), "external next actions should include current input shape checklist row count");
+check(typeof nextActionsReport.currentInputShapeChecklistSummary === "string" && nextActionsReport.currentInputShapeChecklistSummary.length > 0, "external next actions should include current input shape checklist summary");
+check(Array.isArray(nextActionsReport.currentInputShapeChecklistRows), "external next actions should include current input shape checklist rows");
+check(
+  nextActionsReport.currentInputShapeChecklistRowCount === nextActionsReport.currentInputShapeChecklistRows.length,
+  "external next actions current input shape checklist row count should match listed rows"
+);
+check(
+  nextActionsReport.currentInputShapeChecklistReady ===
+    (nextActionsReport.currentInputShapeChecklistRows.length === 0 ||
+      (nextActionsReport.currentInputShapeChecklistRows.length === releaseChannelMetadataKeys.length &&
+        releaseChannelMetadataKeys.every((key) => nextActionsReport.currentInputShapeChecklistRows.some((row) => row.key === key)) &&
+        nextActionsReport.currentInputShapeChecklistRows.every((row) => row.ready === true && row.valueRecorded === false))),
+  "external next actions current input shape checklist readiness should reflect listed release-channel shape rows"
+);
+check(
+  nextActionsReport.currentInputShapeChecklistRows.every(
+    (row, index) =>
+      row.order === index + 1 &&
+      typeof row.key === "string" &&
+      row.key.length > 0 &&
+      typeof row.expectedShape === "string" &&
+      row.expectedShape.length > 0 &&
+      typeof row.evidenceSource === "string" &&
+      row.evidenceSource.length > 0 &&
+      row.proofCommand === nextActionsReport.currentNextCommand &&
+      row.rerunCommand === nextActionsReport.currentRerunCommand &&
+      row.hardGateCommand === nextActionsReport.hardExternalGateCommand &&
+      row.valueRecorded === false
+  ),
+  "external next actions current input shape checklist rows should include shape guidance and current commands without values"
+);
 check(nextActionsReport.currentActionValueRecorded === false, "external next actions should not record current action values");
 check(markdown.includes("Bootstrap mode:"), "external next actions Markdown should include bootstrap mode");
 check(markdown.includes("Source evidence ready:"), "external next actions Markdown should include source evidence readiness");
@@ -3588,6 +3878,46 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
       nextActionsReport.currentActionHandoffRows.some((row) => row.item === "Hard gate" && row.hardGateCommand === "npm run release:external-check"),
     "release channel metadata should include source, edit-target, acceptance, rerun, and hard-gate handoff rows"
   );
+  check(nextActionsReport.currentPrivateEditSafetyReady === true, "release channel metadata should include ready private edit safety rows while placeholders remain");
+  check(nextActionsReport.currentPrivateEditSafetyRowCount === 5, "release channel metadata should include five private edit safety rows when placeholders remain");
+  check(
+    nextActionsReport.currentPrivateEditSafetyRows.every((row) => row.ready === true && row.valueRecorded === false),
+    "release channel metadata private edit safety rows should be ready and value-free"
+  );
+  check(
+    nextActionsReport.currentPrivateEditSafetyRows.some((row) => /ignored local env target/i.test(row.check) && row.evidence.includes(nextActionsReport.currentEnvEditTarget)) &&
+      nextActionsReport.currentPrivateEditSafetyRows.some((row) => /value-free/i.test(row.check) && /private values recorded no/i.test(row.evidence)) &&
+      nextActionsReport.currentPrivateEditSafetyRows.some((row) => /rerun order/i.test(row.check) && row.command === "npm run release:current-blocker") &&
+      nextActionsReport.currentPrivateEditSafetyRows.some((row) => /Hard external gate/i.test(row.check) && row.command === "npm run release:external-check") &&
+      nextActionsReport.currentPrivateEditSafetyRows.some((row) => /No remote side effects/i.test(row.check) && /network probe no/i.test(row.evidence)),
+    "release channel metadata private edit safety should cover ignored target, value-free output, rerun order, hard-gate separation, and no remote side effects"
+  );
+  check(nextActionsReport.currentInputShapeChecklistReady === true, "release channel metadata should include ready input shape checklist rows while placeholders remain");
+  check(nextActionsReport.currentInputShapeChecklistRowCount === 4, "release channel metadata should include four input shape checklist rows when placeholders remain");
+  check(
+    JSON.stringify(nextActionsReport.currentInputShapeChecklistRows.map((row) => row.key)) === JSON.stringify(releaseChannelMetadataKeys),
+    "release channel metadata input shape checklist should cover the release-channel metadata keys in order"
+  );
+  check(
+    nextActionsReport.currentInputShapeChecklistRows.every(
+      (row) =>
+        row.ready === true &&
+        row.proofCommand === "npm run release:doctor" &&
+        row.rerunCommand === "npm run release:current-blocker" &&
+        row.hardGateCommand === "npm run release:external-check" &&
+        row.valueRecorded === false
+    ),
+    "release channel metadata input shape checklist rows should be ready, value-free, and tied to doctor/current-blocker commands"
+  );
+  check(
+    nextActionsReport.currentInputShapeChecklistRows.some((row) => row.key === "GROOVEFORGE_DISTRIBUTION_CHANNEL" && /allowed channel token/i.test(row.expectedShape)) &&
+      nextActionsReport.currentInputShapeChecklistRows.filter((row) => /safe HTTPS URL shape/i.test(row.expectedShape)).length === 3,
+    "release channel metadata input shape checklist should include one allowed channel row and three safe HTTPS URL rows"
+  );
+  check(
+    nextActionsReport.currentInputShapeChecklistRows.every((row) => /expected signal|guidance/i.test(row.evidenceSource)),
+    "release channel metadata input shape checklist should cite value-free expected signals or guidance"
+  );
   check(
     nextActionsReport.currentPlaceholderRemediationRows.every(
       (item) =>
@@ -3727,6 +4057,10 @@ check(markdown.includes("Current action post-edit verification ready:"), "extern
 check(markdown.includes("Current action post-edit verification rows:"), "external next actions Markdown should include current action post-edit verification row status");
 check(markdown.includes("Current action handoff ready:"), "external next actions Markdown should include current action handoff readiness");
 check(markdown.includes("Current action handoff rows:"), "external next actions Markdown should include current action handoff row status");
+check(markdown.includes("Current private edit safety ready:"), "external next actions Markdown should include current private edit safety readiness");
+check(markdown.includes("Current private edit safety rows:"), "external next actions Markdown should include current private edit safety row status");
+check(markdown.includes("Current input shape checklist ready:"), "external next actions Markdown should include current input shape checklist readiness");
+check(markdown.includes("Current input shape checklist rows:"), "external next actions Markdown should include current input shape checklist row status");
 check(markdown.includes("Current env edit target:"), "external next actions Markdown should include current env edit target");
 check(markdown.includes("Current operator action:"), "external next actions Markdown should include current operator action");
 check(markdown.includes("Current rerun command:"), "external next actions Markdown should include current rerun command");
@@ -3760,6 +4094,16 @@ check(markdown.includes("## Current Action Handoff Package"), "external next act
 check(
   markdown.includes("| order | item | source | evidence | blockers | acceptance blockers | proof command | rerun command | hard gate | value recorded |"),
   "external next actions Markdown should include current action handoff table"
+);
+check(markdown.includes("## Current Private Edit Safety Checklist"), "external next actions Markdown should include current private edit safety section");
+check(
+  markdown.includes("| order | ready | check | evidence | command | value recorded |"),
+  "external next actions Markdown should include current private edit safety table"
+);
+check(markdown.includes("## Current Input Shape Checklist"), "external next actions Markdown should include current input shape checklist section");
+check(
+  markdown.includes("| order | key | ready | expected shape | evidence source | proof command | rerun command | value recorded |"),
+  "external next actions Markdown should include current input shape checklist table"
 );
 check(markdown.includes("Completion Gap"), "external next actions Markdown should include completion gap section");
 check(markdown.includes("Proof target:"), "external next actions Markdown should include completion gap proof target details");
@@ -3826,6 +4170,18 @@ if (nextActionsReport.currentActionHandoffRowCount > 0) {
   check(
     nextActionsReport.currentActionHandoffRows.some((item) => markdown.includes(item.item) && markdown.includes(item.evidence)),
     "external next actions Markdown should include current action handoff rows"
+  );
+}
+if (nextActionsReport.currentPrivateEditSafetyRowCount > 0) {
+  check(
+    nextActionsReport.currentPrivateEditSafetyRows.some((item) => markdown.includes(item.check) && markdown.includes(item.evidence)),
+    "external next actions Markdown should include current private edit safety rows"
+  );
+}
+if (nextActionsReport.currentInputShapeChecklistRowCount > 0) {
+  check(
+    nextActionsReport.currentInputShapeChecklistRows.some((item) => markdown.includes(item.key) && markdown.includes(item.expectedShape)),
+    "external next actions Markdown should include current input shape checklist rows"
   );
 }
 check(markdown.includes("Priority Next Actions"), "external next actions Markdown should include priority actions");
@@ -3920,6 +4276,10 @@ console.log(
 console.log(`- Current action post-edit signals currently ready: ${nextActionsReport.currentActionPostEditVerificationCurrentSummary}`);
 console.log(`- Current action handoff ready: ${nextActionsReport.currentActionHandoffReady ? "yes" : "no"}`);
 console.log(`- Current action handoff rows: ${nextActionsReport.currentActionHandoffRowCount} (${nextActionsReport.currentActionHandoffSummary})`);
+console.log(`- Current private edit safety ready: ${nextActionsReport.currentPrivateEditSafetyReady ? "yes" : "no"}`);
+console.log(`- Current private edit safety rows: ${nextActionsReport.currentPrivateEditSafetyRowCount} (${nextActionsReport.currentPrivateEditSafetySummary})`);
+console.log(`- Current input shape checklist ready: ${nextActionsReport.currentInputShapeChecklistReady ? "yes" : "no"}`);
+console.log(`- Current input shape checklist rows: ${nextActionsReport.currentInputShapeChecklistRowCount} (${nextActionsReport.currentInputShapeChecklistSummary})`);
 console.log(`- Current prerequisite commands: ${nextActionsReport.currentPrerequisiteCommandCount} (${nextActionsReport.currentPrerequisiteCommandSummary})`);
 console.log(`- Current rerun commands: ${nextActionsReport.currentRerunCommandCount} (${nextActionsReport.currentRerunCommandSummary})`);
 console.log(`- Current command sequence: ${nextActionsReport.currentCommandSequenceCount} (${nextActionsReport.currentCommandSequenceSummary})`);
