@@ -24,6 +24,14 @@ const releaseProgressJsonPath = path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-progress-report.json`
 );
+const strictLiveCheckJsonPath = path.join(
+  packageRoot,
+  `${appName}-${packageJson.version}-${platformArch}-release-channel-live-check-strict.json`
+);
+const strictSuccessSmokeJsonPath = path.join(
+  packageRoot,
+  `${appName}-${packageJson.version}-${platformArch}-release-channel-live-check-strict-success-smoke.json`
+);
 const finalHandoffMarkdownPath = path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-final-handoff.md`
@@ -35,6 +43,8 @@ const finalHandoffJsonPath = path.join(
 const fromExisting = process.argv.includes("--from-existing");
 const failures = [];
 const refreshCommand = "npm run release:post-edit-proof-bundle";
+const strictSuccessSmokeCommand = "npm run release:channel-live-check-strict-success-smoke";
+const strictLiveCheckCommand = "npm run release:channel-live-check-strict";
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
@@ -57,26 +67,48 @@ function fail(message, details = "") {
   process.exit(1);
 }
 
-function runRefresh() {
-  if (fromExisting) {
-    return;
-  }
-
-  console.log(`Refreshing release final handoff evidence: ${refreshCommand}`);
+function runNpmScript({ label, args, allowedStatuses }) {
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-  const result = spawnSync(npmCommand, ["run", "release:post-edit-proof-bundle"], {
+  const result = spawnSync(npmCommand, args, {
     cwd: root,
     env: process.env,
     stdio: "inherit"
   });
 
   if (result.error) {
-    fail(`Could not run ${refreshCommand}.`, result.error.message);
+    fail(`Could not run ${label}.`, result.error.message);
   }
 
-  if (result.status !== 0) {
-    fail(`${refreshCommand} exited with status ${result.status}.`);
+  if (!allowedStatuses.includes(result.status)) {
+    fail(`${label} exited with status ${result.status}.`);
   }
+}
+
+function runRefresh() {
+  if (fromExisting) {
+    return;
+  }
+
+  console.log(`Refreshing release final handoff evidence: ${refreshCommand}`);
+  runNpmScript({
+    label: refreshCommand,
+    args: ["run", "release:post-edit-proof-bundle"],
+    allowedStatuses: [0]
+  });
+
+  console.log(`Refreshing release final handoff evidence: ${strictSuccessSmokeCommand}`);
+  runNpmScript({
+    label: strictSuccessSmokeCommand,
+    args: ["run", "release:channel-live-check-strict-success-smoke"],
+    allowedStatuses: [0]
+  });
+
+  console.log(`Refreshing release final handoff evidence: ${strictLiveCheckCommand}`);
+  runNpmScript({
+    label: strictLiveCheckCommand,
+    args: ["run", "release:channel-live-check-strict"],
+    allowedStatuses: [0, 1]
+  });
 }
 
 function relative(filePath) {
@@ -172,6 +204,22 @@ function sanitizeOperatorRows(rows) {
   }));
 }
 
+function sanitizeStrictProofRows(rows) {
+  return objectRows(rows).map((row, index) => ({
+    order: Number.isInteger(row.order) ? row.order : index + 1,
+    label: textValue(row.label, "strict proof"),
+    command: textValue(row.command),
+    sourcePath: textValue(row.sourcePath),
+    strictReady: row.strictReady === true,
+    currentReadyCount: integerValue(row.currentReadyCount),
+    currentRowCount: integerValue(row.currentRowCount),
+    placeholderKeyCount: integerValue(row.placeholderKeyCount),
+    synthetic: row.synthetic === true,
+    realLocalEnvRead: row.realLocalEnvRead === true,
+    valueRecorded: false
+  }));
+}
+
 function formatSourceRows(rows) {
   return rows
     .map((row) => `| ${escapeCell(row.label)} | ${row.present ? "yes" : "no"} | ${escapeCell(row.path)} | ${row.ready ? "yes" : "no"} | ${row.valueRecorded ? "yes" : "no"} |`)
@@ -214,6 +262,18 @@ function formatOperatorRows(rows) {
     .join("\n");
 }
 
+function formatStrictProofRows(rows) {
+  if (rows.length === 0) {
+    return "| none | none | none | none | no | none | none | none | no | no | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.label)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.sourcePath)} | ${readyLabel(row.strictReady)} | ${row.currentReadyCount}/${row.currentRowCount} | ${row.placeholderKeyCount} | ${readyLabel(row.synthetic)} | ${readyLabel(row.realLocalEnvRead)} | ${row.valueRecorded ? "yes" : "no"} |`
+    )
+    .join("\n");
+}
+
 function buildCommandRows() {
   return [
     {
@@ -225,27 +285,41 @@ function buildCommandRows() {
     },
     {
       order: 2,
+      label: "Real strict live check",
+      command: "npm run release:channel-live-check-strict",
+      role: "pass/fail proof for real private release-channel metadata after edits",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      label: "Strict success smoke",
+      command: "npm run release:channel-live-check-strict-success-smoke",
+      role: "prove strict pass branch with synthetic shape-ready metadata",
+      valueRecorded: false
+    },
+    {
+      order: 4,
       label: "Post-edit proof bundle",
       command: "npm run release:post-edit-proof-bundle",
       role: "prove synthetic ready branch and current real ignored-env posture",
       valueRecorded: false
     },
     {
-      order: 3,
+      order: 5,
       label: "Current blocker refresh",
       command: "npm run release:current-blocker",
       role: "refresh value-free current blocker and 10-plan progress evidence",
       valueRecorded: false
     },
     {
-      order: 4,
+      order: 6,
       label: "Progress refresh",
       command: "npm run release:progress-smoke",
       role: "refresh user-facing completion and 10-plan report from existing evidence",
       valueRecorded: false
     },
     {
-      order: 5,
+      order: 7,
       label: "Hard external gate",
       command: "npm run release:external-check",
       role: "only command that may claim external distribution completion when all evidence is ready",
@@ -254,7 +328,38 @@ function buildCommandRows() {
   ];
 }
 
-function buildReport({ postEditProofBundle, currentBlocker, releaseProgress }) {
+function buildStrictProofRows({ strictLiveCheck, strictSuccessSmoke }) {
+  return sanitizeStrictProofRows([
+    {
+      order: 1,
+      label: "Real strict live check",
+      command: "npm run release:channel-live-check-strict",
+      sourcePath: relative(strictLiveCheckJsonPath),
+      strictReady: strictLiveCheck.strictReady === true,
+      currentReadyCount: strictLiveCheck.releaseChannelLiveCheckCurrentReadyCount,
+      currentRowCount: strictLiveCheck.releaseChannelLiveCheckRowCount,
+      placeholderKeyCount: strictLiveCheck.currentPlaceholderKeyCount,
+      synthetic: false,
+      realLocalEnvRead: strictLiveCheck.realLocalEnvRead !== false,
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      label: "Synthetic strict success smoke",
+      command: "npm run release:channel-live-check-strict-success-smoke",
+      sourcePath: relative(strictSuccessSmokeJsonPath),
+      strictReady: strictSuccessSmoke.strictReady === true,
+      currentReadyCount: strictSuccessSmoke.releaseChannelLiveCheckCurrentReadyCount,
+      currentRowCount: strictSuccessSmoke.releaseChannelLiveCheckRowCount,
+      placeholderKeyCount: strictSuccessSmoke.currentPlaceholderKeyCount,
+      synthetic: true,
+      realLocalEnvRead: strictSuccessSmoke.realLocalEnvRead === true,
+      valueRecorded: false
+    }
+  ]);
+}
+
+function buildReport({ postEditProofBundle, currentBlocker, releaseProgress, strictLiveCheck, strictSuccessSmoke }) {
   const blockerRequiredKeys = stringArrayValue(currentBlocker.currentRequiredKeys);
   const bundleRequiredKeys = stringArrayValue(postEditProofBundle.actualLiveCheckRequiredKeys);
   const blockerPlaceholderKeys = stringArrayValue(currentBlocker.currentPlaceholderKeys);
@@ -287,6 +392,19 @@ function buildReport({ postEditProofBundle, currentBlocker, releaseProgress }) {
     blockerOperatorRows.length > 0 ? blockerOperatorRows : progressOperatorRows
   );
   const commandRows = buildCommandRows();
+  const strictProofRows = buildStrictProofRows({ strictLiveCheck, strictSuccessSmoke });
+  const strictProofReady =
+    strictProofRows.length === 2 &&
+    strictLiveCheck.strictMode === true &&
+    strictLiveCheck.strictExitCode === (strictLiveCheck.strictReady === true ? 0 : 1) &&
+    strictLiveCheck.releaseChannelLiveCheckRowCount === releaseChannelMetadataKeys.length &&
+    strictSuccessSmoke.syntheticSuccessSmoke === true &&
+    strictSuccessSmoke.strictReady === true &&
+    strictSuccessSmoke.strictExitCode === 0 &&
+    strictSuccessSmoke.releaseChannelLiveCheckCurrentReadyCount === releaseChannelMetadataKeys.length &&
+    strictSuccessSmoke.currentPlaceholderKeyCount === 0 &&
+    strictSuccessSmoke.realLocalEnvRead === false &&
+    strictSuccessSmoke.realLocalEnvModified === false;
   const sourceArtifactRows = [
     {
       label: "Post-edit proof bundle",
@@ -307,6 +425,20 @@ function buildReport({ postEditProofBundle, currentBlocker, releaseProgress }) {
       path: relative(releaseProgressJsonPath),
       present: true,
       ready: releaseProgress.tenPlanProgressReportReceiptReady === true,
+      valueRecorded: false
+    },
+    {
+      label: "Real strict live-check receipt",
+      path: relative(strictLiveCheckJsonPath),
+      present: true,
+      ready: strictLiveCheck.strictMode === true && [0, 1].includes(strictLiveCheck.strictExitCode),
+      valueRecorded: false
+    },
+    {
+      label: "Synthetic strict success smoke",
+      path: relative(strictSuccessSmokeJsonPath),
+      present: true,
+      ready: strictSuccessSmoke.syntheticSuccessSmoke === true && strictSuccessSmoke.strictReady === true,
       valueRecorded: false
     }
   ];
@@ -360,6 +492,20 @@ function buildReport({ postEditProofBundle, currentBlocker, releaseProgress }) {
     currentRowCount,
     releaseChannelMetadataReady,
     privateEditStillRequired,
+    strictProofReady,
+    strictProofRows,
+    strictProofRowCount: strictProofRows.length,
+    realStrictReady: strictLiveCheck.strictReady === true,
+    realStrictExitCode: integerValue(strictLiveCheck.strictExitCode),
+    realStrictCurrentReadyCount: integerValue(strictLiveCheck.releaseChannelLiveCheckCurrentReadyCount),
+    realStrictCurrentRowCount: integerValue(strictLiveCheck.releaseChannelLiveCheckRowCount),
+    realStrictPlaceholderKeyCount: integerValue(strictLiveCheck.currentPlaceholderKeyCount),
+    strictSuccessSmokeReady: strictSuccessSmoke.strictReady === true,
+    strictSuccessSmokeCurrentReadyCount: integerValue(strictSuccessSmoke.releaseChannelLiveCheckCurrentReadyCount),
+    strictSuccessSmokeCurrentRowCount: integerValue(strictSuccessSmoke.releaseChannelLiveCheckRowCount),
+    strictSuccessSmokePlaceholderKeyCount: integerValue(strictSuccessSmoke.currentPlaceholderKeyCount),
+    strictSuccessSmokeRealLocalEnvRead: strictSuccessSmoke.realLocalEnvRead === true,
+    strictSuccessSmokeRealLocalEnvModified: strictSuccessSmoke.realLocalEnvModified === true,
     firstProofAfterPrivateEdits: textValue(
       currentBlocker.releaseChannelFirstProofCommandAfterPrivateEdits,
       postEditProofBundle.actualFirstProofCommandAfterPrivateEdits
@@ -432,6 +578,12 @@ function buildMarkdown(report) {
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current ready rows: ${report.currentReadyCount}/${report.currentRowCount}
 - Current placeholder keys: ${report.currentPlaceholderKeyCount}
+- Strict proof ready: ${readyLabel(report.strictProofReady)}
+- Real strict ready: ${readyLabel(report.realStrictReady)}
+- Real strict rows: ${report.realStrictCurrentReadyCount}/${report.realStrictCurrentRowCount}
+- Real strict placeholder keys: ${report.realStrictPlaceholderKeyCount}
+- Strict success smoke ready: ${readyLabel(report.strictSuccessSmokeReady)}
+- Strict success smoke rows: ${report.strictSuccessSmokeCurrentReadyCount}/${report.strictSuccessSmokeCurrentRowCount}
 - First proof after private edits: \`${report.firstProofAfterPrivateEdits}\`
 - Post-edit proof bundle: \`${report.postEditProofBundleCommand}\`
 - Current blocker refresh: \`${report.currentBlockerRefreshCommand}\`
@@ -475,6 +627,12 @@ ${formatEditRows(report.currentEnvEditRows)}
 |---:|---|---:|---|---|---:|
 ${formatSequenceRows(report.postEditProofSequenceReceiptRows)}
 
+## Strict Release-Channel Proofs
+
+| order | label | command | source path | strict ready | current ready rows | placeholder keys | synthetic | real local env read | value recorded |
+|---:|---|---|---|---:|---:|---:|---:|---:|---:|
+${formatStrictProofRows(report.strictProofRows)}
+
 ## Release-Channel Post-Edit Operator Receipt
 
 | order | step | current state | expected post-edit signal | value recorded |
@@ -502,11 +660,13 @@ ${formatOperatorRows(report.releaseChannelPostEditOperatorReceiptRows)}
 
 function validateReport(report, markdown) {
   check(report.releaseFinalHandoffReady === true, "release final handoff should be ready");
-  check(report.sourceArtifactRowCount === 3, "release final handoff should include three source artifacts");
+  check(report.sourceArtifactRowCount === 5, "release final handoff should include five source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release final handoff source rows should be present, ready, and value-free");
-  check(report.releaseFinalHandoffCommandCount === 5, "release final handoff should include five handoff commands");
+  check(report.releaseFinalHandoffCommandCount === 7, "release final handoff should include seven handoff commands");
   check(report.releaseFinalHandoffCommandRows.every((row) => row.valueRecorded === false), "release final handoff command rows should not record values");
   check(report.firstProofAfterPrivateEdits === "npm run release:channel-live-check", "release final handoff should keep live-check as first proof after private edits");
+  check(report.releaseFinalHandoffCommandRows.some((row) => row.command === "npm run release:channel-live-check-strict"), "release final handoff should include real strict live-check command");
+  check(report.releaseFinalHandoffCommandRows.some((row) => row.command === "npm run release:channel-live-check-strict-success-smoke"), "release final handoff should include strict success smoke command");
   check(report.postEditProofBundleCommand === "npm run release:post-edit-proof-bundle", "release final handoff should keep post-edit proof bundle command");
   check(report.currentBlockerRefreshCommand === "npm run release:current-blocker", "release final handoff should keep current-blocker refresh command");
   check(report.hardGateCommand === "npm run release:external-check", "release final handoff should keep hard external gate command");
@@ -515,6 +675,17 @@ function validateReport(report, markdown) {
   check(report.currentRowCount === 4, "release final handoff should mirror four live-check rows");
   check(report.currentReadyCount >= 0 && report.currentReadyCount <= report.currentRowCount, "release final handoff current-ready count should be bounded");
   check(report.currentPlaceholderKeyCount >= 0 && report.currentPlaceholderKeyCount <= 4, "release final handoff placeholder key count should be bounded");
+  check(report.strictProofReady === true, "release final handoff should include ready strict proof coverage");
+  check(report.strictProofRowCount === 2, "release final handoff should include two strict proof rows");
+  check(report.strictProofRows.every((row) => row.valueRecorded === false), "release final handoff strict proof rows should not record values");
+  check(report.realStrictCurrentRowCount === 4, "release final handoff should mirror four real strict rows");
+  check(report.realStrictCurrentReadyCount >= 0 && report.realStrictCurrentReadyCount <= 4, "release final handoff real strict ready count should be bounded");
+  check(report.realStrictPlaceholderKeyCount >= 0 && report.realStrictPlaceholderKeyCount <= 4, "release final handoff real strict placeholder count should be bounded");
+  check(report.strictSuccessSmokeReady === true, "release final handoff should include ready strict success smoke");
+  check(report.strictSuccessSmokeCurrentReadyCount === 4, "release final handoff strict success smoke should prove four ready rows");
+  check(report.strictSuccessSmokePlaceholderKeyCount === 0, "release final handoff strict success smoke should prove zero placeholder keys");
+  check(report.strictSuccessSmokeRealLocalEnvRead === false, "release final handoff strict success smoke should not read real local env");
+  check(report.strictSuccessSmokeRealLocalEnvModified === false, "release final handoff strict success smoke should not modify real local env");
   check(report.currentEnvEditRows.every((row) => row.valueRecorded === false), "release final handoff edit rows should not record values");
   check(report.currentPlaceholderEditLocations.every((row) => row.valueRecorded === false), "release final handoff placeholder locations should not record values");
   check(report.postEditProofSequenceReceiptReady === true, "release final handoff should include ready post-edit proof sequence receipt");
@@ -527,8 +698,8 @@ function validateReport(report, markdown) {
   check(report.successRealLocalEnvRead === false, "release final handoff success source should not read the real local env");
   check(report.successRealLocalEnvModified === false, "release final handoff success source should not modify the real local env");
   check(report.tenPlanProgressReportReceiptReady === true, "release final handoff should include ready 10-plan progress receipt");
-  check(report.currentTenPlanWindowEnd >= 1200, "release final handoff should cover the plan-1200 cadence window");
-  check(report.currentTenPlanWindowCompletedCount >= 9, "release final handoff should be at or beyond the 9/10 plan-1200 handoff point");
+  check(report.currentTenPlanWindowEnd >= report.currentTenPlanWindowStart, "release final handoff should include a valid current 10-plan window");
+  check(report.currentTenPlanWindowCompletedCount >= 0, "release final handoff completed-count should be non-negative");
   check(report.currentTenPlanWindowCompletedCount <= report.currentTenPlanWindowTotal, "release final handoff completed-count should not exceed the current window total");
   check(report.userFacingCompletionPercent === 99.999999, "release final handoff should preserve user-facing completion percent");
   check(report.userFacingRemainingPercent === 0.000001, "release final handoff should preserve user-facing remaining percent");
@@ -544,6 +715,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("Final Handoff Commands"), "release final handoff Markdown should include commands");
   check(markdown.includes("Current Private Edit Rows"), "release final handoff Markdown should include private edit rows");
   check(markdown.includes("Post-Edit Proof Sequence Receipt"), "release final handoff Markdown should include proof sequence");
+  check(markdown.includes("Strict Release-Channel Proofs"), "release final handoff Markdown should include strict release-channel proofs");
   check(markdown.includes("Release-Channel Post-Edit Operator Receipt"), "release final handoff Markdown should include operator receipt");
   check(markdown.includes("Completion Cadence"), "release final handoff Markdown should include completion cadence");
   check(markdown.includes("External distribution claimed: no"), "release final handoff Markdown should keep external distribution unclaimed");
@@ -558,7 +730,9 @@ runRefresh();
 const postEditProofBundle = await readRequiredJson(postEditProofBundleJsonPath, "Post-edit proof bundle");
 const currentBlocker = await readRequiredJson(currentBlockerJsonPath, "Release current blocker");
 const releaseProgress = await readRequiredJson(releaseProgressJsonPath, "Release progress report");
-const report = buildReport({ postEditProofBundle, currentBlocker, releaseProgress });
+const strictLiveCheck = await readRequiredJson(strictLiveCheckJsonPath, "Real strict live check");
+const strictSuccessSmoke = await readRequiredJson(strictSuccessSmokeJsonPath, "Strict success smoke");
+const report = buildReport({ postEditProofBundle, currentBlocker, releaseProgress, strictLiveCheck, strictSuccessSmoke });
 const markdown = buildMarkdown(report);
 
 validateReport(report, markdown);
@@ -576,6 +750,9 @@ console.log(`- Release-channel metadata ready: ${report.releaseChannelMetadataRe
 console.log(`- Private edit still required: ${report.privateEditStillRequired ? "yes" : "no"}`);
 console.log(`- Current target: ${report.currentTarget}`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount}`);
+console.log(`- Strict proof ready: ${report.strictProofReady ? "yes" : "no"}`);
+console.log(`- Real strict ready: ${report.realStrictReady ? "yes" : "no"}`);
+console.log(`- Strict success smoke ready: ${report.strictSuccessSmokeReady ? "yes" : "no"}`);
 console.log(`- First proof after private edits: ${report.firstProofAfterPrivateEdits}`);
 console.log(`- Post-edit proof bundle: ${report.postEditProofBundleCommand}`);
 console.log(`- Current blocker refresh: ${report.currentBlockerRefreshCommand}`);
