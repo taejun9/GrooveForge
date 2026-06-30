@@ -288,6 +288,15 @@ function formatReleaseChannelPostEditReceiptRows(rows) {
     .join("\n");
 }
 
+function formatReleaseChannelFocusRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | no | no | no | no | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${escapeCell(row.key)} | ${row.present ? "yes" : "no"} | ${row.placeholder ? "yes" : "no"} | ${row.shapeReady ? "yes" : "no"} | ${row.currentReady ? "yes" : "no"} | ${escapeCell(row.evidence)} | ${escapeCell(row.expectedSignal)} | \`${escapeCell(row.proofCommand)}\` | \`${escapeCell(row.rerunCommand)}\` | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
 function formatPrivateEditSafetyRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | no | none | none | none | no |";
@@ -1681,6 +1690,12 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     integerValue(releaseProgress.releaseChannelPostEditReceiptRowCount) === releaseChannelPostEditReceiptRows.length &&
     releaseChannelPostEditReceiptRows.length === 6 &&
     releaseChannelPostEditReceiptRows.every((row) => row.ready === true && row.valueRecorded === false);
+  const releaseChannelFocusRows = valueFreeObjectRows(releaseDoctor.releaseChannelFocusRows);
+  const releaseChannelFocusReceiptReady =
+    releaseDoctor.releaseChannelFocusReceiptReady === true &&
+    integerValue(releaseDoctor.releaseChannelFocusRowCount) === releaseChannelFocusRows.length &&
+    releaseChannelFocusRows.length === releaseChannelMetadataKeys.length &&
+    releaseChannelFocusRows.every((row) => row.valueRecorded === false);
   const consistencyRows = [
     {
       check: "Doctor/proof/gate/progress next command consensus",
@@ -2075,6 +2090,17 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     releaseChannelPostEditReceiptProofCommand: textValue(releaseProgress.releaseChannelPostEditReceiptProofCommand, "npm run release:doctor"),
     releaseChannelPostEditReceiptRerunCommand: textValue(releaseProgress.releaseChannelPostEditReceiptRerunCommand, "npm run release:current-blocker"),
     releaseChannelPostEditReceiptValueRecorded: releaseProgress.releaseChannelPostEditReceiptValueRecorded === true ? true : false,
+    releaseChannelFocusReceiptReady,
+    releaseChannelFocusCurrentReady: releaseDoctor.releaseChannelFocusCurrentReady === true,
+    releaseChannelFocusCurrentReadyCount: integerValue(releaseDoctor.releaseChannelFocusCurrentReadyCount),
+    releaseChannelFocusRowCount: integerValue(releaseDoctor.releaseChannelFocusRowCount),
+    releaseChannelFocusSummary: textValue(releaseDoctor.releaseChannelFocusSummary, "none"),
+    releaseChannelFocusRows,
+    releaseChannelFocusPlaceholderKeyCount: integerValue(releaseDoctor.releaseChannelFocusPlaceholderKeyCount),
+    releaseChannelFocusPlaceholderKeys: stringArrayValue(releaseDoctor.releaseChannelFocusPlaceholderKeys),
+    releaseChannelFocusProofCommand: textValue(releaseDoctor.releaseChannelFocusProofCommand, "npm run desktop:distribution-private-inputs-smoke"),
+    releaseChannelFocusRerunCommand: textValue(releaseDoctor.releaseChannelFocusRerunCommand, "npm run release:doctor"),
+    releaseChannelFocusValueRecorded: releaseDoctor.releaseChannelFocusValueRecorded === true ? true : false,
     audienceReadinessReady: releaseProgress.audienceReadinessReady === true,
     audienceReadinessRowCount: integerValue(releaseProgress.audienceReadinessRowCount),
     audienceReadinessRowSummary: textValue(releaseProgress.audienceReadinessRowSummary, "none"),
@@ -2584,6 +2610,27 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.releaseChannelPostEditReceiptProofCommand === report.currentNextCommand, "release current blocker post-edit receipt proof command should match current next command");
   check(report.releaseChannelPostEditReceiptRerunCommand === report.currentRerunCommand, "release current blocker post-edit receipt rerun command should match current rerun command");
   check(report.releaseChannelPostEditReceiptValueRecorded === false, "release current blocker post-edit receipt should not record values");
+  check(report.releaseChannelFocusReceiptReady === true, "release current blocker release-channel focus receipt should be ready");
+  check(report.releaseChannelFocusReceiptReady === releaseDoctor.releaseChannelFocusReceiptReady, "release current blocker should mirror release doctor focus receipt readiness");
+  check(report.releaseChannelFocusCurrentReady === releaseDoctor.releaseChannelFocusCurrentReady, "release current blocker should mirror release doctor focus current readiness");
+  check(report.releaseChannelFocusRowCount === releaseDoctor.releaseChannelFocusRowCount, "release current blocker should mirror release doctor focus row count");
+  check(report.releaseChannelFocusRowCount === report.releaseChannelFocusRows.length, "release current blocker focus row count should match rows");
+  check(report.releaseChannelFocusRowCount === releaseChannelMetadataKeys.length, "release current blocker focus receipt should include four release-channel keys");
+  check(sameJson(report.releaseChannelFocusRows, valueFreeObjectRows(releaseDoctor.releaseChannelFocusRows)), "release current blocker should mirror release doctor focus rows");
+  check(report.releaseChannelFocusRows.every((row) => row.valueRecorded === false), "release current blocker focus rows should not record values");
+  check(report.releaseChannelFocusRows.every((row) => releaseChannelMetadataKeys.includes(row.key)), "release current blocker focus rows should be limited to release-channel metadata keys");
+  check(releaseChannelMetadataKeys.every((key) => report.releaseChannelFocusRows.some((row) => row.key === key)), "release current blocker focus rows should cover current release-channel metadata keys");
+  check(report.releaseChannelFocusRows.every((row) => typeof row.expectedSignal === "string" && row.expectedSignal.length > 0), "release current blocker focus rows should include expected signals");
+  check(report.releaseChannelFocusRows.every((row) => row.proofCommand === report.releaseChannelFocusProofCommand), "release current blocker focus rows should mirror proof command");
+  check(report.releaseChannelFocusRows.every((row) => row.rerunCommand === report.releaseChannelFocusRerunCommand), "release current blocker focus rows should mirror rerun command");
+  check(report.releaseChannelFocusCurrentReadyCount === report.releaseChannelFocusRows.filter((row) => row.currentReady === true).length, "release current blocker focus current-ready count should match rows");
+  check(report.releaseChannelFocusCurrentReady === (report.releaseChannelFocusCurrentReadyCount === report.releaseChannelFocusRowCount), "release current blocker focus current readiness should match rows");
+  check(report.releaseChannelFocusPlaceholderKeyCount === report.releaseChannelFocusPlaceholderKeys.length, "release current blocker focus placeholder count should match keys");
+  check(report.releaseChannelFocusPlaceholderKeyCount === report.currentPlaceholderKeyCount, "release current blocker focus placeholder count should match current placeholder key count");
+  check(sameStringArray(report.releaseChannelFocusPlaceholderKeys, report.currentPlaceholderKeys), "release current blocker focus placeholder keys should match current placeholder keys");
+  check(report.releaseChannelFocusProofCommand === "npm run desktop:distribution-private-inputs-smoke", "release current blocker focus proof command should be private-inputs smoke");
+  check(report.releaseChannelFocusRerunCommand === "npm run release:doctor", "release current blocker focus rerun command should be release doctor");
+  check(report.releaseChannelFocusValueRecorded === false, "release current blocker focus receipt should not record values");
   check(report.audienceReadinessReady === true, "release current blocker should include ready audience readiness");
   check(report.audienceReadinessRowCount === report.audienceReadinessRows.length, "release current blocker audience row count should match rows");
   check(report.audienceReadinessRowCount === releaseProgress.audienceReadinessRowCount, "release current blocker should mirror release progress audience row count");
@@ -2761,6 +2808,10 @@ function buildMarkdown(report) {
     `- Release-channel post-edit receipt ready: ${report.releaseChannelPostEditReceiptReady ? "yes" : "no"}`,
     `- Release-channel post-edit receipt rows: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary})`,
     `- Release-channel post-edit current-ready rows: ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}`,
+    `- Release-channel focus receipt ready: ${report.releaseChannelFocusReceiptReady ? "yes" : "no"}`,
+    `- Release-channel focus current action ready: ${report.releaseChannelFocusCurrentReady ? "yes" : "no"}`,
+    `- Release-channel focus current-ready rows: ${report.releaseChannelFocusCurrentReadyCount}/${report.releaseChannelFocusRowCount}`,
+    `- Release-channel focus placeholder keys: ${report.releaseChannelFocusPlaceholderKeyCount}`,
     `- Private values recorded: ${report.privateValuesRecorded ? "yes" : "no"}`,
     `- External distribution claimed: ${report.claimedExternalDistribution ? "yes" : "no"}`,
     "",
@@ -2840,6 +2891,21 @@ function buildMarkdown(report) {
     "| order | item | receipt ready | current ready | evidence | expected post-edit signal | proof command | source field | value recorded |",
     "|---:|---|---:|---:|---|---|---|---|---:|",
     formatReleaseChannelPostEditReceiptRows(report.releaseChannelPostEditReceiptRows),
+    "",
+    "## Release-Channel Focus Receipt",
+    "",
+    `- Receipt ready: ${report.releaseChannelFocusReceiptReady ? "yes" : "no"}`,
+    `- Current action ready: ${report.releaseChannelFocusCurrentReady ? "yes" : "no"}`,
+    `- Receipt rows: ${report.releaseChannelFocusRowCount} (${report.releaseChannelFocusSummary})`,
+    `- Current-ready rows: ${report.releaseChannelFocusCurrentReadyCount}/${report.releaseChannelFocusRowCount}`,
+    `- Placeholder keys: ${report.releaseChannelFocusPlaceholderKeyCount} (${formatKeyList(report.releaseChannelFocusPlaceholderKeys)})`,
+    `- Proof command: \`${report.releaseChannelFocusProofCommand}\``,
+    `- Rerun command: \`${report.releaseChannelFocusRerunCommand}\``,
+    `- Value recorded: ${report.releaseChannelFocusValueRecorded ? "yes" : "no"}`,
+    "",
+    "| key | present | placeholder | shape ready | current ready | evidence | expected signal | proof command | rerun command | value recorded |",
+    "|---|---:|---:|---:|---:|---|---|---|---|---:|",
+    formatReleaseChannelFocusRows(report.releaseChannelFocusRows),
     "",
     "## Hard Gate Requirement Ladder",
     "",
@@ -3151,6 +3217,10 @@ check(markdown.includes("Release-channel post-edit receipt ready:"), "release cu
 check(markdown.includes("Release-channel post-edit receipt rows:"), "release current blocker Markdown should include release-channel post-edit receipt rows");
 check(markdown.includes("Release-Channel Post-Edit Receipt"), "release current blocker Markdown should include release-channel post-edit receipt table");
 check(markdown.includes("expected post-edit signal"), "release current blocker Markdown should include post-edit expected signals");
+check(markdown.includes("Release-channel focus receipt ready:"), "release current blocker Markdown should include release-channel focus receipt readiness");
+check(markdown.includes("Release-channel focus current-ready rows:"), "release current blocker Markdown should include release-channel focus current-ready rows");
+check(markdown.includes("Release-Channel Focus Receipt"), "release current blocker Markdown should include release-channel focus receipt table");
+check(markdown.includes("expected signal"), "release current blocker Markdown should include release-channel focus expected signals");
 check(markdown.includes("Hard Gate Requirement Ladder"), "release current blocker Markdown should include hard-gate requirement ladder");
 check(markdown.includes("Blocked Hard Gate Requirements"), "release current blocker Markdown should include blocked hard-gate requirements");
 check(markdown.includes("Blocked Hard Gate Action Matrix"), "release current blocker Markdown should include blocked hard-gate action matrix");
@@ -3287,6 +3357,10 @@ console.log(`- Release-channel unblock rows: ${report.releaseChannelUnblockMetad
 console.log(`- Release-channel post-edit receipt ready: ${report.releaseChannelPostEditReceiptReady ? "yes" : "no"}`);
 console.log(`- Release-channel post-edit receipt rows: ${report.releaseChannelPostEditReceiptRowCount} (${report.releaseChannelPostEditReceiptSummary})`);
 console.log(`- Release-channel post-edit current-ready rows: ${report.releaseChannelPostEditReceiptCurrentReadyCount}/${report.releaseChannelPostEditReceiptRowCount}`);
+console.log(`- Release-channel focus receipt ready: ${report.releaseChannelFocusReceiptReady ? "yes" : "no"}`);
+console.log(`- Release-channel focus current action ready: ${report.releaseChannelFocusCurrentReady ? "yes" : "no"}`);
+console.log(`- Release-channel focus current-ready rows: ${report.releaseChannelFocusCurrentReadyCount}/${report.releaseChannelFocusRowCount}`);
+console.log(`- Release-channel focus placeholder keys: ${report.releaseChannelFocusPlaceholderKeyCount}`);
 console.log("- Private values recorded: no");
 console.log("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted by this report");
 console.log("- Not claimed: Developer ID signing, notarization, Gatekeeper approval, auto-update, manual QA approval, app-store submission, or external distribution completion");
