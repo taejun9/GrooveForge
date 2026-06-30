@@ -103,16 +103,23 @@ async function readJsonRequired(filePath, label) {
 
 async function currentTenPlanProgress() {
   const completedRoot = path.join(root, "docs", "exec_plans", "completed");
-  const files = await readdir(completedRoot);
-  const planNumbers = files
+  const activeRoot = path.join(root, "docs", "exec_plans", "active");
+  const completedFiles = await readdir(completedRoot);
+  const activeFiles = await readdir(activeRoot);
+  const completedPlanNumbers = completedFiles
     .map((file) => /^plan-(\d+)-/.exec(file)?.[1])
     .filter((value) => typeof value === "string")
     .map((value) => Number(value))
     .filter((value) => Number.isInteger(value));
-  const currentPlan = 1210;
+  const activePlanNumbers = activeFiles
+    .map((file) => /^plan-(\d+)-/.exec(file)?.[1])
+    .filter((value) => typeof value === "string")
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value));
+  const currentPlan = Math.max(...completedPlanNumbers, ...activePlanNumbers);
   const windowStart = Math.floor((currentPlan - 1) / 10) * 10 + 1;
   const windowEnd = windowStart + 9;
-  const windowRows = planNumbers.filter((number) => number >= windowStart && number <= windowEnd).sort((a, b) => a - b);
+  const windowRows = completedPlanNumbers.filter((number) => number >= windowStart && number <= windowEnd).sort((a, b) => a - b);
   return {
     label: `${windowStart}-${windowEnd}: ${windowRows.length}/10`,
     windowStart,
@@ -271,7 +278,7 @@ function buildReport({ realProof, successProof, progress }) {
     comparisonRow(
       6,
       "10-plan checkpoint posture",
-      progress.completedCount >= 9 && progress.completedCount <= 10,
+      progress.completedCount >= 0 && progress.completedCount <= 10,
       `${progress.label}; report due ${progress.reportDue ? "yes" : "no"}.`,
       "currentTenPlanProgress"
     )
@@ -481,10 +488,15 @@ function validateReport(report, markdown) {
   check(report.hardGateCommand === "npm run release:external-check", "update feed checkpoint should keep hard external gate command");
   check(report.hardGateReady === false, "update feed checkpoint should keep hard gate unready");
   check(report.hardGateWouldFail === true, "update feed checkpoint should keep hard gate would-fail posture");
-  check(report.currentTenPlanWindowStart === 1201, "update feed checkpoint should use the 1201-1210 window");
-  check(report.currentTenPlanWindowEnd === 1210, "update feed checkpoint should end at plan 1210");
+  check(report.currentTenPlanWindowStart > 0, "update feed checkpoint should report a positive 10-plan window start");
+  check(report.currentTenPlanWindowEnd === report.currentTenPlanWindowStart + 9, "update feed checkpoint should report a 10-plan window range");
   check(report.currentTenPlanWindowTotal === 10, "update feed checkpoint should use ten-plan windows");
-  check(report.currentTenPlanWindowCompletedCount >= 9 && report.currentTenPlanWindowCompletedCount <= 10, "update feed checkpoint completed count should reflect pre/post completion state");
+  check(
+    report.currentTenPlanProgressLabel ===
+      `${report.currentTenPlanWindowStart}-${report.currentTenPlanWindowEnd}: ${report.currentTenPlanWindowCompletedCount}/10`,
+    "update feed checkpoint progress label should match the dynamic 10-plan window"
+  );
+  check(report.currentTenPlanWindowCompletedCount >= 0 && report.currentTenPlanWindowCompletedCount <= 10, "update feed checkpoint completed count should be bounded");
   check(report.userFacingCompletionPercent === 99.999999, "update feed checkpoint should preserve completion percent");
   check(report.userFacingRemainingPercent === 0.000001, "update feed checkpoint should preserve remaining percent");
   check(report.privateValuesRecorded === false, "update feed checkpoint should not record private values");

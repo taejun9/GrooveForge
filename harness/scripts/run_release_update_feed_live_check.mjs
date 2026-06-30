@@ -178,16 +178,23 @@ function textValue(value, fallback = "none") {
 
 async function currentTenPlanProgress() {
   const completedRoot = path.join(root, "docs", "exec_plans", "completed");
-  const files = await readdir(completedRoot);
-  const planNumbers = files
+  const activeRoot = path.join(root, "docs", "exec_plans", "active");
+  const completedFiles = await readdir(completedRoot);
+  const activeFiles = await readdir(activeRoot);
+  const completedPlanNumbers = completedFiles
     .map((file) => /^plan-(\d+)-/.exec(file)?.[1])
     .filter((value) => typeof value === "string")
     .map((value) => Number(value))
     .filter((value) => Number.isInteger(value));
-  const currentPlan = 1207;
+  const activePlanNumbers = activeFiles
+    .map((file) => /^plan-(\d+)-/.exec(file)?.[1])
+    .filter((value) => typeof value === "string")
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value));
+  const currentPlan = Math.max(...completedPlanNumbers, ...activePlanNumbers);
   const windowStart = Math.floor((currentPlan - 1) / 10) * 10 + 1;
   const windowEnd = windowStart + 9;
-  const windowRows = planNumbers.filter((number) => number >= windowStart && number <= windowEnd).sort((a, b) => a - b);
+  const windowRows = completedPlanNumbers.filter((number) => number >= windowStart && number <= windowEnd).sort((a, b) => a - b);
   return {
     label: `${windowStart}-${windowEnd}: ${windowRows.length}/10`,
     windowStart,
