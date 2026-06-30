@@ -107,6 +107,12 @@ Run the value-free release-channel clearance transition smoke when the operator 
 npm run release:channel-clearance-transition-smoke
 ```
 
+Run the value-free auto-update transition smoke when the operator wants one receipt tying the `auto-update-feed` next action to synthetic feed/channel redaction readiness, real auto-update blockers, and the hard-gate boundary:
+
+```sh
+npm run release:auto-update-transition-smoke
+```
+
 Rerun the fast redacted external preflight after editing the ignored local env file:
 
 ```sh
@@ -148,6 +154,8 @@ npm run release:proof-bundle
 `release:final-handoff-success-redaction-smoke` writes synthetic value-free source artifacts under ignored build output, runs final handoff from those artifacts with the separate `release-final-handoff-success-redaction-smoke` stem, and proves the strict-ready final handoff path remains URL/channel/private-value free without reading or modifying the real local env or claiming external distribution.
 
 `release:channel-clearance-transition-smoke` refreshes `release:final-handoff-success-redaction-smoke` and `release:current-blocker`, then writes ignored `release-channel-clearance-transition-smoke` Markdown/JSON artifacts that tie synthetic strict-ready final handoff proof to the real current release-channel metadata blocker, four real placeholders, `auto-update-feed` next priority action, `npm run desktop:auto-update-readiness-smoke` proof command, hard-gate boundary, and current 10-plan progress. It records synthetic clearance, the real release-channel metadata blocker, the auto-update-feed next priority action, the hard-gate boundary, and the current 10-plan progress without URL/channel/private values, probes no network, signs nothing, submits nothing to Apple, and makes no external distribution claim.
+
+`release:auto-update-transition-smoke` refreshes `release:channel-clearance-transition-smoke`, `desktop:update-feed-config-smoke`, and `desktop:auto-update-readiness-smoke`, then writes ignored `release-auto-update-transition-smoke` Markdown/JSON artifacts that tie the `auto-update-feed` next action to the update feed/channel config ready branch and real auto-update readiness blockers. It proves the synthetic feed/channel config case is ready while feed and channel values remain redacted, mirrors real auto-update blocker rows and signed-update artifact readiness, keeps `npm run release:external-check` as the hard gate, records current 10-plan progress, probes no update feed or distribution channel, publishes no feed, signs nothing, submits nothing to Apple, and claims neither auto-update nor external distribution.
 
 `release:doctor` runs targeted redacted distribution input/readiness smokes, reads the generated env-template, prepare-env, update-feed, Developer ID readiness, manual QA, distribution-channel QA, and private-input summaries, then writes a compact release doctor Markdown/JSON report under ignored `build/desktop/` without running the full release gate, recording private values, probing remote channels, signing artifacts, submitting to Apple, or claiming external distribution completion. It mirrors the distribution private-inputs release-channel focus receipt so the four current metadata keys show receipt readiness, current-ready count, placeholder count, proof command, rerun command, and value-recording posture. When release-channel placeholders remain, it keeps `npm run release:doctor` as the next proof command and lists `npm run release:current-blocker` as the refresh rerun after ignored env edits.
 

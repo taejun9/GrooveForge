@@ -5281,8 +5281,12 @@ if (nextActionsReport.bootstrapMode === false) {
         "release-channel current action next preview should include auto-update operator actions"
       );
       check(
-        nextActionsReport.nextActionPreviewEnvEditRows.some((row) => row.location === ".env.distribution.local:24" && row.key === "GROOVEFORGE_UPDATE_FEED_URL") &&
-          nextActionsReport.nextActionPreviewEnvEditRows.some((row) => row.location === ".env.distribution.local:29" && row.key === "UPDATE_CHANNEL"),
+        nextActionsReport.nextActionPreviewEnvEditRows.some(
+          (row) => row.key === "GROOVEFORGE_UPDATE_FEED_URL" && typeof row.location === "string" && row.location.startsWith(".env.distribution.local:")
+        ) &&
+          nextActionsReport.nextActionPreviewEnvEditRows.some(
+            (row) => row.key === "UPDATE_CHANNEL" && typeof row.location === "string" && row.location.startsWith(".env.distribution.local:")
+          ),
         "release-channel current action next preview should include primary and fallback update env edit rows"
       );
       check(

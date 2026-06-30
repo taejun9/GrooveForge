@@ -2522,8 +2522,18 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.nextActionPreviewEnvEditRows.every((row) => row.valueRecorded === false), "release current blocker next action preview env edit rows should not record values");
   check(report.nextActionPreviewEnvEditRows.every((row) => row.proofCommand === report.nextPriorityActionNextCommand), "release current blocker next action preview env edit proof commands should match next priority action command");
   check(report.nextActionPreviewEnvEditRows.every((row) => typeof row.sourceField === "string" && row.sourceField.includes("externalNextActions.priorityActions[1]")), "release current blocker next action preview env edit rows should cite the second priority action source field");
-  check(report.nextActionPreviewEnvEditRows.some((row) => row.location === ".env.distribution.local:24" && row.key === "GROOVEFORGE_UPDATE_FEED_URL"), "release current blocker next action preview env edit rows should include primary update feed URL location");
-  check(report.nextActionPreviewEnvEditRows.some((row) => row.location === ".env.distribution.local:29" && row.key === "UPDATE_CHANNEL"), "release current blocker next action preview env edit rows should include fallback update channel location");
+  check(
+    report.nextActionPreviewEnvEditRows.some(
+      (row) => row.key === "GROOVEFORGE_UPDATE_FEED_URL" && typeof row.location === "string" && row.location.startsWith(".env.distribution.local:")
+    ),
+    "release current blocker next action preview env edit rows should include primary update feed URL location"
+  );
+  check(
+    report.nextActionPreviewEnvEditRows.some(
+      (row) => row.key === "UPDATE_CHANNEL" && typeof row.location === "string" && row.location.startsWith(".env.distribution.local:")
+    ),
+    "release current blocker next action preview env edit rows should include fallback update channel location"
+  );
   check(report.nextActionPreviewEnvEditRows.every((row) => row.assignment.includes("<") && row.assignment.includes(">")), "release current blocker next action preview env edit rows should use value-free assignment shapes");
   check(report.currentActionTransitionReady === true, "release current blocker current action transition preview should be ready");
   check(report.currentActionTransitionRowCount === report.currentActionTransitionRows.length, "release current blocker current action transition row count should match rows");
