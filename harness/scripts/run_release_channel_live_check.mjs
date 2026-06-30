@@ -17,22 +17,59 @@ const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const strictMode = process.argv.includes("--strict");
+const requestedReportStem = process.env.GROOVEFORGE_RELEASE_CHANNEL_LIVE_CHECK_REPORT_STEM?.trim() ?? "";
 const reportArtifacts = {
   default: {
     stem: "release-channel-live-check",
     markdownName: "release-channel-live-check.md",
-    jsonName: "release-channel-live-check.json"
+    jsonName: "release-channel-live-check.json",
+    command: "npm run release:channel-live-check",
+    sourceMode: "real-release-channel-live-check",
+    syntheticSuccessSmoke: false
   },
   strict: {
     stem: "release-channel-live-check-strict",
     markdownName: "release-channel-live-check-strict.md",
-    jsonName: "release-channel-live-check-strict.json"
+    jsonName: "release-channel-live-check-strict.json",
+    command: "npm run release:channel-live-check-strict",
+    sourceMode: "real-release-channel-live-check-strict",
+    syntheticSuccessSmoke: false
+  },
+  strictSuccessSmoke: {
+    stem: "release-channel-live-check-strict-success-smoke",
+    markdownName: "release-channel-live-check-strict-success-smoke.md",
+    jsonName: "release-channel-live-check-strict-success-smoke.json",
+    command: "npm run release:channel-live-check-strict-success-smoke",
+    sourceMode: "synthetic-strict-success-smoke",
+    syntheticSuccessSmoke: true
   }
 };
-const selectedArtifact = strictMode ? reportArtifacts.strict : reportArtifacts.default;
+if (
+  requestedReportStem &&
+  (requestedReportStem !== reportArtifacts.strictSuccessSmoke.stem || strictMode !== true)
+) {
+  console.error("GrooveForge release-channel live check failed:");
+  console.error("- Unsupported report stem override.");
+  process.exit(1);
+}
+const selectedArtifact = requestedReportStem
+  ? reportArtifacts.strictSuccessSmoke
+  : strictMode
+    ? reportArtifacts.strict
+    : reportArtifacts.default;
 const reportStem = selectedArtifact.stem;
 const markdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${reportStem}.md`);
 const jsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${reportStem}.json`);
+const localEnvRootOverride = process.env.GROOVEFORGE_RELEASE_CHANNEL_LIVE_CHECK_ENV_ROOT?.trim() ?? "";
+const resolvedLocalEnvRoot = localEnvRootOverride
+  ? path.resolve(root, localEnvRootOverride)
+  : root;
+const relativeLocalEnvRoot = path.relative(root, resolvedLocalEnvRoot);
+if (localEnvRootOverride && (relativeLocalEnvRoot.startsWith("..") || path.isAbsolute(relativeLocalEnvRoot))) {
+  console.error("GrooveForge release-channel live check failed:");
+  console.error("- Local env root override must stay inside the repository.");
+  process.exit(1);
+}
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
@@ -77,10 +114,10 @@ function displayLocalEnvTarget(filePath) {
 }
 
 function localEnvCandidatePaths() {
-  const paths = [path.join(root, distributionLocalEnvDefaults.defaultEnvFileName)];
+  const paths = [path.join(resolvedLocalEnvRoot, distributionLocalEnvDefaults.defaultEnvFileName)];
   const configuredPath = process.env[distributionLocalEnvDefaults.configuredFileKey]?.trim();
   if (configuredPath) {
-    paths.push(path.isAbsolute(configuredPath) ? configuredPath : path.resolve(root, configuredPath));
+    paths.push(path.isAbsolute(configuredPath) ? configuredPath : path.resolve(resolvedLocalEnvRoot, configuredPath));
   }
   return [...new Set(paths)];
 }
@@ -346,7 +383,7 @@ async function main() {
   const previousValues = new Map(distributionPrivateInputKeys.map((key) => [key, process.env[key]]));
   try {
     const localEnvInput = await loadDistributionLocalEnv({
-      root,
+      root: resolvedLocalEnvRoot,
       allowedKeys: distributionPrivateInputKeys
     });
     const localEntries = await readLocalEnvEntries();
@@ -364,11 +401,17 @@ async function main() {
       arch: process.arch,
       platformArch,
       strictMode,
-      reportCommand: strictMode ? "npm run release:channel-live-check-strict" : "npm run release:channel-live-check",
+      sourceMode: selectedArtifact.sourceMode,
+      syntheticSuccessSmoke: selectedArtifact.syntheticSuccessSmoke,
+      reportCommand: selectedArtifact.command,
       releaseChannelLiveCheckMarkdownArtifactName: selectedArtifact.markdownName,
       releaseChannelLiveCheckJsonArtifactName: selectedArtifact.jsonName,
       releaseChannelLiveCheckMarkdownPath: relative(markdownPath),
       releaseChannelLiveCheckJsonPath: relative(jsonPath),
+      localEnvRootOverrideEnabled: Boolean(localEnvRootOverride),
+      localEnvRootRelativePath: localEnvRootOverride ? relativeLocalEnvRoot : ".",
+      realLocalEnvRead: resolvedLocalEnvRoot === root,
+      realLocalEnvModified: false,
       releaseChannelLiveCheckReady: currentReadyCount === rows.length && rows.every((row) => row.valueRecorded === false),
       releaseChannelLiveCheckCurrentReadyCount: currentReadyCount,
       releaseChannelLiveCheckRowCount: rows.length,
@@ -426,6 +469,8 @@ async function main() {
 
     check(report.appName === appName, "release-channel live check should identify GrooveForge");
     check(report.bundleId === bundleId, `release-channel live check should identify ${bundleId}`);
+    check(report.sourceMode === selectedArtifact.sourceMode, "release-channel live check source mode should match artifact mode");
+    check(report.reportCommand === selectedArtifact.command, "release-channel live check report command should match artifact mode");
     check(report.releaseChannelLiveCheckRowCount === releaseChannelMetadataKeys.length, "release-channel live check should cover four metadata rows");
     check(releaseChannelMetadataKeys.every((key) => rows.some((row) => row.key === key)), "release-channel live check should cover current release-channel keys");
     check(rows.every((row) => row.valueRecorded === false), "release-channel live check rows should not record values");
@@ -452,6 +497,8 @@ async function main() {
     );
     check(report.localEnvValueRecorded === false, "release-channel live check should not record local env values");
     check(report.privateValuesRecorded === false, "release-channel live check should not record private values");
+    check(report.realLocalEnvModified === false, "release-channel live check should not modify real local env");
+    check(report.syntheticSuccessSmoke === selectedArtifact.syntheticSuccessSmoke, "release-channel live check synthetic smoke flag should match artifact mode");
     check(report.networkProbeAttempted === false, "release-channel live check should not probe the network");
     check(report.releaseUploadAttempted === false, "release-channel live check should not upload releases");
     check(report.notarySubmissionAttempted === false, "release-channel live check should not submit to Apple");
@@ -501,6 +548,7 @@ async function main() {
     }
     console.log(`- Markdown: ${relative(markdownPath)}`);
     console.log(`- JSON: ${relative(jsonPath)}`);
+    console.log(`- Source mode: ${report.sourceMode}`);
     console.log(`- Strict mode: ${report.strictMode ? "yes" : "no"}`);
     console.log(`- Strict ready: ${report.strictReady ? "yes" : "no"}`);
     console.log(`- Live check ready: ${report.releaseChannelLiveCheckReady ? "yes" : "no"}`);
