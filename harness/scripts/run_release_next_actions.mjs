@@ -1315,6 +1315,347 @@ function formatCurrentInputShapeChecklistRows(rows) {
   ].join("\n");
 }
 
+function nextActionReadyCriteriaSourceField(criterion) {
+  const lower = String(criterion ?? "").toLowerCase();
+  if (lower.includes("update feed config")) {
+    return "externalNextActions.priorityActions[1].readyCriteria/updateFeedConfig";
+  }
+  if (lower.includes("auto-update readiness")) {
+    return "externalNextActions.priorityActions[1].readyCriteria/autoUpdateReadiness";
+  }
+  if (lower.includes("signed") && lower.includes("notarized")) {
+    return "externalNextActions.priorityActions[1].readyCriteria/updateMetadataArtifacts";
+  }
+  return "externalNextActions.priorityActions[1].readyCriteria";
+}
+
+function nextActionExpectedSignal(criterion) {
+  const lower = String(criterion ?? "").toLowerCase();
+  if (lower.includes("update feed config")) {
+    return "one safe feed URL key ready; one valid update channel key ready; value recorded no";
+  }
+  if (lower.includes("auto-update readiness")) {
+    return "auto-update readiness ready yes; provider/feed/channel metadata ready; value recorded no";
+  }
+  if (lower.includes("signed") && lower.includes("notarized")) {
+    return "signed/notarized update metadata artifacts ready after Developer ID, notarization, and Gatekeeper evidence; value recorded no";
+  }
+  return "next action ready signal present; value recorded no";
+}
+
+function nextActionCurrentEvidenceForCriterion(criterion, blockers) {
+  const lower = String(criterion ?? "").toLowerCase();
+  if (lower.includes("update feed config")) {
+    return blockers.find((blocker) => /provider, feed url, and channel metadata/i.test(blocker)) ?? "none";
+  }
+  if (lower.includes("auto-update readiness")) {
+    return blockers.find((blocker) => /auto-update readiness is not complete/i.test(blocker)) ?? "none";
+  }
+  if (lower.includes("signed") && lower.includes("notarized")) {
+    return blockers.find((blocker) => /signed\/notarized update metadata artifacts/i.test(blocker)) ?? "none";
+  }
+  return blockers.length > 0 ? blockers.join("; ") : "none";
+}
+
+function buildNextActionPreviewSummary(priorityActions = []) {
+  const nextAction = Array.isArray(priorityActions) ? priorityActions[1] : null;
+  if (!nextAction) {
+    return {
+      nextPriorityActionId: "none",
+      nextPriorityActionLabel: "none",
+      nextPriorityActionNextCommand: "none",
+      nextPriorityActionFirstBlocker: "none",
+      nextActionPreviewReady: true,
+      nextActionPreviewId: "none",
+      nextActionPreviewLabel: "none",
+      nextActionPreviewProofCommand: "none",
+      nextActionPreviewFirstBlocker: "none",
+      nextActionPreviewRerunCommandCount: 0,
+      nextActionPreviewRerunCommandSummary: "none",
+      nextActionPreviewRerunCommands: [],
+      nextActionPreviewRequiredKeyCount: 0,
+      nextActionPreviewRequiredKeySummary: "none",
+      nextActionPreviewRequiredKeys: [],
+      nextActionPreviewPlaceholderKeyCount: 0,
+      nextActionPreviewPlaceholderKeySummary: "none",
+      nextActionPreviewPlaceholderKeys: [],
+      nextActionPreviewReadyCriteriaRowCount: 0,
+      nextActionPreviewReadyCriteriaSummary: "none",
+      nextActionPreviewReadyCriteriaRows: [],
+      nextActionPreviewChecklistRowCount: 0,
+      nextActionPreviewChecklistSummary: "none",
+      nextActionPreviewChecklistRows: [],
+      nextActionPreviewEvidenceRowCount: 0,
+      nextActionPreviewEvidenceSummary: "none",
+      nextActionPreviewEvidenceRows: [],
+      nextActionPreviewBlockerRowCount: 0,
+      nextActionPreviewBlockerSummary: "none",
+      nextActionPreviewBlockerRows: [],
+      nextActionPreviewVerificationRowCount: 0,
+      nextActionPreviewVerificationSummary: "none",
+      nextActionPreviewVerificationRows: [],
+      nextActionPreviewPrerequisiteCommandRowCount: 0,
+      nextActionPreviewPrerequisiteCommandSummary: "none",
+      nextActionPreviewPrerequisiteCommandRows: [],
+      nextActionPreviewOperatorActionRowCount: 0,
+      nextActionPreviewOperatorActionSummary: "none",
+      nextActionPreviewOperatorActionRows: [],
+      nextActionPreviewEnvEditRowCount: 0,
+      nextActionPreviewEnvEditSummary: "none",
+      nextActionPreviewEnvEditRows: []
+    };
+  }
+
+  const proofCommand = typeof nextAction.nextCommand === "string" && nextAction.nextCommand.length > 0
+    ? nextAction.nextCommand
+    : "npm run release:external-check";
+  const blockers = Array.isArray(nextAction.blockers) ? unique(nextAction.blockers) : [];
+  const readyCriteria = Array.isArray(nextAction.readyCriteria) ? unique(nextAction.readyCriteria) : [];
+  const checklist = Array.isArray(nextAction.actionChecklist) ? unique(nextAction.actionChecklist) : [];
+  const prerequisiteCommands = Array.isArray(nextAction.prerequisiteCommands) ? unique(nextAction.prerequisiteCommands) : [];
+  const operatorActions = Array.isArray(nextAction.operatorActions) ? unique(nextAction.operatorActions) : [];
+  const rerunCommands = Array.isArray(nextAction.rerunCommands) ? unique(nextAction.rerunCommands) : [];
+  const requiredKeys = Array.isArray(nextAction.requiredKeys) ? unique(nextAction.requiredKeys) : [];
+  const placeholderKeys = Array.isArray(nextAction.placeholderKeys) ? unique(nextAction.placeholderKeys) : [];
+  const evidenceRows = valueFreeObjectRows(nextAction.evidence).map((row) => ({
+    label: row.label ?? "Evidence",
+    path: row.path ?? "unknown",
+    present: row.present === true,
+    valueRecorded: false
+  }));
+  const readyCriteriaRows = readyCriteria.map((criterion, index) => ({
+    order: index + 1,
+    criterion,
+    sourceField: nextActionReadyCriteriaSourceField(criterion),
+    proofCommand,
+    blocker: nextAction.firstBlocker ?? "none",
+    valueRecorded: false
+  }));
+  const checklistRows = checklist.map((step, index) => ({
+    order: index + 1,
+    step,
+    proofCommand,
+    valueRecorded: false
+  }));
+  const blockerRows = blockers.map((blocker, index) => ({
+    order: index + 1,
+    blocker,
+    sourceField: "externalNextActions.priorityActions[1].blockers",
+    proofCommand,
+    valueRecorded: false
+  }));
+  const currentReady = nextAction.ready === true && blockers.length === 0;
+  const verificationRows = readyCriteria.map((criterion, index) => ({
+    order: index + 1,
+    criterion,
+    currentReady,
+    currentEvidence: nextActionCurrentEvidenceForCriterion(criterion, blockers),
+    expectedSignal: nextActionExpectedSignal(criterion),
+    sourceField: "externalNextActions.priorityActions[1].readyCriteria/blockers",
+    proofCommand,
+    valueRecorded: false
+  }));
+  const prerequisiteCommandRows = prerequisiteCommands.map((command, index) => ({
+    order: index + 1,
+    command,
+    sourceField: "externalNextActions.priorityActions[1].prerequisiteCommands",
+    proofCommand,
+    valueRecorded: false
+  }));
+  const operatorActionRows = operatorActions.map((action, index) => ({
+    order: index + 1,
+    action,
+    sourceField: "externalNextActions.priorityActions[1].operatorActions",
+    proofCommand,
+    valueRecorded: false
+  }));
+  const envEditRows = valueFreeObjectRows(nextAction.envEditRows).map((row, index) => ({
+    order: index + 1,
+    key: row.key ?? "unknown",
+    location: row.location ?? (row.file && row.line ? `${row.file}:${row.line}` : row.editTarget ?? "none"),
+    assignment: row.assignment ?? "none",
+    guidance: row.guidance ?? "none",
+    placeholder: row.placeholder === true,
+    sourceField: "externalNextActions.priorityActions[1].envEditRows",
+    proofCommand,
+    valueRecorded: false
+  }));
+  const nextActionPreviewReady =
+    readyCriteriaRows.length === readyCriteria.length &&
+    checklistRows.length === checklist.length &&
+    blockerRows.length === blockers.length &&
+    verificationRows.length === readyCriteria.length &&
+    prerequisiteCommandRows.length === prerequisiteCommands.length &&
+    operatorActionRows.length === operatorActions.length &&
+    envEditRows.length === valueFreeObjectRows(nextAction.envEditRows).length &&
+    readyCriteriaRows.length > 0 &&
+    checklistRows.length > 0 &&
+    blockerRows.length > 0 &&
+    verificationRows.length > 0 &&
+    prerequisiteCommandRows.length > 0 &&
+    operatorActionRows.length > 0 &&
+    envEditRows.length > 0 &&
+    readyCriteriaRows.every((row) => row.valueRecorded === false && row.proofCommand === proofCommand) &&
+    checklistRows.every((row) => row.valueRecorded === false && row.proofCommand === proofCommand) &&
+    evidenceRows.every((row) => row.valueRecorded === false) &&
+    blockerRows.every((row) => row.valueRecorded === false && row.proofCommand === proofCommand) &&
+    verificationRows.every((row) => row.valueRecorded === false && row.proofCommand === proofCommand) &&
+    prerequisiteCommandRows.every((row) => row.valueRecorded === false && row.proofCommand === proofCommand) &&
+    operatorActionRows.every((row) => row.valueRecorded === false && row.proofCommand === proofCommand) &&
+    envEditRows.every((row) => row.valueRecorded === false && row.proofCommand === proofCommand);
+
+  return {
+    nextPriorityActionId: nextAction.id ?? "none",
+    nextPriorityActionLabel: nextAction.label ?? "none",
+    nextPriorityActionNextCommand: proofCommand,
+    nextPriorityActionFirstBlocker: nextAction.firstBlocker ?? "none",
+    nextActionPreviewReady,
+    nextActionPreviewId: nextAction.id ?? "none",
+    nextActionPreviewLabel: nextAction.label ?? "none",
+    nextActionPreviewProofCommand: proofCommand,
+    nextActionPreviewFirstBlocker: nextAction.firstBlocker ?? "none",
+    nextActionPreviewRerunCommandCount: rerunCommands.length,
+    nextActionPreviewRerunCommandSummary: formatCommandSummary(rerunCommands),
+    nextActionPreviewRerunCommands: rerunCommands,
+    nextActionPreviewRequiredKeyCount: requiredKeys.length,
+    nextActionPreviewRequiredKeySummary: requiredKeys.length > 0 ? requiredKeys.join(", ") : "none",
+    nextActionPreviewRequiredKeys: requiredKeys,
+    nextActionPreviewPlaceholderKeyCount: placeholderKeys.length,
+    nextActionPreviewPlaceholderKeySummary: placeholderKeys.length > 0 ? placeholderKeys.join(", ") : "none",
+    nextActionPreviewPlaceholderKeys: placeholderKeys,
+    nextActionPreviewReadyCriteriaRowCount: readyCriteriaRows.length,
+    nextActionPreviewReadyCriteriaSummary: readyCriteriaRows.length > 0 ? `${readyCriteriaRows.length} value-free next action ready criteria rows` : "none",
+    nextActionPreviewReadyCriteriaRows: readyCriteriaRows,
+    nextActionPreviewChecklistRowCount: checklistRows.length,
+    nextActionPreviewChecklistSummary: checklistRows.length > 0 ? `${checklistRows.length} value-free next action checklist rows` : "none",
+    nextActionPreviewChecklistRows: checklistRows,
+    nextActionPreviewEvidenceRowCount: evidenceRows.length,
+    nextActionPreviewEvidenceSummary: evidenceRows.length > 0 ? `${evidenceRows.length} value-free next action evidence rows` : "none",
+    nextActionPreviewEvidenceRows: evidenceRows,
+    nextActionPreviewBlockerRowCount: blockerRows.length,
+    nextActionPreviewBlockerSummary: blockerRows.length > 0 ? `${blockerRows.length} value-free next action blocker rows` : "none",
+    nextActionPreviewBlockerRows: blockerRows,
+    nextActionPreviewVerificationRowCount: verificationRows.length,
+    nextActionPreviewVerificationSummary: verificationRows.length > 0 ? `${verificationRows.length} value-free next action verification rows` : "none",
+    nextActionPreviewVerificationRows: verificationRows,
+    nextActionPreviewPrerequisiteCommandRowCount: prerequisiteCommandRows.length,
+    nextActionPreviewPrerequisiteCommandSummary: prerequisiteCommandRows.length > 0 ? `${prerequisiteCommandRows.length} value-free next action prerequisite command rows` : "none",
+    nextActionPreviewPrerequisiteCommandRows: prerequisiteCommandRows,
+    nextActionPreviewOperatorActionRowCount: operatorActionRows.length,
+    nextActionPreviewOperatorActionSummary: operatorActionRows.length > 0 ? `${operatorActionRows.length} value-free next action operator action rows` : "none",
+    nextActionPreviewOperatorActionRows: operatorActionRows,
+    nextActionPreviewEnvEditRowCount: envEditRows.length,
+    nextActionPreviewEnvEditSummary: envEditRows.length > 0 ? `${envEditRows.length} value-free next action env edit rows` : "none",
+    nextActionPreviewEnvEditRows: envEditRows
+  };
+}
+
+function formatNextActionReadyCriteriaRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | criterion | source field | proof command | blocker | value recorded |\n|---:|---|---|---|---|---:|\n| 0 | none | none | none | none | no |";
+  }
+  return [
+    "| order | criterion | source field | proof command | blocker | value recorded |",
+    "|---:|---|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.criterion)} | ${escapeCell(row.sourceField)} | ${escapeCell(row.proofCommand)} | ${escapeCell(row.blocker)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatNextActionChecklistRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | step | proof command | value recorded |\n|---:|---|---|---:|\n| 0 | none | none | no |";
+  }
+  return [
+    "| order | step | proof command | value recorded |",
+    "|---:|---|---|---:|",
+    ...rows.map((row) => `| ${row.order} | ${escapeCell(row.step)} | ${escapeCell(row.proofCommand)} | ${readyLabel(row.valueRecorded)} |`)
+  ].join("\n");
+}
+
+function formatNextActionEvidenceRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| label | path | present | value recorded |\n|---|---|---:|---:|\n| none | none | no | no |";
+  }
+  return [
+    "| label | path | present | value recorded |",
+    "|---|---|---:|---:|",
+    ...rows.map((row) => `| ${escapeCell(row.label)} | ${escapeCell(row.path)} | ${readyLabel(row.present)} | ${readyLabel(row.valueRecorded)} |`)
+  ].join("\n");
+}
+
+function formatNextActionBlockerRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | blocker | source field | proof command | value recorded |\n|---:|---|---|---|---:|\n| 0 | none | none | none | no |";
+  }
+  return [
+    "| order | blocker | source field | proof command | value recorded |",
+    "|---:|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.blocker)} | ${escapeCell(row.sourceField)} | ${escapeCell(row.proofCommand)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatNextActionVerificationRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | currently ready | criterion | current evidence | expected signal | proof command | value recorded |\n|---:|---:|---|---|---|---|---:|\n| 0 | no | none | none | none | none | no |";
+  }
+  return [
+    "| order | currently ready | criterion | current evidence | expected signal | proof command | value recorded |",
+    "|---:|---:|---|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${readyLabel(row.currentReady)} | ${escapeCell(row.criterion)} | ${escapeCell(row.currentEvidence)} | ${escapeCell(row.expectedSignal)} | ${escapeCell(row.proofCommand)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatNextActionPrerequisiteCommandRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | command | source field | proof command | value recorded |\n|---:|---|---|---|---:|\n| 0 | none | none | none | no |";
+  }
+  return [
+    "| order | command | source field | proof command | value recorded |",
+    "|---:|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.command)} | ${escapeCell(row.sourceField)} | ${escapeCell(row.proofCommand)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatNextActionOperatorActionRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | action | source field | proof command | value recorded |\n|---:|---|---|---|---:|\n| 0 | none | none | none | no |";
+  }
+  return [
+    "| order | action | source field | proof command | value recorded |",
+    "|---:|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.action)} | ${escapeCell(row.sourceField)} | ${escapeCell(row.proofCommand)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatNextActionEnvEditRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | location | key | assignment shape | guidance | proof command | value recorded |\n|---:|---|---|---|---|---|---:|\n| 0 | none | none | none | none | none | no |";
+  }
+  return [
+    "| order | location | key | assignment shape | guidance | proof command | value recorded |",
+    "|---:|---|---|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.location)} | ${escapeCell(row.key)} | ${escapeCell(row.assignment)} | ${escapeCell(row.guidance)} | ${escapeCell(row.proofCommand)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
 function formatChecklistList(items) {
   return Array.isArray(items) && items.length > 0 ? items.map((item, index) => `${index + 1}. ${item}`).join("\n") : "1. None.";
 }
@@ -1933,6 +2274,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     doctorReleaseChannelFocus,
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const nextActionPreview = buildNextActionPreviewSummary(priorityActions);
 
   return {
     appName,
@@ -1975,6 +2317,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...currentActionHandoff,
     ...currentPrivateEditSafety,
     ...currentInputShapeChecklist,
+    ...nextActionPreview,
     localReleaseReady: false,
     localReleaseReadinessPercent: 0,
     externalDistributionReady: false,
@@ -2090,6 +2433,15 @@ function buildMarkdown(report) {
 - Current private edit safety rows: ${report.currentPrivateEditSafetyRowCount} (${report.currentPrivateEditSafetySummary})
 - Current input shape checklist ready: ${readyLabel(report.currentInputShapeChecklistReady)}
 - Current input shape checklist rows: ${report.currentInputShapeChecklistRowCount} (${report.currentInputShapeChecklistSummary})
+- Next priority action after current clears: ${report.nextPriorityActionId} (${report.nextPriorityActionLabel})
+- Next action preview ready: ${readyLabel(report.nextActionPreviewReady)}
+- Next action preview ready criteria rows: ${report.nextActionPreviewReadyCriteriaRowCount} (${report.nextActionPreviewReadyCriteriaSummary})
+- Next action preview checklist rows: ${report.nextActionPreviewChecklistRowCount} (${report.nextActionPreviewChecklistSummary})
+- Next action preview blocker rows: ${report.nextActionPreviewBlockerRowCount} (${report.nextActionPreviewBlockerSummary})
+- Next action preview verification rows: ${report.nextActionPreviewVerificationRowCount} (${report.nextActionPreviewVerificationSummary})
+- Next action preview prerequisite command rows: ${report.nextActionPreviewPrerequisiteCommandRowCount} (${report.nextActionPreviewPrerequisiteCommandSummary})
+- Next action preview operator action rows: ${report.nextActionPreviewOperatorActionRowCount} (${report.nextActionPreviewOperatorActionSummary})
+- Next action preview env edit rows: ${report.nextActionPreviewEnvEditRowCount} (${report.nextActionPreviewEnvEditSummary})
 - Current prerequisite commands: ${report.currentPrerequisiteCommandCount} (${report.currentPrerequisiteCommandSummary})
 - Current rerun commands: ${report.currentRerunCommandCount} (${report.currentRerunCommandSummary})
 - Current command sequence: ${report.currentCommandSequenceCount} (${report.currentCommandSequenceSummary})
@@ -2317,6 +2669,40 @@ ${formatCurrentPrivateEditSafetyRows(report.currentPrivateEditSafetyRows)}
 
 ${formatCurrentInputShapeChecklistRows(report.currentInputShapeChecklistRows)}
 
+## Next Action Preview
+
+- Preview ready: ${readyLabel(report.nextActionPreviewReady)}
+- Next action: ${report.nextActionPreviewId} (${report.nextActionPreviewLabel})
+- Proof command: \`${report.nextActionPreviewProofCommand}\`
+- Rerun commands: ${report.nextActionPreviewRerunCommandSummary}
+- First blocker: ${report.nextActionPreviewFirstBlocker}
+- Required keys: ${report.nextActionPreviewRequiredKeyCount} (${report.nextActionPreviewRequiredKeySummary})
+- Placeholder keys: ${report.nextActionPreviewPlaceholderKeyCount} (${report.nextActionPreviewPlaceholderKeySummary})
+- Ready criteria rows: ${report.nextActionPreviewReadyCriteriaRowCount} (${report.nextActionPreviewReadyCriteriaSummary})
+- Checklist rows: ${report.nextActionPreviewChecklistRowCount} (${report.nextActionPreviewChecklistSummary})
+- Evidence rows: ${report.nextActionPreviewEvidenceRowCount} (${report.nextActionPreviewEvidenceSummary})
+- Blocker rows: ${report.nextActionPreviewBlockerRowCount} (${report.nextActionPreviewBlockerSummary})
+- Verification rows: ${report.nextActionPreviewVerificationRowCount} (${report.nextActionPreviewVerificationSummary})
+- Prerequisite command rows: ${report.nextActionPreviewPrerequisiteCommandRowCount} (${report.nextActionPreviewPrerequisiteCommandSummary})
+- Operator action rows: ${report.nextActionPreviewOperatorActionRowCount} (${report.nextActionPreviewOperatorActionSummary})
+- Env edit rows: ${report.nextActionPreviewEnvEditRowCount} (${report.nextActionPreviewEnvEditSummary})
+
+${formatNextActionReadyCriteriaRows(report.nextActionPreviewReadyCriteriaRows)}
+
+${formatNextActionChecklistRows(report.nextActionPreviewChecklistRows)}
+
+${formatNextActionEvidenceRows(report.nextActionPreviewEvidenceRows)}
+
+${formatNextActionBlockerRows(report.nextActionPreviewBlockerRows)}
+
+${formatNextActionVerificationRows(report.nextActionPreviewVerificationRows)}
+
+${formatNextActionPrerequisiteCommandRows(report.nextActionPreviewPrerequisiteCommandRows)}
+
+${formatNextActionOperatorActionRows(report.nextActionPreviewOperatorActionRows)}
+
+${formatNextActionEnvEditRows(report.nextActionPreviewEnvEditRows)}
+
 ## Current First Blockers
 
 | order | blocker |
@@ -2489,6 +2875,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     doctorReleaseChannelFocus,
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const nextActionPreview = buildNextActionPreviewSummary(priorityActions);
 
   nextActionsReport = {
     appName,
@@ -2531,6 +2918,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...currentActionHandoff,
     ...currentPrivateEditSafety,
     ...currentInputShapeChecklist,
+    ...nextActionPreview,
     localReleaseReady: externalPreflight.localReleaseReady === true,
     localReleaseReadinessPercent: externalPreflight.localReleaseReadinessPercent ?? 0,
     externalDistributionReady: externalPreflight.externalDistributionReady === true,
@@ -2607,6 +2995,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     nextActionsReport.currentActionHandoffReady === true &&
     nextActionsReport.currentPrivateEditSafetyReady === true &&
     nextActionsReport.currentInputShapeChecklistReady === true &&
+    nextActionsReport.nextActionPreviewReady === true &&
     nextActionsReport.sourceValueRecorded === false &&
     nextActionsReport.sourceClaimedExternalDistribution === false;
 }
@@ -3399,6 +3788,114 @@ check(
   ),
   "external next actions current input shape checklist rows should include shape guidance and current commands without values"
 );
+check(typeof nextActionsReport.nextPriorityActionId === "string", "external next actions should include the next priority action id");
+check(typeof nextActionsReport.nextPriorityActionLabel === "string", "external next actions should include the next priority action label");
+check(typeof nextActionsReport.nextPriorityActionNextCommand === "string", "external next actions should include the next priority action command");
+check(typeof nextActionsReport.nextPriorityActionFirstBlocker === "string", "external next actions should include the next priority action blocker");
+check(typeof nextActionsReport.nextActionPreviewReady === "boolean", "external next actions should include next action preview readiness");
+check(typeof nextActionsReport.nextActionPreviewId === "string", "external next actions should include next action preview id");
+check(typeof nextActionsReport.nextActionPreviewLabel === "string", "external next actions should include next action preview label");
+check(typeof nextActionsReport.nextActionPreviewProofCommand === "string", "external next actions should include next action preview proof command");
+check(typeof nextActionsReport.nextActionPreviewFirstBlocker === "string", "external next actions should include next action preview first blocker");
+check(Number.isInteger(nextActionsReport.nextActionPreviewRerunCommandCount), "external next actions should include next action preview rerun command count");
+check(typeof nextActionsReport.nextActionPreviewRerunCommandSummary === "string", "external next actions should include next action preview rerun command summary");
+check(Array.isArray(nextActionsReport.nextActionPreviewRerunCommands), "external next actions should include next action preview rerun commands");
+check(Number.isInteger(nextActionsReport.nextActionPreviewRequiredKeyCount), "external next actions should include next action preview required key count");
+check(typeof nextActionsReport.nextActionPreviewRequiredKeySummary === "string", "external next actions should include next action preview required key summary");
+check(Array.isArray(nextActionsReport.nextActionPreviewRequiredKeys), "external next actions should include next action preview required keys");
+check(Number.isInteger(nextActionsReport.nextActionPreviewPlaceholderKeyCount), "external next actions should include next action preview placeholder key count");
+check(typeof nextActionsReport.nextActionPreviewPlaceholderKeySummary === "string", "external next actions should include next action preview placeholder key summary");
+check(Array.isArray(nextActionsReport.nextActionPreviewPlaceholderKeys), "external next actions should include next action preview placeholder keys");
+check(Number.isInteger(nextActionsReport.nextActionPreviewReadyCriteriaRowCount), "external next actions should include next action preview ready criteria row count");
+check(typeof nextActionsReport.nextActionPreviewReadyCriteriaSummary === "string", "external next actions should include next action preview ready criteria summary");
+check(Array.isArray(nextActionsReport.nextActionPreviewReadyCriteriaRows), "external next actions should include next action preview ready criteria rows");
+check(Number.isInteger(nextActionsReport.nextActionPreviewChecklistRowCount), "external next actions should include next action preview checklist row count");
+check(typeof nextActionsReport.nextActionPreviewChecklistSummary === "string", "external next actions should include next action preview checklist summary");
+check(Array.isArray(nextActionsReport.nextActionPreviewChecklistRows), "external next actions should include next action preview checklist rows");
+check(Number.isInteger(nextActionsReport.nextActionPreviewEvidenceRowCount), "external next actions should include next action preview evidence row count");
+check(typeof nextActionsReport.nextActionPreviewEvidenceSummary === "string", "external next actions should include next action preview evidence summary");
+check(Array.isArray(nextActionsReport.nextActionPreviewEvidenceRows), "external next actions should include next action preview evidence rows");
+check(Number.isInteger(nextActionsReport.nextActionPreviewBlockerRowCount), "external next actions should include next action preview blocker row count");
+check(typeof nextActionsReport.nextActionPreviewBlockerSummary === "string", "external next actions should include next action preview blocker summary");
+check(Array.isArray(nextActionsReport.nextActionPreviewBlockerRows), "external next actions should include next action preview blocker rows");
+check(Number.isInteger(nextActionsReport.nextActionPreviewVerificationRowCount), "external next actions should include next action preview verification row count");
+check(typeof nextActionsReport.nextActionPreviewVerificationSummary === "string", "external next actions should include next action preview verification summary");
+check(Array.isArray(nextActionsReport.nextActionPreviewVerificationRows), "external next actions should include next action preview verification rows");
+check(Number.isInteger(nextActionsReport.nextActionPreviewPrerequisiteCommandRowCount), "external next actions should include next action preview prerequisite command row count");
+check(typeof nextActionsReport.nextActionPreviewPrerequisiteCommandSummary === "string", "external next actions should include next action preview prerequisite command summary");
+check(Array.isArray(nextActionsReport.nextActionPreviewPrerequisiteCommandRows), "external next actions should include next action preview prerequisite command rows");
+check(Number.isInteger(nextActionsReport.nextActionPreviewOperatorActionRowCount), "external next actions should include next action preview operator action row count");
+check(typeof nextActionsReport.nextActionPreviewOperatorActionSummary === "string", "external next actions should include next action preview operator action summary");
+check(Array.isArray(nextActionsReport.nextActionPreviewOperatorActionRows), "external next actions should include next action preview operator action rows");
+check(Number.isInteger(nextActionsReport.nextActionPreviewEnvEditRowCount), "external next actions should include next action preview env edit row count");
+check(typeof nextActionsReport.nextActionPreviewEnvEditSummary === "string", "external next actions should include next action preview env edit summary");
+check(Array.isArray(nextActionsReport.nextActionPreviewEnvEditRows), "external next actions should include next action preview env edit rows");
+check(
+  nextActionsReport.nextActionPreviewReadyCriteriaRowCount === nextActionsReport.nextActionPreviewReadyCriteriaRows.length,
+  "external next actions next action preview ready criteria row count should match rows"
+);
+check(
+  nextActionsReport.nextActionPreviewChecklistRowCount === nextActionsReport.nextActionPreviewChecklistRows.length,
+  "external next actions next action preview checklist row count should match rows"
+);
+check(
+  nextActionsReport.nextActionPreviewEvidenceRowCount === nextActionsReport.nextActionPreviewEvidenceRows.length,
+  "external next actions next action preview evidence row count should match rows"
+);
+check(
+  nextActionsReport.nextActionPreviewBlockerRowCount === nextActionsReport.nextActionPreviewBlockerRows.length,
+  "external next actions next action preview blocker row count should match rows"
+);
+check(
+  nextActionsReport.nextActionPreviewVerificationRowCount === nextActionsReport.nextActionPreviewVerificationRows.length,
+  "external next actions next action preview verification row count should match rows"
+);
+check(
+  nextActionsReport.nextActionPreviewPrerequisiteCommandRowCount === nextActionsReport.nextActionPreviewPrerequisiteCommandRows.length,
+  "external next actions next action preview prerequisite command row count should match rows"
+);
+check(
+  nextActionsReport.nextActionPreviewOperatorActionRowCount === nextActionsReport.nextActionPreviewOperatorActionRows.length,
+  "external next actions next action preview operator action row count should match rows"
+);
+check(
+  nextActionsReport.nextActionPreviewEnvEditRowCount === nextActionsReport.nextActionPreviewEnvEditRows.length,
+  "external next actions next action preview env edit row count should match rows"
+);
+check(
+  [
+    ...nextActionsReport.nextActionPreviewReadyCriteriaRows,
+    ...nextActionsReport.nextActionPreviewChecklistRows,
+    ...nextActionsReport.nextActionPreviewEvidenceRows,
+    ...nextActionsReport.nextActionPreviewBlockerRows,
+    ...nextActionsReport.nextActionPreviewVerificationRows,
+    ...nextActionsReport.nextActionPreviewPrerequisiteCommandRows,
+    ...nextActionsReport.nextActionPreviewOperatorActionRows,
+    ...nextActionsReport.nextActionPreviewEnvEditRows
+  ].every((row) => row.valueRecorded === false),
+  "external next actions next action preview rows should not record values"
+);
+check(
+  nextActionsReport.nextActionPreviewReady ===
+    (nextActionsReport.nextActionPreviewReadyCriteriaRows.length === 0 ||
+      (nextActionsReport.nextActionPreviewReadyCriteriaRows.length > 0 &&
+        nextActionsReport.nextActionPreviewChecklistRows.length > 0 &&
+        nextActionsReport.nextActionPreviewBlockerRows.length > 0 &&
+        nextActionsReport.nextActionPreviewVerificationRows.length > 0 &&
+        nextActionsReport.nextActionPreviewPrerequisiteCommandRows.length > 0 &&
+        nextActionsReport.nextActionPreviewOperatorActionRows.length > 0 &&
+        nextActionsReport.nextActionPreviewEnvEditRows.length > 0 &&
+        [
+          ...nextActionsReport.nextActionPreviewReadyCriteriaRows,
+          ...nextActionsReport.nextActionPreviewChecklistRows,
+          ...nextActionsReport.nextActionPreviewBlockerRows,
+          ...nextActionsReport.nextActionPreviewVerificationRows,
+          ...nextActionsReport.nextActionPreviewPrerequisiteCommandRows,
+          ...nextActionsReport.nextActionPreviewOperatorActionRows,
+          ...nextActionsReport.nextActionPreviewEnvEditRows
+        ].every((row) => row.proofCommand === nextActionsReport.nextActionPreviewProofCommand && row.valueRecorded === false))),
+  "external next actions next action preview readiness should reflect listed rows"
+);
 check(nextActionsReport.currentActionValueRecorded === false, "external next actions should not record current action values");
 check(markdown.includes("Bootstrap mode:"), "external next actions Markdown should include bootstrap mode");
 check(markdown.includes("Source evidence ready:"), "external next actions Markdown should include source evidence readiness");
@@ -3617,6 +4114,89 @@ if (nextActionsReport.priorityActions.length > 0) {
     "external next actions should mirror the first priority command sequence summary"
   );
 }
+if (nextActionsReport.priorityActions.length > 1) {
+  const secondPriorityAction = nextActionsReport.priorityActions[1];
+  check(nextActionsReport.nextPriorityActionId === secondPriorityAction.id, "external next actions should mirror the second priority action id");
+  check(nextActionsReport.nextPriorityActionLabel === secondPriorityAction.label, "external next actions should mirror the second priority action label");
+  check(nextActionsReport.nextPriorityActionNextCommand === secondPriorityAction.nextCommand, "external next actions should mirror the second priority action command");
+  check(nextActionsReport.nextPriorityActionFirstBlocker === secondPriorityAction.firstBlocker, "external next actions should mirror the second priority action blocker");
+  check(nextActionsReport.nextActionPreviewId === secondPriorityAction.id, "external next actions next action preview should mirror the second priority id");
+  check(nextActionsReport.nextActionPreviewLabel === secondPriorityAction.label, "external next actions next action preview should mirror the second priority label");
+  check(nextActionsReport.nextActionPreviewProofCommand === secondPriorityAction.nextCommand, "external next actions next action preview should mirror the second priority command");
+  check(nextActionsReport.nextActionPreviewFirstBlocker === secondPriorityAction.firstBlocker, "external next actions next action preview should mirror the second priority blocker");
+  check(
+    nextActionsReport.nextActionPreviewRerunCommandCount === (secondPriorityAction.rerunCommands ?? []).length,
+    "external next actions next action preview should mirror second priority rerun command count"
+  );
+  check(
+    nextActionsReport.nextActionPreviewRerunCommandSummary === formatCommandSummary(secondPriorityAction.rerunCommands ?? []),
+    "external next actions next action preview should mirror second priority rerun command summary"
+  );
+  check(
+    nextActionsReport.nextActionPreviewRequiredKeyCount === (secondPriorityAction.requiredKeys ?? []).length,
+    "external next actions next action preview should mirror second priority required key count"
+  );
+  check(
+    nextActionsReport.nextActionPreviewPlaceholderKeyCount === (secondPriorityAction.placeholderKeys ?? []).length,
+    "external next actions next action preview should mirror second priority placeholder key count"
+  );
+  check(
+    nextActionsReport.nextActionPreviewReadyCriteriaRowCount === (secondPriorityAction.readyCriteria ?? []).length,
+    "external next actions next action preview should mirror second priority ready criteria count"
+  );
+  check(
+    nextActionsReport.nextActionPreviewChecklistRowCount === (secondPriorityAction.actionChecklist ?? []).length,
+    "external next actions next action preview should mirror second priority checklist count"
+  );
+  check(
+    nextActionsReport.nextActionPreviewEvidenceRowCount === (secondPriorityAction.evidence ?? []).length,
+    "external next actions next action preview should mirror second priority evidence count"
+  );
+  check(
+    nextActionsReport.nextActionPreviewBlockerRowCount === (secondPriorityAction.blockers ?? []).length,
+    "external next actions next action preview should mirror second priority blocker count"
+  );
+  check(
+    nextActionsReport.nextActionPreviewVerificationRowCount === (secondPriorityAction.readyCriteria ?? []).length,
+    "external next actions next action preview should mirror second priority verification count"
+  );
+  check(
+    nextActionsReport.nextActionPreviewPrerequisiteCommandRowCount === (secondPriorityAction.prerequisiteCommands ?? []).length,
+    "external next actions next action preview should mirror second priority prerequisite command count"
+  );
+  check(
+    nextActionsReport.nextActionPreviewOperatorActionRowCount === (secondPriorityAction.operatorActions ?? []).length,
+    "external next actions next action preview should mirror second priority operator action count"
+  );
+  check(
+    nextActionsReport.nextActionPreviewEnvEditRowCount === (secondPriorityAction.envEditRows ?? []).length,
+    "external next actions next action preview should mirror second priority env edit row count"
+  );
+  check(
+    nextActionsReport.nextActionPreviewReadyCriteriaRows.every((row, index) => row.criterion === secondPriorityAction.readyCriteria[index]),
+    "external next actions next action preview ready criteria should mirror second priority criteria"
+  );
+  check(
+    nextActionsReport.nextActionPreviewChecklistRows.every((row, index) => row.step === secondPriorityAction.actionChecklist[index]),
+    "external next actions next action preview checklist should mirror second priority checklist"
+  );
+  check(
+    nextActionsReport.nextActionPreviewBlockerRows.every((row, index) => row.blocker === secondPriorityAction.blockers[index]),
+    "external next actions next action preview blockers should mirror second priority blockers"
+  );
+  check(
+    nextActionsReport.nextActionPreviewPrerequisiteCommandRows.every((row, index) => row.command === secondPriorityAction.prerequisiteCommands[index]),
+    "external next actions next action preview prerequisite commands should mirror second priority commands"
+  );
+  check(
+    nextActionsReport.nextActionPreviewOperatorActionRows.every((row, index) => row.action === secondPriorityAction.operatorActions[index]),
+    "external next actions next action preview operator actions should mirror second priority operator actions"
+  );
+  check(
+    nextActionsReport.nextActionPreviewEnvEditRows.every((row, index) => row.key === secondPriorityAction.envEditRows[index]?.key),
+    "external next actions next action preview env edit rows should mirror second priority env keys"
+  );
+}
 if (nextActionsReport.bootstrapMode === false) {
   const releaseChannelAction = nextActionsReport.priorityActions.find((action) => action.id === "release-channel-metadata");
   if (releaseChannelAction) {
@@ -3668,6 +4248,45 @@ if (nextActionsReport.bootstrapMode === false) {
       autoUpdateAction.readyCriteria.some((item) => item.includes("provider/feed/channel metadata ready")),
       "auto-update priority action should explain auto-update ready criteria"
     );
+    if (nextActionsReport.currentActionId === "release-channel-metadata") {
+      check(nextActionsReport.nextActionPreviewReady === true, "release-channel current action should include a ready next-action preview");
+      check(nextActionsReport.nextPriorityActionId === "auto-update-feed", "release-channel current action should preview auto-update feed next");
+      check(
+        nextActionsReport.nextActionPreviewProofCommand === "npm run desktop:auto-update-readiness-smoke",
+        "release-channel current action should preview the auto-update readiness proof command"
+      );
+      check(
+        nextActionsReport.nextActionPreviewRequiredKeyCount === 6 &&
+          nextActionsReport.nextActionPreviewRequiredKeys.includes("GROOVEFORGE_UPDATE_FEED_URL") &&
+          nextActionsReport.nextActionPreviewRequiredKeys.includes("UPDATE_CHANNEL"),
+        "release-channel current action next preview should include the six update feed/channel keys"
+      );
+      check(
+        nextActionsReport.nextActionPreviewReadyCriteriaRowCount === 3 &&
+          nextActionsReport.nextActionPreviewVerificationRowCount === 3,
+        "release-channel current action next preview should include three ready criteria and verification rows"
+      );
+      check(
+        nextActionsReport.nextActionPreviewPrerequisiteCommandRows.some((row) => row.command === "npm run desktop:update-feed-config-smoke") &&
+          nextActionsReport.nextActionPreviewPrerequisiteCommandRows.some((row) => row.command === "npm run desktop:update-metadata-artifacts-smoke") &&
+          nextActionsReport.nextActionPreviewPrerequisiteCommandRows.some((row) => row.command === "npm run desktop:auto-update-readiness-smoke"),
+        "release-channel current action next preview should include update feed, metadata, and auto-update prerequisite commands"
+      );
+      check(
+        nextActionsReport.nextActionPreviewOperatorActionRows.some((row) => /ignored update feed and channel keys/i.test(row.action)) &&
+          nextActionsReport.nextActionPreviewOperatorActionRows.some((row) => /regenerate update metadata/i.test(row.action)),
+        "release-channel current action next preview should include auto-update operator actions"
+      );
+      check(
+        nextActionsReport.nextActionPreviewEnvEditRows.some((row) => row.location === ".env.distribution.local:24" && row.key === "GROOVEFORGE_UPDATE_FEED_URL") &&
+          nextActionsReport.nextActionPreviewEnvEditRows.some((row) => row.location === ".env.distribution.local:29" && row.key === "UPDATE_CHANNEL"),
+        "release-channel current action next preview should include primary and fallback update env edit rows"
+      );
+      check(
+        nextActionsReport.nextActionPreviewEnvEditRows.every((row) => row.assignment.includes("<") && row.assignment.includes(">")),
+        "release-channel current action next preview env edit rows should use value-free assignment shapes"
+      );
+    }
   }
   const developerIdAction = nextActionsReport.priorityActions.find((action) => action.id === "developer-id-signing");
   if (developerIdAction) {
@@ -4061,6 +4680,15 @@ check(markdown.includes("Current private edit safety ready:"), "external next ac
 check(markdown.includes("Current private edit safety rows:"), "external next actions Markdown should include current private edit safety row status");
 check(markdown.includes("Current input shape checklist ready:"), "external next actions Markdown should include current input shape checklist readiness");
 check(markdown.includes("Current input shape checklist rows:"), "external next actions Markdown should include current input shape checklist row status");
+check(markdown.includes("Next priority action after current clears:"), "external next actions Markdown should include next priority action status");
+check(markdown.includes("Next action preview ready:"), "external next actions Markdown should include next action preview readiness");
+check(markdown.includes("Next action preview ready criteria rows:"), "external next actions Markdown should include next action preview ready criteria status");
+check(markdown.includes("Next action preview checklist rows:"), "external next actions Markdown should include next action preview checklist status");
+check(markdown.includes("Next action preview blocker rows:"), "external next actions Markdown should include next action preview blocker status");
+check(markdown.includes("Next action preview verification rows:"), "external next actions Markdown should include next action preview verification status");
+check(markdown.includes("Next action preview prerequisite command rows:"), "external next actions Markdown should include next action preview prerequisite command status");
+check(markdown.includes("Next action preview operator action rows:"), "external next actions Markdown should include next action preview operator action status");
+check(markdown.includes("Next action preview env edit rows:"), "external next actions Markdown should include next action preview env edit status");
 check(markdown.includes("Current env edit target:"), "external next actions Markdown should include current env edit target");
 check(markdown.includes("Current operator action:"), "external next actions Markdown should include current operator action");
 check(markdown.includes("Current rerun command:"), "external next actions Markdown should include current rerun command");
@@ -4104,6 +4732,39 @@ check(markdown.includes("## Current Input Shape Checklist"), "external next acti
 check(
   markdown.includes("| order | key | ready | expected shape | evidence source | proof command | rerun command | value recorded |"),
   "external next actions Markdown should include current input shape checklist table"
+);
+check(markdown.includes("## Next Action Preview"), "external next actions Markdown should include next action preview section");
+check(
+  markdown.includes("| order | criterion | source field | proof command | blocker | value recorded |"),
+  "external next actions Markdown should include next action ready criteria table"
+);
+check(
+  markdown.includes("| order | step | proof command | value recorded |"),
+  "external next actions Markdown should include next action checklist table"
+);
+check(
+  markdown.includes("| label | path | present | value recorded |"),
+  "external next actions Markdown should include next action evidence table"
+);
+check(
+  markdown.includes("| order | blocker | source field | proof command | value recorded |"),
+  "external next actions Markdown should include next action blocker table"
+);
+check(
+  markdown.includes("| order | currently ready | criterion | current evidence | expected signal | proof command | value recorded |"),
+  "external next actions Markdown should include next action verification table"
+);
+check(
+  markdown.includes("| order | command | source field | proof command | value recorded |"),
+  "external next actions Markdown should include next action prerequisite command table"
+);
+check(
+  markdown.includes("| order | action | source field | proof command | value recorded |"),
+  "external next actions Markdown should include next action operator action table"
+);
+check(
+  markdown.includes("| order | location | key | assignment shape | guidance | proof command | value recorded |"),
+  "external next actions Markdown should include next action env edit table"
 );
 check(markdown.includes("Completion Gap"), "external next actions Markdown should include completion gap section");
 check(markdown.includes("Proof target:"), "external next actions Markdown should include completion gap proof target details");
@@ -4182,6 +4843,42 @@ if (nextActionsReport.currentInputShapeChecklistRowCount > 0) {
   check(
     nextActionsReport.currentInputShapeChecklistRows.some((item) => markdown.includes(item.key) && markdown.includes(item.expectedShape)),
     "external next actions Markdown should include current input shape checklist rows"
+  );
+}
+if (nextActionsReport.nextActionPreviewReadyCriteriaRowCount > 0) {
+  check(
+    nextActionsReport.nextActionPreviewReadyCriteriaRows.some((item) => markdown.includes(item.criterion) && markdown.includes(item.proofCommand)),
+    "external next actions Markdown should include next action ready criteria rows"
+  );
+}
+if (nextActionsReport.nextActionPreviewBlockerRowCount > 0) {
+  check(
+    nextActionsReport.nextActionPreviewBlockerRows.some((item) => markdown.includes(item.blocker) && markdown.includes(item.proofCommand)),
+    "external next actions Markdown should include next action blocker rows"
+  );
+}
+if (nextActionsReport.nextActionPreviewVerificationRowCount > 0) {
+  check(
+    nextActionsReport.nextActionPreviewVerificationRows.some((item) => markdown.includes(item.expectedSignal)),
+    "external next actions Markdown should include next action verification expected signals"
+  );
+}
+if (nextActionsReport.nextActionPreviewPrerequisiteCommandRowCount > 0) {
+  check(
+    nextActionsReport.nextActionPreviewPrerequisiteCommandRows.some((item) => markdown.includes(item.command)),
+    "external next actions Markdown should include next action prerequisite commands"
+  );
+}
+if (nextActionsReport.nextActionPreviewOperatorActionRowCount > 0) {
+  check(
+    nextActionsReport.nextActionPreviewOperatorActionRows.some((item) => markdown.includes(item.action)),
+    "external next actions Markdown should include next action operator actions"
+  );
+}
+if (nextActionsReport.nextActionPreviewEnvEditRowCount > 0) {
+  check(
+    nextActionsReport.nextActionPreviewEnvEditRows.some((item) => markdown.includes(item.key) && markdown.includes(item.assignment)),
+    "external next actions Markdown should include next action env edit rows"
   );
 }
 check(markdown.includes("Priority Next Actions"), "external next actions Markdown should include priority actions");
@@ -4280,6 +4977,15 @@ console.log(`- Current private edit safety ready: ${nextActionsReport.currentPri
 console.log(`- Current private edit safety rows: ${nextActionsReport.currentPrivateEditSafetyRowCount} (${nextActionsReport.currentPrivateEditSafetySummary})`);
 console.log(`- Current input shape checklist ready: ${nextActionsReport.currentInputShapeChecklistReady ? "yes" : "no"}`);
 console.log(`- Current input shape checklist rows: ${nextActionsReport.currentInputShapeChecklistRowCount} (${nextActionsReport.currentInputShapeChecklistSummary})`);
+console.log(`- Next priority action after current clears: ${nextActionsReport.nextPriorityActionId} (${nextActionsReport.nextPriorityActionLabel})`);
+console.log(`- Next action preview ready: ${nextActionsReport.nextActionPreviewReady ? "yes" : "no"}`);
+console.log(`- Next action preview ready criteria rows: ${nextActionsReport.nextActionPreviewReadyCriteriaRowCount} (${nextActionsReport.nextActionPreviewReadyCriteriaSummary})`);
+console.log(`- Next action preview checklist rows: ${nextActionsReport.nextActionPreviewChecklistRowCount} (${nextActionsReport.nextActionPreviewChecklistSummary})`);
+console.log(`- Next action preview blocker rows: ${nextActionsReport.nextActionPreviewBlockerRowCount} (${nextActionsReport.nextActionPreviewBlockerSummary})`);
+console.log(`- Next action preview verification rows: ${nextActionsReport.nextActionPreviewVerificationRowCount} (${nextActionsReport.nextActionPreviewVerificationSummary})`);
+console.log(`- Next action preview prerequisite command rows: ${nextActionsReport.nextActionPreviewPrerequisiteCommandRowCount} (${nextActionsReport.nextActionPreviewPrerequisiteCommandSummary})`);
+console.log(`- Next action preview operator action rows: ${nextActionsReport.nextActionPreviewOperatorActionRowCount} (${nextActionsReport.nextActionPreviewOperatorActionSummary})`);
+console.log(`- Next action preview env edit rows: ${nextActionsReport.nextActionPreviewEnvEditRowCount} (${nextActionsReport.nextActionPreviewEnvEditSummary})`);
 console.log(`- Current prerequisite commands: ${nextActionsReport.currentPrerequisiteCommandCount} (${nextActionsReport.currentPrerequisiteCommandSummary})`);
 console.log(`- Current rerun commands: ${nextActionsReport.currentRerunCommandCount} (${nextActionsReport.currentRerunCommandSummary})`);
 console.log(`- Current command sequence: ${nextActionsReport.currentCommandSequenceCount} (${nextActionsReport.currentCommandSequenceSummary})`);
