@@ -38,6 +38,12 @@ const sourceArtifacts = [
   { label: "Completion progress", path: completionProgressPath },
   { label: "Release doctor", path: releaseDoctorPath }
 ];
+const releaseChannelMetadataKeys = [
+  "GROOVEFORGE_DISTRIBUTION_CHANNEL",
+  "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
+  "GROOVEFORGE_RELEASE_NOTES_URL",
+  "GROOVEFORGE_SUPPORT_URL"
+];
 const sensitivePrivateKeys = [
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
   "GROOVEFORGE_RELEASE_NOTES_URL",
@@ -1148,6 +1154,12 @@ function arrayObjectField(source, key) {
   return Array.isArray(source?.[key]) ? source[key].filter((item) => item !== null && typeof item === "object") : [];
 }
 
+function valueFreeObjectRows(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((item) => item !== null && typeof item === "object")
+    .map((item) => ({ ...item, valueRecorded: false }));
+}
+
 function numberField(source, key, fallback = 0) {
   const value = source?.[key];
   return Number.isInteger(value) ? value : fallback;
@@ -1248,6 +1260,74 @@ function buildDoctorPrepareEnvAuditSummary(releaseDoctor = null) {
   };
 }
 
+function buildDoctorReleaseChannelFocusSummary(releaseDoctor = null) {
+  const doctorReleaseChannelFocusSourceReady = releaseDoctor !== null && typeof releaseDoctor === "object";
+  const doctorReleaseChannelFocusRows = doctorReleaseChannelFocusSourceReady
+    ? valueFreeObjectRows(releaseDoctor.releaseChannelFocusRows)
+    : [];
+  const doctorReleaseChannelFocusRowCount = doctorReleaseChannelFocusSourceReady
+    ? numberField(releaseDoctor, "releaseChannelFocusRowCount", doctorReleaseChannelFocusRows.length)
+    : 0;
+  const doctorReleaseChannelFocusPlaceholderKeys = doctorReleaseChannelFocusSourceReady
+    ? arrayField(releaseDoctor, "releaseChannelFocusPlaceholderKeys")
+    : [];
+  const doctorReleaseChannelFocusReceiptReady =
+    doctorReleaseChannelFocusSourceReady &&
+    booleanField(releaseDoctor, "releaseChannelFocusReceiptReady", false) &&
+    doctorReleaseChannelFocusRowCount === doctorReleaseChannelFocusRows.length &&
+    doctorReleaseChannelFocusRows.length === releaseChannelMetadataKeys.length &&
+    doctorReleaseChannelFocusRows.every((row) => row.valueRecorded === false);
+
+  return {
+    doctorReleaseChannelFocusSourceArtifact: "Release doctor",
+    doctorReleaseChannelFocusSourcePath: relative(releaseDoctorPath),
+    doctorReleaseChannelFocusSourceReady,
+    doctorReleaseChannelFocusDoctorReportReady: doctorReleaseChannelFocusSourceReady
+      ? booleanField(releaseDoctor, "releaseDoctorReportReady", false)
+      : false,
+    doctorReleaseChannelFocusReceiptReady,
+    doctorReleaseChannelFocusCurrentReady: doctorReleaseChannelFocusSourceReady
+      ? booleanField(releaseDoctor, "releaseChannelFocusCurrentReady", false)
+      : false,
+    doctorReleaseChannelFocusCurrentReadyCount: doctorReleaseChannelFocusSourceReady
+      ? numberField(releaseDoctor, "releaseChannelFocusCurrentReadyCount", 0)
+      : 0,
+    doctorReleaseChannelFocusRowCount,
+    doctorReleaseChannelFocusSummary: doctorReleaseChannelFocusSourceReady
+      ? stringField(releaseDoctor, "releaseChannelFocusSummary", "none")
+      : "none",
+    doctorReleaseChannelFocusRows,
+    doctorReleaseChannelFocusPlaceholderKeyCount: doctorReleaseChannelFocusSourceReady
+      ? numberField(releaseDoctor, "releaseChannelFocusPlaceholderKeyCount", doctorReleaseChannelFocusPlaceholderKeys.length)
+      : 0,
+    doctorReleaseChannelFocusPlaceholderKeys,
+    doctorReleaseChannelFocusProofCommand: doctorReleaseChannelFocusSourceReady
+      ? stringField(releaseDoctor, "releaseChannelFocusProofCommand", "npm run desktop:distribution-private-inputs-smoke")
+      : "npm run desktop:distribution-private-inputs-smoke",
+    doctorReleaseChannelFocusRerunCommand: doctorReleaseChannelFocusSourceReady
+      ? stringField(releaseDoctor, "releaseChannelFocusRerunCommand", "npm run release:doctor")
+      : "npm run release:doctor",
+    doctorReleaseChannelFocusValueRecorded: doctorReleaseChannelFocusSourceReady
+      ? booleanField(releaseDoctor, "releaseChannelFocusValueRecorded", false)
+      : false,
+    doctorReleaseChannelFocusClaimedExternalDistribution: doctorReleaseChannelFocusSourceReady
+      ? booleanField(releaseDoctor, "sourceClaimedExternalDistribution", false)
+      : false
+  };
+}
+
+function formatReleaseChannelFocusRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | no | no | no | no | none | none | none | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${escapeCell(row.key)} | ${readyLabel(row.present)} | ${readyLabel(row.placeholder)} | ${readyLabel(row.shapeReady)} | ${readyLabel(row.currentReady)} | ${escapeCell(row.evidence)} | ${escapeCell(row.expectedSignal)} | ${escapeCell(row.proofCommand)} | ${escapeCell(row.rerunCommand)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoctor = null) {
   const missingArtifacts = artifactRows.filter((item) => !item.present);
   const missingLabels = missingArtifacts.map((item) => item.label);
@@ -1305,6 +1385,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     prerequisiteCommand: "npm run release:check"
   });
   const doctorPrepareEnvAudit = buildDoctorPrepareEnvAuditSummary(releaseDoctor);
+  const doctorReleaseChannelFocus = buildDoctorReleaseChannelFocusSummary(releaseDoctor);
   const currentPlaceholderRemediation = buildCurrentPlaceholderRemediationSummary({
     currentActionSummary,
     doctorPrepareEnvAudit
@@ -1350,6 +1431,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...completionGap,
     ...doctorCompletionGap,
     ...doctorPrepareEnvAudit,
+    ...doctorReleaseChannelFocus,
     ...currentPlaceholderRemediation,
     ...currentProofChecklist,
     ...currentCommandVerification,
@@ -1440,6 +1522,10 @@ function buildMarkdown(report) {
 - Doctor prepare-env existing local env placeholder keys: ${report.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeyCount} (${report.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeySummary})
 - Doctor prepare-env release-channel placeholder keys: ${report.doctorPrepareEnvAuditReleaseChannelPlaceholderKeyCount} (${report.doctorPrepareEnvAuditReleaseChannelPlaceholderKeySummary})
 - Doctor prepare-env release-channel placeholder edit locations: ${report.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationCount} (${report.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationSummary})
+- Doctor release-channel focus receipt ready: ${readyLabel(report.doctorReleaseChannelFocusReceiptReady)}
+- Doctor release-channel focus current action ready: ${readyLabel(report.doctorReleaseChannelFocusCurrentReady)}
+- Doctor release-channel focus current-ready rows: ${report.doctorReleaseChannelFocusCurrentReadyCount}/${report.doctorReleaseChannelFocusRowCount}
+- Doctor release-channel focus placeholder keys: ${report.doctorReleaseChannelFocusPlaceholderKeyCount}
 - Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${report.currentPlaceholderKeySummary})
 - Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})
@@ -1558,6 +1644,26 @@ ${formatKeyList(report.doctorPrepareEnvAuditExistingLocalEnvPlaceholderKeys)}
 
 ${formatEditLocationList(report.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocations)}
 
+## Release Doctor Release-Channel Focus Receipt
+
+- Source artifact: ${report.doctorReleaseChannelFocusSourceArtifact}
+- Source path: ${report.doctorReleaseChannelFocusSourcePath}
+- Source ready: ${readyLabel(report.doctorReleaseChannelFocusSourceReady)}
+- Doctor report ready: ${readyLabel(report.doctorReleaseChannelFocusDoctorReportReady)}
+- Receipt ready: ${readyLabel(report.doctorReleaseChannelFocusReceiptReady)}
+- Current action ready: ${readyLabel(report.doctorReleaseChannelFocusCurrentReady)}
+- Receipt rows: ${report.doctorReleaseChannelFocusRowCount} (${report.doctorReleaseChannelFocusSummary})
+- Current-ready rows: ${report.doctorReleaseChannelFocusCurrentReadyCount}/${report.doctorReleaseChannelFocusRowCount}
+- Placeholder keys: ${report.doctorReleaseChannelFocusPlaceholderKeyCount} (${report.doctorReleaseChannelFocusPlaceholderKeys.join(", ") || "none"})
+- Proof command: \`${report.doctorReleaseChannelFocusProofCommand}\`
+- Rerun command: \`${report.doctorReleaseChannelFocusRerunCommand}\`
+- Value recorded: ${readyLabel(report.doctorReleaseChannelFocusValueRecorded)}
+- External distribution claimed by release doctor: ${readyLabel(report.doctorReleaseChannelFocusClaimedExternalDistribution)}
+
+| key | present | placeholder | shape ready | current ready | evidence | expected signal | proof command | rerun command | value recorded |
+|---|---:|---:|---:|---:|---|---|---|---|---:|
+${formatReleaseChannelFocusRows(report.doctorReleaseChannelFocusRows)}
+
 ## Priority Next Actions
 
 | order | action | ready | next command | first blocker |
@@ -1638,9 +1744,11 @@ const preflightRun = runExternalPreflight();
 const artifactRows = sourceArtifacts.map((item) => artifact(item.label, item.path));
 const missingSourceEvidence = artifactRows.some((item) => !item.present);
 let nextActionsReport = null;
+let releaseDoctorSource = null;
 
 if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
   const bootstrapReleaseDoctor = existsSync(releaseDoctorPath) ? JSON.parse(await readFile(releaseDoctorPath, "utf8")) : null;
+  releaseDoctorSource = bootstrapReleaseDoctor;
   nextActionsReport = buildBootstrapNextActionsReport(artifactRows, preflightRun, bootstrapReleaseDoctor);
 } else {
   if (!preflightRun.succeeded) {
@@ -1653,6 +1761,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
   const [externalPreflight, externalRemediation, externalRunbook, externalLedger, completionProgress, releaseDoctor] = await Promise.all(
     sourceArtifacts.map(readJsonRequired)
   );
+  releaseDoctorSource = releaseDoctor;
   const localEnvFileLoaded = externalPreflight.localEnvFileLoaded === true || releaseDoctor.localEnvFileLoaded === true;
   const localEnvPlaceholderKeys = Array.isArray(externalPreflight.localEnvPlaceholderKeys)
     ? externalPreflight.localEnvPlaceholderKeys
@@ -1723,6 +1832,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     prerequisiteCommand: "npm run release:check"
   });
   const doctorPrepareEnvAudit = buildDoctorPrepareEnvAuditSummary(releaseDoctor);
+  const doctorReleaseChannelFocus = buildDoctorReleaseChannelFocusSummary(releaseDoctor);
   const currentPlaceholderRemediation = buildCurrentPlaceholderRemediationSummary({
     currentActionSummary: {
       ...currentActionSummary,
@@ -1771,6 +1881,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...completionGap,
     ...doctorCompletionGap,
     ...doctorPrepareEnvAudit,
+    ...doctorReleaseChannelFocus,
     ...currentPlaceholderRemediation,
     ...currentProofChecklist,
     ...currentCommandVerification,
@@ -1991,6 +2102,76 @@ check(
 );
 check(nextActionsReport.doctorPrepareEnvAuditValueRecorded === false, "external next actions doctor prepare-env audit should not record values");
 check(nextActionsReport.doctorPrepareEnvAuditClaimedExternalDistribution === false, "external next actions doctor prepare-env audit should not claim external distribution");
+check(nextActionsReport.doctorReleaseChannelFocusSourceArtifact === "Release doctor", "external next actions should identify the release doctor focus source");
+check(typeof nextActionsReport.doctorReleaseChannelFocusSourcePath === "string" && nextActionsReport.doctorReleaseChannelFocusSourcePath.length > 0, "external next actions should include the release doctor focus source path");
+check(typeof nextActionsReport.doctorReleaseChannelFocusSourceReady === "boolean", "external next actions should include release doctor focus source readiness");
+check(typeof nextActionsReport.doctorReleaseChannelFocusDoctorReportReady === "boolean", "external next actions should include release doctor focus doctor readiness");
+check(typeof nextActionsReport.doctorReleaseChannelFocusReceiptReady === "boolean", "external next actions should include release doctor focus receipt readiness");
+check(typeof nextActionsReport.doctorReleaseChannelFocusCurrentReady === "boolean", "external next actions should include release doctor focus current action readiness");
+check(Number.isInteger(nextActionsReport.doctorReleaseChannelFocusCurrentReadyCount), "external next actions should include release doctor focus current-ready count");
+check(Number.isInteger(nextActionsReport.doctorReleaseChannelFocusRowCount), "external next actions should include release doctor focus row count");
+check(typeof nextActionsReport.doctorReleaseChannelFocusSummary === "string", "external next actions should include release doctor focus summary");
+check(Array.isArray(nextActionsReport.doctorReleaseChannelFocusRows), "external next actions should include release doctor focus rows");
+check(Number.isInteger(nextActionsReport.doctorReleaseChannelFocusPlaceholderKeyCount), "external next actions should include release doctor focus placeholder key count");
+check(Array.isArray(nextActionsReport.doctorReleaseChannelFocusPlaceholderKeys), "external next actions should include release doctor focus placeholder keys");
+check(typeof nextActionsReport.doctorReleaseChannelFocusProofCommand === "string" && nextActionsReport.doctorReleaseChannelFocusProofCommand.length > 0, "external next actions should include release doctor focus proof command");
+check(typeof nextActionsReport.doctorReleaseChannelFocusRerunCommand === "string" && nextActionsReport.doctorReleaseChannelFocusRerunCommand.length > 0, "external next actions should include release doctor focus rerun command");
+check(nextActionsReport.doctorReleaseChannelFocusRowCount === nextActionsReport.doctorReleaseChannelFocusRows.length, "external next actions release doctor focus row count should match listed rows");
+check(
+  nextActionsReport.doctorReleaseChannelFocusCurrentReadyCount ===
+    nextActionsReport.doctorReleaseChannelFocusRows.filter((row) => row.currentReady === true).length,
+  "external next actions release doctor focus current-ready count should match listed rows"
+);
+check(
+  nextActionsReport.doctorReleaseChannelFocusPlaceholderKeyCount === nextActionsReport.doctorReleaseChannelFocusPlaceholderKeys.length,
+  "external next actions release doctor focus placeholder key count should match listed keys"
+);
+check(
+  nextActionsReport.doctorReleaseChannelFocusRows.every(
+    (row) =>
+      releaseChannelMetadataKeys.includes(row.key) &&
+      typeof row.present === "boolean" &&
+      typeof row.placeholder === "boolean" &&
+      typeof row.shapeReady === "boolean" &&
+      typeof row.currentReady === "boolean" &&
+      typeof row.evidence === "string" &&
+      row.evidence.length > 0 &&
+      typeof row.expectedSignal === "string" &&
+      row.expectedSignal.length > 0 &&
+      row.proofCommand === nextActionsReport.doctorReleaseChannelFocusProofCommand &&
+      row.rerunCommand === nextActionsReport.doctorReleaseChannelFocusRerunCommand &&
+      row.valueRecorded === false
+  ),
+  "external next actions release doctor focus rows should cover value-free current release-channel metadata evidence"
+);
+check(
+  releaseChannelMetadataKeys.every((key) => nextActionsReport.doctorReleaseChannelFocusRows.some((row) => row.key === key)) ||
+    nextActionsReport.doctorReleaseChannelFocusRows.length === 0,
+  "external next actions release doctor focus rows should cover the four release-channel metadata keys when source evidence exists"
+);
+check(nextActionsReport.doctorReleaseChannelFocusProofCommand === "npm run desktop:distribution-private-inputs-smoke", "external next actions release doctor focus proof command should be private-inputs smoke");
+check(nextActionsReport.doctorReleaseChannelFocusRerunCommand === "npm run release:doctor", "external next actions release doctor focus rerun command should be release doctor");
+check(nextActionsReport.doctorReleaseChannelFocusValueRecorded === false, "external next actions release doctor focus should not record values");
+check(nextActionsReport.doctorReleaseChannelFocusClaimedExternalDistribution === false, "external next actions release doctor focus should not claim external distribution");
+if (releaseDoctorSource !== null) {
+  check(nextActionsReport.doctorReleaseChannelFocusSourceReady === true, "external next actions should report ready release doctor focus source evidence when release doctor exists");
+  check(nextActionsReport.doctorReleaseChannelFocusDoctorReportReady === true, "external next actions should report ready release doctor focus doctor evidence when release doctor exists");
+  check(nextActionsReport.doctorReleaseChannelFocusReceiptReady === releaseDoctorSource.releaseChannelFocusReceiptReady, "external next actions should mirror release doctor focus receipt readiness");
+  check(nextActionsReport.doctorReleaseChannelFocusCurrentReady === releaseDoctorSource.releaseChannelFocusCurrentReady, "external next actions should mirror release doctor focus current readiness");
+  check(nextActionsReport.doctorReleaseChannelFocusRowCount === releaseDoctorSource.releaseChannelFocusRowCount, "external next actions should mirror release doctor focus row count");
+  check(
+    JSON.stringify(nextActionsReport.doctorReleaseChannelFocusRows) === JSON.stringify(valueFreeObjectRows(releaseDoctorSource.releaseChannelFocusRows)),
+    "external next actions should mirror release doctor focus rows"
+  );
+  check(
+    nextActionsReport.doctorReleaseChannelFocusPlaceholderKeyCount === releaseDoctorSource.releaseChannelFocusPlaceholderKeyCount,
+    "external next actions should mirror release doctor focus placeholder key count"
+  );
+  check(
+    JSON.stringify(nextActionsReport.doctorReleaseChannelFocusPlaceholderKeys) === JSON.stringify(arrayField(releaseDoctorSource, "releaseChannelFocusPlaceholderKeys")),
+    "external next actions should mirror release doctor focus placeholder keys"
+  );
+}
 check(typeof nextActionsReport.currentPrerequisiteCommand === "string" && nextActionsReport.currentPrerequisiteCommand.length > 0, "external next actions should include the current prerequisite command");
 check(typeof nextActionsReport.currentOperatorAction === "string" && nextActionsReport.currentOperatorAction.length > 0, "external next actions should include the current operator action");
 check(typeof nextActionsReport.currentRerunCommand === "string" && nextActionsReport.currentRerunCommand.length > 0, "external next actions should include the current rerun command");
@@ -2730,6 +2911,18 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   check(nextActionsReport.currentPlaceholderKeyCount === 4, "release channel metadata should surface four current placeholder metadata keys when placeholders remain");
   check(nextActionsReport.currentPlaceholderKeys.includes("GROOVEFORGE_RELEASE_DOWNLOAD_URL"), "release channel metadata should surface release download URL as a current placeholder key name");
   check(nextActionsReport.currentPlaceholderEditLocationCount === 4, "release channel metadata should surface four current placeholder edit locations when placeholders remain");
+  check(nextActionsReport.doctorReleaseChannelFocusReceiptReady === true, "release channel metadata should include ready release doctor focus receipt when placeholders remain");
+  check(nextActionsReport.doctorReleaseChannelFocusRowCount === 4, "release channel metadata should include four release doctor focus rows when placeholders remain");
+  check(nextActionsReport.doctorReleaseChannelFocusCurrentReady === false, "release channel metadata should keep release doctor focus current action blocked while placeholders remain");
+  check(nextActionsReport.doctorReleaseChannelFocusCurrentReadyCount === 0, "release channel metadata should report zero current-ready focus rows while placeholders remain");
+  check(
+    nextActionsReport.doctorReleaseChannelFocusPlaceholderKeyCount === nextActionsReport.currentPlaceholderKeyCount,
+    "release channel metadata should align release doctor focus placeholder count with current placeholder keys"
+  );
+  check(
+    JSON.stringify(nextActionsReport.doctorReleaseChannelFocusPlaceholderKeys) === JSON.stringify(nextActionsReport.currentPlaceholderKeys),
+    "release channel metadata should align release doctor focus placeholder keys with current placeholder keys"
+  );
   check(
     nextActionsReport.currentPlaceholderEditLocations.every(
       (item) =>
@@ -2956,6 +3149,12 @@ check(markdown.includes("## Release Doctor Prepare Env Audit"), "external next a
 check(markdown.includes("Doctor Prepare Env Existing Placeholder Keys"), "external next actions Markdown should include release doctor prepare-env existing placeholder key section");
 check(markdown.includes("Doctor Prepare Env Release-Channel Placeholder Edit Locations"), "external next actions Markdown should include release doctor prepare-env release-channel edit location section");
 check(markdown.includes("Value recorded by release doctor prepare-env audit: no"), "external next actions Markdown should state release doctor prepare-env audit value redaction");
+check(markdown.includes("Doctor release-channel focus receipt ready:"), "external next actions Markdown should include release doctor focus receipt readiness");
+check(markdown.includes("Doctor release-channel focus current-ready rows:"), "external next actions Markdown should include release doctor focus current-ready rows");
+check(markdown.includes("Doctor release-channel focus placeholder keys:"), "external next actions Markdown should include release doctor focus placeholder keys");
+check(markdown.includes("## Release Doctor Release-Channel Focus Receipt"), "external next actions Markdown should include release doctor focus receipt section");
+check(markdown.includes("| key | present | placeholder | shape ready | current ready | evidence | expected signal | proof command | rerun command | value recorded |"), "external next actions Markdown should include release doctor focus receipt table");
+check(markdown.includes("Value recorded: no"), "external next actions Markdown should state release doctor focus value redaction");
 check(markdown.includes("Private values recorded: no"), "external next actions Markdown should state value redaction");
 check(!/https?:\/\//i.test(markdown), "external next actions Markdown should not include public or private URL values");
 check(!/https?:\/\//i.test(serializedReport), "external next actions JSON should not include public or private URL values");
@@ -2999,6 +3198,10 @@ console.log(
 console.log(
   `- Doctor prepare-env release-channel placeholder edit locations: ${nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationCount} (${nextActionsReport.doctorPrepareEnvAuditReleaseChannelPlaceholderEditLocationSummary})`
 );
+console.log(`- Doctor release-channel focus receipt ready: ${nextActionsReport.doctorReleaseChannelFocusReceiptReady ? "yes" : "no"}`);
+console.log(`- Doctor release-channel focus current action ready: ${nextActionsReport.doctorReleaseChannelFocusCurrentReady ? "yes" : "no"}`);
+console.log(`- Doctor release-channel focus current-ready rows: ${nextActionsReport.doctorReleaseChannelFocusCurrentReadyCount}/${nextActionsReport.doctorReleaseChannelFocusRowCount}`);
+console.log(`- Doctor release-channel focus placeholder keys: ${nextActionsReport.doctorReleaseChannelFocusPlaceholderKeyCount}`);
 console.log(`- Current required keys: ${nextActionsReport.currentRequiredKeyCount} (${nextActionsReport.currentRequiredKeySummary})`);
 console.log(`- Current placeholder keys: ${nextActionsReport.currentPlaceholderKeyCount} (${nextActionsReport.currentPlaceholderKeySummary})`);
 console.log(`- Current placeholder edit locations: ${nextActionsReport.currentPlaceholderEditLocationCount} (${nextActionsReport.currentPlaceholderEditLocationSummary})`);
