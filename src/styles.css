@@ -14,7 +14,7 @@
 
 body {
   margin: 0;
-  min-width: 1120px;
+  min-width: 0;
   min-height: 760px;
   background:
     linear-gradient(180deg, rgba(244, 239, 231, 0.04), transparent 26rem),
@@ -34,10 +34,15 @@ button {
 
 .app-shell {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 100vh;
   grid-template-rows: auto auto auto auto auto auto auto auto auto auto 1fr;
   gap: 12px;
   padding: 16px;
+}
+
+.app-shell > * {
+  min-width: 0;
 }
 
 .transport-band,
@@ -14676,11 +14681,14 @@ h2 {
   grid-template-columns: 1.3fr 1.2fr 0.92fr;
   grid-template-rows: minmax(330px, 1fr) minmax(250px, 0.75fr);
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
   min-height: 0;
 }
 
 .panel {
   min-width: 0;
+  max-width: 100%;
   min-height: 0;
   padding: 14px;
   border-radius: 8px;
@@ -28094,6 +28102,116 @@ input[type="range"] {
 }
 
 @media (max-width: 620px) {
+  body {
+    min-height: 100vh;
+  }
+
+  .app-shell {
+    min-width: 0;
+    padding: 10px;
+  }
+
+  .transport-band {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .brand-lockup,
+  .transport-controls,
+  .command-strip,
+  .mode-row,
+  .session-meter {
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .transport-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .field.title-field,
+  .field.compact {
+    width: 100%;
+  }
+
+  .field select,
+  .field input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .command-strip .icon-button {
+    flex: 1 1 86px;
+  }
+
+  .session-meter > span {
+    min-width: 0;
+  }
+
+  .workspace-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+
+  .pattern-panel,
+  .piano-panel,
+  .instrument-panel,
+  .arrangement-panel,
+  .mixer-panel,
+  .master-panel {
+    grid-column: 1;
+    grid-row: auto;
+    min-width: 0;
+  }
+
+  .panel-title,
+  .next-move,
+  .next-move-actions,
+  .mix-balance-heading,
+  .space-fx-heading,
+  .stem-audition-heading,
+  .strip-top {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .next-move {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .next-move-actions {
+    justify-content: flex-start;
+  }
+
+  .next-move-actions button {
+    flex: 1 1 120px;
+    max-width: none;
+  }
+
+  .mixer-strips,
+  .mix-balance-row,
+  .space-fx-row,
+  .stem-audition-row,
+  .stem-audition-readout,
+  .mix-snapshot-head {
+    grid-template-columns: 1fr;
+  }
+
+  .mix-balance-panel,
+  .space-fx-panel,
+  .stem-audition-panel,
+  .mix-snapshot-ab,
+  .strip,
+  .strip-control,
+  .strip-readout {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .guide-quick-start,
   .beat-spine,
   .workflow-navigator,
