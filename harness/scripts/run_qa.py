@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -25,6 +26,25 @@ QUALITY_COMMAND_BLOCK_REQUIRED = [
     "npm run release:proof-bundle",
     "npm run release:external-check",
 ]
+
+DOCUMENTED_COMMAND_COVERAGE_FILES = [
+    "README.md",
+    "docs/release/readiness.md",
+    "docs/architecture/harness.md",
+    "docs/quality/rules.md",
+]
+
+DOCUMENTED_CORE_COMMANDS = {
+    "build",
+    "desktop",
+    "harness:smoke",
+    "persona:smoke",
+    "qa",
+    "renderer:smoke",
+    "typecheck",
+    "verify",
+    "workflow:smoke",
+}
 
 REQUIRED_PATHS = [
     "AGENTS.md",
@@ -25180,6 +25200,33 @@ def check_quality_command_block(errors: list[str]) -> None:
             errors.append(f"docs/quality/rules.md Current commands block missing: {command}")
 
 
+def command_is_documented(text: str, command: str) -> bool:
+    npm_run_command = f"npm run {command}"
+    if npm_run_command in text:
+        return True
+    if ":" in command and command in text:
+        return True
+    return False
+
+
+def check_documented_command_coverage(errors: list[str]) -> None:
+    package_json = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+    scripts = sorted(package_json.get("scripts", {}))
+    documented_commands = [
+        command
+        for command in scripts
+        if command.startswith("release:")
+        or command.startswith("desktop:")
+        or command in DOCUMENTED_CORE_COMMANDS
+    ]
+
+    for file_path in DOCUMENTED_COMMAND_COVERAGE_FILES:
+        text = (ROOT / file_path).read_text(encoding="utf-8")
+        for command in documented_commands:
+            if not command_is_documented(text, command):
+                errors.append(f"{file_path} missing documented command: npm run {command}")
+
+
 def check_official_sources(errors: list[str]) -> None:
     text = (ROOT / "docs/references/official-sources.md").read_text(encoding="utf-8")
     if "| TODO |" in text:
@@ -25319,6 +25366,7 @@ def run_checks(strict: bool = False) -> list[str]:
     check_plan_names(errors)
     check_text_expectations(errors)
     check_quality_command_block(errors)
+    check_documented_command_coverage(errors)
     check_official_sources(errors)
     check_offline_render_determinism(errors)
     check_build_chunk_config(errors)
