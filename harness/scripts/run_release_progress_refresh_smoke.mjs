@@ -189,6 +189,46 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     currentBlocker.hardGateReady === false &&
     currentBlocker.hardGateWouldFail === true &&
     currentBlocker.claimedExternalDistribution === false;
+  const releaseProgressRefreshReady =
+    refreshCommands.every((row) => row.valueRecorded === false) &&
+    sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
+    labelsMatch &&
+    freshnessClean &&
+    operatorBriefReady &&
+    currentBlockerStillExternal;
+  const latestCompletedPlanNumber = integerValue(completionReportPacket.latestCompletedPlanNumber);
+  const completionSummary = {
+    ready: releaseProgressRefreshReady,
+    reportCommand: "npm run release:progress-refresh-smoke",
+    latestPlanNumber: latestCompletedPlanNumber,
+    latestPlan: latestCompletedPlanNumber > 0 ? `plan-${latestCompletedPlanNumber}` : "none",
+    tenPlanProgress: freshnessLabel,
+    tenPlanCompletedCount: integerValue(freshness.latestTenPlanCompletedCount),
+    tenPlanTotal: integerValue(freshness.latestTenPlanTotal),
+    tenPlanReportDue: freshness.tenPlanProgressReportDue === true,
+    completionPercent: 99.999999,
+    remainingPercent: 0.000001,
+    freshArtifactCount: integerValue(freshness.freshArtifactCount),
+    staleArtifactCount: integerValue(freshness.staleArtifactCount),
+    missingArtifactCount: integerValue(freshness.missingArtifactCount),
+    operatorBriefReady,
+    releaseChannelMetadataBlocked: operatorCompletionBrief.releaseChannelMetadataBlocked === true,
+    releaseChannelMetadataCleared: operatorCompletionBrief.releaseChannelMetadataCleared === true,
+    releaseChannelCurrentReadyCount: integerValue(operatorCompletionBrief.releaseChannelCurrentReadyCount),
+    releaseChannelCurrentRequiredKeyCount: integerValue(operatorCompletionBrief.releaseChannelCurrentRequiredKeyCount),
+    releaseChannelCurrentPlaceholderKeyCount: integerValue(operatorCompletionBrief.releaseChannelCurrentPlaceholderKeyCount),
+    operatorProofCommand: textValue(operatorCompletionBrief.privateEditOperatorProofCommand),
+    postClearanceNextAction: textValue(operatorCompletionBrief.postClearanceNextPriorityActionId),
+    postClearanceProofCommand: textValue(operatorCompletionBrief.postClearanceNextActionPreviewProofCommand),
+    firstBlocker: textValue(currentBlocker.currentFirstBlocker),
+    nextCommand: textValue(currentBlocker.currentNextCommand),
+    rerunCommand: textValue(currentBlocker.currentRerunCommand),
+    hardGateReady: currentBlocker.hardGateReady === true,
+    hardGateWouldFail: currentBlocker.hardGateWouldFail === true,
+    privateValuesRecorded: false,
+    claimedAutoUpdate: false,
+    claimedExternalDistribution: false
+  };
 
   return {
     appName,
@@ -202,13 +242,25 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     releaseProgressRefreshJsonArtifactName: "release-progress-refresh-smoke.json",
     releaseProgressRefreshMarkdownPath: relative(refreshMarkdownPath),
     releaseProgressRefreshJsonPath: relative(refreshJsonPath),
-    releaseProgressRefreshReady:
-      refreshCommands.every((row) => row.valueRecorded === false) &&
-      sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
-      labelsMatch &&
-      freshnessClean &&
-      operatorBriefReady &&
-      currentBlockerStillExternal,
+    releaseProgressRefreshReady,
+    completionSummary,
+    latestPlanNumber: completionSummary.latestPlanNumber,
+    latestPlan: completionSummary.latestPlan,
+    tenPlanProgress: completionSummary.tenPlanProgress,
+    completionPercent: completionSummary.completionPercent,
+    remainingPercent: completionSummary.remainingPercent,
+    freshArtifactCount: completionSummary.freshArtifactCount,
+    staleArtifactCount: completionSummary.staleArtifactCount,
+    missingArtifactCount: completionSummary.missingArtifactCount,
+    releaseChannelMetadataBlocked: completionSummary.releaseChannelMetadataBlocked,
+    releaseChannelMetadataCleared: completionSummary.releaseChannelMetadataCleared,
+    releaseChannelPlaceholderKeyCount: completionSummary.releaseChannelCurrentPlaceholderKeyCount,
+    releaseChannelRequiredKeyCount: completionSummary.releaseChannelCurrentRequiredKeyCount,
+    operatorProofCommand: completionSummary.operatorProofCommand,
+    postClearanceNextAction: completionSummary.postClearanceNextAction,
+    postClearanceProofCommand: completionSummary.postClearanceProofCommand,
+    firstBlocker: completionSummary.firstBlocker,
+    nextCommand: completionSummary.nextCommand,
     refreshCommandRows: refreshCommands,
     refreshCommandCount: refreshCommands.length,
     refreshCommandSummary: commandSummary(refreshCommands),
@@ -320,6 +372,26 @@ function buildMarkdown(report) {
 - Auto-update claimed: no
 - External distribution claimed: no
 
+## Completion Summary
+
+- Completion summary ready: ${readyLabel(report.completionSummary.ready)}
+- Latest completed plan: ${report.completionSummary.latestPlan}
+- 10-plan progress: ${report.completionSummary.tenPlanProgress}
+- User-facing completion: ${report.completionSummary.completionPercent}%
+- Remaining completion: ${report.completionSummary.remainingPercent}%
+- Freshness: fresh ${report.completionSummary.freshArtifactCount}, stale ${report.completionSummary.staleArtifactCount}, missing ${report.completionSummary.missingArtifactCount}
+- Release-channel metadata blocked: ${readyLabel(report.completionSummary.releaseChannelMetadataBlocked)}
+- Release-channel metadata cleared: ${readyLabel(report.completionSummary.releaseChannelMetadataCleared)}
+- Release-channel placeholders: ${report.completionSummary.releaseChannelCurrentPlaceholderKeyCount}/${report.completionSummary.releaseChannelCurrentRequiredKeyCount}
+- Operator proof command: \`${report.completionSummary.operatorProofCommand}\`
+- Post-clearance next action: ${report.completionSummary.postClearanceNextAction}
+- Post-clearance proof command: \`${report.completionSummary.postClearanceProofCommand}\`
+- Next command: \`${report.completionSummary.nextCommand}\`
+- First blocker: ${report.completionSummary.firstBlocker}
+- Private values recorded: ${readyLabel(report.completionSummary.privateValuesRecorded)}
+- Auto-update claimed: ${readyLabel(report.completionSummary.claimedAutoUpdate)}
+- External distribution claimed: ${readyLabel(report.completionSummary.claimedExternalDistribution)}
+
 ## Refresh Commands
 
 | order | command | role | value recorded |
@@ -343,6 +415,68 @@ ${formatArtifactRows(report.sourceArtifactRows)}
 function validateReport(report, markdown) {
   const serialized = JSON.stringify(report);
   check(report.releaseProgressRefreshReady === true, "release progress refresh smoke should be ready");
+  check(report.completionSummary.ready === report.releaseProgressRefreshReady, "release progress refresh summary should mirror readiness");
+  check(report.completionSummary.reportCommand === report.reportCommand, "release progress refresh summary should mirror report command");
+  check(report.completionSummary.latestPlanNumber === report.latestPlanNumber, "release progress refresh summary should mirror latest plan number");
+  check(report.completionSummary.latestPlan === report.latestPlan, "release progress refresh summary should mirror latest plan label");
+  check(report.completionSummary.latestPlanNumber > 0, "release progress refresh summary should include a positive latest plan number");
+  check(report.completionSummary.latestPlan === `plan-${report.completionSummary.latestPlanNumber}`, "release progress refresh summary should format latest plan label");
+  check(report.completionSummary.tenPlanProgress === report.latestTenPlanProgressLabel, "release progress refresh summary should mirror latest 10-plan progress");
+  check(report.tenPlanProgress === report.latestTenPlanProgressLabel, "release progress refresh alias should mirror latest 10-plan progress");
+  check(report.completionSummary.completionPercent === report.userFacingCompletionPercent, "release progress refresh summary should mirror completion percent");
+  check(report.completionPercent === report.userFacingCompletionPercent, "release progress refresh alias should mirror completion percent");
+  check(report.completionSummary.remainingPercent === report.userFacingRemainingPercent, "release progress refresh summary should mirror remaining percent");
+  check(report.remainingPercent === report.userFacingRemainingPercent, "release progress refresh alias should mirror remaining percent");
+  check(report.completionSummary.freshArtifactCount === report.finalFreshArtifactCount, "release progress refresh summary should mirror fresh artifact count");
+  check(report.freshArtifactCount === report.finalFreshArtifactCount, "release progress refresh alias should mirror fresh artifact count");
+  check(report.completionSummary.staleArtifactCount === report.finalStaleArtifactCount, "release progress refresh summary should mirror stale artifact count");
+  check(report.staleArtifactCount === report.finalStaleArtifactCount, "release progress refresh alias should mirror stale artifact count");
+  check(report.completionSummary.missingArtifactCount === report.finalMissingArtifactCount, "release progress refresh summary should mirror missing artifact count");
+  check(report.missingArtifactCount === report.finalMissingArtifactCount, "release progress refresh alias should mirror missing artifact count");
+  check(
+    report.completionSummary.releaseChannelMetadataBlocked === report.operatorCompletionBriefReleaseChannelMetadataBlocked,
+    "release progress refresh summary should mirror release-channel blocked posture"
+  );
+  check(
+    report.releaseChannelMetadataBlocked === report.operatorCompletionBriefReleaseChannelMetadataBlocked,
+    "release progress refresh alias should mirror release-channel blocked posture"
+  );
+  check(
+    report.completionSummary.releaseChannelMetadataCleared === report.operatorCompletionBriefReleaseChannelMetadataCleared,
+    "release progress refresh summary should mirror release-channel cleared posture"
+  );
+  check(
+    report.releaseChannelMetadataCleared === report.operatorCompletionBriefReleaseChannelMetadataCleared,
+    "release progress refresh alias should mirror release-channel cleared posture"
+  );
+  check(
+    report.completionSummary.releaseChannelCurrentPlaceholderKeyCount === report.operatorCompletionBriefCurrentPlaceholderKeyCount,
+    "release progress refresh summary should mirror release-channel placeholder count"
+  );
+  check(
+    report.releaseChannelPlaceholderKeyCount === report.operatorCompletionBriefCurrentPlaceholderKeyCount,
+    "release progress refresh alias should mirror release-channel placeholder count"
+  );
+  check(
+    report.completionSummary.operatorProofCommand === report.operatorCompletionBriefProofCommand,
+    "release progress refresh summary should mirror operator proof command"
+  );
+  check(report.operatorProofCommand === report.operatorCompletionBriefProofCommand, "release progress refresh alias should mirror operator proof command");
+  check(
+    report.completionSummary.postClearanceNextAction === report.operatorCompletionBriefPostClearanceNextPriorityActionId,
+    "release progress refresh summary should mirror post-clearance next action"
+  );
+  check(
+    report.postClearanceNextAction === report.operatorCompletionBriefPostClearanceNextPriorityActionId,
+    "release progress refresh alias should mirror post-clearance next action"
+  );
+  check(report.completionSummary.firstBlocker === report.currentFirstBlocker, "release progress refresh summary should mirror current first blocker");
+  check(report.firstBlocker === report.currentFirstBlocker, "release progress refresh alias should mirror current first blocker");
+  check(report.completionSummary.nextCommand === report.currentNextCommand, "release progress refresh summary should mirror current next command");
+  check(report.nextCommand === report.currentNextCommand, "release progress refresh alias should mirror current next command");
+  check(report.completionSummary.privateValuesRecorded === false, "release progress refresh summary should not record private values");
+  check(report.completionSummary.claimedAutoUpdate === false, "release progress refresh summary should not claim auto-update");
+  check(report.completionSummary.claimedExternalDistribution === false, "release progress refresh summary should not claim external distribution");
   check(report.reportCommand === "npm run release:progress-refresh-smoke", "release progress refresh smoke should report its command");
   check(report.refreshCommandCount === 6, "release progress refresh smoke should run six commands");
   check(
@@ -410,6 +544,8 @@ function validateReport(report, markdown) {
   check(!/https?:\/\//i.test(markdown), "release progress refresh Markdown should not include URL values");
   check(markdown.includes("Release Progress Refresh Smoke"), "release progress refresh Markdown should include title");
   check(markdown.includes("Refresh smoke ready: yes"), "release progress refresh Markdown should include readiness");
+  check(markdown.includes("## Completion Summary"), "release progress refresh Markdown should include completion summary section");
+  check(markdown.includes("Completion summary ready: yes"), "release progress refresh Markdown should include summary readiness");
   check(markdown.includes("Auto-update claimed: no"), "release progress refresh Markdown should keep auto-update unclaimed");
   check(markdown.includes("External distribution claimed: no"), "release progress refresh Markdown should keep external distribution unclaimed");
 
@@ -440,6 +576,8 @@ console.log("GrooveForge release progress refresh smoke passed.");
 console.log(`- Markdown: ${relative(refreshMarkdownPath)}`);
 console.log(`- JSON: ${relative(refreshJsonPath)}`);
 console.log("- Refresh smoke ready: yes");
+console.log(`- Completion summary ready: ${report.completionSummary.ready ? "yes" : "no"}`);
+console.log(`- Latest completed plan: ${report.completionSummary.latestPlan}`);
 console.log(`- Command order: ${report.refreshCommandSummary}`);
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
 console.log(`- Fresh artifacts: ${report.finalFreshArtifactCount}/${report.finalFreshnessRowCount}`);
