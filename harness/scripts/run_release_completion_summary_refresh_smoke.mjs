@@ -93,6 +93,20 @@ function percentLabel(value, fallback = "none") {
   return fallback;
 }
 
+function percentNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(/%$/, "");
+    const parsed = Number.parseFloat(normalized);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
 function integerValue(value) {
   return Number.isInteger(value) ? value : 0;
 }
@@ -258,9 +272,32 @@ function formatGitContextRows(rows) {
   return rows.map((row) => `| ${row.order} | ${escapeCell(row.field)} | ${escapeCell(row.value)} | ${row.valueRecorded ? "yes" : "no"} |`).join("\n");
 }
 
+function userFacingCompletionRows(report) {
+  return [
+    ["completion percent", report.userFacingCompletionPercent],
+    ["completion label", report.userFacingCompletionLabel],
+    ["remaining percent", report.userFacingRemainingPercent],
+    ["remaining label", report.userFacingRemainingLabel],
+    ["source field", "completionPercent/remainingPercent"]
+  ].map(([field, value], index) => ({
+    order: index + 1,
+    field,
+    value,
+    valueRecorded: false
+  }));
+}
+
+function formatUserFacingCompletionRows(rows) {
+  return rows.map((row) => `| ${row.order} | ${escapeCell(row.field)} | ${escapeCell(row.value)} | ${row.valueRecorded ? "yes" : "no"} |`).join("\n");
+}
+
 function buildReport({ progressRefresh, completionSummary, checkpoint, gitContext }) {
   const checkpointRequired = tenPlanCheckpointRequired(completionSummary);
   const checkpointReady = checkpointRequired ? checkpoint?.tenPlanCheckpointReady === true : false;
+  const userFacingCompletionPercent = percentNumber(completionSummary.completionPercent);
+  const userFacingRemainingPercent = percentNumber(completionSummary.remainingPercent);
+  const userFacingCompletionLabel = percentLabel(completionSummary.completionPercent);
+  const userFacingRemainingLabel = percentLabel(completionSummary.remainingPercent);
   const report = {
     appName,
     bundleId,
@@ -296,8 +333,12 @@ function buildReport({ progressRefresh, completionSummary, checkpoint, gitContex
     tenPlanCompletedCount: integerValue(completionSummary.tenPlanCompletedCount),
     tenPlanTotal: integerValue(completionSummary.tenPlanTotal),
     tenPlanReportDue: completionSummary.tenPlanReportDue === true,
-    completionPercent: percentLabel(completionSummary.completionPercent),
-    remainingPercent: percentLabel(completionSummary.remainingPercent),
+    completionPercent: userFacingCompletionLabel,
+    remainingPercent: userFacingRemainingLabel,
+    userFacingCompletionPercent,
+    userFacingCompletionLabel,
+    userFacingRemainingPercent,
+    userFacingRemainingLabel,
     freshArtifactCount: integerValue(completionSummary.freshArtifactCount),
     staleArtifactCount: integerValue(completionSummary.staleArtifactCount),
     missingArtifactCount: integerValue(completionSummary.missingArtifactCount),
@@ -359,6 +400,9 @@ function buildReport({ progressRefresh, completionSummary, checkpoint, gitContex
   report.gitContextRows = gitContextRows(gitContext);
   report.gitContextRowCount = report.gitContextRows.length;
   report.gitContextRowSummary = `${report.gitContextRowCount} git context rows`;
+  report.userFacingCompletionRows = userFacingCompletionRows(report);
+  report.userFacingCompletionRowCount = report.userFacingCompletionRows.length;
+  report.userFacingCompletionRowSummary = `${report.userFacingCompletionRowCount} user-facing completion alias rows`;
   return report;
 }
 
@@ -375,8 +419,8 @@ function buildMarkdown(report) {
 - 10-plan report due: ${readyLabel(report.tenPlanReportDue)}
 - 10-plan checkpoint required: ${readyLabel(report.tenPlanCheckpointRequired)}
 - 10-plan checkpoint ready: ${checkpointReadyLabel(report)}
-- User-facing completion: ${report.completionPercent}
-- Remaining completion: ${report.remainingPercent}
+- User-facing completion: ${report.userFacingCompletionLabel}
+- Remaining completion: ${report.userFacingRemainingLabel}
 - Fresh artifacts: ${report.freshArtifactCount}
 - Stale artifacts: ${report.staleArtifactCount}
 - Missing artifacts: ${report.missingArtifactCount}
@@ -440,6 +484,12 @@ ${formatCheckpointRows(report.tenPlanCheckpointRows)}
 |---:|---|---|---:|
 ${formatGitContextRows(report.gitContextRows)}
 
+## User-Facing Completion Aliases
+
+| order | field | value | value recorded |
+|---:|---|---|---:|
+${formatUserFacingCompletionRows(report.userFacingCompletionRows)}
+
 ## Not Claimed
 
 This refresh does not claim auto-update, Developer ID signing, notarization, Gatekeeper approval, manual QA approval, app-store submission, release upload, remote channel probing, or external distribution completion.
@@ -464,6 +514,18 @@ function validateReport(report, markdown) {
   check(report.tenPlanProgress.includes(`${report.tenPlanCompletedCount}/10`), "release completion summary refresh should include current 10-plan progress");
   check(report.completionPercent === "99.999999%", "release completion summary refresh should keep current user-facing completion");
   check(report.remainingPercent === "0.000001%", "release completion summary refresh should keep current remaining completion");
+  check(report.userFacingCompletionLabel === report.completionPercent, "release completion summary refresh user-facing completion label should mirror completion percent");
+  check(report.userFacingRemainingLabel === report.remainingPercent, "release completion summary refresh user-facing remaining label should mirror remaining percent");
+  check(
+    Math.abs(report.userFacingCompletionPercent - 99.999999) < 0.000000001,
+    "release completion summary refresh should expose numeric user-facing completion percent"
+  );
+  check(
+    Math.abs(report.userFacingRemainingPercent - 0.000001) < 0.000000001,
+    "release completion summary refresh should expose numeric user-facing remaining percent"
+  );
+  check(report.userFacingCompletionRows.length === report.userFacingCompletionRowCount, "release completion summary refresh should count user-facing completion alias rows");
+  check(report.userFacingCompletionRows.every((row) => row.valueRecorded === false), "release completion summary refresh user-facing completion alias rows should be value-free");
   check(report.freshArtifactCount >= 6, "release completion summary refresh should keep refreshed artifacts fresh");
   check(report.staleArtifactCount === 0, "release completion summary refresh should keep stale artifact count zero");
   check(report.missingArtifactCount === 0, "release completion summary refresh should keep missing artifact count zero");
@@ -538,6 +600,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("## 10-Plan Checkpoint"), "release completion summary refresh Markdown should include checkpoint section");
   check(markdown.includes("## 10-Plan Checkpoint Rows"), "release completion summary refresh Markdown should include checkpoint rows");
   check(markdown.includes("## Git Worktree Context"), "release completion summary refresh Markdown should include git context section");
+  check(markdown.includes("## User-Facing Completion Aliases"), "release completion summary refresh Markdown should include user-facing completion alias section");
 }
 
 async function main() {
@@ -585,8 +648,8 @@ async function main() {
   console.log(`- 10-plan checkpoint ready: ${checkpointReadyLabel(report)}`);
   console.log(`- 10-plan checkpoint artifact: ${report.tenPlanCheckpointJsonPath}`);
   console.log(`- Git context: ${report.gitBranch}@${report.gitHeadShortSha} (${report.gitWorktreeName}, dirty ${report.gitDirty ? "yes" : "no"})`);
-  console.log(`- User-facing completion: ${report.completionPercent}`);
-  console.log(`- Remaining completion: ${report.remainingPercent}`);
+  console.log(`- User-facing completion: ${report.userFacingCompletionLabel}`);
+  console.log(`- Remaining completion: ${report.userFacingRemainingLabel}`);
   console.log(`- Fresh artifacts: ${report.freshArtifactCount}`);
   console.log(`- Stale artifacts: ${report.staleArtifactCount}`);
   console.log(`- Missing artifacts: ${report.missingArtifactCount}`);
