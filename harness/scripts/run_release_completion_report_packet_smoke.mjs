@@ -226,6 +226,15 @@ function formatRolloverRows(rows) {
     .join("\n");
 }
 
+function formatStrictProofHandoffRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.blocker)} | \`${escapeCell(row.editTarget)}\` | \`${escapeCell(row.command)}\` | ${escapeCell(row.followUp)} | \`${escapeCell(row.sourceField)}\` | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatSourceRows(rows) {
   return rows
     .map((row) => `| ${escapeCell(row.label)} | ${readyLabel(row.present)} | ${readyLabel(row.ready)} | ${escapeCell(row.evidence)} | \`${escapeCell(row.path)}\` | ${readyLabel(row.valueRecorded)} |`)
@@ -245,6 +254,17 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
   const privateEditProofCommandSummary = commandSummary(privateEditProofCommandRows);
   const privateEditOperatorProofCommandRole =
     "recommended strict-first proof chain after replacing the four private release-channel placeholders";
+  const strictProofHandoffReceiptRows = [
+    {
+      order: 1,
+      blocker: textValue(channel.currentFirstBlocker),
+      editTarget: textValue(channel.currentEnvEditTarget),
+      command: privateEditOperatorProofCommand,
+      followUp: "strict live-check, post-edit proof, and progress refresh",
+      sourceField: "currentFirstBlocker/currentEnvEditTarget/privateEditOperatorProofCommand",
+      valueRecorded: false
+    }
+  ];
   const postClearanceTransitionRows = objectRows(clearance.transitionRows);
   const autoUpdateTransitionRows = objectRows(autoUpdate.transitionRows);
   const tenPlanProgressReportRolloverRows = [
@@ -344,6 +364,12 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
     tenPlanProgressReportRolloverRows.every((row) => row.valueRecorded === false) &&
     progress.currentTenPlanReportBoundaryAt === progress.nextTenPlanProgressReportAt &&
     progress.nextScheduledTenPlanProgressReportNumber >= progress.currentTenPlanReportBoundaryNumber;
+  const strictProofHandoffReceiptReady =
+    strictProofHandoffReceiptRows.length === 1 &&
+    strictProofHandoffReceiptRows[0].blocker !== "none" &&
+    strictProofHandoffReceiptRows[0].editTarget === ".env.distribution.local" &&
+    strictProofHandoffReceiptRows[0].command === privateEditOperatorProofCommand &&
+    strictProofHandoffReceiptRows.every((row) => row.valueRecorded === false);
   const sourceArtifactRows = [
     sourceRow({
       label: "Audience completion handoff",
@@ -451,6 +477,7 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
   const releaseCompletionReportPacketReady =
     refreshCommandRows.every((row) => row.valueRecorded === false) &&
     privateEditProofCommandRows.every((row) => row.valueRecorded === false) &&
+    strictProofHandoffReceiptReady &&
     tenPlanProgressReportReceiptReady &&
     tenPlanProgressReportRolloverReady &&
     sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
@@ -493,6 +520,13 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
     privateEditOperatorProofCommand,
     privateEditOperatorProofCommandRole,
     privateEditOperatorProofCommandValueRecorded: false,
+    strictProofHandoffReceiptRows,
+    strictProofHandoffReceiptRowCount: strictProofHandoffReceiptRows.length,
+    strictProofHandoffReceiptReady,
+    strictProofHandoffReceiptSummary: strictProofHandoffReceiptRows
+      .map((row) => `${row.blocker} -> ${row.command}`)
+      .join(", "),
+    strictProofHandoffReceiptValueRecorded: false,
     channelEditRecommendedOperatorProofCommand: textValue(channel.releaseChannelRecommendedOperatorProofCommand),
     channelEditRecommendedOperatorProofCommandRole: textValue(channel.releaseChannelRecommendedOperatorProofCommandRole),
     channelEditRecommendedOperatorProofCommandValueRecorded:
@@ -625,6 +659,8 @@ function buildMarkdown(report) {
 - Private-edit proof command order: ${report.privateEditProofCommandSummary}
 - Private-edit operator proof command: \`${report.privateEditOperatorProofCommand}\`
 - Private-edit operator proof role: ${report.privateEditOperatorProofCommandRole}
+- Strict proof handoff receipt ready: ${readyLabel(report.strictProofHandoffReceiptReady)}
+- Strict proof handoff receipt rows: ${report.strictProofHandoffReceiptRowCount} (${report.strictProofHandoffReceiptSummary})
 - Channel edit packet recommended proof chain: \`${report.channelEditRecommendedOperatorProofCommand}\`
 - Channel edit packet proof role: ${report.channelEditRecommendedOperatorProofCommandRole}
 - Latest completed plan: plan-${report.latestCompletedPlanNumber}
@@ -701,6 +737,12 @@ ${formatCommandRows(report.refreshCommandRows)}
 |---:|---|---|---:|
 ${formatCommandRows(report.privateEditProofCommandRows)}
 
+## Strict Proof Handoff Receipt
+
+| order | current blocker | edit target | recommended command | follow-up | source field | value recorded |
+|---:|---|---|---|---|---|---:|
+${formatStrictProofHandoffRows(report.strictProofHandoffReceiptRows)}
+
 ## Current 10-Plan Window Rows
 
 | order | plan | filename | value recorded |
@@ -764,6 +806,15 @@ function validateReport(report, markdown) {
   check(report.privateEditOperatorProofCommand === privateEditOperatorProofCommand, "release completion report packet should include the recommended private-edit operator proof command");
   check(report.privateEditOperatorProofCommandRole === "recommended strict-first proof chain after replacing the four private release-channel placeholders", "release completion report packet should describe the private-edit operator proof command");
   check(report.privateEditOperatorProofCommandValueRecorded === false, "release completion report packet operator proof command should be value-free");
+  check(report.strictProofHandoffReceiptReady === true, "release completion report packet strict proof handoff receipt should be ready");
+  check(Array.isArray(report.strictProofHandoffReceiptRows), "release completion report packet should include strict proof handoff receipt rows");
+  check(report.strictProofHandoffReceiptRowCount === 1, "release completion report packet should include one strict proof handoff row");
+  check(report.strictProofHandoffReceiptRowCount === report.strictProofHandoffReceiptRows.length, "release completion report packet strict proof handoff row count should match row length");
+  check(report.strictProofHandoffReceiptRows[0]?.command === privateEditOperatorProofCommand, "release completion report packet strict proof handoff should recommend the strict proof chain");
+  check(report.strictProofHandoffReceiptRows[0]?.editTarget === ".env.distribution.local", "release completion report packet strict proof handoff should point at ignored local env");
+  check(report.strictProofHandoffReceiptRows[0]?.blocker === report.currentFirstBlocker, "release completion report packet strict proof handoff should carry the current blocker");
+  check(report.strictProofHandoffReceiptRows.every((row) => row.valueRecorded === false), "release completion report packet strict proof handoff rows should not record values");
+  check(report.strictProofHandoffReceiptValueRecorded === false, "release completion report packet strict proof handoff receipt should be value-free");
   check(report.channelEditRecommendedOperatorProofCommand === privateEditOperatorProofCommand, "release completion report packet should mirror the channel edit packet recommended proof chain");
   check(
     report.channelEditRecommendedOperatorProofCommandRole === report.privateEditOperatorProofCommandRole,
@@ -954,6 +1005,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("Release Completion Report Packet Smoke"), "release completion report packet Markdown should include title");
   check(markdown.includes("Completion report packet ready: yes"), "release completion report packet Markdown should include readiness");
   check(markdown.includes("Private-edit proof command order:"), "release completion report packet Markdown should include private-edit proof command order");
+  check(markdown.includes("Strict proof handoff receipt ready:"), "release completion report packet Markdown should include strict proof handoff receipt readiness");
+  check(markdown.includes("Strict Proof Handoff Receipt"), "release completion report packet Markdown should include strict proof handoff receipt table");
   check(markdown.includes("Channel edit packet recommended proof chain:"), "release completion report packet Markdown should include channel edit packet proof recommendation");
   check(markdown.includes("Private-Edit Proof Commands"), "release completion report packet Markdown should include private-edit proof command table");
   check(markdown.includes("10-plan report due:"), "release completion report packet Markdown should include the 10-plan report due flag");
@@ -1003,6 +1056,8 @@ console.log(`- JSON: ${relative(packetJsonPath)}`);
 console.log("- Completion report packet ready: yes");
 console.log(`- Private-edit proof command order: ${report.privateEditProofCommandSummary}`);
 console.log(`- Private-edit operator proof command: ${report.privateEditOperatorProofCommand}`);
+console.log(`- Strict proof handoff receipt ready: ${report.strictProofHandoffReceiptReady ? "yes" : "no"}`);
+console.log(`- Strict proof handoff receipt rows: ${report.strictProofHandoffReceiptRowCount} (${report.strictProofHandoffReceiptSummary})`);
 console.log(`- Channel edit packet recommended proof chain: ${report.channelEditRecommendedOperatorProofCommand}`);
 console.log(`- Latest completed plan: plan-${report.latestCompletedPlanNumber}`);
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
