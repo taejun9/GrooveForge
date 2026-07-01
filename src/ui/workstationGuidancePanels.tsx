@@ -326,6 +326,31 @@ export function AudienceSessionReadout({
   );
 }
 
+export function createAudienceSessionQuickActions({
+  onSelectAudience,
+  summary
+}: {
+  onSelectAudience: (row: AudienceSessionReadoutRow) => void;
+  summary: AudienceSessionReadoutSummary;
+}): QuickAction[] {
+  return summary.rows.map((row) => ({
+    id: `audience-session-enter-${row.id}`,
+    title: `${row.actionLabel}: ${row.label}`,
+    detail: [
+      `Audience Session ${row.label}`,
+      `Route ${row.actionDetail}`,
+      `Readiness ${row.status}: ${row.value}`,
+      `Context ${row.detail}`,
+      `Next ${row.nextCheck}`,
+      "Visible Audience Session action unchanged"
+    ].join(" / "),
+    group: "Project",
+    keywords: `audience session readout enter guided studio beginner first-time composer professional producer ${row.id} ${row.label} ${row.actionLabel} ${row.actionDetail} ${row.status} ${row.value} ${row.detail} ${row.nextCheck} direct beat workstation sample free`,
+    resultTargetId: row.id,
+    run: () => onSelectAudience(row)
+  }));
+}
+
 export function ReferenceAlignmentReadout({
   focusedCardId,
   onFocus,

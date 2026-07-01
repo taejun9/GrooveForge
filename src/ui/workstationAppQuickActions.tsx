@@ -662,6 +662,8 @@ import type {
   ReviewQueueFocusResult,
   ReviewQueueFocusSummary,
   ReviewQueueSummary,
+  AudienceSessionReadoutRow,
+  AudienceSessionReadoutSummary,
   ModeFocusCard,
   ModeFocusJumpResult,
   ModeFocusSummary,
@@ -832,6 +834,7 @@ import {
   createGuideQuickStartCompletionBottleneckLabel,
   createGuideQuickStartCompletionBreakdownItems,
   createGuideQuickStartCompletionScore,
+  createAudienceSessionQuickActions,
   createModeSwitchButtonContext,
   createModeSwitchQuickActions,
   createModeSwitchResult,
@@ -1259,6 +1262,7 @@ export function createQuickActions({
   drumKitPreviewSummary,
   drumMovePreviewSummary,
   editorAuditionReadout,
+  audienceSessionReadoutSummary,
   firstBeatPathSummary,
   finishChecklistSummary,
   grooveCompassSummary,
@@ -1483,6 +1487,7 @@ export function createQuickActions({
   onSelectArrangementBlock,
   onSelectPattern,
   onSelectStyle,
+  onSelectAudienceSessionRow,
   onSwitchMode,
   onUsePatternInSelectedBlock,
   onSetKeyboardCaptureEnabled,
@@ -1643,6 +1648,7 @@ export function createQuickActions({
   drumKitPreviewSummary: DrumKitPreviewSummary;
   drumMovePreviewSummary: DrumMovePreviewSummary;
   editorAuditionReadout: EditorAuditionReadoutSummary;
+  audienceSessionReadoutSummary: AudienceSessionReadoutSummary;
   firstBeatPathSummary: FirstBeatPathSummary;
   finishChecklistSummary: FinishChecklistSummary;
   grooveCompassSummary: GrooveCompassSummary;
@@ -1867,6 +1873,7 @@ export function createQuickActions({
   onSelectArrangementBlock: (index: number) => void;
   onSelectPattern: (pattern: PatternSlot) => void;
   onSelectStyle: (styleId: ProjectState["styleId"]) => void;
+  onSelectAudienceSessionRow: (row: AudienceSessionReadoutRow) => void;
   onSwitchMode: (mode: ProjectState["mode"]) => void;
   onUsePatternInSelectedBlock: (pattern: PatternSlot) => void;
   onSetKeyboardCaptureEnabled: (enabled: boolean) => void;
@@ -2983,6 +2990,10 @@ export function createQuickActions({
     keywords: `mode focus jump card guided studio orientation stage writing check scan issue handoff ${card.id} ${card.label} ${card.value} ${card.focusLabel} ${card.detail} beginner producer`,
     run: () => onFocusModeFocus(card)
   }));
+  const audienceSessionActions = createAudienceSessionQuickActions({
+    onSelectAudience: onSelectAudienceSessionRow,
+    summary: audienceSessionReadoutSummary
+  });
   const modeSwitchActions = createModeSwitchQuickActions({
     firstBeatPathSummary,
     modeFocusSummary,
@@ -5599,6 +5610,7 @@ export function createQuickActions({
       run: () => onFocusSessionPass(sessionPassCard)
     },
     ...sessionPassActions,
+    ...audienceSessionActions,
     ...modeSwitchActions,
     {
       id: "session-brief-compass-focus",

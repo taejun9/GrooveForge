@@ -304,6 +304,14 @@ const commandReferenceSections: CommandReferenceSection[] = [
         context: "Bottleneck metric, current context, audition cue, next check, completion breakdown, and bottleneck posture before focus."
       },
       {
+        id: "audience-session",
+        command: "Audience Session",
+        shortcut: "Quick Actions",
+        target: "Enter Guided / Enter Studio",
+        context:
+          "Audience Session Readout rows, Enter Guided first-time composer route, Enter Studio professional producer route, active lane, readiness posture, direct visible readout action, audition cue, and next check before Audience Session commands switch workflow mode."
+      },
+      {
         id: "first-beat-path",
         command: "First Beat Path",
         shortcut: "Quick Actions / Readout",
