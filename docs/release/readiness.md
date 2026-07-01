@@ -16,7 +16,13 @@ Run the compact completion progress report when the user needs a fresh progress 
 npm run release:progress
 ```
 
-Run the fast existing-evidence progress smoke after `npm run verify` or `npm run release:check` when only the user-facing completion and 10-plan summary needs refreshing:
+Run the completion-report refresh after each completed work before reporting the user-facing completion percentage:
+
+```sh
+npm run release:progress-refresh-smoke
+```
+
+That receipt refreshes progress, current-blocker, completion-packet, freshness, and operator-brief evidence without running the full release gate. Use the narrower existing-evidence progress smoke only when the source bundle was already refreshed and just the release-progress report itself needs rewriting:
 
 ```sh
 npm run release:progress-smoke

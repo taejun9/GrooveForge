@@ -2018,6 +2018,7 @@ TEXT_EXPECTATIONS = {
     ],
     "docs/quality/rules.md": [
         "QA and review are separate loops.",
+        "Completion reports after each completed work must refresh through `npm run release:progress-refresh-smoke` before reporting the user-facing completion percentage",
         "python3 harness/scripts/run_quality_gate.py",
         "npm run renderer:smoke",
         "npm run workflow:smoke",
@@ -4238,6 +4239,9 @@ TEXT_EXPECTATIONS = {
     "docs/release/readiness.md": [
         "GrooveForge Release Readiness Evidence",
         "npm run release:check",
+        "Run the completion-report refresh after each completed work before reporting the user-facing completion percentage:",
+        "That receipt refreshes progress, current-blocker, completion-packet, freshness, and operator-brief evidence without running the full release gate.",
+        "Use the narrower existing-evidence progress smoke only when the source bundle was already refreshed and just the release-progress report itself needs rewriting:",
         "`release:check` runs `npm run qa` and `npm run verify`",
         "first-run React renderer smoke, first-session workflow smoke, persona readiness smoke, runtime export smoke, local delivery package artifact smoke, local package reopen artifact smoke, TypeScript contracts",
         "live desktop visual launch smoke",
