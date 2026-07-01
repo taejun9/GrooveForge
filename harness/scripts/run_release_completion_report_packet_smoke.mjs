@@ -18,6 +18,7 @@ const packetMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.vers
 const packetJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${packetJsonArtifactName}`);
 const audienceHandoffJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-audience-completion-handoff-smoke.json`);
 const channelEditPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-edit-packet-smoke.json`);
+const privateEditBlockedSmokeJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-private-edit-strict-proof-blocked-smoke.json`);
 const clearanceTransitionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-clearance-transition-smoke.json`);
 const autoUpdateTransitionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-auto-update-transition-smoke.json`);
 const failures = [];
@@ -37,12 +38,18 @@ const refreshCommandRows = [
   },
   {
     order: 3,
+    command: "npm run release:private-edit-strict-proof-blocked-smoke",
+    role: "refresh deterministic blocked strict-proof handoff evidence without reading the real local env",
+    valueRecorded: false
+  },
+  {
+    order: 4,
     command: "npm run release:channel-clearance-transition-smoke",
     role: "refresh post-clearance transition evidence from release-channel metadata to auto-update feed",
     valueRecorded: false
   },
   {
-    order: 4,
+    order: 5,
     command: "npm run release:auto-update-transition-smoke",
     role: "refresh value-free auto-update transition evidence after the release-channel handoff",
     valueRecorded: false
@@ -247,7 +254,7 @@ function formatClearanceTransitionRows(rows) {
     .join("\n");
 }
 
-function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
+function buildReport({ audience, channel, privateEditBlockedSmoke, clearance, autoUpdate, progress }) {
   const currentTenPlanWindowRows = progress.currentTenPlanWindowRows;
   const currentTenPlanWindowRowCount = currentTenPlanWindowRows.length;
   const currentTenPlanWindowRowSummary = planRowSummary(currentTenPlanWindowRows);
@@ -262,6 +269,36 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
       command: privateEditOperatorProofCommand,
       followUp: "strict live-check, post-edit proof, and progress refresh",
       sourceField: "currentFirstBlocker/currentEnvEditTarget/privateEditOperatorProofCommand",
+      valueRecorded: false
+    }
+  ];
+  const privateEditBlockedSmokeRows = [
+    {
+      order: 1,
+      item: "Blocked smoke command",
+      evidence: `${textValue(privateEditBlockedSmoke.reportCommand)}; strict proof ready ${readyLabel(privateEditBlockedSmoke.privateEditStrictProofReady)}`,
+      sourceField: "reportCommand/privateEditStrictProofReady",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      item: "Blocked handoff receipt",
+      evidence: `${integerValue(privateEditBlockedSmoke.privateEditStrictProofBlockedHandoffRowCount)} handoff rows; return ${textValue(privateEditBlockedSmoke.privateEditStrictProofBlockedHandoffRows?.[0]?.returnCommand)}`,
+      sourceField: "privateEditStrictProofBlockedHandoffRows",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      item: "Strict failure coverage",
+      evidence: `${integerValue(privateEditBlockedSmoke.strictFailureRowCount)} strict failure rows; placeholders ${integerValue(privateEditBlockedSmoke.currentPlaceholderKeyCount)}`,
+      sourceField: "strictFailureRowCount/currentPlaceholderKeyCount",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      item: "Real env boundary",
+      evidence: `real local env read ${readyLabel(privateEditBlockedSmoke.realLocalEnvRead)}; modified ${readyLabel(privateEditBlockedSmoke.realLocalEnvModified)}`,
+      sourceField: "realLocalEnvRead/realLocalEnvModified",
       valueRecorded: false
     }
   ];
@@ -335,20 +372,27 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
     },
     {
       order: 8,
+      item: "Private-edit blocked smoke evidence",
+      evidence: `${textValue(privateEditBlockedSmoke.reportCommand)}; blocked handoff rows ${integerValue(privateEditBlockedSmoke.privateEditStrictProofBlockedHandoffRowCount)}`,
+      sourceField: "privateEditBlockedSmoke.reportCommand/privateEditStrictProofBlockedHandoffRowCount",
+      valueRecorded: false
+    },
+    {
+      order: 9,
       item: "Next scheduled report after delivery",
       evidence: progress.nextScheduledTenPlanProgressReportAt,
       sourceField: "nextScheduledTenPlanProgressReportAt",
       valueRecorded: false
     },
     {
-      order: 9,
+      order: 10,
       item: "Post-clearance next action",
       evidence: `${textValue(clearance.nextPriorityActionLabel)} via ${textValue(clearance.nextActionPreviewProofCommand)}`,
       sourceField: "clearanceTransition.nextPriorityActionLabel/nextActionPreviewProofCommand",
       valueRecorded: false
     },
     {
-      order: 10,
+      order: 11,
       item: "Post-clearance auto-update proof",
       evidence: `${textValue(autoUpdate.releaseChannelNextPriorityActionId)} via ${textValue(autoUpdate.releaseChannelNextActionProofCommand)}; real auto-update blocked ${readyLabel(autoUpdate.realAutoUpdateBlocked === true)}`,
       sourceField: "autoUpdateTransition.releaseChannelNextPriorityActionId/releaseChannelNextActionProofCommand/realAutoUpdateBlocked",
@@ -370,6 +414,25 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
     strictProofHandoffReceiptRows[0].editTarget === ".env.distribution.local" &&
     strictProofHandoffReceiptRows[0].command === privateEditOperatorProofCommand &&
     strictProofHandoffReceiptRows.every((row) => row.valueRecorded === false);
+  const privateEditBlockedSmokeReady =
+    privateEditBlockedSmoke.reportCommand === "npm run release:private-edit-strict-proof-blocked-smoke" &&
+    privateEditBlockedSmoke.sourceMode === "synthetic private edit strict proof blocked smoke" &&
+    privateEditBlockedSmoke.privateEditStrictProofReady === false &&
+    privateEditBlockedSmoke.privateEditStrictProofBlockedHandoffReady === true &&
+    integerValue(privateEditBlockedSmoke.privateEditStrictProofBlockedHandoffRowCount) > 0 &&
+    privateEditBlockedSmoke.privateEditStrictProofBlockedHandoffRows?.every((row) => row.valueRecorded === false) &&
+    integerValue(privateEditBlockedSmoke.strictFailureRowCount) === 4 &&
+    integerValue(privateEditBlockedSmoke.currentPlaceholderKeyCount) === 4 &&
+    privateEditBlockedSmoke.realLocalEnvRead === false &&
+    privateEditBlockedSmoke.realLocalEnvModified === false &&
+    privateEditBlockedSmoke.progressRefreshSkippedInBlockedSmoke === true &&
+    privateEditBlockedSmoke.privateValuesRecorded === false &&
+    privateEditBlockedSmoke.networkProbeAttempted === false &&
+    privateEditBlockedSmoke.releaseUploadAttempted === false &&
+    privateEditBlockedSmoke.signingAttempted === false &&
+    privateEditBlockedSmoke.notarySubmissionAttempted === false &&
+    privateEditBlockedSmoke.claimedExternalDistribution === false &&
+    privateEditBlockedSmokeRows.every((row) => row.valueRecorded === false);
   const sourceArtifactRows = [
     sourceRow({
       label: "Audience completion handoff",
@@ -382,6 +445,12 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
       path: channelEditPacketJsonPath,
       ready: channel.releaseChannelEditPacketReady === true,
       evidence: `${channel.latestTenPlanProgressLabel}; ${textValue(channel.releaseChannelEditPacketMode)}; placeholders ${integerValue(channel.currentPlaceholderKeyCount)}; recommended ${textValue(channel.releaseChannelRecommendedOperatorProofCommand)}`
+    }),
+    sourceRow({
+      label: "Private-edit blocked smoke",
+      path: privateEditBlockedSmokeJsonPath,
+      ready: privateEditBlockedSmokeReady,
+      evidence: `${textValue(privateEditBlockedSmoke.currentTenPlanProgressLabel)}; blocked handoff ${readyLabel(privateEditBlockedSmoke.privateEditStrictProofBlockedHandoffReady)}; strict failures ${integerValue(privateEditBlockedSmoke.strictFailureRowCount)}`
     }),
     sourceRow({
       label: "Release-channel clearance transition",
@@ -399,15 +468,18 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
   const labelsMatch =
     audience.latestTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
     channel.latestTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
+    privateEditBlockedSmoke.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
     clearance.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
     autoUpdate.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel;
   const completionPercentsMatch =
     audience.userFacingCompletionPercent === 99.999999 &&
     channel.userFacingCompletionPercent === 99.999999 &&
+    privateEditBlockedSmoke.userFacingCompletionPercent === 99.999999 &&
     clearance.userFacingCompletionPercent === 99.999999 &&
     autoUpdate.userFacingCompletionPercent === 99.999999 &&
     audience.userFacingRemainingPercent === 0.000001 &&
     channel.userFacingRemainingPercent === 0.000001 &&
+    privateEditBlockedSmoke.userFacingRemainingPercent === 0.000001 &&
     clearance.userFacingRemainingPercent === 0.000001 &&
     autoUpdate.userFacingRemainingPercent === 0.000001;
   const valueBoundaryClean =
@@ -417,6 +489,12 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
     channel.valueRecorded === false &&
     channel.claimedExternalDistribution === false &&
     channel.networkProbeAttempted === false &&
+    privateEditBlockedSmoke.valueRecorded === false &&
+    privateEditBlockedSmoke.privateValuesRecorded === false &&
+    privateEditBlockedSmoke.realLocalEnvRead === false &&
+    privateEditBlockedSmoke.realLocalEnvModified === false &&
+    privateEditBlockedSmoke.claimedExternalDistribution === false &&
+    privateEditBlockedSmoke.networkProbeAttempted === false &&
     clearance.valueRecorded === false &&
     clearance.privateValuesRecorded === false &&
     clearance.claimedExternalDistribution === false &&
@@ -478,6 +556,7 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
     refreshCommandRows.every((row) => row.valueRecorded === false) &&
     privateEditProofCommandRows.every((row) => row.valueRecorded === false) &&
     strictProofHandoffReceiptReady &&
+    privateEditBlockedSmokeReady &&
     tenPlanProgressReportReceiptReady &&
     tenPlanProgressReportRolloverReady &&
     sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
@@ -527,6 +606,22 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
       .map((row) => `${row.blocker} -> ${row.command}`)
       .join(", "),
     strictProofHandoffReceiptValueRecorded: false,
+    privateEditBlockedSmokeCommand: "npm run release:private-edit-strict-proof-blocked-smoke",
+    privateEditBlockedSmokeReady,
+    privateEditBlockedSmokeSourceMode: textValue(privateEditBlockedSmoke.sourceMode),
+    privateEditBlockedSmokeReportCommand: textValue(privateEditBlockedSmoke.reportCommand),
+    privateEditBlockedSmokeStrictProofReady: privateEditBlockedSmoke.privateEditStrictProofReady === true,
+    privateEditBlockedSmokeHandoffReady: privateEditBlockedSmoke.privateEditStrictProofBlockedHandoffReady === true,
+    privateEditBlockedSmokeHandoffRowCount: integerValue(privateEditBlockedSmoke.privateEditStrictProofBlockedHandoffRowCount),
+    privateEditBlockedSmokeStrictFailureRowCount: integerValue(privateEditBlockedSmoke.strictFailureRowCount),
+    privateEditBlockedSmokeCurrentPlaceholderKeyCount: integerValue(privateEditBlockedSmoke.currentPlaceholderKeyCount),
+    privateEditBlockedSmokeRealLocalEnvRead: privateEditBlockedSmoke.realLocalEnvRead === true,
+    privateEditBlockedSmokeRealLocalEnvModified: privateEditBlockedSmoke.realLocalEnvModified === true,
+    privateEditBlockedSmokeProgressSkipped: privateEditBlockedSmoke.progressRefreshSkippedInBlockedSmoke === true,
+    privateEditBlockedSmokeRows,
+    privateEditBlockedSmokeRowCount: privateEditBlockedSmokeRows.length,
+    privateEditBlockedSmokeSummary: privateEditBlockedSmokeRows.map((row) => row.item).join(", "),
+    privateEditBlockedSmokeValueRecorded: false,
     channelEditRecommendedOperatorProofCommand: textValue(channel.releaseChannelRecommendedOperatorProofCommand),
     channelEditRecommendedOperatorProofCommandRole: textValue(channel.releaseChannelRecommendedOperatorProofCommandRole),
     channelEditRecommendedOperatorProofCommandValueRecorded:
@@ -538,6 +633,7 @@ function buildReport({ audience, channel, clearance, autoUpdate, progress }) {
     sourceLabelsMatchLatestTenPlan: labelsMatch,
     audienceLatestTenPlanProgressLabel: textValue(audience.latestTenPlanProgressLabel),
     channelEditLatestTenPlanProgressLabel: textValue(channel.latestTenPlanProgressLabel),
+    privateEditBlockedSmokeLatestTenPlanProgressLabel: textValue(privateEditBlockedSmoke.currentTenPlanProgressLabel),
     clearanceTransitionLatestTenPlanProgressLabel: textValue(clearance.currentTenPlanProgressLabel),
     autoUpdateTransitionLatestTenPlanProgressLabel: textValue(autoUpdate.currentTenPlanProgressLabel),
     releaseChannelClearanceTransitionReady: clearance.releaseChannelClearanceTransitionReady === true,
@@ -661,6 +757,13 @@ function buildMarkdown(report) {
 - Private-edit operator proof role: ${report.privateEditOperatorProofCommandRole}
 - Strict proof handoff receipt ready: ${readyLabel(report.strictProofHandoffReceiptReady)}
 - Strict proof handoff receipt rows: ${report.strictProofHandoffReceiptRowCount} (${report.strictProofHandoffReceiptSummary})
+- Private-edit blocked smoke ready: ${readyLabel(report.privateEditBlockedSmokeReady)}
+- Private-edit blocked smoke rows: ${report.privateEditBlockedSmokeRowCount} (${report.privateEditBlockedSmokeSummary})
+- Private-edit blocked smoke command: \`${report.privateEditBlockedSmokeCommand}\`
+- Private-edit blocked smoke source label: ${report.privateEditBlockedSmokeLatestTenPlanProgressLabel}
+- Private-edit blocked smoke handoff rows: ${report.privateEditBlockedSmokeHandoffRowCount}
+- Private-edit blocked smoke strict failures: ${report.privateEditBlockedSmokeStrictFailureRowCount}
+- Private-edit blocked smoke real env read: ${readyLabel(report.privateEditBlockedSmokeRealLocalEnvRead)}
 - Channel edit packet recommended proof chain: \`${report.channelEditRecommendedOperatorProofCommand}\`
 - Channel edit packet proof role: ${report.channelEditRecommendedOperatorProofCommandRole}
 - Latest completed plan: plan-${report.latestCompletedPlanNumber}
@@ -677,6 +780,7 @@ function buildMarkdown(report) {
 - Source labels match latest 10-plan: ${readyLabel(report.sourceLabelsMatchLatestTenPlan)}
 - Audience source label: ${report.audienceLatestTenPlanProgressLabel}
 - Channel edit source label: ${report.channelEditLatestTenPlanProgressLabel}
+- Private-edit blocked smoke source label: ${report.privateEditBlockedSmokeLatestTenPlanProgressLabel}
 - Clearance transition source label: ${report.clearanceTransitionLatestTenPlanProgressLabel}
 - Auto-update transition source label: ${report.autoUpdateTransitionLatestTenPlanProgressLabel}
 - User-facing completion: ${report.userFacingCompletionPercent}%
@@ -743,6 +847,12 @@ ${formatCommandRows(report.privateEditProofCommandRows)}
 |---:|---|---|---|---|---|---:|
 ${formatStrictProofHandoffRows(report.strictProofHandoffReceiptRows)}
 
+## Private-Edit Blocked Smoke Evidence
+
+| order | item | evidence | source field | value recorded |
+|---:|---|---|---|---:|
+${formatReceiptRows(report.privateEditBlockedSmokeRows)}
+
 ## Current 10-Plan Window Rows
 
 | order | plan | filename | value recorded |
@@ -791,11 +901,11 @@ function validateReport(report, markdown) {
   const serialized = JSON.stringify(report);
   check(report.releaseCompletionReportPacketReady === true, "release completion report packet should be ready");
   check(report.reportCommand === "npm run release:completion-report-packet-smoke", "release completion report packet should report its command");
-  check(report.refreshCommandCount === 4, "release completion report packet should refresh four source commands");
+  check(report.refreshCommandCount === 5, "release completion report packet should refresh five source commands");
   check(
     report.refreshCommandSummary ===
-      "npm run release:audience-completion-handoff-smoke -> npm run release:channel-edit-packet-smoke -> npm run release:channel-clearance-transition-smoke -> npm run release:auto-update-transition-smoke",
-    "release completion report packet should refresh audience, channel edit packet, clearance transition, then auto-update transition"
+      "npm run release:audience-completion-handoff-smoke -> npm run release:channel-edit-packet-smoke -> npm run release:private-edit-strict-proof-blocked-smoke -> npm run release:channel-clearance-transition-smoke -> npm run release:auto-update-transition-smoke",
+    "release completion report packet should refresh audience, channel edit packet, private-edit blocked smoke, clearance transition, then auto-update transition"
   );
   check(report.refreshCommandRows.every((row) => row.valueRecorded === false), "release completion report packet command rows should be value-free");
   check(report.privateEditProofCommandCount === 3, "release completion report packet should include three private-edit proof commands");
@@ -815,6 +925,21 @@ function validateReport(report, markdown) {
   check(report.strictProofHandoffReceiptRows[0]?.blocker === report.currentFirstBlocker, "release completion report packet strict proof handoff should carry the current blocker");
   check(report.strictProofHandoffReceiptRows.every((row) => row.valueRecorded === false), "release completion report packet strict proof handoff rows should not record values");
   check(report.strictProofHandoffReceiptValueRecorded === false, "release completion report packet strict proof handoff receipt should be value-free");
+  check(report.privateEditBlockedSmokeReady === true, "release completion report packet blocked smoke evidence should be ready");
+  check(report.privateEditBlockedSmokeCommand === "npm run release:private-edit-strict-proof-blocked-smoke", "release completion report packet should expose the blocked smoke command");
+  check(report.privateEditBlockedSmokeReportCommand === report.privateEditBlockedSmokeCommand, "release completion report packet should match the blocked smoke report command");
+  check(report.privateEditBlockedSmokeStrictProofReady === false, "release completion report packet blocked smoke should stay blocked");
+  check(report.privateEditBlockedSmokeHandoffReady === true, "release completion report packet blocked smoke handoff should be ready");
+  check(report.privateEditBlockedSmokeHandoffRowCount > 0, "release completion report packet blocked smoke should include blocked handoff rows");
+  check(report.privateEditBlockedSmokeStrictFailureRowCount === 4, "release completion report packet blocked smoke should include four strict failure rows");
+  check(report.privateEditBlockedSmokeCurrentPlaceholderKeyCount === 4, "release completion report packet blocked smoke should include four placeholder keys");
+  check(report.privateEditBlockedSmokeRealLocalEnvRead === false, "release completion report packet blocked smoke should not read the real local env");
+  check(report.privateEditBlockedSmokeRealLocalEnvModified === false, "release completion report packet blocked smoke should not modify the real local env");
+  check(report.privateEditBlockedSmokeProgressSkipped === true, "release completion report packet blocked smoke should skip progress refresh");
+  check(report.privateEditBlockedSmokeRowCount === report.privateEditBlockedSmokeRows.length, "release completion report packet blocked smoke row count should match rows");
+  check(report.privateEditBlockedSmokeRowCount === 4, "release completion report packet should include four blocked smoke evidence rows");
+  check(report.privateEditBlockedSmokeRows.every((row) => row.valueRecorded === false), "release completion report packet blocked smoke rows should not record values");
+  check(report.privateEditBlockedSmokeValueRecorded === false, "release completion report packet blocked smoke evidence should be value-free");
   check(report.channelEditRecommendedOperatorProofCommand === privateEditOperatorProofCommand, "release completion report packet should mirror the channel edit packet recommended proof chain");
   check(
     report.channelEditRecommendedOperatorProofCommandRole === report.privateEditOperatorProofCommandRole,
@@ -828,11 +953,12 @@ function validateReport(report, markdown) {
   check(report.privateEditProofCommandRows.every((row) => row.valueRecorded === false), "release completion report packet private-edit proof commands should be value-free");
   check(report.firstPrivateEditProofCommand === "npm run release:channel-live-check-strict", "release completion report packet should make strict live check the first private-edit proof command");
   check(report.postEditProofCommand === "npm run release:post-edit-proof", "release completion report packet should include post-edit proof command");
-  check(report.sourceArtifactRowCount === 4, "release completion report packet should include four source artifacts");
+  check(report.sourceArtifactRowCount === 5, "release completion report packet should include five source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release completion report packet sources should be present, ready, and value-free");
   check(report.sourceLabelsMatchLatestTenPlan === true, "release completion report packet source labels should match latest 10-plan progress");
   check(report.audienceLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet audience label should match latest progress");
   check(report.channelEditLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet channel edit label should match latest progress");
+  check(report.privateEditBlockedSmokeLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet blocked smoke label should match latest progress");
   check(report.clearanceTransitionLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet clearance transition label should match latest progress");
   check(report.autoUpdateTransitionLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet auto-update transition label should match latest progress");
   check(report.firstTimeComposerReady === true, "release completion report packet should prove first-time composer readiness");
@@ -979,6 +1105,7 @@ function validateReport(report, markdown) {
   );
   check(tenPlanReceiptEvidence.includes(report.currentFirstBlocker), "release completion report packet 10-plan receipt should include current blocker");
   check(tenPlanReceiptEvidence.includes(report.privateEditProofCommandSummary), "release completion report packet 10-plan receipt should include private-edit proof command order");
+  check(tenPlanReceiptEvidence.includes(report.privateEditBlockedSmokeCommand), "release completion report packet 10-plan receipt should include blocked smoke evidence");
   check(tenPlanReceiptEvidence.includes(report.postClearanceNextPriorityActionLabel), "release completion report packet 10-plan receipt should include post-clearance next action");
   check(tenPlanReceiptEvidence.includes(report.autoUpdateProofCommand), "release completion report packet should include auto-update transition proof");
   check(report.privateValuesRecorded === false, "release completion report packet should not record private values");
@@ -1007,6 +1134,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("Private-edit proof command order:"), "release completion report packet Markdown should include private-edit proof command order");
   check(markdown.includes("Strict proof handoff receipt ready:"), "release completion report packet Markdown should include strict proof handoff receipt readiness");
   check(markdown.includes("Strict Proof Handoff Receipt"), "release completion report packet Markdown should include strict proof handoff receipt table");
+  check(markdown.includes("Private-edit blocked smoke ready:"), "release completion report packet Markdown should include blocked smoke readiness");
+  check(markdown.includes("Private-Edit Blocked Smoke Evidence"), "release completion report packet Markdown should include blocked smoke evidence table");
   check(markdown.includes("Channel edit packet recommended proof chain:"), "release completion report packet Markdown should include channel edit packet proof recommendation");
   check(markdown.includes("Private-Edit Proof Commands"), "release completion report packet Markdown should include private-edit proof command table");
   check(markdown.includes("10-plan report due:"), "release completion report packet Markdown should include the 10-plan report due flag");
@@ -1039,10 +1168,11 @@ for (const row of refreshCommandRows) {
 
 const audience = await readJsonRequired(audienceHandoffJsonPath, "Audience completion handoff");
 const channel = await readJsonRequired(channelEditPacketJsonPath, "Release-channel edit packet");
+const privateEditBlockedSmoke = await readJsonRequired(privateEditBlockedSmokeJsonPath, "Private-edit blocked smoke");
 const clearance = await readJsonRequired(clearanceTransitionJsonPath, "Release-channel clearance transition");
 const autoUpdate = await readJsonRequired(autoUpdateTransitionJsonPath, "Release auto-update transition");
 const progress = await completedPlanProgress();
-const report = buildReport({ audience, channel, clearance, autoUpdate, progress });
+const report = buildReport({ audience, channel, privateEditBlockedSmoke, clearance, autoUpdate, progress });
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
 
@@ -1058,6 +1188,12 @@ console.log(`- Private-edit proof command order: ${report.privateEditProofComman
 console.log(`- Private-edit operator proof command: ${report.privateEditOperatorProofCommand}`);
 console.log(`- Strict proof handoff receipt ready: ${report.strictProofHandoffReceiptReady ? "yes" : "no"}`);
 console.log(`- Strict proof handoff receipt rows: ${report.strictProofHandoffReceiptRowCount} (${report.strictProofHandoffReceiptSummary})`);
+console.log(`- Private-edit blocked smoke ready: ${report.privateEditBlockedSmokeReady ? "yes" : "no"}`);
+console.log(`- Private-edit blocked smoke rows: ${report.privateEditBlockedSmokeRowCount} (${report.privateEditBlockedSmokeSummary})`);
+console.log(`- Private-edit blocked smoke command: ${report.privateEditBlockedSmokeCommand}`);
+console.log(`- Private-edit blocked smoke handoff rows: ${report.privateEditBlockedSmokeHandoffRowCount}`);
+console.log(`- Private-edit blocked smoke strict failures: ${report.privateEditBlockedSmokeStrictFailureRowCount}`);
+console.log(`- Private-edit blocked smoke real env read: ${report.privateEditBlockedSmokeRealLocalEnvRead ? "yes" : "no"}`);
 console.log(`- Channel edit packet recommended proof chain: ${report.channelEditRecommendedOperatorProofCommand}`);
 console.log(`- Latest completed plan: plan-${report.latestCompletedPlanNumber}`);
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
