@@ -7459,6 +7459,7 @@ export function createQuickActionResult(
   const blueprintPreviewDecisionOnly = action.id === "blueprint-preview-decision";
   const previewOnly = action.id.startsWith("blueprint-preview-") && !blueprintPreviewCueOnly && !blueprintPreviewDecisionOnly;
   const historyOnly = action.id === "undo" || action.id === "redo";
+  const audienceSessionRouteOnly = action.id.startsWith("audience-session-enter-");
   const patternCompareDecisionKind = patternCompareDecisionQuickActionKind(action);
   const patternCompareDecisionCue = patternCompareDecisionKind === "cue";
   const cueOnly =
@@ -7675,7 +7676,7 @@ export function createQuickActionResult(
     tone:
       outcome === "failed"
         ? "danger"
-        : previewOnly || blueprintPreviewDecisionOnly || cueOnly || focusOnly || uiLocal || exportOnly
+        : previewOnly || blueprintPreviewDecisionOnly || cueOnly || focusOnly || audienceSessionRouteOnly || uiLocal || exportOnly
           ? "good"
           : nextMoveQuickActionOnly
             ? changed
@@ -7701,8 +7702,10 @@ export function createQuickActionResult(
               : "Previewed"
           : cueOnly
             ? "Cued"
-            : focusOnly
+          : focusOnly
             ? "Focused"
+            : audienceSessionRouteOnly
+              ? "Entered"
             : nextMoveQuickActionOnly
               ? changed
                 ? "Applied"
@@ -7742,7 +7745,7 @@ export function createQuickActionResult(
     tone:
       outcome === "failed"
         ? "danger"
-        : previewOnly || blueprintPreviewDecisionOnly || cueOnly || focusOnly || uiLocal || exportOnly
+        : previewOnly || blueprintPreviewDecisionOnly || cueOnly || focusOnly || audienceSessionRouteOnly || uiLocal || exportOnly
           ? "good"
           : nextMoveQuickActionOnly
             ? changed
@@ -8891,6 +8894,60 @@ export function quickActionDeliveryTargetAlignDetailParts(action: QuickAction): 
     .split(" / ")
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+export function audienceSessionQuickActionRoute(action: QuickAction): {
+  audienceLabel: string;
+  nextCheck: string;
+  routeLabel: string;
+  targetMode: ProjectState["mode"];
+} | null {
+  if (action.id === "audience-session-enter-beginner" || action.resultTargetId === "beginner") {
+    return {
+      audienceLabel: "first-time composer",
+      nextCheck: "Follow First Beat Path before editing or exporting.",
+      routeLabel: "Enter Guided",
+      targetMode: "guided"
+    };
+  }
+
+  if (action.id === "audience-session-enter-producer" || action.resultTargetId === "producer") {
+    return {
+      audienceLabel: "professional producer",
+      nextCheck: "Scan Mode Focus, Review Queue, and Export Preflight before delivery.",
+      routeLabel: "Enter Studio",
+      targetMode: "studio"
+    };
+  }
+
+  return null;
+}
+
+export function quickActionAudienceSessionMetricSnapshot(
+  project: ProjectState,
+  action: QuickAction
+): { id: string; label: string; value: string } | null {
+  const route = audienceSessionQuickActionRoute(action);
+  if (!route) {
+    return null;
+  }
+
+  const pattern = activePattern(project);
+
+  return {
+    id: "audience-session-route",
+    label: "Audience session route",
+    value: [
+      `${route.routeLabel} for ${route.audienceLabel}`,
+      `${modeLabel(project.mode)} mode`,
+      `target ${modeLabel(route.targetMode)}`,
+      `Pattern ${project.selectedPattern}`,
+      `${patternEventTotal(pattern)} selected-pattern events`,
+      `${projectEventTotal(project)} editable project events`,
+      `${arrangementTotalBars(project)} bars`,
+      route.nextCheck
+    ].join(" / ")
+  };
 }
 
 export function quickActionSessionBriefCompassMetricSnapshot(
@@ -16457,6 +16514,16 @@ export function quickActionResultMetricSnapshot(
     };
   }
 
+  if (action.id.startsWith("audience-session-enter-")) {
+    return (
+      quickActionAudienceSessionMetricSnapshot(project, action) ?? {
+        id: "audience-session-route",
+        label: "Audience session route",
+        value: `${modeLabel(project.mode)} mode`
+      }
+    );
+  }
+
   if (action.id.startsWith("mode-switch-")) {
     return { id: "mode-switch", label: "Mode", value: modeLabel(project.mode) };
   }
@@ -21394,6 +21461,23 @@ export function quickActionResultFollowup(
       auditionCue: "Keep the beat playing only if you are comparing the same music against the new session goal.",
       nextCheck: "Run Delivery Target Align only when arrangement length, master, mix posture, and stem expectation should change."
     };
+  }
+
+  const audienceSessionRoute = audienceSessionQuickActionRoute(action);
+  if (audienceSessionRoute) {
+    return audienceSessionRoute.targetMode === "guided"
+      ? {
+          auditionCue:
+            "Use Guided mode to audition each direct beat-making step from First Beat Path before changing notes, arrangement, mix, or export.",
+          nextCheck:
+            "Confirm the Audience Session result says Enter Guided, then follow First Beat Path for the next sample-free composition move."
+        }
+      : {
+          auditionCue:
+            "Use Studio mode to scan Mode Focus, Review Queue, Production Snapshot, and Export Preflight before changing the beat.",
+          nextCheck:
+            "Confirm the Audience Session result says Enter Studio, then use Review Queue or Export Preflight for the next producer check."
+        };
   }
 
   if (action.id === "command-reference" || action.id === "beat-terms-reference") {
