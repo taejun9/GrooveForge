@@ -96,6 +96,7 @@
     "release:update-feed-edit-packet-smoke": "node harness/scripts/run_release_update_feed_edit_packet_smoke.mjs",
     "release:update-feed-post-edit-proof": "node harness/scripts/run_release_update_feed_post_edit_proof.mjs",
     "release:update-feed-post-edit-proof-success-smoke": "node harness/scripts/run_release_update_feed_post_edit_proof_success_smoke.mjs",
+    "release:update-metadata-publish-packet-smoke": "node harness/scripts/run_release_update_metadata_publish_packet_smoke.mjs",
     "release:update-feed-checkpoint-smoke": "node harness/scripts/run_release_update_feed_checkpoint_smoke.mjs",
     "release:prepare-env-smoke": "node harness/scripts/run_release_prepare_env.mjs",
     "release:prepare-env": "node harness/scripts/run_release_prepare_env.mjs --write-local",
