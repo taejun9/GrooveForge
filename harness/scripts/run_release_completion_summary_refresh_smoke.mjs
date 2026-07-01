@@ -124,6 +124,36 @@ function runNpmScript(command) {
   }
 }
 
+function runGit(args) {
+  const result = spawnSync("git", args, {
+    cwd: root,
+    encoding: "utf8"
+  });
+  if (result.error || result.status !== 0) {
+    return "unavailable";
+  }
+  return String(result.stdout ?? "").trim() || "unavailable";
+}
+
+function buildGitContext() {
+  const headSha = runGit(["rev-parse", "HEAD"]);
+  const branchName = runGit(["branch", "--show-current"]);
+  const statusOutput = runGit(["status", "--porcelain"]);
+  const dirtyLines = statusOutput === "unavailable" ? [] : statusOutput.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const gitContextReady = /^[0-9a-f]{40}$/i.test(headSha) && branchName !== "unavailable";
+  return {
+    gitContextReady,
+    gitBranch: branchName === "unavailable" || branchName.length === 0 ? "detached" : branchName,
+    gitHeadSha: headSha,
+    gitHeadShortSha: /^[0-9a-f]{40}$/i.test(headSha) ? headSha.slice(0, 8) : "unavailable",
+    gitWorktreeName: path.basename(root),
+    gitDirty: dirtyLines.length > 0,
+    gitDirtyFileCount: dirtyLines.length,
+    gitStatusPathsRecorded: false,
+    valueRecorded: false
+  };
+}
+
 async function readJsonRequired(filePath, label) {
   if (!existsSync(filePath)) {
     fail(`${label} artifact is missing.`, `Expected: ${relative(filePath)}`);
@@ -207,7 +237,28 @@ function formatCheckpointRows(rows) {
   return rows.map((row) => `| ${row.order} | ${escapeCell(row.field)} | ${escapeCell(row.value)} | ${row.valueRecorded ? "yes" : "no"} |`).join("\n");
 }
 
-function buildReport({ progressRefresh, completionSummary, checkpoint }) {
+function gitContextRows(gitContext) {
+  return [
+    ["context ready", readyLabel(gitContext.gitContextReady)],
+    ["branch", gitContext.gitBranch],
+    ["head", gitContext.gitHeadShortSha],
+    ["worktree", gitContext.gitWorktreeName],
+    ["dirty", readyLabel(gitContext.gitDirty)],
+    ["dirty file count", gitContext.gitDirtyFileCount],
+    ["status paths recorded", readyLabel(gitContext.gitStatusPathsRecorded)]
+  ].map(([field, value], index) => ({
+    order: index + 1,
+    field,
+    value,
+    valueRecorded: false
+  }));
+}
+
+function formatGitContextRows(rows) {
+  return rows.map((row) => `| ${row.order} | ${escapeCell(row.field)} | ${escapeCell(row.value)} | ${row.valueRecorded ? "yes" : "no"} |`).join("\n");
+}
+
+function buildReport({ progressRefresh, completionSummary, checkpoint, gitContext }) {
   const checkpointRequired = tenPlanCheckpointRequired(completionSummary);
   const checkpointReady = checkpointRequired ? checkpoint?.tenPlanCheckpointReady === true : false;
   const report = {
@@ -285,6 +336,14 @@ function buildReport({ progressRefresh, completionSummary, checkpoint }) {
     checkpointClaimedExternalDistribution: checkpointRequired ? checkpoint?.claimedExternalDistribution === true : false,
     checkpointHardGateReady: checkpointRequired ? checkpoint?.hardGateReady === true : false,
     checkpointHardGateWouldFail: checkpointRequired ? checkpoint?.hardGateWouldFail === true : true,
+    gitContextReady: gitContext.gitContextReady,
+    gitBranch: gitContext.gitBranch,
+    gitHeadSha: gitContext.gitHeadSha,
+    gitHeadShortSha: gitContext.gitHeadShortSha,
+    gitWorktreeName: gitContext.gitWorktreeName,
+    gitDirty: gitContext.gitDirty,
+    gitDirtyFileCount: gitContext.gitDirtyFileCount,
+    gitStatusPathsRecorded: gitContext.gitStatusPathsRecorded,
     privateValuesRecorded: false,
     networkProbeAttempted: false,
     releaseUploadAttempted: false,
@@ -297,6 +356,9 @@ function buildReport({ progressRefresh, completionSummary, checkpoint }) {
   report.tenPlanCheckpointRows = checkpointFieldRows(report);
   report.tenPlanCheckpointRowCount = report.tenPlanCheckpointRows.length;
   report.tenPlanCheckpointRowSummary = `${report.tenPlanCheckpointRowCount} checkpoint receipt rows`;
+  report.gitContextRows = gitContextRows(gitContext);
+  report.gitContextRowCount = report.gitContextRows.length;
+  report.gitContextRowSummary = `${report.gitContextRowCount} git context rows`;
   return report;
 }
 
@@ -324,6 +386,11 @@ function buildMarkdown(report) {
 - Private-edit blocked smoke placeholders: ${report.privateEditBlockedSmokeCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}
 - Final handoff success-redaction ready: ${readyLabel(report.finalHandoffSuccessRedactionReady)}
 - Current first blocker: ${report.firstBlocker}
+- Git context ready: ${readyLabel(report.gitContextReady)}
+- Git branch: ${report.gitBranch}
+- Git HEAD: ${report.gitHeadShortSha}
+- Git worktree: ${report.gitWorktreeName}
+- Git dirty: ${readyLabel(report.gitDirty)}
 - Private values recorded: no
 - Network probe attempted: no
 - Release upload attempted: no
@@ -366,6 +433,12 @@ ${formatCommandRows(report.refreshCommands)}
 | order | field | value | value recorded |
 |---:|---|---|---:|
 ${formatCheckpointRows(report.tenPlanCheckpointRows)}
+
+## Git Worktree Context
+
+| order | field | value | value recorded |
+|---:|---|---|---:|
+${formatGitContextRows(report.gitContextRows)}
 
 ## Not Claimed
 
@@ -414,6 +487,15 @@ function validateReport(report, markdown) {
   check(report.signingAttempted === false, "release completion summary refresh should not sign artifacts");
   check(report.claimedAutoUpdate === false, "release completion summary refresh should not claim auto-update");
   check(report.claimedExternalDistribution === false, "release completion summary refresh should not claim external distribution");
+  check(report.gitContextReady === true, "release completion summary refresh should record current git context");
+  check(/^[0-9a-f]{40}$/i.test(report.gitHeadSha), "release completion summary refresh should record a full HEAD SHA");
+  check(/^[0-9a-f]{8}$/i.test(report.gitHeadShortSha), "release completion summary refresh should record a short HEAD SHA");
+  check(report.gitBranch !== "unavailable", "release completion summary refresh should record the current branch or detached state");
+  check(report.gitWorktreeName.length > 0 && !report.gitWorktreeName.includes(path.sep), "release completion summary refresh should record only a worktree basename");
+  check(Number.isInteger(report.gitDirtyFileCount) && report.gitDirtyFileCount >= 0, "release completion summary refresh should count dirty status rows");
+  check(report.gitStatusPathsRecorded === false, "release completion summary refresh should not record git status paths");
+  check(report.gitContextRows.length === report.gitContextRowCount, "release completion summary refresh should count git context rows");
+  check(report.gitContextRows.every((row) => row.valueRecorded === false), "release completion summary refresh git context rows should be value-free");
   check(report.refreshCommands.length === 3, "release completion summary refresh should record required commands plus conditional checkpoint command");
   check(report.refreshCommands.every((row) => row.valueRecorded === false), "release completion summary refresh command rows should be value-free");
   check(report.refreshCommands.slice(0, 2).every((row) => row.skipped === false), "release completion summary refresh should always run the first two commands");
@@ -455,6 +537,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("npm run release:10-plan-checkpoint-smoke"), "release completion summary refresh Markdown should cite checkpoint command");
   check(markdown.includes("## 10-Plan Checkpoint"), "release completion summary refresh Markdown should include checkpoint section");
   check(markdown.includes("## 10-Plan Checkpoint Rows"), "release completion summary refresh Markdown should include checkpoint rows");
+  check(markdown.includes("## Git Worktree Context"), "release completion summary refresh Markdown should include git context section");
 }
 
 async function main() {
@@ -477,7 +560,8 @@ async function main() {
     console.log("Skipping release 10-plan checkpoint: current completed-plan window is not 10/10.");
   }
 
-  const report = buildReport({ progressRefresh, completionSummary, checkpoint });
+  const gitContext = buildGitContext();
+  const report = buildReport({ progressRefresh, completionSummary, checkpoint, gitContext });
   report.completionSummaryRefreshReady = true;
   const markdown = buildMarkdown(report);
   validateReport(report, markdown);
@@ -500,6 +584,7 @@ async function main() {
   console.log(`- 10-plan checkpoint status: ${report.tenPlanCheckpointStatus}`);
   console.log(`- 10-plan checkpoint ready: ${checkpointReadyLabel(report)}`);
   console.log(`- 10-plan checkpoint artifact: ${report.tenPlanCheckpointJsonPath}`);
+  console.log(`- Git context: ${report.gitBranch}@${report.gitHeadShortSha} (${report.gitWorktreeName}, dirty ${report.gitDirty ? "yes" : "no"})`);
   console.log(`- User-facing completion: ${report.completionPercent}`);
   console.log(`- Remaining completion: ${report.remainingPercent}`);
   console.log(`- Fresh artifacts: ${report.freshArtifactCount}`);

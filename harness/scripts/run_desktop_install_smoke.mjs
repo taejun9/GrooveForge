@@ -5,7 +5,7 @@ import { constants, existsSync, readdirSync, readFileSync } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
+import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -226,9 +226,13 @@ async function launchInstalledApp() {
       }
       settled = true;
       clearTimeout(timeout);
-      const result = parseSmokeResult(`${stdout}\n${stderr}`);
+      const combinedOutput = `${stdout}\n${stderr}`;
+      const result = parseSmokeResult(combinedOutput);
       if (!result) {
-        fail(`Installed app exited without a launch smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`, `${stdout}\n${stderr}`);
+        fail(
+          `Installed app exited without a launch smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`,
+          macGuiLaunchAbortDetails("npm run desktop:install-smoke", { signal, output: combinedOutput })
+        );
       }
       if (code !== 0 || result.ok !== true) {
         fail(

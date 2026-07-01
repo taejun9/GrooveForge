@@ -7,7 +7,7 @@ import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
+import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -260,7 +260,10 @@ async function runPackagedProjectIoSmoke() {
       const combinedOutput = `${stdout}\n${stderr}`;
       const result = parseSmokeResult(combinedOutput);
       if (!result) {
-        fail(`Packaged app exited without a project IO smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`, combinedOutput);
+        fail(
+          `Packaged app exited without a project IO smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`,
+          macGuiLaunchAbortDetails("npm run desktop:packaged-project-io-smoke", { signal, output: combinedOutput })
+        );
       }
       if (code !== 0 || result.ok !== true) {
         const details = typeof result === "object" ? JSON.stringify(result, null, 2) : combinedOutput;

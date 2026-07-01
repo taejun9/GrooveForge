@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
-import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
+import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
@@ -676,7 +676,10 @@ async function launchPackagedApp(paths) {
       const combinedOutput = `${stdout}\n${stderr}`;
       const result = parseSmokeResult(combinedOutput);
       if (!result) {
-        fail(`Packaged app exited without a launch smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`, combinedOutput);
+        fail(
+          `Packaged app exited without a launch smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`,
+          macGuiLaunchAbortDetails("npm run desktop:package-smoke", { signal, output: combinedOutput })
+        );
       }
       if (code !== 0 || result.ok !== true) {
         fail(

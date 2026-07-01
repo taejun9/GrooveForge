@@ -5,7 +5,7 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
+import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
@@ -64,32 +64,6 @@ function parseSmokeResult(output) {
   } catch (error) {
     fail(`Could not parse launch smoke result JSON: ${error instanceof Error ? error.message : String(error)}`, line);
   }
-}
-
-function isMacAppKitAbort({ signal, output }) {
-  return (
-    signal === "SIGABRT" ||
-    /(?:_RegisterApplication|RegisterApplication|NSApplication|HIServices|AppKit|EXC_CRASH|Abort trap:\s*6)/i.test(output)
-  );
-}
-
-function prematureExitDetails({ signal, output }) {
-  const trimmedOutput = output.trim();
-  const rawOutput = trimmedOutput.length > 0 ? trimmedOutput : "none";
-
-  if (!isMacAppKitAbort({ signal, output })) {
-    return rawOutput;
-  }
-
-  return [
-    "Diagnostic: Electron aborted before GrooveForge emitted launch smoke evidence.",
-    "Observed macOS/AppKit registration abort signal before the main/renderer/preload smoke path could report.",
-    "Likely cause: restricted, sandboxed, or non-GUI launch context blocking NSApplication registration.",
-    "Action: rerun `npm run desktop:launch-smoke` or `npm run verify` from a normal macOS GUI session or with approved unsandboxed process access.",
-    "",
-    "Raw Electron output:",
-    rawOutput
-  ].join("\n");
 }
 
 function checkBuiltArtifacts() {
@@ -223,7 +197,7 @@ child.on("exit", (code, signal) => {
   if (!result) {
     fail(
       `Electron exited without a launch smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`,
-      prematureExitDetails({ signal, output: combinedOutput })
+      macGuiLaunchAbortDetails("npm run desktop:launch-smoke", { signal, output: combinedOutput })
     );
   }
 

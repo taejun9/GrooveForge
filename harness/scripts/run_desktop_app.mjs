@@ -5,7 +5,7 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
+import { isMacAppKitAbort, macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
@@ -61,9 +61,11 @@ child.on("error", (error) => {
 
 child.on("exit", (code, signal) => {
   if (signal) {
+    if (isMacAppKitAbort({ signal })) {
+      fail("Electron aborted during macOS AppKit registration.", macGuiLaunchAbortDetails("npm run desktop", { signal }));
+    }
     process.kill(process.pid, signal);
     return;
   }
   process.exit(code ?? 0);
 });
-

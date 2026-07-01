@@ -3,7 +3,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
+import { isMacAppKitAbort, macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const failures = [];
@@ -200,29 +200,55 @@ function checkDesktopGuiLaunchGuardContract() {
   const installedProjectIoSmokeSource = readText("harness/scripts/run_desktop_installed_project_io_smoke.mjs");
 
   checkIncludes(guardSource, "CODEX_SANDBOX", "desktop GUI launch guard");
+  checkIncludes(guardSource, "isMacAppKitAbort", "desktop GUI launch guard");
+  checkIncludes(guardSource, "macGuiLaunchAbortDetails", "desktop GUI launch guard");
   checkIncludes(guardSource, "Electron GUI launch blocked before macOS AppKit registration.", "desktop GUI launch guard");
   checkIncludes(guardSource, "macOS Crash Reporter logs", "desktop GUI launch guard");
   checkIncludes(guardSource, "GROOVEFORGE_ALLOW_RESTRICTED_GUI_ELECTRON", "desktop GUI launch guard");
+  checkIncludes(guardSource, "com\\.openai\\.codex", "desktop GUI launch guard");
+  checkIncludes(desktopAppSource, "isMacAppKitAbort({ signal })", "harness/scripts/run_desktop_app.mjs");
+  checkIncludes(desktopAppSource, "macGuiLaunchAbortDetails(\"npm run desktop\"", "harness/scripts/run_desktop_app.mjs");
   checkIncludes(desktopAppSource, "macGuiLaunchBlockDetails(\"npm run desktop\")", "harness/scripts/run_desktop_app.mjs");
   checkIncludes(launchSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:launch-smoke\")", "harness/scripts/run_desktop_launch_smoke.mjs");
+  checkIncludes(launchSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:launch-smoke\"", "harness/scripts/run_desktop_launch_smoke.mjs");
   checkIncludes(projectIoSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:project-io-smoke\")", "harness/scripts/run_desktop_project_io_smoke.mjs");
+  checkIncludes(projectIoSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:project-io-smoke\"", "harness/scripts/run_desktop_project_io_smoke.mjs");
   checkIncludes(packageSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:package-smoke\")", "harness/scripts/run_desktop_package_smoke.mjs");
+  checkIncludes(packageSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:package-smoke\"", "harness/scripts/run_desktop_package_smoke.mjs");
   checkIncludes(
     packagedProjectIoSmokeSource,
     "macGuiLaunchBlockDetails(\"npm run desktop:packaged-project-io-smoke\")",
     "harness/scripts/run_desktop_packaged_project_io_smoke.mjs"
   );
+  checkIncludes(
+    packagedProjectIoSmokeSource,
+    "macGuiLaunchAbortDetails(\"npm run desktop:packaged-project-io-smoke\"",
+    "harness/scripts/run_desktop_packaged_project_io_smoke.mjs"
+  );
   checkIncludes(adhocSignSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:adhoc-sign-smoke\")", "harness/scripts/run_desktop_adhoc_sign_smoke.mjs");
+  checkIncludes(adhocSignSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:adhoc-sign-smoke\"", "harness/scripts/run_desktop_adhoc_sign_smoke.mjs");
   checkIncludes(pkgPayloadSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:pkg-payload-smoke\")", "harness/scripts/run_desktop_pkg_payload_smoke.mjs");
+  checkIncludes(pkgPayloadSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:pkg-payload-smoke\"", "harness/scripts/run_desktop_pkg_payload_smoke.mjs");
   checkIncludes(
     pkgPayloadProjectIoSmokeSource,
     "macGuiLaunchBlockDetails(\"npm run desktop:pkg-payload-project-io-smoke\")",
     "harness/scripts/run_desktop_pkg_payload_project_io_smoke.mjs"
   );
+  checkIncludes(
+    pkgPayloadProjectIoSmokeSource,
+    "macGuiLaunchAbortDetails(\"npm run desktop:pkg-payload-project-io-smoke\"",
+    "harness/scripts/run_desktop_pkg_payload_project_io_smoke.mjs"
+  );
   checkIncludes(installSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:install-smoke\")", "harness/scripts/run_desktop_install_smoke.mjs");
+  checkIncludes(installSmokeSource, "macGuiLaunchAbortDetails(\"npm run desktop:install-smoke\"", "harness/scripts/run_desktop_install_smoke.mjs");
   checkIncludes(
     installedProjectIoSmokeSource,
     "macGuiLaunchBlockDetails(\"npm run desktop:installed-project-io-smoke\")",
+    "harness/scripts/run_desktop_installed_project_io_smoke.mjs"
+  );
+  checkIncludes(
+    installedProjectIoSmokeSource,
+    "macGuiLaunchAbortDetails(\"npm run desktop:installed-project-io-smoke\"",
     "harness/scripts/run_desktop_installed_project_io_smoke.mjs"
   );
 
@@ -230,6 +256,21 @@ function checkDesktopGuiLaunchGuardContract() {
   check(Boolean(blocked), "desktop GUI launch guard should block Electron under macOS CODEX_SANDBOX");
   checkIncludes(blocked ?? "", "CODEX_SANDBOX=seatbelt", "desktop GUI launch guard blocked details");
   checkIncludes(blocked ?? "", "Electron SIGABRT / Abort trap: 6", "desktop GUI launch guard blocked details");
+  check(
+    isMacAppKitAbort({ signal: "SIGABRT" }) === true,
+    "desktop GUI launch abort classifier should recognize macOS SIGABRT launch reports"
+  );
+  check(
+    isMacAppKitAbort({ signal: null, output: "Thread 0 Crashed:: _RegisterApplication com.openai.codex" }) === true,
+    "desktop GUI launch abort classifier should recognize AppKit crash report text"
+  );
+  const abortDetails = macGuiLaunchAbortDetails("npm run desktop:launch-smoke", {
+    signal: "SIGABRT",
+    output: "Application Specific Information: abort() called"
+  });
+  checkIncludes(abortDetails, "Diagnostic: Electron aborted before GrooveForge emitted launch evidence.", "desktop GUI launch abort details");
+  checkIncludes(abortDetails, "Crash signature: Electron SIGABRT / Abort trap: 6", "desktop GUI launch abort details");
+  checkIncludes(abortDetails, "approved unsandboxed GUI/AppKit process access", "desktop GUI launch abort details");
   check(
     macGuiLaunchBlockDetails("npm run desktop:launch-smoke", {}, "darwin") === null,
     "desktop GUI launch guard should allow normal macOS GUI launches"

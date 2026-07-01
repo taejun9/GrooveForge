@@ -16,3 +16,29 @@ export function macGuiLaunchBlockDetails(commandName, env = process.env, platfor
   ].join("\n");
 }
 
+export function isMacAppKitAbort({ signal, output = "" }) {
+  return (
+    signal === "SIGABRT" ||
+    /(?:_RegisterApplication|RegisterApplication|NSApplication|HIServices|AppKit|EXC_CRASH|Abort trap:\s*6|com\.openai\.codex)/i.test(output)
+  );
+}
+
+export function macGuiLaunchAbortDetails(commandName, { signal, output = "" } = {}) {
+  const trimmedOutput = String(output ?? "").trim();
+  const rawOutput = trimmedOutput.length > 0 ? trimmedOutput : "none";
+
+  if (!isMacAppKitAbort({ signal, output })) {
+    return rawOutput;
+  }
+
+  return [
+    "Diagnostic: Electron aborted before GrooveForge emitted launch evidence.",
+    "Observed macOS/AppKit registration abort evidence before the main/renderer/preload smoke path could report.",
+    "Crash signature: Electron SIGABRT / Abort trap: 6 during AppKit application registration.",
+    "Likely cause: restricted, sandboxed, or non-GUI launch context blocking NSApplication registration.",
+    `Action: rerun \`${commandName}\` from a normal macOS GUI session or with approved unsandboxed GUI/AppKit process access.`,
+    "",
+    "Raw Electron output:",
+    rawOutput
+  ].join("\n");
+}
