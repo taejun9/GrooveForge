@@ -1,0 +1,234 @@
+#!/usr/bin/env node
+
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const appName = "GrooveForge";
+const bundleId = "app.grooveforge.desktop";
+const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+const platformArch = `${process.platform}-${process.arch}`;
+const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
+const sourceStem = "release-progress-refresh-smoke";
+const readoutStem = "release-completion-summary-smoke";
+const sourceJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${sourceStem}.json`);
+const readoutMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${readoutStem}.md`);
+const readoutJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${readoutStem}.json`);
+const failures = [];
+
+function check(condition, message) {
+  if (!condition) {
+    failures.push(message);
+  }
+}
+
+function fail(message, details = "") {
+  console.error("GrooveForge release completion summary smoke failed:");
+  console.error(`- ${message}`);
+  if (details.trim().length > 0) {
+    console.error(details.trim());
+  }
+  process.exit(1);
+}
+
+function relative(filePath) {
+  return path.relative(root, filePath);
+}
+
+function readyLabel(value) {
+  return value === true ? "yes" : "no";
+}
+
+function textValue(value, fallback = "none") {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function integerValue(value) {
+  return Number.isInteger(value) ? value : 0;
+}
+
+async function readJsonRequired(filePath, label) {
+  if (!existsSync(filePath)) {
+    fail(`${label} artifact is missing.`, `Expected: ${relative(filePath)}\nRun npm run release:progress-refresh-smoke before npm run release:completion-summary-smoke.`);
+  }
+  return JSON.parse(await readFile(filePath, "utf8"));
+}
+
+function buildReport(source) {
+  const summary = source.completionSummary ?? {};
+  return {
+    appName,
+    bundleId,
+    version: packageJson.version,
+    platform: process.platform,
+    arch: process.arch,
+    platformArch,
+    reportCommand: "npm run release:completion-summary-smoke",
+    sourceCommand: "npm run release:progress-refresh-smoke",
+    sourceJsonArtifactName: "release-progress-refresh-smoke.json",
+    sourceJsonPath: relative(sourceJsonPath),
+    completionSummaryMarkdownArtifactName: "release-completion-summary-smoke.md",
+    completionSummaryJsonArtifactName: "release-completion-summary-smoke.json",
+    completionSummaryMarkdownPath: relative(readoutMarkdownPath),
+    completionSummaryJsonPath: relative(readoutJsonPath),
+    sourceReady: source.releaseProgressRefreshReady === true,
+    sourceSummaryReady: summary.ready === true,
+    sourceLabelsMatch: source.labelsMatch === true,
+    latestPlanNumber: integerValue(summary.latestPlanNumber),
+    latestPlan: textValue(summary.latestPlan),
+    tenPlanProgress: textValue(summary.tenPlanProgress),
+    tenPlanCompletedCount: integerValue(summary.tenPlanCompletedCount),
+    tenPlanTotal: integerValue(summary.tenPlanTotal),
+    tenPlanReportDue: summary.tenPlanReportDue === true,
+    completionPercent: summary.completionPercent,
+    remainingPercent: summary.remainingPercent,
+    freshArtifactCount: integerValue(summary.freshArtifactCount),
+    staleArtifactCount: integerValue(summary.staleArtifactCount),
+    missingArtifactCount: integerValue(summary.missingArtifactCount),
+    operatorBriefReady: summary.operatorBriefReady === true,
+    releaseChannelMetadataBlocked: summary.releaseChannelMetadataBlocked === true,
+    releaseChannelMetadataCleared: summary.releaseChannelMetadataCleared === true,
+    releaseChannelCurrentReadyCount: integerValue(summary.releaseChannelCurrentReadyCount),
+    releaseChannelCurrentRequiredKeyCount: integerValue(summary.releaseChannelCurrentRequiredKeyCount),
+    releaseChannelCurrentPlaceholderKeyCount: integerValue(summary.releaseChannelCurrentPlaceholderKeyCount),
+    operatorProofCommand: textValue(summary.operatorProofCommand),
+    postClearanceNextAction: textValue(summary.postClearanceNextAction),
+    postClearanceProofCommand: textValue(summary.postClearanceProofCommand),
+    firstBlocker: textValue(summary.firstBlocker),
+    nextCommand: textValue(summary.nextCommand),
+    rerunCommand: textValue(summary.rerunCommand),
+    hardGateReady: summary.hardGateReady === true,
+    hardGateWouldFail: summary.hardGateWouldFail === true,
+    privateValuesRecorded: summary.privateValuesRecorded === true,
+    claimedAutoUpdate: summary.claimedAutoUpdate === true,
+    claimedExternalDistribution: summary.claimedExternalDistribution === true,
+    completionSummaryReadoutReady: false,
+    valueRecorded: false,
+    networkProbeAttempted: false,
+    updateFeedPublishAttempted: false,
+    distributionChannelProbeAttempted: false,
+    releaseUploadAttempted: false,
+    signingAttempted: false,
+    notarySubmissionAttempted: false,
+    claimedDeveloperIdSigning: false,
+    claimedNotarization: false,
+    claimedGatekeeperApproval: false,
+    claimedManualQaApproval: false,
+    claimedAppStoreSubmission: false
+  };
+}
+
+function buildMarkdown(report) {
+  return `# ${appName} ${report.version} ${report.platform}-${report.arch} Release Completion Summary Smoke
+
+## Completion Summary
+
+- Completion summary readout ready: ${readyLabel(report.completionSummaryReadoutReady)}
+- Source command: \`${report.sourceCommand}\`
+- Source JSON: ${report.sourceJsonPath}
+- Source ready: ${readyLabel(report.sourceReady)}
+- Source summary ready: ${readyLabel(report.sourceSummaryReady)}
+- Source labels match: ${readyLabel(report.sourceLabelsMatch)}
+- Latest completed plan: ${report.latestPlan}
+- 10-plan progress: ${report.tenPlanProgress}
+- User-facing completion: ${report.completionPercent}%
+- Remaining completion: ${report.remainingPercent}%
+- Fresh artifacts: ${report.freshArtifactCount}
+- Stale artifacts: ${report.staleArtifactCount}
+- Missing artifacts: ${report.missingArtifactCount}
+- Operator completion brief ready: ${readyLabel(report.operatorBriefReady)}
+- Release-channel metadata blocked: ${readyLabel(report.releaseChannelMetadataBlocked)}
+- Release-channel metadata cleared: ${readyLabel(report.releaseChannelMetadataCleared)}
+- Release-channel current ready rows: ${report.releaseChannelCurrentReadyCount}/${report.releaseChannelCurrentRequiredKeyCount}
+- Release-channel placeholders: ${report.releaseChannelCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}
+- Operator proof command: \`${report.operatorProofCommand}\`
+- Post-clearance next action: ${report.postClearanceNextAction}
+- Post-clearance proof command: \`${report.postClearanceProofCommand}\`
+- Next command: \`${report.nextCommand}\`
+- Rerun command: \`${report.rerunCommand}\`
+- Current first blocker: ${report.firstBlocker}
+- Hard gate ready: ${readyLabel(report.hardGateReady)}
+- Hard gate would fail: ${readyLabel(report.hardGateWouldFail)}
+- Private values recorded: ${readyLabel(report.privateValuesRecorded)}
+- Auto-update claimed: ${readyLabel(report.claimedAutoUpdate)}
+- External distribution claimed: ${readyLabel(report.claimedExternalDistribution)}
+
+## Not Recorded Or Claimed
+
+- No release URL, support URL, feed URL, credential, token, channel value, Developer ID identity value, private beat, or real user audio is recorded.
+- No update feed probe, feed publish, distribution channel probe, release upload, Apple notary submission, or signing is attempted by this readout.
+- Not claimed: auto-update, Developer ID signing, notarization, Gatekeeper approval, manual QA approval, app-store submission, or external distribution completion.
+`;
+}
+
+function validateReport(report, markdown) {
+  const serialized = JSON.stringify(report);
+  check(report.sourceReady === true, "release completion summary should require ready progress refresh source");
+  check(report.sourceSummaryReady === true, "release completion summary should require ready compact source summary");
+  check(report.sourceLabelsMatch === true, "release completion summary should require matched source labels");
+  check(report.latestPlanNumber > 0, "release completion summary should include latest plan number");
+  check(report.latestPlan === `plan-${report.latestPlanNumber}`, "release completion summary should format latest plan");
+  check(report.tenPlanTotal === 10, "release completion summary should use ten-plan totals");
+  check(report.tenPlanProgress === `${report.latestPlanNumber - ((report.latestPlanNumber - 1) % 10)}-${report.latestPlanNumber - ((report.latestPlanNumber - 1) % 10) + 9}: ${report.tenPlanCompletedCount}/10`, "release completion summary should align latest plan window");
+  check(report.completionPercent === 99.999999, "release completion summary should preserve completion percent");
+  check(report.remainingPercent === 0.000001, "release completion summary should preserve remaining percent");
+  check(report.freshArtifactCount > 0, "release completion summary should report fresh artifacts");
+  check(report.staleArtifactCount === 0, "release completion summary should report zero stale artifacts");
+  check(report.missingArtifactCount === 0, "release completion summary should report zero missing artifacts");
+  check(report.operatorBriefReady === true, "release completion summary should keep operator brief ready");
+  check(report.releaseChannelMetadataBlocked !== report.releaseChannelMetadataCleared, "release completion summary should keep exactly one release-channel metadata posture");
+  check(!report.releaseChannelMetadataBlocked || report.releaseChannelCurrentPlaceholderKeyCount === 4, "release completion summary should keep four placeholders while blocked");
+  check(!report.releaseChannelMetadataCleared || report.releaseChannelCurrentPlaceholderKeyCount === 0, "release completion summary should allow zero placeholders when cleared");
+  check(report.operatorProofCommand === "npm run release:private-edit-strict-proof", "release completion summary should keep strict proof as operator proof command");
+  check(report.postClearanceNextAction === "auto-update-feed", "release completion summary should keep auto-update-feed as post-clearance next action");
+  check(report.postClearanceProofCommand === "npm run desktop:auto-update-readiness-smoke", "release completion summary should keep auto-update readiness as post-clearance proof command");
+  check(report.hardGateReady === false, "release completion summary should keep hard gate unready");
+  check(report.hardGateWouldFail === true, "release completion summary should keep hard gate would-fail posture");
+  check(report.privateValuesRecorded === false, "release completion summary should not record private values");
+  check(report.claimedAutoUpdate === false, "release completion summary should not claim auto-update");
+  check(report.claimedExternalDistribution === false, "release completion summary should not claim external distribution");
+  check(report.networkProbeAttempted === false, "release completion summary should not probe networks");
+  check(report.updateFeedPublishAttempted === false, "release completion summary should not publish update feeds");
+  check(report.distributionChannelProbeAttempted === false, "release completion summary should not probe distribution channels");
+  check(report.releaseUploadAttempted === false, "release completion summary should not upload releases");
+  check(report.signingAttempted === false, "release completion summary should not sign artifacts");
+  check(report.notarySubmissionAttempted === false, "release completion summary should not submit to Apple");
+  check(!/https?:\/\//i.test(serialized), "release completion summary JSON should not include URL values");
+  check(!/https?:\/\//i.test(markdown), "release completion summary Markdown should not include URL values");
+  check(markdown.includes("Release Completion Summary Smoke"), "release completion summary Markdown should include title");
+  check(markdown.includes("Completion summary readout ready: yes"), "release completion summary Markdown should include readiness");
+
+  if (failures.length > 0) {
+    fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
+  }
+}
+
+const source = await readJsonRequired(sourceJsonPath, "Release progress refresh smoke");
+const report = buildReport(source);
+report.completionSummaryReadoutReady = true;
+const markdown = buildMarkdown(report);
+validateReport(report, markdown);
+
+await mkdir(packageRoot, { recursive: true });
+await writeFile(readoutMarkdownPath, markdown, "utf8");
+await writeFile(readoutJsonPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+
+console.log("GrooveForge release completion summary smoke passed.");
+console.log(`- Markdown: ${relative(readoutMarkdownPath)}`);
+console.log(`- JSON: ${relative(readoutJsonPath)}`);
+console.log("- Completion summary readout ready: yes");
+console.log(`- Source command: ${report.sourceCommand}`);
+console.log(`- Latest completed plan: ${report.latestPlan}`);
+console.log(`- 10-plan progress: ${report.tenPlanProgress}`);
+console.log(`- User-facing completion: ${report.completionPercent}%`);
+console.log(`- Remaining completion: ${report.remainingPercent}%`);
+console.log(`- Fresh artifacts: ${report.freshArtifactCount}`);
+console.log(`- Stale artifacts: ${report.staleArtifactCount}`);
+console.log(`- Missing artifacts: ${report.missingArtifactCount}`);
+console.log(`- Operator proof command: ${report.operatorProofCommand}`);
+console.log(`- Current first blocker: ${report.firstBlocker}`);
+console.log(`- Private values recorded: ${report.privateValuesRecorded ? "yes" : "no"}`);
+console.log("- Network: no update feed probe, feed publish, distribution channel probe, release upload, Apple notary submission, or signing attempted");
+console.log("- Not claimed: auto-update, Developer ID signing, notarization, Gatekeeper approval, manual QA approval, app-store submission, or external distribution completion");
