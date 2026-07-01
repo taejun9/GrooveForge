@@ -46,6 +46,11 @@ DOCUMENTED_CORE_COMMANDS = {
     "workflow:smoke",
 }
 
+COMPLETION_CITATION_RE = re.compile(
+    r"Completion reports should cite (?P<body>.*?)(?: If a future plan|\n\n)",
+    re.S,
+)
+
 REQUIRED_PATHS = [
     "AGENTS.md",
     "README.md",
@@ -584,9 +589,12 @@ TEXT_EXPECTATIONS = {
         "desktop entry smoke, desktop launch smoke",
         "`npm run release:check` is the release-readiness gate and runs both `npm run qa` and `npm run verify`.",
         "The current requirement-by-requirement proof trail lives in [docs/release/readiness.md](docs/release/readiness.md).",
-        "Completion reports should cite `npm run release:doctor`, `npm run release:prepare-env-smoke`, `npm run release:external-preflight`, `npm run release:next-actions`, `npm run release:proof-bundle`, `npm run release:progress`, `npm run release:current-blocker`, `npm run release:private-edit-quick-proof`, `npm run release:private-edit-strict-proof`, `npm run release:private-edit-strict-proof-blocked-smoke`, `npm run release:private-value-leak-audit`, `npm run release:update-feed-checkpoint-smoke`, `npm run release:check`, `npm run release:audience-completion-handoff-smoke`, `npm run release:channel-clearance-transition-smoke`, `npm run release:auto-update-transition-smoke`, `npm run release:completion-report-packet-smoke`, the release doctor artifact when private distribution inputs are still pending",
-        "the release prepare-env artifact, the external preflight artifact, the external next-actions artifact, the external proof bundle artifact, the release current blocker artifact, the private edit quick-proof artifact when reporting the four current release-channel keys and strict first proof command, the private edit strict-proof artifact when reporting strict-first post-edit/progress proof readiness after operator edits, the private edit strict-proof blocked-smoke artifact when proving the blocked handoff and strict failure coverage without reading or modifying the real ignored env, the private value leak audit artifact when proving generated release evidence does not contain non-placeholder private env values, the release-channel clearance transition artifact when explaining the auto-update-feed follow-up, the auto-update transition artifact when explaining post-clearance auto-update blockers, the update-feed checkpoint artifact when reporting real/synthetic update-feed proof branch posture after auto-update transition, the local delivery package artifact, the local package reopen artifact, the native project IO artifact, the packaged project IO artifact, the PKG payload project IO artifact, the installed project IO artifact, the completion audit artifact, the completion status artifact, the external operator runbook artifact with desktop project IO readiness and current-action proof rows",
-        "current 10-plan rows, private-edit blocked smoke evidence, private value leak audit evidence, update-feed checkpoint evidence, 10-plan progress report receipt rows/readiness",
+        "Completion reports should cite `npm run release:doctor`, `npm run release:prepare-env-smoke`, `npm run release:external-preflight`, `npm run release:next-actions`, `npm run release:proof-bundle`, `npm run release:progress`, `npm run release:current-blocker`, `npm run release:private-edit-quick-proof`, `npm run release:private-edit-strict-proof`, `npm run release:private-edit-strict-proof-blocked-smoke`, `npm run release:private-value-leak-audit`, `npm run release:update-feed-checkpoint-smoke`, `npm run release:check`, `npm run release:audience-completion-handoff-smoke`, `npm run release:channel-clearance-transition-smoke`, `npm run release:auto-update-transition-smoke`, `npm run release:completion-report-packet-smoke`, `npm run release:channel-unblock-smoke`, `npm run release:channel-live-check`, `npm run release:final-handoff-success-redaction-smoke`, `npm run release:update-feed-post-edit-proof`, `npm run release:progress-refresh-smoke`, `npm run release:progress-freshness-smoke`, `npm run release:operator-completion-brief-smoke`, the release doctor artifact when private distribution inputs are still pending",
+        "the release prepare-env artifact, the release-channel unblock artifact, the release-channel live-check artifact after operator local-env edits, the external preflight artifact, the external next-actions artifact, the external proof bundle artifact, the release current blocker artifact, the private edit quick-proof artifact when reporting the four current release-channel keys and strict first proof command, the private edit strict-proof artifact when reporting strict-first post-edit/progress proof readiness after operator edits, the private edit strict-proof blocked-smoke artifact when proving the blocked handoff and strict failure coverage without reading or modifying the real ignored env, the private value leak audit artifact when proving generated release evidence does not contain non-placeholder private env values, the final handoff success-redaction artifact when proving the strict-ready handoff branch stays value-free without reading or modifying the real ignored env, the release-channel clearance transition artifact when explaining the auto-update-feed follow-up, the auto-update transition artifact when explaining post-clearance auto-update blockers, the update feed post-edit proof artifact when explaining feed/channel edit posture and downstream auto-update blockers, the update-feed checkpoint artifact when reporting real/synthetic update-feed proof branch posture after auto-update transition, the local delivery package artifact, the local package reopen artifact, the native project IO artifact, the packaged project IO artifact, the PKG payload project IO artifact, the installed project IO artifact, the completion audit artifact, the completion status artifact, the external operator runbook artifact with desktop project IO readiness and current-action proof rows",
+        "current 10-plan rows, private-edit blocked smoke evidence, final handoff success-redaction evidence, update-feed checkpoint evidence, 10-plan progress report receipt rows/readiness",
+        "the release progress refresh artifact when reporting the refreshed progress/current-blocker/completion-packet/freshness/operator-brief evidence set",
+        "the release progress freshness artifact when reporting fresh/stale/missing evidence alignment",
+        "the operator completion brief artifact when reporting the compact value-free operator path for the private release-channel edit and post-clearance follow-up",
         "the completion progress artifact with current-action proof rows when external distribution is still pending",
         "local project save/load",
         "Local draft recovery that keeps a bounded browser/Electron renderer draft in localStorage",
@@ -25230,6 +25238,24 @@ def check_documented_command_coverage(errors: list[str]) -> None:
                 errors.append(f"{file_path} missing documented command: npm run {command}")
 
 
+def completion_citation_commands(file_path: str, errors: list[str]) -> set[str]:
+    text = (ROOT / file_path).read_text(encoding="utf-8")
+    match = COMPLETION_CITATION_RE.search(text)
+    if not match:
+        errors.append(f"{file_path} missing completion reports citation sentence")
+        return set()
+    return set(re.findall(r"`npm run ([^`]+)`", match.group("body")))
+
+
+def check_readme_completion_citation_coverage(errors: list[str]) -> None:
+    readiness_commands = completion_citation_commands("docs/release/readiness.md", errors)
+    readme_commands = completion_citation_commands("README.md", errors)
+    missing = sorted(readiness_commands - readme_commands)
+    if missing:
+        formatted = ", ".join(f"npm run {command}" for command in missing)
+        errors.append(f"README.md completion proof trail missing release readiness citation commands: {formatted}")
+
+
 def check_official_sources(errors: list[str]) -> None:
     text = (ROOT / "docs/references/official-sources.md").read_text(encoding="utf-8")
     if "| TODO |" in text:
@@ -25370,6 +25396,7 @@ def run_checks(strict: bool = False) -> list[str]:
     check_text_expectations(errors)
     check_quality_command_block(errors)
     check_documented_command_coverage(errors)
+    check_readme_completion_citation_coverage(errors)
     check_official_sources(errors)
     check_offline_render_determinism(errors)
     check_build_chunk_config(errors)

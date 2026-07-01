@@ -34,6 +34,7 @@ These rules should be enforced by the local harness where practical.
 - `AGENTS.md` should stay a concise repository map.
 - `README.md` is the current public entry point and must stay aligned with code behavior.
 - QA must compare current `package.json` release, desktop, and core scripts against `README.md`, release readiness, harness architecture, and this quality command catalog so public operator command maps cannot silently drift.
+- QA must compare README completion-report citation commands against `docs/release/readiness.md` Completion Use so the public proof trail cannot silently omit current completion evidence.
 
 ## Safety
 
