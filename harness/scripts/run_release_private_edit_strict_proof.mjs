@@ -50,6 +50,10 @@ const progressRefreshJsonPath = path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-progress-refresh-smoke.json`
 );
+const privateValueLeakAuditJsonPath = path.join(
+  packageRoot,
+  `${appName}-${packageJson.version}-${platformArch}-${successSmoke ? "release-private-value-leak-audit-success-smoke" : "release-private-value-leak-audit"}.json`
+);
 const currentBlockerJsonPath = path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`
@@ -194,7 +198,18 @@ function formatSourceRows(rows) {
     .join("\n");
 }
 
-function buildReport({ strictResult, postEditResult, progressResult, strictLiveCheck, postEditProof, progressRefresh, currentBlocker, fallbackTenPlanProgressLabel }) {
+function buildReport({
+  strictResult,
+  postEditResult,
+  progressResult,
+  privateValueLeakAuditResult,
+  strictLiveCheck,
+  postEditProof,
+  progressRefresh,
+  privateValueLeakAudit,
+  currentBlocker,
+  fallbackTenPlanProgressLabel
+}) {
   const strictReady = strictLiveCheck?.strictReady === true;
   const strictExitCode = Number.isInteger(strictLiveCheck?.strictExitCode)
     ? strictLiveCheck.strictExitCode
@@ -212,7 +227,8 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
   }));
   const postEditReady = postEditProof?.releasePostEditProofReady === true || postEditProof?.releasePostEditProofSuccessSmokeReady === true;
   const progressReady = successSmoke || blockedSmoke ? true : progressRefresh?.refreshSmokeReady === true;
-  const proofReady = strictReady && postEditReady && progressReady;
+  const privateValueLeakAuditReady = blockedSmoke ? false : privateValueLeakAudit?.releasePrivateValueLeakAuditReady === true;
+  const proofReady = strictReady && postEditReady && progressReady && privateValueLeakAuditReady;
   const currentTenPlanProgressLabel =
     successSmoke || blockedSmoke
       ? fallbackTenPlanProgressLabel
@@ -222,12 +238,9 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
         );
   const strictFailureBlocker = `Strict release-channel proof has ${strictFailureRows.length} missing, placeholder, or malformed metadata rows.`;
   const currentFirstBlocker = proofReady
-    ? textValue(
-        currentBlocker?.currentFirstBlocker,
-        successSmoke
-          ? "Strict release-channel proof succeeded in synthetic rehearsal; broader external proofs remain unclaimed."
-          : "Strict release-channel proof passed; broader external proofs remain unclaimed."
-      )
+    ? successSmoke
+      ? "Strict release-channel proof succeeded in synthetic rehearsal; broader external proofs remain unclaimed."
+      : textValue(currentBlocker?.currentFirstBlocker, "Strict release-channel proof passed; broader external proofs remain unclaimed.")
     : blockedSmoke
       ? strictFailureBlocker
       : textValue(currentBlocker?.currentFirstBlocker, strictFailureBlocker);
@@ -275,6 +288,22 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
             : "not run",
       exitCode: progressResult?.status ?? null,
       valueRecorded: false
+    },
+    {
+      order: 4,
+      command: successSmoke ? "npm run release:private-value-leak-audit-smoke" : "npm run release:private-value-leak-audit",
+      role: successSmoke
+        ? "prove generated release evidence leak-audit success branch without reading the real local env"
+        : blockedSmoke
+          ? "private-value leak audit is skipped in blocked smoke because strict proof fails before private post-edit evidence is generated"
+          : "scan generated release evidence for non-placeholder private env candidates after strict proof and progress refresh",
+      statusLabel: blockedSmoke
+        ? "skipped in blocked smoke"
+        : privateValueLeakAuditResult
+          ? (privateValueLeakAuditResult.success ? "passed" : "failed")
+          : "not run",
+      exitCode: privateValueLeakAuditResult?.status ?? null,
+      valueRecorded: false
     }
   ];
   const blockedHandoffRows = proofReady
@@ -318,6 +347,12 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
       successSmoke
     ),
     sourceRow("Release progress refresh smoke", progressRefreshJsonPath, Boolean(progressRefresh), false),
+    sourceRow(
+      successSmoke ? "Release private value leak audit success smoke" : "Release private value leak audit",
+      privateValueLeakAuditJsonPath,
+      Boolean(privateValueLeakAudit),
+      successSmoke
+    ),
     sourceRow("Release current blocker", currentBlockerJsonPath, Boolean(currentBlocker), false)
   ];
 
@@ -360,6 +395,7 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
     privateEditStrictProofFirstCommand: commandRows[0].command,
     privateEditStrictProofPostEditCommand: commandRows[1].command,
     privateEditStrictProofProgressCommand: commandRows[2].command,
+    privateEditStrictProofLeakAuditCommand: commandRows[3].command,
     privateEditStrictProofCommandRows: commandRows,
     privateEditStrictProofCommandRowCount: commandRows.length,
     privateEditStrictProofCommandSummary: commandRows.map((row) => row.command).join(" -> "),
@@ -388,6 +424,14 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
     progressRefreshReady: progressReady,
     progressRefreshSkippedInSuccessSmoke: successSmoke,
     progressRefreshSkippedInBlockedSmoke: blockedSmoke,
+    privateValueLeakAuditReady,
+    privateValueLeakAuditCommand: commandRows[3].command,
+    privateValueLeakAuditSkippedInBlockedSmoke: blockedSmoke,
+    privateValueLeakAuditSyntheticSuccessSmoke: successSmoke,
+    privateValueLeakAuditCandidateCount: integerValue(privateValueLeakAudit?.privateValueCandidateCount),
+    privateValueLeakAuditScannedArtifactCount: integerValue(privateValueLeakAudit?.scannedArtifactCount),
+    privateValueLeakAuditLeakFindingCount: integerValue(privateValueLeakAudit?.leakFindingCount),
+    privateValueLeakAuditDetectionProbeReady: blockedSmoke ? true : privateValueLeakAudit?.detectionProbeReady === true,
     currentTenPlanProgressLabel,
     nextScheduledTenPlanProgressReport: textValue(
       progressRefresh?.nextScheduledTenPlanProgressReportAfterDelivery,
@@ -437,6 +481,7 @@ function buildMarkdown(report) {
 - First command: \`${report.privateEditStrictProofFirstCommand}\`
 - Post-edit proof command: \`${report.privateEditStrictProofPostEditCommand}\`
 - Progress refresh command: \`${report.privateEditStrictProofProgressCommand}\`
+- Private value leak audit command: \`${report.privateEditStrictProofLeakAuditCommand}\`
 - Strict ready: ${report.strictReady ? "yes" : "no"}
 - Strict exit code: ${report.strictExitCode}
 - Strict current-ready rows: ${report.strictCurrentReadyCount}/${report.strictCurrentRowCount}
@@ -449,6 +494,10 @@ function buildMarkdown(report) {
 - Progress refresh ready: ${report.progressRefreshReady ? "yes" : "no"}
 - Progress refresh skipped in success smoke: ${report.progressRefreshSkippedInSuccessSmoke ? "yes" : "no"}
 - Progress refresh skipped in blocked smoke: ${report.progressRefreshSkippedInBlockedSmoke ? "yes" : "no"}
+- Private value leak audit ready: ${report.privateValueLeakAuditReady ? "yes" : "no"}
+- Private value leak audit skipped in blocked smoke: ${report.privateValueLeakAuditSkippedInBlockedSmoke ? "yes" : "no"}
+- Private value leak audit findings: ${report.privateValueLeakAuditLeakFindingCount}
+- Private value leak audit scanned artifacts: ${report.privateValueLeakAuditScannedArtifactCount}
 - Current 10-plan progress: ${report.currentTenPlanProgressLabel}
 - Next scheduled 10-plan report: ${report.nextScheduledTenPlanProgressReport}
 - Overall completion: ${report.userFacingCompletionPercent.toFixed(6)}%
@@ -501,10 +550,11 @@ async function writeReport(report) {
   const markdown = buildMarkdown(report);
   const json = `${JSON.stringify(report, null, 2)}\n`;
   check(report.privateEditStrictProofReceiptReady === true, "release private edit strict proof should write a ready receipt");
-  check(report.privateEditStrictProofCommandRowCount === 3, "release private edit strict proof should include three command rows");
+  check(report.privateEditStrictProofCommandRowCount === 4, "release private edit strict proof should include four command rows");
   check(report.privateEditStrictProofFirstCommand.includes("channel-live-check-strict"), "release private edit strict proof should run strict live-check first");
   check(report.privateEditStrictProofPostEditCommand.includes("post-edit-proof"), "release private edit strict proof should include post-edit proof");
   check(report.privateEditStrictProofProgressCommand === "npm run release:progress-refresh-smoke", "release private edit strict proof should include progress refresh");
+  check(report.privateEditStrictProofLeakAuditCommand.includes("private-value-leak-audit"), "release private edit strict proof should include private value leak audit");
   check(report.privateEditStrictProofMarkdownArtifactName.endsWith(".md"), "release private edit strict proof should record Markdown artifact name");
   check(report.privateEditStrictProofJsonArtifactName.endsWith(".json"), "release private edit strict proof should record JSON artifact name");
   check(report.privateEditStrictProofBlockedHandoffReady === true, "release private edit strict proof blocked handoff receipt should be ready");
@@ -517,7 +567,12 @@ async function writeReport(report) {
   check(!blockedSmoke || report.sourceMode.includes("blocked smoke"), "release private edit strict proof blocked smoke should use blocked smoke source mode");
   check(!blockedSmoke || report.strictFailureRowCount === releaseChannelMetadataKeys.length, "release private edit strict proof blocked smoke should cover four strict failure rows");
   check(!blockedSmoke || report.progressRefreshSkippedInBlockedSmoke === true, "release private edit strict proof blocked smoke should skip progress refresh");
+  check(!blockedSmoke || report.privateValueLeakAuditSkippedInBlockedSmoke === true, "release private edit strict proof blocked smoke should skip private value leak audit");
   check(!successSmoke && !blockedSmoke || report.currentTenPlanProgressLabel === fallbackTenPlanProgressLabel, "release private edit strict proof smoke should derive the latest completed-plan label without progress refresh");
+  check(successSmoke || blockedSmoke || report.privateValueLeakAuditReady === true, "release private edit strict proof real success path should run a ready private value leak audit");
+  check(!successSmoke || report.privateValueLeakAuditReady === true, "release private edit strict proof success smoke should run a ready private value leak audit smoke");
+  check(report.privateValueLeakAuditLeakFindingCount === 0, "release private edit strict proof private value leak audit should find zero leaks");
+  check(report.privateValueLeakAuditDetectionProbeReady === true, "release private edit strict proof private value leak audit should keep detection probe ready");
   check(report.currentRequiredKeyCount === 4, "release private edit strict proof should track four release-channel keys");
   check(releaseChannelMetadataKeys.every((key) => report.currentRequiredKeys.includes(key)), "release private edit strict proof should cover release-channel keys");
   check(report.strictFailureRowCount === report.strictFailureRows.length, "release private edit strict proof strict failure row count should match rows");
@@ -554,9 +609,11 @@ async function writeReport(report) {
 let strictResult = { command: "none", status: 1, success: false };
 let postEditResult = null;
 let progressResult = null;
+let privateValueLeakAuditResult = null;
 let strictLiveCheck = null;
 let postEditProof = null;
 let progressRefresh = null;
+let privateValueLeakAudit = null;
 let currentBlocker = await readJsonIfPresent(currentBlockerJsonPath);
 const fallbackTenPlanProgressLabel = await currentTenPlanProgressLabel();
 
@@ -586,6 +643,11 @@ try {
       progressRefresh = await readJsonIfPresent(progressRefreshJsonPath);
       currentBlocker = await readJsonIfPresent(currentBlockerJsonPath);
     }
+
+    privateValueLeakAuditResult = runNpmScript(
+      successSmoke ? "release:private-value-leak-audit-smoke" : "release:private-value-leak-audit"
+    );
+    privateValueLeakAudit = await readJsonIfPresent(privateValueLeakAuditJsonPath);
   }
 } catch (error) {
   console.error(`GrooveForge release private edit strict proof${modeLabel} command failed:`);
@@ -597,9 +659,11 @@ const report = buildReport({
   strictResult,
   postEditResult,
   progressResult,
+  privateValueLeakAuditResult,
   strictLiveCheck,
   postEditProof,
   progressRefresh,
+  privateValueLeakAudit,
   currentBlocker,
   fallbackTenPlanProgressLabel
 });
@@ -615,8 +679,11 @@ console.log(`- Current blocker: ${report.privateEditStrictProofCurrentFirstBlock
 console.log(`- First command: ${report.privateEditStrictProofFirstCommand}`);
 console.log(`- Post-edit proof command: ${report.privateEditStrictProofPostEditCommand}`);
 console.log(`- Progress refresh command: ${report.privateEditStrictProofProgressCommand}`);
+console.log(`- Private value leak audit command: ${report.privateEditStrictProofLeakAuditCommand}`);
 console.log(`- Strict ready: ${report.strictReady ? "yes" : "no"}`);
 console.log(`- Strict failure rows: ${report.strictFailureRowCount}`);
+console.log(`- Private value leak audit ready: ${report.privateValueLeakAuditReady ? "yes" : "no"}`);
+console.log(`- Private value leak audit findings: ${report.privateValueLeakAuditLeakFindingCount}`);
 console.log(`- Blocked handoff receipt ready: ${report.privateEditStrictProofBlockedHandoffReady ? "yes" : "no"}`);
 console.log(`- Blocked handoff rows: ${report.privateEditStrictProofBlockedHandoffRowCount} (${report.privateEditStrictProofBlockedHandoffSummary})`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount}`);

@@ -84,6 +84,18 @@ const privateEditProofCommandRows = [
   },
   {
     order: 3,
+    command: "npm run release:progress-refresh-smoke",
+    role: "refresh user-facing completion and current progress evidence after post-edit proof passes",
+    valueRecorded: false
+  },
+  {
+    order: 4,
+    command: "npm run release:private-value-leak-audit",
+    role: "scan generated release evidence for non-placeholder private env candidates after private edits",
+    valueRecorded: false
+  },
+  {
+    order: 5,
     command: "npm run release:external-check",
     role: "run the hard external distribution gate after all private and external evidence is ready",
     valueRecorded: false
@@ -281,7 +293,7 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
       blocker: textValue(channel.currentFirstBlocker),
       editTarget: textValue(channel.currentEnvEditTarget),
       command: privateEditOperatorProofCommand,
-      followUp: "strict live-check, post-edit proof, and progress refresh",
+      followUp: "strict live-check, post-edit proof, progress refresh, and private-value leak audit",
       sourceField: "currentFirstBlocker/currentEnvEditTarget/privateEditOperatorProofCommand",
       valueRecorded: false
     }
@@ -882,6 +894,8 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
       channel.releaseChannelRecommendedOperatorProofCommandValueRecorded === false,
     firstPrivateEditProofCommand: privateEditProofCommandRows[0].command,
     postEditProofCommand: privateEditProofCommandRows[1].command,
+    progressRefreshCommand: privateEditProofCommandRows[2].command,
+    privateValueLeakAuditCommand: privateEditProofCommandRows[3].command,
     sourceArtifactRows,
     sourceArtifactRowCount: sourceArtifactRows.length,
     sourceLabelsMatchLatestTenPlan: labelsMatch,
@@ -1193,9 +1207,10 @@ function validateReport(report, markdown) {
     "release completion report packet should refresh audience, channel edit packet, private-edit blocked smoke, final handoff success-redaction, clearance transition, auto-update transition, then update-feed checkpoint"
   );
   check(report.refreshCommandRows.every((row) => row.valueRecorded === false), "release completion report packet command rows should be value-free");
-  check(report.privateEditProofCommandCount === 3, "release completion report packet should include three private-edit proof commands");
+  check(report.privateEditProofCommandCount === 5, "release completion report packet should include five private-edit proof commands");
   check(
-    report.privateEditProofCommandSummary === "npm run release:channel-live-check-strict -> npm run release:post-edit-proof -> npm run release:external-check",
+    report.privateEditProofCommandSummary ===
+      "npm run release:channel-live-check-strict -> npm run release:post-edit-proof -> npm run release:progress-refresh-smoke -> npm run release:private-value-leak-audit -> npm run release:external-check",
     "release completion report packet should expose the private-edit proof command order"
   );
   check(report.privateEditOperatorProofCommand === privateEditOperatorProofCommand, "release completion report packet should include the recommended private-edit operator proof command");
@@ -1287,6 +1302,8 @@ function validateReport(report, markdown) {
   check(report.privateEditProofCommandRows.every((row) => row.valueRecorded === false), "release completion report packet private-edit proof commands should be value-free");
   check(report.firstPrivateEditProofCommand === "npm run release:channel-live-check-strict", "release completion report packet should make strict live check the first private-edit proof command");
   check(report.postEditProofCommand === "npm run release:post-edit-proof", "release completion report packet should include post-edit proof command");
+  check(report.progressRefreshCommand === "npm run release:progress-refresh-smoke", "release completion report packet should include progress refresh command");
+  check(report.privateValueLeakAuditCommand === "npm run release:private-value-leak-audit", "release completion report packet should include private value leak audit command");
   check(report.sourceArtifactRowCount === 7, "release completion report packet should include seven source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release completion report packet sources should be present, ready, and value-free");
   check(report.sourceLabelsMatchLatestTenPlan === true, "release completion report packet source labels should match latest 10-plan progress");
