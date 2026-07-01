@@ -19,6 +19,8 @@ const externalProofBundleJsonPath = path.join(packageRoot, `${appName}-${package
 const externalGateJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-distribution-gate.json`);
 const releaseChannelUnblockJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-unblock-smoke.json`);
 const releaseChannelLiveCheckJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-live-check.json`);
+const privateEditStrictProofBlockedJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-private-edit-strict-proof-blocked-smoke.json`);
+const privateEditStrictProofSuccessJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-private-edit-strict-proof-success-smoke.json`);
 const releaseProgressMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.md`);
 const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.json`);
 const failures = [];
@@ -65,6 +67,13 @@ function stringArrayValue(values) {
 
 function valueFreeObjectRows(values) {
   return Array.isArray(values) ? values.filter((value) => value && typeof value === "object" && value.valueRecorded === false) : [];
+}
+
+async function readJsonIfPresent(filePath) {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+  return JSON.parse(await readFile(filePath, "utf8"));
 }
 
 function escapeCell(value) {
@@ -237,6 +246,15 @@ function formatPostEditProofSequenceReceiptRows(rows) {
   }
   return rows
     .map((row) => `| ${row.order ?? "?"} | ${escapeCell(row.step)} | ${row.ready ? "yes" : "no"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.expectedEvidence)} | ${escapeCell(row.sourceField)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatPrivateEditStrictProofCommandRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order ?? "?"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.statusLabel)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
     .join("\n");
 }
 
@@ -867,6 +885,101 @@ function buildPostEditProofSequenceReceiptSummary(report) {
   };
 }
 
+function buildPrivateEditStrictProofHandoffSummary({ blockedSmoke, successSmoke }) {
+  const blockedRows = valueFreeObjectRows(blockedSmoke?.privateEditStrictProofBlockedHandoffRows);
+  const commandRows = valueFreeObjectRows(successSmoke?.privateEditStrictProofCommandRows ?? blockedSmoke?.privateEditStrictProofCommandRows);
+  const blockedSourceReady = blockedSmoke !== null;
+  const successSourceReady = successSmoke !== null;
+  const blockedReady =
+    blockedSourceReady &&
+    blockedSmoke.reportCommand === "npm run release:private-edit-strict-proof-blocked-smoke" &&
+    blockedSmoke.privateEditStrictProofReceiptReady === true &&
+    blockedSmoke.privateEditStrictProofReady === false &&
+    blockedSmoke.privateEditStrictProofBlockedHandoffReady === true &&
+    integerValue(blockedSmoke.privateEditStrictProofBlockedHandoffRowCount) === blockedRows.length &&
+    blockedRows.length > 0 &&
+    integerValue(blockedSmoke.strictFailureRowCount) === 4 &&
+    integerValue(blockedSmoke.currentPlaceholderKeyCount) === 4 &&
+    blockedSmoke.progressRefreshSkippedInBlockedSmoke === true &&
+    blockedSmoke.realLocalEnvRead === false &&
+    blockedSmoke.realLocalEnvModified === false &&
+    blockedSmoke.privateValuesRecorded === false &&
+    blockedSmoke.networkProbeAttempted === false &&
+    blockedSmoke.releaseUploadAttempted === false &&
+    blockedSmoke.signingAttempted === false &&
+    blockedSmoke.notarySubmissionAttempted === false &&
+    blockedSmoke.claimedExternalDistribution === false &&
+    blockedRows.every((row) => row.valueRecorded === false);
+  const successReady =
+    successSourceReady &&
+    successSmoke.reportCommand === "npm run release:private-edit-strict-proof-success-smoke" &&
+    successSmoke.privateEditStrictProofReceiptReady === true &&
+    successSmoke.privateEditStrictProofReady === true &&
+    successSmoke.strictReady === true &&
+    integerValue(successSmoke.strictFailureRowCount) === 0 &&
+    integerValue(successSmoke.currentPlaceholderKeyCount) === 0 &&
+    successSmoke.postEditProofReady === true &&
+    successSmoke.progressRefreshReady === true &&
+    successSmoke.privateValueLeakAuditReady === true &&
+    integerValue(successSmoke.privateValueLeakAuditLeakFindingCount) === 0 &&
+    successSmoke.realLocalEnvRead === false &&
+    successSmoke.realLocalEnvModified === false &&
+    successSmoke.privateValuesRecorded === false &&
+    successSmoke.networkProbeAttempted === false &&
+    successSmoke.releaseUploadAttempted === false &&
+    successSmoke.signingAttempted === false &&
+    successSmoke.notarySubmissionAttempted === false &&
+    successSmoke.claimedExternalDistribution === false &&
+    commandRows.length === integerValue(successSmoke.privateEditStrictProofCommandRowCount) &&
+    commandRows.every((row) => row.valueRecorded === false);
+  const sourceReady = blockedSourceReady || successSourceReady;
+  return {
+    privateEditStrictProofHandoffSourceArtifact: "Release private-edit strict proof smokes",
+    privateEditStrictProofHandoffSourceReady: sourceReady,
+    privateEditStrictProofHandoffReady: blockedReady && successReady,
+    privateEditStrictProofOperatorCommand: recommendedPrivateEditOperatorProofCommand,
+    privateEditStrictProofBlockedSourcePath: relative(privateEditStrictProofBlockedJsonPath),
+    privateEditStrictProofBlockedSourceReady: blockedSourceReady,
+    privateEditStrictProofBlockedReady: blockedReady,
+    privateEditStrictProofBlockedCommand: textValue(blockedSmoke?.reportCommand, "npm run release:private-edit-strict-proof-blocked-smoke"),
+    privateEditStrictProofBlockedState: textValue(blockedSmoke?.privateEditStrictProofState, "missing blocked smoke evidence"),
+    privateEditStrictProofBlockedHandoffReady: blockedSmoke?.privateEditStrictProofBlockedHandoffReady === true,
+    privateEditStrictProofBlockedHandoffRowCount: integerValue(blockedSmoke?.privateEditStrictProofBlockedHandoffRowCount),
+    privateEditStrictProofBlockedHandoffSummary: textValue(blockedSmoke?.privateEditStrictProofBlockedHandoffSummary, "missing blocked smoke evidence"),
+    privateEditStrictProofBlockedHandoffRows: blockedRows,
+    privateEditStrictProofBlockedStrictFailureRowCount: integerValue(blockedSmoke?.strictFailureRowCount),
+    privateEditStrictProofBlockedPlaceholderKeyCount: integerValue(blockedSmoke?.currentPlaceholderKeyCount),
+    privateEditStrictProofBlockedProgressSkipped: blockedSmoke?.progressRefreshSkippedInBlockedSmoke === true,
+    privateEditStrictProofBlockedRealLocalEnvRead: blockedSmoke?.realLocalEnvRead === true,
+    privateEditStrictProofBlockedRealLocalEnvModified: blockedSmoke?.realLocalEnvModified === true,
+    privateEditStrictProofSuccessSourcePath: relative(privateEditStrictProofSuccessJsonPath),
+    privateEditStrictProofSuccessSourceReady: successSourceReady,
+    privateEditStrictProofSuccessReady: successReady,
+    privateEditStrictProofSuccessCommand: textValue(successSmoke?.reportCommand, "npm run release:private-edit-strict-proof-success-smoke"),
+    privateEditStrictProofSuccessState: textValue(successSmoke?.privateEditStrictProofState, "missing success smoke evidence"),
+    privateEditStrictProofSuccessStrictReady: successSmoke?.strictReady === true,
+    privateEditStrictProofSuccessPlaceholderKeyCount: integerValue(successSmoke?.currentPlaceholderKeyCount),
+    privateEditStrictProofSuccessPostEditReady: successSmoke?.postEditProofReady === true,
+    privateEditStrictProofSuccessProgressRefreshReady: successSmoke?.progressRefreshReady === true,
+    privateEditStrictProofSuccessLeakAuditReady: successSmoke?.privateValueLeakAuditReady === true,
+    privateEditStrictProofSuccessLeakFindingCount: integerValue(successSmoke?.privateValueLeakAuditLeakFindingCount),
+    privateEditStrictProofSuccessRealLocalEnvRead: successSmoke?.realLocalEnvRead === true,
+    privateEditStrictProofSuccessRealLocalEnvModified: successSmoke?.realLocalEnvModified === true,
+    privateEditStrictProofCommandRowCount: commandRows.length,
+    privateEditStrictProofCommandSummary: textValue(
+      successSmoke?.privateEditStrictProofCommandSummary ?? blockedSmoke?.privateEditStrictProofCommandSummary,
+      "missing strict proof command rows"
+    ),
+    privateEditStrictProofCommandRows: commandRows,
+    privateEditStrictProofValueRecorded: false,
+    privateEditStrictProofPrivateValuesRecorded: blockedSmoke?.privateValuesRecorded === true || successSmoke?.privateValuesRecorded === true,
+    privateEditStrictProofNetworkProbeAttempted: blockedSmoke?.networkProbeAttempted === true || successSmoke?.networkProbeAttempted === true,
+    privateEditStrictProofClaimedAutoUpdate: blockedSmoke?.claimedAutoUpdate === true || successSmoke?.claimedAutoUpdate === true,
+    privateEditStrictProofClaimedExternalDistribution:
+      blockedSmoke?.claimedExternalDistribution === true || successSmoke?.claimedExternalDistribution === true
+  };
+}
+
 function buildExternalProofBundleSummary(externalProofBundle) {
   const releaseChannelPostEditOperatorReceiptRows = valueFreeObjectRows(externalProofBundle.releaseChannelPostEditOperatorReceiptRows);
   const postEditProofSequenceReceiptRows = valueFreeObjectRows(externalProofBundle.postEditProofSequenceReceiptRows);
@@ -1284,6 +1397,11 @@ function buildMarkdown(report) {
 - Proof-bundle doctor post-edit proof source ready: ${report.proofBundleDoctorPostEditProofSourceReady ? "yes" : "no"}
 - Proof-bundle doctor post-edit proof command: \`${report.proofBundleDoctorPostEditProofCommand}\`
 - Proof-bundle doctor post-edit proof matches recommended: ${report.proofBundleDoctorPostEditProofMatchesRecommended ? "yes" : "no"}
+- Private-edit strict proof handoff source ready: ${report.privateEditStrictProofHandoffSourceReady ? "yes" : "no"}
+- Private-edit strict proof handoff ready: ${report.privateEditStrictProofHandoffReady ? "yes" : "no"}
+- Private-edit strict proof operator command: \`${report.privateEditStrictProofOperatorCommand}\`
+- Private-edit strict proof blocked smoke ready: ${report.privateEditStrictProofBlockedReady ? "yes" : "no"}
+- Private-edit strict proof success smoke ready: ${report.privateEditStrictProofSuccessReady ? "yes" : "no"}
 - External proof artifacts present: ${report.externalProofBundleProofArtifactPresentCount}/${report.externalProofBundleProofArtifactCount} (missing: ${report.externalProofBundleProofArtifactMissingSummary})
 - External proof gate requirements ready: ${report.externalProofBundleGateRequirementReadyCount}/${report.externalProofBundleGateRequirementTotal} (blocked: ${report.externalProofBundleGateRequirementBlockedCount})
 - External proof current target: ${report.externalProofBundleCurrentProofTarget}
@@ -1321,6 +1439,7 @@ function buildMarkdown(report) {
 - Release-channel post-edit operator receipt to report: ${report.releaseChannelPostEditOperatorReceiptRowCount} (${report.releaseChannelPostEditOperatorReceiptSummary}); recommended proof ${report.releaseChannelPostEditOperatorReceiptRecommendedProofCommand}; proof ${report.releaseChannelPostEditOperatorReceiptProofCommand}; blocker refresh ${report.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand}
 - Post-edit proof sequence to report: ${report.postEditProofSequenceReceiptRowCount} (${report.postEditProofSequenceReceiptSummary}); recommended proof ${report.postEditProofSequenceReceiptRecommendedProofCommand}; next commands ${report.postEditProofSequenceReceiptDoctorCommand}, ${report.postEditProofSequenceReceiptCurrentBlockerCommand}, ${report.postEditProofSequenceReceiptNextActionsCommand}, ${report.postEditProofSequenceReceiptProofBundleCommand}, ${report.postEditProofSequenceReceiptProgressCommand}
 - Proof-bundle doctor post-edit proof to report: ${report.proofBundleDoctorPostEditProofCommand}; matches recommended ${report.proofBundleDoctorPostEditProofMatchesRecommended ? "yes" : "no"}; source ${report.proofBundleDoctorPostEditProofSourceArtifact}
+- Private-edit strict proof handoff to report: blocked ${report.privateEditStrictProofBlockedReady ? "ready" : "missing"}; success ${report.privateEditStrictProofSuccessReady ? "ready" : "missing"}; command ${report.privateEditStrictProofOperatorCommand}
 - Audience readiness to report: ${report.audienceReadinessRowCount} (${report.audienceReadinessRowSummary})
 - Audience acceptance rows to report: ${report.audienceAcceptanceRowCount} (${report.audienceAcceptanceRowSummary})
 - Persona delivery packages to report: ${report.audienceDeliveryPackageRowCount} (${report.audienceDeliveryPackageRowSummary})
@@ -1529,6 +1648,48 @@ ${formatPostEditProofSequenceReceiptRows(report.postEditProofSequenceReceiptRows
 - Value recorded: ${report.proofBundleDoctorPostEditProofValueRecorded ? "yes" : "no"}
 - External distribution claimed: ${report.proofBundleDoctorPostEditProofClaimedExternalDistribution ? "yes" : "no"}
 
+## Private-Edit Strict Proof Handoff Mirror
+
+- Source artifact: ${report.privateEditStrictProofHandoffSourceArtifact}
+- Source ready: ${report.privateEditStrictProofHandoffSourceReady ? "yes" : "no"}
+- Handoff ready: ${report.privateEditStrictProofHandoffReady ? "yes" : "no"}
+- Operator command: \`${report.privateEditStrictProofOperatorCommand}\`
+- Blocked smoke source path: ${report.privateEditStrictProofBlockedSourcePath}
+- Blocked smoke source ready: ${report.privateEditStrictProofBlockedSourceReady ? "yes" : "no"}
+- Blocked smoke ready: ${report.privateEditStrictProofBlockedReady ? "yes" : "no"}
+- Blocked smoke command: \`${report.privateEditStrictProofBlockedCommand}\`
+- Blocked smoke state: ${report.privateEditStrictProofBlockedState}
+- Blocked handoff ready: ${report.privateEditStrictProofBlockedHandoffReady ? "yes" : "no"}
+- Blocked handoff rows: ${report.privateEditStrictProofBlockedHandoffRowCount} (${report.privateEditStrictProofBlockedHandoffSummary})
+- Blocked strict failure rows: ${report.privateEditStrictProofBlockedStrictFailureRowCount}
+- Blocked placeholder keys: ${report.privateEditStrictProofBlockedPlaceholderKeyCount}
+- Blocked progress refresh skipped: ${report.privateEditStrictProofBlockedProgressSkipped ? "yes" : "no"}
+- Blocked real local env read: ${report.privateEditStrictProofBlockedRealLocalEnvRead ? "yes" : "no"}
+- Blocked real local env modified: ${report.privateEditStrictProofBlockedRealLocalEnvModified ? "yes" : "no"}
+- Success smoke source path: ${report.privateEditStrictProofSuccessSourcePath}
+- Success smoke source ready: ${report.privateEditStrictProofSuccessSourceReady ? "yes" : "no"}
+- Success smoke ready: ${report.privateEditStrictProofSuccessReady ? "yes" : "no"}
+- Success smoke command: \`${report.privateEditStrictProofSuccessCommand}\`
+- Success smoke state: ${report.privateEditStrictProofSuccessState}
+- Success strict ready: ${report.privateEditStrictProofSuccessStrictReady ? "yes" : "no"}
+- Success placeholder keys: ${report.privateEditStrictProofSuccessPlaceholderKeyCount}
+- Success post-edit proof ready: ${report.privateEditStrictProofSuccessPostEditReady ? "yes" : "no"}
+- Success progress refresh ready: ${report.privateEditStrictProofSuccessProgressRefreshReady ? "yes" : "no"}
+- Success private-value leak audit ready: ${report.privateEditStrictProofSuccessLeakAuditReady ? "yes" : "no"}
+- Success private-value leak findings: ${report.privateEditStrictProofSuccessLeakFindingCount}
+- Success real local env read: ${report.privateEditStrictProofSuccessRealLocalEnvRead ? "yes" : "no"}
+- Success real local env modified: ${report.privateEditStrictProofSuccessRealLocalEnvModified ? "yes" : "no"}
+- Command rows: ${report.privateEditStrictProofCommandRowCount} (${report.privateEditStrictProofCommandSummary})
+- Value recorded: ${report.privateEditStrictProofValueRecorded ? "yes" : "no"}
+- Private values recorded: ${report.privateEditStrictProofPrivateValuesRecorded ? "yes" : "no"}
+- Network probe attempted: ${report.privateEditStrictProofNetworkProbeAttempted ? "yes" : "no"}
+- Auto-update claimed: ${report.privateEditStrictProofClaimedAutoUpdate ? "yes" : "no"}
+- External distribution claimed: ${report.privateEditStrictProofClaimedExternalDistribution ? "yes" : "no"}
+
+| order | command | role | status | value recorded |
+|---:|---|---|---|---:|
+${formatPrivateEditStrictProofCommandRows(report.privateEditStrictProofCommandRows)}
+
 ## External Proof Bundle
 
 - Proof bundle ready: ${report.externalProofBundleReady ? "yes" : "no"}
@@ -1715,10 +1876,16 @@ const externalProofBundle = JSON.parse(await readFile(externalProofBundleJsonPat
 const externalGate = JSON.parse(await readFile(externalGateJsonPath, "utf8"));
 const releaseChannelUnblock = JSON.parse(await readFile(releaseChannelUnblockJsonPath, "utf8"));
 const releaseChannelLiveCheck = JSON.parse(await readFile(releaseChannelLiveCheckJsonPath, "utf8"));
+const privateEditStrictProofBlockedSmoke = await readJsonIfPresent(privateEditStrictProofBlockedJsonPath);
+const privateEditStrictProofSuccessSmoke = await readJsonIfPresent(privateEditStrictProofSuccessJsonPath);
 const externalProofBundleSummary = buildExternalProofBundleSummary(externalProofBundle);
 const externalGateCurrentProofSummary = buildExternalGateCurrentProofSummary(externalGate, externalProofBundleSummary);
 const releaseChannelUnblockSummary = buildReleaseChannelUnblockSummary(releaseChannelUnblock);
 const releaseChannelLiveCheckSummary = buildReleaseChannelLiveCheckSummary(releaseChannelLiveCheck);
+const privateEditStrictProofHandoffSummary = buildPrivateEditStrictProofHandoffSummary({
+  blockedSmoke: privateEditStrictProofBlockedSmoke,
+  successSmoke: privateEditStrictProofSuccessSmoke
+});
 const audienceReadinessSummary = buildAudienceReadinessSummary(personaReadiness);
 const completedPlanSummary = await buildCompletedPlanSummary();
 const releaseProgressReport = {
@@ -1744,6 +1911,7 @@ const releaseProgressReport = {
   ...externalGateCurrentProofSummary,
   ...releaseChannelUnblockSummary,
   ...releaseChannelLiveCheckSummary,
+  ...privateEditStrictProofHandoffSummary,
   productScope: completionProgress.productScope,
   completionStage: completionProgress.completionStage,
   sourceEvidenceReady: completionProgress.sourceEvidenceReady === true,
@@ -2175,6 +2343,50 @@ check(releaseProgressReport.proofBundleDoctorPostEditProofMatchesRecommended ===
 check(releaseProgressReport.proofBundleDoctorPostEditProofMirrorsNextActions === true, "release progress report proof-bundle doctor post-edit proof should mirror next-actions");
 check(releaseProgressReport.proofBundleDoctorPostEditProofValueRecorded === false, "release progress report proof-bundle doctor post-edit proof should not record values");
 check(releaseProgressReport.proofBundleDoctorPostEditProofClaimedExternalDistribution === false, "release progress report proof-bundle doctor post-edit proof should not claim external distribution");
+check(releaseProgressReport.privateEditStrictProofHandoffSourceArtifact === "Release private-edit strict proof smokes", "release progress report should label strict proof handoff source artifacts");
+check(typeof releaseProgressReport.privateEditStrictProofHandoffSourceReady === "boolean", "release progress report should include strict proof handoff source readiness");
+check(typeof releaseProgressReport.privateEditStrictProofHandoffReady === "boolean", "release progress report should include strict proof handoff readiness");
+check(releaseProgressReport.privateEditStrictProofOperatorCommand === recommendedPrivateEditOperatorProofCommand, "release progress report should expose strict proof operator command");
+check(releaseProgressReport.privateEditStrictProofBlockedSourcePath === relative(privateEditStrictProofBlockedJsonPath), "release progress report should include blocked strict proof source path");
+check(releaseProgressReport.privateEditStrictProofSuccessSourcePath === relative(privateEditStrictProofSuccessJsonPath), "release progress report should include success strict proof source path");
+check(releaseProgressReport.privateEditStrictProofBlockedSourceReady === (privateEditStrictProofBlockedSmoke !== null), "release progress report should match blocked strict proof source readiness to artifact presence");
+check(releaseProgressReport.privateEditStrictProofSuccessSourceReady === (privateEditStrictProofSuccessSmoke !== null), "release progress report should match success strict proof source readiness to artifact presence");
+if (releaseProgressReport.privateEditStrictProofBlockedSourceReady) {
+  check(releaseProgressReport.privateEditStrictProofBlockedReady === true, "release progress report should prove blocked strict proof smoke readiness when source exists");
+  check(releaseProgressReport.privateEditStrictProofBlockedCommand === "npm run release:private-edit-strict-proof-blocked-smoke", "release progress report should mirror blocked strict proof command");
+  check(releaseProgressReport.privateEditStrictProofBlockedHandoffReady === true, "release progress report should mirror blocked strict proof handoff readiness");
+  check(releaseProgressReport.privateEditStrictProofBlockedHandoffRowCount === releaseProgressReport.privateEditStrictProofBlockedHandoffRows.length, "release progress report blocked strict proof handoff count should match rows");
+  check(releaseProgressReport.privateEditStrictProofBlockedHandoffRows.every((row) => row.valueRecorded === false), "release progress report blocked strict proof handoff rows should be value-free");
+  check(releaseProgressReport.privateEditStrictProofBlockedStrictFailureRowCount === 4, "release progress report blocked strict proof should include four strict failure rows");
+  check(releaseProgressReport.privateEditStrictProofBlockedPlaceholderKeyCount === 4, "release progress report blocked strict proof should include four placeholder keys");
+  check(releaseProgressReport.privateEditStrictProofBlockedProgressSkipped === true, "release progress report blocked strict proof should skip progress refresh");
+  check(releaseProgressReport.privateEditStrictProofBlockedRealLocalEnvRead === false, "release progress report blocked strict proof should not read real local env");
+  check(releaseProgressReport.privateEditStrictProofBlockedRealLocalEnvModified === false, "release progress report blocked strict proof should not modify real local env");
+}
+if (releaseProgressReport.privateEditStrictProofSuccessSourceReady) {
+  check(releaseProgressReport.privateEditStrictProofSuccessReady === true, "release progress report should prove success strict proof smoke readiness when source exists");
+  check(releaseProgressReport.privateEditStrictProofSuccessCommand === "npm run release:private-edit-strict-proof-success-smoke", "release progress report should mirror success strict proof command");
+  check(releaseProgressReport.privateEditStrictProofSuccessStrictReady === true, "release progress report success strict proof should be strict-ready");
+  check(releaseProgressReport.privateEditStrictProofSuccessPlaceholderKeyCount === 0, "release progress report success strict proof should have zero placeholder keys");
+  check(releaseProgressReport.privateEditStrictProofSuccessPostEditReady === true, "release progress report success strict proof should include post-edit proof readiness");
+  check(releaseProgressReport.privateEditStrictProofSuccessProgressRefreshReady === true, "release progress report success strict proof should include progress refresh readiness");
+  check(releaseProgressReport.privateEditStrictProofSuccessLeakAuditReady === true, "release progress report success strict proof should include private-value leak audit readiness");
+  check(releaseProgressReport.privateEditStrictProofSuccessLeakFindingCount === 0, "release progress report success strict proof should include zero leak findings");
+  check(releaseProgressReport.privateEditStrictProofSuccessRealLocalEnvRead === false, "release progress report success strict proof should not read real local env");
+  check(releaseProgressReport.privateEditStrictProofSuccessRealLocalEnvModified === false, "release progress report success strict proof should not modify real local env");
+  check(releaseProgressReport.privateEditStrictProofCommandRowCount === releaseProgressReport.privateEditStrictProofCommandRows.length, "release progress report strict proof command count should match rows");
+  check(releaseProgressReport.privateEditStrictProofCommandRows.every((row) => row.valueRecorded === false), "release progress report strict proof command rows should be value-free");
+}
+check(
+  releaseProgressReport.privateEditStrictProofHandoffReady ===
+    (releaseProgressReport.privateEditStrictProofBlockedReady && releaseProgressReport.privateEditStrictProofSuccessReady),
+  "release progress report strict proof handoff readiness should require blocked and success smoke readiness"
+);
+check(releaseProgressReport.privateEditStrictProofValueRecorded === false, "release progress report strict proof handoff should not record values");
+check(releaseProgressReport.privateEditStrictProofPrivateValuesRecorded === false, "release progress report strict proof handoff should not record private values");
+check(releaseProgressReport.privateEditStrictProofNetworkProbeAttempted === false, "release progress report strict proof handoff should not probe network");
+check(releaseProgressReport.privateEditStrictProofClaimedAutoUpdate === false, "release progress report strict proof handoff should not claim auto-update");
+check(releaseProgressReport.privateEditStrictProofClaimedExternalDistribution === false, "release progress report strict proof handoff should not claim external distribution");
 check(Number.isInteger(releaseProgressReport.externalProofBundleProofArtifactCount), "release progress report should include external proof artifact count");
 check(Number.isInteger(releaseProgressReport.externalProofBundleProofArtifactPresentCount), "release progress report should include external proof artifact present count");
 check(Number.isInteger(releaseProgressReport.externalProofBundleProofArtifactMissingCount), "release progress report should include external proof artifact missing count");
@@ -2299,6 +2511,11 @@ check(markdown.includes("Proof-bundle doctor post-edit proof command:"), "releas
 check(markdown.includes("Proof-Bundle Doctor Post-Edit Proof Mirror"), "release progress Markdown should include proof-bundle doctor post-edit proof mirror section");
 check(markdown.includes("Next-actions source artifact:"), "release progress Markdown should include doctor post-edit proof next-actions source");
 check(markdown.includes("Mirrors next-actions:"), "release progress Markdown should include doctor post-edit proof next-actions mirror posture");
+check(markdown.includes("Private-edit strict proof handoff source ready:"), "release progress Markdown should include strict proof handoff source readiness");
+check(markdown.includes("Private-edit strict proof operator command:"), "release progress Markdown should include strict proof operator command");
+check(markdown.includes("Private-Edit Strict Proof Handoff Mirror"), "release progress Markdown should include strict proof handoff mirror section");
+check(markdown.includes("Blocked smoke ready:"), "release progress Markdown should include blocked strict proof readiness");
+check(markdown.includes("Success smoke ready:"), "release progress Markdown should include success strict proof readiness");
 check(markdown.includes("operator action"), "release progress Markdown should include post-edit operator action guidance");
 check(markdown.includes("expected post-edit signal"), "release progress Markdown should include post-edit expected signals");
 check(markdown.includes("External Gate Current Proof Consistency"), "release progress Markdown should include external gate current proof consistency summary");
@@ -2402,6 +2619,11 @@ console.log(`- Post-edit proof sequence hard-gate command: ${releaseProgressRepo
 console.log(`- Proof-bundle doctor post-edit proof source ready: ${releaseProgressReport.proofBundleDoctorPostEditProofSourceReady ? "yes" : "no"}`);
 console.log(`- Proof-bundle doctor post-edit proof command: ${releaseProgressReport.proofBundleDoctorPostEditProofCommand}`);
 console.log(`- Proof-bundle doctor post-edit proof matches recommended: ${releaseProgressReport.proofBundleDoctorPostEditProofMatchesRecommended ? "yes" : "no"}`);
+console.log(`- Private-edit strict proof handoff source ready: ${releaseProgressReport.privateEditStrictProofHandoffSourceReady ? "yes" : "no"}`);
+console.log(`- Private-edit strict proof handoff ready: ${releaseProgressReport.privateEditStrictProofHandoffReady ? "yes" : "no"}`);
+console.log(`- Private-edit strict proof operator command: ${releaseProgressReport.privateEditStrictProofOperatorCommand}`);
+console.log(`- Private-edit strict proof blocked smoke ready: ${releaseProgressReport.privateEditStrictProofBlockedReady ? "yes" : "no"}`);
+console.log(`- Private-edit strict proof success smoke ready: ${releaseProgressReport.privateEditStrictProofSuccessReady ? "yes" : "no"}`);
 console.log(`- External gate current next command: ${releaseProgressReport.externalGateCurrentNextCommand}`);
 console.log(`- External gate current first blocker: ${releaseProgressReport.externalGateCurrentFirstBlocker}`);
 console.log(`- External gate current env edit rows: ${releaseProgressReport.externalGateCurrentEnvEditRowsCount} (${releaseProgressReport.externalGateCurrentEnvEditRowsSummary})`);
