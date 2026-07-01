@@ -3914,6 +3914,20 @@ export type AudienceSessionReadoutRow = {
   value: string;
   detail: string;
   nextCheck: string;
+  actionLabel: string;
+  actionDetail: string;
+  tone: MixCoachTone;
+};
+
+export type AudienceSessionActionResult = {
+  audienceId: AudienceSessionReadoutRowId;
+  audienceLabel: string;
+  mode: ProjectState["mode"];
+  title: string;
+  status: string;
+  detail: string;
+  readiness: string;
+  nextCheck: string;
   tone: MixCoachTone;
 };
 

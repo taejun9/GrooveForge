@@ -15,6 +15,8 @@ import type {
   FirstBeatPathStep,
   FirstBeatPathJumpResult,
   FirstBeatPathSummary,
+  AudienceSessionActionResult,
+  AudienceSessionReadoutRow,
   AudienceSessionReadoutSummary,
   MixCoachTone,
   ModeFocusCard,
@@ -46,6 +48,11 @@ type GuideQuickStartResult = {
   auditionCue: string;
   nextCheck: string;
   tone: MixCoachTone;
+};
+
+const audienceSessionActionTestIds: Record<AudienceSessionReadoutRow["id"], string> = {
+  beginner: "audience-session-action-beginner",
+  producer: "audience-session-action-producer"
 };
 
 type GuideQuickStartDecision = {
@@ -232,7 +239,15 @@ export function ModeSwitchResultStrip({ result }: { result: ModeSwitchResult }):
   );
 }
 
-export function AudienceSessionReadout({ summary }: { summary: AudienceSessionReadoutSummary }): ReactElement {
+export function AudienceSessionReadout({
+  result,
+  summary,
+  onSelectAudience
+}: {
+  result: AudienceSessionActionResult | null;
+  summary: AudienceSessionReadoutSummary;
+  onSelectAudience: (row: AudienceSessionReadoutRow) => void;
+}): ReactElement {
   return (
     <section
       aria-label="Audience session readout"
@@ -269,9 +284,44 @@ export function AudienceSessionReadout({ summary }: { summary: AudienceSessionRe
             <small data-testid={`audience-session-card-${row.id}-value`}>{row.value}</small>
             <small data-testid={`audience-session-card-${row.id}-detail`}>{row.detail}</small>
             <em data-testid={`audience-session-card-${row.id}-next`}>{row.nextCheck}</em>
+            <button
+              aria-label={`${row.actionLabel} for ${row.label}`}
+              className="audience-session-action"
+              data-testid={audienceSessionActionTestIds[row.id]}
+              title={`${row.actionLabel}: ${row.actionDetail} / ${row.nextCheck}`}
+              type="button"
+              onClick={() => onSelectAudience(row)}
+            >
+              <ArrowRight size={13} aria-hidden="true" />
+              <span>{row.actionLabel}</span>
+            </button>
           </div>
         ))}
       </div>
+      {result && (
+        <div
+          aria-live="polite"
+          className={`audience-session-action-result ${result.tone}`}
+          data-audience-session-action-result={result.audienceId}
+          data-testid="audience-session-action-result"
+        >
+          <div className="audience-session-action-result-main">
+            <Target size={15} aria-hidden="true" />
+            <span>
+              <strong data-testid="audience-session-action-result-title">{result.title}</strong>
+              <small data-testid="audience-session-action-result-detail">{result.detail}</small>
+            </span>
+          </div>
+          <div className="audience-session-action-result-status" data-testid="audience-session-action-result-status">
+            <span>{result.status}</span>
+            <strong>{result.mode === "guided" ? "Guided" : "Studio"}</strong>
+          </div>
+          <div className="audience-session-action-result-followup" data-testid="audience-session-action-result-followup">
+            <span>{result.readiness}</span>
+            <small>{result.nextCheck}</small>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

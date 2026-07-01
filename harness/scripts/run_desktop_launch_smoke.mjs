@@ -22,6 +22,8 @@ const expectedLiveTestIds = [
   "guide-quick-start",
   "guide-quick-start-headline",
   "audience-session-readout",
+  "audience-session-action-beginner",
+  "audience-session-action-producer",
   "mode-guided",
   "mode-studio",
   "quick-actions-open",
@@ -223,7 +225,7 @@ child.on("exit", (code, signal) => {
     `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors, ${result.evidence.visual.nonBackgroundSamples}/${result.evidence.visual.sampledPixels} non-background samples`
   );
   console.log("- Audience session rows: First-time composer, Professional producer");
-  console.log("- Beginner path: Audience Session Readout, Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator");
-  console.log("- Producer path: Audience Session Readout, Studio mode, Review Queue, Production Snapshot, Mix Coach, Sound/Mix Snapshot, Quick Actions, Command Reference");
+  console.log("- Beginner path: Audience Session Readout, Enter Guided, Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator");
+  console.log("- Producer path: Audience Session Readout, Enter Studio, Studio mode, Review Queue, Production Snapshot, Mix Coach, Sound/Mix Snapshot, Quick Actions, Command Reference");
   console.log("- Workstation path: transport, compose, sound, arrange, mix, master, export controls, Handoff Pack");
 });

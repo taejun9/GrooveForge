@@ -33,6 +33,8 @@ When there is ambiguity, read the product draft in this order: all-genre beat cr
 
 GrooveForge should satisfy two workflows at once: beginners get a clear setup -> compose -> arrange -> mix -> deliver path, while working producers can move quickly across editable events, instrument tone, arrangement structure, mix/master posture, and handoff checks without being forced through tutorials or sample-prep steps.
 
+The first-run Audience Session Readout should make that split actionable: first-time composers get an explicit Enter Guided route into the guided first-beat workflow, while professional producers get an explicit Enter Studio route into the producer scan workflow. These routes are UI-local mode choices and must not change generation, export, sampling scope, remote behavior, or project schema beyond the existing explicit mode switch.
+
 The first-session acceptance test is concrete: choose BPM/key/style, program drums, write 808/bass, add melody/chords, shape sounds, arrange sections, balance the mix, set the master posture, and export WAV/stems without importing audio. A product draft that cannot explain this path before mentioning extension features is not aligned.
 
 ## Product Boundary

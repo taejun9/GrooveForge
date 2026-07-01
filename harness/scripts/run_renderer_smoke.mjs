@@ -72,6 +72,8 @@ function validateFirstRunRenderer(html) {
       'data-testid="audience-session-readout"',
       "Audience session",
       "First-time composer",
+      'data-testid="audience-session-action-beginner"',
+      "Enter Guided",
       "First Beat Path",
       "Beat Spine",
       "Composer Guide",
@@ -81,6 +83,8 @@ function validateFirstRunRenderer(html) {
     ],
     "producer workflow": [
       "Professional producer",
+      'data-testid="audience-session-action-producer"',
+      "Enter Studio",
       "Studio",
       "Review Queue",
       "Production Snapshot",

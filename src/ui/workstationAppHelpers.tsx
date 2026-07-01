@@ -542,6 +542,7 @@ import type {
   ModeFocusJumpResult,
   ModeFocusSummary,
   ModeSwitchResult,
+  AudienceSessionActionResult,
   AudienceSessionReadoutRow,
   AudienceSessionReadoutSummary,
   SessionPassTarget,
@@ -11527,6 +11528,8 @@ export function createAudienceSessionReadoutSummary(
       value: `${audienceReadyCount(beginnerTones)}/${beginnerTones.length} clear`,
       detail: `${firstBeatPath.countLabel} / ${guidedPass?.value ?? firstBeatPath.decisionLabel}`,
       nextCheck: firstBeatPath.decisionDetail,
+      actionLabel: "Enter Guided",
+      actionDetail: "Open Guided first-beat workflow",
       tone: beginnerTone
     },
     {
@@ -11536,6 +11539,8 @@ export function createAudienceSessionReadoutSummary(
       value: `${audienceReadyCount(producerTones)}/${producerTones.length} clear`,
       detail: `${studioPass?.value ?? "Studio pass"} / ${finishPass?.value ?? "Finish"} / ${deliverPass?.value ?? "Deliver"}`,
       nextCheck: exportPreflight.headline === "Ready to send" ? "Run Export Preflight and Handoff Pack before send." : exportPreflight.detail,
+      actionLabel: "Enter Studio",
+      actionDetail: "Open Studio producer scan",
       tone: producerTone
     }
   ];
@@ -11558,6 +11563,30 @@ export function createAudienceSessionReadoutSummary(
     }`,
     tone: weakestTone([tone, activeTone]),
     rows
+  };
+}
+
+export function audienceSessionModeForRow(row: AudienceSessionReadoutRow): ProjectState["mode"] {
+  return row.id === "beginner" ? "guided" : "studio";
+}
+
+export function createAudienceSessionActionResult(
+  row: AudienceSessionReadoutRow,
+  summary: AudienceSessionReadoutSummary,
+  mode: ProjectState["mode"]
+): AudienceSessionActionResult {
+  const destination = mode === "guided" ? "Guided first-beat workflow" : "Studio producer scan workflow";
+
+  return {
+    audienceId: row.id,
+    audienceLabel: row.label,
+    mode,
+    title: `${row.label} route selected`,
+    status: `${row.status} path`,
+    detail: `${destination} / ${row.actionDetail} / ${summary.detail}`,
+    readiness: row.value,
+    nextCheck: row.nextCheck,
+    tone: row.tone
   };
 }
 

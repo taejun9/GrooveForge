@@ -1056,6 +1056,7 @@ const renderedSignalRows = [
     "Guide Quick Start",
     "Audience session",
     "First-time composer",
+    "Enter Guided",
     "First Beat Path",
     "Beat Spine",
     "Composer Guide",
@@ -1065,6 +1066,7 @@ const renderedSignalRows = [
   ]),
   checkRenderedGroup(html, "professional producer path", [
     "Professional producer",
+    "Enter Studio",
     "Studio",
     "Review Queue",
     "Production Snapshot",
