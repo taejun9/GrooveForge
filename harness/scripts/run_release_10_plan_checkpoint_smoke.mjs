@@ -87,6 +87,9 @@ async function deriveCompletedPlanWindow() {
   const windowStart = latestPlanNumber > 0 ? latestPlanNumber - ((latestPlanNumber - 1) % 10) : 0;
   const windowEnd = windowStart > 0 ? windowStart + 9 : 0;
   const rows = plans.filter((plan) => plan.number >= windowStart && plan.number <= windowEnd);
+  const tenPlanReportDue = rows.length === 10;
+  const currentBoundary = windowEnd;
+  const postDeliveryNextReportNumber = tenPlanReportDue ? windowEnd + 10 : windowEnd;
   return {
     latestPlanNumber,
     latestPlan: latestPlanNumber > 0 ? `plan-${latestPlanNumber}` : "none",
@@ -95,6 +98,11 @@ async function deriveCompletedPlanWindow() {
     tenPlanTotal: 10,
     tenPlanCompletedCount: rows.length,
     tenPlanProgress: windowStart > 0 ? `${windowStart}-${windowEnd}: ${rows.length}/10` : "none",
+    tenPlanReportDue,
+    currentBoundary,
+    currentBoundaryLabel: currentBoundary > 0 ? `plan-${currentBoundary}` : "none",
+    postDeliveryNextReportNumber,
+    postDeliveryNextReportLabel: postDeliveryNextReportNumber > 0 ? `plan-${postDeliveryNextReportNumber}` : "none",
     rows
   };
 }
@@ -127,6 +135,7 @@ function buildReport(source, localWindow) {
     sourceTenPlanCompletedCount: integerValue(summary.tenPlanCompletedCount),
     sourceTenPlanTotal: integerValue(summary.tenPlanTotal),
     sourceTenPlanReportDue: summary.tenPlanReportDue === true,
+    sourceNextTenPlanProgressReportAt: textValue(source.nextTenPlanProgressReportAt),
     localLatestPlanNumber: localWindow.latestPlanNumber,
     localLatestPlan: localWindow.latestPlan,
     localTenPlanProgress: localWindow.tenPlanProgress,
@@ -136,6 +145,12 @@ function buildReport(source, localWindow) {
     tenPlanWindowEnd: localWindow.windowEnd,
     tenPlanWindowRows: localWindow.rows,
     tenPlanWindowRowCount: localWindow.rows.length,
+    currentTenPlanReportBoundaryNumber: localWindow.currentBoundary,
+    currentTenPlanReportBoundaryAt: localWindow.currentBoundaryLabel,
+    legacyNextTenPlanProgressReportAt: textValue(source.nextTenPlanProgressReportAt, localWindow.currentBoundaryLabel),
+    postDeliveryNextTenPlanProgressReportNumber: localWindow.postDeliveryNextReportNumber,
+    postDeliveryNextTenPlanProgressReportAt: localWindow.postDeliveryNextReportLabel,
+    postDeliveryNextTenPlanProgressReportReady: false,
     tenPlanWindowComplete: false,
     tenPlanBoundaryMatched: false,
     completionPercent: summary.completionPercent,
@@ -197,6 +212,10 @@ function buildMarkdown(report) {
 - 10-plan progress: ${report.localTenPlanProgress}
 - Source 10-plan progress: ${report.sourceTenPlanProgress}
 - 10-plan report due: ${readyLabel(report.sourceTenPlanReportDue)}
+- Current 10-plan report boundary: ${report.currentTenPlanReportBoundaryAt}
+- Legacy next 10-plan report field: ${report.legacyNextTenPlanProgressReportAt}
+- Post-delivery next 10-plan report: ${report.postDeliveryNextTenPlanProgressReportAt}
+- Post-delivery next report ready: ${readyLabel(report.postDeliveryNextTenPlanProgressReportReady)}
 - 10-plan window complete: ${readyLabel(report.tenPlanWindowComplete)}
 - 10-plan boundary matched: ${readyLabel(report.tenPlanBoundaryMatched)}
 - User-facing completion: ${report.completionPercent}%
@@ -245,6 +264,12 @@ function validateReport(report, markdown) {
   check(report.localLatestPlanNumber === report.tenPlanWindowEnd, "release 10-plan checkpoint should require latest plan at the window boundary");
   check(report.sourceTenPlanProgress === expectedProgress, "release 10-plan checkpoint should require source progress at 10/10");
   check(report.localTenPlanProgress === expectedProgress, "release 10-plan checkpoint should require local progress at 10/10");
+  check(report.currentTenPlanReportBoundaryNumber === report.tenPlanWindowEnd, "release 10-plan checkpoint current report boundary should match the window end");
+  check(report.currentTenPlanReportBoundaryAt === `plan-${report.tenPlanWindowEnd}`, "release 10-plan checkpoint should label the current report boundary");
+  check(report.legacyNextTenPlanProgressReportAt === report.currentTenPlanReportBoundaryAt, "release 10-plan checkpoint should preserve legacy next report field as current boundary");
+  check(report.postDeliveryNextTenPlanProgressReportNumber === report.tenPlanWindowEnd + 10, "release 10-plan checkpoint should schedule the next post-delivery report one window ahead");
+  check(report.postDeliveryNextTenPlanProgressReportAt === `plan-${report.tenPlanWindowEnd + 10}`, "release 10-plan checkpoint should label the next post-delivery report");
+  check(report.postDeliveryNextTenPlanProgressReportReady === true, "release 10-plan checkpoint should mark post-delivery next report target ready");
   check(report.tenPlanWindowRows.every((row) => row.valueRecorded === false), "release 10-plan checkpoint rows should be value-free");
   check(report.completionPercent === 99.999999, "release 10-plan checkpoint should preserve completion percent");
   check(report.remainingPercent === 0.000001, "release 10-plan checkpoint should preserve remaining percent");
@@ -285,6 +310,10 @@ const localWindow = await deriveCompletedPlanWindow();
 const report = buildReport(source, localWindow);
 report.tenPlanWindowComplete = report.localTenPlanCompletedCount === 10;
 report.tenPlanBoundaryMatched = report.localLatestPlanNumber === report.tenPlanWindowEnd && report.sourceLatestPlanNumber === report.localLatestPlanNumber;
+report.postDeliveryNextTenPlanProgressReportReady =
+  report.sourceTenPlanReportDue === true &&
+  report.currentTenPlanReportBoundaryAt === report.legacyNextTenPlanProgressReportAt &&
+  report.postDeliveryNextTenPlanProgressReportNumber === report.tenPlanWindowEnd + 10;
 report.tenPlanCheckpointReady =
   report.sourceReady === true &&
   report.sourceSummaryReady === true &&
@@ -309,6 +338,8 @@ console.log("- 10-plan checkpoint ready: yes");
 console.log(`- Source command: ${report.sourceCommand}`);
 console.log(`- Latest completed plan: ${report.localLatestPlan}`);
 console.log(`- 10-plan progress: ${report.localTenPlanProgress}`);
+console.log(`- Current 10-plan report boundary: ${report.currentTenPlanReportBoundaryAt}`);
+console.log(`- Post-delivery next 10-plan report: ${report.postDeliveryNextTenPlanProgressReportAt}`);
 console.log(`- User-facing completion: ${report.completionPercent}%`);
 console.log(`- Remaining completion: ${report.remainingPercent}%`);
 console.log(`- Fresh artifacts: ${report.freshArtifactCount}`);
