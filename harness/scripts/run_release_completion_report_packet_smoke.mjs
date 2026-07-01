@@ -22,6 +22,7 @@ const privateEditBlockedSmokeJsonPath = path.join(packageRoot, `${appName}-${pac
 const finalHandoffSuccessRedactionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-final-handoff-success-redaction-smoke.json`);
 const clearanceTransitionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-channel-clearance-transition-smoke.json`);
 const autoUpdateTransitionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-auto-update-transition-smoke.json`);
+const updateFeedCheckpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-update-feed-checkpoint-smoke.json`);
 const failures = [];
 const privateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const refreshCommandRows = [
@@ -59,6 +60,12 @@ const refreshCommandRows = [
     order: 6,
     command: "npm run release:auto-update-transition-smoke",
     role: "refresh value-free auto-update transition evidence after the release-channel handoff",
+    valueRecorded: false
+  },
+  {
+    order: 7,
+    command: "npm run release:update-feed-checkpoint-smoke",
+    role: "refresh real and synthetic update-feed checkpoint evidence after the auto-update transition",
     valueRecorded: false
   }
 ];
@@ -261,7 +268,7 @@ function formatClearanceTransitionRows(rows) {
     .join("\n");
 }
 
-function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff, clearance, autoUpdate, progress }) {
+function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff, clearance, autoUpdate, updateFeedCheckpoint, progress }) {
   const currentTenPlanWindowRows = progress.currentTenPlanWindowRows;
   const currentTenPlanWindowRowCount = currentTenPlanWindowRows.length;
   const currentTenPlanWindowRowSummary = planRowSummary(currentTenPlanWindowRows);
@@ -341,6 +348,36 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
   ];
   const postClearanceTransitionRows = objectRows(clearance.transitionRows);
   const autoUpdateTransitionRows = objectRows(autoUpdate.transitionRows);
+  const updateFeedCheckpointRows = [
+    {
+      order: 1,
+      item: "Update-feed checkpoint command",
+      evidence: `${textValue(updateFeedCheckpoint.reportCommand)}; checkpoint ready ${readyLabel(updateFeedCheckpoint.releaseUpdateFeedCheckpointReady)}`,
+      sourceField: "reportCommand/releaseUpdateFeedCheckpointReady",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      item: "Real update-feed branch",
+      evidence: `proof ready ${readyLabel(updateFeedCheckpoint.realPostEditProofReady)}; live check ready ${readyLabel(updateFeedCheckpoint.realLiveCheckReady)}; selected ${integerValue(updateFeedCheckpoint.realSelectedReadyCount)}/2; placeholders ${integerValue(updateFeedCheckpoint.realPlaceholderKeyCount)}`,
+      sourceField: "realPostEditProofReady/realLiveCheckReady/realSelectedReadyCount/realPlaceholderKeyCount",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      item: "Synthetic update-feed branch",
+      evidence: `proof ready ${readyLabel(updateFeedCheckpoint.syntheticPostEditProofReady)}; live check ready ${readyLabel(updateFeedCheckpoint.syntheticLiveCheckReady)}; selected ${integerValue(updateFeedCheckpoint.syntheticSelectedReadyCount)}/2; placeholders ${integerValue(updateFeedCheckpoint.syntheticPlaceholderKeyCount)}; real env read ${readyLabel(updateFeedCheckpoint.syntheticRealLocalEnvRead)}`,
+      sourceField: "syntheticPostEditProofReady/syntheticLiveCheckReady/syntheticSelectedReadyCount/syntheticPlaceholderKeyCount/syntheticRealLocalEnvRead",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      item: "Downstream hard-gate boundary",
+      evidence: `real auto-update ready ${readyLabel(updateFeedCheckpoint.realAutoUpdateReady)}; synthetic auto-update ready ${readyLabel(updateFeedCheckpoint.syntheticAutoUpdateReady)}; signed artifacts ready ${readyLabel(updateFeedCheckpoint.signedUpdateArtifactsReady)}; hard gate would fail ${readyLabel(updateFeedCheckpoint.hardGateWouldFail)}`,
+      sourceField: "realAutoUpdateReady/syntheticAutoUpdateReady/signedUpdateArtifactsReady/hardGateWouldFail",
+      valueRecorded: false
+    }
+  ];
   const tenPlanProgressReportRolloverRows = [
     {
       order: 1,
@@ -440,6 +477,13 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
       item: "Post-clearance auto-update proof",
       evidence: `${textValue(autoUpdate.releaseChannelNextPriorityActionId)} via ${textValue(autoUpdate.releaseChannelNextActionProofCommand)}; real auto-update blocked ${readyLabel(autoUpdate.realAutoUpdateBlocked === true)}`,
       sourceField: "autoUpdateTransition.releaseChannelNextPriorityActionId/releaseChannelNextActionProofCommand/realAutoUpdateBlocked",
+      valueRecorded: false
+    },
+    {
+      order: 13,
+      item: "Update-feed checkpoint proof",
+      evidence: `${textValue(updateFeedCheckpoint.reportCommand)}; real selected ${integerValue(updateFeedCheckpoint.realSelectedReadyCount)}/2; synthetic selected ${integerValue(updateFeedCheckpoint.syntheticSelectedReadyCount)}/2; hard gate would fail ${readyLabel(updateFeedCheckpoint.hardGateWouldFail)}`,
+      sourceField: "updateFeedCheckpoint.reportCommand/realSelectedReadyCount/syntheticSelectedReadyCount/hardGateWouldFail",
       valueRecorded: false
     }
   ];
@@ -546,6 +590,12 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
       path: autoUpdateTransitionJsonPath,
       ready: autoUpdate.releaseAutoUpdateTransitionReady === true,
       evidence: `${autoUpdate.currentTenPlanProgressLabel}; synthetic feed/channel ${readyLabel(autoUpdate.syntheticFeedChannelConfigReady)}; real auto-update blocked ${readyLabel(autoUpdate.realAutoUpdateBlocked)}`
+    }),
+    sourceRow({
+      label: "Update feed checkpoint",
+      path: updateFeedCheckpointJsonPath,
+      ready: updateFeedCheckpoint.releaseUpdateFeedCheckpointReady === true,
+      evidence: `${updateFeedCheckpoint.currentTenPlanProgressLabel}; real selected ${integerValue(updateFeedCheckpoint.realSelectedReadyCount)}/2; synthetic selected ${integerValue(updateFeedCheckpoint.syntheticSelectedReadyCount)}/2; hard gate would fail ${readyLabel(updateFeedCheckpoint.hardGateWouldFail)}`
     })
   ];
   const labelsMatch =
@@ -554,7 +604,8 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     privateEditBlockedSmoke.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
     finalHandoff.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
     clearance.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
-    autoUpdate.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel;
+    autoUpdate.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel &&
+    updateFeedCheckpoint.currentTenPlanProgressLabel === progress.latestTenPlanProgressLabel;
   const completionPercentsMatch =
     audience.userFacingCompletionPercent === 99.999999 &&
     channel.userFacingCompletionPercent === 99.999999 &&
@@ -562,12 +613,14 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     finalHandoff.userFacingCompletionPercent === 99.999999 &&
     clearance.userFacingCompletionPercent === 99.999999 &&
     autoUpdate.userFacingCompletionPercent === 99.999999 &&
+    updateFeedCheckpoint.userFacingCompletionPercent === 99.999999 &&
     audience.userFacingRemainingPercent === 0.000001 &&
     channel.userFacingRemainingPercent === 0.000001 &&
     privateEditBlockedSmoke.userFacingRemainingPercent === 0.000001 &&
     finalHandoff.userFacingRemainingPercent === 0.000001 &&
     clearance.userFacingRemainingPercent === 0.000001 &&
-    autoUpdate.userFacingRemainingPercent === 0.000001;
+    autoUpdate.userFacingRemainingPercent === 0.000001 &&
+    updateFeedCheckpoint.userFacingRemainingPercent === 0.000001;
   const valueBoundaryClean =
     audience.valueRecorded === false &&
     audience.claimedExternalDistribution === false &&
@@ -601,7 +654,19 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     autoUpdate.claimedAutoUpdate === false &&
     autoUpdate.claimedExternalDistribution === false &&
     autoUpdate.networkProbeAttempted === false &&
-    autoUpdate.updateFeedPublishAttempted === false;
+    autoUpdate.updateFeedPublishAttempted === false &&
+    updateFeedCheckpoint.valueRecorded === false &&
+    updateFeedCheckpoint.privateValuesRecorded === false &&
+    updateFeedCheckpoint.feedValueRecorded === false &&
+    updateFeedCheckpoint.channelValueRecorded === false &&
+    updateFeedCheckpoint.localEnvValueRecorded === false &&
+    updateFeedCheckpoint.claimedAutoUpdate === false &&
+    updateFeedCheckpoint.claimedExternalDistribution === false &&
+    updateFeedCheckpoint.networkProbeAttempted === false &&
+    updateFeedCheckpoint.updateFeedPublishAttempted === false &&
+    updateFeedCheckpoint.releaseUploadAttempted === false &&
+    updateFeedCheckpoint.signingAttempted === false &&
+    updateFeedCheckpoint.notarySubmissionAttempted === false;
   const clearanceTransitionReady =
     clearance.releaseChannelClearanceTransitionReady === true &&
     ["prepare-local-distribution-env", "replace-release-channel-placeholders", "release-channel-metadata"].includes(
@@ -647,12 +712,51 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     autoUpdateTransitionRows.length === integerValue(autoUpdate.transitionRowCount) &&
     autoUpdateTransitionRows.length > 0 &&
     autoUpdateTransitionRows.every((row) => row.ready === true && row.valueRecorded === false);
+  const updateFeedCheckpointReady =
+    updateFeedCheckpoint.reportCommand === "npm run release:update-feed-checkpoint-smoke" &&
+    updateFeedCheckpoint.releaseUpdateFeedCheckpointReady === true &&
+    integerValue(updateFeedCheckpoint.sourceArtifactRowCount) === 2 &&
+    updateFeedCheckpoint.sourceArtifactRows?.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
+    integerValue(updateFeedCheckpoint.branchRowCount) === 2 &&
+    updateFeedCheckpoint.branchRows?.every((row) => row.ready === true && row.valueRecorded === false) &&
+    integerValue(updateFeedCheckpoint.comparisonRowCount) === 6 &&
+    updateFeedCheckpoint.comparisonRows?.every((row) => row.ready === true && row.valueRecorded === false) &&
+    updateFeedCheckpoint.realPostEditProofReady === true &&
+    updateFeedCheckpoint.syntheticPostEditProofReady === true &&
+    updateFeedCheckpoint.syntheticLiveCheckReady === true &&
+    updateFeedCheckpoint.syntheticStrictReady === true &&
+    integerValue(updateFeedCheckpoint.syntheticSelectedReadyCount) === 2 &&
+    integerValue(updateFeedCheckpoint.syntheticPlaceholderKeyCount) === 0 &&
+    integerValue(updateFeedCheckpoint.syntheticPlaceholderEditLocationCount) === 0 &&
+    updateFeedCheckpoint.syntheticRealLocalEnvRead === false &&
+    updateFeedCheckpoint.realAutoUpdateReady === false &&
+    updateFeedCheckpoint.syntheticAutoUpdateReady === false &&
+    integerValue(updateFeedCheckpoint.realAutoUpdateBlockerCount) > 0 &&
+    integerValue(updateFeedCheckpoint.syntheticAutoUpdateBlockerCount) > 0 &&
+    updateFeedCheckpoint.signedUpdateArtifactsReady === false &&
+    updateFeedCheckpoint.hardGateCommand === "npm run release:external-check" &&
+    updateFeedCheckpoint.hardGateReady === false &&
+    updateFeedCheckpoint.hardGateWouldFail === true &&
+    updateFeedCheckpoint.privateValuesRecorded === false &&
+    updateFeedCheckpoint.feedValueRecorded === false &&
+    updateFeedCheckpoint.channelValueRecorded === false &&
+    updateFeedCheckpoint.localEnvValueRecorded === false &&
+    updateFeedCheckpoint.networkProbeAttempted === false &&
+    updateFeedCheckpoint.updateFeedPublishAttempted === false &&
+    updateFeedCheckpoint.releaseUploadAttempted === false &&
+    updateFeedCheckpoint.signingAttempted === false &&
+    updateFeedCheckpoint.notarySubmissionAttempted === false &&
+    updateFeedCheckpoint.claimedAutoUpdate === false &&
+    updateFeedCheckpoint.claimedExternalDistribution === false &&
+    updateFeedCheckpoint.valueRecorded === false &&
+    updateFeedCheckpointRows.every((row) => row.valueRecorded === false);
   const releaseCompletionReportPacketReady =
     refreshCommandRows.every((row) => row.valueRecorded === false) &&
     privateEditProofCommandRows.every((row) => row.valueRecorded === false) &&
     strictProofHandoffReceiptReady &&
     privateEditBlockedSmokeReady &&
     finalHandoffSuccessRedactionReady &&
+    updateFeedCheckpointReady &&
     tenPlanProgressReportReceiptReady &&
     tenPlanProgressReportRolloverReady &&
     sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
@@ -741,6 +845,37 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     finalHandoffSuccessRedactionRowCount: finalHandoffSuccessRedactionRows.length,
     finalHandoffSuccessRedactionSummary: finalHandoffSuccessRedactionRows.map((row) => row.item).join(", "),
     finalHandoffSuccessRedactionValueRecorded: false,
+    updateFeedCheckpointCommand: "npm run release:update-feed-checkpoint-smoke",
+    updateFeedCheckpointReady,
+    updateFeedCheckpointReportCommand: textValue(updateFeedCheckpoint.reportCommand),
+    updateFeedCheckpointSourceArtifactRowCount: integerValue(updateFeedCheckpoint.sourceArtifactRowCount),
+    updateFeedCheckpointBranchRowCount: integerValue(updateFeedCheckpoint.branchRowCount),
+    updateFeedCheckpointComparisonRowCount: integerValue(updateFeedCheckpoint.comparisonRowCount),
+    updateFeedCheckpointRealPostEditProofReady: updateFeedCheckpoint.realPostEditProofReady === true,
+    updateFeedCheckpointRealLiveCheckReady: updateFeedCheckpoint.realLiveCheckReady === true,
+    updateFeedCheckpointRealStrictReady: updateFeedCheckpoint.realStrictReady === true,
+    updateFeedCheckpointRealSelectedReadyCount: integerValue(updateFeedCheckpoint.realSelectedReadyCount),
+    updateFeedCheckpointRealPlaceholderKeyCount: integerValue(updateFeedCheckpoint.realPlaceholderKeyCount),
+    updateFeedCheckpointRealPlaceholderEditLocationCount: integerValue(updateFeedCheckpoint.realPlaceholderEditLocationCount),
+    updateFeedCheckpointRealAutoUpdateReady: updateFeedCheckpoint.realAutoUpdateReady === true,
+    updateFeedCheckpointRealAutoUpdateBlockerCount: integerValue(updateFeedCheckpoint.realAutoUpdateBlockerCount),
+    updateFeedCheckpointSyntheticPostEditProofReady: updateFeedCheckpoint.syntheticPostEditProofReady === true,
+    updateFeedCheckpointSyntheticLiveCheckReady: updateFeedCheckpoint.syntheticLiveCheckReady === true,
+    updateFeedCheckpointSyntheticStrictReady: updateFeedCheckpoint.syntheticStrictReady === true,
+    updateFeedCheckpointSyntheticSelectedReadyCount: integerValue(updateFeedCheckpoint.syntheticSelectedReadyCount),
+    updateFeedCheckpointSyntheticPlaceholderKeyCount: integerValue(updateFeedCheckpoint.syntheticPlaceholderKeyCount),
+    updateFeedCheckpointSyntheticPlaceholderEditLocationCount: integerValue(updateFeedCheckpoint.syntheticPlaceholderEditLocationCount),
+    updateFeedCheckpointSyntheticRealLocalEnvRead: updateFeedCheckpoint.syntheticRealLocalEnvRead === true,
+    updateFeedCheckpointSyntheticAutoUpdateReady: updateFeedCheckpoint.syntheticAutoUpdateReady === true,
+    updateFeedCheckpointSyntheticAutoUpdateBlockerCount: integerValue(updateFeedCheckpoint.syntheticAutoUpdateBlockerCount),
+    updateFeedCheckpointSignedUpdateArtifactsReady: updateFeedCheckpoint.signedUpdateArtifactsReady === true,
+    updateFeedCheckpointHardGateCommand: textValue(updateFeedCheckpoint.hardGateCommand),
+    updateFeedCheckpointHardGateReady: updateFeedCheckpoint.hardGateReady === true,
+    updateFeedCheckpointHardGateWouldFail: updateFeedCheckpoint.hardGateWouldFail === true,
+    updateFeedCheckpointRows,
+    updateFeedCheckpointRowCount: updateFeedCheckpointRows.length,
+    updateFeedCheckpointSummary: updateFeedCheckpointRows.map((row) => row.item).join(", "),
+    updateFeedCheckpointValueRecorded: false,
     channelEditRecommendedOperatorProofCommand: textValue(channel.releaseChannelRecommendedOperatorProofCommand),
     channelEditRecommendedOperatorProofCommandRole: textValue(channel.releaseChannelRecommendedOperatorProofCommandRole),
     channelEditRecommendedOperatorProofCommandValueRecorded:
@@ -756,6 +891,7 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     finalHandoffSuccessRedactionLatestTenPlanProgressLabel: textValue(finalHandoff.currentTenPlanProgressLabel),
     clearanceTransitionLatestTenPlanProgressLabel: textValue(clearance.currentTenPlanProgressLabel),
     autoUpdateTransitionLatestTenPlanProgressLabel: textValue(autoUpdate.currentTenPlanProgressLabel),
+    updateFeedCheckpointLatestTenPlanProgressLabel: textValue(updateFeedCheckpoint.currentTenPlanProgressLabel),
     releaseChannelClearanceTransitionReady: clearance.releaseChannelClearanceTransitionReady === true,
     postClearanceCurrentBlockerMode: textValue(clearance.currentBlockerMode),
     postClearanceCurrentPriorityActionId: textValue(clearance.currentPriorityActionId),
@@ -911,6 +1047,7 @@ function buildMarkdown(report) {
 - Final handoff success-redaction source label: ${report.finalHandoffSuccessRedactionLatestTenPlanProgressLabel}
 - Clearance transition source label: ${report.clearanceTransitionLatestTenPlanProgressLabel}
 - Auto-update transition source label: ${report.autoUpdateTransitionLatestTenPlanProgressLabel}
+- Update-feed checkpoint source label: ${report.updateFeedCheckpointLatestTenPlanProgressLabel}
 - User-facing completion: ${report.userFacingCompletionPercent}%
 - Remaining completion: ${report.userFacingRemainingPercent}%
 - First-time composer ready: ${readyLabel(report.firstTimeComposerReady)}
@@ -948,6 +1085,14 @@ function buildMarkdown(report) {
 - Auto-update blocker rows: ${report.autoUpdateRealAutoUpdateBlockerCount}
 - Auto-update signed artifacts ready: ${readyLabel(report.autoUpdateSignedUpdateArtifactsReady)}
 - Auto-update proof command: \`${report.autoUpdateProofCommand}\`
+- Update-feed checkpoint ready: ${readyLabel(report.updateFeedCheckpointReady)}
+- Update-feed checkpoint command: \`${report.updateFeedCheckpointCommand}\`
+- Update-feed real selected keys: ${report.updateFeedCheckpointRealSelectedReadyCount}/2
+- Update-feed real placeholder keys: ${report.updateFeedCheckpointRealPlaceholderKeyCount}
+- Update-feed synthetic selected keys: ${report.updateFeedCheckpointSyntheticSelectedReadyCount}/2
+- Update-feed synthetic placeholder keys: ${report.updateFeedCheckpointSyntheticPlaceholderKeyCount}
+- Update-feed synthetic real env read: ${readyLabel(report.updateFeedCheckpointSyntheticRealLocalEnvRead)}
+- Update-feed hard gate would fail: ${readyLabel(report.updateFeedCheckpointHardGateWouldFail)}
 - Hard gate command: \`${report.hardGateCommand}\`
 - Private values recorded: no
 - Local env values recorded: no
@@ -986,6 +1131,12 @@ ${formatReceiptRows(report.privateEditBlockedSmokeRows)}
 | order | item | evidence | source field | value recorded |
 |---:|---|---|---|---:|
 ${formatReceiptRows(report.finalHandoffSuccessRedactionRows)}
+
+## Update Feed Checkpoint Evidence
+
+| order | item | evidence | source field | value recorded |
+|---:|---|---|---|---:|
+${formatReceiptRows(report.updateFeedCheckpointRows)}
 
 ## Current 10-Plan Window Rows
 
@@ -1035,11 +1186,11 @@ function validateReport(report, markdown) {
   const serialized = JSON.stringify(report);
   check(report.releaseCompletionReportPacketReady === true, "release completion report packet should be ready");
   check(report.reportCommand === "npm run release:completion-report-packet-smoke", "release completion report packet should report its command");
-  check(report.refreshCommandCount === 6, "release completion report packet should refresh six source commands");
+  check(report.refreshCommandCount === 7, "release completion report packet should refresh seven source commands");
   check(
     report.refreshCommandSummary ===
-      "npm run release:audience-completion-handoff-smoke -> npm run release:channel-edit-packet-smoke -> npm run release:private-edit-strict-proof-blocked-smoke -> npm run release:final-handoff-success-redaction-smoke -> npm run release:channel-clearance-transition-smoke -> npm run release:auto-update-transition-smoke",
-    "release completion report packet should refresh audience, channel edit packet, private-edit blocked smoke, final handoff success-redaction, clearance transition, then auto-update transition"
+      "npm run release:audience-completion-handoff-smoke -> npm run release:channel-edit-packet-smoke -> npm run release:private-edit-strict-proof-blocked-smoke -> npm run release:final-handoff-success-redaction-smoke -> npm run release:channel-clearance-transition-smoke -> npm run release:auto-update-transition-smoke -> npm run release:update-feed-checkpoint-smoke",
+    "release completion report packet should refresh audience, channel edit packet, private-edit blocked smoke, final handoff success-redaction, clearance transition, auto-update transition, then update-feed checkpoint"
   );
   check(report.refreshCommandRows.every((row) => row.valueRecorded === false), "release completion report packet command rows should be value-free");
   check(report.privateEditProofCommandCount === 3, "release completion report packet should include three private-edit proof commands");
@@ -1097,6 +1248,32 @@ function validateReport(report, markdown) {
   check(report.finalHandoffSuccessRedactionRowCount === 4, "release completion report packet should include four final handoff success-redaction evidence rows");
   check(report.finalHandoffSuccessRedactionRows.every((row) => row.valueRecorded === false), "release completion report packet final handoff rows should not record values");
   check(report.finalHandoffSuccessRedactionValueRecorded === false, "release completion report packet final handoff evidence should be value-free");
+  check(report.updateFeedCheckpointReady === true, "release completion report packet update-feed checkpoint should be ready");
+  check(report.updateFeedCheckpointCommand === "npm run release:update-feed-checkpoint-smoke", "release completion report packet should expose the update-feed checkpoint command");
+  check(report.updateFeedCheckpointReportCommand === report.updateFeedCheckpointCommand, "release completion report packet should match the update-feed checkpoint report command");
+  check(report.updateFeedCheckpointSourceArtifactRowCount === 2, "release completion report packet update-feed checkpoint should include two source artifacts");
+  check(report.updateFeedCheckpointBranchRowCount === 2, "release completion report packet update-feed checkpoint should include two branch rows");
+  check(report.updateFeedCheckpointComparisonRowCount === 6, "release completion report packet update-feed checkpoint should include six comparison rows");
+  check(report.updateFeedCheckpointRealPostEditProofReady === true, "release completion report packet update-feed checkpoint should keep real proof ready");
+  check(report.updateFeedCheckpointSyntheticPostEditProofReady === true, "release completion report packet update-feed checkpoint should keep synthetic proof ready");
+  check(report.updateFeedCheckpointSyntheticLiveCheckReady === true, "release completion report packet update-feed checkpoint should prove synthetic live-check readiness");
+  check(report.updateFeedCheckpointSyntheticStrictReady === true, "release completion report packet update-feed checkpoint should prove synthetic strict readiness");
+  check(report.updateFeedCheckpointSyntheticSelectedReadyCount === 2, "release completion report packet update-feed checkpoint should prove two synthetic selected-ready keys");
+  check(report.updateFeedCheckpointSyntheticPlaceholderKeyCount === 0, "release completion report packet update-feed checkpoint should prove zero synthetic placeholders");
+  check(report.updateFeedCheckpointSyntheticPlaceholderEditLocationCount === 0, "release completion report packet update-feed checkpoint should prove zero synthetic placeholder edit locations");
+  check(report.updateFeedCheckpointSyntheticRealLocalEnvRead === false, "release completion report packet update-feed checkpoint should not read real local env for the synthetic branch");
+  check(report.updateFeedCheckpointRealAutoUpdateReady === false, "release completion report packet update-feed checkpoint should keep real auto-update unready");
+  check(report.updateFeedCheckpointSyntheticAutoUpdateReady === false, "release completion report packet update-feed checkpoint should keep synthetic-source auto-update unready");
+  check(report.updateFeedCheckpointRealAutoUpdateBlockerCount > 0, "release completion report packet update-feed checkpoint should include real auto-update blocker rows");
+  check(report.updateFeedCheckpointSyntheticAutoUpdateBlockerCount > 0, "release completion report packet update-feed checkpoint should include synthetic-source auto-update blocker rows");
+  check(report.updateFeedCheckpointSignedUpdateArtifactsReady === false, "release completion report packet update-feed checkpoint should keep signed update artifacts unready");
+  check(report.updateFeedCheckpointHardGateCommand === "npm run release:external-check", "release completion report packet update-feed checkpoint should keep hard gate command");
+  check(report.updateFeedCheckpointHardGateReady === false, "release completion report packet update-feed checkpoint should keep hard gate unready");
+  check(report.updateFeedCheckpointHardGateWouldFail === true, "release completion report packet update-feed checkpoint should keep hard gate would-fail posture");
+  check(report.updateFeedCheckpointRowCount === report.updateFeedCheckpointRows.length, "release completion report packet update-feed checkpoint row count should match rows");
+  check(report.updateFeedCheckpointRowCount === 4, "release completion report packet should include four update-feed checkpoint evidence rows");
+  check(report.updateFeedCheckpointRows.every((row) => row.valueRecorded === false), "release completion report packet update-feed checkpoint rows should not record values");
+  check(report.updateFeedCheckpointValueRecorded === false, "release completion report packet update-feed checkpoint evidence should be value-free");
   check(report.channelEditRecommendedOperatorProofCommand === privateEditOperatorProofCommand, "release completion report packet should mirror the channel edit packet recommended proof chain");
   check(
     report.channelEditRecommendedOperatorProofCommandRole === report.privateEditOperatorProofCommandRole,
@@ -1110,7 +1287,7 @@ function validateReport(report, markdown) {
   check(report.privateEditProofCommandRows.every((row) => row.valueRecorded === false), "release completion report packet private-edit proof commands should be value-free");
   check(report.firstPrivateEditProofCommand === "npm run release:channel-live-check-strict", "release completion report packet should make strict live check the first private-edit proof command");
   check(report.postEditProofCommand === "npm run release:post-edit-proof", "release completion report packet should include post-edit proof command");
-  check(report.sourceArtifactRowCount === 6, "release completion report packet should include six source artifacts");
+  check(report.sourceArtifactRowCount === 7, "release completion report packet should include seven source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release completion report packet sources should be present, ready, and value-free");
   check(report.sourceLabelsMatchLatestTenPlan === true, "release completion report packet source labels should match latest 10-plan progress");
   check(report.audienceLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet audience label should match latest progress");
@@ -1119,6 +1296,7 @@ function validateReport(report, markdown) {
   check(report.finalHandoffSuccessRedactionLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet final handoff success-redaction label should match latest progress");
   check(report.clearanceTransitionLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet clearance transition label should match latest progress");
   check(report.autoUpdateTransitionLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet auto-update transition label should match latest progress");
+  check(report.updateFeedCheckpointLatestTenPlanProgressLabel === report.latestTenPlanProgressLabel, "release completion report packet update-feed checkpoint label should match latest progress");
   check(report.firstTimeComposerReady === true, "release completion report packet should prove first-time composer readiness");
   check(report.professionalProducerReady === true, "release completion report packet should prove professional producer readiness");
   check(report.directCompositionReady === true, "release completion report packet should prove direct composition readiness");
@@ -1267,6 +1445,7 @@ function validateReport(report, markdown) {
   check(tenPlanReceiptEvidence.includes(report.finalHandoffSuccessRedactionCommand), "release completion report packet 10-plan receipt should include final handoff success-redaction proof");
   check(tenPlanReceiptEvidence.includes(report.postClearanceNextPriorityActionLabel), "release completion report packet 10-plan receipt should include post-clearance next action");
   check(tenPlanReceiptEvidence.includes(report.autoUpdateProofCommand), "release completion report packet should include auto-update transition proof");
+  check(tenPlanReceiptEvidence.includes(report.updateFeedCheckpointCommand), "release completion report packet 10-plan receipt should include update-feed checkpoint proof");
   check(report.privateValuesRecorded === false, "release completion report packet should not record private values");
   check(report.localEnvValueRecorded === false, "release completion report packet should not record local env values");
   check(report.releaseUrlValueRecorded === false, "release completion report packet should not record release URL values");
@@ -1297,6 +1476,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("Private-Edit Blocked Smoke Evidence"), "release completion report packet Markdown should include blocked smoke evidence table");
   check(markdown.includes("Final handoff success-redaction ready:"), "release completion report packet Markdown should include final handoff success-redaction readiness");
   check(markdown.includes("Final Handoff Success-Redaction Evidence"), "release completion report packet Markdown should include final handoff success-redaction evidence table");
+  check(markdown.includes("Update-feed checkpoint ready:"), "release completion report packet Markdown should include update-feed checkpoint readiness");
+  check(markdown.includes("Update Feed Checkpoint Evidence"), "release completion report packet Markdown should include update-feed checkpoint evidence table");
   check(markdown.includes("Channel edit packet recommended proof chain:"), "release completion report packet Markdown should include channel edit packet proof recommendation");
   check(markdown.includes("Private-Edit Proof Commands"), "release completion report packet Markdown should include private-edit proof command table");
   check(markdown.includes("10-plan report due:"), "release completion report packet Markdown should include the 10-plan report due flag");
@@ -1333,8 +1514,9 @@ const privateEditBlockedSmoke = await readJsonRequired(privateEditBlockedSmokeJs
 const finalHandoff = await readJsonRequired(finalHandoffSuccessRedactionJsonPath, "Final handoff success-redaction");
 const clearance = await readJsonRequired(clearanceTransitionJsonPath, "Release-channel clearance transition");
 const autoUpdate = await readJsonRequired(autoUpdateTransitionJsonPath, "Release auto-update transition");
+const updateFeedCheckpoint = await readJsonRequired(updateFeedCheckpointJsonPath, "Update feed checkpoint");
 const progress = await completedPlanProgress();
-const report = buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff, clearance, autoUpdate, progress });
+const report = buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff, clearance, autoUpdate, updateFeedCheckpoint, progress });
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
 
@@ -1362,6 +1544,13 @@ console.log(`- Final handoff metadata ready: ${report.finalHandoffSuccessRedacti
 console.log(`- Final handoff strict rows: ${report.finalHandoffSuccessRedactionRealStrictReadyCount}/${report.finalHandoffSuccessRedactionRealStrictRowCount}`);
 console.log(`- Final handoff strict placeholder keys: ${report.finalHandoffSuccessRedactionRealStrictPlaceholderKeyCount}`);
 console.log(`- Final handoff real env read: ${report.finalHandoffSuccessRedactionRealLocalEnvRead ? "yes" : "no"}`);
+console.log(`- Update-feed checkpoint ready: ${report.updateFeedCheckpointReady ? "yes" : "no"}`);
+console.log(`- Update-feed checkpoint command: ${report.updateFeedCheckpointCommand}`);
+console.log(`- Update-feed real selected keys: ${report.updateFeedCheckpointRealSelectedReadyCount}/2`);
+console.log(`- Update-feed real placeholder keys: ${report.updateFeedCheckpointRealPlaceholderKeyCount}`);
+console.log(`- Update-feed synthetic selected keys: ${report.updateFeedCheckpointSyntheticSelectedReadyCount}/2`);
+console.log(`- Update-feed synthetic placeholder keys: ${report.updateFeedCheckpointSyntheticPlaceholderKeyCount}`);
+console.log(`- Update-feed hard gate would fail: ${report.updateFeedCheckpointHardGateWouldFail ? "yes" : "no"}`);
 console.log(`- Channel edit packet recommended proof chain: ${report.channelEditRecommendedOperatorProofCommand}`);
 console.log(`- Latest completed plan: plan-${report.latestCompletedPlanNumber}`);
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
