@@ -2256,6 +2256,42 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
       "npm run release:external-check"
     ),
     postEditProofSequenceReceiptValueRecorded: releaseProgress.postEditProofSequenceReceiptValueRecorded === true ? true : false,
+    proofBundleDoctorPostEditProofSourceArtifact: textValue(releaseProgress.proofBundleDoctorPostEditProofSourceArtifact, "External proof bundle"),
+    proofBundleDoctorPostEditProofSourcePath: textValue(releaseProgress.proofBundleDoctorPostEditProofSourcePath, "none"),
+    proofBundleDoctorPostEditProofSourceReady: releaseProgress.proofBundleDoctorPostEditProofSourceReady === true,
+    proofBundleDoctorPostEditProofProofBundleReady: releaseProgress.proofBundleDoctorPostEditProofProofBundleReady === true,
+    proofBundleDoctorPostEditProofNextActionsSourceArtifact: textValue(
+      releaseProgress.proofBundleDoctorPostEditProofNextActionsSourceArtifact,
+      "External next actions"
+    ),
+    proofBundleDoctorPostEditProofNextActionsSourcePath: textValue(releaseProgress.proofBundleDoctorPostEditProofNextActionsSourcePath, "none"),
+    proofBundleDoctorPostEditProofNextActionsReady: releaseProgress.proofBundleDoctorPostEditProofNextActionsReady === true,
+    proofBundleDoctorPostEditProofDoctorSourceArtifact: textValue(
+      releaseProgress.proofBundleDoctorPostEditProofDoctorSourceArtifact,
+      "Release doctor"
+    ),
+    proofBundleDoctorPostEditProofDoctorSourcePath: textValue(releaseProgress.proofBundleDoctorPostEditProofDoctorSourcePath, "none"),
+    proofBundleDoctorPostEditProofDoctorReportReady: releaseProgress.proofBundleDoctorPostEditProofDoctorReportReady === true,
+    proofBundleDoctorPostEditProofCurrentActionId: textValue(releaseProgress.proofBundleDoctorPostEditProofCurrentActionId, "none"),
+    proofBundleDoctorPostEditProofCurrentActionLabel: textValue(
+      releaseProgress.proofBundleDoctorPostEditProofCurrentActionLabel,
+      "none"
+    ),
+    proofBundleDoctorPostEditProofCommand: textValue(releaseProgress.proofBundleDoctorPostEditProofCommand, "none"),
+    proofBundleDoctorPostEditProofRole: textValue(releaseProgress.proofBundleDoctorPostEditProofRole, "none"),
+    proofBundleDoctorPostEditProofMatchesRecommended: releaseProgress.proofBundleDoctorPostEditProofMatchesRecommended === true,
+    proofBundleDoctorPostEditProofMirrorsNextActions: releaseProgress.proofBundleDoctorPostEditProofMirrorsNextActions === true,
+    proofBundleDoctorPostEditProofMirrorsProgress:
+      releaseProgress.proofBundleDoctorPostEditProofSourceArtifact === "External proof bundle" &&
+      releaseProgress.proofBundleDoctorPostEditProofSourceReady === true &&
+      textValue(releaseProgress.proofBundleDoctorPostEditProofCommand, "none") === recommendedPrivateEditOperatorProofCommand &&
+      releaseProgress.proofBundleDoctorPostEditProofMatchesRecommended === true &&
+      releaseProgress.proofBundleDoctorPostEditProofMirrorsNextActions === true &&
+      releaseProgress.proofBundleDoctorPostEditProofValueRecorded !== true &&
+      releaseProgress.proofBundleDoctorPostEditProofClaimedExternalDistribution !== true,
+    proofBundleDoctorPostEditProofValueRecorded: releaseProgress.proofBundleDoctorPostEditProofValueRecorded === true ? true : false,
+    proofBundleDoctorPostEditProofClaimedExternalDistribution:
+      releaseProgress.proofBundleDoctorPostEditProofClaimedExternalDistribution === true ? true : false,
     releaseChannelFocusReceiptReady,
     releaseChannelFocusCurrentReady: releaseDoctor.releaseChannelFocusCurrentReady === true,
     releaseChannelFocusCurrentReadyCount: integerValue(releaseDoctor.releaseChannelFocusCurrentReadyCount),
@@ -2952,6 +2988,28 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.postEditProofSequenceReceiptProgressCommand === "npm run release:progress-smoke", "release current blocker post-edit proof sequence should keep progress-smoke command");
   check(report.postEditProofSequenceReceiptHardGateCommand === "npm run release:external-check", "release current blocker post-edit proof sequence should keep hard-gate command");
   check(report.postEditProofSequenceReceiptValueRecorded === false, "release current blocker post-edit proof sequence should not record values");
+  check(report.proofBundleDoctorPostEditProofSourceArtifact === "External proof bundle", "release current blocker should identify the proof bundle as the doctor post-edit proof mirror source");
+  check(report.proofBundleDoctorPostEditProofSourceArtifact === releaseProgress.proofBundleDoctorPostEditProofSourceArtifact, "release current blocker should mirror release progress doctor post-edit proof source artifact");
+  check(report.proofBundleDoctorPostEditProofSourcePath === releaseProgress.proofBundleDoctorPostEditProofSourcePath, "release current blocker should mirror release progress doctor post-edit proof source path");
+  check(report.proofBundleDoctorPostEditProofSourceReady === true, "release current blocker should report ready proof-bundle doctor post-edit proof source evidence");
+  check(report.proofBundleDoctorPostEditProofSourceReady === releaseProgress.proofBundleDoctorPostEditProofSourceReady, "release current blocker should mirror release progress doctor post-edit proof source readiness");
+  check(report.proofBundleDoctorPostEditProofProofBundleReady === true, "release current blocker should mirror proof-bundle readiness for doctor post-edit proof");
+  check(report.proofBundleDoctorPostEditProofNextActionsSourceArtifact === "External next actions", "release current blocker should keep external next-actions as the doctor post-edit proof upstream source");
+  check(report.proofBundleDoctorPostEditProofNextActionsSourcePath === releaseProgress.proofBundleDoctorPostEditProofNextActionsSourcePath, "release current blocker should mirror release progress next-actions doctor post-edit proof source path");
+  check(report.proofBundleDoctorPostEditProofNextActionsReady === true, "release current blocker should mirror next-actions doctor post-edit proof readiness");
+  check(report.proofBundleDoctorPostEditProofDoctorSourceArtifact === "Release doctor", "release current blocker should keep release doctor as the original doctor post-edit proof source");
+  check(report.proofBundleDoctorPostEditProofDoctorSourcePath === releaseProgress.proofBundleDoctorPostEditProofDoctorSourcePath, "release current blocker should mirror release progress release doctor post-edit proof source path");
+  check(report.proofBundleDoctorPostEditProofDoctorReportReady === true, "release current blocker should mirror release doctor post-edit proof readiness");
+  check(typeof report.proofBundleDoctorPostEditProofCurrentActionId === "string" && report.proofBundleDoctorPostEditProofCurrentActionId.length > 0, "release current blocker should include proof-bundle doctor post-edit proof current action id");
+  check(typeof report.proofBundleDoctorPostEditProofCurrentActionLabel === "string" && report.proofBundleDoctorPostEditProofCurrentActionLabel.length > 0, "release current blocker should include proof-bundle doctor post-edit proof current action label");
+  check(report.proofBundleDoctorPostEditProofCommand === recommendedPrivateEditOperatorProofCommand, "release current blocker should mirror the proof-bundle doctor post-edit proof command");
+  check(report.proofBundleDoctorPostEditProofCommand === releaseProgress.proofBundleDoctorPostEditProofCommand, "release current blocker proof-bundle doctor post-edit proof command should match release progress");
+  check(typeof report.proofBundleDoctorPostEditProofRole === "string" && report.proofBundleDoctorPostEditProofRole.length > 0, "release current blocker should include proof-bundle doctor post-edit proof role");
+  check(report.proofBundleDoctorPostEditProofMatchesRecommended === true, "release current blocker proof-bundle doctor post-edit proof should match the recommended operator proof chain");
+  check(report.proofBundleDoctorPostEditProofMirrorsNextActions === true, "release current blocker proof-bundle doctor post-edit proof should mirror next-actions");
+  check(report.proofBundleDoctorPostEditProofMirrorsProgress === true, "release current blocker proof-bundle doctor post-edit proof should mirror release progress");
+  check(report.proofBundleDoctorPostEditProofValueRecorded === false, "release current blocker proof-bundle doctor post-edit proof should not record values");
+  check(report.proofBundleDoctorPostEditProofClaimedExternalDistribution === false, "release current blocker proof-bundle doctor post-edit proof should not claim external distribution");
   check(report.releaseChannelFocusReceiptReady === true, "release current blocker release-channel focus receipt should be ready");
   check(report.releaseChannelFocusReceiptReady === releaseDoctor.releaseChannelFocusReceiptReady, "release current blocker should mirror release doctor focus receipt readiness");
   check(report.releaseChannelFocusCurrentReady === releaseDoctor.releaseChannelFocusCurrentReady, "release current blocker should mirror release doctor focus current readiness");
@@ -3229,6 +3287,9 @@ function buildMarkdown(report) {
     `- Post-edit proof sequence proof-bundle command: \`${report.postEditProofSequenceReceiptProofBundleCommand}\``,
     `- Post-edit proof sequence progress command: \`${report.postEditProofSequenceReceiptProgressCommand}\``,
     `- Post-edit proof sequence hard-gate command: \`${report.postEditProofSequenceReceiptHardGateCommand}\``,
+    `- Proof-bundle doctor post-edit proof source ready: ${report.proofBundleDoctorPostEditProofSourceReady ? "yes" : "no"}`,
+    `- Proof-bundle doctor post-edit proof command: \`${report.proofBundleDoctorPostEditProofCommand}\``,
+    `- Proof-bundle doctor post-edit proof matches recommended: ${report.proofBundleDoctorPostEditProofMatchesRecommended ? "yes" : "no"}`,
     `- Release-channel focus receipt ready: ${report.releaseChannelFocusReceiptReady ? "yes" : "no"}`,
     `- Release-channel focus current action ready: ${report.releaseChannelFocusCurrentReady ? "yes" : "no"}`,
     `- Release-channel focus current-ready rows: ${report.releaseChannelFocusCurrentReadyCount}/${report.releaseChannelFocusRowCount}`,
@@ -3389,6 +3450,28 @@ function buildMarkdown(report) {
     "| order | step | ready | command | expected evidence | source field | value recorded |",
     "|---:|---|---:|---|---|---|---:|",
     formatPostEditProofSequenceReceiptRows(report.postEditProofSequenceReceiptRows),
+    "",
+    "## Proof-Bundle Doctor Post-Edit Proof Mirror",
+    "",
+    `- Source artifact: ${report.proofBundleDoctorPostEditProofSourceArtifact}`,
+    `- Source path: ${report.proofBundleDoctorPostEditProofSourcePath}`,
+    `- Source ready: ${report.proofBundleDoctorPostEditProofSourceReady ? "yes" : "no"}`,
+    `- Proof bundle ready: ${report.proofBundleDoctorPostEditProofProofBundleReady ? "yes" : "no"}`,
+    `- Next-actions source artifact: ${report.proofBundleDoctorPostEditProofNextActionsSourceArtifact}`,
+    `- Next-actions source path: ${report.proofBundleDoctorPostEditProofNextActionsSourcePath}`,
+    `- Next-actions ready: ${report.proofBundleDoctorPostEditProofNextActionsReady ? "yes" : "no"}`,
+    `- Doctor source artifact: ${report.proofBundleDoctorPostEditProofDoctorSourceArtifact}`,
+    `- Doctor source path: ${report.proofBundleDoctorPostEditProofDoctorSourcePath}`,
+    `- Doctor report ready: ${report.proofBundleDoctorPostEditProofDoctorReportReady ? "yes" : "no"}`,
+    `- Current action: ${report.proofBundleDoctorPostEditProofCurrentActionLabel}`,
+    `- Current action id: ${report.proofBundleDoctorPostEditProofCurrentActionId}`,
+    `- Post-edit proof command: \`${report.proofBundleDoctorPostEditProofCommand}\``,
+    `- Post-edit proof role: ${report.proofBundleDoctorPostEditProofRole}`,
+    `- Mirrors next-actions: ${report.proofBundleDoctorPostEditProofMirrorsNextActions ? "yes" : "no"}`,
+    `- Mirrors progress: ${report.proofBundleDoctorPostEditProofMirrorsProgress ? "yes" : "no"}`,
+    `- Matches recommended operator proof chain: ${report.proofBundleDoctorPostEditProofMatchesRecommended ? "yes" : "no"}`,
+    `- Value recorded: ${report.proofBundleDoctorPostEditProofValueRecorded ? "yes" : "no"}`,
+    `- External distribution claimed: ${report.proofBundleDoctorPostEditProofClaimedExternalDistribution ? "yes" : "no"}`,
     "",
     "## Release-Channel Focus Receipt",
     "",
@@ -3732,6 +3815,10 @@ check(markdown.includes("Post-edit proof sequence recommended proof chain:"), "r
 check(markdown.includes("Post-Edit Proof Sequence Receipt"), "release current blocker Markdown should include post-edit proof sequence receipt table");
 check(markdown.includes("Proof-bundle command:"), "release current blocker Markdown should include post-edit proof-bundle command");
 check(markdown.includes("Progress command: `npm run release:progress-smoke`"), "release current blocker Markdown should include post-edit progress-smoke command");
+check(markdown.includes("Proof-bundle doctor post-edit proof source ready:"), "release current blocker Markdown should include proof-bundle doctor post-edit proof source readiness");
+check(markdown.includes("Proof-bundle doctor post-edit proof command:"), "release current blocker Markdown should include proof-bundle doctor post-edit proof command");
+check(markdown.includes("Proof-Bundle Doctor Post-Edit Proof Mirror"), "release current blocker Markdown should include proof-bundle doctor post-edit proof mirror section");
+check(markdown.includes("Mirrors progress:"), "release current blocker Markdown should include proof-bundle doctor post-edit proof progress mirror posture");
 check(markdown.includes("operator action"), "release current blocker Markdown should include post-edit operator action guidance");
 check(markdown.includes("expected post-edit signal"), "release current blocker Markdown should include post-edit expected signals");
 check(markdown.includes("Release-channel focus receipt ready:"), "release current blocker Markdown should include release-channel focus receipt readiness");
@@ -3899,6 +3986,9 @@ console.log(`- Post-edit proof sequence next-actions command: ${report.postEditP
 console.log(`- Post-edit proof sequence proof-bundle command: ${report.postEditProofSequenceReceiptProofBundleCommand}`);
 console.log(`- Post-edit proof sequence progress command: ${report.postEditProofSequenceReceiptProgressCommand}`);
 console.log(`- Post-edit proof sequence hard-gate command: ${report.postEditProofSequenceReceiptHardGateCommand}`);
+console.log(`- Proof-bundle doctor post-edit proof source ready: ${report.proofBundleDoctorPostEditProofSourceReady ? "yes" : "no"}`);
+console.log(`- Proof-bundle doctor post-edit proof command: ${report.proofBundleDoctorPostEditProofCommand}`);
+console.log(`- Proof-bundle doctor post-edit proof matches recommended: ${report.proofBundleDoctorPostEditProofMatchesRecommended ? "yes" : "no"}`);
 console.log(`- Release-channel focus receipt ready: ${report.releaseChannelFocusReceiptReady ? "yes" : "no"}`);
 console.log(`- Release-channel focus current action ready: ${report.releaseChannelFocusCurrentReady ? "yes" : "no"}`);
 console.log(`- Release-channel focus current-ready rows: ${report.releaseChannelFocusCurrentReadyCount}/${report.releaseChannelFocusRowCount}`);
