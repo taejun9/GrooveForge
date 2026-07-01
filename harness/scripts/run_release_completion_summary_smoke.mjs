@@ -13,6 +13,8 @@ const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const sourceStem = "release-progress-refresh-smoke";
 const readoutStem = "release-completion-summary-smoke";
+const sourceRefreshCommand = "npm run release:progress-refresh-smoke";
+const readoutRefreshCommand = "npm run release:completion-summary-refresh-smoke";
 const sourceJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${sourceStem}.json`);
 const readoutMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${readoutStem}.md`);
 const readoutJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${readoutStem}.json`);
@@ -51,9 +53,30 @@ function integerValue(value) {
 
 async function readJsonRequired(filePath, label) {
   if (!existsSync(filePath)) {
-    fail(`${label} artifact is missing.`, `Expected: ${relative(filePath)}\nRun npm run release:progress-refresh-smoke before npm run release:completion-summary-smoke.`);
+    fail(
+      `${label} artifact is missing.`,
+      [
+        `Expected: ${relative(filePath)}`,
+        `Run ${readoutRefreshCommand} for after-work completion reports.`,
+        `Run ${sourceRefreshCommand} before npm run release:completion-summary-smoke when only the source bundle needs refreshing.`
+      ].join("\n")
+    );
   }
   return JSON.parse(await readFile(filePath, "utf8"));
+}
+
+function buildSourceGuidance(report) {
+  return [
+    "Source evidence is missing, stale, or incomplete.",
+    `- Source ready: ${readyLabel(report.sourceReady)}`,
+    `- Source summary ready: ${readyLabel(report.sourceSummaryReady)}`,
+    `- Source labels match: ${readyLabel(report.sourceLabelsMatch)}`,
+    `- Strict proof handoff ready: ${readyLabel(report.strictProofHandoffReceiptReady)}`,
+    `- Private-edit blocked smoke ready: ${readyLabel(report.privateEditBlockedSmokeReady)}`,
+    `- Final handoff success-redaction ready: ${readyLabel(report.finalHandoffSuccessRedactionReady)}`,
+    `Run ${readoutRefreshCommand} for after-work completion reports.`,
+    `Run ${sourceRefreshCommand} before npm run release:completion-summary-smoke when only the source bundle needs refreshing.`
+  ].join("\n");
 }
 
 function buildReport(source) {
@@ -213,7 +236,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("Completion summary readout ready: yes"), "release completion summary Markdown should include readiness");
 
   if (failures.length > 0) {
-    fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
+    fail("Validation failed.", `${failures.map((message) => `- ${message}`).join("\n")}\n${buildSourceGuidance(report)}`);
   }
 }
 
