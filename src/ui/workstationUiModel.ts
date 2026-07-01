@@ -3905,6 +3905,30 @@ export type ModeSwitchResult = {
   tone: MixCoachTone;
 };
 
+export type AudienceSessionReadoutRowId = "beginner" | "producer";
+
+export type AudienceSessionReadoutRow = {
+  id: AudienceSessionReadoutRowId;
+  label: string;
+  status: string;
+  value: string;
+  detail: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+};
+
+export type AudienceSessionReadoutSummary = {
+  headline: string;
+  detail: string;
+  statusLabel: string;
+  activeAudience: AudienceSessionReadoutRowId;
+  activeAudienceLabel: string;
+  readinessLabel: string;
+  nextCheck: string;
+  tone: MixCoachTone;
+  rows: AudienceSessionReadoutRow[];
+};
+
 export type SessionPassTarget = "transport" | ReviewQueueFocusTarget;
 
 export type SessionPassCardId = "guided" | "studio" | "finish" | "deliver";

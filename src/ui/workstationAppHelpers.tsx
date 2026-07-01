@@ -542,6 +542,8 @@ import type {
   ModeFocusJumpResult,
   ModeFocusSummary,
   ModeSwitchResult,
+  AudienceSessionReadoutRow,
+  AudienceSessionReadoutSummary,
   SessionPassTarget,
   SessionPassCardId,
   SessionPassCard,
@@ -11477,6 +11479,102 @@ export function createModeFocusSummary(
     ...createModeFocusDecision("guided", cards),
     cards
   };
+}
+
+export function createAudienceSessionReadoutSummary(
+  project: ProjectState,
+  firstBeatPath: FirstBeatPathSummary,
+  sessionPass: SessionPassSummary,
+  modeFocus: ModeFocusSummary,
+  workflowItems: WorkflowNavigatorItem[],
+  exportPreflight: ExportPreflightSummary
+): AudienceSessionReadoutSummary {
+  const target = activeDeliveryTarget(project);
+  const style = getStyle(project);
+  const guidedPass = sessionPass.cards.find((card) => card.id === "guided") ?? sessionPass.cards[0] ?? null;
+  const studioPass = sessionPass.cards.find((card) => card.id === "studio") ?? sessionPass.cards[0] ?? null;
+  const finishPass = sessionPass.cards.find((card) => card.id === "finish") ?? sessionPass.cards[0] ?? null;
+  const deliverPass = sessionPass.cards.find((card) => card.id === "deliver") ?? sessionPass.cards[0] ?? null;
+  const composeItem = workflowItems.find((item) => item.id === "compose") ?? workflowItems[0] ?? null;
+  const arrangeItem = workflowItems.find((item) => item.id === "arrange") ?? workflowItems[1] ?? null;
+  const mixItem = workflowItems.find((item) => item.id === "mix") ?? workflowItems[2] ?? null;
+  const deliverItem = workflowItems.find((item) => item.id === "deliver") ?? workflowItems[3] ?? null;
+
+  const beginnerTones = [
+    firstBeatPath.tone,
+    guidedPass?.tone ?? "warn",
+    composeItem?.tone ?? "warn",
+    arrangeItem?.tone ?? "warn"
+  ];
+  const producerTones = [
+    studioPass?.tone ?? "warn",
+    finishPass?.tone ?? "warn",
+    deliverPass?.tone ?? "warn",
+    mixItem?.tone ?? "warn",
+    deliverItem?.tone ?? "warn"
+  ];
+  const beginnerTone = weakestTone(beginnerTones);
+  const producerTone = weakestTone(producerTones);
+  const activeAudience = project.mode === "guided" ? "beginner" : "producer";
+  const activeTone = activeAudience === "beginner" ? beginnerTone : producerTone;
+  const activePass = activeAudience === "beginner" ? guidedPass : studioPass;
+  const activeFocus = modeFocus.cards.find((card) => card.id === modeFocus.activeCardId) ?? modeFocus.cards[0] ?? null;
+  const rows: AudienceSessionReadoutRow[] = [
+    {
+      id: "beginner",
+      label: "First-time composer",
+      status: audienceReadinessStatus(beginnerTone),
+      value: `${audienceReadyCount(beginnerTones)}/${beginnerTones.length} clear`,
+      detail: `${firstBeatPath.countLabel} / ${guidedPass?.value ?? firstBeatPath.decisionLabel}`,
+      nextCheck: firstBeatPath.decisionDetail,
+      tone: beginnerTone
+    },
+    {
+      id: "producer",
+      label: "Professional producer",
+      status: audienceReadinessStatus(producerTone),
+      value: `${audienceReadyCount(producerTones)}/${producerTones.length} clear`,
+      detail: `${studioPass?.value ?? "Studio pass"} / ${finishPass?.value ?? "Finish"} / ${deliverPass?.value ?? "Deliver"}`,
+      nextCheck: exportPreflight.headline === "Ready to send" ? "Run Export Preflight and Handoff Pack before send." : exportPreflight.detail,
+      tone: producerTone
+    }
+  ];
+  const tone = weakestTone([beginnerTone, producerTone]);
+  const statusLabel =
+    tone === "good" ? "Audience session clear" : tone === "warn" ? "Audience session review" : "Audience session blocker";
+  const activeLabel = activeAudience === "beginner" ? "First-time composer" : "Professional producer";
+  const headline =
+    tone === "good" ? "Audience session ready" : tone === "warn" ? "Audience session needs review" : "Build session core";
+
+  return {
+    headline,
+    detail: `${activeLabel} focus / ${target.name} / ${barCountLabel(arrangementTotalBars(project))} / ${style.name}`,
+    statusLabel,
+    activeAudience,
+    activeAudienceLabel: activeLabel,
+    readinessLabel: rows.map((row) => `${row.label}: ${row.status}`).join(" / "),
+    nextCheck: `${activePass?.focusLabel ?? activeFocus?.focusLabel ?? "Workflow"}: ${
+      activeFocus?.detail ?? activePass?.detail ?? modeFocus.detail
+    }`,
+    tone: weakestTone([tone, activeTone]),
+    rows
+  };
+}
+
+function audienceReadyCount(tones: MixCoachTone[]): number {
+  return tones.filter((tone) => tone === "good").length;
+}
+
+function audienceReadinessStatus(tone: MixCoachTone): string {
+  if (tone === "good") {
+    return "Ready";
+  }
+
+  if (tone === "warn") {
+    return "Review";
+  }
+
+  return "Build core";
 }
 
 export function createModeFocusDecision(

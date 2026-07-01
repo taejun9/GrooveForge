@@ -15,6 +15,7 @@ import type {
   FirstBeatPathStep,
   FirstBeatPathJumpResult,
   FirstBeatPathSummary,
+  AudienceSessionReadoutSummary,
   MixCoachTone,
   ModeFocusCard,
   ModeFocusJumpResult,
@@ -228,6 +229,50 @@ export function ModeSwitchResultStrip({ result }: { result: ModeSwitchResult }):
         <small>{result.nextCheck}</small>
       </div>
     </div>
+  );
+}
+
+export function AudienceSessionReadout({ summary }: { summary: AudienceSessionReadoutSummary }): ReactElement {
+  return (
+    <section
+      aria-label="Audience session readout"
+      className={`audience-session-readout ${summary.tone}`}
+      data-audience-session-readout={summary.activeAudience}
+      data-testid="audience-session-readout"
+      title={`${summary.headline}: ${summary.detail}`}
+    >
+      <div className="audience-session-heading">
+        <div>
+          <Gauge size={15} aria-hidden="true" />
+          <span data-testid="audience-session-status">{summary.statusLabel}</span>
+        </div>
+        <strong data-testid="audience-session-headline">{summary.headline}</strong>
+        <small data-testid="audience-session-detail">{summary.detail}</small>
+      </div>
+      <div className="audience-session-focus" data-testid="audience-session-focus">
+        <span data-testid="audience-session-active-label">Active lane</span>
+        <strong data-testid="audience-session-active-audience">{summary.activeAudienceLabel}</strong>
+        <small data-testid="audience-session-readiness">{summary.readinessLabel}</small>
+        <em data-testid="audience-session-next-check">{summary.nextCheck}</em>
+      </div>
+      <div className="audience-session-grid" data-testid="audience-session-grid">
+        {summary.rows.map((row) => (
+          <div
+            className={`audience-session-card ${row.tone}`}
+            data-audience-session-card={row.id}
+            data-testid={`audience-session-card-${row.id}`}
+            key={row.id}
+            title={`${row.label}: ${row.status} / ${row.detail} / ${row.nextCheck}`}
+          >
+            <span data-testid={`audience-session-card-${row.id}-status`}>{row.status}</span>
+            <strong data-testid={`audience-session-card-${row.id}-label`}>{row.label}</strong>
+            <small data-testid={`audience-session-card-${row.id}-value`}>{row.value}</small>
+            <small data-testid={`audience-session-card-${row.id}-detail`}>{row.detail}</small>
+            <em data-testid={`audience-session-card-${row.id}-next`}>{row.nextCheck}</em>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

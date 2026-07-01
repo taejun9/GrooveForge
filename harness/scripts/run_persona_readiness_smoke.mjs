@@ -1054,6 +1054,8 @@ check(!forbiddenSamplingText.test(html), "persona readiness renderer output shou
 const renderedSignalRows = [
   checkRenderedGroup(html, "beginner first-run path", [
     "Guide Quick Start",
+    "Audience session",
+    "First-time composer",
     "First Beat Path",
     "Beat Spine",
     "Composer Guide",
@@ -1062,6 +1064,7 @@ const renderedSignalRows = [
     "Guided Session Pass"
   ]),
   checkRenderedGroup(html, "professional producer path", [
+    "Professional producer",
     "Studio",
     "Review Queue",
     "Production Snapshot",

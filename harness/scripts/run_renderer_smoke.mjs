@@ -69,6 +69,9 @@ function validateFirstRunRenderer(html) {
       'data-testid="guide-quick-start"',
       'data-testid="guide-quick-start-headline"',
       "Guide Quick Start",
+      'data-testid="audience-session-readout"',
+      "Audience session",
+      "First-time composer",
       "First Beat Path",
       "Beat Spine",
       "Composer Guide",
@@ -77,6 +80,7 @@ function validateFirstRunRenderer(html) {
       "Guided Session Pass"
     ],
     "producer workflow": [
+      "Professional producer",
       "Studio",
       "Review Queue",
       "Production Snapshot",
@@ -153,7 +157,7 @@ try {
     console.log("- Scope: first-run React workstation server render without browser, Electron window, network, imported audio, or sampling scope");
     console.log(`- Markup: ${html.length} characters from App first render`);
     console.log("- Starter: Untitled Beat, Guided 145 BPM F minor Trap state visible");
-    console.log("- Beginner path: Guide Quick Start, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator");
+    console.log("- Beginner path: Guide Quick Start, Audience Session Readout, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator");
     console.log("- Producer path: Studio switch, Review Queue, Production Snapshot, Mix Coach, Sound/Mix Snapshot, Quick Actions, Command Reference");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack");
   }
