@@ -136,6 +136,100 @@ function validateFirstRunRenderer(html) {
   }
 }
 
+function createAudienceSessionSmokeAction({ id, resultTargetId, title }) {
+  return {
+    id,
+    title,
+    detail: `${title} / Audience Session route / direct composition path`,
+    group: "Guide",
+    keywords: "audience session guided studio beginner producer composer",
+    resultTargetId,
+    run() {}
+  };
+}
+
+function validateAudienceSessionQuickActionResults(quickActions, workstation) {
+  const guidedProject = { ...workstation.starterProject, mode: "guided" };
+  const studioProject = { ...workstation.starterProject, mode: "studio" };
+  const cases = [
+    {
+      label: "beginner Audience Session Quick Action result",
+      action: createAudienceSessionSmokeAction({
+        id: "audience-session-enter-beginner",
+        resultTargetId: "beginner",
+        title: "Enter Guided: First-time composer"
+      }),
+      beforeProject: studioProject,
+      afterProject: guidedProject,
+      beforeNeedles: ["Enter Guided for first-time composer", "Studio mode", "target Guided"],
+      afterNeedles: [
+        "Enter Guided for first-time composer",
+        "Guided mode",
+        "target Guided",
+        "Pattern A",
+        "selected-pattern events",
+        "editable project events",
+        "bars",
+        "Follow First Beat Path"
+      ],
+      auditionNeedles: ["Guided mode", "First Beat Path"],
+      nextNeedles: ["Enter Guided", "First Beat Path"]
+    },
+    {
+      label: "producer Audience Session Quick Action result",
+      action: createAudienceSessionSmokeAction({
+        id: "audience-session-enter-producer",
+        resultTargetId: "producer",
+        title: "Enter Studio: Professional producer"
+      }),
+      beforeProject: guidedProject,
+      afterProject: studioProject,
+      beforeNeedles: ["Enter Studio for professional producer", "Guided mode", "target Studio"],
+      afterNeedles: [
+        "Enter Studio for professional producer",
+        "Studio mode",
+        "target Studio",
+        "Pattern A",
+        "selected-pattern events",
+        "editable project events",
+        "bars",
+        "Scan Mode Focus, Review Queue, and Export Preflight"
+      ],
+      auditionNeedles: ["Studio mode", "Mode Focus", "Review Queue", "Production Snapshot", "Export Preflight"],
+      nextNeedles: ["Enter Studio", "Review Queue", "Export Preflight"]
+    }
+  ];
+
+  for (const testCase of cases) {
+    const result = quickActions.createQuickActionResult(
+      testCase.action,
+      testCase.beforeProject,
+      testCase.afterProject,
+      "complete"
+    );
+
+    check(result.actionId === testCase.action.id, `${testCase.label} should return the executed action id`);
+    check(result.status === "Entered", `${testCase.label} should report Entered status`);
+    check(result.tone === "good", `${testCase.label} should report a good tone`);
+    check(result.metric.id === "audience-session-route", `${testCase.label} should use the audience route metric id`);
+    check(result.metric.label === "Audience session route", `${testCase.label} should use the audience route metric label`);
+    check(result.metric.tone === "good", `${testCase.label} metric should report a good tone`);
+
+    for (const needle of testCase.beforeNeedles) {
+      checkIncludes(result.metric.before, needle, `${testCase.label} before metric`);
+    }
+    for (const needle of testCase.afterNeedles) {
+      checkIncludes(result.metric.after, needle, `${testCase.label} after metric`);
+    }
+    for (const needle of testCase.auditionNeedles) {
+      checkIncludes(result.auditionCue, needle, `${testCase.label} audition cue`);
+    }
+    for (const needle of testCase.nextNeedles) {
+      checkIncludes(result.nextCheck, needle, `${testCase.label} next check`);
+    }
+  }
+}
+
 installBrowserMocks();
 
 const server = await createServer({
@@ -149,6 +243,10 @@ try {
   const { App } = await server.ssrLoadModule("/src/ui/App.tsx");
   const html = renderToStaticMarkup(React.createElement(App));
   validateFirstRunRenderer(html);
+  validateAudienceSessionQuickActionResults(
+    await server.ssrLoadModule("/src/ui/workstationAppQuickActions.tsx"),
+    await server.ssrLoadModule("/src/domain/workstation.ts")
+  );
 
   if (failures.length > 0) {
     console.error("GrooveForge renderer smoke failed:");
@@ -163,6 +261,7 @@ try {
     console.log("- Starter: Untitled Beat, Guided 145 BPM F minor Trap state visible");
     console.log("- Beginner path: Guide Quick Start, Audience Session Readout, First Beat Path, Beat Spine, Composer Guide, Workflow Navigator");
     console.log("- Producer path: Studio switch, Review Queue, Production Snapshot, Mix Coach, Sound/Mix Snapshot, Quick Actions, Command Reference");
+    console.log("- Audience Session result: Enter Guided and Enter Studio Quick Actions return Entered status, route metrics, and route-specific follow-up");
     console.log("- Workstation path: compose, sound, arrange, mix, master, export, Handoff Pack");
   }
 } finally {
