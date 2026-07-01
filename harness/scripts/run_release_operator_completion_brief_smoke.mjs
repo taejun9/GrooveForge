@@ -1,0 +1,688 @@
+#!/usr/bin/env node
+
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const appName = "GrooveForge";
+const bundleId = "app.grooveforge.desktop";
+const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+const platformArch = `${process.platform}-${process.arch}`;
+const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
+const briefStem = "release-operator-completion-brief-smoke";
+const briefMarkdownArtifactName = "release-operator-completion-brief-smoke.md";
+const briefJsonArtifactName = "release-operator-completion-brief-smoke.json";
+const briefMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${briefMarkdownArtifactName}`);
+const briefJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${briefJsonArtifactName}`);
+const completionReportPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-completion-report-packet-smoke.json`);
+const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-report.json`);
+const currentBlockerJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`);
+const progressFreshnessJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-freshness-smoke.json`);
+const reportCommand = "npm run release:operator-completion-brief-smoke";
+const completionPacketCommand = "npm run release:completion-report-packet-smoke";
+const progressCommand = "npm run release:progress-smoke";
+const currentBlockerCommand = "npm run release:current-blocker";
+const currentBlockerSmokeCommand = "npm run release:current-blocker-smoke";
+const freshnessCommand = "npm run release:progress-freshness-smoke";
+const hardGateCommand = "npm run release:external-check";
+const privateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const failures = [];
+
+function check(condition, message) {
+  if (!condition) {
+    failures.push(message);
+  }
+}
+
+function fail(message, details = "") {
+  console.error("GrooveForge release operator completion brief smoke failed:");
+  console.error(`- ${message}`);
+  if (details.trim().length > 0) {
+    console.error(details.trim());
+  }
+  process.exit(1);
+}
+
+function relative(filePath) {
+  return path.relative(root, filePath);
+}
+
+function escapeCell(value) {
+  return String(value ?? "none").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+}
+
+function readyLabel(value) {
+  return value === true ? "yes" : "no";
+}
+
+function textValue(value, fallback = "none") {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function integerValue(value) {
+  return Number.isInteger(value) ? value : 0;
+}
+
+function objectRows(value) {
+  return Array.isArray(value) ? value.filter((row) => row && typeof row === "object" && !Array.isArray(row)) : [];
+}
+
+function rowsValueFree(rows) {
+  return objectRows(rows).every((row) => row.valueRecorded === false);
+}
+
+function fieldsAreFalse(source, fields) {
+  return fields.every((field) => source[field] === false);
+}
+
+function sourcePrivacyBoundaryReady({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness }) {
+  return (
+    fieldsAreFalse(completionReportPacket, [
+      "privateEditOperatorProofCommandValueRecorded",
+      "strictProofHandoffReceiptValueRecorded",
+      "privateEditBlockedSmokeValueRecorded",
+      "finalHandoffSuccessRedactionValueRecorded",
+      "updateFeedCheckpointValueRecorded",
+      "tenPlanProgressReportReceiptValueRecorded",
+      "tenPlanProgressReportRolloverValueRecorded",
+      "privateValuesRecorded",
+      "localEnvValueRecorded",
+      "releaseUrlValueRecorded",
+      "supportUrlValueRecorded",
+      "feedValueRecorded",
+      "credentialValueRecorded",
+      "tokenValueRecorded",
+      "channelValueRecorded",
+      "developerIdIdentityValueRecorded",
+      "privateBeatRecorded",
+      "realUserAudioRecorded",
+      "networkProbeAttempted",
+      "updateFeedPublishAttempted",
+      "distributionChannelProbeAttempted",
+      "releaseUploadAttempted",
+      "signingAttempted",
+      "notarySubmissionAttempted",
+      "claimedDeveloperIdSigning",
+      "claimedNotarization",
+      "claimedGatekeeperApproval",
+      "claimedAutoUpdate",
+      "claimedManualQaApproval",
+      "claimedAppStoreSubmission",
+      "claimedExternalDistribution",
+      "valueRecorded"
+    ]) &&
+    fieldsAreFalse(releaseProgress, [
+      "updateFeedCheckpointValueRecorded",
+      "updateFeedCheckpointPrivateValuesRecorded",
+      "updateFeedCheckpointFeedValueRecorded",
+      "updateFeedCheckpointChannelValueRecorded",
+      "updateFeedCheckpointLocalEnvValueRecorded",
+      "updateFeedCheckpointNetworkProbeAttempted",
+      "updateFeedCheckpointPublishAttempted",
+      "updateFeedCheckpointReleaseUploadAttempted",
+      "updateFeedCheckpointSigningAttempted",
+      "updateFeedCheckpointNotarySubmissionAttempted",
+      "updateFeedCheckpointClaimedAutoUpdate",
+      "updateFeedCheckpointClaimedExternalDistribution",
+      "localEnvValueRecorded",
+      "privateValuesRecorded",
+      "releaseUrlValueRecorded",
+      "supportUrlValueRecorded",
+      "feedValueRecorded",
+      "credentialValueRecorded",
+      "tokenValueRecorded",
+      "channelValueRecorded",
+      "developerIdIdentityValueRecorded",
+      "networkProbeAttemptedByThisReport",
+      "releaseUploadAttemptedByThisReport",
+      "notarySubmissionAttemptedByThisReport",
+      "signingAttemptedByThisReport",
+      "releaseGateClaimedDeveloperIdSigning",
+      "releaseGateClaimedNotarization",
+      "releaseGateClaimedGatekeeperApproval",
+      "releaseGateClaimedAutoUpdate",
+      "releaseGateClaimedManualQaApproval",
+      "releaseGateClaimedExternalDistribution",
+      "userFacingCompletionPrivateValueRecorded",
+      "completedPlanValueRecorded",
+      "tenPlanProgressReportReceiptValueRecorded",
+      "tenPlanProgressReportRolloverValueRecorded",
+      "privateEditStrictProofValueRecorded",
+      "privateEditStrictProofPrivateValuesRecorded",
+      "privateEditStrictProofNetworkProbeAttempted",
+      "privateEditStrictProofClaimedAutoUpdate",
+      "privateEditStrictProofClaimedExternalDistribution"
+    ]) &&
+    fieldsAreFalse(currentBlocker, [
+      "updateFeedCheckpointValueRecorded",
+      "updateFeedCheckpointPrivateValuesRecorded",
+      "updateFeedCheckpointFeedValueRecorded",
+      "updateFeedCheckpointChannelValueRecorded",
+      "updateFeedCheckpointLocalEnvValueRecorded",
+      "updateFeedCheckpointNetworkProbeAttempted",
+      "updateFeedCheckpointPublishAttempted",
+      "updateFeedCheckpointReleaseUploadAttempted",
+      "updateFeedCheckpointSigningAttempted",
+      "updateFeedCheckpointNotarySubmissionAttempted",
+      "updateFeedCheckpointClaimedAutoUpdate",
+      "updateFeedCheckpointClaimedExternalDistribution",
+      "privateEditStrictProofValueRecorded",
+      "privateEditStrictProofPrivateValuesRecorded",
+      "privateEditStrictProofNetworkProbeAttempted",
+      "privateEditStrictProofClaimedAutoUpdate",
+      "privateEditStrictProofClaimedExternalDistribution",
+      "privateValuesRecorded",
+      "networkProbeAttemptedByThisReport",
+      "releaseUploadAttemptedByThisReport",
+      "appleNotarySubmissionAttemptedByThisReport",
+      "signingAttemptedByThisReport",
+      "claimedDeveloperIdSigning",
+      "claimedNotarization",
+      "claimedGatekeeperApproval",
+      "claimedAutoUpdate",
+      "claimedManualQaApproval",
+      "claimedAppStoreSubmission",
+      "claimedExternalDistribution",
+      "valueRecorded"
+    ]) &&
+    fieldsAreFalse(progressFreshness, [
+      "privateValuesRecorded",
+      "feedValueRecorded",
+      "channelValueRecorded",
+      "localEnvValueRecorded",
+      "networkProbeAttempted",
+      "updateFeedPublishAttempted",
+      "releaseUploadAttempted",
+      "signingAttempted",
+      "notarySubmissionAttempted",
+      "claimedDeveloperIdSigning",
+      "claimedNotarization",
+      "claimedGatekeeperApproval",
+      "claimedAutoUpdate",
+      "claimedManualQaApproval",
+      "claimedAppStoreSubmission",
+      "claimedExternalDistribution",
+      "valueRecorded"
+    ])
+  );
+}
+
+async function readJsonRequired(filePath, label) {
+  if (!existsSync(filePath)) {
+    fail(`${label} artifact is missing.`, `Expected: ${relative(filePath)}`);
+  }
+  return JSON.parse(await readFile(filePath, "utf8"));
+}
+
+function sourceArtifactRows({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness }) {
+  return [
+    {
+      label: "Completion report packet",
+      path: relative(completionReportPacketJsonPath),
+      command: completionPacketCommand,
+      present: true,
+      ready: completionReportPacket.releaseCompletionReportPacketReady === true,
+      progressLabel: textValue(completionReportPacket.latestTenPlanProgressLabel),
+      valueRecorded: false
+    },
+    {
+      label: "Release progress report",
+      path: relative(releaseProgressJsonPath),
+      command: progressCommand,
+      present: true,
+      ready: releaseProgress.releaseProgressReportReady === true,
+      progressLabel: textValue(releaseProgress.currentTenPlanWindowLabel),
+      valueRecorded: false
+    },
+    {
+      label: "Release current blocker",
+      path: relative(currentBlockerJsonPath),
+      command: currentBlockerSmokeCommand,
+      present: true,
+      ready: currentBlocker.releaseCurrentBlockerReady === true,
+      progressLabel: textValue(currentBlocker.currentTenPlanProgressLabel),
+      valueRecorded: false
+    },
+    {
+      label: "Release progress freshness",
+      path: relative(progressFreshnessJsonPath),
+      command: freshnessCommand,
+      present: true,
+      ready: progressFreshness.releaseProgressFreshnessReady === true,
+      progressLabel: textValue(progressFreshness.latestTenPlanProgressLabel),
+      valueRecorded: false
+    }
+  ];
+}
+
+function sanitizeEditRows(rows) {
+  return objectRows(rows).map((row, index) => ({
+    order: index + 1,
+    key: textValue(row.key),
+    editTarget: textValue(row.editTarget, ".env.distribution.local"),
+    location: textValue(row.location),
+    assignment: textValue(row.assignment),
+    guidance: textValue(row.guidance),
+    placeholder: row.placeholder === true,
+    proofCommand: textValue(row.proofCommand, privateEditOperatorProofCommand),
+    valueRecorded: row.valueRecorded === false ? false : true
+  }));
+}
+
+function operatorBriefRows({ completionReportPacket, currentBlocker, progressFreshness }) {
+  return [
+    {
+      order: 1,
+      step: "Edit private release-channel metadata",
+      command: "manual edit .env.distribution.local",
+      evidence: `${integerValue(currentBlocker.currentPlaceholderKeyCount)} current release-channel placeholders remain`,
+      expectedPostEditSignal: "release-channel metadata placeholders clear in value-free receipts",
+      sourceField: "currentBlocker.currentEnvEditRows",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      step: "Run strict private-edit proof chain",
+      command: privateEditOperatorProofCommand,
+      evidence: textValue(completionReportPacket.privateEditProofCommandSummary),
+      expectedPostEditSignal: "strict proof, post-edit proof, progress refresh, and private-value leak audit run before the hard gate",
+      sourceField: "completionReportPacket.privateEditOperatorProofCommand/privateEditProofCommandRows",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      step: "Refresh current blocker",
+      command: currentBlockerCommand,
+      evidence: textValue(currentBlocker.currentRerunCommand, currentBlockerCommand),
+      expectedPostEditSignal: "current blocker moves past release-channel metadata when private rows are shape-ready",
+      sourceField: "currentBlocker.currentRerunCommand",
+      valueRecorded: false
+    },
+    {
+      order: 4,
+      step: "Refresh completion packet",
+      command: completionPacketCommand,
+      evidence: textValue(completionReportPacket.latestTenPlanProgressLabel),
+      expectedPostEditSignal: "completion packet keeps the latest 10-plan label and reports the next blocker",
+      sourceField: "completionReportPacket.latestTenPlanProgressLabel",
+      valueRecorded: false
+    },
+    {
+      order: 5,
+      step: "Verify progress freshness",
+      command: freshnessCommand,
+      evidence: `${integerValue(progressFreshness.freshArtifactCount)}/${integerValue(progressFreshness.freshnessRowCount)} fresh; stale ${integerValue(progressFreshness.staleArtifactCount)}; missing ${integerValue(progressFreshness.missingArtifactCount)}`,
+      expectedPostEditSignal: "progress/current-blocker/completion packet remain aligned to the latest checkpoint",
+      sourceField: "progressFreshness.freshnessRows",
+      valueRecorded: false
+    },
+    {
+      order: 6,
+      step: "Keep the hard gate last",
+      command: hardGateCommand,
+      evidence: `hard gate would fail: ${readyLabel(currentBlocker.hardGateWouldFail)}`,
+      expectedPostEditSignal: "run only after private release-channel, auto-update, signing, notarization, Gatekeeper, and manual QA evidence are ready",
+      sourceField: "currentBlocker.hardGateWouldFail",
+      valueRecorded: false
+    }
+  ];
+}
+
+function nextActionRows({ completionReportPacket, currentBlocker }) {
+  return [
+    {
+      order: 1,
+      stage: "after release-channel clears",
+      actionId: textValue(completionReportPacket.postClearanceNextPriorityActionId, "auto-update-feed"),
+      label: textValue(completionReportPacket.postClearanceNextPriorityActionLabel, "Auto-update feed and signed metadata"),
+      proofCommand: textValue(completionReportPacket.postClearanceNextActionPreviewProofCommand, "npm run desktop:auto-update-readiness-smoke"),
+      evidence: textValue(completionReportPacket.postClearanceNextActionPreviewFirstBlocker, currentBlocker.nextPriorityActionFirstBlocker),
+      sourceField: "completionReportPacket.postClearanceNextPriorityActionId",
+      valueRecorded: false
+    },
+    {
+      order: 2,
+      stage: "auto-update proof",
+      actionId: textValue(currentBlocker.nextPriorityActionId, "auto-update-feed"),
+      label: textValue(currentBlocker.nextPriorityActionLabel, "Auto-update feed and signed metadata"),
+      proofCommand: textValue(currentBlocker.nextPriorityActionNextCommand, "npm run desktop:auto-update-readiness-smoke"),
+      evidence: `${integerValue(currentBlocker.nextActionPreviewRequiredKeyCount)} update feed/channel keys; ${integerValue(currentBlocker.nextActionPreviewBlockerRowCount)} blockers`,
+      sourceField: "currentBlocker.nextActionPreviewReadyCriteriaRows",
+      valueRecorded: false
+    },
+    {
+      order: 3,
+      stage: "update-feed checkpoint",
+      actionId: "update-feed-checkpoint",
+      label: "Update-feed checkpoint",
+      proofCommand: textValue(completionReportPacket.updateFeedCheckpointCommand, "npm run release:update-feed-checkpoint-smoke"),
+      evidence: `real selected ${integerValue(completionReportPacket.updateFeedCheckpointRealSelectedReadyCount)}/2; synthetic selected ${integerValue(completionReportPacket.updateFeedCheckpointSyntheticSelectedReadyCount)}/2; hard gate would fail ${readyLabel(completionReportPacket.updateFeedCheckpointHardGateWouldFail)}`,
+      sourceField: "completionReportPacket.updateFeedCheckpointRows",
+      valueRecorded: false
+    }
+  ];
+}
+
+function formatSourceRows(rows) {
+  return rows
+    .map((row) => `| ${escapeCell(row.label)} | ${escapeCell(row.path)} | \`${escapeCell(row.command)}\` | ${readyLabel(row.present)} | ${readyLabel(row.ready)} | ${escapeCell(row.progressLabel)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatEditRows(rows) {
+  return rows
+    .map((row) => `| ${row.order} | ${escapeCell(row.key)} | ${escapeCell(row.location)} | \`${escapeCell(row.assignment)}\` | ${escapeCell(row.guidance)} | ${row.placeholder ? "yes" : "no"} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatOperatorRows(rows) {
+  return rows
+    .map((row) => `| ${row.order} | ${escapeCell(row.step)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.evidence)} | ${escapeCell(row.expectedPostEditSignal)} | ${escapeCell(row.sourceField)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatProofRows(rows) {
+  return rows
+    .map((row) => `| ${row.order} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function formatNextActionRows(rows) {
+  return rows
+    .map((row) => `| ${row.order} | ${escapeCell(row.stage)} | ${escapeCell(row.actionId)} | ${escapeCell(row.label)} | \`${escapeCell(row.proofCommand)}\` | ${escapeCell(row.evidence)} | ${escapeCell(row.sourceField)} | ${row.valueRecorded === false ? "no" : "yes"} |`)
+    .join("\n");
+}
+
+function buildMarkdown(report) {
+  return `# GrooveForge Release Operator Completion Brief Smoke
+
+- Operator completion brief ready: ${readyLabel(report.releaseOperatorCompletionBriefReady)}
+- Report command: \`${report.reportCommand}\`
+- Source privacy boundary ready: ${readyLabel(report.sourcePrivacyBoundaryReady)}
+- User-facing completion: ${report.userFacingCompletionPercent}%
+- Remaining completion: ${report.userFacingRemainingPercent}%
+- Current 10-plan progress: ${report.latestTenPlanProgressLabel}
+- Current blocker: ${report.currentFirstBlocker}
+- Current edit target: ${report.currentEnvEditTarget}
+- Current placeholder keys: ${report.currentPlaceholderKeyCount}/${report.currentRequiredKeyCount}
+- Private-edit operator proof command: \`${report.privateEditOperatorProofCommand}\`
+- Post-clearance next action: ${report.postClearanceNextPriorityActionLabel}
+- Post-clearance proof command: \`${report.postClearanceNextActionPreviewProofCommand}\`
+- Update-feed checkpoint ready: ${readyLabel(report.updateFeedCheckpointReady)}
+- Hard gate command: \`${report.hardGateCommand}\`
+- Hard gate would fail: ${readyLabel(report.hardGateWouldFail)}
+- Fresh artifacts: ${report.freshArtifactCount}/${report.freshnessRowCount}
+- Stale artifacts: ${report.staleArtifactCount}
+- Missing artifacts: ${report.missingArtifactCount}
+- Private values recorded: ${readyLabel(report.privateValuesRecorded)}
+- Feed values recorded: ${readyLabel(report.feedValueRecorded)}
+- Channel values recorded: ${readyLabel(report.channelValueRecorded)}
+- Network probe attempted: ${readyLabel(report.networkProbeAttempted)}
+- Update feed publish attempted: ${readyLabel(report.updateFeedPublishAttempted)}
+- Release upload attempted: ${readyLabel(report.releaseUploadAttempted)}
+- Signing attempted: ${readyLabel(report.signingAttempted)}
+- Apple notary submission attempted: ${readyLabel(report.notarySubmissionAttempted)}
+- Auto-update claimed: ${readyLabel(report.claimedAutoUpdate)}
+- External distribution claimed: ${readyLabel(report.claimedExternalDistribution)}
+
+## Source Artifacts
+
+| label | path | command | present | ready | 10-plan | value recorded |
+|---|---|---|---:|---:|---|---:|
+${formatSourceRows(report.sourceArtifactRows)}
+
+## Current Private Edit Rows
+
+| order | key | location | assignment | guidance | placeholder | value recorded |
+|---:|---|---|---|---|---:|---:|
+${formatEditRows(report.currentEnvEditRows)}
+
+## Operator Brief Rows
+
+| order | step | command | evidence | expected post-edit signal | source | value recorded |
+|---:|---|---|---|---|---|---:|
+${formatOperatorRows(report.operatorBriefRows)}
+
+## Private-Edit Proof Commands
+
+| order | command | role | value recorded |
+|---:|---|---|---:|
+${formatProofRows(report.privateEditProofCommandRows)}
+
+## Post-Clearance Next Action Rows
+
+| order | stage | action | label | proof command | evidence | source | value recorded |
+|---:|---|---|---|---|---|---|---:|
+${formatNextActionRows(report.postClearanceNextActionRows)}
+
+## Non-Claiming Boundary
+
+This brief reads existing value-free release evidence only. It does not read or modify the ignored local env file, does not record URL/channel/feed values, does not probe networks, does not publish feeds, does not upload releases, does not sign artifacts, does not submit to Apple, and does not claim auto-update or external distribution completion.
+`;
+}
+
+function sourceLabelsMatchLatest(rows, latestLabel) {
+  return rows.every((row) => row.progressLabel === latestLabel);
+}
+
+function outputLooksValueFree(text) {
+  return !/https?:\/\//i.test(text) && !/:\/\/[^<\s]+/i.test(text);
+}
+
+function buildReport({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness }) {
+  const latestTenPlanProgressLabel = textValue(completionReportPacket.latestTenPlanProgressLabel);
+  const sourceRows = sourceArtifactRows({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness });
+  const currentEnvEditRows = sanitizeEditRows(currentBlocker.currentEnvEditRows);
+  const operatorRows = operatorBriefRows({ completionReportPacket, currentBlocker, progressFreshness });
+  const proofRows = objectRows(completionReportPacket.privateEditProofCommandRows);
+  const postClearanceRows = nextActionRows({ completionReportPacket, currentBlocker });
+  const sourceBoundaryReady = sourcePrivacyBoundaryReady({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness });
+  const ready =
+    sourceRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
+    sourceLabelsMatchLatest(sourceRows, latestTenPlanProgressLabel) &&
+    sourceBoundaryReady === true &&
+    completionReportPacket.releaseCompletionReportPacketReady === true &&
+    completionReportPacket.sourceLabelsMatchLatestTenPlan === true &&
+    releaseProgress.releaseProgressReportReady === true &&
+    currentBlocker.releaseCurrentBlockerReady === true &&
+    progressFreshness.releaseProgressFreshnessReady === true &&
+    integerValue(progressFreshness.staleArtifactCount) === 0 &&
+    integerValue(progressFreshness.missingArtifactCount) === 0 &&
+    currentEnvEditRows.length === 4 &&
+    currentEnvEditRows.every((row) => row.placeholder === true && row.valueRecorded === false) &&
+    operatorRows.length === 6 &&
+    operatorRows.every((row) => row.valueRecorded === false) &&
+    proofRows.length === 5 &&
+    proofRows.every((row) => row.valueRecorded === false) &&
+    postClearanceRows.length === 3 &&
+    postClearanceRows.every((row) => row.valueRecorded === false) &&
+    completionReportPacket.strictProofHandoffReceiptReady === true &&
+    completionReportPacket.privateEditBlockedSmokeReady === true &&
+    completionReportPacket.finalHandoffSuccessRedactionReady === true &&
+    completionReportPacket.updateFeedCheckpointReady === true &&
+    completionReportPacket.updateFeedCheckpointHardGateWouldFail === true &&
+    currentBlocker.hardGateReady === false &&
+    currentBlocker.hardGateWouldFail === true &&
+    completionReportPacket.claimedExternalDistribution === false &&
+    currentBlocker.claimedExternalDistribution === false &&
+    releaseProgress.releaseGateClaimedExternalDistribution === false &&
+    progressFreshness.claimedExternalDistribution === false;
+  return {
+    appName,
+    bundleId,
+    version: packageJson.version,
+    platformArch,
+    reportCommand,
+    releaseOperatorCompletionBriefMarkdownArtifactName: briefMarkdownArtifactName,
+    releaseOperatorCompletionBriefJsonArtifactName: briefJsonArtifactName,
+    releaseOperatorCompletionBriefMarkdownPath: relative(briefMarkdownPath),
+    releaseOperatorCompletionBriefJsonPath: relative(briefJsonPath),
+    releaseOperatorCompletionBriefReady: ready,
+    sourceArtifactRows: sourceRows,
+    sourceArtifactRowCount: sourceRows.length,
+    sourceLabelsMatchLatestTenPlan: sourceLabelsMatchLatest(sourceRows, latestTenPlanProgressLabel),
+    sourcePrivacyBoundaryReady: sourceBoundaryReady,
+    latestCompletedPlanNumber: integerValue(completionReportPacket.latestCompletedPlanNumber),
+    latestTenPlanProgressLabel,
+    latestTenPlanCompletedCount: integerValue(completionReportPacket.latestTenPlanCompletedCount),
+    latestTenPlanTotal: integerValue(completionReportPacket.latestTenPlanTotal),
+    tenPlanProgressReportDue: completionReportPacket.tenPlanProgressReportDue === true,
+    nextScheduledTenPlanProgressReportAt: textValue(completionReportPacket.nextScheduledTenPlanProgressReportAt),
+    userFacingCompletionPercent: completionReportPacket.userFacingCompletionPercent,
+    userFacingRemainingPercent: completionReportPacket.userFacingRemainingPercent,
+    currentActionLabel: textValue(completionReportPacket.currentActionLabel, currentBlocker.currentPriorityActionLabel),
+    currentFirstBlocker: textValue(completionReportPacket.currentFirstBlocker, currentBlocker.currentFirstBlocker),
+    currentEnvEditTarget: textValue(completionReportPacket.currentEnvEditTarget, currentBlocker.currentEnvEditTarget),
+    currentRequiredKeyCount: integerValue(completionReportPacket.currentRequiredKeyCount),
+    currentPlaceholderKeyCount: integerValue(completionReportPacket.currentPlaceholderKeyCount),
+    currentEnvEditRows,
+    currentEnvEditRowCount: currentEnvEditRows.length,
+    operatorBriefRows: operatorRows,
+    operatorBriefRowCount: operatorRows.length,
+    privateEditOperatorProofCommand: textValue(completionReportPacket.privateEditOperatorProofCommand, privateEditOperatorProofCommand),
+    privateEditProofCommandRows: proofRows,
+    privateEditProofCommandCount: proofRows.length,
+    privateEditProofCommandSummary: textValue(completionReportPacket.privateEditProofCommandSummary),
+    strictProofHandoffReceiptReady: completionReportPacket.strictProofHandoffReceiptReady === true,
+    privateEditBlockedSmokeReady: completionReportPacket.privateEditBlockedSmokeReady === true,
+    privateEditBlockedSmokeCurrentPlaceholderKeyCount: integerValue(completionReportPacket.privateEditBlockedSmokeCurrentPlaceholderKeyCount),
+    finalHandoffSuccessRedactionReady: completionReportPacket.finalHandoffSuccessRedactionReady === true,
+    finalHandoffSuccessRedactionCurrentReadyCount: integerValue(completionReportPacket.finalHandoffSuccessRedactionCurrentReadyCount),
+    finalHandoffSuccessRedactionCurrentPlaceholderKeyCount: integerValue(completionReportPacket.finalHandoffSuccessRedactionCurrentPlaceholderKeyCount),
+    postClearanceNextPriorityActionId: textValue(completionReportPacket.postClearanceNextPriorityActionId, "auto-update-feed"),
+    postClearanceNextPriorityActionLabel: textValue(completionReportPacket.postClearanceNextPriorityActionLabel, "Auto-update feed and signed metadata"),
+    postClearanceNextActionPreviewProofCommand: textValue(completionReportPacket.postClearanceNextActionPreviewProofCommand, "npm run desktop:auto-update-readiness-smoke"),
+    postClearanceNextActionRows: postClearanceRows,
+    postClearanceNextActionRowCount: postClearanceRows.length,
+    updateFeedCheckpointReady: completionReportPacket.updateFeedCheckpointReady === true,
+    updateFeedCheckpointCommand: textValue(completionReportPacket.updateFeedCheckpointCommand, "npm run release:update-feed-checkpoint-smoke"),
+    updateFeedCheckpointRealSelectedReadyCount: integerValue(completionReportPacket.updateFeedCheckpointRealSelectedReadyCount),
+    updateFeedCheckpointRealPlaceholderKeyCount: integerValue(completionReportPacket.updateFeedCheckpointRealPlaceholderKeyCount),
+    updateFeedCheckpointSyntheticSelectedReadyCount: integerValue(completionReportPacket.updateFeedCheckpointSyntheticSelectedReadyCount),
+    updateFeedCheckpointSyntheticPlaceholderKeyCount: integerValue(completionReportPacket.updateFeedCheckpointSyntheticPlaceholderKeyCount),
+    updateFeedCheckpointHardGateWouldFail: completionReportPacket.updateFeedCheckpointHardGateWouldFail === true,
+    hardGateCommand,
+    hardGateReady: currentBlocker.hardGateReady === true,
+    hardGateWouldFail: currentBlocker.hardGateWouldFail === true,
+    freshnessRowCount: integerValue(progressFreshness.freshnessRowCount),
+    freshArtifactCount: integerValue(progressFreshness.freshArtifactCount),
+    staleArtifactCount: integerValue(progressFreshness.staleArtifactCount),
+    missingArtifactCount: integerValue(progressFreshness.missingArtifactCount),
+    refreshCommandCount: integerValue(progressFreshness.refreshCommandCount),
+    privateValuesRecorded: false,
+    feedValueRecorded: false,
+    channelValueRecorded: false,
+    localEnvValueRecorded: false,
+    networkProbeAttempted: false,
+    updateFeedPublishAttempted: false,
+    releaseUploadAttempted: false,
+    signingAttempted: false,
+    notarySubmissionAttempted: false,
+    claimedDeveloperIdSigning: false,
+    claimedNotarization: false,
+    claimedGatekeeperApproval: false,
+    claimedAutoUpdate: false,
+    claimedManualQaApproval: false,
+    claimedAppStoreSubmission: false,
+    claimedExternalDistribution: false,
+    valueRecorded: false
+  };
+}
+
+const completionReportPacket = await readJsonRequired(completionReportPacketJsonPath, "Completion report packet");
+const releaseProgress = await readJsonRequired(releaseProgressJsonPath, "Release progress report");
+const currentBlocker = await readJsonRequired(currentBlockerJsonPath, "Release current blocker");
+const progressFreshness = await readJsonRequired(progressFreshnessJsonPath, "Release progress freshness");
+const report = buildReport({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness });
+const markdown = buildMarkdown(report);
+const jsonText = `${JSON.stringify(report, null, 2)}\n`;
+
+check(report.releaseOperatorCompletionBriefReady === true, "release operator completion brief should be ready");
+check(report.sourceArtifactRowCount === 4, "release operator completion brief should include four source artifacts");
+check(report.sourceArtifactRows.every((row) => row.ready === true && row.valueRecorded === false), "release operator completion brief source rows should be ready and value-free");
+check(report.sourceLabelsMatchLatestTenPlan === true, "release operator completion brief source labels should match latest 10-plan progress");
+check(report.sourcePrivacyBoundaryReady === true, "release operator completion brief source privacy boundaries should be ready");
+check(report.latestTenPlanProgressLabel === completionReportPacket.latestTenPlanProgressLabel, "release operator completion brief should mirror completion packet 10-plan progress");
+check(report.userFacingCompletionPercent === 99.999999, "release operator completion brief should keep user-facing completion percent");
+check(report.userFacingRemainingPercent === 0.000001, "release operator completion brief should keep remaining completion percent");
+check(report.currentEnvEditTarget === ".env.distribution.local", "release operator completion brief should point at the ignored local env target");
+check(report.currentRequiredKeyCount === 4, "release operator completion brief should include four current required keys");
+check(report.currentPlaceholderKeyCount === 4, "release operator completion brief should keep four current placeholder keys while blocked");
+check(report.currentEnvEditRowCount === 4, "release operator completion brief should include four current edit rows");
+check(report.currentEnvEditRows.every((row) => row.valueRecorded === false && row.placeholder === true), "release operator completion brief edit rows should be placeholder and value-free");
+check(report.operatorBriefRowCount === 6, "release operator completion brief should include six operator rows");
+check(report.operatorBriefRows.every((row) => row.valueRecorded === false), "release operator completion brief rows should be value-free");
+check(report.privateEditOperatorProofCommand === privateEditOperatorProofCommand, "release operator completion brief should expose the private-edit strict proof command");
+check(report.privateEditProofCommandCount === 5, "release operator completion brief should include five private-edit proof commands");
+check(report.privateEditProofCommandRows.every((row) => row.valueRecorded === false), "release operator completion brief proof command rows should be value-free");
+check(report.strictProofHandoffReceiptReady === true, "release operator completion brief should include strict proof handoff readiness");
+check(report.privateEditBlockedSmokeReady === true, "release operator completion brief should include blocked smoke readiness");
+check(report.finalHandoffSuccessRedactionReady === true, "release operator completion brief should include final handoff success-redaction readiness");
+check(report.finalHandoffSuccessRedactionCurrentReadyCount === 4, "release operator completion brief should include synthetic four-row readiness");
+check(report.finalHandoffSuccessRedactionCurrentPlaceholderKeyCount === 0, "release operator completion brief synthetic handoff should clear placeholders");
+check(report.postClearanceNextPriorityActionId === "auto-update-feed", "release operator completion brief should surface auto-update-feed as the next action");
+check(report.postClearanceNextActionPreviewProofCommand === "npm run desktop:auto-update-readiness-smoke", "release operator completion brief should surface auto-update readiness proof command");
+check(report.postClearanceNextActionRowCount === 3, "release operator completion brief should include three post-clearance next action rows");
+check(report.postClearanceNextActionRows.every((row) => row.valueRecorded === false), "release operator completion brief next action rows should be value-free");
+check(report.updateFeedCheckpointReady === true, "release operator completion brief should include update-feed checkpoint readiness");
+check(report.updateFeedCheckpointHardGateWouldFail === true, "release operator completion brief should keep update-feed checkpoint hard gate blocked");
+check(report.hardGateCommand === hardGateCommand, "release operator completion brief should keep hard gate command");
+check(report.hardGateReady === false, "release operator completion brief should keep hard gate unready");
+check(report.hardGateWouldFail === true, "release operator completion brief should keep hard gate would-fail posture");
+check(report.freshArtifactCount === report.freshnessRowCount, "release operator completion brief should report all freshness artifacts fresh");
+check(report.staleArtifactCount === 0, "release operator completion brief should report zero stale artifacts");
+check(report.missingArtifactCount === 0, "release operator completion brief should report zero missing artifacts");
+check(rowsValueFree(report.sourceArtifactRows), "release operator completion brief source artifact rows should not record values");
+check(rowsValueFree(report.currentEnvEditRows), "release operator completion brief current edit rows should not record values");
+check(rowsValueFree(report.operatorBriefRows), "release operator completion brief operator rows should not record values");
+check(rowsValueFree(report.privateEditProofCommandRows), "release operator completion brief proof rows should not record values");
+check(rowsValueFree(report.postClearanceNextActionRows), "release operator completion brief next action rows should not record values");
+check(report.privateValuesRecorded === false, "release operator completion brief should not record private values");
+check(report.feedValueRecorded === false, "release operator completion brief should not record feed values");
+check(report.channelValueRecorded === false, "release operator completion brief should not record channel values");
+check(report.localEnvValueRecorded === false, "release operator completion brief should not record local env values");
+check(report.networkProbeAttempted === false, "release operator completion brief should not probe network");
+check(report.updateFeedPublishAttempted === false, "release operator completion brief should not publish update feeds");
+check(report.releaseUploadAttempted === false, "release operator completion brief should not upload releases");
+check(report.signingAttempted === false, "release operator completion brief should not sign artifacts");
+check(report.notarySubmissionAttempted === false, "release operator completion brief should not submit to Apple notary");
+check(report.claimedAutoUpdate === false, "release operator completion brief should not claim auto-update");
+check(report.claimedExternalDistribution === false, "release operator completion brief should not claim external distribution");
+check(outputLooksValueFree(jsonText), "release operator completion brief JSON should not include URL values");
+check(outputLooksValueFree(markdown), "release operator completion brief Markdown should not include URL values");
+check(markdown.includes("Release Operator Completion Brief Smoke"), "release operator completion brief Markdown should include title");
+check(markdown.includes("Operator Brief Rows"), "release operator completion brief Markdown should include operator rows");
+check(markdown.includes("Current Private Edit Rows"), "release operator completion brief Markdown should include edit rows");
+check(markdown.includes("Post-Clearance Next Action Rows"), "release operator completion brief Markdown should include next action rows");
+check(markdown.includes("External distribution claimed: no"), "release operator completion brief Markdown should include non-claiming posture");
+
+if (failures.length > 0) {
+  fail("Validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
+}
+
+await mkdir(packageRoot, { recursive: true });
+await writeFile(briefJsonPath, jsonText);
+await writeFile(briefMarkdownPath, markdown);
+
+console.log("GrooveForge release operator completion brief smoke passed.");
+console.log(`- Markdown: ${relative(briefMarkdownPath)}`);
+console.log(`- JSON: ${relative(briefJsonPath)}`);
+console.log(`- Operator completion brief ready: ${report.releaseOperatorCompletionBriefReady ? "yes" : "no"}`);
+console.log(`- Source privacy boundary ready: ${report.sourcePrivacyBoundaryReady ? "yes" : "no"}`);
+console.log(`- User-facing completion: ${report.userFacingCompletionPercent}%`);
+console.log(`- Remaining completion: ${report.userFacingRemainingPercent}%`);
+console.log(`- Current 10-plan progress: ${report.latestTenPlanProgressLabel}`);
+console.log(`- Current blocker: ${report.currentFirstBlocker}`);
+console.log(`- Current edit target: ${report.currentEnvEditTarget}`);
+console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount}/${report.currentRequiredKeyCount}`);
+console.log(`- Private-edit operator proof command: ${report.privateEditOperatorProofCommand}`);
+console.log(`- Post-clearance next action: ${report.postClearanceNextPriorityActionLabel}`);
+console.log(`- Post-clearance proof command: ${report.postClearanceNextActionPreviewProofCommand}`);
+console.log(`- Update-feed checkpoint ready: ${report.updateFeedCheckpointReady ? "yes" : "no"}`);
+console.log(`- Hard gate would fail: ${report.hardGateWouldFail ? "yes" : "no"}`);
+console.log(`- Fresh artifacts: ${report.freshArtifactCount}/${report.freshnessRowCount}`);
+console.log(`- Private values recorded: ${report.privateValuesRecorded ? "yes" : "no"}`);
+console.log("- Network: no update feed probe, feed publish, distribution channel probe, release upload, Apple notary submission, or signing attempted");
+console.log("- Not claimed: auto-update, Developer ID signing, notarization, Gatekeeper approval, manual QA approval, app-store submission, or external distribution completion");
