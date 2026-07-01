@@ -1128,7 +1128,7 @@ function buildCurrentPrivateEditSafetySummary({
     {
       order: 1,
       check: "Private edits stay in ignored local env target",
-      ready: currentEnvEditTarget === ".env.distribution.local" && currentRequiredKeyCount === releaseChannelMetadataKeys.length,
+      ready: currentEnvEditTarget === currentLocalEnvEditTarget() && currentRequiredKeyCount === releaseChannelMetadataKeys.length,
       evidence: `${currentEnvEditTarget}; ${currentPlaceholderKeyCount}/${currentRequiredKeyCount} current release-channel placeholders; ${currentActionSummary.currentPlaceholderEditLocationSummary ?? "current placeholder edit locations"}`,
       command: currentRerunCommand,
       valueRecorded: false
@@ -1719,7 +1719,7 @@ function buildPostEditProofSequenceReceiptSummary({
     {
       order: 1,
       step: "Private value edit",
-      ready: envEditTarget === ".env.distribution.local" && placeholderKeyCount >= 0,
+      ready: envEditTarget === currentLocalEnvEditTarget() && placeholderKeyCount >= 0,
       command: `manual edit ${envEditTarget}`,
       expectedEvidence: "current release-channel placeholder key count becomes 0 after the operator-owned edit",
       sourceField: "currentEnvEditTarget/currentPlaceholderKeyCount",
@@ -4884,7 +4884,7 @@ check(
 );
 check(
   nextActionsReport.postEditProofSequenceReceiptRows.some(
-    (row) => row.step === "Private value edit" && row.command === "manual edit .env.distribution.local"
+    (row) => row.step === "Private value edit" && row.command === `manual edit ${nextActionsReport.currentEnvEditTarget}`
   ),
   "external next actions post-edit proof sequence should include private value edit"
 );
@@ -5446,10 +5446,16 @@ if (nextActionsReport.bootstrapMode === false) {
       );
       check(
         nextActionsReport.nextActionPreviewEnvEditRows.some(
-          (row) => row.key === "GROOVEFORGE_UPDATE_FEED_URL" && typeof row.location === "string" && row.location.startsWith(".env.distribution.local:")
+          (row) =>
+            row.key === "GROOVEFORGE_UPDATE_FEED_URL" &&
+            typeof row.location === "string" &&
+            row.location.startsWith(`${nextActionsReport.currentEnvEditTarget}:`)
         ) &&
           nextActionsReport.nextActionPreviewEnvEditRows.some(
-            (row) => row.key === "UPDATE_CHANNEL" && typeof row.location === "string" && row.location.startsWith(".env.distribution.local:")
+            (row) =>
+              row.key === "UPDATE_CHANNEL" &&
+              typeof row.location === "string" &&
+              row.location.startsWith(`${nextActionsReport.currentEnvEditTarget}:`)
           ),
         "release-channel current action next preview should include primary and fallback update env edit rows"
       );
@@ -5872,7 +5878,7 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   );
   check(
     nextActionsReport.postEditProofSequenceReceiptRows.some(
-      (row) => row.step === "Private value edit" && row.command === "manual edit .env.distribution.local"
+      (row) => row.step === "Private value edit" && row.command === `manual edit ${nextActionsReport.currentEnvEditTarget}`
     ),
     "release channel metadata post-edit proof sequence should include private value edit"
   );

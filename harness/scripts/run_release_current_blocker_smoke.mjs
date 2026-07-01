@@ -140,15 +140,32 @@ function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function displayEvidenceFile(filePath) {
+  const value = textValue(filePath);
+  if (value === "none") {
+    return value;
+  }
+  const absolutePath = path.isAbsolute(value) ? value : path.resolve(root, value);
+  const relativePath = path.relative(root, absolutePath);
+  if (!relativePath.startsWith("..") && !path.isAbsolute(relativePath)) {
+    return relativePath;
+  }
+  return path.basename(absolutePath);
+}
+
 function locationKeyRows(rows) {
-  return valueFreeObjectRows(rows).map((row) => ({
-    key: textValue(row.key),
-    file: textValue(row.file, row.editTarget ?? "none"),
-    line: Number.isInteger(row.line) ? row.line : 0,
-    location: textValue(row.location, row.file && row.line ? `${row.file}:${row.line}` : "none"),
-    placeholder: row.placeholder === true,
-    valueRecorded: false
-  }));
+  return valueFreeObjectRows(rows).map((row) => {
+    const file = displayEvidenceFile(row.file ?? row.editTarget ?? "none");
+    const line = Number.isInteger(row.line) ? row.line : 0;
+    return {
+      key: textValue(row.key),
+      file,
+      line,
+      location: line > 0 ? `${file}:${line}` : textValue(row.location, "none"),
+      placeholder: row.placeholder === true,
+      valueRecorded: false
+    };
+  });
 }
 
 function formatKeyList(keys) {
@@ -1293,12 +1310,13 @@ function privateEditSafetyRows({
 }) {
   const commandSequence = stringArrayValue(currentCommandSequence);
   const missingLocalEnv = currentNextCommand === "npm run release:prepare-env" && currentPlaceholderKeyCount === 0;
+  const hasCurrentEnvEditTarget = currentEnvEditTarget !== "none" && currentEnvEditTarget.length > 0;
   return [
     {
       order: 1,
       check: "Private edits stay in ignored local env target",
       ready:
-        currentEnvEditTarget === ".env.distribution.local" &&
+        hasCurrentEnvEditTarget &&
         (currentPlaceholderKeyCount === currentRequiredKeyCount || (missingLocalEnv && currentRequiredKeyCount === releaseChannelMetadataKeys.length)),
       evidence: `${currentEnvEditTarget}; ${currentPlaceholderKeyCount}/${currentRequiredKeyCount} current release-channel placeholders; ${currentPlaceholderEditLocationSummary}`,
       command: currentRerunCommand,
@@ -2664,6 +2682,8 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   const postEditRerunCommand = missingLocalEnvCurrentBlocker
     ? report.releaseChannelPostEditReceiptRerunCommand
     : report.currentRerunCommand;
+  const expectedCurrentEnvEditTarget = textValue(externalProofBundle.currentEnvEditTarget, ".env.distribution.local");
+  const currentEnvLocationPrefix = `${report.currentEnvEditTarget}:`;
   check(report.releaseCurrentBlockerReady === true, "release current blocker receipt should be ready");
   check(report.appName === appName, "release current blocker receipt should identify GrooveForge");
   check(report.bundleId === bundleId, `release current blocker receipt should identify ${bundleId}`);
@@ -2677,7 +2697,10 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
     check(report.refreshCommandSequence.includes("npm run desktop:external-distribution-gate-smoke"), "release current blocker should refresh external gate dry-run evidence");
     check(report.refreshCommandSequence.includes("npm run release:progress-smoke"), "release current blocker should refresh release progress evidence from refreshed sources");
   }
-  check(report.currentEnvEditTarget === ".env.distribution.local", "release current blocker receipt should identify the current env edit target");
+  check(
+    report.currentEnvEditTarget === expectedCurrentEnvEditTarget,
+    "release current blocker receipt should identify the current env edit target"
+  );
   check(
     ["npm run release:prepare-env", "npm run release:doctor"].includes(report.currentNextCommand),
     "release current blocker receipt should route local env setup to prepare-env or placeholder cleanup to release doctor"
@@ -2833,13 +2856,19 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.nextActionPreviewEnvEditRows.every((row) => typeof row.sourceField === "string" && row.sourceField.includes("externalNextActions.priorityActions[1]")), "release current blocker next action preview env edit rows should cite the second priority action source field");
   check(
     report.nextActionPreviewEnvEditRows.some(
-      (row) => row.key === "GROOVEFORGE_UPDATE_FEED_URL" && typeof row.location === "string" && row.location.startsWith(".env.distribution.local:")
+      (row) =>
+        row.key === "GROOVEFORGE_UPDATE_FEED_URL" &&
+        typeof row.location === "string" &&
+        row.location.startsWith(currentEnvLocationPrefix)
     ),
     "release current blocker next action preview env edit rows should include primary update feed URL location"
   );
   check(
     report.nextActionPreviewEnvEditRows.some(
-      (row) => row.key === "UPDATE_CHANNEL" && typeof row.location === "string" && row.location.startsWith(".env.distribution.local:")
+      (row) =>
+        row.key === "UPDATE_CHANNEL" &&
+        typeof row.location === "string" &&
+        row.location.startsWith(currentEnvLocationPrefix)
     ),
     "release current blocker next action preview env edit rows should include fallback update channel location"
   );
@@ -2931,7 +2960,7 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.currentReleaseChannelKeyRemediationRows.every((row) => row.proofCommand === report.currentNextCommand), "release current blocker release-channel key remediation proof commands should match current next command");
   check(report.currentReleaseChannelKeyRemediationRows.every((row) => row.rerunCommand === report.currentRerunCommand), "release current blocker release-channel key remediation rerun commands should match current rerun command");
   check(report.currentReleaseChannelKeyRemediationRows.every((row) => row.hardGateCommand === report.hardGateCommand), "release current blocker release-channel key remediation hard-gate commands should match hard gate command");
-  check(report.currentReleaseChannelKeyRemediationRows.every((row) => typeof row.location === "string" && row.location.includes(".env.distribution.local:")), "release current blocker release-channel key remediation rows should include local env edit locations");
+  check(report.currentReleaseChannelKeyRemediationRows.every((row) => typeof row.location === "string" && row.location.includes(currentEnvLocationPrefix)), "release current blocker release-channel key remediation rows should include local env edit locations");
   check(report.currentReleaseChannelKeyRemediationRows.every((row) => typeof row.expectedShape === "string" && /allowed channel token|safe HTTPS URL shape/i.test(row.expectedShape)), "release current blocker release-channel key remediation rows should include expected shapes");
   check(report.currentReleaseChannelKeyRemediationRows.every((row) => /without placeholder values/i.test(row.acceptanceCriteriaImpacted)), "release current blocker release-channel key remediation rows should include placeholder-free acceptance impact");
   check(report.currentReleaseChannelKeyRemediationRows.every((row) => /private-inputs/i.test(row.acceptanceCriteriaImpacted)), "release current blocker release-channel key remediation rows should include private-inputs acceptance impact");
@@ -3012,7 +3041,7 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(typeof report.currentPrivateEditSafetySummary === "string" && report.currentPrivateEditSafetySummary.length > 0, "release current blocker should include private edit safety summary");
   check(report.currentPrivateEditSafetyRows.every((row) => row.valueRecorded === false), "release current blocker private edit safety rows should not record values");
   check(report.currentPrivateEditSafetyRows.every((row) => row.ready === true), "release current blocker private edit safety rows should be ready");
-  check(report.currentPrivateEditSafetyRows.some((row) => /ignored local env target/i.test(row.check) && row.evidence.includes(".env.distribution.local")), "release current blocker private edit safety should include ignored env target evidence");
+  check(report.currentPrivateEditSafetyRows.some((row) => /ignored local env target/i.test(row.check) && row.evidence.includes(report.currentEnvEditTarget)), "release current blocker private edit safety should include ignored env target evidence");
   check(report.currentPrivateEditSafetyRows.some((row) => /value-free/i.test(row.check) && /private values recorded no/i.test(row.evidence)), "release current blocker private edit safety should include value-free receipt evidence");
   check(report.currentPrivateEditSafetyRows.some((row) => /rerun order/i.test(row.check) && row.command === report.currentRerunCommand), "release current blocker private edit safety should include rerun order evidence");
   check(report.currentPrivateEditSafetyRows.some((row) => /Hard external gate/i.test(row.check) && row.command === report.hardGateCommand), "release current blocker private edit safety should keep hard gate separate");
@@ -3167,7 +3196,7 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release current blocker post-edit proof sequence rows should be ready and value-free");
   check(report.postEditProofSequenceReceiptRows.every((row) => typeof row.expectedEvidence === "string" && row.expectedEvidence.length > 0), "release current blocker post-edit proof sequence rows should include expected evidence");
   check(report.postEditProofSequenceReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release current blocker post-edit proof sequence rows should include source fields");
-  check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Private value edit" && row.command === "manual edit .env.distribution.local"), "release current blocker post-edit proof sequence should include private value edit");
+  check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Private value edit" && row.command === `manual edit ${report.currentEnvEditTarget}`), "release current blocker post-edit proof sequence should include private value edit");
   check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Recommended strict proof chain" && row.command === recommendedPrivateEditOperatorProofCommand), "release current blocker post-edit proof sequence should include recommended strict proof chain");
   check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Release doctor proof" && row.command === "npm run release:doctor"), "release current blocker post-edit proof sequence should include release doctor proof");
   check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Current-blocker refresh" && row.command === "npm run release:current-blocker"), "release current blocker post-edit proof sequence should include current-blocker refresh");

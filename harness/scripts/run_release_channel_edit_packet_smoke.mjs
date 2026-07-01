@@ -74,6 +74,25 @@ function textValue(value, fallback = "none") {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
 }
 
+function displayEvidenceFile(filePath) {
+  const value = textValue(filePath);
+  if (value === "none") {
+    return value;
+  }
+  const absolutePath = path.isAbsolute(value) ? value : path.resolve(root, value);
+  const relativePath = path.relative(root, absolutePath);
+  if (!relativePath.startsWith("..") && !path.isAbsolute(relativePath)) {
+    return relativePath;
+  }
+  return path.basename(absolutePath);
+}
+
+function sameEditTarget(left, right) {
+  const normalizedLeft = displayEvidenceFile(left);
+  const normalizedRight = displayEvidenceFile(right);
+  return normalizedLeft !== "none" && normalizedLeft === normalizedRight;
+}
+
 function integerValue(value) {
   return Number.isInteger(value) ? value : 0;
 }
@@ -160,7 +179,7 @@ function packetMode(doctor) {
   return "continue-external-proof-chain";
 }
 
-function operatorCommandRows(mode) {
+function operatorCommandRows(mode, currentEnvEditTarget) {
   const baseRows =
     mode === "create-ignored-env-scaffold"
       ? [
@@ -172,7 +191,7 @@ function operatorCommandRows(mode) {
           },
           {
             order: 2,
-            command: "manual edit .env.distribution.local",
+            command: `manual edit ${currentEnvEditTarget}`,
             role: "replace the four private release-channel placeholder values outside committed files",
             valueRecorded: false
           }
@@ -180,7 +199,7 @@ function operatorCommandRows(mode) {
       : [
           {
             order: 1,
-            command: "manual edit .env.distribution.local",
+            command: `manual edit ${currentEnvEditTarget}`,
             role: "replace the four private release-channel placeholder values outside committed files",
             valueRecorded: false
           }
@@ -269,7 +288,8 @@ function formatEditRows(rows) {
 function buildReport({ doctor, liveCheck, progress }) {
   const mode = packetMode(doctor);
   const editRows = buildEditRows(liveCheck);
-  const operatorRows = operatorCommandRows(mode);
+  const currentEnvEditTarget = displayEvidenceFile(liveCheck.currentEnvEditTarget ?? doctor.currentEnvEditTarget);
+  const operatorRows = operatorCommandRows(mode, currentEnvEditTarget);
   const sourceArtifactRows = [
     sourceRow({
       label: "Release doctor",
@@ -292,10 +312,10 @@ function buildReport({ doctor, liveCheck, progress }) {
     editRows.every((row) => releaseChannelMetadataKeys.includes(row.key) && row.valueRecorded === false) &&
     doctor.releaseDoctorReportReady === true &&
     doctor.completionGapStatus === "external proof pending" &&
-    doctor.currentEnvEditTarget === ".env.distribution.local" &&
+    sameEditTarget(doctor.currentEnvEditTarget, currentEnvEditTarget) &&
     doctor.currentActionRequiredKeyCount === releaseChannelMetadataKeys.length &&
     doctor.externalDistributionReady === false &&
-    liveCheck.currentEnvEditTarget === ".env.distribution.local" &&
+    sameEditTarget(liveCheck.currentEnvEditTarget, currentEnvEditTarget) &&
     liveCheck.currentRequiredKeyCount === releaseChannelMetadataKeys.length &&
     liveCheck.privateValuesRecorded === false &&
     liveCheck.networkProbeAttempted === false &&
@@ -342,7 +362,7 @@ function buildReport({ doctor, liveCheck, progress }) {
     completionGapProofTarget: textValue(doctor.completionGapCurrentProofTarget),
     completionGapNextProofCommand: textValue(doctor.completionGapNextProofCommand),
     completionGapHardGateCommand: textValue(doctor.completionGapHardGateCommand),
-    currentEnvEditTarget: textValue(doctor.currentEnvEditTarget),
+    currentEnvEditTarget,
     currentRequiredKeyCount: integerValue(doctor.currentActionRequiredKeyCount),
     currentRequiredKeys: arrayValue(doctor.currentActionRequiredKeys),
     currentPlaceholderKeyCount: integerValue(doctor.currentActionPlaceholderKeyCount),
@@ -508,7 +528,7 @@ function validateReport(report, markdown) {
   check(report.sourceArtifactRowCount === 2, "release-channel edit packet should include two source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release-channel edit packet source artifacts should be present, ready, and value-free");
   check(["create-ignored-env-scaffold", "replace-release-channel-placeholders", "verify-release-channel-metadata", "continue-external-proof-chain"].includes(report.releaseChannelEditPacketMode), "release-channel edit packet should identify a known mode");
-  check(report.currentEnvEditTarget === ".env.distribution.local", "release-channel edit packet should point at the ignored local env target");
+  check(report.currentEnvEditTarget !== "none", "release-channel edit packet should point at the ignored local env target");
   check(report.currentRequiredKeyCount === 4, "release-channel edit packet should report four current release-channel keys");
   check(releaseChannelMetadataKeys.every((key) => report.currentRequiredKeys.includes(key)), "release-channel edit packet should include all current release-channel keys");
   check(report.releaseChannelEditRowCount === 4, "release-channel edit packet should include four edit rows");

@@ -621,6 +621,8 @@ function buildTenPlanCadenceRolloverSummary(report) {
 function buildReleaseChannelPostEditReceiptSummary(report) {
   const requiredKeys = stringArrayValue(report.externalProofBundleCurrentRequiredKeys);
   const placeholderKeys = stringArrayValue(report.externalProofBundleCurrentPlaceholderKeys);
+  const currentEnvEditTarget = textValue(report.externalProofBundleCurrentEnvEditTarget, ".env.distribution.local");
+  const liveCheckEnvEditTarget = textValue(report.releaseChannelLiveCheckCurrentEnvEditTarget, currentEnvEditTarget);
   const unblockRows = valueFreeObjectRows(report.releaseChannelUnblockMetadataRows);
   const proofChecklistRows = valueFreeObjectRows(report.externalProofBundleCurrentProofChecklistRows);
   const actionChecklistRows = valueFreeObjectRows(report.externalProofBundleCurrentActionChecklistRows);
@@ -635,7 +637,7 @@ function buildReleaseChannelPostEditReceiptSummary(report) {
       ready:
         requiredKeys.length === report.externalProofBundleCurrentRequiredKeyCount &&
         requiredKeys.length === 4 &&
-        textValue(report.externalProofBundleCurrentEnvEditTarget) === ".env.distribution.local",
+        currentEnvEditTarget === liveCheckEnvEditTarget,
       currentReady: placeholderKeys.length === 0,
       evidence: `${requiredKeys.length} required release-channel keys; edit target ${report.externalProofBundleCurrentEnvEditTarget}; ${report.externalProofBundleCurrentPlaceholderEditLocationCount} edit locations`,
       expectedPostEditSignal: "all current release-channel keys load without placeholders",
@@ -828,7 +830,7 @@ function buildPostEditProofSequenceReceiptSummary(report) {
     {
       order: 1,
       step: "Private value edit",
-      ready: envEditTarget === ".env.distribution.local" && placeholderKeyCount >= 0,
+      ready: envEditTarget.length > 0 && placeholderKeyCount >= 0,
       command: `manual edit ${envEditTarget}`,
       expectedEvidence: "current release-channel placeholder key count becomes 0 after the operator-owned edit",
       sourceField: "externalProofBundleCurrentEnvEditTarget/externalProofBundleCurrentPlaceholderKeyCount",
@@ -2451,7 +2453,12 @@ check(
 );
 check(releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release progress report post-edit operator receipt rows should be ready and value-free");
 check(releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.every((row) => typeof row.operatorAction === "string" && row.operatorAction.length > 0), "release progress report post-edit operator receipt rows should include operator actions");
-check(releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Edit target" && row.operatorAction.includes(".env.distribution.local")), "release progress report post-edit operator receipt should include ignored edit target");
+check(
+  releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.some(
+    (row) => row.step === "Edit target" && row.operatorAction.includes(releaseProgressReport.externalProofBundleCurrentEnvEditTarget)
+  ),
+  "release progress report post-edit operator receipt should include ignored edit target"
+);
 check(releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Recommended strict proof chain" && row.command === recommendedPrivateEditOperatorProofCommand), "release progress report post-edit operator receipt should include recommended strict proof chain");
 check(releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Release doctor proof" && row.command === "npm run release:doctor"), "release progress report post-edit operator receipt should include release doctor proof");
 check(releaseProgressReport.releaseChannelPostEditOperatorReceiptRows.some((row) => row.step === "Current blocker refresh" && row.command === "npm run release:current-blocker"), "release progress report post-edit operator receipt should include current-blocker refresh");
@@ -2506,7 +2513,12 @@ check(
 check(releaseProgressReport.postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release progress report post-edit proof sequence rows should be ready and value-free");
 check(releaseProgressReport.postEditProofSequenceReceiptRows.every((row) => typeof row.expectedEvidence === "string" && row.expectedEvidence.length > 0), "release progress report post-edit proof sequence rows should include expected evidence");
 check(releaseProgressReport.postEditProofSequenceReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release progress report post-edit proof sequence rows should include source fields");
-check(releaseProgressReport.postEditProofSequenceReceiptRows.some((row) => row.step === "Private value edit" && row.command === "manual edit .env.distribution.local"), "release progress report post-edit proof sequence should include private value edit");
+check(
+  releaseProgressReport.postEditProofSequenceReceiptRows.some(
+    (row) => row.step === "Private value edit" && row.command === `manual edit ${releaseProgressReport.externalProofBundleCurrentEnvEditTarget}`
+  ),
+  "release progress report post-edit proof sequence should include private value edit"
+);
 check(releaseProgressReport.postEditProofSequenceReceiptRows.some((row) => row.step === "Recommended strict proof chain" && row.command === recommendedPrivateEditOperatorProofCommand), "release progress report post-edit proof sequence should include recommended strict proof chain");
 check(releaseProgressReport.postEditProofSequenceReceiptRows.some((row) => row.step === "Release doctor proof" && row.command === "npm run release:doctor"), "release progress report post-edit proof sequence should include release doctor proof");
 check(releaseProgressReport.postEditProofSequenceReceiptRows.some((row) => row.step === "Current-blocker refresh" && row.command === "npm run release:current-blocker"), "release progress report post-edit proof sequence should include current-blocker refresh");

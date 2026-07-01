@@ -763,7 +763,12 @@ check(summary.postEditProofSequenceReceiptRowCount === 8, "release proof bundle 
 check(summary.postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release proof bundle post-edit proof sequence rows should be ready and value-free");
 check(summary.postEditProofSequenceReceiptRows.every((row) => typeof row.expectedEvidence === "string" && row.expectedEvidence.length > 0), "release proof bundle post-edit proof sequence rows should include expected evidence");
 check(summary.postEditProofSequenceReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release proof bundle post-edit proof sequence rows should include source fields");
-check(summary.postEditProofSequenceReceiptRows.some((row) => row.step === "Private value edit" && row.command === "manual edit .env.distribution.local"), "release proof bundle post-edit proof sequence should include private value edit");
+check(
+  summary.postEditProofSequenceReceiptRows.some(
+    (row) => row.step === "Private value edit" && row.command === `manual edit ${summary.currentEnvEditTarget}`
+  ),
+  "release proof bundle post-edit proof sequence should include private value edit"
+);
 check(
   summary.postEditProofSequenceReceiptRows.some((row) => row.step === "Recommended strict proof chain" && row.command === recommendedPrivateEditOperatorProofCommand),
   "release proof bundle post-edit proof sequence should include the recommended strict proof chain"
