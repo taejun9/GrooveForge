@@ -25,7 +25,8 @@ const reportArtifacts = {
     jsonName: "release-channel-live-check.json",
     command: "npm run release:channel-live-check",
     sourceMode: "real-release-channel-live-check",
-    syntheticSuccessSmoke: false
+    syntheticSuccessSmoke: false,
+    syntheticBlockedSmoke: false
   },
   strict: {
     stem: "release-channel-live-check-strict",
@@ -33,7 +34,8 @@ const reportArtifacts = {
     jsonName: "release-channel-live-check-strict.json",
     command: "npm run release:channel-live-check-strict",
     sourceMode: "real-release-channel-live-check-strict",
-    syntheticSuccessSmoke: false
+    syntheticSuccessSmoke: false,
+    syntheticBlockedSmoke: false
   },
   strictSuccessSmoke: {
     stem: "release-channel-live-check-strict-success-smoke",
@@ -41,19 +43,29 @@ const reportArtifacts = {
     jsonName: "release-channel-live-check-strict-success-smoke.json",
     command: "npm run release:channel-live-check-strict-success-smoke",
     sourceMode: "synthetic-strict-success-smoke",
-    syntheticSuccessSmoke: true
+    syntheticSuccessSmoke: true,
+    syntheticBlockedSmoke: false
+  },
+  strictBlockedSmoke: {
+    stem: "release-channel-live-check-strict-blocked-smoke",
+    markdownName: "release-channel-live-check-strict-blocked-smoke.md",
+    jsonName: "release-channel-live-check-strict-blocked-smoke.json",
+    command: "npm run release:private-edit-strict-proof-blocked-smoke",
+    sourceMode: "synthetic-strict-blocked-smoke",
+    syntheticSuccessSmoke: false,
+    syntheticBlockedSmoke: true
   }
 };
-if (
-  requestedReportStem &&
-  (requestedReportStem !== reportArtifacts.strictSuccessSmoke.stem || strictMode !== true)
-) {
+const requestedArtifact = requestedReportStem
+  ? Object.values(reportArtifacts).find((artifact) => artifact.stem === requestedReportStem)
+  : null;
+if (requestedReportStem && (!requestedArtifact || strictMode !== true)) {
   console.error("GrooveForge release-channel live check failed:");
   console.error("- Unsupported report stem override.");
   process.exit(1);
 }
-const selectedArtifact = requestedReportStem
-  ? reportArtifacts.strictSuccessSmoke
+const selectedArtifact = requestedArtifact
+  ? requestedArtifact
   : strictMode
     ? reportArtifacts.strict
     : reportArtifacts.default;
@@ -403,6 +415,7 @@ async function main() {
       strictMode,
       sourceMode: selectedArtifact.sourceMode,
       syntheticSuccessSmoke: selectedArtifact.syntheticSuccessSmoke,
+      syntheticBlockedSmoke: selectedArtifact.syntheticBlockedSmoke,
       reportCommand: selectedArtifact.command,
       releaseChannelLiveCheckMarkdownArtifactName: selectedArtifact.markdownName,
       releaseChannelLiveCheckJsonArtifactName: selectedArtifact.jsonName,
@@ -499,6 +512,9 @@ async function main() {
     check(report.privateValuesRecorded === false, "release-channel live check should not record private values");
     check(report.realLocalEnvModified === false, "release-channel live check should not modify real local env");
     check(report.syntheticSuccessSmoke === selectedArtifact.syntheticSuccessSmoke, "release-channel live check synthetic smoke flag should match artifact mode");
+    check(report.syntheticBlockedSmoke === selectedArtifact.syntheticBlockedSmoke, "release-channel live check synthetic blocked smoke flag should match artifact mode");
+    check(!report.syntheticBlockedSmoke || report.strictReady === false, "release-channel strict blocked smoke should stay blocked");
+    check(!report.syntheticBlockedSmoke || report.strictFailureRowCount === releaseChannelMetadataKeys.length, "release-channel strict blocked smoke should include four strict failure rows");
     check(report.networkProbeAttempted === false, "release-channel live check should not probe the network");
     check(report.releaseUploadAttempted === false, "release-channel live check should not upload releases");
     check(report.notarySubmissionAttempted === false, "release-channel live check should not submit to Apple");

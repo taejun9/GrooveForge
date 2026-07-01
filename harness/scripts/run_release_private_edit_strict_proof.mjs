@@ -13,16 +13,34 @@ const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "
 const platformArch = `${process.platform}-${process.arch}`;
 const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformArch}`);
 const successSmoke = process.argv.includes("--success-smoke");
-const reportStem = successSmoke ? "release-private-edit-strict-proof-success-smoke" : "release-private-edit-strict-proof";
+const blockedSmoke = process.argv.includes("--blocked-smoke");
+if (successSmoke && blockedSmoke) {
+  console.error("GrooveForge release private edit strict proof failed:");
+  console.error("- Use either --success-smoke or --blocked-smoke, not both.");
+  process.exit(1);
+}
+const modeLabel = successSmoke ? " success smoke" : blockedSmoke ? " blocked smoke" : "";
+const reportStem = successSmoke
+  ? "release-private-edit-strict-proof-success-smoke"
+  : blockedSmoke
+    ? "release-private-edit-strict-proof-blocked-smoke"
+    : "release-private-edit-strict-proof";
 const strictProofMarkdownArtifactName = "release-private-edit-strict-proof.md";
 const strictProofJsonArtifactName = "release-private-edit-strict-proof.json";
 const strictProofSuccessMarkdownArtifactName = "release-private-edit-strict-proof-success-smoke.md";
 const strictProofSuccessJsonArtifactName = "release-private-edit-strict-proof-success-smoke.json";
+const strictProofBlockedMarkdownArtifactName = "release-private-edit-strict-proof-blocked-smoke.md";
+const strictProofBlockedJsonArtifactName = "release-private-edit-strict-proof-blocked-smoke.json";
 const markdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${reportStem}.md`);
 const jsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${reportStem}.json`);
+const strictLiveCheckReportStem = successSmoke
+  ? "release-channel-live-check-strict-success-smoke"
+  : blockedSmoke
+    ? "release-channel-live-check-strict-blocked-smoke"
+    : "release-channel-live-check-strict";
 const strictJsonPath = path.join(
   packageRoot,
-  `${appName}-${packageJson.version}-${platformArch}-${successSmoke ? "release-channel-live-check-strict-success-smoke" : "release-channel-live-check-strict"}.json`
+  `${appName}-${packageJson.version}-${platformArch}-${strictLiveCheckReportStem}.json`
 );
 const postEditJsonPath = path.join(
   packageRoot,
@@ -36,6 +54,9 @@ const currentBlockerJsonPath = path.join(
   packageRoot,
   `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`
 );
+const blockedSmokeEnvRoot = path.join(packageRoot, "release-private-edit-strict-proof-blocked-smoke-env");
+const blockedLiveCheckReportStem = "release-channel-live-check-strict-blocked-smoke";
+const distributionLocalEnvFileName = ".env.distribution.local";
 const failures = [];
 const planNumberPattern = /^plan-(\d+)-[a-z0-9][a-z0-9-]*\.md$/;
 const releaseChannelMetadataKeys = [
@@ -75,12 +96,16 @@ function objectRows(values) {
   return Array.isArray(values) ? values.filter((value) => value && typeof value === "object" && !Array.isArray(value)) : [];
 }
 
-function runNpmScript(scriptName, { allowFailure = false } = {}) {
+function runNpmScript(scriptName, { allowFailure = false, envOverrides = {}, deleteEnvKeys = [] } = {}) {
   const command = `npm run ${scriptName}`;
   console.log(`Running release private edit strict proof step: ${command}`);
+  const childEnv = { ...process.env, ...envOverrides };
+  for (const key of deleteEnvKeys) {
+    delete childEnv[key];
+  }
   const result = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", scriptName], {
     cwd: root,
-    env: process.env,
+    env: childEnv,
     stdio: "inherit"
   });
   if (result.error) {
@@ -94,6 +119,13 @@ function runNpmScript(scriptName, { allowFailure = false } = {}) {
     status: Number.isInteger(result.status) ? result.status : 1,
     success: result.status === 0
   };
+}
+
+async function writeBlockedSmokeEnvFixture() {
+  await mkdir(blockedSmokeEnvRoot, { recursive: true });
+  const envText = `${releaseChannelMetadataKeys.map((key) => `${key}=CHANGE_ME`).join("\n")}\n`;
+  await writeFile(path.join(blockedSmokeEnvRoot, distributionLocalEnvFileName), envText, "utf8");
+  return relative(blockedSmokeEnvRoot);
 }
 
 async function readJsonIfPresent(filePath) {
@@ -179,12 +211,13 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
     valueRecorded: false
   }));
   const postEditReady = postEditProof?.releasePostEditProofReady === true || postEditProof?.releasePostEditProofSuccessSmokeReady === true;
-  const progressReady = successSmoke ? true : progressRefresh?.refreshSmokeReady === true;
+  const progressReady = successSmoke || blockedSmoke ? true : progressRefresh?.refreshSmokeReady === true;
   const proofReady = strictReady && postEditReady && progressReady;
   const currentTenPlanProgressLabel = textValue(
     progressRefresh?.latestTenPlanProgressLabel,
     textValue(currentBlocker?.currentTenPlanProgressLabel, textValue(postEditProof?.currentTenPlanProgressLabel, fallbackTenPlanProgressLabel))
   );
+  const strictFailureBlocker = `Strict release-channel proof has ${strictFailureRows.length} missing, placeholder, or malformed metadata rows.`;
   const currentFirstBlocker = proofReady
     ? textValue(
         currentBlocker?.currentFirstBlocker,
@@ -192,17 +225,20 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
           ? "Strict release-channel proof succeeded in synthetic rehearsal; broader external proofs remain unclaimed."
           : "Strict release-channel proof passed; broader external proofs remain unclaimed."
       )
-    : textValue(
-        currentBlocker?.currentFirstBlocker,
-        `Strict release-channel proof has ${strictFailureRows.length} missing, placeholder, or malformed metadata rows.`
-      );
+    : blockedSmoke
+      ? strictFailureBlocker
+      : textValue(currentBlocker?.currentFirstBlocker, strictFailureBlocker);
   const commandRows = [
     {
       order: 1,
-      command: successSmoke ? "npm run release:channel-live-check-strict-success-smoke" : "npm run release:channel-live-check-strict",
+      command: successSmoke
+        ? "npm run release:channel-live-check-strict-success-smoke"
+        : "npm run release:channel-live-check-strict",
       role: successSmoke
         ? "prove strict release-channel success branch without reading the real local env"
-        : "pass/fail proof that the four private release-channel keys are present, non-placeholder, and shape-ready",
+        : blockedSmoke
+          ? "prove strict release-channel blocked branch with a synthetic placeholder env without reading the real local env"
+          : "pass/fail proof that the four private release-channel keys are present, non-placeholder, and shape-ready",
       statusLabel: strictReady ? "passed" : "failed",
       exitCode: strictExitCode,
       valueRecorded: false
@@ -212,8 +248,10 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
       command: successSmoke ? "npm run release:post-edit-proof-success-smoke" : "npm run release:post-edit-proof",
       role: successSmoke
         ? "prove post-edit proof success branch with synthetic ready evidence"
-        : "refresh release-channel live-check and current-blocker evidence after strict proof passes",
-      statusLabel: postEditResult ? (postEditResult.success ? "passed" : "failed") : "not run",
+        : blockedSmoke
+          ? "skipped in blocked smoke because strict proof is expected to fail before post-edit proof"
+          : "refresh release-channel live-check and current-blocker evidence after strict proof passes",
+      statusLabel: blockedSmoke ? "skipped in blocked smoke" : postEditResult ? (postEditResult.success ? "passed" : "failed") : "not run",
       exitCode: postEditResult?.status ?? null,
       valueRecorded: false
     },
@@ -222,8 +260,16 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
       command: "npm run release:progress-refresh-smoke",
       role: successSmoke
         ? "real progress refresh is skipped in success smoke to avoid reading private local env state"
-        : "refresh user-facing completion, current blocker, completion packet, and freshness after strict proof passes",
-      statusLabel: successSmoke ? "skipped in success smoke" : progressResult ? (progressResult.success ? "passed" : "failed") : "not run",
+        : blockedSmoke
+          ? "progress refresh is skipped in blocked smoke because strict proof is expected to fail before post-edit proof"
+          : "refresh user-facing completion, current blocker, completion packet, and freshness after strict proof passes",
+      statusLabel: successSmoke
+        ? "skipped in success smoke"
+        : blockedSmoke
+          ? "skipped in blocked smoke"
+          : progressResult
+            ? (progressResult.success ? "passed" : "failed")
+            : "not run",
       exitCode: progressResult?.status ?? null,
       valueRecorded: false
     }
@@ -241,7 +287,11 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
           placeholderKeys: stringArrayValue(strictLiveCheck?.currentPlaceholderKeys),
           strictFailureRowCount: strictFailureRows.length,
           manualAction: "replace the current release-channel placeholder values outside committed files",
-          returnCommand: successSmoke ? "npm run release:private-edit-strict-proof-success-smoke" : "npm run release:private-edit-strict-proof",
+          returnCommand: successSmoke
+            ? "npm run release:private-edit-strict-proof-success-smoke"
+            : blockedSmoke
+              ? "npm run release:private-edit-strict-proof-blocked-smoke"
+              : "npm run release:private-edit-strict-proof",
           firstProofCommand: commandRows[0].command,
           sourceField: "strictFailureRows/currentFirstBlocker/currentEnvEditTarget",
           valueRecorded: false
@@ -249,10 +299,14 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
       ];
   const sourceRows = [
     sourceRow(
-      successSmoke ? "Release-channel strict success smoke" : "Release-channel strict live check",
+      successSmoke
+        ? "Release-channel strict success smoke"
+        : blockedSmoke
+          ? "Release-channel strict blocked smoke"
+          : "Release-channel strict live check",
       strictJsonPath,
       Boolean(strictLiveCheck),
-      successSmoke
+      successSmoke || blockedSmoke
     ),
     sourceRow(
       successSmoke ? "Release post-edit proof success smoke" : "Release post-edit proof",
@@ -271,10 +325,28 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
     platform: process.platform,
     arch: process.arch,
     platformArch,
-    reportCommand: successSmoke ? "npm run release:private-edit-strict-proof-success-smoke" : "npm run release:private-edit-strict-proof",
-    sourceMode: successSmoke ? "synthetic private edit strict proof success smoke" : "real private edit strict proof",
-    realLocalEnvRead: successSmoke ? false : strictLiveCheck?.realLocalEnvRead === true,
+    reportCommand: successSmoke
+      ? "npm run release:private-edit-strict-proof-success-smoke"
+      : blockedSmoke
+        ? "npm run release:private-edit-strict-proof-blocked-smoke"
+        : "npm run release:private-edit-strict-proof",
+    sourceMode: successSmoke
+      ? "synthetic private edit strict proof success smoke"
+      : blockedSmoke
+        ? "synthetic private edit strict proof blocked smoke"
+        : "real private edit strict proof",
+    realLocalEnvRead: successSmoke || blockedSmoke ? false : strictLiveCheck?.realLocalEnvRead === true,
     realLocalEnvModified: false,
+    privateEditStrictProofMarkdownArtifactName: successSmoke
+      ? strictProofSuccessMarkdownArtifactName
+      : blockedSmoke
+        ? strictProofBlockedMarkdownArtifactName
+        : strictProofMarkdownArtifactName,
+    privateEditStrictProofJsonArtifactName: successSmoke
+      ? strictProofSuccessJsonArtifactName
+      : blockedSmoke
+        ? strictProofBlockedJsonArtifactName
+        : strictProofJsonArtifactName,
     privateEditStrictProofReceiptReady: true,
     privateEditStrictProofReady: proofReady,
     privateEditStrictProofState: proofReady
@@ -312,6 +384,7 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
     postEditProofCurrentPlaceholderKeys: stringArrayValue(postEditProof?.currentPlaceholderKeys),
     progressRefreshReady: progressReady,
     progressRefreshSkippedInSuccessSmoke: successSmoke,
+    progressRefreshSkippedInBlockedSmoke: blockedSmoke,
     currentTenPlanProgressLabel,
     nextScheduledTenPlanProgressReport: textValue(
       progressRefresh?.nextScheduledTenPlanProgressReportAfterDelivery,
@@ -372,6 +445,7 @@ function buildMarkdown(report) {
 - Post-edit proof ready: ${report.postEditProofReady ? "yes" : "no"}
 - Progress refresh ready: ${report.progressRefreshReady ? "yes" : "no"}
 - Progress refresh skipped in success smoke: ${report.progressRefreshSkippedInSuccessSmoke ? "yes" : "no"}
+- Progress refresh skipped in blocked smoke: ${report.progressRefreshSkippedInBlockedSmoke ? "yes" : "no"}
 - Current 10-plan progress: ${report.currentTenPlanProgressLabel}
 - Next scheduled 10-plan report: ${report.nextScheduledTenPlanProgressReport}
 - Overall completion: ${report.userFacingCompletionPercent.toFixed(6)}%
@@ -428,10 +502,18 @@ async function writeReport(report) {
   check(report.privateEditStrictProofFirstCommand.includes("channel-live-check-strict"), "release private edit strict proof should run strict live-check first");
   check(report.privateEditStrictProofPostEditCommand.includes("post-edit-proof"), "release private edit strict proof should include post-edit proof");
   check(report.privateEditStrictProofProgressCommand === "npm run release:progress-refresh-smoke", "release private edit strict proof should include progress refresh");
+  check(report.privateEditStrictProofMarkdownArtifactName.endsWith(".md"), "release private edit strict proof should record Markdown artifact name");
+  check(report.privateEditStrictProofJsonArtifactName.endsWith(".json"), "release private edit strict proof should record JSON artifact name");
   check(report.privateEditStrictProofBlockedHandoffReady === true, "release private edit strict proof blocked handoff receipt should be ready");
   check(report.privateEditStrictProofBlockedHandoffRowCount === report.privateEditStrictProofBlockedHandoffRows.length, "release private edit strict proof blocked handoff row count should match rows");
   check(report.privateEditStrictProofReady || report.privateEditStrictProofBlockedHandoffRowCount > 0, "release private edit strict proof should include a blocked handoff row when blocked");
   check(report.privateEditStrictProofBlockedHandoffRows.every((row) => row.valueRecorded === false), "release private edit strict proof blocked handoff rows should not record values");
+  check(!blockedSmoke || report.privateEditStrictProofReady === false, "release private edit strict proof blocked smoke should stay blocked");
+  check(!blockedSmoke || report.privateEditStrictProofBlockedHandoffRowCount > 0, "release private edit strict proof blocked smoke should include blocked handoff rows");
+  check(!blockedSmoke || report.realLocalEnvRead === false, "release private edit strict proof blocked smoke should not read real local env");
+  check(!blockedSmoke || report.sourceMode.includes("blocked smoke"), "release private edit strict proof blocked smoke should use blocked smoke source mode");
+  check(!blockedSmoke || report.strictFailureRowCount === releaseChannelMetadataKeys.length, "release private edit strict proof blocked smoke should cover four strict failure rows");
+  check(!blockedSmoke || report.progressRefreshSkippedInBlockedSmoke === true, "release private edit strict proof blocked smoke should skip progress refresh");
   check(report.currentRequiredKeyCount === 4, "release private edit strict proof should track four release-channel keys");
   check(releaseChannelMetadataKeys.every((key) => report.currentRequiredKeys.includes(key)), "release private edit strict proof should cover release-channel keys");
   check(report.strictFailureRowCount === report.strictFailureRows.length, "release private edit strict proof strict failure row count should match rows");
@@ -454,7 +536,7 @@ async function writeReport(report) {
   check(markdown.includes("Blocked Handoff Receipt"), "release private edit strict proof Markdown should include blocked handoff receipt");
 
   if (failures.length > 0) {
-    console.error(`GrooveForge release private edit strict proof${successSmoke ? " success smoke" : ""} failed:`);
+    console.error(`GrooveForge release private edit strict proof${modeLabel} failed:`);
     for (const failure of failures) {
       console.error(`- ${failure}`);
     }
@@ -475,12 +557,23 @@ let currentBlocker = await readJsonIfPresent(currentBlockerJsonPath);
 const fallbackTenPlanProgressLabel = await currentTenPlanProgressLabel();
 
 try {
-  strictResult = runNpmScript(successSmoke ? "release:channel-live-check-strict-success-smoke" : "release:channel-live-check-strict", {
+  const strictScriptName = successSmoke ? "release:channel-live-check-strict-success-smoke" : "release:channel-live-check-strict";
+  const strictOptions = {
     allowFailure: !successSmoke
-  });
+  };
+  if (blockedSmoke) {
+    const blockedSmokeEnvRootRelative = await writeBlockedSmokeEnvFixture();
+    strictOptions.envOverrides = {
+      GROOVEFORGE_DISTRIBUTION_ENV_FILE: "",
+      GROOVEFORGE_RELEASE_CHANNEL_LIVE_CHECK_ENV_ROOT: blockedSmokeEnvRootRelative,
+      GROOVEFORGE_RELEASE_CHANNEL_LIVE_CHECK_REPORT_STEM: blockedLiveCheckReportStem
+    };
+    strictOptions.deleteEnvKeys = releaseChannelMetadataKeys;
+  }
+  strictResult = runNpmScript(strictScriptName, strictOptions);
   strictLiveCheck = await readJsonIfPresent(strictJsonPath);
 
-  if (strictResult.success) {
+  if (strictResult.success && !blockedSmoke) {
     postEditResult = runNpmScript(successSmoke ? "release:post-edit-proof-success-smoke" : "release:post-edit-proof");
     postEditProof = await readJsonIfPresent(postEditJsonPath);
 
@@ -491,7 +584,7 @@ try {
     }
   }
 } catch (error) {
-  console.error(`GrooveForge release private edit strict proof${successSmoke ? " success smoke" : ""} command failed:`);
+  console.error(`GrooveForge release private edit strict proof${modeLabel} command failed:`);
   console.error(`- ${error.message}`);
   process.exit(1);
 }
@@ -508,7 +601,7 @@ const report = buildReport({
 });
 await writeReport(report);
 
-console.log(`GrooveForge release private edit strict proof${successSmoke ? " success smoke" : ""} ${report.privateEditStrictProofReady ? "passed" : "blocked"}.`);
+console.log(`GrooveForge release private edit strict proof${modeLabel} ${report.privateEditStrictProofReady ? "passed" : "blocked"}.`);
 console.log(`- Markdown: ${relative(markdownPath)}`);
 console.log(`- JSON: ${relative(jsonPath)}`);
 console.log(`- Receipt ready: ${report.privateEditStrictProofReceiptReady ? "yes" : "no"}`);
@@ -530,6 +623,6 @@ console.log("- Private values recorded: no");
 console.log("- Network: no update feed probe, distribution channel probe, release upload, Apple notary submission, or signing attempted");
 console.log("- Not claimed: auto-update, Developer ID signing, notarization, Gatekeeper approval, manual QA approval, app-store submission, or external distribution completion");
 
-if (!successSmoke && !report.privateEditStrictProofReady) {
+if (!successSmoke && !blockedSmoke && !report.privateEditStrictProofReady) {
   process.exit(1);
 }
