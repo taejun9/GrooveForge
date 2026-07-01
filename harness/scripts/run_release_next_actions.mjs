@@ -2795,6 +2795,38 @@ function buildDoctorReleaseChannelFocusSummary(releaseDoctor = null) {
   };
 }
 
+function buildDoctorPostEditProofSummary(releaseDoctor = null) {
+  const doctorPostEditProofSourceReady = releaseDoctor !== null && typeof releaseDoctor === "object";
+  const doctorPostEditProofCommand = doctorPostEditProofSourceReady
+    ? stringField(releaseDoctor, "currentActionPostEditProofCommand", "none")
+    : "none";
+  const doctorPostEditProofRole = doctorPostEditProofSourceReady
+    ? stringField(releaseDoctor, "currentActionPostEditProofRole", "none")
+    : "none";
+  const doctorPostEditProofValueRecorded = doctorPostEditProofSourceReady
+    ? booleanField(releaseDoctor, "currentActionPostEditProofValueRecorded", false)
+    : false;
+  return {
+    doctorPostEditProofSourceArtifact: "Release doctor",
+    doctorPostEditProofSourcePath: relative(releaseDoctorPath),
+    doctorPostEditProofSourceReady,
+    doctorPostEditProofDoctorReportReady: doctorPostEditProofSourceReady
+      ? booleanField(releaseDoctor, "releaseDoctorReportReady", false)
+      : false,
+    doctorPostEditProofCurrentActionId: doctorPostEditProofSourceReady ? stringField(releaseDoctor, "currentActionId", "none") : "none",
+    doctorPostEditProofCurrentActionLabel: doctorPostEditProofSourceReady
+      ? stringField(releaseDoctor, "currentActionLabel", "none")
+      : "none",
+    doctorPostEditProofCommand,
+    doctorPostEditProofRole,
+    doctorPostEditProofMatchesRecommended: doctorPostEditProofCommand === recommendedPrivateEditOperatorProofCommand,
+    doctorPostEditProofValueRecorded,
+    doctorPostEditProofClaimedExternalDistribution: doctorPostEditProofSourceReady
+      ? booleanField(releaseDoctor, "releaseGateClaimedExternalDistribution", false)
+      : false
+  };
+}
+
 function formatReleaseChannelFocusRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | no | no | no | no | none | none | none | none | no |";
@@ -2865,6 +2897,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
   });
   const doctorPrepareEnvAudit = buildDoctorPrepareEnvAuditSummary(releaseDoctor);
   const doctorReleaseChannelFocus = buildDoctorReleaseChannelFocusSummary(releaseDoctor);
+  const doctorPostEditProof = buildDoctorPostEditProofSummary(releaseDoctor);
   const currentPlaceholderRemediation = buildCurrentPlaceholderRemediationSummary({
     currentActionSummary,
     doctorPrepareEnvAudit
@@ -2964,6 +2997,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...doctorCompletionGap,
     ...doctorPrepareEnvAudit,
     ...doctorReleaseChannelFocus,
+    ...doctorPostEditProof,
     ...currentPlaceholderRemediation,
     ...currentProofChecklist,
     ...currentCommandVerification,
@@ -3068,6 +3102,8 @@ function buildMarkdown(report) {
 - Doctor release-channel focus current action ready: ${readyLabel(report.doctorReleaseChannelFocusCurrentReady)}
 - Doctor release-channel focus current-ready rows: ${report.doctorReleaseChannelFocusCurrentReadyCount}/${report.doctorReleaseChannelFocusRowCount}
 - Doctor release-channel focus placeholder keys: ${report.doctorReleaseChannelFocusPlaceholderKeyCount}
+- Doctor post-edit proof command: \`${report.doctorPostEditProofCommand}\`
+- Doctor post-edit proof matches recommended: ${readyLabel(report.doctorPostEditProofMatchesRecommended)}
 - Current required keys: ${report.currentRequiredKeyCount} (${report.currentRequiredKeySummary})
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${report.currentPlaceholderKeySummary})
 - Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})
@@ -3246,6 +3282,20 @@ ${formatEditLocationList(report.doctorPrepareEnvAuditReleaseChannelPlaceholderEd
 | key | present | placeholder | shape ready | current ready | evidence | expected signal | proof command | rerun command | value recorded |
 |---|---:|---:|---:|---:|---|---|---|---|---:|
 ${formatReleaseChannelFocusRows(report.doctorReleaseChannelFocusRows)}
+
+## Release Doctor Post-Edit Proof
+
+- Source artifact: ${report.doctorPostEditProofSourceArtifact}
+- Source path: ${report.doctorPostEditProofSourcePath}
+- Source ready: ${readyLabel(report.doctorPostEditProofSourceReady)}
+- Doctor report ready: ${readyLabel(report.doctorPostEditProofDoctorReportReady)}
+- Current action: ${report.doctorPostEditProofCurrentActionLabel}
+- Current action id: ${report.doctorPostEditProofCurrentActionId}
+- Post-edit proof command: \`${report.doctorPostEditProofCommand}\`
+- Post-edit proof role: ${report.doctorPostEditProofRole}
+- Matches recommended operator proof chain: ${readyLabel(report.doctorPostEditProofMatchesRecommended)}
+- Value recorded: ${readyLabel(report.doctorPostEditProofValueRecorded)}
+- External distribution claimed by release doctor: ${readyLabel(report.doctorPostEditProofClaimedExternalDistribution)}
 
 ## Priority Next Actions
 
@@ -3541,6 +3591,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
   });
   const doctorPrepareEnvAudit = buildDoctorPrepareEnvAuditSummary(releaseDoctor);
   const doctorReleaseChannelFocus = buildDoctorReleaseChannelFocusSummary(releaseDoctor);
+  const doctorPostEditProof = buildDoctorPostEditProofSummary(releaseDoctor);
   const currentPlaceholderRemediation = buildCurrentPlaceholderRemediationSummary({
     currentActionSummary: {
       ...currentActionSummary,
@@ -3668,6 +3719,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...doctorCompletionGap,
     ...doctorPrepareEnvAudit,
     ...doctorReleaseChannelFocus,
+    ...doctorPostEditProof,
     ...currentPlaceholderRemediation,
     ...currentProofChecklist,
     ...currentCommandVerification,
@@ -3957,6 +4009,17 @@ check(nextActionsReport.doctorReleaseChannelFocusProofCommand === "npm run deskt
 check(nextActionsReport.doctorReleaseChannelFocusRerunCommand === "npm run release:doctor", "external next actions release doctor focus rerun command should be release doctor");
 check(nextActionsReport.doctorReleaseChannelFocusValueRecorded === false, "external next actions release doctor focus should not record values");
 check(nextActionsReport.doctorReleaseChannelFocusClaimedExternalDistribution === false, "external next actions release doctor focus should not claim external distribution");
+check(nextActionsReport.doctorPostEditProofSourceArtifact === "Release doctor", "external next actions should identify the release doctor post-edit proof source");
+check(typeof nextActionsReport.doctorPostEditProofSourcePath === "string" && nextActionsReport.doctorPostEditProofSourcePath.length > 0, "external next actions should include the release doctor post-edit proof source path");
+check(typeof nextActionsReport.doctorPostEditProofSourceReady === "boolean", "external next actions should include release doctor post-edit proof source readiness");
+check(typeof nextActionsReport.doctorPostEditProofDoctorReportReady === "boolean", "external next actions should include release doctor post-edit proof doctor readiness");
+check(typeof nextActionsReport.doctorPostEditProofCurrentActionId === "string", "external next actions should include release doctor post-edit proof current action id");
+check(typeof nextActionsReport.doctorPostEditProofCurrentActionLabel === "string", "external next actions should include release doctor post-edit proof current action label");
+check(typeof nextActionsReport.doctorPostEditProofCommand === "string" && nextActionsReport.doctorPostEditProofCommand.length > 0, "external next actions should include release doctor post-edit proof command");
+check(typeof nextActionsReport.doctorPostEditProofRole === "string" && nextActionsReport.doctorPostEditProofRole.length > 0, "external next actions should include release doctor post-edit proof role");
+check(typeof nextActionsReport.doctorPostEditProofMatchesRecommended === "boolean", "external next actions should include release doctor post-edit proof recommended match");
+check(nextActionsReport.doctorPostEditProofValueRecorded === false, "external next actions release doctor post-edit proof should not record values");
+check(nextActionsReport.doctorPostEditProofClaimedExternalDistribution === false, "external next actions release doctor post-edit proof should not claim external distribution");
 if (releaseDoctorSource !== null) {
   check(nextActionsReport.doctorReleaseChannelFocusSourceReady === true, "external next actions should report ready release doctor focus source evidence when release doctor exists");
   check(nextActionsReport.doctorReleaseChannelFocusDoctorReportReady === true, "external next actions should report ready release doctor focus doctor evidence when release doctor exists");
@@ -3974,6 +4037,24 @@ if (releaseDoctorSource !== null) {
   check(
     JSON.stringify(nextActionsReport.doctorReleaseChannelFocusPlaceholderKeys) === JSON.stringify(arrayField(releaseDoctorSource, "releaseChannelFocusPlaceholderKeys")),
     "external next actions should mirror release doctor focus placeholder keys"
+  );
+  check(nextActionsReport.doctorPostEditProofSourceReady === true, "external next actions should report ready release doctor post-edit proof source evidence when release doctor exists");
+  check(nextActionsReport.doctorPostEditProofDoctorReportReady === true, "external next actions should report ready release doctor post-edit proof doctor evidence when release doctor exists");
+  check(
+    nextActionsReport.doctorPostEditProofCurrentActionId === stringField(releaseDoctorSource, "currentActionId", "none"),
+    "external next actions should mirror release doctor post-edit proof current action id"
+  );
+  check(
+    nextActionsReport.doctorPostEditProofCommand === stringField(releaseDoctorSource, "currentActionPostEditProofCommand", "none"),
+    "external next actions should mirror release doctor post-edit proof command"
+  );
+  check(
+    nextActionsReport.doctorPostEditProofRole === stringField(releaseDoctorSource, "currentActionPostEditProofRole", "none"),
+    "external next actions should mirror release doctor post-edit proof role"
+  );
+  check(
+    nextActionsReport.doctorPostEditProofValueRecorded === booleanField(releaseDoctorSource, "currentActionPostEditProofValueRecorded", false),
+    "external next actions should mirror release doctor post-edit proof value redaction"
   );
 }
 check(typeof nextActionsReport.currentPrerequisiteCommand === "string" && nextActionsReport.currentPrerequisiteCommand.length > 0, "external next actions should include the current prerequisite command");
@@ -5516,6 +5597,18 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
     "release channel metadata should align release doctor focus placeholder keys with current placeholder keys"
   );
   check(
+    nextActionsReport.doctorPostEditProofCurrentActionId === "replace-release-channel-placeholders",
+    "release channel metadata should mirror doctor post-edit proof action id while placeholders remain"
+  );
+  check(
+    nextActionsReport.doctorPostEditProofCommand === recommendedPrivateEditOperatorProofCommand,
+    "release channel metadata should mirror doctor post-edit strict proof command while placeholders remain"
+  );
+  check(
+    nextActionsReport.doctorPostEditProofMatchesRecommended === true,
+    "release channel metadata doctor post-edit proof should match recommended strict proof while placeholders remain"
+  );
+  check(
     nextActionsReport.currentPlaceholderEditLocations.every(
       (item) =>
         nextActionsReport.currentPlaceholderKeys.includes(item.key) &&
@@ -6225,6 +6318,10 @@ check(markdown.includes("Doctor release-channel focus placeholder keys:"), "exte
 check(markdown.includes("## Release Doctor Release-Channel Focus Receipt"), "external next actions Markdown should include release doctor focus receipt section");
 check(markdown.includes("| key | present | placeholder | shape ready | current ready | evidence | expected signal | proof command | rerun command | value recorded |"), "external next actions Markdown should include release doctor focus receipt table");
 check(markdown.includes("Value recorded: no"), "external next actions Markdown should state release doctor focus value redaction");
+check(markdown.includes("Doctor post-edit proof command:"), "external next actions Markdown should include release doctor post-edit proof command");
+check(markdown.includes("Doctor post-edit proof matches recommended:"), "external next actions Markdown should include release doctor post-edit proof recommended match");
+check(markdown.includes("## Release Doctor Post-Edit Proof"), "external next actions Markdown should include release doctor post-edit proof section");
+check(markdown.includes("Matches recommended operator proof chain:"), "external next actions Markdown should include release doctor post-edit proof match details");
 check(markdown.includes("Private values recorded: no"), "external next actions Markdown should state value redaction");
 check(!/https?:\/\//i.test(markdown), "external next actions Markdown should not include public or private URL values");
 check(!/https?:\/\//i.test(serializedReport), "external next actions JSON should not include public or private URL values");
@@ -6272,6 +6369,8 @@ console.log(`- Doctor release-channel focus receipt ready: ${nextActionsReport.d
 console.log(`- Doctor release-channel focus current action ready: ${nextActionsReport.doctorReleaseChannelFocusCurrentReady ? "yes" : "no"}`);
 console.log(`- Doctor release-channel focus current-ready rows: ${nextActionsReport.doctorReleaseChannelFocusCurrentReadyCount}/${nextActionsReport.doctorReleaseChannelFocusRowCount}`);
 console.log(`- Doctor release-channel focus placeholder keys: ${nextActionsReport.doctorReleaseChannelFocusPlaceholderKeyCount}`);
+console.log(`- Doctor post-edit proof command: ${nextActionsReport.doctorPostEditProofCommand}`);
+console.log(`- Doctor post-edit proof matches recommended: ${nextActionsReport.doctorPostEditProofMatchesRecommended ? "yes" : "no"}`);
 console.log(`- Current required keys: ${nextActionsReport.currentRequiredKeyCount} (${nextActionsReport.currentRequiredKeySummary})`);
 console.log(`- Current placeholder keys: ${nextActionsReport.currentPlaceholderKeyCount} (${nextActionsReport.currentPlaceholderKeySummary})`);
 console.log(`- Current placeholder edit locations: ${nextActionsReport.currentPlaceholderEditLocationCount} (${nextActionsReport.currentPlaceholderEditLocationSummary})`);
