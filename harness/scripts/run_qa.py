@@ -12,6 +12,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PLAN_RE = re.compile(r"plan-\d{3,}-[a-z0-9][a-z0-9-]*\.md$")
 
+QUALITY_COMMAND_BLOCK_REQUIRED = [
+    "npm run persona:smoke",
+    "npm run release:progress-smoke",
+    "npm run release:current-blocker",
+    "npm run release:current-blocker-smoke",
+    "npm run release:channel-unblock-smoke",
+    "npm run release:channel-edit-packet-smoke",
+    "npm run release:completion-report-packet-smoke",
+    "npm run release:operator-completion-brief-smoke",
+    "npm run release:proof-bundle-smoke",
+    "npm run release:proof-bundle",
+    "npm run release:external-check",
+]
+
 REQUIRED_PATHS = [
     "AGENTS.md",
     "README.md",
@@ -25149,6 +25163,19 @@ def check_text_expectations(errors: list[str]) -> None:
                 errors.append(f"{file_path} missing text: {needle}")
 
 
+def check_quality_command_block(errors: list[str]) -> None:
+    text = (ROOT / "docs/quality/rules.md").read_text(encoding="utf-8")
+    match = re.search(r"Current commands:\n\n```sh\n(?P<commands>.*?)\n```", text, re.S)
+    if not match:
+        errors.append("docs/quality/rules.md missing Current commands shell block")
+        return
+
+    commands = {line.strip() for line in match.group("commands").splitlines() if line.strip()}
+    for command in QUALITY_COMMAND_BLOCK_REQUIRED:
+        if command not in commands:
+            errors.append(f"docs/quality/rules.md Current commands block missing: {command}")
+
+
 def check_official_sources(errors: list[str]) -> None:
     text = (ROOT / "docs/references/official-sources.md").read_text(encoding="utf-8")
     if "| TODO |" in text:
@@ -25287,6 +25314,7 @@ def run_checks(strict: bool = False) -> list[str]:
     check_forbidden_paths(errors)
     check_plan_names(errors)
     check_text_expectations(errors)
+    check_quality_command_block(errors)
     check_official_sources(errors)
     check_offline_render_determinism(errors)
     check_build_chunk_config(errors)

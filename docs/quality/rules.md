@@ -50,6 +50,7 @@ python3 harness/scripts/run_qa.py
 python3 harness/scripts/run_quality_gate.py
 npm run renderer:smoke
 npm run workflow:smoke
+npm run persona:smoke
 npm run harness:smoke
 npm run desktop:local-delivery-package-smoke
 npm run desktop:local-package-reopen-smoke
@@ -97,12 +98,17 @@ npm run qa
 npm run verify
 npm run release:check
 npm run release:progress
+npm run release:progress-smoke
+npm run release:current-blocker
+npm run release:current-blocker-smoke
 npm run release:doctor
 npm run release:prepare-env-smoke
 npm run release:prepare-env
+npm run release:channel-unblock-smoke
 npm run release:channel-live-check
 npm run release:channel-live-check-strict
 npm run release:channel-live-check-strict-success-smoke
+npm run release:channel-edit-packet-smoke
 npm run release:post-edit-proof
 npm run release:private-edit-quick-proof
 npm run release:private-edit-quick-proof-smoke
@@ -115,6 +121,8 @@ npm run release:final-handoff
 npm run release:final-handoff-success-redaction-smoke
 npm run release:final-handoff-refresh-smoke
 npm run release:audience-completion-handoff-smoke
+npm run release:completion-report-packet-smoke
+npm run release:operator-completion-brief-smoke
 npm run release:channel-clearance-transition-smoke
 npm run release:auto-update-transition-smoke
 npm run release:update-feed-live-check
@@ -130,6 +138,9 @@ npm run release:progress-freshness-smoke
 npm run release:external-preflight
 npm run release:next-actions-smoke
 npm run release:next-actions
+npm run release:proof-bundle-smoke
+npm run release:proof-bundle
+npm run release:external-check
 ```
 
 Desktop app manual check:
