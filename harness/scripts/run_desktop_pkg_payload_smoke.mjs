@@ -6,6 +6,7 @@ import { constants, createReadStream, existsSync, readdirSync, readFileSync } fr
 import { access, lstat, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -316,6 +317,11 @@ async function checkExtractedApp(extractedApp) {
 }
 
 async function launchExtractedApp(extractedExecutable, extractedAppRoot) {
+  const blockDetails = macGuiLaunchBlockDetails("npm run desktop:pkg-payload-smoke");
+  if (blockDetails) {
+    fail("Refusing to start extracted Electron in a restricted macOS GUI context.", blockDetails);
+  }
+
   const env = {
     ...process.env,
     GROOVEFORGE_DESKTOP_LAUNCH_SMOKE: "1",

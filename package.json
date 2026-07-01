@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -p tsconfig.json && vite build && tsc -p tsconfig.electron.json",
-    "desktop": "npm run build && electron .",
+    "desktop": "npm run build && node harness/scripts/run_desktop_app.mjs",
     "desktop:smoke": "node harness/scripts/run_desktop_entry_smoke.mjs",
     "desktop:launch-smoke": "node harness/scripts/run_desktop_launch_smoke.mjs",
     "desktop:project-io-smoke": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_desktop_project_io_smoke.mjs",
@@ -93,6 +93,7 @@
     "release:update-feed-live-check": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_release_update_feed_live_check.mjs",
     "release:update-feed-live-check-strict": "node --experimental-strip-types --import ./harness/scripts/register_ts_loader.mjs harness/scripts/run_release_update_feed_live_check.mjs --strict",
     "release:update-feed-live-check-strict-success-smoke": "node harness/scripts/run_release_update_feed_live_check_strict_success_smoke.mjs",
+    "release:update-feed-edit-packet-smoke": "node harness/scripts/run_release_update_feed_edit_packet_smoke.mjs",
     "release:update-feed-post-edit-proof": "node harness/scripts/run_release_update_feed_post_edit_proof.mjs",
     "release:update-feed-post-edit-proof-success-smoke": "node harness/scripts/run_release_update_feed_post_edit_proof_success_smoke.mjs",
     "release:update-feed-checkpoint-smoke": "node harness/scripts/run_release_update_feed_checkpoint_smoke.mjs",

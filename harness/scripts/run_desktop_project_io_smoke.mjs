@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
@@ -202,6 +203,11 @@ async function runElectronProjectIoSmoke() {
   const electronBin = resolveElectronBinary();
   if (!electronBin) {
     fail("Electron binary is missing; run npm install first.");
+  }
+
+  const blockDetails = macGuiLaunchBlockDetails("npm run desktop:project-io-smoke");
+  if (blockDetails) {
+    fail("Refusing to start Electron in a restricted macOS GUI context.", blockDetails);
   }
 
   const env = {
