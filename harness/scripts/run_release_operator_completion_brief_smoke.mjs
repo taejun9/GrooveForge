@@ -65,6 +65,10 @@ function integerValue(value) {
   return Number.isInteger(value) ? value : 0;
 }
 
+function integerValueOr(value, fallback) {
+  return Number.isInteger(value) ? value : fallback;
+}
+
 function objectRows(value) {
   return Array.isArray(value) ? value.filter((row) => row && typeof row === "object" && !Array.isArray(row)) : [];
 }
@@ -271,15 +275,40 @@ function sanitizeEditRows(rows) {
   }));
 }
 
+function releaseChannelMetadataPosture({ completionReportPacket, currentBlocker }) {
+  const requiredKeyCount = integerValueOr(
+    currentBlocker.releaseChannelLiveCheckCurrentRequiredKeyCount,
+    integerValue(completionReportPacket.currentRequiredKeyCount)
+  );
+  const readyCount = integerValueOr(currentBlocker.releaseChannelLiveCheckCurrentReadyCount, 0);
+  const placeholderKeyCount = integerValueOr(
+    currentBlocker.releaseChannelLiveCheckCurrentPlaceholderKeyCount,
+    integerValue(completionReportPacket.currentPlaceholderKeyCount)
+  );
+  const blocked = requiredKeyCount === 4 && placeholderKeyCount > 0;
+  const cleared = requiredKeyCount === 4 && readyCount === requiredKeyCount && placeholderKeyCount === 0;
+  return {
+    requiredKeyCount,
+    readyCount,
+    placeholderKeyCount,
+    blocked,
+    cleared,
+    ready: blocked || cleared
+  };
+}
+
 function operatorBriefRows({ completionReportPacket, currentBlocker, progressFreshness }) {
+  const releaseChannelPosture = releaseChannelMetadataPosture({ completionReportPacket, currentBlocker });
   return [
     {
       order: 1,
       step: "Edit private release-channel metadata",
       command: "manual edit .env.distribution.local",
-      evidence: `${integerValue(currentBlocker.currentPlaceholderKeyCount)} current release-channel placeholders remain`,
+      evidence: releaseChannelPosture.cleared
+        ? "release-channel metadata placeholders cleared in value-free receipts"
+        : `${releaseChannelPosture.placeholderKeyCount} current release-channel placeholders remain`,
       expectedPostEditSignal: "release-channel metadata placeholders clear in value-free receipts",
-      sourceField: "currentBlocker.currentEnvEditRows",
+      sourceField: "currentBlocker.releaseChannelLiveCheckCurrentPlaceholderKeyCount",
       valueRecorded: false
     },
     {
@@ -407,6 +436,10 @@ function buildMarkdown(report) {
 - Current blocker: ${report.currentFirstBlocker}
 - Current edit target: ${report.currentEnvEditTarget}
 - Current placeholder keys: ${report.currentPlaceholderKeyCount}/${report.currentRequiredKeyCount}
+- Release-channel metadata blocked: ${readyLabel(report.releaseChannelMetadataBlocked)}
+- Release-channel metadata cleared: ${readyLabel(report.releaseChannelMetadataCleared)}
+- Release-channel current ready rows: ${report.releaseChannelCurrentReadyCount}/${report.releaseChannelCurrentRequiredKeyCount}
+- Release-channel current placeholder keys: ${report.releaseChannelCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}
 - Private-edit operator proof command: \`${report.privateEditOperatorProofCommand}\`
 - Post-clearance next action: ${report.postClearanceNextPriorityActionLabel}
 - Post-clearance proof command: \`${report.postClearanceNextActionPreviewProofCommand}\`
@@ -479,6 +512,11 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
   const proofRows = objectRows(completionReportPacket.privateEditProofCommandRows);
   const postClearanceRows = nextActionRows({ completionReportPacket, currentBlocker });
   const sourceBoundaryReady = sourcePrivacyBoundaryReady({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness });
+  const releaseChannelPosture = releaseChannelMetadataPosture({ completionReportPacket, currentBlocker });
+  const currentEditRowsReady =
+    currentEnvEditRows.length > 0 &&
+    currentEnvEditRows.every((row) => row.valueRecorded === false) &&
+    (releaseChannelPosture.blocked ? currentEnvEditRows.length === 4 && currentEnvEditRows.every((row) => row.placeholder === true) : true);
   const ready =
     sourceRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
     sourceLabelsMatchLatest(sourceRows, latestTenPlanProgressLabel) &&
@@ -490,8 +528,8 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     progressFreshness.releaseProgressFreshnessReady === true &&
     integerValue(progressFreshness.staleArtifactCount) === 0 &&
     integerValue(progressFreshness.missingArtifactCount) === 0 &&
-    currentEnvEditRows.length === 4 &&
-    currentEnvEditRows.every((row) => row.placeholder === true && row.valueRecorded === false) &&
+    releaseChannelPosture.ready === true &&
+    currentEditRowsReady === true &&
     operatorRows.length === 6 &&
     operatorRows.every((row) => row.valueRecorded === false) &&
     proofRows.length === 5 &&
@@ -524,6 +562,12 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     sourceArtifactRowCount: sourceRows.length,
     sourceLabelsMatchLatestTenPlan: sourceLabelsMatchLatest(sourceRows, latestTenPlanProgressLabel),
     sourcePrivacyBoundaryReady: sourceBoundaryReady,
+    releaseChannelMetadataPostureReady: releaseChannelPosture.ready,
+    releaseChannelMetadataBlocked: releaseChannelPosture.blocked,
+    releaseChannelMetadataCleared: releaseChannelPosture.cleared,
+    releaseChannelCurrentRequiredKeyCount: releaseChannelPosture.requiredKeyCount,
+    releaseChannelCurrentReadyCount: releaseChannelPosture.readyCount,
+    releaseChannelCurrentPlaceholderKeyCount: releaseChannelPosture.placeholderKeyCount,
     latestCompletedPlanNumber: integerValue(completionReportPacket.latestCompletedPlanNumber),
     latestTenPlanProgressLabel,
     latestTenPlanCompletedCount: integerValue(completionReportPacket.latestTenPlanCompletedCount),
@@ -608,10 +652,27 @@ check(report.latestTenPlanProgressLabel === completionReportPacket.latestTenPlan
 check(report.userFacingCompletionPercent === 99.999999, "release operator completion brief should keep user-facing completion percent");
 check(report.userFacingRemainingPercent === 0.000001, "release operator completion brief should keep remaining completion percent");
 check(report.currentEnvEditTarget === ".env.distribution.local", "release operator completion brief should point at the ignored local env target");
-check(report.currentRequiredKeyCount === 4, "release operator completion brief should include four current required keys");
-check(report.currentPlaceholderKeyCount === 4, "release operator completion brief should keep four current placeholder keys while blocked");
-check(report.currentEnvEditRowCount === 4, "release operator completion brief should include four current edit rows");
-check(report.currentEnvEditRows.every((row) => row.valueRecorded === false && row.placeholder === true), "release operator completion brief edit rows should be placeholder and value-free");
+check(report.releaseChannelMetadataPostureReady === true, "release operator completion brief should accept blocked or cleared release-channel metadata posture");
+check(report.releaseChannelCurrentRequiredKeyCount === 4, "release operator completion brief should track four release-channel metadata keys");
+check(
+  report.releaseChannelMetadataBlocked !== report.releaseChannelMetadataCleared,
+  "release operator completion brief should report exactly one release-channel metadata posture"
+);
+check(
+  !report.releaseChannelMetadataBlocked || report.releaseChannelCurrentPlaceholderKeyCount === 4,
+  "release operator completion brief blocked posture should keep four release-channel placeholders"
+);
+check(
+  !report.releaseChannelMetadataCleared ||
+    (report.releaseChannelCurrentReadyCount === 4 && report.releaseChannelCurrentPlaceholderKeyCount === 0),
+  "release operator completion brief cleared posture should report four ready release-channel rows and zero placeholders"
+);
+check(report.currentEnvEditRowCount > 0, "release operator completion brief should include current edit rows");
+check(report.currentEnvEditRows.every((row) => row.valueRecorded === false), "release operator completion brief edit rows should be value-free");
+check(
+  !report.releaseChannelMetadataBlocked || report.currentEnvEditRows.every((row) => row.placeholder === true),
+  "release operator completion brief blocked edit rows should be placeholders"
+);
 check(report.operatorBriefRowCount === 6, "release operator completion brief should include six operator rows");
 check(report.operatorBriefRows.every((row) => row.valueRecorded === false), "release operator completion brief rows should be value-free");
 check(report.privateEditOperatorProofCommand === privateEditOperatorProofCommand, "release operator completion brief should expose the private-edit strict proof command");
@@ -677,6 +738,10 @@ console.log(`- Current 10-plan progress: ${report.latestTenPlanProgressLabel}`);
 console.log(`- Current blocker: ${report.currentFirstBlocker}`);
 console.log(`- Current edit target: ${report.currentEnvEditTarget}`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount}/${report.currentRequiredKeyCount}`);
+console.log(`- Release-channel metadata blocked: ${report.releaseChannelMetadataBlocked ? "yes" : "no"}`);
+console.log(`- Release-channel metadata cleared: ${report.releaseChannelMetadataCleared ? "yes" : "no"}`);
+console.log(`- Release-channel current ready rows: ${report.releaseChannelCurrentReadyCount}/${report.releaseChannelCurrentRequiredKeyCount}`);
+console.log(`- Release-channel current placeholder keys: ${report.releaseChannelCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}`);
 console.log(`- Private-edit operator proof command: ${report.privateEditOperatorProofCommand}`);
 console.log(`- Post-clearance next action: ${report.postClearanceNextPriorityActionLabel}`);
 console.log(`- Post-clearance proof command: ${report.postClearanceNextActionPreviewProofCommand}`);

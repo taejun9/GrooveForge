@@ -17,32 +17,45 @@ const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson
 const currentBlockerJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-current-blocker.json`);
 const completionReportPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-completion-report-packet-smoke.json`);
 const freshnessJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-progress-freshness-smoke.json`);
+const operatorCompletionBriefJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-operator-completion-brief-smoke.json`);
 const refreshMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${refreshStem}.md`);
 const refreshJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${refreshStem}.json`);
 const failures = [];
 const refreshCommands = [
   {
     order: 1,
+    command: "npm run release:update-feed-checkpoint-smoke",
+    role: "refresh latest update-feed checkpoint before progress reads it",
+    valueRecorded: false
+  },
+  {
+    order: 2,
     command: "npm run release:progress-smoke",
     role: "refresh existing-evidence release progress report",
     valueRecorded: false
   },
   {
-    order: 2,
+    order: 3,
     command: "npm run release:current-blocker-smoke",
     role: "refresh existing-evidence current blocker receipt",
     valueRecorded: false
   },
   {
-    order: 3,
+    order: 4,
     command: "npm run release:completion-report-packet-smoke",
     role: "refresh user-facing completion report packet",
     valueRecorded: false
   },
   {
-    order: 4,
+    order: 5,
     command: "npm run release:progress-freshness-smoke",
     role: "verify refreshed artifacts match latest update-feed checkpoint",
+    valueRecorded: false
+  },
+  {
+    order: 6,
+    command: "npm run release:operator-completion-brief-smoke",
+    role: "refresh compact operator completion brief from aligned release evidence",
     valueRecorded: false
   }
 ];
@@ -121,11 +134,12 @@ function commandSummary(rows) {
   return rows.map((row) => row.command).join(" -> ");
 }
 
-function buildReport({ releaseProgress, currentBlocker, completionReportPacket, freshness }) {
+function buildReport({ releaseProgress, currentBlocker, completionReportPacket, freshness, operatorCompletionBrief }) {
   const progressLabel = textValue(releaseProgress.currentTenPlanWindowLabel);
   const blockerLabel = textValue(currentBlocker.currentTenPlanProgressLabel);
   const packetLabel = textValue(completionReportPacket.latestTenPlanProgressLabel);
   const freshnessLabel = textValue(freshness.latestTenPlanProgressLabel);
+  const operatorBriefLabel = textValue(operatorCompletionBrief.latestTenPlanProgressLabel);
   const sourceArtifactRows = [
     artifactRow("Release progress report", releaseProgressJsonPath, releaseProgress.releaseProgressReportReady === true, progressLabel, "currentTenPlanWindowLabel"),
     artifactRow("Release current blocker", currentBlockerJsonPath, currentBlocker.releaseCurrentBlockerReady === true, blockerLabel, "currentTenPlanProgressLabel"),
@@ -136,14 +150,41 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
       packetLabel,
       "latestTenPlanProgressLabel"
     ),
-    artifactRow("Release progress freshness smoke", freshnessJsonPath, freshness.releaseProgressFreshnessReady === true, freshnessLabel, "latestTenPlanProgressLabel")
+    artifactRow("Release progress freshness smoke", freshnessJsonPath, freshness.releaseProgressFreshnessReady === true, freshnessLabel, "latestTenPlanProgressLabel"),
+    artifactRow(
+      "Release operator completion brief smoke",
+      operatorCompletionBriefJsonPath,
+      operatorCompletionBrief.releaseOperatorCompletionBriefReady === true,
+      operatorBriefLabel,
+      "latestTenPlanProgressLabel"
+    )
   ];
-  const labelsMatch = progressLabel === blockerLabel && blockerLabel === packetLabel && packetLabel === freshnessLabel;
+  const labelsMatch =
+    progressLabel === blockerLabel &&
+    blockerLabel === packetLabel &&
+    packetLabel === freshnessLabel &&
+    freshnessLabel === operatorBriefLabel;
   const freshnessClean =
     freshness.releaseProgressFreshnessReady === true &&
     integerValue(freshness.freshArtifactCount) === integerValue(freshness.freshnessRowCount) &&
     integerValue(freshness.staleArtifactCount) === 0 &&
     integerValue(freshness.missingArtifactCount) === 0;
+  const operatorBriefReady =
+    operatorCompletionBrief.releaseOperatorCompletionBriefReady === true &&
+    operatorCompletionBrief.sourcePrivacyBoundaryReady === true &&
+    operatorCompletionBrief.sourceLabelsMatchLatestTenPlan === true &&
+    operatorCompletionBrief.releaseChannelMetadataPostureReady === true &&
+    operatorCompletionBrief.releaseChannelCurrentRequiredKeyCount === 4 &&
+    operatorCompletionBrief.releaseChannelMetadataBlocked !== operatorCompletionBrief.releaseChannelMetadataCleared &&
+    operatorCompletionBrief.privateEditOperatorProofCommand === "npm run release:private-edit-strict-proof" &&
+    operatorCompletionBrief.postClearanceNextPriorityActionId === "auto-update-feed" &&
+    operatorCompletionBrief.updateFeedCheckpointReady === true &&
+    operatorCompletionBrief.hardGateReady === false &&
+    operatorCompletionBrief.hardGateWouldFail === true &&
+    operatorCompletionBrief.privateValuesRecorded === false &&
+    operatorCompletionBrief.feedValueRecorded === false &&
+    operatorCompletionBrief.channelValueRecorded === false &&
+    operatorCompletionBrief.claimedExternalDistribution === false;
   const currentBlockerStillExternal =
     currentBlocker.hardGateReady === false &&
     currentBlocker.hardGateWouldFail === true &&
@@ -166,6 +207,7 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
       sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
       labelsMatch &&
       freshnessClean &&
+      operatorBriefReady &&
       currentBlockerStillExternal,
     refreshCommandRows: refreshCommands,
     refreshCommandCount: refreshCommands.length,
@@ -184,6 +226,23 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     finalFreshnessRowCount: integerValue(freshness.freshnessRowCount),
     finalStaleArtifactCount: integerValue(freshness.staleArtifactCount),
     finalMissingArtifactCount: integerValue(freshness.missingArtifactCount),
+    operatorCompletionBriefReady: operatorBriefReady,
+    operatorCompletionBriefSourcePrivacyBoundaryReady: operatorCompletionBrief.sourcePrivacyBoundaryReady === true,
+    operatorCompletionBriefSourceLabelsMatchLatestTenPlan: operatorCompletionBrief.sourceLabelsMatchLatestTenPlan === true,
+    operatorCompletionBriefReleaseChannelMetadataPostureReady: operatorCompletionBrief.releaseChannelMetadataPostureReady === true,
+    operatorCompletionBriefReleaseChannelMetadataBlocked: operatorCompletionBrief.releaseChannelMetadataBlocked === true,
+    operatorCompletionBriefReleaseChannelMetadataCleared: operatorCompletionBrief.releaseChannelMetadataCleared === true,
+    operatorCompletionBriefCurrentPlaceholderKeyCount: integerValue(operatorCompletionBrief.releaseChannelCurrentPlaceholderKeyCount),
+    operatorCompletionBriefCurrentReadyCount: integerValue(operatorCompletionBrief.releaseChannelCurrentReadyCount),
+    operatorCompletionBriefCurrentRequiredKeyCount: integerValue(operatorCompletionBrief.releaseChannelCurrentRequiredKeyCount),
+    operatorCompletionBriefProofCommand: textValue(operatorCompletionBrief.privateEditOperatorProofCommand),
+    operatorCompletionBriefPostClearanceNextPriorityActionId: textValue(operatorCompletionBrief.postClearanceNextPriorityActionId),
+    operatorCompletionBriefPostClearanceProofCommand: textValue(operatorCompletionBrief.postClearanceNextActionPreviewProofCommand),
+    operatorCompletionBriefUpdateFeedCheckpointReady: operatorCompletionBrief.updateFeedCheckpointReady === true,
+    operatorCompletionBriefHardGateWouldFail: operatorCompletionBrief.hardGateWouldFail === true,
+    operatorCompletionBriefFreshArtifactCount: integerValue(operatorCompletionBrief.freshArtifactCount),
+    operatorCompletionBriefStaleArtifactCount: integerValue(operatorCompletionBrief.staleArtifactCount),
+    operatorCompletionBriefMissingArtifactCount: integerValue(operatorCompletionBrief.missingArtifactCount),
     currentFirstBlocker: textValue(currentBlocker.currentFirstBlocker),
     currentNextCommand: textValue(currentBlocker.currentNextCommand),
     currentRerunCommand: textValue(currentBlocker.currentRerunCommand),
@@ -233,6 +292,16 @@ function buildMarkdown(report) {
 - Fresh artifacts: ${report.finalFreshArtifactCount}/${report.finalFreshnessRowCount}
 - Stale artifacts: ${report.finalStaleArtifactCount}
 - Missing artifacts: ${report.finalMissingArtifactCount}
+- Operator completion brief ready: ${readyLabel(report.operatorCompletionBriefReady)}
+- Operator source privacy boundary ready: ${readyLabel(report.operatorCompletionBriefSourcePrivacyBoundaryReady)}
+- Operator release-channel metadata blocked: ${readyLabel(report.operatorCompletionBriefReleaseChannelMetadataBlocked)}
+- Operator release-channel metadata cleared: ${readyLabel(report.operatorCompletionBriefReleaseChannelMetadataCleared)}
+- Operator release-channel current ready rows: ${report.operatorCompletionBriefCurrentReadyCount}/${report.operatorCompletionBriefCurrentRequiredKeyCount}
+- Operator current placeholder keys: ${report.operatorCompletionBriefCurrentPlaceholderKeyCount}/${report.operatorCompletionBriefCurrentRequiredKeyCount}
+- Operator proof command: \`${report.operatorCompletionBriefProofCommand}\`
+- Operator post-clearance next action: ${report.operatorCompletionBriefPostClearanceNextPriorityActionId}
+- Operator post-clearance proof command: \`${report.operatorCompletionBriefPostClearanceProofCommand}\`
+- Operator update-feed checkpoint ready: ${readyLabel(report.operatorCompletionBriefUpdateFeedCheckpointReady)}
 - Current next command: \`${report.currentNextCommand}\`
 - Current first blocker: ${report.currentFirstBlocker}
 - Hard gate ready: ${readyLabel(report.hardGateReady)}
@@ -275,14 +344,14 @@ function validateReport(report, markdown) {
   const serialized = JSON.stringify(report);
   check(report.releaseProgressRefreshReady === true, "release progress refresh smoke should be ready");
   check(report.reportCommand === "npm run release:progress-refresh-smoke", "release progress refresh smoke should report its command");
-  check(report.refreshCommandCount === 4, "release progress refresh smoke should run four commands");
+  check(report.refreshCommandCount === 6, "release progress refresh smoke should run six commands");
   check(
     report.refreshCommandSummary ===
-      "npm run release:progress-smoke -> npm run release:current-blocker-smoke -> npm run release:completion-report-packet-smoke -> npm run release:progress-freshness-smoke",
-    "release progress refresh smoke should run progress, current-blocker, completion packet, then freshness"
+      "npm run release:update-feed-checkpoint-smoke -> npm run release:progress-smoke -> npm run release:current-blocker-smoke -> npm run release:completion-report-packet-smoke -> npm run release:progress-freshness-smoke -> npm run release:operator-completion-brief-smoke",
+    "release progress refresh smoke should run update-feed checkpoint, progress, current-blocker, completion packet, freshness, then operator completion brief"
   );
   check(report.refreshCommandRows.every((row) => row.valueRecorded === false), "release progress refresh command rows should be value-free");
-  check(report.sourceArtifactRowCount === 4, "release progress refresh smoke should include four source artifacts");
+  check(report.sourceArtifactRowCount === 5, "release progress refresh smoke should include five source artifacts");
   check(report.sourceArtifactRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false), "release progress refresh source artifacts should be present, ready, and value-free");
   check(report.labelsMatch === true, "release progress refresh smoke should leave progress labels matched");
   check(report.latestTenPlanWindowStart > 0, "release progress refresh smoke should report a positive 10-plan window start");
@@ -295,6 +364,32 @@ function validateReport(report, markdown) {
   check(report.finalFreshArtifactCount === report.finalFreshnessRowCount, "release progress refresh smoke should finish with all freshness rows fresh");
   check(report.finalStaleArtifactCount === 0, "release progress refresh smoke should finish with zero stale artifacts");
   check(report.finalMissingArtifactCount === 0, "release progress refresh smoke should finish with zero missing artifacts");
+  check(report.operatorCompletionBriefReady === true, "release progress refresh smoke should refresh the operator completion brief");
+  check(report.operatorCompletionBriefSourcePrivacyBoundaryReady === true, "release progress refresh smoke should keep operator source privacy boundary ready");
+  check(report.operatorCompletionBriefSourceLabelsMatchLatestTenPlan === true, "release progress refresh smoke should keep operator source labels matched");
+  check(report.operatorCompletionBriefReleaseChannelMetadataPostureReady === true, "release progress refresh smoke should keep operator release-channel posture ready");
+  check(
+    report.operatorCompletionBriefReleaseChannelMetadataBlocked !== report.operatorCompletionBriefReleaseChannelMetadataCleared,
+    "release progress refresh smoke should keep exactly one operator release-channel posture"
+  );
+  check(report.operatorCompletionBriefCurrentRequiredKeyCount === 4, "release progress refresh smoke should keep four release-channel metadata keys");
+  check(
+    !report.operatorCompletionBriefReleaseChannelMetadataBlocked || report.operatorCompletionBriefCurrentPlaceholderKeyCount === 4,
+    "release progress refresh smoke should keep four operator placeholders while blocked"
+  );
+  check(
+    !report.operatorCompletionBriefReleaseChannelMetadataCleared ||
+      (report.operatorCompletionBriefCurrentReadyCount === 4 && report.operatorCompletionBriefCurrentPlaceholderKeyCount === 0),
+    "release progress refresh smoke should allow operator release-channel metadata cleared posture"
+  );
+  check(report.operatorCompletionBriefProofCommand === "npm run release:private-edit-strict-proof", "release progress refresh smoke should keep strict proof as operator proof command");
+  check(report.operatorCompletionBriefPostClearanceNextPriorityActionId === "auto-update-feed", "release progress refresh smoke should keep auto-update-feed as post-clearance next action");
+  check(report.operatorCompletionBriefPostClearanceProofCommand === "npm run desktop:auto-update-readiness-smoke", "release progress refresh smoke should keep auto-update readiness as post-clearance proof");
+  check(report.operatorCompletionBriefUpdateFeedCheckpointReady === true, "release progress refresh smoke should keep operator update-feed checkpoint ready");
+  check(report.operatorCompletionBriefHardGateWouldFail === true, "release progress refresh smoke should keep operator hard gate would-fail posture");
+  check(report.operatorCompletionBriefFreshArtifactCount === report.finalFreshArtifactCount, "release progress refresh smoke should align operator fresh artifact count");
+  check(report.operatorCompletionBriefStaleArtifactCount === 0, "release progress refresh smoke should keep operator stale artifacts at zero");
+  check(report.operatorCompletionBriefMissingArtifactCount === 0, "release progress refresh smoke should keep operator missing artifacts at zero");
   check(report.hardGateReady === false, "release progress refresh smoke should keep hard gate unready");
   check(report.hardGateWouldFail === true, "release progress refresh smoke should keep hard gate would-fail posture");
   check(report.userFacingCompletionPercent === 99.999999, "release progress refresh smoke should preserve completion percent");
@@ -332,7 +427,8 @@ const releaseProgress = await readJsonRequired(releaseProgressJsonPath, "Release
 const currentBlocker = await readJsonRequired(currentBlockerJsonPath, "Release current blocker");
 const completionReportPacket = await readJsonRequired(completionReportPacketJsonPath, "Release completion report packet");
 const freshness = await readJsonRequired(freshnessJsonPath, "Release progress freshness smoke");
-const report = buildReport({ releaseProgress, currentBlocker, completionReportPacket, freshness });
+const operatorCompletionBrief = await readJsonRequired(operatorCompletionBriefJsonPath, "Release operator completion brief smoke");
+const report = buildReport({ releaseProgress, currentBlocker, completionReportPacket, freshness, operatorCompletionBrief });
 const markdown = buildMarkdown(report);
 validateReport(report, markdown);
 
@@ -349,6 +445,14 @@ console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
 console.log(`- Fresh artifacts: ${report.finalFreshArtifactCount}/${report.finalFreshnessRowCount}`);
 console.log(`- Stale artifacts: ${report.finalStaleArtifactCount}`);
 console.log(`- Missing artifacts: ${report.finalMissingArtifactCount}`);
+console.log(`- Operator completion brief ready: ${report.operatorCompletionBriefReady ? "yes" : "no"}`);
+console.log(`- Operator source privacy boundary ready: ${report.operatorCompletionBriefSourcePrivacyBoundaryReady ? "yes" : "no"}`);
+console.log(`- Operator release-channel metadata blocked: ${report.operatorCompletionBriefReleaseChannelMetadataBlocked ? "yes" : "no"}`);
+console.log(`- Operator release-channel metadata cleared: ${report.operatorCompletionBriefReleaseChannelMetadataCleared ? "yes" : "no"}`);
+console.log(`- Operator release-channel current ready rows: ${report.operatorCompletionBriefCurrentReadyCount}/${report.operatorCompletionBriefCurrentRequiredKeyCount}`);
+console.log(`- Operator current placeholder keys: ${report.operatorCompletionBriefCurrentPlaceholderKeyCount}/${report.operatorCompletionBriefCurrentRequiredKeyCount}`);
+console.log(`- Operator proof command: ${report.operatorCompletionBriefProofCommand}`);
+console.log(`- Operator post-clearance next action: ${report.operatorCompletionBriefPostClearanceNextPriorityActionId}`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
 console.log(`- User-facing completion: ${report.userFacingCompletionPercent}%`);
 console.log(`- Remaining completion: ${report.userFacingRemainingPercent}%`);
