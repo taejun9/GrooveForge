@@ -27,6 +27,7 @@ const refreshCommandsBeforeSourceCheck = [
 ];
 const refreshCommandsAfterSourceCheck = [
   ["run", "desktop:external-distribution-gate-smoke"],
+  ["run", "release:update-feed-checkpoint-smoke"],
   ["run", "release:progress-smoke"]
 ];
 const refreshCommands = [...refreshCommandsBeforeSourceCheck, ...refreshCommandsAfterSourceCheck];
@@ -2695,6 +2696,7 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
     check(report.refreshCommandSequence.includes("npm run release:doctor"), "release current blocker should refresh release doctor evidence");
     check(report.refreshCommandSequence.includes("npm run release:proof-bundle"), "release current blocker should refresh proof bundle evidence");
     check(report.refreshCommandSequence.includes("npm run desktop:external-distribution-gate-smoke"), "release current blocker should refresh external gate dry-run evidence");
+    check(report.refreshCommandSequence.includes("npm run release:update-feed-checkpoint-smoke"), "release current blocker should refresh update-feed checkpoint evidence before release progress");
     check(report.refreshCommandSequence.includes("npm run release:progress-smoke"), "release current blocker should refresh release progress evidence from refreshed sources");
   }
   check(
