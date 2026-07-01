@@ -213,10 +213,13 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
   const postEditReady = postEditProof?.releasePostEditProofReady === true || postEditProof?.releasePostEditProofSuccessSmokeReady === true;
   const progressReady = successSmoke || blockedSmoke ? true : progressRefresh?.refreshSmokeReady === true;
   const proofReady = strictReady && postEditReady && progressReady;
-  const currentTenPlanProgressLabel = textValue(
-    progressRefresh?.latestTenPlanProgressLabel,
-    textValue(currentBlocker?.currentTenPlanProgressLabel, textValue(postEditProof?.currentTenPlanProgressLabel, fallbackTenPlanProgressLabel))
-  );
+  const currentTenPlanProgressLabel =
+    successSmoke || blockedSmoke
+      ? fallbackTenPlanProgressLabel
+      : textValue(
+          progressRefresh?.latestTenPlanProgressLabel,
+          textValue(currentBlocker?.currentTenPlanProgressLabel, textValue(postEditProof?.currentTenPlanProgressLabel, fallbackTenPlanProgressLabel))
+        );
   const strictFailureBlocker = `Strict release-channel proof has ${strictFailureRows.length} missing, placeholder, or malformed metadata rows.`;
   const currentFirstBlocker = proofReady
     ? textValue(
@@ -514,6 +517,7 @@ async function writeReport(report) {
   check(!blockedSmoke || report.sourceMode.includes("blocked smoke"), "release private edit strict proof blocked smoke should use blocked smoke source mode");
   check(!blockedSmoke || report.strictFailureRowCount === releaseChannelMetadataKeys.length, "release private edit strict proof blocked smoke should cover four strict failure rows");
   check(!blockedSmoke || report.progressRefreshSkippedInBlockedSmoke === true, "release private edit strict proof blocked smoke should skip progress refresh");
+  check(!successSmoke && !blockedSmoke || report.currentTenPlanProgressLabel === fallbackTenPlanProgressLabel, "release private edit strict proof smoke should derive the latest completed-plan label without progress refresh");
   check(report.currentRequiredKeyCount === 4, "release private edit strict proof should track four release-channel keys");
   check(releaseChannelMetadataKeys.every((key) => report.currentRequiredKeys.includes(key)), "release private edit strict proof should cover release-channel keys");
   check(report.strictFailureRowCount === report.strictFailureRows.length, "release private edit strict proof strict failure row count should match rows");

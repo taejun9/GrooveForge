@@ -7152,6 +7152,7 @@ TEXT_EXPECTATIONS = {
         "release private edit strict proof blocked smoke should use blocked smoke source mode",
         "release private edit strict proof blocked smoke should cover four strict failure rows",
         "release private edit strict proof blocked smoke should skip progress refresh",
+        "release private edit strict proof smoke should derive the latest completed-plan label without progress refresh",
         "release private edit strict proof should not record private values",
         "release private edit strict proof should not probe update feeds",
         "release private edit strict proof should not claim external distribution",
