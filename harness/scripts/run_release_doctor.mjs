@@ -270,7 +270,11 @@ function displayLocalEnvTarget(filePath) {
     return distributionLocalEnvDefaults.defaultEnvFileName;
   }
   const absolute = path.isAbsolute(filePath) ? filePath : path.resolve(root, filePath);
-  return path.relative(root, absolute) || distributionLocalEnvDefaults.defaultEnvFileName;
+  const relativePath = path.relative(root, absolute);
+  if (!relativePath.startsWith("..") && !path.isAbsolute(relativePath)) {
+    return relativePath || distributionLocalEnvDefaults.defaultEnvFileName;
+  }
+  return path.basename(absolute);
 }
 
 function currentLocalEnvEditTarget(localEnvPresentFiles = []) {
@@ -283,12 +287,11 @@ function currentLocalEnvEditTarget(localEnvPresentFiles = []) {
 }
 
 function localEnvCandidatePaths() {
-  const paths = [path.join(root, distributionLocalEnvDefaults.defaultEnvFileName)];
   const configuredPath = process.env[distributionLocalEnvDefaults.configuredFileKey]?.trim();
   if (configuredPath) {
-    paths.push(path.isAbsolute(configuredPath) ? configuredPath : path.resolve(root, configuredPath));
+    return [path.isAbsolute(configuredPath) ? configuredPath : path.resolve(root, configuredPath)];
   }
-  return [...new Set(paths)];
+  return [path.join(root, distributionLocalEnvDefaults.defaultEnvFileName)];
 }
 
 function parseEnvLineKey(line) {

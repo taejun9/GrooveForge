@@ -66,12 +66,11 @@ function displayPath(root, filePath) {
 }
 
 function configuredFilePaths(root) {
-  const paths = [path.join(root, defaultEnvFileName)];
   const customPath = process.env.GROOVEFORGE_DISTRIBUTION_ENV_FILE?.trim();
   if (customPath) {
-    paths.push(path.isAbsolute(customPath) ? customPath : path.resolve(root, customPath));
+    return [path.isAbsolute(customPath) ? customPath : path.resolve(root, customPath)];
   }
-  return [...new Set(paths)];
+  return [path.join(root, defaultEnvFileName)];
 }
 
 export async function loadDistributionLocalEnv(options = {}) {

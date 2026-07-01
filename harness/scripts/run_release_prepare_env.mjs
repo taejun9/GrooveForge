@@ -117,10 +117,10 @@ function displayLocalEnvTarget(filePath) {
 
 function localEnvCandidatePaths() {
   const configuredPath = process.env[distributionLocalEnvDefaults.configuredFileKey]?.trim();
-  return [
-    localEnvPath,
-    configuredPath ? (path.isAbsolute(configuredPath) ? configuredPath : path.resolve(root, configuredPath)) : ""
-  ].filter(Boolean);
+  if (configuredPath) {
+    return [path.isAbsolute(configuredPath) ? configuredPath : path.resolve(root, configuredPath)];
+  }
+  return [localEnvPath];
 }
 
 async function readExistingLocalEnvPlaceholderAudit() {

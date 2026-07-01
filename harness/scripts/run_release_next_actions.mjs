@@ -189,12 +189,11 @@ function currentLocalEnvEditTarget(evidence = {}) {
 }
 
 function localEnvCandidatePaths() {
-  const paths = [path.join(root, distributionLocalEnvDefaults.defaultEnvFileName)];
   const configuredPath = process.env[distributionLocalEnvDefaults.configuredFileKey]?.trim();
   if (configuredPath) {
-    paths.push(path.isAbsolute(configuredPath) ? configuredPath : path.resolve(root, configuredPath));
+    return [path.isAbsolute(configuredPath) ? configuredPath : path.resolve(root, configuredPath)];
   }
-  return [...new Set(paths)];
+  return [path.join(root, distributionLocalEnvDefaults.defaultEnvFileName)];
 }
 
 function parseEnvLineKey(line) {

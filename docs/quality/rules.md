@@ -43,6 +43,7 @@ These rules should be enforced by the local harness where practical.
 - Broad permissions, remote AI calls, trackers, ads, payment flows, and destructive automations require explicit project rationale.
 - Real user audio, copyrighted sample packs, unreleased beats, credentials, and private project files must not be committed.
 - User-facing UI copy must keep GrooveForge composition-first: section guidance, beat-starter guidance, and mix/master details should avoid sampling-first phrases such as sample pocket, crate-dig, chop energy, rendered samples, and sample-free starter/signal wording when direct beat-writing, editable beat, or rendered-frame wording is more accurate.
+- `GROOVEFORGE_DISTRIBUTION_ENV_FILE` is an override for release evidence, not an additive env source. When it is set, release doctor/current-blocker/live-check evidence must use only the configured env file for current placeholder keys and file/line edit locations.
 
 ## Commands
 

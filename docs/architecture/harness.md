@@ -48,6 +48,8 @@ Agents should be able to answer these questions from repo files alone:
 
 If an answer only exists in chat, move it into an exec plan, meeting note, review, or product/quality document.
 
+Distribution env checks treat `GROOVEFORGE_DISTRIBUTION_ENV_FILE` as an override, not an extra input. When it is set, redacted loader, release doctor, prepare-env, channel live-check, update-feed live-check, and next-actions evidence should inspect that configured file as the single active local env source so default ignored `.env.distribution.local` placeholders do not contaminate operator receipts.
+
 ## Current Harness Commands
 
 ```sh
