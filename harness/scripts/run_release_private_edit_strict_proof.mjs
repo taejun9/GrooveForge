@@ -147,6 +147,15 @@ function formatFailureRows(rows) {
     .join("\n");
 }
 
+function formatBlockedHandoffRows(rows) {
+  if (rows.length === 0) {
+    return "| none | none | none | none | none | none | none | none | no |";
+  }
+  return rows
+    .map((row) => `| ${row.order} | ${escapeCell(row.blocker)} | ${escapeCell(row.editTarget)} | ${row.placeholderKeyCount} | ${row.strictFailureRowCount} | ${escapeCell(row.manualAction)} | \`${escapeCell(row.returnCommand)}\` | \`${escapeCell(row.firstProofCommand)}\` | ${row.valueRecorded ? "yes" : "no"} |`)
+    .join("\n");
+}
+
 function formatSourceRows(rows) {
   return rows
     .map((row) => `| ${escapeCell(row.label)} | ${row.synthetic ? "yes" : "no"} | ${row.present ? "yes" : "no"} | ${escapeCell(row.path)} | ${row.valueRecorded ? "yes" : "no"} |`)
@@ -185,7 +194,7 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
       )
     : textValue(
         currentBlocker?.currentFirstBlocker,
-        "Strict release-channel proof did not pass, so post-edit proof and progress refresh were not run."
+        `Strict release-channel proof has ${strictFailureRows.length} missing, placeholder, or malformed metadata rows.`
       );
   const commandRows = [
     {
@@ -219,6 +228,25 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
       valueRecorded: false
     }
   ];
+  const blockedHandoffRows = proofReady
+    ? []
+    : [
+        {
+          order: 1,
+          blocker: currentFirstBlocker,
+          editTarget: textValue(strictLiveCheck?.currentEnvEditTarget, ".env.distribution.local"),
+          requiredKeyCount: releaseChannelMetadataKeys.length,
+          requiredKeys: releaseChannelMetadataKeys,
+          placeholderKeyCount: integerValue(strictLiveCheck?.currentPlaceholderKeyCount),
+          placeholderKeys: stringArrayValue(strictLiveCheck?.currentPlaceholderKeys),
+          strictFailureRowCount: strictFailureRows.length,
+          manualAction: "replace the current release-channel placeholder values outside committed files",
+          returnCommand: successSmoke ? "npm run release:private-edit-strict-proof-success-smoke" : "npm run release:private-edit-strict-proof",
+          firstProofCommand: commandRows[0].command,
+          sourceField: "strictFailureRows/currentFirstBlocker/currentEnvEditTarget",
+          valueRecorded: false
+        }
+      ];
   const sourceRows = [
     sourceRow(
       successSmoke ? "Release-channel strict success smoke" : "Release-channel strict live check",
@@ -260,6 +288,13 @@ function buildReport({ strictResult, postEditResult, progressResult, strictLiveC
     privateEditStrictProofCommandRows: commandRows,
     privateEditStrictProofCommandRowCount: commandRows.length,
     privateEditStrictProofCommandSummary: commandRows.map((row) => row.command).join(" -> "),
+    privateEditStrictProofBlockedHandoffReady: proofReady || blockedHandoffRows.length > 0,
+    privateEditStrictProofBlockedHandoffRows: blockedHandoffRows,
+    privateEditStrictProofBlockedHandoffRowCount: blockedHandoffRows.length,
+    privateEditStrictProofBlockedHandoffSummary: blockedHandoffRows.length
+      ? `${blockedHandoffRows.length} blocked handoff row for ${blockedHandoffRows[0].editTarget}`
+      : "none",
+    privateEditStrictProofBlockedHandoffValueRecorded: false,
     strictReady,
     strictExitCode,
     strictFailureRowCount: strictFailureRows.length,
@@ -330,6 +365,8 @@ function buildMarkdown(report) {
 - Strict exit code: ${report.strictExitCode}
 - Strict current-ready rows: ${report.strictCurrentReadyCount}/${report.strictCurrentRowCount}
 - Strict failure rows: ${report.strictFailureRowCount}
+- Blocked handoff receipt ready: ${report.privateEditStrictProofBlockedHandoffReady ? "yes" : "no"}
+- Blocked handoff rows: ${report.privateEditStrictProofBlockedHandoffRowCount} (${report.privateEditStrictProofBlockedHandoffSummary})
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current placeholder keys: ${report.currentPlaceholderKeyCount} (${report.currentPlaceholderKeys.join(", ") || "none"})
 - Post-edit proof ready: ${report.postEditProofReady ? "yes" : "no"}
@@ -359,6 +396,12 @@ ${formatCommandRows(report.privateEditStrictProofCommandRows)}
 |---|---:|---:|---:|---|---|---:|---:|
 ${formatFailureRows(report.strictFailureRows)}
 
+## Blocked Handoff Receipt
+
+| order | blocker | edit target | placeholder keys | strict failure rows | manual action | return command | first proof command | value recorded |
+|---:|---|---|---:|---:|---|---|---|---:|
+${formatBlockedHandoffRows(report.privateEditStrictProofBlockedHandoffRows)}
+
 ## Source Artifacts
 
 | artifact | synthetic | present | path | value recorded |
@@ -385,6 +428,10 @@ async function writeReport(report) {
   check(report.privateEditStrictProofFirstCommand.includes("channel-live-check-strict"), "release private edit strict proof should run strict live-check first");
   check(report.privateEditStrictProofPostEditCommand.includes("post-edit-proof"), "release private edit strict proof should include post-edit proof");
   check(report.privateEditStrictProofProgressCommand === "npm run release:progress-refresh-smoke", "release private edit strict proof should include progress refresh");
+  check(report.privateEditStrictProofBlockedHandoffReady === true, "release private edit strict proof blocked handoff receipt should be ready");
+  check(report.privateEditStrictProofBlockedHandoffRowCount === report.privateEditStrictProofBlockedHandoffRows.length, "release private edit strict proof blocked handoff row count should match rows");
+  check(report.privateEditStrictProofReady || report.privateEditStrictProofBlockedHandoffRowCount > 0, "release private edit strict proof should include a blocked handoff row when blocked");
+  check(report.privateEditStrictProofBlockedHandoffRows.every((row) => row.valueRecorded === false), "release private edit strict proof blocked handoff rows should not record values");
   check(report.currentRequiredKeyCount === 4, "release private edit strict proof should track four release-channel keys");
   check(releaseChannelMetadataKeys.every((key) => report.currentRequiredKeys.includes(key)), "release private edit strict proof should cover release-channel keys");
   check(report.strictFailureRowCount === report.strictFailureRows.length, "release private edit strict proof strict failure row count should match rows");
@@ -404,6 +451,7 @@ async function writeReport(report) {
   check(markdown.includes("Release Private Edit Strict Proof"), "release private edit strict proof Markdown should include title");
   check(markdown.includes("Proof Chain Commands"), "release private edit strict proof Markdown should include proof chain commands");
   check(markdown.includes("Strict Failure Rows"), "release private edit strict proof Markdown should include strict failure rows");
+  check(markdown.includes("Blocked Handoff Receipt"), "release private edit strict proof Markdown should include blocked handoff receipt");
 
   if (failures.length > 0) {
     console.error(`GrooveForge release private edit strict proof${successSmoke ? " success smoke" : ""} failed:`);
@@ -472,6 +520,8 @@ console.log(`- Post-edit proof command: ${report.privateEditStrictProofPostEditC
 console.log(`- Progress refresh command: ${report.privateEditStrictProofProgressCommand}`);
 console.log(`- Strict ready: ${report.strictReady ? "yes" : "no"}`);
 console.log(`- Strict failure rows: ${report.strictFailureRowCount}`);
+console.log(`- Blocked handoff receipt ready: ${report.privateEditStrictProofBlockedHandoffReady ? "yes" : "no"}`);
+console.log(`- Blocked handoff rows: ${report.privateEditStrictProofBlockedHandoffRowCount} (${report.privateEditStrictProofBlockedHandoffSummary})`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount}`);
 console.log(`- Current 10-plan progress: ${report.currentTenPlanProgressLabel}`);
 console.log(`- Overall completion: ${report.userFacingCompletionPercent.toFixed(6)}%`);
