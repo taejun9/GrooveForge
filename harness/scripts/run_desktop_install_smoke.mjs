@@ -5,6 +5,7 @@ import { constants, existsSync, readdirSync, readFileSync } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -172,6 +173,11 @@ async function checkInstalledApp() {
 }
 
 async function launchInstalledApp() {
+  const blockDetails = macGuiLaunchBlockDetails("npm run desktop:install-smoke");
+  if (blockDetails) {
+    fail("Refusing to start installed Electron in a restricted macOS GUI context.", blockDetails);
+  }
+
   const env = {
     ...process.env,
     GROOVEFORGE_DESKTOP_LAUNCH_SMOKE: "1",

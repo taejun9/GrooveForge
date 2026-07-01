@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
+import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
@@ -615,6 +616,11 @@ function checkLaunchResult(result) {
 }
 
 async function launchPackagedApp(paths) {
+  const blockDetails = macGuiLaunchBlockDetails("npm run desktop:package-smoke");
+  if (blockDetails) {
+    fail("Refusing to start packaged Electron in a restricted macOS GUI context.", blockDetails);
+  }
+
   const env = {
     ...process.env,
     GROOVEFORGE_DESKTOP_LAUNCH_SMOKE: "1",

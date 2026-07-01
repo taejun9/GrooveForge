@@ -3,6 +3,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const failures = [];
@@ -115,7 +116,7 @@ function checkPackageScripts() {
   check(packageJson.main === "dist-electron/main.js", "package.json main should point at dist-electron/main.js");
   checkIncludes(packageJson.description ?? "", "desktop beat workstation", "package.json description");
   checkIncludes(packageJson.scripts?.build ?? "", "tsc -p tsconfig.electron.json", "package.json build script");
-  checkIncludes(packageJson.scripts?.desktop ?? "", "electron .", "package.json desktop script");
+  checkIncludes(packageJson.scripts?.desktop ?? "", "run_desktop_app.mjs", "package.json desktop script");
   checkIncludes(packageJson.scripts?.["desktop:smoke"] ?? "", "run_desktop_entry_smoke.mjs", "package.json desktop:smoke script");
   checkIncludes(
     packageJson.scripts?.["desktop:project-io-smoke"] ?? "",
@@ -182,6 +183,68 @@ function checkPackageScripts() {
       (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:installed-project-io-smoke") <
         (packageJson.scripts?.verify ?? "").indexOf("npm run desktop:gatekeeper-readiness-smoke"),
     "package.json verify should run desktop:installed-project-io-smoke after install smoke and before Gatekeeper readiness"
+  );
+}
+
+function checkDesktopGuiLaunchGuardContract() {
+  const guardSource = readText("harness/scripts/desktop_gui_launch_guard.mjs");
+  const desktopAppSource = readText("harness/scripts/run_desktop_app.mjs");
+  const launchSmokeSource = readText("harness/scripts/run_desktop_launch_smoke.mjs");
+  const projectIoSmokeSource = readText("harness/scripts/run_desktop_project_io_smoke.mjs");
+  const packageSmokeSource = readText("harness/scripts/run_desktop_package_smoke.mjs");
+  const packagedProjectIoSmokeSource = readText("harness/scripts/run_desktop_packaged_project_io_smoke.mjs");
+  const adhocSignSmokeSource = readText("harness/scripts/run_desktop_adhoc_sign_smoke.mjs");
+  const pkgPayloadSmokeSource = readText("harness/scripts/run_desktop_pkg_payload_smoke.mjs");
+  const pkgPayloadProjectIoSmokeSource = readText("harness/scripts/run_desktop_pkg_payload_project_io_smoke.mjs");
+  const installSmokeSource = readText("harness/scripts/run_desktop_install_smoke.mjs");
+  const installedProjectIoSmokeSource = readText("harness/scripts/run_desktop_installed_project_io_smoke.mjs");
+
+  checkIncludes(guardSource, "CODEX_SANDBOX", "desktop GUI launch guard");
+  checkIncludes(guardSource, "Electron GUI launch blocked before macOS AppKit registration.", "desktop GUI launch guard");
+  checkIncludes(guardSource, "macOS Crash Reporter logs", "desktop GUI launch guard");
+  checkIncludes(guardSource, "GROOVEFORGE_ALLOW_RESTRICTED_GUI_ELECTRON", "desktop GUI launch guard");
+  checkIncludes(desktopAppSource, "macGuiLaunchBlockDetails(\"npm run desktop\")", "harness/scripts/run_desktop_app.mjs");
+  checkIncludes(launchSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:launch-smoke\")", "harness/scripts/run_desktop_launch_smoke.mjs");
+  checkIncludes(projectIoSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:project-io-smoke\")", "harness/scripts/run_desktop_project_io_smoke.mjs");
+  checkIncludes(packageSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:package-smoke\")", "harness/scripts/run_desktop_package_smoke.mjs");
+  checkIncludes(
+    packagedProjectIoSmokeSource,
+    "macGuiLaunchBlockDetails(\"npm run desktop:packaged-project-io-smoke\")",
+    "harness/scripts/run_desktop_packaged_project_io_smoke.mjs"
+  );
+  checkIncludes(adhocSignSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:adhoc-sign-smoke\")", "harness/scripts/run_desktop_adhoc_sign_smoke.mjs");
+  checkIncludes(pkgPayloadSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:pkg-payload-smoke\")", "harness/scripts/run_desktop_pkg_payload_smoke.mjs");
+  checkIncludes(
+    pkgPayloadProjectIoSmokeSource,
+    "macGuiLaunchBlockDetails(\"npm run desktop:pkg-payload-project-io-smoke\")",
+    "harness/scripts/run_desktop_pkg_payload_project_io_smoke.mjs"
+  );
+  checkIncludes(installSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:install-smoke\")", "harness/scripts/run_desktop_install_smoke.mjs");
+  checkIncludes(
+    installedProjectIoSmokeSource,
+    "macGuiLaunchBlockDetails(\"npm run desktop:installed-project-io-smoke\")",
+    "harness/scripts/run_desktop_installed_project_io_smoke.mjs"
+  );
+
+  const blocked = macGuiLaunchBlockDetails("npm run desktop:launch-smoke", { CODEX_SANDBOX: "seatbelt" }, "darwin");
+  check(Boolean(blocked), "desktop GUI launch guard should block Electron under macOS CODEX_SANDBOX");
+  checkIncludes(blocked ?? "", "CODEX_SANDBOX=seatbelt", "desktop GUI launch guard blocked details");
+  checkIncludes(blocked ?? "", "Electron SIGABRT / Abort trap: 6", "desktop GUI launch guard blocked details");
+  check(
+    macGuiLaunchBlockDetails("npm run desktop:launch-smoke", {}, "darwin") === null,
+    "desktop GUI launch guard should allow normal macOS GUI launches"
+  );
+  check(
+    macGuiLaunchBlockDetails("npm run desktop:launch-smoke", { CODEX_SANDBOX: "seatbelt" }, "linux") === null,
+    "desktop GUI launch guard should not block non-macOS launches"
+  );
+  check(
+    macGuiLaunchBlockDetails(
+      "npm run desktop:launch-smoke",
+      { CODEX_SANDBOX: "seatbelt", GROOVEFORGE_ALLOW_RESTRICTED_GUI_ELECTRON: "1" },
+      "darwin"
+    ) === null,
+    "desktop GUI launch guard should allow explicit restricted-launch reproduction override"
   );
 }
 
@@ -288,6 +351,7 @@ function checkRendererEntryContract() {
 
 checkBuiltArtifacts();
 checkPackageScripts();
+checkDesktopGuiLaunchGuardContract();
 checkElectronMainContract();
 checkPreloadContract();
 checkRendererNativeMenuContract();
@@ -302,6 +366,6 @@ if (failures.length > 0) {
 }
 
 console.log("GrooveForge desktop entry smoke passed.");
-console.log("- Scope: Electron production entry, preload bridge, renderer menu handler, renderer artifact contract");
+console.log("- Scope: Electron production entry, preload bridge, renderer menu handler, renderer artifact contract, and restricted GUI launch guard");
 console.log("- Entry: dist-electron/main.js -> dist/index.html");
 console.log("- Bridge: context-isolated GrooveForge desktop API with validated native menu commands");

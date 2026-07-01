@@ -7,6 +7,7 @@ import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -201,6 +202,11 @@ This PKG payload project IO smoke does not run the macOS Installer, install into
 }
 
 async function runPkgPayloadProjectIoSmoke() {
+  const blockDetails = macGuiLaunchBlockDetails("npm run desktop:pkg-payload-project-io-smoke");
+  if (blockDetails) {
+    fail("Refusing to start PKG payload Electron in a restricted macOS GUI context.", blockDetails);
+  }
+
   const env = {
     ...process.env,
     GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE: "1",

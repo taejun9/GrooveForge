@@ -7,6 +7,7 @@ import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -196,6 +197,11 @@ This packaged project IO smoke does not claim Developer ID signing, notarization
 }
 
 async function runPackagedProjectIoSmoke() {
+  const blockDetails = macGuiLaunchBlockDetails("npm run desktop:packaged-project-io-smoke");
+  if (blockDetails) {
+    fail("Refusing to start packaged Electron in a restricted macOS GUI context.", blockDetails);
+  }
+
   const env = {
     ...process.env,
     GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE: "1",

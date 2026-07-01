@@ -5,6 +5,7 @@ import { constants, existsSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -164,6 +165,11 @@ async function adHocSignApp() {
 }
 
 async function launchSignedApp() {
+  const blockDetails = macGuiLaunchBlockDetails("npm run desktop:adhoc-sign-smoke");
+  if (blockDetails) {
+    fail("Refusing to start ad-hoc signed Electron in a restricted macOS GUI context.", blockDetails);
+  }
+
   const env = {
     ...process.env,
     GROOVEFORGE_DESKTOP_LAUNCH_SMOKE: "1",
