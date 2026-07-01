@@ -267,7 +267,7 @@ async function runPkgPayloadProjectIoSmoke() {
       if (!result) {
         fail(
           `PKG payload app exited without a project IO smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`,
-          macGuiLaunchAbortDetails("npm run desktop:pkg-payload-project-io-smoke", { signal, output: combinedOutput })
+          macGuiLaunchAbortDetails("npm run desktop:pkg-payload-project-io-smoke", { code, signal, output: combinedOutput })
         );
       }
       if (code !== 0 || result.ok !== true) {

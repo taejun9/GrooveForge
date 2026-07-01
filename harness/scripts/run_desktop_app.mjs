@@ -61,11 +61,14 @@ child.on("error", (error) => {
 
 child.on("exit", (code, signal) => {
   if (signal) {
-    if (isMacAppKitAbort({ signal })) {
-      fail("Electron aborted during macOS AppKit registration.", macGuiLaunchAbortDetails("npm run desktop", { signal }));
+    if (isMacAppKitAbort({ code, signal })) {
+      fail("Electron aborted during macOS AppKit registration.", macGuiLaunchAbortDetails("npm run desktop", { code, signal }));
     }
     process.kill(process.pid, signal);
     return;
+  }
+  if (isMacAppKitAbort({ code, signal })) {
+    fail("Electron aborted during macOS AppKit registration.", macGuiLaunchAbortDetails("npm run desktop", { code, signal }));
   }
   process.exit(code ?? 0);
 });

@@ -375,7 +375,7 @@ async function launchExtractedApp(extractedExecutable, extractedAppRoot) {
       if (!result) {
         fail(
           `Extracted app exited without a launch smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`,
-          macGuiLaunchAbortDetails("npm run desktop:pkg-payload-smoke", { signal, output: combinedOutput })
+          macGuiLaunchAbortDetails("npm run desktop:pkg-payload-smoke", { code, signal, output: combinedOutput })
         );
       }
       if (code !== 0 || result.ok !== true) {

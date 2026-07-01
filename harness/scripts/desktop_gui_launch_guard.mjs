@@ -10,31 +10,41 @@ export function macGuiLaunchBlockDetails(commandName, env = process.env, platfor
     "Electron GUI launch blocked before macOS AppKit registration.",
     `Command: ${commandName}`,
     `Detected CODEX_SANDBOX=${sandboxName}, which indicates a restricted command sandbox.`,
-    "This preflight prevents macOS Crash Reporter logs such as Electron SIGABRT / Abort trap: 6 during AppKit application registration.",
+    "This preflight prevents macOS Crash Reporter logs such as Electron SIGABRT / exit code 6 / Abort trap: 6 during AppKit application registration.",
     "Rerun from a normal macOS GUI terminal or with approved unsandboxed GUI/AppKit process access.",
     "Set GROOVEFORGE_ALLOW_RESTRICTED_GUI_ELECTRON=1 only when intentionally reproducing the restricted-launch crash path."
   ].join("\n");
 }
 
-export function isMacAppKitAbort({ signal, output = "" }) {
+export function isMacAppKitAbort({ code, signal, output = "" } = {}) {
+  const text = String(output ?? "");
+  const abortEvidence =
+    signal === "SIGABRT" ||
+    code === 6 ||
+    /(?:EXC_CRASH\s*\(SIGABRT\)|Abort trap:\s*6|Namespace SIGNAL,\s*Code 6|abort\(\) called)/i.test(text);
+  const appKitEvidence = /(?:_RegisterApplication|RegisterApplication|NSApplication|HIServices|AppKit)/i.test(text);
+  const codexElectronCrashEvidence = /(?:Process:\s+Electron|Identifier:\s+com\.github\.Electron|com\.openai\.codex)/i.test(text);
+  const crashReportEvidence = /(?:Thread \d+ Crashed|Triggered by Thread|Termination Reason|Exception Type)/i.test(text);
+
   return (
     signal === "SIGABRT" ||
-    /(?:_RegisterApplication|RegisterApplication|NSApplication|HIServices|AppKit|EXC_CRASH|Abort trap:\s*6|com\.openai\.codex)/i.test(output)
+    (appKitEvidence && (abortEvidence || crashReportEvidence || codexElectronCrashEvidence)) ||
+    (abortEvidence && codexElectronCrashEvidence)
   );
 }
 
-export function macGuiLaunchAbortDetails(commandName, { signal, output = "" } = {}) {
+export function macGuiLaunchAbortDetails(commandName, { code, signal, output = "" } = {}) {
   const trimmedOutput = String(output ?? "").trim();
   const rawOutput = trimmedOutput.length > 0 ? trimmedOutput : "none";
 
-  if (!isMacAppKitAbort({ signal, output })) {
+  if (!isMacAppKitAbort({ code, signal, output })) {
     return rawOutput;
   }
 
   return [
     "Diagnostic: Electron aborted before GrooveForge emitted launch evidence.",
     "Observed macOS/AppKit registration abort evidence before the main/renderer/preload smoke path could report.",
-    "Crash signature: Electron SIGABRT / Abort trap: 6 during AppKit application registration.",
+    "Crash signature: Electron SIGABRT / exit code 6 / Abort trap: 6 during AppKit application registration.",
     "Likely cause: restricted, sandboxed, or non-GUI launch context blocking NSApplication registration.",
     `Action: rerun \`${commandName}\` from a normal macOS GUI session or with approved unsandboxed GUI/AppKit process access.`,
     "",

@@ -223,7 +223,7 @@ async function launchSignedApp() {
       if (!result) {
         fail(
           `Ad-hoc signed app exited without a launch smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`,
-          macGuiLaunchAbortDetails("npm run desktop:adhoc-sign-smoke", { signal, output: combinedOutput })
+          macGuiLaunchAbortDetails("npm run desktop:adhoc-sign-smoke", { code, signal, output: combinedOutput })
         );
       }
       if (code !== 0 || result.ok !== true) {

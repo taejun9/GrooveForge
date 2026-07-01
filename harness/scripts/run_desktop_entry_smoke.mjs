@@ -206,7 +206,9 @@ function checkDesktopGuiLaunchGuardContract() {
   checkIncludes(guardSource, "macOS Crash Reporter logs", "desktop GUI launch guard");
   checkIncludes(guardSource, "GROOVEFORGE_ALLOW_RESTRICTED_GUI_ELECTRON", "desktop GUI launch guard");
   checkIncludes(guardSource, "com\\.openai\\.codex", "desktop GUI launch guard");
-  checkIncludes(desktopAppSource, "isMacAppKitAbort({ signal })", "harness/scripts/run_desktop_app.mjs");
+  checkIncludes(guardSource, "Namespace SIGNAL,\\s*Code 6", "desktop GUI launch guard");
+  checkIncludes(guardSource, "code === 6", "desktop GUI launch guard");
+  checkIncludes(desktopAppSource, "isMacAppKitAbort({ code, signal })", "harness/scripts/run_desktop_app.mjs");
   checkIncludes(desktopAppSource, "macGuiLaunchAbortDetails(\"npm run desktop\"", "harness/scripts/run_desktop_app.mjs");
   checkIncludes(desktopAppSource, "macGuiLaunchBlockDetails(\"npm run desktop\")", "harness/scripts/run_desktop_app.mjs");
   checkIncludes(launchSmokeSource, "macGuiLaunchBlockDetails(\"npm run desktop:launch-smoke\")", "harness/scripts/run_desktop_launch_smoke.mjs");
@@ -255,7 +257,7 @@ function checkDesktopGuiLaunchGuardContract() {
   const blocked = macGuiLaunchBlockDetails("npm run desktop:launch-smoke", { CODEX_SANDBOX: "seatbelt" }, "darwin");
   check(Boolean(blocked), "desktop GUI launch guard should block Electron under macOS CODEX_SANDBOX");
   checkIncludes(blocked ?? "", "CODEX_SANDBOX=seatbelt", "desktop GUI launch guard blocked details");
-  checkIncludes(blocked ?? "", "Electron SIGABRT / Abort trap: 6", "desktop GUI launch guard blocked details");
+  checkIncludes(blocked ?? "", "Electron SIGABRT / exit code 6 / Abort trap: 6", "desktop GUI launch guard blocked details");
   check(
     isMacAppKitAbort({ signal: "SIGABRT" }) === true,
     "desktop GUI launch abort classifier should recognize macOS SIGABRT launch reports"
@@ -264,13 +266,42 @@ function checkDesktopGuiLaunchGuardContract() {
     isMacAppKitAbort({ signal: null, output: "Thread 0 Crashed:: _RegisterApplication com.openai.codex" }) === true,
     "desktop GUI launch abort classifier should recognize AppKit crash report text"
   );
+  const attachedCrashReportShape = [
+    "Process: Electron [3070]",
+    "Identifier: com.github.Electron",
+    "Exception Type: EXC_CRASH (SIGABRT)",
+    "Termination Reason: Namespace SIGNAL, Code 6, Abort trap: 6",
+    "Application Specific Information:",
+    "abort() called",
+    "Thread 0 Crashed:: Dispatch queue: com.apple.main-thread",
+    "___RegisterApplication_block_invoke",
+    "_RegisterApplication",
+    "GetCurrentProcess",
+    "-[NSApplication init]",
+    "Responsible Process: Codex",
+    "Coalition: com.openai.codex"
+  ].join("\n");
+  check(
+    isMacAppKitAbort({ code: 6, signal: null, output: attachedCrashReportShape }) === true,
+    "desktop GUI launch abort classifier should recognize attached exit-code-6 Crash Reporter shape"
+  );
+  check(
+    isMacAppKitAbort({ code: 0, signal: null, output: "AppKit loaded normally" }) === false,
+    "desktop GUI launch abort classifier should not treat non-abort AppKit output as a crash"
+  );
   const abortDetails = macGuiLaunchAbortDetails("npm run desktop:launch-smoke", {
+    code: 6,
+    signal: null,
+    output: attachedCrashReportShape
+  });
+  checkIncludes(abortDetails, "Diagnostic: Electron aborted before GrooveForge emitted launch evidence.", "desktop GUI launch abort details");
+  checkIncludes(abortDetails, "Crash signature: Electron SIGABRT / exit code 6 / Abort trap: 6", "desktop GUI launch abort details");
+  checkIncludes(abortDetails, "approved unsandboxed GUI/AppKit process access", "desktop GUI launch abort details");
+  const signalAbortDetails = macGuiLaunchAbortDetails("npm run desktop:launch-smoke", {
     signal: "SIGABRT",
     output: "Application Specific Information: abort() called"
   });
-  checkIncludes(abortDetails, "Diagnostic: Electron aborted before GrooveForge emitted launch evidence.", "desktop GUI launch abort details");
-  checkIncludes(abortDetails, "Crash signature: Electron SIGABRT / Abort trap: 6", "desktop GUI launch abort details");
-  checkIncludes(abortDetails, "approved unsandboxed GUI/AppKit process access", "desktop GUI launch abort details");
+  checkIncludes(signalAbortDetails, "Crash signature: Electron SIGABRT / exit code 6 / Abort trap: 6", "desktop GUI launch signal abort details");
   check(
     macGuiLaunchBlockDetails("npm run desktop:launch-smoke", {}, "darwin") === null,
     "desktop GUI launch guard should allow normal macOS GUI launches"

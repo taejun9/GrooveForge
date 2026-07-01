@@ -231,7 +231,7 @@ async function launchInstalledApp() {
       if (!result) {
         fail(
           `Installed app exited without a launch smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`,
-          macGuiLaunchAbortDetails("npm run desktop:install-smoke", { signal, output: combinedOutput })
+          macGuiLaunchAbortDetails("npm run desktop:install-smoke", { code, signal, output: combinedOutput })
         );
       }
       if (code !== 0 || result.ok !== true) {

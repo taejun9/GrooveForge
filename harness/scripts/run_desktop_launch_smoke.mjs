@@ -197,7 +197,7 @@ child.on("exit", (code, signal) => {
   if (!result) {
     fail(
       `Electron exited without a launch smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`,
-      macGuiLaunchAbortDetails("npm run desktop:launch-smoke", { signal, output: combinedOutput })
+      macGuiLaunchAbortDetails("npm run desktop:launch-smoke", { code, signal, output: combinedOutput })
     );
   }
 
