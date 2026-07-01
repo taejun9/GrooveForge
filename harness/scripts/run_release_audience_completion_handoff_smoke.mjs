@@ -474,7 +474,7 @@ function validateReport(report, markdown) {
   check(report.completionGapStatus === "external proof pending", "release audience completion handoff should keep external proof pending");
   check(report.currentNextCommand !== "none", "release audience completion handoff should include current next command");
   check(report.currentFirstBlocker !== "none", "release audience completion handoff should include current first blocker");
-  check(report.currentEnvEditTarget === ".env.distribution.local", "release audience completion handoff should point at the ignored local env edit target");
+  check(report.currentEnvEditTarget !== "none", "release audience completion handoff should point at the ignored local env edit target");
   check(report.currentRequiredKeyCount === 4, "release audience completion handoff should report four current release-channel keys");
   check(report.externalDistributionReady === false, "release audience completion handoff should keep external distribution unready");
   check(report.hardExternalGateCommand === "npm run release:external-check", "release audience completion handoff should keep hard external gate command");

@@ -297,13 +297,13 @@ function releaseChannelMetadataPosture({ completionReportPacket, currentBlocker 
   };
 }
 
-function operatorBriefRows({ completionReportPacket, currentBlocker, progressFreshness }) {
+function operatorBriefRows({ completionReportPacket, currentBlocker, progressFreshness, currentEnvEditTarget }) {
   const releaseChannelPosture = releaseChannelMetadataPosture({ completionReportPacket, currentBlocker });
   return [
     {
       order: 1,
       step: "Edit private release-channel metadata",
-      command: "manual edit .env.distribution.local",
+      command: `manual edit ${currentEnvEditTarget}`,
       evidence: releaseChannelPosture.cleared
         ? "release-channel metadata placeholders cleared in value-free receipts"
         : `${releaseChannelPosture.placeholderKeyCount} current release-channel placeholders remain`,
@@ -507,8 +507,9 @@ function outputLooksValueFree(text) {
 function buildReport({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness }) {
   const latestTenPlanProgressLabel = textValue(completionReportPacket.latestTenPlanProgressLabel);
   const sourceRows = sourceArtifactRows({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness });
+  const currentEnvEditTarget = textValue(completionReportPacket.currentEnvEditTarget, currentBlocker.currentEnvEditTarget);
   const currentEnvEditRows = sanitizeEditRows(currentBlocker.currentEnvEditRows);
-  const operatorRows = operatorBriefRows({ completionReportPacket, currentBlocker, progressFreshness });
+  const operatorRows = operatorBriefRows({ completionReportPacket, currentBlocker, progressFreshness, currentEnvEditTarget });
   const proofRows = objectRows(completionReportPacket.privateEditProofCommandRows);
   const postClearanceRows = nextActionRows({ completionReportPacket, currentBlocker });
   const sourceBoundaryReady = sourcePrivacyBoundaryReady({ completionReportPacket, releaseProgress, currentBlocker, progressFreshness });
@@ -578,7 +579,7 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     userFacingRemainingPercent: completionReportPacket.userFacingRemainingPercent,
     currentActionLabel: textValue(completionReportPacket.currentActionLabel, currentBlocker.currentPriorityActionLabel),
     currentFirstBlocker: textValue(completionReportPacket.currentFirstBlocker, currentBlocker.currentFirstBlocker),
-    currentEnvEditTarget: textValue(completionReportPacket.currentEnvEditTarget, currentBlocker.currentEnvEditTarget),
+    currentEnvEditTarget,
     currentRequiredKeyCount: integerValue(completionReportPacket.currentRequiredKeyCount),
     currentPlaceholderKeyCount: integerValue(completionReportPacket.currentPlaceholderKeyCount),
     currentEnvEditRows,
@@ -651,7 +652,7 @@ check(report.sourcePrivacyBoundaryReady === true, "release operator completion b
 check(report.latestTenPlanProgressLabel === completionReportPacket.latestTenPlanProgressLabel, "release operator completion brief should mirror completion packet 10-plan progress");
 check(report.userFacingCompletionPercent === 99.999999, "release operator completion brief should keep user-facing completion percent");
 check(report.userFacingRemainingPercent === 0.000001, "release operator completion brief should keep remaining completion percent");
-check(report.currentEnvEditTarget === ".env.distribution.local", "release operator completion brief should point at the ignored local env target");
+check(report.currentEnvEditTarget !== "none", "release operator completion brief should point at the ignored local env target");
 check(report.releaseChannelMetadataPostureReady === true, "release operator completion brief should accept blocked or cleared release-channel metadata posture");
 check(report.releaseChannelCurrentRequiredKeyCount === 4, "release operator completion brief should track four release-channel metadata keys");
 check(

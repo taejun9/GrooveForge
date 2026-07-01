@@ -65,6 +65,32 @@ function parseSmokeResult(output) {
   }
 }
 
+function isMacAppKitAbort({ signal, output }) {
+  return (
+    signal === "SIGABRT" ||
+    /(?:_RegisterApplication|RegisterApplication|NSApplication|HIServices|AppKit|EXC_CRASH|Abort trap:\s*6)/i.test(output)
+  );
+}
+
+function prematureExitDetails({ signal, output }) {
+  const trimmedOutput = output.trim();
+  const rawOutput = trimmedOutput.length > 0 ? trimmedOutput : "none";
+
+  if (!isMacAppKitAbort({ signal, output })) {
+    return rawOutput;
+  }
+
+  return [
+    "Diagnostic: Electron aborted before GrooveForge emitted launch smoke evidence.",
+    "Observed macOS/AppKit registration abort signal before the main/renderer/preload smoke path could report.",
+    "Likely cause: restricted, sandboxed, or non-GUI launch context blocking NSApplication registration.",
+    "Action: rerun `npm run desktop:launch-smoke` or `npm run verify` from a normal macOS GUI session or with approved unsandboxed process access.",
+    "",
+    "Raw Electron output:",
+    rawOutput
+  ].join("\n");
+}
+
 function checkBuiltArtifacts() {
   check(existsSync(path.join(root, "dist/index.html")), "dist/index.html is missing; run npm run build before desktop launch smoke");
   check(
@@ -189,7 +215,10 @@ child.on("exit", (code, signal) => {
   const combinedOutput = `${stdout}\n${stderr}`;
   const result = parseSmokeResult(combinedOutput);
   if (!result) {
-    fail(`Electron exited without a launch smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`, combinedOutput);
+    fail(
+      `Electron exited without a launch smoke result (code ${code ?? "null"}, signal ${signal ?? "null"}).`,
+      prematureExitDetails({ signal, output: combinedOutput })
+    );
   }
 
   if (code !== 0 || result.ok !== true) {

@@ -284,6 +284,7 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
   const currentTenPlanWindowRows = progress.currentTenPlanWindowRows;
   const currentTenPlanWindowRowCount = currentTenPlanWindowRows.length;
   const currentTenPlanWindowRowSummary = planRowSummary(currentTenPlanWindowRows);
+  const currentEnvEditTarget = textValue(channel.currentEnvEditTarget);
   const privateEditProofCommandSummary = commandSummary(privateEditProofCommandRows);
   const privateEditOperatorProofCommandRole =
     "recommended strict-first proof chain after replacing the four private release-channel placeholders";
@@ -291,7 +292,7 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     {
       order: 1,
       blocker: textValue(channel.currentFirstBlocker),
-      editTarget: textValue(channel.currentEnvEditTarget),
+      editTarget: currentEnvEditTarget,
       command: privateEditOperatorProofCommand,
       followUp: "strict live-check, post-edit proof, progress refresh, and private-value leak audit",
       sourceField: "currentFirstBlocker/currentEnvEditTarget/privateEditOperatorProofCommand",
@@ -511,7 +512,8 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
   const strictProofHandoffReceiptReady =
     strictProofHandoffReceiptRows.length === 1 &&
     strictProofHandoffReceiptRows[0].blocker !== "none" &&
-    strictProofHandoffReceiptRows[0].editTarget === ".env.distribution.local" &&
+    strictProofHandoffReceiptRows[0].editTarget === currentEnvEditTarget &&
+    strictProofHandoffReceiptRows[0].editTarget !== "none" &&
     strictProofHandoffReceiptRows[0].command === privateEditOperatorProofCommand &&
     strictProofHandoffReceiptRows.every((row) => row.valueRecorded === false);
   const privateEditBlockedSmokeReady =
@@ -978,7 +980,7 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     currentActionLabel: textValue(channel.currentActionLabel),
     currentNextCommand: textValue(channel.currentNextCommand),
     currentFirstBlocker: textValue(channel.currentFirstBlocker),
-    currentEnvEditTarget: textValue(channel.currentEnvEditTarget),
+    currentEnvEditTarget,
     releaseChannelEditPacketMode: textValue(channel.releaseChannelEditPacketMode),
     releaseChannelEditPacketOperatorCommandSummary: textValue(channel.operatorCommandSummary),
     currentRequiredKeyCount: integerValue(channel.currentRequiredKeyCount),
@@ -1221,7 +1223,7 @@ function validateReport(report, markdown) {
   check(report.strictProofHandoffReceiptRowCount === 1, "release completion report packet should include one strict proof handoff row");
   check(report.strictProofHandoffReceiptRowCount === report.strictProofHandoffReceiptRows.length, "release completion report packet strict proof handoff row count should match row length");
   check(report.strictProofHandoffReceiptRows[0]?.command === privateEditOperatorProofCommand, "release completion report packet strict proof handoff should recommend the strict proof chain");
-  check(report.strictProofHandoffReceiptRows[0]?.editTarget === ".env.distribution.local", "release completion report packet strict proof handoff should point at ignored local env");
+  check(report.strictProofHandoffReceiptRows[0]?.editTarget === report.currentEnvEditTarget, "release completion report packet strict proof handoff should point at ignored local env");
   check(report.strictProofHandoffReceiptRows[0]?.blocker === report.currentFirstBlocker, "release completion report packet strict proof handoff should carry the current blocker");
   check(report.strictProofHandoffReceiptRows.every((row) => row.valueRecorded === false), "release completion report packet strict proof handoff rows should not record values");
   check(report.strictProofHandoffReceiptValueRecorded === false, "release completion report packet strict proof handoff receipt should be value-free");
@@ -1327,7 +1329,7 @@ function validateReport(report, markdown) {
   check(report.completionGapStatus === "external proof pending", "release completion report packet should keep external proof pending");
   check(report.currentNextCommand !== "none", "release completion report packet should include current next command");
   check(report.currentFirstBlocker !== "none", "release completion report packet should include current first blocker");
-  check(report.currentEnvEditTarget === ".env.distribution.local", "release completion report packet should point at ignored local env target");
+  check(report.currentEnvEditTarget !== "none", "release completion report packet should point at ignored local env target");
   check(report.currentRequiredKeyCount === 4, "release completion report packet should report four release-channel keys");
   check(report.liveCheckRowCount === 4, "release completion report packet should mirror four live-check rows");
   check(report.releaseChannelClearanceTransitionReady === true, "release completion report packet should carry ready clearance transition evidence");

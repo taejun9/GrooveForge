@@ -94,6 +94,10 @@ function buildReport(source) {
     releaseChannelCurrentRequiredKeyCount: integerValue(summary.releaseChannelCurrentRequiredKeyCount),
     releaseChannelCurrentPlaceholderKeyCount: integerValue(summary.releaseChannelCurrentPlaceholderKeyCount),
     operatorProofCommand: textValue(summary.operatorProofCommand),
+    strictProofHandoffReceiptReady: summary.strictProofHandoffReceiptReady === true,
+    privateEditBlockedSmokeReady: summary.privateEditBlockedSmokeReady === true,
+    privateEditBlockedSmokeCurrentPlaceholderKeyCount: integerValue(summary.privateEditBlockedSmokeCurrentPlaceholderKeyCount),
+    finalHandoffSuccessRedactionReady: summary.finalHandoffSuccessRedactionReady === true,
     postClearanceNextAction: textValue(summary.postClearanceNextAction),
     postClearanceProofCommand: textValue(summary.postClearanceProofCommand),
     firstBlocker: textValue(summary.firstBlocker),
@@ -144,6 +148,10 @@ function buildMarkdown(report) {
 - Release-channel current ready rows: ${report.releaseChannelCurrentReadyCount}/${report.releaseChannelCurrentRequiredKeyCount}
 - Release-channel placeholders: ${report.releaseChannelCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}
 - Operator proof command: \`${report.operatorProofCommand}\`
+- Strict proof handoff ready: ${readyLabel(report.strictProofHandoffReceiptReady)}
+- Private-edit blocked smoke ready: ${readyLabel(report.privateEditBlockedSmokeReady)}
+- Private-edit blocked smoke placeholders: ${report.privateEditBlockedSmokeCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}
+- Final handoff success-redaction ready: ${readyLabel(report.finalHandoffSuccessRedactionReady)}
 - Post-clearance next action: ${report.postClearanceNextAction}
 - Post-clearance proof command: \`${report.postClearanceProofCommand}\`
 - Next command: \`${report.nextCommand}\`
@@ -182,6 +190,10 @@ function validateReport(report, markdown) {
   check(!report.releaseChannelMetadataBlocked || report.releaseChannelCurrentPlaceholderKeyCount === 4, "release completion summary should keep four placeholders while blocked");
   check(!report.releaseChannelMetadataCleared || report.releaseChannelCurrentPlaceholderKeyCount === 0, "release completion summary should allow zero placeholders when cleared");
   check(report.operatorProofCommand === "npm run release:private-edit-strict-proof", "release completion summary should keep strict proof as operator proof command");
+  check(report.strictProofHandoffReceiptReady === true, "release completion summary should expose strict proof handoff readiness");
+  check(report.privateEditBlockedSmokeReady === true, "release completion summary should expose private-edit blocked smoke readiness");
+  check(report.privateEditBlockedSmokeCurrentPlaceholderKeyCount === 4, "release completion summary should expose blocked smoke coverage for four placeholders");
+  check(report.finalHandoffSuccessRedactionReady === true, "release completion summary should expose final handoff success-redaction readiness");
   check(report.postClearanceNextAction === "auto-update-feed", "release completion summary should keep auto-update-feed as post-clearance next action");
   check(report.postClearanceProofCommand === "npm run desktop:auto-update-readiness-smoke", "release completion summary should keep auto-update readiness as post-clearance proof command");
   check(report.hardGateReady === false, "release completion summary should keep hard gate unready");
@@ -228,6 +240,12 @@ console.log(`- Fresh artifacts: ${report.freshArtifactCount}`);
 console.log(`- Stale artifacts: ${report.staleArtifactCount}`);
 console.log(`- Missing artifacts: ${report.missingArtifactCount}`);
 console.log(`- Operator proof command: ${report.operatorProofCommand}`);
+console.log(`- Strict proof handoff ready: ${report.strictProofHandoffReceiptReady ? "yes" : "no"}`);
+console.log(`- Private-edit blocked smoke ready: ${report.privateEditBlockedSmokeReady ? "yes" : "no"}`);
+console.log(
+  `- Private-edit blocked smoke placeholders: ${report.privateEditBlockedSmokeCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}`
+);
+console.log(`- Final handoff success-redaction ready: ${report.finalHandoffSuccessRedactionReady ? "yes" : "no"}`);
 console.log(`- Current first blocker: ${report.firstBlocker}`);
 console.log(`- Private values recorded: ${report.privateValuesRecorded ? "yes" : "no"}`);
 console.log("- Network: no update feed probe, feed publish, distribution channel probe, release upload, Apple notary submission, or signing attempted");

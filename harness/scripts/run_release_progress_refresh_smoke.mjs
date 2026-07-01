@@ -218,6 +218,10 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     releaseChannelCurrentRequiredKeyCount: integerValue(operatorCompletionBrief.releaseChannelCurrentRequiredKeyCount),
     releaseChannelCurrentPlaceholderKeyCount: integerValue(operatorCompletionBrief.releaseChannelCurrentPlaceholderKeyCount),
     operatorProofCommand: textValue(operatorCompletionBrief.privateEditOperatorProofCommand),
+    strictProofHandoffReceiptReady: operatorCompletionBrief.strictProofHandoffReceiptReady === true,
+    privateEditBlockedSmokeReady: operatorCompletionBrief.privateEditBlockedSmokeReady === true,
+    privateEditBlockedSmokeCurrentPlaceholderKeyCount: integerValue(operatorCompletionBrief.privateEditBlockedSmokeCurrentPlaceholderKeyCount),
+    finalHandoffSuccessRedactionReady: operatorCompletionBrief.finalHandoffSuccessRedactionReady === true,
     postClearanceNextAction: textValue(operatorCompletionBrief.postClearanceNextPriorityActionId),
     postClearanceProofCommand: textValue(operatorCompletionBrief.postClearanceNextActionPreviewProofCommand),
     firstBlocker: textValue(currentBlocker.currentFirstBlocker),
@@ -288,6 +292,12 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     operatorCompletionBriefCurrentReadyCount: integerValue(operatorCompletionBrief.releaseChannelCurrentReadyCount),
     operatorCompletionBriefCurrentRequiredKeyCount: integerValue(operatorCompletionBrief.releaseChannelCurrentRequiredKeyCount),
     operatorCompletionBriefProofCommand: textValue(operatorCompletionBrief.privateEditOperatorProofCommand),
+    operatorCompletionBriefStrictProofHandoffReceiptReady: operatorCompletionBrief.strictProofHandoffReceiptReady === true,
+    operatorCompletionBriefPrivateEditBlockedSmokeReady: operatorCompletionBrief.privateEditBlockedSmokeReady === true,
+    operatorCompletionBriefPrivateEditBlockedSmokeCurrentPlaceholderKeyCount: integerValue(
+      operatorCompletionBrief.privateEditBlockedSmokeCurrentPlaceholderKeyCount
+    ),
+    operatorCompletionBriefFinalHandoffSuccessRedactionReady: operatorCompletionBrief.finalHandoffSuccessRedactionReady === true,
     operatorCompletionBriefPostClearanceNextPriorityActionId: textValue(operatorCompletionBrief.postClearanceNextPriorityActionId),
     operatorCompletionBriefPostClearanceProofCommand: textValue(operatorCompletionBrief.postClearanceNextActionPreviewProofCommand),
     operatorCompletionBriefUpdateFeedCheckpointReady: operatorCompletionBrief.updateFeedCheckpointReady === true,
@@ -351,6 +361,10 @@ function buildMarkdown(report) {
 - Operator release-channel current ready rows: ${report.operatorCompletionBriefCurrentReadyCount}/${report.operatorCompletionBriefCurrentRequiredKeyCount}
 - Operator current placeholder keys: ${report.operatorCompletionBriefCurrentPlaceholderKeyCount}/${report.operatorCompletionBriefCurrentRequiredKeyCount}
 - Operator proof command: \`${report.operatorCompletionBriefProofCommand}\`
+- Strict proof handoff ready: ${readyLabel(report.operatorCompletionBriefStrictProofHandoffReceiptReady)}
+- Private-edit blocked smoke ready: ${readyLabel(report.operatorCompletionBriefPrivateEditBlockedSmokeReady)}
+- Private-edit blocked smoke placeholders: ${report.operatorCompletionBriefPrivateEditBlockedSmokeCurrentPlaceholderKeyCount}/${report.operatorCompletionBriefCurrentRequiredKeyCount}
+- Final handoff success-redaction ready: ${readyLabel(report.operatorCompletionBriefFinalHandoffSuccessRedactionReady)}
 - Operator post-clearance next action: ${report.operatorCompletionBriefPostClearanceNextPriorityActionId}
 - Operator post-clearance proof command: \`${report.operatorCompletionBriefPostClearanceProofCommand}\`
 - Operator update-feed checkpoint ready: ${readyLabel(report.operatorCompletionBriefUpdateFeedCheckpointReady)}
@@ -384,6 +398,10 @@ function buildMarkdown(report) {
 - Release-channel metadata cleared: ${readyLabel(report.completionSummary.releaseChannelMetadataCleared)}
 - Release-channel placeholders: ${report.completionSummary.releaseChannelCurrentPlaceholderKeyCount}/${report.completionSummary.releaseChannelCurrentRequiredKeyCount}
 - Operator proof command: \`${report.completionSummary.operatorProofCommand}\`
+- Strict proof handoff ready: ${readyLabel(report.completionSummary.strictProofHandoffReceiptReady)}
+- Private-edit blocked smoke ready: ${readyLabel(report.completionSummary.privateEditBlockedSmokeReady)}
+- Private-edit blocked smoke placeholders: ${report.completionSummary.privateEditBlockedSmokeCurrentPlaceholderKeyCount}/${report.completionSummary.releaseChannelCurrentRequiredKeyCount}
+- Final handoff success-redaction ready: ${readyLabel(report.completionSummary.finalHandoffSuccessRedactionReady)}
 - Post-clearance next action: ${report.completionSummary.postClearanceNextAction}
 - Post-clearance proof command: \`${report.completionSummary.postClearanceProofCommand}\`
 - Next command: \`${report.completionSummary.nextCommand}\`
@@ -463,6 +481,23 @@ function validateReport(report, markdown) {
   );
   check(report.operatorProofCommand === report.operatorCompletionBriefProofCommand, "release progress refresh alias should mirror operator proof command");
   check(
+    report.completionSummary.strictProofHandoffReceiptReady === report.operatorCompletionBriefStrictProofHandoffReceiptReady,
+    "release progress refresh summary should mirror strict proof handoff readiness"
+  );
+  check(
+    report.completionSummary.privateEditBlockedSmokeReady === report.operatorCompletionBriefPrivateEditBlockedSmokeReady,
+    "release progress refresh summary should mirror private-edit blocked smoke readiness"
+  );
+  check(
+    report.completionSummary.privateEditBlockedSmokeCurrentPlaceholderKeyCount ===
+      report.operatorCompletionBriefPrivateEditBlockedSmokeCurrentPlaceholderKeyCount,
+    "release progress refresh summary should mirror private-edit blocked smoke placeholder count"
+  );
+  check(
+    report.completionSummary.finalHandoffSuccessRedactionReady === report.operatorCompletionBriefFinalHandoffSuccessRedactionReady,
+    "release progress refresh summary should mirror final handoff success-redaction readiness"
+  );
+  check(
     report.completionSummary.postClearanceNextAction === report.operatorCompletionBriefPostClearanceNextPriorityActionId,
     "release progress refresh summary should mirror post-clearance next action"
   );
@@ -517,6 +552,13 @@ function validateReport(report, markdown) {
     "release progress refresh smoke should allow operator release-channel metadata cleared posture"
   );
   check(report.operatorCompletionBriefProofCommand === "npm run release:private-edit-strict-proof", "release progress refresh smoke should keep strict proof as operator proof command");
+  check(report.operatorCompletionBriefStrictProofHandoffReceiptReady === true, "release progress refresh smoke should keep strict proof handoff ready");
+  check(report.operatorCompletionBriefPrivateEditBlockedSmokeReady === true, "release progress refresh smoke should keep private-edit blocked smoke ready");
+  check(
+    report.operatorCompletionBriefPrivateEditBlockedSmokeCurrentPlaceholderKeyCount === 4,
+    "release progress refresh smoke should keep blocked smoke placeholder coverage at four keys"
+  );
+  check(report.operatorCompletionBriefFinalHandoffSuccessRedactionReady === true, "release progress refresh smoke should keep final handoff success-redaction ready");
   check(report.operatorCompletionBriefPostClearanceNextPriorityActionId === "auto-update-feed", "release progress refresh smoke should keep auto-update-feed as post-clearance next action");
   check(report.operatorCompletionBriefPostClearanceProofCommand === "npm run desktop:auto-update-readiness-smoke", "release progress refresh smoke should keep auto-update readiness as post-clearance proof");
   check(report.operatorCompletionBriefUpdateFeedCheckpointReady === true, "release progress refresh smoke should keep operator update-feed checkpoint ready");
@@ -590,6 +632,12 @@ console.log(`- Operator release-channel metadata cleared: ${report.operatorCompl
 console.log(`- Operator release-channel current ready rows: ${report.operatorCompletionBriefCurrentReadyCount}/${report.operatorCompletionBriefCurrentRequiredKeyCount}`);
 console.log(`- Operator current placeholder keys: ${report.operatorCompletionBriefCurrentPlaceholderKeyCount}/${report.operatorCompletionBriefCurrentRequiredKeyCount}`);
 console.log(`- Operator proof command: ${report.operatorCompletionBriefProofCommand}`);
+console.log(`- Strict proof handoff ready: ${report.operatorCompletionBriefStrictProofHandoffReceiptReady ? "yes" : "no"}`);
+console.log(`- Private-edit blocked smoke ready: ${report.operatorCompletionBriefPrivateEditBlockedSmokeReady ? "yes" : "no"}`);
+console.log(
+  `- Private-edit blocked smoke placeholders: ${report.operatorCompletionBriefPrivateEditBlockedSmokeCurrentPlaceholderKeyCount}/${report.operatorCompletionBriefCurrentRequiredKeyCount}`
+);
+console.log(`- Final handoff success-redaction ready: ${report.operatorCompletionBriefFinalHandoffSuccessRedactionReady ? "yes" : "no"}`);
 console.log(`- Operator post-clearance next action: ${report.operatorCompletionBriefPostClearanceNextPriorityActionId}`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
 console.log(`- User-facing completion: ${report.userFacingCompletionPercent}%`);

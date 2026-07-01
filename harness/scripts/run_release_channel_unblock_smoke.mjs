@@ -22,6 +22,7 @@ const releaseChannelMetadataKeys = [
   "GROOVEFORGE_RELEASE_NOTES_URL",
   "GROOVEFORGE_SUPPORT_URL"
 ];
+const configuredEnvFileKey = "GROOVEFORGE_DISTRIBUTION_ENV_FILE";
 const syntheticValues = {
   GROOVEFORGE_DISTRIBUTION_CHANNEL: "private-beta",
   GROOVEFORGE_RELEASE_DOWNLOAD_URL: ["https:", "", "downloads.invalid", "grooveforge", "darwin-arm64"].join("/"),
@@ -98,6 +99,8 @@ function buildMarkdown(report) {
 
 - Report ready: ${report.releaseChannelUnblockSmokeReady ? "yes" : "no"}
 - Synthetic env fixture: ${report.syntheticEnvFixturePath}
+- Synthetic fixture isolation: ${report.syntheticFixtureOnly ? "yes" : "no"}
+- Configured env override ignored for synthetic load: ${report.configuredEnvOverrideIgnoredForSyntheticLoad ? "yes" : "no"}
 - Loader enabled: ${report.loaderEnabled ? "yes" : "no"}
 - Loaded key count: ${report.loadedKeyCount}
 - Placeholder key count: ${report.placeholderKeyCount}
@@ -138,10 +141,12 @@ async function main() {
   await writeFile(syntheticEnvPath, envLines.join("\n"), "utf8");
 
   const previousValues = new Map(releaseChannelMetadataKeys.map((key) => [key, process.env[key]]));
+  const previousConfiguredEnvFile = process.env[configuredEnvFileKey];
   try {
     for (const key of releaseChannelMetadataKeys) {
       delete process.env[key];
     }
+    delete process.env[configuredEnvFileKey];
 
     const localEnvInput = await loadDistributionLocalEnv({
       root: syntheticRoot,
@@ -156,6 +161,15 @@ async function main() {
       platformArch,
       reportCommand: "npm run release:channel-unblock-smoke",
       syntheticEnvFixturePath: relative(syntheticEnvPath),
+      configuredEnvOverrideIgnoredForSyntheticLoad:
+        typeof previousConfiguredEnvFile === "string" && previousConfiguredEnvFile.trim().length > 0,
+      syntheticInputFilesChecked: localEnvInput.filesChecked,
+      syntheticInputPresentFiles: localEnvInput.presentFiles,
+      syntheticFixtureOnly:
+        localEnvInput.filesChecked.length === 1 &&
+        localEnvInput.filesChecked[0] === ".env.distribution.local" &&
+        localEnvInput.presentFiles.length === 1 &&
+        localEnvInput.presentFiles[0] === ".env.distribution.local",
       loaderEnabled: localEnvInput.enabled === true,
       loadedKeyCount: localEnvInput.loadedKeys.length,
       loadedKeys: localEnvInput.loadedKeys,
@@ -189,6 +203,7 @@ async function main() {
     };
     report.releaseChannelUnblockSmokeReady =
       report.loaderEnabled &&
+      report.syntheticFixtureOnly &&
       report.loadedKeyCount === releaseChannelMetadataKeys.length &&
       report.skippedExistingKeyCount === 0 &&
       report.placeholderKeyCount === 0 &&
@@ -201,6 +216,7 @@ async function main() {
 
     check(report.releaseChannelUnblockSmokeReady === true, "release-channel unblock smoke should be ready");
     check(report.loaderEnabled === true, "release-channel unblock smoke should load the synthetic env fixture");
+    check(report.syntheticFixtureOnly === true, "release-channel unblock smoke should isolate the synthetic env fixture from configured env overrides");
     check(report.loadedKeyCount === releaseChannelMetadataKeys.length, "release-channel unblock smoke should load four release-channel keys");
     check(report.placeholderKeyCount === 0, "release-channel unblock smoke should clear release-channel placeholder keys");
     check(report.releaseChannelMetadataReady === true, "release-channel unblock smoke should validate release-channel metadata shape");
@@ -234,6 +250,8 @@ async function main() {
     console.log(`- Markdown: ${relative(markdownPath)}`);
     console.log(`- JSON: ${relative(jsonPath)}`);
     console.log(`- Synthetic env fixture: ${relative(syntheticEnvPath)}`);
+    console.log(`- Synthetic fixture isolation: ${report.syntheticFixtureOnly ? "yes" : "no"}`);
+    console.log(`- Configured env override ignored for synthetic load: ${report.configuredEnvOverrideIgnoredForSyntheticLoad ? "yes" : "no"}`);
     console.log(`- Loaded keys: ${report.loadedKeyCount}`);
     console.log(`- Placeholder keys: ${report.placeholderKeyCount}`);
     console.log(`- Release-channel metadata ready: ${report.releaseChannelMetadataReady ? "yes" : "no"}`);
@@ -250,6 +268,11 @@ async function main() {
       } else {
         delete process.env[key];
       }
+    }
+    if (typeof previousConfiguredEnvFile === "string") {
+      process.env[configuredEnvFileKey] = previousConfiguredEnvFile;
+    } else {
+      delete process.env[configuredEnvFileKey];
     }
   }
 }
