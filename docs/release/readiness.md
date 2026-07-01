@@ -22,7 +22,7 @@ Run the one-command completion summary refresh after each completed work before 
 npm run release:completion-summary-refresh-smoke
 ```
 
-That receipt runs the progress refresh first, then writes the compact completion summary readout without running the full release gate.
+That receipt runs the progress refresh first, writes the compact completion summary readout, and automatically runs the 10-plan checkpoint when the refreshed completed-plan window is at `10/10`, all without running the full release gate.
 
 Run the source progress refresh directly when only the underlying progress/current-blocker/completion-packet/freshness/operator-brief bundle needs rewriting:
 
@@ -30,7 +30,7 @@ Run the source progress refresh directly when only the underlying progress/curre
 npm run release:progress-refresh-smoke
 ```
 
-Run the 10-plan checkpoint smoke after that refresh when the just-completed plan closes the current 10-plan window:
+Run the 10-plan checkpoint smoke directly only when manually rerunning the checkpoint from already refreshed source evidence:
 
 ```sh
 npm run release:10-plan-checkpoint-smoke
@@ -290,7 +290,7 @@ Progress and current-blocker receipts also surface `npm run release:private-edit
 
 `release:completion-summary-smoke` reads the existing `release:progress-refresh-smoke` JSON, validates the compact `completionSummary`, and writes ignored readout Markdown/JSON artifacts for the latest completed plan, 10-plan progress, completion percentage, remaining percentage, freshness counts, release-channel metadata posture, operator proof command, strict proof handoff readiness, private-edit blocked-smoke coverage, final handoff success-redaction readiness, and current first blocker. It fails with `npm run release:completion-summary-refresh-smoke` guidance for after-work reports and `npm run release:progress-refresh-smoke` guidance for source-only refreshes when the refreshed source artifact is missing, stale, or incomplete, and it never records private values or replaces the hard gate.
 
-`release:completion-summary-refresh-smoke` runs `release:progress-refresh-smoke` first and `release:completion-summary-smoke` second, then writes ignored release-completion-summary-refresh-smoke Markdown/JSON artifacts proving the after-work completion readout was refreshed before reporting the latest completed plan, 10-plan progress, completion percentage, freshness counts, strict proof handoff readiness, private-edit blocked-smoke coverage, final handoff success-redaction readiness, and current first blocker. It records no private values, does not claim auto-update or external distribution, and keeps `release:completion-summary-smoke` available as the narrower readout-only command when the source refresh already exists.
+`release:completion-summary-refresh-smoke` runs `release:progress-refresh-smoke` first and `release:completion-summary-smoke` second; when the refreshed completed-plan window is at `10/10`, it runs `release:10-plan-checkpoint-smoke` as a conditional third step. It then writes ignored release-completion-summary-refresh-smoke Markdown/JSON artifacts proving the after-work completion readout, checkpoint requirement/run status, latest completed plan, 10-plan progress, completion percentage, freshness counts, strict proof handoff readiness, private-edit blocked-smoke coverage, final handoff success-redaction readiness, and current first blocker. It records no private values, does not claim auto-update or external distribution, and keeps `release:completion-summary-smoke` available as the narrower readout-only command when the source refresh already exists.
 
 `release:10-plan-checkpoint-smoke` reads the existing `release:progress-refresh-smoke` JSON, validates the compact `completionSummary`, independently counts the current 10-plan window from `docs/exec_plans/completed`, and writes ignored checkpoint Markdown/JSON artifacts only when the source and local completed-plan files agree that the current 10-plan window is at `10/10`. It preserves the completion percentage, remaining percentage, freshness counts, current blocker, release-channel metadata posture, strict operator proof command, hard-gate would-fail posture, and non-claiming external distribution boundary without recording private values, while exposing separate fields for the current report boundary and the post-delivery next 10-plan report target.
 

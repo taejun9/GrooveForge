@@ -15,25 +15,41 @@ const packageRoot = path.join(root, "build", "desktop", `${appName}-${platformAr
 const receiptStem = "release-completion-summary-refresh-smoke";
 const progressRefreshStem = "release-progress-refresh-smoke";
 const completionSummaryStem = "release-completion-summary-smoke";
+const checkpointStem = "release-10-plan-checkpoint-smoke";
 const progressRefreshJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${progressRefreshStem}.json`);
 const completionSummaryJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${completionSummaryStem}.json`);
+const checkpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${checkpointStem}.json`);
 const receiptMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${receiptStem}.md`);
 const receiptJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${receiptStem}.json`);
 const failures = [];
-const refreshCommands = [
+
+const requiredRefreshCommands = [
   {
     order: 1,
     command: "npm run release:progress-refresh-smoke",
     role: "refresh progress, current-blocker, completion-packet, freshness, and operator-brief evidence",
+    condition: "always",
+    skipped: false,
     valueRecorded: false
   },
   {
     order: 2,
     command: "npm run release:completion-summary-smoke",
     role: "emit compact after-work completion summary from the refreshed progress receipt",
+    condition: "always",
+    skipped: false,
     valueRecorded: false
   }
 ];
+
+const checkpointCommandRow = {
+  order: 3,
+  command: "npm run release:10-plan-checkpoint-smoke",
+  role: "emit the 10-plan checkpoint receipt at a completed report boundary",
+  condition: "when 10-plan progress is 10/10",
+  skipped: true,
+  valueRecorded: false
+};
 
 function check(condition, message) {
   if (!condition) {
@@ -81,10 +97,21 @@ function integerValue(value) {
   return Number.isInteger(value) ? value : 0;
 }
 
+function parseNpmRunCommand(command) {
+  const parts = command.trim().split(/\s+/);
+  if (parts[0] !== "npm" || parts[1] !== "run" || !parts[2]) {
+    fail(`Unsupported refresh command: ${command}`);
+  }
+  return {
+    scriptName: parts[2],
+    args: parts.slice(3)
+  };
+}
+
 function runNpmScript(command) {
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-  const [, , scriptName] = command.split(" ");
-  const result = spawnSync(npmCommand, ["run", scriptName], {
+  const { scriptName, args } = parseNpmRunCommand(command);
+  const result = spawnSync(npmCommand, ["run", scriptName, ...args], {
     cwd: root,
     env: process.env,
     stdio: "inherit"
@@ -104,14 +131,86 @@ async function readJsonRequired(filePath, label) {
   return JSON.parse(await readFile(filePath, "utf8"));
 }
 
+function tenPlanCheckpointRequired(summary) {
+  return summary.tenPlanReportDue === true && integerValue(summary.tenPlanCompletedCount) === 10 && integerValue(summary.tenPlanTotal) === 10;
+}
+
+function buildRefreshCommands(checkpointRequired) {
+  return [
+    ...requiredRefreshCommands,
+    {
+      ...checkpointCommandRow,
+      skipped: !checkpointRequired
+    }
+  ];
+}
+
+function commandStatus(row) {
+  return row.skipped === true ? "skipped" : "run";
+}
+
 function formatCommandRows(rows) {
   return rows
-    .map((row) => `| ${row.order} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${row.valueRecorded ? "yes" : "no"} |`)
+    .map(
+      (row) =>
+        `| ${row.order} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.condition)} | ${commandStatus(row)} | ${row.valueRecorded ? "yes" : "no"} |`
+    )
     .join("\n");
 }
 
-function buildReport({ progressRefresh, completionSummary }) {
-  return {
+function checkpointStatus({ required, ready }) {
+  if (!required) {
+    return "not-due";
+  }
+  return ready ? "ready" : "blocked";
+}
+
+function checkpointRowsValueFree(checkpoint) {
+  if (!checkpoint) {
+    return true;
+  }
+  return Array.isArray(checkpoint.tenPlanWindowRows) && checkpoint.tenPlanWindowRows.every((row) => row.valueRecorded === false);
+}
+
+function checkpointReadyLabel(report) {
+  return report.tenPlanCheckpointRequired ? readyLabel(report.tenPlanCheckpointReady) : "not due";
+}
+
+function checkpointFieldRows(report) {
+  return [
+    ["required", readyLabel(report.tenPlanCheckpointRequired)],
+    ["run", readyLabel(report.tenPlanCheckpointRun)],
+    ["ready", checkpointReadyLabel(report)],
+    ["status", report.tenPlanCheckpointStatus],
+    ["reason", report.tenPlanCheckpointReason],
+    ["skipped reason", report.tenPlanCheckpointSkippedReason],
+    ["artifact", report.tenPlanCheckpointJsonPath],
+    ["latest plan", report.checkpointLatestPlan],
+    ["10-plan progress", report.checkpointTenPlanProgress],
+    ["current boundary", report.currentTenPlanReportBoundaryAt],
+    ["post-delivery next report", report.postDeliveryNextTenPlanProgressReportAt],
+    ["source ready", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointSourceReady) : "not due"],
+    ["source labels match", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointSourceLabelsMatch) : "not due"],
+    ["rows value-free", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointRowsValueFree) : "not due"],
+    ["private values recorded", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointPrivateValuesRecorded) : "not due"],
+    ["auto-update claimed", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointClaimedAutoUpdate) : "not due"],
+    ["external distribution claimed", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointClaimedExternalDistribution) : "not due"]
+  ].map(([field, value], index) => ({
+    order: index + 1,
+    field,
+    value,
+    valueRecorded: false
+  }));
+}
+
+function formatCheckpointRows(rows) {
+  return rows.map((row) => `| ${row.order} | ${escapeCell(row.field)} | ${escapeCell(row.value)} | ${row.valueRecorded ? "yes" : "no"} |`).join("\n");
+}
+
+function buildReport({ progressRefresh, completionSummary, checkpoint }) {
+  const checkpointRequired = tenPlanCheckpointRequired(completionSummary);
+  const checkpointReady = checkpointRequired ? checkpoint?.tenPlanCheckpointReady === true : false;
+  const report = {
     appName,
     bundleId,
     version: packageJson.version,
@@ -119,15 +218,18 @@ function buildReport({ progressRefresh, completionSummary }) {
     arch: process.arch,
     platformArch,
     reportCommand: "npm run release:completion-summary-refresh-smoke",
-    refreshCommands,
+    refreshCommands: buildRefreshCommands(checkpointRequired),
     progressRefreshCommand: "npm run release:progress-refresh-smoke",
     completionSummaryCommand: "npm run release:completion-summary-smoke",
+    tenPlanCheckpointCommand: checkpointCommandRow.command,
     progressRefreshJsonArtifactName: "release-progress-refresh-smoke.json",
     completionSummaryJsonArtifactName: "release-completion-summary-smoke.json",
+    tenPlanCheckpointJsonArtifactName: "release-10-plan-checkpoint-smoke.json",
     completionSummaryRefreshMarkdownArtifactName: "release-completion-summary-refresh-smoke.md",
     completionSummaryRefreshJsonArtifactName: "release-completion-summary-refresh-smoke.json",
     progressRefreshJsonPath: relative(progressRefreshJsonPath),
     completionSummaryJsonPath: relative(completionSummaryJsonPath),
+    tenPlanCheckpointJsonPath: checkpointRequired ? relative(checkpointJsonPath) : "not due",
     completionSummaryRefreshMarkdownPath: relative(receiptMarkdownPath),
     completionSummaryRefreshJsonPath: relative(receiptJsonPath),
     progressRefreshReady: progressRefresh.releaseProgressRefreshReady === true,
@@ -165,6 +267,24 @@ function buildReport({ progressRefresh, completionSummary }) {
     nextCommand: textValue(completionSummary.nextCommand),
     hardGateReady: completionSummary.hardGateReady === true,
     hardGateWouldFail: completionSummary.hardGateWouldFail === true,
+    tenPlanCheckpointRequired: checkpointRequired,
+    tenPlanCheckpointRun: checkpointRequired,
+    tenPlanCheckpointReady: checkpointReady,
+    tenPlanCheckpointStatus: checkpointStatus({ required: checkpointRequired, ready: checkpointReady }),
+    tenPlanCheckpointReason: checkpointRequired ? "10-plan report due at the current boundary" : "10-plan report not due",
+    tenPlanCheckpointSkippedReason: checkpointRequired ? "not skipped" : "current completed-plan window is not 10/10",
+    checkpointLatestPlan: checkpointRequired ? textValue(checkpoint?.localLatestPlan) : "not due",
+    checkpointTenPlanProgress: checkpointRequired ? textValue(checkpoint?.localTenPlanProgress) : "not due",
+    currentTenPlanReportBoundaryAt: checkpointRequired ? textValue(checkpoint?.currentTenPlanReportBoundaryAt) : "not due",
+    postDeliveryNextTenPlanProgressReportAt: checkpointRequired ? textValue(checkpoint?.postDeliveryNextTenPlanProgressReportAt) : "not due",
+    checkpointSourceReady: checkpointRequired ? checkpoint?.sourceReady === true : false,
+    checkpointSourceLabelsMatch: checkpointRequired ? checkpoint?.sourceLabelsMatch === true : false,
+    checkpointRowsValueFree: checkpointRequired ? checkpointRowsValueFree(checkpoint) : true,
+    checkpointPrivateValuesRecorded: checkpointRequired ? checkpoint?.privateValuesRecorded === true || checkpoint?.valueRecorded === true : false,
+    checkpointClaimedAutoUpdate: checkpointRequired ? checkpoint?.claimedAutoUpdate === true : false,
+    checkpointClaimedExternalDistribution: checkpointRequired ? checkpoint?.claimedExternalDistribution === true : false,
+    checkpointHardGateReady: checkpointRequired ? checkpoint?.hardGateReady === true : false,
+    checkpointHardGateWouldFail: checkpointRequired ? checkpoint?.hardGateWouldFail === true : true,
     privateValuesRecorded: false,
     networkProbeAttempted: false,
     releaseUploadAttempted: false,
@@ -174,6 +294,10 @@ function buildReport({ progressRefresh, completionSummary }) {
     claimedExternalDistribution: false,
     completionSummaryRefreshReady: false
   };
+  report.tenPlanCheckpointRows = checkpointFieldRows(report);
+  report.tenPlanCheckpointRowCount = report.tenPlanCheckpointRows.length;
+  report.tenPlanCheckpointRowSummary = `${report.tenPlanCheckpointRowCount} checkpoint receipt rows`;
+  return report;
 }
 
 function buildMarkdown(report) {
@@ -186,6 +310,9 @@ function buildMarkdown(report) {
 - Completion summary readout ready: ${readyLabel(report.completionSummaryReadoutReady)}
 - Latest completed plan: ${report.latestPlan}
 - 10-plan progress: ${report.tenPlanProgress}
+- 10-plan report due: ${readyLabel(report.tenPlanReportDue)}
+- 10-plan checkpoint required: ${readyLabel(report.tenPlanCheckpointRequired)}
+- 10-plan checkpoint ready: ${checkpointReadyLabel(report)}
 - User-facing completion: ${report.completionPercent}
 - Remaining completion: ${report.remainingPercent}
 - Fresh artifacts: ${report.freshArtifactCount}
@@ -204,14 +331,41 @@ function buildMarkdown(report) {
 
 ## Command Order
 
-| order | command | role | value recorded |
-|---:|---|---|---:|
+| order | command | role | condition | status | value recorded |
+|---:|---|---|---|---|---:|
 ${formatCommandRows(report.refreshCommands)}
 
 ## Source Artifacts
 
 - Progress refresh JSON: ${report.progressRefreshJsonPath}
 - Completion summary JSON: ${report.completionSummaryJsonPath}
+- 10-plan checkpoint JSON: ${report.tenPlanCheckpointJsonPath}
+
+## 10-Plan Checkpoint
+
+- 10-plan checkpoint command: \`${report.tenPlanCheckpointCommand}\`
+- 10-plan checkpoint required: ${readyLabel(report.tenPlanCheckpointRequired)}
+- 10-plan checkpoint run: ${readyLabel(report.tenPlanCheckpointRun)}
+- 10-plan checkpoint status: ${report.tenPlanCheckpointStatus}
+- 10-plan checkpoint ready: ${checkpointReadyLabel(report)}
+- 10-plan checkpoint reason: ${report.tenPlanCheckpointReason}
+- 10-plan checkpoint skipped reason: ${report.tenPlanCheckpointSkippedReason}
+- 10-plan checkpoint latest plan: ${report.checkpointLatestPlan}
+- 10-plan checkpoint progress: ${report.checkpointTenPlanProgress}
+- Current 10-plan report boundary: ${report.currentTenPlanReportBoundaryAt}
+- Post-delivery next 10-plan report: ${report.postDeliveryNextTenPlanProgressReportAt}
+- Checkpoint source ready: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointSourceReady) : "not due"}
+- Checkpoint source labels match: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointSourceLabelsMatch) : "not due"}
+- Checkpoint rows value-free: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointRowsValueFree) : "not due"}
+- Checkpoint private values recorded: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointPrivateValuesRecorded) : "not due"}
+- Checkpoint auto-update claimed: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointClaimedAutoUpdate) : "not due"}
+- Checkpoint external distribution claimed: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointClaimedExternalDistribution) : "not due"}
+
+## 10-Plan Checkpoint Rows
+
+| order | field | value | value recorded |
+|---:|---|---|---:|
+${formatCheckpointRows(report.tenPlanCheckpointRows)}
 
 ## Not Claimed
 
@@ -220,6 +374,9 @@ This refresh does not claim auto-update, Developer ID signing, notarization, Gat
 }
 
 function validateReport(report, markdown) {
+  const checkpointExpected = report.tenPlanReportDue === true && report.tenPlanCompletedCount === 10 && report.tenPlanTotal === 10;
+  const checkpointRow = report.refreshCommands.find((row) => row.command === report.tenPlanCheckpointCommand);
+
   check(report.progressRefreshReady === true, "release completion summary refresh should run a ready progress refresh first");
   check(report.progressRefreshCompletionSummaryReady === true, "release completion summary refresh should keep progress compact summary ready");
   check(report.progressRefreshLabelsMatch === true, "release completion summary refresh should keep progress labels matched");
@@ -257,13 +414,51 @@ function validateReport(report, markdown) {
   check(report.signingAttempted === false, "release completion summary refresh should not sign artifacts");
   check(report.claimedAutoUpdate === false, "release completion summary refresh should not claim auto-update");
   check(report.claimedExternalDistribution === false, "release completion summary refresh should not claim external distribution");
+  check(report.refreshCommands.length === 3, "release completion summary refresh should record required commands plus conditional checkpoint command");
+  check(report.refreshCommands.every((row) => row.valueRecorded === false), "release completion summary refresh command rows should be value-free");
+  check(report.refreshCommands.slice(0, 2).every((row) => row.skipped === false), "release completion summary refresh should always run the first two commands");
+  check(Boolean(checkpointRow), "release completion summary refresh should include checkpoint command row");
+  check(checkpointRow?.skipped === !checkpointExpected, "release completion summary refresh should skip checkpoint only when the 10-plan window is not due");
+  check(report.tenPlanCheckpointRequired === checkpointExpected, "release completion summary refresh should derive checkpoint requirement from the refreshed 10-plan summary");
+  check(report.tenPlanCheckpointRun === checkpointExpected, "release completion summary refresh should run checkpoint when required");
+  check(report.tenPlanCheckpointStatus === checkpointStatus({ required: checkpointExpected, ready: report.tenPlanCheckpointReady }), "release completion summary refresh checkpoint status should match readiness");
+  check(report.tenPlanCheckpointRows.length === report.tenPlanCheckpointRowCount, "release completion summary refresh should count checkpoint rows");
+  check(report.tenPlanCheckpointRowSummary === `${report.tenPlanCheckpointRowCount} checkpoint receipt rows`, "release completion summary refresh should summarize checkpoint rows");
+  check(report.tenPlanCheckpointRows.every((row) => row.valueRecorded === false), "release completion summary refresh checkpoint rows should be value-free");
+
+  if (checkpointExpected) {
+    check(report.tenPlanCheckpointReady === true, "release completion summary refresh should produce a ready checkpoint when the 10-plan report is due");
+    check(report.tenPlanCheckpointJsonPath === relative(checkpointJsonPath), "release completion summary refresh should expose checkpoint artifact path when due");
+    check(report.checkpointLatestPlan === report.latestPlan, "release completion summary refresh checkpoint should match latest plan");
+    check(report.checkpointTenPlanProgress === report.tenPlanProgress, "release completion summary refresh checkpoint should match 10-plan progress");
+    check(report.currentTenPlanReportBoundaryAt === report.latestPlan, "release completion summary refresh checkpoint boundary should match latest boundary plan");
+    check(report.postDeliveryNextTenPlanProgressReportAt !== "not due", "release completion summary refresh checkpoint should expose post-delivery next report");
+    check(report.checkpointSourceReady === true, "release completion summary refresh checkpoint source should be ready");
+    check(report.checkpointSourceLabelsMatch === true, "release completion summary refresh checkpoint labels should match");
+    check(report.checkpointRowsValueFree === true, "release completion summary refresh checkpoint rows should be value-free");
+    check(report.checkpointPrivateValuesRecorded === false, "release completion summary refresh checkpoint should not record private values");
+    check(report.checkpointClaimedAutoUpdate === false, "release completion summary refresh checkpoint should not claim auto-update");
+    check(report.checkpointClaimedExternalDistribution === false, "release completion summary refresh checkpoint should not claim external distribution");
+    check(report.checkpointHardGateReady === false, "release completion summary refresh checkpoint should keep hard gate unready");
+    check(report.checkpointHardGateWouldFail === true, "release completion summary refresh checkpoint should keep hard gate would-fail posture");
+  } else {
+    check(report.tenPlanCheckpointReady === false, "release completion summary refresh should not mark checkpoint ready when it is not due");
+    check(report.tenPlanCheckpointJsonPath === "not due", "release completion summary refresh should not expose a checkpoint artifact path when not due");
+    check(report.checkpointLatestPlan === "not due", "release completion summary refresh should mark checkpoint plan not due");
+    check(report.checkpointTenPlanProgress === "not due", "release completion summary refresh should mark checkpoint progress not due");
+  }
+
   check(markdown.includes("## Command Order"), "release completion summary refresh Markdown should include command order");
+  check(markdown.includes("condition | status"), "release completion summary refresh Markdown should include command conditions and statuses");
   check(markdown.includes("npm run release:progress-refresh-smoke"), "release completion summary refresh Markdown should cite progress refresh command");
   check(markdown.includes("npm run release:completion-summary-smoke"), "release completion summary refresh Markdown should cite completion summary command");
+  check(markdown.includes("npm run release:10-plan-checkpoint-smoke"), "release completion summary refresh Markdown should cite checkpoint command");
+  check(markdown.includes("## 10-Plan Checkpoint"), "release completion summary refresh Markdown should include checkpoint section");
+  check(markdown.includes("## 10-Plan Checkpoint Rows"), "release completion summary refresh Markdown should include checkpoint rows");
 }
 
 async function main() {
-  for (const step of refreshCommands) {
+  for (const step of requiredRefreshCommands) {
     console.log(`Refreshing release completion summary evidence: ${step.command}`);
     runNpmScript(step.command);
   }
@@ -272,7 +467,17 @@ async function main() {
     readJsonRequired(progressRefreshJsonPath, "release progress refresh"),
     readJsonRequired(completionSummaryJsonPath, "release completion summary")
   ]);
-  const report = buildReport({ progressRefresh, completionSummary });
+
+  let checkpoint = null;
+  if (tenPlanCheckpointRequired(completionSummary)) {
+    console.log(`Refreshing release completion summary evidence: ${checkpointCommandRow.command}`);
+    runNpmScript(checkpointCommandRow.command);
+    checkpoint = await readJsonRequired(checkpointJsonPath, "release 10-plan checkpoint");
+  } else {
+    console.log("Skipping release 10-plan checkpoint: current completed-plan window is not 10/10.");
+  }
+
+  const report = buildReport({ progressRefresh, completionSummary, checkpoint });
   report.completionSummaryRefreshReady = true;
   const markdown = buildMarkdown(report);
   validateReport(report, markdown);
@@ -290,6 +495,11 @@ async function main() {
   console.log(`- JSON: ${relative(receiptJsonPath)}`);
   console.log(`- Latest completed plan: ${report.latestPlan}`);
   console.log(`- 10-plan progress: ${report.tenPlanProgress}`);
+  console.log(`- 10-plan checkpoint required: ${report.tenPlanCheckpointRequired ? "yes" : "no"}`);
+  console.log(`- 10-plan checkpoint run: ${report.tenPlanCheckpointRun ? "yes" : "no"}`);
+  console.log(`- 10-plan checkpoint status: ${report.tenPlanCheckpointStatus}`);
+  console.log(`- 10-plan checkpoint ready: ${checkpointReadyLabel(report)}`);
+  console.log(`- 10-plan checkpoint artifact: ${report.tenPlanCheckpointJsonPath}`);
   console.log(`- User-facing completion: ${report.completionPercent}`);
   console.log(`- Remaining completion: ${report.remainingPercent}`);
   console.log(`- Fresh artifacts: ${report.freshArtifactCount}`);
