@@ -34,6 +34,9 @@ const updateMetadataPacketJsonPath = path.join(
 );
 const developerIdPacketJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${developerIdPacketStem}.json`);
 const failures = [];
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
+const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const privateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
 
 const refreshCommands = [
   {
@@ -103,6 +106,11 @@ function objectRows(value) {
 
 function valueFreeRows(rows) {
   return objectRows(rows).every((row) => row.valueRecorded === false);
+}
+
+function commandOrder(rows, command) {
+  const row = objectRows(rows).find((item) => item.command === command);
+  return integerValue(row?.order);
 }
 
 function runNpmScript(command) {
@@ -176,23 +184,28 @@ function sequenceRunRows(rows) {
 }
 
 function deriveFirstRunCommand(completionSummary) {
+  const currentOperatorFirstCommand = textValue(completionSummary.currentOperatorFirstCommand, "");
+  if (completionSummary.currentOperatorCommandSequenceReady === true && currentOperatorFirstCommand !== "none") {
+    return currentOperatorFirstCommand;
+  }
   if (completionSummary.releaseChannelMetadataNeedsIgnoredEnv === true || /ignored local distribution env/i.test(textValue(completionSummary.firstBlocker))) {
     return "npm run release:channel-setup-wizard";
   }
-  return "npm run release:private-edit-strict-proof";
+  return privateEditStrictProofCommand;
 }
 
 function buildRunRows({ completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket }) {
   const firstRunCommand = deriveFirstRunCommand(completionSummary);
+  const releaseChannelProofCommand = textValue(completionSummary.currentOperatorStrictProofCommand, privateEditStrictProofCommand);
   const rows = [
     commandRow(
       1,
       "release-channel-metadata",
       firstRunCommand,
-      "npm run release:private-edit-strict-proof",
+      releaseChannelProofCommand,
       completionSummary.releaseChannelMetadataCleared === true ? "ready" : "blocked",
-      "completionSummary.releaseChannelMetadata",
-      "create/fill the ignored distribution env and prove the four release-channel metadata rows without printing values"
+      "completionSummary.currentOperatorCommandRows",
+      "run the current value-free operator command sequence for release-channel metadata, then prove the four rows without printing values"
     ),
     commandRow(
       2,
@@ -343,6 +356,19 @@ function buildSourceRows({ completionSummaryRefresh, completionSummary, updateFe
 }
 
 function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket }) {
+  const currentOperatorCommandRows = objectRows(completionSummary.currentOperatorCommandRows);
+  const currentOperatorPreflightCommand = textValue(
+    completionSummary.currentOperatorPreflightCommand,
+    releaseChannelApplyPrivateEnvPreflightCommand
+  );
+  const currentOperatorApplyCommand = textValue(completionSummary.currentOperatorApplyCommand, releaseChannelApplyPrivateEnvCommand);
+  const currentOperatorStrictProofCommand = textValue(completionSummary.currentOperatorStrictProofCommand, privateEditStrictProofCommand);
+  const currentOperatorPreflightCommandOrder =
+    integerValue(completionSummary.currentOperatorPreflightCommandOrder) || commandOrder(currentOperatorCommandRows, currentOperatorPreflightCommand);
+  const currentOperatorApplyCommandOrder =
+    integerValue(completionSummary.currentOperatorApplyCommandOrder) || commandOrder(currentOperatorCommandRows, currentOperatorApplyCommand);
+  const currentOperatorStrictProofCommandOrder =
+    integerValue(completionSummary.currentOperatorStrictProofCommandOrder) || commandOrder(currentOperatorCommandRows, currentOperatorStrictProofCommand);
   const runRows = buildRunRows({ completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket });
   const sourceRows = buildSourceRows({ completionSummaryRefresh, completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket });
   const blockedRows = runRows.filter((row) => row.readiness !== "ready");
@@ -379,6 +405,25 @@ function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPa
     currentFirstBlocker: textValue(completionSummary.firstBlocker),
     currentNextCommand: textValue(completionSummary.nextCommand),
     currentEnvEditTarget: textValue(completionSummary.currentEnvEditTarget, ".env.distribution.local"),
+    currentOperatorCommandSequenceReady: completionSummary.currentOperatorCommandSequenceReady === true,
+    currentOperatorCommandRows,
+    currentOperatorCommandRowCount: integerValue(completionSummary.currentOperatorCommandRowCount),
+    currentOperatorCommandSummary: textValue(completionSummary.currentOperatorCommandSummary),
+    currentOperatorFirstCommand: textValue(completionSummary.currentOperatorFirstCommand),
+    currentOperatorPreflightCommand,
+    currentOperatorPreflightCommandOrder,
+    currentOperatorApplyCommand,
+    currentOperatorApplyCommandOrder,
+    currentOperatorStrictProofCommand,
+    currentOperatorStrictProofCommandOrder,
+    currentOperatorBlockerRefreshCommand: textValue(completionSummary.currentOperatorBlockerRefreshCommand, "npm run release:current-blocker"),
+    currentOperatorNextActionsRefreshCommand: textValue(completionSummary.currentOperatorNextActionsRefreshCommand, "npm run release:next-actions"),
+    currentOperatorPreflightBeforeApply: completionSummary.currentOperatorPreflightBeforeApply === true,
+    currentOperatorApplyBeforeStrictProof: completionSummary.currentOperatorApplyBeforeStrictProof === true,
+    currentOperatorValueRecorded: completionSummary.currentOperatorValueRecorded === true ? true : false,
+    firstRunCommand: textValue(runRows[0]?.command),
+    firstRunMatchesCurrentOperatorFirstCommand:
+      textValue(runRows[0]?.command) !== "none" && textValue(runRows[0]?.command) === textValue(completionSummary.currentOperatorFirstCommand),
     releaseChannelMetadataBlocked: completionSummary.releaseChannelMetadataBlocked === true,
     releaseChannelMetadataCleared: completionSummary.releaseChannelMetadataCleared === true,
     releaseChannelMetadataNeedsIgnoredEnv: completionSummary.releaseChannelMetadataNeedsIgnoredEnv === true,
@@ -462,6 +507,15 @@ function formatRunRows(rows) {
     .join("\n");
 }
 
+function formatCurrentOperatorCommandRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${readyLabel(row.ready === true)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function formatCompletionActionRows(rows) {
   return rows
     .map(
@@ -493,6 +547,13 @@ function buildMarkdown(report) {
 - Current first blocker: ${report.currentFirstBlocker}
 - Current next command: \`${report.currentNextCommand}\`
 - Current env edit target: ${report.currentEnvEditTarget}
+- Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
+- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
+- Current operator first command: \`${report.currentOperatorFirstCommand}\`
+- First run command: \`${report.firstRunCommand}\`
+- First run matches current operator first command: ${readyLabel(report.firstRunMatchesCurrentOperatorFirstCommand)}
+- Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
+- Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
 - Release-channel metadata blocked: ${readyLabel(report.releaseChannelMetadataBlocked)}
 - Release-channel metadata cleared: ${readyLabel(report.releaseChannelMetadataCleared)}
 - Release-channel metadata needs ignored env: ${readyLabel(report.releaseChannelMetadataNeedsIgnoredEnv)}
@@ -538,6 +599,24 @@ ${formatSourceRows(report.sourceRows)}
 |---:|---|---|---|---|---|---|---|---:|
 ${formatRunRows(report.runRows)}
 
+## Current Operator Command Sequence
+
+- Sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
+- Command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
+- First command: \`${report.currentOperatorFirstCommand}\`
+- Preflight command: \`${report.currentOperatorPreflightCommand}\`
+- Apply command: \`${report.currentOperatorApplyCommand}\`
+- Strict proof command: \`${report.currentOperatorStrictProofCommand}\`
+- Current-blocker refresh command: \`${report.currentOperatorBlockerRefreshCommand}\`
+- Next-actions refresh command: \`${report.currentOperatorNextActionsRefreshCommand}\`
+- Preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
+- Apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Value recorded: ${readyLabel(report.currentOperatorValueRecorded)}
+
+| order | command | role | ready | value recorded |
+|---:|---|---|---:|---:|
+${formatCurrentOperatorCommandRows(report.currentOperatorCommandRows)}
+
 ## Current Completion Blocker Actions
 
 | order | item | ready | current state | operator action | evidence | proof command | source field | value recorded |
@@ -575,6 +654,42 @@ function validateReport(report, markdown) {
   check(report.completionPercent === 99.999999, "external completion run packet should preserve completion percent");
   check(report.remainingPercent === 0.000001, "external completion run packet should preserve remaining percent");
   check(report.currentEnvEditTarget !== "none", "external completion run packet should expose current env edit target");
+  check(report.currentOperatorCommandSequenceReady === true, "external completion run packet current operator command sequence should be ready");
+  check(
+    report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length,
+    "external completion run packet current operator command row count should match rows"
+  );
+  check(
+    report.currentOperatorCommandRows.length >= 5,
+    "external completion run packet current operator command sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh"
+  );
+  check(
+    report.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false),
+    "external completion run packet current operator command rows should be ready and value-free"
+  );
+  check(
+    report.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand,
+    "external completion run packet current operator sequence should expose private env preflight command"
+  );
+  check(
+    report.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand,
+    "external completion run packet current operator sequence should expose private env apply command"
+  );
+  check(
+    report.currentOperatorStrictProofCommand === privateEditStrictProofCommand,
+    "external completion run packet current operator sequence should expose strict proof command"
+  );
+  check(report.currentOperatorPreflightBeforeApply === true, "external completion run packet current operator sequence should place preflight before apply");
+  check(report.currentOperatorApplyBeforeStrictProof === true, "external completion run packet current operator sequence should place apply before strict proof");
+  check(
+    report.currentOperatorBlockerRefreshCommand === "npm run release:current-blocker",
+    "external completion run packet current operator sequence should include current-blocker refresh"
+  );
+  check(
+    report.currentOperatorNextActionsRefreshCommand === "npm run release:next-actions",
+    "external completion run packet current operator sequence should include next-actions refresh"
+  );
+  check(report.currentOperatorValueRecorded === false, "external completion run packet current operator sequence should be value-free");
   check(report.releaseChannelRequiredCount === 4, "external completion run packet should track four release-channel metadata keys");
   check(report.updateFeedSelectedRequiredCount === 2, "external completion run packet should track two update feed/channel selected keys");
   check(report.hardGateCommand === "npm run release:external-check", "external completion run packet should cite hard gate command");
@@ -594,7 +709,23 @@ function validateReport(report, markdown) {
   );
   check(report.runRows[0]?.phase === "release-channel-metadata", "external completion run packet should start with release-channel metadata");
   check(report.runRows[0]?.sequenceStatus === "current-blocker", "external completion run packet should mark the first incomplete row as current blocker");
-  check(report.runRows[0]?.command === "npm run release:channel-setup-wizard" || report.runRows[0]?.command === "npm run release:private-edit-strict-proof", "external completion run packet should start with setup wizard or strict proof");
+  check(report.firstRunCommand === report.runRows[0]?.command, "external completion run packet first run command should match the first run row");
+  check(
+    report.firstRunMatchesCurrentOperatorFirstCommand === true,
+    "external completion run packet first run command should match current operator first command"
+  );
+  check(
+    report.runRows[0]?.command === report.currentOperatorFirstCommand,
+    "external completion run packet release-channel row should start with current operator first command"
+  );
+  check(
+    report.runRows[0]?.proofCommand === report.currentOperatorStrictProofCommand,
+    "external completion run packet release-channel proof command should match current operator strict proof command"
+  );
+  check(
+    report.runRows[0]?.command !== privateEditStrictProofCommand,
+    "external completion run packet should not use the strict proof command as the first operator command while release-channel metadata is blocked"
+  );
   check(report.runRows.some((row) => row.command === "npm run release:update-feed-edit-packet-smoke"), "external completion run packet should include update feed edit packet");
   check(report.runRows.some((row) => row.command === "npm run release:update-metadata-publish-packet-smoke"), "external completion run packet should include update metadata publish packet");
   check(report.runRows.some((row) => row.command === "npm run release:developer-id-operator-packet-smoke"), "external completion run packet should include Developer ID operator packet");
@@ -630,6 +761,7 @@ function validateReport(report, markdown) {
   check(!/https?:\/\//i.test(markdown), "external completion run packet Markdown should not include URL values");
   check(markdown.includes("External Completion Run Packet Smoke"), "external completion run packet Markdown should include title");
   check(markdown.includes("## External Completion Run Rows"), "external completion run packet Markdown should include run rows");
+  check(markdown.includes("## Current Operator Command Sequence"), "external completion run packet Markdown should include current operator command sequence");
   check(markdown.includes("Current blocker run rows"), "external completion run packet Markdown should include current blocker row summary");
   check(markdown.includes("External distribution claimed: no"), "external completion run packet Markdown should keep external distribution unclaimed");
 
@@ -670,6 +802,12 @@ console.log(`- Remaining completion: ${report.remainingPercent}%`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
 console.log(`- Current next command: ${report.currentNextCommand}`);
 console.log(`- First run command: ${report.runRows[0]?.command}`);
+console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
+console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
+console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- First run matches current operator first command: ${report.firstRunMatchesCurrentOperatorFirstCommand ? "yes" : "no"}`);
+console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
+console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Run rows: ${report.runRowCount}`);
 console.log(`- Blocked run rows: ${report.blockedRunRowCount} (${report.blockedRunRowSummary})`);
 console.log(`- Current blocker run rows: ${report.currentBlockedRunRowCount} (${report.currentBlockedRunRowSummary})`);
