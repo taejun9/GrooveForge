@@ -1940,6 +1940,12 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     currentFirstBlocker: textValue(externalProofBundle.currentFirstBlocker),
     doctorFirstBlocker: textValue(releaseDoctor.currentActionFirstBlocker),
     currentOperatorAction: textValue(externalProofBundle.currentOperatorAction),
+    releaseChannelPrivateEnvApplyCommand: releaseChannelApplyPrivateEnvCommand,
+    releaseChannelPrivateEnvApplyRole: "apply operator-owned release-channel process env values into the ignored local env before strict proof",
+    releaseChannelPrivateEnvApplyBeforeStrictProof:
+      releaseChannelApplyPrivateEnvCommand === "npm run release:channel-apply-private-env" &&
+      recommendedPrivateEditOperatorProofCommand === "npm run release:private-edit-strict-proof",
+    releaseChannelPrivateEnvApplyValueRecorded: false,
     hardGateCommand,
     hardGateReady: externalGate.externalDistributionGateReady === true,
     hardGateWouldFail: externalGate.hardGateWouldFail === true,
@@ -3447,6 +3453,13 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits !== report.releaseChannelFirstProofCommandAfterPrivateEdits, "release current blocker should distinguish the operator proof chain from the narrow first proof");
   check(report.releaseChannelRecommendedOperatorProofCommandRole === "recommended strict-first proof chain after replacing the four private release-channel placeholders", "release current blocker should describe the strict proof chain role");
   check(report.releaseChannelRecommendedOperatorProofCommandValueRecorded === false, "release current blocker recommended operator proof command should not record values");
+  check(report.releaseChannelPrivateEnvApplyCommand === releaseChannelApplyPrivateEnvCommand, "release current blocker should expose private env apply command");
+  check(
+    report.releaseChannelPrivateEnvApplyRole === "apply operator-owned release-channel process env values into the ignored local env before strict proof",
+    "release current blocker should describe private env apply role"
+  );
+  check(report.releaseChannelPrivateEnvApplyBeforeStrictProof === true, "release current blocker should place private env apply before strict proof");
+  check(report.releaseChannelPrivateEnvApplyValueRecorded === false, "release current blocker private env apply command should not record values");
   check(report.releaseChannelLiveCheckRefreshedByProgressReport === true, "release current blocker should mirror live-check refresh posture");
   check(report.releaseChannelLiveCheckReady === releaseProgress.releaseChannelLiveCheckReady, "release current blocker should mirror live-check readiness");
   check(report.releaseChannelLiveCheckRowCount === report.releaseChannelLiveCheckRows.length, "release current blocker live-check row count should match rows");
@@ -3517,6 +3530,8 @@ function buildMarkdown(report) {
     `- Current next command: \`${report.currentNextCommand}\``,
     `- Current first blocker: ${report.currentFirstBlocker}`,
     `- Doctor first blocker: ${report.doctorFirstBlocker}`,
+    `- Private env apply command: \`${report.releaseChannelPrivateEnvApplyCommand}\``,
+    `- Private env apply before strict proof: ${report.releaseChannelPrivateEnvApplyBeforeStrictProof ? "yes" : "no"}`,
     `- Current env edit target: ${report.currentEnvEditTarget}`,
     `- Current placeholder edit locations: ${report.currentPlaceholderEditLocationCount} (${report.currentPlaceholderEditLocationSummary})`,
     `- Current action checklist rows: ${report.currentActionChecklistCount} (${report.currentActionChecklistSummary})`,
@@ -4347,6 +4362,8 @@ console.log(`- Refresh commands: ${report.refreshCommandCount}`);
 console.log(`- Current target: ${report.currentTarget}`);
 console.log(`- Current next command: ${report.currentNextCommand}`);
 console.log(`- Current first blocker: ${report.currentFirstBlocker}`);
+console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);
+console.log(`- Private env apply before strict proof: ${report.releaseChannelPrivateEnvApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
 console.log(`- Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})`);
