@@ -95,6 +95,8 @@ npm run desktop:distribution-bundle-manifest-smoke
 npm run desktop:distribution-env-template-smoke
 npm run desktop:distribution-private-inputs-smoke
 npm run release:channel-unblock-smoke
+npm run release:channel-apply-private-env
+npm run release:channel-apply-private-env-success-smoke
 npm run release:channel-live-check
 npm run release:channel-live-check-strict
 npm run release:channel-live-check-strict-success-smoke
@@ -124,6 +126,8 @@ npm run release:check
 npm run release:progress
 npm run release:doctor
 npm run release:channel-unblock-smoke
+npm run release:channel-apply-private-env
+npm run release:channel-apply-private-env-success-smoke
 npm run release:channel-live-check
 npm run release:channel-live-check-strict
 npm run release:channel-live-check-strict-success-smoke
@@ -164,6 +168,8 @@ These commands validate the base structure, documentation rules, first-run React
 `npm run release:private-edit-strict-proof` blocked receipts include value-free blocked handoff rows with the current blocker, ignored edit target, placeholder count, manual edit action, return command, and strict first proof command before the command exits non-zero.
 
 `npm run release:private-edit-strict-proof-blocked-smoke` uses a synthetic ignored env fixture to prove the blocked handoff receipt path without reading or modifying the real ignored env.
+
+`npm run release:channel-apply-private-env` applies operator-owned release-channel metadata from the current process environment into the ignored local env file (`.env.distribution.local` by default, or `GROOVEFORGE_DISTRIBUTION_ENV_FILE` when configured), validates the allowed channel token plus safe HTTPS URL shapes, and writes ignored release-channel-apply-private-env Markdown/JSON artifacts with key names, readiness booleans, row counts, file names, and line numbers only. `npm run release:channel-apply-private-env-success-smoke` proves the same private-env apply path against a synthetic ignored env fixture under `build/desktop/`, runs `harness/scripts/run_release_channel_apply_private_env.mjs --success-smoke` against a synthetic ignored env root, verifies 4/4 current-ready rows, and records no synthetic values, URL values, real local-env read or modification, network probe, signing, Apple notary submission, upload, or external-distribution claim.
 
 `npm run release:final-handoff` refreshes the post-edit proof bundle, strict success smoke, and real strict live-check receipt, then writes ignored release-final-handoff Markdown/JSON artifacts that tie source artifact readiness, current private edit rows, strict proof rows, post-edit proof sequence rows, release-channel post-edit operator receipt rows, hard-gate boundary, user-facing completion percentage, and 10-plan cadence into one value-free operator receipt without recording URL/channel values or claiming external distribution. `npm run release:final-handoff-success-redaction-smoke` uses synthetic value-free source artifacts with a separate final-handoff artifact stem to prove the strict-ready final handoff path stays redacted without reading or modifying the real local env. `npm run release:final-handoff-refresh-smoke` runs proof-bundle refresh, progress refresh, real final handoff, and success-redaction final handoff in order, then writes an ignored final-handoff-refresh receipt proving final-handoff and post-edit-proof labels match the latest 10-plan checkpoint while values and external distribution claims remain absent. `npm run release:audience-completion-handoff-smoke` refreshes persona readiness, sample-free local delivery, package reopen, and release doctor evidence, then writes an ignored audience-completion-handoff receipt proving beginner/professional producer readiness, direct composition, all-genre coverage, local package durability, current 10-plan progress, and the remaining external/private blocker without values or release claims.
 
