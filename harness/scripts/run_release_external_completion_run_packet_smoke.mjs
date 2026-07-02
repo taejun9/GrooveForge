@@ -152,6 +152,29 @@ function commandRow(order, phase, command, proofCommand, readiness, source, note
   };
 }
 
+function sequenceRunRows(rows) {
+  let currentBlockerAssigned = false;
+  return rows.map((row) => {
+    if (row.readiness === "ready") {
+      return {
+        ...row,
+        sequenceStatus: "ready"
+      };
+    }
+    if (!currentBlockerAssigned) {
+      currentBlockerAssigned = true;
+      return {
+        ...row,
+        sequenceStatus: "current-blocker"
+      };
+    }
+    return {
+      ...row,
+      sequenceStatus: "waiting-for-prerequisite"
+    };
+  });
+}
+
 function deriveFirstRunCommand(completionSummary) {
   if (completionSummary.releaseChannelMetadataNeedsIgnoredEnv === true || /ignored local distribution env/i.test(textValue(completionSummary.firstBlocker))) {
     return "npm run release:channel-setup-wizard";
@@ -271,7 +294,7 @@ function buildRunRows({ completionSummary, updateFeedPacket, updateMetadataPacke
       "final local gate after every private-input, update, signing, notarization, Gatekeeper, and manual QA proof is ready"
     )
   ];
-  return rows;
+  return sequenceRunRows(rows);
 }
 
 function buildSourceRows({ completionSummaryRefresh, completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket }) {
@@ -323,6 +346,9 @@ function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPa
   const runRows = buildRunRows({ completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket });
   const sourceRows = buildSourceRows({ completionSummaryRefresh, completionSummary, updateFeedPacket, updateMetadataPacket, developerIdPacket });
   const blockedRows = runRows.filter((row) => row.readiness !== "ready");
+  const currentBlockedRows = runRows.filter((row) => row.sequenceStatus === "current-blocker");
+  const waitingRows = runRows.filter((row) => row.sequenceStatus === "waiting-for-prerequisite");
+  const readyRows = runRows.filter((row) => row.sequenceStatus === "ready");
   const completionBlockerActionRows = objectRows(completionSummary.completionBlockerActionRows);
   const completionBlockerFocusRows = objectRows(completionSummary.completionBlockerFocusRows);
   return {
@@ -373,8 +399,13 @@ function buildReport({ completionSummaryRefresh, completionSummary, updateFeedPa
     runRows,
     runRowCount: runRows.length,
     runRowsValueFree: valueFreeRows(runRows),
+    readyRunRowCount: readyRows.length,
     blockedRunRowCount: blockedRows.length,
     blockedRunRowSummary: blockedRows.map((row) => row.phase).join(", ") || "none",
+    currentBlockedRunRowCount: currentBlockedRows.length,
+    currentBlockedRunRowSummary: currentBlockedRows.map((row) => row.phase).join(", ") || "none",
+    waitingRunRowCount: waitingRows.length,
+    waitingRunRowSummary: waitingRows.map((row) => row.phase).join(", ") || "none",
     completionBlockerActionRows,
     completionBlockerActionRowCount: integerValue(completionSummary.completionBlockerActionRowCount),
     completionBlockerActionRowsValueFree: valueFreeRows(completionBlockerActionRows),
@@ -426,7 +457,7 @@ function formatRunRows(rows) {
   return rows
     .map(
       (row) =>
-        `| ${row.order} | ${escapeCell(row.phase)} | \`${escapeCell(row.command)}\` | \`${escapeCell(row.proofCommand)}\` | ${escapeCell(row.readiness)} | ${escapeCell(row.source)} | ${escapeCell(row.note)} | ${readyLabel(row.valueRecorded)} |`
+        `| ${row.order} | ${escapeCell(row.phase)} | \`${escapeCell(row.command)}\` | \`${escapeCell(row.proofCommand)}\` | ${escapeCell(row.readiness)} | ${escapeCell(row.sequenceStatus)} | ${escapeCell(row.source)} | ${escapeCell(row.note)} | ${readyLabel(row.valueRecorded)} |`
     )
     .join("\n");
 }
@@ -479,6 +510,8 @@ function buildMarkdown(report) {
 - Hard gate would fail: ${readyLabel(report.hardGateWouldFail)}
 - Run rows: ${report.runRowCount}
 - Blocked run rows: ${report.blockedRunRowCount} (${report.blockedRunRowSummary})
+- Current blocker run rows: ${report.currentBlockedRunRowCount} (${report.currentBlockedRunRowSummary})
+- Waiting run rows: ${report.waitingRunRowCount} (${report.waitingRunRowSummary})
 - Private values recorded: no
 - Network probe attempted: no
 - Update feed publish attempted: no
@@ -501,8 +534,8 @@ ${formatSourceRows(report.sourceRows)}
 
 ## External Completion Run Rows
 
-| order | phase | command | proof command | readiness | source | note | value recorded |
-|---:|---|---|---|---|---|---|---:|
+| order | phase | command | proof command | readiness | sequence status | source | note | value recorded |
+|---:|---|---|---|---|---|---|---|---:|
 ${formatRunRows(report.runRows)}
 
 ## Current Completion Blocker Actions
@@ -549,7 +582,18 @@ function validateReport(report, markdown) {
   check(report.hardGateWouldFail === true, "external completion run packet should keep hard gate would-fail posture");
   check(report.runRowCount === 12, "external completion run packet should include twelve run rows");
   check(report.runRowsValueFree === true, "external completion run packet run rows should be value-free");
+  check(
+    report.runRows.every((row) => ["ready", "current-blocker", "waiting-for-prerequisite"].includes(row.sequenceStatus)),
+    "external completion run packet run rows should include valid sequence statuses"
+  );
+  check(report.currentBlockedRunRowCount === 1, "external completion run packet should identify exactly one current blocker run row");
+  check(report.currentBlockedRunRowSummary !== "none", "external completion run packet should summarize the current blocker run row");
+  check(
+    report.waitingRunRowCount === report.blockedRunRowCount - report.currentBlockedRunRowCount,
+    "external completion run packet waiting count should cover blocked rows after the current blocker"
+  );
   check(report.runRows[0]?.phase === "release-channel-metadata", "external completion run packet should start with release-channel metadata");
+  check(report.runRows[0]?.sequenceStatus === "current-blocker", "external completion run packet should mark the first incomplete row as current blocker");
   check(report.runRows[0]?.command === "npm run release:channel-setup-wizard" || report.runRows[0]?.command === "npm run release:private-edit-strict-proof", "external completion run packet should start with setup wizard or strict proof");
   check(report.runRows.some((row) => row.command === "npm run release:update-feed-edit-packet-smoke"), "external completion run packet should include update feed edit packet");
   check(report.runRows.some((row) => row.command === "npm run release:update-metadata-publish-packet-smoke"), "external completion run packet should include update metadata publish packet");
@@ -586,6 +630,7 @@ function validateReport(report, markdown) {
   check(!/https?:\/\//i.test(markdown), "external completion run packet Markdown should not include URL values");
   check(markdown.includes("External Completion Run Packet Smoke"), "external completion run packet Markdown should include title");
   check(markdown.includes("## External Completion Run Rows"), "external completion run packet Markdown should include run rows");
+  check(markdown.includes("Current blocker run rows"), "external completion run packet Markdown should include current blocker row summary");
   check(markdown.includes("External distribution claimed: no"), "external completion run packet Markdown should keep external distribution unclaimed");
 
   if (failures.length > 0) {
@@ -627,6 +672,8 @@ console.log(`- Current next command: ${report.currentNextCommand}`);
 console.log(`- First run command: ${report.runRows[0]?.command}`);
 console.log(`- Run rows: ${report.runRowCount}`);
 console.log(`- Blocked run rows: ${report.blockedRunRowCount} (${report.blockedRunRowSummary})`);
+console.log(`- Current blocker run rows: ${report.currentBlockedRunRowCount} (${report.currentBlockedRunRowSummary})`);
+console.log(`- Waiting run rows: ${report.waitingRunRowCount} (${report.waitingRunRowSummary})`);
 console.log(`- Hard gate command: ${report.hardGateCommand}`);
 console.log(`- Hard gate ready: ${report.hardGateReady ? "yes" : "no"}`);
 console.log("- Private values recorded: no");
