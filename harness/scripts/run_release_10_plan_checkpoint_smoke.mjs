@@ -18,6 +18,11 @@ const completedPlansDir = path.join(root, "docs", "exec_plans", "completed");
 const sourceJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${sourceStem}.json`);
 const checkpointMarkdownPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${checkpointStem}.md`);
 const checkpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${checkpointStem}.json`);
+const guidedSetupCommand = "npm run release:channel-setup-wizard";
+const releasePrepareEnvCommand = "npm run release:prepare-env";
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
+const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const releasePrivateEditStrictProofCommand = "npm run release:private-edit-strict-proof";
 const expectedSourceRefreshCommandSummary =
   "npm run release:proof-bundle -> npm run desktop:external-distribution-gate-smoke -> npm run release:update-feed-checkpoint-smoke -> npm run release:progress-smoke -> npm run release:current-blocker-smoke -> npm run release:completion-report-packet-smoke -> npm run release:progress-freshness-smoke -> npm run release:operator-completion-brief-smoke";
 const expectedProofGateRefreshCommands = [
@@ -67,6 +72,10 @@ function escapeCell(value) {
 
 function integerValue(value) {
   return Number.isInteger(value) ? value : 0;
+}
+
+function objectRows(value) {
+  return Array.isArray(value) ? value.filter((row) => row && typeof row === "object" && !Array.isArray(row)) : [];
 }
 
 function planNumberFromName(name) {
@@ -147,9 +156,20 @@ function buildReport(source, localWindow) {
   const summary = source.completionSummary ?? {};
   const sourceRefreshCommandRows = Array.isArray(source.refreshCommandRows) ? source.refreshCommandRows : [];
   const sourceProofGateRefreshRows = buildProofGateRefreshRows(sourceRefreshCommandRows);
+  const currentOperatorCommandRows = objectRows(summary.currentOperatorCommandRows);
   const sourceRefreshCommandsValueFree =
     sourceRefreshCommandRows.length > 0 && sourceRefreshCommandRows.every((row) => row?.valueRecorded === false);
   const sourceProofGateRefreshRowsValueFree = sourceProofGateRefreshRows.every((row) => row.valueRecorded === false);
+  const currentOperatorFirstCommand = textValue(summary.currentOperatorFirstCommand);
+  const currentOperatorPreflightCommand = textValue(summary.currentOperatorPreflightCommand, releaseChannelApplyPrivateEnvPreflightCommand);
+  const currentOperatorApplyCommand = textValue(summary.currentOperatorApplyCommand, releaseChannelApplyPrivateEnvCommand);
+  const currentOperatorStrictProofCommand = textValue(summary.currentOperatorStrictProofCommand, releasePrivateEditStrictProofCommand);
+  const currentOperatorPreflightCommandOrder = integerValue(summary.currentOperatorPreflightCommandOrder);
+  const currentOperatorApplyCommandOrder = integerValue(summary.currentOperatorApplyCommandOrder);
+  const currentOperatorStrictProofCommandOrder = integerValue(summary.currentOperatorStrictProofCommandOrder);
+  const currentOperatorCommandRowsValueFree =
+    currentOperatorCommandRows.length > 0 && currentOperatorCommandRows.every((row) => row?.valueRecorded === false && row?.ready === true);
+  const currentOperatorCommandRowsContainGuidedSetup = currentOperatorCommandRows.some((row) => textValue(row.command) === guidedSetupCommand);
   const sourceProofGateRefreshReady =
     source.releaseProgressRefreshReady === true &&
     integerValue(source.refreshCommandCount) === 8 &&
@@ -187,6 +207,26 @@ function buildReport(source, localWindow) {
     sourceProofGateRefreshRowsValueFree,
     sourceProofBundleRefreshCommand: sourceProofGateRefreshRows[0]?.command ?? "missing",
     sourceExternalGateRefreshCommand: sourceProofGateRefreshRows[1]?.command ?? "missing",
+    currentOperatorCommandSequenceReady: summary.currentOperatorCommandSequenceReady === true,
+    currentOperatorCommandRows,
+    currentOperatorCommandRowCount: integerValue(summary.currentOperatorCommandRowCount),
+    currentOperatorCommandSummary: textValue(summary.currentOperatorCommandSummary),
+    currentOperatorCommandRowsValueFree,
+    currentOperatorFirstCommand,
+    currentOperatorFirstCommandIsGuidedSetup: currentOperatorFirstCommand === guidedSetupCommand,
+    currentOperatorFirstCommandAllowed: [releasePrepareEnvCommand, releaseChannelApplyPrivateEnvPreflightCommand].includes(currentOperatorFirstCommand),
+    currentOperatorCommandRowsContainGuidedSetup,
+    currentOperatorPreflightCommand,
+    currentOperatorPreflightCommandOrder,
+    currentOperatorApplyCommand,
+    currentOperatorApplyCommandOrder,
+    currentOperatorStrictProofCommand,
+    currentOperatorStrictProofCommandOrder,
+    currentOperatorBlockerRefreshCommand: textValue(summary.currentOperatorBlockerRefreshCommand, "npm run release:current-blocker"),
+    currentOperatorNextActionsRefreshCommand: textValue(summary.currentOperatorNextActionsRefreshCommand, "npm run release:next-actions"),
+    currentOperatorPreflightBeforeApply: summary.currentOperatorPreflightBeforeApply === true,
+    currentOperatorApplyBeforeStrictProof: summary.currentOperatorApplyBeforeStrictProof === true,
+    currentOperatorValueRecorded: summary.currentOperatorValueRecorded === true ? true : false,
     sourceLatestPlanNumber: integerValue(summary.latestPlanNumber),
     sourceLatestPlan: textValue(summary.latestPlan),
     sourceTenPlanProgress: textValue(summary.tenPlanProgress),
@@ -219,9 +259,16 @@ function buildReport(source, localWindow) {
     operatorBriefReady: summary.operatorBriefReady === true,
     releaseChannelMetadataBlocked: summary.releaseChannelMetadataBlocked === true,
     releaseChannelMetadataCleared: summary.releaseChannelMetadataCleared === true,
+    releaseChannelMetadataNeedsIgnoredEnv:
+      summary.releaseChannelMetadataNeedsIgnoredEnv === true ||
+      (summary.releaseChannelMetadataBlocked === true &&
+        integerValue(summary.releaseChannelCurrentReadyCount) < integerValue(summary.releaseChannelCurrentRequiredKeyCount) &&
+        integerValue(summary.releaseChannelCurrentPlaceholderKeyCount) === 0),
     releaseChannelCurrentReadyCount: integerValue(summary.releaseChannelCurrentReadyCount),
     releaseChannelCurrentRequiredKeyCount: integerValue(summary.releaseChannelCurrentRequiredKeyCount),
     releaseChannelCurrentPlaceholderKeyCount: integerValue(summary.releaseChannelCurrentPlaceholderKeyCount),
+    privateEditBlockedSmokeReady: summary.privateEditBlockedSmokeReady === true,
+    privateEditBlockedSmokeCurrentPlaceholderKeyCount: integerValue(summary.privateEditBlockedSmokeCurrentPlaceholderKeyCount),
     operatorProofCommand: textValue(summary.operatorProofCommand),
     postClearanceNextAction: textValue(summary.postClearanceNextAction),
     postClearanceProofCommand: textValue(summary.postClearanceProofCommand),
@@ -253,6 +300,12 @@ function buildMarkdown(report) {
   const rows = report.tenPlanWindowRows
     .map((row) => `| ${row.label} | ${row.path} | ${readyLabel(!row.valueRecorded)} |`)
     .join("\n");
+  const currentOperatorRows = report.currentOperatorCommandRows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.step)} | ${readyLabel(row.ready === true)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.expectedOperatorInput)} | ${escapeCell(row.expectedEvidence)} | ${escapeCell(row.sourceField)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
   const proofGateRows = report.sourceProofGateRefreshRows
     .map(
       (row) =>
@@ -275,6 +328,13 @@ function buildMarkdown(report) {
 - Source proof/gate refresh ready: ${readyLabel(report.sourceProofGateRefreshReady)}
 - Source proof bundle refresh command: \`${report.sourceProofBundleRefreshCommand}\`
 - Source external gate refresh command: \`${report.sourceExternalGateRefreshCommand}\`
+- Source current operator sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
+- Source current operator rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
+- Source current operator first command: \`${report.currentOperatorFirstCommand}\`
+- Source current operator first command is guided setup: ${readyLabel(report.currentOperatorFirstCommandIsGuidedSetup)}
+- Source current operator rows contain guided setup: ${readyLabel(report.currentOperatorCommandRowsContainGuidedSetup)}
+- Source current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
+- Source current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
 - Latest completed plan: ${report.localLatestPlan}
 - Source latest completed plan: ${report.sourceLatestPlan}
 - 10-plan progress: ${report.localTenPlanProgress}
@@ -292,6 +352,12 @@ function buildMarkdown(report) {
 - Stale artifacts: ${report.staleArtifactCount}
 - Missing artifacts: ${report.missingArtifactCount}
 - Operator proof command: \`${report.operatorProofCommand}\`
+- Release-channel metadata blocked: ${readyLabel(report.releaseChannelMetadataBlocked)}
+- Release-channel metadata cleared: ${readyLabel(report.releaseChannelMetadataCleared)}
+- Release-channel metadata needs ignored env: ${readyLabel(report.releaseChannelMetadataNeedsIgnoredEnv)}
+- Release-channel current placeholders: ${report.releaseChannelCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}
+- Private-edit blocked smoke ready: ${readyLabel(report.privateEditBlockedSmokeReady)}
+- Private-edit blocked smoke placeholders: ${report.privateEditBlockedSmokeCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}
 - Post-clearance next action: ${report.postClearanceNextAction}
 - Post-clearance proof command: \`${report.postClearanceProofCommand}\`
 - Current first blocker: ${report.firstBlocker}
@@ -311,6 +377,27 @@ function buildMarkdown(report) {
 | order | command | expected command | command matched | role | role matched | value recorded |
 |---:|---|---|---:|---|---:|---:|
 ${proofGateRows}
+
+## Source Current Operator Command Sequence
+
+- Sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
+- Command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
+- First command: \`${report.currentOperatorFirstCommand}\`
+- First command allowed: ${readyLabel(report.currentOperatorFirstCommandAllowed)}
+- First command is guided setup: ${readyLabel(report.currentOperatorFirstCommandIsGuidedSetup)}
+- Rows contain guided setup: ${readyLabel(report.currentOperatorCommandRowsContainGuidedSetup)}
+- Preflight command: \`${report.currentOperatorPreflightCommand}\`
+- Apply command: \`${report.currentOperatorApplyCommand}\`
+- Strict proof command: \`${report.currentOperatorStrictProofCommand}\`
+- Current-blocker refresh command: \`${report.currentOperatorBlockerRefreshCommand}\`
+- Next-actions refresh command: \`${report.currentOperatorNextActionsRefreshCommand}\`
+- Preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
+- Apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Value recorded: ${readyLabel(report.currentOperatorValueRecorded)}
+
+| order | step | ready | command | role | expected operator input | expected evidence | source field | value recorded |
+|---:|---|---:|---|---|---|---|---|---:|
+${currentOperatorRows}
 
 ## 10-Plan Window Rows
 
@@ -348,6 +435,24 @@ function validateReport(report, markdown) {
     report.sourceExternalGateRefreshCommand === "npm run desktop:external-distribution-gate-smoke",
     "release 10-plan checkpoint should expose external gate refresh command"
   );
+  check(report.currentOperatorCommandSequenceReady === true, "release 10-plan checkpoint should require source current operator command sequence readiness");
+  check(report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length, "release 10-plan checkpoint current operator row count should match rows");
+  check(report.currentOperatorCommandRows.length >= 5, "release 10-plan checkpoint current operator sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
+  check(report.currentOperatorCommandRowsValueFree === true, "release 10-plan checkpoint current operator rows should be ready and value-free");
+  check(report.currentOperatorFirstCommandAllowed === true, "release 10-plan checkpoint current operator first command should be prepare-env or private-env preflight");
+  check(report.currentOperatorFirstCommandIsGuidedSetup === false, "release 10-plan checkpoint current operator first command should not be the guided setup wizard");
+  check(report.currentOperatorCommandRowsContainGuidedSetup === false, "release 10-plan checkpoint current operator rows should not include the guided setup wizard");
+  check(report.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release 10-plan checkpoint current operator sequence should expose private env preflight command");
+  check(report.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand, "release 10-plan checkpoint current operator sequence should expose private env apply command");
+  check(report.currentOperatorStrictProofCommand === releasePrivateEditStrictProofCommand, "release 10-plan checkpoint current operator sequence should expose strict proof command");
+  check(report.currentOperatorPreflightCommandOrder > 0, "release 10-plan checkpoint current operator preflight command should have an order");
+  check(report.currentOperatorApplyCommandOrder > report.currentOperatorPreflightCommandOrder, "release 10-plan checkpoint current operator apply command should follow preflight");
+  check(report.currentOperatorStrictProofCommandOrder > report.currentOperatorApplyCommandOrder, "release 10-plan checkpoint current operator strict proof should follow apply");
+  check(report.currentOperatorBlockerRefreshCommand === "npm run release:current-blocker", "release 10-plan checkpoint current operator sequence should include current-blocker refresh");
+  check(report.currentOperatorNextActionsRefreshCommand === "npm run release:next-actions", "release 10-plan checkpoint current operator sequence should include next-actions refresh");
+  check(report.currentOperatorPreflightBeforeApply === true, "release 10-plan checkpoint current operator sequence should place preflight before apply");
+  check(report.currentOperatorApplyBeforeStrictProof === true, "release 10-plan checkpoint current operator sequence should place apply before strict proof");
+  check(report.currentOperatorValueRecorded === false, "release 10-plan checkpoint current operator sequence should not record values");
   check(report.localLatestPlanNumber > 0, "release 10-plan checkpoint should include latest local completed plan number");
   check(report.sourceLatestPlanNumber === report.localLatestPlanNumber, "release 10-plan checkpoint should match source and local latest plan number");
   check(report.sourceLatestPlan === report.localLatestPlan, "release 10-plan checkpoint should match source and local latest plan label");
@@ -373,8 +478,15 @@ function validateReport(report, markdown) {
   check(report.missingArtifactCount === 0, "release 10-plan checkpoint should report zero missing artifacts");
   check(report.operatorBriefReady === true, "release 10-plan checkpoint should keep operator brief ready");
   check(report.releaseChannelMetadataBlocked !== report.releaseChannelMetadataCleared, "release 10-plan checkpoint should keep exactly one release-channel metadata posture");
-  check(!report.releaseChannelMetadataBlocked || report.releaseChannelCurrentPlaceholderKeyCount === 4, "release 10-plan checkpoint should keep four placeholders while blocked");
+  check(
+    !report.releaseChannelMetadataBlocked ||
+      report.releaseChannelCurrentPlaceholderKeyCount === 4 ||
+      report.releaseChannelMetadataNeedsIgnoredEnv,
+    "release 10-plan checkpoint should keep placeholders or require ignored env setup while blocked"
+  );
   check(!report.releaseChannelMetadataCleared || report.releaseChannelCurrentPlaceholderKeyCount === 0, "release 10-plan checkpoint should allow zero placeholders when cleared");
+  check(report.privateEditBlockedSmokeReady === true, "release 10-plan checkpoint should expose private-edit blocked smoke readiness");
+  check(report.privateEditBlockedSmokeCurrentPlaceholderKeyCount === 4, "release 10-plan checkpoint should expose blocked smoke coverage for four placeholders");
   check(report.operatorProofCommand === "npm run release:private-edit-strict-proof", "release 10-plan checkpoint should keep strict proof as operator proof command");
   check(report.postClearanceNextAction === "auto-update-feed", "release 10-plan checkpoint should keep auto-update-feed as post-clearance next action");
   check(report.postClearanceProofCommand === "npm run desktop:auto-update-readiness-smoke", "release 10-plan checkpoint should keep auto-update readiness as post-clearance proof command");
@@ -395,6 +507,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("10-plan checkpoint ready: yes"), "release 10-plan checkpoint Markdown should include readiness");
   check(markdown.includes("Proof/Gate Refresh Evidence"), "release 10-plan checkpoint Markdown should include proof/gate refresh evidence");
   check(markdown.includes("Source proof/gate refresh ready: yes"), "release 10-plan checkpoint Markdown should include proof/gate refresh readiness");
+  check(markdown.includes("Source Current Operator Command Sequence"), "release 10-plan checkpoint Markdown should include source current operator sequence");
+  check(markdown.includes("First command is guided setup: no"), "release 10-plan checkpoint Markdown should prove guided setup is not first command");
   check(markdown.includes(`| ${report.localLatestPlan} |`), "release 10-plan checkpoint Markdown should include the boundary plan row when current window completes");
 
   if (failures.length > 0) {
@@ -437,6 +551,17 @@ console.log(`- Source command: ${report.sourceCommand}`);
 console.log(`- Source proof/gate refresh ready: ${report.sourceProofGateRefreshReady ? "yes" : "no"}`);
 console.log(`- Source proof bundle refresh command: ${report.sourceProofBundleRefreshCommand}`);
 console.log(`- Source external gate refresh command: ${report.sourceExternalGateRefreshCommand}`);
+console.log(`- Source current operator sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
+console.log(`- Source current operator rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
+console.log(`- Source current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- Source current operator first command is guided setup: ${report.currentOperatorFirstCommandIsGuidedSetup ? "yes" : "no"}`);
+console.log(`- Source current operator rows contain guided setup: ${report.currentOperatorCommandRowsContainGuidedSetup ? "yes" : "no"}`);
+console.log(`- Source current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
+console.log(`- Source current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Release-channel metadata needs ignored env: ${report.releaseChannelMetadataNeedsIgnoredEnv ? "yes" : "no"}`);
+console.log(`- Release-channel current placeholders: ${report.releaseChannelCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}`);
+console.log(`- Private-edit blocked smoke ready: ${report.privateEditBlockedSmokeReady ? "yes" : "no"}`);
+console.log(`- Private-edit blocked smoke placeholders: ${report.privateEditBlockedSmokeCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}`);
 console.log(`- Latest completed plan: ${report.localLatestPlan}`);
 console.log(`- 10-plan progress: ${report.localTenPlanProgress}`);
 console.log(`- Current 10-plan report boundary: ${report.currentTenPlanReportBoundaryAt}`);
