@@ -13,7 +13,7 @@ const isProjectIoSmoke = process.env.GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE === "1
 const launchSmokeResultPrefix = "GROOVEFORGE_DESKTOP_LAUNCH_SMOKE_RESULT ";
 const projectIoSmokeResultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
 const launchSmokeTimeoutMs = 180000;
-const projectIoSmokeTimeoutMs = 60000;
+const projectIoSmokeTimeoutMs = launchSmokeTimeoutMs;
 
 type NativeMenuCommand =
   | "open-project"

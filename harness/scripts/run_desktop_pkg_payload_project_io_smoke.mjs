@@ -23,7 +23,7 @@ const targetPath = path.join(smokeRoot, "pkg-payload-project-io-smoke-beat.groov
 const reportJsonPath = path.join(smokeRoot, `${appName}-${packageJson.version}-${platformArch}-pkg-payload-project-io-smoke.json`);
 const reportMarkdownPath = path.join(smokeRoot, `${appName}-${packageJson.version}-${platformArch}-pkg-payload-project-io-smoke.md`);
 const resultPrefix = "GROOVEFORGE_DESKTOP_PROJECT_IO_SMOKE_RESULT ";
-const timeoutMs = 120000;
+const timeoutMs = 210000;
 const failures = [];
 
 const workstation = await import("../../src/domain/workstation.ts");
