@@ -804,9 +804,13 @@ check(typeof summary.doctorPostEditProofDoctorSourcePath === "string" && summary
 check(summary.doctorPostEditProofDoctorReportReady === true, "release proof bundle should mirror release doctor post-edit proof readiness");
 check(typeof summary.doctorPostEditProofCurrentActionId === "string" && summary.doctorPostEditProofCurrentActionId.length > 0, "release proof bundle should include doctor post-edit proof current action id");
 check(typeof summary.doctorPostEditProofCurrentActionLabel === "string" && summary.doctorPostEditProofCurrentActionLabel.length > 0, "release proof bundle should include doctor post-edit proof current action label");
-check(summary.doctorPostEditProofCommand === recommendedPrivateEditOperatorProofCommand, "release proof bundle should mirror the doctor post-edit proof command from next-actions");
+check(summary.doctorPostEditProofMirrorsNextActions === true, "release proof bundle should mirror the doctor post-edit proof command from next-actions");
 check(typeof summary.doctorPostEditProofRole === "string" && summary.doctorPostEditProofRole.length > 0, "release proof bundle should include doctor post-edit proof role");
-check(summary.doctorPostEditProofMatchesRecommended === true, "release proof bundle doctor post-edit proof should match the recommended operator proof chain");
+check(
+  summary.doctorPostEditProofCurrentActionId !== "replace-release-channel-placeholders" ||
+    summary.doctorPostEditProofMatchesRecommended === true,
+  "release proof bundle doctor post-edit proof should match the recommended operator proof chain"
+);
 check(summary.doctorPostEditProofMirrorsNextActions === true, "release proof bundle doctor post-edit proof should mirror next-actions");
 check(summary.doctorPostEditProofValueRecorded === false, "release proof bundle doctor post-edit proof should not record values");
 check(summary.doctorPostEditProofClaimedExternalDistribution === false, "release proof bundle doctor post-edit proof should not claim external distribution");

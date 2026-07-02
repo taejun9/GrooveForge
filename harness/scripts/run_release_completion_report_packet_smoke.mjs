@@ -24,6 +24,7 @@ const clearanceTransitionJsonPath = path.join(packageRoot, `${appName}-${package
 const autoUpdateTransitionJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-auto-update-transition-smoke.json`);
 const updateFeedCheckpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-update-feed-checkpoint-smoke.json`);
 const failures = [];
+const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const privateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const refreshCommandRows = [
@@ -787,6 +788,8 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     audience.completionGapStatus === "external proof pending" &&
     channel.completionGapStatus === "external proof pending" &&
     channel.externalDistributionReady === false &&
+    channel.releaseChannelSetupWizardCommand === releaseChannelSetupWizardCommand &&
+    channel.releaseChannelSetupWizardCommandValueRecorded === false &&
     channel.releaseChannelRecommendedOperatorProofCommand === privateEditOperatorProofCommand &&
     channel.releaseChannelRecommendedOperatorProofCommandValueRecorded === false &&
     clearanceTransitionReady &&
@@ -891,6 +894,8 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     updateFeedCheckpointRowCount: updateFeedCheckpointRows.length,
     updateFeedCheckpointSummary: updateFeedCheckpointRows.map((row) => row.item).join(", "),
     updateFeedCheckpointValueRecorded: false,
+    channelEditSetupWizardCommand: textValue(channel.releaseChannelSetupWizardCommand),
+    channelEditSetupWizardCommandValueRecorded: channel.releaseChannelSetupWizardCommandValueRecorded === false,
     channelEditRecommendedOperatorProofCommand: textValue(channel.releaseChannelRecommendedOperatorProofCommand),
     channelEditRecommendedOperatorProofCommandRole: textValue(channel.releaseChannelRecommendedOperatorProofCommandRole),
     channelEditApplyPrivateEnvCommand: textValue(channel.releaseChannelApplyPrivateEnvCommand),
@@ -1045,6 +1050,7 @@ function buildMarkdown(report) {
 - Final handoff real strict rows: ${report.finalHandoffSuccessRedactionRealStrictReadyCount}/${report.finalHandoffSuccessRedactionRealStrictRowCount}
 - Final handoff real strict placeholder keys: ${report.finalHandoffSuccessRedactionRealStrictPlaceholderKeyCount}
 - Final handoff real env read: ${readyLabel(report.finalHandoffSuccessRedactionRealLocalEnvRead)}
+- Channel edit packet setup wizard command: \`${report.channelEditSetupWizardCommand}\`
 - Channel edit packet recommended proof chain: \`${report.channelEditRecommendedOperatorProofCommand}\`
 - Channel edit packet proof role: ${report.channelEditRecommendedOperatorProofCommandRole}
 - Channel edit packet first apply command: \`${report.channelEditApplyPrivateEnvCommand}\`
@@ -1295,6 +1301,8 @@ function validateReport(report, markdown) {
   check(report.updateFeedCheckpointRows.every((row) => row.valueRecorded === false), "release completion report packet update-feed checkpoint rows should not record values");
   check(report.updateFeedCheckpointValueRecorded === false, "release completion report packet update-feed checkpoint evidence should be value-free");
   check(report.channelEditRecommendedOperatorProofCommand === privateEditOperatorProofCommand, "release completion report packet should mirror the channel edit packet recommended proof chain");
+  check(report.channelEditSetupWizardCommand === releaseChannelSetupWizardCommand, "release completion report packet should mirror the channel edit packet setup wizard");
+  check(report.channelEditSetupWizardCommandValueRecorded === true, "release completion report packet should prove the channel edit packet setup wizard is value-free");
   check(report.channelEditApplyPrivateEnvCommand === releaseChannelApplyPrivateEnvCommand, "release completion report packet should mirror the channel edit packet private env apply helper");
   check(
     report.channelEditRecommendedOperatorProofCommandRole === report.privateEditOperatorProofCommandRole,
@@ -1304,6 +1312,10 @@ function validateReport(report, markdown) {
   check(
     report.releaseChannelEditPacketOperatorCommandSummary.includes(privateEditOperatorProofCommand),
     "release completion report packet should show the channel edit packet operator order includes the strict proof chain"
+  );
+  check(
+    report.releaseChannelEditPacketOperatorCommandSummary.includes(releaseChannelSetupWizardCommand),
+    "release completion report packet should show the channel edit packet operator order includes the setup wizard"
   );
   check(
     report.releaseChannelEditPacketOperatorCommandSummary.includes(releaseChannelApplyPrivateEnvCommand),
@@ -1509,6 +1521,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("Final Handoff Success-Redaction Evidence"), "release completion report packet Markdown should include final handoff success-redaction evidence table");
   check(markdown.includes("Update-feed checkpoint ready:"), "release completion report packet Markdown should include update-feed checkpoint readiness");
   check(markdown.includes("Update Feed Checkpoint Evidence"), "release completion report packet Markdown should include update-feed checkpoint evidence table");
+  check(markdown.includes("Channel edit packet setup wizard command:"), "release completion report packet Markdown should include channel edit packet setup wizard");
   check(markdown.includes("Channel edit packet recommended proof chain:"), "release completion report packet Markdown should include channel edit packet proof recommendation");
   check(markdown.includes("Private-Edit Proof Commands"), "release completion report packet Markdown should include private-edit proof command table");
   check(markdown.includes("10-plan report due:"), "release completion report packet Markdown should include the 10-plan report due flag");

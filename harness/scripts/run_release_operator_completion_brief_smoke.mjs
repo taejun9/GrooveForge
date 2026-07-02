@@ -286,12 +286,14 @@ function releaseChannelMetadataPosture({ completionReportPacket, currentBlocker 
     currentBlocker.releaseChannelLiveCheckCurrentPlaceholderKeyCount,
     integerValue(completionReportPacket.currentPlaceholderKeyCount)
   );
-  const blocked = requiredKeyCount === 4 && placeholderKeyCount > 0;
+  const blocked = requiredKeyCount === 4 && readyCount < requiredKeyCount;
   const cleared = requiredKeyCount === 4 && readyCount === requiredKeyCount && placeholderKeyCount === 0;
+  const needsIgnoredEnv = blocked && placeholderKeyCount === 0;
   return {
     requiredKeyCount,
     readyCount,
     placeholderKeyCount,
+    needsIgnoredEnv,
     blocked,
     cleared,
     ready: blocked || cleared
@@ -307,7 +309,9 @@ function operatorBriefRows({ completionReportPacket, currentBlocker, progressFre
       command: releaseChannelApplyPrivateEnvCommand,
       evidence: releaseChannelPosture.cleared
         ? "release-channel metadata placeholders cleared in value-free receipts"
-        : `${releaseChannelPosture.placeholderKeyCount} current release-channel placeholders remain`,
+        : releaseChannelPosture.needsIgnoredEnv
+          ? "ignored local distribution env is not loaded; release-channel setup must create it first"
+          : `${releaseChannelPosture.placeholderKeyCount} current release-channel placeholders remain`,
       expectedPostEditSignal: `operator-owned process env metadata applies into ${currentEnvEditTarget}; release-channel metadata placeholders clear in value-free receipts`,
       sourceField: "currentBlocker.releaseChannelLiveCheckCurrentPlaceholderKeyCount",
       valueRecorded: false
@@ -518,7 +522,10 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
   const currentEditRowsReady =
     currentEnvEditRows.length > 0 &&
     currentEnvEditRows.every((row) => row.valueRecorded === false) &&
-    (releaseChannelPosture.blocked ? currentEnvEditRows.length === 4 && currentEnvEditRows.every((row) => row.placeholder === true) : true);
+    (releaseChannelPosture.blocked
+      ? currentEnvEditRows.length === 4 &&
+        (releaseChannelPosture.needsIgnoredEnv === true || currentEnvEditRows.every((row) => row.placeholder === true))
+      : true);
   const ready =
     sourceRows.every((row) => row.present === true && row.ready === true && row.valueRecorded === false) &&
     sourceLabelsMatchLatest(sourceRows, latestTenPlanProgressLabel) &&
@@ -567,6 +574,7 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     releaseChannelMetadataPostureReady: releaseChannelPosture.ready,
     releaseChannelMetadataBlocked: releaseChannelPosture.blocked,
     releaseChannelMetadataCleared: releaseChannelPosture.cleared,
+    releaseChannelMetadataNeedsIgnoredEnv: releaseChannelPosture.needsIgnoredEnv,
     releaseChannelCurrentRequiredKeyCount: releaseChannelPosture.requiredKeyCount,
     releaseChannelCurrentReadyCount: releaseChannelPosture.readyCount,
     releaseChannelCurrentPlaceholderKeyCount: releaseChannelPosture.placeholderKeyCount,
@@ -661,8 +669,8 @@ check(
   "release operator completion brief should report exactly one release-channel metadata posture"
 );
 check(
-  !report.releaseChannelMetadataBlocked || report.releaseChannelCurrentPlaceholderKeyCount === 4,
-  "release operator completion brief blocked posture should keep four release-channel placeholders"
+  !report.releaseChannelMetadataBlocked || [0, 4].includes(report.releaseChannelCurrentPlaceholderKeyCount),
+  "release operator completion brief blocked posture should keep release-channel placeholders or require ignored env setup"
 );
 check(
   !report.releaseChannelMetadataCleared ||
@@ -672,8 +680,10 @@ check(
 check(report.currentEnvEditRowCount > 0, "release operator completion brief should include current edit rows");
 check(report.currentEnvEditRows.every((row) => row.valueRecorded === false), "release operator completion brief edit rows should be value-free");
 check(
-  !report.releaseChannelMetadataBlocked || report.currentEnvEditRows.every((row) => row.placeholder === true),
-  "release operator completion brief blocked edit rows should be placeholders"
+  !report.releaseChannelMetadataBlocked ||
+    report.releaseChannelMetadataNeedsIgnoredEnv === true ||
+    report.currentEnvEditRows.every((row) => row.placeholder === true),
+  "release operator completion brief blocked edit rows should be placeholders unless ignored env setup is required"
 );
 check(report.operatorBriefRowCount === 6, "release operator completion brief should include six operator rows");
 check(report.operatorBriefRows.every((row) => row.valueRecorded === false), "release operator completion brief rows should be value-free");

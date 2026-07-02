@@ -385,6 +385,11 @@ function buildReport({ progressRefresh, completionSummary, checkpoint, gitContex
     operatorBriefReady: completionSummary.operatorBriefReady === true,
     releaseChannelMetadataBlocked: completionSummary.releaseChannelMetadataBlocked === true,
     releaseChannelMetadataCleared: completionSummary.releaseChannelMetadataCleared === true,
+    releaseChannelMetadataNeedsIgnoredEnv:
+      completionSummary.releaseChannelMetadataNeedsIgnoredEnv === true ||
+      (completionSummary.releaseChannelMetadataBlocked === true &&
+        integerValue(completionSummary.releaseChannelCurrentReadyCount) < integerValue(completionSummary.releaseChannelCurrentRequiredKeyCount) &&
+        integerValue(completionSummary.releaseChannelCurrentPlaceholderKeyCount) === 0),
     releaseChannelCurrentReadyCount: integerValue(completionSummary.releaseChannelCurrentReadyCount),
     releaseChannelCurrentRequiredKeyCount: integerValue(completionSummary.releaseChannelCurrentRequiredKeyCount),
     releaseChannelCurrentPlaceholderKeyCount: integerValue(completionSummary.releaseChannelCurrentPlaceholderKeyCount),
@@ -492,6 +497,7 @@ function buildMarkdown(report) {
 - Private-edit blocked smoke ready: ${readyLabel(report.privateEditBlockedSmokeReady)}
 - Private-edit blocked smoke placeholders: ${report.privateEditBlockedSmokeCurrentPlaceholderKeyCount}/${report.releaseChannelCurrentRequiredKeyCount}
 - Final handoff success-redaction ready: ${readyLabel(report.finalHandoffSuccessRedactionReady)}
+- Release-channel metadata needs ignored env: ${readyLabel(report.releaseChannelMetadataNeedsIgnoredEnv)}
 - Current first blocker: ${report.firstBlocker}
 - Current env edit target: ${report.currentEnvEditTarget}
 - Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})
@@ -642,7 +648,11 @@ function validateReport(report, markdown) {
   check(report.currentRequiredKeys.length === report.currentRequiredKeyCount, "release completion summary refresh required keys should match count");
   check(report.currentPlaceholderKeys.length === report.currentPlaceholderKeyCount, "release completion summary refresh placeholder keys should match count");
   check(report.currentPlaceholderEditLocationCount === report.currentPlaceholderKeyCount, "release completion summary refresh placeholder locations should match placeholders");
-  check(report.currentPlaceholderEditLocationSummary.includes(report.currentEnvEditTarget), "release completion summary refresh should expose value-free placeholder edit location summary");
+  check(
+    report.currentPlaceholderEditLocationSummary.includes(report.currentEnvEditTarget) ||
+      (report.currentPlaceholderEditLocationCount === 0 && report.currentPlaceholderEditLocationSummary === "none"),
+    "release completion summary refresh should expose value-free placeholder edit location summary or none before ignored env setup"
+  );
   check(report.completionBlockerActionReceiptReady === true, "release completion summary refresh should expose ready completion blocker action receipt");
   check(report.completionBlockerActionRowCount === report.completionBlockerActionRows.length, "release completion summary refresh blocker action row count should match rows");
   check(report.completionBlockerActionRowCount === 7, "release completion summary refresh blocker action receipt should include seven rows");
@@ -801,6 +811,7 @@ async function main() {
   console.log(`- Stale artifacts: ${report.staleArtifactCount}`);
   console.log(`- Missing artifacts: ${report.missingArtifactCount}`);
   console.log(`- Operator proof command: ${report.operatorProofCommand}`);
+  console.log(`- Release-channel metadata needs ignored env: ${report.releaseChannelMetadataNeedsIgnoredEnv ? "yes" : "no"}`);
   console.log(`- Strict proof handoff ready: ${report.strictProofHandoffReceiptReady ? "yes" : "no"}`);
   console.log(`- Private-edit blocked smoke ready: ${report.privateEditBlockedSmokeReady ? "yes" : "no"}`);
   console.log(

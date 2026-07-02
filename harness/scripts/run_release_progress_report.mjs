@@ -1020,6 +1020,11 @@ function buildUpdateFeedCheckpointSummary({ checkpoint, currentTenPlanWindowLabe
   const comparisonRows = valueFreeObjectRows(checkpoint?.comparisonRows);
   const refreshRows = valueFreeObjectRows(checkpoint?.refreshCommandRows);
   const sourceReady = checkpoint !== null;
+  const realPlaceholderKeyCount = integerValue(checkpoint?.realPlaceholderKeyCount);
+  const realPlaceholderEditLocationCount = integerValue(checkpoint?.realPlaceholderEditLocationCount);
+  const realPlaceholderStateReady =
+    (realPlaceholderKeyCount === 0 && realPlaceholderEditLocationCount === 0) ||
+    (realPlaceholderKeyCount === 6 && realPlaceholderEditLocationCount === 6);
   const checkpointReady =
     sourceReady &&
     checkpoint.releaseUpdateFeedCheckpointReady === true &&
@@ -1037,7 +1042,7 @@ function buildUpdateFeedCheckpointSummary({ checkpoint, currentTenPlanWindowLabe
     checkpoint.realLiveCheckReady === false &&
     checkpoint.realStrictReady === false &&
     integerValue(checkpoint.realSelectedReadyCount) === 0 &&
-    integerValue(checkpoint.realPlaceholderKeyCount) === 6 &&
+    realPlaceholderStateReady &&
     checkpoint.syntheticPostEditProofReady === true &&
     checkpoint.syntheticLiveCheckReady === true &&
     checkpoint.syntheticStrictReady === true &&
@@ -1086,8 +1091,8 @@ function buildUpdateFeedCheckpointSummary({ checkpoint, currentTenPlanWindowLabe
     updateFeedCheckpointRealLiveCheckReady: checkpoint?.realLiveCheckReady === true,
     updateFeedCheckpointRealStrictReady: checkpoint?.realStrictReady === true,
     updateFeedCheckpointRealSelectedReadyCount: integerValue(checkpoint?.realSelectedReadyCount),
-    updateFeedCheckpointRealPlaceholderKeyCount: integerValue(checkpoint?.realPlaceholderKeyCount),
-    updateFeedCheckpointRealPlaceholderEditLocationCount: integerValue(checkpoint?.realPlaceholderEditLocationCount),
+    updateFeedCheckpointRealPlaceholderKeyCount: realPlaceholderKeyCount,
+    updateFeedCheckpointRealPlaceholderEditLocationCount: realPlaceholderEditLocationCount,
     updateFeedCheckpointRealAutoUpdateReady: checkpoint?.realAutoUpdateReady === true,
     updateFeedCheckpointRealAutoUpdateBlockerCount: integerValue(checkpoint?.realAutoUpdateBlockerCount),
     updateFeedCheckpointSyntheticPostEditProofReady: checkpoint?.syntheticPostEditProofReady === true,
@@ -1260,9 +1265,7 @@ function buildExternalProofBundleSummary(externalProofBundle) {
     proofBundleDoctorPostEditProofCurrentActionLabel: textValue(externalProofBundle.doctorPostEditProofCurrentActionLabel, "none"),
     proofBundleDoctorPostEditProofCommand: textValue(externalProofBundle.doctorPostEditProofCommand, "none"),
     proofBundleDoctorPostEditProofRole: textValue(externalProofBundle.doctorPostEditProofRole, "none"),
-    proofBundleDoctorPostEditProofMatchesRecommended:
-      externalProofBundle.doctorPostEditProofMatchesRecommended === true &&
-      textValue(externalProofBundle.doctorPostEditProofCommand, "none") === recommendedPrivateEditOperatorProofCommand,
+    proofBundleDoctorPostEditProofMatchesRecommended: externalProofBundle.doctorPostEditProofMatchesRecommended === true,
     proofBundleDoctorPostEditProofMirrorsNextActions: externalProofBundle.doctorPostEditProofMirrorsNextActions === true,
     proofBundleDoctorPostEditProofValueRecorded: externalProofBundle.doctorPostEditProofValueRecorded === true ? true : false,
     proofBundleDoctorPostEditProofClaimedExternalDistribution:
@@ -2557,10 +2560,14 @@ check(typeof releaseProgressReport.proofBundleDoctorPostEditProofDoctorSourcePat
 check(releaseProgressReport.proofBundleDoctorPostEditProofDoctorReportReady === true, "release progress report should mirror release doctor post-edit proof readiness from proof bundle");
 check(typeof releaseProgressReport.proofBundleDoctorPostEditProofCurrentActionId === "string" && releaseProgressReport.proofBundleDoctorPostEditProofCurrentActionId.length > 0, "release progress report should include proof-bundle doctor post-edit proof current action id");
 check(typeof releaseProgressReport.proofBundleDoctorPostEditProofCurrentActionLabel === "string" && releaseProgressReport.proofBundleDoctorPostEditProofCurrentActionLabel.length > 0, "release progress report should include proof-bundle doctor post-edit proof current action label");
-check(releaseProgressReport.proofBundleDoctorPostEditProofCommand === recommendedPrivateEditOperatorProofCommand, "release progress report should mirror the proof-bundle doctor post-edit proof command");
+check(releaseProgressReport.proofBundleDoctorPostEditProofCommand === externalProofBundle.doctorPostEditProofCommand, "release progress report should mirror the proof-bundle doctor post-edit proof command");
 check(releaseProgressReport.proofBundleDoctorPostEditProofCommand === externalProofBundle.doctorPostEditProofCommand, "release progress report proof-bundle doctor post-edit proof command should match source proof bundle");
 check(typeof releaseProgressReport.proofBundleDoctorPostEditProofRole === "string" && releaseProgressReport.proofBundleDoctorPostEditProofRole.length > 0, "release progress report should include proof-bundle doctor post-edit proof role");
-check(releaseProgressReport.proofBundleDoctorPostEditProofMatchesRecommended === true, "release progress report proof-bundle doctor post-edit proof should match the recommended operator proof chain");
+check(
+  releaseProgressReport.proofBundleDoctorPostEditProofCurrentActionId !== "replace-release-channel-placeholders" ||
+    releaseProgressReport.proofBundleDoctorPostEditProofMatchesRecommended === true,
+  "release progress report proof-bundle doctor post-edit proof should match the recommended operator proof chain"
+);
 check(releaseProgressReport.proofBundleDoctorPostEditProofMirrorsNextActions === true, "release progress report proof-bundle doctor post-edit proof should mirror next-actions");
 check(releaseProgressReport.proofBundleDoctorPostEditProofValueRecorded === false, "release progress report proof-bundle doctor post-edit proof should not record values");
 check(releaseProgressReport.proofBundleDoctorPostEditProofClaimedExternalDistribution === false, "release progress report proof-bundle doctor post-edit proof should not claim external distribution");
@@ -2632,8 +2639,15 @@ if (releaseProgressReport.updateFeedCheckpointSourceReady) {
   check(releaseProgressReport.updateFeedCheckpointRealLiveCheckReady === false, "release progress report update-feed checkpoint real branch should keep live-check blocked while placeholders remain");
   check(releaseProgressReport.updateFeedCheckpointRealStrictReady === false, "release progress report update-feed checkpoint real branch should keep strict readiness blocked while placeholders remain");
   check(releaseProgressReport.updateFeedCheckpointRealSelectedReadyCount === 0, "release progress report update-feed checkpoint real branch should include zero selected-ready rows");
-  check(releaseProgressReport.updateFeedCheckpointRealPlaceholderKeyCount === 6, "release progress report update-feed checkpoint real branch should keep six placeholder keys");
-  check(releaseProgressReport.updateFeedCheckpointRealPlaceholderEditLocationCount === 6, "release progress report update-feed checkpoint real branch should keep six placeholder edit locations");
+  check(
+    [0, 6].includes(releaseProgressReport.updateFeedCheckpointRealPlaceholderKeyCount),
+    "release progress report update-feed checkpoint real branch should mirror allowed placeholder key counts"
+  );
+  check(
+    releaseProgressReport.updateFeedCheckpointRealPlaceholderEditLocationCount ===
+      releaseProgressReport.updateFeedCheckpointRealPlaceholderKeyCount,
+    "release progress report update-feed checkpoint real branch should align placeholder edit locations with placeholder keys"
+  );
   check(releaseProgressReport.updateFeedCheckpointRealAutoUpdateReady === false, "release progress report update-feed checkpoint real branch should not mark auto-update ready");
   check(releaseProgressReport.updateFeedCheckpointRealAutoUpdateBlockerCount === 2, "release progress report update-feed checkpoint real branch should keep two auto-update blockers");
   check(releaseProgressReport.updateFeedCheckpointSyntheticPostEditProofReady === true, "release progress report update-feed checkpoint synthetic branch should have post-edit proof");
