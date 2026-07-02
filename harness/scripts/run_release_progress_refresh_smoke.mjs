@@ -342,6 +342,12 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
   );
   const completionBlockerActionRows = buildCompletionBlockerActionRows(currentBlocker);
   const completionBlockerFocusRows = sanitizeCompletionBlockerFocusRows(currentBlocker.releaseChannelFocusRows);
+  const currentOperatorCommandRows = objectRows(currentBlocker.currentOperatorCommandRows);
+  const currentOperatorCommandSequenceReady =
+    currentBlocker.currentOperatorCommandSequenceReady === true &&
+    integerValue(currentBlocker.currentOperatorCommandRowCount) === currentOperatorCommandRows.length &&
+    currentOperatorCommandRows.length >= 5 &&
+    currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false);
   const completionBlockerActionReceiptReady =
     completionBlockerActionRows.length === 7 &&
     completionBlockerActionRows.every((row) => row.ready === true && row.valueRecorded === false) &&
@@ -360,7 +366,8 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     freshnessClean &&
     operatorBriefReady &&
     currentBlockerStillExternal &&
-    completionBlockerActionReceiptReady;
+    completionBlockerActionReceiptReady &&
+    currentOperatorCommandSequenceReady;
   const latestCompletedPlanNumber = integerValue(completionReportPacket.latestCompletedPlanNumber);
   const completionSummary = {
     ready: releaseProgressRefreshReady,
@@ -408,6 +415,35 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     completionBlockerFocusRows,
     completionBlockerFocusRowCount: completionBlockerFocusRows.length,
     completionBlockerFocusRowsValueFree: valueFreeRows(completionBlockerFocusRows),
+    currentOperatorCommandSequenceReady,
+    currentOperatorCommandRows,
+    currentOperatorCommandRowCount: currentOperatorCommandRows.length,
+    currentOperatorCommandSummary:
+      currentOperatorCommandRows.length > 0 ? `${currentOperatorCommandRows.length} value-free current operator command rows` : "none",
+    currentOperatorFirstCommand: textValue(currentBlocker.currentOperatorFirstCommand, "none"),
+    currentOperatorPreflightCommand: textValue(
+      currentBlocker.currentOperatorPreflightCommand,
+      releaseChannelApplyPrivateEnvPreflightCommand
+    ),
+    currentOperatorPreflightCommandOrder: integerValue(currentBlocker.currentOperatorPreflightCommandOrder),
+    currentOperatorApplyCommand: textValue(currentBlocker.currentOperatorApplyCommand, releaseChannelApplyPrivateEnvCommand),
+    currentOperatorApplyCommandOrder: integerValue(currentBlocker.currentOperatorApplyCommandOrder),
+    currentOperatorStrictProofCommand: textValue(
+      currentBlocker.currentOperatorStrictProofCommand,
+      "npm run release:private-edit-strict-proof"
+    ),
+    currentOperatorStrictProofCommandOrder: integerValue(currentBlocker.currentOperatorStrictProofCommandOrder),
+    currentOperatorBlockerRefreshCommand: textValue(
+      currentBlocker.currentOperatorBlockerRefreshCommand,
+      "npm run release:current-blocker"
+    ),
+    currentOperatorNextActionsRefreshCommand: textValue(
+      currentBlocker.currentOperatorNextActionsRefreshCommand,
+      "npm run release:next-actions"
+    ),
+    currentOperatorPreflightBeforeApply: currentBlocker.currentOperatorPreflightBeforeApply === true,
+    currentOperatorApplyBeforeStrictProof: currentBlocker.currentOperatorApplyBeforeStrictProof === true,
+    currentOperatorValueRecorded: currentBlocker.currentOperatorValueRecorded === true ? true : false,
     releaseChannelPrivateEnvApplyPreflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
     releaseChannelPrivateEnvApplyPreflightRole: releaseChannelApplyPrivateEnvPreflightRole,
     releaseChannelPrivateEnvApplyPreflightBeforeApply:
@@ -520,6 +556,22 @@ function buildReport({ releaseProgress, currentBlocker, completionReportPacket, 
     completionBlockerFocusRows,
     completionBlockerFocusRowCount: completionBlockerFocusRows.length,
     completionBlockerFocusRowsValueFree: valueFreeRows(completionBlockerFocusRows),
+    currentOperatorCommandSequenceReady: completionSummary.currentOperatorCommandSequenceReady,
+    currentOperatorCommandRows: completionSummary.currentOperatorCommandRows,
+    currentOperatorCommandRowCount: completionSummary.currentOperatorCommandRowCount,
+    currentOperatorCommandSummary: completionSummary.currentOperatorCommandSummary,
+    currentOperatorFirstCommand: completionSummary.currentOperatorFirstCommand,
+    currentOperatorPreflightCommand: completionSummary.currentOperatorPreflightCommand,
+    currentOperatorPreflightCommandOrder: completionSummary.currentOperatorPreflightCommandOrder,
+    currentOperatorApplyCommand: completionSummary.currentOperatorApplyCommand,
+    currentOperatorApplyCommandOrder: completionSummary.currentOperatorApplyCommandOrder,
+    currentOperatorStrictProofCommand: completionSummary.currentOperatorStrictProofCommand,
+    currentOperatorStrictProofCommandOrder: completionSummary.currentOperatorStrictProofCommandOrder,
+    currentOperatorBlockerRefreshCommand: completionSummary.currentOperatorBlockerRefreshCommand,
+    currentOperatorNextActionsRefreshCommand: completionSummary.currentOperatorNextActionsRefreshCommand,
+    currentOperatorPreflightBeforeApply: completionSummary.currentOperatorPreflightBeforeApply,
+    currentOperatorApplyBeforeStrictProof: completionSummary.currentOperatorApplyBeforeStrictProof,
+    currentOperatorValueRecorded: completionSummary.currentOperatorValueRecorded,
     releaseChannelPrivateEnvApplyPreflightCommand: completionSummary.releaseChannelPrivateEnvApplyPreflightCommand,
     releaseChannelPrivateEnvApplyPreflightRole: completionSummary.releaseChannelPrivateEnvApplyPreflightRole,
     releaseChannelPrivateEnvApplyPreflightBeforeApply: completionSummary.releaseChannelPrivateEnvApplyPreflightBeforeApply,
@@ -659,6 +711,11 @@ function buildMarkdown(report) {
 - Completion blocker action rows: ${report.completionSummary.completionBlockerActionRowCount}
 - Completion blocker focus receipt ready: ${readyLabel(report.completionSummary.completionBlockerFocusReceiptReady)}
 - Completion blocker focus rows: ${report.completionSummary.completionBlockerFocusRowCount}
+- Current operator command sequence ready: ${readyLabel(report.completionSummary.currentOperatorCommandSequenceReady)}
+- Current operator command rows: ${report.completionSummary.currentOperatorCommandRowCount} (${report.completionSummary.currentOperatorCommandSummary})
+- Current operator first command: \`${report.completionSummary.currentOperatorFirstCommand}\`
+- Current operator preflight before apply: ${readyLabel(report.completionSummary.currentOperatorPreflightBeforeApply)}
+- Current operator apply before strict proof: ${readyLabel(report.completionSummary.currentOperatorApplyBeforeStrictProof)}
 - Private env apply preflight command: \`${report.completionSummary.releaseChannelPrivateEnvApplyPreflightCommand}\`
 - Private env apply preflight before apply: ${readyLabel(report.completionSummary.releaseChannelPrivateEnvApplyPreflightBeforeApply)}
 - Private env apply command: \`${report.completionSummary.releaseChannelPrivateEnvApplyCommand}\`
@@ -846,6 +903,22 @@ function validateReport(report, markdown) {
     report.completionBlockerFocusRows.every((row) => report.currentRequiredKeys.includes(row.key)),
     "release progress refresh blocker focus rows should match current required keys"
   );
+  check(report.currentOperatorCommandSequenceReady === true, "release progress refresh current operator command sequence should be ready");
+  check(
+    report.completionSummary.currentOperatorCommandSequenceReady === report.currentOperatorCommandSequenceReady,
+    "release progress refresh summary should mirror current operator command sequence readiness"
+  );
+  check(report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length, "release progress refresh current operator command row count should match rows");
+  check(report.currentOperatorCommandRows.length >= 5, "release progress refresh current operator command sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
+  check(report.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false), "release progress refresh current operator command rows should be ready and value-free");
+  check(report.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release progress refresh current operator sequence should expose private env preflight command");
+  check(report.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand, "release progress refresh current operator sequence should expose private env apply command");
+  check(report.currentOperatorStrictProofCommand === "npm run release:private-edit-strict-proof", "release progress refresh current operator sequence should expose strict proof command");
+  check(report.currentOperatorPreflightBeforeApply === true, "release progress refresh current operator sequence should place preflight before apply");
+  check(report.currentOperatorApplyBeforeStrictProof === true, "release progress refresh current operator sequence should place apply before strict proof");
+  check(report.currentOperatorBlockerRefreshCommand === "npm run release:current-blocker", "release progress refresh current operator sequence should include current-blocker refresh");
+  check(report.currentOperatorNextActionsRefreshCommand === "npm run release:next-actions", "release progress refresh current operator sequence should include next-actions refresh");
+  check(report.currentOperatorValueRecorded === false, "release progress refresh current operator sequence should be value-free");
   check(
     report.completionSummary.releaseChannelFirstProofCommandAfterPrivateEdits === "npm run release:channel-live-check",
     "release progress refresh summary should expose release-channel first proof command"
@@ -1023,6 +1096,11 @@ console.log(`- Operator post-clearance next action: ${report.operatorCompletionB
 console.log(`- Completion blocker action receipt ready: ${report.completionBlockerActionReceiptReady ? "yes" : "no"}`);
 console.log(`- Completion blocker action rows: ${report.completionBlockerActionRowCount}`);
 console.log(`- Completion blocker focus rows: ${report.completionBlockerFocusRowCount}`);
+console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
+console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
+console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
+console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Private env apply preflight command: ${report.releaseChannelPrivateEnvApplyPreflightCommand}`);
 console.log(`- Private env apply preflight before apply: ${report.releaseChannelPrivateEnvApplyPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);

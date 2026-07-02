@@ -1788,6 +1788,123 @@ function buildReleaseChannelPostEditOperatorReceiptSummary({
   };
 }
 
+function buildCurrentOperatorCommandSequenceSummary({
+  currentActionSummary = {}
+} = {}) {
+  const currentStepCommand =
+    currentActionSummary.currentNextCommand && currentActionSummary.currentNextCommand !== "none"
+      ? currentActionSummary.currentNextCommand
+      : "npm run release:doctor";
+  const blockerRefreshCommand =
+    currentActionSummary.currentActionId === "release-channel-metadata" ? "npm run release:current-blocker" : currentStepCommand;
+  const nextActionsRefreshCommand = "npm run release:next-actions";
+  const missingLocalEnv =
+    currentStepCommand === "npm run release:prepare-env" ||
+    String(currentActionSummary.currentFirstBlocker ?? "").includes("local distribution env file is not loaded");
+  const currentEnvEditTarget = currentActionSummary.currentEnvEditTarget ?? currentLocalEnvEditTarget();
+  const placeholderKeyCount = Number.isInteger(currentActionSummary.currentPlaceholderKeyCount)
+    ? currentActionSummary.currentPlaceholderKeyCount
+    : 0;
+  const placeholderLocationSummary =
+    currentActionSummary.currentPlaceholderEditLocationSummary ??
+    formatEditLocationSummary(currentActionSummary.currentPlaceholderEditLocations ?? []);
+  const rows = [
+    ...(missingLocalEnv
+      ? [
+          {
+            step: "Ignored env scaffold",
+            command: "npm run release:prepare-env",
+            role: "operator-scaffold",
+            expectedOperatorInput: `create ${currentEnvEditTarget} without recording private values`,
+            expectedEvidence: "ignored local distribution env file is present before private metadata apply",
+            sourceField: "currentNextCommand/currentFirstBlocker"
+          }
+        ]
+      : []),
+    {
+      step: "Private metadata preflight",
+      command: releaseChannelApplyPrivateEnvPreflightCommand,
+      role: "operator-preflight",
+      expectedOperatorInput: "operator-owned release-channel process env values are present and shape-valid",
+      expectedEvidence: `preflight verifies the current release-channel metadata keys before writing ${currentEnvEditTarget}`,
+      sourceField: "releaseChannelApplyPrivateEnvPreflightCommand/currentInputShapeChecklistRows"
+    },
+    {
+      step: "Private metadata apply",
+      command: releaseChannelApplyPrivateEnvCommand,
+      role: "operator-apply",
+      expectedOperatorInput: `apply only the current release-channel placeholder keys (${placeholderKeyCount}) into ${currentEnvEditTarget}`,
+      expectedEvidence: `current placeholder keys clear from ${placeholderLocationSummary}`,
+      sourceField: "releaseChannelApplyPrivateEnvCommand/currentPlaceholderKeys/currentPlaceholderEditLocations"
+    },
+    {
+      step: "Recommended strict proof",
+      command: recommendedPrivateEditOperatorProofCommand,
+      role: "operator-proof",
+      expectedOperatorInput: "run the strict proof chain after private metadata apply",
+      expectedEvidence: "strict live-check, post-edit proof, progress refresh, leak audit, and hard-gate boundary run value-free",
+      sourceField: "releaseChannelRecommendedOperatorProofCommandAfterPrivateEdits"
+    },
+    {
+      step: "Current blocker refresh",
+      command: blockerRefreshCommand,
+      role: "operator-refresh",
+      expectedOperatorInput: "refresh the compact current blocker after the strict proof chain",
+      expectedEvidence: "current blocker advances past release-channel metadata or reports the next value-free blocker",
+      sourceField: "currentRerunCommand"
+    },
+    {
+      step: "Next-actions refresh",
+      command: nextActionsRefreshCommand,
+      role: "operator-refresh",
+      expectedOperatorInput: "refresh prioritized next actions after the blocker advances",
+      expectedEvidence: "next-actions reports the next priority action without recording private values",
+      sourceField: "nextActionsCommand"
+    }
+  ].map((row, index) => ({
+    order: index + 1,
+    ready: true,
+    ...row,
+    valueRecorded: false
+  }));
+  const commandOrder = (command) => rows.find((row) => row.command === command)?.order ?? 0;
+  const preflightOrder = commandOrder(releaseChannelApplyPrivateEnvPreflightCommand);
+  const applyOrder = commandOrder(releaseChannelApplyPrivateEnvCommand);
+  const strictProofOrder = commandOrder(recommendedPrivateEditOperatorProofCommand);
+  const blockerRefreshOrder = commandOrder(blockerRefreshCommand);
+  const nextActionsRefreshOrder = commandOrder(nextActionsRefreshCommand);
+
+  return {
+    currentOperatorCommandSequenceReady:
+      currentActionSummary.currentActionId === "release-channel-metadata" &&
+      rows.length >= 5 &&
+      rows.every((row) => row.ready === true && row.valueRecorded === false) &&
+      preflightOrder > 0 &&
+      applyOrder > 0 &&
+      strictProofOrder > 0 &&
+      preflightOrder < applyOrder &&
+      applyOrder < strictProofOrder &&
+      blockerRefreshCommand === "npm run release:current-blocker" &&
+      blockerRefreshOrder > strictProofOrder &&
+      nextActionsRefreshOrder > blockerRefreshOrder,
+    currentOperatorCommandRowCount: rows.length,
+    currentOperatorCommandSummary: `${rows.length} value-free current operator command rows`,
+    currentOperatorCommandRows: rows,
+    currentOperatorFirstCommand: rows[0]?.command ?? "none",
+    currentOperatorPreflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
+    currentOperatorPreflightCommandOrder: preflightOrder,
+    currentOperatorApplyCommand: releaseChannelApplyPrivateEnvCommand,
+    currentOperatorApplyCommandOrder: applyOrder,
+    currentOperatorStrictProofCommand: recommendedPrivateEditOperatorProofCommand,
+    currentOperatorStrictProofCommandOrder: strictProofOrder,
+    currentOperatorBlockerRefreshCommand: blockerRefreshCommand,
+    currentOperatorNextActionsRefreshCommand: nextActionsRefreshCommand,
+    currentOperatorPreflightBeforeApply: preflightOrder > 0 && applyOrder > 0 && preflightOrder < applyOrder,
+    currentOperatorApplyBeforeStrictProof: applyOrder > 0 && strictProofOrder > 0 && applyOrder < strictProofOrder,
+    currentOperatorValueRecorded: false
+  };
+}
+
 function buildPostEditProofSequenceReceiptSummary({
   currentActionSummary = {},
   releaseChannelPostEditOperatorReceipt = {},
@@ -2036,6 +2153,20 @@ function formatReleaseChannelPostEditOperatorReceiptRows(rows) {
     ...rows.map(
       (row) =>
         `| ${row.order} | ${escapeCell(row.step)} | ${readyLabel(row.ready)} | ${escapeCell(row.currentState)} | ${escapeCell(row.operatorAction)} | ${escapeCell(row.expectedPostEditSignal)} | ${escapeCell(row.command)} | ${escapeCell(row.proofCommand)} | ${escapeCell(row.rerunCommand)} | ${escapeCell(row.sourceField)} | ${readyLabel(row.valueRecorded)} |`
+    )
+  ].join("\n");
+}
+
+function formatCurrentOperatorCommandRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| order | step | ready | command | role | expected operator input | expected evidence | source | value recorded |\n|---:|---|---:|---|---|---|---|---|---:|\n| 0 | none | no | none | none | none | none | none | no |";
+  }
+  return [
+    "| order | step | ready | command | role | expected operator input | expected evidence | source | value recorded |",
+    "|---:|---|---:|---|---|---|---|---|---:|",
+    ...rows.map(
+      (row) =>
+        `| ${row.order} | ${escapeCell(row.step)} | ${readyLabel(row.ready)} | ${escapeCell(row.command)} | ${escapeCell(row.role)} | ${escapeCell(row.expectedOperatorInput)} | ${escapeCell(row.expectedEvidence)} | ${escapeCell(row.sourceField)} | ${readyLabel(row.valueRecorded)} |`
     )
   ].join("\n");
 }
@@ -3070,6 +3201,9 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     releaseChannelPostEditOperatorReceipt,
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const currentOperatorCommandSequence = buildCurrentOperatorCommandSequenceSummary({
+    currentActionSummary
+  });
   const nextActionPreview = buildNextActionPreviewSummary(priorityActions);
 
   return {
@@ -3117,6 +3251,7 @@ function buildBootstrapNextActionsReport(artifactRows, preflightRun, releaseDoct
     ...currentLocalEnvDiagnostics,
     ...releaseChannelPostEditReceipt,
     ...releaseChannelPostEditOperatorReceipt,
+    ...currentOperatorCommandSequence,
     ...postEditProofSequenceReceipt,
     ...nextActionPreview,
     localReleaseReady: false,
@@ -3247,6 +3382,11 @@ function buildMarkdown(report) {
 - Release-channel post-edit operator proof command: \`${report.releaseChannelPostEditOperatorReceiptProofCommand}\`
 - Release-channel post-edit operator blocker refresh: \`${report.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand}\`
 - Release-channel post-edit operator next-actions refresh: \`${report.releaseChannelPostEditOperatorReceiptNextActionsCommand}\`
+- Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
+- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
+- Current operator first command: \`${report.currentOperatorFirstCommand}\`
+- Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
+- Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
 - Post-edit proof sequence receipt ready: ${readyLabel(report.postEditProofSequenceReceiptReady)}
 - Post-edit proof sequence receipt rows: ${report.postEditProofSequenceReceiptRowCount} (${report.postEditProofSequenceReceiptSummary})
 - Post-edit proof sequence recommended proof chain: \`${report.postEditProofSequenceReceiptRecommendedProofCommand}\`
@@ -3537,6 +3677,22 @@ ${formatReleaseChannelPostEditReceiptRows(report.releaseChannelPostEditReceiptRo
 
 ${formatReleaseChannelPostEditOperatorReceiptRows(report.releaseChannelPostEditOperatorReceiptRows)}
 
+## Current Operator Command Sequence
+
+- Sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
+- Command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
+- First command: \`${report.currentOperatorFirstCommand}\`
+- Preflight command: \`${report.currentOperatorPreflightCommand}\`
+- Apply command: \`${report.currentOperatorApplyCommand}\`
+- Strict proof command: \`${report.currentOperatorStrictProofCommand}\`
+- Blocker refresh command: \`${report.currentOperatorBlockerRefreshCommand}\`
+- Next-actions refresh command: \`${report.currentOperatorNextActionsRefreshCommand}\`
+- Preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
+- Apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Value recorded: ${readyLabel(report.currentOperatorValueRecorded)}
+
+${formatCurrentOperatorCommandRows(report.currentOperatorCommandRows)}
+
 ## Post-Edit Proof Sequence Receipt
 
 - Receipt ready: ${readyLabel(report.postEditProofSequenceReceiptReady)}
@@ -3792,6 +3948,12 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     releaseChannelPostEditOperatorReceipt,
     hardExternalGateCommand: "npm run release:external-check"
   });
+  const currentOperatorCommandSequence = buildCurrentOperatorCommandSequenceSummary({
+    currentActionSummary: {
+      ...currentActionSummary,
+      currentEnvEditTarget: localEnvEditTarget
+    }
+  });
   const nextActionPreview = buildNextActionPreviewSummary(priorityActions);
 
   nextActionsReport = {
@@ -3839,6 +4001,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     ...currentLocalEnvDiagnostics,
     ...releaseChannelPostEditReceipt,
     ...releaseChannelPostEditOperatorReceipt,
+    ...currentOperatorCommandSequence,
     ...postEditProofSequenceReceipt,
     ...nextActionPreview,
     localReleaseReady: externalPreflight.localReleaseReady === true,
@@ -3920,6 +4083,7 @@ if (!preflightRun.succeeded && missingSourceEvidence && !fromExisting) {
     nextActionsReport.currentLocalEnvDiagnosticsReady === true &&
     nextActionsReport.releaseChannelPostEditReceiptReady === true &&
     nextActionsReport.releaseChannelPostEditOperatorReceiptReady === true &&
+    nextActionsReport.currentOperatorCommandSequenceReady === true &&
     nextActionsReport.nextActionPreviewReady === true &&
     nextActionsReport.sourceValueRecorded === false &&
     nextActionsReport.sourceClaimedExternalDistribution === false;
@@ -4945,6 +5109,79 @@ check(
   ),
   "external next actions release-channel post-edit operator receipt should include the recommended strict proof chain row"
 );
+check(typeof nextActionsReport.currentOperatorCommandSequenceReady === "boolean", "external next actions should include current operator command sequence readiness");
+check(Number.isInteger(nextActionsReport.currentOperatorCommandRowCount), "external next actions should include current operator command row count");
+check(typeof nextActionsReport.currentOperatorCommandSummary === "string" && nextActionsReport.currentOperatorCommandSummary.length > 0, "external next actions should include current operator command summary");
+check(Array.isArray(nextActionsReport.currentOperatorCommandRows), "external next actions should include current operator command rows");
+const releaseChannelCurrentOperatorSequenceRequired = nextActionsReport.currentActionId === "release-channel-metadata";
+check(
+  nextActionsReport.currentOperatorCommandSequenceReady === releaseChannelCurrentOperatorSequenceRequired,
+  "external next actions current operator command sequence readiness should match the current release-channel action"
+);
+check(
+  nextActionsReport.currentOperatorCommandRowCount === nextActionsReport.currentOperatorCommandRows.length,
+  "external next actions current operator command row count should match rows"
+);
+check(
+  nextActionsReport.currentOperatorCommandRows.length >= 5,
+  "external next actions current operator command sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh"
+);
+check(
+  nextActionsReport.currentOperatorCommandRows.every(
+    (row, index) =>
+      row.order === index + 1 &&
+      row.ready === true &&
+      typeof row.step === "string" &&
+      row.step.length > 0 &&
+      typeof row.command === "string" &&
+      row.command.length > 0 &&
+      typeof row.role === "string" &&
+      row.role.length > 0 &&
+      typeof row.expectedOperatorInput === "string" &&
+      row.expectedOperatorInput.length > 0 &&
+      typeof row.expectedEvidence === "string" &&
+      row.expectedEvidence.length > 0 &&
+      typeof row.sourceField === "string" &&
+      row.sourceField.length > 0 &&
+      row.valueRecorded === false
+  ),
+  "external next actions current operator command rows should include ready value-free command evidence"
+);
+check(
+  nextActionsReport.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand,
+  "external next actions current operator sequence should expose the private env preflight command"
+);
+check(
+  nextActionsReport.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand,
+  "external next actions current operator sequence should expose the private env apply command"
+);
+check(
+  nextActionsReport.currentOperatorStrictProofCommand === recommendedPrivateEditOperatorProofCommand,
+  "external next actions current operator sequence should expose the recommended strict proof command"
+);
+check(
+  !releaseChannelCurrentOperatorSequenceRequired ||
+    (nextActionsReport.currentOperatorPreflightBeforeApply === true &&
+      nextActionsReport.currentOperatorPreflightCommandOrder > 0 &&
+      nextActionsReport.currentOperatorApplyCommandOrder > nextActionsReport.currentOperatorPreflightCommandOrder),
+  "external next actions current operator sequence should place preflight before apply"
+);
+check(
+  !releaseChannelCurrentOperatorSequenceRequired ||
+    (nextActionsReport.currentOperatorApplyBeforeStrictProof === true &&
+      nextActionsReport.currentOperatorStrictProofCommandOrder > nextActionsReport.currentOperatorApplyCommandOrder),
+  "external next actions current operator sequence should place apply before strict proof"
+);
+check(
+  !releaseChannelCurrentOperatorSequenceRequired ||
+    nextActionsReport.currentOperatorBlockerRefreshCommand === "npm run release:current-blocker",
+  "external next actions current operator sequence should include current-blocker refresh"
+);
+check(
+  nextActionsReport.currentOperatorNextActionsRefreshCommand === "npm run release:next-actions",
+  "external next actions current operator sequence should include next-actions refresh"
+);
+check(nextActionsReport.currentOperatorValueRecorded === false, "external next actions current operator sequence should be value-free");
 check(typeof nextActionsReport.postEditProofSequenceReceiptReady === "boolean", "external next actions should include post-edit proof sequence receipt readiness");
 check(Number.isInteger(nextActionsReport.postEditProofSequenceReceiptRowCount), "external next actions should include post-edit proof sequence row count");
 check(
@@ -6544,6 +6781,11 @@ console.log(`- Release-channel post-edit operator receipt rows: ${nextActionsRep
 console.log(`- Release-channel post-edit operator proof command: ${nextActionsReport.releaseChannelPostEditOperatorReceiptProofCommand}`);
 console.log(`- Release-channel post-edit operator blocker refresh: ${nextActionsReport.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand}`);
 console.log(`- Release-channel post-edit operator next-actions refresh: ${nextActionsReport.releaseChannelPostEditOperatorReceiptNextActionsCommand}`);
+console.log(`- Current operator command sequence ready: ${nextActionsReport.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
+console.log(`- Current operator command rows: ${nextActionsReport.currentOperatorCommandRowCount} (${nextActionsReport.currentOperatorCommandSummary})`);
+console.log(`- Current operator first command: ${nextActionsReport.currentOperatorFirstCommand}`);
+console.log(`- Current operator preflight before apply: ${nextActionsReport.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
+console.log(`- Current operator apply before strict proof: ${nextActionsReport.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Post-edit proof sequence receipt ready: ${nextActionsReport.postEditProofSequenceReceiptReady ? "yes" : "no"}`);
 console.log(`- Post-edit proof sequence rows: ${nextActionsReport.postEditProofSequenceReceiptRowCount} (${nextActionsReport.postEditProofSequenceReceiptSummary})`);
 console.log(`- Post-edit proof sequence doctor command: ${nextActionsReport.postEditProofSequenceReceiptDoctorCommand}`);

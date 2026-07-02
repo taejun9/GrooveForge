@@ -353,6 +353,18 @@ function formatReleaseChannelPostEditOperatorReceiptRows(rows) {
     .join("\n");
 }
 
+function formatCurrentOperatorCommandRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "| none | none | no | none | none | none | none | none | no |";
+  }
+  return rows
+    .map(
+      (row) =>
+        `| ${row.order ?? "?"} | ${escapeCell(row.step)} | ${row.ready ? "yes" : "no"} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.expectedOperatorInput)} | ${escapeCell(row.expectedEvidence)} | ${escapeCell(row.sourceField)} | ${row.valueRecorded === false ? "no" : "yes"} |`
+    )
+    .join("\n");
+}
+
 function formatPostEditProofSequenceReceiptRows(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "| none | none | no | none | none | none | no |";
@@ -1834,6 +1846,12 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     integerValue(releaseProgress.releaseChannelPostEditOperatorReceiptRowCount) === releaseChannelPostEditOperatorReceiptRows.length &&
     releaseChannelPostEditOperatorReceiptRows.length === 7 &&
     releaseChannelPostEditOperatorReceiptRows.every((row) => row.ready === true && row.valueRecorded === false);
+  const currentOperatorCommandRows = valueFreeObjectRows(releaseProgress.currentOperatorCommandRows);
+  const currentOperatorCommandSequenceReady =
+    releaseProgress.currentOperatorCommandSequenceReady === true &&
+    integerValue(releaseProgress.currentOperatorCommandRowCount) === currentOperatorCommandRows.length &&
+    currentOperatorCommandRows.length >= 5 &&
+    currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false);
   const postEditProofSequenceReceiptRows = valueFreeObjectRows(releaseProgress.postEditProofSequenceReceiptRows);
   const postEditProofSequenceReceiptReady =
     releaseProgress.postEditProofSequenceReceiptReady === true &&
@@ -2314,6 +2332,34 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
     ),
     releaseChannelPostEditOperatorReceiptValueRecorded:
       releaseProgress.releaseChannelPostEditOperatorReceiptValueRecorded === true ? true : false,
+    currentOperatorCommandSequenceReady,
+    currentOperatorCommandRowCount: integerValue(releaseProgress.currentOperatorCommandRowCount),
+    currentOperatorCommandSummary: textValue(releaseProgress.currentOperatorCommandSummary, "none"),
+    currentOperatorCommandRows,
+    currentOperatorFirstCommand: textValue(releaseProgress.currentOperatorFirstCommand, "none"),
+    currentOperatorPreflightCommand: textValue(
+      releaseProgress.currentOperatorPreflightCommand,
+      releaseChannelApplyPrivateEnvPreflightCommand
+    ),
+    currentOperatorPreflightCommandOrder: integerValue(releaseProgress.currentOperatorPreflightCommandOrder),
+    currentOperatorApplyCommand: textValue(releaseProgress.currentOperatorApplyCommand, releaseChannelApplyPrivateEnvCommand),
+    currentOperatorApplyCommandOrder: integerValue(releaseProgress.currentOperatorApplyCommandOrder),
+    currentOperatorStrictProofCommand: textValue(
+      releaseProgress.currentOperatorStrictProofCommand,
+      recommendedPrivateEditOperatorProofCommand
+    ),
+    currentOperatorStrictProofCommandOrder: integerValue(releaseProgress.currentOperatorStrictProofCommandOrder),
+    currentOperatorBlockerRefreshCommand: textValue(
+      releaseProgress.currentOperatorBlockerRefreshCommand,
+      "npm run release:current-blocker"
+    ),
+    currentOperatorNextActionsRefreshCommand: textValue(
+      releaseProgress.currentOperatorNextActionsRefreshCommand,
+      "npm run release:next-actions"
+    ),
+    currentOperatorPreflightBeforeApply: releaseProgress.currentOperatorPreflightBeforeApply === true,
+    currentOperatorApplyBeforeStrictProof: releaseProgress.currentOperatorApplyBeforeStrictProof === true,
+    currentOperatorValueRecorded: releaseProgress.currentOperatorValueRecorded === true ? true : false,
     postEditProofSequenceReceiptReady,
     postEditProofSequenceReceiptRowCount: integerValue(releaseProgress.postEditProofSequenceReceiptRowCount),
     postEditProofSequenceReceiptSummary: textValue(releaseProgress.postEditProofSequenceReceiptSummary, "none"),
@@ -3201,6 +3247,21 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.releaseChannelPostEditOperatorReceiptNextActionsCommand === "npm run release:next-actions", "release current blocker post-edit operator receipt should keep next-actions refresh command");
   check(report.releaseChannelPostEditOperatorReceiptHardGateCommand === report.hardGateCommand, "release current blocker post-edit operator receipt hard gate should match hard gate command");
   check(report.releaseChannelPostEditOperatorReceiptValueRecorded === false, "release current blocker post-edit operator receipt should not record values");
+  check(report.currentOperatorCommandSequenceReady === true, "release current blocker current operator command sequence should be ready");
+  check(report.currentOperatorCommandSequenceReady === releaseProgress.currentOperatorCommandSequenceReady, "release current blocker should mirror release progress current operator command sequence readiness");
+  check(report.currentOperatorCommandRowCount === releaseProgress.currentOperatorCommandRowCount, "release current blocker should mirror release progress current operator command row count");
+  check(report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length, "release current blocker current operator command row count should match rows");
+  check(report.currentOperatorCommandRows.length >= 5, "release current blocker current operator command sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
+  check(sameJson(report.currentOperatorCommandRows, valueFreeObjectRows(releaseProgress.currentOperatorCommandRows)), "release current blocker should mirror release progress current operator command rows");
+  check(report.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false), "release current blocker current operator command rows should be ready and value-free");
+  check(report.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release current blocker current operator sequence should expose private env preflight command");
+  check(report.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand, "release current blocker current operator sequence should expose private env apply command");
+  check(report.currentOperatorStrictProofCommand === recommendedPrivateEditOperatorProofCommand, "release current blocker current operator sequence should expose recommended strict proof command");
+  check(report.currentOperatorPreflightBeforeApply === true, "release current blocker current operator sequence should place preflight before apply");
+  check(report.currentOperatorApplyBeforeStrictProof === true, "release current blocker current operator sequence should place apply before strict proof");
+  check(report.currentOperatorBlockerRefreshCommand === "npm run release:current-blocker", "release current blocker current operator sequence should include current-blocker refresh");
+  check(report.currentOperatorNextActionsRefreshCommand === "npm run release:next-actions", "release current blocker current operator sequence should include next-actions refresh");
+  check(report.currentOperatorValueRecorded === false, "release current blocker current operator sequence should be value-free");
   check(report.postEditProofSequenceReceiptReady === true, "release current blocker post-edit proof sequence receipt should be ready");
   check(report.postEditProofSequenceReceiptReady === releaseProgress.postEditProofSequenceReceiptReady, "release current blocker should mirror release progress post-edit proof sequence readiness");
   check(report.postEditProofSequenceReceiptRowCount === releaseProgress.postEditProofSequenceReceiptRowCount, "release current blocker should mirror release progress post-edit proof sequence row count");
@@ -3652,6 +3713,11 @@ function buildMarkdown(report) {
     `- Release-channel post-edit operator proof command: \`${report.releaseChannelPostEditOperatorReceiptProofCommand}\``,
     `- Release-channel post-edit operator blocker refresh: \`${report.releaseChannelPostEditOperatorReceiptBlockerRefreshCommand}\``,
     `- Release-channel post-edit operator next-actions refresh: \`${report.releaseChannelPostEditOperatorReceiptNextActionsCommand}\``,
+    `- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`,
+    `- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`,
+    `- Current operator first command: \`${report.currentOperatorFirstCommand}\``,
+    `- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`,
+    `- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`,
     `- Post-edit proof sequence receipt ready: ${report.postEditProofSequenceReceiptReady ? "yes" : "no"}`,
     `- Post-edit proof sequence receipt rows: ${report.postEditProofSequenceReceiptRowCount} (${report.postEditProofSequenceReceiptSummary})`,
     `- Post-edit proof sequence recommended proof chain: \`${report.postEditProofSequenceReceiptRecommendedProofCommand}\``,
@@ -3818,6 +3884,24 @@ function buildMarkdown(report) {
     "| order | step | ready | current state | operator action | expected post-edit signal | command | proof command | rerun command | source | value recorded |",
     "|---:|---|---:|---|---|---|---|---|---|---|---:|",
     formatReleaseChannelPostEditOperatorReceiptRows(report.releaseChannelPostEditOperatorReceiptRows),
+    "",
+    "## Current Operator Command Sequence",
+    "",
+    `- Sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`,
+    `- Command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`,
+    `- First command: \`${report.currentOperatorFirstCommand}\``,
+    `- Preflight command: \`${report.currentOperatorPreflightCommand}\``,
+    `- Apply command: \`${report.currentOperatorApplyCommand}\``,
+    `- Strict proof command: \`${report.currentOperatorStrictProofCommand}\``,
+    `- Current-blocker refresh command: \`${report.currentOperatorBlockerRefreshCommand}\``,
+    `- Next-actions refresh command: \`${report.currentOperatorNextActionsRefreshCommand}\``,
+    `- Preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`,
+    `- Apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`,
+    `- Value recorded: ${report.currentOperatorValueRecorded ? "yes" : "no"}`,
+    "",
+    "| order | step | ready | command | role | expected operator input | expected evidence | source | value recorded |",
+    "|---:|---|---:|---|---|---|---|---|---:|",
+    formatCurrentOperatorCommandRows(report.currentOperatorCommandRows),
     "",
     "## Post-Edit Proof Sequence Receipt",
     "",
@@ -4366,6 +4450,8 @@ check(markdown.includes("Current Input Shape Checklist"), "release current block
 check(markdown.includes("Current input shape checklist ready:"), "release current blocker Markdown should include input shape checklist readiness");
 check(markdown.includes("Local Env Loader Diagnostics"), "release current blocker Markdown should include local env loader diagnostics");
 check(markdown.includes("Local env diagnostics ready:"), "release current blocker Markdown should include local env diagnostics readiness");
+check(markdown.includes("Current Operator Command Sequence"), "release current blocker Markdown should include current operator command sequence");
+check(markdown.includes("Current operator command sequence ready:"), "release current blocker Markdown should include current operator command sequence readiness");
 
 if (failures.length > 0) {
   fail("Validation failed.", failures.map((message) => `- ${message}`).join("\n"));
@@ -4386,6 +4472,11 @@ console.log(`- Private env apply preflight command: ${report.releaseChannelPriva
 console.log(`- Private env apply preflight before apply: ${report.releaseChannelPrivateEnvApplyPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);
 console.log(`- Private env apply before strict proof: ${report.releaseChannelPrivateEnvApplyBeforeStrictProof ? "yes" : "no"}`);
+console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
+console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
+console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
+console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Current env edit target: ${report.currentEnvEditTarget}`);
 console.log(`- Current required keys: ${report.currentRequiredKeyCount} (${formatKeyList(report.currentRequiredKeys)})`);
 console.log(`- Current placeholder keys: ${report.currentPlaceholderKeyCount} (${formatKeyList(report.currentPlaceholderKeys)})`);

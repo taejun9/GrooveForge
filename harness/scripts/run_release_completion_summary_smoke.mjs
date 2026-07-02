@@ -175,6 +175,22 @@ function buildReport(source) {
     completionBlockerFocusRows,
     completionBlockerFocusRowCount: integerValue(summary.completionBlockerFocusRowCount),
     completionBlockerFocusRowsValueFree: summary.completionBlockerFocusRowsValueFree === true && valueFreeRows(completionBlockerFocusRows),
+    currentOperatorCommandSequenceReady: summary.currentOperatorCommandSequenceReady === true,
+    currentOperatorCommandRows: objectRows(summary.currentOperatorCommandRows),
+    currentOperatorCommandRowCount: integerValue(summary.currentOperatorCommandRowCount),
+    currentOperatorCommandSummary: textValue(summary.currentOperatorCommandSummary),
+    currentOperatorFirstCommand: textValue(summary.currentOperatorFirstCommand),
+    currentOperatorPreflightCommand: textValue(summary.currentOperatorPreflightCommand, releaseChannelApplyPrivateEnvPreflightCommand),
+    currentOperatorPreflightCommandOrder: integerValue(summary.currentOperatorPreflightCommandOrder),
+    currentOperatorApplyCommand: textValue(summary.currentOperatorApplyCommand, releaseChannelApplyPrivateEnvCommand),
+    currentOperatorApplyCommandOrder: integerValue(summary.currentOperatorApplyCommandOrder),
+    currentOperatorStrictProofCommand: textValue(summary.currentOperatorStrictProofCommand, "npm run release:private-edit-strict-proof"),
+    currentOperatorStrictProofCommandOrder: integerValue(summary.currentOperatorStrictProofCommandOrder),
+    currentOperatorBlockerRefreshCommand: textValue(summary.currentOperatorBlockerRefreshCommand, "npm run release:current-blocker"),
+    currentOperatorNextActionsRefreshCommand: textValue(summary.currentOperatorNextActionsRefreshCommand, "npm run release:next-actions"),
+    currentOperatorPreflightBeforeApply: summary.currentOperatorPreflightBeforeApply === true,
+    currentOperatorApplyBeforeStrictProof: summary.currentOperatorApplyBeforeStrictProof === true,
+    currentOperatorValueRecorded: summary.currentOperatorValueRecorded === true ? true : false,
     releaseChannelPrivateEnvApplyPreflightCommand: textValue(summary.releaseChannelPrivateEnvApplyPreflightCommand, releaseChannelApplyPrivateEnvPreflightCommand),
     releaseChannelPrivateEnvApplyPreflightRole: textValue(summary.releaseChannelPrivateEnvApplyPreflightRole, releaseChannelApplyPrivateEnvPreflightRole),
     releaseChannelPrivateEnvApplyPreflightBeforeApply:
@@ -231,6 +247,15 @@ function formatCompletionBlockerFocusRows(rows) {
     .join("\n");
 }
 
+function formatCurrentOperatorCommandRows(rows) {
+  return rows
+    .map(
+      (row) =>
+        `| ${integerValue(row.order)} | ${escapeCell(row.step)} | ${readyLabel(row.ready === true)} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${escapeCell(row.expectedOperatorInput)} | ${escapeCell(row.expectedEvidence)} | ${escapeCell(row.sourceField)} | ${readyLabel(row.valueRecorded)} |`
+    )
+    .join("\n");
+}
+
 function buildMarkdown(report) {
   return `# ${appName} ${report.version} ${report.platform}-${report.arch} Release Completion Summary Smoke
 
@@ -273,6 +298,11 @@ function buildMarkdown(report) {
 - Completion blocker action rows: ${report.completionBlockerActionRowCount}
 - Completion blocker focus receipt ready: ${readyLabel(report.completionBlockerFocusReceiptReady)}
 - Completion blocker focus rows: ${report.completionBlockerFocusRowCount}
+- Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
+- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
+- Current operator first command: \`${report.currentOperatorFirstCommand}\`
+- Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
+- Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
 - Private env apply preflight command: \`${report.releaseChannelPrivateEnvApplyPreflightCommand}\`
 - Private env apply preflight before apply: ${readyLabel(report.releaseChannelPrivateEnvApplyPreflightBeforeApply)}
 - Private env apply command: \`${report.releaseChannelPrivateEnvApplyCommand}\`
@@ -304,6 +334,24 @@ ${formatCompletionBlockerActionRows(report.completionBlockerActionRows)}
 | order | key | present | placeholder | shape ready | current ready | expected signal | proof command | rerun command | value recorded |
 |---:|---|---:|---:|---:|---:|---|---|---|---:|
 ${formatCompletionBlockerFocusRows(report.completionBlockerFocusRows)}
+
+## Current Operator Command Sequence
+
+- Sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
+- Command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
+- First command: \`${report.currentOperatorFirstCommand}\`
+- Preflight command: \`${report.currentOperatorPreflightCommand}\`
+- Apply command: \`${report.currentOperatorApplyCommand}\`
+- Strict proof command: \`${report.currentOperatorStrictProofCommand}\`
+- Current-blocker refresh command: \`${report.currentOperatorBlockerRefreshCommand}\`
+- Next-actions refresh command: \`${report.currentOperatorNextActionsRefreshCommand}\`
+- Preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
+- Apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
+- Value recorded: ${readyLabel(report.currentOperatorValueRecorded)}
+
+| order | step | ready | command | role | expected operator input | expected evidence | source | value recorded |
+|---:|---|---:|---|---|---|---|---|---:|
+${formatCurrentOperatorCommandRows(report.currentOperatorCommandRows)}
 
 ## Not Recorded Or Claimed
 
@@ -367,6 +415,18 @@ function validateReport(report, markdown) {
   check(report.completionBlockerFocusRowsValueFree === true, "release completion summary blocker focus rows should be value-free");
   check(report.completionBlockerFocusRows.every((row) => row.valueRecorded === false), "release completion summary blocker focus rows should not record values");
   check(report.completionBlockerFocusRows.every((row) => report.currentRequiredKeys.includes(row.key)), "release completion summary blocker focus rows should match required keys");
+  check(report.currentOperatorCommandSequenceReady === true, "release completion summary current operator command sequence should be ready");
+  check(report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length, "release completion summary current operator command row count should match rows");
+  check(report.currentOperatorCommandRows.length >= 5, "release completion summary current operator command sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
+  check(report.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false), "release completion summary current operator command rows should be ready and value-free");
+  check(report.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release completion summary current operator sequence should expose private env preflight command");
+  check(report.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand, "release completion summary current operator sequence should expose private env apply command");
+  check(report.currentOperatorStrictProofCommand === "npm run release:private-edit-strict-proof", "release completion summary current operator sequence should expose strict proof command");
+  check(report.currentOperatorPreflightBeforeApply === true, "release completion summary current operator sequence should place preflight before apply");
+  check(report.currentOperatorApplyBeforeStrictProof === true, "release completion summary current operator sequence should place apply before strict proof");
+  check(report.currentOperatorBlockerRefreshCommand === "npm run release:current-blocker", "release completion summary current operator sequence should include current-blocker refresh");
+  check(report.currentOperatorNextActionsRefreshCommand === "npm run release:next-actions", "release completion summary current operator sequence should include next-actions refresh");
+  check(report.currentOperatorValueRecorded === false, "release completion summary current operator sequence should be value-free");
   check(report.releaseChannelPrivateEnvApplyPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release completion summary should expose private env apply preflight command");
   check(report.releaseChannelPrivateEnvApplyPreflightRole === releaseChannelApplyPrivateEnvPreflightRole, "release completion summary should describe private env apply preflight role");
   check(report.releaseChannelPrivateEnvApplyPreflightBeforeApply === true, "release completion summary should place private env apply preflight before apply");
@@ -395,6 +455,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("## Completion Blocker Action Receipt"), "release completion summary Markdown should include completion blocker action receipt");
   check(markdown.includes("## Completion Blocker Focus Rows"), "release completion summary Markdown should include completion blocker focus rows");
   check(markdown.includes("Completion blocker action receipt ready: yes"), "release completion summary Markdown should include blocker action receipt readiness");
+  check(markdown.includes("Current operator command sequence ready: yes"), "release completion summary Markdown should include current operator command sequence readiness");
+  check(markdown.includes("Current Operator Command Sequence"), "release completion summary Markdown should include current operator command sequence");
 
   if (failures.length > 0) {
     fail("Validation failed.", `${failures.map((message) => `- ${message}`).join("\n")}\n${buildSourceGuidance(report)}`);
@@ -434,6 +496,11 @@ console.log(`- Final handoff success-redaction ready: ${report.finalHandoffSucce
 console.log(`- Completion blocker action receipt ready: ${report.completionBlockerActionReceiptReady ? "yes" : "no"}`);
 console.log(`- Completion blocker action rows: ${report.completionBlockerActionRowCount}`);
 console.log(`- Completion blocker focus rows: ${report.completionBlockerFocusRowCount}`);
+console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
+console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
+console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
+console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Private env apply preflight command: ${report.releaseChannelPrivateEnvApplyPreflightCommand}`);
 console.log(`- Private env apply preflight before apply: ${report.releaseChannelPrivateEnvApplyPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Private env apply command: ${report.releaseChannelPrivateEnvApplyCommand}`);

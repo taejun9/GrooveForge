@@ -247,6 +247,12 @@ function formatCommandRows(rows) {
   return rows.map((row) => `| ${row.order} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${readyLabel(row.valueRecorded)} |`).join("\n");
 }
 
+function formatCurrentOperatorCommandRows(rows) {
+  return rows
+    .map((row) => `| ${row.order} | \`${escapeCell(row.command)}\` | ${escapeCell(row.role)} | ${readyLabel(row.ready)} | ${readyLabel(row.valueRecorded)} |`)
+    .join("\n");
+}
+
 function planRowSummary(rows) {
   return rows.length > 0 ? rows.map((row) => `plan-${row.planNumber}`).join(", ") : "none";
 }
@@ -299,6 +305,22 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     releaseChannelApplyPrivateEnvPreflightCommand
   );
   const channelEditApplyCommandOrder = commandOrder(channelEditOperatorCommandRows, releaseChannelApplyPrivateEnvCommand);
+  const currentOperatorCommandRows = objectRows(channel.operatorCommandRows).map((row) => ({
+    ...row,
+    ready: true,
+    valueRecorded: false
+  }));
+  const currentOperatorPreflightCommandOrder = commandOrder(currentOperatorCommandRows, releaseChannelApplyPrivateEnvPreflightCommand);
+  const currentOperatorApplyCommandOrder = commandOrder(currentOperatorCommandRows, releaseChannelApplyPrivateEnvCommand);
+  const currentOperatorStrictProofCommandOrder = commandOrder(currentOperatorCommandRows, privateEditOperatorProofCommand);
+  const currentOperatorCommandSequenceReady =
+    currentOperatorCommandRows.length >= 5 &&
+    currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false) &&
+    currentOperatorPreflightCommandOrder > 0 &&
+    currentOperatorApplyCommandOrder > currentOperatorPreflightCommandOrder &&
+    currentOperatorStrictProofCommandOrder > currentOperatorApplyCommandOrder &&
+    currentOperatorCommandRows.some((row) => row.command === "npm run release:current-blocker") &&
+    currentOperatorCommandRows.some((row) => row.command === "npm run release:next-actions");
   const privateEditProofCommandSummary = commandSummary(privateEditProofCommandRows);
   const privateEditOperatorProofCommandRole =
     "recommended strict-first proof chain after applying the four private release-channel metadata values";
@@ -781,6 +803,7 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
   const releaseCompletionReportPacketReady =
     refreshCommandRows.every((row) => row.valueRecorded === false) &&
     privateEditProofCommandRows.every((row) => row.valueRecorded === false) &&
+    currentOperatorCommandSequenceReady &&
     strictProofHandoffReceiptReady &&
     privateEditBlockedSmokeReady &&
     finalHandoffSuccessRedactionReady &&
@@ -829,6 +852,28 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     privateEditOperatorProofCommand,
     privateEditOperatorProofCommandRole,
     privateEditOperatorProofCommandValueRecorded: false,
+    currentOperatorCommandSequenceReady,
+    currentOperatorCommandRows,
+    currentOperatorCommandRowCount: currentOperatorCommandRows.length,
+    currentOperatorCommandSummary: commandSummary(currentOperatorCommandRows),
+    currentOperatorFirstCommand: currentOperatorCommandRows[0]?.command ?? "none",
+    currentOperatorPreflightCommand: releaseChannelApplyPrivateEnvPreflightCommand,
+    currentOperatorPreflightCommandOrder,
+    currentOperatorApplyCommand: releaseChannelApplyPrivateEnvCommand,
+    currentOperatorApplyCommandOrder,
+    currentOperatorStrictProofCommand: privateEditOperatorProofCommand,
+    currentOperatorStrictProofCommandOrder,
+    currentOperatorBlockerRefreshCommand: "npm run release:current-blocker",
+    currentOperatorNextActionsRefreshCommand: "npm run release:next-actions",
+    currentOperatorPreflightBeforeApply:
+      currentOperatorPreflightCommandOrder > 0 &&
+      currentOperatorApplyCommandOrder > 0 &&
+      currentOperatorPreflightCommandOrder < currentOperatorApplyCommandOrder,
+    currentOperatorApplyBeforeStrictProof:
+      currentOperatorApplyCommandOrder > 0 &&
+      currentOperatorStrictProofCommandOrder > 0 &&
+      currentOperatorApplyCommandOrder < currentOperatorStrictProofCommandOrder,
+    currentOperatorValueRecorded: false,
     strictProofHandoffReceiptRows,
     strictProofHandoffReceiptRowCount: strictProofHandoffReceiptRows.length,
     strictProofHandoffReceiptReady,
@@ -1057,6 +1102,14 @@ function buildMarkdown(report) {
 - Private-edit proof command order: ${report.privateEditProofCommandSummary}
 - Private-edit operator proof command: \`${report.privateEditOperatorProofCommand}\`
 - Private-edit operator proof role: ${report.privateEditOperatorProofCommandRole}
+- Current operator command sequence ready: ${readyLabel(report.currentOperatorCommandSequenceReady)}
+- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})
+- Current operator first command: \`${report.currentOperatorFirstCommand}\`
+- Current operator preflight command: \`${report.currentOperatorPreflightCommand}\`
+- Current operator apply command: \`${report.currentOperatorApplyCommand}\`
+- Current operator strict proof command: \`${report.currentOperatorStrictProofCommand}\`
+- Current operator preflight before apply: ${readyLabel(report.currentOperatorPreflightBeforeApply)}
+- Current operator apply before strict proof: ${readyLabel(report.currentOperatorApplyBeforeStrictProof)}
 - Strict proof handoff receipt ready: ${readyLabel(report.strictProofHandoffReceiptReady)}
 - Strict proof handoff receipt rows: ${report.strictProofHandoffReceiptRowCount} (${report.strictProofHandoffReceiptSummary})
 - Private-edit blocked smoke ready: ${readyLabel(report.privateEditBlockedSmokeReady)}
@@ -1164,6 +1217,12 @@ ${formatCommandRows(report.refreshCommandRows)}
 |---:|---|---|---:|
 ${formatCommandRows(report.privateEditProofCommandRows)}
 
+## Current Operator Command Sequence
+
+| order | command | role | ready | value recorded |
+|---:|---|---|---:|---:|
+${formatCurrentOperatorCommandRows(report.currentOperatorCommandRows)}
+
 ## Strict Proof Handoff Receipt
 
 | order | current blocker | edit target | recommended command | follow-up | source field | value recorded |
@@ -1252,6 +1311,19 @@ function validateReport(report, markdown) {
   check(report.privateEditOperatorProofCommand === privateEditOperatorProofCommand, "release completion report packet should include the recommended private-edit operator proof command");
   check(report.privateEditOperatorProofCommandRole === "recommended strict-first proof chain after applying the four private release-channel metadata values", "release completion report packet should describe the private-edit operator proof command");
   check(report.privateEditOperatorProofCommandValueRecorded === false, "release completion report packet operator proof command should be value-free");
+  check(report.currentOperatorCommandSequenceReady === true, "release completion report packet current operator command sequence should be ready");
+  check(Array.isArray(report.currentOperatorCommandRows), "release completion report packet should include current operator command rows");
+  check(report.currentOperatorCommandRowCount === report.currentOperatorCommandRows.length, "release completion report packet current operator command row count should match rows");
+  check(report.currentOperatorCommandRows.length >= 5, "release completion report packet current operator command sequence should include preflight, apply, strict proof, blocker refresh, and next-actions refresh");
+  check(report.currentOperatorCommandRows.every((row) => row.ready === true && row.valueRecorded === false), "release completion report packet current operator command rows should be ready and value-free");
+  check(report.currentOperatorPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand, "release completion report packet current operator sequence should expose private env preflight command");
+  check(report.currentOperatorApplyCommand === releaseChannelApplyPrivateEnvCommand, "release completion report packet current operator sequence should expose private env apply command");
+  check(report.currentOperatorStrictProofCommand === privateEditOperatorProofCommand, "release completion report packet current operator sequence should expose strict proof command");
+  check(report.currentOperatorPreflightBeforeApply === true, "release completion report packet current operator sequence should place preflight before apply");
+  check(report.currentOperatorApplyBeforeStrictProof === true, "release completion report packet current operator sequence should place apply before strict proof");
+  check(report.currentOperatorBlockerRefreshCommand === "npm run release:current-blocker", "release completion report packet current operator sequence should include current-blocker refresh");
+  check(report.currentOperatorNextActionsRefreshCommand === "npm run release:next-actions", "release completion report packet current operator sequence should include next-actions refresh");
+  check(report.currentOperatorValueRecorded === false, "release completion report packet current operator sequence should be value-free");
   check(report.strictProofHandoffReceiptReady === true, "release completion report packet strict proof handoff receipt should be ready");
   check(Array.isArray(report.strictProofHandoffReceiptRows), "release completion report packet should include strict proof handoff receipt rows");
   check(report.strictProofHandoffReceiptRowCount === 1, "release completion report packet should include one strict proof handoff row");
@@ -1554,6 +1626,8 @@ function validateReport(report, markdown) {
   check(markdown.includes("Release Completion Report Packet Smoke"), "release completion report packet Markdown should include title");
   check(markdown.includes("Completion report packet ready: yes"), "release completion report packet Markdown should include readiness");
   check(markdown.includes("Private-edit proof command order:"), "release completion report packet Markdown should include private-edit proof command order");
+  check(markdown.includes("Current operator command sequence ready: yes"), "release completion report packet Markdown should include current operator command sequence readiness");
+  check(markdown.includes("Current Operator Command Sequence"), "release completion report packet Markdown should include current operator command sequence");
   check(markdown.includes("Strict proof handoff receipt ready:"), "release completion report packet Markdown should include strict proof handoff receipt readiness");
   check(markdown.includes("Strict Proof Handoff Receipt"), "release completion report packet Markdown should include strict proof handoff receipt table");
   check(markdown.includes("Private-edit blocked smoke ready:"), "release completion report packet Markdown should include blocked smoke readiness");
@@ -1615,6 +1689,11 @@ console.log(`- JSON: ${relative(packetJsonPath)}`);
 console.log("- Completion report packet ready: yes");
 console.log(`- Private-edit proof command order: ${report.privateEditProofCommandSummary}`);
 console.log(`- Private-edit operator proof command: ${report.privateEditOperatorProofCommand}`);
+console.log(`- Current operator command sequence ready: ${report.currentOperatorCommandSequenceReady ? "yes" : "no"}`);
+console.log(`- Current operator command rows: ${report.currentOperatorCommandRowCount} (${report.currentOperatorCommandSummary})`);
+console.log(`- Current operator first command: ${report.currentOperatorFirstCommand}`);
+console.log(`- Current operator preflight before apply: ${report.currentOperatorPreflightBeforeApply ? "yes" : "no"}`);
+console.log(`- Current operator apply before strict proof: ${report.currentOperatorApplyBeforeStrictProof ? "yes" : "no"}`);
 console.log(`- Strict proof handoff receipt ready: ${report.strictProofHandoffReceiptReady ? "yes" : "no"}`);
 console.log(`- Strict proof handoff receipt rows: ${report.strictProofHandoffReceiptRowCount} (${report.strictProofHandoffReceiptSummary})`);
 console.log(`- Private-edit blocked smoke ready: ${report.privateEditBlockedSmokeReady ? "yes" : "no"}`);
