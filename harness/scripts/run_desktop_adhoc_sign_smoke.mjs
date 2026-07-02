@@ -6,6 +6,7 @@ import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
+import { electronFrameworkDependencyReport } from "./desktop_bundle_dependency_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -164,6 +165,31 @@ async function adHocSignApp() {
   return { appSignature, executableSignature };
 }
 
+async function checkSignedFrameworkDependencies() {
+  const frameworkDependencies = await electronFrameworkDependencyReport(packagedApp, { root, timeoutMs });
+  check(frameworkDependencies.otoolReady, "ad-hoc signed app Electron Framework dependency scan should run");
+  check(frameworkDependencies.otoolLoadCommandsReady, "ad-hoc signed app Electron Framework rpath scan should run");
+  check(frameworkDependencies.appExecutableLoadCommandsReady, "ad-hoc signed app executable rpath scan should run");
+  check(frameworkDependencies.rpathScansReady, "ad-hoc signed app Electron dyld rpath scans should run");
+  check(
+    frameworkDependencies.allRequiredDependenciesReferenced,
+    "ad-hoc signed app Electron Framework should reference Squirrel, ReactiveObjC, and Mantle through @rpath"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesPresent,
+    "ad-hoc signed app should include every @rpath Electron runtime framework dependency, including Squirrel.framework/Squirrel"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesCodeSigned,
+    "ad-hoc signed app Electron runtime framework dependencies should pass codesign --verify --strict before launch"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesDyldLoadable,
+    "ad-hoc signed app Electron runtime framework dependencies should be dyld-loadable through @rpath before launch"
+  );
+  return frameworkDependencies;
+}
+
 async function launchSignedApp() {
   const blockDetails = macGuiLaunchBlockDetails("npm run desktop:adhoc-sign-smoke");
   if (blockDetails) {
@@ -264,6 +290,11 @@ if (failures.length > 0) {
   fail("Ad-hoc signature validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
 }
 
+const frameworkDependencies = await checkSignedFrameworkDependencies();
+if (failures.length > 0) {
+  fail("Ad-hoc signed Electron framework dependency validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
+}
+
 const result = await launchSignedApp();
 checkLaunchResult(result);
 if (failures.length > 0) {
@@ -276,5 +307,11 @@ console.log(`- App: ${path.relative(root, packagedApp)}`);
 console.log(`- Entitlements: ${path.relative(root, entitlementsPath)}`);
 console.log("- Signature: ad-hoc with hardened runtime option and Electron runtime entitlements, Developer ID signing not claimed");
 console.log(`- Runtime flags: app ${signature.appSignature.hasRuntimeFlag ? "yes" : "no"}, executable ${signature.executableSignature.hasRuntimeFlag ? "yes" : "no"}`);
+console.log(
+  `- Framework dependencies: ${frameworkDependencies.presentDependencyCount}/${frameworkDependencies.requiredDependencyCount} present, ${frameworkDependencies.signatureVerifiedDependencyCount}/${frameworkDependencies.requiredDependencyCount} code-signed`
+);
+console.log(
+  `- Dyld framework loadability: ${frameworkDependencies.dyldLoadableDependencyCount}/${frameworkDependencies.requiredDependencyCount} loadable via ${frameworkDependencies.rpathCount} dyld rpaths`
+);
 console.log(`- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors`);
 console.log("- Not claimed: Developer ID signing, notarization, Gatekeeper approval, auto-update, app-store submission, or external distribution-channel QA");

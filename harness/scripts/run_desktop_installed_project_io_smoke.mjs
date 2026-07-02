@@ -8,6 +8,7 @@ import { constants } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
+import { electronFrameworkDependencyReport, formatFrameworkDependencyRows } from "./desktop_bundle_dependency_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -71,6 +72,29 @@ async function checkInstalledArtifacts() {
   check(existsSync(path.join(installedApp, "Contents", "Info.plist")), "installed app should include Info.plist");
   check(existsSync(path.join(installedApp, "Contents", "Resources", "GrooveForge.icns")), "installed app should include GrooveForge.icns");
   check(!existsSync(path.join(installedApp, "Contents", "Resources", "electron.icns")), "installed app should not include Electron default icon");
+
+  const frameworkDependencies = await electronFrameworkDependencyReport(installedApp, { root, timeoutMs });
+  check(frameworkDependencies.otoolReady, "installed project IO Electron Framework dependency scan should run");
+  check(frameworkDependencies.otoolLoadCommandsReady, "installed project IO Electron Framework rpath scan should run");
+  check(frameworkDependencies.appExecutableLoadCommandsReady, "installed project IO executable rpath scan should run");
+  check(frameworkDependencies.rpathScansReady, "installed project IO Electron dyld rpath scans should run");
+  check(
+    frameworkDependencies.allRequiredDependenciesReferenced,
+    "installed project IO Electron Framework should reference Squirrel, ReactiveObjC, and Mantle through @rpath"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesPresent,
+    "installed project IO app should include every @rpath Electron runtime framework dependency, including Squirrel.framework/Squirrel"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesCodeSigned,
+    "installed project IO Electron runtime framework dependencies should pass codesign --verify --strict before launch"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesDyldLoadable,
+    "installed project IO Electron runtime framework dependencies should be dyld-loadable through @rpath before launch"
+  );
+  return frameworkDependencies;
 }
 
 function parseSmokeResult(output) {
@@ -108,7 +132,7 @@ function buildProject() {
   };
 }
 
-function buildReport(project, result, sourceContents, savedContents) {
+function buildReport(project, result, sourceContents, savedContents, frameworkDependencies) {
   const target = workstation.activeDeliveryTarget(project);
   return {
     appName,
@@ -138,6 +162,11 @@ function buildReport(project, result, sourceContents, savedContents) {
     savedBytes: Buffer.byteLength(savedContents, "utf8"),
     sourceSha256: sha256(sourceContents),
     savedSha256: sha256(savedContents),
+    frameworkDependencies,
+    installedFrameworkDependenciesReady:
+      frameworkDependencies.allRequiredDependenciesPresent === true &&
+      frameworkDependencies.allRequiredDependenciesCodeSigned === true &&
+      frameworkDependencies.allRequiredDependenciesDyldLoadable === true,
     installedNativeSaveReady: true,
     installedNativeOpenReady: true,
     installedProjectRoundtripReady: true,
@@ -177,6 +206,8 @@ function buildMarkdown(report) {
 - Saved bytes: ${report.savedBytes}
 - Source SHA-256: \`${report.sourceSha256.slice(0, 16)}...\`
 - Saved SHA-256: \`${report.savedSha256.slice(0, 16)}...\`
+- Electron runtime framework dependencies ready: ${report.installedFrameworkDependenciesReady ? "yes" : "no"}
+- Electron runtime framework dependencies: ${report.frameworkDependencies.presentDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} present, ${report.frameworkDependencies.signatureVerifiedDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} code-signed, ${report.frameworkDependencies.dyldLoadableDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} dyld-loadable
 
 ## Installed Native Bridge Checks
 
@@ -187,6 +218,12 @@ function buildMarkdown(report) {
 - Save bridge present: ${report.electronEvidence.hasSaveProject ? "yes" : "no"}
 - Open bridge present: ${report.electronEvidence.hasOpenProject ? "yes" : "no"}
 - Contents matched: ${report.electronEvidence.openResult.contentsMatched ? "yes" : "no"}
+
+## Dyld Framework Dependency Checks
+
+| install name | referenced | present | code-signed | dyld-loadable | candidate count | resolved path |
+|---|---:|---:|---:|---:|---:|---|
+${formatFrameworkDependencyRows(report.frameworkDependencies.requiredDependencyRows)}
 
 ## Not Recorded
 
@@ -276,7 +313,7 @@ async function runInstalledProjectIoSmoke() {
   });
 }
 
-await checkInstalledArtifacts();
+const frameworkDependencies = await checkInstalledArtifacts();
 if (failures.length > 0) {
   fail("Installed artifact preflight failed.", failures.map((failure) => `- ${failure}`).join("\n"));
 }
@@ -319,9 +356,10 @@ check(reparsedProject.title === reopenedProject.title, "installed saved project 
 check(workstation.projectFileName(reopenedProject) === path.basename(targetPath), "installed saved project filename should match the project title slug");
 checkNoSamplingText(savedContents, "installed saved project file");
 
-const report = buildReport(reopenedProject, result, sourceContents, savedContents);
+const report = buildReport(reopenedProject, result, sourceContents, savedContents, frameworkDependencies);
 const reportMarkdown = buildMarkdown(report);
 check(report.installedProjectIoReady === true, "installed project IO report should be ready");
+check(report.installedFrameworkDependenciesReady === true, "installed project IO report should prove Electron runtime framework dependencies are launch-ready");
 check(report.localEnvValueRecorded === false, "installed project IO report should not record local env values");
 check(report.privateValuesRecorded === false, "installed project IO report should not record private values");
 check(report.privateBeatRecorded === false, "installed project IO report should not record private beats");
@@ -346,6 +384,12 @@ console.log(`- Report JSON: ${relative(reportJsonPath)}`);
 console.log(`- Report Markdown: ${relative(reportMarkdownPath)}`);
 console.log(`- Project: ${reopenedProject.title}, ${reopenedProject.bpm} BPM ${reopenedProject.key}, ${workstation.arrangementTotalBars(reopenedProject)} bars`);
 console.log(`- Installed bridge: saveProject/openProject roundtrip matched ${report.savedBytes} bytes, sha256 ${report.savedSha256.slice(0, 16)}...`);
+console.log(
+  `- Framework dependencies: ${report.frameworkDependencies.presentDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} present, ${report.frameworkDependencies.signatureVerifiedDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} code-signed`
+);
+console.log(
+  `- Dyld framework loadability: ${report.frameworkDependencies.dyldLoadableDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} loadable via ${report.frameworkDependencies.rpathCount} dyld rpaths`
+);
 console.log("- Network: no distribution channel probe, release upload, Apple notary submission, or signing attempted");
 console.log("- Not recorded: private values, private beats, real user audio, release URLs, support URLs, feed URLs, credentials, tokens, identity labels, channel values, or local env values");
 console.log("- Not claimed: real /Applications install, Developer ID signing, notarization, Gatekeeper approval, auto-update, manual QA approval, app-store submission, or external distribution completion");
