@@ -3,7 +3,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { isMacAppKitAbort, macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
+import { isMacAppKitAbort, isMacDyldFrameworkAbort, macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const failures = [];
@@ -297,6 +297,24 @@ function checkDesktopGuiLaunchGuardContract() {
     isMacAppKitAbort({ code: 0, signal: null, output: "AppKit loaded normally" }) === false,
     "desktop GUI launch abort classifier should not treat non-abort AppKit output as a crash"
   );
+  const attachedSquirrelDyldReportShape = [
+    "Process: GrooveForge [15208]",
+    "Identifier: app.grooveforge.desktop",
+    "Exception Type: EXC_CRASH (SIGABRT)",
+    "Termination Reason: Namespace DYLD, Code 1, Library missing",
+    "Library not loaded: @rpath/Squirrel.framework/Squirrel",
+    "Referenced from: /Users/USER/*/GrooveForge.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework",
+    "Reason: tried: '/Users/USER/GrooveForge.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/Squirrel.framework/Squirrel' (no such file), '/Users/USER/GrooveForge.app/Contents/Frameworks/Squirrel.framework/Squirrel' (code signature invalid)",
+    "fatalDyldError: 1"
+  ].join("\n");
+  check(
+    isMacDyldFrameworkAbort({ output: attachedSquirrelDyldReportShape }) === true,
+    "desktop GUI launch abort classifier should recognize attached Squirrel dyld framework report shape"
+  );
+  check(
+    isMacDyldFrameworkAbort({ output: "Library not loaded: @rpath/Other.framework/Other" }) === false,
+    "desktop GUI launch abort classifier should not treat unrelated dyld output as an Electron runtime framework crash"
+  );
   const abortDetails = macGuiLaunchAbortDetails("npm run desktop:launch-smoke", {
     code: 6,
     signal: null,
@@ -310,6 +328,14 @@ function checkDesktopGuiLaunchGuardContract() {
     output: "Application Specific Information: abort() called"
   });
   checkIncludes(signalAbortDetails, "Crash signature: Electron SIGABRT / exit code 6 / Abort trap: 6", "desktop GUI launch signal abort details");
+  const squirrelDyldDetails = macGuiLaunchAbortDetails("npm run desktop:package-smoke", {
+    code: 1,
+    signal: null,
+    output: attachedSquirrelDyldReportShape
+  });
+  checkIncludes(squirrelDyldDetails, "Diagnostic: Electron failed during macOS dyld framework loading", "desktop GUI launch dyld abort details");
+  checkIncludes(squirrelDyldDetails, "@rpath/Squirrel.framework/Squirrel", "desktop GUI launch dyld abort details");
+  checkIncludes(squirrelDyldDetails, "strict code signatures", "desktop GUI launch dyld abort details");
   check(
     macGuiLaunchBlockDetails("npm run desktop:launch-smoke", {}, "darwin") === null,
     "desktop GUI launch guard should allow normal macOS GUI launches"

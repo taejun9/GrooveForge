@@ -33,9 +33,44 @@ export function isMacAppKitAbort({ code, signal, output = "" } = {}) {
   );
 }
 
+export function isMacDyldFrameworkAbort({ output = "" } = {}) {
+  const text = String(output ?? "");
+  const dyldEvidence = /(?:Namespace DYLD|Library not loaded:|fatalDyldError|dyld\[\d+\])/i.test(text);
+  const runtimeFrameworkEvidence =
+    /(?:@rpath\/(?:Squirrel|ReactiveObjC|Mantle)\.framework\/(?:Squirrel|ReactiveObjC|Mantle)|(?:Squirrel|ReactiveObjC|Mantle)\.framework\/(?:Squirrel|ReactiveObjC|Mantle))/i.test(
+      text
+    );
+  const electronBundleEvidence = /(?:Electron Framework|com\.github\.Electron\.framework|GrooveForge\.app|app\.grooveforge\.desktop|Process:\s+GrooveForge)/i.test(
+    text
+  );
+  const missingOrSignatureEvidence =
+    /(?:Library missing|no such file|code signature|no suitable image found|not valid for use in process|different Team IDs|mapped file)/i.test(
+      text
+    );
+
+  return dyldEvidence && runtimeFrameworkEvidence && (electronBundleEvidence || missingOrSignatureEvidence);
+}
+
+function macDyldFrameworkAbortDetails(commandName, rawOutput) {
+  return [
+    "Diagnostic: Electron failed during macOS dyld framework loading before GrooveForge emitted launch evidence.",
+    "Observed missing or signature-blocked Electron runtime framework dependency evidence.",
+    "Crash signature: Namespace DYLD / Library missing for @rpath/Squirrel.framework/Squirrel, @rpath/ReactiveObjC.framework/ReactiveObjC, or @rpath/Mantle.framework/Mantle.",
+    "Likely cause: stale or damaged packaged app bundle, unsigned nested framework, or launching an artifact built before the framework dependency guard.",
+    `Action: rerun \`${commandName}\` after a fresh \`npm run build\`; package, PKG payload, and install smokes verify framework presence, strict code signatures, and @rpath dyld loadability before launch.`,
+    "",
+    "Raw Electron output:",
+    rawOutput
+  ].join("\n");
+}
+
 export function macGuiLaunchAbortDetails(commandName, { code, signal, output = "" } = {}) {
   const trimmedOutput = String(output ?? "").trim();
   const rawOutput = trimmedOutput.length > 0 ? trimmedOutput : "none";
+
+  if (isMacDyldFrameworkAbort({ output })) {
+    return macDyldFrameworkAbortDetails(commandName, rawOutput);
+  }
 
   if (!isMacAppKitAbort({ code, signal, output })) {
     return rawOutput;
