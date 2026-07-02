@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
+import { electronFrameworkDependencyReport } from "./desktop_bundle_dependency_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const require = createRequire(import.meta.url);
@@ -589,6 +590,22 @@ async function checkPackagedApp(paths) {
     check(helperPlist.includes(`<string>${helperName}</string>`), `${helperApp} should use GrooveForge helper name`);
     check(helperPlist.includes(`<string>${helperId}</string>`), `${helperApp} should use GrooveForge helper bundle id`);
   }
+
+  const frameworkDependencies = await electronFrameworkDependencyReport(paths.packagedApp, { root, timeoutMs });
+  check(frameworkDependencies.otoolReady, "packaged app Electron Framework dependency scan should run");
+  check(
+    frameworkDependencies.allRequiredDependenciesReferenced,
+    "packaged app Electron Framework should reference Squirrel, ReactiveObjC, and Mantle through @rpath"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesPresent,
+    "packaged app should include every @rpath Electron runtime framework dependency, including Squirrel.framework/Squirrel"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesCodeSigned,
+    "packaged app Electron runtime framework dependencies should pass codesign --verify --strict before launch"
+  );
+  paths.frameworkDependencies = frameworkDependencies;
 }
 
 function checkLaunchResult(result) {
@@ -724,6 +741,9 @@ console.log("- Scope: macOS portable GrooveForge.app assembly, bundle contract, 
 console.log(`- App: ${path.relative(root, paths.packagedApp)}`);
 console.log(`- Entry: ${path.relative(root, path.join(paths.appRoot, "dist-electron", "main.js"))} -> packaged dist/index.html`);
 console.log(`- Icon: ${path.basename(paths.icon.iconPath)}, ${paths.icon.iconBytes} bytes, GrooveForge bundle metadata`);
+console.log(
+  `- Framework dependencies: ${paths.frameworkDependencies.presentDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} present, ${paths.frameworkDependencies.signatureVerifiedDependencyCount}/${paths.frameworkDependencies.requiredDependencyCount} code-signed`
+);
 console.log(
   `- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors`
 );

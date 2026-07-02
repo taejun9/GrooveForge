@@ -6,6 +6,7 @@ import { access, cp, lstat, mkdir, readFile, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
+import { electronFrameworkDependencyReport } from "./desktop_bundle_dependency_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -165,11 +166,31 @@ async function checkInstalledApp() {
   check(existsSync(path.join(installedAppRoot, "dist", "index.html")), "installed app should include packaged dist/index.html");
   check(existsSync(path.join(installedAppRoot, "dist-electron", "main.js")), "installed app should include packaged dist-electron/main.js");
   check(existsSync(path.join(installedAppRoot, "dist-electron", "preload.cjs")), "installed app should include packaged dist-electron/preload.cjs");
+  check(
+    existsSync(path.join(installedApp, "Contents", "Frameworks", "Squirrel.framework", "Squirrel")),
+    "installed app should include Squirrel.framework/Squirrel for Electron @rpath loading"
+  );
 
   const signatureDetails = await readCodeSignatureDetails(installedApp);
   check(signatureDetails.includes(`Identifier=${bundleId}`), `installed app ad-hoc signature should preserve ${bundleId}`);
   check(signatureDetails.includes("Signature=adhoc"), "installed app should retain ad-hoc signature");
   check(!signatureDetails.includes("Authority=Developer ID"), "installed app should not claim Developer ID authority");
+
+  const frameworkDependencies = await electronFrameworkDependencyReport(installedApp, { root, timeoutMs });
+  check(frameworkDependencies.otoolReady, "installed app Electron Framework dependency scan should run");
+  check(
+    frameworkDependencies.allRequiredDependenciesReferenced,
+    "installed app Electron Framework should reference Squirrel, ReactiveObjC, and Mantle through @rpath"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesPresent,
+    "installed app should include every @rpath Electron runtime framework dependency, including Squirrel.framework/Squirrel"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesCodeSigned,
+    "installed app Electron runtime framework dependencies should pass codesign --verify --strict before launch"
+  );
+  return frameworkDependencies;
 }
 
 async function launchInstalledApp() {
@@ -263,7 +284,7 @@ if (process.platform !== "darwin") {
 }
 
 await installFromDmg();
-await checkInstalledApp();
+const frameworkDependencies = await checkInstalledApp();
 if (failures.length > 0) {
   fail("Installed app validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
 }
@@ -277,5 +298,8 @@ if (failures.length > 0) {
 console.log("GrooveForge desktop install smoke passed.");
 console.log("- Scope: local DMG mount, simulated Applications copy, ad-hoc signature retention, and installed app launch smoke");
 console.log(`- Installed app: ${path.relative(root, installedApp)}`);
+console.log(
+  `- Framework dependencies: ${frameworkDependencies.presentDependencyCount}/${frameworkDependencies.requiredDependencyCount} present, ${frameworkDependencies.signatureVerifiedDependencyCount}/${frameworkDependencies.requiredDependencyCount} code-signed`
+);
 console.log(`- Visual: ${result.evidence.visual.width}x${result.evidence.visual.height}, ${result.evidence.visual.pngBytes} PNG bytes, ${result.evidence.visual.uniqueSampledColors} sampled colors`);
 console.log("- Not claimed: real /Applications install, Developer ID signing, notarization, Gatekeeper approval, auto-update, app-store submission, or external distribution-channel QA");

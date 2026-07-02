@@ -32,6 +32,7 @@ const refreshCommandsAfterSourceCheck = [
 ];
 const refreshCommands = [...refreshCommandsBeforeSourceCheck, ...refreshCommandsAfterSourceCheck];
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
@@ -924,10 +925,10 @@ function currentActionAcceptanceBlockerRows({
 
       if (lower.includes("without placeholder values")) {
         sourceField = "externalProofBundle.currentPlaceholderKeys/currentPlaceholderEditLocations";
-        operatorAction = `Replace current release-channel placeholder keys in ${currentEnvEditTarget}: ${currentPlaceholderEditLocationSummary}.`;
+        operatorAction = `Set private release-channel process env values, run ${releaseChannelApplyPrivateEnvCommand}, and update ${currentEnvEditTarget}: ${currentPlaceholderEditLocationSummary}.`;
       } else if (lower.includes("private-inputs") || lower.includes("private inputs")) {
         sourceField = "releaseDoctor.privateInputsReady/channelMetadataReady/privateValuesRecorded";
-        operatorAction = `Run ${currentNextCommand} after replacing the current release-channel metadata placeholders.`;
+        operatorAction = `Run ${currentNextCommand} after ${releaseChannelApplyPrivateEnvCommand} applies the current release-channel metadata placeholders.`;
       } else if (lower.includes("distribution-channel qa")) {
         sourceField = "releaseDoctor.distributionChannelQaReady/channelMetadataReady/privateValuesRecorded";
         operatorAction = "Run npm run desktop:distribution-channel-qa-smoke after release doctor reports channel metadata ready.";
@@ -3198,7 +3199,7 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release current blocker post-edit proof sequence rows should be ready and value-free");
   check(report.postEditProofSequenceReceiptRows.every((row) => typeof row.expectedEvidence === "string" && row.expectedEvidence.length > 0), "release current blocker post-edit proof sequence rows should include expected evidence");
   check(report.postEditProofSequenceReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release current blocker post-edit proof sequence rows should include source fields");
-  check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Private value edit" && row.command === `manual edit ${report.currentEnvEditTarget}`), "release current blocker post-edit proof sequence should include private value edit");
+  check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Private value edit" && row.command === releaseChannelApplyPrivateEnvCommand), "release current blocker post-edit proof sequence should include the private env apply helper");
   check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Recommended strict proof chain" && row.command === recommendedPrivateEditOperatorProofCommand), "release current blocker post-edit proof sequence should include recommended strict proof chain");
   check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Release doctor proof" && row.command === "npm run release:doctor"), "release current blocker post-edit proof sequence should include release doctor proof");
   check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Current-blocker refresh" && row.command === "npm run release:current-blocker"), "release current blocker post-edit proof sequence should include current-blocker refresh");

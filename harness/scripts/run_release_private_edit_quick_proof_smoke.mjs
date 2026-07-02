@@ -23,6 +23,7 @@ const currentBlockerJsonPath = path.join(packageRoot, `${appName}-${packageJson.
 const failures = [];
 const recommendedOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const recommendedStrictFirstProofCommand = "npm run release:channel-live-check-strict";
+const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
@@ -155,8 +156,8 @@ function buildReport({ liveCheck, currentBlocker, refreshRows }) {
   const operatorProofRows = [
     {
       order: 1,
-      command: "manual edit .env.distribution.local",
-      role: "replace only the current private release-channel placeholder values outside committed files",
+      command: releaseChannelApplyPrivateEnvCommand,
+      role: "apply only operator-owned current release-channel metadata from process env into the ignored local env file",
       valueRecorded: false
     },
     {

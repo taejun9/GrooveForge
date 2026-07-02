@@ -28,6 +28,7 @@ const currentBlockerSmokeCommand = "npm run release:current-blocker-smoke";
 const freshnessCommand = "npm run release:progress-freshness-smoke";
 const hardGateCommand = "npm run release:external-check";
 const privateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const failures = [];
 
 function check(condition, message) {
@@ -303,11 +304,11 @@ function operatorBriefRows({ completionReportPacket, currentBlocker, progressFre
     {
       order: 1,
       step: "Edit private release-channel metadata",
-      command: `manual edit ${currentEnvEditTarget}`,
+      command: releaseChannelApplyPrivateEnvCommand,
       evidence: releaseChannelPosture.cleared
         ? "release-channel metadata placeholders cleared in value-free receipts"
         : `${releaseChannelPosture.placeholderKeyCount} current release-channel placeholders remain`,
-      expectedPostEditSignal: "release-channel metadata placeholders clear in value-free receipts",
+      expectedPostEditSignal: `operator-owned process env metadata applies into ${currentEnvEditTarget}; release-channel metadata placeholders clear in value-free receipts`,
       sourceField: "currentBlocker.releaseChannelLiveCheckCurrentPlaceholderKeyCount",
       valueRecorded: false
     },

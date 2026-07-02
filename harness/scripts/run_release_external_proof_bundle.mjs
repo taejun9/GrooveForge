@@ -39,6 +39,7 @@ const proofBundleMarkdownPath = path.join(packageRoot, `${appName}-${packageJson
 const proofBundleJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-proof-bundle.json`);
 const hardExternalGateCommand = "npm run release:external-check";
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const args = new Set(process.argv.slice(2));
 const fromExisting = args.has("--from-existing");
 const failures = [];
@@ -765,9 +766,9 @@ check(summary.postEditProofSequenceReceiptRows.every((row) => typeof row.expecte
 check(summary.postEditProofSequenceReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release proof bundle post-edit proof sequence rows should include source fields");
 check(
   summary.postEditProofSequenceReceiptRows.some(
-    (row) => row.step === "Private value edit" && row.command === `manual edit ${summary.currentEnvEditTarget}`
+    (row) => row.step === "Private value edit" && row.command === releaseChannelApplyPrivateEnvCommand
   ),
-  "release proof bundle post-edit proof sequence should include private value edit"
+  "release proof bundle post-edit proof sequence should include the private env apply helper"
 );
 check(
   summary.postEditProofSequenceReceiptRows.some((row) => row.step === "Recommended strict proof chain" && row.command === recommendedPrivateEditOperatorProofCommand),

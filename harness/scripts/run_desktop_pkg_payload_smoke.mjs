@@ -7,6 +7,7 @@ import { access, lstat, mkdir, readFile, rm, stat, writeFile } from "node:fs/pro
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { macGuiLaunchAbortDetails, macGuiLaunchBlockDetails } from "./desktop_gui_launch_guard.mjs";
+import { electronFrameworkDependencyReport, formatFrameworkDependencyRows } from "./desktop_bundle_dependency_guard.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const appName = "GrooveForge";
@@ -230,6 +231,12 @@ function buildMarkdown(report) {
 |---|---:|---|
 ${formatCheckRows(report.requiredPayload)}
 
+## Dyld Framework Dependency Checks
+
+| install name | referenced | present | code-signed | resolved path |
+|---|---:|---:|---:|---|
+${formatFrameworkDependencyRows(report.frameworkDependencies.requiredDependencyRows)}
+
 ## Not Recorded
 
 Release URLs, support URLs, feed URLs, credentials, tokens, Developer ID identity labels, channel values, private beats, and real user audio are not recorded.
@@ -296,7 +303,8 @@ async function checkExtractedApp(extractedApp) {
     { label: "GrooveForge icon", path: path.join(extractedApp, "Contents", "Resources", "GrooveForge.icns") },
     { label: "Renderer HTML", path: path.join(extractedAppRoot, "dist", "index.html") },
     { label: "Electron main", path: path.join(extractedAppRoot, "dist-electron", "main.js") },
-    { label: "Electron preload", path: path.join(extractedAppRoot, "dist-electron", "preload.cjs") }
+    { label: "Electron preload", path: path.join(extractedAppRoot, "dist-electron", "preload.cjs") },
+    { label: "Squirrel framework binary", path: path.join(extractedApp, "Contents", "Frameworks", "Squirrel.framework", "Squirrel") }
   ].map((item) => ({ ...item, present: existsSync(item.path), path: relative(item.path) }));
   check(requiredPayload.every((item) => item.present), "extracted app should include required GrooveForge app files");
   check(!existsSync(path.join(extractedApp, "Contents", "Resources", "electron.icns")), "extracted app should not contain electron.icns");
@@ -313,7 +321,22 @@ async function checkExtractedApp(extractedApp) {
   check(signatureDetails.includes("Signature=adhoc"), "extracted app should retain ad-hoc signature");
   check(!signatureDetails.includes("Authority=Developer ID"), "extracted app should not claim Developer ID authority");
 
-  return { extractedExecutable, extractedAppRoot, requiredPayload };
+  const frameworkDependencies = await electronFrameworkDependencyReport(extractedApp, { root, timeoutMs });
+  check(frameworkDependencies.otoolReady, "extracted app Electron Framework dependency scan should run");
+  check(
+    frameworkDependencies.allRequiredDependenciesReferenced,
+    "extracted app Electron Framework should reference Squirrel, ReactiveObjC, and Mantle through @rpath"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesPresent,
+    "extracted app should include every @rpath Electron runtime framework dependency, including Squirrel.framework/Squirrel"
+  );
+  check(
+    frameworkDependencies.allRequiredDependenciesCodeSigned,
+    "extracted app Electron runtime framework dependencies should pass codesign --verify --strict before launch"
+  );
+
+  return { extractedExecutable, extractedAppRoot, requiredPayload, frameworkDependencies };
 }
 
 async function launchExtractedApp(extractedExecutable, extractedAppRoot) {
@@ -400,7 +423,7 @@ function checkLaunchResult(result) {
   check(result?.evidence?.visual?.uniqueSampledColors >= 24, "extracted app screenshot should have visible color diversity");
 }
 
-async function writeReport({ pkgStats, packageInfoPath, payloadArchive, extractedApp, extractedExecutable, requiredPayload, launchResult }) {
+async function writeReport({ pkgStats, packageInfoPath, payloadArchive, extractedApp, extractedExecutable, requiredPayload, frameworkDependencies, launchResult }) {
   const extractedAppBytes = await directoryByteSize(extractedApp);
   const report = {
     appName,
@@ -428,6 +451,7 @@ async function writeReport({ pkgStats, packageInfoPath, payloadArchive, extracte
       extractedUnderIgnoredBuildOutput: true
     },
     requiredPayload,
+    frameworkDependencies,
     launch: {
       title: launchResult.evidence.title,
       appKind: launchResult.evidence.appKind,
@@ -464,6 +488,8 @@ async function writeReport({ pkgStats, packageInfoPath, payloadArchive, extracte
   const serializedReport = `${JSON.stringify(report, null, 2)}\n`;
 
   check(report.pkgPayloadSmokeReady === true, "PKG payload smoke report should be ready");
+  check(report.frameworkDependencies.allRequiredDependenciesPresent === true, "PKG payload smoke should prove Electron framework dependencies are present");
+  check(report.frameworkDependencies.allRequiredDependenciesCodeSigned === true, "PKG payload smoke should prove Electron framework dependencies pass strict code-sign verification");
   check(report.pkg.signed === false, "PKG payload smoke should record unsigned package posture");
   check(report.realApplicationsInstallAttempted === false, "PKG payload smoke should not install into real Applications");
   check(report.pkgInstallerRunAttempted === false, "PKG payload smoke should not run macOS Installer");
@@ -497,7 +523,7 @@ if (process.platform !== "darwin") {
 
 const pkgStats = await ensurePkgExists();
 const { packageInfoPath, payloadArchive, extractedApp } = await expandPkgPayload();
-const { extractedExecutable, extractedAppRoot, requiredPayload } = await checkExtractedApp(extractedApp);
+const { extractedExecutable, extractedAppRoot, requiredPayload, frameworkDependencies } = await checkExtractedApp(extractedApp);
 if (failures.length > 0) {
   fail("Extracted app validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
 }
@@ -508,13 +534,16 @@ if (failures.length > 0) {
   fail("Extracted app launch evidence validation failed.", failures.map((failure) => `- ${failure}`).join("\n"));
 }
 
-const report = await writeReport({ pkgStats, packageInfoPath, payloadArchive, extractedApp, extractedExecutable, requiredPayload, launchResult });
+const report = await writeReport({ pkgStats, packageInfoPath, payloadArchive, extractedApp, extractedExecutable, requiredPayload, frameworkDependencies, launchResult });
 
 console.log("GrooveForge desktop PKG payload smoke passed.");
 console.log("- Scope: local unsigned macOS PKG payload extraction, extracted app validation, and extracted app launch smoke");
 console.log(`- PKG: ${report.pkg.path} (${report.pkg.bytes} bytes)`);
 console.log(`- SHA-256: ${report.pkg.sha256}`);
 console.log(`- Extracted app: ${report.payload.extractedAppPath}`);
+console.log(
+  `- Framework dependencies: ${report.frameworkDependencies.presentDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} present, ${report.frameworkDependencies.signatureVerifiedDependencyCount}/${report.frameworkDependencies.requiredDependencyCount} code-signed`
+);
 console.log(`- Visual: ${report.launch.visual.width}x${report.launch.visual.height}, ${report.launch.visual.pngBytes} PNG bytes, ${report.launch.visual.uniqueSampledColors} sampled colors`);
 console.log(`- Markdown: ${relative(reportMarkdownPath)}`);
 console.log(`- JSON: ${relative(reportJsonPath)}`);

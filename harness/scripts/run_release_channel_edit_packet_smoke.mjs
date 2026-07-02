@@ -25,6 +25,7 @@ const releaseChannelMetadataKeys = [
   "GROOVEFORGE_SUPPORT_URL"
 ];
 const recommendedOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const lowerLevelLiveCheckCommand = "npm run release:channel-live-check";
 const lowerLevelStrictProofCommand = "npm run release:channel-live-check-strict";
 const refreshCommandRows = [
@@ -191,23 +192,23 @@ function operatorCommandRows(mode, currentEnvEditTarget) {
           },
           {
             order: 2,
-            command: `manual edit ${currentEnvEditTarget}`,
-            role: "replace the four private release-channel placeholder values outside committed files",
+            command: releaseChannelApplyPrivateEnvCommand,
+            role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget}`,
             valueRecorded: false
           }
         ]
       : [
           {
             order: 1,
-            command: `manual edit ${currentEnvEditTarget}`,
-            role: "replace the four private release-channel placeholder values outside committed files",
+            command: releaseChannelApplyPrivateEnvCommand,
+            role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget}`,
             valueRecorded: false
           }
         ];
   const followUpRows = [
     {
       command: recommendedOperatorProofCommand,
-      role: "recommended one-command strict proof chain after replacing the four private release-channel placeholders",
+      role: "recommended one-command strict proof chain after applying the four private release-channel metadata values",
       valueRecorded: false
     },
     {
@@ -344,9 +345,10 @@ function buildReport({ doctor, liveCheck, progress }) {
     operatorCommandRows: operatorRows,
     operatorCommandCount: operatorRows.length,
     operatorCommandSummary: commandSummary(operatorRows),
+    releaseChannelApplyPrivateEnvCommand,
     releaseChannelRecommendedOperatorProofCommand: recommendedOperatorProofCommand,
     releaseChannelRecommendedOperatorProofCommandRole:
-      "recommended strict-first proof chain after replacing the four private release-channel placeholders",
+      "recommended strict-first proof chain after applying the four private release-channel metadata values",
     releaseChannelRecommendedOperatorProofCommandValueRecorded: false,
     releaseChannelLowerLevelLiveCheckCommand: lowerLevelLiveCheckCommand,
     releaseChannelLowerLevelStrictProofCommand: lowerLevelStrictProofCommand,
@@ -439,6 +441,7 @@ function buildMarkdown(report) {
 - Packet mode: ${report.releaseChannelEditPacketMode}
 - Refresh command order: ${report.refreshCommandSummary}
 - Operator command order: ${report.operatorCommandSummary}
+- First private metadata apply command: \`${report.releaseChannelApplyPrivateEnvCommand}\`
 - Recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommand}\`
 - Recommended operator proof role: ${report.releaseChannelRecommendedOperatorProofCommandRole}
 - Lower-level live-check proof: \`${report.releaseChannelLowerLevelLiveCheckCommand}\`
@@ -505,6 +508,15 @@ function validateReport(report, markdown) {
   check(report.operatorCommandCount >= 7, "release-channel edit packet should include operator proof commands");
   check(report.operatorCommandRows.every((row) => row.valueRecorded === false), "release-channel edit packet operator rows should be value-free");
   check(
+    report.operatorCommandRows.some((row) => row.command === releaseChannelApplyPrivateEnvCommand),
+    "release-channel edit packet should include the private env apply helper"
+  );
+  check(
+    !report.operatorCommandSummary.includes("manual edit"),
+    "release-channel edit packet operator order should not use stale manual edit language"
+  );
+  check(report.releaseChannelApplyPrivateEnvCommand === releaseChannelApplyPrivateEnvCommand, "release-channel edit packet should expose the private env apply helper");
+  check(
     report.operatorCommandRows.some((row) => row.command === recommendedOperatorProofCommand),
     "release-channel edit packet should include the recommended private-edit strict proof chain"
   );
@@ -518,7 +530,7 @@ function validateReport(report, markdown) {
   );
   check(report.releaseChannelRecommendedOperatorProofCommand === recommendedOperatorProofCommand, "release-channel edit packet should expose the recommended operator proof chain");
   check(
-    report.releaseChannelRecommendedOperatorProofCommandRole === "recommended strict-first proof chain after replacing the four private release-channel placeholders",
+    report.releaseChannelRecommendedOperatorProofCommandRole === "recommended strict-first proof chain after applying the four private release-channel metadata values",
     "release-channel edit packet should describe the recommended operator proof chain role"
   );
   check(report.releaseChannelRecommendedOperatorProofCommandValueRecorded === false, "release-channel edit packet recommended operator proof chain should be value-free");

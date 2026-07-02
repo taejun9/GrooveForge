@@ -45,6 +45,7 @@ const releaseChannelMetadataKeys = [
   "GROOVEFORGE_SUPPORT_URL"
 ];
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const sensitivePrivateKeys = [
   "GROOVEFORGE_RELEASE_DOWNLOAD_URL",
   "GROOVEFORGE_RELEASE_NOTES_URL",
@@ -835,7 +836,7 @@ function currentActionAcceptanceEvidence(criterion, { currentActionSummary = {},
       sourceField: "currentRequiredKeys/currentPlaceholderKeys/currentPlaceholderEditLocations",
       operatorAction:
         placeholderCount > 0
-          ? `Replace current release-channel placeholder keys in ${currentActionSummary.currentEnvEditTarget ?? ".env.distribution.local"}: ${currentActionSummary.currentPlaceholderEditLocationSummary ?? "current placeholder edit locations"}.`
+          ? `Set private release-channel process env values, run ${releaseChannelApplyPrivateEnvCommand}, and update ${currentActionSummary.currentEnvEditTarget ?? ".env.distribution.local"}: ${currentActionSummary.currentPlaceholderEditLocationSummary ?? "current placeholder edit locations"}.`
           : "Keep the current release-channel keys placeholder-free in the ignored local env file.",
       expectedSignal: "current required keys present and current placeholder key count is 0"
     };
@@ -848,7 +849,7 @@ function currentActionAcceptanceEvidence(criterion, { currentActionSummary = {},
       ready: privateInputsReady && channelMetadataReady && !privateValuesRecorded,
       evidence: `private inputs ready ${readyLabel(privateInputsReady)}; channel metadata ready ${readyLabel(channelMetadataReady)}; private values recorded ${readyLabel(privateValuesRecorded)}`,
       sourceField: "releaseDoctor.privateInputsReady/channelMetadataReady/privateValuesRecorded",
-      operatorAction: `Run ${currentActionSummary.currentNextCommand ?? "npm run release:doctor"} after replacing the current release-channel metadata placeholders.`,
+      operatorAction: `Run ${currentActionSummary.currentNextCommand ?? "npm run release:doctor"} after ${releaseChannelApplyPrivateEnvCommand} applies the current release-channel metadata placeholders.`,
       expectedSignal: "private inputs ready yes; channel metadata ready yes; private values recorded no"
     };
   }
@@ -1580,10 +1581,10 @@ function buildReleaseChannelPostEditOperatorReceiptSummary({
           (missingLocalEnv && placeholderKeys.length === 0 && placeholderLocations.length === 0)),
       currentState: `${placeholderKeys.length} current release-channel placeholder keys at ${placeholderLocationSummary}`,
       operatorAction: missingLocalEnv
-        ? `Run ${currentStepCommand} to create ${currentActionSummary.currentEnvEditTarget}, then replace private values for the four current release-channel metadata keys.`
-        : `Replace private values in ${currentActionSummary.currentEnvEditTarget} for the four current release-channel metadata keys.`,
-      expectedPostEditSignal: "0 current placeholder keys; values still redacted in reports",
-      command: missingLocalEnv ? currentStepCommand : "edit ignored local env file",
+        ? `Run ${currentStepCommand} to create ${currentActionSummary.currentEnvEditTarget}, then set private process env values and run ${releaseChannelApplyPrivateEnvCommand} for the four current release-channel metadata keys.`
+        : `Set private process env values and run ${releaseChannelApplyPrivateEnvCommand} to update ${currentActionSummary.currentEnvEditTarget} for the four current release-channel metadata keys.`,
+      expectedPostEditSignal: "0 current placeholder keys after apply helper; values still redacted in reports",
+      command: missingLocalEnv ? currentStepCommand : releaseChannelApplyPrivateEnvCommand,
       proofCommand,
       rerunCommand: blockerRefreshCommand,
       sourceField: "currentPlaceholderKeys/currentPlaceholderEditLocations/currentEnvEditTarget",
@@ -1719,8 +1720,8 @@ function buildPostEditProofSequenceReceiptSummary({
       order: 1,
       step: "Private value edit",
       ready: envEditTarget === currentLocalEnvEditTarget() && placeholderKeyCount >= 0,
-      command: `manual edit ${envEditTarget}`,
-      expectedEvidence: "current release-channel placeholder key count becomes 0 after the operator-owned edit",
+      command: releaseChannelApplyPrivateEnvCommand,
+      expectedEvidence: `operator-owned process env metadata is applied into ${envEditTarget}; current release-channel placeholder key count becomes 0`,
       sourceField: "currentEnvEditTarget/currentPlaceholderKeyCount",
       valueRecorded: false
     },
@@ -2315,10 +2316,10 @@ function buildActionChecklist(action, context = {}) {
   if (context.shouldReplacePlaceholders) {
     const locationSummary = formatEditLocationSummary(action.placeholderEditLocations);
     return [
-      `Edit current placeholder keys at ${locationSummary}.`,
-      "Replace only the listed current-action placeholders in the ignored local env file first.",
+      `Set private release-channel process env values for current placeholder keys at ${locationSummary}.`,
+      `Run \`${releaseChannelApplyPrivateEnvCommand}\` to apply only the listed current-action placeholders into the ignored local env file first.`,
       "Follow the current value-free key guidance for allowed channel and safe HTTPS URL constraints.",
-      `Rerun \`${rerunCommand}\` after editing.`,
+      `Rerun \`${rerunCommand}\` after applying the private env metadata.`,
       "Continue only when the current ready criteria pass in redacted evidence."
     ];
   }
@@ -2362,7 +2363,7 @@ function buildPriorityActions(remediation, context = {}) {
           ])
         : shouldReplacePlaceholders
           ? unique([
-              `Replace placeholder values in ${localEnvEditTarget} for the current release-channel keys (${placeholderKeys.length}): ${placeholderKeys.join(", ")}.`,
+              `Set private process env values for the current release-channel keys (${placeholderKeys.length}), then run ${releaseChannelApplyPrivateEnvCommand} to update ${localEnvEditTarget}: ${placeholderKeys.join(", ")}.`,
               `The full local env still has ${localEnvPlaceholderKeyCount} placeholder keys across all external distribution groups.`,
               "Keep those private values out of committed files and generated reports.",
               group.operatorActions ?? []
@@ -4883,9 +4884,9 @@ check(
 );
 check(
   nextActionsReport.postEditProofSequenceReceiptRows.some(
-    (row) => row.step === "Private value edit" && row.command === `manual edit ${nextActionsReport.currentEnvEditTarget}`
+    (row) => row.step === "Private value edit" && row.command === releaseChannelApplyPrivateEnvCommand
   ),
-  "external next actions post-edit proof sequence should include private value edit"
+  "external next actions post-edit proof sequence should include the private env apply helper"
 );
 check(
   nextActionsReport.postEditProofSequenceReceiptRows.some(
@@ -5662,8 +5663,8 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
     "release channel metadata should map acceptance blockers to placeholder, private-input, and channel-QA source fields"
   );
   check(
-    nextActionsReport.currentActionAcceptanceBlockerRows.some((row) => row.operatorAction.includes("Replace current release-channel placeholder keys")),
-    "release channel metadata should include placeholder replacement operator action in acceptance blockers"
+    nextActionsReport.currentActionAcceptanceBlockerRows.some((row) => row.operatorAction.includes(releaseChannelApplyPrivateEnvCommand)),
+    "release channel metadata should include private env apply helper operator action in acceptance blockers"
   );
   check(nextActionsReport.currentActionPostEditVerificationReady === true, "release channel metadata should include ready post-edit verification receipt while placeholders remain");
   check(nextActionsReport.currentActionPostEditVerificationRowCount === 3, "release channel metadata should surface three post-edit verification rows when placeholders remain");
@@ -5877,9 +5878,9 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   );
   check(
     nextActionsReport.postEditProofSequenceReceiptRows.some(
-      (row) => row.step === "Private value edit" && row.command === `manual edit ${nextActionsReport.currentEnvEditTarget}`
+      (row) => row.step === "Private value edit" && row.command === releaseChannelApplyPrivateEnvCommand
     ),
-    "release channel metadata post-edit proof sequence should include private value edit"
+    "release channel metadata post-edit proof sequence should include the private env apply helper"
   );
   check(
     nextActionsReport.postEditProofSequenceReceiptRows.some(
@@ -5998,18 +5999,18 @@ if (nextActionsReport.bootstrapMode === false && nextActionsReport.localEnvPlace
   );
   check(nextActionsReport.currentEnvKeyGuidance.some((item) => item.key === "GROOVEFORGE_DISTRIBUTION_CHANNEL" && item.guidance.includes("managed-release")), "release channel metadata should keep channel value guidance when placeholders remain");
   check(nextActionsReport.currentEnvKeyGuidance.some((item) => item.key === "GROOVEFORGE_SUPPORT_URL" && item.guidance.includes("no credentials")), "release channel metadata should keep safe URL guidance when placeholders remain");
-  check(nextActionsReport.currentOperatorAction.includes("Replace placeholder values"), "release channel metadata should surface placeholder replacement as the current operator action when placeholders remain");
+  check(nextActionsReport.currentOperatorAction.includes(releaseChannelApplyPrivateEnvCommand), "release channel metadata should surface private env apply helper as the current operator action when placeholders remain");
   check(nextActionsReport.currentOperatorAction.includes(nextActionsReport.currentEnvEditTarget), "release channel metadata should include the env edit target when placeholders remain");
   check(nextActionsReport.currentOperatorAction.includes("current release-channel keys (4)"), "release channel metadata should focus placeholder replacement on current action keys");
-  check(nextActionsReport.currentActionChecklist.some((item) => item.includes("Edit current placeholder keys at")), "release channel metadata should include edit locations in the current action checklist");
+  check(nextActionsReport.currentActionChecklist.some((item) => item.includes(releaseChannelApplyPrivateEnvCommand)), "release channel metadata should include the private env apply helper in the current action checklist");
   check(
     nextActionsReport.currentActionChecklist.some((item) => item.includes("release:current-blocker")),
     "release channel metadata should include current-blocker refresh in the current action checklist"
   );
   check(releaseChannelAction?.nextCommand === "npm run release:doctor", "release channel metadata should rerun release doctor after placeholder cleanup");
   check(
-    releaseChannelAction?.operatorActions.some((action) => action.includes(`Replace placeholder values in ${nextActionsReport.currentEnvEditTarget}`)),
-    "release channel metadata should tell operators to replace placeholder values"
+    releaseChannelAction?.operatorActions.some((action) => action.includes(releaseChannelApplyPrivateEnvCommand) && action.includes(nextActionsReport.currentEnvEditTarget)),
+    "release channel metadata should tell operators to run the private env apply helper"
   );
   check(
     releaseChannelAction?.firstBlocker.includes("placeholder keys"),

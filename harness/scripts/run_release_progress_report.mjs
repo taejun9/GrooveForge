@@ -27,6 +27,7 @@ const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson
 const failures = [];
 const fromExisting = process.argv.includes("--from-existing");
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 
 function check(condition, message) {
   if (!condition) {
@@ -831,8 +832,8 @@ function buildPostEditProofSequenceReceiptSummary(report) {
       order: 1,
       step: "Private value edit",
       ready: envEditTarget.length > 0 && placeholderKeyCount >= 0,
-      command: `manual edit ${envEditTarget}`,
-      expectedEvidence: "current release-channel placeholder key count becomes 0 after the operator-owned edit",
+      command: releaseChannelApplyPrivateEnvCommand,
+      expectedEvidence: `operator-owned process env metadata is applied into ${envEditTarget}; current release-channel placeholder key count becomes 0`,
       sourceField: "externalProofBundleCurrentEnvEditTarget/externalProofBundleCurrentPlaceholderKeyCount",
       valueRecorded: false
     },
@@ -2515,9 +2516,9 @@ check(releaseProgressReport.postEditProofSequenceReceiptRows.every((row) => type
 check(releaseProgressReport.postEditProofSequenceReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release progress report post-edit proof sequence rows should include source fields");
 check(
   releaseProgressReport.postEditProofSequenceReceiptRows.some(
-    (row) => row.step === "Private value edit" && row.command === `manual edit ${releaseProgressReport.externalProofBundleCurrentEnvEditTarget}`
+    (row) => row.step === "Private value edit" && row.command === releaseChannelApplyPrivateEnvCommand
   ),
-  "release progress report post-edit proof sequence should include private value edit"
+  "release progress report post-edit proof sequence should include the private env apply helper"
 );
 check(releaseProgressReport.postEditProofSequenceReceiptRows.some((row) => row.step === "Recommended strict proof chain" && row.command === recommendedPrivateEditOperatorProofCommand), "release progress report post-edit proof sequence should include recommended strict proof chain");
 check(releaseProgressReport.postEditProofSequenceReceiptRows.some((row) => row.step === "Release doctor proof" && row.command === "npm run release:doctor"), "release progress report post-edit proof sequence should include release doctor proof");
