@@ -261,6 +261,14 @@ function checkpointFieldRows(report) {
     ["proof bundle refresh command", report.checkpointProofBundleRefreshCommand],
     ["external gate refresh command", report.checkpointExternalGateRefreshCommand],
     ["proof/gate rows value-free", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointProofGateRowsValueFree) : "not due"],
+    ["current operator sequence ready", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorCommandSequenceReady) : "not due"],
+    ["current operator first command", report.checkpointCurrentOperatorFirstCommand],
+    ["current operator first command matches summary", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorFirstCommandMatchesSummary) : "not due"],
+    ["current operator first command is guided setup", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorFirstCommandIsGuidedSetup) : "not due"],
+    ["current operator rows contain guided setup", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorRowsContainGuidedSetup) : "not due"],
+    ["current operator rows value-free", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorRowsValueFree) : "not due"],
+    ["current operator preflight before apply", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorPreflightBeforeApply) : "not due"],
+    ["current operator apply before strict proof", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorApplyBeforeStrictProof) : "not due"],
     ["rows value-free", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointRowsValueFree) : "not due"],
     ["private values recorded", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointPrivateValuesRecorded) : "not due"],
     ["auto-update claimed", report.tenPlanCheckpointRequired ? readyLabel(report.checkpointClaimedAutoUpdate) : "not due"],
@@ -477,6 +485,15 @@ function buildReport({ progressRefresh, completionSummary, checkpoint, gitContex
     checkpointExternalGateRefreshCommand: checkpointRequired ? textValue(checkpoint?.sourceExternalGateRefreshCommand) : "not due",
     checkpointProofGateRefreshRowCount: checkpointRequired ? integerValue(checkpoint?.sourceProofGateRefreshRowCount) : 0,
     checkpointProofGateRowsValueFree: checkpointRequired ? checkpoint?.sourceProofGateRefreshRowsValueFree === true : true,
+    checkpointCurrentOperatorCommandSequenceReady: checkpointRequired ? checkpoint?.currentOperatorCommandSequenceReady === true : false,
+    checkpointCurrentOperatorCommandRowCount: checkpointRequired ? integerValue(checkpoint?.currentOperatorCommandRowCount) : 0,
+    checkpointCurrentOperatorFirstCommand: checkpointRequired ? textValue(checkpoint?.currentOperatorFirstCommand) : "not due",
+    checkpointCurrentOperatorFirstCommandMatchesSummary: checkpointRequired ? textValue(checkpoint?.currentOperatorFirstCommand) === textValue(completionSummary.currentOperatorFirstCommand) : false,
+    checkpointCurrentOperatorFirstCommandIsGuidedSetup: checkpointRequired ? checkpoint?.currentOperatorFirstCommandIsGuidedSetup === true : false,
+    checkpointCurrentOperatorRowsContainGuidedSetup: checkpointRequired ? checkpoint?.currentOperatorCommandRowsContainGuidedSetup === true : false,
+    checkpointCurrentOperatorRowsValueFree: checkpointRequired ? checkpoint?.currentOperatorCommandRowsValueFree === true : true,
+    checkpointCurrentOperatorPreflightBeforeApply: checkpointRequired ? checkpoint?.currentOperatorPreflightBeforeApply === true : false,
+    checkpointCurrentOperatorApplyBeforeStrictProof: checkpointRequired ? checkpoint?.currentOperatorApplyBeforeStrictProof === true : false,
     checkpointRowsValueFree: checkpointRequired ? checkpointRowsValueFree(checkpoint) : true,
     checkpointPrivateValuesRecorded: checkpointRequired ? checkpoint?.privateValuesRecorded === true || checkpoint?.valueRecorded === true : false,
     checkpointClaimedAutoUpdate: checkpointRequired ? checkpoint?.claimedAutoUpdate === true : false,
@@ -617,6 +634,15 @@ ${formatCompletionBlockerFocusRows(report.completionBlockerFocusRows)}
 - Checkpoint proof bundle refresh command: \`${report.checkpointProofBundleRefreshCommand}\`
 - Checkpoint external gate refresh command: \`${report.checkpointExternalGateRefreshCommand}\`
 - Checkpoint proof/gate rows value-free: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointProofGateRowsValueFree) : "not due"}
+- Checkpoint current operator sequence ready: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorCommandSequenceReady) : "not due"}
+- Checkpoint current operator rows: ${report.tenPlanCheckpointRequired ? report.checkpointCurrentOperatorCommandRowCount : "not due"}
+- Checkpoint current operator first command: \`${report.checkpointCurrentOperatorFirstCommand}\`
+- Checkpoint current operator first command matches summary: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorFirstCommandMatchesSummary) : "not due"}
+- Checkpoint current operator first command is guided setup: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorFirstCommandIsGuidedSetup) : "not due"}
+- Checkpoint current operator rows contain guided setup: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorRowsContainGuidedSetup) : "not due"}
+- Checkpoint current operator rows value-free: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorRowsValueFree) : "not due"}
+- Checkpoint current operator preflight before apply: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorPreflightBeforeApply) : "not due"}
+- Checkpoint current operator apply before strict proof: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointCurrentOperatorApplyBeforeStrictProof) : "not due"}
 - Checkpoint rows value-free: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointRowsValueFree) : "not due"}
 - Checkpoint private values recorded: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointPrivateValuesRecorded) : "not due"}
 - Checkpoint auto-update claimed: ${report.tenPlanCheckpointRequired ? readyLabel(report.checkpointClaimedAutoUpdate) : "not due"}
@@ -798,6 +824,14 @@ function validateReport(report, markdown) {
     );
     check(report.checkpointProofGateRefreshRowCount === 2, "release completion summary refresh checkpoint should expose two proof/gate rows");
     check(report.checkpointProofGateRowsValueFree === true, "release completion summary refresh checkpoint proof/gate rows should be value-free");
+    check(report.checkpointCurrentOperatorCommandSequenceReady === true, "release completion summary refresh checkpoint should prove current operator sequence readiness");
+    check(report.checkpointCurrentOperatorCommandRowCount >= 5, "release completion summary refresh checkpoint should expose current operator rows");
+    check(report.checkpointCurrentOperatorFirstCommandMatchesSummary === true, "release completion summary refresh checkpoint current operator first command should match completion summary");
+    check(report.checkpointCurrentOperatorFirstCommandIsGuidedSetup === false, "release completion summary refresh checkpoint current operator first command should not be guided setup");
+    check(report.checkpointCurrentOperatorRowsContainGuidedSetup === false, "release completion summary refresh checkpoint current operator rows should not include guided setup");
+    check(report.checkpointCurrentOperatorRowsValueFree === true, "release completion summary refresh checkpoint current operator rows should be value-free");
+    check(report.checkpointCurrentOperatorPreflightBeforeApply === true, "release completion summary refresh checkpoint current operator sequence should place preflight before apply");
+    check(report.checkpointCurrentOperatorApplyBeforeStrictProof === true, "release completion summary refresh checkpoint current operator sequence should place apply before strict proof");
     check(report.checkpointRowsValueFree === true, "release completion summary refresh checkpoint rows should be value-free");
     check(report.checkpointPrivateValuesRecorded === false, "release completion summary refresh checkpoint should not record private values");
     check(report.checkpointClaimedAutoUpdate === false, "release completion summary refresh checkpoint should not claim auto-update");
@@ -820,6 +854,7 @@ function validateReport(report, markdown) {
   check(markdown.includes("## 10-Plan Checkpoint"), "release completion summary refresh Markdown should include checkpoint section");
   check(markdown.includes("## 10-Plan Checkpoint Rows"), "release completion summary refresh Markdown should include checkpoint rows");
   check(markdown.includes("Checkpoint proof/gate refresh ready:"), "release completion summary refresh Markdown should include checkpoint proof/gate readiness");
+  check(markdown.includes("Checkpoint current operator sequence ready:"), "release completion summary refresh Markdown should include checkpoint current operator readiness");
   check(markdown.includes("## Completion Blocker Action Receipt"), "release completion summary refresh Markdown should include blocker action receipt section");
   check(markdown.includes("## Completion Blocker Focus Rows"), "release completion summary refresh Markdown should include blocker focus rows");
   check(markdown.includes("Completion blocker action receipt ready: yes"), "release completion summary refresh Markdown should include blocker action receipt readiness");
@@ -872,6 +907,22 @@ async function main() {
   console.log(`- 10-plan checkpoint ready: ${checkpointReadyLabel(report)}`);
   console.log(`- 10-plan checkpoint artifact: ${report.tenPlanCheckpointJsonPath}`);
   console.log(`- 10-plan checkpoint proof/gate refresh ready: ${report.tenPlanCheckpointRequired ? (report.checkpointProofGateRefreshReady ? "yes" : "no") : "not due"}`);
+  console.log(
+    `- 10-plan checkpoint current operator sequence ready: ${
+      report.tenPlanCheckpointRequired ? (report.checkpointCurrentOperatorCommandSequenceReady ? "yes" : "no") : "not due"
+    }`
+  );
+  console.log(`- 10-plan checkpoint current operator first command: ${report.checkpointCurrentOperatorFirstCommand}`);
+  console.log(
+    `- 10-plan checkpoint current operator first command matches summary: ${
+      report.tenPlanCheckpointRequired ? (report.checkpointCurrentOperatorFirstCommandMatchesSummary ? "yes" : "no") : "not due"
+    }`
+  );
+  console.log(
+    `- 10-plan checkpoint current operator first command is guided setup: ${
+      report.tenPlanCheckpointRequired ? (report.checkpointCurrentOperatorFirstCommandIsGuidedSetup ? "yes" : "no") : "not due"
+    }`
+  );
   console.log(`- Git context: ${report.gitBranch}@${report.gitHeadShortSha} (${report.gitWorktreeName}, dirty ${report.gitDirty ? "yes" : "no"})`);
   console.log(`- User-facing completion: ${report.userFacingCompletionLabel}`);
   console.log(`- Remaining completion: ${report.userFacingRemainingLabel}`);
