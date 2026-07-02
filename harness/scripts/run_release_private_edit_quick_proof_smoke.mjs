@@ -23,6 +23,7 @@ const currentBlockerJsonPath = path.join(packageRoot, `${appName}-${packageJson.
 const failures = [];
 const recommendedOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const recommendedStrictFirstProofCommand = "npm run release:channel-live-check-strict";
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const releaseChannelMetadataKeys = [
   "GROOVEFORGE_DISTRIBUTION_CHANNEL",
@@ -156,42 +157,48 @@ function buildReport({ liveCheck, currentBlocker, refreshRows }) {
   const operatorProofRows = [
     {
       order: 1,
-      command: releaseChannelApplyPrivateEnvCommand,
-      role: "apply only operator-owned current release-channel metadata from process env into the ignored local env file",
+      command: releaseChannelApplyPrivateEnvPreflightCommand,
+      role: "verify operator-owned current release-channel metadata from process env before writing the ignored local env file",
       valueRecorded: false
     },
     {
       order: 2,
+      command: releaseChannelApplyPrivateEnvCommand,
+      role: "apply only operator-owned current release-channel metadata from process env into the ignored local env file after preflight passes",
+      valueRecorded: false
+    },
+    {
+      order: 3,
       command: recommendedOperatorProofCommand,
       role: "recommended one-command proof chain after replacing the four private release-channel placeholders",
       valueRecorded: false
     },
     {
-      order: 3,
+      order: 4,
       command: "npm run release:channel-live-check",
       role: "value-free shape/location check that passes while reporting any remaining blocker",
       valueRecorded: false
     },
     {
-      order: 4,
+      order: 5,
       command: recommendedStrictFirstProofCommand,
       role: "pass/fail proof for the four release-channel keys after private edits",
       valueRecorded: false
     },
     {
-      order: 5,
+      order: 6,
       command: "npm run release:post-edit-proof",
       role: "refresh live-check and current-blocker proof after the private edit",
       valueRecorded: false
     },
     {
-      order: 6,
+      order: 7,
       command: "npm run release:progress-refresh-smoke",
       role: "refresh user-facing completion and 10-plan progress receipts",
       valueRecorded: false
     },
     {
-      order: 7,
+      order: 8,
       command: "npm run release:external-check",
       role: "hard gate after every private and external proof is ready",
       valueRecorded: false
@@ -377,7 +384,13 @@ check(report.currentKeyRows.every((row) => row.proofCommand === recommendedStric
 check(report.currentPlaceholderKeyCount === report.currentPlaceholderKeys.length, "release private edit quick proof placeholder key count should match listed keys");
 check(report.privateEditQuickProofRecommendedOperatorProofCommand === recommendedOperatorProofCommand, "release private edit quick proof should recommend the strict proof chain operator command");
 check(report.privateEditQuickProofRecommendedFirstProofCommand === recommendedStrictFirstProofCommand, "release private edit quick proof should preserve the strict first proof command");
-check(report.operatorProofCommandRowCount === 7, "release private edit quick proof should include seven operator proof rows");
+check(report.operatorProofCommandRowCount === 8, "release private edit quick proof should include eight operator proof rows");
+check(report.operatorProofCommandRows.some((row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand), "release private edit quick proof should include preflight guidance before apply");
+check(
+  report.operatorProofCommandRows.findIndex((row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand) <
+    report.operatorProofCommandRows.findIndex((row) => row.command === releaseChannelApplyPrivateEnvCommand),
+  "release private edit quick proof should place preflight before apply"
+);
 check(report.operatorProofCommandRows.some((row) => row.command === recommendedOperatorProofCommand), "release private edit quick proof should include strict proof chain guidance");
 check(report.operatorProofCommandRows.some((row) => row.command === recommendedStrictFirstProofCommand), "release private edit quick proof should include strict live-check guidance");
 check(report.operatorProofCommandRows.some((row) => row.command === "npm run release:post-edit-proof"), "release private edit quick proof should include post-edit proof guidance");

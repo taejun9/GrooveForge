@@ -293,8 +293,10 @@ function buildMarkdown(report) {
 - Local env prepared by wizard: ${readyLabel(report.prepareEnvRun)}
 - Real local env read: ${readyLabel(report.realLocalEnvRead)}
 - Real local env modified: ${readyLabel(report.realLocalEnvModified)}
+- Preflight command exit code: ${report.preflightExitCode}
 - Apply command exit code: ${report.applyExitCode}
 - Strict live-check exit code: ${report.strictLiveCheckExitCode}
+- Preflight ready: ${readyLabel(report.preflightReady)}
 - Apply ready: ${readyLabel(report.applyReady)}
 - Strict live-check ready: ${readyLabel(report.strictLiveCheckReady)}
 - Current ready rows: ${report.currentReadyKeyCount}/${report.currentRequiredKeyCount}
@@ -323,9 +325,10 @@ ${formatSyntheticRows(report.syntheticFixtureRows)}
 ## Command Chain
 
 1. \`${report.prepareEnvCommand}\` when the ignored local env is missing.
-2. \`${report.applyCommand}\` to write shape-ready private metadata into the ignored local env.
-3. \`${report.firstProofCommand}\` to prove the four release-channel rows are strict-ready.
-4. \`${report.recommendedOperatorProofCommand}\` for the full value-free proof chain after setup succeeds.
+2. \`${report.preflightCommand}\` to prove process-env private metadata is shape-ready before writing.
+3. \`${report.applyCommand}\` to write shape-ready private metadata into the ignored local env after preflight passes.
+4. \`${report.firstProofCommand}\` to prove the four release-channel rows are strict-ready.
+5. \`${report.recommendedOperatorProofCommand}\` for the full value-free proof chain after setup succeeds.
 
 ## Not Recorded
 
@@ -362,27 +365,38 @@ async function main() {
   const privateValueCandidates = [...inputValues.values()].filter((value) => value.trim().length >= 8);
   const prepareResult = inputReady ? await ensureRealLocalEnv(localEnvPath) : { prepareEnvRun: false, prepareEnvExitCode: null };
   const localEnvFileLoaded = existsSync(localEnvPath);
+  const preflightArgs = ["--preflight"];
+  if (forceOverwrite) {
+    preflightArgs.push("--force");
+  }
+  const preflightResult = inputReady && localEnvFileLoaded
+    ? runNodeScript("harness/scripts/run_release_channel_apply_private_env.mjs", preflightArgs, childEnvForApply(inputValues))
+    : { status: 1, stdout: "", stderr: "" };
   const applyArgs = syntheticSuccessSmoke ? ["--success-smoke"] : [];
   if (forceOverwrite) {
     applyArgs.push("--force");
   }
-  const applyResult = inputReady && localEnvFileLoaded
+  const applyResult = preflightResult.status === 0
     ? runNodeScript("harness/scripts/run_release_channel_apply_private_env.mjs", applyArgs, childEnvForApply(inputValues))
     : { status: 1, stdout: "", stderr: "" };
   const strictResult = applyResult.status === 0
     ? runNodeScript("harness/scripts/run_release_channel_live_check.mjs", ["--strict"], childEnvForLiveCheck())
     : { status: 1, stdout: "", stderr: "" };
+  const preflightOutput = `${preflightResult.stdout ?? ""}\n${preflightResult.stderr ?? ""}`;
   const applyOutput = `${applyResult.stdout ?? ""}\n${applyResult.stderr ?? ""}`;
   const strictOutput = `${strictResult.stdout ?? ""}\n${strictResult.stderr ?? ""}`;
-  const childOutput = `${prepareResult.prepareEnvOutput ?? ""}\n${applyOutput}\n${strictOutput}`;
+  const childOutput = `${prepareResult.prepareEnvOutput ?? ""}\n${preflightOutput}\n${applyOutput}\n${strictOutput}`;
+  const preflightReportStem = "release-channel-apply-private-env-preflight";
   const applyReportStem = syntheticSuccessSmoke
     ? "release-channel-apply-private-env-success-smoke"
     : "release-channel-apply-private-env";
   const liveCheckReportStem = syntheticSuccessSmoke
     ? "release-channel-live-check-strict-success-smoke"
     : "release-channel-live-check-strict";
+  const preflightJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${preflightReportStem}.json`);
   const applyJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${applyReportStem}.json`);
   const liveCheckJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-${liveCheckReportStem}.json`);
+  const preflightReport = existsSync(preflightJsonPath) ? JSON.parse(await readFile(preflightJsonPath, "utf8")) : null;
   const applyReport = existsSync(applyJsonPath) ? JSON.parse(await readFile(applyJsonPath, "utf8")) : null;
   const liveCheckReport = existsSync(liveCheckJsonPath) ? JSON.parse(await readFile(liveCheckJsonPath, "utf8")) : null;
   const syntheticFixtureRows = await readSyntheticEnvRows(localEnvPath);
@@ -415,6 +429,11 @@ async function main() {
     prepareEnvRun: prepareResult.prepareEnvRun,
     prepareEnvExitCode: prepareResult.prepareEnvExitCode,
     prepareEnvCommand: "npm run release:prepare-env",
+    preflightCommand: "npm run release:channel-apply-private-env-preflight",
+    preflightExitCode: preflightResult.status,
+    preflightReportReady: preflightReport?.releaseChannelPrivateEnvApplyPreflightReady === true,
+    preflightReady: preflightResult.status === 0 && preflightReport?.releaseChannelPrivateEnvApplyPreflightReady === true,
+    preflightReportPath: preflightReport ? relative(preflightJsonPath) : "none",
     applyCommand: "npm run release:channel-apply-private-env",
     applyExitCode: applyResult.status,
     applyReportReady: applyReport?.releaseChannelPrivateEnvApplyReady === true,
@@ -439,8 +458,10 @@ async function main() {
     releaseChannelSetupWizardReady:
       inputReady === true &&
       localEnvFileLoaded === true &&
+      preflightResult.status === 0 &&
       applyResult.status === 0 &&
       strictResult.status === 0 &&
+      preflightReport?.releaseChannelPrivateEnvApplyPreflightReady === true &&
       applyReport?.releaseChannelPrivateEnvApplyReady === true &&
       liveCheckReport?.strictReady === true &&
       currentReadyKeyCount === releaseChannelMetadataKeys.length,
@@ -476,6 +497,7 @@ async function main() {
   check(report.releaseGateClaimedExternalDistribution === false, "release-channel setup wizard should not claim external distribution");
   check(!syntheticSuccessSmoke || report.realLocalEnvRead === false, "release-channel setup wizard success smoke should not read real local env");
   check(!syntheticSuccessSmoke || report.realLocalEnvModified === false, "release-channel setup wizard success smoke should not modify real local env");
+  check(report.preflightCommand === "npm run release:channel-apply-private-env-preflight", "release-channel setup wizard should call the private env preflight helper");
   check(report.applyCommand === "npm run release:channel-apply-private-env", "release-channel setup wizard should call the private env apply helper");
   check(report.firstProofCommand === "npm run release:channel-live-check-strict", "release-channel setup wizard should run strict live check first");
   check(report.recommendedOperatorProofCommand === "npm run release:private-edit-strict-proof", "release-channel setup wizard should expose the full proof chain");
@@ -483,6 +505,7 @@ async function main() {
   check(!/https?:\/\//i.test(childOutput), "release-channel setup wizard child output should not include URL values");
   if (syntheticSuccessSmoke) {
     check(report.releaseChannelSetupWizardReady === true, "release-channel setup wizard success smoke should be ready");
+    check(report.preflightReady === true, "release-channel setup wizard success smoke should prove preflight readiness");
     check(report.applyReady === true, "release-channel setup wizard success smoke should prove apply readiness");
     check(report.strictLiveCheckReady === true, "release-channel setup wizard success smoke should prove strict live-check readiness");
     check(report.currentReadyKeyCount === 4, "release-channel setup wizard success smoke should produce four ready rows");
@@ -501,6 +524,7 @@ async function main() {
     console.error(`- Local env file loaded: ${readyLabel(report.localEnvFileLoaded)}`);
     console.error(`- Real local env read: ${readyLabel(report.realLocalEnvRead)}`);
     console.error(`- Real local env modified: ${readyLabel(report.realLocalEnvModified)}`);
+    console.error(`- Preflight ready: ${readyLabel(report.preflightReady)}`);
     console.error(`- Apply ready: ${readyLabel(report.applyReady)}`);
     console.error(`- Strict live-check ready: ${readyLabel(report.strictLiveCheckReady)}`);
     console.error(`- Current ready rows: ${report.currentReadyKeyCount}/${report.currentRequiredKeyCount}`);
@@ -523,6 +547,7 @@ async function main() {
   console.log(`- Local env prepared by wizard: ${readyLabel(report.prepareEnvRun)}`);
   console.log(`- Real local env read: ${readyLabel(report.realLocalEnvRead)}`);
   console.log(`- Real local env modified: ${readyLabel(report.realLocalEnvModified)}`);
+  console.log(`- Preflight ready: ${readyLabel(report.preflightReady)}`);
   console.log(`- Apply ready: ${readyLabel(report.applyReady)}`);
   console.log(`- Strict live-check ready: ${readyLabel(report.strictLiveCheckReady)}`);
   console.log(`- Current ready rows: ${report.currentReadyKeyCount}/${report.currentRequiredKeyCount}`);

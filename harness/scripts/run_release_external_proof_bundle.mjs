@@ -39,6 +39,7 @@ const proofBundleMarkdownPath = path.join(packageRoot, `${appName}-${packageJson
 const proofBundleJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-external-proof-bundle.json`);
 const hardExternalGateCommand = "npm run release:external-check";
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const args = new Set(process.argv.slice(2));
 const fromExisting = args.has("--from-existing");
@@ -210,7 +211,7 @@ function buildCurrentEnvSummary(externalNextActions) {
     postEditProofSequenceReceiptReady:
       externalNextActions?.postEditProofSequenceReceiptReady === true &&
       integerValue(externalNextActions?.postEditProofSequenceReceiptRowCount) === postEditProofSequenceReceiptRows.length &&
-      postEditProofSequenceReceiptRows.length === 8 &&
+      postEditProofSequenceReceiptRows.length === 9 &&
       postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false),
     postEditProofSequenceReceiptRowCount: integerValue(externalNextActions?.postEditProofSequenceReceiptRowCount),
     postEditProofSequenceReceiptSummary: textValue(externalNextActions?.postEditProofSequenceReceiptSummary, "none"),
@@ -760,10 +761,16 @@ check(summary.releaseChannelPostEditOperatorReceiptHardGateCommand === hardExter
 check(summary.releaseChannelPostEditOperatorReceiptValueRecorded === false, "release proof bundle post-edit operator receipt should not record values");
 check(summary.postEditProofSequenceReceiptReady === true, "release proof bundle should include ready post-edit proof sequence receipt");
 check(summary.postEditProofSequenceReceiptRowCount === summary.postEditProofSequenceReceiptRows.length, "release proof bundle post-edit proof sequence row count should match rows");
-check(summary.postEditProofSequenceReceiptRowCount === 8, "release proof bundle post-edit proof sequence should include eight rows");
+check(summary.postEditProofSequenceReceiptRowCount === 9, "release proof bundle post-edit proof sequence should include nine rows");
 check(summary.postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release proof bundle post-edit proof sequence rows should be ready and value-free");
 check(summary.postEditProofSequenceReceiptRows.every((row) => typeof row.expectedEvidence === "string" && row.expectedEvidence.length > 0), "release proof bundle post-edit proof sequence rows should include expected evidence");
 check(summary.postEditProofSequenceReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release proof bundle post-edit proof sequence rows should include source fields");
+check(
+  summary.postEditProofSequenceReceiptRows.some(
+    (row) => row.step === "Private value preflight" && row.command === releaseChannelApplyPrivateEnvPreflightCommand
+  ),
+  "release proof bundle post-edit proof sequence should include the private env preflight helper"
+);
 check(
   summary.postEditProofSequenceReceiptRows.some(
     (row) => row.step === "Private value edit" && row.command === releaseChannelApplyPrivateEnvCommand

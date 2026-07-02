@@ -34,7 +34,9 @@ const releaseChannelMetadataKeys = [
   "GROOVEFORGE_RELEASE_NOTES_URL",
   "GROOVEFORGE_SUPPORT_URL"
 ];
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
+const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const planNumberPattern = /^plan-(\d+)-[a-z0-9][a-z0-9-]*\.md$/;
 const failures = [];
 
@@ -102,7 +104,9 @@ function buildEditRows() {
 
 function buildSequenceRows() {
   return [
-    ["Private value edit", releaseChannelApplyPrivateEnvCommand, "operator-owned metadata becomes shape-ready"],
+    ["Private value preflight", releaseChannelApplyPrivateEnvPreflightCommand, "operator-owned metadata is shape-ready without writing the ignored local env file"],
+    ["Private value edit", releaseChannelApplyPrivateEnvCommand, "operator-owned metadata becomes shape-ready after preflight passes"],
+    ["Recommended strict proof chain", recommendedPrivateEditOperatorProofCommand, "strict live-check runs first, then post-edit proof and progress refresh run without recording private values"],
     ["Release doctor proof", "npm run release:doctor", "doctor current action clears release-channel placeholders"],
     ["Current-blocker refresh", "npm run release:current-blocker", "current blocker mirrors release-channel ready posture"],
     ["Next-actions refresh", "npm run release:next-actions", "next action advances beyond release-channel metadata"],

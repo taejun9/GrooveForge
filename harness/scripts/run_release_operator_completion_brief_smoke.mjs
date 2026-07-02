@@ -28,6 +28,7 @@ const currentBlockerSmokeCommand = "npm run release:current-blocker-smoke";
 const freshnessCommand = "npm run release:progress-freshness-smoke";
 const hardGateCommand = "npm run release:external-check";
 const privateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const failures = [];
 
@@ -305,19 +306,32 @@ function operatorBriefRows({ completionReportPacket, currentBlocker, progressFre
   return [
     {
       order: 1,
+      step: "Preflight private release-channel metadata",
+      command: releaseChannelApplyPrivateEnvPreflightCommand,
+      evidence: releaseChannelPosture.cleared
+        ? "release-channel metadata placeholders cleared in value-free receipts"
+        : releaseChannelPosture.needsIgnoredEnv
+          ? "ignored local distribution env is not loaded; release-channel setup must create it first"
+          : `${releaseChannelPosture.placeholderKeyCount} current release-channel placeholders remain`,
+      expectedPostEditSignal: `operator-owned process env metadata is shape-valid for ${currentEnvEditTarget}; ignored local env is not modified by preflight`,
+      sourceField: "currentBlocker.releaseChannelPrivateEnvApplyPreflightCommand",
+      valueRecorded: false
+    },
+    {
+      order: 2,
       step: "Edit private release-channel metadata",
       command: releaseChannelApplyPrivateEnvCommand,
       evidence: releaseChannelPosture.cleared
         ? "release-channel metadata placeholders cleared in value-free receipts"
         : releaseChannelPosture.needsIgnoredEnv
           ? "ignored local distribution env is not loaded; release-channel setup must create it first"
-          : `${releaseChannelPosture.placeholderKeyCount} current release-channel placeholders remain`,
+          : `${releaseChannelPosture.placeholderKeyCount} current release-channel placeholders remain after preflight is required`,
       expectedPostEditSignal: `operator-owned process env metadata applies into ${currentEnvEditTarget}; release-channel metadata placeholders clear in value-free receipts`,
       sourceField: "currentBlocker.releaseChannelLiveCheckCurrentPlaceholderKeyCount",
       valueRecorded: false
     },
     {
-      order: 2,
+      order: 3,
       step: "Run strict private-edit proof chain",
       command: privateEditOperatorProofCommand,
       evidence: textValue(completionReportPacket.privateEditProofCommandSummary),
@@ -326,7 +340,7 @@ function operatorBriefRows({ completionReportPacket, currentBlocker, progressFre
       valueRecorded: false
     },
     {
-      order: 3,
+      order: 4,
       step: "Refresh current blocker",
       command: currentBlockerCommand,
       evidence: textValue(currentBlocker.currentRerunCommand, currentBlockerCommand),
@@ -335,7 +349,7 @@ function operatorBriefRows({ completionReportPacket, currentBlocker, progressFre
       valueRecorded: false
     },
     {
-      order: 4,
+      order: 5,
       step: "Refresh completion packet",
       command: completionPacketCommand,
       evidence: textValue(completionReportPacket.latestTenPlanProgressLabel),
@@ -344,7 +358,7 @@ function operatorBriefRows({ completionReportPacket, currentBlocker, progressFre
       valueRecorded: false
     },
     {
-      order: 5,
+      order: 6,
       step: "Verify progress freshness",
       command: freshnessCommand,
       evidence: `${integerValue(progressFreshness.freshArtifactCount)}/${integerValue(progressFreshness.freshnessRowCount)} fresh; stale ${integerValue(progressFreshness.staleArtifactCount)}; missing ${integerValue(progressFreshness.missingArtifactCount)}`,
@@ -353,7 +367,7 @@ function operatorBriefRows({ completionReportPacket, currentBlocker, progressFre
       valueRecorded: false
     },
     {
-      order: 6,
+      order: 7,
       step: "Keep the hard gate last",
       command: hardGateCommand,
       evidence: `hard gate would fail: ${readyLabel(currentBlocker.hardGateWouldFail)}`,
@@ -539,7 +553,7 @@ function buildReport({ completionReportPacket, releaseProgress, currentBlocker, 
     integerValue(progressFreshness.missingArtifactCount) === 0 &&
     releaseChannelPosture.ready === true &&
     currentEditRowsReady === true &&
-    operatorRows.length === 6 &&
+    operatorRows.length === 7 &&
     operatorRows.every((row) => row.valueRecorded === false) &&
     proofRows.length === 5 &&
     proofRows.every((row) => row.valueRecorded === false) &&
@@ -685,8 +699,17 @@ check(
     report.currentEnvEditRows.every((row) => row.placeholder === true),
   "release operator completion brief blocked edit rows should be placeholders unless ignored env setup is required"
 );
-check(report.operatorBriefRowCount === 6, "release operator completion brief should include six operator rows");
+check(report.operatorBriefRowCount === 7, "release operator completion brief should include seven operator rows");
 check(report.operatorBriefRows.every((row) => row.valueRecorded === false), "release operator completion brief rows should be value-free");
+check(
+  report.operatorBriefRows.some((row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand),
+  "release operator completion brief should include the private env preflight command"
+);
+check(
+  report.operatorBriefRows.findIndex((row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand) <
+    report.operatorBriefRows.findIndex((row) => row.command === releaseChannelApplyPrivateEnvCommand),
+  "release operator completion brief should place private env preflight before apply"
+);
 check(report.privateEditOperatorProofCommand === privateEditOperatorProofCommand, "release operator completion brief should expose the private-edit strict proof command");
 check(report.privateEditProofCommandCount === 5, "release operator completion brief should include five private-edit proof commands");
 check(report.privateEditProofCommandRows.every((row) => row.valueRecorded === false), "release operator completion brief proof command rows should be value-free");

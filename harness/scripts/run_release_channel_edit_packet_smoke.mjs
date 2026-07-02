@@ -26,6 +26,7 @@ const releaseChannelMetadataKeys = [
 ];
 const recommendedOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const lowerLevelLiveCheckCommand = "npm run release:channel-live-check";
 const lowerLevelStrictProofCommand = "npm run release:channel-live-check-strict";
@@ -199,8 +200,14 @@ function operatorCommandRows(mode, currentEnvEditTarget) {
           },
           {
             order: 3,
+            command: releaseChannelApplyPrivateEnvPreflightCommand,
+            role: `verify the four private release-channel process env values before writing ${currentEnvEditTarget}`,
+            valueRecorded: false
+          },
+          {
+            order: 4,
             command: releaseChannelApplyPrivateEnvCommand,
-            role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget}`,
+            role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget} after preflight passes`,
             valueRecorded: false
           }
         ]
@@ -213,15 +220,21 @@ function operatorCommandRows(mode, currentEnvEditTarget) {
           },
           {
             order: 2,
+            command: releaseChannelApplyPrivateEnvPreflightCommand,
+            role: `verify the four private release-channel process env values before writing ${currentEnvEditTarget}`,
+            valueRecorded: false
+          },
+          {
+            order: 3,
             command: releaseChannelApplyPrivateEnvCommand,
-            role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget}`,
+            role: `apply the four private release-channel metadata values from process env into ${currentEnvEditTarget} after preflight passes`,
             valueRecorded: false
           }
         ];
   const followUpRows = [
     {
       command: recommendedOperatorProofCommand,
-      role: "recommended one-command strict proof chain after applying the four private release-channel metadata values",
+      role: "recommended one-command strict proof chain after preflight and apply for the four private release-channel metadata values",
       valueRecorded: false
     },
     {
@@ -360,6 +373,8 @@ function buildReport({ doctor, liveCheck, progress }) {
     operatorCommandSummary: commandSummary(operatorRows),
     releaseChannelSetupWizardCommand,
     releaseChannelSetupWizardCommandValueRecorded: false,
+    releaseChannelApplyPrivateEnvPreflightCommand,
+    releaseChannelApplyPrivateEnvPreflightCommandValueRecorded: false,
     releaseChannelApplyPrivateEnvCommand,
     releaseChannelRecommendedOperatorProofCommand: recommendedOperatorProofCommand,
     releaseChannelRecommendedOperatorProofCommandRole:
@@ -457,6 +472,7 @@ function buildMarkdown(report) {
 - Refresh command order: ${report.refreshCommandSummary}
 - Operator command order: ${report.operatorCommandSummary}
 - Guided setup wizard command: \`${report.releaseChannelSetupWizardCommand}\`
+- Private metadata preflight command: \`${report.releaseChannelApplyPrivateEnvPreflightCommand}\`
 - First private metadata apply command: \`${report.releaseChannelApplyPrivateEnvCommand}\`
 - Recommended operator proof chain: \`${report.releaseChannelRecommendedOperatorProofCommand}\`
 - Recommended operator proof role: ${report.releaseChannelRecommendedOperatorProofCommandRole}
@@ -528,14 +544,31 @@ function validateReport(report, markdown) {
     "release-channel edit packet should include the setup wizard"
   );
   check(
+    report.operatorCommandRows.some((row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand),
+    "release-channel edit packet should include the private env preflight helper"
+  );
+  check(
     report.operatorCommandRows.some((row) => row.command === releaseChannelApplyPrivateEnvCommand),
     "release-channel edit packet should include the private env apply helper"
+  );
+  check(
+    report.operatorCommandRows.findIndex((row) => row.command === releaseChannelApplyPrivateEnvPreflightCommand) <
+      report.operatorCommandRows.findIndex((row) => row.command === releaseChannelApplyPrivateEnvCommand),
+    "release-channel edit packet should place the private env preflight before apply"
   );
   check(
     !report.operatorCommandSummary.includes("manual edit"),
     "release-channel edit packet operator order should not use stale manual edit language"
   );
   check(report.releaseChannelApplyPrivateEnvCommand === releaseChannelApplyPrivateEnvCommand, "release-channel edit packet should expose the private env apply helper");
+  check(
+    report.releaseChannelApplyPrivateEnvPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand,
+    "release-channel edit packet should expose the private env preflight helper"
+  );
+  check(
+    report.releaseChannelApplyPrivateEnvPreflightCommandValueRecorded === false,
+    "release-channel edit packet private env preflight command should be value-free"
+  );
   check(report.releaseChannelSetupWizardCommand === releaseChannelSetupWizardCommand, "release-channel edit packet should expose the setup wizard");
   check(report.releaseChannelSetupWizardCommandValueRecorded === false, "release-channel edit packet setup wizard command should be value-free");
   check(

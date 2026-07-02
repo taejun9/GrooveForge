@@ -27,6 +27,7 @@ const releaseProgressJsonPath = path.join(packageRoot, `${appName}-${packageJson
 const failures = [];
 const fromExisting = process.argv.includes("--from-existing");
 const recommendedPrivateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 
 function check(condition, message) {
@@ -776,7 +777,7 @@ function buildPostEditProofSequenceReceiptSummary(report) {
     return {
       postEditProofSequenceReceiptReady:
         report.externalProofBundlePostEditProofSequenceReceiptReady === true &&
-        upstreamRows.length === 8 &&
+        upstreamRows.length === 9 &&
         upstreamRows.every((row) => row.ready === true && row.valueRecorded === false),
       postEditProofSequenceReceiptRowCount: upstreamRows.length,
       postEditProofSequenceReceiptSummary: textValue(
@@ -830,6 +831,15 @@ function buildPostEditProofSequenceReceiptSummary(report) {
   const rows = [
     {
       order: 1,
+      step: "Private value preflight",
+      ready: envEditTarget.length > 0 && placeholderKeyCount >= 0,
+      command: releaseChannelApplyPrivateEnvPreflightCommand,
+      expectedEvidence: `operator-owned process env metadata is shape-valid for ${envEditTarget}; ignored local env file is not modified`,
+      sourceField: "externalProofBundleCurrentEnvEditTarget/externalProofBundleCurrentPlaceholderKeyCount/releaseChannelApplyPrivateEnvPreflightCommand",
+      valueRecorded: false
+    },
+    {
+      order: 2,
       step: "Private value edit",
       ready: envEditTarget.length > 0 && placeholderKeyCount >= 0,
       command: releaseChannelApplyPrivateEnvCommand,
@@ -838,7 +848,7 @@ function buildPostEditProofSequenceReceiptSummary(report) {
       valueRecorded: false
     },
     {
-      order: 2,
+      order: 3,
       step: "Recommended strict proof chain",
       ready: recommendedPrivateEditOperatorProofCommand === "npm run release:private-edit-strict-proof",
       command: recommendedPrivateEditOperatorProofCommand,
@@ -847,7 +857,7 @@ function buildPostEditProofSequenceReceiptSummary(report) {
       valueRecorded: false
     },
     {
-      order: 3,
+      order: 4,
       step: "Release doctor proof",
       ready: doctorCommand === "npm run release:doctor",
       command: doctorCommand,
@@ -856,7 +866,7 @@ function buildPostEditProofSequenceReceiptSummary(report) {
       valueRecorded: false
     },
     {
-      order: 4,
+      order: 5,
       step: "Current-blocker refresh",
       ready: currentBlockerCommand === "npm run release:current-blocker",
       command: currentBlockerCommand,
@@ -865,7 +875,7 @@ function buildPostEditProofSequenceReceiptSummary(report) {
       valueRecorded: false
     },
     {
-      order: 5,
+      order: 6,
       step: "Next-actions refresh",
       ready: nextActionsCommand === "npm run release:next-actions",
       command: nextActionsCommand,
@@ -874,7 +884,7 @@ function buildPostEditProofSequenceReceiptSummary(report) {
       valueRecorded: false
     },
     {
-      order: 6,
+      order: 7,
       step: "Proof bundle refresh",
       ready: proofBundleCommand === "npm run release:proof-bundle",
       command: proofBundleCommand,
@@ -883,7 +893,7 @@ function buildPostEditProofSequenceReceiptSummary(report) {
       valueRecorded: false
     },
     {
-      order: 7,
+      order: 8,
       step: "Progress refresh",
       ready: progressCommand === "npm run release:progress-smoke",
       command: progressCommand,
@@ -892,7 +902,7 @@ function buildPostEditProofSequenceReceiptSummary(report) {
       valueRecorded: false
     },
     {
-      order: 8,
+      order: 9,
       step: "Hard-gate boundary",
       ready: hardGateCommand === "npm run release:external-check",
       command: hardGateCommand,
@@ -903,7 +913,7 @@ function buildPostEditProofSequenceReceiptSummary(report) {
   ];
 
   return {
-    postEditProofSequenceReceiptReady: rows.length === 8 && rows.every((row) => row.ready === true && row.valueRecorded === false),
+    postEditProofSequenceReceiptReady: rows.length === 9 && rows.every((row) => row.ready === true && row.valueRecorded === false),
     postEditProofSequenceReceiptRowCount: rows.length,
     postEditProofSequenceReceiptSummary: `${rows.length} value-free post-edit proof sequence rows`,
     postEditProofSequenceReceiptRows: rows,
@@ -1213,7 +1223,7 @@ function buildExternalProofBundleSummary(externalProofBundle) {
     externalProofBundlePostEditProofSequenceReceiptReady:
       externalProofBundle.postEditProofSequenceReceiptReady === true &&
       integerValue(externalProofBundle.postEditProofSequenceReceiptRowCount) === postEditProofSequenceReceiptRows.length &&
-      postEditProofSequenceReceiptRows.length === 8 &&
+      postEditProofSequenceReceiptRows.length === 9 &&
       postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false),
     externalProofBundlePostEditProofSequenceReceiptRowCount: integerValue(externalProofBundle.postEditProofSequenceReceiptRowCount),
     externalProofBundlePostEditProofSequenceReceiptSummary: textValue(externalProofBundle.postEditProofSequenceReceiptSummary, "none"),
@@ -2506,7 +2516,7 @@ check(
   "release progress report should mirror external proof post-edit proof sequence row count"
 );
 check(releaseProgressReport.postEditProofSequenceReceiptRowCount === releaseProgressReport.postEditProofSequenceReceiptRows.length, "release progress report post-edit proof sequence row count should match rows");
-check(releaseProgressReport.postEditProofSequenceReceiptRowCount === 8, "release progress report post-edit proof sequence receipt should include eight rows");
+check(releaseProgressReport.postEditProofSequenceReceiptRowCount === 9, "release progress report post-edit proof sequence receipt should include nine rows");
 check(
   sameJson(
     releaseProgressReport.postEditProofSequenceReceiptRows,
@@ -2517,6 +2527,12 @@ check(
 check(releaseProgressReport.postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release progress report post-edit proof sequence rows should be ready and value-free");
 check(releaseProgressReport.postEditProofSequenceReceiptRows.every((row) => typeof row.expectedEvidence === "string" && row.expectedEvidence.length > 0), "release progress report post-edit proof sequence rows should include expected evidence");
 check(releaseProgressReport.postEditProofSequenceReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release progress report post-edit proof sequence rows should include source fields");
+check(
+  releaseProgressReport.postEditProofSequenceReceiptRows.some(
+    (row) => row.step === "Private value preflight" && row.command === releaseChannelApplyPrivateEnvPreflightCommand
+  ),
+  "release progress report post-edit proof sequence should include the private env preflight helper"
+);
 check(
   releaseProgressReport.postEditProofSequenceReceiptRows.some(
     (row) => row.step === "Private value edit" && row.command === releaseChannelApplyPrivateEnvCommand

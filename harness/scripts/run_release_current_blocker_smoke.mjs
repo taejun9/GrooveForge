@@ -926,10 +926,10 @@ function currentActionAcceptanceBlockerRows({
 
       if (lower.includes("without placeholder values")) {
         sourceField = "externalProofBundle.currentPlaceholderKeys/currentPlaceholderEditLocations";
-        operatorAction = `Set private release-channel process env values, run ${releaseChannelApplyPrivateEnvCommand}, and update ${currentEnvEditTarget}: ${currentPlaceholderEditLocationSummary}.`;
+        operatorAction = `Set private release-channel process env values, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand} to update ${currentEnvEditTarget}: ${currentPlaceholderEditLocationSummary}.`;
       } else if (lower.includes("private-inputs") || lower.includes("private inputs")) {
         sourceField = "releaseDoctor.privateInputsReady/channelMetadataReady/privateValuesRecorded";
-        operatorAction = `Run ${currentNextCommand} after ${releaseChannelApplyPrivateEnvCommand} applies the current release-channel metadata placeholders.`;
+        operatorAction = `Run ${currentNextCommand} after ${releaseChannelApplyPrivateEnvPreflightCommand} verifies and ${releaseChannelApplyPrivateEnvCommand} applies the current release-channel metadata placeholders.`;
       } else if (lower.includes("distribution-channel qa")) {
         sourceField = "releaseDoctor.distributionChannelQaReady/channelMetadataReady/privateValuesRecorded";
         operatorAction = "Run npm run desktop:distribution-channel-qa-smoke after release doctor reports channel metadata ready.";
@@ -1838,7 +1838,7 @@ function buildReport({ releaseDoctor, externalNextActions, externalProofBundle, 
   const postEditProofSequenceReceiptReady =
     releaseProgress.postEditProofSequenceReceiptReady === true &&
     integerValue(releaseProgress.postEditProofSequenceReceiptRowCount) === postEditProofSequenceReceiptRows.length &&
-    postEditProofSequenceReceiptRows.length === 8 &&
+    postEditProofSequenceReceiptRows.length === 9 &&
     postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false);
   const updateFeedCheckpointRefreshCommandRows = valueFreeObjectRows(releaseProgress.updateFeedCheckpointRefreshCommandRows);
   const updateFeedCheckpointSourceArtifactRows = valueFreeObjectRows(releaseProgress.updateFeedCheckpointSourceArtifactRows);
@@ -3205,11 +3205,15 @@ function validateReport(report, { releaseDoctor, externalNextActions, externalPr
   check(report.postEditProofSequenceReceiptReady === releaseProgress.postEditProofSequenceReceiptReady, "release current blocker should mirror release progress post-edit proof sequence readiness");
   check(report.postEditProofSequenceReceiptRowCount === releaseProgress.postEditProofSequenceReceiptRowCount, "release current blocker should mirror release progress post-edit proof sequence row count");
   check(report.postEditProofSequenceReceiptRowCount === report.postEditProofSequenceReceiptRows.length, "release current blocker post-edit proof sequence row count should match rows");
-  check(report.postEditProofSequenceReceiptRowCount === 8, "release current blocker post-edit proof sequence receipt should include eight rows");
+  check(report.postEditProofSequenceReceiptRowCount === 9, "release current blocker post-edit proof sequence receipt should include nine rows");
   check(sameJson(report.postEditProofSequenceReceiptRows, valueFreeObjectRows(releaseProgress.postEditProofSequenceReceiptRows)), "release current blocker should mirror release progress post-edit proof sequence rows");
   check(report.postEditProofSequenceReceiptRows.every((row) => row.ready === true && row.valueRecorded === false), "release current blocker post-edit proof sequence rows should be ready and value-free");
   check(report.postEditProofSequenceReceiptRows.every((row) => typeof row.expectedEvidence === "string" && row.expectedEvidence.length > 0), "release current blocker post-edit proof sequence rows should include expected evidence");
   check(report.postEditProofSequenceReceiptRows.every((row) => typeof row.sourceField === "string" && row.sourceField.length > 0), "release current blocker post-edit proof sequence rows should include source fields");
+  check(
+    report.postEditProofSequenceReceiptRows.some((row) => row.step === "Private value preflight" && row.command === releaseChannelApplyPrivateEnvPreflightCommand),
+    "release current blocker post-edit proof sequence should include the private env preflight helper"
+  );
   check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Private value edit" && row.command === releaseChannelApplyPrivateEnvCommand), "release current blocker post-edit proof sequence should include the private env apply helper");
   check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Recommended strict proof chain" && row.command === recommendedPrivateEditOperatorProofCommand), "release current blocker post-edit proof sequence should include recommended strict proof chain");
   check(report.postEditProofSequenceReceiptRows.some((row) => row.step === "Release doctor proof" && row.command === "npm run release:doctor"), "release current blocker post-edit proof sequence should include release doctor proof");

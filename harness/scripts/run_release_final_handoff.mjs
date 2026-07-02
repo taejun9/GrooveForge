@@ -776,7 +776,7 @@ function validateReport(report, markdown) {
   check(report.currentEnvEditRows.every((row) => row.valueRecorded === false), "release final handoff edit rows should not record values");
   check(report.currentPlaceholderEditLocations.every((row) => row.valueRecorded === false), "release final handoff placeholder locations should not record values");
   check(report.postEditProofSequenceReceiptReady === true, "release final handoff should include ready post-edit proof sequence receipt");
-  check(report.postEditProofSequenceReceiptRowCount === 7, "release final handoff should include seven post-edit proof sequence rows");
+  check(report.postEditProofSequenceReceiptRowCount === 9, "release final handoff should include nine post-edit proof sequence rows");
   check(report.postEditProofSequenceReceiptRows.every((row) => row.valueRecorded === false), "release final handoff post-edit sequence rows should not record values");
   check(report.releaseChannelPostEditOperatorReceiptReady === true, "release final handoff should include ready post-edit operator receipt");
   check(report.releaseChannelPostEditOperatorReceiptRowCount === 6, "release final handoff should include six post-edit operator rows");

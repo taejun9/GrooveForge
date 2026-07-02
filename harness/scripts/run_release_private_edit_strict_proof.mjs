@@ -69,6 +69,7 @@ const releaseChannelMetadataKeys = [
   "GROOVEFORGE_RELEASE_NOTES_URL",
   "GROOVEFORGE_SUPPORT_URL"
 ];
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 
 function check(condition, message) {
@@ -319,7 +320,7 @@ function buildReport({
           placeholderKeyCount: integerValue(strictLiveCheck?.currentPlaceholderKeyCount),
           placeholderKeys: stringArrayValue(strictLiveCheck?.currentPlaceholderKeys),
           strictFailureRowCount: strictFailureRows.length,
-          manualAction: `set private release-channel process env values and run ${releaseChannelApplyPrivateEnvCommand}`,
+          manualAction: `set private release-channel process env values, run ${releaseChannelApplyPrivateEnvPreflightCommand}, then run ${releaseChannelApplyPrivateEnvCommand}`,
           returnCommand: successSmoke
             ? "npm run release:private-edit-strict-proof-success-smoke"
             : blockedSmoke

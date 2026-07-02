@@ -25,6 +25,7 @@ const autoUpdateTransitionJsonPath = path.join(packageRoot, `${appName}-${packag
 const updateFeedCheckpointJsonPath = path.join(packageRoot, `${appName}-${packageJson.version}-${platformArch}-release-update-feed-checkpoint-smoke.json`);
 const failures = [];
 const releaseChannelSetupWizardCommand = "npm run release:channel-setup-wizard";
+const releaseChannelApplyPrivateEnvPreflightCommand = "npm run release:channel-apply-private-env-preflight";
 const releaseChannelApplyPrivateEnvCommand = "npm run release:channel-apply-private-env";
 const privateEditOperatorProofCommand = "npm run release:private-edit-strict-proof";
 const refreshCommandRows = [
@@ -145,6 +146,11 @@ function objectRows(value) {
 
 function commandSummary(rows) {
   return rows.map((row) => row.command).join(" -> ");
+}
+
+function commandOrder(rows, command) {
+  const row = rows.find((candidate) => candidate.command === command);
+  return Number.isInteger(row?.order) ? row.order : 0;
 }
 
 function runNpmScript(command) {
@@ -287,6 +293,12 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
   const currentTenPlanWindowRowCount = currentTenPlanWindowRows.length;
   const currentTenPlanWindowRowSummary = planRowSummary(currentTenPlanWindowRows);
   const currentEnvEditTarget = textValue(channel.currentEnvEditTarget);
+  const channelEditOperatorCommandRows = objectRows(channel.operatorCommandRows);
+  const channelEditPreflightCommandOrder = commandOrder(
+    channelEditOperatorCommandRows,
+    releaseChannelApplyPrivateEnvPreflightCommand
+  );
+  const channelEditApplyCommandOrder = commandOrder(channelEditOperatorCommandRows, releaseChannelApplyPrivateEnvCommand);
   const privateEditProofCommandSummary = commandSummary(privateEditProofCommandRows);
   const privateEditOperatorProofCommandRole =
     "recommended strict-first proof chain after applying the four private release-channel metadata values";
@@ -898,6 +910,9 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     channelEditSetupWizardCommandValueRecorded: channel.releaseChannelSetupWizardCommandValueRecorded === false,
     channelEditRecommendedOperatorProofCommand: textValue(channel.releaseChannelRecommendedOperatorProofCommand),
     channelEditRecommendedOperatorProofCommandRole: textValue(channel.releaseChannelRecommendedOperatorProofCommandRole),
+    channelEditApplyPrivateEnvPreflightCommand: textValue(channel.releaseChannelApplyPrivateEnvPreflightCommand),
+    channelEditApplyPrivateEnvPreflightCommandValueRecorded:
+      channel.releaseChannelApplyPrivateEnvPreflightCommandValueRecorded === false,
     channelEditApplyPrivateEnvCommand: textValue(channel.releaseChannelApplyPrivateEnvCommand),
     channelEditRecommendedOperatorProofCommandValueRecorded:
       channel.releaseChannelRecommendedOperatorProofCommandValueRecorded === false,
@@ -989,6 +1004,14 @@ function buildReport({ audience, channel, privateEditBlockedSmoke, finalHandoff,
     currentFirstBlocker: textValue(channel.currentFirstBlocker),
     currentEnvEditTarget,
     releaseChannelEditPacketMode: textValue(channel.releaseChannelEditPacketMode),
+    releaseChannelEditPacketOperatorCommandRows: channelEditOperatorCommandRows,
+    releaseChannelEditPacketOperatorCommandRowCount: channelEditOperatorCommandRows.length,
+    releaseChannelEditPacketApplyPrivateEnvPreflightCommandOrder: channelEditPreflightCommandOrder,
+    releaseChannelEditPacketApplyPrivateEnvCommandOrder: channelEditApplyCommandOrder,
+    releaseChannelEditPacketApplyPrivateEnvPreflightBeforeApply:
+      channelEditPreflightCommandOrder > 0 &&
+      channelEditApplyCommandOrder > 0 &&
+      channelEditPreflightCommandOrder < channelEditApplyCommandOrder,
     releaseChannelEditPacketOperatorCommandSummary: textValue(channel.operatorCommandSummary),
     currentRequiredKeyCount: integerValue(channel.currentRequiredKeyCount),
     currentPlaceholderKeyCount: integerValue(channel.currentPlaceholderKeyCount),
@@ -1053,7 +1076,9 @@ function buildMarkdown(report) {
 - Channel edit packet setup wizard command: \`${report.channelEditSetupWizardCommand}\`
 - Channel edit packet recommended proof chain: \`${report.channelEditRecommendedOperatorProofCommand}\`
 - Channel edit packet proof role: ${report.channelEditRecommendedOperatorProofCommandRole}
+- Channel edit packet preflight command: \`${report.channelEditApplyPrivateEnvPreflightCommand}\`
 - Channel edit packet first apply command: \`${report.channelEditApplyPrivateEnvCommand}\`
+- Channel edit packet preflight before apply: ${readyLabel(report.releaseChannelEditPacketApplyPrivateEnvPreflightBeforeApply)}
 - Latest completed plan: plan-${report.latestCompletedPlanNumber}
 - Latest 10-plan progress: ${report.latestTenPlanProgressLabel}
 - 10-plan report due: ${readyLabel(report.tenPlanProgressReportDue)}
@@ -1303,6 +1328,14 @@ function validateReport(report, markdown) {
   check(report.channelEditRecommendedOperatorProofCommand === privateEditOperatorProofCommand, "release completion report packet should mirror the channel edit packet recommended proof chain");
   check(report.channelEditSetupWizardCommand === releaseChannelSetupWizardCommand, "release completion report packet should mirror the channel edit packet setup wizard");
   check(report.channelEditSetupWizardCommandValueRecorded === true, "release completion report packet should prove the channel edit packet setup wizard is value-free");
+  check(
+    report.channelEditApplyPrivateEnvPreflightCommand === releaseChannelApplyPrivateEnvPreflightCommand,
+    "release completion report packet should mirror the channel edit packet private env preflight helper"
+  );
+  check(
+    report.channelEditApplyPrivateEnvPreflightCommandValueRecorded === true,
+    "release completion report packet should prove the channel edit packet private env preflight helper is value-free"
+  );
   check(report.channelEditApplyPrivateEnvCommand === releaseChannelApplyPrivateEnvCommand, "release completion report packet should mirror the channel edit packet private env apply helper");
   check(
     report.channelEditRecommendedOperatorProofCommandRole === report.privateEditOperatorProofCommandRole,
@@ -1318,8 +1351,16 @@ function validateReport(report, markdown) {
     "release completion report packet should show the channel edit packet operator order includes the setup wizard"
   );
   check(
+    report.releaseChannelEditPacketOperatorCommandSummary.includes(releaseChannelApplyPrivateEnvPreflightCommand),
+    "release completion report packet should show the channel edit packet operator order includes the private env preflight helper"
+  );
+  check(
     report.releaseChannelEditPacketOperatorCommandSummary.includes(releaseChannelApplyPrivateEnvCommand),
     "release completion report packet should show the channel edit packet operator order includes the private env apply helper"
+  );
+  check(
+    report.releaseChannelEditPacketApplyPrivateEnvPreflightBeforeApply === true,
+    "release completion report packet should show the channel edit packet operator order places preflight before apply"
   );
   check(
     !report.releaseChannelEditPacketOperatorCommandSummary.includes("manual edit"),
@@ -1596,6 +1637,9 @@ console.log(`- Update-feed synthetic selected keys: ${report.updateFeedCheckpoin
 console.log(`- Update-feed synthetic placeholder keys: ${report.updateFeedCheckpointSyntheticPlaceholderKeyCount}`);
 console.log(`- Update-feed hard gate would fail: ${report.updateFeedCheckpointHardGateWouldFail ? "yes" : "no"}`);
 console.log(`- Channel edit packet recommended proof chain: ${report.channelEditRecommendedOperatorProofCommand}`);
+console.log(`- Channel edit packet preflight command: ${report.channelEditApplyPrivateEnvPreflightCommand}`);
+console.log(`- Channel edit packet apply command: ${report.channelEditApplyPrivateEnvCommand}`);
+console.log(`- Channel edit packet preflight before apply: ${report.releaseChannelEditPacketApplyPrivateEnvPreflightBeforeApply ? "yes" : "no"}`);
 console.log(`- Latest completed plan: plan-${report.latestCompletedPlanNumber}`);
 console.log(`- Latest 10-plan progress: ${report.latestTenPlanProgressLabel}`);
 console.log(`- 10-plan report due: ${report.tenPlanProgressReportDue ? "yes" : "no"}`);
